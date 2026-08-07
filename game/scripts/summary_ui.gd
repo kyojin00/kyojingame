@@ -6,7 +6,9 @@ extends CanvasLayer
 
 
 func _ready() -> void:
-	$Panel/V/OkBtn.pressed.connect(close)
+	$Panel/V/OkBtn.pressed.connect(func() -> void:
+		Sound.play_sfx("sfx_ui")
+		close())
 
 
 func open(title_text: String, body_text: String) -> void:

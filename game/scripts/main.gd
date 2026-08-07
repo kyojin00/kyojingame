@@ -42,6 +42,9 @@ var fishing_timer := 0.0
 var fishing_ui: CanvasLayer
 var pending_fish: Array = []
 var dialog: CanvasLayer
+var fade_rect: ColorRect
+var day_transitioning := false
+var particles: Array = []
 
 # 개발/CI용: KYOJIN_SHOT=경로 로 실행하면 잠시 후 스크린샷을 저장하고 종료한다.
 # KYOJIN_DAY=숫자, KYOJIN_WEATHER=0/1/2 로 시작 날짜/날씨를 강제할 수 있다.
@@ -131,7 +134,9 @@ func _ready() -> void:
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
 	sleep_dialog.ok_button_text = "잔다"
 	sleep_dialog.cancel_button_text = "안 잔다"
-	sleep_dialog.confirmed.connect(func() -> void: _next_day(false))
+	sleep_dialog.confirmed.connect(func() -> void:
+		Sound.play_sfx("sfx_sleep")
+		_fade_next_day(false))
 	add_child(sleep_dialog)
 
 	_shot_path = OS.get_environment("KYOJIN_SHOT")
@@ -145,11 +150,24 @@ func _ready() -> void:
 		_apply_save(loaded)
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
+		GameData.reset_all()
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
 		GameData.make_daily_quest()
+
+	# 페이드 전환 오버레이
+	var fade_layer := CanvasLayer.new()
+	fade_layer.layer = 50
+	add_child(fade_layer)
+	fade_rect = ColorRect.new()
+	fade_rect.color = Color(0, 0, 0, 1)
+	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fade_layer.add_child(fade_rect)
+	var tw := create_tween()
+	tw.tween_property(fade_rect, "color:a", 0.0, 0.5)
 
 
 func _load_textures() -> void:
@@ -292,6 +310,7 @@ func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Nod
 func _apply_season_visuals() -> void:
 	for s in tree_sprites:
 		s.texture = tex["tree_" + GameData.season_key()]
+	Sound.play_bgm(GameData.season_key())
 	queue_redraw()
 
 
@@ -367,6 +386,7 @@ func _start_fishing() -> void:
 	GameData.energy -= ENERGY_COST["rod"]
 	fishing_state = "waiting"
 	fishing_timer = randf_range(1.5, 4.0)
+	Sound.play_sfx("sfx_cast")
 
 
 func _update_fishing(delta: float) -> void:
@@ -375,6 +395,7 @@ func _update_fishing(delta: float) -> void:
 		if fishing_timer <= 0.0:
 			fishing_state = "bite"
 			fishing_timer = 0.9
+			Sound.play_sfx("sfx_bite")
 	elif fishing_state == "bite":
 		fishing_timer -= delta
 		if fishing_timer <= 0.0:
@@ -389,8 +410,11 @@ func _on_fishing_finished(success: bool) -> void:
 		GameData.items[id] += 1
 		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
 		GameData.today_harvest += 1
+		Sound.play_sfx("sfx_catch")
+		spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
 	else:
+		Sound.play_sfx("sfx_miss")
 		hud.show_message("놓쳤다...")
 
 
@@ -424,6 +448,7 @@ func use_tool() -> void:
 				cell.crop_day = 0
 				cell.dead = false
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_hoe", 0.1)
 				hud.show_message("시든 작물을 정리했다.")
 			elif obj != null:
 				hud.show_message("여기는 갈 수 없다.")
@@ -432,6 +457,7 @@ func use_tool() -> void:
 				cell.ground = "grass"
 				cell.watered = false
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_hoe", 0.1)
 			else:
 				var worked := false
 				for pos: Vector2i in _affected_tiles(t):
@@ -443,9 +469,11 @@ func use_tool() -> void:
 					c.ground = "soil"
 					if weather_now() == GameData.WEATHER_RAIN:
 						c.watered = true
+					spawn_particles(pos, "dirt")
 					worked = true
 				if worked:
 					GameData.energy -= cost
+					Sound.play_sfx("sfx_hoe", 0.1)
 		"water":
 			var worked := false
 			for pos: Vector2i in _affected_tiles(t):
@@ -454,9 +482,11 @@ func use_tool() -> void:
 				var c: Dictionary = grid[pos.y][pos.x]
 				if c.ground == "soil" and not c.watered and not objects.has(pos):
 					c.watered = true
+					spawn_particles(pos, "water")
 					worked = true
 			if worked:
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_water", 0.1)
 			elif grid[t.y][t.x].ground != "soil":
 				hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
@@ -481,6 +511,8 @@ func use_tool() -> void:
 			if weather_now() == GameData.WEATHER_RAIN:
 				cell.watered = true
 			GameData.energy -= cost
+			Sound.play_sfx("sfx_seed", 0.1)
+			spawn_particles(t, "seed")
 		"hand":
 			if cell.crop_id != "":
 				if cell.dead:
@@ -494,6 +526,8 @@ func use_tool() -> void:
 					cell.crop_id = ""
 					cell.crop_day = 0
 					GameData.energy -= cost
+					Sound.play_sfx("sfx_harvest")
+					spawn_particles(t, "sparkle")
 				else:
 					hud.show_message("아직 다 자라지 않았다.")
 		"axe":
@@ -503,6 +537,8 @@ func use_tool() -> void:
 			if obj.kind == "tree":
 				obj.hp -= 1
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_chop", 0.15)
+				spawn_particles(t, "wood")
 				if obj.hp <= 0:
 					_remove_object(t)
 					GameData.wood += WOOD_PER_TREE
@@ -513,6 +549,7 @@ func use_tool() -> void:
 				_remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_place")
 				hud.show_message("울타리를 회수했다.")
 			else:
 				hud.show_message("도끼로 벨 수 없다.")
@@ -523,6 +560,8 @@ func use_tool() -> void:
 			if obj.kind == "rock":
 				obj.hp -= 1
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_pick", 0.15)
+				spawn_particles(t, "stone")
 				if obj.hp <= 0:
 					_remove_object(t)
 					GameData.stone += STONE_PER_ROCK
@@ -534,6 +573,7 @@ func use_tool() -> void:
 				GameData.wood += GameData.SPRINKLER_COST_WOOD
 				GameData.stone += GameData.SPRINKLER_COST_STONE
 				GameData.energy -= cost
+				Sound.play_sfx("sfx_place")
 				hud.show_message("스프링클러를 회수했다.")
 			else:
 				hud.show_message("곡괭이로 캘 수 없다.")
@@ -547,6 +587,7 @@ func use_tool() -> void:
 			GameData.wood -= GameData.FENCE_COST_WOOD
 			_place_object(t, "fence", 0)
 			GameData.energy -= cost
+			Sound.play_sfx("sfx_place")
 		"sprinkler":
 			if obj != null or cell.ground == "water" or cell.crop_id != "" or t == player_tile():
 				hud.show_message("여기에는 설치할 수 없다.")
@@ -559,6 +600,7 @@ func use_tool() -> void:
 			GameData.stone -= GameData.SPRINKLER_COST_STONE
 			_place_object(t, "sprinkler", 0)
 			GameData.energy -= cost
+			Sound.play_sfx("sfx_place")
 			hud.show_message("스프링클러 설치! 매일 아침 주변 4칸에 물을 준다.")
 		"rod":
 			match fishing_state:
@@ -588,6 +630,7 @@ func interact() -> void:
 			hud.show_message("%s는 이미 만족스러워 보인다." % def.name)
 		else:
 			animal.fed = true
+			Sound.play_sfx("sfx_heart")
 			hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
 				[def.name, GameData.ITEMS[def.product].name])
 		return
@@ -657,12 +700,14 @@ func _give_gift(npc_id: String) -> void:
 		if GameData.produce[id] > 0:
 			GameData.produce[id] -= 1
 			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+			Sound.play_sfx("sfx_heart")
 			dialog.set_body("%s을(를) 선물했다! 정말 좋아한다. ♥" % GameData.CROPS[id].name)
 			return
 	for id in GameData.ITEM_IDS:
 		if GameData.items[id] > 0:
 			GameData.items[id] -= 1
 			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+			Sound.play_sfx("sfx_heart")
 			dialog.set_body("%s을(를) 선물했다! 정말 좋아한다. ♥" % GameData.ITEMS[id].name)
 			return
 	dialog.set_body("선물할 것이 없다... 수확물이나 생산물이 필요하다.")
@@ -701,6 +746,7 @@ func _turn_in_quest() -> void:
 	GameData.money += q.reward
 	GameData.today_earned += int(q.reward)
 	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
+	Sound.play_sfx("sfx_coin")
 	dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % q.reward)
 	GameData.quest = {}
 
@@ -731,6 +777,17 @@ func _find_free_tile_near(center: Vector2i) -> Vector2i:
 
 
 # ---- 하루 진행 ----
+
+func _fade_next_day(passed_out: bool) -> void:
+	if day_transitioning:
+		return
+	day_transitioning = true
+	var tw := create_tween()
+	tw.tween_property(fade_rect, "color:a", 1.0, 0.4)
+	tw.tween_callback(_next_day.bind(passed_out))
+	tw.tween_property(fade_rect, "color:a", 0.0, 0.4)
+	tw.tween_callback(func() -> void: day_transitioning = false)
+
 
 func _next_day(passed_out: bool) -> void:
 	# 물 준 작물 성장
@@ -909,14 +966,15 @@ func _apply_save(d: Dictionary) -> void:
 func _process(delta: float) -> void:
 	if not ui_open():
 		GameData.minutes += delta * MIN_PER_SEC
-		if GameData.minutes >= GameData.DAY_END:
-			_next_day(true)
+		if GameData.minutes >= GameData.DAY_END and not day_transitioning:
+			_fade_next_day(true)
 		water_timer += delta
 		if water_timer > 0.8:
 			water_timer = 0.0
 			water_frame = 1 - water_frame
 		_update_fishing(delta)
 	weather_time += delta
+	_update_particles(delta)
 	_update_night()
 	hud.refresh()
 	queue_redraw()
@@ -938,6 +996,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_cancel"):
 			shop.close()
 			summary.close()
+			dialog.close()
+		return
+	if event.is_action_pressed("ui_cancel"):
+		# 게임 메뉴: 저장 후 타이틀로
+		Sound.play_sfx("sfx_ui")
+		dialog.open("게임 메뉴", "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)", [
+			["저장 후 타이틀로", _back_to_title],
+			["계속하기", null],
+		])
 		return
 	if event.is_action_pressed("tool_1"):
 		set_tool("hoe")
@@ -974,6 +1041,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_click_at(get_canvas_transform().affine_inverse() * event.position)
 
 
+func _back_to_title() -> void:
+	save_now()
+	Sound.stop_bgm()
+	get_tree().change_scene_to_file("res://scenes/title.tscn")
+
+
 func _click_at(pos: Vector2) -> void:
 	# 플레이어 인접(또는 발밑) 타일 클릭 시 그 방향을 보고 도구를 쓴다.
 	var t := Vector2i(int(floor(pos.x / TILE)), int(floor(pos.y / TILE)))
@@ -990,6 +1063,45 @@ func _click_at(pos: Vector2) -> void:
 		use_tool()
 	elif d == Vector2i.ZERO:
 		use_tool()
+
+
+# ---- 파티클 ----
+
+const PARTICLE_DEFS := {
+	"water": [Color(0.45, 0.65, 1.0), 8, -18.0, 40.0],
+	"sparkle": [Color(1.0, 0.85, 0.3), 10, -45.0, 25.0],
+	"wood": [Color(0.55, 0.38, 0.2), 7, -35.0, 70.0],
+	"stone": [Color(0.62, 0.62, 0.68), 7, -35.0, 70.0],
+	"seed": [Color(0.4, 0.75, 0.35), 6, -28.0, 50.0],
+	"dirt": [Color(0.52, 0.4, 0.26), 6, -25.0, 60.0],
+}
+
+
+func spawn_particles(t: Vector2i, kind: String) -> void:
+	var d: Array = PARTICLE_DEFS[kind]
+	var center := Vector2(t.x * TILE + 8, t.y * TILE + 8)
+	for i in d[1]:
+		particles.append({
+			"p": center + Vector2(randf_range(-5, 5), randf_range(-4, 2)),
+			"v": Vector2(randf_range(-14, 14), d[2] + randf_range(-8, 8)),
+			"c": d[0],
+			"life": randf_range(0.3, 0.55),
+			"g": d[3],
+		})
+
+
+func _update_particles(delta: float) -> void:
+	if particles.is_empty():
+		return
+	var alive := []
+	for pt in particles:
+		pt.life -= delta
+		if pt.life <= 0.0:
+			continue
+		pt.v.y += pt.g * delta
+		pt.p += pt.v * delta
+		alive.append(pt)
+	particles = alive
 
 
 # ---- 렌더링 ----
@@ -1041,6 +1153,9 @@ func _draw() -> void:
 		var base := player.position + Vector2(-1, -46)
 		draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
 		draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
+
+	for pt in particles:
+		draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
 
 	_draw_context_hint()
 	_draw_weather()

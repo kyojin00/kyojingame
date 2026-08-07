@@ -175,6 +175,30 @@ func reset_daily() -> void:
 	today_spent = 0
 
 
+# 새 게임 시작 시 전체 초기화 (오토로드는 씬 전환에도 유지되므로 필수)
+func reset_all() -> void:
+	day = 1
+	minutes = DAY_START
+	money = 500
+	energy = ENERGY_MAX
+	tool = "hoe"
+	seed_index = 0
+	wood = 0
+	stone = 0
+	tool_level = {"hoe": 1, "water": 1}
+	quest = {}
+	fish_caught = {}
+	for id in CROP_IDS:
+		seeds[id] = 0
+		produce[id] = 0
+	for id in ITEM_IDS:
+		items[id] = 0
+	for k in affinity:
+		affinity[k] = 0
+	seeds["potato"] = 5
+	reset_daily()
+
+
 # ---- 계절/날씨 ----
 
 func season_of_day(d: int) -> int:

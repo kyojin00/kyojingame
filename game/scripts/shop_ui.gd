@@ -157,6 +157,7 @@ func _on_buy(id: String) -> void:
 	var price := GameData.seed_price(id)
 	if GameData.money < price:
 		return
+	Sound.play_sfx("sfx_coin")
 	GameData.money -= price
 	GameData.seeds[id] += 1
 	GameData.today_spent += price
@@ -166,6 +167,7 @@ func _on_buy(id: String) -> void:
 func _on_sell(id: String) -> void:
 	var def: Dictionary = GameData.CROPS[id]
 	var amount: int = def.sell_price * GameData.produce[id]
+	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.produce[id] = 0
@@ -175,6 +177,7 @@ func _on_sell(id: String) -> void:
 func _on_sell_item(id: String) -> void:
 	var def: Dictionary = GameData.ITEMS[id]
 	var amount: int = def.sell * GameData.items[id]
+	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.items[id] = 0
@@ -185,6 +188,7 @@ func _on_buy_animal(id: String) -> void:
 	var def: Dictionary = GameData.ANIMALS[id]
 	if GameData.money < def.price or main.animals.size() >= GameData.MAX_ANIMALS:
 		return
+	Sound.play_sfx("sfx_coin")
 	GameData.money -= def.price
 	GameData.today_spent += def.price
 	main.spawn_animal(id)
@@ -195,6 +199,7 @@ func _on_upgrade(id: String) -> void:
 	var up: Dictionary = GameData.UPGRADES[id]
 	if GameData.tool_level[id] >= 2 or GameData.money < up.money or GameData.wood < up.wood:
 		return
+	Sound.play_sfx("sfx_coin")
 	GameData.money -= up.money
 	GameData.wood -= up.wood
 	GameData.tool_level[id] = 2

@@ -8,6 +8,8 @@ var main: Node2D
 var dir := "down"
 var moving := false
 var anim_time := 0.0
+var step_timer := 0.0
+var step_alt := false
 
 @onready var sprite: Sprite2D = $Sprite
 
@@ -37,6 +39,13 @@ func _process(delta: float) -> void:
 		if not _blocked(position + Vector2(0, v.y)):
 			position.y += v.y
 		anim_time += delta
+		step_timer -= delta
+		if step_timer <= 0.0:
+			step_timer = 0.33
+			step_alt = not step_alt
+			Sound.play_sfx("sfx_step1" if step_alt else "sfx_step0", 0.2)
+	else:
+		step_timer = 0.15
 	_update_sprite()
 
 
