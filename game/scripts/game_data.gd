@@ -37,11 +37,84 @@ const CROP_IDS := [
 	"winter_radish",
 ]
 
-const ENERGY_MAX := 100.0
+const ENERGY_MAX := 100.0  # 체력 (동굴 전투용. 밖에서는 천천히 자연 회복)
 const DAY_START := 6.0 * 60.0   # 오전 6시
 const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
 const SAVE_PATH := "user://kyojin_farm_save.json"
+
+# ---- 화면 설정 ----
+const SETTINGS_PATH := "user://kyojin_display.json"
+const WINDOW_MODES := ["960x640", "1440x960", "1920x1280", "fullscreen"]
+var window_mode := "960x640"
+var _last_windowed := "960x640"
+
+
+func _ready() -> void:
+	load_settings()
+	apply_window_mode()
+
+
+func _input(event: InputEvent) -> void:
+	# F11: 전체 화면 토글 (어디서든)
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F11:
+		if window_mode == "fullscreen":
+			window_mode = _last_windowed
+		else:
+			_last_windowed = window_mode
+			window_mode = "fullscreen"
+		apply_window_mode()
+		save_settings()
+
+
+func apply_window_mode() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	if window_mode == "fullscreen":
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	var parts := window_mode.split("x")
+	if parts.size() != 2:
+		return
+	var size := Vector2i(int(parts[0]), int(parts[1]))
+	DisplayServer.window_set_size(size)
+	var screen := DisplayServer.screen_get_size()
+	DisplayServer.window_set_position(DisplayServer.screen_get_position()
+		+ (screen - size) / 2)
+
+
+func cycle_window_mode() -> void:
+	var i := WINDOW_MODES.find(window_mode)
+	window_mode = WINDOW_MODES[(i + 1) % WINDOW_MODES.size()]
+	if window_mode != "fullscreen":
+		_last_windowed = window_mode
+	apply_window_mode()
+	save_settings()
+
+
+func window_mode_label() -> String:
+	return "전체 화면" if window_mode == "fullscreen" else "창 " + window_mode
+
+
+func save_settings() -> void:
+	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify({"window": window_mode}))
+
+
+func load_settings() -> void:
+	if not FileAccess.file_exists(SETTINGS_PATH):
+		return
+	var f := FileAccess.open(SETTINGS_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(d) == TYPE_DICTIONARY and d.has("window"):
+		window_mode = str(d.window)
+		if window_mode != "fullscreen":
+			_last_windowed = window_mode
 
 var day := 1
 var minutes := DAY_START
@@ -87,6 +160,119 @@ const MOBS := {
 }
 var mob_kills := {}
 
+# ---- 능력치 (숙련도): 하다 보면 는다 ----
+const SKILLS := {
+	"farm": {"name": "농사", "effect": "작물 성장 +4%/Lv"},
+	"fish": {"name": "낚시", "effect": "입질 대기 -5%/Lv"},
+	"forest": {"name": "벌목", "effect": "목재 추가 +6%/Lv"},
+	"mine": {"name": "채광", "effect": "석재·광석 추가 +6%/Lv"},
+	"combat": {"name": "전투", "effect": "동굴 공격력 +0.5/Lv"},
+	"cook": {"name": "요리", "effect": "요리 회복량 +5%/Lv"},
+}
+const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook"]
+const SKILL_MAX_LV := 10
+var skills := {}
+
+
+func _reset_skills() -> void:
+	for id in SKILL_IDS:
+		skills[id] = {"lv": 1, "xp": 0.0}
+
+
+func skill_lv(id: String) -> int:
+	return int(skills[id].lv)
+
+
+func skill_xp_needed(lv: int) -> float:
+	return 30.0 + 20.0 * lv * lv
+
+
+# 경험치 추가. 레벨업하면 도달한 레벨을, 아니면 0을 반환
+func add_skill_xp(id: String, amount: float) -> int:
+	var s: Dictionary = skills[id]
+	if int(s.lv) >= SKILL_MAX_LV:
+		return 0
+	s.xp = float(s.xp) + amount
+	var leveled := 0
+	while int(s.lv) < SKILL_MAX_LV and float(s.xp) >= skill_xp_needed(int(s.lv)):
+		s.xp = float(s.xp) - skill_xp_needed(int(s.lv))
+		s.lv = int(s.lv) + 1
+		leveled = int(s.lv)
+	return leveled
+
+
+func farm_growth_mult() -> float:
+	var m := 1.0 + 0.04 * (skill_lv("farm") - 1)
+	if active_pet == "rabbit":
+		m += 0.05
+	return m
+
+
+func fish_wait_mult() -> float:
+	var m := maxf(0.55, 1.0 - 0.05 * (skill_lv("fish") - 1))
+	if active_pet == "cat":
+		m *= 0.85
+	return m
+
+
+# 벌목/채광 레벨에 따른 추가 획득 확률
+func bonus_drop_chance(id: String) -> float:
+	return 0.06 * (skill_lv(id) - 1)
+
+
+func combat_bonus() -> float:
+	return 0.5 * (skill_lv("combat") - 1)
+
+
+func cook_energy_mult() -> float:
+	return 1.0 + 0.05 * (skill_lv("cook") - 1)
+
+
+# ---- 집 꾸미기 가구 ----
+# solid: 지나갈 수 없는 가구 (러그/액자는 통과 가능)
+const FURNITURE := {
+	"table": {"name": "식탁", "price": 250, "w": 60, "h": 42, "solid": true},
+	"chair": {"name": "의자", "price": 80, "w": 14, "h": 16, "solid": true},
+	"chest": {"name": "궤짝", "price": 150, "w": 30, "h": 26, "solid": true},
+	"rug": {"name": "러그", "price": 120, "w": 88, "h": 40, "solid": false},
+	"plant": {"name": "화분", "price": 100, "w": 16, "h": 20, "solid": true},
+	"bookshelf": {"name": "책장", "price": 300, "w": 36, "h": 48, "solid": true},
+	"lamp": {"name": "램프", "price": 150, "w": 12, "h": 26, "solid": true},
+	"small_table": {"name": "탁자", "price": 140, "w": 28, "h": 24, "solid": true},
+}
+const FURNITURE_IDS := ["table", "chair", "chest", "rug", "plant", "bookshelf", "lamp", "small_table"]
+var furniture: Array = []  # [{id, x, y}]
+
+
+func default_furniture() -> Array:
+	return [
+		{"id": "rug", "x": 196.0, "y": 206.0},
+		{"id": "table", "x": 226.0, "y": 152.0},
+		{"id": "chair", "x": 208.0, "y": 162.0},
+		{"id": "chair", "x": 290.0, "y": 162.0},
+		{"id": "chest", "x": 344.0, "y": 110.0},
+	]
+
+# ---- 펫: 한 마리만 데리고 다니며 고유 패시브를 준다 ----
+const PETS := {
+	"dog": {"name": "강아지", "price": 2000, "passive": "이동 속도 +10%"},
+	"cat": {"name": "고양이", "price": 2000, "passive": "낚시 입질 대기 -15%"},
+	"owl": {"name": "부엉이", "price": 3500, "passive": "동굴 피해 -25%"},
+	"rabbit": {"name": "토끼", "price": 3000, "passive": "작물 성장 +5%"},
+}
+const PET_IDS := ["dog", "cat", "owl", "rabbit"]
+var owned_pets: Array = []
+var active_pet := ""
+
+
+func pet_speed_mult() -> float:
+	return 1.1 if active_pet == "dog" else 1.0
+
+
+func pet_cave_def_mult() -> float:
+	return 0.75 if active_pet == "owl" else 1.0
+
+
 # ---- 동물 ----
 const ANIMALS := {
 	"chicken": {"name": "닭", "price": 800, "product": "egg"},
@@ -104,8 +290,62 @@ const ITEMS := {
 	"fish_golden": {"name": "황금잉어", "sell": 300},
 	"ore": {"name": "광석", "sell": 50},
 	"gem": {"name": "보석", "sell": 220},
+	"dish_baked_potato": {"name": "구운 감자", "sell": 70},
+	"dish_soup": {"name": "야채 수프", "sell": 110},
+	"dish_jam": {"name": "딸기잼", "sell": 150},
+	"dish_cornbread": {"name": "옥수수빵", "sell": 130},
+	"dish_grilled_fish": {"name": "생선구이", "sell": 90},
+	"dish_stew": {"name": "매운탕", "sell": 200},
+	"dish_pie": {"name": "호박파이", "sell": 280},
+	"dish_salad": {"name": "치즈 샐러드", "sell": 170},
+	"dish_punch": {"name": "수박화채", "sell": 240},
+	"dish_eggplant": {"name": "가지볶음", "sell": 120},
 }
-const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden", "ore", "gem"]
+const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
+	"ore", "gem", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant"]
+
+# ---- 요리: 재료(작물/아이템) -> 요리 아이템. energy = 먹었을 때 회복량 ----
+const RECIPES := {
+	"dish_baked_potato": {"needs": {"potato": 2}, "energy": 30},
+	"dish_soup": {"needs": {"potato": 1, "carrot": 2}, "energy": 45},
+	"dish_jam": {"needs": {"strawberry": 3}, "energy": 35},
+	"dish_cornbread": {"needs": {"corn": 2}, "energy": 50},
+	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40},
+	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65},
+	"dish_pie": {"needs": {"pumpkin": 1, "egg": 1}, "energy": 80},
+	"dish_salad": {"needs": {"cabbage": 1, "milk": 1}, "energy": 55},
+	"dish_punch": {"needs": {"watermelon": 1, "strawberry": 1}, "energy": 60},
+	"dish_eggplant": {"needs": {"eggplant": 2}, "energy": 40},
+}
+const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant"]
+var recipes_cooked := {}  # 도감: id -> 만든 횟수
+
+
+# 재료 보유량 (작물이면 수확물, 아니면 아이템)
+func ingredient_count(id: String) -> int:
+	return int(produce[id]) if CROPS.has(id) else int(items[id])
+
+
+func can_cook(id: String) -> bool:
+	for k in RECIPES[id].needs:
+		if ingredient_count(k) < int(RECIPES[id].needs[k]):
+			return false
+	return true
+
+
+func cook(id: String) -> bool:
+	if not can_cook(id):
+		return false
+	for k in RECIPES[id].needs:
+		if CROPS.has(k):
+			produce[k] -= int(RECIPES[id].needs[k])
+		else:
+			items[k] -= int(RECIPES[id].needs[k])
+	items[id] += 1
+	recipes_cooked[id] = int(recipes_cooked.get(id, 0)) + 1
+	return true
 
 # 낚시: [아이템 id, 확률 가중치, 타이밍 존 폭(px)]
 const FISH := [
@@ -284,6 +524,8 @@ func _init() -> void:
 	for id in ITEM_IDS:
 		items[id] = 0
 	seeds["potato"] = 5
+	_reset_skills()
+	furniture = default_furniture()
 
 
 func reset_daily() -> void:
@@ -306,6 +548,9 @@ func reset_all() -> void:
 	quest = {}
 	fish_caught = {}
 	mob_kills = {}
+	recipes_cooked = {}
+	owned_pets = []
+	active_pet = ""
 	for id in CROP_IDS:
 		seeds[id] = 0
 		produce[id] = 0
@@ -314,6 +559,8 @@ func reset_all() -> void:
 	for k in affinity:
 		affinity[k] = 0
 	seeds["potato"] = 5
+	_reset_skills()
+	furniture = default_furniture()
 	tutorial = fresh_tutorial()
 	unlocked_tools = ["hoe"]  # 튜토리얼을 깨며 하나씩 해금
 	owned_parcels = ["home"]
@@ -421,6 +668,11 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,
+		"skills": skills,
+		"furniture": furniture,
+		"recipes_cooked": recipes_cooked,
+		"owned_pets": owned_pets,
+		"active_pet": active_pet,
 		"player": [player_pos.x, player_pos.y],
 		"grid": grid_data,
 		"objects": objects_data,
@@ -444,6 +696,9 @@ func build_stats() -> Dictionary:
 		"fish_caught": fish_caught, "mob_kills": mob_kills, "affinity": affinity,
 		"quest": quest, "tool_level": tool_level,
 		"owned_parcels": owned_parcels,
+		"skills": skills, "furniture": furniture,
+		"recipes_cooked": recipes_cooked,
+		"owned_pets": owned_pets, "active_pet": active_pet,
 	}
 
 
@@ -466,6 +721,13 @@ func apply_stats(d: Dictionary) -> void:
 	for k in d.get("tool_level", {}):
 		tool_level[k] = int(d.tool_level[k])
 	owned_parcels = d.get("owned_parcels", owned_parcels)
+	apply_skills_data(d.get("skills", {}))
+	if d.has("furniture"):
+		apply_furniture_data(d.furniture)
+	for k in d.get("recipes_cooked", {}):
+		recipes_cooked[k] = int(d.recipes_cooked[k])
+	owned_pets = d.get("owned_pets", owned_pets)
+	active_pet = str(d.get("active_pet", active_pet))
 	var q: Variant = d.get("quest", {})
 	if typeof(q) == TYPE_DICTIONARY:
 		if q.is_empty():
@@ -475,6 +737,20 @@ func apply_stats(d: Dictionary) -> void:
 				"crop": q.crop, "qty": int(q.qty),
 				"reward": int(q.reward), "accepted": bool(q.accepted),
 			}
+
+
+# JSON에서 읽은 스킬/가구 데이터를 타입을 맞춰 적용 (저장 로드·멀티 동기화 공용)
+func apply_skills_data(data: Dictionary) -> void:
+	for k in data:
+		if skills.has(k):
+			skills[k] = {"lv": int(data[k].lv), "xp": float(data[k].xp)}
+
+
+func apply_furniture_data(data: Array) -> void:
+	furniture = []
+	for f in data:
+		if FURNITURE.has(f.get("id", "")):
+			furniture.append({"id": f.id, "x": float(f.x), "y": float(f.y)})
 
 
 func load_game() -> Dictionary:

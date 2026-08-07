@@ -19,7 +19,6 @@ var current_bgm := ""
 var master_volume := 80.0
 var bgm_volume := 60.0
 var sfx_volume := 80.0
-var fullscreen := false
 
 
 func _ready() -> void:
@@ -84,16 +83,14 @@ func apply_settings() -> void:
 	AudioServer.set_bus_mute(0, master_volume <= 0.5)
 	AudioServer.set_bus_mute(1, bgm_volume <= 0.5)
 	AudioServer.set_bus_mute(2, sfx_volume <= 0.5)
-	DisplayServer.window_set_mode(
-		DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
+	# 창/전체화면 모드는 GameData.apply_window_mode()가 담당한다
 
 
 func save_settings() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify({
-			"master": master_volume, "bgm": bgm_volume,
-			"sfx": sfx_volume, "fullscreen": fullscreen,
+			"master": master_volume, "bgm": bgm_volume, "sfx": sfx_volume,
 		}))
 
 
@@ -109,4 +106,3 @@ func load_settings() -> void:
 	master_volume = float(d.get("master", master_volume))
 	bgm_volume = float(d.get("bgm", bgm_volume))
 	sfx_volume = float(d.get("sfx", sfx_volume))
-	fullscreen = bool(d.get("fullscreen", false))

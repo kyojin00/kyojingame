@@ -6,11 +6,6 @@ const MAP_H := 60
 const TILE := 16
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
-const ENERGY_COST := {
-	"hoe": 2.0, "water": 1.0, "seed": 1.0, "hand": 1.0,
-	"axe": 2.0, "pickaxe": 2.0, "fence": 1.0, "sprinkler": 1.0,
-	"rod": 2.0,
-}
 const TREE_HP := 3
 const ROCK_HP := 2
 const WOOD_PER_TREE := 3
@@ -61,7 +56,9 @@ var dialog: CanvasLayer
 var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
 var interior: CanvasLayer
+var cooking_ui: CanvasLayer
 var cave: CanvasLayer
+var pet: Node2D
 var fade_rect: ColorRect
 
 # ---- 멀티플레이 상태 ----
@@ -94,6 +91,8 @@ const TEXTURE_NAMES := [
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
+	"pet_dog_0", "pet_dog_1", "pet_cat_0", "pet_cat_1",
+	"pet_owl_0", "pet_owl_1", "pet_rabbit_0", "pet_rabbit_1",
 	"npc_merchant_down_0", "npc_merchant_down_1", "npc_merchant_up_0",
 	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
 	"npc_fisher_down_0", "npc_fisher_down_1", "npc_fisher_up_0",
@@ -165,6 +164,11 @@ func _ready() -> void:
 	world.add_child(player)
 	_setup_camera()
 
+	pet = preload("res://scripts/pet.gd").new()
+	pet.main = self
+	pet.position = player.position + Vector2(14, 4)
+	world.add_child(pet)
+
 	hud = preload("res://scenes/hud.tscn").instantiate()
 	hud.main = self
 	add_child(hud)
@@ -194,6 +198,10 @@ func _ready() -> void:
 	interior = preload("res://scripts/interior_ui.gd").new()
 	interior.main = self
 	add_child(interior)
+
+	cooking_ui = preload("res://scripts/cooking_ui.gd").new()
+	cooking_ui.main = self
+	add_child(cooking_ui)
 
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
@@ -537,6 +545,7 @@ func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
+		or cooking_ui.visible \
 		or (story_layer != null and story_layer.visible)
 
 
@@ -580,12 +589,8 @@ func _start_fishing() -> void:
 	if not can_use_tile(t):
 		hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
 		return
-	if GameData.energy < ENERGY_COST["rod"]:
-		hud.show_message("너무 지쳤다... 자러 가야 할 것 같다.")
-		return
-	GameData.energy -= ENERGY_COST["rod"]
 	fishing_state = "waiting"
-	fishing_timer = randf_range(1.5, 4.0)
+	fishing_timer = randf_range(1.5, 4.0) * GameData.fish_wait_mult()
 	Sound.play_sfx("sfx_cast")
 
 
@@ -603,6 +608,17 @@ func _update_fishing(delta: float) -> void:
 			hud.show_message("물고기가 도망갔다...")
 
 
+# 숙련도 경험치를 주고, 레벨업하면 하단에 알린다
+func gain_skill(id: String, amount: float) -> void:
+	var lv := GameData.add_skill_xp(id, amount)
+	if lv > 0:
+		Sound.play_sfx("sfx_catch")
+		hud.show_message("[능력치] %s Lv.%d 달성! (%s)" %
+			[GameData.SKILLS[id].name, lv, GameData.SKILLS[id].effect])
+	if lv > 0 and Net.is_host():
+		_broadcast_stats()
+
+
 func _on_fishing_finished(success: bool) -> void:
 	if success:
 		var id: String = pending_fish[0]
@@ -614,6 +630,7 @@ func _on_fishing_finished(success: bool) -> void:
 		spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
 		tutorial_notify("fish")
+		gain_skill("fish", 10.0)
 		if Net.is_guest():
 			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
 			GameData.items[id] -= 1
@@ -650,12 +667,7 @@ func use_tool() -> void:
 		return
 	var cell: Dictionary = grid[t.y][t.x]
 	var obj: Variant = objects.get(t)
-	var cost: float = ENERGY_COST[GameData.tool]
 	var seed_now := GameData.current_seed_id()
-
-	if GameData.energy < cost:
-		hud.show_message("너무 지쳤다... 자러 가야 할 것 같다.")
-		return
 
 	match GameData.tool:
 		"hoe":
@@ -664,7 +676,6 @@ func use_tool() -> void:
 				cell.crop_id = ""
 				cell.crop_day = 0
 				cell.dead = false
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_hoe", 0.1)
 				hud.show_message("시든 작물을 정리했다.")
 			elif obj != null:
@@ -674,7 +685,6 @@ func use_tool() -> void:
 				cell.ground = "grass"
 				cell.watered = false
 				cell.wet_min = 0.0
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_hoe", 0.1)
 			else:
 				var worked := false
@@ -690,7 +700,6 @@ func use_tool() -> void:
 					spawn_particles(pos, "dirt")
 					worked = true
 				if worked:
-					GameData.energy -= cost
 					Sound.play_sfx("sfx_hoe", 0.1)
 					tutorial_notify("till")
 		"water":
@@ -705,7 +714,6 @@ func use_tool() -> void:
 					spawn_particles(pos, "water")
 					worked = true
 			if worked:
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_water", 0.1)
 				tutorial_notify("water")
 			elif grid[t.y][t.x].ground != "soil":
@@ -731,10 +739,10 @@ func use_tool() -> void:
 			cell.dead = false
 			if weather_now() == GameData.WEATHER_RAIN:
 				_wet(cell, WET_ALL_DAY)
-			GameData.energy -= cost
 			Sound.play_sfx("sfx_seed", 0.1)
 			spawn_particles(t, "seed")
 			tutorial_notify("plant")
+			gain_skill("farm", 2.0)
 		"hand":
 			if cell.crop_id != "":
 				if cell.dead:
@@ -747,10 +755,10 @@ func use_tool() -> void:
 					hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
 					cell.crop_id = ""
 					cell.crop_day = 0.0
-					GameData.energy -= cost
 					Sound.play_sfx("sfx_harvest")
 					spawn_particles(t, "sparkle")
 					tutorial_notify("harvest")
+					gain_skill("farm", 8.0)
 				else:
 					hud.show_message("아직 다 자라지 않았다.")
 		"axe":
@@ -759,20 +767,22 @@ func use_tool() -> void:
 				return
 			if obj.kind == "tree":
 				obj.hp -= 3 if int(GameData.tool_level.get("axe", 1)) >= 2 else 1
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_chop", 0.15)
 				spawn_particles(t, "wood")
 				if obj.hp <= 0:
 					_remove_object(t)
-					GameData.wood += WOOD_PER_TREE
-					hud.show_message("나무를 베었다! 목재 +%d" % WOOD_PER_TREE)
+					var wood_got := WOOD_PER_TREE
+					if randf() < GameData.bonus_drop_chance("forest"):
+						wood_got += 1
+					GameData.wood += wood_got
+					hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
 					tutorial_notify("chop")
+					gain_skill("forest", 6.0)
 				else:
 					hud.show_message("나무를 찍었다. (%d/%d)" % [TREE_HP - obj.hp, TREE_HP])
 			elif obj.kind == "fence":
 				_remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_place")
 				hud.show_message("울타리를 회수했다.")
 			else:
@@ -783,21 +793,23 @@ func use_tool() -> void:
 				return
 			if obj.kind == "rock":
 				obj.hp -= 2 if int(GameData.tool_level.get("pickaxe", 1)) >= 2 else 1
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_pick", 0.15)
 				spawn_particles(t, "stone")
 				if obj.hp <= 0:
 					_remove_object(t)
-					GameData.stone += STONE_PER_ROCK
-					hud.show_message("돌을 캤다! 석재 +%d" % STONE_PER_ROCK)
+					var stone_got := STONE_PER_ROCK
+					if randf() < GameData.bonus_drop_chance("mine"):
+						stone_got += 1
+					GameData.stone += stone_got
+					hud.show_message("돌을 캤다! 석재 +%d" % stone_got)
 					tutorial_notify("mine")
+					gain_skill("mine", 6.0)
 				else:
 					hud.show_message("돌을 내리쳤다. (%d/%d)" % [ROCK_HP - obj.hp, ROCK_HP])
 			elif obj.kind == "sprinkler":
 				_remove_object(t)
 				GameData.wood += GameData.SPRINKLER_COST_WOOD
 				GameData.stone += GameData.SPRINKLER_COST_STONE
-				GameData.energy -= cost
 				Sound.play_sfx("sfx_place")
 				hud.show_message("스프링클러를 회수했다.")
 			else:
@@ -811,7 +823,6 @@ func use_tool() -> void:
 				return
 			GameData.wood -= GameData.FENCE_COST_WOOD
 			_place_object(t, "fence", 0)
-			GameData.energy -= cost
 			Sound.play_sfx("sfx_place")
 			tutorial_notify("build")
 		"sprinkler":
@@ -825,7 +836,6 @@ func use_tool() -> void:
 			GameData.wood -= GameData.SPRINKLER_COST_WOOD
 			GameData.stone -= GameData.SPRINKLER_COST_STONE
 			_place_object(t, "sprinkler", 0)
-			GameData.energy -= cost
 			Sound.play_sfx("sfx_place")
 			hud.show_message("스프링클러 설치! 매일 아침 주변 4칸에 물을 준다.")
 			tutorial_notify("build")
@@ -933,9 +943,12 @@ func _building_kind_at(t: Vector2i) -> String:
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 const STORY_PAGES := [
-	["", "도시 생활에 지쳐가던 어느 날,\n낡은 우표가 붙은 편지 한 통이 도착했다."],
-	["할아버지의 편지", "\"사랑하는 손주에게.\n나의 오래된 농장을 너에게 맡기마.\n흙을 만지다 보면, 도시에서 잃어버린 것들을\n다시 찾게 될 게다.\""],
-	["", "그렇게 나는 짐을 싸서\n'교진 마을'의 작은 농장으로 향했다.\n\n낡았지만 따뜻한 집, 그리고 드넓은 땅...\n이제 이곳이 나의 새 보금자리다."],
+	["잿빛 도시", "회색 빌딩 숲, 끝나지 않는 야근.\n깜빡이는 모니터 앞에서 문득 생각했다.\n\n'...내가 원하던 삶이, 정말 이런 거였나?'"],
+	["한 통의 편지", "그러던 어느 날, 우편함에\n낡은 우표가 붙은 편지 한 통이 꽂혀 있었다.\n\n봉투에서는 희미하게 흙냄새가 났다.\n보낸 사람은 — 오래 소식이 끊겼던 할아버지."],
+	["할아버지의 편지", "\"사랑하는 손주에게.\n나도 이제 몸이 예전 같지 않구나.\n평생을 일군 '교진 팜'을 너에게 맡기마.\n\n흙을 만지다 보면, 도시에서 잃어버린 것들을\n다시 찾게 될 게다.\""],
+	["오래된 기억", "어린 시절, 할아버지 밭에서 캐 먹던\n포슬포슬한 감자의 맛.\n여름밤 평상에 누워 듣던 풀벌레 소리.\n\n잊고 지냈던 기억들이 하나둘 떠올랐다."],
+	["결심", "다음 날 아침, 나는 사표를 냈다.\n짐이라곤 낡은 트렁크 하나.\n\n기차를 타고, 버스를 갈아타고,\n흙길을 한참 걸어 '교진 마을'로 향했다."],
+	["새 보금자리", "언덕을 넘자, 작은 농장이 눈에 들어왔다.\n낡았지만 따뜻해 보이는 집,\n잡초가 무성한 드넓은 밭,\n멀리 마을 굴뚝에서 피어오르는 저녁 연기.\n\n이제 이곳이 나의 새 보금자리다."],
 ]
 var _story_idx := 0
 var story_layer: CanvasLayer
@@ -994,16 +1007,38 @@ func _build_story_ui() -> void:
 func _show_story_page() -> void:
 	for c in _story_buttons.get_children():
 		c.queue_free()
+
+	# 페이지 번호 (왼쪽) + 버튼 (오른쪽)
+	var pnum := Label.new()
+	pnum.text = "%d / %d" % [_story_idx + 1, STORY_PAGES.size() + 1]
+	pnum.add_theme_color_override("font_color", Color(0.62, 0.5, 0.34))
+	_story_buttons.add_child(pnum)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_story_buttons.add_child(spacer)
+
+	if _story_idx > 0:
+		_story_add_button("< 이전", _prev_story_page)
 	if _story_idx < STORY_PAGES.size():
 		var page: Array = STORY_PAGES[_story_idx]
 		_story_title.text = page[0]
 		_story_body.text = page[1]
 		_story_add_button("다음 >", _next_story_page)
+		_story_add_button("건너뛰기 >>", func() -> void:
+			Sound.play_sfx("sfx_ui")
+			_story_idx = STORY_PAGES.size()
+			_show_story_page())
 	else:
 		_story_title.text = "교진 팜에 어서 와!"
 		_story_body.text = "지금 가진 것은 호미 하나와 감자 씨앗 5개.\n화면 위의 '다음 목표'를 하나씩 달성하면\n새 도구가 열린다. 천천히 배워보자!"
 		_story_add_button("튜토리얼 시작", _end_intro)
 		_story_add_button("건너뛰기", _skip_tutorial)
+
+
+func _prev_story_page() -> void:
+	Sound.play_sfx("sfx_ui")
+	_story_idx -= 1
+	_show_story_page()
 
 
 func _story_add_button(text: String, cb: Callable) -> void:
@@ -1402,6 +1437,13 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.owned_parcels = d.get("owned_parcels", ["home", "east", "south", "forest"])
 	for k in d.get("mob_kills", {}):
 		GameData.mob_kills[k] = int(d.mob_kills[k])
+	GameData.apply_skills_data(d.get("skills", {}))
+	if d.has("furniture"):
+		GameData.apply_furniture_data(d.furniture)
+	for k in d.get("recipes_cooked", {}):
+		GameData.recipes_cooked[k] = int(d.recipes_cooked[k])
+	GameData.owned_pets = d.get("owned_pets", [])
+	GameData.active_pet = str(d.get("active_pet", ""))
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
@@ -1459,6 +1501,9 @@ func _process(delta: float) -> void:
 		if player.walked > 40.0:
 			tutorial_notify("moved")
 	weather_time += delta
+	# 체력은 동굴 밖에서 천천히 회복된다 (요리를 먹으면 즉시 회복)
+	if not cave.visible:
+		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	_update_particles(delta)
 	_net_process(delta)
 	_update_night()
@@ -1484,7 +1529,7 @@ func _growth_tick(game_minutes: float) -> void:
 				changed = true
 			if cell.crop_id != "" and not cell.dead:
 				var before_stage := _crop_texture(cell)
-				cell.crop_day = float(cell.crop_day) + game_minutes
+				cell.crop_day = float(cell.crop_day) + game_minutes * GameData.farm_growth_mult()
 				if _crop_texture(cell) != before_stage:
 					changed = true
 	if changed:
@@ -1519,6 +1564,8 @@ func _auto_select_tool() -> void:
 				want = "hand"
 			elif not cell.watered:
 				want = "water"
+		elif cell.ground == "water":
+			want = "rod"
 	if want != "" and want != GameData.tool and GameData.is_tool_unlocked(want):
 		GameData.tool = want
 
@@ -1970,16 +2017,27 @@ func _debug_tick() -> void:
 			_save_shot("_parcel2.png")
 		122: interior.open()                           # 집 내부 확인
 		128: _save_shot("_house.png")
-		130:
+		129: _send_key(KEY_F)                          # 꾸미기 모드
+		133: _save_shot("_deco.png")
+		134: _send_key(KEY_F)                          # 꾸미기 종료
+		136: interior.ppos = Vector2(330, 116)         # 조리대 앞으로
+		138: _send_key(KEY_E)                          # 주방 열기
+		142: _save_shot("_cook.png")
+		144:
+			cooking_ui.close()
 			interior.close()
-			inventory_ui.toggle()                      # 인벤토리(도구 선택) 확인
-		134: _save_shot("_inv.png")
-		136:
+			inventory_ui.toggle()                      # 인벤토리(도구/능력치) 확인
+		148: _save_shot("_inv.png")
+		150:
 			inventory_ui.close()
-			cave.open()                                # 동굴 확인
-		138: _send_key(KEY_SPACE)                      # 공격 모션
-		140: _save_shot("_cave.png")
-		144: get_tree().quit()
+			GameData.owned_pets = ["dog"]              # 펫 확인
+			GameData.active_pet = "dog"
+			pet.position = player.position + Vector2(14, 4)
+		156: _save_shot("_pet.png")
+		158: cave.open()                               # 동굴 확인
+		160: _send_key(KEY_SPACE)                      # 공격 모션
+		162: _save_shot("_cave.png")
+		166: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -2225,6 +2283,10 @@ func _req_shop(op: String, id: String) -> void:
 			shop._on_sell_item(id)
 		"buy_animal":
 			shop._on_buy_animal(id)
+		"buy_pet":
+			shop._on_buy_pet(id)
+		"select_pet":
+			shop._on_select_pet(id)
 		"upgrade":
 			shop._on_upgrade(id)
 		"parcel":
@@ -2288,6 +2350,71 @@ func _req_gain(id: String, count: int) -> void:
 		if id.begins_with("fish_"):
 			GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + count
 		_broadcast_stats()
+
+
+# 요리/먹기 — 멀티에서는 호스트가 재고를 확정한다 (에너지는 각자)
+func do_cook(id: String) -> void:
+	if not GameData.cook(id):
+		hud.show_message("재료가 부족하다.")
+		return
+	Sound.play_sfx("sfx_buy")
+	hud.show_message("'%s' 완성!" % GameData.ITEMS[id].name)
+	gain_skill("cook", 8.0)
+	if Net.is_guest():
+		_req_cook.rpc_id(1, id)
+	elif Net.is_host():
+		_broadcast_stats()
+
+
+@rpc("any_peer", "reliable")
+func _req_cook(id: String) -> void:
+	if not Net.is_host():
+		return
+	if GameData.RECIPES.has(id) and GameData.cook(id):
+		_broadcast_stats()
+
+
+func do_eat(id: String) -> void:
+	if int(GameData.items[id]) <= 0:
+		return
+	GameData.items[id] -= 1
+	var e: float = float(GameData.RECIPES[id].energy) * GameData.cook_energy_mult()
+	GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + e)
+	Sound.play_sfx("sfx_harvest")
+	hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
+	if Net.is_guest():
+		_req_eat.rpc_id(1, id)
+	elif Net.is_host():
+		_broadcast_stats()
+
+
+@rpc("any_peer", "reliable")
+func _req_eat(id: String) -> void:
+	if not Net.is_host():
+		return
+	if GameData.RECIPES.has(id) and int(GameData.items[id]) > 0:
+		GameData.items[id] -= 1
+		_broadcast_stats()
+
+
+# 집 꾸미기 변경 동기화: 가구 배치 목록 + 돈 변화(구입/판매)를 호스트가 확정한다
+func sync_furniture(money_delta: int) -> void:
+	if Net.is_guest():
+		_req_furniture.rpc_id(1, JSON.stringify(GameData.furniture), money_delta)
+	elif Net.is_host():
+		_broadcast_stats()
+
+
+@rpc("any_peer", "reliable")
+func _req_furniture(furn_json: String, money_delta: int) -> void:
+	if not Net.is_host():
+		return
+	var arr: Variant = JSON.parse_string(furn_json)
+	if typeof(arr) != TYPE_ARRAY or absi(money_delta) > 1000:
+		return
+	GameData.apply_furniture_data(arr)
+	GameData.money += money_delta
+	_broadcast_stats()
 
 
 @rpc("any_peer", "reliable")

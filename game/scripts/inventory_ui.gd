@@ -20,8 +20,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(80, 30)
-	panel.custom_minimum_size = Vector2(320, 250)
+	panel.position = Vector2(55, 30)
+	panel.custom_minimum_size = Vector2(370, 250)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -42,7 +42,7 @@ func _ready() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(300, 200)
+	scroll.custom_minimum_size = Vector2(350, 200)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()
@@ -124,6 +124,20 @@ func _rebuild() -> void:
 
 	_line("소지금 %dG   목재 %d   석재 %d" % [GameData.money, GameData.wood, GameData.stone],
 		Color("ffd75e"))
+
+	# 능력치: 하다 보면 는다
+	_line("[능력치]", Color(0.65, 0.85, 0.6))
+	for sid in GameData.SKILL_IDS:
+		var lv := GameData.skill_lv(sid)
+		var s: Dictionary = GameData.skills[sid]
+		var prog := "MAX" if lv >= GameData.SKILL_MAX_LV else \
+			"%d/%d" % [int(s.xp), int(GameData.skill_xp_needed(lv))]
+		_line("  %s Lv.%d (%s) - %s" %
+			[GameData.SKILLS[sid].name, lv, prog, GameData.SKILLS[sid].effect])
+
+	if GameData.active_pet != "":
+		var pdef: Dictionary = GameData.PETS[GameData.active_pet]
+		_line("[펫] %s - %s" % [pdef.name, pdef.passive], Color(0.65, 0.85, 0.6))
 
 	var any_seed := false
 	for id in GameData.CROP_IDS:

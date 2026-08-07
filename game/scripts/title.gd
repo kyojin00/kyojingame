@@ -200,15 +200,20 @@ func _build_settings_panel() -> void:
 	v.add_child(_mk_slider("효과음", Sound.sfx_volume,
 		func(val: float) -> void: Sound.sfx_volume = val))
 
-	var fs := CheckBox.new()
-	fs.text = "전체화면"
-	fs.focus_mode = Control.FOCUS_NONE
-	fs.button_pressed = Sound.fullscreen
-	fs.toggled.connect(func(on: bool) -> void:
-		Sound.fullscreen = on
-		Sound.apply_settings()
-		Sound.save_settings())
-	v.add_child(fs)
+	# 화면 크기: 누를 때마다 창 960/1440/1920 → 전체 화면 순환 (F11: 전체 화면 토글)
+	var win_btn := Button.new()
+	win_btn.text = "화면: " + GameData.window_mode_label()
+	win_btn.focus_mode = Control.FOCUS_NONE
+	win_btn.pressed.connect(func() -> void:
+		Sound.play_sfx("sfx_ui")
+		GameData.cycle_window_mode()
+		win_btn.text = "화면: " + GameData.window_mode_label())
+	v.add_child(win_btn)
+
+	var win_hint := Label.new()
+	win_hint.text = "F11: 전체 화면 토글"
+	win_hint.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
+	v.add_child(win_hint)
 
 	var close_btn := _mk_button("닫기", func() -> void: settings_panel.visible = false)
 	v.add_child(close_btn)

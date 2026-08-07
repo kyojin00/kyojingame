@@ -46,7 +46,7 @@ func _ready() -> void:
 
 func open() -> void:
 	if GameData.energy < 15.0:
-		main.hud.show_message("너무 지쳤다... 동굴은 위험하다.")
+		main.hud.show_message("체력이 너무 낮다... 회복하고 오자. (요리를 먹거나 잠시 기다리기)")
 		return
 	floor_num = 1
 	_gen_floor()
@@ -184,7 +184,7 @@ func _process(delta: float) -> void:
 		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 12.0:
 			hurt_cd = 0.9
 			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0}[m.type]
-			GameData.energy -= dmg
+			GameData.energy -= dmg * GameData.pet_cave_def_mult()  # 부엉이 펫: 피해 감소
 			Sound.play_sfx("sfx_miss")
 			# 넉백은 막히지 않은 곳으로만 (벽/바위 끼임 방지)
 			var kb: Vector2 = ppos + (ppos - m.pos).normalized() * 10.0
@@ -209,6 +209,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_interact()
 	elif event.is_action_pressed("ui_cancel"):
 		close()
+	else:
+		return
+	# 이벤트를 소비하지 않으면 같은 E가 main으로 넘어가 동굴이 새로 열린다
+	get_viewport().set_input_as_handled()
 
 
 func _attack() -> void:
@@ -218,7 +222,8 @@ func _attack() -> void:
 	swing_t = 0.15
 	Sound.play_sfx("sfx_chop", 0.2)
 	var reach := ppos + _dir_vec() * 14.0
-	var dmg := 1 + (int(GameData.tool_level.get("axe", 1)) - 1)  # 도끼 강화 = 공격력 2배
+	# 도끼 강화 = 공격력 2배, 전투 숙련도 = +0.5/Lv
+	var dmg: float = 1 + (int(GameData.tool_level.get("axe", 1)) - 1) + GameData.combat_bonus()
 	# 몬스터 타격
 	for m in monsters:
 		if (m.pos - reach).length() < 14.0 or (m.pos - ppos).length() < 12.0:
@@ -229,6 +234,7 @@ func _attack() -> void:
 				monsters.erase(m)
 				Sound.play_sfx("sfx_pick", 0.2)
 				main.record_kill(m.type)
+				main.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0}[m.type])
 				match m.type:
 					"slime":
 						if randf() < 0.35:
@@ -251,8 +257,10 @@ func _attack() -> void:
 	if ores.has(rt):
 		ores.erase(rt)
 		Sound.play_sfx("sfx_pick", 0.1)
-		main.gain_item("ore", 1)
-		main.hud.show_message("광석 획득!")
+		var n := 2 if randf() < GameData.bonus_drop_chance("mine") else 1
+		main.gain_item("ore", n)
+		main.hud.show_message("광석 %d개 획득!" % n if n > 1 else "광석 획득!")
+		main.gain_skill("mine", 8.0)
 
 
 func _floor_clear() -> void:
@@ -349,7 +357,7 @@ func _draw_cave() -> void:
 		canvas.draw_rect(Rect2(reach.x - 6, reach.y - 6, 12, 12), Color(1, 0.9, 0.5, 0.5))
 
 	# 상단 정보
-	var info := "동굴 %d층 · 슬라임 %d마리 · 기력 %d" % [floor_num, monsters.size(), int(GameData.energy)]
+	var info := "동굴 %d층 · 몬스터 %d마리 · 체력 %d" % [floor_num, monsters.size(), int(GameData.energy)]
 	if chest_pos.x >= 0:
 		info += " · 상자를 열자(E)!"
 	elif stairs_pos.x >= 0:

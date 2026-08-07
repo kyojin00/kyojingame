@@ -11,7 +11,7 @@ border_width_bottom = 1
 border_color = Color(0.29, 0.25, 0.39, 1)
 
 [sub_resource type="StyleBoxFlat" id="energy_fill"]
-bg_color = Color(0.48, 0.83, 0.35, 1)
+bg_color = Color(0.88, 0.35, 0.32, 1)
 
 [node name="HUD" type="CanvasLayer"]
 layer = 10

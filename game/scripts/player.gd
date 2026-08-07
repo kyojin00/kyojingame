@@ -39,7 +39,7 @@ func _process(delta: float) -> void:
 			dir = "right" if v.x > 0 else "left"
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
-		v = v * SPEED * delta
+		v = v * SPEED * GameData.pet_speed_mult() * delta  # 강아지 펫: 이동 속도 증가
 		if not _blocked(position + Vector2(v.x, 0)):
 			position.x += v.x
 		if not _blocked(position + Vector2(0, v.y)):
