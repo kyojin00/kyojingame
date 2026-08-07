@@ -212,6 +212,9 @@ func _build_settings_panel() -> void:
 
 	var win_hint := Label.new()
 	win_hint.text = "F11: 전체 화면 토글"
+	# 에디터 임베드 실행 중에는 창 크기/전체 화면 변경이 막힌다
+	if OS.has_feature("editor"):
+		win_hint.text += "\n(에디터에서는 게임 패널 우상단 메뉴의\n'창 띄우기'를 켜야 화면 변경이 적용됨)"
 	win_hint.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
 	v.add_child(win_hint)
 

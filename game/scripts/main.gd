@@ -950,7 +950,37 @@ const STORY_PAGES := [
 	["결심", "다음 날 아침, 나는 사표를 냈다.\n짐이라곤 낡은 트렁크 하나.\n\n기차를 타고, 버스를 갈아타고,\n흙길을 한참 걸어 '교진 마을'로 향했다."],
 	["새 보금자리", "언덕을 넘자, 작은 농장이 눈에 들어왔다.\n낡았지만 따뜻해 보이는 집,\n잡초가 무성한 드넓은 밭,\n멀리 마을 굴뚝에서 피어오르는 저녁 연기.\n\n이제 이곳이 나의 새 보금자리다."],
 ]
+# 부지를 열 때마다 한 장(章)씩 이어지는 마을 확장 스토리
+const PARCEL_STORIES := {
+	"east": [
+		["제1장 · 동쪽 들판", "표지판 너머, 무성한 풀숲 사이에서\n낡은 팻말 하나를 발견했다.\n\n'여기서부터 우리 농장의 두 번째 밭이었다'\n— 할아버지의 글씨다."],
+		["제1장 · 동쪽 들판", "'혼자서는 넓히지 마라.\n땅은 이웃과 함께 넓히는 것이다.'\n\n남쪽 들판 너머로,\n옛 마을의 흔적이 이어져 있는 듯하다..."],
+	],
+	"south": [
+		["제2장 · 남쪽 들판", "들판 한가운데,\n돌로 쌓은 화덕 터가 남아 있다.\n\n옛날 이곳에서 마을 사람들이\n수확 축제를 열었다고 한다."],
+		["제2장 · 남쪽 들판", "'가을이면 온 마을이 여기 모여\n감자를 구워 먹었지.'\n\n...숲과 호수 쪽에서\n바람을 타고 물 냄새가 실려 온다."],
+	],
+	"forest": [
+		["제3장 · 숲과 호수", "호숫가 바위에 오래된 낚시 의자가 놓여 있다.\n\n할아버지가 철수네 할아버지와\n밤새 낚시를 하던 자리라고 한다."],
+		["제3장 · 숲과 호수", "'이 호수엔 달빛을 먹은\n황금잉어가 산다네.'\n\n전설을 믿어보자. 강변을 따라가면\n더 큰 물길이 나온다던데..."],
+	],
+	"river": [
+		["제4장 · 강변", "강가에 낡은 나루터가 남아 있다.\n\n옛날에는 배로 곡식을 실어 날랐다고 한다.\n물살 소리가 밤낮없이 흐른다."],
+		["제4장 · 강변", "'강을 따라 올라가면\n바람이 자라는 평야가 있다.'\n\n뱃사공의 노래가\n아직도 들리는 것만 같다."],
+	],
+	"plains": [
+		["제5장 · 황금 평야", "끝없이 펼쳐진 평야.\n바람이 지나갈 때마다\n풀이 금빛으로 일렁인다.\n\n할아버지가 가장 사랑하던 땅이다."],
+		["제5장 · 황금 평야", "'언젠가 이 평야를\n온통 밀밭으로 만들고 싶었지.'\n\n이제 그 꿈은 나의 것이다.\n남은 것은... 깊은 숲뿐."],
+	],
+	"deepforest": [
+		["마지막 장 · 깊은 숲", "아름드리 나무가 하늘을 가리는 깊은 숲.\n새소리조차 조심스러운 이곳은\n자원의 보고이자, 농장의 끝이다."],
+		["마지막 장 · 깊은 숲", "편지의 마지막 문장이 떠오른다.\n\n'땅 끝까지 가 보면 알게 될 게다.\n농장은 땅이 아니라,\n네가 흘린 시간이라는 걸.'\n\n— 이제 이 땅 전부가 나의 농장이다."],
+	],
+}
+
 var _story_idx := 0
+var _story_pages: Array = []
+var _story_mode := "intro"  # "intro": 오프닝(튜토리얼로 연결) / "parcel": 부지 스토리
 var story_layer: CanvasLayer
 var _story_title: Label
 var _story_body: Label
@@ -960,6 +990,19 @@ var _story_buttons: HBoxContainer
 func _show_intro() -> void:
 	hud.visible = false
 	fade_rect.color.a = 0.0  # 농장이 보이는 채로 편지지 연출
+	_story_mode = "intro"
+	_story_pages = STORY_PAGES
+	_build_story_ui()
+	_story_idx = 0
+	_show_story_page()
+
+
+func show_parcel_story(pid: String) -> void:
+	if not PARCEL_STORIES.has(pid) or story_layer != null:
+		return
+	hud.visible = false
+	_story_mode = "parcel"
+	_story_pages = PARCEL_STORIES[pid]
 	_build_story_ui()
 	_story_idx = 0
 	_show_story_page()
@@ -1008,9 +1051,10 @@ func _show_story_page() -> void:
 	for c in _story_buttons.get_children():
 		c.queue_free()
 
-	# 페이지 번호 (왼쪽) + 버튼 (오른쪽)
+	# 페이지 번호 (왼쪽) + 버튼 (오른쪽). 오프닝은 마지막에 환영 페이지가 하나 더 있다
+	var total := _story_pages.size() + (1 if _story_mode == "intro" else 0)
 	var pnum := Label.new()
-	pnum.text = "%d / %d" % [_story_idx + 1, STORY_PAGES.size() + 1]
+	pnum.text = "%d / %d" % [_story_idx + 1, total]
 	pnum.add_theme_color_override("font_color", Color(0.62, 0.5, 0.34))
 	_story_buttons.add_child(pnum)
 	var spacer := Control.new()
@@ -1019,15 +1063,18 @@ func _show_story_page() -> void:
 
 	if _story_idx > 0:
 		_story_add_button("< 이전", _prev_story_page)
-	if _story_idx < STORY_PAGES.size():
-		var page: Array = STORY_PAGES[_story_idx]
+	if _story_idx < _story_pages.size():
+		var page: Array = _story_pages[_story_idx]
 		_story_title.text = page[0]
 		_story_body.text = page[1]
-		_story_add_button("다음 >", _next_story_page)
-		_story_add_button("건너뛰기 >>", func() -> void:
-			Sound.play_sfx("sfx_ui")
-			_story_idx = STORY_PAGES.size()
-			_show_story_page())
+		if _story_mode == "parcel" and _story_idx == _story_pages.size() - 1:
+			_story_add_button("탐험 시작!", _close_story)
+		else:
+			_story_add_button("다음 >", _next_story_page)
+			_story_add_button("건너뛰기 >>", func() -> void:
+				Sound.play_sfx("sfx_ui")
+				_story_idx = _story_pages.size() - (0 if _story_mode == "intro" else 1)
+				_show_story_page())
 	else:
 		_story_title.text = "교진 팜에 어서 와!"
 		_story_body.text = "지금 가진 것은 호미 하나와 감자 씨앗 5개.\n화면 위의 '다음 목표'를 하나씩 달성하면\n새 도구가 열린다. 천천히 배워보자!"
@@ -1039,6 +1086,15 @@ func _prev_story_page() -> void:
 	Sound.play_sfx("sfx_ui")
 	_story_idx -= 1
 	_show_story_page()
+
+
+# 부지 스토리 닫기 (오프닝과 달리 튜토리얼로 이어지지 않는다)
+func _close_story() -> void:
+	Sound.play_sfx("sfx_ui")
+	if story_layer != null:
+		story_layer.queue_free()
+		story_layer = null
+	hud.visible = true
 
 
 func _story_add_button(text: String, cb: Callable) -> void:
@@ -1122,12 +1178,17 @@ func _buy_parcel(pid: String) -> void:
 	GameData.today_spent += int(def.price)
 	GameData.owned_parcels.append(pid)
 	Sound.play_sfx("sfx_coin")
-	dialog.set_body("'%s' 구입 완료!\n이제 이 땅은 우리 농장이다!" % def.name)
 	if Net.is_guest():
 		_req_shop.rpc_id(1, "parcel", pid)
 	elif Net.is_host():
 		_broadcast_stats()
 	queue_redraw()
+	# 구입한 사람에게 이 부지의 장(章) 스토리를 보여준다
+	if not _remote_acting:
+		dialog.close()
+		show_parcel_story(pid)
+	else:
+		dialog.set_body("'%s' 구입 완료!\n이제 이 땅은 우리 농장이다!" % def.name)
 
 
 # ---- NPC 대화 / 선물 / 퀘스트 ----
@@ -2012,9 +2073,8 @@ func _debug_tick() -> void:
 		106: _send_key(KEY_E)                          # 부지 구입 대화
 		112: _save_shot("_parcel.png")
 		114: _buy_parcel("east")
-		118:
-			dialog.close()
-			_save_shot("_parcel2.png")
+		118: _save_shot("_parcel2.png")                # 부지 장(章) 스토리 확인
+		120: _close_story()
 		122: interior.open()                           # 집 내부 확인
 		128: _save_shot("_house.png")
 		129: _send_key(KEY_F)                          # 꾸미기 모드
