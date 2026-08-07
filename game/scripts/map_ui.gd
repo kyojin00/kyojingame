@@ -1,7 +1,7 @@
 # 지도 (M): 농장 전체를 축소해 보여주고 주요 시설과 내 위치를 표시한다.
 extends CanvasLayer
 
-const CELL := 7.0  # 타일당 픽셀
+const CELL := 5.0  # 타일당 픽셀 (90x60 맵)
 
 var main: Node2D
 var canvas: Control
@@ -56,6 +56,8 @@ func _draw_map() -> void:
 			var c: Color
 			if cell.ground == "water":
 				c = Color(0.26, 0.45, 0.68)
+			elif cell.ground == "path":
+				c = Color(0.72, 0.62, 0.44)
 			elif cell.ground == "soil":
 				c = Color(0.42, 0.31, 0.19)
 			else:
@@ -114,8 +116,8 @@ func _draw_map() -> void:
 
 	# 라벨
 	_label(Vector2(ox + 4.0 * CELL, oy + 1.0 * CELL - 2), "우리집")
-	_label(Vector2(ox + 50.0 * CELL, oy + 3.0 * CELL - 2), "마을")
-	_label(Vector2(ox + 55.0 * CELL, oy + 8.0 * CELL - 4), "게시판")
+	_label(Vector2(ox + 74.0 * CELL, oy + 1.0 * CELL - 2), "마을")
+	_label(Vector2(ox + 73.0 * CELL, oy + 15.0 * CELL - 4), "광장")
 	_label(Vector2(ox + 25.0 * CELL, oy + 13.0 * CELL - 2), "연못")
 	_label(Vector2(ox + 50.0 * CELL, oy + 1.0 * CELL - 2), "동굴")
 	_label(Vector2(ox + main.player.position.x / 16.0 * CELL, oy + main.player.position.y / 16.0 * CELL - 8), "내 위치")

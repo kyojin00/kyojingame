@@ -1,8 +1,8 @@
 # 메인 월드: 맵, 경작, 도구, 자원, 시간, 낮/밤을 관리한다.
 extends Node2D
 
-const MAP_W := 60
-const MAP_H := 40
+const MAP_W := 90
+const MAP_H := 60
 const TILE := 16
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
@@ -105,20 +105,36 @@ const TEXTURE_NAMES := [
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
-	"soil_dry", "soil_wet", "water_0", "water_1",
+	"soil_dry", "soil_wet", "water_0", "water_1", "path",
 ]
 
 const START_TILE := Vector2i(14, 10)
 const CAVE_POS := Vector2i(50, 1)
+# 부지 표지판: 잠긴 부지의 경계 안쪽 (밖에서 E로 조준 가능)
 const PARCEL_SIGNS := {
-	"east": Vector2i(31, 9),
-	"south": Vector2i(9, 21),
-	"forest": Vector2i(33, 22),
+	"east": Vector2i(30, 7),
+	"south": Vector2i(9, 20),
+	"forest": Vector2i(30, 25),
+	"river": Vector2i(61, 30),
+	"plains": Vector2i(2, 40),
+	"deepforest": Vector2i(46, 40),
 }
-# 집 앵커(좌상단): [0]=농장 집(취침), [1]=마을 상점, [2]=철수네 집
-const HOUSES := [Vector2i(2, 1), Vector2i(48, 3), Vector2i(48, 10)]
-const BOARD_POS := Vector2i(55, 8)
-const VILLAGE_REGION := Rect2i(46, 2, 13, 15)
+# 건물 앵커(좌상단 5x4) -> 종류
+const BUILDINGS := {
+	Vector2i(2, 1): "home",      # 우리집 (취침)
+	Vector2i(63, 3): "general",  # 잡화점 (씨앗/판매)
+	Vector2i(70, 3): "ranch",    # 목장 상회 (동물)
+	Vector2i(77, 3): "smith",    # 대장간 (강화)
+	Vector2i(63, 10): "fish",    # 수산시장 (도감/판매)
+	Vector2i(77, 10): "npc_house",
+}
+const BUILDING_NAMES := {
+	"home": "집", "general": "잡화점", "ranch": "목장 상회",
+	"smith": "대장간", "fish": "수산시장", "npc_house": "철수네 집",
+}
+const BOARD_POS := Vector2i(75, 17)
+const VILLAGE_REGION := Rect2i(60, 0, 30, 30)
+const ROAD := Rect2i(30, 8, 30, 2)  # 농장 -> 마을 공용 길
 const UI_FONT := preload("res://assets/fonts/unifont_ko.otf")
 
 var npcs: Array = []
@@ -181,7 +197,7 @@ func _ready() -> void:
 		n.main = self
 		n.id = npc_id
 		n.region = VILLAGE_REGION
-		n.position = Vector2(52 * TILE + 8, (8 if npc_id == "merchant" else 13) * TILE + 8)
+		n.position = Vector2(66 * TILE + 8, (12 if npc_id == "merchant" else 16) * TILE + 8)
 		npcs.append(n)
 		world.add_child(n)
 
@@ -282,16 +298,40 @@ func _build_map() -> void:
 				"crop_id": "", "crop_day": 0.0, "dead": false})
 		grid.append(row)
 
-	# 연못 2개
+	# 연못들 (농장/숲/깊은 숲) + 강 + 마을 분수대
 	for y in range(13, 18):
 		for x in range(23, 28):
 			grid[y][x].ground = "water"
 	for y in range(28, 35):
 		for x in range(45, 53):
 			grid[y][x].ground = "water"
+	for y in range(34, 36):          # 강변 부지의 강
+		for x in range(60, 90):
+			grid[y][x].ground = "water"
+	for y in range(48, 54):          # 깊은 숲 연못
+		for x in range(70, 79):
+			grid[y][x].ground = "water"
+	for y in range(17, 19):          # 마을 분수대
+		for x in range(71, 73):
+			grid[y][x].ground = "water"
 
-	# 집들 (각 5x4 타일) + 출하 상자 + 퀘스트 게시판
-	for anchor in HOUSES:
+	# 길: 농장 -> 마을 도로 + 마을 광장/거리
+	for y in range(ROAD.position.y, ROAD.end.y):
+		for x in range(ROAD.position.x, ROAD.end.x):
+			grid[y][x].ground = "path"
+	for y in range(8, 10):           # 마을 안 도로
+		for x in range(60, 84):
+			grid[y][x].ground = "path"
+	for y in range(15, 22):          # 광장
+		for x in range(68, 78):
+			if grid[y][x].ground == "grass":
+				grid[y][x].ground = "path"
+	for y in range(10, 15):          # 광장-도로 연결
+		for x in range(72, 74):
+			grid[y][x].ground = "path"
+
+	# 건물들 (각 5x4 타일) + 출하 상자 + 퀘스트 게시판 + 동굴
+	for anchor: Vector2i in BUILDINGS:
 		for y in range(anchor.y, anchor.y + 4):
 			for x in range(anchor.x, anchor.x + 5):
 				objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
@@ -315,7 +355,9 @@ func _build_map() -> void:
 	for pid in PARCEL_SIGNS:
 		objects[PARCEL_SIGNS[pid]] = {"kind": "sign", "hp": 0}
 
-	# 흩어진 나무/돌 (결정적 해시 배치)
+	# 흩어진 나무/돌 (결정적 해시 배치, 깊은 숲은 빽빽하게)
+	var deep: Array = GameData.PARCELS["deepforest"].rect
+	var deep_rect := Rect2i(deep[0], deep[1], deep[2], deep[3])
 	for y in range(1, MAP_H - 1):
 		for x in range(1, MAP_W - 1):
 			var pos := Vector2i(x, y)
@@ -325,13 +367,24 @@ func _build_map() -> void:
 				continue  # 집/출하상자 주변은 비워둔다
 			if abs(x - START_TILE.x) <= 3 and abs(y - START_TILE.y) <= 3:
 				continue  # 시작 지점 주변도 비워둔다
-			if VILLAGE_REGION.has_point(Vector2i(x, y)):
-				continue  # 마을 구역도 비워둔다
+			if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
+				continue  # 마을/길은 비워둔다
 			var h := _hash01(x * 3 + 7, y * 5 + 11)
-			if h < 0.045:
+			if deep_rect.has_point(pos):
+				if h < 0.14:
+					objects[pos] = {"kind": "tree", "hp": TREE_HP}
+				elif h < 0.19:
+					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
+			elif h < 0.045:
 				objects[pos] = {"kind": "tree", "hp": TREE_HP}
 			elif h < 0.075:
 				objects[pos] = {"kind": "rock", "hp": ROCK_HP}
+
+	# 마을 장식: 광장 둘레 나무
+	for deco_pos in [Vector2i(67, 14), Vector2i(78, 14), Vector2i(67, 22), Vector2i(78, 22),
+			Vector2i(85, 6), Vector2i(85, 20)]:
+		if not objects.has(deco_pos) and grid[deco_pos.y][deco_pos.x].ground == "grass":
+			objects[deco_pos] = {"kind": "tree", "hp": TREE_HP}
 
 
 func _spawn_objects() -> void:
@@ -339,7 +392,7 @@ func _spawn_objects() -> void:
 		n.queue_free()
 	obj_nodes.clear()
 	tree_sprites.clear()
-	for anchor: Vector2i in HOUSES:
+	for anchor: Vector2i in BUILDINGS:
 		var hn := _make_object(tex["house"],
 			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -64))
 		obj_nodes[anchor] = hn
@@ -434,7 +487,14 @@ func is_passable(t: Vector2i) -> bool:
 		return false
 	if objects.has(t):
 		return false
+	if not _tile_accessible(t):
+		return false  # 해금하지 않은 부지는 들어갈 수 없다
 	return true
+
+
+func _tile_accessible(t: Vector2i) -> bool:
+	return VILLAGE_REGION.has_point(t) or ROAD.has_point(t) \
+		or GameData.is_tile_owned(t.x, t.y)
 
 
 func is_passable_px(p: Vector2) -> bool:
@@ -462,8 +522,8 @@ func _current_perp() -> Vector2i:
 
 
 func can_use_tile(t: Vector2i) -> bool:
-	# 마을 구역은 공용, 나머지는 부지 소유 여부를 따른다
-	return VILLAGE_REGION.has_point(t) or GameData.is_tile_owned(t.x, t.y)
+	# 마을/길은 공용, 나머지는 부지 소유 여부를 따른다
+	return _tile_accessible(t)
 
 
 func ui_open() -> bool:
@@ -825,15 +885,21 @@ func interact() -> void:
 			cave.open()
 			return
 		if obj.kind == "house":
-			match _house_index_at(t):
-				0:
+			match _building_kind_at(t):
+				"home":
 					interior.open()  # 우리집 입장
-				1:
+				"general":
 					shop.open("buy")
+				"ranch":
+					shop.open("animal")
+				"smith":
+					shop.open("upgrade")
+				"fish":
+					shop.open("codex")
 				_:
 					hud.show_message("철수네 집이다. 낚시하러 갔는지 조용하다.")
 			return
-	hud.show_message("집 문 앞에서 E: 취침 · 출하 상자 앞에서 E: 판매")
+	hud.show_message("마을(동쪽 길 끝)에 상점들이 있다. 지도(M)를 보자!")
 
 
 func nearby_npc() -> Node2D:
@@ -850,12 +916,11 @@ func nearby_animal() -> Node2D:
 	return null
 
 
-func _house_index_at(t: Vector2i) -> int:
-	for i in HOUSES.size():
-		var a: Vector2i = HOUSES[i]
+func _building_kind_at(t: Vector2i) -> String:
+	for a: Vector2i in BUILDINGS:
 		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
-			return i
-	return -1
+			return BUILDINGS[a]
+	return ""
 
 
 # ---- 오프닝 스토리 / 튜토리얼 ----
@@ -1270,6 +1335,8 @@ func _respawn_resources() -> void:
 		var cell: Dictionary = grid[pos.y][pos.x]
 		if objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
 			continue
+		if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
+			continue  # 마을/길에는 리스폰하지 않는다
 		if (pos - player_tile()).length() < 4.0:
 			continue
 		_place_object(pos, kind, TREE_HP if kind == "tree" else ROCK_HP)
@@ -1380,6 +1447,7 @@ func _process(delta: float) -> void:
 		if _growth_timer >= 0.7:
 			_growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
+		_auto_select_tool()
 		_update_fishing(delta)
 		if player.walked > 40.0:
 			tutorial_notify("moved")
@@ -1413,6 +1481,38 @@ func _growth_tick(game_minutes: float) -> void:
 					changed = true
 	if changed:
 		queue_redraw()
+
+
+# 바라보는 대상에 맞는 도구를 자동 선택한다 (해금된 도구만)
+var _last_auto_target := Vector2i(-999, -999)
+
+
+func _auto_select_tool() -> void:
+	var t := target_tile()
+	if t == _last_auto_target:
+		return
+	_last_auto_target = t
+	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H or fishing_state != "":
+		return
+	var want := ""
+	var obj: Variant = objects.get(t)
+	if obj != null:
+		match obj.kind:
+			"tree":
+				want = "axe"
+			"rock":
+				want = "pickaxe"
+	else:
+		var cell: Dictionary = grid[t.y][t.x]
+		if cell.crop_id != "":
+			if cell.dead:
+				want = "hoe"
+			elif float(cell.crop_day) >= _grow_total(GameData.CROPS[cell.crop_id]):
+				want = "hand"
+			elif not cell.watered:
+				want = "water"
+	if want != "" and want != GameData.tool and GameData.is_tool_unlocked(want):
+		GameData.tool = want
 
 
 func _update_night() -> void:
@@ -1484,7 +1584,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("interact"):
 		interact()
 	elif event.is_action_pressed("open_shop"):
-		shop.open("buy")
+		if _near_shop():
+			shop.open("buy")
+		else:
+			hud.show_message("상점은 마을에! 상점 건물이나 출하 상자 근처에서 열 수 있다.")
 	elif event.is_action_pressed("save_game"):
 		save_now()
 		hud.show_message("저장했다!")
@@ -1498,6 +1601,20 @@ func _back_to_title() -> void:
 	Sound.stop_bgm()
 	Net.reset()
 	get_tree().change_scene_to_file("res://scenes/title.tscn")
+
+
+# 상점 건물/출하 상자 근처인가 (B키 사용 조건)
+func _near_shop() -> bool:
+	var p := player_tile()
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			var t := p + Vector2i(dx, dy)
+			if _building_kind_at(t) in ["general", "ranch", "smith", "fish"]:
+				return true
+			var obj: Variant = objects.get(t)
+			if obj != null and obj.kind == "bin":
+				return true
+	return false
 
 
 func _click_at(pos: Vector2) -> void:
@@ -1574,15 +1691,24 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 
 
 func _draw() -> void:
+	# 카메라에 보이는 타일만 그린다 (90x60 맵 컬링)
+	var vis: Rect2 = get_canvas_transform().affine_inverse() * get_viewport_rect()
+	var x0 := maxi(0, int(vis.position.x / TILE) - 1)
+	var y0 := maxi(0, int(vis.position.y / TILE) - 1)
+	var x1 := mini(MAP_W, int(vis.end.x / TILE) + 2)
+	var y1 := mini(MAP_H, int(vis.end.y / TILE) + 2)
+
 	var grass_prefix := "grass_" + GameData.season_key() + "_"
-	for y in MAP_H:
-		for x in MAP_W:
+	for y in range(y0, y1):
+		for x in range(x0, x1):
 			var cell: Dictionary = grid[y][x]
 			var t: Texture2D
 			if cell.ground == "water":
 				t = tex["water_%d" % water_frame]
 			elif cell.ground == "soil":
 				t = tex["soil_wet"] if cell.watered else tex["soil_dry"]
+			elif cell.ground == "path":
+				t = tex["path"]
 			else:
 				t = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
 			draw_texture(t, Vector2(x * TILE, y * TILE))
@@ -1658,11 +1784,11 @@ func _context_hint() -> Array:
 			"cave":
 				return ["E: 동굴 탐험", above_tile]
 			"house":
-				match _house_index_at(t):
-					0:
-						return ["E: 집에 들어가기", above_tile]
-					1:
-						return ["E: 상점", above_tile]
+				var bk := _building_kind_at(t)
+				if bk == "home":
+					return ["E: 집에 들어가기", above_tile]
+				if bk in ["general", "ranch", "smith", "fish"]:
+					return ["E: " + BUILDING_NAMES[bk], above_tile]
 			"tree":
 				if GameData.tool == "axe":
 					return ["나무 베기", above_tile]
@@ -1693,7 +1819,7 @@ func nav_target() -> Variant:
 		"slept":
 			return Vector2(4 * TILE + 8, 5 * TILE + 8)     # 농장 집 문 앞
 		"shop":
-			return Vector2(50 * TILE + 8, 7 * TILE + 8)    # 마을 상점 앞
+			return Vector2(65 * TILE + 8, 7 * TILE + 8)    # 마을 잡화점 앞
 		"fish":
 			return Vector2(25 * TILE + 8, 12 * TILE + 8)   # 연못가
 		"chop":
@@ -1805,10 +1931,10 @@ func _debug_tick() -> void:
 		73: _save_shot("_map.png")
 		74:
 			map_ui.close()
-			player.position = Vector2(54 * TILE + 8, 8 * TILE + 8)
-			player.dir = "right"                       # 마을 게시판 앞으로
+			player.position = Vector2(74 * TILE + 8, 17 * TILE + 8)
+			player.dir = "right"                       # 마을 광장 게시판 앞으로
 			for n in npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
-				n.position = Vector2(47 * TILE + 8, 16 * TILE + 8)
+				n.position = Vector2(62 * TILE + 8, 25 * TILE + 8)
 				n.target = n.position
 		78: _send_key(KEY_E)
 		84: _save_shot("_quest.png")
@@ -1819,9 +1945,9 @@ func _debug_tick() -> void:
 		100: _save_shot("_npc.png")
 		102:
 			dialog.close()
-			player.position = Vector2(30 * TILE + 8, 9 * TILE + 8)
-			player.dir = "right"                       # 동쪽 부지 표지판 앞
-			GameData.money = 20000
+			player.position = Vector2(30 * TILE + 8, 8 * TILE + 8)
+			player.dir = "up"                          # 동쪽 부지 표지판 앞 (길 위)
+			GameData.money = 200000
 		106: _send_key(KEY_E)                          # 부지 구입 대화
 		112: _save_shot("_parcel.png")
 		114: _buy_parcel("east")

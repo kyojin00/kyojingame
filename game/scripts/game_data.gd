@@ -45,7 +45,8 @@ const SAVE_PATH := "user://kyojin_farm_save.json"
 
 var day := 1
 var minutes := DAY_START
-var money := 500
+# 개발용 시작 자금 (출시 전 500으로 되돌릴 것!)
+var money := 100000000
 var energy := ENERGY_MAX
 var tool := "hoe"
 var seed_index := 0
@@ -123,6 +124,9 @@ const PARCELS := {
 	"east": {"name": "동쪽 들판", "rect": [30, 0, 30, 20], "price": 3000},
 	"south": {"name": "남쪽 들판", "rect": [0, 20, 30, 20], "price": 8000},
 	"forest": {"name": "숲과 호수", "rect": [30, 20, 30, 20], "price": 15000},
+	"river": {"name": "강변 부지", "rect": [60, 30, 30, 10], "price": 20000},
+	"plains": {"name": "황금 평야", "rect": [0, 40, 45, 20], "price": 30000},
+	"deepforest": {"name": "깊은 숲", "rect": [45, 40, 45, 20], "price": 50000},
 }
 var owned_parcels: Array = ["home"]
 
@@ -173,7 +177,7 @@ const TUTORIAL_ORDER := [
 	["mine", "곡괭이(6)로 돌을 캐서 석재를 모으자"],
 	["build", "울타리(7)나 스프링클러(8)를 설치해보자"],
 	["fish", "낚싯대(9)로 물가에서 물고기를 낚자"],
-	["shop", "상점(B)을 열어보자 - 도감 탭도 구경!"],
+	["shop", "마을 잡화점에 들어가 보자(E) - 도감도 구경!"],
 ]
 # 목표 달성 시 해금되는 도구
 const TUTORIAL_UNLOCKS := {
@@ -292,7 +296,7 @@ func reset_daily() -> void:
 func reset_all() -> void:
 	day = 1
 	minutes = DAY_START
-	money = 500
+	money = 100000000  # 개발용 (출시 전 500으로!)
 	energy = ENERGY_MAX
 	tool = "hoe"
 	seed_index = 0
