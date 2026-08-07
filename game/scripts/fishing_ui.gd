@@ -3,8 +3,8 @@ extends CanvasLayer
 
 signal finished(success: bool)
 
-const BAR_W := 200.0
-const CURSOR_SPEED := 240.0
+const BAR_W := 300.0
+const CURSOR_SPEED := 360.0
 
 var zone_x := 0.0
 var zone_w := 60.0
@@ -17,7 +17,7 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(210, 150)
+	panel.position = Vector2(315, 225)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -37,7 +37,7 @@ func _ready() -> void:
 	v.add_child(label)
 
 	bar = Control.new()
-	bar.custom_minimum_size = Vector2(BAR_W, 24)
+	bar.custom_minimum_size = Vector2(BAR_W, 36)
 	bar.draw.connect(_draw_bar)
 	v.add_child(bar)
 
@@ -74,6 +74,6 @@ func _cursor_x() -> float:
 
 
 func _draw_bar() -> void:
-	bar.draw_rect(Rect2(0, 0, BAR_W, 24), Color(0.09, 0.07, 0.13))
-	bar.draw_rect(Rect2(zone_x, 2, zone_w, 20), Color(0.32, 0.72, 0.36))
-	bar.draw_rect(Rect2(_cursor_x() - 1.0, 0, 2, 24), Color(1, 1, 1))
+	bar.draw_rect(Rect2(0, 0, BAR_W, 36), Color(0.09, 0.07, 0.13))
+	bar.draw_rect(Rect2(zone_x, 3, zone_w, 30), Color(0.32, 0.72, 0.36))
+	bar.draw_rect(Rect2(_cursor_x() - 1.5, 0, 3, 36), Color(1, 1, 1))

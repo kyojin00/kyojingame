@@ -12,8 +12,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(140, 52)
-	panel.custom_minimum_size = Vector2(360, 250)
+	panel.position = Vector2(210, 78)
+	panel.custom_minimum_size = Vector2(540, 375)
 	var style := StyleBoxFlat.new()
 	# 노트 느낌의 밝은 양피지 배경
 	style.bg_color = Color(0.93, 0.88, 0.74, 0.98)
@@ -35,7 +35,7 @@ func _ready() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(340, 204)
+	scroll.custom_minimum_size = Vector2(510, 306)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()

@@ -14,7 +14,7 @@ var wait := 0.0
 func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
-	sprite.offset = Vector2(-8, -14)
+	sprite.offset = Vector2(-16, -28)
 	sprite.scale = Vector2(1.35, 1.35)  # 큰 캐릭터에 맞춘 비율
 	add_child(sprite)
 	target = position
@@ -42,7 +42,7 @@ func _process(delta: float) -> void:
 			moving = false
 			wait = randf_range(1.0, 3.5)
 		else:
-			var speed := 22.0 if type == "chicken" else 15.0
+			var speed := 44.0 if type == "chicken" else 30.0
 			var step := d.normalized() * speed * delta
 			if absf(step.x) > 0.01:
 				sprite.flip_h = step.x > 0  # 기본 그림은 왼쪽 보기

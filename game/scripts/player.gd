@@ -1,8 +1,8 @@
 # 플레이어: 수동 타일 충돌 이동 + 방향별 걷기 애니메이션
 extends Node2D
 
-const SPEED := 75.0  # 아트 픽셀/초
-const R := 3.0       # 발 밑 충돌 반경
+const SPEED := 150.0  # 아트 픽셀/초
+const R := 6.0       # 발 밑 충돌 반경
 
 var main: Node2D
 var dir := "down"
@@ -21,7 +21,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	# 발밑 그림자
-	draw_rect(Rect2(-6, -2, 12, 4), Color(0, 0, 0, 0.22))
+	draw_rect(Rect2(-10, -3, 20, 6), Color(0, 0, 0, 0.22))
 
 
 func _process(delta: float) -> void:

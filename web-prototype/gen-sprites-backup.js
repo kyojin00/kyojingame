@@ -1009,7 +1009,9 @@ function fillRect(png, x, y, w, h, rgb) {
   for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) setPx(png, xx, yy, rgb);
 }
 
+const SAVED_NAMES = [];
 function save(png, name) {
+  SAVED_NAMES.push(name);
   fs.writeFileSync(path.join(OUT, name + '.png'), PNG.sync.write(png));
   console.log('wrote', name + '.png', png.width + 'x' + png.height);
 }
@@ -1468,60 +1470,90 @@ function hash(x, y) {
 
 // 계절별 잔디 3종 (겨울은 눈밭)
 const GRASS_SETS = {
-  spring: { bases: ['#7da35a', '#769c54', '#83aa60'], detail: '#5f8443' },
-  summer: { bases: ['#6a9a4c', '#639347', '#71a152'], detail: '#4f7c39' },
-  fall:   { bases: ['#b5904e', '#ad8848', '#bb9854'], detail: '#8f6f3a' },
-  winter: { bases: ['#e8ecf2', '#e2e6ee', '#edf1f6'], detail: '#c9d2e0' },
+  spring: { bases: ['#7da35a', '#769c54', '#83aa60'], detail: '#5f8443', lite: '#8fb56a', flower: '#e8e0f0' },
+  summer: { bases: ['#6a9a4c', '#639347', '#71a152'], detail: '#4f7c39', lite: '#7cab58', flower: '#f0d878' },
+  fall:   { bases: ['#b5904e', '#ad8848', '#bb9854'], detail: '#8f6f3a', lite: '#c7a25e', flower: '#c9703a' },
+  winter: { bases: ['#e8ecf2', '#e2e6ee', '#edf1f6'], detail: '#c9d2e0', lite: '#f6f9fc', flower: '#dfe8f2' },
 };
 for (const [season, set] of Object.entries(GRASS_SETS)) {
   set.bases.forEach((base, i) => {
-    const png = newImg(16, 16);
-    fillRect(png, 0, 0, 16, 16, hex(base));
-    for (let k = 0; k < 5; k++) {
-      const x = Math.floor(hash(i * 31 + k, k * 7 + 1) * 16);
-      const y = Math.floor(hash(k * 13 + 2, i * 17 + k) * 16);
-      setPx(png, x, y, hex(set.detail));
+    const png = newImg(32, 32);
+    fillRect(png, 0, 0, 32, 32, hex(base));
+    // 풀잎 다발 (2~3px 세로 잎 + 밝은 끝)
+    for (let k = 0; k < 12; k++) {
+      const x = Math.floor(hash(i * 31 + k, k * 7 + 1) * 30) + 1;
+      const y = Math.floor(hash(k * 13 + 2, i * 17 + k) * 28) + 2;
+      setPx(png, x, y, hex(set.lite));
       setPx(png, x, y + 1, hex(set.detail));
+      setPx(png, x, y + 2, hex(set.detail));
+      if (hash(x, y) < 0.5) setPx(png, x + 1, y + 1, hex(set.detail));
+    }
+    // 어두운 점 (흙 틈)
+    for (let k = 0; k < 6; k++) {
+      const x = Math.floor(hash(k * 19 + i, k * 3 + 7) * 32);
+      const y = Math.floor(hash(k * 5 + 11, k * 23 + i) * 32);
+      setPx(png, x, y, hex(set.detail));
+    }
+    // 아주 가끔 들꽃 한 송이
+    if (i === 2) {
+      const fx = 8 + Math.floor(hash(i, 99) * 16), fy = 8 + Math.floor(hash(99, i) * 16);
+      setPx(png, fx, fy, hex(set.flower));
+      setPx(png, fx + 1, fy, hex(set.flower));
+      setPx(png, fx, fy + 1, hex(set.flower));
+      setPx(png, fx + 1, fy + 1, hex(set.flower));
     }
     save(png, 'grass_' + season + '_' + i);
   });
 }
 
-// 밭 (마른/젖은)
-[['soil_dry', '#8a6a42', '#80613c', '#755835'], ['soil_wet', '#5a4028', '#513a24', '#48331f']]
-  .forEach(([name, a, b, line]) => {
-    const png = newImg(16, 16);
-    fillRect(png, 0, 0, 16, 16, hex(a));
-    for (let k = 0; k < 14; k++) {
-      const x = Math.floor(hash(k * 5, k + 3) * 16);
-      const y = Math.floor(hash(k + 9, k * 3) * 16);
+// 밭 (마른/젖은): 흙덩이 알갱이 + 고랑 2줄 + 하이라이트
+[['soil_dry', '#8a6a42', '#80613c', '#755835', '#97764c'],
+ ['soil_wet', '#5a4028', '#513a24', '#48331f', '#66492e']]
+  .forEach(([name, a, b, line, hi]) => {
+    const png = newImg(32, 32);
+    fillRect(png, 0, 0, 32, 32, hex(a));
+    for (let k = 0; k < 40; k++) {
+      const x = Math.floor(hash(k * 5, k + 3) * 32);
+      const y = Math.floor(hash(k + 9, k * 3) * 32);
       setPx(png, x, y, hex(b));
+      if (hash(k, x) < 0.35) setPx(png, x + 1, y, hex(hi));
     }
-    fillRect(png, 0, 7, 16, 1, hex(line)); // 밭고랑
+    fillRect(png, 0, 10, 32, 1, hex(line)); // 밭고랑 2줄
+    fillRect(png, 0, 22, 32, 1, hex(line));
     save(png, name);
   });
 
-// 길 (마을/가로 도로)
+// 길: 자갈 몇 개 + 모래알
 {
-  const png = newImg(16, 16);
-  fillRect(png, 0, 0, 16, 16, hex('#c2a878'));
-  for (let k = 0; k < 10; k++) {
-    const x = Math.floor(hash(k * 3 + 1, k * 7 + 2) * 16);
-    const y = Math.floor(hash(k * 11 + 5, k * 5 + 3) * 16);
+  const png = newImg(32, 32);
+  fillRect(png, 0, 0, 32, 32, hex('#c2a878'));
+  for (let k = 0; k < 26; k++) {
+    const x = Math.floor(hash(k * 3 + 1, k * 7 + 2) * 32);
+    const y = Math.floor(hash(k * 11 + 5, k * 5 + 3) * 32);
     setPx(png, x, y, hex('#b09668'));
     setPx(png, x + 1, y, hex('#b09668'));
   }
-  setPx(png, 3, 12, hex('#8f7a52'));
-  setPx(png, 11, 4, hex('#8f7a52'));
+  // 자갈 (2x2 밝은 돌 + 그림자)
+  [[5, 22], [21, 8], [13, 15], [26, 26]].forEach(([x, y]) => {
+    fillRect(png, x, y, 2, 2, hex('#d8c298'));
+    setPx(png, x, y + 2, hex('#8f7a52'));
+    setPx(png, x + 1, y + 2, hex('#8f7a52'));
+  });
   save(png, 'path');
 }
 
-// 물 2종 (물결 애니메이션 프레임)
+// 물 2종: 물결 곡선 + 반짝임
 [0, 1].forEach((i) => {
-  const png = newImg(16, 16);
-  fillRect(png, 0, 0, 16, 16, hex(i ? '#356598' : '#3b6ea5'));
-  fillRect(png, 3 + i * 4, 5, 5, 1, hex('#5b8cc0'));
-  fillRect(png, 9 - i * 3, 11, 4, 1, hex('#5b8cc0'));
+  const png = newImg(32, 32);
+  fillRect(png, 0, 0, 32, 32, hex(i ? '#356598' : '#3b6ea5'));
+  fillRect(png, 0, 0, 32, 2, hex(i ? '#3b6ea5' : '#356598'));
+  const wave = hex('#5b8cc0');
+  fillRect(png, 5 + i * 6, 9, 8, 1, wave);
+  setPx(png, 4 + i * 6, 10, wave); setPx(png, 13 + i * 6, 10, wave);
+  fillRect(png, 18 - i * 5, 21, 7, 1, wave);
+  setPx(png, 17 - i * 5, 22, wave); setPx(png, 25 - i * 5, 22, wave);
+  setPx(png, 26, 5 + i * 3, hex('#a8cbe8'));
+  setPx(png, 8, 27 - i * 2, hex('#a8cbe8'));
   save(png, 'water_' + i);
 });
 
@@ -1551,3 +1583,21 @@ for (const [season, set] of Object.entries(GRASS_SETS)) {
 }
 
 console.log('done');
+
+
+// ---- 32px 세계: 아직 1x인 스프라이트를 전부 2배로 (최근접) ----
+const SKIP_2X = /^(player_|npc_.+_(down|up|side)_|grass_|soil_|path$|water_)/;
+for (const name of SAVED_NAMES) {
+  if (SKIP_2X.test(name)) continue;
+  const file = path.join(OUT, name + '.png');
+  const img = PNG.sync.read(fs.readFileSync(file));
+  const big = new PNG({ width: img.width * 2, height: img.height * 2 });
+  for (let y = 0; y < big.height; y++) for (let x = 0; x < big.width; x++) {
+    const si = ((y >> 1) * img.width + (x >> 1)) * 4;
+    const di = (y * big.width + x) * 4;
+    big.data[di] = img.data[si]; big.data[di + 1] = img.data[si + 1];
+    big.data[di + 2] = img.data[si + 2]; big.data[di + 3] = img.data[si + 3];
+  }
+  fs.writeFileSync(file, PNG.sync.write(big));
+}
+console.log('2x upscale pass done');

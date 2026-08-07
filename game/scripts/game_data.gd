@@ -140,9 +140,9 @@ func reset_keybinds() -> void:
 
 # ---- 화면 설정 ----
 const SETTINGS_PATH := "user://kyojin_display.json"
-const WINDOW_MODES := ["1280x720", "1920x1080", "fullscreen"]
-var window_mode := "1280x720"
-var _last_windowed := "1280x720"
+const WINDOW_MODES := ["960x540", "1440x810", "1920x1080", "fullscreen"]
+var window_mode := "1440x810"
+var _last_windowed := "1440x810"
 
 
 func _ready() -> void:
@@ -211,7 +211,7 @@ func load_settings() -> void:
 		window_mode = str(d.window)
 		# 구버전 해상도 설정은 현재 기본값으로 교체
 		if not WINDOW_MODES.has(window_mode):
-			window_mode = "1280x720"
+			window_mode = "1440x810"
 		if window_mode != "fullscreen":
 			_last_windowed = window_mode
 
@@ -334,14 +334,14 @@ func cook_energy_mult() -> float:
 # ---- 집 꾸미기 가구 ----
 # solid: 지나갈 수 없는 가구 (러그/액자는 통과 가능)
 const FURNITURE := {
-	"table": {"name": "식탁", "price": 250, "w": 60, "h": 42, "solid": true},
-	"chair": {"name": "의자", "price": 80, "w": 14, "h": 16, "solid": true},
-	"chest": {"name": "궤짝", "price": 150, "w": 30, "h": 26, "solid": true},
-	"rug": {"name": "러그", "price": 120, "w": 88, "h": 40, "solid": false},
-	"plant": {"name": "화분", "price": 100, "w": 16, "h": 20, "solid": true},
-	"bookshelf": {"name": "책장", "price": 300, "w": 36, "h": 48, "solid": true},
-	"lamp": {"name": "램프", "price": 150, "w": 12, "h": 26, "solid": true},
-	"small_table": {"name": "탁자", "price": 140, "w": 28, "h": 24, "solid": true},
+	"table": {"name": "식탁", "price": 250, "w": 90, "h": 63, "solid": true},
+	"chair": {"name": "의자", "price": 80, "w": 21, "h": 24, "solid": true},
+	"chest": {"name": "궤짝", "price": 150, "w": 45, "h": 39, "solid": true},
+	"rug": {"name": "러그", "price": 120, "w": 132, "h": 60, "solid": false},
+	"plant": {"name": "화분", "price": 100, "w": 24, "h": 30, "solid": true},
+	"bookshelf": {"name": "책장", "price": 300, "w": 54, "h": 72, "solid": true},
+	"lamp": {"name": "램프", "price": 150, "w": 18, "h": 39, "solid": true},
+	"small_table": {"name": "탁자", "price": 140, "w": 42, "h": 36, "solid": true},
 }
 const FURNITURE_IDS := ["table", "chair", "chest", "rug", "plant", "bookshelf", "lamp", "small_table"]
 var furniture: Array = []  # [{id, x, y}]
@@ -349,11 +349,11 @@ var furniture: Array = []  # [{id, x, y}]
 
 func default_furniture() -> Array:
 	return [
-		{"id": "rug", "x": 196.0, "y": 206.0},
-		{"id": "table", "x": 226.0, "y": 152.0},
-		{"id": "chair", "x": 208.0, "y": 162.0},
-		{"id": "chair", "x": 290.0, "y": 162.0},
-		{"id": "chest", "x": 344.0, "y": 110.0},
+		{"id": "rug", "x": 294.0, "y": 309.0},
+		{"id": "table", "x": 339.0, "y": 228.0},
+		{"id": "chair", "x": 312.0, "y": 243.0},
+		{"id": "chair", "x": 435.0, "y": 243.0},
+		{"id": "chest", "x": 516.0, "y": 165.0},
 	]
 
 # ---- 펫: 한 마리만 데리고 다니며 고유 패시브를 준다 ----
@@ -608,10 +608,10 @@ func cook(id: String) -> bool:
 
 # 낚시: [아이템 id, 확률 가중치, 타이밍 존 폭(px)]
 const FISH := [
-	["fish_crucian", 0.45, 62.0],
-	["fish_carp", 0.30, 46.0],
-	["fish_catfish", 0.18, 32.0],
-	["fish_golden", 0.07, 18.0],
+	["fish_crucian", 0.45, 93.0],
+	["fish_carp", 0.30, 69.0],
+	["fish_catfish", 0.18, 48.0],
+	["fish_golden", 0.07, 27.0],
 ]
 
 var items := {}
@@ -1032,6 +1032,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"barn_built": barn_built,
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
+		"tile": 32,
 		"player": [player_pos.x, player_pos.y],
 		"grid": grid_data,
 		"objects": objects_data,

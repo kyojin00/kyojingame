@@ -19,18 +19,17 @@ Net="*res://scripts/net.gd"
 
 [display]
 
-window/size/viewport_width=640
-window/size/viewport_height=360
-window/size/window_width_override=1280
-window/size/window_height_override=720
+window/size/viewport_width=960
+window/size/viewport_height=540
+window/size/window_width_override=1440
+window/size/window_height_override=810
 window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
-window/stretch/scale_mode="integer"
 
 [gui]
 
 theme/custom_font="res://assets/fonts/Galmuri11.ttf"
-theme/default_font_size=11
+theme/default_font_size=22
 
 [input]
 

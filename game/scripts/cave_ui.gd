@@ -3,9 +3,9 @@ extends CanvasLayer
 
 const GW := 26          # 동굴 그리드 (타일)
 const GH := 13
-const TS := 16.0        # 타일 픽셀
-const OX := 112.0        # 화면 오프셋
-const OY := 76.0
+const TS := 32.0        # 타일 픽셀
+const OX := 64.0         # 화면 오프셋
+const OY := 62.0
 
 var main: Node2D
 var canvas: Control
@@ -41,6 +41,7 @@ func _ready() -> void:
 	add_child(canvas)
 	player_sprite = Sprite2D.new()
 	player_sprite.centered = false
+	player_sprite.scale = Vector2(2, 2)
 	add_child(player_sprite)
 
 
@@ -127,7 +128,7 @@ func _free_tile(min_dist: float) -> Vector2i:
 
 
 func _blocked_at(p: Vector2) -> bool:
-	for off in [Vector2(-5, -3), Vector2(5, -3), Vector2(-5, 4), Vector2(5, 4)]:
+	for off in [Vector2(-10, -6), Vector2(10, -6), Vector2(-10, 8), Vector2(10, 8)]:
 		var t := Vector2i(int((p.x + off.x - OX) / TS), int((p.y + off.y - OY) / TS))
 		if t.x < 0 or t.y < 0 or t.x >= GW or t.y >= GH or walls.has(t) or ores.has(t):
 			return true
@@ -153,12 +154,12 @@ func _process(delta: float) -> void:
 			pdir = "right" if v.x > 0 else "left"
 		else:
 			pdir = "down" if v.y > 0 else "up"
-		var np := ppos + v * 85.0 * delta
+		var np := ppos + v * 170.0 * delta
 		var stuck := _blocked_at(ppos)
 		if stuck or not _blocked_at(Vector2(np.x, ppos.y)):
-			ppos.x = clampf(np.x, OX + 4, OX + GW * TS - 4)
+			ppos.x = clampf(np.x, OX + 8, OX + GW * TS - 8)
 		if stuck or not _blocked_at(Vector2(ppos.x, np.y)):
-			ppos.y = clampf(np.y, OY + 4, OY + GH * TS - 4)
+			ppos.y = clampf(np.y, OY + 8, OY + GH * TS - 8)
 		anim_time += delta
 
 	# 몬스터
@@ -170,29 +171,29 @@ func _process(delta: float) -> void:
 			"slime":
 				if m.think <= 0.0:
 					m.think = randf_range(0.6, 1.6)
-					if to_player.length() < 70.0:
-						m.vel = to_player.normalized() * (26.0 + floor_num * 4.0)
+					if to_player.length() < 140.0:
+						m.vel = to_player.normalized() * (52.0 + floor_num * 8.0)
 					else:
-						m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 20.0
+						m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 40.0
 			"bat":
 				if m.think <= 0.0:
 					# 주기적으로 플레이어를 향해 돌진
 					m.think = randf_range(1.2, 2.0)
-					if to_player.length() < 120.0:
-						m.vel = to_player.normalized() * (70.0 + floor_num * 8.0)
+					if to_player.length() < 240.0:
+						m.vel = to_player.normalized() * (140.0 + floor_num * 16.0)
 					else:
-						m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 34.0
-				m.vel = m.vel.move_toward(Vector2.ZERO, 30.0 * delta)  # 돌진 후 감속
+						m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 68.0
+				m.vel = m.vel.move_toward(Vector2.ZERO, 60.0 * delta)  # 돌진 후 감속
 			"ghost":
 				# 벽을 통과하며 끈질기게 추적
-				m.vel = to_player.normalized() * (22.0 + floor_num * 3.0)
+				m.vel = to_player.normalized() * (44.0 + floor_num * 6.0)
 			"treant":
 				# 느리게 다가오다 주기적으로 돌진한다
 				if m.think <= 0.0:
 					m.think = randf_range(2.0, 3.0)
-					m.vel = to_player.normalized() * 95.0
+					m.vel = to_player.normalized() * 190.0
 				else:
-					m.vel = m.vel.move_toward(to_player.normalized() * 18.0, 60.0 * delta)
+					m.vel = m.vel.move_toward(to_player.normalized() * 36.0, 120.0 * delta)
 		var np: Vector2 = m.pos + m.vel * delta
 		if m.type == "ghost":
 			m.pos.x = clampf(np.x, OX + TS, OX + (GW - 1) * TS)
@@ -202,13 +203,13 @@ func _process(delta: float) -> void:
 		else:
 			m.pos = np
 		# 접촉 피해 (종류별)
-		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 12.0:
+		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 24.0:
 			hurt_cd = 0.9
 			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0, "treant": 20.0}[m.type]
 			GameData.energy -= dmg * GameData.pet_cave_def_mult()  # 부엉이 펫: 피해 감소
 			Sound.play_sfx("sfx_miss")
 			# 넉백은 막히지 않은 곳으로만 (벽/바위 끼임 방지)
-			var kb: Vector2 = ppos + (ppos - m.pos).normalized() * 10.0
+			var kb: Vector2 = ppos + (ppos - m.pos).normalized() * 20.0
 			if not _blocked_at(kb):
 				ppos = kb
 			if GameData.energy <= 0.0:
@@ -242,15 +243,15 @@ func _attack() -> void:
 	attack_cd = 0.35
 	swing_t = 0.15
 	Sound.play_sfx("sfx_chop", 0.2)
-	var reach := ppos + _dir_vec() * 14.0
+	var reach := ppos + _dir_vec() * 28.0
 	# 도끼 강화 = 공격력 2배, 전투 숙련도 = +0.5/Lv
 	var dmg: float = 1 + (int(GameData.tool_level.get("axe", 1)) - 1) + GameData.combat_bonus()
 	# 몬스터 타격
 	for m in monsters:
-		if (m.pos - reach).length() < 14.0 or (m.pos - ppos).length() < 12.0:
+		if (m.pos - reach).length() < 28.0 or (m.pos - ppos).length() < 24.0:
 			m.hp -= dmg
 			if m.type != "ghost":
-				m.vel = (m.pos - ppos).normalized() * 60.0
+				m.vel = (m.pos - ppos).normalized() * 120.0
 			if m.hp <= 0:
 				monsters.erase(m)
 				Sound.play_sfx("sfx_pick", 0.2)
@@ -351,7 +352,7 @@ func _update_sprite() -> void:
 			tex_name = "player_side_%d" % frame
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
-	player_sprite.position = ppos + Vector2(-8, -21)
+	player_sprite.position = ppos + Vector2(-16, -42)
 	player_sprite.modulate = Color(1, 0.55, 0.55) if hurt_cd > 0.6 else Color(1, 1, 1)
 
 
@@ -380,13 +381,13 @@ func _draw_cave() -> void:
 	for m in monsters:
 		var frame := int(m.anim * (7.0 if m.type == "bat" else 4.0)) % 2
 		var mod := Color(1, 1, 1, 0.7) if m.type == "ghost" else Color(1, 1, 1)
-		var moff := Vector2(-12, -16) if m.type == "treant" else Vector2(-8, -10)
+		var moff := Vector2(-24, -32) if m.type == "treant" else Vector2(-16, -20)
 		canvas.draw_texture(main.tex["%s_%d" % [m.type, frame]], m.pos + moff, mod)
 
 	# 공격 스윙
 	if swing_t > 0.0:
-		var reach := ppos + _dir_vec() * 14.0
-		canvas.draw_rect(Rect2(reach.x - 6, reach.y - 6, 12, 12), Color(1, 0.9, 0.5, 0.5))
+		var reach := ppos + _dir_vec() * 28.0
+		canvas.draw_rect(Rect2(reach.x - 12, reach.y - 12, 24, 24), Color(1, 0.9, 0.5, 0.5))
 
 	# 상단 정보
 	var cave_name := "세계수 동굴" if worldtree else "동굴"
@@ -395,13 +396,13 @@ func _draw_cave() -> void:
 		info += " · 상자를 열자(E)!"
 	elif stairs_pos.x >= 0:
 		info += " · 계단(E)으로 다음 층!"
-	_cave_label(Vector2(320, 40), info)
+	_cave_label(Vector2(480, 52), info)
 
 
 func _cave_label(center: Vector2, text: String) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 	var p := Vector2(center.x - w / 2.0, center.y)
-	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2,
+	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 3,
 		Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
+	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22,
 		Color(0.95, 0.92, 0.85))

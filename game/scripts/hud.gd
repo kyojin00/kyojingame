@@ -67,20 +67,20 @@ func _build_hotbar() -> void:
 	_slot_selected.set_border_width_all(2)
 
 	var slot_count: int = GameData.tool_slots.size()
-	var slot_w := 26
-	var sep := 2
-	var pad := 6
+	var slot_w := 40
+	var sep := 3
+	var pad := 9
 	var width := slot_count * slot_w + (slot_count - 1) * sep + pad * 2
 	hotbar_panel = Panel.new()
 	hotbar_panel.add_theme_stylebox_override("panel", _wood_style())
-	hotbar_panel.position = Vector2((640 - width) / 2.0, 320.0)
-	hotbar_panel.size = Vector2(width, 38)
+	hotbar_panel.position = Vector2((960 - width) / 2.0, 480.0)
+	hotbar_panel.size = Vector2(width, 58)
 	add_child(hotbar_panel)
 
 	for i in slot_count:
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(slot_w, 26)
-		b.position = Vector2(pad + i * (slot_w + sep), 6)
+		b.custom_minimum_size = Vector2(slot_w, 40)
+		b.position = Vector2(pad + i * (slot_w + sep), 9)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		var slot_i := i
@@ -91,7 +91,7 @@ func _build_hotbar() -> void:
 		if i < 9:
 			var num := Label.new()
 			num.text = str(i + 1)
-			num.position = Vector2(1, -4)
+			num.position = Vector2(2, -6)
 			num.add_theme_color_override("font_color", Color(0.5, 0.32, 0.14))
 			num.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			b.add_child(num)

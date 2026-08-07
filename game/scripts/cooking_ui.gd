@@ -11,8 +11,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(130, 58)
-	panel.custom_minimum_size = Vector2(380, 238)
+	panel.position = Vector2(195, 87)
+	panel.custom_minimum_size = Vector2(570, 357)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -33,7 +33,7 @@ func _ready() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(360, 190)
+	scroll.custom_minimum_size = Vector2(540, 285)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()

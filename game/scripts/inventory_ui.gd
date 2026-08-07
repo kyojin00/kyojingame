@@ -22,8 +22,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(135, 55)
-	panel.custom_minimum_size = Vector2(370, 230)
+	panel.position = Vector2(203, 83)
+	panel.custom_minimum_size = Vector2(555, 345)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -44,7 +44,7 @@ func _ready() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(350, 180)
+	scroll.custom_minimum_size = Vector2(525, 270)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()
@@ -106,7 +106,7 @@ func _rebuild() -> void:
 		var t: String = GameData.tool_slots[i]
 		var unlocked: bool = t != "" and GameData.is_tool_unlocked(t)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(26, 26)
+		b.custom_minimum_size = Vector2(40, 40)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null

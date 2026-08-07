@@ -1,7 +1,7 @@
 # 지도 (M): 농장 전체를 축소해 보여주고 주요 시설과 내 위치를 표시한다.
 extends CanvasLayer
 
-const CELL := 5.0  # 타일당 픽셀 (90x60 맵, 화면 640x360)
+const CELL := 8.0  # 타일당 픽셀 (90x60 맵, 화면 960x540)
 
 var main: Node2D
 var canvas: Control
@@ -46,8 +46,8 @@ func _process(delta: float) -> void:
 
 
 func _draw_map() -> void:
-	var ox: float = (640.0 - main.MAP_W * CELL) / 2.0
-	var oy: float = (360.0 - main.MAP_H * CELL) / 2.0 + 2.0
+	var ox: float = (960.0 - main.MAP_W * CELL) / 2.0
+	var oy: float = (540.0 - main.MAP_H * CELL) / 2.0 + 2.0
 
 	# 지형
 	for y in main.MAP_H:
@@ -91,15 +91,15 @@ func _draw_map() -> void:
 
 	# 동물/NPC
 	for a in main.animals:
-		canvas.draw_rect(Rect2(ox + a.position.x / 16.0 * CELL - 1, oy + a.position.y / 16.0 * CELL - 1, 3, 3),
+		canvas.draw_rect(Rect2(ox + a.position.x / 32.0 * CELL - 1, oy + a.position.y / 32.0 * CELL - 1, 3, 3),
 			Color(0.95, 0.95, 0.9))
 	for n in main.npcs:
-		canvas.draw_rect(Rect2(ox + n.position.x / 16.0 * CELL - 1, oy + n.position.y / 16.0 * CELL - 1, 3, 3),
+		canvas.draw_rect(Rect2(ox + n.position.x / 32.0 * CELL - 1, oy + n.position.y / 32.0 * CELL - 1, 3, 3),
 			Color(0.95, 0.55, 0.75))
 
 	# 내 위치 (깜빡임)
 	if fmod(blink, 0.8) < 0.5:
-		var pp := Vector2(ox + main.player.position.x / 16.0 * CELL, oy + main.player.position.y / 16.0 * CELL)
+		var pp := Vector2(ox + main.player.position.x / 32.0 * CELL, oy + main.player.position.y / 32.0 * CELL)
 		canvas.draw_rect(Rect2(pp.x - 2, pp.y - 2, 5, 5), Color(1, 1, 1))
 		canvas.draw_rect(Rect2(pp.x - 1, pp.y - 1, 3, 3), Color(0.95, 0.3, 0.25))
 
@@ -120,18 +120,18 @@ func _draw_map() -> void:
 	_label(Vector2(ox + 73.0 * CELL, oy + 15.0 * CELL - 4), "광장")
 	_label(Vector2(ox + 25.0 * CELL, oy + 13.0 * CELL - 2), "연못")
 	_label(Vector2(ox + 50.0 * CELL, oy + 1.0 * CELL - 2), "동굴")
-	_label(Vector2(ox + main.player.position.x / 16.0 * CELL, oy + main.player.position.y / 16.0 * CELL - 8), "내 위치")
+	_label(Vector2(ox + main.player.position.x / 32.0 * CELL, oy + main.player.position.y / 32.0 * CELL - 8), "내 위치")
 
 	# 안내
 	var guide := "M 또는 ESC: 닫기"
-	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
-	canvas.draw_string(main.UI_FONT, Vector2(320 - w / 2.0, 350), guide,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.7, 0.68, 0.8))
+	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	canvas.draw_string(main.UI_FONT, Vector2(480 - w / 2.0, 526), guide,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.7, 0.68, 0.8))
 
 
 func _label(pos: Vector2, text: String) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 	var p := Vector2(pos.x - w / 2.0, pos.y)
-	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2,
+	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 3,
 		Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.92, 0.7))
+	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.92, 0.7))

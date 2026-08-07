@@ -33,9 +33,9 @@ func _process(delta: float) -> void:
 	_think -= delta
 	if _think <= 0.0:
 		_think = randf_range(1.0, 2.5)
-		_target = position + Vector2(randf_range(-40, 40), randf_range(-30, 30))
-		_target.x = clampf(_target.x, 16, (main.MAP_W - 1) * 16.0)
-		_target.y = clampf(_target.y, 16, (main.MAP_H - 1) * 16.0)
-	position = position.move_toward(_target, 22.0 * delta)
+		_target = position + Vector2(randf_range(-80, 80), randf_range(-60, 60))
+		_target.x = clampf(_target.x, main.TILE, (main.MAP_W - 1) * float(main.TILE))
+		_target.y = clampf(_target.y, main.TILE, (main.MAP_H - 1) * float(main.TILE))
+	position = position.move_toward(_target, 44.0 * delta)
 	position.y += sin(anim * 5.0) * 0.15
 	sprite.texture = main.tex["%s_%d" % [bug_id, int(anim * 6.0) % 2]]

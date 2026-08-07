@@ -14,7 +14,7 @@ func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
 	sprite.offset = Vector2(-16, -47)
-	sprite.scale = Vector2(1.5, 1.5)
+	sprite.scale = Vector2(2, 2)
 	sprite.modulate = tint
 	add_child(sprite)
 	target_pos = position

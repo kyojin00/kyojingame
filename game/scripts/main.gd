@@ -3,7 +3,7 @@ extends Node2D
 
 const MAP_W := 90
 const MAP_H := 60
-const TILE := 16
+const TILE := 32
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
 const TREE_HP := 3
@@ -177,7 +177,7 @@ func _ready() -> void:
 
 	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
-	player.position = Vector2(START_TILE.x * TILE + 8, START_TILE.y * TILE + 8)
+	player.position = Vector2(START_TILE.x * TILE + 16, START_TILE.y * TILE + 16)
 	world.add_child(player)
 	_setup_camera()
 
@@ -248,7 +248,7 @@ func _ready() -> void:
 		n.id = npc_id
 		n.region = VILLAGE_REGION
 		var sp: Vector2i = npc_spawns[npc_id]
-		n.position = Vector2(sp.x * TILE + 8, sp.y * TILE + 8)
+		n.position = Vector2(sp.x * TILE + 16, sp.y * TILE + 16)
 		npcs.append(n)
 		world.add_child(n)
 
@@ -276,8 +276,8 @@ func _ready() -> void:
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
 		GameData.unlock_all_tools()
-		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 8,
-			START_TILE.y * TILE + 8)
+		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 16,
+			START_TILE.y * TILE + 16)
 		_show_connecting()
 		# 연결이 완료된 뒤에 스냅샷을 요청한다 (그 전 RPC는 유실됨)
 		multiplayer.connected_to_server.connect(func() -> void: _req_snapshot.rpc_id(1))
@@ -296,7 +296,7 @@ func _ready() -> void:
 		GameData.reset_all()
 		hud.show_message("교진 마을에 도착했다. 할아버지의 집에서 눈을 뜬다...")
 		# 새 게임은 물려받은 집 안에서 눈을 뜨며 시작한다 (문 앞 위치로 준비)
-		player.position = Vector2(4 * TILE + 8, 5 * TILE + 8)
+		player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if (_shot_path == "" and OS.get_environment("KYOJIN_MP") == "") \
 				or OS.get_environment("KYOJIN_STORY") != "":
 			interior.open.call_deferred()
@@ -449,10 +449,10 @@ func _spawn_objects() -> void:
 	tree_sprites.clear()
 	for anchor: Vector2i in BUILDINGS:
 		var hn := _make_object(tex["house"],
-			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -64))
+			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -128))
 		var hspr: Sprite2D = hn.get_child(0)
 		hspr.scale = Vector2(1.4, 1.4)
-		hspr.offset.x = 40.0 / 1.4 - 40.0
+		hspr.offset.x = 80.0 / 1.4 - 80.0
 		obj_nodes[anchor] = hn
 		world.add_child(hn)
 	for pos: Vector2i in objects:
@@ -468,12 +468,12 @@ const OBJECT_SCALES := {
 
 
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
-	var offset := Vector2(0, -16)
+	var offset := Vector2(0, -32)
 	var texture: Texture2D
 	match kind:
 		"tree":
 			texture = tex["tree_" + GameData.season_key()]
-			offset = Vector2(0, -25)
+			offset = Vector2(0, -50)
 		"rock":
 			texture = tex["rock"]
 		"bin":
@@ -484,7 +484,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["sign"]
 		"cave":
 			texture = tex["cave"]
-			offset = Vector2(0, -25)
+			offset = Vector2(0, -50)
 		"fence":
 			texture = tex["fence"]
 		"sprinkler":
@@ -495,10 +495,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["forage_herb"]
 		"worldtree":
 			texture = tex["cave"]
-			offset = Vector2(0, -25)
+			offset = Vector2(0, -50)
 		"barn":
 			texture = tex["barn"]
-			offset = Vector2(0, -22)
+			offset = Vector2(0, -44)
 		"barn_block":
 			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
 	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
@@ -507,7 +507,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	if sc != 1.0 and texture != null:
 		var spr: Sprite2D = node.get_child(0)
 		spr.scale = Vector2(sc, sc)
-		spr.offset.x = 8.0 / sc - texture.get_width() / 2.0
+		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
 	obj_nodes[pos] = node
 	if kind == "tree":
 		tree_sprites.append(node.get_child(0))
@@ -1094,14 +1094,14 @@ func _tile_overlaps_player(t: Vector2i) -> bool:
 
 func nearby_npc() -> Node2D:
 	for n in npcs:
-		if (n.position - player.position).length() < 24.0:
+		if (n.position - player.position).length() < 48.0:
 			return n
 	return null
 
 
 func nearby_animal() -> Node2D:
 	for a in animals:
-		if (a.position - player.position).length() < 22.0:
+		if (a.position - player.position).length() < 44.0:
 			return a
 	return null
 
@@ -1198,8 +1198,8 @@ func _build_story_ui() -> void:
 
 	# 양피지 편지 패널 (밝은 배경 + 진한 글씨)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(140, 60)
-	panel.custom_minimum_size = Vector2(360, 210)
+	panel.position = Vector2(210, 90)
+	panel.custom_minimum_size = Vector2(540, 315)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.93, 0.88, 0.74)
 	style.border_color = Color(0.55, 0.42, 0.26)
@@ -1546,7 +1546,7 @@ func spawn_animal(type: String, pos: Vector2 = Vector2.ZERO, fed: bool = false) 
 	a.fed = fed
 	if pos == Vector2.ZERO:
 		var t := _find_free_tile_near(Vector2i(10, 7))
-		pos = Vector2(t.x * TILE + 8, t.y * TILE + 8)
+		pos = Vector2(t.x * TILE + 16, t.y * TILE + 16)
 	a.position = pos
 	animals.append(a)
 	world.add_child(a)
@@ -1741,7 +1741,7 @@ func _spawn_bugs() -> void:
 
 func nearby_bug() -> Node2D:
 	for bnode in bugs:
-		if bnode.visible and (bnode.position - player.position).length() < 20.0:
+		if bnode.visible and (bnode.position - player.position).length() < 40.0:
 			return bnode
 	return null
 
@@ -1808,6 +1808,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.apply_skills_data(d.get("skills", {}))
 	if d.has("furniture"):
 		GameData.apply_furniture_data(d.furniture)
+		if int(d.get("tile", 16)) != TILE:
+			for furn in GameData.furniture:  # 구버전 집 좌표(640기준) → 960기준
+				furn.x = float(furn.x) * 1.5
+				furn.y = float(furn.y) * 1.5
 	for k in d.get("recipes_cooked", {}):
 		GameData.recipes_cooked[k] = int(d.recipes_cooked[k])
 	GameData.owned_pets = d.get("owned_pets", [])
@@ -1822,14 +1826,17 @@ func _apply_save(d: Dictionary) -> void:
 	if GameData.barn_built and not objects.has(BARN_POS):
 		objects[BARN_POS] = {"kind": "barn", "hp": 0}
 		objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
+	var anim_scale := float(TILE) / float(d.get("tile", 16))
 	for a in d.get("animals", []):
-		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
-	player.position = Vector2(float(d.player[0]), float(d.player[1]))
+		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])) * anim_scale, int(a[3]) == 1)
+	# 구버전(16px 타일) 저장 좌표 환산
+	var pos_scale := float(TILE) / float(d.get("tile", 16))
+	player.position = Vector2(float(d.player[0]), float(d.player[1])) * pos_scale
 
 	# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다
 	var g: Array = d.grid
 	if g.size() != MAP_H or (g.size() > 0 and g[0].size() != MAP_W):
-		player.position = Vector2(START_TILE.x * TILE + 8, START_TILE.y * TILE + 8)
+		player.position = Vector2(START_TILE.x * TILE + 16, START_TILE.y * TILE + 16)
 		return
 	for y in MAP_H:
 		for x in MAP_W:
@@ -2101,7 +2108,7 @@ const PARTICLE_DEFS := {
 
 func spawn_particles(t: Vector2i, kind: String) -> void:
 	var d: Array = PARTICLE_DEFS[kind]
-	var center := Vector2(t.x * TILE + 8, t.y * TILE + 8)
+	var center := Vector2(t.x * TILE + 16, t.y * TILE + 16)
 	for i in d[1]:
 		particles.append({
 			"p": center + Vector2(randf_range(-5, 5), randf_range(-4, 2)),
@@ -2191,13 +2198,13 @@ func _draw_overlay() -> void:
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if player != null:
 		if fishing_state == "waiting":
-			var base := player.position + Vector2(-6, -60)
+			var base := player.position + Vector2(-8, -96)
 			var dots := int(weather_time * 2.0) % 3 + 1
 			for i in dots:
 				overlay.draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)),
 					Color(1, 1, 1, 0.8))
 		elif fishing_state == "bite":
-			var base := player.position + Vector2(-1, -68)
+			var base := player.position + Vector2(-2, -108)
 			overlay.draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
 			overlay.draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
 
@@ -2213,7 +2220,7 @@ func _context_hint() -> Array:
 	# 반환: [문구, 기준 위치(월드)] 또는 []
 	if player == null or ui_open():
 		return []
-	var above_player := player.position + Vector2(0, -62)
+	var above_player := player.position + Vector2(0, -100)
 	if fishing_state == "bite":
 		return ["지금이다!", above_player]
 	if fishing_state == "waiting":
@@ -2225,7 +2232,7 @@ func _context_hint() -> Array:
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return []
-	var above_tile := Vector2(t.x * TILE + 8, t.y * TILE - 6)
+	var above_tile := Vector2(t.x * TILE + 16, t.y * TILE - 12)
 	var obj: Variant = objects.get(t)
 	if obj != null:
 		match obj.kind:
@@ -2278,11 +2285,11 @@ func _context_hint() -> Array:
 func nav_target() -> Variant:
 	match GameData.tutorial_current_flag():
 		"slept":
-			return Vector2(4 * TILE + 8, 5 * TILE + 8)     # 농장 집 문 앞
+			return Vector2(4 * TILE + 16, 5 * TILE + 16)     # 농장 집 문 앞
 		"shop":
-			return Vector2(65 * TILE + 8, 7 * TILE + 8)    # 마을 잡화점 앞
+			return Vector2(65 * TILE + 16, 7 * TILE + 16)    # 마을 잡화점 앞
 		"fish":
-			return Vector2(25 * TILE + 8, 12 * TILE + 8)   # 연못가
+			return Vector2(25 * TILE + 16, 12 * TILE + 16)   # 연못가
 		"chop":
 			return _nearest_object_pos("tree")
 		"mine":
@@ -2296,7 +2303,7 @@ func _nearest_object_pos(kind: String) -> Variant:
 	for pos: Vector2i in objects:
 		if objects[pos].kind != kind:
 			continue
-		var p := Vector2(pos.x * TILE + 8, pos.y * TILE + 8)
+		var p := Vector2(pos.x * TILE + 16, pos.y * TILE + 16)
 		var d := p.distance_to(player.position)
 		if d < best_d:
 			best_d = d
@@ -2315,7 +2322,7 @@ func _draw_nav_arrow() -> void:
 		return  # 목적지 근처에서는 숨긴다
 	var dirv := to.normalized()
 	var bob := sin(weather_time * 6.0) * 2.0
-	var base := player.position + Vector2(0, -52) + dirv * (16.0 + bob)
+	var base := player.position + Vector2(0, -80) + dirv * (24.0 + bob)
 	var tip := base + dirv * 7.0
 	var left := base + dirv.rotated(2.6) * 4.0
 	var right := base + dirv.rotated(-2.6) * 4.0
@@ -2329,11 +2336,11 @@ func _draw_context_hint() -> void:
 		return
 	var text: String = hint[0]
 	var base: Vector2 = hint[1]
-	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 	var pos := Vector2(base.x - w / 2.0, base.y)
-	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2,
+	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 3,
 		Color(0.08, 0.06, 0.12, 0.9))
-	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 0.9))
+	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 0.9))
 
 
 func _draw_weather() -> void:
@@ -2371,7 +2378,7 @@ func _debug_tick() -> void:
 	match _shot_frames:
 		10: _send_key(KEY_1)
 		14: _send_key(KEY_SPACE)                       # 아래 타일 밭 갈기
-		18: _send_click(Vector2((START_TILE.x + 1) * TILE + 8, START_TILE.y * TILE + 8))
+		18: _send_click(Vector2((START_TILE.x + 1) * TILE + 16, START_TILE.y * TILE + 16))
 		22: _send_key(KEY_2)
 		26: _send_key(KEY_SPACE)                       # 물 주기
 		30: _send_key(KEY_3)
@@ -2393,10 +2400,10 @@ func _debug_tick() -> void:
 		73: _save_shot("_map.png")
 		74:
 			map_ui.close()
-			player.position = Vector2(74 * TILE + 8, 17 * TILE + 8)
+			player.position = Vector2(74 * TILE + 16, 17 * TILE + 16)
 			player.dir = "right"                       # 마을 광장 게시판 앞으로
 			for n in npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
-				n.position = Vector2(62 * TILE + 8, 25 * TILE + 8)
+				n.position = Vector2(62 * TILE + 16, 25 * TILE + 16)
 				n.target = n.position
 		78: _send_key(KEY_E)
 		84: _save_shot("_quest.png")
@@ -2407,7 +2414,7 @@ func _debug_tick() -> void:
 		100: _save_shot("_npc.png")
 		102:
 			dialog.close()
-			player.position = Vector2(30 * TILE + 8, 8 * TILE + 8)
+			player.position = Vector2(30 * TILE + 16, 8 * TILE + 16)
 			player.dir = "up"                          # 동쪽 부지 표지판 앞 (길 위)
 			GameData.money = 200000
 		106: _send_key(KEY_E)                          # 부지 구입 대화
@@ -2420,7 +2427,7 @@ func _debug_tick() -> void:
 		129: _send_key(KEY_F)                          # 꾸미기 모드
 		133: _save_shot("_deco.png")
 		134: _send_key(KEY_F)                          # 꾸미기 종료
-		136: interior.ppos = Vector2(430, 116)         # 조리대 앞으로
+		136: interior.ppos = Vector2(645, 174)         # 조리대 앞으로
 		138: _send_key(KEY_E)                          # 주방 열기
 		142: _save_shot("_cook.png")
 		144:

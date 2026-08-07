@@ -17,7 +17,7 @@ func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
 	sprite.offset = Vector2(-16, -47)
-	sprite.scale = Vector2(1.5, 1.5)
+	sprite.scale = Vector2(2, 2)
 	add_child(sprite)
 	target = position
 	wait = randf_range(0.5, 2.0)
@@ -39,7 +39,7 @@ func _process(delta: float) -> void:
 			moving = false
 			wait = randf_range(1.5, 4.0)
 		else:
-			var step := d.normalized() * 20.0 * delta
+			var step := d.normalized() * 40.0 * delta
 			if absf(step.x) > absf(step.y):
 				dir = "right" if step.x > 0 else "left"
 			else:

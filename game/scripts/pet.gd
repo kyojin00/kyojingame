@@ -10,7 +10,7 @@ var _flip := false
 func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
-	sprite.offset = Vector2(-8, -14)
+	sprite.offset = Vector2(-16, -28)
 	add_child(sprite)
 
 
@@ -21,13 +21,13 @@ func _process(delta: float) -> void:
 	visible = true
 	anim += delta
 	# 플레이어 뒤를 따라다닌다
-	var target: Vector2 = main.player.position + Vector2(14, 4)
+	var target: Vector2 = main.player.position + Vector2(28, 8)
 	var d := position.distance_to(target)
-	if d > 20.0:
+	if d > 40.0:
 		var dir := (target - position).normalized()
-		position += dir * minf(95.0, d * 2.5) * delta
+		position += dir * minf(190.0, d * 2.5) * delta
 		if absf(dir.x) > 0.2:
 			_flip = dir.x > 0.0
-	var frame := int(anim * 4.0) % 2 if d > 20.0 else 0
+	var frame := int(anim * 4.0) % 2 if d > 40.0 else 0
 	sprite.texture = main.tex["pet_%s_%d" % [GameData.active_pet, frame]]
 	sprite.flip_h = _flip

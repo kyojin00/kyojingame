@@ -24,10 +24,10 @@ func _ready() -> void:
 	deco.position = Vector2(0, 0)
 	add_child(deco)
 	var deco_items := [
-		["tree_spring", Vector2(50, 250), 2.5], ["tree_spring", Vector2(540, 240), 2.5],
-		["house", Vector2(40, 40), 1.6], ["mature_pumpkin", Vector2(140, 306), 2.0],
-		["mature_strawberry", Vector2(200, 310), 2.0], ["chicken_0", Vector2(390, 312), 2.0],
-		["cow_0", Vector2(460, 306), 2.0],
+		["tree_spring", Vector2(75, 375), 2.5], ["tree_spring", Vector2(810, 360), 2.5],
+		["house", Vector2(60, 60), 1.6], ["mature_pumpkin", Vector2(210, 459), 2.0],
+		["mature_strawberry", Vector2(300, 465), 2.0], ["chicken_0", Vector2(585, 468), 2.0],
+		["cow_0", Vector2(690, 459), 2.0],
 	]
 	for item in deco_items:
 		var s := Sprite2D.new()
@@ -41,12 +41,12 @@ func _ready() -> void:
 	# 타이틀
 	var title := Label.new()
 	title.text = "교 진 팜"
-	title.add_theme_font_size_override("font_size", 33)
+	title.add_theme_font_size_override("font_size", 44)
 	title.add_theme_color_override("font_color", Color("ffd75e"))
 	title.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
 	title.add_theme_constant_override("outline_size", 3)
-	title.position = Vector2(190, 48)
-	title.size = Vector2(260, 40)
+	title.position = Vector2(285, 72)
+	title.size = Vector2(390, 60)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
@@ -55,15 +55,15 @@ func _ready() -> void:
 	subtitle.add_theme_color_override("font_color", Color(0.8, 0.85, 0.7))
 	subtitle.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
 	subtitle.add_theme_constant_override("outline_size", 2)
-	subtitle.position = Vector2(200, 96)
-	subtitle.size = Vector2(240, 20)
+	subtitle.position = Vector2(300, 148)
+	subtitle.size = Vector2(360, 30)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(subtitle)
 
 	# 메뉴 버튼
 	var v := VBoxContainer.new()
-	v.position = Vector2(250, 130)
-	v.custom_minimum_size = Vector2(140, 0)
+	v.position = Vector2(375, 200)
+	v.custom_minimum_size = Vector2(210, 0)
 	v.add_theme_constant_override("separation", 4)
 	add_child(v)
 
@@ -125,8 +125,8 @@ func _on_multiplayer() -> void:
 func _build_mp_panel() -> void:
 	mp_panel = PanelContainer.new()
 	mp_panel.visible = false
-	mp_panel.position = Vector2(190, 90)
-	mp_panel.custom_minimum_size = Vector2(260, 150)
+	mp_panel.position = Vector2(285, 135)
+	mp_panel.custom_minimum_size = Vector2(390, 225)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -153,7 +153,7 @@ func _build_mp_panel() -> void:
 	ip_edit = LineEdit.new()
 	ip_edit.text = "127.0.0.1"
 	ip_edit.placeholder_text = "호스트 IP"
-	ip_edit.custom_minimum_size = Vector2(140, 0)
+	ip_edit.custom_minimum_size = Vector2(210, 0)
 	ip_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(ip_edit)
 	row.add_child(_mk_button("참가", _on_join))
@@ -183,8 +183,8 @@ func _on_join() -> void:
 func _build_settings_panel() -> void:
 	settings_panel = PanelContainer.new()
 	settings_panel.visible = false
-	settings_panel.position = Vector2(200, 60)
-	settings_panel.custom_minimum_size = Vector2(240, 150)
+	settings_panel.position = Vector2(300, 90)
+	settings_panel.custom_minimum_size = Vector2(360, 225)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -235,8 +235,8 @@ func _build_settings_panel() -> void:
 func _build_keys_panel() -> void:
 	keys_panel = PanelContainer.new()
 	keys_panel.visible = false
-	keys_panel.position = Vector2(170, 20)
-	keys_panel.custom_minimum_size = Vector2(300, 320)
+	keys_panel.position = Vector2(255, 30)
+	keys_panel.custom_minimum_size = Vector2(450, 480)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -257,7 +257,7 @@ func _build_keys_panel() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(280, 238)
+	scroll.custom_minimum_size = Vector2(420, 357)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	var list := VBoxContainer.new()
@@ -274,7 +274,7 @@ func _build_keys_panel() -> void:
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(l)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(72, 0)
+		b.custom_minimum_size = Vector2(108, 0)
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func() -> void:
 			Sound.play_sfx("sfx_ui")

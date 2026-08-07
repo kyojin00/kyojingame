@@ -12,8 +12,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(105, 190)
-	panel.custom_minimum_size = Vector2(430, 140)
+	panel.position = Vector2(158, 285)
+	panel.custom_minimum_size = Vector2(645, 210)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -28,7 +28,7 @@ func _ready() -> void:
 	panel.add_child(h)
 
 	portrait = TextureRect.new()
-	portrait.custom_minimum_size = Vector2(64, 64)
+	portrait.custom_minimum_size = Vector2(96, 96)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -49,7 +49,7 @@ func _ready() -> void:
 	body_label = Label.new()
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# 초상화(64px)+여백을 빼고 화면 안에 들어오는 고정 폭
-	body_label.custom_minimum_size = Vector2(310, 60)
+	body_label.custom_minimum_size = Vector2(465, 90)
 	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body_label)
