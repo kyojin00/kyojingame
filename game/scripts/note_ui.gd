@@ -12,7 +12,7 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(60, 10)
+	panel.position = Vector2(140, 52)
 	panel.custom_minimum_size = Vector2(360, 250)
 	var style := StyleBoxFlat.new()
 	# 노트 느낌의 밝은 양피지 배경

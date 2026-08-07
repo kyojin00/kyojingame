@@ -20,7 +20,7 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(55, 20)
+	panel.position = Vector2(135, 55)
 	panel.custom_minimum_size = Vector2(370, 230)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
@@ -36,7 +36,7 @@ func _ready() -> void:
 	panel.add_child(v)
 
 	var title := Label.new()
-	title.text = "- 인벤토리 (I/ESC: 닫기) -"
+	title.text = "- 인벤토리 (I/ESC: 닫기 · U: 능력치) -"
 	title.add_theme_color_override("font_color", Color("ffd75e"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
@@ -124,20 +124,6 @@ func _rebuild() -> void:
 
 	_line("소지금 %dG   목재 %d   석재 %d" % [GameData.money, GameData.wood, GameData.stone],
 		Color("ffd75e"))
-
-	# 능력치: 하다 보면 는다
-	_line("[능력치]", Color(0.65, 0.85, 0.6))
-	for sid in GameData.SKILL_IDS:
-		var lv := GameData.skill_lv(sid)
-		var s: Dictionary = GameData.skills[sid]
-		var prog := "MAX" if lv >= GameData.SKILL_MAX_LV else \
-			"%d/%d" % [int(s.xp), int(GameData.skill_xp_needed(lv))]
-		_line("  %s Lv.%d (%s) - %s" %
-			[GameData.SKILLS[sid].name, lv, prog, GameData.SKILLS[sid].effect])
-
-	if GameData.active_pet != "":
-		var pdef: Dictionary = GameData.PETS[GameData.active_pet]
-		_line("[펫] %s - %s" % [pdef.name, pdef.passive], Color(0.65, 0.85, 0.6))
 
 	var any_seed := false
 	for id in GameData.CROP_IDS:

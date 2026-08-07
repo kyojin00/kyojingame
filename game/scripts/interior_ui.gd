@@ -1,24 +1,24 @@
 # 집 내부: 문에서 E로 입장, 침대에서 잠자기, F로 꾸미기 모드, 아래 문으로 나가기.
 extends CanvasLayer
 
-const ROOM := Rect2(90, 56, 300, 204)   # 방 전체 (벽 포함)
+const ROOM := Rect2(80, 50, 480, 260)   # 방 전체 (벽 포함)
 const FLOOR_TOP := 104.0                # 벽 아래부터 바닥
 const BED := Rect2(104, 108, 46, 66)
-const KITCHEN := Rect2(300, 82, 62, 24)  # 조리대 (윗벽에 붙박이)
-const EXIT_X := Vector2(216, 264)       # 아랫벽 문 구간
+const KITCHEN := Rect2(400, 78, 62, 26)  # 조리대 (윗벽에 붙박이)
+const EXIT_X := Vector2(272, 368)       # 아랫벽 문 구간
 const GRID := 8.0                       # 꾸미기 배치 격자
 
 var main: Node2D
 var canvas: Control
 var player_sprite: Sprite2D
-var ppos := Vector2(240, 236)
+var ppos := Vector2(320, 296)
 var pdir := "up"
 var moving := false
 var anim_time := 0.0
 
 # 꾸미기 모드
 var deco_mode := false
-var cursor := Vector2(240, 180)
+var cursor := Vector2(320, 200)
 var held: Dictionary = {}       # 들고 있는 가구 {id, x, y} (+ orig_x/orig_y = 원위치)
 var _cursor_cd := 0.0
 
@@ -44,7 +44,7 @@ func _ready() -> void:
 
 func open() -> void:
 	visible = true
-	ppos = Vector2(240, 236)
+	ppos = Vector2(320, 296)
 	pdir = "up"
 	deco_mode = false
 	held = {}
@@ -291,7 +291,7 @@ func _draw_room() -> void:
 		Color(0.42, 0.29, 0.19))
 	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, 8)), Color(0.3, 0.2, 0.13))
 	# 창문 2개 (밖의 하늘)
-	for wx in [140.0, 300.0]:
+	for wx in [180.0, 460.0]:
 		canvas.draw_rect(Rect2(wx, 66, 40, 26), Color(0.25, 0.17, 0.11))
 		canvas.draw_rect(Rect2(wx + 2, 68, 36, 22),
 			Color(0.55, 0.75, 0.95) if GameData.minutes < 18 * 60 else Color(0.13, 0.12, 0.3))
@@ -357,11 +357,11 @@ func _draw_room() -> void:
 
 
 func _draw_center_text(text: String, ty: float) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-	canvas.draw_string_outline(main.UI_FONT, Vector2(240 - w / 2.0, ty), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, Vector2(240 - w / 2.0, ty), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.92, 0.85))
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	canvas.draw_string_outline(main.UI_FONT, Vector2(320 - w / 2.0, ty), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2, Color(0.05, 0.04, 0.08))
+	canvas.draw_string(main.UI_FONT, Vector2(320 - w / 2.0, ty), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.95, 0.92, 0.85))
 
 
 func _draw_deco_ui() -> void:
@@ -382,14 +382,14 @@ func _draw_deco_ui() -> void:
 	canvas.draw_rect(Rect2(px - 4, py - 14, 84, GameData.FURNITURE_IDS.size() * 18.0 + 20),
 		Color(0.05, 0.04, 0.08, 0.75))
 	canvas.draw_string(main.UI_FONT, Vector2(px, py), "[가구 구입]",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 0.84, 0.37))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 0.84, 0.37))
 	for i in GameData.FURNITURE_IDS.size():
 		var id: String = GameData.FURNITURE_IDS[i]
 		var def: Dictionary = GameData.FURNITURE[id]
 		py += 18.0
 		canvas.draw_string(main.UI_FONT, Vector2(px, py),
 			"%d %s %dG" % [i + 1, def.name, int(def.price)],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.92, 0.9, 0.95))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.92, 0.9, 0.95))
 
 
 func _draw_furniture(f: Dictionary) -> void:

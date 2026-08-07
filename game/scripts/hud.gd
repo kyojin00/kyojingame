@@ -41,7 +41,7 @@ func _mk_resource(icon: String) -> Label:
 	resources.add_child(rect)
 	var l := Label.new()
 	l.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.12))
-	l.add_theme_constant_override("outline_size", 3)
+	l.add_theme_constant_override("outline_size", 2)
 	resources.add_child(l)
 	return l
 
@@ -54,7 +54,17 @@ func refresh() -> void:
 	energy_bar.value = GameData.energy
 	wood_label.text = str(GameData.wood)
 	stone_label.text = str(GameData.stone)
-	objective_label.text = GameData.tutorial_objective()
+	var track := []
+	var obj := GameData.tutorial_objective()
+	if obj != "":
+		track.append(obj)
+	var q: Dictionary = GameData.quest
+	if not q.is_empty() and bool(q.accepted):
+		track.append("의뢰: %s %d/%d" % [GameData.CROPS[q.crop].name,
+			mini(int(GameData.produce[q.crop]), int(q.qty)), int(q.qty)])
+	var prog: Dictionary = GameData.note_progress()
+	track.append("연구 노트 %d%% (N)" % int(prog.ratio * 100.0))
+	objective_label.text = "\n".join(track)
 
 	if GameData.tool == "seed":
 		var id := GameData.current_seed_id()

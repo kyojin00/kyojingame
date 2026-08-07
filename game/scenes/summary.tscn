@@ -24,10 +24,10 @@ visible = false
 script = ExtResource("1_summary")
 
 [node name="Panel" type="PanelContainer" parent="."]
-offset_left = 130.0
-offset_top = 60.0
-offset_right = 350.0
-offset_bottom = 250.0
+offset_left = 200.0
+offset_top = 90.0
+offset_right = 440.0
+offset_bottom = 290.0
 theme_override_styles/panel = SubResource("panel_style")
 
 [node name="V" type="VBoxContainer" parent="Panel"]

@@ -4,8 +4,8 @@ extends CanvasLayer
 const GW := 26          # 동굴 그리드 (타일)
 const GH := 13
 const TS := 16.0        # 타일 픽셀
-const OX := 32.0        # 화면 오프셋
-const OY := 48.0
+const OX := 112.0        # 화면 오프셋
+const OY := 76.0
 
 var main: Node2D
 var canvas: Control
@@ -367,13 +367,13 @@ func _draw_cave() -> void:
 		info += " · 상자를 열자(E)!"
 	elif stairs_pos.x >= 0:
 		info += " · 계단(E)으로 다음 층!"
-	_cave_label(Vector2(240, 32), info)
+	_cave_label(Vector2(320, 40), info)
 
 
 func _cave_label(center: Vector2, text: String) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
 	var p := Vector2(center.x - w / 2.0, center.y)
-	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4,
+	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2,
 		Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
+	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
 		Color(0.95, 0.92, 0.85))

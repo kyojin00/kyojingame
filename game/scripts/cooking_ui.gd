@@ -11,7 +11,7 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(50, 16)
+	panel.position = Vector2(130, 58)
 	panel.custom_minimum_size = Vector2(380, 238)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)

@@ -59,6 +59,7 @@ var interior: CanvasLayer
 var cooking_ui: CanvasLayer
 var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
+var stats_ui: CanvasLayer
 var cave: CanvasLayer
 var pet: Node2D
 var fade_rect: ColorRect
@@ -137,7 +138,7 @@ const BUILDING_NAMES := {
 const BOARD_POS := Vector2i(75, 17)
 const VILLAGE_REGION := Rect2i(60, 0, 30, 30)
 const ROAD := Rect2i(30, 8, 30, 2)  # 농장 -> 마을 공용 길
-const UI_FONT := preload("res://assets/fonts/unifont_ko.otf")
+const UI_FONT := preload("res://assets/fonts/Galmuri9.ttf")
 
 var npcs: Array = []
 
@@ -212,6 +213,10 @@ func _ready() -> void:
 	note_ui = preload("res://scripts/note_ui.gd").new()
 	note_ui.main = self
 	add_child(note_ui)
+
+	stats_ui = preload("res://scripts/stats_ui.gd").new()
+	stats_ui.main = self
+	add_child(stats_ui)
 
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
@@ -575,6 +580,7 @@ func ui_open() -> bool:
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or cooking_ui.visible or quest_ui.visible or note_ui.visible \
+		or stats_ui.visible \
 		or (story_layer != null and story_layer.visible)
 
 
@@ -1084,7 +1090,7 @@ func _build_story_ui() -> void:
 
 	# 양피지 편지 패널 (밝은 배경 + 진한 글씨)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(60, 26)
+	panel.position = Vector2(140, 60)
 	panel.custom_minimum_size = Vector2(360, 210)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.93, 0.88, 0.74)
@@ -1760,6 +1766,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			inventory_ui.close()
 			quest_ui.close()
 			note_ui.close()
+			stats_ui.close()
 			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
 			if fade_rect == null or fade_rect.color.a < 0.5:
 				dialog.close()
@@ -1771,6 +1778,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			quest_ui.close()
 		elif event.is_action_pressed("open_note") and note_ui.visible:
 			note_ui.close()
+		elif event.is_action_pressed("open_stats") and stats_ui.visible:
+			stats_ui.close()
 		return
 	if event.is_action_pressed("open_map"):
 		Sound.play_sfx("sfx_ui")
@@ -1790,6 +1799,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		Sound.play_sfx("sfx_ui")
 		note_ui.toggle()
 		tutorial_notify("note")
+		return
+	if event.is_action_pressed("open_stats"):
+		Sound.play_sfx("sfx_ui")
+		stats_ui.toggle()
 		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 저장 후 타이틀로
@@ -2122,11 +2135,11 @@ func _draw_context_hint() -> void:
 		return
 	var text: String = hint[0]
 	var base: Vector2 = hint[1]
-	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
 	var pos := Vector2(base.x - w / 2.0, base.y)
-	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 5,
+	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2,
 		Color(0.08, 0.06, 0.12, 0.9))
-	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 0.9))
+	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 0.9))
 
 
 func _draw_weather() -> void:
@@ -2213,7 +2226,7 @@ func _debug_tick() -> void:
 		129: _send_key(KEY_F)                          # 꾸미기 모드
 		133: _save_shot("_deco.png")
 		134: _send_key(KEY_F)                          # 꾸미기 종료
-		136: interior.ppos = Vector2(330, 116)         # 조리대 앞으로
+		136: interior.ppos = Vector2(430, 116)         # 조리대 앞으로
 		138: _send_key(KEY_E)                          # 주방 열기
 		142: _save_shot("_cook.png")
 		144:

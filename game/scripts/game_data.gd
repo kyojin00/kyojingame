@@ -59,6 +59,7 @@ const BINDABLE_ACTIONS := [
 	["open_map", "지도"],
 	["open_quest", "퀘스트 창"],
 	["open_note", "연구 노트"],
+	["open_stats", "능력치 창"],
 	["save_game", "저장"],
 ]
 
@@ -139,9 +140,9 @@ func reset_keybinds() -> void:
 
 # ---- 화면 설정 ----
 const SETTINGS_PATH := "user://kyojin_display.json"
-const WINDOW_MODES := ["960x540", "1440x810", "1920x1080", "fullscreen"]
-var window_mode := "960x540"
-var _last_windowed := "960x540"
+const WINDOW_MODES := ["1280x720", "1920x1080", "fullscreen"]
+var window_mode := "1280x720"
+var _last_windowed := "1280x720"
 
 
 func _ready() -> void:
@@ -208,9 +209,9 @@ func load_settings() -> void:
 	var d: Variant = JSON.parse_string(f.get_as_text())
 	if typeof(d) == TYPE_DICTIONARY and d.has("window"):
 		window_mode = str(d.window)
-		# 구버전(3:2) 해상도 설정은 16:9 기본값으로 교체
+		# 구버전 해상도 설정은 현재 기본값으로 교체
 		if not WINDOW_MODES.has(window_mode):
-			window_mode = "960x540"
+			window_mode = "1280x720"
 		if window_mode != "fullscreen":
 			_last_windowed = window_mode
 
