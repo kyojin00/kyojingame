@@ -106,18 +106,25 @@ func _rebuild() -> void:
 			_line("  [미수락] %s %d개 납품 - 보상 %dG" % [crop_name, int(q.qty), int(q.reward)])
 			_line("    마을 광장 게시판(E)에서 수락하자.", Color(0.75, 0.72, 0.85))
 
-	# 영토 확장
+	# 최종 목표: 할아버지의 농장 부활
 	_line("")
-	_line("[영토 확장]", Color(0.65, 0.85, 0.6))
+	_line("[최종 목표: 할아버지의 농장 부활]", Color(0.65, 0.85, 0.6))
+	var total := 0
+	var owned := 0
 	var next_pid := ""
 	for pid in GameData.PARCELS:
-		if not GameData.owned_parcels.has(pid):
+		total += 1
+		if GameData.owned_parcels.has(pid):
+			owned += 1
+		elif next_pid == "":
 			next_pid = pid
-			break
 	if next_pid == "":
-		_line("  모든 부지를 손에 넣었다! 이 땅의 주인은 나다.")
+		_line("  달성! 할아버지의 땅을 전부 되찾았다. (%d/%d)" % [owned, total],
+			Color("ffd75e"))
+		_line("    농장 생활은 계속된다. 도감을 채워보자!", Color(0.75, 0.72, 0.85))
 	else:
 		var def: Dictionary = GameData.PARCELS[next_pid]
-		_line("  다음 부지: %s (%dG)" % [def.name, int(def.price)])
-		_line("    지도(%s)에서 위치 확인 · 표지판에서 구입" % GameData.key_label("open_map"),
+		_line("  잃어버린 부지를 모두 되찾자 (%d/%d)" % [owned, total])
+		_line("    다음 부지: %s (%dG) · 지도(%s)에서 확인" %
+			[def.name, int(def.price), GameData.key_label("open_map")],
 			Color(0.75, 0.72, 0.85))

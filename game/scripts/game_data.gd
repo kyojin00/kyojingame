@@ -418,6 +418,8 @@ const RECIPES := {
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant"]
 var recipes_cooked := {}  # 도감: id -> 만든 횟수
+# 최종 목표(모든 부지 회수 = 할아버지의 농장 부활) 달성 후 엔딩을 봤는가
+var ending_seen := false
 
 
 # 재료 보유량 (작물이면 수확물, 아니면 아이템)
@@ -647,6 +649,7 @@ func reset_all() -> void:
 	fish_caught = {}
 	mob_kills = {}
 	recipes_cooked = {}
+	ending_seen = false
 	owned_pets = []
 	active_pet = ""
 	for id in CROP_IDS:
@@ -769,6 +772,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,
+		"ending_seen": ending_seen,
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
 		"player": [player_pos.x, player_pos.y],
@@ -795,7 +799,7 @@ func build_stats() -> Dictionary:
 		"quest": quest, "tool_level": tool_level,
 		"owned_parcels": owned_parcels,
 		"skills": skills, "furniture": furniture,
-		"recipes_cooked": recipes_cooked,
+		"recipes_cooked": recipes_cooked, "ending_seen": ending_seen,
 		"owned_pets": owned_pets, "active_pet": active_pet,
 	}
 
@@ -826,6 +830,7 @@ func apply_stats(d: Dictionary) -> void:
 		recipes_cooked[k] = int(d.recipes_cooked[k])
 	owned_pets = d.get("owned_pets", owned_pets)
 	active_pet = str(d.get("active_pet", active_pet))
+	ending_seen = bool(d.get("ending_seen", ending_seen))
 	var q: Variant = d.get("quest", {})
 	if typeof(q) == TYPE_DICTIONARY:
 		if q.is_empty():

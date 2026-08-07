@@ -1,8 +1,14 @@
-# 상점 UI: 씨앗 구매 / 작물 판매
+# 상점 UI: 씨앗 구매 / 작물 판매 (가게마다 허용된 탭만 보인다)
 extends CanvasLayer
+
+const TAB_BUTTONS := {
+	"buy": "BuyBtn", "sell": "SellBtn", "animal": "AnimalBtn",
+	"upgrade": "UpgradeBtn", "codex": "CodexBtn",
+}
 
 var main: Node2D
 var tab := "buy"
+var allowed: Array = TAB_BUTTONS.keys()
 
 @onready var items_box: VBoxContainer = $Panel/V/Scroll/Items
 
@@ -17,12 +23,18 @@ func _ready() -> void:
 
 
 func _on_tab(t: String) -> void:
+	if not allowed.has(t):
+		return
 	tab = t
 	_rebuild()
 
 
-func open(t: String) -> void:
+# allowed_tabs: 이 가게에서 쓸 수 있는 탭 (비우면 t 하나만)
+func open(t: String, allowed_tabs: Array = []) -> void:
 	tab = t
+	allowed = allowed_tabs if not allowed_tabs.is_empty() else [t]
+	for key in TAB_BUTTONS:
+		get_node("Panel/V/Tabs/" + TAB_BUTTONS[key]).visible = allowed.has(key)
 	visible = true
 	if main != null:
 		main.tutorial_notify("shop")

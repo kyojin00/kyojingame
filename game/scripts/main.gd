@@ -525,9 +525,28 @@ func player_tile() -> Vector2i:
 	return Vector2i(int(floor(player.position.x / TILE)), int(floor(player.position.y / TILE)))
 
 
+# 마우스가 플레이어 주변 8칸 위에 있으면 그 칸이 타겟 (대각선 선택 가능)
+var _mouse_target := Vector2i(-999, -999)
+
+
+func _update_mouse_target() -> void:
+	if player == null:
+		_mouse_target = Vector2i(-999, -999)
+		return
+	var mp := get_global_mouse_position()
+	var t := Vector2i(int(floor(mp.x / TILE)), int(floor(mp.y / TILE)))
+	var d := t - player_tile()
+	if d != Vector2i.ZERO and absi(d.x) <= 1 and absi(d.y) <= 1:
+		_mouse_target = t
+	else:
+		_mouse_target = Vector2i(-999, -999)
+
+
 func target_tile() -> Vector2i:
 	if _target_override.x != -999:
 		return _target_override  # 원격 플레이어 행동 처리 중
+	if _mouse_target.x != -999:
+		return _mouse_target
 	var dirs := {
 		"down": Vector2i(0, 1), "up": Vector2i(0, -1),
 		"left": Vector2i(-1, 0), "right": Vector2i(1, 0),
@@ -897,7 +916,7 @@ func interact() -> void:
 		if obj == null:
 			continue
 		if obj.kind == "bin":
-			shop.open("sell")
+			shop.open("sell", ["sell"])
 			return
 		if obj.kind == "board":
 			_open_quest_board()
@@ -913,13 +932,13 @@ func interact() -> void:
 				"home":
 					interior.open()  # 우리집 입장
 				"general":
-					shop.open("buy")
+					shop.open("buy", ["buy", "sell"])
 				"ranch":
-					shop.open("animal")
+					shop.open("animal", ["animal"])
 				"smith":
-					shop.open("upgrade")
+					shop.open("upgrade", ["upgrade"])
 				"fish":
-					shop.open("codex")
+					shop.open("codex", ["codex"])
 				_:
 					hud.show_message("철수네 집이다. 낚시하러 갔는지 조용하다.")
 			return
@@ -996,9 +1015,16 @@ const PARCEL_STORIES := {
 	],
 }
 
+# 최종 목표: 모든 부지를 되찾아 할아버지의 농장을 부활시키기 → 엔딩
+const ENDING_PAGES := [
+	["에필로그 · 약속", "마지막 문서에 도장을 찍었다.\n할아버지의 땅 전부가\n다시 우리 농장이 되었다.\n\n이장님은 모자를 벗으며 웃었다.\n'축하하네, 젊은 농부.'"],
+	["에필로그 · 부치지 못한 편지", "그날 밤, 책상 서랍 깊은 곳에서\n부치지 못한 편지 한 장을 발견했다.\n\n'네가 이 편지를 읽고 있다면,\n농장은 이미 너의 것이겠구나.'"],
+	["에필로그 · 할아버지의 꿈", "'고맙다. 내 꿈을 이어줘서.\n하지만 기억하렴 —\n농장의 진짜 주인은 땅이 아니라\n거기서 흘린 웃음과 땀이란다.'\n\n창밖에는 우리 밭이\n달빛을 받아 반짝이고 있었다."],
+]
+
 var _story_idx := 0
 var _story_pages: Array = []
-var _story_mode := "intro"  # "intro": 오프닝(튜토리얼로 연결) / "parcel": 부지 스토리
+var _story_mode := "intro"  # "intro": 오프닝 / "parcel": 부지 스토리 / "ending": 엔딩
 var story_layer: CanvasLayer
 var _story_title: Label
 var _story_body: Label
@@ -1085,8 +1111,9 @@ func _show_story_page() -> void:
 		var page: Array = _story_pages[_story_idx]
 		_story_title.text = page[0]
 		_story_body.text = page[1]
-		if _story_mode == "parcel" and _story_idx == _story_pages.size() - 1:
-			_story_add_button("탐험 시작!", _close_story)
+		if _story_mode != "intro" and _story_idx == _story_pages.size() - 1:
+			_story_add_button("탐험 시작!" if _story_mode == "parcel"
+				else "농장 생활 계속하기", _close_story)
 		else:
 			_story_add_button("다음 >", _next_story_page)
 			_story_add_button("건너뛰기 >>", func() -> void:
@@ -1106,13 +1133,48 @@ func _prev_story_page() -> void:
 	_show_story_page()
 
 
-# 부지 스토리 닫기 (오프닝과 달리 튜토리얼로 이어지지 않는다)
+# 부지/엔딩 스토리 닫기 (오프닝과 달리 튜토리얼로 이어지지 않는다)
 func _close_story() -> void:
 	Sound.play_sfx("sfx_ui")
+	var was_parcel := _story_mode == "parcel"
 	if story_layer != null:
 		story_layer.queue_free()
 		story_layer = null
 	hud.visible = true
+	# 마지막 부지까지 되찾았으면 최종 목표 달성 → 엔딩
+	if was_parcel and not GameData.ending_seen and _all_parcels_owned():
+		show_ending()
+
+
+func _all_parcels_owned() -> bool:
+	for pid in GameData.PARCELS:
+		if not GameData.owned_parcels.has(pid):
+			return false
+	return true
+
+
+func show_ending() -> void:
+	GameData.ending_seen = true
+	save_now()
+	hud.visible = false
+	_story_mode = "ending"
+	var kills := 0
+	for k in GameData.mob_kills:
+		kills += int(GameData.mob_kills[k])
+	var fish_n := 0
+	for k in GameData.fish_caught:
+		fish_n += int(GameData.fish_caught[k])
+	var skill_sum := 0
+	for sid in GameData.SKILL_IDS:
+		skill_sum += GameData.skill_lv(sid)
+	_story_pages = ENDING_PAGES.duplicate()
+	_story_pages.append(["농장 부활의 기록",
+		"함께한 날: %d일째\n소지금: %dG\n낚은 물고기: %d마리 · 처치한 몬스터: %d\n만든 요리: %d종류 · 능력치 합계: Lv.%d\n\n...그리고 농장 생활은 계속된다!" %
+		[GameData.day, GameData.money, fish_n, kills,
+		GameData.recipes_cooked.size(), skill_sum]])
+	_build_story_ui()
+	_story_idx = 0
+	_show_story_page()
 
 
 func _story_add_button(text: String, cb: Callable) -> void:
@@ -1575,6 +1637,7 @@ func _process(delta: float) -> void:
 		if _growth_timer >= 0.7:
 			_growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
+		_update_mouse_target()
 		_auto_select_tool()
 		_update_fishing(delta)
 		if player.walked > 40.0:
@@ -1726,10 +1789,19 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("interact"):
 		interact()
 	elif event.is_action_pressed("open_shop"):
-		if _near_shop():
-			shop.open("buy")
-		else:
-			hud.show_message("상점은 마을에! 상점 건물이나 출하 상자 근처에서 열 수 있다.")
+		match _near_shop():
+			"general":
+				shop.open("buy", ["buy", "sell"])
+			"bin":
+				shop.open("sell", ["sell"])
+			"ranch":
+				shop.open("animal", ["animal"])
+			"smith":
+				shop.open("upgrade", ["upgrade"])
+			"fish":
+				shop.open("codex", ["codex"])
+			_:
+				hud.show_message("상점은 마을에! 상점 건물이나 출하 상자 근처에서 열 수 있다.")
 	elif event.is_action_pressed("save_game"):
 		save_now()
 		hud.show_message("저장했다!")
@@ -1746,32 +1818,31 @@ func _back_to_title() -> void:
 
 
 # 상점 건물/출하 상자 근처인가 (B키 사용 조건)
-func _near_shop() -> bool:
+# 근처 가게 종류 반환 ("" = 없음). B키가 그 가게에 맞는 탭만 연다
+func _near_shop() -> String:
 	var p := player_tile()
 	for dy in range(-3, 4):
 		for dx in range(-3, 4):
 			var t := p + Vector2i(dx, dy)
-			if _building_kind_at(t) in ["general", "ranch", "smith", "fish"]:
-				return true
+			var bk := _building_kind_at(t)
+			if bk in ["general", "ranch", "smith", "fish"]:
+				return bk
 			var obj: Variant = objects.get(t)
 			if obj != null and obj.kind == "bin":
-				return true
-	return false
+				return "bin"
+	return ""
 
 
 func _click_at(pos: Vector2) -> void:
-	# 플레이어 인접(또는 발밑) 타일 클릭 시 그 방향을 보고 도구를 쓴다.
+	# 플레이어 주변 8칸(대각선 포함) 또는 발밑 클릭 시 그쪽을 보고 도구를 쓴다.
 	var t := Vector2i(int(floor(pos.x / TILE)), int(floor(pos.y / TILE)))
 	var d := t - player_tile()
-	if absi(d.x) + absi(d.y) == 1:
-		if d.x == 1:
-			player.dir = "right"
-		elif d.x == -1:
-			player.dir = "left"
-		elif d.y == 1:
-			player.dir = "down"
+	if d != Vector2i.ZERO and absi(d.x) <= 1 and absi(d.y) <= 1:
+		# 스프라이트 방향은 우세한 축 기준 (대각선이면 좌우 우선)
+		if d.x != 0:
+			player.dir = "right" if d.x > 0 else "left"
 		else:
-			player.dir = "up"
+			player.dir = "down" if d.y > 0 else "up"
 		use_tool()
 	elif d == Vector2i.ZERO:
 		use_tool()
