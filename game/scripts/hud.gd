@@ -20,7 +20,8 @@ var msg_timer := 0.0
 
 
 func refresh() -> void:
-	day_label.text = "%d일차(봄)" % GameData.day
+	day_label.text = "%s %d일 %s" % [GameData.season_name(), GameData.day_in_season(),
+		GameData.weather_icon(main.weather_now())]
 	clock_label.text = GameData.clock_text()
 	money_label.text = "%dG" % GameData.money
 	energy_bar.value = GameData.energy
@@ -29,7 +30,10 @@ func refresh() -> void:
 		var l: Label = tool_labels[key]
 		if key == "seed":
 			var id := GameData.current_seed_id()
-			l.text = "3 %s씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]]
+			if id == "":
+				l.text = "3 씨앗 없음"
+			else:
+				l.text = "3 %s씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]]
 		else:
 			l.text = TOOL_NAMES[key]
 		var selected: bool = GameData.tool == key

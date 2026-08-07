@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bekoescxx5ew7"
-path="res://.godot/imported/tree.png-15cb16b197553088007c6ba3ce2f75b0.ctex"
+uid="uid://c2mpwu4yow5p2"
+path="res://.godot/imported/mature_watermelon.png-2e1295e76950ae0f6f3af6f15b836a73.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/tree.png"
-dest_files=["res://.godot/imported/tree.png-15cb16b197553088007c6ba3ce2f75b0.ctex"]
+source_file="res://assets/sprites/mature_watermelon.png"
+dest_files=["res://.godot/imported/mature_watermelon.png-2e1295e76950ae0f6f3af6f15b836a73.ctex"]
 
 [params]
 

@@ -43,6 +43,8 @@ func _rebuild() -> void:
 	if tab == "buy":
 		for id in GameData.CROP_IDS:
 			var def: Dictionary = GameData.CROPS[id]
+			if GameData.season() not in def.seasons:
+				continue  # 제철 씨앗만 판매
 			var row := HBoxContainer.new()
 			var l := Label.new()
 			l.text = "%s 씨앗(보유%d) 성장%d일" % [def.name, GameData.seeds[id], def.grow_days]

@@ -22,18 +22,29 @@ var night: CanvasModulate
 var sleep_dialog: ConfirmationDialog
 var water_frame := 0
 var water_timer := 0.0
+var tree_sprites: Array = []
+var weather_time := 0.0
 
 # 개발/CI용: KYOJIN_SHOT=경로 로 실행하면 잠시 후 스크린샷을 저장하고 종료한다.
+# KYOJIN_DAY=숫자, KYOJIN_WEATHER=0/1/2 로 시작 날짜/날씨를 강제할 수 있다.
 var _shot_path := ""
 var _shot_frames := 0
+var _weather_override := -1
 
 const TEXTURE_NAMES := [
 	"player_down_0", "player_down_1", "player_up_0", "player_up_1",
 	"player_side_0", "player_side_1",
-	"crop_sprout", "crop_small", "crop_medium",
+	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
-	"tree", "rock", "bin", "house",
-	"grass_0", "grass_1", "grass_2", "soil_dry", "soil_wet", "water_0", "water_1",
+	"mature_tomato", "mature_corn", "mature_watermelon",
+	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
+	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
+	"rock", "bin", "house",
+	"grass_spring_0", "grass_spring_1", "grass_spring_2",
+	"grass_summer_0", "grass_summer_1", "grass_summer_2",
+	"grass_fall_0", "grass_fall_1", "grass_fall_2",
+	"grass_winter_0", "grass_winter_1", "grass_winter_2",
+	"soil_dry", "soil_wet", "water_0", "water_1",
 ]
 
 
@@ -74,6 +85,10 @@ func _ready() -> void:
 	add_child(sleep_dialog)
 
 	_shot_path = OS.get_environment("KYOJIN_SHOT")
+	if OS.get_environment("KYOJIN_DAY") != "":
+		GameData.day = int(OS.get_environment("KYOJIN_DAY"))
+	if OS.get_environment("KYOJIN_WEATHER") != "":
+		_weather_override = int(OS.get_environment("KYOJIN_WEATHER"))
 
 	var loaded := GameData.load_game()
 	if loaded.size() > 0:
@@ -81,6 +96,7 @@ func _ready() -> void:
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
+	_apply_season_visuals()
 
 
 func _load_textures() -> void:
@@ -96,7 +112,7 @@ func _build_map() -> void:
 	for y in MAP_H:
 		var row := []
 		for x in MAP_W:
-			row.append({"ground": "grass", "watered": false, "crop_id": "", "crop_day": 0})
+			row.append({"ground": "grass", "watered": false, "crop_id": "", "crop_day": 0, "dead": false})
 		grid.append(row)
 
 	# 연못 (오른쪽 아래)
@@ -146,7 +162,9 @@ func _spawn_objects(world: Node2D) -> void:
 			house_done = true
 			world.add_child(_make_object(tex["house"], Vector2(2 * TILE, 5 * TILE), Vector2(0, -64)))
 		elif kind == "tree":
-			world.add_child(_make_object(tex["tree"], Vector2(pos.x * TILE, (pos.y + 1) * TILE), Vector2(0, -18)))
+			var t := _make_object(tex["tree_spring"], Vector2(pos.x * TILE, (pos.y + 1) * TILE), Vector2(0, -18))
+			tree_sprites.append(t.get_child(0))
+			world.add_child(t)
 		elif kind == "rock":
 			world.add_child(_make_object(tex["rock"], Vector2(pos.x * TILE, (pos.y + 1) * TILE), Vector2(0, -16)))
 		elif kind == "bin":
@@ -163,6 +181,18 @@ func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Nod
 	s.offset = offset
 	node.add_child(s)
 	return node
+
+
+func _apply_season_visuals() -> void:
+	for s in tree_sprites:
+		s.texture = tex["tree_" + GameData.season_key()]
+	queue_redraw()
+
+
+func weather_now() -> int:
+	if _weather_override >= 0:
+		return _weather_override
+	return GameData.weather_today()
 
 
 func _hash01(x: int, y: int) -> float:
@@ -227,8 +257,17 @@ func use_tool() -> void:
 			if has_obj:
 				hud.show_message("여기는 갈 수 없다.")
 				return
-			if cell.ground == "grass":
+			if cell.crop_id != "" and cell.dead:
+				# 시든 작물 정리
+				cell.crop_id = ""
+				cell.crop_day = 0
+				cell.dead = false
+				GameData.energy -= cost
+				hud.show_message("시든 작물을 정리했다.")
+			elif cell.ground == "grass":
 				cell.ground = "soil"
+				if weather_now() == GameData.WEATHER_RAIN:
+					cell.watered = true
 				GameData.energy -= cost
 			elif cell.ground == "soil" and cell.crop_id == "":
 				cell.ground = "grass"
@@ -243,21 +282,31 @@ func use_tool() -> void:
 				hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
 			var id := GameData.current_seed_id()
+			if id == "":
+				hud.show_message("씨앗이 없다. 상점(B)에서 사자.")
+				return
 			if cell.ground != "soil":
 				hud.show_message("먼저 호미로 밭을 갈자.")
 				return
 			if cell.crop_id != "":
 				hud.show_message("이미 작물이 자라고 있다.")
 				return
-			if GameData.seeds[id] <= 0:
-				hud.show_message("%s 씨앗이 없다. 상점(B)에서 사자." % GameData.CROPS[id].name)
+			var def: Dictionary = GameData.CROPS[id]
+			if GameData.season() not in def.seasons:
+				hud.show_message("%s은(는) 지금 계절에 자라지 않는다." % def.name)
 				return
 			GameData.seeds[id] -= 1
 			cell.crop_id = id
 			cell.crop_day = 0
+			cell.dead = false
+			if weather_now() == GameData.WEATHER_RAIN:
+				cell.watered = true
 			GameData.energy -= cost
 		"hand":
 			if cell.crop_id != "":
+				if cell.dead:
+					hud.show_message("시들어버렸다... 호미로 정리하자.")
+					return
 				var def: Dictionary = GameData.CROPS[cell.crop_id]
 				if cell.crop_day >= def.grow_days:
 					GameData.produce[cell.crop_id] += 1
@@ -285,21 +334,58 @@ func interact() -> void:
 # ---- 하루 진행 ----
 
 func _next_day(passed_out: bool) -> void:
+	# 물 준 작물 성장
 	for y in MAP_H:
 		for x in MAP_W:
 			var cell: Dictionary = grid[y][x]
-			if cell.crop_id != "" and cell.watered:
+			if cell.crop_id != "" and not cell.dead and cell.watered:
 				cell.crop_day += 1
 			cell.watered = false
+
 	var stats := [GameData.today_harvest, GameData.today_earned, GameData.today_spent]
+	var prev_season := GameData.season()
 	GameData.day += 1
 	GameData.minutes = GameData.DAY_START
 	GameData.energy = GameData.ENERGY_MAX * 0.5 if passed_out else GameData.ENERGY_MAX
 	GameData.reset_daily()
+
+	# 계절이 바뀌면 제철 아닌 작물은 시든다
+	var season_changed := GameData.season() != prev_season
+	var wilted := 0
+	if season_changed:
+		for y in MAP_H:
+			for x in MAP_W:
+				var cell: Dictionary = grid[y][x]
+				if cell.crop_id != "" and not cell.dead \
+						and GameData.season() not in GameData.CROPS[cell.crop_id].seasons:
+					cell.dead = true
+					wilted += 1
+		_apply_season_visuals()
+
+	# 비 오는 날은 밭이 저절로 젖는다
+	if weather_now() == GameData.WEATHER_RAIN:
+		for y in MAP_H:
+			for x in MAP_W:
+				if grid[y][x].ground == "soil":
+					grid[y][x].watered = true
+
 	save_now()
-	var note := "\n\n쓰러져서 기력이 절반만 회복됐다..." if passed_out else ""
-	summary.open("- %d일차 아침 -" % GameData.day,
-		"어제 수확: %d개\n판매 수입: +%dG\n씨앗 지출: -%dG\n\n소지금: %dG%s"
+
+	var note := ""
+	if season_changed:
+		note += "\n%s이 시작됐다!" % GameData.season_name()
+	if wilted > 0:
+		note += "\n작물 %d개가 시들어버렸다..." % wilted
+	match weather_now():
+		GameData.WEATHER_RAIN:
+			note += "\n오늘은 비가 온다. 물주기는 쉬자! ☔"
+		GameData.WEATHER_SNOW:
+			note += "\n함박눈이 내린다. ☃"
+	if passed_out:
+		note += "\n쓰러져서 기력이 절반만 회복됐다..."
+
+	summary.open("- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()],
+		"어제 수확: %d개\n판매 수입: +%dG\n씨앗 지출: -%dG\n소지금: %dG\n%s"
 		% [stats[0], stats[1], stats[2], GameData.money, note])
 	queue_redraw()
 
@@ -312,7 +398,7 @@ func save_now() -> void:
 		var row := []
 		for x in MAP_W:
 			var c: Dictionary = grid[y][x]
-			row.append([c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day])
+			row.append([c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
 		g.append(row)
 	GameData.save_game(g, player.position)
 
@@ -337,6 +423,7 @@ func _apply_save(d: Dictionary) -> void:
 			cell.watered = int(s[1]) == 1
 			cell.crop_id = s[2]
 			cell.crop_day = int(s[3])
+			cell.dead = s.size() > 4 and int(s[4]) == 1
 
 
 # ---- 루프 ----
@@ -350,6 +437,7 @@ func _process(delta: float) -> void:
 		if water_timer > 0.8:
 			water_timer = 0.0
 			water_frame = 1 - water_frame
+	weather_time += delta
 	_update_night()
 	hud.refresh()
 	queue_redraw()
@@ -404,7 +492,10 @@ func _save_shot(suffix: String) -> void:
 func _update_night() -> void:
 	var start := 18.0 * 60.0
 	var a := clampf((GameData.minutes - start) / (6.0 * 60.0), 0.0, 1.0)
-	night.color = Color(1, 1, 1).lerp(Color(0.5, 0.48, 0.72), a)
+	var c := Color(1, 1, 1).lerp(Color(0.5, 0.48, 0.72), a)
+	if weather_now() == GameData.WEATHER_RAIN:
+		c *= Color(0.78, 0.8, 0.88)  # 비 오는 날은 어둑하게
+	night.color = c
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -422,7 +513,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("tool_4"):
 		set_tool("hand")
 	elif event.is_action_pressed("cycle_seed"):
-		GameData.seed_index = (GameData.seed_index + 1) % GameData.CROP_IDS.size()
+		GameData.cycle_seed()
 		set_tool("seed")
 	elif event.is_action_pressed("use_tool"):
 		use_tool()
@@ -458,11 +549,13 @@ func _click_at(pos: Vector2) -> void:
 
 # ---- 렌더링 ----
 
-func _crop_texture(id: String, crop_day: int) -> Texture2D:
-	var def: Dictionary = GameData.CROPS[id]
-	if crop_day >= def.grow_days:
-		return tex["mature_" + id]
-	var t := float(crop_day) / float(def.grow_days)
+func _crop_texture(cell: Dictionary) -> Texture2D:
+	if cell.dead:
+		return tex["withered"]
+	var def: Dictionary = GameData.CROPS[cell.crop_id]
+	if cell.crop_day >= def.grow_days:
+		return tex["mature_" + cell.crop_id]
+	var t := float(cell.crop_day) / float(def.grow_days)
 	if t < 0.34:
 		return tex["crop_sprout"]
 	if t < 0.67:
@@ -471,6 +564,7 @@ func _crop_texture(id: String, crop_day: int) -> Texture2D:
 
 
 func _draw() -> void:
+	var grass_prefix := "grass_" + GameData.season_key() + "_"
 	for y in MAP_H:
 		for x in MAP_W:
 			var cell: Dictionary = grid[y][x]
@@ -480,10 +574,10 @@ func _draw() -> void:
 			elif cell.ground == "soil":
 				t = tex["soil_wet"] if cell.watered else tex["soil_dry"]
 			else:
-				t = tex["grass_%d" % (int(_hash01(x, y) * 3.0) % 3)]
+				t = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
 			draw_texture(t, Vector2(x * TILE, y * TILE))
 			if cell.crop_id != "":
-				draw_texture(_crop_texture(cell.crop_id, cell.crop_day), Vector2(x * TILE, y * TILE))
+				draw_texture(_crop_texture(cell), Vector2(x * TILE, y * TILE))
 
 	# 타겟 타일 하이라이트
 	if player != null:
@@ -491,3 +585,19 @@ func _draw() -> void:
 		if tt.x >= 0 and tt.y >= 0 and tt.x < MAP_W and tt.y < MAP_H:
 			draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 				Color(1, 1, 1, 0.6), false, 1.0)
+
+	_draw_weather()
+
+
+func _draw_weather() -> void:
+	var w := weather_now()
+	if w == GameData.WEATHER_RAIN:
+		for i in 90:
+			var sx := _hash01(i, 1) * 500.0 - 10.0
+			var sy := fposmod(_hash01(i, 2) * 330.0 + weather_time * 280.0, 330.0) - 5.0
+			draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy), Color(0.72, 0.82, 1.0, 0.5), 1.0)
+	elif w == GameData.WEATHER_SNOW:
+		for i in 60:
+			var sx := fposmod(_hash01(i, 1) * 480.0 + sin(weather_time * 1.5 + i) * 12.0, 480.0)
+			var sy := fposmod(_hash01(i, 2) * 330.0 + weather_time * 35.0, 330.0) - 5.0
+			draw_rect(Rect2(Vector2(sx, sy), Vector2(1, 1)), Color(1, 1, 1, 0.85))
