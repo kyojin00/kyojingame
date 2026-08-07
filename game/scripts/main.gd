@@ -1958,10 +1958,14 @@ func _debug_tick() -> void:
 		128: _save_shot("_house.png")
 		130:
 			interior.close()
+			inventory_ui.toggle()                      # 인벤토리(도구 선택) 확인
+		134: _save_shot("_inv.png")
+		136:
+			inventory_ui.close()
 			cave.open()                                # 동굴 확인
-		134: _send_key(KEY_SPACE)                      # 공격 모션
-		136: _save_shot("_cave.png")
-		140: get_tree().quit()
+		138: _send_key(KEY_SPACE)                      # 공격 모션
+		140: _save_shot("_cave.png")
+		144: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

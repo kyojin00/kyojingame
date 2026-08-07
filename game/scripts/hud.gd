@@ -16,11 +16,8 @@ const TOOL_LABELS := {
 
 var main: Node2D
 var msg_timer := 0.0
-var slots := {}  # tool -> Button
 var wood_label: Label
 var stone_label: Label
-var slot_normal: StyleBoxFlat
-var slot_selected: StyleBoxFlat
 
 @onready var day_label: Label = $Top/DayLabel
 @onready var clock_label: Label = $Top/ClockLabel
@@ -28,43 +25,11 @@ var slot_selected: StyleBoxFlat
 @onready var energy_bar: ProgressBar = $Top/EnergyBar
 @onready var msg_label: Label = $Message
 @onready var objective_label: Label = $Objective
-@onready var hotbar: HBoxContainer = $Hotbar
 @onready var tool_name: Label = $ToolName
 @onready var resources: HBoxContainer = $Resources
 
 
 func _ready() -> void:
-	slot_normal = StyleBoxFlat.new()
-	slot_normal.bg_color = Color(0.11, 0.09, 0.16, 0.85)
-	slot_normal.border_color = Color(0.32, 0.27, 0.43)
-	slot_normal.set_border_width_all(1)
-	slot_normal.set_corner_radius_all(3)
-	slot_selected = slot_normal.duplicate()
-	slot_selected.bg_color = Color(0.24, 0.2, 0.32, 0.95)
-	slot_selected.border_color = Color(1, 0.84, 0.37)
-	slot_selected.set_border_width_all(2)
-
-	for i in TOOLS.size():
-		var t: String = TOOLS[i]
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(28, 28)
-		b.focus_mode = Control.FOCUS_NONE
-		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.add_theme_stylebox_override("hover", slot_normal)
-		b.add_theme_stylebox_override("pressed", slot_selected)
-		b.pressed.connect(main.set_tool.bind(t))
-		# 슬롯 좌상단에 숫자키 표시
-		var num := Label.new()
-		num.text = str(i + 1)
-		num.position = Vector2(2, -4)
-		num.add_theme_color_override("font_color", Color(0.62, 0.58, 0.75))
-		num.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
-		num.add_theme_constant_override("outline_size", 2)
-		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(num)
-		hotbar.add_child(b)
-		slots[t] = b
-
 	wood_label = _mk_resource("icon_wood")
 	stone_label = _mk_resource("icon_stone")
 
@@ -91,15 +56,6 @@ func refresh() -> void:
 	stone_label.text = str(GameData.stone)
 	objective_label.text = GameData.tutorial_objective()
 
-	for t in slots:
-		var b: Button = slots[t]
-		var unlocked := GameData.is_tool_unlocked(t)
-		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
-		b.disabled = not unlocked
-		b.tooltip_text = TOOL_LABELS.get(t, "씨앗") if unlocked else "???"
-		b.add_theme_stylebox_override("normal",
-			slot_selected if GameData.tool == t else slot_normal)
-
 	if GameData.tool == "seed":
 		var id := GameData.current_seed_id()
 		if id == "":
@@ -107,7 +63,7 @@ func refresh() -> void:
 		else:
 			tool_name.text = "%s 씨앗 x%d (Tab: 바꾸기)" % [GameData.CROPS[id].name, GameData.seeds[id]]
 	else:
-		tool_name.text = TOOL_LABELS[GameData.tool]
+		tool_name.text = TOOL_LABELS[GameData.tool] + " · I: 가방"
 
 
 func show_message(text: String) -> void:

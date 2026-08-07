@@ -131,7 +131,7 @@ func _process(delta: float) -> void:
 	hurt_cd -= delta
 	swing_t -= delta
 
-	# 이동
+	# 이동 (이미 끼어 있으면 충돌 무시하고 빠져나올 수 있게)
 	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	moving = v != Vector2.ZERO
 	if moving:
@@ -140,10 +140,11 @@ func _process(delta: float) -> void:
 		else:
 			pdir = "down" if v.y > 0 else "up"
 		var np := ppos + v * 85.0 * delta
-		if not _blocked_at(Vector2(np.x, ppos.y)):
-			ppos.x = np.x
-		if not _blocked_at(Vector2(ppos.x, np.y)):
-			ppos.y = np.y
+		var stuck := _blocked_at(ppos)
+		if stuck or not _blocked_at(Vector2(np.x, ppos.y)):
+			ppos.x = clampf(np.x, OX + 4, OX + GW * TS - 4)
+		if stuck or not _blocked_at(Vector2(ppos.x, np.y)):
+			ppos.y = clampf(np.y, OY + 4, OY + GH * TS - 4)
 		anim_time += delta
 
 	# 몬스터
@@ -185,7 +186,10 @@ func _process(delta: float) -> void:
 			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0}[m.type]
 			GameData.energy -= dmg
 			Sound.play_sfx("sfx_miss")
-			ppos += (ppos - m.pos).normalized() * 10.0
+			# 넉백은 막히지 않은 곳으로만 (벽/바위 끼임 방지)
+			var kb: Vector2 = ppos + (ppos - m.pos).normalized() * 10.0
+			if not _blocked_at(kb):
+				ppos = kb
 			if GameData.energy <= 0.0:
 				GameData.energy = 10.0
 				close()
@@ -260,8 +264,8 @@ func _floor_clear() -> void:
 
 func _interact() -> void:
 	var pt := Vector2i(int((ppos.x - OX) / TS), int((ppos.y - OY) / TS))
-	# 입구 사다리: 나가기
-	if pt.distance_to(entry_pos) < 1.5:
+	# 입구 사다리: 나가기 (ESC로도 언제든 가능)
+	if pt.distance_to(entry_pos) < 2.0:
 		close()
 		return
 	# 보상 상자
