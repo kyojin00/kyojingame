@@ -117,6 +117,7 @@ func _draw_map() -> void:
 	_label(Vector2(ox + 50.0 * CELL, oy + 3.0 * CELL - 2), "마을")
 	_label(Vector2(ox + 55.0 * CELL, oy + 8.0 * CELL - 4), "게시판")
 	_label(Vector2(ox + 25.0 * CELL, oy + 13.0 * CELL - 2), "연못")
+	_label(Vector2(ox + 50.0 * CELL, oy + 1.0 * CELL - 2), "동굴")
 	_label(Vector2(ox + main.player.position.x / 16.0 * CELL, oy + main.player.position.y / 16.0 * CELL - 8), "내 위치")
 
 	# 안내

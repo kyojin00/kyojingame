@@ -60,6 +60,7 @@ var dialog: CanvasLayer
 var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
 var interior: CanvasLayer
+var cave: CanvasLayer
 var fade_rect: ColorRect
 
 # ---- 멀티플레이 상태 ----
@@ -89,6 +90,7 @@ const TEXTURE_NAMES := [
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
+	"cave", "slime_0", "slime_1", "ore_node", "chest", "stairs",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
 	"npc_merchant_down_0", "npc_merchant_down_1", "npc_merchant_up_0",
 	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
@@ -106,6 +108,7 @@ const TEXTURE_NAMES := [
 ]
 
 const START_TILE := Vector2i(14, 10)
+const CAVE_POS := Vector2i(50, 1)
 const PARCEL_SIGNS := {
 	"east": Vector2i(31, 9),
 	"south": Vector2i(9, 21),
@@ -167,6 +170,10 @@ func _ready() -> void:
 	interior = preload("res://scripts/interior_ui.gd").new()
 	interior.main = self
 	add_child(interior)
+
+	cave = preload("res://scripts/cave_ui.gd").new()
+	cave.main = self
+	add_child(cave)
 
 	for npc_id in ["merchant", "fisher"]:
 		var n: Node2D = preload("res://scripts/npc.gd").new()
@@ -289,6 +296,7 @@ func _build_map() -> void:
 				objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
 	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
 	objects[BOARD_POS] = {"kind": "board", "hp": 0}
+	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
 
 	# 테두리 나무
 	for x in MAP_W:
@@ -355,6 +363,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["board"]
 		"sign":
 			texture = tex["sign"]
+		"cave":
+			texture = tex["cave"]
+			offset = Vector2(0, -25)
 		"fence":
 			texture = tex["fence"]
 		"sprinkler":
@@ -457,15 +468,15 @@ func can_use_tile(t: Vector2i) -> bool:
 func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
-		or inventory_ui.visible or interior.visible \
+		or inventory_ui.visible or interior.visible or cave.visible \
 		or (story_layer != null and story_layer.visible)
 
 
 func interior_only_open() -> bool:
-	# 집 안에 있을 때는 시간이 흐른다 (다른 창이 겹치면 정지)
-	return interior.visible and not (shop.visible or summary.visible
-		or sleep_dialog.visible or dialog.visible or map_ui.visible
-		or inventory_ui.visible)
+	# 집/동굴 안에 있을 때는 시간이 흐른다 (다른 창이 겹치면 정지)
+	return (interior.visible or cave.visible) and not (shop.visible
+		or summary.visible or sleep_dialog.visible or dialog.visible
+		or map_ui.visible or inventory_ui.visible)
 
 
 func request_sleep() -> void:
@@ -539,7 +550,7 @@ func _on_fishing_finished(success: bool) -> void:
 			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
 			GameData.items[id] -= 1
 			GameData.fish_caught[id] = int(GameData.fish_caught[id]) - 1
-			_req_add_item.rpc_id(1, id)
+			_req_gain.rpc_id(1, id, 1)
 		elif Net.is_host():
 			_broadcast_stats()
 	else:
@@ -803,6 +814,9 @@ func interact() -> void:
 			return
 		if obj.kind == "sign":
 			_open_parcel_dialog(GameData.parcel_at(t.x, t.y))
+			return
+		if obj.kind == "cave":
+			cave.open()
 			return
 		if obj.kind == "house":
 			match _house_index_at(t):
@@ -1155,6 +1169,8 @@ func _next_day(passed_out: bool) -> void:
 			cell.watered = false
 			cell.wet_min = 0.0
 
+	if cave.visible:
+		cave.visible = false  # 새벽이 되면 동굴에서 나온다
 	var stats := [GameData.today_harvest, GameData.today_earned, GameData.today_spent]
 	var prev_season := GameData.season()
 	GameData.day += 1
@@ -1629,6 +1645,8 @@ func _context_hint() -> Array:
 				if not GameData.owned_parcels.has(pid):
 					return ["E: 부지 구입 (%dG)" % GameData.PARCELS[pid].price, above_tile]
 				return ["내 부지", above_tile]
+			"cave":
+				return ["E: 동굴 탐험", above_tile]
 			"house":
 				match _house_index_at(t):
 					0:
@@ -1802,7 +1820,12 @@ func _debug_tick() -> void:
 			_save_shot("_parcel2.png")
 		122: interior.open()                           # 집 내부 확인
 		128: _save_shot("_house.png")
-		130: get_tree().quit()
+		130:
+			interior.close()
+			cave.open()                                # 동굴 확인
+		134: _send_key(KEY_SPACE)                      # 공격 모션
+		136: _save_shot("_cave.png")
+		140: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -2073,13 +2096,25 @@ func _req_feed(index: int) -> void:
 		animals[index].fed = true
 
 
+# 아이템 획득 (동굴 보상/낚시 등) — 멀티에서는 호스트가 확정한다
+func gain_item(id: String, count: int) -> void:
+	if Net.is_guest():
+		GameData.items[id] += count  # 낙관적 반영, 통계 브로드캐스트로 수렴
+		_req_gain.rpc_id(1, id, count)
+		return
+	GameData.items[id] += count
+	if Net.is_host():
+		_broadcast_stats()
+
+
 @rpc("any_peer", "reliable")
-func _req_add_item(id: String) -> void:
+func _req_gain(id: String, count: int) -> void:
 	if not Net.is_host():
 		return
-	if GameData.items.has(id):
-		GameData.items[id] += 1
-		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
+	if GameData.items.has(id) and count > 0 and count <= 50:
+		GameData.items[id] += count
+		if id.begins_with("fish_"):
+			GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + count
 		_broadcast_stats()
 
 

@@ -80,8 +80,10 @@ const ITEMS := {
 	"fish_carp": {"name": "잉어", "sell": 60},
 	"fish_catfish": {"name": "메기", "sell": 90},
 	"fish_golden": {"name": "황금잉어", "sell": 300},
+	"ore": {"name": "광석", "sell": 50},
+	"gem": {"name": "보석", "sell": 220},
 }
-const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden"]
+const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden", "ore", "gem"]
 
 # 낚시: [아이템 id, 확률 가중치, 타이밍 존 폭(px)]
 const FISH := [
