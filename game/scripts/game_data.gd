@@ -94,6 +94,56 @@ const FISH := [
 var items := {}
 var fish_caught := {}  # 도감용 누적 기록
 
+# ---- NPC / 퀘스트 ----
+const NPCS := {
+	"merchant": {"name": "민지", "lines": [
+		"어서 와! 오늘도 농사는 잘 되고 있어?",
+		"제철 씨앗이 제일 잘 자라. 상점(B)에 들러!",
+		"출하 상자에 넣은 작물은 내가 좋은 값에 팔아줄게.",
+		"스프링클러를 만들면 아침 물주기가 편해져.",
+	]},
+	"fisher": {"name": "철수", "lines": [
+		"입질이 오면 초록 구간에서 낚아채는 거야.",
+		"황금잉어는 정말 귀하지... 나도 두 번밖에 못 봤어.",
+		"비 오는 날엔 왠지 물고기가 더 잘 잡히는 기분이야.",
+		"겨울엔 농사가 안 되니 낚시가 최고야.",
+	]},
+}
+var affinity := {"merchant": 0, "fisher": 0}
+# {crop, qty, reward, accepted}
+var quest := {}
+
+
+func merchant_discount() -> bool:
+	return int(affinity["merchant"]) >= 50
+
+
+func seed_price(id: String) -> int:
+	var p: int = CROPS[id].seed_price
+	if merchant_discount():
+		p = int(ceil(p * 0.9))
+	return p
+
+
+func make_daily_quest() -> void:
+	# 오늘 계절 작물 중 하나 납품 퀘스트 (날짜 해시로 결정적)
+	var pool := []
+	for id in CROP_IDS:
+		if season() in CROPS[id].seasons:
+			pool.append(id)
+	if pool.is_empty():
+		quest = {}
+		return
+	var h := fposmod(sin(float(day) * 73.7 + 17.3) * 43758.5453, 1.0)
+	var crop: String = pool[int(h * pool.size()) % pool.size()]
+	var qty := 3 + int(h * 97.0) % 4
+	quest = {
+		"crop": crop,
+		"qty": qty,
+		"reward": int(CROPS[crop].sell_price * qty * 1.5),
+		"accepted": false,
+	}
+
 
 func pick_fish() -> Array:
 	var r := randf()
@@ -217,6 +267,8 @@ func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"produce": produce,
 		"items": items,
 		"fish_caught": fish_caught,
+		"affinity": affinity,
+		"quest": quest,
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,

@@ -49,72 +49,28 @@ theme_override_styles/fill = SubResource("energy_fill")
 max_value = 100.0
 show_percentage = false
 
-[node name="Resources" type="Label" parent="."]
+[node name="Resources" type="HBoxContainer" parent="."]
 offset_left = 4.0
-offset_top = 22.0
+offset_top = 24.0
+offset_right = 200.0
+offset_bottom = 44.0
+theme_override_constants/separation = 4
+
+[node name="ToolName" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 268.0
 offset_right = 300.0
-offset_bottom = 40.0
+offset_bottom = 286.0
+theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 3
 
-[node name="Bottom" type="HBoxContainer" parent="."]
-offset_left = 4.0
-offset_top = 282.0
-offset_right = 476.0
-offset_bottom = 300.0
-theme_override_constants/separation = 12
-
-[node name="ToolHoe" type="Label" parent="Bottom"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolWater" type="Label" parent="Bottom"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolSeed" type="Label" parent="Bottom"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolHand" type="Label" parent="Bottom"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="Bottom2" type="HBoxContainer" parent="."]
-offset_left = 4.0
-offset_top = 300.0
-offset_right = 476.0
-offset_bottom = 318.0
-theme_override_constants/separation = 12
-
-[node name="ToolAxe" type="Label" parent="Bottom2"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolPickaxe" type="Label" parent="Bottom2"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolFence" type="Label" parent="Bottom2"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolSprinkler" type="Label" parent="Bottom2"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
-
-[node name="ToolRod" type="Label" parent="Bottom2"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 3
+[node name="Hotbar" type="HBoxContainer" parent="."]
+offset_left = 8.0
+offset_top = 288.0
+offset_right = 300.0
+offset_bottom = 316.0
+theme_override_constants/separation = 4
 
 [node name="Message" type="Label" parent="."]
 visible = false

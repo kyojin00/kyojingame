@@ -41,6 +41,7 @@ var fishing_state := ""
 var fishing_timer := 0.0
 var fishing_ui: CanvasLayer
 var pending_fish: Array = []
+var dialog: CanvasLayer
 
 # 개발/CI용: KYOJIN_SHOT=경로 로 실행하면 잠시 후 스크린샷을 저장하고 종료한다.
 # KYOJIN_DAY=숫자, KYOJIN_WEATHER=0/1/2 로 시작 날짜/날씨를 강제할 수 있다.
@@ -56,8 +57,14 @@ const TEXTURE_NAMES := [
 	"mature_tomato", "mature_corn", "mature_watermelon",
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
-	"rock", "bin", "house", "fence", "sprinkler",
+	"rock", "bin", "house", "fence", "sprinkler", "board",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
+	"npc_merchant_down_0", "npc_merchant_down_1", "npc_merchant_up_0",
+	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
+	"npc_fisher_down_0", "npc_fisher_down_1", "npc_fisher_up_0",
+	"npc_fisher_up_1", "npc_fisher_side_0", "npc_fisher_side_1",
+	"icon_hoe", "icon_water", "icon_seed", "icon_basket", "icon_axe",
+	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
@@ -66,6 +73,13 @@ const TEXTURE_NAMES := [
 ]
 
 const START_TILE := Vector2i(30, 20)
+# 집 앵커(좌상단): [0]=농장 집(취침), [1]=마을 상점, [2]=철수네 집
+const HOUSES := [Vector2i(2, 1), Vector2i(48, 3), Vector2i(48, 10)]
+const BOARD_POS := Vector2i(55, 8)
+const VILLAGE_REGION := Rect2i(46, 2, 13, 15)
+const UI_FONT := preload("res://assets/fonts/unifont_ko.otf")
+
+var npcs: Array = []
 
 
 func _ready() -> void:
@@ -101,6 +115,18 @@ func _ready() -> void:
 	fishing_ui.finished.connect(_on_fishing_finished)
 	add_child(fishing_ui)
 
+	dialog = preload("res://scripts/dialog_ui.gd").new()
+	add_child(dialog)
+
+	for npc_id in ["merchant", "fisher"]:
+		var n: Node2D = preload("res://scripts/npc.gd").new()
+		n.main = self
+		n.id = npc_id
+		n.region = VILLAGE_REGION
+		n.position = Vector2(52 * TILE + 8, (8 if npc_id == "merchant" else 13) * TILE + 8)
+		npcs.append(n)
+		world.add_child(n)
+
 	sleep_dialog = ConfirmationDialog.new()
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
 	sleep_dialog.ok_button_text = "잔다"
@@ -122,6 +148,8 @@ func _ready() -> void:
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
 	_spawn_objects()
 	_apply_season_visuals()
+	if GameData.quest.is_empty():
+		GameData.make_daily_quest()
 
 
 func _load_textures() -> void:
@@ -156,11 +184,13 @@ func _build_map() -> void:
 		for x in range(45, 53):
 			grid[y][x].ground = "water"
 
-	# 집 (왼쪽 위 5x4 타일) + 출하 상자
-	for y in range(1, 5):
-		for x in range(2, 7):
-			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+	# 집들 (각 5x4 타일) + 출하 상자 + 퀘스트 게시판
+	for anchor in HOUSES:
+		for y in range(anchor.y, anchor.y + 4):
+			for x in range(anchor.x, anchor.x + 5):
+				objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
 	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
+	objects[BOARD_POS] = {"kind": "board", "hp": 0}
 
 	# 테두리 나무
 	for x in MAP_W:
@@ -184,6 +214,8 @@ func _build_map() -> void:
 				continue  # 집/출하상자 주변은 비워둔다
 			if abs(x - START_TILE.x) <= 3 and abs(y - START_TILE.y) <= 3:
 				continue  # 시작 지점 주변도 비워둔다
+			if VILLAGE_REGION.has_point(Vector2i(x, y)):
+				continue  # 마을 구역도 비워둔다
 			var h := _hash01(x * 3 + 7, y * 5 + 11)
 			if h < 0.045:
 				objects[pos] = {"kind": "tree", "hp": TREE_HP}
@@ -196,18 +228,14 @@ func _spawn_objects() -> void:
 		n.queue_free()
 	obj_nodes.clear()
 	tree_sprites.clear()
-	var house_done := false
+	for anchor: Vector2i in HOUSES:
+		var hn := _make_object(tex["house"],
+			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -64))
+		obj_nodes[anchor] = hn
+		world.add_child(hn)
 	for pos: Vector2i in objects:
-		var kind: String = objects[pos].kind
-		if kind == "house":
-			if house_done:
-				continue
-			house_done = true
-			var hn := _make_object(tex["house"], Vector2(2 * TILE, 5 * TILE), Vector2(0, -64))
-			obj_nodes[pos] = hn
-			world.add_child(hn)
-		else:
-			_spawn_object_node(pos, kind)
+		if objects[pos].kind != "house":
+			_spawn_object_node(pos, objects[pos].kind)
 
 
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
@@ -221,6 +249,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["rock"]
 		"bin":
 			texture = tex["bin"]
+		"board":
+			texture = tex["board"]
 		"fence":
 			texture = tex["fence"]
 		"sprinkler":
@@ -307,7 +337,8 @@ func target_tile() -> Vector2i:
 
 
 func ui_open() -> bool:
-	return shop.visible or summary.visible or sleep_dialog.visible or fishing_ui.visible
+	return shop.visible or summary.visible or sleep_dialog.visible \
+		or fishing_ui.visible or dialog.visible
 
 
 # ---- 도구/상호작용 ----
@@ -544,17 +575,22 @@ func use_tool() -> void:
 
 
 func interact() -> void:
+	# 가까운 NPC와 대화
+	var npc := nearby_npc()
+	if npc != null:
+		_talk_to(npc)
+		return
 	# 가까운 동물 쓰다듬기(=먹이 주기)
-	for a in animals:
-		if (a.position - player.position).length() < 22.0:
-			var def: Dictionary = GameData.ANIMALS[a.type]
-			if a.fed:
-				hud.show_message("%s는 이미 만족스러워 보인다." % def.name)
-			else:
-				a.fed = true
-				hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
-					[def.name, GameData.ITEMS[def.product].name])
-			return
+	var animal := nearby_animal()
+	if animal != null:
+		var def: Dictionary = GameData.ANIMALS[animal.type]
+		if animal.fed:
+			hud.show_message("%s는 이미 만족스러워 보인다." % def.name)
+		else:
+			animal.fed = true
+			hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
+				[def.name, GameData.ITEMS[def.product].name])
+		return
 	for t in [target_tile(), player_tile()]:
 		var obj: Variant = objects.get(t)
 		if obj == null:
@@ -562,10 +598,111 @@ func interact() -> void:
 		if obj.kind == "bin":
 			shop.open("sell")
 			return
+		if obj.kind == "board":
+			_open_quest_board()
+			return
 		if obj.kind == "house":
-			sleep_dialog.popup_centered()
+			match _house_index_at(t):
+				0:
+					sleep_dialog.popup_centered()
+				1:
+					shop.open("buy")
+				_:
+					hud.show_message("철수네 집이다. 낚시하러 갔는지 조용하다.")
 			return
 	hud.show_message("집 문 앞에서 E: 취침 · 출하 상자 앞에서 E: 판매")
+
+
+func nearby_npc() -> Node2D:
+	for n in npcs:
+		if (n.position - player.position).length() < 24.0:
+			return n
+	return null
+
+
+func nearby_animal() -> Node2D:
+	for a in animals:
+		if (a.position - player.position).length() < 22.0:
+			return a
+	return null
+
+
+func _house_index_at(t: Vector2i) -> int:
+	for i in HOUSES.size():
+		var a: Vector2i = HOUSES[i]
+		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
+			return i
+	return -1
+
+
+# ---- NPC 대화 / 선물 / 퀘스트 ----
+
+func _talk_to(npc: Node2D) -> void:
+	var def: Dictionary = GameData.NPCS[npc.id]
+	if not npc.talked_today:
+		npc.talked_today = true
+		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
+	var lines: Array = def.lines
+	var line: String = lines[randi() % lines.size()]
+	var hearts := int(GameData.affinity[npc.id]) / 10
+	dialog.open("%s %s" % [def.name, "♥".repeat(mini(hearts, 10))], line, [
+		["선물하기", _give_gift.bind(npc.id)],
+		["닫기", null],
+	])
+
+
+func _give_gift(npc_id: String) -> void:
+	# 수확물/아이템 중 하나를 선물한다
+	for id in GameData.CROP_IDS:
+		if GameData.produce[id] > 0:
+			GameData.produce[id] -= 1
+			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+			dialog.set_body("%s을(를) 선물했다! 정말 좋아한다. ♥" % GameData.CROPS[id].name)
+			return
+	for id in GameData.ITEM_IDS:
+		if GameData.items[id] > 0:
+			GameData.items[id] -= 1
+			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+			dialog.set_body("%s을(를) 선물했다! 정말 좋아한다. ♥" % GameData.ITEMS[id].name)
+			return
+	dialog.set_body("선물할 것이 없다... 수확물이나 생산물이 필요하다.")
+
+
+func _open_quest_board() -> void:
+	var q: Dictionary = GameData.quest
+	if q.is_empty():
+		dialog.open("의뢰 게시판", "오늘은 새 의뢰가 없다.", [["닫기", null]])
+		return
+	var crop: Dictionary = GameData.CROPS[q.crop]
+	var text := "[납품 의뢰]\n%s %d개를 모아 오면 %dG를 드립니다." % [crop.name, q.qty, q.reward]
+	if not q.accepted:
+		dialog.open("의뢰 게시판", text, [
+			["수락", _accept_quest],
+			["닫기", null],
+		])
+	elif GameData.produce[q.crop] >= q.qty:
+		dialog.open("의뢰 게시판", text + "\n(보유: %d개 - 납품 가능!)" % GameData.produce[q.crop], [
+			["납품하기", _turn_in_quest],
+			["닫기", null],
+		])
+	else:
+		dialog.open("의뢰 게시판", text + "\n(진행중: %d/%d개)" % [GameData.produce[q.crop], q.qty],
+			[["닫기", null]])
+
+
+func _accept_quest() -> void:
+	GameData.quest.accepted = true
+	dialog.set_body("의뢰를 수락했다! 작물을 모아서 다시 오자.")
+
+
+func _turn_in_quest() -> void:
+	var q: Dictionary = GameData.quest
+	GameData.produce[q.crop] -= q.qty
+	GameData.money += q.reward
+	GameData.today_earned += int(q.reward)
+	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
+	dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % q.reward)
+	GameData.quest = {}
 
 
 # ---- 동물 ----
@@ -653,6 +790,12 @@ func _next_day(passed_out: bool) -> void:
 	# 나무/돌이 조금씩 다시 자란다
 	_respawn_resources()
 
+	# NPC 일일 상태 리셋 + 새 의뢰
+	for n in npcs:
+		n.talked_today = false
+	if GameData.quest.is_empty() or not GameData.quest.get("accepted", false):
+		GameData.make_daily_quest()
+
 	save_now()
 
 	var note := ""
@@ -728,6 +871,13 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.items[k] = int(d.items[k])
 	for k in d.get("fish_caught", {}):
 		GameData.fish_caught[k] = int(d.fish_caught[k])
+	for k in d.get("affinity", {}):
+		GameData.affinity[k] = int(d.affinity[k])
+	if d.has("quest") and typeof(d.quest) == TYPE_DICTIONARY and not d.quest.is_empty():
+		GameData.quest = {
+			"crop": d.quest.crop, "qty": int(d.quest.qty),
+			"reward": int(d.quest.reward), "accepted": bool(d.quest.accepted),
+		}
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
@@ -892,7 +1042,75 @@ func _draw() -> void:
 		draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
 		draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
 
+	_draw_context_hint()
 	_draw_weather()
+
+
+# 타겟 타일/주변 상황에 맞는 안내 문구를 월드에 띄운다
+func _context_hint() -> Array:
+	# 반환: [문구, 기준 위치(월드)] 또는 []
+	if player == null or ui_open():
+		return []
+	var above_player := player.position + Vector2(0, -40)
+	if fishing_state == "bite":
+		return ["지금이다!", above_player]
+	if fishing_state == "waiting":
+		return []
+	if nearby_npc() != null:
+		return ["E: 대화", above_player]
+	if nearby_animal() != null:
+		return ["E: 쓰다듬기", above_player]
+	var t := target_tile()
+	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
+		return []
+	var above_tile := Vector2(t.x * TILE + 8, t.y * TILE - 6)
+	var obj: Variant = objects.get(t)
+	if obj != null:
+		match obj.kind:
+			"bin":
+				return ["E: 판매", above_tile]
+			"board":
+				return ["E: 의뢰 게시판", above_tile]
+			"house":
+				match _house_index_at(t):
+					0:
+						return ["E: 취침", above_tile]
+					1:
+						return ["E: 상점", above_tile]
+			"tree":
+				if GameData.tool == "axe":
+					return ["나무 베기", above_tile]
+			"rock":
+				if GameData.tool == "pickaxe":
+					return ["돌 캐기", above_tile]
+		return []
+	var cell: Dictionary = grid[t.y][t.x]
+	if cell.crop_id != "":
+		if cell.dead:
+			return ["시듦 - 호미로 정리", above_tile]
+		var def: Dictionary = GameData.CROPS[cell.crop_id]
+		if cell.crop_day >= def.grow_days:
+			return ["수확!", above_tile]
+		var text := "성장중 %d/%d일" % [cell.crop_day, def.grow_days]
+		if not cell.watered:
+			text += " · 물주기!"
+		return [text, above_tile]
+	if cell.ground == "water" and GameData.tool == "rod":
+		return ["Space: 낚시", above_tile]
+	return []
+
+
+func _draw_context_hint() -> void:
+	var hint := _context_hint()
+	if hint.is_empty():
+		return
+	var text: String = hint[0]
+	var base: Vector2 = hint[1]
+	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	var pos := Vector2(base.x - w / 2.0, base.y)
+	draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 5,
+		Color(0.08, 0.06, 0.12, 0.9))
+	draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 0.9))
 
 
 func _draw_weather() -> void:
@@ -936,30 +1154,23 @@ func _debug_tick() -> void:
 		56: _send_key_release(KEY_S)                   # 아래 보기
 		60: _send_key(KEY_8)
 		64: _send_key(KEY_SPACE)                       # 스프링클러 설치
+		66: _send_key(KEY_3)                           # 씨앗 도구로 컨텍스트 힌트 확인
 		70: _save_shot("_game.png")
-		74: _send_key(KEY_B)                           # 상점 열기
-		76:
-			GameData.money = 3000
-			shop._on_tab("animal")                     # 동물 탭에서 닭+소 입양
-		78: shop._on_buy_animal("chicken")
-		80: shop._on_buy_animal("cow")
-		84: _save_shot("_shop.png")
-		88: shop.close()
-		92:
-			player.position = Vector2(25 * TILE + 8, 12 * TILE + 8)
-			player.dir = "down"                        # 연못가로 이동
-		96: _send_key(KEY_9)
-		100: _send_key(KEY_SPACE)                      # 캐스팅
-		102: fishing_timer = 0.2                       # 입질 시간 단축
-		112: _send_key(KEY_SPACE)                      # 입질! -> 미니게임
-		118: _save_shot("_fishing.png")
-		122: _send_key(KEY_SPACE)                      # 타이밍 판정
-		130:
-			for a in animals:
-				a.fed = true                           # 아침 생산 테스트
-			_next_day(false)
-		138:
-			_save_shot("_summary.png")
+		74:
+			player.position = Vector2(54 * TILE + 8, 8 * TILE + 8)
+			player.dir = "right"                       # 마을 게시판 앞으로
+			for n in npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
+				n.position = Vector2(47 * TILE + 8, 16 * TILE + 8)
+				n.target = n.position
+		78: _send_key(KEY_E)
+		84: _save_shot("_quest.png")
+		86: dialog.close()
+		90:
+			player.position = npcs[0].position + Vector2(12, 0)
+		94: _send_key(KEY_E)                           # NPC 대화
+		100: _save_shot("_npc.png")
+		102:
+			dialog.close()
 			get_tree().quit()
 
 

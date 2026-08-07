@@ -53,10 +53,15 @@ func _rebuild() -> void:
 			l.text = "%s 씨앗(보유%d) 성장%d일" % [def.name, GameData.seeds[id], def.grow_days]
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(l)
-			var b := _mk_button("%dG 구매" % def.seed_price, _on_buy.bind(id))
-			b.disabled = GameData.money < def.seed_price
+			var price := GameData.seed_price(id)
+			var b := _mk_button("%dG 구매" % price, _on_buy.bind(id))
+			b.disabled = GameData.money < price
 			row.add_child(b)
 			items_box.add_child(row)
+		if GameData.merchant_discount():
+			var note := Label.new()
+			note.text = "민지와 친해져서 씨앗 10% 할인 중! ♥"
+			items_box.add_child(note)
 	elif tab == "sell":
 		var any := false
 		for id in GameData.CROP_IDS:
@@ -149,12 +154,12 @@ func _rebuild() -> void:
 
 
 func _on_buy(id: String) -> void:
-	var def: Dictionary = GameData.CROPS[id]
-	if GameData.money < def.seed_price:
+	var price := GameData.seed_price(id)
+	if GameData.money < price:
 		return
-	GameData.money -= def.seed_price
+	GameData.money -= price
 	GameData.seeds[id] += 1
-	GameData.today_spent += def.seed_price
+	GameData.today_spent += price
 	_rebuild()
 
 
