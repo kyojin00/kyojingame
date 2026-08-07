@@ -163,6 +163,8 @@ func _on_buy(id: String) -> void:
 	GameData.money -= price
 	GameData.seeds[id] += 1
 	GameData.today_spent += price
+	if main != null and not main._remote_acting:
+		main.net_shop("buy_seed", id)
 	_rebuild()
 
 
@@ -173,6 +175,8 @@ func _on_sell(id: String) -> void:
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.produce[id] = 0
+	if main != null and not main._remote_acting:
+		main.net_shop("sell_crop", id)
 	_rebuild()
 
 
@@ -183,6 +187,8 @@ func _on_sell_item(id: String) -> void:
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.items[id] = 0
+	if main != null and not main._remote_acting:
+		main.net_shop("sell_item", id)
 	_rebuild()
 
 
@@ -194,6 +200,8 @@ func _on_buy_animal(id: String) -> void:
 	GameData.money -= def.price
 	GameData.today_spent += def.price
 	main.spawn_animal(id)
+	if main != null and not main._remote_acting:
+		main.net_shop("buy_animal", id)
 	_rebuild()
 
 
@@ -205,4 +213,6 @@ func _on_upgrade(id: String) -> void:
 	GameData.money -= up.money
 	GameData.wood -= up.wood
 	GameData.tool_level[id] = 2
+	if main != null and not main._remote_acting:
+		main.net_shop("upgrade", id)
 	_rebuild()

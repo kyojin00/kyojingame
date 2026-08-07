@@ -1,0 +1,56 @@
+# 다른 플레이어의 아바타: 수신한 위치/방향으로 부드럽게 따라간다.
+extends Node2D
+
+var main: Node2D
+var tint := Color(1, 1, 1)
+var target_pos := Vector2.ZERO
+var dir := "down"
+var moving := false
+var anim_time := 0.0
+var sprite: Sprite2D
+
+
+func _ready() -> void:
+	sprite = Sprite2D.new()
+	sprite.centered = false
+	sprite.offset = Vector2(-8, -23)
+	sprite.modulate = tint
+	add_child(sprite)
+	target_pos = position
+	_update_sprite()
+
+
+func _draw() -> void:
+	draw_rect(Rect2(-4, -2, 8, 3), Color(0, 0, 0, 0.22))
+
+
+func set_state(pos: Vector2, new_dir: String, new_moving: bool) -> void:
+	target_pos = pos
+	dir = new_dir
+	moving = new_moving
+
+
+func _process(delta: float) -> void:
+	var d := target_pos - position
+	if d.length() > 64.0:
+		position = target_pos  # 순간이동 (스냅샷 직후 등)
+	else:
+		position = position.lerp(target_pos, minf(delta * 12.0, 1.0))
+	if moving:
+		anim_time += delta
+	_update_sprite()
+
+
+func _update_sprite() -> void:
+	var frame := (int(anim_time * 6.0) % 2) if moving else 0
+	var tex_name := ""
+	sprite.flip_h = false
+	match dir:
+		"down":
+			tex_name = "player_down_%d" % frame
+		"up":
+			tex_name = "player_up_%d" % frame
+		_:
+			tex_name = "player_side_%d" % frame
+			sprite.flip_h = dir == "left"
+	sprite.texture = main.tex[tex_name]

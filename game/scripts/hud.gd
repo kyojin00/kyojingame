@@ -111,6 +111,8 @@ func refresh() -> void:
 
 
 func show_message(text: String) -> void:
+	if main != null and main._remote_acting:
+		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
 	msg_label.text = text
 	msg_label.visible = true
 	msg_timer = 2.5

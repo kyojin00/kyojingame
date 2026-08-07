@@ -43,7 +43,18 @@ var fishing_ui: CanvasLayer
 var pending_fish: Array = []
 var dialog: CanvasLayer
 var map_ui: CanvasLayer
+var inventory_ui: CanvasLayer
 var fade_rect: ColorRect
+
+# ---- 멀티플레이 상태 ----
+var remote_players := {}  # peer_id -> remote_player 노드
+var _pos_sync_timer := 0.0
+var _time_sync_timer := 0.0
+var _net_ready := false   # 게스트: 스냅샷 수신 완료 여부
+var _connect_label: Label
+const PLAYER_TINTS := [
+	Color(1, 1, 1), Color(1, 0.85, 0.85), Color(0.85, 1, 0.9), Color(0.88, 0.9, 1),
+]
 var day_transitioning := false
 var particles: Array = []
 
@@ -128,6 +139,10 @@ func _ready() -> void:
 	map_ui.main = self
 	add_child(map_ui)
 
+	inventory_ui = preload("res://scripts/inventory_ui.gd").new()
+	inventory_ui.main = self
+	add_child(inventory_ui)
+
 	for npc_id in ["merchant", "fisher"]:
 		var n: Node2D = preload("res://scripts/npc.gd").new()
 		n.main = self
@@ -152,6 +167,27 @@ func _ready() -> void:
 	if OS.get_environment("KYOJIN_WEATHER") != "":
 		_weather_override = int(OS.get_environment("KYOJIN_WEATHER"))
 
+	if Net.active():
+		multiplayer.peer_connected.connect(_on_peer_connected)
+		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+	if Net.is_guest():
+		multiplayer.server_disconnected.connect(_on_server_disconnected)
+		# 게스트: 로컬 저장 대신 호스트 스냅샷을 기다린다
+		GameData.reset_all()
+		GameData.tutorial = {"active": false}
+		GameData.unlock_all_tools()
+		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 8,
+			START_TILE.y * TILE + 8)
+		_show_connecting()
+		# 연결이 완료된 뒤에 스냅샷을 요청한다 (그 전 RPC는 유실됨)
+		multiplayer.connected_to_server.connect(func() -> void: _req_snapshot.rpc_id(1))
+		if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+			_req_snapshot.rpc_id(1)
+		_spawn_objects()
+		_apply_season_visuals()
+		_setup_fade(false)
+		return
+
 	var loaded := GameData.load_game()
 	if loaded.size() > 0:
 		_apply_save(loaded)
@@ -159,28 +195,32 @@ func _ready() -> void:
 	else:
 		GameData.reset_all()
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
-		if _shot_path == "" or OS.get_environment("KYOJIN_STORY") != "":
+		if (_shot_path == "" and OS.get_environment("KYOJIN_MP") == "") \
+				or OS.get_environment("KYOJIN_STORY") != "":
 			_show_intro.call_deferred()
-		if _shot_path != "":
+		if _shot_path != "" or OS.get_environment("KYOJIN_MP") != "":
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
 		GameData.make_daily_quest()
 
-	# 페이드 전환 오버레이
+	_setup_fade(loaded.size() > 0 or _shot_path != "")
+	# 신규 게임은 _show_intro가 스토리 동안 화면을 가렸다가 직접 페이드한다
+
+
+func _setup_fade(animate_in: bool) -> void:
 	var fade_layer := CanvasLayer.new()
 	fade_layer.layer = 50
 	add_child(fade_layer)
 	fade_rect = ColorRect.new()
-	fade_rect.color = Color(0, 0, 0, 1)
+	fade_rect.color = Color(0, 0, 0, 1 if animate_in else 0)
 	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fade_layer.add_child(fade_rect)
-	if loaded.size() > 0 or _shot_path != "":
+	if animate_in:
 		var tw := create_tween()
 		tw.tween_property(fade_rect, "color:a", 0.0, 0.5)
-	# 신규 게임은 _show_intro가 스토리 동안 어둡게 유지했다가 직접 페이드한다
 
 
 func _load_textures() -> void:
@@ -361,6 +401,8 @@ func player_tile() -> Vector2i:
 
 
 func target_tile() -> Vector2i:
+	if _target_override.x != -999:
+		return _target_override  # 원격 플레이어 행동 처리 중
 	var dirs := {
 		"down": Vector2i(0, 1), "up": Vector2i(0, -1),
 		"left": Vector2i(-1, 0), "right": Vector2i(1, 0),
@@ -368,9 +410,16 @@ func target_tile() -> Vector2i:
 	return player_tile() + dirs[player.dir]
 
 
+func _current_perp() -> Vector2i:
+	if _perp_override != Vector2i.ZERO:
+		return _perp_override
+	return Vector2i(0, 1) if player.dir in ["left", "right"] else Vector2i(1, 0)
+
+
 func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
-		or fishing_ui.visible or dialog.visible or map_ui.visible
+		or fishing_ui.visible or dialog.visible or map_ui.visible \
+		or inventory_ui.visible or (story_layer != null and story_layer.visible)
 
 
 # ---- 도구/상호작용 ----
@@ -430,6 +479,13 @@ func _on_fishing_finished(success: bool) -> void:
 		spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
 		tutorial_notify("fish")
+		if Net.is_guest():
+			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
+			GameData.items[id] -= 1
+			GameData.fish_caught[id] = int(GameData.fish_caught[id]) - 1
+			_req_add_item.rpc_id(1, id)
+		elif Net.is_host():
+			_broadcast_stats()
 	else:
 		Sound.play_sfx("sfx_miss")
 		hud.show_message("놓쳤다...")
@@ -439,7 +495,7 @@ func _affected_tiles(base: Vector2i) -> Array:
 	# 업그레이드된 호미/물뿌리개는 전방 3칸(진행 방향의 좌우 포함)에 적용된다.
 	var out := [base]
 	if GameData.tool_level.get(GameData.tool, 1) >= 2:
-		var perp := Vector2i(0, 1) if player.dir in ["left", "right"] else Vector2i(1, 0)
+		var perp := _current_perp()
 		out.append(base + perp)
 		out.append(base - perp)
 	return out
@@ -452,6 +508,7 @@ func use_tool() -> void:
 	var cell: Dictionary = grid[t.y][t.x]
 	var obj: Variant = objects.get(t)
 	var cost: float = ENERGY_COST[GameData.tool]
+	var seed_now := GameData.current_seed_id()
 
 	if GameData.energy < cost:
 		hud.show_message("너무 지쳤다... 자러 가야 할 것 같다.")
@@ -509,7 +566,7 @@ func use_tool() -> void:
 			elif grid[t.y][t.x].ground != "soil":
 				hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
-			var id := GameData.current_seed_id()
+			var id := _forced_seed if _forced_seed != "" else GameData.current_seed_id()
 			if id == "":
 				hud.show_message("씨앗이 없다. 상점(B)에서 사자.")
 				return
@@ -642,6 +699,14 @@ func use_tool() -> void:
 					if int(GameData.affinity["fisher"]) >= 50:
 						zone *= 1.25
 					fishing_ui.start(zone)
+	# 멀티: 내 행동을 다른 플레이어에게 반영 (낚싯대는 로컬 진행)
+	if not _remote_acting:
+		if Net.is_guest() and GameData.tool != "rod":
+			_req_tool.rpc_id(1, t.x, t.y, GameData.tool, seed_now,
+				_current_perp().x, _current_perp().y)
+		elif Net.is_host():
+			_broadcast_area(t)
+			_broadcast_stats()
 	queue_redraw()
 
 
@@ -660,6 +725,8 @@ func interact() -> void:
 		else:
 			animal.fed = true
 			Sound.play_sfx("sfx_heart")
+			if Net.is_guest():
+				_req_feed.rpc_id(1, animals.find(animal))
 			hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
 				[def.name, GameData.ITEMS[def.product].name])
 		return
@@ -676,7 +743,10 @@ func interact() -> void:
 		if obj.kind == "house":
 			match _house_index_at(t):
 				0:
-					sleep_dialog.popup_centered()
+					if Net.is_guest():
+						hud.show_message("하루는 호스트가 잠자리에 들어야 넘어간다.")
+					else:
+						sleep_dialog.popup_centered()
 				1:
 					shop.open("buy")
 				_:
@@ -715,22 +785,80 @@ const STORY_PAGES := [
 	["", "그렇게 나는 짐을 싸서\n'교진 마을'의 작은 농장으로 향했다.\n\n낡았지만 따뜻한 집, 그리고 드넓은 땅...\n이제 이곳이 나의 새 보금자리다."],
 ]
 var _story_idx := 0
+var story_layer: CanvasLayer
+var _story_title: Label
+var _story_body: Label
+var _story_buttons: HBoxContainer
 
 
 func _show_intro() -> void:
-	fade_rect.color.a = 0.7  # 스토리 동안 어둡게
+	hud.visible = false
+	fade_rect.color.a = 1.0  # 게임 화면 대신 편지지 연출
+	_build_story_ui()
 	_story_idx = 0
 	_show_story_page()
 
 
+func _build_story_ui() -> void:
+	story_layer = CanvasLayer.new()
+	story_layer.layer = 60
+	add_child(story_layer)
+
+	# 양피지 편지 패널 (밝은 배경 + 진한 글씨)
+	var panel := PanelContainer.new()
+	panel.position = Vector2(60, 50)
+	panel.custom_minimum_size = Vector2(360, 210)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.93, 0.88, 0.74)
+	style.border_color = Color(0.55, 0.42, 0.26)
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(6)
+	style.set_content_margin_all(16)
+	panel.add_theme_stylebox_override("panel", style)
+	story_layer.add_child(panel)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	panel.add_child(v)
+
+	_story_title = Label.new()
+	_story_title.add_theme_color_override("font_color", Color(0.5, 0.32, 0.12))
+	_story_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(_story_title)
+
+	_story_body = Label.new()
+	_story_body.add_theme_color_override("font_color", Color(0.24, 0.17, 0.09))
+	_story_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_story_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_story_body)
+
+	_story_buttons = HBoxContainer.new()
+	_story_buttons.add_theme_constant_override("separation", 10)
+	_story_buttons.alignment = BoxContainer.ALIGNMENT_END
+	v.add_child(_story_buttons)
+
+
 func _show_story_page() -> void:
+	for c in _story_buttons.get_children():
+		c.queue_free()
 	if _story_idx < STORY_PAGES.size():
 		var page: Array = STORY_PAGES[_story_idx]
-		dialog.open(page[0], page[1], [["다음 >", _next_story_page]])
+		_story_title.text = page[0]
+		_story_body.text = page[1]
+		_story_add_button("다음 >", _next_story_page)
 	else:
-		dialog.open("교진 팜에 어서 와!",
-			"지금 가진 것은 호미 하나와 감자 씨앗 5개.\n화면 위의 '다음 목표'를 하나씩 달성하면\n새 도구가 열린다. 천천히 배워보자!",
-			[["튜토리얼 시작", _end_intro], ["건너뛰기", _skip_tutorial]])
+		_story_title.text = "교진 팜에 어서 와!"
+		_story_body.text = "지금 가진 것은 호미 하나와 감자 씨앗 5개.\n화면 위의 '다음 목표'를 하나씩 달성하면\n새 도구가 열린다. 천천히 배워보자!"
+		_story_add_button("튜토리얼 시작", _end_intro)
+		_story_add_button("건너뛰기", _skip_tutorial)
+
+
+func _story_add_button(text: String, cb: Callable) -> void:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(cb)
+	_story_buttons.add_child(b)
 
 
 func _next_story_page() -> void:
@@ -740,7 +868,10 @@ func _next_story_page() -> void:
 
 
 func _end_intro() -> void:
-	dialog.close()
+	if story_layer != null:
+		story_layer.queue_free()
+		story_layer = null
+	hud.visible = true
 	var tw := create_tween()
 	tw.tween_property(fade_rect, "color:a", 0.0, 0.6)
 
@@ -823,8 +954,12 @@ func _give_gift(npc_id: String) -> void:
 		dialog.set_body("선물할 것이 없다... 수확물이나 생산물이 필요하다.")
 		return
 	var before := int(GameData.affinity[npc_id])
+	if Net.is_guest():
+		_req_gift.rpc_id(1, npc_id)  # 호스트가 차감/가산 후 통계 전파
 	GameData.affinity[npc_id] = before + 10
 	Sound.play_sfx("sfx_heart")
+	if Net.is_host():
+		_broadcast_stats()
 	dialog.set_portrait(_npc_portrait(npc_id, true))
 	var body := "%s을(를) 선물했다! 정말 좋아한다. ♥" % gift_name
 	if before < 50 and before + 10 >= 50:
@@ -859,6 +994,10 @@ func _open_quest_board() -> void:
 
 func _accept_quest() -> void:
 	GameData.quest.accepted = true
+	if Net.is_guest():
+		_req_quest.rpc_id(1, "accept")
+	elif Net.is_host():
+		_broadcast_stats()
 	dialog.set_body("의뢰를 수락했다! 작물을 모아서 다시 오자.")
 
 
@@ -871,6 +1010,10 @@ func _turn_in_quest() -> void:
 	Sound.play_sfx("sfx_coin")
 	dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % q.reward)
 	GameData.quest = {}
+	if Net.is_guest():
+		_req_quest.rpc_id(1, "turnin")
+	elif Net.is_host():
+		_broadcast_stats()
 
 
 # ---- 동물 ----
@@ -994,9 +1137,12 @@ func _next_day(passed_out: bool) -> void:
 	if passed_out:
 		note += "\n쓰러져서 기력이 절반만 회복됐다..."
 
-	summary.open("- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()],
-		"어제 수확: %d개\n판매 수입: +%dG\n지출: -%dG\n소지금: %dG\n%s"
-		% [stats[0], stats[1], stats[2], GameData.money, note])
+	var s_title := "- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()]
+	var s_body := "어제 수확: %d개\n판매 수입: +%dG\n지출: -%dG\n소지금: %dG\n%s" \
+		% [stats[0], stats[1], stats[2], GameData.money, note]
+	summary.open(s_title, s_body)
+	if Net.is_host():
+		_net_new_day.rpc(_make_snapshot_json(), s_title, s_body)
 	queue_redraw()
 
 
@@ -1019,6 +1165,8 @@ func _respawn_resources() -> void:
 # ---- 저장 ----
 
 func save_now() -> void:
+	if Net.is_guest():
+		return  # 저장은 호스트만
 	var g := []
 	for y in MAP_H:
 		var row := []
@@ -1092,9 +1240,11 @@ func _apply_save(d: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	if not ui_open():
-		GameData.minutes += delta * MIN_PER_SEC
-		if GameData.minutes >= GameData.DAY_END and not day_transitioning:
-			_fade_next_day(true)
+		if not Net.is_guest():
+			# 시간은 호스트/솔로만 진행 (게스트는 동기화 수신)
+			GameData.minutes += delta * MIN_PER_SEC
+			if GameData.minutes >= GameData.DAY_END and not day_transitioning:
+				_fade_next_day(true)
 		water_timer += delta
 		if water_timer > 0.8:
 			water_timer = 0.0
@@ -1104,6 +1254,7 @@ func _process(delta: float) -> void:
 			tutorial_notify("moved")
 	weather_time += delta
 	_update_particles(delta)
+	_net_process(delta)
 	_update_night()
 	hud.refresh()
 	queue_redraw()
@@ -1121,21 +1272,30 @@ func _update_night() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if Net.is_guest() and not _net_ready:
+		return  # 접속 완료 전에는 조작 금지
 	if ui_open():
 		if event.is_action_pressed("ui_cancel"):
 			shop.close()
 			summary.close()
 			map_ui.close()
+			inventory_ui.close()
 			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
 			if fade_rect == null or fade_rect.color.a < 0.5:
 				dialog.close()
 		elif event.is_action_pressed("open_map") and map_ui.visible:
 			map_ui.close()
+		elif event.is_action_pressed("open_inventory") and inventory_ui.visible:
+			inventory_ui.close()
 		return
 	if event.is_action_pressed("open_map"):
 		Sound.play_sfx("sfx_ui")
 		map_ui.open()
 		tutorial_notify("map")
+		return
+	if event.is_action_pressed("open_inventory"):
+		Sound.play_sfx("sfx_ui")
+		inventory_ui.toggle()
 		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 저장 후 타이틀로
@@ -1183,6 +1343,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _back_to_title() -> void:
 	save_now()
 	Sound.stop_bgm()
+	Net.reset()
 	get_tree().change_scene_to_file("res://scenes/title.tscn")
 
 
@@ -1439,6 +1600,8 @@ func _draw_weather() -> void:
 # 밭갈기->클릭 경작->물주기->파종->자원->설치->상점->결산까지 자동 재생한다.
 
 func _debug_tick() -> void:
+	if Net.is_guest() and not _net_ready:
+		return  # 접속 완료 후부터 시퀀스 시작
 	_shot_frames += 1
 	if OS.get_environment("KYOJIN_STORY") != "":
 		# 스토리 화면만 캡처하고 종료
@@ -1488,6 +1651,336 @@ func _debug_tick() -> void:
 			dialog.close()
 			get_tree().quit()
 
+
+# ==== 멀티플레이 ====
+
+func _show_connecting() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 55
+	layer.name = "Connecting"
+	add_child(layer)
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.04, 0.09, 1)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(bg)
+	_connect_label = Label.new()
+	_connect_label.text = "호스트에 접속하는 중..."
+	_connect_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_connect_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_connect_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	layer.add_child(_connect_label)
+	# 12초 안에 스냅샷을 못 받으면 타이틀로
+	get_tree().create_timer(12.0).timeout.connect(func() -> void:
+		if not _net_ready and Net.is_guest():
+			_back_to_title())
+
+
+func _hide_connecting() -> void:
+	var layer := get_node_or_null("Connecting")
+	if layer != null:
+		layer.queue_free()
+
+
+func _on_peer_connected(_id: int) -> void:
+	if Net.is_host():
+		hud.show_message("새 일꾼이 농장에 도착했다!")
+
+
+func _on_peer_disconnected(id: int) -> void:
+	if remote_players.has(id):
+		remote_players[id].queue_free()
+		remote_players.erase(id)
+	if Net.is_host():
+		hud.show_message("일꾼이 농장을 떠났다.")
+
+
+func _on_server_disconnected() -> void:
+	Net.reset()
+	get_tree().change_scene_to_file("res://scenes/title.tscn")
+
+
+func _make_snapshot_json() -> String:
+	var g := []
+	for y in MAP_H:
+		var row := []
+		for x in MAP_W:
+			var c: Dictionary = grid[y][x]
+			row.append([c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
+		g.append(row)
+	var objs := []
+	for pos: Vector2i in objects:
+		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp])
+	var anims := []
+	for a in animals:
+		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
+	return JSON.stringify(GameData.build_save(g, player.position, objs, anims))
+
+
+@rpc("any_peer", "reliable")
+func _req_snapshot() -> void:
+	if not Net.is_host():
+		return
+	_recv_snapshot.rpc_id(multiplayer.get_remote_sender_id(), _make_snapshot_json())
+
+
+@rpc("authority", "reliable")
+func _recv_snapshot(json: String) -> void:
+	var d: Variant = JSON.parse_string(json)
+	if typeof(d) != TYPE_DICTIONARY:
+		return
+	# 스냅샷의 플레이어 위치는 호스트 것이므로 내 위치는 유지한다
+	var my_pos := player.position
+	for a in animals:
+		a.queue_free()
+	animals.clear()
+	_apply_save(d)
+	player.position = my_pos
+	GameData.tutorial = {"active": false}
+	GameData.unlock_all_tools()
+	_spawn_objects()
+	_apply_season_visuals()
+	_net_ready = true
+	_hide_connecting()
+	hud.show_message("농장에 도착했다! 함께 일해보자.")
+	queue_redraw()
+
+
+# 위치 동기화 (15Hz, 비신뢰)
+@rpc("any_peer", "unreliable_ordered")
+func _sync_pos(x: float, y: float, dir: String, moving: bool) -> void:
+	var pid := multiplayer.get_remote_sender_id()
+	if not remote_players.has(pid):
+		var rp: Node2D = preload("res://scripts/remote_player.gd").new()
+		rp.main = self
+		rp.tint = PLAYER_TINTS[(pid % 3) + 1]
+		rp.position = Vector2(x, y)
+		remote_players[pid] = rp
+		world.add_child(rp)
+	remote_players[pid].set_state(Vector2(x, y), dir, moving)
+
+
+var _snapshot_retry := 0.0
+
+
+func _net_process(delta: float) -> void:
+	if not Net.active():
+		return
+	if Net.is_guest() and not _net_ready:
+		# 스냅샷 재요청 (유실 대비)
+		_snapshot_retry -= delta
+		if _snapshot_retry <= 0.0 and multiplayer.multiplayer_peer != null \
+				and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+			_snapshot_retry = 2.0
+			_req_snapshot.rpc_id(1)
+	_pos_sync_timer -= delta
+	if _pos_sync_timer <= 0.0:
+		_pos_sync_timer = 1.0 / 15.0
+		_sync_pos.rpc(player.position.x, player.position.y, player.dir, player.moving)
+	if Net.is_host():
+		_time_sync_timer -= delta
+		if _time_sync_timer <= 0.0:
+			_time_sync_timer = 3.0
+			_net_time.rpc(GameData.day, GameData.minutes, GameData.energy)
+
+
+@rpc("authority", "unreliable_ordered")
+func _net_time(day: int, minutes: float, _host_energy: float) -> void:
+	GameData.day = day
+	GameData.minutes = minutes
+
+
+# 도구 사용 결과 영역 동기화 (호스트 -> 전체)
+func _broadcast_area(center: Vector2i) -> void:
+	if not Net.is_host():
+		return
+	var cells := []
+	var objs := []
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			var pos := center + Vector2i(dx, dy)
+			if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
+				continue
+			var c: Dictionary = grid[pos.y][pos.x]
+			cells.append([pos.x, pos.y, c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
+			if objects.has(pos):
+				var o: Dictionary = objects[pos]
+				objs.append([pos.x, pos.y, o.kind, o.hp])
+	_net_area.rpc(center.x, center.y, cells, objs)
+
+
+@rpc("authority", "reliable")
+func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
+	for entry in cells:
+		var c: Dictionary = grid[entry[1]][entry[0]]
+		c.ground = entry[2]
+		c.watered = int(entry[3]) == 1
+		c.crop_id = entry[4]
+		c.crop_day = int(entry[5])
+		c.dead = int(entry[6]) == 1
+	# 영역 내 오브젝트: 목록에 없는 건 제거, 있는 건 갱신/추가
+	var present := {}
+	for o in objs:
+		present[Vector2i(int(o[0]), int(o[1]))] = o
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			var pos := Vector2i(cx + dx, cy + dy)
+			if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
+				continue
+			if objects.has(pos) and not present.has(pos):
+				if objects[pos].kind != "house":
+					_remove_object(pos)
+			elif present.has(pos):
+				var o: Array = present[pos]
+				if o[2] == "house":
+					continue
+				if objects.has(pos):
+					objects[pos].hp = int(o[3])
+				else:
+					_place_object(pos, o[2], int(o[3]))
+	queue_redraw()
+
+
+func _broadcast_stats() -> void:
+	if Net.is_host():
+		_net_stats.rpc(JSON.stringify(GameData.build_stats()))
+
+
+@rpc("authority", "reliable")
+func _net_stats(json: String) -> void:
+	var d: Variant = JSON.parse_string(json)
+	if typeof(d) == TYPE_DICTIONARY:
+		GameData.apply_stats(d)
+
+
+# 게스트 행동 요청: 호스트가 같은 로직을 실행하고 결과를 전파한다
+var _target_override := Vector2i(-999, -999)
+var _perp_override := Vector2i.ZERO
+var _forced_seed := ""
+var _remote_acting := false
+
+
+@rpc("any_peer", "reliable")
+func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int) -> void:
+	if not Net.is_host():
+		return
+	var saved_tool: String = GameData.tool
+	var saved_energy: float = GameData.energy
+	_target_override = Vector2i(tx, ty)
+	_perp_override = Vector2i(px, py)
+	_forced_seed = seed_id
+	_remote_acting = true
+	GameData.tool = tool
+	use_tool()
+	GameData.tool = saved_tool
+	GameData.energy = saved_energy  # 게스트 기력은 게스트 로컬 관리
+	_remote_acting = false
+	_target_override = Vector2i(-999, -999)
+	_perp_override = Vector2i.ZERO
+	_forced_seed = ""
+	_broadcast_area(Vector2i(tx, ty))
+	_broadcast_stats()
+
+
+@rpc("any_peer", "reliable")
+func _req_shop(op: String, id: String) -> void:
+	if not Net.is_host():
+		return
+	match op:
+		"buy_seed":
+			shop._on_buy(id)
+		"sell_crop":
+			shop._on_sell(id)
+		"sell_item":
+			shop._on_sell_item(id)
+		"buy_animal":
+			shop._on_buy_animal(id)
+		"upgrade":
+			shop._on_upgrade(id)
+	_broadcast_stats()
+
+
+# 게스트가 상점 조작 후 호출 (호스트면 즉시 전파)
+func net_shop(op: String, id: String) -> void:
+	if Net.is_host():
+		_broadcast_stats()
+	elif Net.is_guest():
+		_req_shop.rpc_id(1, op, id)
+
+
+@rpc("any_peer", "reliable")
+func _req_feed(index: int) -> void:
+	if not Net.is_host():
+		return
+	if index >= 0 and index < animals.size():
+		animals[index].fed = true
+
+
+@rpc("any_peer", "reliable")
+func _req_add_item(id: String) -> void:
+	if not Net.is_host():
+		return
+	if GameData.items.has(id):
+		GameData.items[id] += 1
+		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
+		_broadcast_stats()
+
+
+@rpc("any_peer", "reliable")
+func _req_gift(npc_id: String) -> void:
+	if not Net.is_host():
+		return
+	# 게스트 로컬과 같은 규칙: 첫 번째 보유 품목을 선물
+	for id in GameData.CROP_IDS:
+		if GameData.produce[id] > 0:
+			GameData.produce[id] -= 1
+			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+			_broadcast_stats()
+			return
+	for id in GameData.ITEM_IDS:
+		if GameData.items[id] > 0:
+			GameData.items[id] -= 1
+			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+			_broadcast_stats()
+			return
+
+
+@rpc("any_peer", "reliable")
+func _req_quest(op: String) -> void:
+	if not Net.is_host():
+		return
+	if op == "accept" and not GameData.quest.is_empty():
+		GameData.quest.accepted = true
+	elif op == "turnin" and not GameData.quest.is_empty():
+		var q: Dictionary = GameData.quest
+		if GameData.produce[q.crop] >= q.qty:
+			GameData.produce[q.crop] -= q.qty
+			GameData.money += q.reward
+			GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
+			GameData.quest = {}
+	_broadcast_stats()
+
+
+@rpc("authority", "reliable")
+func _net_new_day(json: String, title_text: String, body: String) -> void:
+	var d: Variant = JSON.parse_string(json)
+	if typeof(d) != TYPE_DICTIONARY:
+		return
+	var my_pos := player.position
+	for a in animals:
+		a.queue_free()
+	animals.clear()
+	_apply_save(d)
+	player.position = my_pos
+	GameData.tutorial = {"active": false}
+	GameData.unlock_all_tools()
+	GameData.energy = GameData.ENERGY_MAX
+	_spawn_objects()
+	_apply_season_visuals()
+	summary.open(title_text, body)
+	queue_redraw()
+
+
+# ==== 검증 시퀀스 ====
 
 func _send_key(code: Key) -> void:
 	_send_key_press(code)

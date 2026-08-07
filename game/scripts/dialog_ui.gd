@@ -28,7 +28,7 @@ func _ready() -> void:
 	panel.add_child(h)
 
 	portrait = TextureRect.new()
-	portrait.custom_minimum_size = Vector2(48, 48)
+	portrait.custom_minimum_size = Vector2(64, 64)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN

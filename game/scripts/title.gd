@@ -2,6 +2,9 @@
 extends Control
 
 var settings_panel: PanelContainer
+var mp_panel: PanelContainer
+var ip_edit: LineEdit
+var mp_status: Label
 var _shot_frames := 0
 
 
@@ -65,11 +68,23 @@ func _ready() -> void:
 	continue_btn.disabled = not has_save
 	v.add_child(continue_btn)
 	v.add_child(_mk_button("새로 시작", _on_new_game))
+	v.add_child(_mk_button("함께하기", _on_multiplayer))
 	v.add_child(_mk_button("설정", _on_settings))
 	v.add_child(_mk_button("종료", func() -> void: get_tree().quit()))
 
 	_build_settings_panel()
+	_build_mp_panel()
+	Net.reset()
 	Sound.play_bgm("spring")
+
+	# 개발/CI용: KYOJIN_MP=host|guest 로 자동 접속
+	var mp := OS.get_environment("KYOJIN_MP")
+	if mp == "host":
+		Net.host_game()
+		get_tree().change_scene_to_file.call_deferred("res://scenes/main.tscn")
+	elif mp == "guest":
+		Net.join_game("127.0.0.1")
+		get_tree().change_scene_to_file.call_deferred("res://scenes/main.tscn")
 
 
 func _mk_button(text: String, cb: Callable) -> Button:
@@ -93,7 +108,71 @@ func _on_new_game() -> void:
 
 
 func _on_settings() -> void:
+	mp_panel.visible = false
 	settings_panel.visible = not settings_panel.visible
+
+
+func _on_multiplayer() -> void:
+	settings_panel.visible = false
+	mp_panel.visible = not mp_panel.visible
+
+
+func _build_mp_panel() -> void:
+	mp_panel = PanelContainer.new()
+	mp_panel.visible = false
+	mp_panel.position = Vector2(110, 84)
+	mp_panel.custom_minimum_size = Vector2(260, 150)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
+	style.border_color = Color(0.42, 0.36, 0.55)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(12)
+	mp_panel.add_theme_stylebox_override("panel", style)
+	add_child(mp_panel)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	mp_panel.add_child(v)
+
+	var title := Label.new()
+	title.text = "함께하기 (같은 네트워크)"
+	title.add_theme_color_override("font_color", Color("ffd75e"))
+	v.add_child(title)
+
+	v.add_child(_mk_button("방 만들기 (호스트)", _on_host))
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	v.add_child(row)
+	ip_edit = LineEdit.new()
+	ip_edit.text = "127.0.0.1"
+	ip_edit.placeholder_text = "호스트 IP"
+	ip_edit.custom_minimum_size = Vector2(140, 0)
+	ip_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(ip_edit)
+	row.add_child(_mk_button("참가", _on_join))
+
+	mp_status = Label.new()
+	mp_status.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
+	mp_status.text = "호스트의 농장(저장)을 함께 가꾼다.\n호스트: 방 만들기 / 친구: IP 입력 후 참가"
+	v.add_child(mp_status)
+
+	v.add_child(_mk_button("닫기", func() -> void: mp_panel.visible = false))
+
+
+func _on_host() -> void:
+	if Net.host_game() != OK:
+		mp_status.text = "방 만들기 실패... 포트(7777)를 확인하자."
+		return
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+func _on_join() -> void:
+	if Net.join_game(ip_edit.text.strip_edges()) != OK:
+		mp_status.text = "접속 시작 실패... IP를 확인하자."
+		return
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
 func _build_settings_panel() -> void:
@@ -159,7 +238,7 @@ func _mk_slider(label_text: String, value: float, setter: Callable) -> HBoxConta
 
 func _process(_delta: float) -> void:
 	# 개발/CI용 스크린샷
-	if OS.get_environment("KYOJIN_SHOT") == "":
+	if OS.get_environment("KYOJIN_SHOT") == "" or OS.get_environment("KYOJIN_MP") != "":
 		return
 	_shot_frames += 1
 	if _shot_frames == 30:

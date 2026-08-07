@@ -349,9 +349,9 @@ func clock_text() -> String:
 
 # ---- 저장 ----
 
-func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
-		animals_data: Array = []) -> void:
-	var data := {
+func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
+		animals_data: Array = []) -> Dictionary:
+	return {
 		"day": day,
 		"minutes": minutes,
 		"money": money,
@@ -372,9 +372,51 @@ func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"objects": objects_data,
 		"animals": animals_data,
 	}
+
+
+func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
+		animals_data: Array = []) -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify(data))
+		f.store_string(JSON.stringify(build_save(grid_data, player_pos, objects_data, animals_data)))
+
+
+# ---- 멀티플레이 동기화용 (그리드 제외 공유 상태) ----
+
+func build_stats() -> Dictionary:
+	return {
+		"money": money, "wood": wood, "stone": stone,
+		"seeds": seeds, "produce": produce, "items": items,
+		"fish_caught": fish_caught, "affinity": affinity,
+		"quest": quest, "tool_level": tool_level,
+	}
+
+
+func apply_stats(d: Dictionary) -> void:
+	money = int(d.get("money", money))
+	wood = int(d.get("wood", wood))
+	stone = int(d.get("stone", stone))
+	for k in d.get("seeds", {}):
+		seeds[k] = int(d.seeds[k])
+	for k in d.get("produce", {}):
+		produce[k] = int(d.produce[k])
+	for k in d.get("items", {}):
+		items[k] = int(d.items[k])
+	for k in d.get("fish_caught", {}):
+		fish_caught[k] = int(d.fish_caught[k])
+	for k in d.get("affinity", {}):
+		affinity[k] = int(d.affinity[k])
+	for k in d.get("tool_level", {}):
+		tool_level[k] = int(d.tool_level[k])
+	var q: Variant = d.get("quest", {})
+	if typeof(q) == TYPE_DICTIONARY:
+		if q.is_empty():
+			quest = {}
+		else:
+			quest = {
+				"crop": q.crop, "qty": int(q.qty),
+				"reward": int(q.reward), "accepted": bool(q.accepted),
+			}
 
 
 func load_game() -> Dictionary:
