@@ -2191,13 +2191,13 @@ func _draw_overlay() -> void:
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if player != null:
 		if fishing_state == "waiting":
-			var base := player.position + Vector2(-6, -50)
+			var base := player.position + Vector2(-6, -60)
 			var dots := int(weather_time * 2.0) % 3 + 1
 			for i in dots:
 				overlay.draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)),
 					Color(1, 1, 1, 0.8))
 		elif fishing_state == "bite":
-			var base := player.position + Vector2(-1, -58)
+			var base := player.position + Vector2(-1, -68)
 			overlay.draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
 			overlay.draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
 
@@ -2213,7 +2213,7 @@ func _context_hint() -> Array:
 	# 반환: [문구, 기준 위치(월드)] 또는 []
 	if player == null or ui_open():
 		return []
-	var above_player := player.position + Vector2(0, -52)
+	var above_player := player.position + Vector2(0, -62)
 	if fishing_state == "bite":
 		return ["지금이다!", above_player]
 	if fishing_state == "waiting":
@@ -2315,7 +2315,7 @@ func _draw_nav_arrow() -> void:
 		return  # 목적지 근처에서는 숨긴다
 	var dirv := to.normalized()
 	var bob := sin(weather_time * 6.0) * 2.0
-	var base := player.position + Vector2(0, -44) + dirv * (16.0 + bob)
+	var base := player.position + Vector2(0, -52) + dirv * (16.0 + bob)
 	var tip := base + dirv * 7.0
 	var left := base + dirv.rotated(2.6) * 4.0
 	var right := base + dirv.rotated(-2.6) * 4.0

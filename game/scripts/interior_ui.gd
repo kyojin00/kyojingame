@@ -39,6 +39,7 @@ func _ready() -> void:
 
 	player_sprite = Sprite2D.new()
 	player_sprite.centered = false
+	player_sprite.scale = Vector2(1.5, 1.5)
 	add_child(player_sprite)
 
 
@@ -281,7 +282,7 @@ func _update_sprite() -> void:
 			tex_name = "player_side_%d" % frame
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
-	player_sprite.position = ppos + Vector2(-12, -35)
+	player_sprite.position = ppos + Vector2(-16, -47)
 	player_sprite.modulate.a = 0.4 if deco_mode else 1.0
 
 

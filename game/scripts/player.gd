@@ -21,7 +21,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	# 발밑 그림자
-	draw_rect(Rect2(-4, -2, 8, 3), Color(0, 0, 0, 0.22))
+	draw_rect(Rect2(-6, -2, 12, 4), Color(0, 0, 0, 0.22))
 
 
 func _process(delta: float) -> void:
