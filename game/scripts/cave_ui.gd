@@ -78,17 +78,29 @@ func _gen_floor() -> void:
 		var p := _free_tile(3.0)
 		if p.x >= 0:
 			ores[p] = true
-	# 슬라임
+	# 몬스터 (층이 깊어질수록 종류/수 증가)
 	for i in 2 + floor_num:
-		var p := _free_tile(5.0)
-		if p.x >= 0:
-			monsters.append({
-				"pos": Vector2(OX + (p.x + 0.5) * TS, OY + (p.y + 0.5) * TS),
-				"vel": Vector2.ZERO, "think": 0.0, "hp": 1 + int(floor_num / 3.0),
-				"anim": randf() * 10.0,
-			})
+		_spawn_mob("slime", 1 + int(floor_num / 3.0))
+	if floor_num >= 2:
+		for i in 1 + int(floor_num / 2.0):
+			_spawn_mob("bat", 1)
+	if floor_num >= 4:
+		for i in int((floor_num - 2) / 2.0):
+			_spawn_mob("ghost", 2 + int(floor_num / 4.0))
 	ppos = Vector2(OX + (entry_pos.x + 0.5) * TS, OY + (entry_pos.y + 0.5) * TS)
 	pdir = "right"
+
+
+func _spawn_mob(type: String, hp: int) -> void:
+	var p := _free_tile(5.0)
+	if p.x < 0:
+		return
+	monsters.append({
+		"type": type,
+		"pos": Vector2(OX + (p.x + 0.5) * TS, OY + (p.y + 0.5) * TS),
+		"vel": Vector2.ZERO, "think": 0.0, "hp": hp,
+		"anim": randf() * 10.0,
+	})
 
 
 func _free_tile(min_dist: float) -> Vector2i:
@@ -138,23 +150,40 @@ func _process(delta: float) -> void:
 	for m in monsters:
 		m.anim += delta
 		m.think -= delta
-		if m.think <= 0.0:
-			m.think = randf_range(0.6, 1.6)
-			var to_player: Vector2 = ppos - m.pos
-			# 가까우면 추적, 멀면 배회
-			if to_player.length() < 70.0:
-				m.vel = to_player.normalized() * (26.0 + floor_num * 4.0)
-			else:
-				m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 20.0
+		var to_player: Vector2 = ppos - m.pos
+		match m.type:
+			"slime":
+				if m.think <= 0.0:
+					m.think = randf_range(0.6, 1.6)
+					if to_player.length() < 70.0:
+						m.vel = to_player.normalized() * (26.0 + floor_num * 4.0)
+					else:
+						m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 20.0
+			"bat":
+				if m.think <= 0.0:
+					# 주기적으로 플레이어를 향해 돌진
+					m.think = randf_range(1.2, 2.0)
+					if to_player.length() < 120.0:
+						m.vel = to_player.normalized() * (70.0 + floor_num * 8.0)
+					else:
+						m.vel = Vector2.RIGHT.rotated(randf() * TAU) * 34.0
+				m.vel = m.vel.move_toward(Vector2.ZERO, 30.0 * delta)  # 돌진 후 감속
+			"ghost":
+				# 벽을 통과하며 끈질기게 추적
+				m.vel = to_player.normalized() * (22.0 + floor_num * 3.0)
 		var np: Vector2 = m.pos + m.vel * delta
-		if _blocked_at(np):
+		if m.type == "ghost":
+			m.pos.x = clampf(np.x, OX + TS, OX + (GW - 1) * TS)
+			m.pos.y = clampf(np.y, OY + TS, OY + (GH - 1) * TS)
+		elif _blocked_at(np):
 			m.vel = -m.vel
 		else:
 			m.pos = np
-		# 접촉 피해
+		# 접촉 피해 (종류별)
 		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 12.0:
 			hurt_cd = 0.9
-			GameData.energy -= 8.0
+			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0}[m.type]
+			GameData.energy -= dmg
 			Sound.play_sfx("sfx_miss")
 			ppos += (ppos - m.pos).normalized() * 10.0
 			if GameData.energy <= 0.0:
@@ -185,17 +214,31 @@ func _attack() -> void:
 	swing_t = 0.15
 	Sound.play_sfx("sfx_chop", 0.2)
 	var reach := ppos + _dir_vec() * 14.0
+	var dmg := 1 + (int(GameData.tool_level.get("axe", 1)) - 1)  # 도끼 강화 = 공격력 2배
 	# 몬스터 타격
 	for m in monsters:
 		if (m.pos - reach).length() < 14.0 or (m.pos - ppos).length() < 12.0:
-			m.hp -= 1
-			m.vel = (m.pos - ppos).normalized() * 60.0
+			m.hp -= dmg
+			if m.type != "ghost":
+				m.vel = (m.pos - ppos).normalized() * 60.0
 			if m.hp <= 0:
 				monsters.erase(m)
 				Sound.play_sfx("sfx_pick", 0.2)
-				if randf() < 0.35:
-					main.gain_item("ore", 1)
-					main.hud.show_message("슬라임이 광석을 떨어뜨렸다!")
+				main.record_kill(m.type)
+				match m.type:
+					"slime":
+						if randf() < 0.35:
+							main.gain_item("ore", 1)
+							main.hud.show_message("슬라임이 광석을 떨어뜨렸다!")
+					"bat":
+						if randf() < 0.2:
+							main.gain_item("ore", 1)
+							main.hud.show_message("박쥐가 광석을 떨어뜨렸다!")
+					"ghost":
+						main.gain_item("ore", 1)
+						if randf() < 0.15:
+							main.gain_item("gem", 1)
+							main.hud.show_message("유령이 보석을 떨어뜨렸다!")
 				if monsters.is_empty():
 					_floor_clear()
 			return
@@ -292,8 +335,9 @@ func _draw_cave() -> void:
 
 	# 몬스터
 	for m in monsters:
-		var frame := int(m.anim * 4.0) % 2
-		canvas.draw_texture(main.tex["slime_%d" % frame], m.pos + Vector2(-8, -10))
+		var frame := int(m.anim * (7.0 if m.type == "bat" else 4.0)) % 2
+		var mod := Color(1, 1, 1, 0.7) if m.type == "ghost" else Color(1, 1, 1)
+		canvas.draw_texture(main.tex["%s_%d" % [m.type, frame]], m.pos + Vector2(-8, -10), mod)
 
 	# 공격 스윙
 	if swing_t > 0.0:

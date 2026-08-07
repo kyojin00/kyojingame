@@ -90,7 +90,8 @@ const TEXTURE_NAMES := [
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
-	"cave", "slime_0", "slime_1", "ore_node", "chest", "stairs",
+	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
+	"ore_node", "chest", "stairs",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
 	"npc_merchant_down_0", "npc_merchant_down_1", "npc_merchant_up_0",
 	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
@@ -559,13 +560,18 @@ func _on_fishing_finished(success: bool) -> void:
 
 
 func _affected_tiles(base: Vector2i) -> Array:
-	# 업그레이드된 호미/물뿌리개는 전방 3칸(진행 방향의 좌우 포함)에 적용된다.
-	var out := [base]
-	if GameData.tool_level.get(GameData.tool, 1) >= 2:
+	# Lv2 호미/물뿌리개: 전방 3칸 / Lv3: 3x3 범위
+	var lvl: int = GameData.tool_level.get(GameData.tool, 1)
+	if lvl >= 3:
+		var out := []
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				out.append(base + Vector2i(dx, dy))
+		return out
+	if lvl >= 2:
 		var perp := _current_perp()
-		out.append(base + perp)
-		out.append(base - perp)
-	return out
+		return [base, base + perp, base - perp]
+	return [base]
 
 
 func use_tool() -> void:
@@ -685,7 +691,7 @@ func use_tool() -> void:
 				hud.show_message("벨 것이 없다.")
 				return
 			if obj.kind == "tree":
-				obj.hp -= 1
+				obj.hp -= 3 if int(GameData.tool_level.get("axe", 1)) >= 2 else 1
 				GameData.energy -= cost
 				Sound.play_sfx("sfx_chop", 0.15)
 				spawn_particles(t, "wood")
@@ -709,7 +715,7 @@ func use_tool() -> void:
 				hud.show_message("캘 것이 없다.")
 				return
 			if obj.kind == "rock":
-				obj.hp -= 1
+				obj.hp -= 2 if int(GameData.tool_level.get("pickaxe", 1)) >= 2 else 1
 				GameData.energy -= cost
 				Sound.play_sfx("sfx_pick", 0.15)
 				spawn_particles(t, "stone")
@@ -1318,6 +1324,10 @@ func _apply_save(d: Dictionary) -> void:
 	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.unlocked_tools = d.get("unlocked_tools", GameData.ALL_TOOLS.duplicate())
+	# 구버전(부지 도입 전) 저장은 전체 부지 소유로 간주
+	GameData.owned_parcels = d.get("owned_parcels", ["home", "east", "south", "forest"])
+	for k in d.get("mob_kills", {}):
+		GameData.mob_kills[k] = int(d.mob_kills[k])
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
@@ -2094,6 +2104,24 @@ func _req_feed(index: int) -> void:
 		return
 	if index >= 0 and index < animals.size():
 		animals[index].fed = true
+
+
+# 몬스터 처치 기록 (도감용)
+func record_kill(mob: String) -> void:
+	GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
+	if Net.is_guest():
+		_req_kill.rpc_id(1, mob)
+	elif Net.is_host():
+		_broadcast_stats()
+
+
+@rpc("any_peer", "reliable")
+func _req_kill(mob: String) -> void:
+	if not Net.is_host():
+		return
+	if GameData.MOBS.has(mob):
+		GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
+		_broadcast_stats()
 
 
 # 아이템 획득 (동굴 보상/낚시 등) — 멀티에서는 호스트가 확정한다

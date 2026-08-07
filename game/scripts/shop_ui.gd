@@ -128,29 +128,47 @@ func _rebuild() -> void:
 			else:
 				l.text = "??? - 아직 낚지 못했다"
 			items_box.add_child(l)
+		var mob_title := Label.new()
+		mob_title.text = "\n- 몬스터 도감 -"
+		items_box.add_child(mob_title)
+		for mid in GameData.MOBS:
+			var kills := int(GameData.mob_kills.get(mid, 0))
+			var ml := Label.new()
+			if kills > 0:
+				ml.text = "%s - %d마리 처치. %s" % [GameData.MOBS[mid].name, kills, GameData.MOBS[mid].desc]
+				ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			else:
+				ml.text = "??? - 동굴에서 만나보자"
+			items_box.add_child(ml)
 		var hint := Label.new()
 		hint.text = "\n낚싯대(9)를 들고 물가에서 Space! 입질(!)이 오면 다시 Space!\n철수와 친해지면(호감도 50+) 판정 구간이 넓어진다."
 		items_box.add_child(hint)
 	else:
 		for id in GameData.UPGRADES:
 			var up: Dictionary = GameData.UPGRADES[id]
-			var level: int = GameData.tool_level[id]
+			var levels: Array = up.levels
+			var level: int = GameData.tool_level.get(id, 1)
 			var row := HBoxContainer.new()
 			var l := Label.new()
-			l.text = "%s Lv%d - %s" % [up.name, level, up.desc]
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(l)
-			if level >= 2:
-				var done := Label.new()
-				done.text = "최대 레벨"
-				row.add_child(done)
+			if level - 1 >= levels.size():
+				l.text = "%s Lv%d (최대)" % [up.name, level]
 			else:
-				var b := _mk_button("%dG+목재%d" % [up.money, up.wood], _on_upgrade.bind(id))
-				b.disabled = GameData.money < up.money or GameData.wood < up.wood
+				var next: Dictionary = levels[level - 1]
+				l.text = "%s Lv%d→%d: %s" % [up.name, level, level + 1, next.desc]
+				var cost_text := "%dG" % next.money
+				if int(next.wood) > 0:
+					cost_text += "+목재%d" % next.wood
+				if int(next.ore) > 0:
+					cost_text += "+광석%d" % next.ore
+				var b := _mk_button(cost_text, _on_upgrade.bind(id))
+				b.disabled = GameData.money < next.money or GameData.wood < next.wood \
+					or GameData.items["ore"] < next.ore
 				row.add_child(b)
 			items_box.add_child(row)
 		var hint := Label.new()
-		hint.text = "\n울타리: 목재 %d / 스프링클러: 목재 %d+석재 %d\n(나무는 도끼로, 돌은 곡괭이로 캔다)" % [
+		hint.text = "\n광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d /\n스프링클러: 목재 %d+석재 %d" % [
 			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD, GameData.SPRINKLER_COST_STONE]
 		items_box.add_child(hint)
 
@@ -206,13 +224,19 @@ func _on_buy_animal(id: String) -> void:
 
 
 func _on_upgrade(id: String) -> void:
-	var up: Dictionary = GameData.UPGRADES[id]
-	if GameData.tool_level[id] >= 2 or GameData.money < up.money or GameData.wood < up.wood:
+	var levels: Array = GameData.UPGRADES[id].levels
+	var level: int = GameData.tool_level.get(id, 1)
+	if level - 1 >= levels.size():
+		return
+	var next: Dictionary = levels[level - 1]
+	if GameData.money < next.money or GameData.wood < next.wood \
+			or GameData.items["ore"] < next.ore:
 		return
 	Sound.play_sfx("sfx_coin")
-	GameData.money -= up.money
-	GameData.wood -= up.wood
-	GameData.tool_level[id] = 2
+	GameData.money -= next.money
+	GameData.wood -= int(next.wood)
+	GameData.items["ore"] -= int(next.ore)
+	GameData.tool_level[id] = level + 1
 	if main != null and not main._remote_acting:
 		main.net_shop("upgrade", id)
 	_rebuild()

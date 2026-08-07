@@ -52,18 +52,38 @@ var seeds := {}
 var produce := {}
 var wood := 0
 var stone := 0
-var tool_level := {"hoe": 1, "water": 1}
+var tool_level := {"hoe": 1, "water": 1, "axe": 1, "pickaxe": 1}
 
 # 설치물 비용
 const FENCE_COST_WOOD := 1
 const SPRINKLER_COST_WOOD := 2
 const SPRINKLER_COST_STONE := 2
 
-# 업그레이드 정의
+# 업그레이드 정의: levels[현재레벨-1] = 다음 레벨 비용/효과
 const UPGRADES := {
-	"hoe": {"name": "호미", "money": 500, "wood": 10, "desc": "전방 3칸 갈기"},
-	"water": {"name": "물뿌리개", "money": 500, "wood": 10, "desc": "전방 3칸 물주기"},
+	"hoe": {"name": "호미", "levels": [
+		{"money": 500, "wood": 10, "ore": 0, "desc": "전방 3칸 갈기"},
+		{"money": 1500, "wood": 0, "ore": 8, "desc": "3x3 범위 갈기"},
+	]},
+	"water": {"name": "물뿌리개", "levels": [
+		{"money": 500, "wood": 10, "ore": 0, "desc": "전방 3칸 물주기"},
+		{"money": 1500, "wood": 0, "ore": 8, "desc": "3x3 범위 물주기"},
+	]},
+	"axe": {"name": "도끼", "levels": [
+		{"money": 1200, "wood": 0, "ore": 6, "desc": "나무 1타 벌목 + 동굴 공격력 2배"},
+	]},
+	"pickaxe": {"name": "곡괭이", "levels": [
+		{"money": 1200, "wood": 0, "ore": 6, "desc": "돌 1타 채굴 + 동굴 공격력 2배"},
+	]},
 }
+
+# ---- 몬스터 도감 ----
+const MOBS := {
+	"slime": {"name": "슬라임", "desc": "동굴 어디에나 있는 말랑이. 느리지만 떼로 다닌다."},
+	"bat": {"name": "박쥐", "desc": "2층부터 등장. 빠르게 덮쳐온다!"},
+	"ghost": {"name": "유령", "desc": "4층부터 등장. 벽을 통과해 끈질기게 쫓아온다..."},
+}
+var mob_kills := {}
 
 # ---- 동물 ----
 const ANIMALS := {
@@ -277,9 +297,10 @@ func reset_all() -> void:
 	seed_index = 0
 	wood = 0
 	stone = 0
-	tool_level = {"hoe": 1, "water": 1}
+	tool_level = {"hoe": 1, "water": 1, "axe": 1, "pickaxe": 1}
 	quest = {}
 	fish_caught = {}
+	mob_kills = {}
 	for id in CROP_IDS:
 		seeds[id] = 0
 		produce[id] = 0
@@ -386,6 +407,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"produce": produce,
 		"items": items,
 		"fish_caught": fish_caught,
+		"mob_kills": mob_kills,
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
@@ -414,7 +436,7 @@ func build_stats() -> Dictionary:
 	return {
 		"money": money, "wood": wood, "stone": stone,
 		"seeds": seeds, "produce": produce, "items": items,
-		"fish_caught": fish_caught, "affinity": affinity,
+		"fish_caught": fish_caught, "mob_kills": mob_kills, "affinity": affinity,
 		"quest": quest, "tool_level": tool_level,
 		"owned_parcels": owned_parcels,
 	}
@@ -432,6 +454,8 @@ func apply_stats(d: Dictionary) -> void:
 		items[k] = int(d.items[k])
 	for k in d.get("fish_caught", {}):
 		fish_caught[k] = int(d.fish_caught[k])
+	for k in d.get("mob_kills", {}):
+		mob_kills[k] = int(d.mob_kills[k])
 	for k in d.get("affinity", {}):
 		affinity[k] = int(d.affinity[k])
 	for k in d.get("tool_level", {}):
