@@ -4,6 +4,7 @@ extends CanvasLayer
 const TOOL_NAMES := {
 	"hoe": "1 호미", "water": "2 물뿌리개", "hand": "4 수확",
 	"axe": "5 도끼", "pickaxe": "6 곡괭이", "fence": "7 울타리", "sprinkler": "8 스프링클러",
+	"rod": "9 낚싯대",
 }
 
 var main: Node2D
@@ -24,6 +25,7 @@ var msg_timer := 0.0
 	"pickaxe": $Bottom2/ToolPickaxe,
 	"fence": $Bottom2/ToolFence,
 	"sprinkler": $Bottom2/ToolSprinkler,
+	"rod": $Bottom2/ToolRod,
 }
 
 

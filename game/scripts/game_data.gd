@@ -65,6 +65,45 @@ const UPGRADES := {
 	"water": {"name": "물뿌리개", "money": 500, "wood": 10, "desc": "전방 3칸 물주기"},
 }
 
+# ---- 동물 ----
+const ANIMALS := {
+	"chicken": {"name": "닭", "price": 800, "product": "egg"},
+	"cow": {"name": "소", "price": 1500, "product": "milk"},
+}
+const MAX_ANIMALS := 8
+
+# ---- 기타 판매 아이템 (동물 생산물, 물고기) ----
+const ITEMS := {
+	"egg": {"name": "달걀", "sell": 60},
+	"milk": {"name": "우유", "sell": 120},
+	"fish_crucian": {"name": "붕어", "sell": 40},
+	"fish_carp": {"name": "잉어", "sell": 60},
+	"fish_catfish": {"name": "메기", "sell": 90},
+	"fish_golden": {"name": "황금잉어", "sell": 300},
+}
+const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden"]
+
+# 낚시: [아이템 id, 확률 가중치, 타이밍 존 폭(px)]
+const FISH := [
+	["fish_crucian", 0.45, 62.0],
+	["fish_carp", 0.30, 46.0],
+	["fish_catfish", 0.18, 32.0],
+	["fish_golden", 0.07, 18.0],
+]
+
+var items := {}
+var fish_caught := {}  # 도감용 누적 기록
+
+
+func pick_fish() -> Array:
+	var r := randf()
+	var acc := 0.0
+	for f in FISH:
+		acc += f[1]
+		if r <= acc:
+			return f
+	return FISH[0]
+
 # 일별 통계 (결산 화면용, 매일 아침 리셋)
 var today_harvest := 0
 var today_earned := 0
@@ -75,6 +114,8 @@ func _init() -> void:
 	for id in CROP_IDS:
 		seeds[id] = 0
 		produce[id] = 0
+	for id in ITEM_IDS:
+		items[id] = 0
 	seeds["potato"] = 5
 
 
@@ -165,7 +206,8 @@ func clock_text() -> String:
 
 # ---- 저장 ----
 
-func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = []) -> void:
+func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
+		animals_data: Array = []) -> void:
 	var data := {
 		"day": day,
 		"minutes": minutes,
@@ -173,12 +215,15 @@ func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = []) 
 		"energy": energy,
 		"seeds": seeds,
 		"produce": produce,
+		"items": items,
+		"fish_caught": fish_caught,
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,
 		"player": [player_pos.x, player_pos.y],
 		"grid": grid_data,
 		"objects": objects_data,
+		"animals": animals_data,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:

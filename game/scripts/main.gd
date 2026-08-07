@@ -9,6 +9,7 @@ const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
 const ENERGY_COST := {
 	"hoe": 2.0, "water": 1.0, "seed": 1.0, "hand": 1.0,
 	"axe": 2.0, "pickaxe": 2.0, "fence": 1.0, "sprinkler": 1.0,
+	"rod": 2.0,
 }
 const TREE_HP := 3
 const ROCK_HP := 2
@@ -33,6 +34,13 @@ var water_frame := 0
 var water_timer := 0.0
 var tree_sprites: Array = []
 var weather_time := 0.0
+var animals: Array = []
+
+# 낚시 상태: "" | "waiting"(입질 대기) | "bite"(입질!)
+var fishing_state := ""
+var fishing_timer := 0.0
+var fishing_ui: CanvasLayer
+var pending_fish: Array = []
 
 # 개발/CI용: KYOJIN_SHOT=경로 로 실행하면 잠시 후 스크린샷을 저장하고 종료한다.
 # KYOJIN_DAY=숫자, KYOJIN_WEATHER=0/1/2 로 시작 날짜/날씨를 강제할 수 있다.
@@ -49,6 +57,7 @@ const TEXTURE_NAMES := [
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"rock", "bin", "house", "fence", "sprinkler",
+	"chicken_0", "chicken_1", "cow_0", "cow_1",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
@@ -87,6 +96,10 @@ func _ready() -> void:
 
 	summary = preload("res://scenes/summary.tscn").instantiate()
 	add_child(summary)
+
+	fishing_ui = preload("res://scripts/fishing_ui.gd").new()
+	fishing_ui.finished.connect(_on_fishing_finished)
+	add_child(fishing_ui)
 
 	sleep_dialog = ConfirmationDialog.new()
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
@@ -294,13 +307,60 @@ func target_tile() -> Vector2i:
 
 
 func ui_open() -> bool:
-	return shop.visible or summary.visible or sleep_dialog.visible
+	return shop.visible or summary.visible or sleep_dialog.visible or fishing_ui.visible
 
 
 # ---- 도구/상호작용 ----
 
 func set_tool(t: String) -> void:
+	if t != "rod":
+		cancel_fishing()
 	GameData.tool = t
+
+
+# ---- 낚시 ----
+
+func cancel_fishing() -> void:
+	fishing_state = ""
+
+
+func _start_fishing() -> void:
+	var t := target_tile()
+	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H \
+			or grid[t.y][t.x].ground != "water":
+		hud.show_message("물가를 보고 낚싯대를 던지자.")
+		return
+	if GameData.energy < ENERGY_COST["rod"]:
+		hud.show_message("너무 지쳤다... 자러 가야 할 것 같다.")
+		return
+	GameData.energy -= ENERGY_COST["rod"]
+	fishing_state = "waiting"
+	fishing_timer = randf_range(1.5, 4.0)
+
+
+func _update_fishing(delta: float) -> void:
+	if fishing_state == "waiting":
+		fishing_timer -= delta
+		if fishing_timer <= 0.0:
+			fishing_state = "bite"
+			fishing_timer = 0.9
+	elif fishing_state == "bite":
+		fishing_timer -= delta
+		if fishing_timer <= 0.0:
+			fishing_state = ""
+			hud.show_message("물고기가 도망갔다...")
+
+
+func _on_fishing_finished(success: bool) -> void:
+	if success:
+		var id: String = pending_fish[0]
+		var def: Dictionary = GameData.ITEMS[id]
+		GameData.items[id] += 1
+		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
+		GameData.today_harvest += 1
+		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
+	else:
+		hud.show_message("놓쳤다...")
 
 
 func _affected_tiles(base: Vector2i) -> Array:
@@ -469,10 +529,32 @@ func use_tool() -> void:
 			_place_object(t, "sprinkler", 0)
 			GameData.energy -= cost
 			hud.show_message("스프링클러 설치! 매일 아침 주변 4칸에 물을 준다.")
+		"rod":
+			match fishing_state:
+				"":
+					_start_fishing()
+				"waiting":
+					fishing_state = ""
+					hud.show_message("아직 입질이 없다...")
+				"bite":
+					fishing_state = ""
+					pending_fish = GameData.pick_fish()
+					fishing_ui.start(pending_fish[2])
 	queue_redraw()
 
 
 func interact() -> void:
+	# 가까운 동물 쓰다듬기(=먹이 주기)
+	for a in animals:
+		if (a.position - player.position).length() < 22.0:
+			var def: Dictionary = GameData.ANIMALS[a.type]
+			if a.fed:
+				hud.show_message("%s는 이미 만족스러워 보인다." % def.name)
+			else:
+				a.fed = true
+				hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
+					[def.name, GameData.ITEMS[def.product].name])
+			return
 	for t in [target_tile(), player_tile()]:
 		var obj: Variant = objects.get(t)
 		if obj == null:
@@ -484,6 +566,31 @@ func interact() -> void:
 			sleep_dialog.popup_centered()
 			return
 	hud.show_message("집 문 앞에서 E: 취침 · 출하 상자 앞에서 E: 판매")
+
+
+# ---- 동물 ----
+
+func spawn_animal(type: String, pos: Vector2 = Vector2.ZERO, fed: bool = false) -> void:
+	var a: Node2D = preload("res://scripts/animal.gd").new()
+	a.main = self
+	a.type = type
+	a.fed = fed
+	if pos == Vector2.ZERO:
+		var t := _find_free_tile_near(Vector2i(10, 7))
+		pos = Vector2(t.x * TILE + 8, t.y * TILE + 8)
+	a.position = pos
+	animals.append(a)
+	world.add_child(a)
+
+
+func _find_free_tile_near(center: Vector2i) -> Vector2i:
+	for r in range(0, 8):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var t := center + Vector2i(dx, dy)
+				if is_passable(t):
+					return t
+	return START_TILE
 
 
 # ---- 하루 진행 ----
@@ -534,12 +641,23 @@ func _next_day(passed_out: bool) -> void:
 					and grid[n.y][n.x].ground == "soil":
 				grid[n.y][n.x].watered = true
 
+	# 동물 생산물 수거
+	var collected := {}
+	for a in animals:
+		if a.fed:
+			var product: String = GameData.ANIMALS[a.type].product
+			GameData.items[product] += 1
+			collected[product] = int(collected.get(product, 0)) + 1
+		a.fed = false
+
 	# 나무/돌이 조금씩 다시 자란다
 	_respawn_resources()
 
 	save_now()
 
 	var note := ""
+	for product in collected:
+		note += "\n%s %d개를 얻었다!" % [GameData.ITEMS[product].name, collected[product]]
 	if season_changed:
 		note += "\n%s이 시작됐다!" % GameData.season_name()
 	if wilted > 0:
@@ -553,7 +671,7 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n쓰러져서 기력이 절반만 회복됐다..."
 
 	summary.open("- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()],
-		"어제 수확: %d개\n판매 수입: +%dG\n씨앗 지출: -%dG\n소지금: %dG\n%s"
+		"어제 수확: %d개\n판매 수입: +%dG\n지출: -%dG\n소지금: %dG\n%s"
 		% [stats[0], stats[1], stats[2], GameData.money, note])
 	queue_redraw()
 
@@ -587,7 +705,10 @@ func save_now() -> void:
 	var objs := []
 	for pos: Vector2i in objects:
 		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp])
-	GameData.save_game(g, player.position, objs)
+	var anims := []
+	for a in animals:
+		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
+	GameData.save_game(g, player.position, objs, anims)
 
 
 func _apply_save(d: Dictionary) -> void:
@@ -603,6 +724,12 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.seeds[k] = int(d.seeds[k])
 	for k in d.produce:
 		GameData.produce[k] = int(d.produce[k])
+	for k in d.get("items", {}):
+		GameData.items[k] = int(d.items[k])
+	for k in d.get("fish_caught", {}):
+		GameData.fish_caught[k] = int(d.fish_caught[k])
+	for a in d.get("animals", []):
+		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
 
 	# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다
@@ -638,6 +765,7 @@ func _process(delta: float) -> void:
 		if water_timer > 0.8:
 			water_timer = 0.0
 			water_frame = 1 - water_frame
+		_update_fishing(delta)
 	weather_time += delta
 	_update_night()
 	hud.refresh()
@@ -677,6 +805,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		set_tool("fence")
 	elif event.is_action_pressed("tool_8"):
 		set_tool("sprinkler")
+	elif event.is_action_pressed("tool_9"):
+		set_tool("rod")
 	elif event.is_action_pressed("cycle_seed"):
 		GameData.cycle_seed()
 		set_tool("seed")
@@ -751,6 +881,17 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 				Color(1, 1, 1, 0.6), false, 1.0)
 
+	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
+	if fishing_state == "waiting":
+		var base := player.position + Vector2(-6, -38)
+		var dots := int(weather_time * 2.0) % 3 + 1
+		for i in dots:
+			draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)), Color(1, 1, 1, 0.8))
+	elif fishing_state == "bite":
+		var base := player.position + Vector2(-1, -46)
+		draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
+		draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
+
 	_draw_weather()
 
 
@@ -797,12 +938,27 @@ func _debug_tick() -> void:
 		64: _send_key(KEY_SPACE)                       # 스프링클러 설치
 		70: _save_shot("_game.png")
 		74: _send_key(KEY_B)                           # 상점 열기
-		78: shop._on_tab("upgrade")                    # 업그레이드 탭
+		76:
+			GameData.money = 3000
+			shop._on_tab("animal")                     # 동물 탭에서 닭+소 입양
+		78: shop._on_buy_animal("chicken")
+		80: shop._on_buy_animal("cow")
 		84: _save_shot("_shop.png")
-		88:
-			shop.close()
-			_next_day(false)                           # 결산 화면
-		96:
+		88: shop.close()
+		92:
+			player.position = Vector2(25 * TILE + 8, 12 * TILE + 8)
+			player.dir = "down"                        # 연못가로 이동
+		96: _send_key(KEY_9)
+		100: _send_key(KEY_SPACE)                      # 캐스팅
+		102: fishing_timer = 0.2                       # 입질 시간 단축
+		112: _send_key(KEY_SPACE)                      # 입질! -> 미니게임
+		118: _save_shot("_fishing.png")
+		122: _send_key(KEY_SPACE)                      # 타이밍 판정
+		130:
+			for a in animals:
+				a.fed = true                           # 아침 생산 테스트
+			_next_day(false)
+		138:
 			_save_shot("_summary.png")
 			get_tree().quit()
 

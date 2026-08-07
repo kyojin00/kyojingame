@@ -10,7 +10,9 @@ var tab := "buy"
 func _ready() -> void:
 	$Panel/V/Tabs/BuyBtn.pressed.connect(_on_tab.bind("buy"))
 	$Panel/V/Tabs/SellBtn.pressed.connect(_on_tab.bind("sell"))
+	$Panel/V/Tabs/AnimalBtn.pressed.connect(_on_tab.bind("animal"))
 	$Panel/V/Tabs/UpgradeBtn.pressed.connect(_on_tab.bind("upgrade"))
+	$Panel/V/Tabs/CodexBtn.pressed.connect(_on_tab.bind("codex"))
 	$Panel/V/Tabs/CloseBtn.pressed.connect(close)
 
 
@@ -70,10 +72,58 @@ func _rebuild() -> void:
 			row.add_child(l)
 			row.add_child(_mk_button("%dG에 전부 판매" % (def.sell_price * count), _on_sell.bind(id)))
 			items_box.add_child(row)
+		for id in GameData.ITEM_IDS:
+			var count: int = GameData.items[id]
+			if count <= 0:
+				continue
+			any = true
+			var def: Dictionary = GameData.ITEMS[id]
+			var row := HBoxContainer.new()
+			var l := Label.new()
+			l.text = "%s x%d (개당 %dG)" % [def.name, count, def.sell]
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(l)
+			row.add_child(_mk_button("%dG에 전부 판매" % (def.sell * count), _on_sell_item.bind(id)))
+			items_box.add_child(row)
 		if not any:
 			var empty := Label.new()
-			empty.text = "팔 수 있는 작물이 없다. 수확하면 여기에 표시된다."
+			empty.text = "팔 수 있는 것이 없다. 수확물/생산물이 여기에 표시된다."
 			items_box.add_child(empty)
+	elif tab == "animal":
+		for id in GameData.ANIMALS:
+			var def: Dictionary = GameData.ANIMALS[id]
+			var count := 0
+			for a in main.animals:
+				if a.type == id:
+					count += 1
+			var row := HBoxContainer.new()
+			var l := Label.new()
+			l.text = "%s x%d - %s 생산" % [def.name, count, GameData.ITEMS[def.product].name]
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(l)
+			var b := _mk_button("%dG 입양" % def.price, _on_buy_animal.bind(id))
+			b.disabled = GameData.money < def.price or main.animals.size() >= GameData.MAX_ANIMALS
+			row.add_child(b)
+			items_box.add_child(row)
+		var hint := Label.new()
+		hint.text = "\n동물은 농장을 돌아다닌다. 가까이 가서 E로 쓰다듬어주면\n다음 날 아침 생산물을 준다. (최대 %d마리)" % GameData.MAX_ANIMALS
+		items_box.add_child(hint)
+	elif tab == "codex":
+		var title := Label.new()
+		title.text = "- 물고기 도감 -"
+		items_box.add_child(title)
+		for f in GameData.FISH:
+			var id: String = f[0]
+			var caught := int(GameData.fish_caught.get(id, 0))
+			var l := Label.new()
+			if caught > 0:
+				l.text = "%s - %d마리 낚음 (%dG)" % [GameData.ITEMS[id].name, caught, GameData.ITEMS[id].sell]
+			else:
+				l.text = "??? - 아직 낚지 못했다"
+			items_box.add_child(l)
+		var hint := Label.new()
+		hint.text = "\n낚싯대(9)를 들고 물가에서 Space! 입질(!)이 오면 다시 Space!"
+		items_box.add_child(hint)
 	else:
 		for id in GameData.UPGRADES:
 			var up: Dictionary = GameData.UPGRADES[id]
@@ -114,6 +164,25 @@ func _on_sell(id: String) -> void:
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.produce[id] = 0
+	_rebuild()
+
+
+func _on_sell_item(id: String) -> void:
+	var def: Dictionary = GameData.ITEMS[id]
+	var amount: int = def.sell * GameData.items[id]
+	GameData.money += amount
+	GameData.today_earned += amount
+	GameData.items[id] = 0
+	_rebuild()
+
+
+func _on_buy_animal(id: String) -> void:
+	var def: Dictionary = GameData.ANIMALS[id]
+	if GameData.money < def.price or main.animals.size() >= GameData.MAX_ANIMALS:
+		return
+	GameData.money -= def.price
+	GameData.today_spent += def.price
+	main.spawn_animal(id)
 	_rebuild()
 
 
