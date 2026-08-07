@@ -24,6 +24,8 @@ func _on_tab(t: String) -> void:
 func open(t: String) -> void:
 	tab = t
 	visible = true
+	if main != null:
+		main.tutorial_notify("shop")
 	_rebuild()
 
 
@@ -127,7 +129,7 @@ func _rebuild() -> void:
 				l.text = "??? - 아직 낚지 못했다"
 			items_box.add_child(l)
 		var hint := Label.new()
-		hint.text = "\n낚싯대(9)를 들고 물가에서 Space! 입질(!)이 오면 다시 Space!"
+		hint.text = "\n낚싯대(9)를 들고 물가에서 Space! 입질(!)이 오면 다시 Space!\n철수와 친해지면(호감도 50+) 판정 구간이 넓어진다."
 		items_box.add_child(hint)
 	else:
 		for id in GameData.UPGRADES:

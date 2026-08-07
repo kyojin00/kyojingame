@@ -21,6 +21,16 @@ func _ready() -> void:
 	_update_sprite()
 
 
+func _draw() -> void:
+	# 발밑 그림자 (쓰다듬어준 날은 하트 표시)
+	draw_rect(Rect2(-5, -2, 10, 3), Color(0, 0, 0, 0.22))
+	if fed:
+		draw_rect(Rect2(-2, -18, 2, 2), Color(0.95, 0.35, 0.45))
+		draw_rect(Rect2(1, -18, 2, 2), Color(0.95, 0.35, 0.45))
+		draw_rect(Rect2(-1, -16, 3, 2), Color(0.95, 0.35, 0.45))
+		draw_rect(Rect2(0, -14, 1, 1), Color(0.95, 0.35, 0.45))
+
+
 func _process(delta: float) -> void:
 	if main.ui_open():
 		return
@@ -41,6 +51,7 @@ func _process(delta: float) -> void:
 		if wait <= 0.0:
 			_pick_target()
 	_update_sprite()
+	queue_redraw()
 
 
 func _pick_target() -> void:

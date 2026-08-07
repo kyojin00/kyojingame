@@ -23,6 +23,11 @@ func _ready() -> void:
 	_update_sprite()
 
 
+func _draw() -> void:
+	# 발밑 그림자
+	draw_rect(Rect2(-4, -2, 8, 3), Color(0, 0, 0, 0.22))
+
+
 func _process(delta: float) -> void:
 	if main.ui_open():
 		return

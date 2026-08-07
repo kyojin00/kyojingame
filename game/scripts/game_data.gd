@@ -113,7 +113,7 @@ var affinity := {"merchant": 0, "fisher": 0}
 # {crop, qty, reward, accepted}
 var quest := {}
 
-# ---- 튜토리얼 ----
+# ---- 튜토리얼 / 도구 해금 ----
 # 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
 const TUTORIAL_ORDER := [
 	["moved", "방향키/WASD로 움직여보자"],
@@ -122,8 +122,37 @@ const TUTORIAL_ORDER := [
 	["water", "물뿌리개(2)로 물을 주자"],
 	["slept", "집(북서쪽) 문 앞에서 E로 잠자기"],
 	["harvest", "다 자란 작물을 수확(4)하자 - 매일 물주기!"],
+	["chop", "도끼(5)로 나무를 베어 목재를 모으자"],
+	["mine", "곡괭이(6)로 돌을 캐서 석재를 모으자"],
+	["build", "울타리(7)나 스프링클러(8)를 설치해보자"],
+	["fish", "낚싯대(9)로 물가에서 물고기를 낚자"],
+	["shop", "상점(B)을 열어보자 - 도감 탭도 구경!"],
 ]
+# 목표 달성 시 해금되는 도구
+const TUTORIAL_UNLOCKS := {
+	"till": ["seed"],
+	"plant": ["water"],
+	"slept": ["hand"],
+	"harvest": ["axe", "pickaxe"],
+	"mine": ["fence", "sprinkler"],
+	"build": ["rod"],
+}
+const ALL_TOOLS := ["hoe", "water", "seed", "hand", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+const TOOL_KOR := {
+	"hoe": "호미(1)", "water": "물뿌리개(2)", "seed": "씨앗(3)", "hand": "수확(4)",
+	"axe": "도끼(5)", "pickaxe": "곡괭이(6)", "fence": "울타리(7)",
+	"sprinkler": "스프링클러(8)", "rod": "낚싯대(9)",
+}
 var tutorial := {"active": false}
+var unlocked_tools: Array = ALL_TOOLS.duplicate()
+
+
+func is_tool_unlocked(id: String) -> bool:
+	return unlocked_tools.has(id)
+
+
+func unlock_all_tools() -> void:
+	unlocked_tools = ALL_TOOLS.duplicate()
 
 
 func fresh_tutorial() -> Dictionary:
@@ -225,6 +254,7 @@ func reset_all() -> void:
 		affinity[k] = 0
 	seeds["potato"] = 5
 	tutorial = fresh_tutorial()
+	unlocked_tools = ["hoe"]  # 튜토리얼을 깨며 하나씩 해금
 	reset_daily()
 
 
@@ -323,6 +353,7 @@ func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
+		"unlocked_tools": unlocked_tools,
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,

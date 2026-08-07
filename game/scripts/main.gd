@@ -154,6 +154,8 @@ func _ready() -> void:
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
 		if _shot_path == "":
 			_show_intro.call_deferred()
+		else:
+			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
@@ -365,6 +367,9 @@ func ui_open() -> bool:
 # ---- 도구/상호작용 ----
 
 func set_tool(t: String) -> void:
+	if not GameData.is_tool_unlocked(t):
+		hud.show_message("아직 열리지 않은 도구다. 목표를 달성하면 해금된다!")
+		return
 	if t != "rod":
 		cancel_fishing()
 	GameData.tool = t
@@ -415,6 +420,7 @@ func _on_fishing_finished(success: bool) -> void:
 		Sound.play_sfx("sfx_catch")
 		spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
+		tutorial_notify("fish")
 	else:
 		Sound.play_sfx("sfx_miss")
 		hud.show_message("놓쳤다...")
@@ -549,6 +555,7 @@ func use_tool() -> void:
 					_remove_object(t)
 					GameData.wood += WOOD_PER_TREE
 					hud.show_message("나무를 베었다! 목재 +%d" % WOOD_PER_TREE)
+					tutorial_notify("chop")
 				else:
 					hud.show_message("나무를 찍었다. (%d/%d)" % [TREE_HP - obj.hp, TREE_HP])
 			elif obj.kind == "fence":
@@ -572,6 +579,7 @@ func use_tool() -> void:
 					_remove_object(t)
 					GameData.stone += STONE_PER_ROCK
 					hud.show_message("돌을 캤다! 석재 +%d" % STONE_PER_ROCK)
+					tutorial_notify("mine")
 				else:
 					hud.show_message("돌을 내리쳤다. (%d/%d)" % [ROCK_HP - obj.hp, ROCK_HP])
 			elif obj.kind == "sprinkler":
@@ -594,6 +602,7 @@ func use_tool() -> void:
 			_place_object(t, "fence", 0)
 			GameData.energy -= cost
 			Sound.play_sfx("sfx_place")
+			tutorial_notify("build")
 		"sprinkler":
 			if obj != null or cell.ground == "water" or cell.crop_id != "" or t == player_tile():
 				hud.show_message("여기에는 설치할 수 없다.")
@@ -608,6 +617,7 @@ func use_tool() -> void:
 			GameData.energy -= cost
 			Sound.play_sfx("sfx_place")
 			hud.show_message("스프링클러 설치! 매일 아침 주변 4칸에 물을 준다.")
+			tutorial_notify("build")
 		"rod":
 			match fishing_state:
 				"":
@@ -618,7 +628,11 @@ func use_tool() -> void:
 				"bite":
 					fishing_state = ""
 					pending_fish = GameData.pick_fish()
-					fishing_ui.start(pending_fish[2])
+					# 철수 호감도 50+ 특전: 판정 구간 25% 확대
+					var zone: float = pending_fish[2]
+					if int(GameData.affinity["fisher"]) >= 50:
+						zone *= 1.25
+					fishing_ui.start(zone)
 	queue_redraw()
 
 
@@ -688,12 +702,13 @@ func _house_index_at(t: Vector2i) -> int:
 
 func _show_intro() -> void:
 	dialog.open("교진 팜에 어서 와!",
-		"작은 농장을 물려받았다!\n작물을 키워 팔고, 동물을 기르고, 낚시도 하고,\n마을 사람들과 친해져 보자.\n\n화면 위의 '다음 목표'를 따라가면 된다.",
+		"작은 농장을 물려받았다!\n지금은 호미 하나뿐이지만, 화면 위의 '다음 목표'를\n하나씩 달성하면 새 도구가 열린다.\n작물을 키워 팔고, 동물을 기르고, 낚시도 해보자!",
 		[["튜토리얼 시작", null], ["건너뛰기", _skip_tutorial]])
 
 
 func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
+	GameData.unlock_all_tools()
 	dialog.close()
 
 
@@ -703,13 +718,25 @@ func tutorial_notify(flag: String) -> void:
 		return
 	tut[flag] = true
 	Sound.play_sfx("sfx_catch")
-	hud.show_message("목표 달성!")
+
+	# 목표 달성 시 새 도구 해금
+	var msg := "목표 달성!"
+	var unlocked: Array = GameData.TUTORIAL_UNLOCKS.get(flag, [])
+	if not unlocked.is_empty():
+		var names := []
+		for id in unlocked:
+			if not GameData.unlocked_tools.has(id):
+				GameData.unlocked_tools.append(id)
+			names.append(GameData.TOOL_KOR[id])
+		msg += " 새 도구 해금: " + ", ".join(names)
+	hud.show_message(msg)
+
 	for pair in GameData.TUTORIAL_ORDER:
 		if not tut.get(pair[0], false):
 			return
 	tut["active"] = false
 	dialog.open("튜토리얼 완료!",
-		"이제 진짜 농장 생활 시작이다!\n- 수확물은 출하 상자(E)나 상점(B)에서 판다\n- 도끼(5)/곡괭이(6)로 재료를 모아 스프링클러(8)를 만들자\n- 동쪽 마을에는 상점, 의뢰 게시판, 주민들이 있다\n- 계절이 바뀌기 전에 수확을 끝내자!",
+		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nB: 상점 (씨앗/판매/동물/강화/도감 탭)\nE: 상호작용 (대화/취침/판매/쓰다듬기)\nTab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n동쪽 마을의 주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
 		[["좋아!", null]])
 
 
@@ -722,8 +749,12 @@ func _talk_to(npc: Node2D) -> void:
 		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
 	var lines: Array = def.lines
 	var line: String = lines[randi() % lines.size()]
-	var hearts := int(GameData.affinity[npc.id]) / 10
-	dialog.open("%s %s" % [def.name, "♥".repeat(mini(hearts, 10))], line, [
+	var aff := mini(int(GameData.affinity[npc.id]), 100)
+	var hearts := int(aff / 10.0)
+	var title := "%s %s (%d/100)" % [def.name, "♥".repeat(maxi(hearts, 0)), aff]
+	if aff >= 50:
+		line += "\n(친밀한 사이다! 특전 발동 중)"
+	dialog.open(title, line, [
 		["선물하기", _give_gift.bind(npc.id)],
 		["닫기", null],
 	])
@@ -731,21 +762,31 @@ func _talk_to(npc: Node2D) -> void:
 
 func _give_gift(npc_id: String) -> void:
 	# 수확물/아이템 중 하나를 선물한다
+	var gift_name := ""
 	for id in GameData.CROP_IDS:
 		if GameData.produce[id] > 0:
 			GameData.produce[id] -= 1
-			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
-			Sound.play_sfx("sfx_heart")
-			dialog.set_body("%s을(를) 선물했다! 정말 좋아한다. ♥" % GameData.CROPS[id].name)
-			return
-	for id in GameData.ITEM_IDS:
-		if GameData.items[id] > 0:
-			GameData.items[id] -= 1
-			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
-			Sound.play_sfx("sfx_heart")
-			dialog.set_body("%s을(를) 선물했다! 정말 좋아한다. ♥" % GameData.ITEMS[id].name)
-			return
-	dialog.set_body("선물할 것이 없다... 수확물이나 생산물이 필요하다.")
+			gift_name = GameData.CROPS[id].name
+			break
+	if gift_name == "":
+		for id in GameData.ITEM_IDS:
+			if GameData.items[id] > 0:
+				GameData.items[id] -= 1
+				gift_name = GameData.ITEMS[id].name
+				break
+	if gift_name == "":
+		dialog.set_body("선물할 것이 없다... 수확물이나 생산물이 필요하다.")
+		return
+	var before := int(GameData.affinity[npc_id])
+	GameData.affinity[npc_id] = before + 10
+	Sound.play_sfx("sfx_heart")
+	var body := "%s을(를) 선물했다! 정말 좋아한다. ♥" % gift_name
+	if before < 50 and before + 10 >= 50:
+		if npc_id == "merchant":
+			body += "\n\n[특전 해금] 민지의 씨앗 10% 할인!"
+		else:
+			body += "\n\n[특전 해금] 철수의 낚시 비법! 판정 구간 확대!"
+	dialog.set_body(body)
 
 
 func _open_quest_board() -> void:
@@ -974,6 +1015,7 @@ func _apply_save(d: Dictionary) -> void:
 		}
 	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
 	GameData.tutorial = d.get("tutorial", {"active": false})
+	GameData.unlocked_tools = d.get("unlocked_tools", GameData.ALL_TOOLS.duplicate())
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))

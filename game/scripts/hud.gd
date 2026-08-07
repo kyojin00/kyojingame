@@ -44,15 +44,24 @@ func _ready() -> void:
 	slot_selected.border_color = Color(1, 0.84, 0.37)
 	slot_selected.set_border_width_all(2)
 
-	for t in TOOLS:
+	for i in TOOLS.size():
+		var t: String = TOOLS[i]
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(26, 26)
+		b.custom_minimum_size = Vector2(28, 28)
 		b.focus_mode = Control.FOCUS_NONE
-		b.icon = main.tex[TOOL_ICONS[t]]
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.add_theme_stylebox_override("hover", slot_normal)
 		b.add_theme_stylebox_override("pressed", slot_selected)
 		b.pressed.connect(main.set_tool.bind(t))
+		# 슬롯 좌상단에 숫자키 표시
+		var num := Label.new()
+		num.text = str(i + 1)
+		num.position = Vector2(2, -4)
+		num.add_theme_color_override("font_color", Color(0.62, 0.58, 0.75))
+		num.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
+		num.add_theme_constant_override("outline_size", 2)
+		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(num)
 		hotbar.add_child(b)
 		slots[t] = b
 
@@ -84,6 +93,10 @@ func refresh() -> void:
 
 	for t in slots:
 		var b: Button = slots[t]
+		var unlocked := GameData.is_tool_unlocked(t)
+		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
+		b.disabled = not unlocked
+		b.tooltip_text = TOOL_LABELS.get(t, "씨앗") if unlocked else "???"
 		b.add_theme_stylebox_override("normal",
 			slot_selected if GameData.tool == t else slot_normal)
 
