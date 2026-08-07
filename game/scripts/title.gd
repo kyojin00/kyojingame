@@ -41,7 +41,7 @@ func _ready() -> void:
 	# 타이틀
 	var title := Label.new()
 	title.text = "교 진 팜"
-	title.add_theme_font_size_override("font_size", 36)
+	title.add_theme_font_size_override("font_size", 33)
 	title.add_theme_color_override("font_color", Color("ffd75e"))
 	title.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
 	title.add_theme_constant_override("outline_size", 3)

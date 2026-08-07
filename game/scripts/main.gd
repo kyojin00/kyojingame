@@ -2135,11 +2135,11 @@ func _draw_context_hint() -> void:
 		return
 	var text: String = hint[0]
 	var base: Vector2 = hint[1]
-	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	var pos := Vector2(base.x - w / 2.0, base.y)
-	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2,
+	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2,
 		Color(0.08, 0.06, 0.12, 0.9))
-	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 0.9))
+	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 0.9))
 
 
 func _draw_weather() -> void:

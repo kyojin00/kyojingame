@@ -124,14 +124,14 @@ func _draw_map() -> void:
 
 	# 안내
 	var guide := "M 또는 ESC: 닫기"
-	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	canvas.draw_string(main.UI_FONT, Vector2(320 - w / 2.0, 350), guide,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.7, 0.68, 0.8))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.7, 0.68, 0.8))
 
 
 func _label(pos: Vector2, text: String) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	var p := Vector2(pos.x - w / 2.0, pos.y)
-	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2,
+	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2,
 		Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 0.92, 0.7))
+	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.92, 0.7))

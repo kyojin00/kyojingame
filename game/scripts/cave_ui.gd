@@ -371,9 +371,9 @@ func _draw_cave() -> void:
 
 
 func _cave_label(center: Vector2, text: String) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	var p := Vector2(center.x - w / 2.0, center.y)
-	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2,
+	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2,
 		Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
+	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
 		Color(0.95, 0.92, 0.85))

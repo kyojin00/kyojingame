@@ -29,8 +29,8 @@ window/stretch/scale_mode="integer"
 
 [gui]
 
-theme/custom_font="res://assets/fonts/Galmuri9.ttf"
-theme/default_font_size=9
+theme/custom_font="res://assets/fonts/Galmuri11.ttf"
+theme/default_font_size=11
 
 [input]
 

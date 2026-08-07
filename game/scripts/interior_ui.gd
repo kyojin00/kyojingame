@@ -357,11 +357,11 @@ func _draw_room() -> void:
 
 
 func _draw_center_text(text: String, ty: float) -> void:
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	canvas.draw_string_outline(main.UI_FONT, Vector2(320 - w / 2.0, ty), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, 2, Color(0.05, 0.04, 0.08))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, 2, Color(0.05, 0.04, 0.08))
 	canvas.draw_string(main.UI_FONT, Vector2(320 - w / 2.0, ty), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.95, 0.92, 0.85))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.95, 0.92, 0.85))
 
 
 func _draw_deco_ui() -> void:
@@ -382,14 +382,14 @@ func _draw_deco_ui() -> void:
 	canvas.draw_rect(Rect2(px - 4, py - 14, 84, GameData.FURNITURE_IDS.size() * 18.0 + 20),
 		Color(0.05, 0.04, 0.08, 0.75))
 	canvas.draw_string(main.UI_FONT, Vector2(px, py), "[가구 구입]",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 0.84, 0.37))
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 0.84, 0.37))
 	for i in GameData.FURNITURE_IDS.size():
 		var id: String = GameData.FURNITURE_IDS[i]
 		var def: Dictionary = GameData.FURNITURE[id]
 		py += 18.0
 		canvas.draw_string(main.UI_FONT, Vector2(px, py),
 			"%d %s %dG" % [i + 1, def.name, int(def.price)],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.92, 0.9, 0.95))
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.92, 0.9, 0.95))
 
 
 func _draw_furniture(f: Dictionary) -> void:
