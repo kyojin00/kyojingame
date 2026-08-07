@@ -12,8 +12,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(60, 90)
-	panel.custom_minimum_size = Vector2(360, 140)
+	panel.position = Vector2(25, 64)
+	panel.custom_minimum_size = Vector2(430, 140)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -42,11 +42,15 @@ func _ready() -> void:
 
 	title_label = Label.new()
 	title_label.add_theme_color_override("font_color", Color("ffd75e"))
+	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(title_label)
 
 	body_label = Label.new()
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body_label.custom_minimum_size = Vector2(340, 60)
+	# 초상화(64px)+여백을 빼고 화면 안에 들어오는 고정 폭
+	body_label.custom_minimum_size = Vector2(310, 60)
+	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body_label)
 
