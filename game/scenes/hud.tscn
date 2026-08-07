@@ -22,7 +22,40 @@ offset_left = 0.0
 offset_top = 0.0
 offset_right = 640.0
 offset_bottom = 22.0
-color = Color(0.06, 0.05, 0.1, 0.5)
+color = Color(0.06, 0.05, 0.1, 0.62)
+mouse_filter = 2
+
+[node name="TopLine" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 22.0
+offset_right = 640.0
+offset_bottom = 23.0
+color = Color(0.42, 0.36, 0.55, 0.6)
+mouse_filter = 2
+
+[node name="ToolBg" type="ColorRect" parent="."]
+offset_left = 4.0
+offset_top = 338.0
+offset_right = 250.0
+offset_bottom = 358.0
+color = Color(0.06, 0.05, 0.1, 0.55)
+mouse_filter = 2
+
+[node name="ToolIcon" type="TextureRect" parent="."]
+offset_left = 8.0
+offset_top = 340.0
+offset_right = 24.0
+offset_bottom = 356.0
+stretch_mode = 3
+mouse_filter = 2
+
+[node name="MessageBg" type="ColorRect" parent="."]
+visible = false
+offset_left = 100.0
+offset_top = 306.0
+offset_right = 540.0
+offset_bottom = 326.0
+color = Color(0.06, 0.05, 0.1, 0.55)
 mouse_filter = 2
 
 [node name="Top" type="HBoxContainer" parent="."]
@@ -42,11 +75,21 @@ layout_mode = 2
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 2
 
+[node name="CoinIcon" type="TextureRect" parent="Top"]
+layout_mode = 2
+stretch_mode = 3
+size_flags_vertical = 4
+
 [node name="MoneyLabel" type="Label" parent="Top"]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 2
+
+[node name="HeartIcon" type="TextureRect" parent="Top"]
+layout_mode = 2
+stretch_mode = 3
+size_flags_vertical = 4
 
 [node name="EnergyBar" type="ProgressBar" parent="Top"]
 custom_minimum_size = Vector2(60, 12)
@@ -65,10 +108,10 @@ offset_bottom = 44.0
 theme_override_constants/separation = 4
 
 [node name="ToolName" type="Label" parent="."]
-offset_left = 8.0
-offset_top = 344.0
+offset_left = 28.0
+offset_top = 341.0
 offset_right = 400.0
-offset_bottom = 358.0
+offset_bottom = 355.0
 theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 2

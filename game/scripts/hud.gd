@@ -32,6 +32,8 @@ var stone_label: Label
 func _ready() -> void:
 	wood_label = _mk_resource("icon_wood")
 	stone_label = _mk_resource("icon_stone")
+	$Top/CoinIcon.texture = main.tex["icon_coin"]
+	$Top/HeartIcon.texture = main.tex["icon_heart"]
 
 
 func _mk_resource(icon: String) -> Label:
@@ -55,9 +57,9 @@ func refresh() -> void:
 	wood_label.text = str(GameData.wood)
 	stone_label.text = str(GameData.stone)
 	var track := ["[퀘스트 (J)]"]
-	var obj := GameData.tutorial_objective()
+	var obj := GameData.tutorial_objective_short()
 	if obj != "":
-		track.append(obj)
+		track.append("목표: " + obj)
 	var q: Dictionary = GameData.quest
 	if not q.is_empty() and bool(q.accepted):
 		track.append("의뢰: %s %d/%d" % [GameData.CROPS[q.crop].name,
@@ -66,6 +68,7 @@ func refresh() -> void:
 	track.append("연구 노트 %d%% (N)" % int(prog.ratio * 100.0))
 	objective_label.text = "\n".join(track)
 
+	$ToolIcon.texture = main.tex[TOOL_ICONS[GameData.tool]]
 	if GameData.tool == "seed":
 		var id := GameData.current_seed_id()
 		if id == "":
@@ -83,6 +86,7 @@ func show_message(text: String) -> void:
 		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
 	msg_label.text = text
 	msg_label.visible = true
+	$MessageBg.visible = true
 	msg_timer = 2.5
 
 
@@ -91,3 +95,4 @@ func _process(delta: float) -> void:
 		msg_timer -= delta
 		if msg_timer <= 0.0:
 			msg_label.visible = false
+			$MessageBg.visible = false

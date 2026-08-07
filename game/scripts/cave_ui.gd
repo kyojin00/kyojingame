@@ -44,15 +44,22 @@ func _ready() -> void:
 	add_child(player_sprite)
 
 
-func open() -> void:
+var worldtree := false  # 세계수 동굴 모드 (강화 몬스터 + 3층 보스)
+
+
+func open(wt: bool = false) -> void:
 	if GameData.energy < 15.0:
 		main.hud.show_message("체력이 너무 낮다... 회복하고 오자. (요리를 먹거나 잠시 기다리기)")
 		return
+	worldtree = wt
 	floor_num = 1
 	_gen_floor()
 	visible = true
 	Sound.play_sfx("sfx_place")
-	main.hud.show_message("동굴 %d층. Space: 공격 · 슬라임을 모두 잡자!" % floor_num)
+	if worldtree:
+		main.hud.show_message("세계수 동굴... 공기가 다르다. 3층에 수호자가 있다!")
+	else:
+		main.hud.show_message("동굴 %d층. Space: 공격 · 슬라임을 모두 잡자!" % floor_num)
 
 
 func close() -> void:
@@ -78,15 +85,22 @@ func _gen_floor() -> void:
 		var p := _free_tile(3.0)
 		if p.x >= 0:
 			ores[p] = true
-	# 몬스터 (층이 깊어질수록 종류/수 증가)
-	for i in 2 + floor_num:
-		_spawn_mob("slime", 1 + int(floor_num / 3.0))
-	if floor_num >= 2:
-		for i in 1 + int(floor_num / 2.0):
-			_spawn_mob("bat", 1)
-	if floor_num >= 4:
-		for i in int((floor_num - 2) / 2.0):
-			_spawn_mob("ghost", 2 + int(floor_num / 4.0))
+	# 몬스터 (층이 깊어질수록 종류/수 증가, 세계수 동굴은 2배 강함)
+	var hp_mult := 2 if worldtree else 1
+	if worldtree and floor_num == 3:
+		# 보스층: 숲의 수호자 + 호위
+		_spawn_mob("treant", 40)
+		_spawn_mob("ghost", 4)
+		_spawn_mob("ghost", 4)
+	else:
+		for i in 2 + floor_num:
+			_spawn_mob("slime", (1 + int(floor_num / 3.0)) * hp_mult)
+		if floor_num >= 2 or worldtree:
+			for i in 1 + int(floor_num / 2.0):
+				_spawn_mob("bat", 1 * hp_mult)
+		if floor_num >= 4 or (worldtree and floor_num >= 2):
+			for i in maxi(1, int((floor_num - 2) / 2.0)):
+				_spawn_mob("ghost", (2 + int(floor_num / 4.0)) * hp_mult)
 	ppos = Vector2(OX + (entry_pos.x + 0.5) * TS, OY + (entry_pos.y + 0.5) * TS)
 	pdir = "right"
 
@@ -172,6 +186,13 @@ func _process(delta: float) -> void:
 			"ghost":
 				# 벽을 통과하며 끈질기게 추적
 				m.vel = to_player.normalized() * (22.0 + floor_num * 3.0)
+			"treant":
+				# 느리게 다가오다 주기적으로 돌진한다
+				if m.think <= 0.0:
+					m.think = randf_range(2.0, 3.0)
+					m.vel = to_player.normalized() * 95.0
+				else:
+					m.vel = m.vel.move_toward(to_player.normalized() * 18.0, 60.0 * delta)
 		var np: Vector2 = m.pos + m.vel * delta
 		if m.type == "ghost":
 			m.pos.x = clampf(np.x, OX + TS, OX + (GW - 1) * TS)
@@ -183,7 +204,7 @@ func _process(delta: float) -> void:
 		# 접촉 피해 (종류별)
 		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 12.0:
 			hurt_cd = 0.9
-			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0}[m.type]
+			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0, "treant": 20.0}[m.type]
 			GameData.energy -= dmg * GameData.pet_cave_def_mult()  # 부엉이 펫: 피해 감소
 			Sound.play_sfx("sfx_miss")
 			# 넉백은 막히지 않은 곳으로만 (벽/바위 끼임 방지)
@@ -234,7 +255,7 @@ func _attack() -> void:
 				monsters.erase(m)
 				Sound.play_sfx("sfx_pick", 0.2)
 				main.record_kill(m.type)
-				main.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0}[m.type])
+				main.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0, "treant": 40.0}[m.type])
 				match m.type:
 					"slime":
 						if randf() < 0.35:
@@ -251,6 +272,10 @@ func _attack() -> void:
 							main.hud.show_message("유령이 보석을 떨어뜨렸다!")
 						if randf() < 0.1:
 							main.gain_legend("ghost_essence")
+					"treant":
+						main.gain_item("gem", 3)
+						main.gain_legend("world_branch")
+						main.hud.show_message("숲의 수호자를 쓰러뜨렸다! 세계수 가지를 얻었다!")
 				if monsters.is_empty():
 					_floor_clear()
 			return
@@ -332,7 +357,8 @@ func _update_sprite() -> void:
 
 func _draw_cave() -> void:
 	# 바닥
-	canvas.draw_rect(Rect2(OX, OY, GW * TS, GH * TS), Color(0.22, 0.19, 0.24))
+	canvas.draw_rect(Rect2(OX, OY, GW * TS, GH * TS),
+		Color(0.16, 0.24, 0.18) if worldtree else Color(0.22, 0.19, 0.24))
 	for y in GH:
 		for x in GW:
 			if (x + y * 3) % 7 == 0:
@@ -354,7 +380,8 @@ func _draw_cave() -> void:
 	for m in monsters:
 		var frame := int(m.anim * (7.0 if m.type == "bat" else 4.0)) % 2
 		var mod := Color(1, 1, 1, 0.7) if m.type == "ghost" else Color(1, 1, 1)
-		canvas.draw_texture(main.tex["%s_%d" % [m.type, frame]], m.pos + Vector2(-8, -10), mod)
+		var moff := Vector2(-12, -16) if m.type == "treant" else Vector2(-8, -10)
+		canvas.draw_texture(main.tex["%s_%d" % [m.type, frame]], m.pos + moff, mod)
 
 	# 공격 스윙
 	if swing_t > 0.0:
@@ -362,7 +389,8 @@ func _draw_cave() -> void:
 		canvas.draw_rect(Rect2(reach.x - 6, reach.y - 6, 12, 12), Color(1, 0.9, 0.5, 0.5))
 
 	# 상단 정보
-	var info := "동굴 %d층 · 몬스터 %d마리 · 체력 %d" % [floor_num, monsters.size(), int(GameData.energy)]
+	var cave_name := "세계수 동굴" if worldtree else "동굴"
+	var info := "%s %d층 · 몬스터 %d마리 · 체력 %d" % [cave_name, floor_num, monsters.size(), int(GameData.energy)]
 	if chest_pos.x >= 0:
 		info += " · 상자를 열자(E)!"
 	elif stairs_pos.x >= 0:

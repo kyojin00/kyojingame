@@ -86,10 +86,18 @@ func _rebuild() -> void:
 			var def: Dictionary = GameData.CROPS[id]
 			var row := HBoxContainer.new()
 			var l := Label.new()
-			l.text = "%s x%d (개당 %dG)" % [def.name, count, def.sell_price]
+			var silver := int(GameData.produce_silver.get(id, 0))
+			var gold := int(GameData.produce_gold.get(id, 0))
+			var qtxt := ""
+			if gold > 0:
+				qtxt += " 금%d" % gold
+			if silver > 0:
+				qtxt += " 은%d" % silver
+			l.text = "%s x%d%s" % [def.name, count, qtxt]
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(l)
-			row.add_child(_mk_button("%dG에 전부 판매" % (def.sell_price * count), _on_sell.bind(id)))
+			row.add_child(_mk_button("%dG에 전부 판매" % GameData.produce_sell_value(id),
+				_on_sell.bind(id)))
 			items_box.add_child(row)
 		for id in GameData.ITEM_IDS:
 			var count: int = GameData.items[id]
@@ -121,12 +129,30 @@ func _rebuild() -> void:
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(l)
 			var b := _mk_button("%dG 입양" % def.price, _on_buy_animal.bind(id))
-			b.disabled = GameData.money < def.price or main.animals.size() >= GameData.MAX_ANIMALS
+			b.disabled = GameData.money < def.price or main.animals.size() >= GameData.max_animals()
 			row.add_child(b)
 			items_box.add_child(row)
 		var hint := Label.new()
-		hint.text = "\n동물은 농장을 돌아다닌다. 가까이 가서 E로 쓰다듬어주면\n다음 날 아침 생산물을 준다. (최대 %d마리)" % GameData.MAX_ANIMALS
+		hint.text = "동물은 E로 쓰다듬으면 다음 날 아침 생산물을 준다. (최대 %d마리)" % GameData.max_animals()
 		items_box.add_child(hint)
+
+		# 축사 건설
+		var brow := HBoxContainer.new()
+		var bl := Label.new()
+		bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		brow.add_child(bl)
+		if GameData.barn_built:
+			bl.text = "축사 완공! 동물 %d마리 + 굳은 날 자동 배부름" % GameData.BARN_MAX_ANIMALS
+		else:
+			bl.text = "축사 건설: 동물 %d마리 + 비 오는 날 자동 배부름" % GameData.BARN_MAX_ANIMALS
+			var bb := _mk_button("%dG+목재%d" % [GameData.BARN_COST_MONEY, GameData.BARN_COST_WOOD],
+				func() -> void:
+					main.build_barn()
+					_rebuild())
+			bb.disabled = GameData.money < GameData.BARN_COST_MONEY \
+				or GameData.wood < GameData.BARN_COST_WOOD
+			brow.add_child(bb)
+		items_box.add_child(brow)
 
 		var pet_title := Label.new()
 		pet_title.text = "\n- 펫 입양 (한 마리만 데리고 다닌다) -"
@@ -231,12 +257,13 @@ func _on_buy(id: String) -> void:
 
 
 func _on_sell(id: String) -> void:
-	var def: Dictionary = GameData.CROPS[id]
-	var amount: int = def.sell_price * GameData.produce[id]
+	var amount: int = GameData.produce_sell_value(id)  # 은/금 품질은 더 비싸게
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.produce[id] = 0
+	GameData.produce_silver[id] = 0
+	GameData.produce_gold[id] = 0
 	if main != null and not main._remote_acting:
 		main.net_shop("sell_crop", id)
 	_rebuild()

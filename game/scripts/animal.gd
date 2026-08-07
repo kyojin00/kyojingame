@@ -15,6 +15,7 @@ func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
 	sprite.offset = Vector2(-8, -14)
+	sprite.scale = Vector2(1.35, 1.35)  # 큰 캐릭터에 맞춘 비율
 	add_child(sprite)
 	target = position
 	wait = randf_range(0.5, 2.0)

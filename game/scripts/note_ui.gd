@@ -117,6 +117,24 @@ func _rebuild() -> void:
 		else:
 			_line("  ??? — 동굴 어딘가에", DIM)
 
+	# 채집/곤충
+	_line("")
+	_head("[채집 기록]")
+	for fid in GameData.FORAGE_IDS:
+		var got := int(GameData.forage_caught.get(fid, 0))
+		if got > 0:
+			_line("  %s — %d개 채집" % [GameData.ITEMS[fid].name, got])
+		else:
+			_line("  ??? — 들판 어딘가에 돋아난다", DIM)
+	_line("")
+	_head("[곤충 기록]")
+	for bid in GameData.BUG_IDS:
+		var caught_b := int(GameData.forage_caught.get(bid, 0))
+		if caught_b > 0:
+			_line("  %s — %d마리 관찰" % [GameData.ITEMS[bid].name, caught_b])
+		else:
+			_line("  ??? — 계절과 시간을 살펴보자", DIM)
+
 	# 몬스터 관찰
 	_line("")
 	_head("[몬스터 관찰]")

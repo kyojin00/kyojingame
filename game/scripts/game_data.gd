@@ -224,6 +224,9 @@ var tool := "hoe"
 var seed_index := 0
 var seeds := {}
 var produce := {}
+# 품질 등급: 수확 시 농사 숙련도에 따라 은/금 품질 (판매가 1.25/1.5배)
+var produce_silver := {}
+var produce_gold := {}
 var wood := 0
 var stone := 0
 var tool_level := {"hoe": 1, "water": 1, "axe": 1, "pickaxe": 1}
@@ -256,6 +259,7 @@ const MOBS := {
 	"slime": {"name": "슬라임", "desc": "동굴 어디에나 있는 말랑이. 느리지만 떼로 다닌다."},
 	"bat": {"name": "박쥐", "desc": "2층부터 등장. 빠르게 덮쳐온다!"},
 	"ghost": {"name": "유령", "desc": "4층부터 등장. 벽을 통과해 끈질기게 쫓아온다..."},
+	"treant": {"name": "숲의 수호자", "desc": "세계수 동굴 최심부의 보스. 오래된 나무의 정령이다."},
 }
 var mob_kills := {}
 
@@ -377,7 +381,15 @@ const ANIMALS := {
 	"chicken": {"name": "닭", "price": 800, "product": "egg"},
 	"cow": {"name": "소", "price": 1500, "product": "milk"},
 }
-const MAX_ANIMALS := 8
+const MAX_ANIMALS := 8          # 기본 동물 상한
+const BARN_MAX_ANIMALS := 16    # 축사 건설 후
+const BARN_COST_MONEY := 5000
+const BARN_COST_WOOD := 20
+var barn_built := false
+
+
+func max_animals() -> int:
+	return BARN_MAX_ANIMALS if barn_built else MAX_ANIMALS
 
 # ---- 기타 판매 아이템 (동물 생산물, 물고기) ----
 const ITEMS := {
@@ -399,6 +411,12 @@ const ITEMS := {
 	"dish_salad": {"name": "치즈 샐러드", "sell": 170},
 	"dish_punch": {"name": "수박화채", "sell": 240},
 	"dish_eggplant": {"name": "가지볶음", "sell": 120},
+	# 채집물/곤충
+	"forage_berry": {"name": "산딸기", "sell": 40},
+	"forage_herb": {"name": "약초", "sell": 60},
+	"bug_butterfly": {"name": "나비", "sell": 30},
+	"bug_dragonfly": {"name": "잠자리", "sell": 50},
+	"bug_firefly": {"name": "반딧불이", "sell": 90},
 	# 전설 재료 (판매 불가, 최후의 연금술 재료)
 	"gold_crop": {"name": "달빛 작물", "sell": 0, "legend": true},
 	"world_branch": {"name": "세계수 가지", "sell": 0, "legend": true},
@@ -410,14 +428,26 @@ const ITEMS := {
 const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
 	"ore", "gem", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
+	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece"]
+
+# 채집물/곤충 도감 (팔아도 기록은 남는다)
+const FORAGE_IDS := ["forage_berry", "forage_herb"]
+const BUG_IDS := ["bug_butterfly", "bug_dragonfly", "bug_firefly"]
+# 곤충 출현 조건
+const BUGS := {
+	"bug_butterfly": {"seasons": [SPRING, SUMMER], "night": false},
+	"bug_dragonfly": {"seasons": [SUMMER, FALL], "night": false},
+	"bug_firefly": {"seasons": [SUMMER], "night": true},
+}
+var forage_caught := {}  # id -> 누적 획득 수
 
 # 최후의 연금술에 필요한 전설 재료 7종 (콘텐츠마다 하나씩)
 # [아이템 id, 어느 콘텐츠에서, 힌트]
 const LEGENDS := [
 	["gold_crop", "농사", "달 밝은 날, 정성껏 키운 작물에서 아주 드물게..."],
 	["fish_golden", "낚시", "물가의 전설. 철수도 두 번밖에 못 봤다는 황금잉어."],
-	["world_branch", "벌목", "깊은 숲의 오래된 나무는 가끔 신비한 가지를 떨어뜨린다."],
+	["world_branch", "탐험", "깊은 숲 '세계수 동굴' 3층의 수호자가 지키고 있다."],
 	["star_ore", "채광", "동굴 깊은 곳(5층+)의 보상 상자에서 별처럼 빛나는 광석이."],
 	["ghost_essence", "전투", "유령은 아주 드물게 정수를 남긴다."],
 	["golden_egg", "목장", "사랑받은 닭은 아주 가끔 황금빛 알을 낳는다."],
@@ -489,6 +519,10 @@ func note_progress() -> Dictionary:
 			filled += 1
 		if int(affinity[npc_id]) >= 100:
 			filled += 1
+	for fid in FORAGE_IDS + BUG_IDS:
+		total += 1
+		if int(forage_caught.get(fid, 0)) > 0:
+			filled += 1
 	for leg in LEGENDS:
 		total += 1
 		if int(items[leg[0]]) > 0:
@@ -508,6 +542,46 @@ func can_final_alchemy() -> bool:
 	return legends_owned() == LEGENDS.size() and not ending_seen
 
 
+# 수확 품질 굴리기: 0=일반 1=은 2=금 (농사 숙련도가 높을수록 좋다)
+func roll_quality() -> int:
+	var lv := skill_lv("farm")
+	if randf() < 0.02 + lv * 0.008:
+		return 2
+	if randf() < 0.08 + lv * 0.02:
+		return 1
+	return 0
+
+
+func add_produce(id: String, quality: int) -> void:
+	produce[id] += 1
+	if quality == 2:
+		produce_gold[id] = int(produce_gold.get(id, 0)) + 1
+	elif quality == 1:
+		produce_silver[id] = int(produce_silver.get(id, 0)) + 1
+
+
+# 수확물 소비(요리/의뢰): 일반부터 쓰고, 품질본은 판매용으로 남긴다
+func consume_produce(id: String, n: int) -> void:
+	produce[id] -= n
+	var normal: int = int(produce[id]) - int(produce_silver.get(id, 0)) \
+		- int(produce_gold.get(id, 0))
+	while normal < 0 and int(produce_silver.get(id, 0)) > 0:
+		produce_silver[id] = int(produce_silver[id]) - 1
+		normal += 1
+	while normal < 0 and int(produce_gold.get(id, 0)) > 0:
+		produce_gold[id] = int(produce_gold[id]) - 1
+		normal += 1
+
+
+# 보유 전량 판매 가치 (은 1.25배 / 금 1.5배)
+func produce_sell_value(id: String) -> int:
+	var price: int = CROPS[id].sell_price
+	var silver := int(produce_silver.get(id, 0))
+	var gold := int(produce_gold.get(id, 0))
+	var normal: int = int(produce[id]) - silver - gold
+	return int(normal * price + silver * price * 1.25 + gold * price * 1.5)
+
+
 # 재료 보유량 (작물이면 수확물, 아니면 아이템)
 func ingredient_count(id: String) -> int:
 	return int(produce[id]) if CROPS.has(id) else int(items[id])
@@ -525,7 +599,7 @@ func cook(id: String) -> bool:
 		return false
 	for k in RECIPES[id].needs:
 		if CROPS.has(k):
-			produce[k] -= int(RECIPES[id].needs[k])
+			consume_produce(k, int(RECIPES[id].needs[k]))
 		else:
 			items[k] -= int(RECIPES[id].needs[k])
 	items[id] += 1
@@ -590,8 +664,35 @@ const NPCS := {
 	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
 	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
 	},
+	"blacksmith": {"name": "무쇠", "lines": [
+		"광석을 가져오면 도구를 벼려주지. 대장간으로 와.",
+		"동굴 깊은 곳 광석일수록 좋은 쇠가 된다.",
+		"쇠는 정직해. 두드린 만큼만 단단해지지.",
+		"요즘 젊은것들은 도끼 가는 법도 몰라... 자네는 다르군.",
+	],
+	"secret50": "자네 할아버지? 별난 양반이었지. 광석을 사 가면서\n'이건 녹이려는 게 아니라 별을 담으려는 거야'라고 하더군.",
+	"secret100": "떠나기 전에 화로를 빌려 갔어. 뭘 만들었는지는 끝내 안 보여줬지만...\n그날 밤 대장간 굴뚝에서 무지개색 연기가 올라왔다네.",
+	},
+	"rancher": {"name": "보라", "lines": [
+		"동물은 사랑을 먹고 자라. 매일 쓰다듬어 줘!",
+		"닭이 낳은 달걀은 아침에 거둬야 신선해.",
+		"우리 목장 상회에서 귀여운 펫도 분양하고 있어~",
+		"축사가 있으면 비 오는 날에도 동물들이 편하지.",
+	],
+	"secret50": "너희 할아버지, 동물들이 유난히 따랐어.\n'동물이 주는 건 생산물이 아니라 마음'이라고 입버릇처럼 말씀하셨지.",
+	"secret100": "언젠가 금빛으로 빛나는 달걀을 보여주신 적이 있어.\n'사랑받은 닭만이 낳을 수 있다'며... 나는 아직도 그게 꿈같아.",
+	},
+	"chief": {"name": "덕수", "lines": [
+		"우리 마을에 젊은 사람이 오니 좋구먼.",
+		"부지 문서는 내가 관리하고 있네. 표지판에서 사면 돼.",
+		"광장 게시판에 마을 사람들 부탁이 올라온다네.",
+		"자네 할아버지와는... 오랜 친구였지.",
+	],
+	"secret50": "자네 할아버지가 이 마을에 처음 왔을 때, 다들 미친 사람 취급했어.\n나만 빼고. 그 눈빛은... 미친 게 아니라 믿는 사람의 눈이었거든.",
+	"secret100": "그 양반이 마지막으로 한 말을 전해주지. '덕수, 내 손주가 오면\n일곱 가지를 모을 걸세. 그때 이 마을은 기적을 보게 될 거야.'",
+	},
 }
-var affinity := {"merchant": 0, "fisher": 0}
+var affinity := {"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0}
 # {crop, qty, reward, accepted}
 var quest := {}
 
@@ -666,6 +767,21 @@ func fresh_tutorial() -> Dictionary:
 	for pair in TUTORIAL_ORDER:
 		t[pair[0]] = false
 	return t
+
+
+# 우측 트래커용 짧은 목표 문구
+const TUTORIAL_SHORT := {
+	"moved": "움직여보기 (WASD)", "map": "지도 열기 (M)", "quest": "퀘스트 창 (J)",
+	"note": "연구 노트 (N)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
+	"water": "물 주기 (2)", "slept": "침대에서 자기", "harvest": "수확하기 (4)",
+	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
+	"fish": "낚시하기 (9)", "shop": "잡화점 가보기",
+}
+
+
+func tutorial_objective_short() -> String:
+	var flag := tutorial_current_flag()
+	return String(TUTORIAL_SHORT.get(flag, "")) if flag != "" else ""
 
 
 func tutorial_objective() -> String:
@@ -768,6 +884,10 @@ func reset_all() -> void:
 	crops_harvested = {}
 	minerals_found = {}
 	memory_given = false
+	forage_caught = {}
+	produce_silver = {}
+	produce_gold = {}
+	barn_built = false
 	owned_pets = []
 	active_pet = ""
 	for id in CROP_IDS:
@@ -896,6 +1016,10 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"crops_harvested": crops_harvested,
 		"minerals_found": minerals_found,
 		"memory_given": memory_given,
+		"forage_caught": forage_caught,
+		"produce_silver": produce_silver,
+		"produce_gold": produce_gold,
+		"barn_built": barn_built,
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
 		"player": [player_pos.x, player_pos.y],
@@ -924,7 +1048,9 @@ func build_stats() -> Dictionary:
 		"skills": skills, "furniture": furniture,
 		"recipes_cooked": recipes_cooked, "ending_seen": ending_seen,
 		"crops_harvested": crops_harvested, "minerals_found": minerals_found,
-		"memory_given": memory_given,
+		"memory_given": memory_given, "forage_caught": forage_caught,
+		"produce_silver": produce_silver, "produce_gold": produce_gold,
+		"barn_built": barn_built,
 		"owned_pets": owned_pets, "active_pet": active_pet,
 	}
 
@@ -961,6 +1087,13 @@ func apply_stats(d: Dictionary) -> void:
 	for k in d.get("minerals_found", {}):
 		minerals_found[k] = bool(d.minerals_found[k])
 	memory_given = bool(d.get("memory_given", memory_given))
+	for k in d.get("forage_caught", {}):
+		forage_caught[k] = int(d.forage_caught[k])
+	for k in d.get("produce_silver", {}):
+		produce_silver[k] = int(d.produce_silver[k])
+	for k in d.get("produce_gold", {}):
+		produce_gold[k] = int(d.produce_gold[k])
+	barn_built = bool(d.get("barn_built", barn_built))
 	var q: Variant = d.get("quest", {})
 	if typeof(q) == TYPE_DICTIONARY:
 		if q.is_empty():

@@ -102,6 +102,18 @@ const TEXTURE_NAMES := [
 	"npc_fisher_up_1", "npc_fisher_side_0", "npc_fisher_side_1",
 	"npc_merchant_portrait_normal", "npc_merchant_portrait_happy",
 	"npc_fisher_portrait_normal", "npc_fisher_portrait_happy",
+	"npc_blacksmith_down_0", "npc_blacksmith_down_1", "npc_blacksmith_up_0",
+	"npc_blacksmith_up_1", "npc_blacksmith_side_0", "npc_blacksmith_side_1",
+	"npc_blacksmith_portrait_normal", "npc_blacksmith_portrait_happy",
+	"npc_rancher_down_0", "npc_rancher_down_1", "npc_rancher_up_0",
+	"npc_rancher_up_1", "npc_rancher_side_0", "npc_rancher_side_1",
+	"npc_rancher_portrait_normal", "npc_rancher_portrait_happy",
+	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
+	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
+	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
+	"forage_berry", "forage_herb", "bug_butterfly_0", "bug_butterfly_1",
+	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
+	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_basket", "icon_axe",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
@@ -113,6 +125,8 @@ const TEXTURE_NAMES := [
 
 const START_TILE := Vector2i(14, 10)
 const CAVE_POS := Vector2i(50, 1)
+const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
+const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
 # 부지 표지판: 잠긴 부지의 경계 안쪽 (밖에서 E로 조준 가능)
 const PARCEL_SIGNS := {
 	"east": Vector2i(30, 7),
@@ -222,12 +236,19 @@ func _ready() -> void:
 	cave.main = self
 	add_child(cave)
 
-	for npc_id in ["merchant", "fisher"]:
+	# NPC들: 각자 자기 가게/구역 근처를 배회한다
+	var npc_spawns := {
+		"merchant": Vector2i(66, 12), "fisher": Vector2i(66, 16),
+		"blacksmith": Vector2i(79, 8), "rancher": Vector2i(72, 8),
+		"chief": Vector2i(75, 15),
+	}
+	for npc_id in npc_spawns:
 		var n: Node2D = preload("res://scripts/npc.gd").new()
 		n.main = self
 		n.id = npc_id
 		n.region = VILLAGE_REGION
-		n.position = Vector2(66 * TILE + 8, (12 if npc_id == "merchant" else 16) * TILE + 8)
+		var sp: Vector2i = npc_spawns[npc_id]
+		n.position = Vector2(sp.x * TILE + 8, sp.y * TILE + 8)
 		npcs.append(n)
 		world.add_child(n)
 
@@ -371,6 +392,7 @@ func _build_map() -> void:
 	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
 	objects[BOARD_POS] = {"kind": "board", "hp": 0}
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
+	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
 	# 테두리 나무
 	for x in MAP_W:
@@ -428,11 +450,21 @@ func _spawn_objects() -> void:
 	for anchor: Vector2i in BUILDINGS:
 		var hn := _make_object(tex["house"],
 			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -64))
+		var hspr: Sprite2D = hn.get_child(0)
+		hspr.scale = Vector2(1.4, 1.4)
+		hspr.offset.x = 40.0 / 1.4 - 40.0
 		obj_nodes[anchor] = hn
 		world.add_child(hn)
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
+
+
+# 종류별 시각 배율 (나무는 2배 = 32x48로 캐릭터와 비율이 맞는다)
+const OBJECT_SCALES := {
+	"tree": 2.0, "rock": 1.4, "cave": 1.5, "worldtree": 1.6,
+	"barn": 1.5, "forage_berry": 1.2, "forage_herb": 1.2,
+}
 
 
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
@@ -457,7 +489,25 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["fence"]
 		"sprinkler":
 			texture = tex["sprinkler"]
+		"forage_berry":
+			texture = tex["forage_berry"]
+		"forage_herb":
+			texture = tex["forage_herb"]
+		"worldtree":
+			texture = tex["cave"]
+			offset = Vector2(0, -25)
+		"barn":
+			texture = tex["barn"]
+			offset = Vector2(0, -22)
+		"barn_block":
+			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
 	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
+	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
+	var sc: float = OBJECT_SCALES.get(kind, 1.0)
+	if sc != 1.0 and texture != null:
+		var spr: Sprite2D = node.get_child(0)
+		spr.scale = Vector2(sc, sc)
+		spr.offset.x = 8.0 / sc - texture.get_width() / 2.0
 	obj_nodes[pos] = node
 	if kind == "tree":
 		tree_sprites.append(node.get_child(0))
@@ -646,6 +696,21 @@ func _update_fishing(delta: float) -> void:
 			hud.show_message("물고기가 도망갔다...")
 
 
+# 축사 건설: 농장 고정 위치에 세워진다 (동물 16마리 + 굳은 날씨 자동 배부름)
+func build_barn() -> void:
+	if GameData.barn_built:
+		return
+	GameData.barn_built = true
+	GameData.money -= GameData.BARN_COST_MONEY
+	GameData.wood -= GameData.BARN_COST_WOOD
+	_place_object(BARN_POS, "barn", 0)
+	objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
+	Sound.play_sfx("sfx_place")
+	hud.show_message("축사 완공! 동물을 %d마리까지 키울 수 있다." % GameData.BARN_MAX_ANIMALS)
+	if Net.is_host():
+		_broadcast_stats()
+
+
 # 전설 재료 획득 (판매 불가, 최후의 연금술 재료 — 연구 노트에 기록)
 func gain_legend(id: String) -> void:
 	if int(GameData.items[id]) > 0:
@@ -797,9 +862,18 @@ func use_tool() -> void:
 					return
 				var def: Dictionary = GameData.CROPS[cell.crop_id]
 				if float(cell.crop_day) >= _grow_total(def):
-					GameData.produce[cell.crop_id] += 1
+					var quality := GameData.roll_quality()
+					GameData.add_produce(cell.crop_id, quality)
 					GameData.today_harvest += 1
-					hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
+					match quality:
+						2:
+							hud.show_message("금빛 %s 수확! (판매가 %dG)" %
+								[def.name, int(def.sell_price * 1.5)])
+						1:
+							hud.show_message("은빛 %s 수확! (판매가 %dG)" %
+								[def.name, int(def.sell_price * 1.25)])
+						_:
+							hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
 					cell.crop_id = ""
 					cell.crop_day = 0.0
 					Sound.play_sfx("sfx_harvest")
@@ -942,10 +1016,41 @@ func interact() -> void:
 			hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
 				[def.name, GameData.ITEMS[def.product].name])
 		return
+	# 곤충 잡기
+	var bug := nearby_bug()
+	if bug != null:
+		var bid: String = bug.bug_id
+		GameData.items[bid] += 1
+		GameData.forage_caught[bid] = int(GameData.forage_caught.get(bid, 0)) + 1
+		Sound.play_sfx("sfx_catch")
+		spawn_particles(player_tile(), "sparkle")
+		hud.show_message("%s를 잡았다! 연구 노트에 기록됐다." % GameData.ITEMS[bid].name)
+		bug.respawn()
+		if Net.is_host():
+			_broadcast_stats()
+		return
 	for t in [target_tile(), player_tile()]:
 		var obj: Variant = objects.get(t)
 		if obj == null:
 			continue
+		if String(obj.kind).begins_with("forage_"):
+			var fid: String = obj.kind
+			_remove_object(t)
+			GameData.items[fid] += 1
+			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + 1
+			Sound.play_sfx("sfx_harvest")
+			spawn_particles(t, "sparkle")
+			hud.show_message("%s 채집! 연구 노트에 기록됐다." % GameData.ITEMS[fid].name)
+			gain_skill("forest", 3.0)
+			if Net.is_host():
+				_broadcast_area(t)
+				_broadcast_stats()
+			elif Net.is_guest():
+				_req_gain.rpc_id(1, fid, 1)
+			return
+		if obj.kind == "worldtree":
+			cave.open(true)
+			return
 		if obj.kind == "bin":
 			shop.open("sell", ["sell"])
 			return
@@ -1419,7 +1524,7 @@ func _accept_quest() -> void:
 
 func _turn_in_quest() -> void:
 	var q: Dictionary = GameData.quest
-	GameData.produce[q.crop] -= q.qty
+	GameData.consume_produce(q.crop, int(q.qty))
 	GameData.money += q.reward
 	GameData.today_earned += int(q.reward)
 	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
@@ -1517,6 +1622,11 @@ func _next_day(passed_out: bool) -> void:
 					and grid[n.y][n.x].ground == "soil":
 				_wet(grid[n.y][n.x], WET_ALL_DAY)
 
+	# 축사가 있으면 굳은 날씨에도 동물들이 알아서 배부르다
+	if GameData.barn_built and weather_now() != GameData.WEATHER_SUN:
+		for a2 in animals:
+			a2.fed = true
+
 	# 동물 생산물 수거
 	var collected := {}
 	for a in animals:
@@ -1531,6 +1641,8 @@ func _next_day(passed_out: bool) -> void:
 
 	# 나무/돌이 조금씩 다시 자란다
 	_respawn_resources()
+	_respawn_forage()
+	_spawn_bugs()
 
 	tutorial_notify("slept")
 
@@ -1582,6 +1694,56 @@ func _respawn_resources() -> void:
 			continue
 		_place_object(pos, kind, TREE_HP if kind == "tree" else ROCK_HP)
 		break
+
+
+# 아침마다 열매/약초가 풀밭에 돋아난다 (최대 12개 유지)
+func _respawn_forage() -> void:
+	var count := 0
+	for pos in objects:
+		if String(objects[pos].kind).begins_with("forage_"):
+			count += 1
+	for attempt in 8:
+		if count >= 12:
+			break
+		var pos := Vector2i(randi_range(1, MAP_W - 2), randi_range(1, MAP_H - 2))
+		var cell: Dictionary = grid[pos.y][pos.x]
+		if objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
+			continue
+		if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
+			continue
+		var kind := "forage_berry" if randf() < 0.6 else "forage_herb"
+		_place_object(pos, kind, 0)
+		count += 1
+
+
+# 곤충: 계절/시간대에 맞는 곤충들이 들판을 날아다닌다
+var bugs: Array = []
+
+
+func _spawn_bugs() -> void:
+	for bnode in bugs:
+		bnode.queue_free()
+	bugs.clear()
+	for bid in GameData.BUGS:
+		var cond: Dictionary = GameData.BUGS[bid]
+		if GameData.season() not in cond.seasons:
+			continue
+		for i in 3:
+			var bnode: Node2D = preload("res://scripts/bug.gd").new()
+			bnode.main = self
+			bnode.bug_id = bid
+			bnode.night_only = bool(cond.night)
+			bnode.position = Vector2(randi_range(2, MAP_W - 2) * TILE,
+				randi_range(2, MAP_H - 2) * TILE)
+			bugs.append(bnode)
+			world.add_child(bnode)
+
+
+func nearby_bug() -> Node2D:
+	for bnode in bugs:
+		if bnode.visible and (bnode.position - player.position).length() < 20.0:
+			return bnode
+	return null
 
 
 # ---- 저장 ----
@@ -1648,6 +1810,16 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.recipes_cooked[k] = int(d.recipes_cooked[k])
 	GameData.owned_pets = d.get("owned_pets", [])
 	GameData.active_pet = str(d.get("active_pet", ""))
+	for k in d.get("forage_caught", {}):
+		GameData.forage_caught[k] = int(d.forage_caught[k])
+	for k in d.get("produce_silver", {}):
+		GameData.produce_silver[k] = int(d.produce_silver[k])
+	for k in d.get("produce_gold", {}):
+		GameData.produce_gold[k] = int(d.produce_gold[k])
+	GameData.barn_built = bool(d.get("barn_built", false))
+	if GameData.barn_built and not objects.has(BARN_POS):
+		objects[BARN_POS] = {"kind": "barn", "hp": 0}
+		objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
@@ -2066,6 +2238,10 @@ func _context_hint() -> Array:
 				return ["내 부지", above_tile]
 			"cave":
 				return ["E: 동굴 탐험", above_tile]
+			"worldtree":
+				return ["E: 세계수 동굴 (위험!)", above_tile]
+			"forage_berry", "forage_herb":
+				return ["E: 채집", above_tile]
 			"house":
 				var bk := _building_kind_at(t)
 				if bk == "home":
