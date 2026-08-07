@@ -40,9 +40,11 @@ func _process(delta: float) -> void:
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
 		v = v * SPEED * GameData.pet_speed_mult() * delta  # 강아지 펫: 이동 속도 증가
-		if not _blocked(position + Vector2(v.x, 0)):
+		# 이미 끼어 있으면(설치물 등) 충돌을 무시하고 빠져나올 수 있게 한다
+		var stuck := _blocked(position)
+		if stuck or not _blocked(position + Vector2(v.x, 0)):
 			position.x += v.x
-		if not _blocked(position + Vector2(0, v.y)):
+		if stuck or not _blocked(position + Vector2(0, v.y)):
 			position.y += v.y
 		anim_time += delta
 		walked += SPEED * delta

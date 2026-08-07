@@ -59,11 +59,13 @@ func refresh() -> void:
 	if GameData.tool == "seed":
 		var id := GameData.current_seed_id()
 		if id == "":
-			tool_name.text = "씨앗 없음 - 상점(B)에서 사자"
+			tool_name.text = "씨앗 없음 - 상점(%s)에서 사자" % GameData.key_label("open_shop")
 		else:
-			tool_name.text = "%s 씨앗 x%d (Tab: 바꾸기)" % [GameData.CROPS[id].name, GameData.seeds[id]]
+			tool_name.text = "%s 씨앗 x%d (%s: 바꾸기)" % [GameData.CROPS[id].name,
+				GameData.seeds[id], GameData.key_label("cycle_seed")]
 	else:
-		tool_name.text = TOOL_LABELS[GameData.tool] + " · I: 가방"
+		tool_name.text = "%s · %s: 가방 · %s: 퀘스트" % [TOOL_LABELS[GameData.tool],
+			GameData.key_label("open_inventory"), GameData.key_label("open_quest")]
 
 
 func show_message(text: String) -> void:

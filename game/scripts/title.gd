@@ -3,9 +3,13 @@ extends Control
 
 var settings_panel: PanelContainer
 var mp_panel: PanelContainer
+var keys_panel: PanelContainer
 var ip_edit: LineEdit
 var mp_status: Label
 var _shot_frames := 0
+# 키 리바인딩: 값이 비어있지 않으면 다음 키 입력을 이 액션에 배정한다
+var _waiting_action := ""
+var _key_buttons := {}
 
 
 func _ready() -> void:
@@ -20,10 +24,10 @@ func _ready() -> void:
 	deco.position = Vector2(0, 0)
 	add_child(deco)
 	var deco_items := [
-		["tree_spring", Vector2(30, 210), 2.5], ["tree_spring", Vector2(410, 190), 2.5],
-		["house", Vector2(24, 26), 1.4], ["mature_pumpkin", Vector2(100, 268), 2.0],
-		["mature_strawberry", Vector2(150, 272), 2.0], ["chicken_0", Vector2(300, 274), 2.0],
-		["cow_0", Vector2(350, 268), 2.0],
+		["tree_spring", Vector2(30, 180), 2.5], ["tree_spring", Vector2(410, 170), 2.5],
+		["house", Vector2(24, 26), 1.4], ["mature_pumpkin", Vector2(100, 226), 2.0],
+		["mature_strawberry", Vector2(150, 230), 2.0], ["chicken_0", Vector2(300, 232), 2.0],
+		["cow_0", Vector2(350, 226), 2.0],
 	]
 	for item in deco_items:
 		var s := Sprite2D.new()
@@ -41,7 +45,7 @@ func _ready() -> void:
 	title.add_theme_color_override("font_color", Color("ffd75e"))
 	title.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
 	title.add_theme_constant_override("outline_size", 6)
-	title.position = Vector2(110, 56)
+	title.position = Vector2(110, 30)
 	title.size = Vector2(260, 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
@@ -51,16 +55,16 @@ func _ready() -> void:
 	subtitle.add_theme_color_override("font_color", Color(0.8, 0.85, 0.7))
 	subtitle.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
 	subtitle.add_theme_constant_override("outline_size", 3)
-	subtitle.position = Vector2(120, 100)
+	subtitle.position = Vector2(120, 72)
 	subtitle.size = Vector2(240, 20)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(subtitle)
 
 	# 메뉴 버튼
 	var v := VBoxContainer.new()
-	v.position = Vector2(170, 140)
+	v.position = Vector2(170, 98)
 	v.custom_minimum_size = Vector2(140, 0)
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 4)
 	add_child(v)
 
 	var has_save := FileAccess.file_exists(GameData.SAVE_PATH)
@@ -73,6 +77,7 @@ func _ready() -> void:
 	v.add_child(_mk_button("종료", func() -> void: get_tree().quit()))
 
 	_build_settings_panel()
+	_build_keys_panel()
 	_build_mp_panel()
 	Net.reset()
 	Sound.play_bgm("spring")
@@ -120,7 +125,7 @@ func _on_multiplayer() -> void:
 func _build_mp_panel() -> void:
 	mp_panel = PanelContainer.new()
 	mp_panel.visible = false
-	mp_panel.position = Vector2(110, 84)
+	mp_panel.position = Vector2(110, 50)
 	mp_panel.custom_minimum_size = Vector2(260, 150)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
@@ -178,7 +183,7 @@ func _on_join() -> void:
 func _build_settings_panel() -> void:
 	settings_panel = PanelContainer.new()
 	settings_panel.visible = false
-	settings_panel.position = Vector2(120, 90)
+	settings_panel.position = Vector2(120, 30)
 	settings_panel.custom_minimum_size = Vector2(240, 150)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
@@ -218,8 +223,97 @@ func _build_settings_panel() -> void:
 	win_hint.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
 	v.add_child(win_hint)
 
+	v.add_child(_mk_button("키 설정", func() -> void:
+		settings_panel.visible = false
+		_refresh_key_buttons()
+		keys_panel.visible = true))
+
 	var close_btn := _mk_button("닫기", func() -> void: settings_panel.visible = false)
 	v.add_child(close_btn)
+
+
+func _build_keys_panel() -> void:
+	keys_panel = PanelContainer.new()
+	keys_panel.visible = false
+	keys_panel.position = Vector2(90, 6)
+	keys_panel.custom_minimum_size = Vector2(300, 258)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
+	style.border_color = Color(0.42, 0.36, 0.55)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(10)
+	keys_panel.add_theme_stylebox_override("panel", style)
+	add_child(keys_panel)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4)
+	keys_panel.add_child(v)
+
+	var title := Label.new()
+	title.text = "키 설정 (버튼 누르고 새 키 입력)"
+	title.add_theme_color_override("font_color", Color("ffd75e"))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(280, 176)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 2)
+	scroll.add_child(list)
+
+	for pair in GameData.BINDABLE_ACTIONS:
+		var action: String = pair[0]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var l := Label.new()
+		l.text = pair[1]
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(l)
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(72, 0)
+		b.focus_mode = Control.FOCUS_NONE
+		b.pressed.connect(func() -> void:
+			Sound.play_sfx("sfx_ui")
+			_waiting_action = action
+			_refresh_key_buttons())
+		_key_buttons[action] = b
+		row.add_child(b)
+		list.add_child(row)
+
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 8)
+	bottom.alignment = BoxContainer.ALIGNMENT_END
+	v.add_child(bottom)
+	bottom.add_child(_mk_button("기본값 복원", func() -> void:
+		GameData.reset_keybinds()
+		_waiting_action = ""
+		_refresh_key_buttons()))
+	bottom.add_child(_mk_button("닫기", func() -> void:
+		_waiting_action = ""
+		keys_panel.visible = false))
+
+
+func _refresh_key_buttons() -> void:
+	for action in _key_buttons:
+		var b: Button = _key_buttons[action]
+		b.text = "[키 입력...]" if _waiting_action == action else GameData.key_label(action)
+
+
+func _input(event: InputEvent) -> void:
+	# 리바인딩 대기 중이면 다음 키 입력을 가로챈다 (ESC: 취소)
+	if _waiting_action == "" or not keys_panel.visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode != KEY_ESCAPE:
+			GameData.rebind_action(_waiting_action, int(event.physical_keycode))
+			Sound.play_sfx("sfx_place")
+		_waiting_action = ""
+		_refresh_key_buttons()
+		get_viewport().set_input_as_handled()
 
 
 func _mk_slider(label_text: String, value: float, setter: Callable) -> HBoxContainer:
@@ -252,5 +346,13 @@ func _process(_delta: float) -> void:
 	if _shot_frames == 30:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png(OS.get_environment("KYOJIN_SHOT") + "_title.png")
+	elif _shot_frames == 32:
+		_refresh_key_buttons()
+		keys_panel.visible = true
+	elif _shot_frames == 36:
+		var img := get_viewport().get_texture().get_image()
+		img.save_png(OS.get_environment("KYOJIN_SHOT") + "_keys.png")
+	elif _shot_frames == 38:
+		keys_panel.visible = false
 	elif _shot_frames == 40:
 		_on_new_game()

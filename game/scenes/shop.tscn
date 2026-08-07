@@ -25,9 +25,9 @@ script = ExtResource("1_shop")
 
 [node name="Panel" type="PanelContainer" parent="."]
 offset_left = 20.0
-offset_top = 28.0
+offset_top = 14.0
 offset_right = 460.0
-offset_bottom = 288.0
+offset_bottom = 256.0
 theme_override_styles/panel = SubResource("panel_style")
 
 [node name="V" type="VBoxContainer" parent="Panel"]

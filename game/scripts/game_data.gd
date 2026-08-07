@@ -43,16 +43,110 @@ const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
 const SAVE_PATH := "user://kyojin_farm_save.json"
 
+# ---- 키 설정 (사람마다 다르게 바꿀 수 있다) ----
+const KEYBIND_PATH := "user://keybinds.json"
+# [액션, 설명] — 이 목록이 설정 화면의 키 안내 겸 리바인딩 대상
+const BINDABLE_ACTIONS := [
+	["move_up", "위로 이동"],
+	["move_down", "아래로 이동"],
+	["move_left", "왼쪽으로 이동"],
+	["move_right", "오른쪽으로 이동"],
+	["use_tool", "도구 사용 / 낚시 / 공격"],
+	["interact", "상호작용 (대화/입장/줍기)"],
+	["open_shop", "상점 (상점 근처에서)"],
+	["cycle_seed", "씨앗 바꾸기"],
+	["open_inventory", "가방 (도구/능력치)"],
+	["open_map", "지도"],
+	["open_quest", "퀘스트 창"],
+	["save_game", "저장"],
+]
+
+
+func key_label(action: String) -> String:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey:
+			if ev.physical_keycode != KEY_NONE:
+				return OS.get_keycode_string(
+					DisplayServer.keyboard_get_keycode_from_physical(ev.physical_keycode))
+			return OS.get_keycode_string(ev.keycode)
+	return "?"
+
+
+# 첫 번째 키보드 바인딩만 교체하고 나머지(화살표 같은 보조 키)는 유지한다.
+# 다른 액션이 이미 그 키를 쓰고 있으면 두 액션의 키를 맞바꾼다.
+func rebind_action(action: String, physical: int) -> void:
+	var old := _primary_key(action)
+	for pair in BINDABLE_ACTIONS:
+		var other: String = pair[0]
+		if other != action and _primary_key(other) == physical:
+			_set_primary_key(other, old)
+			break
+	_set_primary_key(action, physical)
+	save_keybinds()
+
+
+func _primary_key(action: String) -> int:
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey:
+			return int(ev.physical_keycode)
+	return 0
+
+
+func _set_primary_key(action: String, physical: int) -> void:
+	var kept := []
+	var replaced := false
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventKey and not replaced:
+			replaced = true
+			continue
+		kept.append(ev)
+	InputMap.action_erase_events(action)
+	var nev := InputEventKey.new()
+	nev.physical_keycode = physical
+	InputMap.action_add_event(action, nev)
+	for k in kept:
+		InputMap.action_add_event(action, k)
+
+
+func save_keybinds() -> void:
+	var out := {}
+	for pair in BINDABLE_ACTIONS:
+		out[pair[0]] = _primary_key(pair[0])
+	var f := FileAccess.open(KEYBIND_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(out))
+
+
+func load_keybinds() -> void:
+	if not FileAccess.file_exists(KEYBIND_PATH):
+		return
+	var f := FileAccess.open(KEYBIND_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(d) != TYPE_DICTIONARY:
+		return
+	for a in d:
+		if InputMap.has_action(a) and int(d[a]) > 0:
+			_set_primary_key(a, int(d[a]))
+
+
+func reset_keybinds() -> void:
+	InputMap.load_from_project_settings()
+	if FileAccess.file_exists(KEYBIND_PATH):
+		DirAccess.remove_absolute(KEYBIND_PATH)
+
 # ---- 화면 설정 ----
 const SETTINGS_PATH := "user://kyojin_display.json"
-const WINDOW_MODES := ["960x640", "1440x960", "1920x1280", "fullscreen"]
-var window_mode := "960x640"
-var _last_windowed := "960x640"
+const WINDOW_MODES := ["960x540", "1440x810", "1920x1080", "fullscreen"]
+var window_mode := "960x540"
+var _last_windowed := "960x540"
 
 
 func _ready() -> void:
 	load_settings()
 	apply_window_mode()
+	load_keybinds()
 
 
 func _input(event: InputEvent) -> void:
@@ -113,6 +207,9 @@ func load_settings() -> void:
 	var d: Variant = JSON.parse_string(f.get_as_text())
 	if typeof(d) == TYPE_DICTIONARY and d.has("window"):
 		window_mode = str(d.window)
+		# 구버전(3:2) 해상도 설정은 16:9 기본값으로 교체
+		if not WINDOW_MODES.has(window_mode):
+			window_mode = "960x540"
 		if window_mode != "fullscreen":
 			_last_windowed = window_mode
 
@@ -408,6 +505,7 @@ var quest := {}
 const TUTORIAL_ORDER := [
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
+	["quest", "퀘스트 창(J)을 열어 할 일을 확인하자"],
 	["till", "호미(1)로 풀밭을 갈자"],
 	["plant", "밭에 씨앗(3)을 심자"],
 	["water", "물뿌리개(2)로 물을 주자"],
@@ -642,8 +740,8 @@ func clock_text() -> String:
 	var h12 := h % 12
 	if h12 == 0:
 		h12 = 12
-	var mm := int((m % 60) / 10.0) * 10
-	return "%s %d:%02d" % [ampm, h12, mm]
+	# 1분 단위로 표시해 시간이 흐르는 게 체감되게 한다
+	return "%s %d:%02d" % [ampm, h12, m % 60]
 
 
 # ---- 저장 ----

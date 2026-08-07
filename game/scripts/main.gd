@@ -57,6 +57,7 @@ var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
 var interior: CanvasLayer
 var cooking_ui: CanvasLayer
+var quest_ui: CanvasLayer
 var cave: CanvasLayer
 var pet: Node2D
 var fade_rect: ColorRect
@@ -202,6 +203,10 @@ func _ready() -> void:
 	cooking_ui = preload("res://scripts/cooking_ui.gd").new()
 	cooking_ui.main = self
 	add_child(cooking_ui)
+
+	quest_ui = preload("res://scripts/quest_ui.gd").new()
+	quest_ui.main = self
+	add_child(quest_ui)
 
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
@@ -545,7 +550,7 @@ func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
-		or cooking_ui.visible \
+		or cooking_ui.visible or quest_ui.visible \
 		or (story_layer != null and story_layer.visible)
 
 
@@ -815,7 +820,8 @@ func use_tool() -> void:
 			else:
 				hud.show_message("곡괭이로 캘 수 없다.")
 		"fence":
-			if obj != null or cell.ground == "water" or cell.crop_id != "" or t == player_tile():
+			if obj != null or cell.ground == "water" or cell.crop_id != "" \
+					or _tile_overlaps_player(t):
 				hud.show_message("여기에는 설치할 수 없다.")
 				return
 			if GameData.wood < GameData.FENCE_COST_WOOD:
@@ -826,7 +832,8 @@ func use_tool() -> void:
 			Sound.play_sfx("sfx_place")
 			tutorial_notify("build")
 		"sprinkler":
-			if obj != null or cell.ground == "water" or cell.crop_id != "" or t == player_tile():
+			if obj != null or cell.ground == "water" or cell.crop_id != "" \
+					or _tile_overlaps_player(t):
 				hud.show_message("여기에는 설치할 수 없다.")
 				return
 			if GameData.wood < GameData.SPRINKLER_COST_WOOD or GameData.stone < GameData.SPRINKLER_COST_STONE:
@@ -917,6 +924,17 @@ func interact() -> void:
 					hud.show_message("철수네 집이다. 낚시하러 갔는지 조용하다.")
 			return
 	hud.show_message("마을(동쪽 길 끝)에 상점들이 있다. 지도(M)를 보자!")
+
+
+# 설치 타일이 플레이어(원격 포함) 발밑과 겹치면 끼이므로 설치를 막는다
+func _tile_overlaps_player(t: Vector2i) -> bool:
+	var rect := Rect2(t.x * TILE - 2, t.y * TILE - 2, TILE + 4, TILE + 4)
+	if rect.has_point(player.position):
+		return true
+	for pid in remote_players:
+		if rect.has_point(remote_players[pid].position):
+			return true
+	return false
 
 
 func nearby_npc() -> Node2D:
@@ -1015,7 +1033,7 @@ func _build_story_ui() -> void:
 
 	# 양피지 편지 패널 (밝은 배경 + 진한 글씨)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(60, 50)
+	panel.position = Vector2(60, 26)
 	panel.custom_minimum_size = Vector2(360, 210)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.93, 0.88, 0.74)
@@ -1649,6 +1667,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			summary.close()
 			map_ui.close()
 			inventory_ui.close()
+			quest_ui.close()
 			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
 			if fade_rect == null or fade_rect.color.a < 0.5:
 				dialog.close()
@@ -1656,6 +1675,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			map_ui.close()
 		elif event.is_action_pressed("open_inventory") and inventory_ui.visible:
 			inventory_ui.close()
+		elif event.is_action_pressed("open_quest") and quest_ui.visible:
+			quest_ui.close()
 		return
 	if event.is_action_pressed("open_map"):
 		Sound.play_sfx("sfx_ui")
@@ -1665,6 +1686,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("open_inventory"):
 		Sound.play_sfx("sfx_ui")
 		inventory_ui.toggle()
+		return
+	if event.is_action_pressed("open_quest"):
+		Sound.play_sfx("sfx_ui")
+		quest_ui.toggle()
+		tutorial_notify("quest")
 		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 저장 후 타이틀로
@@ -2097,7 +2123,10 @@ func _debug_tick() -> void:
 		158: cave.open()                               # 동굴 확인
 		160: _send_key(KEY_SPACE)                      # 공격 모션
 		162: _save_shot("_cave.png")
-		166: get_tree().quit()
+		164: cave.close()
+		166: quest_ui.toggle()                         # 퀘스트 창(J) 확인
+		170: _save_shot("_questwin.png")
+		172: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

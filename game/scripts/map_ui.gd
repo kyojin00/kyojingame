@@ -1,7 +1,7 @@
 # 지도 (M): 농장 전체를 축소해 보여주고 주요 시설과 내 위치를 표시한다.
 extends CanvasLayer
 
-const CELL := 5.0  # 타일당 픽셀 (90x60 맵)
+const CELL := 4.0  # 타일당 픽셀 (90x60 맵, 화면 480x270)
 
 var main: Node2D
 var canvas: Control
@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
 
 func _draw_map() -> void:
 	var ox: float = (480.0 - main.MAP_W * CELL) / 2.0
-	var oy: float = (320.0 - main.MAP_H * CELL) / 2.0 + 4.0
+	var oy: float = (270.0 - main.MAP_H * CELL) / 2.0 + 2.0
 
 	# 지형
 	for y in main.MAP_H:
@@ -125,7 +125,7 @@ func _draw_map() -> void:
 	# 안내
 	var guide := "M 또는 ESC: 닫기"
 	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
-	canvas.draw_string(main.UI_FONT, Vector2(240 - w / 2.0, 316), guide,
+	canvas.draw_string(main.UI_FONT, Vector2(240 - w / 2.0, 265), guide,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.7, 0.68, 0.8))
 
 
