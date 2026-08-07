@@ -13,7 +13,7 @@ var sprite: Sprite2D
 func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
-	sprite.offset = Vector2(-8, -23)
+	sprite.offset = Vector2(-12, -35)
 	sprite.modulate = tint
 	add_child(sprite)
 	target_pos = position

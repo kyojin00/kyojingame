@@ -54,7 +54,7 @@ func refresh() -> void:
 	energy_bar.value = GameData.energy
 	wood_label.text = str(GameData.wood)
 	stone_label.text = str(GameData.stone)
-	var track := []
+	var track := ["[퀘스트 (J)]"]
 	var obj := GameData.tutorial_objective()
 	if obj != "":
 		track.append(obj)

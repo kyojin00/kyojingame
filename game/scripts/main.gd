@@ -273,9 +273,12 @@ func _ready() -> void:
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		GameData.reset_all()
-		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
+		hud.show_message("교진 마을에 도착했다. 할아버지의 집에서 눈을 뜬다...")
+		# 새 게임은 물려받은 집 안에서 눈을 뜨며 시작한다 (문 앞 위치로 준비)
+		player.position = Vector2(4 * TILE + 8, 5 * TILE + 8)
 		if (_shot_path == "" and OS.get_environment("KYOJIN_MP") == "") \
 				or OS.get_environment("KYOJIN_STORY") != "":
+			interior.open.call_deferred()
 			_show_intro.call_deferred()
 		if _shot_path != "" or OS.get_environment("KYOJIN_MP") != "":
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
@@ -1232,8 +1235,29 @@ func tutorial_notify(flag: String) -> void:
 	tut[flag] = true
 	Sound.play_sfx("sfx_catch")
 
-	# 목표 달성 시 새 도구 해금
+	# 목표 달성 보상 (돈/자원/씨앗)
 	var msg := "목표 달성!"
+	var reward: Dictionary = GameData.TUTORIAL_REWARDS.get(flag, {})
+	var parts := []
+	if reward.has("money"):
+		GameData.money += int(reward.money)
+		parts.append("%dG" % int(reward.money))
+	if reward.has("wood"):
+		GameData.wood += int(reward.wood)
+		parts.append("목재 %d" % int(reward.wood))
+	if reward.has("stone"):
+		GameData.stone += int(reward.stone)
+		parts.append("석재 %d" % int(reward.stone))
+	if reward.has("seeds"):
+		for sid in reward.seeds:
+			GameData.seeds[sid] += int(reward.seeds[sid])
+			parts.append("%s 씨앗 x%d" % [GameData.CROPS[sid].name, int(reward.seeds[sid])])
+	if not parts.is_empty():
+		msg += " 보상: " + ", ".join(parts)
+	if Net.is_host():
+		_broadcast_stats()
+
+	# 새 도구 해금
 	var unlocked: Array = GameData.TUTORIAL_UNLOCKS.get(flag, [])
 	if not unlocked.is_empty():
 		var names := []
@@ -1590,6 +1614,11 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):
 		GameData.tool_level[k] = int(d.tool_level[k])
+	var slots: Variant = d.get("tool_slots", null)
+	if typeof(slots) == TYPE_ARRAY and slots.size() == 9:
+		GameData.tool_slots = []
+		for t in slots:
+			GameData.tool_slots.append(str(t))
 	for k in d.seeds:
 		GameData.seeds[k] = int(d.seeds[k])
 	for k in d.produce:
@@ -1812,25 +1841,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			["계속하기", null],
 		])
 		return
-	if event.is_action_pressed("tool_1"):
-		set_tool("hoe")
-	elif event.is_action_pressed("tool_2"):
-		set_tool("water")
-	elif event.is_action_pressed("tool_3"):
-		set_tool("seed")
-	elif event.is_action_pressed("tool_4"):
-		set_tool("hand")
-	elif event.is_action_pressed("tool_5"):
-		set_tool("axe")
-	elif event.is_action_pressed("tool_6"):
-		set_tool("pickaxe")
-	elif event.is_action_pressed("tool_7"):
-		set_tool("fence")
-	elif event.is_action_pressed("tool_8"):
-		set_tool("sprinkler")
-	elif event.is_action_pressed("tool_9"):
-		set_tool("rod")
-	elif event.is_action_pressed("cycle_seed"):
+	for slot_i in 9:
+		if event.is_action_pressed("tool_%d" % (slot_i + 1)):
+			if slot_i < GameData.tool_slots.size() and GameData.tool_slots[slot_i] != "":
+				set_tool(GameData.tool_slots[slot_i])
+			return
+	if event.is_action_pressed("cycle_seed"):
 		GameData.cycle_seed()
 		set_tool("seed")
 	elif event.is_action_pressed("use_tool"):
@@ -2001,13 +2017,13 @@ func _draw_overlay() -> void:
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if player != null:
 		if fishing_state == "waiting":
-			var base := player.position + Vector2(-6, -38)
+			var base := player.position + Vector2(-6, -50)
 			var dots := int(weather_time * 2.0) % 3 + 1
 			for i in dots:
 				overlay.draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)),
 					Color(1, 1, 1, 0.8))
 		elif fishing_state == "bite":
-			var base := player.position + Vector2(-1, -46)
+			var base := player.position + Vector2(-1, -58)
 			overlay.draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
 			overlay.draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
 
@@ -2023,7 +2039,7 @@ func _context_hint() -> Array:
 	# 반환: [문구, 기준 위치(월드)] 또는 []
 	if player == null or ui_open():
 		return []
-	var above_player := player.position + Vector2(0, -40)
+	var above_player := player.position + Vector2(0, -52)
 	if fishing_state == "bite":
 		return ["지금이다!", above_player]
 	if fishing_state == "waiting":
@@ -2121,7 +2137,7 @@ func _draw_nav_arrow() -> void:
 		return  # 목적지 근처에서는 숨긴다
 	var dirv := to.normalized()
 	var bob := sin(weather_time * 6.0) * 2.0
-	var base := player.position + Vector2(0, -34) + dirv * (16.0 + bob)
+	var base := player.position + Vector2(0, -44) + dirv * (16.0 + bob)
 	var tip := base + dirv * 7.0
 	var left := base + dirv.rotated(2.6) * 4.0
 	var right := base + dirv.rotated(-2.6) * 4.0

@@ -623,6 +623,27 @@ const TUTORIAL_UNLOCKS := {
 	"build": ["rod"],
 }
 const ALL_TOOLS := ["hoe", "water", "seed", "hand", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+
+# 튜토리얼 목표 달성 보상 (도구 해금과 별개)
+const TUTORIAL_REWARDS := {
+	"moved": {"money": 50},
+	"map": {"money": 50},
+	"quest": {"money": 50},
+	"note": {"seeds": {"potato": 2}},
+	"till": {"money": 30},
+	"plant": {"money": 50},
+	"water": {"money": 100},
+	"slept": {"seeds": {"carrot": 2}},
+	"harvest": {"money": 100},
+	"chop": {"wood": 5},
+	"mine": {"stone": 5},
+	"build": {"money": 150},
+	"fish": {"money": 200},
+	"shop": {"money": 300},
+}
+
+# 숫자키 1~9 도구 슬롯 (인벤토리에서 우클릭으로 자유 배치)
+var tool_slots: Array = ALL_TOOLS.duplicate()
 const TOOL_KOR := {
 	"hoe": "호미(1)", "water": "물뿌리개(2)", "seed": "씨앗(3)", "hand": "수확(4)",
 	"axe": "도끼(5)", "pickaxe": "곡괭이(6)", "fence": "울타리(7)",
@@ -761,6 +782,7 @@ func reset_all() -> void:
 	furniture = default_furniture()
 	tutorial = fresh_tutorial()
 	unlocked_tools = ["hoe"]  # 튜토리얼을 깨며 하나씩 해금
+	tool_slots = ALL_TOOLS.duplicate()
 	owned_parcels = ["home"]
 	reset_daily()
 
@@ -866,6 +888,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,
+		"tool_slots": tool_slots,
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,

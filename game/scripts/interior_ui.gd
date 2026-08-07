@@ -281,7 +281,7 @@ func _update_sprite() -> void:
 			tex_name = "player_side_%d" % frame
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
-	player_sprite.position = ppos + Vector2(-8, -23)
+	player_sprite.position = ppos + Vector2(-12, -35)
 	player_sprite.modulate.a = 0.4 if deco_mode else 1.0
 
 

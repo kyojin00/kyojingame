@@ -13,6 +13,8 @@ var items_box: VBoxContainer
 var _refresh_timer := 0.0
 var _slot_normal: StyleBoxFlat
 var _slot_selected: StyleBoxFlat
+var _slot_moving: StyleBoxFlat
+var _move_from := -1  # 우클릭으로 이동 중인 슬롯 (-1 = 없음)
 
 
 func _ready() -> void:
@@ -58,6 +60,7 @@ func toggle() -> void:
 
 func close() -> void:
 	visible = false
+	_move_from = -1
 
 
 func _process(delta: float) -> void:
@@ -90,27 +93,49 @@ func _rebuild() -> void:
 		_slot_selected.bg_color = Color(0.24, 0.2, 0.32, 0.95)
 		_slot_selected.border_color = Color(1, 0.84, 0.37)
 		_slot_selected.set_border_width_all(2)
+		_slot_moving = _slot_normal.duplicate()
+		_slot_moving.bg_color = Color(0.3, 0.22, 0.14, 0.95)
+		_slot_moving.border_color = Color(0.45, 0.9, 0.5)
+		_slot_moving.set_border_width_all(2)
 
-	# 도구 선택 (클릭 또는 숫자키 1~9)
-	_line("[도구]", Color(0.65, 0.85, 0.6))
+	# 도구 슬롯 (좌클릭: 선택 / 우클릭: 슬롯 이동 시작 → 다른 슬롯 좌클릭으로 교환)
+	_line("[도구]  우클릭: 원하는 숫자 슬롯으로 이동", Color(0.65, 0.85, 0.6))
 	var tool_row := HBoxContainer.new()
 	tool_row.add_theme_constant_override("separation", 4)
-	for i in TOOLS.size():
-		var t: String = TOOLS[i]
-		var unlocked: bool = GameData.is_tool_unlocked(t)
+	for i in GameData.tool_slots.size():
+		var t: String = GameData.tool_slots[i]
+		var unlocked: bool = t != "" and GameData.is_tool_unlocked(t)
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(28, 28)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
-		b.disabled = not unlocked
-		b.add_theme_stylebox_override("normal",
-			_slot_selected if GameData.tool == t else _slot_normal)
+		if _move_from == i:
+			b.add_theme_stylebox_override("normal", _slot_moving)
+		else:
+			b.add_theme_stylebox_override("normal",
+				_slot_selected if (t != "" and GameData.tool == t) else _slot_normal)
 		b.add_theme_stylebox_override("hover", _slot_normal)
 		b.add_theme_stylebox_override("pressed", _slot_selected)
-		b.pressed.connect(func() -> void:
-			main.set_tool(t)
-			_rebuild())
+		var slot_i := i
+		b.gui_input.connect(func(ev: InputEvent) -> void:
+			if ev is InputEventMouseButton and ev.pressed:
+				if ev.button_index == MOUSE_BUTTON_RIGHT:
+					# 이동 모드 시작/취소
+					_move_from = -1 if _move_from == slot_i else slot_i
+					Sound.play_sfx("sfx_ui")
+					_rebuild()
+				elif ev.button_index == MOUSE_BUTTON_LEFT:
+					if _move_from >= 0 and _move_from != slot_i:
+						var tmp: String = GameData.tool_slots[_move_from]
+						GameData.tool_slots[_move_from] = GameData.tool_slots[slot_i]
+						GameData.tool_slots[slot_i] = tmp
+						_move_from = -1
+						Sound.play_sfx("sfx_place")
+						_rebuild()
+					elif _move_from < 0 and unlocked:
+						main.set_tool(GameData.tool_slots[slot_i])
+						_rebuild())
 		var num := Label.new()
 		num.text = str(i + 1)
 		num.position = Vector2(2, -4)
