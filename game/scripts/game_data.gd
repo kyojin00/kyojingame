@@ -17,17 +17,18 @@ const WEATHER_RAIN := 1
 const WEATHER_SNOW := 2
 
 # ---- 작물 ----
+# grow_days = 성장에 필요한 게임 시간(시). 초반 작물은 빨리, 비쌀수록 오래.
 const CROPS := {
-	"potato": {"name": "감자", "seed_price": 30, "sell_price": 80, "grow_days": 4, "seasons": [SPRING]},
-	"carrot": {"name": "당근", "seed_price": 40, "sell_price": 110, "grow_days": 5, "seasons": [SPRING]},
-	"strawberry": {"name": "딸기", "seed_price": 60, "sell_price": 170, "grow_days": 6, "seasons": [SPRING]},
-	"tomato": {"name": "토마토", "seed_price": 50, "sell_price": 130, "grow_days": 5, "seasons": [SUMMER]},
-	"corn": {"name": "옥수수", "seed_price": 75, "sell_price": 150, "grow_days": 6, "seasons": [SUMMER, FALL]},
-	"watermelon": {"name": "수박", "seed_price": 120, "sell_price": 380, "grow_days": 9, "seasons": [SUMMER]},
-	"pumpkin": {"name": "호박", "seed_price": 100, "sell_price": 320, "grow_days": 9, "seasons": [FALL]},
-	"eggplant": {"name": "가지", "seed_price": 45, "sell_price": 120, "grow_days": 5, "seasons": [FALL]},
-	"cabbage": {"name": "배추", "seed_price": 70, "sell_price": 200, "grow_days": 7, "seasons": [FALL]},
-	"winter_radish": {"name": "겨울무", "seed_price": 60, "sell_price": 180, "grow_days": 6, "seasons": [WINTER]},
+	"potato": {"name": "감자", "seed_price": 30, "sell_price": 80, "grow_days": 2, "seasons": [SPRING]},
+	"carrot": {"name": "당근", "seed_price": 40, "sell_price": 110, "grow_days": 3, "seasons": [SPRING]},
+	"strawberry": {"name": "딸기", "seed_price": 60, "sell_price": 170, "grow_days": 4, "seasons": [SPRING]},
+	"tomato": {"name": "토마토", "seed_price": 50, "sell_price": 130, "grow_days": 3, "seasons": [SUMMER]},
+	"corn": {"name": "옥수수", "seed_price": 75, "sell_price": 150, "grow_days": 4, "seasons": [SUMMER, FALL]},
+	"watermelon": {"name": "수박", "seed_price": 120, "sell_price": 380, "grow_days": 7, "seasons": [SUMMER]},
+	"pumpkin": {"name": "호박", "seed_price": 100, "sell_price": 320, "grow_days": 7, "seasons": [FALL]},
+	"eggplant": {"name": "가지", "seed_price": 45, "sell_price": 120, "grow_days": 3, "seasons": [FALL]},
+	"cabbage": {"name": "배추", "seed_price": 70, "sell_price": 200, "grow_days": 5, "seasons": [FALL]},
+	"winter_radish": {"name": "겨울무", "seed_price": 60, "sell_price": 180, "grow_days": 4, "seasons": [WINTER]},
 }
 const CROP_IDS := [
 	"potato", "carrot", "strawberry",
