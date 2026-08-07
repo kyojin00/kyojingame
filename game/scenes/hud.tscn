@@ -3,145 +3,125 @@
 [ext_resource type="Script" path="res://scripts/hud.gd" id="1_hud"]
 
 [sub_resource type="StyleBoxFlat" id="energy_bg"]
-bg_color = Color(0.09, 0.07, 0.12, 0.85)
+bg_color = Color(0.32, 0.18, 0.08, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.29, 0.25, 0.39, 1)
+border_color = Color(0.43, 0.24, 0.11, 1)
 
 [sub_resource type="StyleBoxFlat" id="energy_fill"]
-bg_color = Color(0.88, 0.35, 0.32, 1)
+bg_color = Color(0.48, 0.83, 0.35, 1)
 
 [node name="HUD" type="CanvasLayer"]
 layer = 10
 script = ExtResource("1_hud")
 
-[node name="TopBg" type="ColorRect" parent="."]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 640.0
-offset_bottom = 22.0
-color = Color(0.06, 0.05, 0.1, 0.62)
-mouse_filter = 2
-
-[node name="TopLine" type="ColorRect" parent="."]
-offset_left = 0.0
-offset_top = 22.0
-offset_right = 640.0
-offset_bottom = 23.0
-color = Color(0.42, 0.36, 0.55, 0.6)
-mouse_filter = 2
-
-[node name="ToolBg" type="ColorRect" parent="."]
-offset_left = 4.0
-offset_top = 338.0
-offset_right = 250.0
-offset_bottom = 358.0
-color = Color(0.06, 0.05, 0.1, 0.55)
-mouse_filter = 2
-
-[node name="ToolIcon" type="TextureRect" parent="."]
-offset_left = 8.0
-offset_top = 340.0
-offset_right = 24.0
-offset_bottom = 356.0
-stretch_mode = 3
-mouse_filter = 2
-
-[node name="MessageBg" type="ColorRect" parent="."]
-visible = false
-offset_left = 100.0
-offset_top = 306.0
-offset_right = 540.0
-offset_bottom = 326.0
-color = Color(0.06, 0.05, 0.1, 0.55)
-mouse_filter = 2
-
-[node name="Top" type="HBoxContainer" parent="."]
-offset_left = 4.0
-offset_top = 2.0
+[node name="ClockPanel" type="Panel" parent="."]
+offset_left = 478.0
+offset_top = 4.0
 offset_right = 636.0
-offset_bottom = 22.0
-theme_override_constants/separation = 10
+offset_bottom = 66.0
+mouse_filter = 2
 
-[node name="DayLabel" type="Label" parent="Top"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 2
+[node name="DayLabel" type="Label" parent="ClockPanel"]
+offset_left = 8.0
+offset_top = 5.0
+offset_right = 150.0
+offset_bottom = 19.0
+theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+horizontal_alignment = 2
 
-[node name="ClockLabel" type="Label" parent="Top"]
-layout_mode = 2
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 2
+[node name="ClockLabel" type="Label" parent="ClockPanel"]
+offset_left = 8.0
+offset_top = 19.0
+offset_right = 150.0
+offset_bottom = 33.0
+theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+horizontal_alignment = 2
 
-[node name="CoinIcon" type="TextureRect" parent="Top"]
-layout_mode = 2
+[node name="CoinIcon" type="TextureRect" parent="ClockPanel"]
+offset_left = 8.0
+offset_top = 35.0
+offset_right = 18.0
+offset_bottom = 45.0
 stretch_mode = 3
-size_flags_vertical = 4
+mouse_filter = 2
 
-[node name="MoneyLabel" type="Label" parent="Top"]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 2
+[node name="MoneyLabel" type="Label" parent="ClockPanel"]
+offset_left = 20.0
+offset_top = 33.0
+offset_right = 150.0
+offset_bottom = 47.0
+theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+horizontal_alignment = 2
 
-[node name="HeartIcon" type="TextureRect" parent="Top"]
-layout_mode = 2
+[node name="HeartIcon" type="TextureRect" parent="ClockPanel"]
+offset_left = 8.0
+offset_top = 49.0
+offset_right = 18.0
+offset_bottom = 59.0
 stretch_mode = 3
-size_flags_vertical = 4
+mouse_filter = 2
 
-[node name="EnergyBar" type="ProgressBar" parent="Top"]
-custom_minimum_size = Vector2(60, 12)
-layout_mode = 2
-size_flags_vertical = 4
+[node name="EnergyBar" type="ProgressBar" parent="ClockPanel"]
+offset_left = 22.0
+offset_top = 50.0
+offset_right = 150.0
+offset_bottom = 58.0
 theme_override_styles/background = SubResource("energy_bg")
 theme_override_styles/fill = SubResource("energy_fill")
 max_value = 100.0
 show_percentage = false
 
+[node name="TrackerPanel" type="Panel" parent="."]
+offset_left = 478.0
+offset_top = 70.0
+offset_right = 636.0
+offset_bottom = 162.0
+mouse_filter = 2
+
+[node name="Objective" type="Label" parent="TrackerPanel"]
+offset_left = 7.0
+offset_top = 5.0
+offset_right = 151.0
+offset_bottom = 88.0
+theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+vertical_alignment = 0
+autowrap_mode = 3
+
 [node name="Resources" type="HBoxContainer" parent="."]
-offset_left = 4.0
-offset_top = 24.0
+offset_left = 6.0
+offset_top = 6.0
 offset_right = 200.0
-offset_bottom = 44.0
+offset_bottom = 26.0
 theme_override_constants/separation = 4
 
 [node name="ToolName" type="Label" parent="."]
-offset_left = 28.0
-offset_top = 341.0
-offset_right = 400.0
-offset_bottom = 355.0
-theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
+offset_left = 0.0
+offset_top = 302.0
+offset_right = 640.0
+offset_bottom = 316.0
+theme_override_colors/font_color = Color(1, 0.92, 0.75, 1)
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 2
+horizontal_alignment = 1
 
-[node name="TrackerBg" type="ColorRect" parent="."]
-offset_left = 414.0
-offset_top = 24.0
-offset_right = 638.0
-offset_bottom = 112.0
-color = Color(0.06, 0.05, 0.1, 0.45)
+[node name="MessageBg" type="ColorRect" parent="."]
+visible = false
+offset_left = 110.0
+offset_top = 282.0
+offset_right = 530.0
+offset_bottom = 300.0
+color = Color(0.06, 0.05, 0.1, 0.55)
 mouse_filter = 2
-
-[node name="Objective" type="Label" parent="."]
-offset_left = 420.0
-offset_top = 26.0
-offset_right = 634.0
-offset_bottom = 150.0
-theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
-theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
-theme_override_constants/outline_size = 2
-horizontal_alignment = 2
-vertical_alignment = 0
-autowrap_mode = 3
 
 [node name="Message" type="Label" parent="."]
 visible = false
 offset_left = 0.0
-offset_top = 310.0
+offset_top = 284.0
 offset_right = 640.0
-offset_bottom = 324.0
+offset_bottom = 298.0
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 2
 horizontal_alignment = 1

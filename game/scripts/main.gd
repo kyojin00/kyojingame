@@ -1777,10 +1777,12 @@ func _apply_save(d: Dictionary) -> void:
 	for k in d.get("tool_level", {}):
 		GameData.tool_level[k] = int(d.tool_level[k])
 	var slots: Variant = d.get("tool_slots", null)
-	if typeof(slots) == TYPE_ARRAY and slots.size() == 9:
+	if typeof(slots) == TYPE_ARRAY and slots.size() >= 9:
 		GameData.tool_slots = []
 		for t in slots:
 			GameData.tool_slots.append(str(t))
+		while GameData.tool_slots.size() < GameData.TOOL_SLOT_COUNT:
+			GameData.tool_slots.append("")  # 구버전(9칸) 저장 호환
 	for k in d.seeds:
 		GameData.seeds[k] = int(d.seeds[k])
 	for k in d.produce:

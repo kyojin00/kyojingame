@@ -743,8 +743,18 @@ const TUTORIAL_REWARDS := {
 	"shop": {"money": 300},
 }
 
-# 숫자키 1~9 도구 슬롯 (인벤토리에서 우클릭으로 자유 배치)
-var tool_slots: Array = ALL_TOOLS.duplicate()
+# 도구 슬롯 12칸: 1~9는 숫자키, 10~12는 빈 칸(핫바 클릭 전용) — 자유 배치
+const TOOL_SLOT_COUNT := 12
+
+
+static func default_tool_slots() -> Array:
+	var slots: Array = ALL_TOOLS.duplicate()
+	while slots.size() < TOOL_SLOT_COUNT:
+		slots.append("")
+	return slots
+
+
+var tool_slots: Array = default_tool_slots()
 const TOOL_KOR := {
 	"hoe": "호미(1)", "water": "물뿌리개(2)", "seed": "씨앗(3)", "hand": "수확(4)",
 	"axe": "도끼(5)", "pickaxe": "곡괭이(6)", "fence": "울타리(7)",
@@ -902,7 +912,7 @@ func reset_all() -> void:
 	furniture = default_furniture()
 	tutorial = fresh_tutorial()
 	unlocked_tools = ["hoe"]  # 튜토리얼을 깨며 하나씩 해금
-	tool_slots = ALL_TOOLS.duplicate()
+	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
 

@@ -99,14 +99,14 @@ func _rebuild() -> void:
 		_slot_moving.set_border_width_all(2)
 
 	# 도구 슬롯 (좌클릭: 선택 / 우클릭: 슬롯 이동 시작 → 다른 슬롯 좌클릭으로 교환)
-	_line("[도구]  우클릭: 원하는 숫자 슬롯으로 이동", Color(0.65, 0.85, 0.6))
+	_line("[도구]  우클릭 → 다른 슬롯 클릭: 위치 교환", Color(0.65, 0.85, 0.6))
 	var tool_row := HBoxContainer.new()
 	tool_row.add_theme_constant_override("separation", 4)
 	for i in GameData.tool_slots.size():
 		var t: String = GameData.tool_slots[i]
 		var unlocked: bool = t != "" and GameData.is_tool_unlocked(t)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(28, 28)
+		b.custom_minimum_size = Vector2(26, 26)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
@@ -137,7 +137,7 @@ func _rebuild() -> void:
 						main.set_tool(GameData.tool_slots[slot_i])
 						_rebuild())
 		var num := Label.new()
-		num.text = str(i + 1)
+		num.text = str(i + 1) if i < 9 else ""
 		num.position = Vector2(2, -4)
 		num.add_theme_color_override("font_color", Color(0.62, 0.58, 0.75))
 		num.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
