@@ -52,7 +52,7 @@ func _rebuild() -> void:
 				continue  # 제철 씨앗만 판매
 			var row := HBoxContainer.new()
 			var l := Label.new()
-			l.text = "%s 씨앗(보유%d) 성장%d일" % [def.name, GameData.seeds[id], def.grow_days]
+			l.text = "%s 씨앗(보유%d) 성장 %d시간" % [def.name, GameData.seeds[id], def.grow_days]
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(l)
 			var price := GameData.seed_price(id)

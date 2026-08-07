@@ -16,6 +16,20 @@ const ROCK_HP := 2
 const WOOD_PER_TREE := 3
 const STONE_PER_ROCK := 2
 
+# 물 지속 시간 (게임 분): 손 물주기 6시간, 비/스프링클러는 하루 종일
+const WET_MANUAL := 360.0
+const WET_ALL_DAY := 1200.0
+
+
+# 작물 성숙에 필요한 누적 성장 시간 (게임 분) — grow_days를 '시간'으로 해석
+func _grow_total(def: Dictionary) -> float:
+	return float(def.grow_days) * 60.0
+
+
+func _wet(cell: Dictionary, minutes: float) -> void:
+	cell.wet_min = maxf(float(cell.wet_min), minutes)
+	cell.watered = true
+
 # grid[y][x] = {ground, watered, crop_id, crop_day, dead}
 var grid: Array = []
 # Vector2i -> {kind: "tree"|"rock"|"house"|"bin"|"fence"|"sprinkler", hp: int}
@@ -32,6 +46,7 @@ var night: CanvasModulate
 var sleep_dialog: ConfirmationDialog
 var water_frame := 0
 var water_timer := 0.0
+var _growth_timer := 0.0
 var tree_sprites: Array = []
 var weather_time := 0.0
 var animals: Array = []
@@ -44,6 +59,7 @@ var pending_fish: Array = []
 var dialog: CanvasLayer
 var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
+var interior: CanvasLayer
 var fade_rect: ColorRect
 
 # ---- 멀티플레이 상태 ----
@@ -148,6 +164,10 @@ func _ready() -> void:
 	inventory_ui.main = self
 	add_child(inventory_ui)
 
+	interior = preload("res://scripts/interior_ui.gd").new()
+	interior.main = self
+	add_child(interior)
+
 	for npc_id in ["merchant", "fisher"]:
 		var n: Node2D = preload("res://scripts/npc.gd").new()
 		n.main = self
@@ -249,7 +269,9 @@ func _build_map() -> void:
 	for y in MAP_H:
 		var row := []
 		for x in MAP_W:
-			row.append({"ground": "grass", "watered": false, "crop_id": "", "crop_day": 0, "dead": false})
+			# crop_day = 누적 성장 시간(게임 분), wet_min = 남은 젖음 시간(게임 분)
+			row.append({"ground": "grass", "watered": false, "wet_min": 0.0,
+				"crop_id": "", "crop_day": 0.0, "dead": false})
 		grid.append(row)
 
 	# 연못 2개
@@ -435,7 +457,22 @@ func can_use_tile(t: Vector2i) -> bool:
 func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
-		or inventory_ui.visible or (story_layer != null and story_layer.visible)
+		or inventory_ui.visible or interior.visible \
+		or (story_layer != null and story_layer.visible)
+
+
+func interior_only_open() -> bool:
+	# 집 안에 있을 때는 시간이 흐른다 (다른 창이 겹치면 정지)
+	return interior.visible and not (shop.visible or summary.visible
+		or sleep_dialog.visible or dialog.visible or map_ui.visible
+		or inventory_ui.visible)
+
+
+func request_sleep() -> void:
+	if Net.is_guest():
+		hud.show_message("하루는 호스트가 잠자리에 들어야 넘어간다.")
+	else:
+		sleep_dialog.popup_centered()
 
 
 # ---- 도구/상호작용 ----
@@ -552,6 +589,7 @@ func use_tool() -> void:
 			elif cell.ground == "soil" and cell.crop_id == "":
 				cell.ground = "grass"
 				cell.watered = false
+				cell.wet_min = 0.0
 				GameData.energy -= cost
 				Sound.play_sfx("sfx_hoe", 0.1)
 			else:
@@ -564,7 +602,7 @@ func use_tool() -> void:
 						continue
 					c.ground = "soil"
 					if weather_now() == GameData.WEATHER_RAIN:
-						c.watered = true
+						_wet(c, WET_ALL_DAY)
 					spawn_particles(pos, "dirt")
 					worked = true
 				if worked:
@@ -577,8 +615,9 @@ func use_tool() -> void:
 				if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
 					continue
 				var c: Dictionary = grid[pos.y][pos.x]
-				if c.ground == "soil" and not c.watered and not objects.has(pos):
-					c.watered = true
+				if c.ground == "soil" and not objects.has(pos) \
+						and float(c.wet_min) < WET_MANUAL - 1.0:
+					_wet(c, WET_MANUAL)
 					spawn_particles(pos, "water")
 					worked = true
 			if worked:
@@ -604,10 +643,10 @@ func use_tool() -> void:
 				return
 			GameData.seeds[id] -= 1
 			cell.crop_id = id
-			cell.crop_day = 0
+			cell.crop_day = 0.0
 			cell.dead = false
 			if weather_now() == GameData.WEATHER_RAIN:
-				cell.watered = true
+				_wet(cell, WET_ALL_DAY)
 			GameData.energy -= cost
 			Sound.play_sfx("sfx_seed", 0.1)
 			spawn_particles(t, "seed")
@@ -618,12 +657,12 @@ func use_tool() -> void:
 					hud.show_message("시들어버렸다... 호미로 정리하자.")
 					return
 				var def: Dictionary = GameData.CROPS[cell.crop_id]
-				if cell.crop_day >= def.grow_days:
+				if float(cell.crop_day) >= _grow_total(def):
 					GameData.produce[cell.crop_id] += 1
 					GameData.today_harvest += 1
 					hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
 					cell.crop_id = ""
-					cell.crop_day = 0
+					cell.crop_day = 0.0
 					GameData.energy -= cost
 					Sound.play_sfx("sfx_harvest")
 					spawn_particles(t, "sparkle")
@@ -768,10 +807,7 @@ func interact() -> void:
 		if obj.kind == "house":
 			match _house_index_at(t):
 				0:
-					if Net.is_guest():
-						hud.show_message("하루는 호스트가 잠자리에 들어야 넘어간다.")
-					else:
-						sleep_dialog.popup_centered()
+					interior.open()  # 우리집 입장
 				1:
 					shop.open("buy")
 				_:
@@ -1112,13 +1148,12 @@ func _fade_next_day(passed_out: bool) -> void:
 
 
 func _next_day(passed_out: bool) -> void:
-	# 물 준 작물 성장
+	# 밤사이 밭은 마른다 (성장은 실시간 _growth_tick에서)
 	for y in MAP_H:
 		for x in MAP_W:
 			var cell: Dictionary = grid[y][x]
-			if cell.crop_id != "" and not cell.dead and cell.watered:
-				cell.crop_day += 1
 			cell.watered = false
+			cell.wet_min = 0.0
 
 	var stats := [GameData.today_harvest, GameData.today_earned, GameData.today_spent]
 	var prev_season := GameData.season()
@@ -1140,14 +1175,14 @@ func _next_day(passed_out: bool) -> void:
 					wilted += 1
 		_apply_season_visuals()
 
-	# 비 오는 날은 밭이 저절로 젖는다
+	# 비 오는 날은 밭이 하루 종일 젖어 있다
 	if weather_now() == GameData.WEATHER_RAIN:
 		for y in MAP_H:
 			for x in MAP_W:
 				if grid[y][x].ground == "soil":
-					grid[y][x].watered = true
+					_wet(grid[y][x], WET_ALL_DAY)
 
-	# 스프링클러는 주변 4칸에 물을 준다
+	# 스프링클러는 주변 4칸을 하루 종일 적신다
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "sprinkler":
 			continue
@@ -1155,7 +1190,7 @@ func _next_day(passed_out: bool) -> void:
 			var n: Vector2i = pos + d
 			if n.x >= 0 and n.y >= 0 and n.x < MAP_W and n.y < MAP_H \
 					and grid[n.y][n.x].ground == "soil":
-				grid[n.y][n.x].watered = true
+				_wet(grid[n.y][n.x], WET_ALL_DAY)
 
 	# 동물 생산물 수거
 	var collected := {}
@@ -1229,7 +1264,7 @@ func save_now() -> void:
 		var row := []
 		for x in MAP_W:
 			var c: Dictionary = grid[y][x]
-			row.append([c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
+			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day), 1 if c.dead else 0])
 		g.append(row)
 	var objs := []
 	for pos: Vector2i in objects:
@@ -1283,9 +1318,18 @@ func _apply_save(d: Dictionary) -> void:
 			# 물 타일은 맵 생성 결과를 유지하고 경작 상태만 복원
 			if cell.ground != "water" and s[0] != "water":
 				cell.ground = s[0]
-			cell.watered = int(s[1]) == 1
+			# 구버전 호환: 0/1 플래그였으면 젖음 6시간으로 간주
+			var wet := float(s[1])
+			if wet == 1.0:
+				wet = WET_MANUAL
+			cell.wet_min = wet
+			cell.watered = wet > 0.0
 			cell.crop_id = s[2]
-			cell.crop_day = int(s[3])
+			# 구버전 호환: 일 단위(0~9)였으면 시간 단위(분)로 환산
+			var growth := float(s[3])
+			if growth > 0.0 and growth < 15.0:
+				growth *= 60.0
+			cell.crop_day = growth
 			cell.dead = s.size() > 4 and int(s[4]) == 1
 	if d.has("objects"):
 		objects.clear()
@@ -1296,7 +1340,7 @@ func _apply_save(d: Dictionary) -> void:
 # ---- 루프 ----
 
 func _process(delta: float) -> void:
-	if not ui_open():
+	if not ui_open() or interior_only_open():
 		if not Net.is_guest():
 			# 시간은 호스트/솔로만 진행 (게스트는 동기화 수신)
 			GameData.minutes += delta * MIN_PER_SEC
@@ -1306,6 +1350,10 @@ func _process(delta: float) -> void:
 		if water_timer > 0.8:
 			water_timer = 0.0
 			water_frame = 1 - water_frame
+		_growth_timer += delta
+		if _growth_timer >= 0.7:
+			_growth_tick(_growth_timer * MIN_PER_SEC)
+			_growth_timer = 0.0
 		_update_fishing(delta)
 		if player.walked > 40.0:
 			tutorial_notify("moved")
@@ -1317,6 +1365,28 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if _shot_path != "":
 		_debug_tick()
+
+
+# 젖은 밭 위 작물은 실시간으로 자라고, 물기는 서서히 마른다
+func _growth_tick(game_minutes: float) -> void:
+	var changed := false
+	for y in MAP_H:
+		for x in MAP_W:
+			var cell: Dictionary = grid[y][x]
+			if float(cell.wet_min) <= 0.0:
+				continue
+			cell.wet_min = float(cell.wet_min) - game_minutes
+			if float(cell.wet_min) <= 0.0:
+				cell.wet_min = 0.0
+				cell.watered = false
+				changed = true
+			if cell.crop_id != "" and not cell.dead:
+				var before_stage := _crop_texture(cell)
+				cell.crop_day = float(cell.crop_day) + game_minutes
+				if _crop_texture(cell) != before_stage:
+					changed = true
+	if changed:
+		queue_redraw()
 
 
 func _update_night() -> void:
@@ -1467,9 +1537,9 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 	if cell.dead:
 		return tex["withered"]
 	var def: Dictionary = GameData.CROPS[cell.crop_id]
-	if cell.crop_day >= def.grow_days:
+	var t := float(cell.crop_day) / _grow_total(def)
+	if t >= 1.0:
 		return tex["mature_" + cell.crop_id]
-	var t := float(cell.crop_day) / float(def.grow_days)
 	if t < 0.34:
 		return tex["crop_sprout"]
 	if t < 0.67:
@@ -1562,7 +1632,7 @@ func _context_hint() -> Array:
 			"house":
 				match _house_index_at(t):
 					0:
-						return ["E: 취침", above_tile]
+						return ["E: 집에 들어가기", above_tile]
 					1:
 						return ["E: 상점", above_tile]
 			"tree":
@@ -1577,9 +1647,10 @@ func _context_hint() -> Array:
 		if cell.dead:
 			return ["시듦 - 호미로 정리", above_tile]
 		var def: Dictionary = GameData.CROPS[cell.crop_id]
-		if cell.crop_day >= def.grow_days:
+		var pct := float(cell.crop_day) / _grow_total(def)
+		if pct >= 1.0:
 			return ["수확!", above_tile]
-		var text := "성장중 %d/%d일" % [cell.crop_day, def.grow_days]
+		var text := "성장 %d%%" % int(pct * 100.0)
 		if not cell.watered:
 			text += " · 물주기!"
 		return [text, above_tile]
@@ -1729,7 +1800,9 @@ func _debug_tick() -> void:
 		118:
 			dialog.close()
 			_save_shot("_parcel2.png")
-			get_tree().quit()
+		122: interior.open()                           # 집 내부 확인
+		128: _save_shot("_house.png")
+		130: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -1785,7 +1858,7 @@ func _make_snapshot_json() -> String:
 		var row := []
 		for x in MAP_W:
 			var c: Dictionary = grid[y][x]
-			row.append([c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
+			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day), 1 if c.dead else 0])
 		g.append(row)
 	var objs := []
 	for pos: Vector2i in objects:
@@ -1881,7 +1954,7 @@ func _broadcast_area(center: Vector2i) -> void:
 			if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
 				continue
 			var c: Dictionary = grid[pos.y][pos.x]
-			cells.append([pos.x, pos.y, c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
+			cells.append([pos.x, pos.y, c.ground, int(c.wet_min), c.crop_id, int(c.crop_day), 1 if c.dead else 0])
 			if objects.has(pos):
 				var o: Dictionary = objects[pos]
 				objs.append([pos.x, pos.y, o.kind, o.hp])
@@ -1893,9 +1966,10 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 	for entry in cells:
 		var c: Dictionary = grid[entry[1]][entry[0]]
 		c.ground = entry[2]
-		c.watered = int(entry[3]) == 1
+		c.wet_min = float(entry[3])
+		c.watered = float(entry[3]) > 0.0
 		c.crop_id = entry[4]
-		c.crop_day = int(entry[5])
+		c.crop_day = float(entry[5])
 		c.dead = int(entry[6]) == 1
 	# 영역 내 오브젝트: 목록에 없는 건 제거, 있는 건 갱신/추가
 	var present := {}
