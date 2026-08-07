@@ -1,0 +1,261 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a1423;
+  color: #f0e6d2;
+  font-family: 'Galmuri11', 'DungGeunMo', 'Courier New', monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+#game-wrap {
+  position: relative;
+  width: 960px;
+}
+
+canvas {
+  display: block;
+  width: 960px;
+  height: 640px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 4px solid #3a2f4b;
+  border-radius: 4px;
+  background: #000;
+}
+
+/* ---- 상단 HUD ---- */
+#hud-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.hud-box {
+  background: #2b2438;
+  border: 2px solid #4a3f63;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+#hud-money { color: #ffd75e; }
+
+.hud-energy { display: flex; align-items: center; gap: 8px; }
+
+#energy-bar {
+  width: 120px;
+  height: 12px;
+  background: #17121f;
+  border: 1px solid #4a3f63;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#energy-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(to right, #7bd35a, #b8e986);
+  transition: width 0.2s;
+}
+
+.hud-btn {
+  margin-left: auto;
+  background: #4a3f63;
+  color: #f0e6d2;
+  border: 2px solid #6b5c8c;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.hud-btn:hover { background: #5d4f7c; }
+.hud-btn + .hud-btn { margin-left: 8px; }
+
+/* ---- 하단 툴바 ---- */
+#hud-bottom {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.tool-slot {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  background: #2b2438;
+  border: 2px solid #4a3f63;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tool-slot.active {
+  border-color: #ffd75e;
+  background: #3d3352;
+  box-shadow: 0 0 8px rgba(255, 215, 94, 0.4);
+}
+
+.tool-icon { font-size: 22px; line-height: 1; }
+.tool-name { font-size: 11px; margin-top: 4px; color: #bcaee0; }
+
+.tool-key {
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  font-size: 10px;
+  color: #8b7bb0;
+}
+
+.tool-count {
+  position: absolute;
+  bottom: 2px;
+  right: 5px;
+  font-size: 11px;
+  color: #ffd75e;
+}
+
+#hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #8b7bb0;
+  text-align: right;
+}
+
+/* ---- 메시지 토스트 ---- */
+#message {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 15, 30, 0.9);
+  border: 2px solid #6b5c8c;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+#message.show { opacity: 1; }
+
+/* ---- 모달 공통 ---- */
+.hidden { display: none !important; }
+
+#shop-modal, #sleep-modal {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+#shop-panel {
+  width: 480px;
+  max-height: 480px;
+  background: #2b2438;
+  border: 3px solid #6b5c8c;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#shop-tabs {
+  display: flex;
+  background: #221c30;
+  border-bottom: 2px solid #4a3f63;
+}
+
+.shop-tab {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: none;
+  color: #8b7bb0;
+  font-family: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.shop-tab.active { color: #ffd75e; background: #2b2438; }
+
+#shop-close {
+  width: 44px;
+  background: none;
+  border: none;
+  color: #8b7bb0;
+  font-size: 16px;
+  cursor: pointer;
+}
+#shop-close:hover { color: #fff; }
+
+#shop-list {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-bottom: 1px solid #3a2f4b;
+}
+
+.shop-item-icon { font-size: 24px; width: 32px; text-align: center; }
+.shop-item-info { flex: 1; }
+.shop-item-name { font-size: 15px; }
+.shop-item-desc { font-size: 12px; color: #8b7bb0; margin-top: 2px; }
+.shop-item-price { color: #ffd75e; font-size: 14px; min-width: 70px; text-align: right; }
+
+.shop-item button {
+  background: #4a7c3f;
+  color: #fff;
+  border: 2px solid #6ba35c;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.shop-item button:hover:not(:disabled) { background: #5b9450; }
+.shop-item button:disabled { opacity: 0.4; cursor: default; }
+
+.shop-empty { text-align: center; color: #8b7bb0; padding: 30px 0; }
+
+/* ---- 취침 모달 ---- */
+#sleep-panel {
+  background: #2b2438;
+  border: 3px solid #6b5c8c;
+  border-radius: 8px;
+  padding: 28px;
+  text-align: center;
+}
+
+#sleep-panel p { margin-bottom: 20px; font-size: 15px; }
+
+#sleep-panel button {
+  background: #4a3f63;
+  color: #f0e6d2;
+  border: 2px solid #6b5c8c;
+  border-radius: 4px;
+  padding: 10px 24px;
+  margin: 0 6px;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+#sleep-panel button:hover { background: #5d4f7c; }
+#sleep-yes { background: #4a7c3f !important; border-color: #6ba35c !important; }
