@@ -113,6 +113,34 @@ var affinity := {"merchant": 0, "fisher": 0}
 # {crop, qty, reward, accepted}
 var quest := {}
 
+# ---- 튜토리얼 ----
+# 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
+const TUTORIAL_ORDER := [
+	["moved", "방향키/WASD로 움직여보자"],
+	["till", "호미(1)로 풀밭을 갈자"],
+	["plant", "밭에 씨앗(3)을 심자"],
+	["water", "물뿌리개(2)로 물을 주자"],
+	["slept", "집(북서쪽) 문 앞에서 E로 잠자기"],
+	["harvest", "다 자란 작물을 수확(4)하자 - 매일 물주기!"],
+]
+var tutorial := {"active": false}
+
+
+func fresh_tutorial() -> Dictionary:
+	var t := {"active": true}
+	for pair in TUTORIAL_ORDER:
+		t[pair[0]] = false
+	return t
+
+
+func tutorial_objective() -> String:
+	if not tutorial.get("active", false):
+		return ""
+	for pair in TUTORIAL_ORDER:
+		if not tutorial.get(pair[0], false):
+			return "다음 목표: " + pair[1]
+	return ""
+
 
 func merchant_discount() -> bool:
 	return int(affinity["merchant"]) >= 50
@@ -196,6 +224,7 @@ func reset_all() -> void:
 	for k in affinity:
 		affinity[k] = 0
 	seeds["potato"] = 5
+	tutorial = fresh_tutorial()
 	reset_daily()
 
 
@@ -293,6 +322,7 @@ func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"fish_caught": fish_caught,
 		"affinity": affinity,
 		"quest": quest,
+		"tutorial": tutorial,
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,

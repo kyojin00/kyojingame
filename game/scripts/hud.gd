@@ -27,6 +27,7 @@ var slot_selected: StyleBoxFlat
 @onready var money_label: Label = $Top/MoneyLabel
 @onready var energy_bar: ProgressBar = $Top/EnergyBar
 @onready var msg_label: Label = $Message
+@onready var objective_label: Label = $Objective
 @onready var hotbar: HBoxContainer = $Hotbar
 @onready var tool_name: Label = $ToolName
 @onready var resources: HBoxContainer = $Resources
@@ -79,6 +80,7 @@ func refresh() -> void:
 	energy_bar.value = GameData.energy
 	wood_label.text = str(GameData.wood)
 	stone_label.text = str(GameData.stone)
+	objective_label.text = GameData.tutorial_objective()
 
 	for t in slots:
 		var b: Button = slots[t]

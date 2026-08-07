@@ -152,6 +152,8 @@ func _ready() -> void:
 	else:
 		GameData.reset_all()
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
+		if _shot_path == "":
+			_show_intro.call_deferred()
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
@@ -474,6 +476,7 @@ func use_tool() -> void:
 				if worked:
 					GameData.energy -= cost
 					Sound.play_sfx("sfx_hoe", 0.1)
+					tutorial_notify("till")
 		"water":
 			var worked := false
 			for pos: Vector2i in _affected_tiles(t):
@@ -487,6 +490,7 @@ func use_tool() -> void:
 			if worked:
 				GameData.energy -= cost
 				Sound.play_sfx("sfx_water", 0.1)
+				tutorial_notify("water")
 			elif grid[t.y][t.x].ground != "soil":
 				hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
@@ -513,6 +517,7 @@ func use_tool() -> void:
 			GameData.energy -= cost
 			Sound.play_sfx("sfx_seed", 0.1)
 			spawn_particles(t, "seed")
+			tutorial_notify("plant")
 		"hand":
 			if cell.crop_id != "":
 				if cell.dead:
@@ -528,6 +533,7 @@ func use_tool() -> void:
 					GameData.energy -= cost
 					Sound.play_sfx("sfx_harvest")
 					spawn_particles(t, "sparkle")
+					tutorial_notify("harvest")
 				else:
 					hud.show_message("아직 다 자라지 않았다.")
 		"axe":
@@ -676,6 +682,35 @@ func _house_index_at(t: Vector2i) -> int:
 		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
 			return i
 	return -1
+
+
+# ---- 튜토리얼 ----
+
+func _show_intro() -> void:
+	dialog.open("교진 팜에 어서 와!",
+		"작은 농장을 물려받았다!\n작물을 키워 팔고, 동물을 기르고, 낚시도 하고,\n마을 사람들과 친해져 보자.\n\n화면 위의 '다음 목표'를 따라가면 된다.",
+		[["튜토리얼 시작", null], ["건너뛰기", _skip_tutorial]])
+
+
+func _skip_tutorial() -> void:
+	GameData.tutorial = {"active": false}
+	dialog.close()
+
+
+func tutorial_notify(flag: String) -> void:
+	var tut: Dictionary = GameData.tutorial
+	if not tut.get("active", false) or tut.get(flag, true):
+		return
+	tut[flag] = true
+	Sound.play_sfx("sfx_catch")
+	hud.show_message("목표 달성!")
+	for pair in GameData.TUTORIAL_ORDER:
+		if not tut.get(pair[0], false):
+			return
+	tut["active"] = false
+	dialog.open("튜토리얼 완료!",
+		"이제 진짜 농장 생활 시작이다!\n- 수확물은 출하 상자(E)나 상점(B)에서 판다\n- 도끼(5)/곡괭이(6)로 재료를 모아 스프링클러(8)를 만들자\n- 동쪽 마을에는 상점, 의뢰 게시판, 주민들이 있다\n- 계절이 바뀌기 전에 수확을 끝내자!",
+		[["좋아!", null]])
 
 
 # ---- NPC 대화 / 선물 / 퀘스트 ----
@@ -847,6 +882,8 @@ func _next_day(passed_out: bool) -> void:
 	# 나무/돌이 조금씩 다시 자란다
 	_respawn_resources()
 
+	tutorial_notify("slept")
+
 	# NPC 일일 상태 리셋 + 새 의뢰
 	for n in npcs:
 		n.talked_today = false
@@ -935,6 +972,8 @@ func _apply_save(d: Dictionary) -> void:
 			"crop": d.quest.crop, "qty": int(d.quest.qty),
 			"reward": int(d.quest.reward), "accepted": bool(d.quest.accepted),
 		}
+	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
+	GameData.tutorial = d.get("tutorial", {"active": false})
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])), int(a[3]) == 1)
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
@@ -973,6 +1012,8 @@ func _process(delta: float) -> void:
 			water_timer = 0.0
 			water_frame = 1 - water_frame
 		_update_fishing(delta)
+		if player.walked > 40.0:
+			tutorial_notify("moved")
 	weather_time += delta
 	_update_particles(delta)
 	_update_night()

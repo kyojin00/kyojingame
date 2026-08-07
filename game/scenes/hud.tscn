@@ -72,12 +72,22 @@ offset_right = 300.0
 offset_bottom = 316.0
 theme_override_constants/separation = 4
 
+[node name="Objective" type="Label" parent="."]
+offset_left = 0.0
+offset_top = 24.0
+offset_right = 480.0
+offset_bottom = 44.0
+theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+horizontal_alignment = 1
+
 [node name="Message" type="Label" parent="."]
 visible = false
 offset_left = 0.0
-offset_top = 42.0
+offset_top = 44.0
 offset_right = 480.0
-offset_bottom = 62.0
+offset_bottom = 64.0
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 3
 horizontal_alignment = 1

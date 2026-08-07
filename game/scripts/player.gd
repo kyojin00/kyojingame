@@ -10,6 +10,7 @@ var moving := false
 var anim_time := 0.0
 var step_timer := 0.0
 var step_alt := false
+var walked := 0.0  # 튜토리얼 이동 체크용 누적 거리
 
 @onready var sprite: Sprite2D = $Sprite
 
@@ -39,6 +40,7 @@ func _process(delta: float) -> void:
 		if not _blocked(position + Vector2(0, v.y)):
 			position.y += v.y
 		anim_time += delta
+		walked += SPEED * delta
 		step_timer -= delta
 		if step_timer <= 0.0:
 			step_timer = 0.33
