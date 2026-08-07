@@ -8,14 +8,11 @@ var main: Node2D
 var dir := "down"
 var moving := false
 var anim_time := 0.0
-var sprite: Sprite2D
+
+@onready var sprite: Sprite2D = $Sprite
 
 
 func _ready() -> void:
-	sprite = Sprite2D.new()
-	sprite.centered = false
-	sprite.offset = Vector2(-6, -15)  # 발 밑 기준
-	add_child(sprite)
 	_update_sprite()
 
 
@@ -25,23 +22,14 @@ func _process(delta: float) -> void:
 		_update_sprite()
 		return
 
-	var v := Vector2.ZERO
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		v.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		v.y += 1.0
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		v.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		v.x += 1.0
-
+	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	moving = v != Vector2.ZERO
 	if moving:
 		if absf(v.x) > absf(v.y):
 			dir = "right" if v.x > 0 else "left"
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
-		v = v.normalized() * SPEED * delta
+		v = v * SPEED * delta
 		if not _blocked(position + Vector2(v.x, 0)):
 			position.x += v.x
 		if not _blocked(position + Vector2(0, v.y)):

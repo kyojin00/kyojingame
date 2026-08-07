@@ -17,6 +17,7 @@ var tex: Dictionary = {}
 var player: Node2D
 var hud: CanvasLayer
 var shop: CanvasLayer
+var summary: CanvasLayer
 var night: CanvasModulate
 var sleep_dialog: ConfirmationDialog
 var water_frame := 0
@@ -49,18 +50,21 @@ func _ready() -> void:
 	add_child(world)
 	_spawn_objects(world)
 
-	player = preload("res://scripts/player.gd").new()
+	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
 	player.position = Vector2(10 * TILE + 8, 9 * TILE + 8)
 	world.add_child(player)
 
-	hud = preload("res://scripts/hud.gd").new()
+	hud = preload("res://scenes/hud.tscn").instantiate()
 	hud.main = self
 	add_child(hud)
 
-	shop = preload("res://scripts/shop_ui.gd").new()
+	shop = preload("res://scenes/shop.tscn").instantiate()
 	shop.main = self
 	add_child(shop)
+
+	summary = preload("res://scenes/summary.tscn").instantiate()
+	add_child(summary)
 
 	sleep_dialog = ConfirmationDialog.new()
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
@@ -197,7 +201,7 @@ func target_tile() -> Vector2i:
 
 
 func ui_open() -> bool:
-	return shop.visible or sleep_dialog.visible
+	return shop.visible or summary.visible or sleep_dialog.visible
 
 
 # ---- 도구/상호작용 ----
@@ -257,6 +261,7 @@ func use_tool() -> void:
 				var def: Dictionary = GameData.CROPS[cell.crop_id]
 				if cell.crop_day >= def.grow_days:
 					GameData.produce[cell.crop_id] += 1
+					GameData.today_harvest += 1
 					hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
 					cell.crop_id = ""
 					cell.crop_day = 0
@@ -286,14 +291,16 @@ func _next_day(passed_out: bool) -> void:
 			if cell.crop_id != "" and cell.watered:
 				cell.crop_day += 1
 			cell.watered = false
+	var stats := [GameData.today_harvest, GameData.today_earned, GameData.today_spent]
 	GameData.day += 1
 	GameData.minutes = GameData.DAY_START
 	GameData.energy = GameData.ENERGY_MAX * 0.5 if passed_out else GameData.ENERGY_MAX
+	GameData.reset_daily()
 	save_now()
-	if passed_out:
-		hud.show_message("쓰러진 채 아침을 맞았다... 기력이 절반만 회복됐다.")
-	else:
-		hud.show_message("%d일차 아침. 상쾌하다!" % GameData.day)
+	var note := "\n\n쓰러져서 기력이 절반만 회복됐다..." if passed_out else ""
+	summary.open("- %d일차 아침 -" % GameData.day,
+		"어제 수확: %d개\n판매 수입: +%dG\n씨앗 지출: -%dG\n\n소지금: %dG%s"
+		% [stats[0], stats[1], stats[2], GameData.money, note])
 	queue_redraw()
 
 
@@ -347,15 +354,51 @@ func _process(delta: float) -> void:
 	hud.refresh()
 	queue_redraw()
 	if _shot_path != "":
-		_shot_frames += 1
-		if _shot_frames == 40:
-			shop.open("buy")
-		elif _shot_frames == 30 or _shot_frames == 60:
-			var img := get_viewport().get_texture().get_image()
-			var suffix := "_game.png" if _shot_frames == 30 else "_shop.png"
-			img.save_png(_shot_path + suffix)
-			if _shot_frames == 60:
-				get_tree().quit()
+		_debug_tick()
+
+
+# 스크린샷 검증 시퀀스: 키/마우스 이벤트를 실제 InputMap 경로로 흘려보내
+# 밭갈기->클릭 경작->물주기->파종->상점->결산까지 자동 재생한다.
+func _debug_tick() -> void:
+	_shot_frames += 1
+	match _shot_frames:
+		10: _send_key(KEY_1)
+		14: _send_key(KEY_SPACE)                       # 아래 타일 밭 갈기
+		18: _send_click(Vector2(11 * TILE + 8, 9 * TILE + 8))  # 오른쪽 타일 클릭 경작
+		22: _send_key(KEY_2)
+		26: _send_key(KEY_SPACE)                       # 물 주기
+		30: _send_key(KEY_3)
+		34: _send_key(KEY_SPACE)                       # 씨앗 심기
+		40: _save_shot("_game.png")
+		44: _send_key(KEY_B)                           # 상점 열기
+		54: _save_shot("_shop.png")
+		58:
+			shop.close()
+			_next_day(false)                           # 결산 화면
+		66:
+			_save_shot("_summary.png")
+			get_tree().quit()
+
+
+func _send_key(code: Key) -> void:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = code
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+
+func _send_click(world_pos: Vector2) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	# parse_input_event 는 OS 창 좌표 기준이므로 스트레치 변환까지 적용한다.
+	ev.position = get_viewport().get_screen_transform() * (get_canvas_transform() * world_pos)
+	Input.parse_input_event(ev)
+
+
+func _save_shot(suffix: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(_shot_path + suffix)
 
 
 func _update_night() -> void:
@@ -364,34 +407,53 @@ func _update_night() -> void:
 	night.color = Color(1, 1, 1).lerp(Color(0.5, 0.48, 0.72), a)
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if not (event is InputEventKey and event.pressed and not event.echo):
-		return
+func _unhandled_input(event: InputEvent) -> void:
 	if ui_open():
-		if event.keycode == KEY_ESCAPE:
+		if event.is_action_pressed("ui_cancel"):
 			shop.close()
+			summary.close()
 		return
-	match event.keycode:
-		KEY_1:
-			set_tool("hoe")
-		KEY_2:
-			set_tool("water")
-		KEY_3:
-			set_tool("seed")
-		KEY_4:
-			set_tool("hand")
-		KEY_TAB:
-			GameData.seed_index = (GameData.seed_index + 1) % GameData.CROP_IDS.size()
-			set_tool("seed")
-		KEY_SPACE, KEY_ENTER:
-			use_tool()
-		KEY_E:
-			interact()
-		KEY_B:
-			shop.open("buy")
-		KEY_F5:
-			save_now()
-			hud.show_message("저장했다!")
+	if event.is_action_pressed("tool_1"):
+		set_tool("hoe")
+	elif event.is_action_pressed("tool_2"):
+		set_tool("water")
+	elif event.is_action_pressed("tool_3"):
+		set_tool("seed")
+	elif event.is_action_pressed("tool_4"):
+		set_tool("hand")
+	elif event.is_action_pressed("cycle_seed"):
+		GameData.seed_index = (GameData.seed_index + 1) % GameData.CROP_IDS.size()
+		set_tool("seed")
+	elif event.is_action_pressed("use_tool"):
+		use_tool()
+	elif event.is_action_pressed("interact"):
+		interact()
+	elif event.is_action_pressed("open_shop"):
+		shop.open("buy")
+	elif event.is_action_pressed("save_game"):
+		save_now()
+		hud.show_message("저장했다!")
+	elif event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		_click_at(get_canvas_transform().affine_inverse() * event.position)
+
+
+func _click_at(pos: Vector2) -> void:
+	# 플레이어 인접(또는 발밑) 타일 클릭 시 그 방향을 보고 도구를 쓴다.
+	var t := Vector2i(int(floor(pos.x / TILE)), int(floor(pos.y / TILE)))
+	var d := t - player_tile()
+	if absi(d.x) + absi(d.y) == 1:
+		if d.x == 1:
+			player.dir = "right"
+		elif d.x == -1:
+			player.dir = "left"
+		elif d.y == 1:
+			player.dir = "down"
+		else:
+			player.dir = "up"
+		use_tool()
+	elif d == Vector2i.ZERO:
+		use_tool()
 
 
 # ---- 렌더링 ----

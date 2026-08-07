@@ -25,6 +25,17 @@ var seed_index := 0
 var seeds := {"potato": 5, "carrot": 0, "strawberry": 0, "pumpkin": 0}
 var produce := {"potato": 0, "carrot": 0, "strawberry": 0, "pumpkin": 0}
 
+# 일별 통계 (결산 화면용, 매일 아침 리셋)
+var today_harvest := 0
+var today_earned := 0
+var today_spent := 0
+
+
+func reset_daily() -> void:
+	today_harvest = 0
+	today_earned = 0
+	today_spent = 0
+
 
 func current_seed_id() -> String:
 	return CROP_IDS[seed_index]

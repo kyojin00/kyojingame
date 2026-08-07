@@ -2,59 +2,20 @@
 extends CanvasLayer
 
 var main: Node2D
-var panel: PanelContainer
-var items_box: VBoxContainer
 var tab := "buy"
+
+@onready var items_box: VBoxContainer = $Panel/V/Scroll/Items
 
 
 func _ready() -> void:
-	layer = 20
-	visible = false
-
-	panel = PanelContainer.new()
-	panel.position = Vector2(20, 28)
-	panel.custom_minimum_size = Vector2(440, 260)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
-	style.border_color = Color(0.42, 0.36, 0.55)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(8)
-	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
-
-	var v := VBoxContainer.new()
-	panel.add_child(v)
-
-	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 8)
-	v.add_child(tabs)
-
-	tabs.add_child(_mk_button("씨앗 구매", func() -> void:
-		tab = "buy"
-		_rebuild()))
-	tabs.add_child(_mk_button("작물 판매", func() -> void:
-		tab = "sell"
-		_rebuild()))
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tabs.add_child(spacer)
-	tabs.add_child(_mk_button("닫기(ESC)", close))
-
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(432, 216)
-	v.add_child(scroll)
-	items_box = VBoxContainer.new()
-	items_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(items_box)
+	$Panel/V/Tabs/BuyBtn.pressed.connect(_on_tab.bind("buy"))
+	$Panel/V/Tabs/SellBtn.pressed.connect(_on_tab.bind("sell"))
+	$Panel/V/Tabs/CloseBtn.pressed.connect(close)
 
 
-func _mk_button(text: String, on_pressed: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(on_pressed)
-	return b
+func _on_tab(t: String) -> void:
+	tab = t
+	_rebuild()
 
 
 func open(t: String) -> void:
@@ -65,6 +26,14 @@ func open(t: String) -> void:
 
 func close() -> void:
 	visible = false
+
+
+func _mk_button(text: String, on_pressed: Callable) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(on_pressed)
+	return b
 
 
 func _rebuild() -> void:
@@ -110,11 +79,14 @@ func _on_buy(id: String) -> void:
 		return
 	GameData.money -= def.seed_price
 	GameData.seeds[id] += 1
+	GameData.today_spent += def.seed_price
 	_rebuild()
 
 
 func _on_sell(id: String) -> void:
 	var def: Dictionary = GameData.CROPS[id]
-	GameData.money += def.sell_price * GameData.produce[id]
+	var amount: int = def.sell_price * GameData.produce[id]
+	GameData.money += amount
+	GameData.today_earned += amount
 	GameData.produce[id] = 0
 	_rebuild()

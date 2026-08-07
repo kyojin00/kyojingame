@@ -1,0 +1,87 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="energy_bg"]
+bg_color = Color(0.09, 0.07, 0.12, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.29, 0.25, 0.39, 1)
+
+[sub_resource type="StyleBoxFlat" id="energy_fill"]
+bg_color = Color(0.48, 0.83, 0.35, 1)
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_hud")
+
+[node name="Top" type="HBoxContainer" parent="."]
+offset_left = 4.0
+offset_top = 2.0
+offset_right = 476.0
+offset_bottom = 22.0
+theme_override_constants/separation = 10
+
+[node name="DayLabel" type="Label" parent="Top"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ClockLabel" type="Label" parent="Top"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="MoneyLabel" type="Label" parent="Top"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.843137, 0.368627, 1)
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="EnergyBar" type="ProgressBar" parent="Top"]
+custom_minimum_size = Vector2(60, 12)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_styles/background = SubResource("energy_bg")
+theme_override_styles/fill = SubResource("energy_fill")
+max_value = 100.0
+show_percentage = false
+
+[node name="Bottom" type="HBoxContainer" parent="."]
+offset_left = 4.0
+offset_top = 300.0
+offset_right = 476.0
+offset_bottom = 318.0
+theme_override_constants/separation = 12
+
+[node name="ToolHoe" type="Label" parent="Bottom"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ToolWater" type="Label" parent="Bottom"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ToolSeed" type="Label" parent="Bottom"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ToolHand" type="Label" parent="Bottom"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="Message" type="Label" parent="."]
+visible = false
+offset_left = 0.0
+offset_top = 26.0
+offset_right = 480.0
+offset_bottom = 46.0
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+horizontal_alignment = 1

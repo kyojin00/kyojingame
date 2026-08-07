@@ -1,0 +1,65 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/shop_ui.gd" id="1_shop"]
+
+[sub_resource type="StyleBoxFlat" id="panel_style"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.17, 0.14, 0.22, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.42, 0.36, 0.55, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="Shop" type="CanvasLayer"]
+layer = 20
+visible = false
+script = ExtResource("1_shop")
+
+[node name="Panel" type="PanelContainer" parent="."]
+offset_left = 20.0
+offset_top = 28.0
+offset_right = 460.0
+offset_bottom = 288.0
+theme_override_styles/panel = SubResource("panel_style")
+
+[node name="V" type="VBoxContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="Tabs" type="HBoxContainer" parent="Panel/V"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BuyBtn" type="Button" parent="Panel/V/Tabs"]
+layout_mode = 2
+focus_mode = 0
+text = "씨앗 구매"
+
+[node name="SellBtn" type="Button" parent="Panel/V/Tabs"]
+layout_mode = 2
+focus_mode = 0
+text = "작물 판매"
+
+[node name="Spacer" type="Control" parent="Panel/V/Tabs"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseBtn" type="Button" parent="Panel/V/Tabs"]
+layout_mode = 2
+focus_mode = 0
+text = "닫기(ESC)"
+
+[node name="Scroll" type="ScrollContainer" parent="Panel/V"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Items" type="VBoxContainer" parent="Panel/V/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
