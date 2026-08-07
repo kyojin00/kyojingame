@@ -47,6 +47,11 @@ layout_mode = 2
 focus_mode = 0
 text = "작물 판매"
 
+[node name="UpgradeBtn" type="Button" parent="Panel/V/Tabs"]
+layout_mode = 2
+focus_mode = 0
+text = "업그레이드"
+
 [node name="Spacer" type="Control" parent="Panel/V/Tabs"]
 layout_mode = 2
 size_flags_horizontal = 3

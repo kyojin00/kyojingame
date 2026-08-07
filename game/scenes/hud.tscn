@@ -49,11 +49,19 @@ theme_override_styles/fill = SubResource("energy_fill")
 max_value = 100.0
 show_percentage = false
 
+[node name="Resources" type="Label" parent="."]
+offset_left = 4.0
+offset_top = 22.0
+offset_right = 300.0
+offset_bottom = 40.0
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
 [node name="Bottom" type="HBoxContainer" parent="."]
 offset_left = 4.0
-offset_top = 300.0
+offset_top = 282.0
 offset_right = 476.0
-offset_bottom = 318.0
+offset_bottom = 300.0
 theme_override_constants/separation = 12
 
 [node name="ToolHoe" type="Label" parent="Bottom"]
@@ -76,12 +84,39 @@ layout_mode = 2
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 3
 
+[node name="Bottom2" type="HBoxContainer" parent="."]
+offset_left = 4.0
+offset_top = 300.0
+offset_right = 476.0
+offset_bottom = 318.0
+theme_override_constants/separation = 12
+
+[node name="ToolAxe" type="Label" parent="Bottom2"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ToolPickaxe" type="Label" parent="Bottom2"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ToolFence" type="Label" parent="Bottom2"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
+[node name="ToolSprinkler" type="Label" parent="Bottom2"]
+layout_mode = 2
+theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
+theme_override_constants/outline_size = 3
+
 [node name="Message" type="Label" parent="."]
 visible = false
 offset_left = 0.0
-offset_top = 26.0
+offset_top = 42.0
 offset_right = 480.0
-offset_bottom = 46.0
+offset_bottom = 62.0
 theme_override_colors/font_outline_color = Color(0.08, 0.06, 0.12, 1)
 theme_override_constants/outline_size = 3
 horizontal_alignment = 1

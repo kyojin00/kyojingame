@@ -10,6 +10,7 @@ var tab := "buy"
 func _ready() -> void:
 	$Panel/V/Tabs/BuyBtn.pressed.connect(_on_tab.bind("buy"))
 	$Panel/V/Tabs/SellBtn.pressed.connect(_on_tab.bind("sell"))
+	$Panel/V/Tabs/UpgradeBtn.pressed.connect(_on_tab.bind("upgrade"))
 	$Panel/V/Tabs/CloseBtn.pressed.connect(close)
 
 
@@ -54,7 +55,7 @@ func _rebuild() -> void:
 			b.disabled = GameData.money < def.seed_price
 			row.add_child(b)
 			items_box.add_child(row)
-	else:
+	elif tab == "sell":
 		var any := false
 		for id in GameData.CROP_IDS:
 			var count: int = GameData.produce[id]
@@ -73,6 +74,28 @@ func _rebuild() -> void:
 			var empty := Label.new()
 			empty.text = "팔 수 있는 작물이 없다. 수확하면 여기에 표시된다."
 			items_box.add_child(empty)
+	else:
+		for id in GameData.UPGRADES:
+			var up: Dictionary = GameData.UPGRADES[id]
+			var level: int = GameData.tool_level[id]
+			var row := HBoxContainer.new()
+			var l := Label.new()
+			l.text = "%s Lv%d - %s" % [up.name, level, up.desc]
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(l)
+			if level >= 2:
+				var done := Label.new()
+				done.text = "최대 레벨"
+				row.add_child(done)
+			else:
+				var b := _mk_button("%dG+목재%d" % [up.money, up.wood], _on_upgrade.bind(id))
+				b.disabled = GameData.money < up.money or GameData.wood < up.wood
+				row.add_child(b)
+			items_box.add_child(row)
+		var hint := Label.new()
+		hint.text = "\n울타리: 목재 %d / 스프링클러: 목재 %d+석재 %d\n(나무는 도끼로, 돌은 곡괭이로 캔다)" % [
+			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD, GameData.SPRINKLER_COST_STONE]
+		items_box.add_child(hint)
 
 
 func _on_buy(id: String) -> void:
@@ -91,4 +114,14 @@ func _on_sell(id: String) -> void:
 	GameData.money += amount
 	GameData.today_earned += amount
 	GameData.produce[id] = 0
+	_rebuild()
+
+
+func _on_upgrade(id: String) -> void:
+	var up: Dictionary = GameData.UPGRADES[id]
+	if GameData.tool_level[id] >= 2 or GameData.money < up.money or GameData.wood < up.wood:
+		return
+	GameData.money -= up.money
+	GameData.wood -= up.wood
+	GameData.tool_level[id] = 2
 	_rebuild()

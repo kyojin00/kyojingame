@@ -50,6 +50,20 @@ var tool := "hoe"
 var seed_index := 0
 var seeds := {}
 var produce := {}
+var wood := 0
+var stone := 0
+var tool_level := {"hoe": 1, "water": 1}
+
+# 설치물 비용
+const FENCE_COST_WOOD := 1
+const SPRINKLER_COST_WOOD := 2
+const SPRINKLER_COST_STONE := 2
+
+# 업그레이드 정의
+const UPGRADES := {
+	"hoe": {"name": "호미", "money": 500, "wood": 10, "desc": "전방 3칸 갈기"},
+	"water": {"name": "물뿌리개", "money": 500, "wood": 10, "desc": "전방 3칸 물주기"},
+}
 
 # 일별 통계 (결산 화면용, 매일 아침 리셋)
 var today_harvest := 0
@@ -151,7 +165,7 @@ func clock_text() -> String:
 
 # ---- 저장 ----
 
-func save_game(grid_data: Array, player_pos: Vector2) -> void:
+func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = []) -> void:
 	var data := {
 		"day": day,
 		"minutes": minutes,
@@ -159,8 +173,12 @@ func save_game(grid_data: Array, player_pos: Vector2) -> void:
 		"energy": energy,
 		"seeds": seeds,
 		"produce": produce,
+		"wood": wood,
+		"stone": stone,
+		"tool_level": tool_level,
 		"player": [player_pos.x, player_pos.y],
 		"grid": grid_data,
+		"objects": objects_data,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:

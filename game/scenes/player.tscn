@@ -8,3 +8,7 @@ script = ExtResource("1_player")
 [node name="Sprite" type="Sprite2D" parent="."]
 offset = Vector2(-6, -15)
 centered = false
+
+[node name="Camera" type="Camera2D" parent="."]
+position_smoothing_enabled = true
+position_smoothing_speed = 8.0

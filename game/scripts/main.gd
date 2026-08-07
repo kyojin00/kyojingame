@@ -1,19 +1,28 @@
-# 메인 월드: 맵, 경작, 도구, 시간, 낮/밤을 관리한다.
+# 메인 월드: 맵, 경작, 도구, 자원, 시간, 낮/밤을 관리한다.
 extends Node2D
 
-const MAP_W := 30
-const MAP_H := 20
+const MAP_W := 60
+const MAP_H := 40
 const TILE := 16
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
-const ENERGY_COST := {"hoe": 2.0, "water": 1.0, "seed": 1.0, "hand": 1.0}
+const ENERGY_COST := {
+	"hoe": 2.0, "water": 1.0, "seed": 1.0, "hand": 1.0,
+	"axe": 2.0, "pickaxe": 2.0, "fence": 1.0, "sprinkler": 1.0,
+}
+const TREE_HP := 3
+const ROCK_HP := 2
+const WOOD_PER_TREE := 3
+const STONE_PER_ROCK := 2
 
-# grid[y][x] = {ground: "grass"|"soil"|"water", watered: bool, crop_id: String, crop_day: int}
+# grid[y][x] = {ground, watered, crop_id, crop_day, dead}
 var grid: Array = []
-# Vector2i -> "tree" | "rock" | "house" | "bin"
+# Vector2i -> {kind: "tree"|"rock"|"house"|"bin"|"fence"|"sprinkler", hp: int}
 var objects: Dictionary = {}
+var obj_nodes: Dictionary = {}  # Vector2i -> Node2D (설치/제거 가능한 오브젝트만)
 
 var tex: Dictionary = {}
+var world: Node2D
 var player: Node2D
 var hud: CanvasLayer
 var shop: CanvasLayer
@@ -39,13 +48,15 @@ const TEXTURE_NAMES := [
 	"mature_tomato", "mature_corn", "mature_watermelon",
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
-	"rock", "bin", "house",
+	"rock", "bin", "house", "fence", "sprinkler",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
 	"soil_dry", "soil_wet", "water_0", "water_1",
 ]
+
+const START_TILE := Vector2i(30, 20)
 
 
 func _ready() -> void:
@@ -55,16 +66,16 @@ func _ready() -> void:
 	night = CanvasModulate.new()
 	add_child(night)
 
-	var world := Node2D.new()
+	world = Node2D.new()
 	world.name = "World"
 	world.y_sort_enabled = true
 	add_child(world)
-	_spawn_objects(world)
 
 	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
-	player.position = Vector2(10 * TILE + 8, 9 * TILE + 8)
+	player.position = Vector2(START_TILE.x * TILE + 8, START_TILE.y * TILE + 8)
 	world.add_child(player)
+	_setup_camera()
 
 	hud = preload("res://scenes/hud.tscn").instantiate()
 	hud.main = self
@@ -96,12 +107,21 @@ func _ready() -> void:
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
+	_spawn_objects()
 	_apply_season_visuals()
 
 
 func _load_textures() -> void:
 	for n in TEXTURE_NAMES:
 		tex[n] = load("res://assets/sprites/%s.png" % n)
+
+
+func _setup_camera() -> void:
+	var cam: Camera2D = player.get_node("Camera")
+	cam.limit_left = 0
+	cam.limit_top = 0
+	cam.limit_right = MAP_W * TILE
+	cam.limit_bottom = MAP_H * TILE
 
 
 # ---- 맵 ----
@@ -115,60 +135,103 @@ func _build_map() -> void:
 			row.append({"ground": "grass", "watered": false, "crop_id": "", "crop_day": 0, "dead": false})
 		grid.append(row)
 
-	# 연못 (오른쪽 아래)
+	# 연못 2개
 	for y in range(13, 18):
 		for x in range(23, 28):
 			grid[y][x].ground = "water"
+	for y in range(28, 35):
+		for x in range(45, 53):
+			grid[y][x].ground = "water"
 
-	# 집 (왼쪽 위 5x4 타일)
+	# 집 (왼쪽 위 5x4 타일) + 출하 상자
 	for y in range(1, 5):
 		for x in range(2, 7):
-			objects[Vector2i(x, y)] = "house"
-
-	# 출하 상자
-	objects[Vector2i(9, 4)] = "bin"
+			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
 
 	# 테두리 나무
 	for x in MAP_W:
 		if _hash01(x, 0) < 0.75 and not objects.has(Vector2i(x, 0)):
-			objects[Vector2i(x, 0)] = "tree"
+			objects[Vector2i(x, 0)] = {"kind": "tree", "hp": TREE_HP}
 		if _hash01(x, MAP_H - 1) < 0.75:
-			objects[Vector2i(x, MAP_H - 1)] = "tree"
+			objects[Vector2i(x, MAP_H - 1)] = {"kind": "tree", "hp": TREE_HP}
 	for y in MAP_H:
 		if _hash01(0, y) < 0.75 and not objects.has(Vector2i(0, y)):
-			objects[Vector2i(0, y)] = "tree"
+			objects[Vector2i(0, y)] = {"kind": "tree", "hp": TREE_HP}
 		if _hash01(MAP_W - 1, y) < 0.75 and not objects.has(Vector2i(MAP_W - 1, y)):
-			objects[Vector2i(MAP_W - 1, y)] = "tree"
+			objects[Vector2i(MAP_W - 1, y)] = {"kind": "tree", "hp": TREE_HP}
 
-	# 흩어진 나무/돌
-	var decor := [
-		[12, 2, "tree"], [18, 3, "tree"], [24, 2, "tree"], [21, 7, "tree"],
-		[3, 12, "tree"], [5, 16, "tree"], [16, 16, "rock"], [8, 8, "rock"],
-		[19, 12, "rock"], [26, 8, "rock"], [13, 6, "rock"],
-	]
-	for d in decor:
-		var pos := Vector2i(d[0], d[1])
-		if not objects.has(pos) and grid[d[1]][d[0]].ground == "grass":
-			objects[pos] = d[2]
+	# 흩어진 나무/돌 (결정적 해시 배치)
+	for y in range(1, MAP_H - 1):
+		for x in range(1, MAP_W - 1):
+			var pos := Vector2i(x, y)
+			if objects.has(pos) or grid[y][x].ground != "grass":
+				continue
+			if x >= 1 and x <= 10 and y >= 0 and y <= 6:
+				continue  # 집/출하상자 주변은 비워둔다
+			if abs(x - START_TILE.x) <= 3 and abs(y - START_TILE.y) <= 3:
+				continue  # 시작 지점 주변도 비워둔다
+			var h := _hash01(x * 3 + 7, y * 5 + 11)
+			if h < 0.045:
+				objects[pos] = {"kind": "tree", "hp": TREE_HP}
+			elif h < 0.075:
+				objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 
 
-func _spawn_objects(world: Node2D) -> void:
+func _spawn_objects() -> void:
+	for n in obj_nodes.values():
+		n.queue_free()
+	obj_nodes.clear()
+	tree_sprites.clear()
 	var house_done := false
 	for pos: Vector2i in objects:
-		var kind: String = objects[pos]
+		var kind: String = objects[pos].kind
 		if kind == "house":
 			if house_done:
 				continue
 			house_done = true
-			world.add_child(_make_object(tex["house"], Vector2(2 * TILE, 5 * TILE), Vector2(0, -64)))
-		elif kind == "tree":
-			var t := _make_object(tex["tree_spring"], Vector2(pos.x * TILE, (pos.y + 1) * TILE), Vector2(0, -18))
-			tree_sprites.append(t.get_child(0))
-			world.add_child(t)
-		elif kind == "rock":
-			world.add_child(_make_object(tex["rock"], Vector2(pos.x * TILE, (pos.y + 1) * TILE), Vector2(0, -16)))
-		elif kind == "bin":
-			world.add_child(_make_object(tex["bin"], Vector2(pos.x * TILE, (pos.y + 1) * TILE), Vector2(0, -16)))
+			var hn := _make_object(tex["house"], Vector2(2 * TILE, 5 * TILE), Vector2(0, -64))
+			obj_nodes[pos] = hn
+			world.add_child(hn)
+		else:
+			_spawn_object_node(pos, kind)
+
+
+func _spawn_object_node(pos: Vector2i, kind: String) -> void:
+	var offset := Vector2(0, -16)
+	var texture: Texture2D
+	match kind:
+		"tree":
+			texture = tex["tree_" + GameData.season_key()]
+			offset = Vector2(0, -18)
+		"rock":
+			texture = tex["rock"]
+		"bin":
+			texture = tex["bin"]
+		"fence":
+			texture = tex["fence"]
+		"sprinkler":
+			texture = tex["sprinkler"]
+	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
+	obj_nodes[pos] = node
+	if kind == "tree":
+		tree_sprites.append(node.get_child(0))
+	world.add_child(node)
+
+
+func _remove_object(pos: Vector2i) -> void:
+	objects.erase(pos)
+	if obj_nodes.has(pos):
+		var node: Node2D = obj_nodes[pos]
+		var sprite := node.get_child(0)
+		tree_sprites.erase(sprite)
+		node.queue_free()
+		obj_nodes.erase(pos)
+
+
+func _place_object(pos: Vector2i, kind: String, hp: int) -> void:
+	objects[pos] = {"kind": kind, "hp": hp}
+	_spawn_object_node(pos, kind)
 
 
 func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Node2D:
@@ -240,12 +303,22 @@ func set_tool(t: String) -> void:
 	GameData.tool = t
 
 
+func _affected_tiles(base: Vector2i) -> Array:
+	# 업그레이드된 호미/물뿌리개는 전방 3칸(진행 방향의 좌우 포함)에 적용된다.
+	var out := [base]
+	if GameData.tool_level.get(GameData.tool, 1) >= 2:
+		var perp := Vector2i(0, 1) if player.dir in ["left", "right"] else Vector2i(1, 0)
+		out.append(base + perp)
+		out.append(base - perp)
+	return out
+
+
 func use_tool() -> void:
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return
 	var cell: Dictionary = grid[t.y][t.x]
-	var has_obj := objects.has(t)
+	var obj: Variant = objects.get(t)
 	var cost: float = ENERGY_COST[GameData.tool]
 
 	if GameData.energy < cost:
@@ -254,9 +327,6 @@ func use_tool() -> void:
 
 	match GameData.tool:
 		"hoe":
-			if has_obj:
-				hud.show_message("여기는 갈 수 없다.")
-				return
 			if cell.crop_id != "" and cell.dead:
 				# 시든 작물 정리
 				cell.crop_id = ""
@@ -264,28 +334,46 @@ func use_tool() -> void:
 				cell.dead = false
 				GameData.energy -= cost
 				hud.show_message("시든 작물을 정리했다.")
-			elif cell.ground == "grass":
-				cell.ground = "soil"
-				if weather_now() == GameData.WEATHER_RAIN:
-					cell.watered = true
-				GameData.energy -= cost
+			elif obj != null:
+				hud.show_message("여기는 갈 수 없다.")
+				return
 			elif cell.ground == "soil" and cell.crop_id == "":
 				cell.ground = "grass"
 				cell.watered = false
 				GameData.energy -= cost
-		"water":
-			if cell.ground == "soil":
-				if not cell.watered:
-					cell.watered = true
-					GameData.energy -= cost
 			else:
+				var worked := false
+				for pos: Vector2i in _affected_tiles(t):
+					if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
+						continue
+					var c: Dictionary = grid[pos.y][pos.x]
+					if objects.has(pos) or c.ground != "grass":
+						continue
+					c.ground = "soil"
+					if weather_now() == GameData.WEATHER_RAIN:
+						c.watered = true
+					worked = true
+				if worked:
+					GameData.energy -= cost
+		"water":
+			var worked := false
+			for pos: Vector2i in _affected_tiles(t):
+				if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
+					continue
+				var c: Dictionary = grid[pos.y][pos.x]
+				if c.ground == "soil" and not c.watered and not objects.has(pos):
+					c.watered = true
+					worked = true
+			if worked:
+				GameData.energy -= cost
+			elif grid[t.y][t.x].ground != "soil":
 				hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
 			var id := GameData.current_seed_id()
 			if id == "":
 				hud.show_message("씨앗이 없다. 상점(B)에서 사자.")
 				return
-			if cell.ground != "soil":
+			if cell.ground != "soil" or obj != null:
 				hud.show_message("먼저 호미로 밭을 갈자.")
 				return
 			if cell.crop_id != "":
@@ -317,15 +405,82 @@ func use_tool() -> void:
 					GameData.energy -= cost
 				else:
 					hud.show_message("아직 다 자라지 않았다.")
+		"axe":
+			if obj == null:
+				hud.show_message("벨 것이 없다.")
+				return
+			if obj.kind == "tree":
+				obj.hp -= 1
+				GameData.energy -= cost
+				if obj.hp <= 0:
+					_remove_object(t)
+					GameData.wood += WOOD_PER_TREE
+					hud.show_message("나무를 베었다! 목재 +%d" % WOOD_PER_TREE)
+				else:
+					hud.show_message("나무를 찍었다. (%d/%d)" % [TREE_HP - obj.hp, TREE_HP])
+			elif obj.kind == "fence":
+				_remove_object(t)
+				GameData.wood += GameData.FENCE_COST_WOOD
+				GameData.energy -= cost
+				hud.show_message("울타리를 회수했다.")
+			else:
+				hud.show_message("도끼로 벨 수 없다.")
+		"pickaxe":
+			if obj == null:
+				hud.show_message("캘 것이 없다.")
+				return
+			if obj.kind == "rock":
+				obj.hp -= 1
+				GameData.energy -= cost
+				if obj.hp <= 0:
+					_remove_object(t)
+					GameData.stone += STONE_PER_ROCK
+					hud.show_message("돌을 캤다! 석재 +%d" % STONE_PER_ROCK)
+				else:
+					hud.show_message("돌을 내리쳤다. (%d/%d)" % [ROCK_HP - obj.hp, ROCK_HP])
+			elif obj.kind == "sprinkler":
+				_remove_object(t)
+				GameData.wood += GameData.SPRINKLER_COST_WOOD
+				GameData.stone += GameData.SPRINKLER_COST_STONE
+				GameData.energy -= cost
+				hud.show_message("스프링클러를 회수했다.")
+			else:
+				hud.show_message("곡괭이로 캘 수 없다.")
+		"fence":
+			if obj != null or cell.ground == "water" or cell.crop_id != "" or t == player_tile():
+				hud.show_message("여기에는 설치할 수 없다.")
+				return
+			if GameData.wood < GameData.FENCE_COST_WOOD:
+				hud.show_message("목재가 부족하다. (목재 %d 필요)" % GameData.FENCE_COST_WOOD)
+				return
+			GameData.wood -= GameData.FENCE_COST_WOOD
+			_place_object(t, "fence", 0)
+			GameData.energy -= cost
+		"sprinkler":
+			if obj != null or cell.ground == "water" or cell.crop_id != "" or t == player_tile():
+				hud.show_message("여기에는 설치할 수 없다.")
+				return
+			if GameData.wood < GameData.SPRINKLER_COST_WOOD or GameData.stone < GameData.SPRINKLER_COST_STONE:
+				hud.show_message("재료 부족: 목재 %d + 석재 %d 필요" %
+					[GameData.SPRINKLER_COST_WOOD, GameData.SPRINKLER_COST_STONE])
+				return
+			GameData.wood -= GameData.SPRINKLER_COST_WOOD
+			GameData.stone -= GameData.SPRINKLER_COST_STONE
+			_place_object(t, "sprinkler", 0)
+			GameData.energy -= cost
+			hud.show_message("스프링클러 설치! 매일 아침 주변 4칸에 물을 준다.")
 	queue_redraw()
 
 
 func interact() -> void:
 	for t in [target_tile(), player_tile()]:
-		if objects.get(t, "") == "bin":
+		var obj: Variant = objects.get(t)
+		if obj == null:
+			continue
+		if obj.kind == "bin":
 			shop.open("sell")
 			return
-		if objects.get(t, "") == "house":
+		if obj.kind == "house":
 			sleep_dialog.popup_centered()
 			return
 	hud.show_message("집 문 앞에서 E: 취침 · 출하 상자 앞에서 E: 판매")
@@ -369,6 +524,19 @@ func _next_day(passed_out: bool) -> void:
 				if grid[y][x].ground == "soil":
 					grid[y][x].watered = true
 
+	# 스프링클러는 주변 4칸에 물을 준다
+	for pos: Vector2i in objects:
+		if objects[pos].kind != "sprinkler":
+			continue
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = pos + d
+			if n.x >= 0 and n.y >= 0 and n.x < MAP_W and n.y < MAP_H \
+					and grid[n.y][n.x].ground == "soil":
+				grid[n.y][n.x].watered = true
+
+	# 나무/돌이 조금씩 다시 자란다
+	_respawn_resources()
+
 	save_now()
 
 	var note := ""
@@ -390,6 +558,22 @@ func _next_day(passed_out: bool) -> void:
 	queue_redraw()
 
 
+func _respawn_resources() -> void:
+	for attempt in 6:
+		var kind := "tree" if randf() < 0.5 else "rock"
+		var chance := 0.4 if kind == "tree" else 0.3
+		if randf() > chance:
+			continue
+		var pos := Vector2i(randi_range(1, MAP_W - 2), randi_range(1, MAP_H - 2))
+		var cell: Dictionary = grid[pos.y][pos.x]
+		if objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
+			continue
+		if (pos - player_tile()).length() < 4.0:
+			continue
+		_place_object(pos, kind, TREE_HP if kind == "tree" else ROCK_HP)
+		break
+
+
 # ---- 저장 ----
 
 func save_now() -> void:
@@ -400,7 +584,10 @@ func save_now() -> void:
 			var c: Dictionary = grid[y][x]
 			row.append([c.ground, 1 if c.watered else 0, c.crop_id, c.crop_day, 1 if c.dead else 0])
 		g.append(row)
-	GameData.save_game(g, player.position)
+	var objs := []
+	for pos: Vector2i in objects:
+		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp])
+	GameData.save_game(g, player.position, objs)
 
 
 func _apply_save(d: Dictionary) -> void:
@@ -408,14 +595,24 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.minutes = float(d.minutes)
 	GameData.money = int(d.money)
 	GameData.energy = float(d.energy)
+	GameData.wood = int(d.get("wood", 0))
+	GameData.stone = int(d.get("stone", 0))
+	for k in d.get("tool_level", {}):
+		GameData.tool_level[k] = int(d.tool_level[k])
 	for k in d.seeds:
 		GameData.seeds[k] = int(d.seeds[k])
 	for k in d.produce:
 		GameData.produce[k] = int(d.produce[k])
 	player.position = Vector2(float(d.player[0]), float(d.player[1]))
+
+	# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다
+	var g: Array = d.grid
+	if g.size() != MAP_H or (g.size() > 0 and g[0].size() != MAP_W):
+		player.position = Vector2(START_TILE.x * TILE + 8, START_TILE.y * TILE + 8)
+		return
 	for y in MAP_H:
 		for x in MAP_W:
-			var s: Array = d.grid[y][x]
+			var s: Array = g[y][x]
 			var cell: Dictionary = grid[y][x]
 			# 물 타일은 맵 생성 결과를 유지하고 경작 상태만 복원
 			if cell.ground != "water" and s[0] != "water":
@@ -424,6 +621,10 @@ func _apply_save(d: Dictionary) -> void:
 			cell.crop_id = s[2]
 			cell.crop_day = int(s[3])
 			cell.dead = s.size() > 4 and int(s[4]) == 1
+	if d.has("objects"):
+		objects.clear()
+		for o in d.objects:
+			objects[Vector2i(int(o[0]), int(o[1]))] = {"kind": o[2], "hp": int(o[3])}
 
 
 # ---- 루프 ----
@@ -443,50 +644,6 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if _shot_path != "":
 		_debug_tick()
-
-
-# 스크린샷 검증 시퀀스: 키/마우스 이벤트를 실제 InputMap 경로로 흘려보내
-# 밭갈기->클릭 경작->물주기->파종->상점->결산까지 자동 재생한다.
-func _debug_tick() -> void:
-	_shot_frames += 1
-	match _shot_frames:
-		10: _send_key(KEY_1)
-		14: _send_key(KEY_SPACE)                       # 아래 타일 밭 갈기
-		18: _send_click(Vector2(11 * TILE + 8, 9 * TILE + 8))  # 오른쪽 타일 클릭 경작
-		22: _send_key(KEY_2)
-		26: _send_key(KEY_SPACE)                       # 물 주기
-		30: _send_key(KEY_3)
-		34: _send_key(KEY_SPACE)                       # 씨앗 심기
-		40: _save_shot("_game.png")
-		44: _send_key(KEY_B)                           # 상점 열기
-		54: _save_shot("_shop.png")
-		58:
-			shop.close()
-			_next_day(false)                           # 결산 화면
-		66:
-			_save_shot("_summary.png")
-			get_tree().quit()
-
-
-func _send_key(code: Key) -> void:
-	var ev := InputEventKey.new()
-	ev.physical_keycode = code
-	ev.pressed = true
-	Input.parse_input_event(ev)
-
-
-func _send_click(world_pos: Vector2) -> void:
-	var ev := InputEventMouseButton.new()
-	ev.button_index = MOUSE_BUTTON_LEFT
-	ev.pressed = true
-	# parse_input_event 는 OS 창 좌표 기준이므로 스트레치 변환까지 적용한다.
-	ev.position = get_viewport().get_screen_transform() * (get_canvas_transform() * world_pos)
-	Input.parse_input_event(ev)
-
-
-func _save_shot(suffix: String) -> void:
-	var img := get_viewport().get_texture().get_image()
-	img.save_png(_shot_path + suffix)
 
 
 func _update_night() -> void:
@@ -512,6 +669,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		set_tool("seed")
 	elif event.is_action_pressed("tool_4"):
 		set_tool("hand")
+	elif event.is_action_pressed("tool_5"):
+		set_tool("axe")
+	elif event.is_action_pressed("tool_6"):
+		set_tool("pickaxe")
+	elif event.is_action_pressed("tool_7"):
+		set_tool("fence")
+	elif event.is_action_pressed("tool_8"):
+		set_tool("sprinkler")
 	elif event.is_action_pressed("cycle_seed"):
 		GameData.cycle_seed()
 		set_tool("seed")
@@ -591,13 +756,84 @@ func _draw() -> void:
 
 func _draw_weather() -> void:
 	var w := weather_now()
+	var full_w := MAP_W * TILE + 20.0
+	var full_h := MAP_H * TILE + 10.0
 	if w == GameData.WEATHER_RAIN:
-		for i in 90:
-			var sx := _hash01(i, 1) * 500.0 - 10.0
-			var sy := fposmod(_hash01(i, 2) * 330.0 + weather_time * 280.0, 330.0) - 5.0
+		for i in 360:
+			var sx := _hash01(i, 1) * full_w - 10.0
+			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 280.0, full_h) - 5.0
 			draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy), Color(0.72, 0.82, 1.0, 0.5), 1.0)
 	elif w == GameData.WEATHER_SNOW:
-		for i in 60:
-			var sx := fposmod(_hash01(i, 1) * 480.0 + sin(weather_time * 1.5 + i) * 12.0, 480.0)
-			var sy := fposmod(_hash01(i, 2) * 330.0 + weather_time * 35.0, 330.0) - 5.0
+		for i in 240:
+			var sx := fposmod(_hash01(i, 1) * full_w + sin(weather_time * 1.5 + i) * 12.0, full_w)
+			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 35.0, full_h) - 5.0
 			draw_rect(Rect2(Vector2(sx, sy), Vector2(1, 1)), Color(1, 1, 1, 0.85))
+
+
+# ---- 검증 시퀀스 ----
+# 키/마우스 이벤트를 실제 InputMap 경로로 흘려보내
+# 밭갈기->클릭 경작->물주기->파종->자원->설치->상점->결산까지 자동 재생한다.
+
+func _debug_tick() -> void:
+	_shot_frames += 1
+	match _shot_frames:
+		10: _send_key(KEY_1)
+		14: _send_key(KEY_SPACE)                       # 아래 타일 밭 갈기
+		18: _send_click(Vector2((START_TILE.x + 1) * TILE + 8, START_TILE.y * TILE + 8))
+		22: _send_key(KEY_2)
+		26: _send_key(KEY_SPACE)                       # 물 주기
+		30: _send_key(KEY_3)
+		34: _send_key(KEY_SPACE)                       # 씨앗 심기
+		36:
+			GameData.wood = 5                          # 설치 테스트용 자원 지급
+			GameData.stone = 5
+		38: _send_key_press(KEY_A)
+		42: _send_key_release(KEY_A)                   # 왼쪽 보기
+		46: _send_key(KEY_7)
+		50: _send_key(KEY_SPACE)                       # 울타리 설치
+		54: _send_key_press(KEY_S)
+		56: _send_key_release(KEY_S)                   # 아래 보기
+		60: _send_key(KEY_8)
+		64: _send_key(KEY_SPACE)                       # 스프링클러 설치
+		70: _save_shot("_game.png")
+		74: _send_key(KEY_B)                           # 상점 열기
+		78: shop._on_tab("upgrade")                    # 업그레이드 탭
+		84: _save_shot("_shop.png")
+		88:
+			shop.close()
+			_next_day(false)                           # 결산 화면
+		96:
+			_save_shot("_summary.png")
+			get_tree().quit()
+
+
+func _send_key(code: Key) -> void:
+	_send_key_press(code)
+
+
+func _send_key_press(code: Key) -> void:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = code
+	ev.pressed = true
+	Input.parse_input_event(ev)
+
+
+func _send_key_release(code: Key) -> void:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = code
+	ev.pressed = false
+	Input.parse_input_event(ev)
+
+
+func _send_click(world_pos: Vector2) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	# parse_input_event 는 OS 창 좌표 기준이므로 스트레치 변환까지 적용한다.
+	ev.position = get_viewport().get_screen_transform() * (get_canvas_transform() * world_pos)
+	Input.parse_input_event(ev)
+
+
+func _save_shot(suffix: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(_shot_path + suffix)

@@ -1,7 +1,10 @@
 # HUD: 상단 정보 바 + 하단 도구 바 + 메시지 토스트
 extends CanvasLayer
 
-const TOOL_NAMES := {"hoe": "1 호미", "water": "2 물뿌리개", "hand": "4 수확"}
+const TOOL_NAMES := {
+	"hoe": "1 호미", "water": "2 물뿌리개", "hand": "4 수확",
+	"axe": "5 도끼", "pickaxe": "6 곡괭이", "fence": "7 울타리", "sprinkler": "8 스프링클러",
+}
 
 var main: Node2D
 var msg_timer := 0.0
@@ -10,12 +13,17 @@ var msg_timer := 0.0
 @onready var clock_label: Label = $Top/ClockLabel
 @onready var money_label: Label = $Top/MoneyLabel
 @onready var energy_bar: ProgressBar = $Top/EnergyBar
+@onready var resources_label: Label = $Resources
 @onready var msg_label: Label = $Message
 @onready var tool_labels := {
 	"hoe": $Bottom/ToolHoe,
 	"water": $Bottom/ToolWater,
 	"seed": $Bottom/ToolSeed,
 	"hand": $Bottom/ToolHand,
+	"axe": $Bottom2/ToolAxe,
+	"pickaxe": $Bottom2/ToolPickaxe,
+	"fence": $Bottom2/ToolFence,
+	"sprinkler": $Bottom2/ToolSprinkler,
 }
 
 
@@ -25,6 +33,7 @@ func refresh() -> void:
 	clock_label.text = GameData.clock_text()
 	money_label.text = "%dG" % GameData.money
 	energy_bar.value = GameData.energy
+	resources_label.text = "목재 %d  석재 %d" % [GameData.wood, GameData.stone]
 
 	for key in tool_labels:
 		var l: Label = tool_labels[key]
