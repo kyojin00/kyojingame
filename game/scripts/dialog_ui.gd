@@ -4,6 +4,7 @@ extends CanvasLayer
 var title_label: Label
 var body_label: Label
 var buttons_box: HBoxContainer
+var portrait: TextureRect
 
 
 func _ready() -> void:
@@ -22,9 +23,22 @@ func _ready() -> void:
 	panel.add_theme_stylebox_override("panel", style)
 	add_child(panel)
 
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 10)
+	panel.add_child(h)
+
+	portrait = TextureRect.new()
+	portrait.custom_minimum_size = Vector2(48, 48)
+	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait.visible = false
+	h.add_child(portrait)
+
 	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 8)
-	panel.add_child(v)
+	h.add_child(v)
 
 	title_label = Label.new()
 	title_label.add_theme_color_override("font_color", Color("ffd75e"))
@@ -43,9 +57,12 @@ func _ready() -> void:
 
 
 # buttons: [[라벨, Callable], ...] — 콜백이 null이면 닫기 동작
-func open(title_text: String, body_text: String, buttons: Array) -> void:
+func open(title_text: String, body_text: String, buttons: Array,
+		portrait_tex: Texture2D = null) -> void:
 	title_label.text = title_text
 	body_label.text = body_text
+	portrait.texture = portrait_tex
+	portrait.visible = portrait_tex != null
 	for c in buttons_box.get_children():
 		c.queue_free()
 	for b in buttons:
@@ -62,6 +79,11 @@ func open(title_text: String, body_text: String, buttons: Array) -> void:
 
 func set_body(text: String) -> void:
 	body_label.text = text
+
+
+func set_portrait(tex: Texture2D) -> void:
+	portrait.texture = tex
+	portrait.visible = tex != null
 
 
 func close() -> void:

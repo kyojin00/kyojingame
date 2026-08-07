@@ -16,7 +16,7 @@ var wait := 0.0
 func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
-	sprite.offset = Vector2(-6, -15)
+	sprite.offset = Vector2(-8, -23)
 	add_child(sprite)
 	target = position
 	wait = randf_range(0.5, 2.0)

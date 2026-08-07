@@ -117,6 +117,7 @@ var quest := {}
 # 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
 const TUTORIAL_ORDER := [
 	["moved", "방향키/WASD로 움직여보자"],
+	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["till", "호미(1)로 풀밭을 갈자"],
 	["plant", "밭에 씨앗(3)을 심자"],
 	["water", "물뿌리개(2)로 물을 주자"],
@@ -168,6 +169,15 @@ func tutorial_objective() -> String:
 	for pair in TUTORIAL_ORDER:
 		if not tutorial.get(pair[0], false):
 			return "다음 목표: " + pair[1]
+	return ""
+
+
+func tutorial_current_flag() -> String:
+	if not tutorial.get("active", false):
+		return ""
+	for pair in TUTORIAL_ORDER:
+		if not tutorial.get(pair[0], false):
+			return pair[0]
 	return ""
 
 

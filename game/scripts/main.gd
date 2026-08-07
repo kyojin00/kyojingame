@@ -42,6 +42,7 @@ var fishing_timer := 0.0
 var fishing_ui: CanvasLayer
 var pending_fish: Array = []
 var dialog: CanvasLayer
+var map_ui: CanvasLayer
 var fade_rect: ColorRect
 var day_transitioning := false
 var particles: Array = []
@@ -66,6 +67,8 @@ const TEXTURE_NAMES := [
 	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
 	"npc_fisher_down_0", "npc_fisher_down_1", "npc_fisher_up_0",
 	"npc_fisher_up_1", "npc_fisher_side_0", "npc_fisher_side_1",
+	"npc_merchant_portrait_normal", "npc_merchant_portrait_happy",
+	"npc_fisher_portrait_normal", "npc_fisher_portrait_happy",
 	"icon_hoe", "icon_water", "icon_seed", "icon_basket", "icon_axe",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
@@ -121,6 +124,10 @@ func _ready() -> void:
 	dialog = preload("res://scripts/dialog_ui.gd").new()
 	add_child(dialog)
 
+	map_ui = preload("res://scripts/map_ui.gd").new()
+	map_ui.main = self
+	add_child(map_ui)
+
 	for npc_id in ["merchant", "fisher"]:
 		var n: Node2D = preload("res://scripts/npc.gd").new()
 		n.main = self
@@ -152,9 +159,9 @@ func _ready() -> void:
 	else:
 		GameData.reset_all()
 		hud.show_message("교진 팜에 온 것을 환영한다! 감자 씨앗 5개로 시작하자.")
-		if _shot_path == "":
+		if _shot_path == "" or OS.get_environment("KYOJIN_STORY") != "":
 			_show_intro.call_deferred()
-		else:
+		if _shot_path != "":
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 	_spawn_objects()
 	_apply_season_visuals()
@@ -170,8 +177,10 @@ func _ready() -> void:
 	fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fade_layer.add_child(fade_rect)
-	var tw := create_tween()
-	tw.tween_property(fade_rect, "color:a", 0.0, 0.5)
+	if loaded.size() > 0 or _shot_path != "":
+		var tw := create_tween()
+		tw.tween_property(fade_rect, "color:a", 0.0, 0.5)
+	# 신규 게임은 _show_intro가 스토리 동안 어둡게 유지했다가 직접 페이드한다
 
 
 func _load_textures() -> void:
@@ -266,7 +275,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	match kind:
 		"tree":
 			texture = tex["tree_" + GameData.season_key()]
-			offset = Vector2(0, -18)
+			offset = Vector2(0, -25)
 		"rock":
 			texture = tex["rock"]
 		"bin":
@@ -361,7 +370,7 @@ func target_tile() -> Vector2i:
 
 func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
-		or fishing_ui.visible or dialog.visible
+		or fishing_ui.visible or dialog.visible or map_ui.visible
 
 
 # ---- 도구/상호작용 ----
@@ -698,18 +707,48 @@ func _house_index_at(t: Vector2i) -> int:
 	return -1
 
 
-# ---- 튜토리얼 ----
+# ---- 오프닝 스토리 / 튜토리얼 ----
+
+const STORY_PAGES := [
+	["", "도시 생활에 지쳐가던 어느 날,\n낡은 우표가 붙은 편지 한 통이 도착했다."],
+	["할아버지의 편지", "\"사랑하는 손주에게.\n나의 오래된 농장을 너에게 맡기마.\n흙을 만지다 보면, 도시에서 잃어버린 것들을\n다시 찾게 될 게다.\""],
+	["", "그렇게 나는 짐을 싸서\n'교진 마을'의 작은 농장으로 향했다.\n\n낡았지만 따뜻한 집, 그리고 드넓은 땅...\n이제 이곳이 나의 새 보금자리다."],
+]
+var _story_idx := 0
+
 
 func _show_intro() -> void:
-	dialog.open("교진 팜에 어서 와!",
-		"작은 농장을 물려받았다!\n지금은 호미 하나뿐이지만, 화면 위의 '다음 목표'를\n하나씩 달성하면 새 도구가 열린다.\n작물을 키워 팔고, 동물을 기르고, 낚시도 해보자!",
-		[["튜토리얼 시작", null], ["건너뛰기", _skip_tutorial]])
+	fade_rect.color.a = 0.7  # 스토리 동안 어둡게
+	_story_idx = 0
+	_show_story_page()
+
+
+func _show_story_page() -> void:
+	if _story_idx < STORY_PAGES.size():
+		var page: Array = STORY_PAGES[_story_idx]
+		dialog.open(page[0], page[1], [["다음 >", _next_story_page]])
+	else:
+		dialog.open("교진 팜에 어서 와!",
+			"지금 가진 것은 호미 하나와 감자 씨앗 5개.\n화면 위의 '다음 목표'를 하나씩 달성하면\n새 도구가 열린다. 천천히 배워보자!",
+			[["튜토리얼 시작", _end_intro], ["건너뛰기", _skip_tutorial]])
+
+
+func _next_story_page() -> void:
+	Sound.play_sfx("sfx_ui")
+	_story_idx += 1
+	_show_story_page()
+
+
+func _end_intro() -> void:
+	dialog.close()
+	var tw := create_tween()
+	tw.tween_property(fade_rect, "color:a", 0.0, 0.6)
 
 
 func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
-	dialog.close()
+	_end_intro()
 
 
 func tutorial_notify(flag: String) -> void:
@@ -757,7 +796,13 @@ func _talk_to(npc: Node2D) -> void:
 	dialog.open(title, line, [
 		["선물하기", _give_gift.bind(npc.id)],
 		["닫기", null],
-	])
+	], _npc_portrait(npc.id))
+
+
+func _npc_portrait(npc_id: String, happy := false) -> Texture2D:
+	# 호감도 50+ 또는 선물 직후엔 웃는 얼굴
+	var expr := "happy" if (happy or int(GameData.affinity[npc_id]) >= 50) else "normal"
+	return tex["npc_%s_portrait_%s" % [npc_id, expr]]
 
 
 func _give_gift(npc_id: String) -> void:
@@ -780,6 +825,7 @@ func _give_gift(npc_id: String) -> void:
 	var before := int(GameData.affinity[npc_id])
 	GameData.affinity[npc_id] = before + 10
 	Sound.play_sfx("sfx_heart")
+	dialog.set_portrait(_npc_portrait(npc_id, true))
 	var body := "%s을(를) 선물했다! 정말 좋아한다. ♥" % gift_name
 	if before < 50 and before + 10 >= 50:
 		if npc_id == "merchant":
@@ -1079,7 +1125,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_cancel"):
 			shop.close()
 			summary.close()
-			dialog.close()
+			map_ui.close()
+			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
+			if fade_rect == null or fade_rect.color.a < 0.5:
+				dialog.close()
+		elif event.is_action_pressed("open_map") and map_ui.visible:
+			map_ui.close()
+		return
+	if event.is_action_pressed("open_map"):
+		Sound.play_sfx("sfx_ui")
+		map_ui.open()
+		tutorial_notify("map")
 		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 저장 후 타이틀로
@@ -1226,6 +1282,8 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 				Color(1, 1, 1, 0.6), false, 1.0)
 
+	_draw_nav_arrow()
+
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if fishing_state == "waiting":
 		var base := player.position + Vector2(-6, -38)
@@ -1298,6 +1356,55 @@ func _context_hint() -> Array:
 	return []
 
 
+# 현재 목표에 목적지가 있으면 플레이어 주위에 방향 화살표를 띄운다
+func nav_target() -> Variant:
+	match GameData.tutorial_current_flag():
+		"slept":
+			return Vector2(4 * TILE + 8, 5 * TILE + 8)     # 농장 집 문 앞
+		"shop":
+			return Vector2(50 * TILE + 8, 7 * TILE + 8)    # 마을 상점 앞
+		"fish":
+			return Vector2(25 * TILE + 8, 12 * TILE + 8)   # 연못가
+		"chop":
+			return _nearest_object_pos("tree")
+		"mine":
+			return _nearest_object_pos("rock")
+	return null
+
+
+func _nearest_object_pos(kind: String) -> Variant:
+	var best: Variant = null
+	var best_d := INF
+	for pos: Vector2i in objects:
+		if objects[pos].kind != kind:
+			continue
+		var p := Vector2(pos.x * TILE + 8, pos.y * TILE + 8)
+		var d := p.distance_to(player.position)
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+
+func _draw_nav_arrow() -> void:
+	if player == null or ui_open():
+		return
+	var target: Variant = nav_target()
+	if target == null:
+		return
+	var to: Vector2 = target - player.position
+	if to.length() < 40.0:
+		return  # 목적지 근처에서는 숨긴다
+	var dirv := to.normalized()
+	var bob := sin(weather_time * 6.0) * 2.0
+	var base := player.position + Vector2(0, -34) + dirv * (16.0 + bob)
+	var tip := base + dirv * 7.0
+	var left := base + dirv.rotated(2.6) * 4.0
+	var right := base + dirv.rotated(-2.6) * 4.0
+	draw_colored_polygon(PackedVector2Array([tip, left, right]),
+		Color(1, 0.85, 0.3, 0.95))
+
+
 func _draw_context_hint() -> void:
 	var hint := _context_hint()
 	if hint.is_empty():
@@ -1333,6 +1440,13 @@ func _draw_weather() -> void:
 
 func _debug_tick() -> void:
 	_shot_frames += 1
+	if OS.get_environment("KYOJIN_STORY") != "":
+		# 스토리 화면만 캡처하고 종료
+		if _shot_frames == 30:
+			_save_shot("_story.png")
+		elif _shot_frames == 34:
+			get_tree().quit()
+		return
 	match _shot_frames:
 		10: _send_key(KEY_1)
 		14: _send_key(KEY_SPACE)                       # 아래 타일 밭 갈기
@@ -1354,7 +1468,10 @@ func _debug_tick() -> void:
 		64: _send_key(KEY_SPACE)                       # 스프링클러 설치
 		66: _send_key(KEY_3)                           # 씨앗 도구로 컨텍스트 힌트 확인
 		70: _save_shot("_game.png")
+		71: map_ui.open()                              # 지도 확인
+		73: _save_shot("_map.png")
 		74:
+			map_ui.close()
 			player.position = Vector2(54 * TILE + 8, 8 * TILE + 8)
 			player.dir = "right"                       # 마을 게시판 앞으로
 			for n in npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
