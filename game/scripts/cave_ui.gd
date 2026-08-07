@@ -249,6 +249,8 @@ func _attack() -> void:
 						if randf() < 0.15:
 							main.gain_item("gem", 1)
 							main.hud.show_message("유령이 보석을 떨어뜨렸다!")
+						if randf() < 0.1:
+							main.gain_legend("ghost_essence")
 				if monsters.is_empty():
 					_floor_clear()
 			return
@@ -288,6 +290,9 @@ func _interact() -> void:
 		if gem_n > 0:
 			msg += ", 보석 %d개" % gem_n
 		main.hud.show_message(msg + "를 얻었다!")
+		# 깊은 층(5층+)의 상자에서는 별빛 광석이 나온다
+		if floor_num >= 5:
+			main.gain_legend("star_ore")
 		chest_pos = Vector2i(-1, -1)
 		var sp := _free_tile(0.0)
 		stairs_pos = sp if sp.x >= 0 else Vector2i(GW / 2, GH / 2)

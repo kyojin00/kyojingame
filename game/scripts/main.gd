@@ -58,6 +58,7 @@ var inventory_ui: CanvasLayer
 var interior: CanvasLayer
 var cooking_ui: CanvasLayer
 var quest_ui: CanvasLayer
+var note_ui: CanvasLayer
 var cave: CanvasLayer
 var pet: Node2D
 var fade_rect: ColorRect
@@ -207,6 +208,10 @@ func _ready() -> void:
 	quest_ui = preload("res://scripts/quest_ui.gd").new()
 	quest_ui.main = self
 	add_child(quest_ui)
+
+	note_ui = preload("res://scripts/note_ui.gd").new()
+	note_ui.main = self
+	add_child(note_ui)
 
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
@@ -569,7 +574,7 @@ func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
-		or cooking_ui.visible or quest_ui.visible \
+		or cooking_ui.visible or quest_ui.visible or note_ui.visible \
 		or (story_layer != null and story_layer.visible)
 
 
@@ -630,6 +635,15 @@ func _update_fishing(delta: float) -> void:
 		if fishing_timer <= 0.0:
 			fishing_state = ""
 			hud.show_message("물고기가 도망갔다...")
+
+
+# 전설 재료 획득 (판매 불가, 최후의 연금술 재료 — 연구 노트에 기록)
+func gain_legend(id: String) -> void:
+	if int(GameData.items[id]) > 0:
+		return  # 각 전설 재료는 하나면 충분하다
+	gain_item(id, 1)
+	Sound.play_sfx("sfx_catch")
+	hud.show_message("[전설 재료] %s 획득! 연구 노트(N)에 기록됐다." % GameData.ITEMS[id].name)
 
 
 # 숙련도 경험치를 주고, 레벨업하면 하단에 알린다
@@ -783,6 +797,12 @@ func use_tool() -> void:
 					spawn_particles(t, "sparkle")
 					tutorial_notify("harvest")
 					gain_skill("farm", 8.0)
+					if int(GameData.crops_harvested.get(cell.crop_id, 0)) == 0:
+						hud.show_message("연구 노트에 '%s' 기록이 추가됐다! (N)" % def.name)
+					GameData.crops_harvested[cell.crop_id] = \
+						int(GameData.crops_harvested.get(cell.crop_id, 0)) + 1
+					if randf() < 0.02:
+						gain_legend("gold_crop")
 				else:
 					hud.show_message("아직 다 자라지 않았다.")
 		"axe":
@@ -802,6 +822,8 @@ func use_tool() -> void:
 					hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
 					tutorial_notify("chop")
 					gain_skill("forest", 6.0)
+					if randf() < 0.02:
+						gain_legend("world_branch")
 				else:
 					hud.show_message("나무를 찍었다. (%d/%d)" % [TREE_HP - obj.hp, TREE_HP])
 			elif obj.kind == "fence":
@@ -980,46 +1002,49 @@ func _building_kind_at(t: Vector2i) -> String:
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 const STORY_PAGES := [
-	["잿빛 도시", "회색 빌딩 숲, 끝나지 않는 야근.\n깜빡이는 모니터 앞에서 문득 생각했다.\n\n'...내가 원하던 삶이, 정말 이런 거였나?'"],
-	["한 통의 편지", "그러던 어느 날, 우편함에\n낡은 우표가 붙은 편지 한 통이 꽂혀 있었다.\n\n봉투에서는 희미하게 흙냄새가 났다.\n보낸 사람은 — 오래 소식이 끊겼던 할아버지."],
-	["할아버지의 편지", "\"사랑하는 손주에게.\n나도 이제 몸이 예전 같지 않구나.\n평생을 일군 '교진 팜'을 너에게 맡기마.\n\n흙을 만지다 보면, 도시에서 잃어버린 것들을\n다시 찾게 될 게다.\""],
-	["오래된 기억", "어린 시절, 할아버지 밭에서 캐 먹던\n포슬포슬한 감자의 맛.\n여름밤 평상에 누워 듣던 풀벌레 소리.\n\n잊고 지냈던 기억들이 하나둘 떠올랐다."],
-	["결심", "다음 날 아침, 나는 사표를 냈다.\n짐이라곤 낡은 트렁크 하나.\n\n기차를 타고, 버스를 갈아타고,\n흙길을 한참 걸어 '교진 마을'로 향했다."],
-	["새 보금자리", "언덕을 넘자, 작은 농장이 눈에 들어왔다.\n낡았지만 따뜻해 보이는 집,\n잡초가 무성한 드넓은 밭,\n멀리 마을 굴뚝에서 피어오르는 저녁 연기.\n\n이제 이곳이 나의 새 보금자리다."],
+	["탐험가 할아버지", "나의 할아버지는 유명한 탐험가이자\n연금술 연구자였다.\n\n평생 신비한 생명체와 전설 속 재료를 찾아\n세계 곳곳을 누비셨다."],
+	["비웃음", "사람들은 할아버지의 연구를\n'허황된 꿈'이라며 비웃었다.\n\n하지만 할아버지는 단 한 번도\n포기하지 않으셨다."],
+	["이별", "수많은 연구 노트와 기록을 남기고도,\n할아버지는 끝내 마지막 연구를\n완성하지 못한 채 세상을 떠나셨다.\n\n무엇을 만들려 하셨는지는\n아무도 알지 못한다."],
+	["나무 상자", "장례식이 끝난 뒤,\n부모님이 낡은 나무 상자를 건네주셨다.\n\n안에는 대부분 비어 있는 연구 노트 한 권과\n손으로 눌러쓴 편지 한 통."],
+	["할아버지의 편지", "\"이 편지를 읽고 있다면, 나는 이미 떠났겠구나.\n내가 마지막까지 조사하던 곳은 '교진 마을'이다.\n그곳에 내가 평생 찾던 답이 있을지도 모른다.\n\n...내가 이루지 못한 꿈을,\n네가 이어주었으면 좋겠다.\""],
+	["교진 마을로", "할아버지가 무엇을 찾고 계셨는지,\n나는 아직 아무것도 모른다.\n\n하지만 상자 속 빈 노트가\n왠지 나를 부르는 것 같았다.\n\n나는 짐을 싸서 교진 마을로 향했다."],
+	["물려받은 농장", "마을 어귀, 할아버지가 머물던 작은 농장.\n오래 방치되어 잡초가 무성하고\n시설은 낡아 있었다.\n\n당분간은... 여기서 살아가 보자.\n농사도 짓고, 이웃도 사귀면서."],
 ]
 # 부지를 열 때마다 한 장(章)씩 이어지는 마을 확장 스토리
 const PARCEL_STORIES := {
 	"east": [
-		["제1장 · 동쪽 들판", "표지판 너머, 무성한 풀숲 사이에서\n낡은 팻말 하나를 발견했다.\n\n'여기서부터 우리 농장의 두 번째 밭이었다'\n— 할아버지의 글씨다."],
-		["제1장 · 동쪽 들판", "'혼자서는 넓히지 마라.\n땅은 이웃과 함께 넓히는 것이다.'\n\n남쪽 들판 너머로,\n옛 마을의 흔적이 이어져 있는 듯하다..."],
+		["제1장 · 동쪽 들판", "표지판 너머 풀숲에서\n비바람에 삭은 팻말을 발견했다.\n\n'관찰 지점 1 — 이 들판의 흙은 특별하다.'\n\n...할아버지의 글씨다."],
+		["제1장 · 동쪽 들판", "할아버지는 이 마을의 밭을\n연구하고 계셨던 걸까?\n\n노트에 팻말의 내용을 옮겨 적었다.\n남쪽 들판에도 뭔가 있을지 모른다."],
 	],
 	"south": [
-		["제2장 · 남쪽 들판", "들판 한가운데,\n돌로 쌓은 화덕 터가 남아 있다.\n\n옛날 이곳에서 마을 사람들이\n수확 축제를 열었다고 한다."],
-		["제2장 · 남쪽 들판", "'가을이면 온 마을이 여기 모여\n감자를 구워 먹었지.'\n\n...숲과 호수 쪽에서\n바람을 타고 물 냄새가 실려 온다."],
+		["제2장 · 남쪽 들판", "들판 한가운데, 돌로 쌓은 화덕 터.\n재 속에서 그을린 유리병 조각이 나왔다.\n\n병 바닥에 조그맣게 새겨진 글자.\n'시료 34 — 실패.'"],
+		["제2장 · 남쪽 들판", "실패, 실패, 실패...\n할아버지는 대체 여기서\n무엇을 만들고 계셨던 걸까.\n\n바람을 타고 숲과 호수의\n물 냄새가 실려 온다."],
 	],
 	"forest": [
-		["제3장 · 숲과 호수", "호숫가 바위에 오래된 낚시 의자가 놓여 있다.\n\n할아버지가 철수네 할아버지와\n밤새 낚시를 하던 자리라고 한다."],
-		["제3장 · 숲과 호수", "'이 호수엔 달빛을 먹은\n황금잉어가 산다네.'\n\n전설을 믿어보자. 강변을 따라가면\n더 큰 물길이 나온다던데..."],
+		["제3장 · 숲과 호수", "호숫가 바위에 오래된 낚시 의자.\n철수 아저씨가 말했던,\n할아버지가 밤새 낚시하던 자리다.\n\n의자 밑에 방수포로 싼 쪽지가 있었다."],
+		["제3장 · 숲과 호수", "'달빛을 먹은 황금잉어.\n비늘이 아니라, 그 존재 자체가 재료다.\n놓아주어도 기록은 남는다.'\n\n...할아버지는 물고기조차\n연구의 눈으로 보고 계셨다."],
 	],
 	"river": [
-		["제4장 · 강변", "강가에 낡은 나루터가 남아 있다.\n\n옛날에는 배로 곡식을 실어 날랐다고 한다.\n물살 소리가 밤낮없이 흐른다."],
-		["제4장 · 강변", "'강을 따라 올라가면\n바람이 자라는 평야가 있다.'\n\n뱃사공의 노래가\n아직도 들리는 것만 같다."],
+		["제4장 · 강변", "낡은 나루터 기둥에\n노끈으로 묶인 양철통이 매달려 있다.\n\n안에는 물에 불은 지도 한 장.\n강 상류에 X 표시가 되어 있다."],
+		["제4장 · 강변", "X 옆에 흘려 쓴 메모.\n\n'물은 모든 것을 기억한다.\n상류의 평야, 그 아래의 동굴.\n일곱 중 몇은 거기에 있다.'\n\n...일곱? 일곱이 뭘까."],
 	],
 	"plains": [
-		["제5장 · 황금 평야", "끝없이 펼쳐진 평야.\n바람이 지나갈 때마다\n풀이 금빛으로 일렁인다.\n\n할아버지가 가장 사랑하던 땅이다."],
-		["제5장 · 황금 평야", "'언젠가 이 평야를\n온통 밀밭으로 만들고 싶었지.'\n\n이제 그 꿈은 나의 것이다.\n남은 것은... 깊은 숲뿐."],
+		["제5장 · 황금 평야", "바람이 지나갈 때마다\n풀이 금빛으로 일렁이는 평야.\n\n무너진 돌담 아래에서\n녹슨 실험 도구 상자를 찾았다."],
+		["제5장 · 황금 평야", "상자 안쪽 뚜껑에 적힌 문장.\n\n'재료는 사는 것이 아니라 얻어지는 것.\n땀에서, 물에서, 어둠에서, 그리고 마음에서.'\n\n남은 곳은... 깊은 숲뿐이다."],
 	],
 	"deepforest": [
-		["마지막 장 · 깊은 숲", "아름드리 나무가 하늘을 가리는 깊은 숲.\n새소리조차 조심스러운 이곳은\n자원의 보고이자, 농장의 끝이다."],
-		["마지막 장 · 깊은 숲", "편지의 마지막 문장이 떠오른다.\n\n'땅 끝까지 가 보면 알게 될 게다.\n농장은 땅이 아니라,\n네가 흘린 시간이라는 걸.'\n\n— 이제 이 땅 전부가 나의 농장이다."],
+		["마지막 장 · 깊은 숲", "아름드리 나무가 하늘을 가리는 깊은 숲.\n숲의 가장 깊은 곳, 거대한 고목 아래에\n작은 오두막의 잔해가 있었다.\n\n할아버지의 마지막 연구 캠프다."],
+		["마지막 장 · 깊은 숲", "무너진 책상 위, 마지막 일지.\n\n'세계수는 보았다. 재료도 거의 모았다.\n하지만 시간이... 시간이 부족하구나.'\n\n일지의 나머지는 찢겨 있었다.\n연구 노트를 더 채우면, 알 수 있을까."],
 	],
 }
 
-# 최종 목표: 모든 부지를 되찾아 할아버지의 농장을 부활시키기 → 엔딩
+# 진 엔딩: 전설 재료 7종을 모아 최후의 연금술로 '유니콘의 뿔'을 완성한다.
+# (최종 목표는 게임 내에서 이 순간까지 절대 공개되지 않는다)
 const ENDING_PAGES := [
-	["에필로그 · 약속", "마지막 문서에 도장을 찍었다.\n할아버지의 땅 전부가\n다시 우리 농장이 되었다.\n\n이장님은 모자를 벗으며 웃었다.\n'축하하네, 젊은 농부.'"],
-	["에필로그 · 부치지 못한 편지", "그날 밤, 책상 서랍 깊은 곳에서\n부치지 못한 편지 한 장을 발견했다.\n\n'네가 이 편지를 읽고 있다면,\n농장은 이미 너의 것이겠구나.'"],
-	["에필로그 · 할아버지의 꿈", "'고맙다. 내 꿈을 이어줘서.\n하지만 기억하렴 —\n농장의 진짜 주인은 땅이 아니라\n거기서 흘린 웃음과 땀이란다.'\n\n창밖에는 우리 밭이\n달빛을 받아 반짝이고 있었다."],
+	["마지막 연금술", "연구실 책상 위에 일곱 재료를 늘어놓았다.\n\n달빛 작물, 황금잉어, 세계수 가지,\n별빛 광석, 유령의 정수, 황금 달걀,\n그리고... 할아버지의 기억 조각."],
+	["완성되는 노트", "재료를 노트의 마지막 장에 겹쳐 놓자,\n빈 페이지에 글씨가 스며들 듯 떠올랐다.\n\n할아버지가 평생 찾아 헤매던 것.\n그것은 자연 어디에도 없는 재료 —\n일곱 개의 정성이 모여야만 태어나는 것."],
+	["유니콘의 뿔", "빛이 잦아들자, 책상 위에는\n나선형으로 빛나는 뿔 하나가 놓여 있었다.\n\n세상에 단 하나뿐인, 유니콘의 뿔.\n\n사람들이 비웃던 할아버지의 연구는\n허황된 꿈이 아니었다."],
+	["이어진 꿈", "'내가 이루지 못한 꿈을\n네가 이어주었으면 좋겠다.'\n\n...할아버지, 보이시나요.\n농사를 짓고, 물고기를 잡고,\n사람들과 웃고 지내던 그 모든 날들이\n전부 할아버지의 연구였어요.\n\n그리고 오늘, 그 꿈이 완성됐어요."],
 ]
 
 var _story_idx := 0
@@ -1121,10 +1146,10 @@ func _show_story_page() -> void:
 				_story_idx = _story_pages.size() - (0 if _story_mode == "intro" else 1)
 				_show_story_page())
 	else:
-		_story_title.text = "교진 팜에 어서 와!"
-		_story_body.text = "지금 가진 것은 호미 하나와 감자 씨앗 5개.\n화면 위의 '다음 목표'를 하나씩 달성하면\n새 도구가 열린다. 천천히 배워보자!"
-		_story_add_button("튜토리얼 시작", _end_intro)
-		_story_add_button("건너뛰기", _skip_tutorial)
+		_story_title.text = "교진 마을에서의 첫날"
+		_story_body.text = "가진 것은 호미 하나, 감자 씨앗 5개,\n그리고 할아버지의 낡은 연구 노트(N).\n\n새로운 것을 발견할 때마다\n노트의 빈 페이지가 채워진다고 한다.\n화면 위 '다음 목표'를 따라 천천히 배워보자!"
+		_story_add_button("시작하기", _end_intro)
+		_story_add_button("튜토리얼 건너뛰기", _skip_tutorial)
 
 
 func _prev_story_page() -> void:
@@ -1136,23 +1161,13 @@ func _prev_story_page() -> void:
 # 부지/엔딩 스토리 닫기 (오프닝과 달리 튜토리얼로 이어지지 않는다)
 func _close_story() -> void:
 	Sound.play_sfx("sfx_ui")
-	var was_parcel := _story_mode == "parcel"
 	if story_layer != null:
 		story_layer.queue_free()
 		story_layer = null
 	hud.visible = true
-	# 마지막 부지까지 되찾았으면 최종 목표 달성 → 엔딩
-	if was_parcel and not GameData.ending_seen and _all_parcels_owned():
-		show_ending()
 
 
-func _all_parcels_owned() -> bool:
-	for pid in GameData.PARCELS:
-		if not GameData.owned_parcels.has(pid):
-			return false
-	return true
-
-
+# 최후의 연금술 (연구 노트에서 재료 7종을 모두 모으면 실행 가능)
 func show_ending() -> void:
 	GameData.ending_seen = true
 	save_now()
@@ -1164,14 +1179,12 @@ func show_ending() -> void:
 	var fish_n := 0
 	for k in GameData.fish_caught:
 		fish_n += int(GameData.fish_caught[k])
-	var skill_sum := 0
-	for sid in GameData.SKILL_IDS:
-		skill_sum += GameData.skill_lv(sid)
+	var prog: Dictionary = GameData.note_progress()
 	_story_pages = ENDING_PAGES.duplicate()
-	_story_pages.append(["농장 부활의 기록",
-		"함께한 날: %d일째\n소지금: %dG\n낚은 물고기: %d마리 · 처치한 몬스터: %d\n만든 요리: %d종류 · 능력치 합계: Lv.%d\n\n...그리고 농장 생활은 계속된다!" %
-		[GameData.day, GameData.money, fish_n, kills,
-		GameData.recipes_cooked.size(), skill_sum]])
+	_story_pages.append(["연구의 기록",
+		"함께한 날: %d일째\n연구 노트: %d/%d 페이지\n낚은 물고기: %d마리 · 처치한 몬스터: %d\n만든 요리: %d종류\n\n...그리고 교진 마을의 나날은 계속된다." %
+		[GameData.day, int(prog.filled), int(prog.total), fish_n, kills,
+		GameData.recipes_cooked.size()]])
 	_build_story_ui()
 	_story_idx = 0
 	_show_story_page()
@@ -1281,10 +1294,22 @@ func _talk_to(npc: Node2D) -> void:
 	var lines: Array = def.lines
 	var line: String = lines[randi() % lines.size()]
 	var aff := mini(int(GameData.affinity[npc.id]), 100)
+	# 호감도가 오르면 비밀 이야기(할아버지의 과거)가 섞여 나온다
+	if aff >= 100 and def.has("secret100") and randf() < 0.4:
+		line = def.secret100
+	elif aff >= 50 and def.has("secret50") and randf() < 0.4:
+		line = def.secret50
 	var hearts := int(aff / 10.0)
 	var title := "%s %s (%d/100)" % [def.name, "♥".repeat(maxi(hearts, 0)), aff]
 	if aff >= 50:
 		line += "\n(친밀한 사이다! 특전 발동 중)"
+	# 호감도 100: 할아버지의 기억 조각을 건네받는다 (1회)
+	if aff >= 100 and not GameData.memory_given:
+		GameData.memory_given = true
+		line = def.get("secret100", line)
+		gain_legend("memory_piece")
+		if Net.is_host():
+			_broadcast_stats()
 	dialog.open(title, line, [
 		["선물하기", _give_gift.bind(npc.id)],
 		["닫기", null],
@@ -1469,6 +1494,9 @@ func _next_day(passed_out: bool) -> void:
 			var product: String = GameData.ANIMALS[a.type].product
 			GameData.items[product] += 1
 			collected[product] = int(collected.get(product, 0)) + 1
+			if a.type == "chicken" and randf() < 0.03 and int(GameData.items["golden_egg"]) == 0:
+				GameData.items["golden_egg"] += 1
+				collected["golden_egg"] = 1
 		a.fed = false
 
 	# 나무/돌이 조금씩 다시 자란다
@@ -1731,6 +1759,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			map_ui.close()
 			inventory_ui.close()
 			quest_ui.close()
+			note_ui.close()
 			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
 			if fade_rect == null or fade_rect.color.a < 0.5:
 				dialog.close()
@@ -1740,6 +1769,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			inventory_ui.close()
 		elif event.is_action_pressed("open_quest") and quest_ui.visible:
 			quest_ui.close()
+		elif event.is_action_pressed("open_note") and note_ui.visible:
+			note_ui.close()
 		return
 	if event.is_action_pressed("open_map"):
 		Sound.play_sfx("sfx_ui")
@@ -1754,6 +1785,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		Sound.play_sfx("sfx_ui")
 		quest_ui.toggle()
 		tutorial_notify("quest")
+		return
+	if event.is_action_pressed("open_note"):
+		Sound.play_sfx("sfx_ui")
+		note_ui.toggle()
+		tutorial_notify("note")
 		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 저장 후 타이틀로
@@ -2197,7 +2233,13 @@ func _debug_tick() -> void:
 		164: cave.close()
 		166: quest_ui.toggle()                         # 퀘스트 창(J) 확인
 		170: _save_shot("_questwin.png")
-		172: get_tree().quit()
+		172:
+			quest_ui.close()
+			GameData.crops_harvested = {"potato": 3, "carrot": 1}
+			GameData.affinity["merchant"] = 60
+			note_ui.toggle()                           # 연구 노트(N) 확인
+		176: _save_shot("_note.png")
+		178: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -2492,6 +2534,8 @@ func _req_kill(mob: String) -> void:
 
 # 아이템 획득 (동굴 보상/낚시 등) — 멀티에서는 호스트가 확정한다
 func gain_item(id: String, count: int) -> void:
+	if id in ["ore", "gem"]:
+		GameData.minerals_found[id] = true
 	if Net.is_guest():
 		GameData.items[id] += count  # 낙관적 반영, 통계 브로드캐스트로 수렴
 		_req_gain.rpc_id(1, id, count)

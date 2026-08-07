@@ -106,9 +106,24 @@ func _rebuild() -> void:
 			_line("  [미수락] %s %d개 납품 - 보상 %dG" % [crop_name, int(q.qty), int(q.reward)])
 			_line("    마을 광장 게시판(E)에서 수락하자.", Color(0.75, 0.72, 0.85))
 
-	# 최종 목표: 할아버지의 농장 부활
+	# 할아버지의 부탁 (진짜 목표는 끝까지 밝히지 않는다)
 	_line("")
-	_line("[최종 목표: 할아버지의 농장 부활]", Color(0.65, 0.85, 0.6))
+	_line("[할아버지의 부탁]", Color(0.65, 0.85, 0.6))
+	var prog: Dictionary = GameData.note_progress()
+	if GameData.ending_seen:
+		_line("  할아버지의 꿈을 완성했다.", Color("ffd75e"))
+		_line("    교진 마을의 나날은 계속된다.", Color(0.75, 0.72, 0.85))
+	else:
+		_line("  연구 노트(%s)를 채워 할아버지의 흔적을 따라가자" %
+			GameData.key_label("open_note"))
+		_line("    기록 %d/%d (%d%%)" % [int(prog.filled), int(prog.total),
+			int(prog.ratio * 100.0)], Color(0.75, 0.72, 0.85))
+		if prog.ratio >= 0.5:
+			_line("    노트에 숨겨진 메모가 나타나기 시작했다...", Color("ffd75e"))
+
+	# 마을 탐사 (부지)
+	_line("")
+	_line("[마을 탐사]", Color(0.65, 0.85, 0.6))
 	var total := 0
 	var owned := 0
 	var next_pid := ""
@@ -119,12 +134,11 @@ func _rebuild() -> void:
 		elif next_pid == "":
 			next_pid = pid
 	if next_pid == "":
-		_line("  달성! 할아버지의 땅을 전부 되찾았다. (%d/%d)" % [owned, total],
+		_line("  할아버지가 조사하던 곳을 전부 되찾았다. (%d/%d)" % [owned, total],
 			Color("ffd75e"))
-		_line("    농장 생활은 계속된다. 도감을 채워보자!", Color(0.75, 0.72, 0.85))
 	else:
-		var def: Dictionary = GameData.PARCELS[next_pid]
-		_line("  잃어버린 부지를 모두 되찾자 (%d/%d)" % [owned, total])
-		_line("    다음 부지: %s (%dG) · 지도(%s)에서 확인" %
-			[def.name, int(def.price), GameData.key_label("open_map")],
+		var pdef: Dictionary = GameData.PARCELS[next_pid]
+		_line("  할아버지의 탐사 흔적을 따라 부지를 되찾자 (%d/%d)" % [owned, total])
+		_line("    다음: %s (%dG) · 지도(%s)에서 확인" %
+			[pdef.name, int(pdef.price), GameData.key_label("open_map")],
 			Color(0.75, 0.72, 0.85))

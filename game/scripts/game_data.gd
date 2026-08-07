@@ -58,6 +58,7 @@ const BINDABLE_ACTIONS := [
 	["open_inventory", "가방 (도구/능력치)"],
 	["open_map", "지도"],
 	["open_quest", "퀘스트 창"],
+	["open_note", "연구 노트"],
 	["save_game", "저장"],
 ]
 
@@ -397,10 +398,30 @@ const ITEMS := {
 	"dish_salad": {"name": "치즈 샐러드", "sell": 170},
 	"dish_punch": {"name": "수박화채", "sell": 240},
 	"dish_eggplant": {"name": "가지볶음", "sell": 120},
+	# 전설 재료 (판매 불가, 최후의 연금술 재료)
+	"gold_crop": {"name": "달빛 작물", "sell": 0, "legend": true},
+	"world_branch": {"name": "세계수 가지", "sell": 0, "legend": true},
+	"star_ore": {"name": "별빛 광석", "sell": 0, "legend": true},
+	"ghost_essence": {"name": "유령의 정수", "sell": 0, "legend": true},
+	"golden_egg": {"name": "황금 달걀", "sell": 0, "legend": true},
+	"memory_piece": {"name": "할아버지의 기억 조각", "sell": 0, "legend": true},
 }
 const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
 	"ore", "gem", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
-	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant"]
+	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
+	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece"]
+
+# 최후의 연금술에 필요한 전설 재료 7종 (콘텐츠마다 하나씩)
+# [아이템 id, 어느 콘텐츠에서, 힌트]
+const LEGENDS := [
+	["gold_crop", "농사", "달 밝은 날, 정성껏 키운 작물에서 아주 드물게..."],
+	["fish_golden", "낚시", "물가의 전설. 철수도 두 번밖에 못 봤다는 황금잉어."],
+	["world_branch", "벌목", "깊은 숲의 오래된 나무는 가끔 신비한 가지를 떨어뜨린다."],
+	["star_ore", "채광", "동굴 깊은 곳(5층+)의 보상 상자에서 별처럼 빛나는 광석이."],
+	["ghost_essence", "전투", "유령은 아주 드물게 정수를 남긴다."],
+	["golden_egg", "목장", "사랑받은 닭은 아주 가끔 황금빛 알을 낳는다."],
+	["memory_piece", "교류", "마을 사람과 마음이 통하면(호감도 100) 건네받게 될 것."],
+]
 
 # ---- 요리: 재료(작물/아이템) -> 요리 아이템. energy = 먹었을 때 회복량 ----
 const RECIPES := {
@@ -418,8 +439,72 @@ const RECIPES := {
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant"]
 var recipes_cooked := {}  # 도감: id -> 만든 횟수
-# 최종 목표(모든 부지 회수 = 할아버지의 농장 부활) 달성 후 엔딩을 봤는가
+# 최후의 연금술(유니콘의 뿔)을 완성했는가 — 엔딩 후에도 자유 플레이 계속
 var ending_seen := false
+
+# ---- 연구 노트 ----
+# 할아버지가 남긴 노트. 발견할 때마다 빈 페이지가 채워진다.
+var crops_harvested := {}   # crop id -> 수확 횟수 (첫 수확 = 작물 기록)
+var minerals_found := {}    # "ore"/"gem" -> true (한 번이라도 획득)
+var memory_given := false   # 기억 조각을 받았는가 (호감도 100 보상, 1회)
+
+# 진행도 50%부터 하나씩 풀리는 할아버지의 숨겨진 메모
+# [필요 진행도(0~1), 제목, 내용]
+const NOTE_MEMOS := [
+	[0.5, "숨겨진 메모 I", "…흙에서 시작해야 한다. 생명을 키워 본 손만이\n다음 장을 읽을 자격이 있다.\n\n나는 이 마을의 밭에서 그 씨앗을 보았다."],
+	[0.6, "숨겨진 메모 II", "물속에도, 바위 속에도, 어둠 속에도 재료는 있다.\n하나하나는 평범해 보이지만, 모이면 이야기가 된다.\n\n일곱. 일곱이 필요하다."],
+	[0.7, "숨겨진 메모 III", "사람들은 내 연구를 비웃었지.\n하지만 가장 중요한 재료는 시장에서 살 수 없는 것들이다.\n땀, 정성, 그리고 사람의 마음."],
+	[0.8, "숨겨진 메모 IV", "이제 너도 눈치챘을 것이다.\n네가 매일 하던 모든 일이 — 농사도, 낚시도, 탐험도 —\n전부 나의 연구였다는 걸.\n\n일곱 재료가 모이면, 연구실 책상에서 나를 만나러 오렴."],
+]
+
+
+func note_progress() -> Dictionary:
+	# 연구 노트 채움 상태: {filled, total, ratio}
+	var filled := 0
+	var total := 0
+	for id in CROP_IDS:
+		total += 1
+		if int(crops_harvested.get(id, 0)) > 0:
+			filled += 1
+	for f in FISH:
+		total += 1
+		if int(fish_caught.get(f[0], 0)) > 0:
+			filled += 1
+	for mid in MOBS:
+		total += 1
+		if int(mob_kills.get(mid, 0)) > 0:
+			filled += 1
+	for rid in RECIPE_IDS:
+		total += 1
+		if int(recipes_cooked.get(rid, 0)) > 0:
+			filled += 1
+	for mineral in ["ore", "gem"]:
+		total += 1
+		if minerals_found.get(mineral, false):
+			filled += 1
+	for npc_id in NPCS:
+		total += 2  # 호감도 50 / 100 이야기
+		if int(affinity[npc_id]) >= 50:
+			filled += 1
+		if int(affinity[npc_id]) >= 100:
+			filled += 1
+	for leg in LEGENDS:
+		total += 1
+		if int(items[leg[0]]) > 0:
+			filled += 1
+	return {"filled": filled, "total": total, "ratio": float(filled) / float(total)}
+
+
+func legends_owned() -> int:
+	var n := 0
+	for leg in LEGENDS:
+		if int(items[leg[0]]) > 0:
+			n += 1
+	return n
+
+
+func can_final_alchemy() -> bool:
+	return legends_owned() == LEGENDS.size() and not ending_seen
 
 
 # 재료 보유량 (작물이면 수확물, 아니면 아이템)
@@ -484,19 +569,26 @@ func is_tile_owned(x: int, y: int) -> bool:
 
 
 # ---- NPC / 퀘스트 ----
+# 호감도가 오르면 secret50/secret100 대사가 풀리며 할아버지의 과거가 드러난다
 const NPCS := {
 	"merchant": {"name": "민지", "lines": [
 		"어서 와! 오늘도 농사는 잘 되고 있어?",
 		"제철 씨앗이 제일 잘 자라. 상점(B)에 들러!",
 		"출하 상자에 넣은 작물은 내가 좋은 값에 팔아줄게.",
 		"스프링클러를 만들면 아침 물주기가 편해져.",
-	]},
+	],
+	"secret50": "너희 할아버지... 우리 가게 단골이었어. 늘 이상한 걸 찾으셨지.\n'달빛을 먹고 자란 작물'이라던가... 밭에서도 기적이 자란다고 하셨어.",
+	"secret100": "떠나시기 전에 그러셨어. '내 연구는 이 마을 전부에 흩어져 있다'고.\n밭, 호수, 숲, 동굴... 그리고 사람들 속에도. 이제 그 말뜻을 알겠니?",
+	},
 	"fisher": {"name": "철수", "lines": [
 		"입질이 오면 초록 구간에서 낚아채는 거야.",
 		"황금잉어는 정말 귀하지... 나도 두 번밖에 못 봤어.",
 		"비 오는 날엔 왠지 물고기가 더 잘 잡히는 기분이야.",
 		"겨울엔 농사가 안 되니 낚시가 최고야.",
-	]},
+	],
+	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
+	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
+	},
 }
 var affinity := {"merchant": 0, "fisher": 0}
 # {crop, qty, reward, accepted}
@@ -508,6 +600,7 @@ const TUTORIAL_ORDER := [
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["quest", "퀘스트 창(J)을 열어 할 일을 확인하자"],
+	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
 	["till", "호미(1)로 풀밭을 갈자"],
 	["plant", "밭에 씨앗(3)을 심자"],
 	["water", "물뿌리개(2)로 물을 주자"],
@@ -650,6 +743,9 @@ func reset_all() -> void:
 	mob_kills = {}
 	recipes_cooked = {}
 	ending_seen = false
+	crops_harvested = {}
+	minerals_found = {}
+	memory_given = false
 	owned_pets = []
 	active_pet = ""
 	for id in CROP_IDS:
@@ -773,6 +869,9 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,
 		"ending_seen": ending_seen,
+		"crops_harvested": crops_harvested,
+		"minerals_found": minerals_found,
+		"memory_given": memory_given,
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
 		"player": [player_pos.x, player_pos.y],
@@ -800,6 +899,8 @@ func build_stats() -> Dictionary:
 		"owned_parcels": owned_parcels,
 		"skills": skills, "furniture": furniture,
 		"recipes_cooked": recipes_cooked, "ending_seen": ending_seen,
+		"crops_harvested": crops_harvested, "minerals_found": minerals_found,
+		"memory_given": memory_given,
 		"owned_pets": owned_pets, "active_pet": active_pet,
 	}
 
@@ -831,6 +932,11 @@ func apply_stats(d: Dictionary) -> void:
 	owned_pets = d.get("owned_pets", owned_pets)
 	active_pet = str(d.get("active_pet", active_pet))
 	ending_seen = bool(d.get("ending_seen", ending_seen))
+	for k in d.get("crops_harvested", {}):
+		crops_harvested[k] = int(d.crops_harvested[k])
+	for k in d.get("minerals_found", {}):
+		minerals_found[k] = bool(d.minerals_found[k])
+	memory_given = bool(d.get("memory_given", memory_given))
 	var q: Variant = d.get("quest", {})
 	if typeof(q) == TYPE_DICTIONARY:
 		if q.is_empty():

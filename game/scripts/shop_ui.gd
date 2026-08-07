@@ -93,8 +93,8 @@ func _rebuild() -> void:
 			items_box.add_child(row)
 		for id in GameData.ITEM_IDS:
 			var count: int = GameData.items[id]
-			if count <= 0:
-				continue
+			if count <= 0 or GameData.ITEMS[id].get("legend", false):
+				continue  # 전설 재료는 팔 수 없다
 			any = true
 			var def: Dictionary = GameData.ITEMS[id]
 			var row := HBoxContainer.new()
