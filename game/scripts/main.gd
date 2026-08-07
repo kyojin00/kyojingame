@@ -72,7 +72,7 @@ const TEXTURE_NAMES := [
 	"mature_tomato", "mature_corn", "mature_watermelon",
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
-	"rock", "bin", "house", "fence", "sprinkler", "board",
+	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
 	"npc_merchant_down_0", "npc_merchant_down_1", "npc_merchant_up_0",
 	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
@@ -89,7 +89,12 @@ const TEXTURE_NAMES := [
 	"soil_dry", "soil_wet", "water_0", "water_1",
 ]
 
-const START_TILE := Vector2i(30, 20)
+const START_TILE := Vector2i(14, 10)
+const PARCEL_SIGNS := {
+	"east": Vector2i(31, 9),
+	"south": Vector2i(9, 21),
+	"forest": Vector2i(33, 22),
+}
 # 집 앵커(좌상단): [0]=농장 집(취침), [1]=마을 상점, [2]=철수네 집
 const HOUSES := [Vector2i(2, 1), Vector2i(48, 3), Vector2i(48, 10)]
 const BOARD_POS := Vector2i(55, 8)
@@ -275,6 +280,10 @@ func _build_map() -> void:
 		if _hash01(MAP_W - 1, y) < 0.75 and not objects.has(Vector2i(MAP_W - 1, y)):
 			objects[Vector2i(MAP_W - 1, y)] = {"kind": "tree", "hp": TREE_HP}
 
+	# 부지 판매 표지판
+	for pid in PARCEL_SIGNS:
+		objects[PARCEL_SIGNS[pid]] = {"kind": "sign", "hp": 0}
+
 	# 흩어진 나무/돌 (결정적 해시 배치)
 	for y in range(1, MAP_H - 1):
 		for x in range(1, MAP_W - 1):
@@ -322,6 +331,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["bin"]
 		"board":
 			texture = tex["board"]
+		"sign":
+			texture = tex["sign"]
 		"fence":
 			texture = tex["fence"]
 		"sprinkler":
@@ -416,6 +427,11 @@ func _current_perp() -> Vector2i:
 	return Vector2i(0, 1) if player.dir in ["left", "right"] else Vector2i(1, 0)
 
 
+func can_use_tile(t: Vector2i) -> bool:
+	# 마을 구역은 공용, 나머지는 부지 소유 여부를 따른다
+	return VILLAGE_REGION.has_point(t) or GameData.is_tile_owned(t.x, t.y)
+
+
 func ui_open() -> bool:
 	return shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
@@ -444,6 +460,9 @@ func _start_fishing() -> void:
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H \
 			or grid[t.y][t.x].ground != "water":
 		hud.show_message("물가를 보고 낚싯대를 던지자.")
+		return
+	if not can_use_tile(t):
+		hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
 		return
 	if GameData.energy < ENERGY_COST["rod"]:
 		hud.show_message("너무 지쳤다... 자러 가야 할 것 같다.")
@@ -504,6 +523,9 @@ func _affected_tiles(base: Vector2i) -> Array:
 func use_tool() -> void:
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
+		return
+	if not can_use_tile(t):
+		hud.show_message("아직 구입하지 않은 부지다. 표지판(E)에서 구입하자!")
 		return
 	var cell: Dictionary = grid[t.y][t.x]
 	var obj: Variant = objects.get(t)
@@ -740,6 +762,9 @@ func interact() -> void:
 		if obj.kind == "board":
 			_open_quest_board()
 			return
+		if obj.kind == "sign":
+			_open_parcel_dialog(GameData.parcel_at(t.x, t.y))
+			return
 		if obj.kind == "house":
 			match _house_index_at(t):
 				0:
@@ -908,6 +933,38 @@ func tutorial_notify(flag: String) -> void:
 	dialog.open("튜토리얼 완료!",
 		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nB: 상점 (씨앗/판매/동물/강화/도감 탭)\nE: 상호작용 (대화/취침/판매/쓰다듬기)\nTab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n동쪽 마을의 주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
 		[["좋아!", null]])
+
+
+# ---- 부지 구입 ----
+
+func _open_parcel_dialog(pid: String) -> void:
+	if pid == "home" or GameData.owned_parcels.has(pid):
+		hud.show_message("내 부지다! 마음껏 가꾸자.")
+		return
+	var def: Dictionary = GameData.PARCELS[pid]
+	Sound.play_sfx("sfx_ui")
+	dialog.open("부지 판매: %s" % def.name,
+		"가격: %dG (소지금 %dG)\n구입하면 이 구역에서 농사, 벌목, 채광,\n낚시를 할 수 있다!" % [def.price, GameData.money],
+		[["구입하기", _buy_parcel.bind(pid)], ["닫기", null]])
+
+
+func _buy_parcel(pid: String) -> void:
+	var def: Dictionary = GameData.PARCELS[pid]
+	if GameData.owned_parcels.has(pid):
+		return
+	if GameData.money < def.price:
+		dialog.set_body("돈이 부족하다... (가격 %dG, 소지금 %dG)" % [def.price, GameData.money])
+		return
+	GameData.money -= def.price
+	GameData.today_spent += int(def.price)
+	GameData.owned_parcels.append(pid)
+	Sound.play_sfx("sfx_coin")
+	dialog.set_body("'%s' 구입 완료!\n이제 이 땅은 우리 농장이다!" % def.name)
+	if Net.is_guest():
+		_req_shop.rpc_id(1, "parcel", pid)
+	elif Net.is_host():
+		_broadcast_stats()
+	queue_redraw()
 
 
 # ---- NPC 대화 / 선물 / 퀘스트 ----
@@ -1443,6 +1500,15 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 				Color(1, 1, 1, 0.6), false, 1.0)
 
+	# 미구매 부지: 어둑한 오버레이 + 금색 경계
+	for pid in GameData.PARCELS:
+		if GameData.owned_parcels.has(pid):
+			continue
+		var r: Array = GameData.PARCELS[pid].rect
+		var rect := Rect2(r[0] * TILE, r[1] * TILE, r[2] * TILE, r[3] * TILE)
+		draw_rect(rect, Color(0.08, 0.04, 0.15, 0.18))
+		draw_rect(rect, Color(1, 0.85, 0.4, 0.45), false, 1.0)
+
 	_draw_nav_arrow()
 
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
@@ -1488,6 +1554,11 @@ func _context_hint() -> Array:
 				return ["E: 판매", above_tile]
 			"board":
 				return ["E: 의뢰 게시판", above_tile]
+			"sign":
+				var pid := GameData.parcel_at(t.x, t.y)
+				if not GameData.owned_parcels.has(pid):
+					return ["E: 부지 구입 (%dG)" % GameData.PARCELS[pid].price, above_tile]
+				return ["내 부지", above_tile]
 			"house":
 				match _house_index_at(t):
 					0:
@@ -1649,6 +1720,15 @@ func _debug_tick() -> void:
 		100: _save_shot("_npc.png")
 		102:
 			dialog.close()
+			player.position = Vector2(30 * TILE + 8, 9 * TILE + 8)
+			player.dir = "right"                       # 동쪽 부지 표지판 앞
+			GameData.money = 20000
+		106: _send_key(KEY_E)                          # 부지 구입 대화
+		112: _save_shot("_parcel.png")
+		114: _buy_parcel("east")
+		118:
+			dialog.close()
+			_save_shot("_parcel2.png")
 			get_tree().quit()
 
 
@@ -1896,6 +1976,10 @@ func _req_shop(op: String, id: String) -> void:
 			shop._on_buy_animal(id)
 		"upgrade":
 			shop._on_upgrade(id)
+		"parcel":
+			if not GameData.owned_parcels.has(id) and GameData.money >= GameData.PARCELS[id].price:
+				GameData.money -= GameData.PARCELS[id].price
+				GameData.owned_parcels.append(id)
 	_broadcast_stats()
 
 

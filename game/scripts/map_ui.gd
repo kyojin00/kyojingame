@@ -101,6 +101,17 @@ func _draw_map() -> void:
 		canvas.draw_rect(Rect2(pp.x - 2, pp.y - 2, 5, 5), Color(1, 1, 1))
 		canvas.draw_rect(Rect2(pp.x - 1, pp.y - 1, 3, 3), Color(0.95, 0.3, 0.25))
 
+	# 미구매 부지 표시
+	for pid in GameData.PARCELS:
+		if GameData.owned_parcels.has(pid):
+			continue
+		var r: Array = GameData.PARCELS[pid].rect
+		var rect := Rect2(ox + r[0] * CELL, oy + r[1] * CELL, r[2] * CELL, r[3] * CELL)
+		canvas.draw_rect(rect, Color(0.05, 0.03, 0.1, 0.45))
+		canvas.draw_rect(rect, Color(1, 0.85, 0.4, 0.8), false, 1.0)
+		_label(rect.get_center() + Vector2(0, -6), GameData.PARCELS[pid].name)
+		_label(rect.get_center() + Vector2(0, 10), "%dG" % GameData.PARCELS[pid].price)
+
 	# 라벨
 	_label(Vector2(ox + 4.0 * CELL, oy + 1.0 * CELL - 2), "우리집")
 	_label(Vector2(ox + 50.0 * CELL, oy + 3.0 * CELL - 2), "마을")

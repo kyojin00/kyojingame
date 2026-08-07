@@ -94,6 +94,29 @@ const FISH := [
 var items := {}
 var fish_caught := {}  # 도감용 누적 기록
 
+# ---- 부지 ----
+# 시작 부지(home) 외에는 표지판에서 구입해야 사용할 수 있다 (이동은 자유)
+const PARCELS := {
+	"east": {"name": "동쪽 들판", "rect": [30, 0, 30, 20], "price": 3000},
+	"south": {"name": "남쪽 들판", "rect": [0, 20, 30, 20], "price": 8000},
+	"forest": {"name": "숲과 호수", "rect": [30, 20, 30, 20], "price": 15000},
+}
+var owned_parcels: Array = ["home"]
+
+
+func parcel_at(x: int, y: int) -> String:
+	for id in PARCELS:
+		var r: Array = PARCELS[id].rect
+		if x >= r[0] and x < r[0] + r[2] and y >= r[1] and y < r[1] + r[3]:
+			return id
+	return "home"
+
+
+func is_tile_owned(x: int, y: int) -> bool:
+	var p := parcel_at(x, y)
+	return p == "home" or owned_parcels.has(p)
+
+
 # ---- NPC / 퀘스트 ----
 const NPCS := {
 	"merchant": {"name": "민지", "lines": [
@@ -265,6 +288,7 @@ func reset_all() -> void:
 	seeds["potato"] = 5
 	tutorial = fresh_tutorial()
 	unlocked_tools = ["hoe"]  # 튜토리얼을 깨며 하나씩 해금
+	owned_parcels = ["home"]
 	reset_daily()
 
 
@@ -364,6 +388,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"quest": quest,
 		"tutorial": tutorial,
 		"unlocked_tools": unlocked_tools,
+		"owned_parcels": owned_parcels,
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,
@@ -389,6 +414,7 @@ func build_stats() -> Dictionary:
 		"seeds": seeds, "produce": produce, "items": items,
 		"fish_caught": fish_caught, "affinity": affinity,
 		"quest": quest, "tool_level": tool_level,
+		"owned_parcels": owned_parcels,
 	}
 
 
@@ -408,6 +434,7 @@ func apply_stats(d: Dictionary) -> void:
 		affinity[k] = int(d.affinity[k])
 	for k in d.get("tool_level", {}):
 		tool_level[k] = int(d.tool_level[k])
+	owned_parcels = d.get("owned_parcels", owned_parcels)
 	var q: Variant = d.get("quest", {})
 	if typeof(q) == TYPE_DICTIONARY:
 		if q.is_empty():
