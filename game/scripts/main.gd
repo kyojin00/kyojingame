@@ -38,6 +38,7 @@ var obj_nodes: Dictionary = {}  # Vector2i -> Node2D (설치/제거 가능한 �
 
 var tex: Dictionary = {}
 var world: Node2D
+var overlay: Node2D  # 건물보다 앞에 그리는 안내 텍스트/화살표/날씨 레이어
 var player: Node2D
 var hud: CanvasLayer
 var shop: CanvasLayer
@@ -151,6 +152,12 @@ func _ready() -> void:
 	world.name = "World"
 	world.y_sort_enabled = true
 	add_child(world)
+
+	overlay = Node2D.new()
+	overlay.name = "Overlay"
+	overlay.z_index = 100
+	overlay.draw.connect(_draw_overlay)
+	add_child(overlay)
 
 	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
@@ -1457,6 +1464,7 @@ func _process(delta: float) -> void:
 	_update_night()
 	hud.refresh()
 	queue_redraw()
+	overlay.queue_redraw()
 	if _shot_path != "":
 		_debug_tick()
 
@@ -1731,21 +1739,26 @@ func _draw() -> void:
 		draw_rect(rect, Color(0.08, 0.04, 0.15, 0.18))
 		draw_rect(rect, Color(1, 0.85, 0.4, 0.45), false, 1.0)
 
+
+# 건물/오브젝트 위에 그려야 하는 것들 (안내 텍스트·화살표·파티클·날씨)
+func _draw_overlay() -> void:
 	_draw_nav_arrow()
 
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
-	if fishing_state == "waiting":
-		var base := player.position + Vector2(-6, -38)
-		var dots := int(weather_time * 2.0) % 3 + 1
-		for i in dots:
-			draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)), Color(1, 1, 1, 0.8))
-	elif fishing_state == "bite":
-		var base := player.position + Vector2(-1, -46)
-		draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
-		draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
+	if player != null:
+		if fishing_state == "waiting":
+			var base := player.position + Vector2(-6, -38)
+			var dots := int(weather_time * 2.0) % 3 + 1
+			for i in dots:
+				overlay.draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)),
+					Color(1, 1, 1, 0.8))
+		elif fishing_state == "bite":
+			var base := player.position + Vector2(-1, -46)
+			overlay.draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
+			overlay.draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
 
 	for pt in particles:
-		draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
+		overlay.draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
 
 	_draw_context_hint()
 	_draw_weather()
@@ -1858,7 +1871,7 @@ func _draw_nav_arrow() -> void:
 	var tip := base + dirv * 7.0
 	var left := base + dirv.rotated(2.6) * 4.0
 	var right := base + dirv.rotated(-2.6) * 4.0
-	draw_colored_polygon(PackedVector2Array([tip, left, right]),
+	overlay.draw_colored_polygon(PackedVector2Array([tip, left, right]),
 		Color(1, 0.85, 0.3, 0.95))
 
 
@@ -1870,9 +1883,9 @@ func _draw_context_hint() -> void:
 	var base: Vector2 = hint[1]
 	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 	var pos := Vector2(base.x - w / 2.0, base.y)
-	draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 5,
+	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 5,
 		Color(0.08, 0.06, 0.12, 0.9))
-	draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 0.9))
+	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 1, 0.9))
 
 
 func _draw_weather() -> void:
@@ -1883,12 +1896,13 @@ func _draw_weather() -> void:
 		for i in 360:
 			var sx := _hash01(i, 1) * full_w - 10.0
 			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 280.0, full_h) - 5.0
-			draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy), Color(0.72, 0.82, 1.0, 0.5), 1.0)
+			overlay.draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy),
+				Color(0.72, 0.82, 1.0, 0.5), 1.0)
 	elif w == GameData.WEATHER_SNOW:
 		for i in 240:
 			var sx := fposmod(_hash01(i, 1) * full_w + sin(weather_time * 1.5 + i) * 12.0, full_w)
 			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 35.0, full_h) - 5.0
-			draw_rect(Rect2(Vector2(sx, sy), Vector2(1, 1)), Color(1, 1, 1, 0.85))
+			overlay.draw_rect(Rect2(Vector2(sx, sy), Vector2(1, 1)), Color(1, 1, 1, 0.85))
 
 
 # ---- 검증 시퀀스 ----
