@@ -793,7 +793,7 @@ var _story_buttons: HBoxContainer
 
 func _show_intro() -> void:
 	hud.visible = false
-	fade_rect.color.a = 1.0  # 게임 화면 대신 편지지 연출
+	fade_rect.color.a = 0.0  # 농장이 보이는 채로 편지지 연출
 	_build_story_ui()
 	_story_idx = 0
 	_show_story_page()
