@@ -1,0 +1,7 @@
+# Godot
+game/.godot/
+game/export_presets.cfg
+
+# OS
+.DS_Store
+Thumbs.db
