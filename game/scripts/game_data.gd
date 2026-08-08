@@ -371,6 +371,8 @@ var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
 # enter: 숲 안으로 들어가보기 / approach: 우체부 접근·대화 /
 # equip: 나무도끼를 가방 슬롯에 장착 / chop: 나무를 베어보자 / done: 완료
 var story_phase := "done"
+# 벤 나무 자리의 재성장 대기열: [x, y, 남은 일수]
+var tree_regrow: Array = []
 
 
 func story_objective_short() -> String:
@@ -978,6 +980,7 @@ func reset_all() -> void:
 	tutorial = fresh_tutorial()
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
+	tree_regrow = []
 	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
@@ -1085,6 +1088,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"stone": stone,
 		"tool_level": tool_level,
 		"tool_slots": tool_slots,
+		"tree_regrow": tree_regrow,
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,

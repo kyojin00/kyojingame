@@ -105,6 +105,7 @@ const TEXTURE_NAMES := [
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
+	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
@@ -503,7 +504,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var texture: Texture2D
 	match kind:
 		"tree":
-			texture = tex["tree_" + GameData.season_key()]
+			texture = tex["tree_01"]  # 실제 상태별 텍스처는 _refresh_tree_sprite가 결정
 			offset = Vector2(0, -100)
 		"rock":
 			texture = tex["rock"]
@@ -549,7 +550,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	world.add_child(node)
 
 
-# 나무 파괴 단계별 비주얼: 3=온전 / 2=잎 없음 / 1=반파
+# 나무 상태별 이미지 규칙 (고정 매핑):
+# 어린 나무=tree_15 / 다 자란 나무=tree_01 / 1회 벌목=tree_06 / 2회 벌목=tree_09
 func _refresh_tree_sprite(pos: Vector2i) -> void:
 	if not obj_nodes.has(pos) or not objects.has(pos):
 		return
@@ -558,13 +560,16 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 	var spr: Sprite2D = obj_nodes[pos].get_child(0)
 	var hp := int(objects[pos].hp)
 	if hp >= TREE_HP:
-		# 일부 나무에는 사과가 열려 있다 (가지 사이에 자연스럽게)
-		spr.texture = tex["tree_apple"] if objects[pos].get("apple", false) \
-			else tex["tree_" + GameData.season_key()]
+		if bool(objects[pos].get("young", false)):
+			spr.texture = tex["tree_15"]  # 아직 덜 자란 어린 나무
+		elif objects[pos].get("apple", false):
+			spr.texture = tex["tree_13"]  # 일부 나무에만 사과 3개
+		else:
+			spr.texture = tex["tree_01"]  # 완전히 자란 기본 나무
 	elif hp == 2:
-		spr.texture = tex["tree_bare"]
+		spr.texture = tex["tree_06"]
 	else:
-		spr.texture = tex["tree_half"]
+		spr.texture = tex["tree_09"]
 
 
 func _remove_object(pos: Vector2i) -> void:
@@ -655,6 +660,8 @@ func player_tile() -> Vector2i:
 
 # 마우스가 플레이어 주변 8칸 위에 있으면 그 칸이 타겟 (대각선 선택 가능)
 var _mouse_target := Vector2i(-999, -999)
+# 좌클릭으로 고정한 선택 대상 (E키/더블클릭 상호작용의 기준)
+var _sel_target := Vector2i(-999, -999)
 
 
 func _update_mouse_target() -> void:
@@ -673,6 +680,11 @@ func _update_mouse_target() -> void:
 func target_tile() -> Vector2i:
 	if _target_override.x != -999:
 		return _target_override  # 원격 플레이어 행동 처리 중
+	if _sel_target.x != -999:
+		var d := _sel_target - player_tile()
+		if absi(d.x) <= 1 and absi(d.y) <= 1:
+			return _sel_target  # 좌클릭으로 고정한 선택
+		_sel_target = Vector2i(-999, -999)  # 멀어지면 선택 해제
 	if _mouse_target.x != -999:
 		return _mouse_target
 	var dirs := {
@@ -967,12 +979,16 @@ func use_tool() -> void:
 				hud.show_message("벨 것이 없다.")
 				return
 			if obj.kind == "tree":
+				if bool(obj.get("young", false)):
+					hud.show_message("아직 어린 나무다. 다 자라면 벨 수 있다.")
+					return
 				obj.hp -= 3 if int(GameData.tool_level.get("axe", 1)) >= 2 else 1
 				Sound.play_sfx("sfx_chop", 0.15)
 				spawn_particles(t, "wood")
 				_refresh_tree_sprite(t)
 				if obj.hp <= 0:
 					_remove_object(t)
+					GameData.tree_regrow.append([t.x, t.y, 1])  # 다음 날 어린 나무가 돋는다
 					var wood_got := WOOD_PER_TREE
 					if randf() < GameData.bonus_drop_chance("forest"):
 						wood_got += 1
@@ -984,9 +1000,9 @@ func use_tool() -> void:
 					if randf() < 0.02:
 						gain_legend("world_branch")
 				elif obj.hp == 2:
-					hud.show_message("나뭇잎이 우수수 떨어졌다! (1/%d)" % TREE_HP)
+					hud.show_message("나무를 베었다! (1/%d)" % TREE_HP)
 				else:
-					hud.show_message("나무가 반쯤 부서졌다! (2/%d)" % TREE_HP)
+					hud.show_message("나무가 쓰러지기 직전이다! (2/%d)" % TREE_HP)
 			elif obj.kind == "fence":
 				_remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
@@ -1156,6 +1172,22 @@ func interact() -> void:
 				_:
 					hud.show_message("철수네 집이다. 낚시하러 갔는지 조용하다.")
 			return
+	# 자연물: E키가 기본 상호작용 (나무=도끼 벌목, 돌=곡괭이 채광)
+	var tobj: Variant = objects.get(target_tile())
+	if tobj != null and tobj.kind == "tree":
+		if bool(tobj.get("young", false)):
+			hud.show_message("아직 어린 나무다. 다 자라면 벨 수 있다.")
+		elif GameData.tool == "axe":
+			use_tool()
+		else:
+			hud.show_message("도끼가 필요하다. 숫자키로 도끼를 선택하자!")
+		return
+	if tobj != null and tobj.kind == "rock":
+		if GameData.tool == "pickaxe":
+			use_tool()
+		else:
+			hud.show_message("곡괭이가 필요하다. 숫자키로 곡괭이를 선택하자!")
+		return
 	# 상호작용 대상이 없으면 조용히 무시한다 (걸어다니며 E를 눌러도 메시지 없음)
 
 
@@ -1842,6 +1874,33 @@ func _fade_next_day(passed_out: bool) -> void:
 	tw.tween_callback(func() -> void: day_transitioning = false)
 
 
+# 나무 성장: 어린 나무(tree_15)는 며칠 지나면 다 자란 나무(tree_01)가 되고,
+# 벤 자리에는 다음 날 어린 나무가 돋아 다시 자란다.
+func _advance_tree_growth() -> void:
+	for pos: Vector2i in objects:
+		var o: Dictionary = objects[pos]
+		if o.kind == "tree" and bool(o.get("young", false)):
+			o["grow"] = int(o.get("grow", 2)) - 1
+			if int(o.grow) <= 0:
+				o.erase("young")
+				o.erase("grow")
+			_refresh_tree_sprite(pos)
+	var keep := []
+	for e in GameData.tree_regrow:
+		var pos := Vector2i(int(e[0]), int(e[1]))
+		var days := int(e[2]) - 1
+		if days > 0:
+			keep.append([pos.x, pos.y, days])
+			continue
+		# 자리가 비어 있고 밭/작물이 아니면 어린 나무가 돋는다 (차 있으면 소멸)
+		if not objects.has(pos) and grid[pos.y][pos.x].ground == "grass" \
+				and grid[pos.y][pos.x].crop_id == "":
+			objects[pos] = {"kind": "tree", "hp": TREE_HP, "young": true, "grow": 2}
+			_spawn_object_node(pos, "tree")
+			_refresh_tree_sprite(pos)
+	GameData.tree_regrow = keep
+
+
 func _next_day(passed_out: bool) -> void:
 	# 밤사이 밭은 마른다 (성장은 실시간 _growth_tick에서)
 	for y in MAP_H:
@@ -1858,6 +1917,7 @@ func _next_day(passed_out: bool) -> void:
 	GameData.minutes = GameData.DAY_START
 	GameData.energy = GameData.ENERGY_MAX * 0.5 if passed_out else GameData.ENERGY_MAX
 	GameData.reset_daily()
+	_advance_tree_growth()
 
 	# 계절이 바뀌면 제철 아닌 작물은 시든다
 	var season_changed := GameData.season() != prev_season
@@ -2028,7 +2088,9 @@ func save_now() -> void:
 	var objs := []
 	for pos: Vector2i in objects:
 		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp,
-			1 if objects[pos].get("apple", false) else 0])
+			1 if objects[pos].get("apple", false) else 0,
+			1 if objects[pos].get("young", false) else 0,
+			int(objects[pos].get("grow", 0))])
 	var anims := []
 	for a in animals:
 		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
@@ -2042,6 +2104,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.energy = float(d.energy)
 	GameData.gender = str(d.get("gender", "m"))
 	GameData.story_phase = str(d.get("main_story", "done"))
+	GameData.tree_regrow = d.get("tree_regrow", [])
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):
@@ -2136,6 +2199,9 @@ func _apply_save(d: Dictionary) -> void:
 			var od := {"kind": o[2], "hp": int(o[3])}
 			if o.size() > 4 and int(o[4]) == 1:
 				od["apple"] = true
+			if o.size() > 6 and int(o[5]) == 1:
+				od["young"] = true
+				od["grow"] = int(o[6])
 			objects[Vector2i(int(o[0]), int(o[1]))] = od
 
 
@@ -2352,7 +2418,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		hud.show_message("저장했다!")
 	elif event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
-		_click_at(get_canvas_transform().affine_inverse() * event.position)
+		_click_at(get_canvas_transform().affine_inverse() * event.position,
+			event.double_click)
 
 
 func _back_to_title() -> void:
@@ -2378,19 +2445,28 @@ func _near_shop() -> String:
 	return ""
 
 
-func _click_at(pos: Vector2) -> void:
-	# 플레이어 주변 8칸(대각선 포함) 또는 발밑 클릭 시 그쪽을 보고 도구를 쓴다.
+func _click_at(pos: Vector2, dbl: bool) -> void:
+	# 좌클릭 1회: 대상 선택 / 더블클릭: 선택 + 즉시 상호작용 (E키와 동일)
 	var t := Vector2i(int(floor(pos.x / TILE)), int(floor(pos.y / TILE)))
 	var d := t - player_tile()
-	if d != Vector2i.ZERO and absi(d.x) <= 1 and absi(d.y) <= 1:
+	if absi(d.x) > 1 or absi(d.y) > 1:
+		_sel_target = Vector2i(-999, -999)  # 먼 곳 클릭 = 선택 해제
+		return
+	if d != Vector2i.ZERO:
 		# 스프라이트 방향은 우세한 축 기준 (대각선이면 좌우 우선)
 		if d.x != 0:
 			player.dir = "right" if d.x > 0 else "left"
 		else:
 			player.dir = "down" if d.y > 0 else "up"
-		use_tool()
-	elif d == Vector2i.ZERO:
-		use_tool()
+	_sel_target = t
+	queue_redraw()
+	if dbl:
+		# 마우스만으로 즉시 상호작용: 대상이 있으면 E와 동일, 빈 칸이면 도구 사용
+		if objects.has(t) or nearby_npc() != null or nearby_animal() != null \
+				or nearby_bug() != null:
+			interact()
+		else:
+			use_tool()
 
 
 # ---- 파티클 ----
@@ -2475,12 +2551,16 @@ func _draw() -> void:
 			if cell.crop_id != "":
 				draw_texture_rect(_crop_texture(cell), tile_rect, false)
 
-	# 타겟 타일 하이라이트
+	# 타겟 타일 하이라이트 (호버: 흰 실선 / 좌클릭 선택: 금색 강조)
 	if player != null:
 		var tt := target_tile()
 		if tt.x >= 0 and tt.y >= 0 and tt.x < MAP_W and tt.y < MAP_H:
-			draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
-				Color(1, 1, 1, 0.6), false, 1.0)
+			if tt == _sel_target:
+				draw_rect(Rect2(Vector2(tt.x * TILE + 1, tt.y * TILE + 1),
+					Vector2(TILE - 2, TILE - 2)), Color(1, 0.85, 0.3, 0.9), false, 2.0)
+			else:
+				draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
+					Color(1, 1, 1, 0.6), false, 1.0)
 
 	# 미구매 부지: 어둑한 오버레이 + 금색 경계 (스토리 중에는 표시하지 않는다)
 	if GameData.story_phase != "done":
@@ -2564,6 +2644,12 @@ func _context_hint() -> Array:
 				return ["E: 세계수 동굴 (위험!)", above_tile]
 			"forage_berry", "forage_herb":
 				return ["E: 채집", above_tile]
+			"tree":
+				if bool(obj.get("young", false)):
+					return ["어린 나무 (자라는 중)", above_tile]
+				return ["E: 벌목 (도끼)", above_tile]
+			"rock":
+				return ["E: 채광 (곡괭이)", above_tile]
 			"house":
 				var bk := _building_kind_at(t)
 				if bk == "home":
@@ -2827,7 +2913,9 @@ func _make_snapshot_json() -> String:
 	var objs := []
 	for pos: Vector2i in objects:
 		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp,
-			1 if objects[pos].get("apple", false) else 0])
+			1 if objects[pos].get("apple", false) else 0,
+			1 if objects[pos].get("young", false) else 0,
+			int(objects[pos].get("grow", 0))])
 	var anims := []
 	for a in animals:
 		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
