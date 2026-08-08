@@ -374,12 +374,17 @@ func player_tex(part: String) -> String:
 	return ("player_f_" if gender == "f" else "player_") + part
 
 
-func player_side_tex(suffix: String, t: float) -> String:
-	# 옆모습: 남자는 10프레임 풀 걷기 사이클 (12fps), 대기는 숨쉬기 모션
-	if suffix == "idle":
-		return player_idle_tex("side")
+func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
+	# 옆모습. 남자: 걷는 중엔 20프레임 걷기만(8fps), 멈추면 숨쉬기 모션.
+	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
 	if gender == "m":
-		return "player_side_walk_%d" % (int(t * 10.0) % 20)
+		if not is_moving:
+			return player_idle_tex("side")
+		# 20장 중 핵심 4포즈: 디딤A -> 통과 -> 디딤B -> 통과
+		var seq := [0, 3, 5, 8]
+		return "player_side_walk_%d" % seq[int(t * 6.0) % 4]
+	if suffix == "idle":
+		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
 
 
