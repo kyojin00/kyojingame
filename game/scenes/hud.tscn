@@ -18,42 +18,46 @@ layer = 10
 script = ExtResource("1_hud")
 
 [node name="ClockPanel" type="Panel" parent="."]
-offset_left = 717.0
-offset_top = 6.0
+offset_left = 818.0
+offset_top = 5.0
 offset_right = 954.0
-offset_bottom = 78.0
+offset_bottom = 53.0
 mouse_filter = 2
 
 [node name="DayLabel" type="Label" parent="ClockPanel"]
-offset_left = 12.0
-offset_top = 7.0
-offset_right = 225.0
-offset_bottom = 29.0
+offset_left = 8.0
+offset_top = 3.0
+offset_right = 128.0
+offset_bottom = 17.0
 theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+theme_override_font_sizes/font_size = 11
 horizontal_alignment = 2
 
 [node name="ClockLabel" type="Label" parent="ClockPanel"]
-offset_left = 12.0
-offset_top = 29.0
-offset_right = 225.0
-offset_bottom = 51.0
+offset_left = 8.0
+offset_top = 17.0
+offset_right = 128.0
+offset_bottom = 31.0
 theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+theme_override_font_sizes/font_size = 11
 horizontal_alignment = 2
 
 [node name="CoinIcon" type="TextureRect" parent="ClockPanel"]
-offset_left = 12.0
-offset_top = 53.0
-offset_right = 32.0
-offset_bottom = 73.0
-stretch_mode = 3
+offset_left = 8.0
+offset_top = 32.0
+offset_right = 21.0
+offset_bottom = 45.0
+expand_mode = 1
+stretch_mode = 5
 mouse_filter = 2
 
 [node name="MoneyLabel" type="Label" parent="ClockPanel"]
-offset_left = 34.0
-offset_top = 51.0
-offset_right = 225.0
-offset_bottom = 73.0
+offset_left = 23.0
+offset_top = 31.0
+offset_right = 128.0
+offset_bottom = 45.0
 theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+theme_override_font_sizes/font_size = 11
 horizontal_alignment = 2
 
 [node name="EnergyPanel" type="Panel" parent="."]
@@ -82,18 +86,19 @@ max_value = 100.0
 show_percentage = false
 
 [node name="TrackerPanel" type="Panel" parent="."]
-offset_left = 717.0
-offset_top = 84.0
+offset_left = 794.0
+offset_top = 58.0
 offset_right = 954.0
-offset_bottom = 222.0
+offset_bottom = 128.0
 mouse_filter = 2
 
 [node name="Objective" type="Label" parent="TrackerPanel"]
-offset_left = 10.0
-offset_top = 7.0
-offset_right = 227.0
-offset_bottom = 132.0
-theme_override_colors/font_color = Color(0.29, 0.16, 0.06, 1)
+offset_left = 16.0
+offset_top = 13.0
+offset_right = 146.0
+offset_bottom = 58.0
+theme_override_colors/font_color = Color(0.32, 0.2, 0.08, 1)
+theme_override_font_sizes/font_size = 10
 vertical_alignment = 0
 autowrap_mode = 3
 

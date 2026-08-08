@@ -50,9 +50,117 @@ func _ready() -> void:
 	$ClockPanel/CoinIcon.texture = main.tex["icon_coin"]
 	$EnergyPanel/HeartIcon.texture = main.tex["icon_heart"]
 	$ClockPanel.add_theme_stylebox_override("panel", _wood_style())
-	$TrackerPanel.add_theme_stylebox_override("panel", _wood_style())
 	$EnergyPanel.add_theme_stylebox_override("panel", _wood_style())
+	_build_tracker_scroll()
 	_build_hotbar()
+
+
+# ---- 퀘스트 트래커: 픽셀아트 두루마리 ----
+
+func _build_tracker_scroll() -> void:
+	var panel: Panel = $TrackerPanel
+	var empty := StyleBoxEmpty.new()
+	panel.add_theme_stylebox_override("panel", empty)
+	var deco := Control.new()
+	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	deco.show_behind_parent = true
+	deco.draw.connect(func() -> void:
+		var w := deco.size.x
+		var h := deco.size.y
+		var paper := Color(0.93, 0.85, 0.66)
+		var paper_dk := Color(0.85, 0.75, 0.55)
+		var edge := Color(0.55, 0.4, 0.2)
+		var roll := Color(0.82, 0.71, 0.5)
+		var roll_dk := Color(0.62, 0.49, 0.3)
+		# 종이 몸통
+		deco.draw_rect(Rect2(6, 8, w - 12, h - 16), paper)
+		deco.draw_rect(Rect2(6, 8, 3, h - 16), paper_dk)       # 왼쪽 음영
+		deco.draw_rect(Rect2(w - 9, 8, 3, h - 16), paper_dk)   # 오른쪽 음영
+		deco.draw_rect(Rect2(6, 8, w - 12, h - 16), edge, false, 1.0)
+		# 위/아래 말린 축 (양쪽 끝이 살짝 튀어나온 원통)
+		for ry in [0.0, h - 10.0]:
+			deco.draw_rect(Rect2(2, ry + 2, w - 4, 6), roll)
+			deco.draw_rect(Rect2(2, ry + 2, w - 4, 2), Color(0.9, 0.8, 0.6))  # 하이라이트
+			deco.draw_rect(Rect2(2, ry + 6, w - 4, 2), roll_dk)               # 그림자
+			deco.draw_rect(Rect2(2, ry + 2, w - 4, 6), edge, false, 1.0)
+			# 말린 끝 (좌우 마감 캡)
+			deco.draw_rect(Rect2(0, ry + 1, 4, 8), roll_dk)
+			deco.draw_rect(Rect2(0, ry + 1, 4, 8), edge, false, 1.0)
+			deco.draw_rect(Rect2(w - 4, ry + 1, 4, 8), roll_dk)
+			deco.draw_rect(Rect2(w - 4, ry + 1, 4, 8), edge, false, 1.0))
+	panel.add_child(deco)
+
+
+# ---- 퀘스트 완료/보상 토스트 ----
+
+var _toast_queue: Array = []
+var _toast: Panel = null
+var _toast_t := 0.0
+
+const TOAST_TIME := 2.6
+
+
+func quest_toast(title: String) -> void:
+	_toast_queue.append({"head": "✔ 퀘스트 완료!", "body": title, "icon": null,
+		"head_col": Color(0.35, 0.72, 0.3)})
+	Sound.play_sfx("sfx_catch")
+
+
+func reward_toast(item_name: String, icon: Texture2D) -> void:
+	_toast_queue.append({"head": "보상 획득!", "body": item_name, "icon": icon,
+		"head_col": Color(0.85, 0.6, 0.15)})
+	Sound.play_sfx("sfx_catch")
+
+
+func _show_next_toast() -> void:
+	var d: Dictionary = _toast_queue.pop_front()
+	_toast = Panel.new()
+	_toast.add_theme_stylebox_override("panel", _wood_style())
+	var has_icon: bool = d.icon != null
+	var tw := 250
+	_toast.position = Vector2((960 - tw) / 2.0, -50)
+	_toast.size = Vector2(tw, 44)
+	var head := Label.new()
+	head.text = str(d.head)
+	head.position = Vector2(44 if has_icon else 12, 4)
+	head.size = Vector2(tw - 50, 16)
+	head.add_theme_font_size_override("font_size", 12)
+	head.add_theme_color_override("font_color", d.head_col)
+	_toast.add_child(head)
+	var body := Label.new()
+	body.text = str(d.body)
+	body.position = Vector2(44 if has_icon else 12, 21)
+	body.size = Vector2(tw - 50, 18)
+	body.add_theme_font_size_override("font_size", 13)
+	body.add_theme_color_override("font_color", WOOD_TEXT)
+	_toast.add_child(body)
+	if has_icon:
+		var ic := TextureRect.new()
+		ic.texture = d.icon
+		ic.position = Vector2(8, 8)
+		ic.size = Vector2(28, 28)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_SCALE
+		_toast.add_child(ic)
+	add_child(_toast)
+	_toast_t = 0.0
+
+
+func _update_toast(delta: float) -> void:
+	if _toast == null:
+		if not _toast_queue.is_empty():
+			_show_next_toast()
+		return
+	_toast_t += delta
+	# 슬라이드 인 (0~0.25초) -> 유지 -> 페이드 아웃 (마지막 0.4초)
+	var slide := clampf(_toast_t / 0.25, 0.0, 1.0)
+	_toast.position.y = -50.0 + (58.0 + 50.0) * (1.0 - (1.0 - slide) * (1.0 - slide))
+	var fade := clampf((TOAST_TIME - _toast_t) / 0.4, 0.0, 1.0)
+	_toast.modulate.a = fade
+	if _toast_t >= TOAST_TIME:
+		_toast.queue_free()
+		_toast = null
 
 
 # ---- 하단 핫바 ----
@@ -147,13 +255,20 @@ func _refresh_hotbar() -> void:
 
 
 func refresh() -> void:
-	day_label.text = "%s %d일 %s" % [GameData.season_name(), GameData.day_in_season(),
-		GameData.weather_icon(main.weather_now())]
-	clock_label.text = GameData.clock_text()
+	# 컴팩트 날씨/날짜/시간: "☀ 맑음" / "봄 1일 · 오전 8:30"
+	var w: int = main.weather_now()
+	var wname := "맑음"
+	if w == GameData.WEATHER_RAIN:
+		wname = "비"
+	elif w == GameData.WEATHER_SNOW:
+		wname = "눈"
+	day_label.text = "%s %s" % [GameData.weather_icon(w), wname]
+	clock_label.text = "%s %d일 · %s" % [GameData.season_name(),
+		GameData.day_in_season(), GameData.clock_text()]
 	money_label.text = "%dG" % GameData.money
 	energy_bar.value = GameData.energy
 
-	# 우측 퀘스트 트래커 (짧은 문구)
+	# 두루마리 퀘스트 트래커 (최소 문구)
 	var track := []
 	var story_obj := GameData.story_objective_short()
 	var obj := GameData.tutorial_objective_short()
@@ -165,8 +280,6 @@ func refresh() -> void:
 	if not q.is_empty() and bool(q.accepted):
 		track.append("의뢰: %s %d/%d" % [GameData.CROPS[q.crop].name,
 			mini(int(GameData.produce[q.crop]), int(q.qty)), int(q.qty)])
-	var prog: Dictionary = GameData.note_progress()
-	track.append("노트 %d%% (N)" % int(prog.ratio * 100.0))
 	track.append("J: 퀘스트 창")
 	objective_label.text = "\n".join(track)
 
@@ -197,6 +310,7 @@ func show_message(text: String) -> void:
 
 
 func _process(delta: float) -> void:
+	_update_toast(delta)
 	if msg_label.visible:
 		msg_timer -= delta
 		if msg_timer <= 0.0:

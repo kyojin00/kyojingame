@@ -334,6 +334,7 @@ func _ready() -> void:
 			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
+			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
@@ -486,6 +487,7 @@ func _spawn_objects() -> void:
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
+	_apply_story_visibility()
 
 
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
@@ -1220,6 +1222,16 @@ func _apply_story_camera() -> void:
 		cam.position_smoothing_enabled = true
 
 
+func _apply_story_visibility() -> void:
+	# 스토리(시작 숲) 진행 중엔 집/건물류가 어느 방향에서도 보이지 않는다
+	var show := GameData.story_phase == "done"
+	for pos: Vector2i in obj_nodes:
+		# BUILDINGS 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
+		var kind: String = objects[pos].kind if objects.has(pos) else "house"
+		if kind in ["house", "bin", "board", "sign", "barn", "barn_block", "cave"]:
+			obj_nodes[pos].visible = show
+
+
 func _plant_story_forest() -> void:
 	# 주인공(왼쪽) 앞을 가로막는 울창한 숲: 나무 사이 간격은 불규칙하게,
 	# 곳곳에 큰 돌을 드문드문 섞어 자연스러운 숲 지형을 만든다.
@@ -1260,8 +1272,7 @@ func _story_update(delta: float) -> void:
 			if player_tile().x >= 5 or player.walked >= 160.0 \
 					or (story_shot and _story_t > 0.8):
 				GameData.story_phase = "approach"
-				Sound.play_sfx("sfx_catch")
-				hud.show_message("퀘스트 완료: 숲 안으로 들어가보기!")
+				hud.quest_toast("숲 안으로 들어가보기")
 				_spawn_postman()
 		"approach":
 			_update_postman(delta, story_shot)
@@ -1270,8 +1281,8 @@ func _story_update(delta: float) -> void:
 			# 받은 나무도끼를 가방에서 빠른 슬롯에 넣으면 퀘스트 2 완료
 			if GameData.tool_slots.has("axe"):
 				GameData.story_phase = "chop"
-				Sound.play_sfx("sfx_catch")
-				hud.show_message("퀘스트 완료: 나무도끼를 장착해보기! (숫자키: 도구 선택)")
+				hud.quest_toast("나무도끼를 장착해보기")
+				hud.show_message("숫자키로 도끼를 선택하고, 나무를 클릭한 뒤 E로 베어보자!")
 		"chop":
 			_update_postman(delta, story_shot)  # 떠나는 중일 수 있다
 
@@ -1334,8 +1345,8 @@ func _start_postman_dialog() -> void:
 func _story_give_axe() -> void:
 	if not GameData.is_tool_unlocked("axe"):
 		GameData.unlocked_tools.append("axe")
-	Sound.play_sfx("sfx_catch")
-	hud.show_message("나무도끼를 받았다! 슬롯에 장착하기 전에는 쓸 수 없다.")
+	hud.reward_toast("나무도끼 × 1", tex["icon_axe"])
+	hud.show_message("나무도끼는 슬롯에 장착하기 전에는 쓸 수 없다.")
 
 
 func _end_postman_dialog() -> void:
@@ -1351,8 +1362,9 @@ func _story_tree_chopped() -> void:
 		return
 	GameData.story_phase = "done"
 	_apply_story_camera()
-	Sound.play_sfx("sfx_catch")
-	hud.show_message("퀘스트 완료: 나무를 베어보자! 이제 집터까지 길을 열자.")
+	_apply_story_visibility()
+	hud.quest_toast("나무를 베어보자")
+	hud.show_message("이제 집터까지 길을 열자.")
 
 
 func _snap_story(name: String) -> void:
@@ -1610,6 +1622,7 @@ func tutorial_notify(flag: String) -> void:
 			parts.append("%s 씨앗 x%d" % [GameData.CROPS[sid].name, int(reward.seeds[sid])])
 	if not parts.is_empty():
 		msg += " 보상: " + ", ".join(parts)
+		hud.reward_toast(", ".join(parts), tex["icon_coin"])
 	if Net.is_host():
 		_broadcast_stats()
 
@@ -1782,6 +1795,7 @@ func _turn_in_quest() -> void:
 	GameData.today_earned += int(q.reward)
 	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
 	Sound.play_sfx("sfx_coin")
+	hud.reward_toast("%dG" % int(q.reward), tex["icon_coin"])
 	dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % q.reward)
 	GameData.quest = {}
 	if Net.is_guest():

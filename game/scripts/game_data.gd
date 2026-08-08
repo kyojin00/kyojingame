@@ -973,11 +973,11 @@ func reset_all() -> void:
 		items[id] = 0
 	for k in affinity:
 		affinity[k] = 0
-	seeds["potato"] = 5
 	_reset_skills()
 	furniture = default_furniture()
 	tutorial = fresh_tutorial()
-	unlocked_tools = ["hoe"]  # 튜토리얼을 깨며 하나씩 해금
+	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
+	unlocked_tools = []
 	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
