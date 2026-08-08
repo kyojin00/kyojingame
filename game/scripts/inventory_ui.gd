@@ -211,8 +211,9 @@ func _rebuild() -> void:
 		_slot_moving.border_color = Color(0.45, 0.9, 0.5)
 		_slot_moving.set_border_width_all(2)
 
-	# 도구 슬롯: 드래그로 원하는 칸에 배치 (좌클릭: 선택 / 우클릭: 칸 비우기)
-	_line("[도구 슬롯]  드래그: 배치 · 좌클릭: 선택 · 우클릭: 빼기", Color(0.65, 0.85, 0.6))
+	# 빠른 사용 슬롯 1~9: 드래그로 배치, 숫자키로 선택 (우클릭: 칸 비우기)
+	_line("[빠른 사용 슬롯 1~9]  드래그: 배치 · 숫자키/좌클릭: 선택 · 우클릭: 빼기",
+		Color(0.65, 0.85, 0.6))
 	var tool_row := HBoxContainer.new()
 	tool_row.add_theme_constant_override("separation", 4)
 	for i in GameData.tool_slots.size():
@@ -254,6 +255,13 @@ func _mk_tool_slot(slot_i: int) -> Button:
 		_slot_selected if (t != "" and GameData.tool == t) else _slot_normal)
 	b.add_theme_stylebox_override("hover", _slot_normal)
 	b.add_theme_stylebox_override("pressed", _slot_selected)
+	var num := Label.new()  # 슬롯 번호 = 숫자키
+	num.text = str(slot_i + 1)
+	num.position = Vector2(3, 0)
+	num.add_theme_font_size_override("font_size", 10)
+	num.add_theme_color_override("font_color", Color(0.75, 0.7, 0.85, 0.75))
+	num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(num)
 	b.pressed.connect(func() -> void:
 		if unlocked:
 			main.set_tool(t)

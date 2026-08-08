@@ -368,18 +368,21 @@ var owned_pets: Array = []
 var active_pet := ""
 var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
 # 메인 스토리 1 「우체부 아저씨와의 첫 만남」 진행 단계
-# enter: 숲에 들어가 보자 / approach: 우체부 접근·대화 / chop: 나무를 베어보자 / done: 완료
+# enter: 숲 안으로 들어가보기 / approach: 우체부 접근·대화 /
+# equip: 나무도끼를 가방 슬롯에 장착 / chop: 나무를 베어보자 / done: 완료
 var story_phase := "done"
 
 
 func story_objective_short() -> String:
 	match story_phase:
 		"enter":
-			return "우거진 숲으로 들어가 보자"
+			return "우거진 숲 안으로 들어가 보자"
 		"approach":
 			return "우체부 아저씨의 이야기를 듣자"
+		"equip":
+			return "나무도끼를 가방(I) 슬롯에 장착해 보자"
 		"chop":
-			return "나무를 1그루 베어보자"
+			return "나무도끼로 나무를 베어보자"
 	return ""
 
 
@@ -765,15 +768,15 @@ const TUTORIAL_ORDER := [
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["quest", "퀘스트 창(J)을 열어 할 일을 확인하자"],
 	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
-	["till", "호미(1)로 풀밭을 갈자"],
-	["plant", "밭에 씨앗(3)을 심자"],
-	["water", "물뿌리개(2)로 물을 주자"],
+	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
+	["plant", "밭에 씨앗을 심자"],
+	["water", "물뿌리개로 물을 주자"],
 	["slept", "집(북서쪽)에 들어가 침대에서 잠자기"],
-	["harvest", "다 자란 작물을 수확(4)하자 - 매일 물주기!"],
-	["chop", "도끼(5)로 나무를 베어 목재를 모으자"],
-	["mine", "곡괭이(6)로 돌을 캐서 석재를 모으자"],
-	["build", "울타리(7)나 스프링클러(8)를 설치해보자"],
-	["fish", "낚싯대(9)로 물가에서 물고기를 낚자"],
+	["harvest", "다 자란 작물을 수확하자 - 매일 물주기!"],
+	["chop", "도끼로 나무를 베어 목재를 모으자"],
+	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
+	["build", "울타리나 스프링클러를 설치해보자"],
+	["fish", "낚싯대로 물가에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 보자(E) - 도감도 구경!"],
 ]
 # 목표 달성 시 해금되는 도구
@@ -805,8 +808,8 @@ const TUTORIAL_REWARDS := {
 	"shop": {"money": 300},
 }
 
-# 도구 슬롯 12칸: 1~9는 숫자키, 10~12는 빈 칸(핫바 클릭 전용) — 자유 배치
-const TOOL_SLOT_COUNT := 12
+# 도구 슬롯(빠른 사용 슬롯) 9칸: 1~9 숫자키로 선택 — 가방에서 자유 배치
+const TOOL_SLOT_COUNT := 9
 
 
 static func default_tool_slots() -> Array:
@@ -817,10 +820,11 @@ static func default_tool_slots() -> Array:
 
 
 var tool_slots: Array = default_tool_slots()
+# 슬롯은 자유 배치이므로 고정 번호를 붙이지 않는다 (가방에서 장착 후 숫자키 선택)
 const TOOL_KOR := {
-	"hoe": "호미(1)", "water": "물뿌리개(2)", "seed": "씨앗(3)", "hand": "수확(4)",
-	"axe": "도끼(5)", "pickaxe": "곡괭이(6)", "fence": "울타리(7)",
-	"sprinkler": "스프링클러(8)", "rod": "낚싯대(9)",
+	"hoe": "호미", "water": "물뿌리개", "seed": "씨앗", "hand": "수확",
+	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리",
+	"sprinkler": "스프링클러", "rod": "낚싯대",
 }
 var tutorial := {"active": false}
 var unlocked_tools: Array = ALL_TOOLS.duplicate()

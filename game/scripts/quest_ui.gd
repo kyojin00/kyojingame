@@ -76,16 +76,25 @@ func _rebuild() -> void:
 	if GameData.story_phase != "done" or GameData.tutorial.get("active", false):
 		_line("[메인 스토리 1 — 우체부 아저씨와의 첫 만남]", Color(0.65, 0.85, 0.6))
 		var ph: String = GameData.story_phase
+		var done_col := Color(0.5, 0.62, 0.5)
+		var now_col := Color("ffd75e")
 		var q1_done := ph != "enter"
-		var q2_done := ph == "done"
-		_line(("  V " if q1_done else "  > ") + "우거진 숲에 들어가 보자",
-			Color(0.5, 0.62, 0.5) if q1_done else Color("ffd75e"))
+		var q2_done := ph in ["chop", "done"]
+		var q3_done := ph == "done"
+		_line("  V 숲 안으로 들어가보기 (완료)" if q1_done
+			else "  > 숲 안으로 들어가보기 — 우거진 숲 안으로 들어가 보자",
+			done_col if q1_done else now_col)
 		if ph == "approach":
-			_line("  > 우체부 아저씨의 이야기를 듣자", Color("ffd75e"))
+			_line("  > 우체부 아저씨의 이야기를 듣자", now_col)
+		if ph in ["equip", "chop", "done"]:
+			_line("  V 나무도끼를 장착해보기 (완료)" if q2_done
+				else "  > 나무도끼를 장착해보기 — 받은 나무도끼를 가방(I)의 슬롯에 장착해 보자",
+				done_col if q2_done else now_col)
 		if ph in ["chop", "done"]:
-			_line(("  V " if q2_done else "  > ") + "나무를 1그루 베어보자",
-				Color(0.5, 0.62, 0.5) if q2_done else Color("ffd75e"))
-		elif ph in ["enter", "approach"]:
+			_line("  V 나무를 베어보자 (완료)" if q3_done
+				else "  > 나무를 베어보자 — 나무도끼를 사용해 나무를 베어보자",
+				done_col if q3_done else now_col)
+		if ph != "done":
 			_line("  - ???", Color(0.5, 0.48, 0.6))
 		_line("")
 

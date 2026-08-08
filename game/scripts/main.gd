@@ -316,6 +316,12 @@ func _ready() -> void:
 		if (_shot_path == "" and OS.get_environment("KYOJIN_MP") == "") or story_shot:
 			# 메인 스토리 1: 울창한 숲 동남쪽 구석에서 시작한다
 			GameData.story_phase = "enter"
+			# 스토리로 배우는 조작: 빠른 슬롯은 비운 채 시작한다
+			# (도끼를 받아 가방(I)에서 직접 장착해야 사용할 수 있다)
+			GameData.tool_slots = []
+			for i in GameData.TOOL_SLOT_COUNT:
+				GameData.tool_slots.append("")
+			GameData.tool = "hand"
 			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
 			_plant_story_forest()
 			_apply_story_camera.call_deferred()
@@ -711,6 +717,10 @@ func request_sleep() -> void:
 func set_tool(t: String) -> void:
 	if not GameData.is_tool_unlocked(t):
 		hud.show_message("아직 열리지 않은 도구다. 목표를 달성하면 해금된다!")
+		return
+	if not GameData.tool_slots.has(t):
+		# 획득 -> 가방(I)에서 슬롯 장착 -> 숫자키 선택 -> 사용 순서를 지킨다
+		hud.show_message("가방(I)에서 빠른 슬롯에 장착해야 쓸 수 있다!")
 		return
 	if t != "rod":
 		cancel_fishing()
@@ -1244,15 +1254,22 @@ func _story_update(delta: float) -> void:
 		"enter":
 			if story_shot and absf(_story_t - 0.6) < delta:
 				_snap_story("story_forest")
-			# 몇 걸음 걷기만 하면 퀘스트 1 완료
+			# 숲 안으로 일정 거리만 들어가면 퀘스트 1 완료
 			if player_tile().x >= 5 or player.walked >= 160.0 \
 					or (story_shot and _story_t > 0.8):
 				GameData.story_phase = "approach"
 				Sound.play_sfx("sfx_catch")
-				hud.show_message("퀘스트 완료: 우거진 숲에 들어가 보자!")
+				hud.show_message("퀘스트 완료: 숲 안으로 들어가보기!")
 				_spawn_postman()
 		"approach":
 			_update_postman(delta, story_shot)
+		"equip":
+			_update_postman(delta, story_shot)  # 우체부가 떠나는 중일 수 있다
+			# 받은 나무도끼를 가방에서 빠른 슬롯에 넣으면 퀘스트 2 완료
+			if GameData.tool_slots.has("axe"):
+				GameData.story_phase = "chop"
+				Sound.play_sfx("sfx_catch")
+				hud.show_message("퀘스트 완료: 나무도끼를 장착해보기! (숫자키: 도구 선택)")
 		"chop":
 			_update_postman(delta, story_shot)  # 떠나는 중일 수 있다
 
@@ -1316,13 +1333,13 @@ func _story_give_axe() -> void:
 	if not GameData.is_tool_unlocked("axe"):
 		GameData.unlocked_tools.append("axe")
 	Sound.play_sfx("sfx_catch")
-	hud.show_message("나무도끼를 받았다! (도끼 획득)")
+	hud.show_message("나무도끼를 받았다! 슬롯에 장착하기 전에는 쓸 수 없다.")
 
 
 func _end_postman_dialog() -> void:
 	story_cutscene = false
-	GameData.story_phase = "chop"
-	hud.show_message("새 퀘스트: 나무를 1그루 베어보자 (도끼: 5번 슬롯)")
+	GameData.story_phase = "equip"
+	hud.show_message("새 퀘스트: 받은 나무도끼를 가방의 슬롯에 장착해 보자 (I: 가방)")
 	if _postman != null:
 		_postman_state = "leave"
 
@@ -2019,7 +2036,9 @@ func _apply_save(d: Dictionary) -> void:
 		for t in slots:
 			GameData.tool_slots.append(str(t))
 		while GameData.tool_slots.size() < GameData.TOOL_SLOT_COUNT:
-			GameData.tool_slots.append("")  # 구버전(9칸) 저장 호환
+			GameData.tool_slots.append("")  # 칸 수가 늘어난 구버전 저장 호환
+		if GameData.tool_slots.size() > GameData.TOOL_SLOT_COUNT:
+			GameData.tool_slots.resize(GameData.TOOL_SLOT_COUNT)  # 12칸 -> 9칸 호환
 	for k in d.seeds:
 		GameData.seeds[k] = int(d.seeds[k])
 	for k in d.produce:
