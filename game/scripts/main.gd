@@ -1138,6 +1138,14 @@ func use_tool() -> void:
 
 
 func interact() -> void:
+	# 맞는 도구를 들고 나무/돌을 조준 중이면 채집이 최우선
+	# (근처에 NPC가 있어도 대화가 끼어들지 않는다)
+	var aim: Variant = objects.get(target_tile())
+	if aim != null and not bool(aim.get("young", false)) \
+			and ((aim.kind == "tree" and GameData.tool == "axe")
+			or (aim.kind == "rock" and GameData.tool == "pickaxe")):
+		use_tool()
+		return
 	# 동행 중인 우체부 아저씨에게 말 걸기 (진행 단계별 보조 대화)
 	if _postman != null and _postman_state == "follow" \
 			and (player.position - _postman.position).length() < 56.0:
