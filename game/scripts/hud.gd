@@ -83,6 +83,7 @@ func _build_hotbar() -> void:
 		b.position = Vector2(pad + i * (slot_w + sep), 9)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.expand_icon = true  # 텍스처 해상도와 무관하게 버튼 크기에 맞춤
 		var slot_i := i
 		b.pressed.connect(func() -> void:
 			var t: String = GameData.tool_slots[slot_i]

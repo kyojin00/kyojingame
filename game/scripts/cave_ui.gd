@@ -340,7 +340,16 @@ func _dir_vec() -> Vector2:
 
 
 func _update_sprite() -> void:
-	var suffix := str(int(anim_time * 6.0) % 2) if moving else "idle"
+	# 4박자 걷기: 발걸음A -> 서기(통과) -> 발걸음B -> 서기(통과)
+	var suffix := "idle"
+	if moving:
+		match int(anim_time * 8.0) % 4:
+			0:
+				suffix = "0"
+			2:
+				suffix = "1"
+			_:
+				suffix = "idle"
 	var tex_name := ""
 	player_sprite.flip_h = false
 	match pdir:
@@ -367,14 +376,19 @@ func _draw_cave() -> void:
 					Color(0.17, 0.15, 0.19))
 	# 벽/광석/상자/계단/입구
 	for pos: Vector2i in walls:
-		canvas.draw_texture(main.tex["rock"], Vector2(OX + pos.x * TS, OY + pos.y * TS))
+		canvas.draw_texture_rect(main.tex["rock"],
+			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)
 	for pos: Vector2i in ores:
-		canvas.draw_texture(main.tex["ore_node"], Vector2(OX + pos.x * TS, OY + pos.y * TS))
+		canvas.draw_texture_rect(main.tex["ore_node"],
+			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)
 	if chest_pos.x >= 0:
-		canvas.draw_texture(main.tex["chest"], Vector2(OX + chest_pos.x * TS, OY + chest_pos.y * TS))
+		canvas.draw_texture_rect(main.tex["chest"],
+			Rect2(Vector2(OX + chest_pos.x * TS, OY + chest_pos.y * TS), Vector2(TS, TS)), false)
 	if stairs_pos.x >= 0:
-		canvas.draw_texture(main.tex["stairs"], Vector2(OX + stairs_pos.x * TS, OY + stairs_pos.y * TS))
-	canvas.draw_texture(main.tex["stairs"], Vector2(OX + entry_pos.x * TS, OY + entry_pos.y * TS))
+		canvas.draw_texture_rect(main.tex["stairs"],
+			Rect2(Vector2(OX + stairs_pos.x * TS, OY + stairs_pos.y * TS), Vector2(TS, TS)), false)
+	canvas.draw_texture_rect(main.tex["stairs"],
+		Rect2(Vector2(OX + entry_pos.x * TS, OY + entry_pos.y * TS), Vector2(TS, TS)), false)
 	_cave_label(Vector2(OX + (entry_pos.x + 0.5) * TS, OY + entry_pos.y * TS - 4), "E: 나가기")
 
 	# 몬스터

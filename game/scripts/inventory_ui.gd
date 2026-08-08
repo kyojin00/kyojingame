@@ -109,6 +109,7 @@ func _rebuild() -> void:
 		b.custom_minimum_size = Vector2(40, 40)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.expand_icon = true  # 텍스처 해상도와 무관하게 버튼 크기에 맞춤
 		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
 		if _move_from == i:
 			b.add_theme_stylebox_override("normal", _slot_moving)

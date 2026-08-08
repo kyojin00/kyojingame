@@ -450,10 +450,10 @@ func _spawn_objects() -> void:
 	tree_sprites.clear()
 	for anchor: Vector2i in BUILDINGS:
 		var hn := _make_object(tex["house"],
-			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -128))
+			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -256))
 		var hspr: Sprite2D = hn.get_child(0)
-		hspr.scale = Vector2(1.4, 1.4)
-		hspr.offset.x = 80.0 / 1.4 - 80.0
+		hspr.scale = Vector2(0.7, 0.7)
+		hspr.offset.x = 80.0 / 0.7 - 160.0
 		obj_nodes[anchor] = hn
 		world.add_child(hn)
 	for pos: Vector2i in objects:
@@ -461,20 +461,21 @@ func _spawn_objects() -> void:
 			_spawn_object_node(pos, objects[pos].kind)
 
 
-# 종류별 시각 배율 (나무는 2배 = 32x48로 캐릭터와 비율이 맞는다)
+# 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
 const OBJECT_SCALES := {
 	"tree": 2.0, "rock": 1.4, "cave": 1.5, "worldtree": 1.6,
 	"barn": 1.5, "forage_berry": 1.2, "forage_herb": 1.2,
 }
+const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
 
 
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
-	var offset := Vector2(0, -32)
+	var offset := Vector2(0, -64)
 	var texture: Texture2D
 	match kind:
 		"tree":
 			texture = tex["tree_" + GameData.season_key()]
-			offset = Vector2(0, -50)
+			offset = Vector2(0, -100)
 		"rock":
 			texture = tex["rock"]
 		"bin":
@@ -485,7 +486,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["sign"]
 		"cave":
 			texture = tex["cave"]
-			offset = Vector2(0, -50)
+			offset = Vector2(0, -100)
 		"fence":
 			texture = tex["fence"]
 		"sprinkler":
@@ -496,16 +497,16 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["forage_herb"]
 		"worldtree":
 			texture = tex["cave"]
-			offset = Vector2(0, -50)
+			offset = Vector2(0, -100)
 		"barn":
 			texture = tex["barn"]
-			offset = Vector2(0, -44)
+			offset = Vector2(0, -88)
 		"barn_block":
 			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
 	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
-	var sc: float = OBJECT_SCALES.get(kind, 1.0)
-	if sc != 1.0 and texture != null:
+	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
+	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
@@ -2171,9 +2172,11 @@ func _draw() -> void:
 				t = tex["path"]
 			else:
 				t = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
-			draw_texture(t, Vector2(x * TILE, y * TILE))
+			# 텍스처 해상도와 무관하게 타일 칸에 맞춰 그린다 (64px 아트 → 1080p에서 1:1)
+			var tile_rect := Rect2(Vector2(x * TILE, y * TILE), Vector2(TILE, TILE))
+			draw_texture_rect(t, tile_rect, false)
 			if cell.crop_id != "":
-				draw_texture(_crop_texture(cell), Vector2(x * TILE, y * TILE))
+				draw_texture_rect(_crop_texture(cell), tile_rect, false)
 
 	# 타겟 타일 하이라이트
 	if player != null:

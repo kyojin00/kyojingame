@@ -66,7 +66,16 @@ func _blocked(p: Vector2) -> bool:
 
 
 func _update_sprite() -> void:
-	var suffix := str(int(anim_time * 6.0) % 2) if moving else "idle"
+	# 4박자 걷기: 발걸음A -> 서기(통과) -> 발걸음B -> 서기(통과)
+	var suffix := "idle"
+	if moving:
+		match int(anim_time * 8.0) % 4:
+			0:
+				suffix = "0"
+			2:
+				suffix = "1"
+			_:
+				suffix = "idle"
 	var tex_name := ""
 	sprite.flip_h = false
 	match dir:

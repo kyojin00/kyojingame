@@ -1476,30 +1476,41 @@ const GRASS_SETS = {
 };
 for (const [season, set] of Object.entries(GRASS_SETS)) {
   set.bases.forEach((base, i) => {
-    const png = newImg(32, 32);
-    fillRect(png, 0, 0, 32, 32, hex(base));
-    // 풀잎 다발 (2~3px 세로 잎 + 밝은 끝)
-    for (let k = 0; k < 12; k++) {
-      const x = Math.floor(hash(i * 31 + k, k * 7 + 1) * 30) + 1;
-      const y = Math.floor(hash(k * 13 + 2, i * 17 + k) * 28) + 2;
+    const png = newImg(64, 64);
+    fillRect(png, 0, 0, 64, 64, hex(base));
+    // 은은한 톤 얼룩 (땅의 밝기 변화)
+    for (let k = 0; k < 10; k++) {
+      const x = Math.floor(hash(i * 41 + k, k * 29 + 3) * 58);
+      const y = Math.floor(hash(k * 37 + 5, i * 43 + k) * 58);
+      const w = 4 + Math.floor(hash(x, k) * 6), h = 3 + Math.floor(hash(k, y) * 4);
+      if (hash(x + 1, y + 1) < 0.5) fillRect(png, x, y, w, h, hex(set.bases[(i + 1) % 3]));
+    }
+    // 풀잎 다발 (뿌리 2톤 + 밝은 끝, 3~5px)
+    for (let k = 0; k < 30; k++) {
+      const x = Math.floor(hash(i * 31 + k, k * 7 + 1) * 61) + 1;
+      const y = Math.floor(hash(k * 13 + 2, i * 17 + k) * 56) + 4;
+      const tall = 3 + Math.floor(hash(x, y + k) * 3);
+      for (let t = 0; t < tall; t++) setPx(png, x, y + t, hex(set.detail));
       setPx(png, x, y, hex(set.lite));
-      setPx(png, x, y + 1, hex(set.detail));
-      setPx(png, x, y + 2, hex(set.detail));
-      if (hash(x, y) < 0.5) setPx(png, x + 1, y + 1, hex(set.detail));
+      if (hash(x, y) < 0.6) {
+        for (let t = 1; t < tall; t++) setPx(png, x + 1, y + t, hex(set.detail));
+        setPx(png, x + 1, y + Math.max(1, tall - 3), hex(set.lite));
+      }
     }
     // 어두운 점 (흙 틈)
-    for (let k = 0; k < 6; k++) {
-      const x = Math.floor(hash(k * 19 + i, k * 3 + 7) * 32);
-      const y = Math.floor(hash(k * 5 + 11, k * 23 + i) * 32);
+    for (let k = 0; k < 14; k++) {
+      const x = Math.floor(hash(k * 19 + i, k * 3 + 7) * 64);
+      const y = Math.floor(hash(k * 5 + 11, k * 23 + i) * 64);
       setPx(png, x, y, hex(set.detail));
     }
-    // 아주 가끔 들꽃 한 송이
+    // 들꽃 (꽃잎 4장 + 중심)
     if (i === 2) {
-      const fx = 8 + Math.floor(hash(i, 99) * 16), fy = 8 + Math.floor(hash(99, i) * 16);
-      setPx(png, fx, fy, hex(set.flower));
-      setPx(png, fx + 1, fy, hex(set.flower));
-      setPx(png, fx, fy + 1, hex(set.flower));
-      setPx(png, fx + 1, fy + 1, hex(set.flower));
+      [[14 + Math.floor(hash(i, 99) * 20), 14 + Math.floor(hash(99, i) * 20)],
+       [34 + Math.floor(hash(i, 55) * 16), 36 + Math.floor(hash(55, i) * 16)]].forEach(([fx, fy]) => {
+        setPx(png, fx, fy - 1, hex(set.flower)); setPx(png, fx, fy + 1, hex(set.flower));
+        setPx(png, fx - 1, fy, hex(set.flower)); setPx(png, fx + 1, fy, hex(set.flower));
+        setPx(png, fx, fy, hex('#f5e28a'));
+      });
     }
     save(png, 'grass_' + season + '_' + i);
   });
@@ -1509,50 +1520,63 @@ for (const [season, set] of Object.entries(GRASS_SETS)) {
 [['soil_dry', '#8a6a42', '#80613c', '#755835', '#97764c'],
  ['soil_wet', '#5a4028', '#513a24', '#48331f', '#66492e']]
   .forEach(([name, a, b, line, hi]) => {
-    const png = newImg(32, 32);
-    fillRect(png, 0, 0, 32, 32, hex(a));
-    for (let k = 0; k < 40; k++) {
-      const x = Math.floor(hash(k * 5, k + 3) * 32);
-      const y = Math.floor(hash(k + 9, k * 3) * 32);
+    const png = newImg(64, 64);
+    fillRect(png, 0, 0, 64, 64, hex(a));
+    // 흙덩이 알갱이 (2x1~2x2 덩어리 + 하이라이트)
+    for (let k = 0; k < 110; k++) {
+      const x = Math.floor(hash(k * 5, k + 3) * 63);
+      const y = Math.floor(hash(k + 9, k * 3) * 63);
       setPx(png, x, y, hex(b));
-      if (hash(k, x) < 0.35) setPx(png, x + 1, y, hex(hi));
+      if (hash(k, x) < 0.5) setPx(png, x + 1, y, hex(b));
+      if (hash(k, y) < 0.3) setPx(png, x + 1, y + 1, hex(b));
+      if (hash(k, x) < 0.35) setPx(png, x, y - 1, hex(hi));
     }
-    fillRect(png, 0, 10, 32, 1, hex(line)); // 밭고랑 2줄
-    fillRect(png, 0, 22, 32, 1, hex(line));
+    // 밭고랑 2줄 (2px 골 + 아래 밝은 모서리)
+    [20, 44].forEach((gy) => {
+      fillRect(png, 0, gy, 64, 2, hex(line));
+      fillRect(png, 0, gy + 2, 64, 1, hex(hi));
+    });
     save(png, name);
   });
 
 // 길: 자갈 몇 개 + 모래알
 {
-  const png = newImg(32, 32);
-  fillRect(png, 0, 0, 32, 32, hex('#c2a878'));
-  for (let k = 0; k < 26; k++) {
-    const x = Math.floor(hash(k * 3 + 1, k * 7 + 2) * 32);
-    const y = Math.floor(hash(k * 11 + 5, k * 5 + 3) * 32);
+  const png = newImg(64, 64);
+  fillRect(png, 0, 0, 64, 64, hex('#c2a878'));
+  // 모래알
+  for (let k = 0; k < 70; k++) {
+    const x = Math.floor(hash(k * 3 + 1, k * 7 + 2) * 63);
+    const y = Math.floor(hash(k * 11 + 5, k * 5 + 3) * 64);
     setPx(png, x, y, hex('#b09668'));
-    setPx(png, x + 1, y, hex('#b09668'));
+    if (hash(k, x) < 0.5) setPx(png, x + 1, y, hex('#b09668'));
   }
-  // 자갈 (2x2 밝은 돌 + 그림자)
-  [[5, 22], [21, 8], [13, 15], [26, 26]].forEach(([x, y]) => {
-    fillRect(png, x, y, 2, 2, hex('#d8c298'));
-    setPx(png, x, y + 2, hex('#8f7a52'));
-    setPx(png, x + 1, y + 2, hex('#8f7a52'));
-  });
+  // 자갈 (3~4px 돌: 밝은 윗면 + 그림자)
+  [[9, 44, 4], [42, 15, 3], [26, 30, 4], [52, 52, 3], [14, 10, 3], [50, 34, 4], [30, 55, 3]]
+    .forEach(([x, y, s]) => {
+      fillRect(png, x, y, s, s - 1, hex('#d8c298'));
+      fillRect(png, x, y, s - 1, 1, hex('#e8d4ac'));
+      fillRect(png, x, y + s - 1, s, 1, hex('#8f7a52'));
+    });
   save(png, 'path');
 }
 
 // 물 2종: 물결 곡선 + 반짝임
 [0, 1].forEach((i) => {
-  const png = newImg(32, 32);
-  fillRect(png, 0, 0, 32, 32, hex(i ? '#356598' : '#3b6ea5'));
-  fillRect(png, 0, 0, 32, 2, hex(i ? '#3b6ea5' : '#356598'));
-  const wave = hex('#5b8cc0');
-  fillRect(png, 5 + i * 6, 9, 8, 1, wave);
-  setPx(png, 4 + i * 6, 10, wave); setPx(png, 13 + i * 6, 10, wave);
-  fillRect(png, 18 - i * 5, 21, 7, 1, wave);
-  setPx(png, 17 - i * 5, 22, wave); setPx(png, 25 - i * 5, 22, wave);
-  setPx(png, 26, 5 + i * 3, hex('#a8cbe8'));
-  setPx(png, 8, 27 - i * 2, hex('#a8cbe8'));
+  const png = newImg(64, 64);
+  fillRect(png, 0, 0, 64, 64, hex(i ? '#356598' : '#3b6ea5'));
+  fillRect(png, 0, 0, 64, 3, hex(i ? '#3b6ea5' : '#356598'));
+  const wave = hex('#5b8cc0'), deep = hex('#2f5a88');
+  // 물결 4가닥 (끝이 처지는 곡선)
+  [[10 + i * 12, 16, 14], [34 - i * 10, 34, 12], [44 + i * 6, 50, 12], [6 - i * 4, 56, 10]]
+    .forEach(([x, y, w]) => {
+      fillRect(png, x, y, w, 1, wave);
+      setPx(png, x - 1, y + 1, wave); setPx(png, x + w, y + 1, wave);
+      fillRect(png, x + 2, y + 2, w - 4, 1, deep);
+    });
+  // 반짝임
+  [[52, 10 + i * 6], [16, 44 - i * 4], [58, 40 + i * 3], [28, 22 + i * 5]].forEach(([x, y]) => {
+    setPx(png, x, y, hex('#a8cbe8')); setPx(png, x + 1, y, hex('#d5e8f5'));
+  });
   save(png, 'water_' + i);
 });
 
@@ -1600,3 +1624,37 @@ for (const name of SAVED_NAMES) {
   fs.writeFileSync(file, PNG.sync.write(big));
 }
 console.log('2x upscale pass done');
+
+// ---- 농장 맵 오브젝트: Scale2x(EPX)로 한 번 더 2배 (64px 밀도, 계단 완화) ----
+// 코드에서 절반 스케일로 그려 월드 크기는 그대로 유지된다.
+const FARM_EPX = /^(tree_|rock$|bin$|house$|fence$|sprinkler$|board$|sign$|cave$|barn$|forage_|crop_|mature_|withered$)/;
+function epx2x(img) {
+  const big = new PNG({ width: img.width * 2, height: img.height * 2 });
+  const get = (x, y) => {
+    if (x < 0 || y < 0 || x >= img.width || y >= img.height) return -1;
+    const i = (y * img.width + x) * 4;
+    return img.data[i] << 24 | img.data[i + 1] << 16 | img.data[i + 2] << 8 | img.data[i + 3];
+  };
+  const put = (x, y, v) => {
+    const i = (y * big.width + x) * 4;
+    big.data[i] = (v >>> 24) & 255; big.data[i + 1] = (v >>> 16) & 255;
+    big.data[i + 2] = (v >>> 8) & 255; big.data[i + 3] = v & 255;
+  };
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+    const P = get(x, y), A = get(x, y - 1), B = get(x + 1, y), C = get(x - 1, y), D = get(x, y + 1);
+    let e0 = P, e1 = P, e2 = P, e3 = P;
+    if (C === A && C !== D && A !== B) e0 = A;
+    if (A === B && A !== C && B !== D) e1 = B;
+    if (D === C && D !== B && C !== A) e2 = C;
+    if (B === D && B !== A && D !== C) e3 = D;
+    put(x * 2, y * 2, e0); put(x * 2 + 1, y * 2, e1);
+    put(x * 2, y * 2 + 1, e2); put(x * 2 + 1, y * 2 + 1, e3);
+  }
+  return big;
+}
+for (const name of SAVED_NAMES) {
+  if (!FARM_EPX.test(name)) continue;
+  const file = path.join(OUT, name + '.png');
+  fs.writeFileSync(file, PNG.sync.write(epx2x(PNG.sync.read(fs.readFileSync(file)))));
+}
+console.log('farm epx pass done');
