@@ -43,9 +43,11 @@ func _process(delta: float) -> void:
 		v = v * SPEED * GameData.pet_speed_mult() * delta  # 강아지 펫: 이동 속도 증가
 		# 이미 끼어 있으면(설치물 등) 충돌을 무시하고 빠져나올 수 있게 한다
 		var stuck := _blocked(position)
-		if stuck or not _blocked(position + Vector2(v.x, 0)):
+		if not _blocked(position + Vector2(v.x, 0)) \
+				or (stuck and _loose_ok(position + Vector2(v.x, 0))):
 			position.x += v.x
-		if stuck or not _blocked(position + Vector2(0, v.y)):
+		if not _blocked(position + Vector2(0, v.y)) \
+				or (stuck and _loose_ok(position + Vector2(0, v.y))):
 			position.y += v.y
 		anim_time += delta
 		walked += SPEED * delta
@@ -57,6 +59,14 @@ func _process(delta: float) -> void:
 	else:
 		step_timer = 0.15
 	_update_sprite()
+
+
+# 끼임 탈출용 검사: 물/맵 밖/미구매 부지로는 절대 빠져나갈 수 없다
+func _loose_ok(p: Vector2) -> bool:
+	for off in [Vector2(-R, -R), Vector2(R, -R), Vector2(-R, R), Vector2(R, R)]:
+		if not main.is_passable_px_loose(p + off):
+			return false
+	return true
 
 
 func _blocked(p: Vector2) -> bool:

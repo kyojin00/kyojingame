@@ -1461,6 +1461,35 @@ for (const [season, colors] of Object.entries(TREE_LEAVES)) {
   spriteToPng(SPRITES.tree, 'tree_' + season, colors);
 }
 
+// ---- 나무 파괴 단계 (1타: 잎 없음 / 2타: 반파) ----
+{
+  const png = newImg(16, 24);
+  const trunk = hex('#6b4423'), dark = hex('#59371c'), lite = hex('#8a5a30');
+  fillRect(png, 7, 5, 2, 19, trunk);       // 기둥
+  fillRect(png, 8, 5, 1, 19, dark);
+  fillRect(png, 7, 5, 1, 2, lite);
+  fillRect(png, 3, 8, 4, 1, trunk);        // 왼가지
+  fillRect(png, 3, 5, 1, 4, trunk);
+  fillRect(png, 9, 10, 4, 1, trunk);       // 오른가지
+  fillRect(png, 12, 7, 1, 4, dark);
+  fillRect(png, 5, 3, 1, 3, dark);         // 잔가지
+  fillRect(png, 11, 3, 1, 2, trunk);
+  save(png, 'tree_bare');
+}
+{
+  const png = newImg(16, 24);
+  const trunk = hex('#6b4423'), dark = hex('#59371c'), split = hex('#a07444');
+  fillRect(png, 7, 13, 2, 11, trunk);      // 반만 남은 기둥
+  fillRect(png, 8, 13, 1, 11, dark);
+  // 부러진 단면 (들쭉날쭉)
+  setPx(png, 7, 12, split); setPx(png, 8, 11, split);
+  setPx(png, 7, 11, trunk); setPx(png, 8, 12, dark);
+  setPx(png, 6, 13, split);
+  fillRect(png, 5, 22, 1, 2, dark);        // 뿌리 잔해
+  fillRect(png, 10, 23, 2, 1, dark);
+  save(png, 'tree_half');
+}
+
 // ---- 지형 타일 (웹 버전 색상 + 디테일을 텍스처로 굽기) ----
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) | 0;

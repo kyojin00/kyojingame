@@ -105,6 +105,7 @@ const TEXTURE_NAMES := [
 	"mature_tomato", "mature_corn", "mature_watermelon",
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
+	"tree_bare", "tree_half",
 	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
@@ -375,10 +376,7 @@ func _build_map() -> void:
 				"crop_id": "", "crop_day": 0.0, "dead": false})
 		grid.append(row)
 
-	# 연못들 (농장/숲/깊은 숲) + 강 + 마을 분수대
-	for y in range(13, 18):
-		for x in range(23, 28):
-			grid[y][x].ground = "water"
+	# 연못들 (숲/깊은 숲) + 강 + 마을 분수대 — 시작 부지의 연못은 없앴다
 	for y in range(28, 35):
 		for x in range(45, 53):
 			grid[y][x].ground = "water"
@@ -528,14 +526,34 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
+	if kind == "tree":
+		sc *= 0.85 + _hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.35  # 크기 다양화
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
+		if kind == "tree":
+			spr.flip_h = _hash01(pos.x * 3 + 5, pos.y * 11 + 7) > 0.5  # 좌우 변형
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
 	obj_nodes[pos] = node
 	if kind == "tree":
 		tree_sprites.append(node.get_child(0))
 	world.add_child(node)
+
+
+# 나무 파괴 단계별 비주얼: 3=온전 / 2=잎 없음 / 1=반파
+func _refresh_tree_sprite(pos: Vector2i) -> void:
+	if not obj_nodes.has(pos) or not objects.has(pos):
+		return
+	if objects[pos].kind != "tree":
+		return
+	var spr: Sprite2D = obj_nodes[pos].get_child(0)
+	var hp := int(objects[pos].hp)
+	if hp >= TREE_HP:
+		spr.texture = tex["tree_" + GameData.season_key()]
+	elif hp == 2:
+		spr.texture = tex["tree_bare"]
+	else:
+		spr.texture = tex["tree_half"]
 
 
 func _remove_object(pos: Vector2i) -> void:
@@ -566,8 +584,9 @@ func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Nod
 
 
 func _apply_season_visuals() -> void:
-	for s in tree_sprites:
-		s.texture = tex["tree_" + GameData.season_key()]
+	for pos: Vector2i in obj_nodes:
+		if objects.has(pos) and objects[pos].kind == "tree":
+			_refresh_tree_sprite(pos)  # 손상 단계(잎 없음/반파)를 유지한 채 계절 반영
 	Sound.play_bgm(GameData.season_key())
 	queue_redraw()
 
@@ -606,6 +625,17 @@ func _tile_accessible(t: Vector2i) -> bool:
 
 func is_passable_px(p: Vector2) -> bool:
 	return is_passable(Vector2i(int(floor(p.x / TILE)), int(floor(p.y / TILE))))
+
+
+func is_passable_px_loose(p: Vector2) -> bool:
+	# 끼임 탈출용: 설치물/나무 충돌은 무시하되
+	# 물·맵 밖·미구매 부지는 어떤 경우에도 통과할 수 없다
+	var t := Vector2i(int(floor(p.x / TILE)), int(floor(p.y / TILE)))
+	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
+		return false
+	if grid[t.y][t.x].ground == "water":
+		return false
+	return _tile_accessible(t)
 
 
 func player_tile() -> Vector2i:
@@ -920,6 +950,7 @@ func use_tool() -> void:
 				obj.hp -= 3 if int(GameData.tool_level.get("axe", 1)) >= 2 else 1
 				Sound.play_sfx("sfx_chop", 0.15)
 				spawn_particles(t, "wood")
+				_refresh_tree_sprite(t)
 				if obj.hp <= 0:
 					_remove_object(t)
 					var wood_got := WOOD_PER_TREE
@@ -932,8 +963,10 @@ func use_tool() -> void:
 					gain_skill("forest", 6.0)
 					if randf() < 0.02:
 						gain_legend("world_branch")
+				elif obj.hp == 2:
+					hud.show_message("나뭇잎이 우수수 떨어졌다! (1/%d)" % TREE_HP)
 				else:
-					hud.show_message("나무를 찍었다. (%d/%d)" % [TREE_HP - obj.hp, TREE_HP])
+					hud.show_message("나무가 반쯤 부서졌다! (2/%d)" % TREE_HP)
 			elif obj.kind == "fence":
 				_remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
@@ -1141,8 +1174,8 @@ func _building_kind_at(t: Vector2i) -> String:
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(26, 17)      # 숲 속 시작 지점 (홈 부지 동남쪽)
-const STORY_LANE_Y := 17                   # 우체부가 걸어오는 길
+const STORY_SPAWN := Vector2i(2, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
+const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
 var story_cutscene := false                # 컷신 중 조작 잠금
 var _postman: Node2D = null
 var _postman_spr: Sprite2D = null
@@ -1152,19 +1185,24 @@ var _story_t := 0.0
 
 
 func _plant_story_forest() -> void:
-	# 홈 부지 동남쪽을 빽빽한 숲으로 채운다 (스폰 공터/우체부 길만 남김)
-	for y in range(8, 20):
-		for x in range(10, 30):
+	# 주인공(왼쪽) 앞을 가로막는 울창한 숲: 나무 사이 간격은 불규칙하게,
+	# 곳곳에 큰 돌을 드문드문 섞어 자연스러운 숲 지형을 만든다.
+	for y in range(1, 20):
+		for x in range(5, 30):
 			var pos := Vector2i(x, y)
 			if grid[y][x].ground != "grass" or objects.has(pos):
 				continue
-			if Vector2(STORY_SPAWN).distance_to(Vector2(pos)) <= 2.2:
-				continue  # 스폰 공터
-			if y == STORY_LANE_Y and x >= 18 and x <= 25:
-				continue  # 우체부 길
-			if _hash01(x, y) < 0.07:
-				continue  # 자연스러운 틈
-			objects[pos] = {"kind": "tree", "hp": TREE_HP}
+			if x >= 3 and x <= 10 and y <= 6:
+				continue  # 집터 주변 공터 (숲을 헤치고 나와야 보인다)
+			if y == STORY_LANE_Y and x <= 7:
+				continue  # 숲 입구 + 우체부 길
+			var h := _hash01(x, y)
+			if h < 0.16:
+				continue  # 불규칙한 틈
+			if h > 0.9:
+				objects[pos] = {"kind": "rock", "hp": ROCK_HP}  # 큰 돌
+			else:
+				objects[pos] = {"kind": "tree", "hp": TREE_HP}
 
 
 func _story_update(delta: float) -> void:
@@ -1177,7 +1215,8 @@ func _story_update(delta: float) -> void:
 			if story_shot and absf(_story_t - 0.6) < delta:
 				_snap_story("story_forest")
 			# 몇 걸음 걷기만 하면 퀘스트 1 완료
-			if player.walked >= 96.0 or (story_shot and _story_t > 0.8):
+			if player_tile().x >= 5 or player.walked >= 160.0 \
+					or (story_shot and _story_t > 0.8):
 				GameData.story_phase = "approach"
 				Sound.play_sfx("sfx_catch")
 				hud.show_message("퀘스트 완료: 우거진 숲에 들어가 보자!")
@@ -1190,7 +1229,7 @@ func _story_update(delta: float) -> void:
 
 func _spawn_postman() -> void:
 	_postman = Node2D.new()
-	_postman.position = Vector2(18 * TILE + 16, STORY_LANE_Y * TILE + 16)
+	_postman.position = Vector2(16, STORY_LANE_Y * TILE + 16)  # 화면 왼쪽 끝
 	_postman_spr = Sprite2D.new()
 	_postman_spr.centered = false
 	_postman_spr.offset = Vector2(-16, -47)
@@ -1227,7 +1266,7 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 			_postman.position += Vector2.LEFT * 55.0 * delta
 			_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
 			_postman_spr.flip_h = true
-			if _postman.position.x < 15 * TILE:
+			if _postman.position.x < -32.0:
 				_postman.queue_free()
 				_postman = null
 
