@@ -1555,6 +1555,8 @@ func _start_postman_dialog2() -> void:
 		{"text": "「이 숲은 나무가 너무 많아서 그냥 지나가기는 힘들겠구먼.」"},
 		{"text": "「안전하게 지나가려면 길을 조금 만들어야 할 것 같네.」"},
 		{"text": "「%s, 이 나무도끼를 한번 사용해보게.」" % nm, "event": _story_give_axe},
+		{"text": "「가방을 열어 도끼를 슬롯에 넣어두게.」"},
+		{"text": "「숫자키를 누르면 슬롯에 넣어둔 도구를 빠르게 꺼낼 수 있다네.」"},
 		{"text": "「지금 자네가 해야 할 일은 오른쪽 위에 간단하게 적혀 있을 걸세.」"},
 		{"text": "「자세한 내용을 보고 싶다면 Q 키를 눌러보게.」"},
 	], _end_postman_dialog)
@@ -1592,6 +1594,7 @@ func _start_travel_dialog() -> void:
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
 		{"text": "「오, 제법이구먼! 좋은 목재도 얻었고 말이야.」"},
+		{"text": "「도구를 사용해야만 나무를 벨 수 있다는 걸 기억하게.」"},
 		{"text": "「이렇게 나무를 베어 길을 만들면서 가면 되겠네.」"},
 		{"text": "「%s, 마을은 동쪽일세. 함께 가세나.」" % nm},
 	], func() -> void:
@@ -1688,7 +1691,8 @@ func _talk_to_postman() -> void:
 			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
 				{"text": "「그건 나무를 베기 위한 도구라네.」"},
 				{"text": "「숲을 지나가려면 그 도끼로 나무를 베어 길을 만들어야 할 걸세.」"},
-				{"text": "「가방(I)을 열어 도끼를 슬롯에 넣으면 쓸 수 있네.」"},
+				{"text": "「가방을 열어 도끼를 슬롯에 넣어두게.」"},
+				{"text": "「숫자키를 누르면 슬롯에 넣어둔 도구를 빠르게 꺼낼 수 있다네.」"},
 			], Callable())
 		"chop":
 			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
