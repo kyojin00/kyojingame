@@ -91,6 +91,8 @@ const TEXTURE_NAMES := [
 	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
 	"player_side_idle_0", "player_side_idle_1", "player_side_idle_2",
 	"player_side_idle_3",
+	"player_down_idle_0", "player_down_idle_1", "player_down_idle_2",
+	"player_down_idle_3",
 	"player_side_walk_0", "player_side_walk_1", "player_side_walk_2",
 	"player_side_walk_3",
 	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
