@@ -73,7 +73,26 @@ func _rebuild() -> void:
 		var s: Dictionary = GameData.skills[sid]
 		var prog := "MAX" if lv >= GameData.SKILL_MAX_LV else \
 			"%d/%d" % [int(s.xp), int(GameData.skill_xp_needed(lv))]
-		_line("%s Lv.%d (%s)" % [GameData.SKILLS[sid].name, lv, prog], Color("ffd75e"))
+		_line("%s Lv.%d  (%s)" % [GameData.SKILLS[sid].name, lv, prog], Color("ffd75e"))
+		var bar := ProgressBar.new()
+		bar.custom_minimum_size = Vector2(350, 10)
+		bar.show_percentage = false
+		if lv >= GameData.SKILL_MAX_LV:
+			bar.max_value = 1.0
+			bar.value = 1.0
+		else:
+			bar.max_value = GameData.skill_xp_needed(lv)
+			bar.value = float(s.xp)
+		var bg := StyleBoxFlat.new()
+		bg.bg_color = Color(0.1, 0.08, 0.15)
+		bg.border_color = Color(0.32, 0.27, 0.43)
+		bg.set_border_width_all(1)
+		var fill := StyleBoxFlat.new()
+		fill.bg_color = Color(0.48, 0.83, 0.35) if lv < GameData.SKILL_MAX_LV \
+			else Color(1.0, 0.84, 0.37)
+		bar.add_theme_stylebox_override("background", bg)
+		bar.add_theme_stylebox_override("fill", fill)
+		items_box.add_child(bar)
 		_line("  %s" % GameData.SKILLS[sid].effect)
 
 	_line("")

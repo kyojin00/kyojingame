@@ -12,6 +12,11 @@ const TOOL_LABELS := {
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리 (목재1)",
 	"sprinkler": "스프링클러 (목재2·석재2)", "rod": "낚싯대",
 }
+# 도구 -> 관련 숙련도
+const TOOL_SKILL := {
+	"hoe": "farm", "water": "farm", "seed": "farm", "hand": "farm",
+	"axe": "forest", "pickaxe": "mine", "rod": "fish",
+}
 # 나무 프레임 팔레트
 const WOOD_TEXT := Color(0.29, 0.16, 0.06)
 
@@ -176,6 +181,10 @@ func refresh() -> void:
 				GameData.seeds[id], GameData.key_label("cycle_seed")]
 	else:
 		tool_name.text = TOOL_LABELS[GameData.tool]
+		var sk: String = TOOL_SKILL.get(GameData.tool, "")
+		if sk != "":
+			tool_name.text += "  ·  %s Lv.%d" % [GameData.SKILLS[sk].name,
+				GameData.skill_lv(sk)]
 
 
 func show_message(text: String) -> void:

@@ -781,7 +781,12 @@ func gain_legend(id: String) -> void:
 
 
 # 숙련도 경험치를 주고, 레벨업하면 하단에 알린다
+var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos, t}]
+
+
 func gain_skill(id: String, amount: float) -> void:
+	float_texts.append({"text": "+%d %s" % [int(amount), GameData.SKILLS[id].name],
+		"pos": player.position + Vector2(0, -100), "t": 0.0})
 	var lv := GameData.add_skill_xp(id, amount)
 	if lv > 0:
 		Sound.play_sfx("sfx_catch")
@@ -2108,6 +2113,9 @@ func _apply_save(d: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_story_update(delta)
+	for ft in float_texts:
+		ft.t += delta
+	float_texts = float_texts.filter(func(ft: Dictionary) -> bool: return ft.t < 1.3)
 	if not ui_open() or interior_only_open():
 		if not Net.is_guest():
 			# 시간은 호스트/솔로만 진행 (게스트는 동기화 수신)
@@ -2475,6 +2483,16 @@ func _draw_overlay() -> void:
 
 	for pt in particles:
 		overlay.draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
+
+	# 경험치 획득 플로팅 텍스트
+	for ft in float_texts:
+		var a: float = clampf(1.4 - ft.t, 0.0, 1.0)
+		var p: Vector2 = ft.pos + Vector2(0, -ft.t * 26.0)
+		var tw: float = UI_FONT.get_string_size(ft.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		overlay.draw_string_outline(UI_FONT, p + Vector2(-tw / 2.0, 0), ft.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 3, Color(0.05, 0.04, 0.08, a))
+		overlay.draw_string(UI_FONT, p + Vector2(-tw / 2.0, 0), ft.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.65, 0.95, 0.5, a))
 
 	_draw_context_hint()
 	_draw_weather()
