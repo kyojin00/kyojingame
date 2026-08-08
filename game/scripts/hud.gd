@@ -54,7 +54,27 @@ func _ready() -> void:
 	$ClockPanel.add_theme_stylebox_override("panel", _wood_style())
 	$EnergyPanel.add_theme_stylebox_override("panel", _wood_style())
 	_build_tracker_scroll()
+	_build_outfit_button()
 	_build_hotbar()
+
+
+# (테스트용) 왼쪽 상단 옷 교체 버튼 — 커스텀 의상 시안 확인용
+var _outfit_btn: Button = null
+
+
+func _build_outfit_button() -> void:
+	_outfit_btn = Button.new()
+	_outfit_btn.position = Vector2(6, 6)
+	_outfit_btn.size = Vector2(110, 24)
+	_outfit_btn.focus_mode = Control.FOCUS_NONE
+	_outfit_btn.add_theme_font_override("font", FONT_SMALL)
+	_outfit_btn.add_theme_font_size_override("font_size", 12)
+	_outfit_btn.text = "옷: 농부 (테스트)"
+	_outfit_btn.pressed.connect(func() -> void:
+		GameData.outfit = "casual" if GameData.outfit == "farm" else "farm"
+		_outfit_btn.text = "옷: %s (테스트)" % ("평상복" if GameData.outfit == "casual" else "농부")
+		Sound.play_sfx("sfx_ui"))
+	add_child(_outfit_btn)
 
 
 # ---- 퀘스트 트래커: 픽셀아트 두루마리 ----

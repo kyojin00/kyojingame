@@ -483,9 +483,16 @@ func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
 	return player_tex("up_" + suffix)
 
 
+# 의상 (커스텀 시스템 초안): farm=농부 작업복 / casual=평상복
+# 평상복은 아직 정면 서기 1장뿐 — 나머지 방향/걷기는 농부 복장으로 표시된다
+var outfit := "farm"
+
+
 func player_idle_tex(dirn: String) -> String:
 	# 대기: 단일 서기 프레임. 숨쉬기는 스프라이트 세로 스케일로 연출한다 (player.gd)
 	if gender == "m" and dirn == "down":
+		if outfit == "casual":
+			return "player_casual_down_idle"
 		return "player_down_idle_0"
 	if gender == "m" and dirn == "side":
 		return "player_side_idle_0"
