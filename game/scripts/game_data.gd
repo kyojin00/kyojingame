@@ -376,6 +376,28 @@ var tree_regrow: Array = []
 # 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
 var player_name := ""
 
+# 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
+var house_lv := 0
+var has_bed := false  # 침대는 직접 제작해야 잠을 잘 수 있다
+const HOUSE_BUILD_WOOD := 20
+const HOUSE_UPGRADE_WOOD := 60
+const HOUSE_UPGRADE_STONE := 40
+const BED_WOOD := 10
+
+
+# ---- 밤 시간대 (잠을 자야 하는 자연스러운 이유) ----
+
+func is_evening() -> bool:
+	return minutes >= 19.0 * 60.0  # 19시: NPC들이 집으로 돌아간다
+
+
+func is_night() -> bool:
+	return minutes >= 20.0 * 60.0  # 20시: 채집 효율 저하
+
+
+func is_deep_night() -> bool:
+	return minutes >= 21.0 * 60.0  # 21시: 위험한 밤 몬스터 등장
+
 # 메인 스토리 1 퀘스트 순서 (기준 문서: game/docs/quests.md)
 # {이름, 해야 하는 일, 스토리} — Q 상세 창과 목록 모두 여기서 가져온다
 const STORY1_QUESTS := [
@@ -813,7 +835,7 @@ const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
-	["slept", "집(마을 서쪽)에 들어가 침대에서 잠자기"],
+	["slept", "집터(마을 서쪽)에 집을 짓고, 침대를 만들어 잠자기"],
 	["harvest", "다 자란 작물을 수확하자 - 매일 물주기!"],
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
@@ -1021,6 +1043,8 @@ func reset_all() -> void:
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
 	tree_regrow = []
+	house_lv = 0
+	has_bed = false
 	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
@@ -1130,6 +1154,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tool_slots": tool_slots,
 		"tree_regrow": tree_regrow,
 		"player_name": player_name,
+		"house_lv": house_lv,
+		"has_bed": has_bed,
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,

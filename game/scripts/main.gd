@@ -130,6 +130,7 @@ const TEXTURE_NAMES := [
 	"npc_rancher_down_0", "npc_rancher_down_1", "npc_rancher_up_0",
 	"npc_rancher_up_1", "npc_rancher_side_0", "npc_rancher_side_1",
 	"npc_rancher_portrait_normal", "npc_rancher_portrait_happy",
+	"mob_centipede_0", "mob_centipede_1",
 	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
 	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
 	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
@@ -159,8 +160,10 @@ const PARCEL_SIGNS := {
 	"deepforest": Vector2i(46, 40),
 }
 # 건물 앵커(좌상단 5x4) -> 종류
+# 우리집: 스토리 1 완료 후 마을 서쪽 집터(E)에서 목재로 직접 짓는다
+const HOME_ANCHOR := Vector2i(61, 15)
+const HOME_SITE := Vector2i(63, 17)  # 집터 표지판 위치
 const BUILDINGS := {
-	Vector2i(61, 15): "home",    # 우리집 (취침) — 마을 서쪽, 숲을 지나야 도착한다
 	Vector2i(63, 3): "general",  # 잡화점 (씨앗/판매)
 	Vector2i(70, 3): "ranch",    # 목장 상회 (동물)
 	Vector2i(77, 3): "smith",    # 대장간 (강화)
@@ -347,6 +350,12 @@ func _ready() -> void:
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
+			GameData.house_lv = 2         # 집/부엌/침대 캡처용
+			GameData.has_bed = true
+			for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
+				for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
+					objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+			objects.erase(HOME_SITE)
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
@@ -430,6 +439,8 @@ func _build_map() -> void:
 		for y in range(anchor.y, anchor.y + 4):
 			for x in range(anchor.x, anchor.x + 5):
 				objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+	# 우리집은 처음엔 집터뿐 — 스토리 1 완료 후 직접 짓는다
+	objects[HOME_SITE] = {"kind": "housesite", "hp": 0}
 	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
 	objects[BOARD_POS] = {"kind": "board", "hp": 0}
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
@@ -489,17 +500,23 @@ func _spawn_objects() -> void:
 	obj_nodes.clear()
 	tree_sprites.clear()
 	for anchor: Vector2i in BUILDINGS:
-		var hn := _make_object(tex["house"],
-			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -256))
-		var hspr: Sprite2D = hn.get_child(0)
-		hspr.scale = Vector2(0.8, 0.8)  # 문이 캐릭터와 1:1이 되는 크기
-		hspr.offset.x = 80.0 / 0.8 - 160.0
-		obj_nodes[anchor] = hn
-		world.add_child(hn)
+		_spawn_house_node(anchor)
+	if GameData.house_lv >= 1:
+		_spawn_house_node(HOME_ANCHOR)  # 지은 뒤에만 존재
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
 	_apply_story_visibility()
+
+
+func _spawn_house_node(anchor: Vector2i) -> void:
+	var hn := _make_object(tex["house"],
+		Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -256))
+	var hspr: Sprite2D = hn.get_child(0)
+	hspr.scale = Vector2(0.8, 0.8)  # 문이 캐릭터와 1:1이 되는 크기
+	hspr.offset.x = 80.0 / 0.8 - 160.0
+	obj_nodes[anchor] = hn
+	world.add_child(hn)
 
 
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
@@ -521,6 +538,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["rock"]
 		"bin":
 			texture = tex["bin"]
+		"housesite":
+			texture = tex["sign"]  # 집터 표지판
 		"board":
 			texture = tex["board"]
 		"sign":
@@ -738,6 +757,10 @@ func interior_only_open() -> bool:
 
 
 func request_sleep() -> void:
+	if not GameData.has_bed:
+		hud.show_message("잘 침대가 없다. 침대 자리에서 침대를 만들자 (목재 %d)." %
+			GameData.BED_WOOD)
+		return
 	if Net.is_guest():
 		hud.show_message("하루는 호스트가 잠자리에 들어야 넘어간다.")
 	else:
@@ -822,6 +845,8 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 
 func gain_skill(id: String, amount: float) -> void:
+	if GameData.is_night():
+		amount = maxf(1.0, amount * 0.5)  # 밤에는 채집/작업 효율이 떨어진다
 	float_texts.append({"text": "+%d %s" % [int(amount), GameData.SKILLS[id].name],
 		"pos": player.position + Vector2(0, -100), "t": 0.0})
 	var lv := GameData.add_skill_xp(id, amount)
@@ -878,6 +903,11 @@ func use_tool() -> void:
 			and not GameData.tool_slots.has(GameData.tool):
 		hud.show_message("가방(I)에서 도구를 슬롯에 장착하고 숫자키로 선택하자!")
 		return
+	# 밤 채집 패널티: 어두워서 몸이 무겁고(기력 소모) 손이 무디다 (숙련도 절반)
+	if not _remote_acting and GameData.is_night() and GameData.tool != "hand":
+		GameData.energy = maxf(0.0, GameData.energy - 4.0)
+		if randf() < 0.15:
+			hud.show_message("어두워서 일이 손에 잡히지 않는다... 슬슬 돌아가서 쉬자.")
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return
@@ -1166,6 +1196,9 @@ func interact() -> void:
 		if obj.kind == "worldtree":
 			cave.open(true)
 			return
+		if obj.kind == "housesite":
+			_open_build_dialog()
+			return
 		if obj.kind == "bin":
 			shop.open("sell", ["sell"])
 			return
@@ -1225,6 +1258,8 @@ func _tile_overlaps_player(t: Vector2i) -> bool:
 
 func nearby_npc() -> Node2D:
 	for n in npcs:
+		if not n.visible:
+			continue  # 집에 들어간 NPC와는 만날 수 없다
 		if (n.position - player.position).length() < 48.0:
 			return n
 	return null
@@ -1238,6 +1273,9 @@ func nearby_animal() -> Node2D:
 
 
 func _building_kind_at(t: Vector2i) -> String:
+	if GameData.house_lv >= 1 and t.x >= HOME_ANCHOR.x and t.x < HOME_ANCHOR.x + 5 \
+			and t.y >= HOME_ANCHOR.y and t.y < HOME_ANCHOR.y + 4:
+		return "home"
 	for a: Vector2i in BUILDINGS:
 		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
 			return BUILDINGS[a]
@@ -1282,7 +1320,7 @@ func _apply_story_visibility() -> void:
 	for pos: Vector2i in obj_nodes:
 		# BUILDINGS 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = objects[pos].kind if objects.has(pos) else "house"
-		if kind in ["house", "bin", "board", "sign", "barn", "barn_block", "cave"]:
+		if kind in ["house", "housesite", "bin", "board", "sign", "barn", "barn_block", "cave"]:
 			obj_nodes[pos].visible = show
 
 
@@ -1544,6 +1582,88 @@ func _story_tree_chopped() -> void:
 	hud.show_message("우체부 아저씨와 함께 숲을 개척해 마을(동쪽)로 가자!", 6.0)
 
 
+# ---- 밤 몬스터: 지네 (21시 이후 야외에서 등장, 아침에 사라진다) ----
+# 밤늦게까지 밖에서 채집하는 것이 위험해지도록 만드는 요소.
+
+var night_mobs: Array = []  # [{node, spr, anim}]
+var _mob_hit_cd := 0.0
+var _mob_spawn_cd := 0.0
+
+
+func _update_night_mobs(delta: float) -> void:
+	_mob_hit_cd = maxf(0.0, _mob_hit_cd - delta)
+	var outdoors := not interior.visible and not cave.visible \
+		and GameData.story_phase == "done" and not Net.is_guest()
+	if not GameData.is_deep_night() or not outdoors:
+		if not night_mobs.is_empty():
+			for m in night_mobs:
+				m.node.queue_free()
+			night_mobs.clear()
+		return
+	# 최대 2마리, 플레이어에서 조금 떨어진 곳에서 스멀스멀 나타난다
+	_mob_spawn_cd -= delta
+	if night_mobs.size() < 2 and _mob_spawn_cd <= 0.0:
+		_mob_spawn_cd = 6.0
+		var ang := randf() * TAU
+		var node := Node2D.new()
+		node.position = player.position + Vector2.from_angle(ang) * 380.0
+		var spr := Sprite2D.new()
+		spr.texture = tex["mob_centipede_0"]
+		spr.scale = Vector2(1.4, 1.4)
+		node.add_child(spr)
+		world.add_child(node)
+		night_mobs.append({"node": node, "spr": spr, "anim": 0.0})
+		hud.show_message("어둠 속에서 무언가 기어오는 소리가 들린다...", 4.0)
+	for m in night_mobs:
+		m.anim += delta
+		var to: Vector2 = player.position - m.node.position
+		if to.length() > 8.0:
+			m.node.position += to.normalized() * 55.0 * delta
+		m.spr.texture = tex["mob_centipede_%d" % (int(m.anim * 8.0) % 2)]
+		m.spr.flip_h = to.x > 0.0  # 머리가 진행 방향을 향한다
+		# 접촉 피해
+		if to.length() < 22.0 and _mob_hit_cd <= 0.0 and not ui_open():
+			_mob_hit_cd = 1.2
+			GameData.energy = maxf(0.0, GameData.energy - 10.0)
+			Sound.play_sfx("sfx_chop", 0.2)
+			spawn_particles(player_tile(), "stone")
+			hud.show_message("지네에게 물렸다! 밤의 숲은 위험하다...", 3.0)
+			player.position += (player.position - m.node.position).normalized() * 36.0
+			if GameData.energy <= 0.0 and not day_transitioning:
+				hud.show_message("정신을 잃고 쓰러졌다...")
+				_fade_next_day(true)
+
+
+# ---- 집 건설 (스토리 1 완료 후 집터에서 직접 짓는다) ----
+
+func _open_build_dialog() -> void:
+	dialog.open("집터",
+		"할아버지가 남긴 집터다.\n재료를 모아 직접 집을 지어야 한다.\n\n필요 재료: 목재 %d (보유 %d)" %
+			[GameData.HOUSE_BUILD_WOOD, GameData.wood], [
+		["집 짓기", _build_house],
+		["닫기", null],
+	])
+
+
+func _build_house() -> void:
+	if GameData.wood < GameData.HOUSE_BUILD_WOOD:
+		dialog.set_body("목재가 부족하다... (%d/%d)\n도끼로 나무를 베어 목재를 모으자." %
+			[GameData.wood, GameData.HOUSE_BUILD_WOOD])
+		return
+	GameData.wood -= GameData.HOUSE_BUILD_WOOD
+	GameData.house_lv = 1
+	_remove_object(HOME_SITE)
+	for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
+		for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
+			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+	_spawn_house_node(HOME_ANCHOR)
+	Sound.play_sfx("sfx_place")
+	dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
+		GameData.BED_WOOD)
+	hud.quest_toast("집 짓기")
+	save_now()
+
+
 func _story_chief() -> Node2D:
 	for n in npcs:
 		if n.id == "chief":
@@ -1571,7 +1691,7 @@ func _end_delivery() -> void:
 	_apply_story_camera()
 	_apply_story_visibility()
 	hud.quest_toast("이장에게 편지 전달")
-	hud.show_message("메인 스토리 1 완료! 이제 교진 마을에서의 생활이 시작된다.", 6.0)
+	hud.show_message("메인 스토리 1 완료! 마을 서쪽 집터(E)에 집을 지어 정착하자.", 6.0)
 	if _postman != null:
 		_postman_state = "leave"
 	save_now()
@@ -2303,6 +2423,8 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.story_phase = str(d.get("main_story", "done"))
 	GameData.tree_regrow = d.get("tree_regrow", [])
 	GameData.player_name = str(d.get("player_name", ""))
+	GameData.house_lv = int(d.get("house_lv", 0))
+	GameData.has_bed = bool(d.get("has_bed", false))
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):
@@ -2433,6 +2555,7 @@ func _process(delta: float) -> void:
 	if not cave.visible:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	_update_particles(delta)
+	_update_night_mobs(delta)
 	_net_process(delta)
 	_update_night()
 	hud.refresh()
@@ -2813,6 +2936,8 @@ func _context_hint() -> Array:
 				return ["E: 세계수 동굴 (위험!)", above_tile]
 			"forage_berry", "forage_herb":
 				return ["E: 채집", above_tile]
+			"housesite":
+				return ["E: 집 짓기 (목재 %d)" % GameData.HOUSE_BUILD_WOOD, above_tile]
 			"tree":
 				if bool(obj.get("young", false)):
 					return ["어린 나무 (자라는 중)", above_tile]

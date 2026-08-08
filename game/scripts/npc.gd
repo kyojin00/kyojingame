@@ -30,6 +30,14 @@ func _draw() -> void:
 
 
 func _process(delta: float) -> void:
+	# NPC 일정: 저녁(19시)이 되면 집으로 돌아가 아침까지 만날 수 없다.
+	# (이장은 스토리 1 편지 전달 중에는 남아 있는다)
+	var home_time: bool = GameData.is_evening() \
+		and not (id == "chief" and GameData.story_phase == "travel")
+	if visible == home_time:
+		visible = not home_time
+	if home_time:
+		return
 	if main.ui_open():
 		return
 	anim_time += delta

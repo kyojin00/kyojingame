@@ -150,19 +150,70 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("interact"):
 		if (ppos - KITCHEN.get_center()).length() < 69.0:
-			main.cooking_ui.open()
+			if GameData.house_lv >= 2:
+				main.cooking_ui.open()
+			else:
+				# 부엌은 집 확장으로 얻는다
+				main.dialog.open("집 확장",
+					"부엌을 만들려면 집을 확장해야 한다.\n\n필요 재료: 목재 %d · 석재 %d\n(보유: 목재 %d · 석재 %d)" %
+						[GameData.HOUSE_UPGRADE_WOOD, GameData.HOUSE_UPGRADE_STONE,
+						GameData.wood, GameData.stone], [
+					["확장하기", _upgrade_house],
+					["닫기", null],
+				])
 			get_viewport().set_input_as_handled()
 		elif (ppos - BED.get_center()).length() < 82.0:
-			main.request_sleep()
+			if GameData.has_bed:
+				main.request_sleep()
+			else:
+				# 침대는 직접 만들어야 한다
+				main.dialog.open("침대 제작",
+					"침대가 있어야 잠을 잘 수 있다.\n\n필요 재료: 목재 %d (보유 %d)" %
+						[GameData.BED_WOOD, GameData.wood], [
+					["침대 만들기", _craft_bed],
+					["닫기", null],
+				])
 		else:
 			main.hud.show_message("침대 E: 잠자기 · 조리대 E: 요리 · F: 꾸미기")
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and _key_of(event) == KEY_F:
+		if GameData.house_lv < 2:
+			main.hud.show_message("집을 확장하면 가구로 꾸밀 수 있다 (조리대 자리 E).")
+			return
 		deco_mode = true
 		cursor = (ppos / GRID).floor() * GRID
 		Sound.play_sfx("sfx_ui")
 	elif event.is_action_pressed("ui_cancel"):
 		close()
+
+
+func _craft_bed() -> void:
+	if GameData.wood < GameData.BED_WOOD:
+		main.dialog.set_body("목재가 부족하다... (%d/%d)\n도끼로 나무를 베어 목재를 모으자." %
+			[GameData.wood, GameData.BED_WOOD])
+		return
+	GameData.wood -= GameData.BED_WOOD
+	GameData.has_bed = true
+	Sound.play_sfx("sfx_place")
+	main.dialog.set_body("포근한 침대 완성!\n이제 밤이 되면 여기서 잘 수 있다.")
+	main.hud.quest_toast("침대 만들기")
+	main.save_now()
+
+
+func _upgrade_house() -> void:
+	if GameData.wood < GameData.HOUSE_UPGRADE_WOOD \
+			or GameData.stone < GameData.HOUSE_UPGRADE_STONE:
+		main.dialog.set_body("재료가 부족하다...\n(보유: 목재 %d/%d · 석재 %d/%d)" %
+			[GameData.wood, GameData.HOUSE_UPGRADE_WOOD,
+			GameData.stone, GameData.HOUSE_UPGRADE_STONE])
+		return
+	GameData.wood -= GameData.HOUSE_UPGRADE_WOOD
+	GameData.stone -= GameData.HOUSE_UPGRADE_STONE
+	GameData.house_lv = 2
+	Sound.play_sfx("sfx_place")
+	main.dialog.set_body("집 확장 완료!\n부엌(요리)과 꾸미기(F)를 쓸 수 있다.")
+	main.hud.quest_toast("집 확장")
+	main.save_now()
 
 
 # 실제 키보드는 keycode, 테스트 하네스는 physical_keycode만 채워서 보낸다
@@ -337,13 +388,17 @@ func _draw_room() -> void:
 	canvas.draw_rect(Rect2(KITCHEN.end.x - 10, KITCHEN.position.y + 1, 6, 4),
 		Color(0.9, 0.9, 0.92))
 
-	# 침대 (고정 가구)
-	canvas.draw_rect(BED.grow(2), Color(0.35, 0.23, 0.14))
-	canvas.draw_rect(BED, Color(0.75, 0.3, 0.28))
-	canvas.draw_rect(Rect2(BED.position.x + 3, BED.position.y + 3, BED.size.x - 6, 16),
-		Color(0.92, 0.9, 0.85))
-	canvas.draw_rect(Rect2(BED.position.x, BED.position.y + 24, BED.size.x, 4),
-		Color(0.6, 0.22, 0.2))
+	# 침대 (직접 만들어야 생긴다 — 만들기 전에는 빈 자리 표시)
+	if GameData.has_bed:
+		canvas.draw_rect(BED.grow(2), Color(0.35, 0.23, 0.14))
+		canvas.draw_rect(BED, Color(0.75, 0.3, 0.28))
+		canvas.draw_rect(Rect2(BED.position.x + 3, BED.position.y + 3, BED.size.x - 6, 16),
+			Color(0.92, 0.9, 0.85))
+		canvas.draw_rect(Rect2(BED.position.x, BED.position.y + 24, BED.size.x, 4),
+			Color(0.6, 0.22, 0.2))
+	else:
+		canvas.draw_rect(BED, Color(0.5, 0.42, 0.3, 0.35))
+		canvas.draw_rect(BED, Color(0.45, 0.35, 0.22, 0.8), false, 2.0)
 
 	# 배치된 가구 (러그 같은 비충돌 가구 먼저 → 그 위에 솔리드)
 	for f in GameData.furniture:
@@ -363,6 +418,10 @@ func _draw_room() -> void:
 		_draw_deco_ui()
 	else:
 		var guide := "E: 잠자기/요리 · F: 꾸미기 · 아랫문: 나가기"
+		if not GameData.has_bed:
+			guide = "침대 자리 E: 침대 만들기 · 아랫문: 나가기"
+		elif GameData.house_lv < 2:
+			guide = "침대 E: 잠자기 · 조리대 자리 E: 집 확장 · 아랫문: 나가기"
 		_draw_center_text(guide, 72)
 
 
