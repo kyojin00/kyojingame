@@ -354,11 +354,14 @@ func _update_sprite() -> void:
 	player_sprite.flip_h = false
 	match pdir:
 		"down":
-			tex_name = GameData.player_tex("down_" + suffix)
+			tex_name = GameData.player_tex("down_" + suffix) if suffix != "idle" \
+				else GameData.player_idle_tex("down")
 		"up":
-			tex_name = GameData.player_tex("up_" + suffix)
+			tex_name = GameData.player_tex("up_" + suffix) if suffix != "idle" \
+				else GameData.player_idle_tex("up")
 		_:
-			tex_name = GameData.player_tex("side_" + suffix)
+			tex_name = GameData.player_tex("side_" + suffix) if suffix != "idle" \
+				else GameData.player_idle_tex("side")
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
 	player_sprite.position = ppos + Vector2(-16, -42)

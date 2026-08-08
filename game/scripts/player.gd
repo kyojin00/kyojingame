@@ -80,10 +80,13 @@ func _update_sprite() -> void:
 	sprite.flip_h = false
 	match dir:
 		"down":
-			tex_name = GameData.player_tex("down_" + suffix)
+			tex_name = GameData.player_tex("down_" + suffix) if suffix != "idle" \
+				else GameData.player_idle_tex("down")
 		"up":
-			tex_name = GameData.player_tex("up_" + suffix)
+			tex_name = GameData.player_tex("up_" + suffix) if suffix != "idle" \
+				else GameData.player_idle_tex("up")
 		_:
-			tex_name = GameData.player_tex("side_" + suffix)
+			tex_name = GameData.player_tex("side_" + suffix) if suffix != "idle" \
+				else GameData.player_idle_tex("side")
 			sprite.flip_h = dir == "left"
 	sprite.texture = main.tex[tex_name]

@@ -89,6 +89,8 @@ const TEXTURE_NAMES := [
 	"player_f_down_0", "player_f_down_1", "player_f_up_0", "player_f_up_1",
 	"player_f_side_0", "player_f_side_1",
 	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
+	"player_side_idle_0", "player_side_idle_1", "player_side_idle_2",
+	"player_side_idle_3", "player_side_idle_4",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",

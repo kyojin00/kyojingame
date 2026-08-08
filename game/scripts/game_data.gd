@@ -374,6 +374,13 @@ func player_tex(part: String) -> String:
 	return ("player_f_" if gender == "f" else "player_") + part
 
 
+func player_idle_tex(dirn: String) -> String:
+	# 대기 모션: 남자 옆모습은 5프레임 숨쉬기 애니메이션 (0.4초/프레임)
+	if gender == "m" and dirn == "side":
+		return "player_side_idle_%d" % (int(Time.get_ticks_msec() / 400.0) % 5)
+	return player_tex(dirn + "_idle")
+
+
 
 func pet_speed_mult() -> float:
 	return 1.1 if active_pet == "dog" else 1.0
