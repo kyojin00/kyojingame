@@ -131,7 +131,7 @@ const TEXTURE_NAMES := [
 	"forage_berry", "forage_herb", "bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
-	"icon_hoe", "icon_water", "icon_seed", "icon_basket", "icon_axe",
+	"icon_hoe", "icon_water", "icon_seed", "icon_basket", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",

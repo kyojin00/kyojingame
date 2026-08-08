@@ -250,7 +250,7 @@ func _mk_tool_slot(slot_i: int) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.expand_icon = true
-	b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
+	b.icon = main.hud.tool_icon(t) if unlocked else null
 	b.add_theme_stylebox_override("normal",
 		_slot_selected if (t != "" and GameData.tool == t) else _slot_normal)
 	b.add_theme_stylebox_override("hover", _slot_normal)
@@ -284,7 +284,7 @@ func _mk_tool_slot(slot_i: int) -> Button:
 			if tt == "" or not GameData.is_tool_unlocked(tt):
 				return null
 			var pv := TextureRect.new()
-			pv.texture = main.tex[TOOL_ICONS[tt]]
+			pv.texture = main.hud.tool_icon(tt)
 			pv.custom_minimum_size = Vector2(36, 36)
 			pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			pv.stretch_mode = TextureRect.STRETCH_SCALE
@@ -307,7 +307,7 @@ func _mk_pick_slot(t: String) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	b.expand_icon = true
-	b.icon = main.tex[TOOL_ICONS[t]]
+	b.icon = main.hud.tool_icon(t)
 	b.add_theme_stylebox_override("normal", _slot_normal)
 	b.add_theme_stylebox_override("hover", _slot_selected)
 	b.add_theme_stylebox_override("pressed", _slot_normal)
@@ -317,7 +317,7 @@ func _mk_pick_slot(t: String) -> Button:
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var pv := TextureRect.new()
-			pv.texture = main.tex[TOOL_ICONS[t]]
+			pv.texture = main.hud.tool_icon(t)
 			pv.custom_minimum_size = Vector2(36, 36)
 			pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			pv.stretch_mode = TextureRect.STRETCH_SCALE

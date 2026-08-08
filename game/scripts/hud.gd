@@ -7,6 +7,13 @@ const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
 	"sprinkler": "sprinkler", "rod": "icon_rod",
 }
+
+
+# 도구 아이콘 (강화 단계 반영: 도끼 2강 이상 = 돌도끼)
+func tool_icon(t: String) -> Texture2D:
+	if t == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
+		return main.tex["icon_axe_stone"]
+	return main.tex[TOOL_ICONS[t]]
 const TOOL_LABELS := {
 	"hoe": "호미", "water": "물뿌리개", "hand": "수확",
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리 (목재1)",
@@ -237,7 +244,7 @@ func _build_hotbar() -> void:
 				if t == "" or not GameData.is_tool_unlocked(t):
 					return null
 				var pv := TextureRect.new()
-				pv.texture = main.tex[TOOL_ICONS[t]]
+				pv.texture = tool_icon(t)
 				pv.custom_minimum_size = Vector2(30, 30)
 				pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				pv.stretch_mode = TextureRect.STRETCH_SCALE
@@ -272,7 +279,7 @@ func _refresh_hotbar() -> void:
 		var b: Button = slot_buttons[i]
 		var t: String = GameData.tool_slots[i] if i < GameData.tool_slots.size() else ""
 		var unlocked: bool = t != "" and GameData.is_tool_unlocked(t)
-		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
+		b.icon = tool_icon(t) if unlocked else null
 		b.add_theme_stylebox_override("normal",
 			_slot_selected if (t != "" and GameData.tool == t) else _slot_normal)
 		b.add_theme_stylebox_override("hover", _slot_selected)
