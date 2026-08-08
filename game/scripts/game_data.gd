@@ -436,15 +436,18 @@ const STORY1_QUESTS := [
 	{"name": "지도를 확인해보자",
 		"task": "M 키를 눌러 지도를 열어 보자",
 		"story": "숲길이 여러 갈래로 갈라졌다. 어느 길로 가야 할까? 아저씨가 알려준 대로 지도에서 우리 위치와 가 본 곳을 확인해 보자."},
+	{"name": "마을로 가는 길을 열어보자",
+		"task": "우체부 아저씨에게 받은 곡괭이를 장착하고, 길을 막은 커다란 바위를 캐보자",
+		"story": "마을로 향하던 중 커다란 바위가 길을 완전히 가로막고 있었다. 아저씨가 곡괭이로 캐는 모습을 보여주며 곡괭이를 건네주었다. 배운 대로 바위를 캐서 길을 열자."},
 	{"name": "마을로 이동",
 		"task": "우체부 아저씨와 함께 마을 방향으로 가자 (화살표 방향)",
-		"story": "지도로 마을 방향을 확인했다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
+		"story": "바위를 치워 마침내 길이 열렸다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
 		"task": "마을 이장을 찾아가자",
 		"story": "드디어 마을이 보인다. 우체부 아저씨가 이장님께 편지를 전하면 긴 여정이 끝난다."},
 ]
 const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3,
-	"path": 4, "map": 5, "travel": 6}
+	"path": 4, "map": 5, "rock": 6, "travel": 7}
 
 
 func story_current_quest() -> Dictionary:
@@ -467,6 +470,14 @@ func story_objective_short() -> String:
 			return "숲길을 따라 나아가자 (화살표 방향)"
 		"map":
 			return "M 키를 눌러 지도를 열어 보자"
+		"rock":
+			match story_rock_state:
+				0:
+					return "길을 따라 마을 방향으로 가보자 (화살표 방향)"
+				1:
+					return "곡괭이를 장착하고 바위를 클릭한 뒤 E로 캐보자"
+				_:
+					return "우체부 아저씨에게 말을 걸어보자"
 		"travel":
 			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
 	return ""
@@ -483,6 +494,8 @@ func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("side")
+		if outfit == "casual":
+			return "player_casual_side_walk_%d" % (int(t * 9.0) % 6)
 		return "player_side_walk_%d" % (int(t * 9.0) % 6)
 	if suffix == "idle":
 		return player_tex("side_idle")
@@ -511,6 +524,14 @@ func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
 	return player_tex("up_" + suffix)
 
 
+# 벌목 누적 횟수 (스토리 중 15그루째에 우체부가 능력치 창을 알려준다)
+var trees_chopped := 0
+# U키 능력치 안내 단계: 0=대기 / 1=대사 완료(U 누르기 대기) / 2=창 열어봄 / 3=완료
+var u_intro_state := 0
+# 퀘스트 5 「마을로 가는 길을 열어보자」 진행 단계:
+# 0=바위 발견 전 / 1=곡괭이 받음(채광 중) / 2=바위 제거(곡괭이 돌려주기 대기) / 3=완료
+var story_rock_state := 0
+
 # 의상 (커스텀 시스템 초안): farm=농부 작업복 / casual=평상복
 # 평상복은 아직 정면 서기 1장뿐 — 나머지 방향/걷기는 농부 복장으로 표시된다
 var outfit := "farm"
@@ -523,7 +544,7 @@ func player_idle_tex(dirn: String) -> String:
 			return "player_casual_down_idle"
 		return "player_down_idle_0"
 	if gender == "m" and dirn == "side":
-		return "player_side_idle_0"
+		return "player_casual_side_idle" if outfit == "casual" else "player_side_idle_0"
 	return player_tex(dirn + "_idle")
 
 
@@ -1077,6 +1098,9 @@ func reset_all() -> void:
 	house_lv = 0
 	has_bed = false
 	explored = {}
+	trees_chopped = 0
+	u_intro_state = 0
+	story_rock_state = 0
 	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
@@ -1189,6 +1213,9 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"house_lv": house_lv,
 		"has_bed": has_bed,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
+		"trees_chopped": trees_chopped,
+		"u_intro": u_intro_state,
+		"rock_state": story_rock_state,
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,

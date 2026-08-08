@@ -90,6 +90,9 @@ const TEXTURE_NAMES := [
 	"player_f_side_0", "player_f_side_1",
 	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
 	"player_side_idle_0", "player_down_idle_0", "player_casual_down_idle",
+	"player_casual_side_idle", "player_casual_side_walk_0", "player_casual_side_walk_1",
+	"player_casual_side_walk_2", "player_casual_side_walk_3", "player_casual_side_walk_4",
+	"player_casual_side_walk_5",
 	"player_side_walk_0", "player_side_walk_1", "player_side_walk_2",
 	"player_side_walk_3", "player_side_walk_4", "player_side_walk_5",
 	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
@@ -317,7 +320,7 @@ func _ready() -> void:
 		# 스토리 도중 저장했다면 우체부 아저씨가 계속 동행한다
 		if GameData.story_phase == "approach":
 			_spawn_postman()  # 아직 대화 전 -> 다시 걸어와 말을 건다
-		elif GameData.story_phase in ["equip", "chop", "path", "map", "travel"]:
+		elif GameData.story_phase in ["equip", "chop", "path", "map", "rock", "travel"]:
 			_spawn_postman()
 			story_cutscene = false
 			_postman_state = "follow"
@@ -520,7 +523,7 @@ func _spawn_house_node(anchor: Vector2i) -> void:
 
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
 const OBJECT_SCALES := {
-	"tree": 2.0, "rock": 1.4, "cave": 1.5, "worldtree": 1.6,
+	"tree": 2.0, "rock": 1.4, "bigrock": 3.0, "cave": 1.5, "worldtree": 1.6,
 	"barn": 1.5, "forage_berry": 1.2, "forage_herb": 1.2,
 }
 const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
@@ -535,6 +538,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -100)
 		"rock":
 			texture = tex["rock"]
+		"bigrock":
+			texture = tex["rock"]  # 같은 바위 그림을 크게 그린다 (퀘스트 5)
 		"bin":
 			texture = tex["bin"]
 		"housesite":
@@ -1043,10 +1048,16 @@ func use_tool() -> void:
 					if randf() < GameData.bonus_drop_chance("forest"):
 						wood_got += 1
 					GameData.wood += wood_got
+					GameData.trees_chopped += 1
 					hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
 					_story_tree_chopped()
 					tutorial_notify("chop")
-					gain_skill("forest", 6.0)
+					gain_skill("forest", 3.0)
+					# 15그루째: 우체부 아저씨가 능력치 창(U)을 알려준다
+					if GameData.u_intro_state == 0 and GameData.trees_chopped >= 15 \
+							and _postman != null and _postman_state == "follow":
+						GameData.u_intro_state = 1
+						get_tree().create_timer(1.0).timeout.connect(_start_u_intro_dialog)
 					if randf() < 0.02:
 						gain_legend("world_branch")
 				elif obj.hp == 2:
@@ -1079,6 +1090,20 @@ func use_tool() -> void:
 					gain_skill("mine", 6.0)
 				else:
 					hud.show_message("돌을 내리쳤다. (%d/%d)" % [ROCK_HP - obj.hp, ROCK_HP])
+			elif obj.kind == "bigrock":
+				# 퀘스트 5: 길을 막은 커다란 바위 (여러 번 캐야 부서진다)
+				obj.hp -= 1
+				Sound.play_sfx("sfx_pick", 0.15)
+				spawn_particles(t, "stone")
+				if obj.hp <= 0:
+					_remove_object(t)
+					GameData.stone += BIGROCK_STONE
+					hud.show_message("커다란 바위를 캐냈다! 돌 +%d" % BIGROCK_STONE)
+					gain_skill("mine", 4.0)
+					_story_rock_mined()
+				else:
+					hud.show_message("커다란 바위를 내리쳤다. (%d/%d)" %
+						[BIGROCK_HP - obj.hp, BIGROCK_HP])
 			elif obj.kind == "sprinkler":
 				_remove_object(t)
 				GameData.wood += GameData.SPRINKLER_COST_WOOD
@@ -1146,7 +1171,7 @@ func interact() -> void:
 	var aim: Variant = objects.get(target_tile())
 	if aim != null and not bool(aim.get("young", false)) \
 			and ((aim.kind == "tree" and GameData.tool == "axe")
-			or (aim.kind == "rock" and GameData.tool == "pickaxe")):
+			or (aim.kind in ["rock", "bigrock"] and GameData.tool == "pickaxe")):
 		use_tool()
 		return
 	# 동행 중인 우체부 아저씨에게 말 걸기 (진행 단계별 보조 대화)
@@ -1248,7 +1273,7 @@ func interact() -> void:
 		else:
 			hud.show_message("도끼가 필요하다. 숫자키로 도끼를 선택하자!")
 		return
-	if tobj != null and tobj.kind == "rock":
+	if tobj != null and tobj.kind in ["rock", "bigrock"]:
 		if GameData.tool == "pickaxe":
 			use_tool()
 		else:
@@ -1300,6 +1325,9 @@ func _building_kind_at(t: Vector2i) -> String:
 const STORY_SPAWN := Vector2i(2, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
 const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
 const STORY_FORK := Vector2i(20, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
+const STORY_ROCK := Vector2i(26, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
+const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
+const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
 var _postman: Node2D = null
 var _postman_spr: Sprite2D = null
@@ -1312,7 +1340,7 @@ func _apply_story_camera() -> void:
 	# 숲 구간(마을 이동 전)에는 시작 숲 한 화면(30x17타일)에 카메라를 고정한다.
 	# 마을로 이동하는 travel 단계부터는 전체 맵 카메라로 풀린다.
 	var cam: Camera2D = player.get_node("Camera")
-	if GameData.story_phase in ["enter", "approach", "equip", "chop", "path", "map"]:
+	if GameData.story_phase in ["enter", "approach", "equip", "chop", "path", "map", "rock"]:
 		cam.limit_left = 0
 		cam.limit_top = 6 * TILE
 		cam.limit_right = 30 * TILE
@@ -1329,7 +1357,7 @@ func _apply_story_camera() -> void:
 func _apply_story_visibility() -> void:
 	# 숲 구간(마을 이동 전)엔 집/건물류가 어느 방향에서도 보이지 않는다.
 	# 마을로 이동하는 travel 단계부터는 마을이 보여야 하므로 표시한다.
-	var show := GameData.story_phase not in ["enter", "approach", "equip", "chop", "path", "map"]
+	var show := GameData.story_phase not in ["enter", "approach", "equip", "chop", "path", "map", "rock"]
 	for pos: Vector2i in obj_nodes:
 		# BUILDINGS 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = objects[pos].kind if objects.has(pos) else "house"
@@ -1373,6 +1401,13 @@ func _plant_story_forest() -> void:
 				if _hash01(x * 17 + 2, y * 23 + 5) < 0.15:
 					tr["apple"] = true  # 일부 나무만 사과 3개가 열린다
 				objects[pos] = tr
+	# 퀘스트 5: 동쪽 길 한가운데를 커다란 바위가 완전히 가로막는다
+	# (위아래는 나무가 빽빽해 돌아갈 수 없다 — 바위를 캐야만 지나갈 수 있다)
+	objects[STORY_ROCK] = {"kind": "bigrock", "hp": BIGROCK_HP}
+	for dy in [-2, -1, 1, 2]:
+		var wall := Vector2i(STORY_ROCK.x, STORY_ROCK.y + dy)
+		if not objects.has(wall):
+			objects[wall] = {"kind": "tree", "hp": TREE_HP}
 
 
 func _story_update(delta: float) -> void:
@@ -1432,8 +1467,15 @@ func _story_update(delta: float) -> void:
 				_story_map_opened = true
 			elif _story_map_opened and not map_ui.visible and not dialog.visible:
 				hud.quest_toast("지도를 확인해보자")
-				GameData.story_phase = "travel"  # 대화는 토스트 뒤에 이어진다
+				GameData.story_phase = "rock"  # 대화는 토스트 뒤에 이어진다
 				get_tree().create_timer(1.4).timeout.connect(_after_map_dialog)
+		"rock":
+			_update_postman(delta, story_shot)
+			# 길을 막은 커다란 바위를 발견하면 우체부 아저씨가 곡괭이를 보여준다
+			if GameData.story_rock_state == 0 and not dialog.visible and not ui_open() \
+					and objects.has(STORY_ROCK) and player.position.distance_to(
+						Vector2(STORY_ROCK.x * TILE + 16, STORY_ROCK.y * TILE + 16)) < 110.0:
+				_start_rock_dialog()
 		"travel":
 			_update_postman(delta, story_shot)
 			# 마을 이장 근처에 도착하면 편지 전달 컷신
@@ -1490,6 +1532,18 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 					_postman_spr.flip_h = to.x < 0
 			else:
 				_postman_spr.texture = tex["npc_postman_side_0"]
+		"mine_demo":
+			# 퀘스트 5: 대사가 나오는 동안 커다란 바위 옆으로 걸어가 시연 위치에 선다
+			var demo_pos := Vector2(STORY_ROCK.x * TILE - 20, STORY_ROCK.y * TILE + 22)
+			var to_rock := demo_pos - _postman.position
+			if to_rock.length() > 6.0:
+				_postman.position += to_rock.normalized() * minf(to_rock.length() * 3.0, 110.0) * delta
+				_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
+				if absf(to_rock.x) > 4.0:
+					_postman_spr.flip_h = to_rock.x < 0
+			else:
+				_postman_spr.texture = tex["npc_postman_side_0"]
+				_postman_spr.flip_h = false  # 바위(오른쪽)를 바라본다
 		"deliver":
 			# 이장에게 걸어가 편지를 전달한다
 			var chief := _story_chief()
@@ -1657,14 +1711,94 @@ func _start_fork_dialog() -> void:
 
 
 func _after_map_dialog() -> void:
-	# 지도를 확인한 뒤: 마을 방향을 함께 확인하고 이동 시작
+	# 지도를 확인한 뒤: 마을 방향을 함께 확인하고 이동 재개 (아직 숲길 — 카메라 잠금 유지)
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
 		{"text": "「이제 우리가 어디쯤 있는지 알겠나?」"},
 		{"text": "「마을은 이쪽 방향일세. 계속 가보세.」"},
 	], func() -> void:
-		_apply_story_camera()
-		_apply_story_visibility()
-		hud.show_message("우체부 아저씨와 함께 마을로 가자! (화살표 방향)", 6.0))
+		hud.show_message("길을 따라 마을 방향으로 가보자 (화살표 방향)", 6.0))
+
+
+# ---- 퀘스트 5 「마을로 가는 길을 열어보자」 (커다란 바위 / 곡괭이) ----
+
+func _start_rock_dialog() -> void:
+	# 커다란 바위 발견: 우체부 아저씨가 곡괭이 채광을 보여준 뒤 곡괭이를 건네준다
+	story_cutscene = true
+	_postman_state = "mine_demo"  # 대사가 진행되는 동안 바위 옆으로 걸어간다
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+		{"text": "「이런, 하필 여기서 길이 막혀버렸구먼.」"},
+		{"text": "「이 정도로 큰 돌은 그냥 지나갈 수가 없겠어.」"},
+		{"text": "(우체부 아저씨가 가방에서 낡은 나무 곡괭이를 꺼낸다...)"},
+		{"text": "「잠깐만 기다리게.」"},
+		{"text": "「이 곡괭이라면 저 돌을 치울 수 있을 걸세.」"},
+		{"text": "(우체부 아저씨가 곡괭이로 바위를 몇 번 캐 보인다...)", "event": _rock_demo},
+		{"text": "「자, 한번 자네가 직접 해보게.」", "event": _story_give_pickaxe},
+		{"text": "「바위도 나무와 마찬가지로 대상에 가까이 가서 E 키를 누르면 캘 수 있다네.」"},
+	], func() -> void:
+		story_cutscene = false
+		GameData.story_rock_state = 1
+		if not GameData.is_tool_unlocked("pickaxe"):
+			GameData.unlocked_tools.append("pickaxe")  # 대화를 스킵해도 지급 보장
+		if _postman != null:
+			_postman_state = "follow"
+		hud.show_message("곡괭이를 가방(I) 슬롯에 장착하고, 바위를 클릭한 뒤 E로 캐보자!", 6.0))
+
+
+func _rock_demo() -> void:
+	# 채광 시연: 바위에 곡괭이질 3번 (효과음 + 돌조각, 바위는 줄지 않는다)
+	for i in 3:
+		get_tree().create_timer(0.35 + 0.5 * i).timeout.connect(func() -> void:
+			if objects.has(STORY_ROCK):
+				Sound.play_sfx("sfx_pick", 0.15)
+				spawn_particles(STORY_ROCK, "stone"))
+
+
+func _story_give_pickaxe() -> void:
+	if not GameData.is_tool_unlocked("pickaxe"):
+		GameData.unlocked_tools.append("pickaxe")
+	hud.reward_toast("낡은 나무 곡괭이 × 1", tex["icon_pickaxe"])
+	hud.show_message("곡괭이는 슬롯에 장착하기 전에는 쓸 수 없다.", 5.0)
+
+
+func _story_rock_mined() -> void:
+	# 커다란 바위를 모두 캐면: 돌 획득 -> 우체부 아저씨의 칭찬 -> 곡괭이 돌려주기 목표
+	if GameData.story_phase != "rock" or GameData.story_rock_state != 1:
+		return
+	GameData.story_rock_state = 2
+	hud.reward_toast("돌 × %d" % BIGROCK_STONE, tex["icon_stone"])
+	get_tree().create_timer(1.2).timeout.connect(func() -> void:
+		if dialog.visible or ui_open():
+			return  # 창이 열려 있으면 말을 걸 때 같은 안내가 나온다
+		dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
+			{"text": "「잘했네. 이제 길이 열렸구먼.」"},
+		], func() -> void:
+			hud.show_message("우체부 아저씨에게 곡괭이를 돌려주자 (E: 대화)", 6.0)))
+
+
+func _start_pickaxe_return_dialog() -> void:
+	# 곡괭이를 돌려주려 하면 정식으로 건네준다 -> 퀘스트 5 완료, 마을로 출발
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	story_cutscene = true
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+		{"text": "(곡괭이를 우체부 아저씨에게 돌려주려 했다...)"},
+		{"text": "「아, 그건 자네가 가지게.」",
+			"portrait": tex["npc_postman_portrait_happy"]},
+		{"text": "「앞으로도 이런 돌을 만날 일이 있을 테니 잘 써보게.」"},
+		{"text": "「그럼 %s, 이제 마을로 가 보세나!」" % nm},
+	], _end_rock_quest)
+
+
+func _end_rock_quest() -> void:
+	# 퀘스트 5 완료: 곡괭이 정식 획득. 이후 튜토리얼 없이 마을로 향한다.
+	story_cutscene = false
+	GameData.story_rock_state = 3
+	GameData.story_phase = "travel"
+	hud.quest_toast("마을로 가는 길을 열어보자")
+	hud.reward_toast("나무 곡괭이 (정식 획득)", tex["icon_pickaxe"])
+	_apply_story_camera()
+	_apply_story_visibility()
+	hud.show_message("우체부 아저씨와 함께 마을로 가자! (화살표 방향)", 6.0)
+	save_now()
 
 
 # ---- 밤 몬스터: 지네 (21시 이후 야외에서 등장, 아침에 사라진다) ----
@@ -1772,10 +1906,44 @@ func _talk_to_postman() -> void:
 			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
 				{"text": "「M 키를 누르면 지도를 볼 수 있다네.」"},
 			], Callable())
+		"rock":
+			match GameData.story_rock_state:
+				1:
+					dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+						{"text": "「곡괭이도 도끼처럼 가방(I)에서 슬롯에 넣고 숫자키로 꺼내야 쓸 수 있다네.」"},
+						{"text": "「준비되면 바위를 클릭한 뒤 E 키로 캐보게.」"},
+					], Callable())
+				2:
+					_start_pickaxe_return_dialog()
+				_:
+					dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+						{"text": "「길을 따라 계속 가보세.」"},
+					], Callable())
 		_:
 			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
 				{"text": "「마을은 동쪽일세. 같이 가세나.」"},
 			], Callable())
+
+
+func _start_u_intro_dialog() -> void:
+	if dialog.visible or ui_open():
+		# 다른 창이 열려 있으면 잠시 뒤에 다시 시도
+		get_tree().create_timer(2.0).timeout.connect(_start_u_intro_dialog)
+		return
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+		{"text": "「계속 같은 일을 하다 보면 자연스럽게 실력이 늘기도 한다네.」"},
+		{"text": "「자신의 능력이 얼마나 늘었는지는 U를 눌러 확인해보게.」"},
+	], func() -> void:
+		hud.show_message("U 키를 눌러 능력치 창을 확인해 보자", 6.0))
+
+
+func _update_u_intro() -> void:
+	# U 안내: 창을 실제로 열어본 뒤 닫으면 완료 처리하고 스토리로 복귀
+	if GameData.u_intro_state == 1 and stats_ui.visible:
+		GameData.u_intro_state = 2
+	elif GameData.u_intro_state == 2 and not stats_ui.visible:
+		GameData.u_intro_state = 3
+		hud.quest_toast("자신의 능력 확인해보기")
 
 
 func _story_chief() -> Node2D:
@@ -2542,6 +2710,9 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.explored = {}
 	for c in d.get("explored", []):
 		GameData.explored[Vector2i(int(c[0]), int(c[1]))] = true
+	GameData.trees_chopped = int(d.get("trees_chopped", 0))
+	GameData.u_intro_state = int(d.get("u_intro", 0))
+	GameData.story_rock_state = int(d.get("rock_state", 0))
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):
@@ -2676,6 +2847,7 @@ func _process(delta: float) -> void:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	_update_particles(delta)
 	_update_night_mobs(delta)
+	_update_u_intro()
 	_net_process(delta)
 	_update_night()
 	hud.refresh()
@@ -3062,7 +3234,7 @@ func _context_hint() -> Array:
 				if bool(obj.get("young", false)):
 					return ["어린 나무 (자라는 중)", above_tile]
 				return ["E: 벌목 (도끼)", above_tile]
-			"rock":
+			"rock", "bigrock":
 				return ["E: 채광 (곡괭이)", above_tile]
 			"house":
 				var bk := _building_kind_at(t)
@@ -3093,6 +3265,11 @@ func nav_target() -> Variant:
 	if GameData.story_phase == "path":
 		# 갈림길까지 숲길 안내
 		return Vector2(STORY_FORK.x * TILE + 16, STORY_FORK.y * TILE + 16)
+	if GameData.story_phase == "rock":
+		# 커다란 바위까지 안내, 바위를 캔 뒤에는 우체부 아저씨에게
+		if GameData.story_rock_state >= 2 and _postman != null:
+			return _postman.position
+		return Vector2(STORY_ROCK.x * TILE + 16, STORY_ROCK.y * TILE + 16)
 	if GameData.story_phase == "travel":
 		# 마을 이장에게 가는 길 안내
 		var chief := _story_chief()

@@ -308,6 +308,8 @@ func refresh() -> void:
 		track.append("목표: " + story_obj)
 	elif obj != "":
 		track.append("목표: " + obj)
+	if GameData.u_intro_state == 1:
+		track.append("목표: U 키로 능력치를 확인해 보자")
 	var q: Dictionary = GameData.quest
 	if not q.is_empty() and bool(q.accepted):
 		track.append("의뢰: %s %d/%d" % [GameData.CROPS[q.crop].name,
