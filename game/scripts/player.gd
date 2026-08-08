@@ -35,7 +35,8 @@ func _process(delta: float) -> void:
 	if moving and main.fishing_state != "":
 		main.cancel_fishing()  # 움직이면 낚시 중단
 	if moving:
-		if absf(v.x) > absf(v.y):
+		if v.x != 0.0:
+			# 대각선 포함: 좌우 성분이 있으면 옆모습 걷기
 			dir = "right" if v.x > 0 else "left"
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
