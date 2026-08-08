@@ -394,9 +394,7 @@ func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("side")
-		# 20장 중 핵심 4포즈: 디딤A -> 통과 -> 디딤B -> 통과
-		var seq := [0, 3, 5, 8]
-		return "player_side_walk_%d" % seq[int(t * 6.0) % 4]
+		return "player_side_walk_%d" % (int(t * 6.0) % 4)
 	if suffix == "idle":
 		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
