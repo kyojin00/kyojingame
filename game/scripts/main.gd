@@ -1459,10 +1459,12 @@ func _talk_to(npc: Node2D) -> void:
 		gain_legend("memory_piece")
 		if Net.is_host():
 			_broadcast_stats()
-	dialog.open(title, line, [
-		["선물하기", _give_gift.bind(npc.id)],
-		["닫기", null],
-	], _npc_portrait(npc.id))
+	dialog.open_seq(title, _npc_portrait(npc.id), [
+		{"text": line, "choices": [
+			["선물하기", _give_gift.bind(npc.id)],
+			["대화 끝", null],
+		]},
+	])
 
 
 func _npc_portrait(npc_id: String, happy := false) -> Texture2D:
@@ -1983,6 +1985,18 @@ func _update_night() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.is_guest() and not _net_ready:
 		return  # 접속 완료 전에는 조작 금지
+	if story_layer != null:
+		# 스토리 연출 중 ESC = 스킵. 텍스트만 건너뛰고 후속 이벤트는 그대로 진행된다.
+		if event.is_action_pressed("ui_cancel"):
+			Sound.play_sfx("sfx_ui")
+			if _story_mode == "intro":
+				# 마지막 선택 페이지(시작하기/튜토리얼 건너뛰기)로 점프
+				_story_idx = _story_pages.size()
+				_show_story_page()
+			else:
+				_close_story()  # 부지/엔딩: 정상 종료 루틴 (HUD 복구 등)
+			get_viewport().set_input_as_handled()
+		return
 	if ui_open():
 		if event.is_action_pressed("ui_cancel"):
 			shop.close()
