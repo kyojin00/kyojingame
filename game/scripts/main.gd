@@ -870,6 +870,11 @@ func _affected_tiles(base: Vector2i) -> Array:
 
 
 func use_tool() -> void:
+	# 도구는 슬롯에 장착하고 직접 선택해 손에 든 상태여야만 쓸 수 있다 (맨손 수확 제외)
+	if not _remote_acting and GameData.tool != "hand" \
+			and not GameData.tool_slots.has(GameData.tool):
+		hud.show_message("가방(I)에서 도구를 슬롯에 장착하고 숫자키로 선택하자!")
+		return
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return
@@ -1291,12 +1296,15 @@ func _plant_story_forest() -> void:
 			if y == STORY_LANE_Y and x <= 7:
 				continue  # 숲 입구 + 우체부 길
 			var h := _hash01(x, y)
-			if h < 0.09:
-				continue  # 불규칙한 빈 공간 (넓은 공터가 생기지 않게 최소로)
-			if h < 0.14:
+			if h < 0.045:
+				grid[y][x].ground = "path"  # 드문드문 흙바닥 자국
+				continue
+			if h < 0.5:
+				continue  # 나무 사이 이동 공간 (불규칙한 빈 풀밭)
+			if h < 0.57:
 				# 풀/낮은 풀숲/작은 식물 (열매 덤불·약초) — 드문드문
-				objects[pos] = {"kind": "forage_herb" if h < 0.115 else "forage_berry", "hp": 0}
-			elif h > 0.9:
+				objects[pos] = {"kind": "forage_herb" if h < 0.535 else "forage_berry", "hp": 0}
+			elif h > 0.94:
 				objects[pos] = {"kind": "rock", "hp": ROCK_HP}  # 큰 돌/작은 돌 (크기 랜덤)
 			else:
 				var tr := {"kind": "tree", "hp": TREE_HP}
@@ -1312,7 +1320,13 @@ func _story_update(delta: float) -> void:
 	var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
 	match GameData.story_phase:
 		"enter":
-			if story_shot and absf(_story_t - 0.6) < delta:
+			# (검증용) t를 지나는 첫 프레임에만 1회 발동
+			if story_shot and _story_t >= 0.4 and _story_t - delta < 0.4:
+				quest_ui.toggle()  # 상세 퀘스트 창 캡처
+			if story_shot and _story_t >= 0.55 and _story_t - delta < 0.55:
+				_snap_story("story_quest")
+				quest_ui.close()
+			if story_shot and absf(_story_t - 0.7) < delta:
 				_snap_story("story_forest")
 			# 숲 안으로 일정 거리만 들어가면 퀘스트 1 완료
 			if player_tile().x >= 5 or player.walked >= 160.0 \
@@ -2378,7 +2392,6 @@ func _process(delta: float) -> void:
 			_growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
 		_update_mouse_target()
-		_auto_select_tool()
 		_update_fishing(delta)
 		if player.walked > 40.0:
 			tutorial_notify("moved")
@@ -2418,38 +2431,8 @@ func _growth_tick(game_minutes: float) -> void:
 		queue_redraw()
 
 
-# 바라보는 대상에 맞는 도구를 자동 선택한다 (해금된 도구만)
-var _last_auto_target := Vector2i(-999, -999)
-
-
-func _auto_select_tool() -> void:
-	var t := target_tile()
-	if t == _last_auto_target:
-		return
-	_last_auto_target = t
-	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H or fishing_state != "":
-		return
-	var want := ""
-	var obj: Variant = objects.get(t)
-	if obj != null:
-		match obj.kind:
-			"tree":
-				want = "axe"
-			"rock":
-				want = "pickaxe"
-	else:
-		var cell: Dictionary = grid[t.y][t.x]
-		if cell.crop_id != "":
-			if cell.dead:
-				want = "hoe"
-			elif float(cell.crop_day) >= _grow_total(GameData.CROPS[cell.crop_id]):
-				want = "hand"
-			elif not cell.watered:
-				want = "water"
-		elif cell.ground == "water":
-			want = "rod"
-	if want != "" and want != GameData.tool and GameData.is_tool_unlocked(want):
-		GameData.tool = want
+# (자동 도구 선택은 제거됨 — 도구는 반드시 슬롯에 장착하고 숫자키/클릭으로
+#  직접 선택해야 하며, 대상에 접근하는 것만으로는 아무 일도 일어나지 않는다)
 
 
 func _update_night() -> void:

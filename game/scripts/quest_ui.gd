@@ -18,44 +18,41 @@ func _ready() -> void:
 	layer = 22
 	visible = false
 
-	# 픽셀아트 두루마리: 양피지 몸통 + 위아래 말린 축
+	# 픽셀아트 두루마리: 양피지 몸통 + 위아래 말린 축.
+	# 모든 텍스트는 이 두루마리 안(여백 안쪽)에만 표시된다.
 	var panel := PanelContainer.new()
-	panel.position = Vector2(495, 24)
-	panel.custom_minimum_size = Vector2(450, 495)
+	panel.position = Vector2(240, 26)
+	panel.custom_minimum_size = Vector2(480, 488)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.93, 0.85, 0.66)
 	style.border_color = Color(0.55, 0.4, 0.2)
 	style.set_border_width_all(2)
-	style.set_content_margin_all(14)
-	style.content_margin_top = 22.0
-	style.content_margin_bottom = 22.0
+	style.set_content_margin_all(26)
+	style.content_margin_top = 30.0
+	style.content_margin_bottom = 30.0
 	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
-
-	var deco := Control.new()
-	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
-	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	deco.draw.connect(func() -> void:
-		var w := deco.size.x
-		var h := deco.size.y
+	# 말린 축은 패널 자체에 그린다 (자식은 content margin 안쪽으로 밀리므로)
+	panel.draw.connect(func() -> void:
+		var w := panel.size.x
+		var h := panel.size.y
 		var edge := Color(0.55, 0.4, 0.2)
 		var roll := Color(0.82, 0.71, 0.5)
 		var roll_dk := Color(0.62, 0.49, 0.3)
 		# 좌우 가장자리 음영 (말려 있던 자국)
-		deco.draw_rect(Rect2(2, 12, 5, h - 24), Color(0.85, 0.75, 0.55))
-		deco.draw_rect(Rect2(w - 7, 12, 5, h - 24), Color(0.85, 0.75, 0.55))
+		panel.draw_rect(Rect2(3, 16, 6, h - 32), Color(0.85, 0.75, 0.55))
+		panel.draw_rect(Rect2(w - 9, 16, 6, h - 32), Color(0.85, 0.75, 0.55))
 		# 위/아래 말린 축
-		for ry in [0.0, h - 14.0]:
-			deco.draw_rect(Rect2(4, ry + 3, w - 8, 8), roll)
-			deco.draw_rect(Rect2(4, ry + 3, w - 8, 3), Color(0.9, 0.8, 0.6))
-			deco.draw_rect(Rect2(4, ry + 8, w - 8, 3), roll_dk)
-			deco.draw_rect(Rect2(4, ry + 3, w - 8, 8), edge, false, 1.0)
-			# 양쪽으로 튀어나온 말린 끝
-			deco.draw_rect(Rect2(0, ry + 2, 6, 10), roll_dk)
-			deco.draw_rect(Rect2(0, ry + 2, 6, 10), edge, false, 1.0)
-			deco.draw_rect(Rect2(w - 6, ry + 2, 6, 10), roll_dk)
-			deco.draw_rect(Rect2(w - 6, ry + 2, 6, 10), edge, false, 1.0))
-	panel.add_child(deco)
+		for ry in [0.0, h - 16.0]:
+			panel.draw_rect(Rect2(5, ry + 4, w - 10, 9), roll)
+			panel.draw_rect(Rect2(5, ry + 4, w - 10, 3), Color(0.9, 0.8, 0.6))
+			panel.draw_rect(Rect2(5, ry + 10, w - 10, 3), roll_dk)
+			panel.draw_rect(Rect2(5, ry + 4, w - 10, 9), edge, false, 1.0)
+			# 양쪽으로 살짝 튀어나온 말린 끝
+			panel.draw_rect(Rect2(0, ry + 3, 7, 11), roll_dk)
+			panel.draw_rect(Rect2(0, ry + 3, 7, 11), edge, false, 1.0)
+			panel.draw_rect(Rect2(w - 7, ry + 3, 7, 11), roll_dk)
+			panel.draw_rect(Rect2(w - 7, ry + 3, 7, 11), edge, false, 1.0))
+	add_child(panel)
 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
@@ -68,11 +65,12 @@ func _ready() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(414, 410)
+	scroll.custom_minimum_size = Vector2(428, 396)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()
 	items_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	items_box.custom_minimum_size = Vector2(424, 0)
 	scroll.add_child(items_box)
 
 
