@@ -100,12 +100,14 @@ const TEXTURE_NAMES := [
 	"player_side_walk_18", "player_side_walk_19",
 	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
 	"player_down_walk_3",
+	"player_up_walk_0", "player_up_walk_1", "player_up_walk_2",
+	"player_up_walk_3",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
 	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
-	"tree_bare", "tree_half",
+	"tree_bare", "tree_half", "tree_apple",
 	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
@@ -311,6 +313,7 @@ func _ready() -> void:
 	var loaded := GameData.load_game()
 	if loaded.size() > 0:
 		_apply_save(loaded)
+		_apply_story_camera.call_deferred()
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		GameData.reset_all()
@@ -320,6 +323,7 @@ func _ready() -> void:
 			GameData.story_phase = "enter"
 			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
 			_plant_story_forest()
+			_apply_story_camera.call_deferred()
 			hud.show_message("우거진 숲... 이 너머에 앞으로 지낼 집터가 있다.")
 			if not story_shot:
 				_show_intro.call_deferred()
@@ -549,7 +553,9 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 	var spr: Sprite2D = obj_nodes[pos].get_child(0)
 	var hp := int(objects[pos].hp)
 	if hp >= TREE_HP:
-		spr.texture = tex["tree_" + GameData.season_key()]
+		# 일부 나무에는 사과가 열려 있다 (가지 사이에 자연스럽게)
+		spr.texture = tex["tree_apple"] if objects[pos].get("apple", false) \
+			else tex["tree_" + GameData.season_key()]
 	elif hp == 2:
 		spr.texture = tex["tree_bare"]
 	else:
@@ -1184,25 +1190,49 @@ var _postman_anim := 0.0
 var _story_t := 0.0
 
 
+func _apply_story_camera() -> void:
+	# 스토리 진행 중엔 시작 숲 한 화면(30x17타일)에 카메라를 고정한다.
+	# 집(y0~5)은 화면 밖이라 보이지 않는다.
+	var cam: Camera2D = player.get_node("Camera")
+	if GameData.story_phase != "done":
+		cam.limit_left = 0
+		cam.limit_top = 6 * TILE
+		cam.limit_right = 30 * TILE
+		cam.limit_bottom = 6 * TILE + 540
+		cam.position_smoothing_enabled = false
+	else:
+		cam.limit_left = 0
+		cam.limit_top = 0
+		cam.limit_right = MAP_W * TILE
+		cam.limit_bottom = MAP_H * TILE
+		cam.position_smoothing_enabled = true
+
+
 func _plant_story_forest() -> void:
 	# 주인공(왼쪽) 앞을 가로막는 울창한 숲: 나무 사이 간격은 불규칙하게,
 	# 곳곳에 큰 돌을 드문드문 섞어 자연스러운 숲 지형을 만든다.
-	for y in range(1, 20):
-		for x in range(5, 30):
+	for y in range(1, 23):
+		for x in range(4, 30):
 			var pos := Vector2i(x, y)
 			if grid[y][x].ground != "grass" or objects.has(pos):
 				continue
-			if x >= 3 and x <= 10 and y <= 6:
-				continue  # 집터 주변 공터 (숲을 헤치고 나와야 보인다)
+			if x >= 3 and x <= 10 and y <= 7:
+				continue  # 집터 앞 공터 (집은 화면 밖, 문 진입로 확보)
 			if y == STORY_LANE_Y and x <= 7:
 				continue  # 숲 입구 + 우체부 길
 			var h := _hash01(x, y)
-			if h < 0.16:
-				continue  # 불규칙한 틈
-			if h > 0.9:
+			if h < 0.14:
+				continue  # 불규칙한 빈 공간
+			if h < 0.19:
+				# 풀/작은 식물 (열매 덤불·약초)
+				objects[pos] = {"kind": "forage_herb" if h < 0.165 else "forage_berry", "hp": 0}
+			elif h > 0.9:
 				objects[pos] = {"kind": "rock", "hp": ROCK_HP}  # 큰 돌
 			else:
-				objects[pos] = {"kind": "tree", "hp": TREE_HP}
+				var tr := {"kind": "tree", "hp": TREE_HP}
+				if _hash01(x * 17 + 2, y * 23 + 5) < 0.15:
+					tr["apple"] = true  # 일부 나무만 사과가 열린다
+				objects[pos] = tr
 
 
 func _story_update(delta: float) -> void:
@@ -1301,6 +1331,7 @@ func _story_tree_chopped() -> void:
 	if GameData.story_phase != "chop":
 		return
 	GameData.story_phase = "done"
+	_apply_story_camera()
 	Sound.play_sfx("sfx_catch")
 	hud.show_message("퀘스트 완료: 나무를 베어보자! 이제 집터까지 길을 열자.")
 
@@ -1526,6 +1557,7 @@ func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
 	GameData.story_phase = "done"
+	_apply_story_camera()
 	if _postman != null:
 		_postman.queue_free()
 		_postman = null
@@ -1962,7 +1994,8 @@ func save_now() -> void:
 		g.append(row)
 	var objs := []
 	for pos: Vector2i in objects:
-		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp])
+		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp,
+			1 if objects[pos].get("apple", false) else 0])
 	var anims := []
 	for a in animals:
 		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
@@ -2065,7 +2098,10 @@ func _apply_save(d: Dictionary) -> void:
 	if d.has("objects"):
 		objects.clear()
 		for o in d.objects:
-			objects[Vector2i(int(o[0]), int(o[1]))] = {"kind": o[2], "hp": int(o[3])}
+			var od := {"kind": o[2], "hp": int(o[3])}
+			if o.size() > 4 and int(o[4]) == 1:
+				od["apple"] = true
+			objects[Vector2i(int(o[0]), int(o[1]))] = od
 
 
 # ---- 루프 ----
@@ -2408,7 +2444,9 @@ func _draw() -> void:
 			draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 				Color(1, 1, 1, 0.6), false, 1.0)
 
-	# 미구매 부지: 어둑한 오버레이 + 금색 경계
+	# 미구매 부지: 어둑한 오버레이 + 금색 경계 (스토리 중에는 표시하지 않는다)
+	if GameData.story_phase != "done":
+		return
 	for pid in GameData.PARCELS:
 		if GameData.owned_parcels.has(pid):
 			continue
@@ -2740,7 +2778,8 @@ func _make_snapshot_json() -> String:
 		g.append(row)
 	var objs := []
 	for pos: Vector2i in objects:
-		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp])
+		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp,
+			1 if objects[pos].get("apple", false) else 0])
 	var anims := []
 	for a in animals:
 		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])

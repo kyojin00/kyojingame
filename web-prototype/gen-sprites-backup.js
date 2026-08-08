@@ -1692,3 +1692,28 @@ for (const name of SAVED_NAMES) {
   fs.writeFileSync(file, PNG.sync.write(epx2x(PNG.sync.read(fs.readFileSync(file)))));
 }
 console.log('farm epx pass done');
+
+// ---- 사과가 열린 나무: 봄 나무 캐노피 잎 사이에 사과 3개 ----
+{
+  const file = path.join(OUT, 'tree_spring.png');
+  const img = PNG.sync.read(fs.readFileSync(file));  // 64x96
+  const put = (x, y, r, g, b) => {
+    if (x < 0 || y < 0 || x >= img.width || y >= img.height) return;
+    const i = (y * img.width + x) * 4;
+    if (img.data[i + 3] >= 128) {  // 잎이 있는 곳에만 = 가지에 달린 느낌
+      img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = b;
+    }
+  };
+  for (const [ax, ay] of [[14, 24], [38, 16], [26, 40]]) {
+    for (let dy = 0; dy < 6; dy++) for (let dx = 0; dx < 6; dx++) {
+      if ((dx === 0 || dx === 5) && (dy === 0 || dy === 5)) continue;
+      put(ax + dx, ay + dy, 206, 54, 42);
+    }
+    put(ax + 1, ay + 1, 255, 138, 112); put(ax + 2, ay + 1, 255, 138, 112);
+    put(ax + 1, ay + 2, 240, 96, 74);
+    put(ax + 4, ay + 4, 158, 36, 28); put(ax + 3, ay + 5, 158, 36, 28);
+    put(ax + 2, ay - 1, 92, 62, 30);  // 꼭지
+  }
+  fs.writeFileSync(path.join(OUT, 'tree_apple.png'), PNG.sync.write(img));
+  console.log('tree_apple ok');
+}

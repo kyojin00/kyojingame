@@ -356,8 +356,7 @@ func _update_sprite() -> void:
 		"down":
 			tex_name = GameData.player_down_tex(moving, suffix, anim_time)
 		"up":
-			tex_name = GameData.player_tex("up_" + suffix) if suffix != "idle" \
-				else GameData.player_idle_tex("up")
+			tex_name = GameData.player_up_tex(moving, suffix, anim_time)
 		_:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			player_sprite.flip_h = pdir == "left"

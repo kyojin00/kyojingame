@@ -37,25 +37,60 @@ func _ready() -> void:
 	layer = 22
 	visible = false
 
+	# 가죽 가방을 펼친 듯한 패널 (덮개 + 버클 + 재봉선)
 	var panel := PanelContainer.new()
-	panel.position = Vector2(203, 83)
+	panel.position = Vector2(203, 92)
 	panel.custom_minimum_size = Vector2(555, 345)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
-	style.border_color = Color(0.42, 0.36, 0.55)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(10)
+	style.bg_color = Color(0.55, 0.36, 0.2, 0.98)
+	style.border_color = Color(0.29, 0.18, 0.09)
+	style.set_border_width_all(4)
+	style.set_corner_radius_all(16)
+	style.set_content_margin_all(14)
 	panel.add_theme_stylebox_override("panel", style)
 	add_child(panel)
+
+	var deco := Control.new()
+	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	deco.draw.connect(func() -> void:
+		var w := deco.size.x
+		# 가방 덮개 (위로 접힌 뚜껑)
+		var flap := PackedVector2Array([
+			Vector2(w / 2 - 150, -12), Vector2(w / 2 + 150, -12),
+			Vector2(w / 2 + 115, -40), Vector2(w / 2 - 115, -40)])
+		deco.draw_colored_polygon(flap, Color(0.42, 0.27, 0.14))
+		deco.draw_polyline(PackedVector2Array([
+			Vector2(w / 2 - 150, -12), Vector2(w / 2 - 115, -40),
+			Vector2(w / 2 + 115, -40), Vector2(w / 2 + 150, -12)]),
+			Color(0.29, 0.18, 0.09), 3.0)
+		# 버클
+		deco.draw_rect(Rect2(w / 2 - 12, -30, 24, 16), Color(0.79, 0.57, 0.18))
+		deco.draw_rect(Rect2(w / 2 - 12, -30, 24, 16), Color(0.47, 0.33, 0.1), false, 2.0)
+		deco.draw_rect(Rect2(w / 2 - 2, -28, 4, 12), Color(0.47, 0.33, 0.1))
+		# 재봉선 (안쪽 점선)
+		var r := Rect2(Vector2(-4, -4), deco.size + Vector2(8, 8))
+		var dash := 8.0
+		for edge in [[r.position, Vector2(r.end.x, r.position.y)],
+				[Vector2(r.position.x, r.end.y), r.end],
+				[r.position, Vector2(r.position.x, r.end.y)],
+				[Vector2(r.end.x, r.position.y), r.end]]:
+			var a: Vector2 = edge[0]
+			var b: Vector2 = edge[1]
+			var n := int(a.distance_to(b) / dash)
+			for i in n:
+				if i % 2 == 0:
+					deco.draw_line(a.lerp(b, float(i) / n),
+						a.lerp(b, float(i + 0.7) / n), Color(0.85, 0.7, 0.45, 0.55), 2.0))
+	panel.add_child(deco)
 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	panel.add_child(v)
 
 	var title := Label.new()
-	title.text = "- 인벤토리 (I/ESC: 닫기 · U: 능력치) -"
-	title.add_theme_color_override("font_color", Color("ffd75e"))
+	title.text = "- 가방 (I/ESC: 닫기 · U: 능력치) -"
+	title.add_theme_color_override("font_color", Color(1, 0.9, 0.65))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
 

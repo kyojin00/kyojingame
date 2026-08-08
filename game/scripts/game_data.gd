@@ -413,6 +413,17 @@ func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
 	return player_tex("down_" + suffix)
 
 
+func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
+	# 뒷모습. 남자: 걷는 중엔 4프레임 걷기(6fps), 멈추면 정지 프레임.
+	if gender == "m":
+		if not is_moving:
+			return player_idle_tex("up")
+		return "player_up_walk_%d" % (int(t * 6.0) % 4)
+	if suffix == "idle":
+		return player_tex("up_idle")
+	return player_tex("up_" + suffix)
+
+
 func player_idle_tex(dirn: String) -> String:
 	# 대기 모션: 남자 옆모습은 5프레임 숨쉬기 애니메이션 (0.4초/프레임)
 	if gender == "m" and dirn == "side":
