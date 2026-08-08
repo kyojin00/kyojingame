@@ -98,7 +98,8 @@ var _toast_queue: Array = []
 var _toast: Panel = null
 var _toast_t := 0.0
 
-const TOAST_TIME := 2.6
+# 처음 하는 유저도 충분히 읽을 수 있는 표시 시간
+const TOAST_TIME := 4.5
 
 
 func quest_toast(title: String) -> void:
@@ -280,7 +281,7 @@ func refresh() -> void:
 	if not q.is_empty() and bool(q.accepted):
 		track.append("의뢰: %s %d/%d" % [GameData.CROPS[q.crop].name,
 			mini(int(GameData.produce[q.crop]), int(q.qty)), int(q.qty)])
-	track.append("J: 퀘스트 창")
+	track.append("%s: 퀘스트 창" % GameData.key_label("open_quest"))
 	objective_label.text = "\n".join(track)
 
 	_refresh_hotbar()
@@ -300,13 +301,13 @@ func refresh() -> void:
 				GameData.skill_lv(sk)]
 
 
-func show_message(text: String) -> void:
+func show_message(text: String, dur := 2.5) -> void:
 	if main != null and main._remote_acting:
 		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
 	msg_label.text = text
 	msg_label.visible = true
 	$MessageBg.visible = true
-	msg_timer = 2.5
+	msg_timer = dur
 
 
 func _process(delta: float) -> void:

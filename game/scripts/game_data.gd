@@ -373,6 +373,38 @@ var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
 var story_phase := "done"
 # 벤 나무 자리의 재성장 대기열: [x, y, 남은 일수]
 var tree_regrow: Array = []
+# 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
+var player_name := ""
+
+# 메인 스토리 1 퀘스트 순서 (기준 문서: game/docs/quests.md)
+# {이름, 해야 하는 일, 스토리} — Q 상세 창과 목록 모두 여기서 가져온다
+const STORY1_QUESTS := [
+	{"name": "숲 안으로 들어가보기",
+		"task": "우거진 숲 안으로 들어가 보자",
+		"story": "새로운 생활을 위해 교진 마을로 향하는 길. 마을 앞이 나무가 빽빽한 숲으로 막혀 있다."},
+	{"name": "우체부 아저씨와의 만남",
+		"task": "우체부 아저씨의 이야기를 듣자",
+		"story": "숲 속에서 우체부 아저씨가 다가와 말을 걸었다. 그도 마을로 가는 길이라고 한다."},
+	{"name": "나무도끼를 장착해보기",
+		"task": "받은 나무도끼를 가방(I)의 슬롯에 장착해 보자",
+		"story": "이장님께 전할 편지를 가진 우체부 아저씨. 숲이 험해 혼자 가기 어렵다며 함께 가자고 했다. 길을 만들 나무도끼를 받았다."},
+	{"name": "나무를 베어보자",
+		"task": "도끼를 선택(숫자키)하고 나무를 클릭한 뒤 E 키로 베어보자",
+		"story": "도끼를 장착했다. 길을 막는 나무를 베어 마을로 가는 길을 만들자."},
+	{"name": "마을로 이동",
+		"task": "우체부 아저씨와 함께 숲을 개척해 마을(동쪽)에 도착하자",
+		"story": "길이 열리기 시작했다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
+	{"name": "이장에게 편지 전달",
+		"task": "마을 이장을 찾아가자",
+		"story": "드디어 마을이 보인다. 우체부 아저씨가 이장님께 편지를 전하면 긴 여정이 끝난다."},
+]
+const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3, "travel": 4}
+
+
+func story_current_quest() -> Dictionary:
+	if STORY1_PHASE_IDX.has(story_phase):
+		return STORY1_QUESTS[STORY1_PHASE_IDX[story_phase]]
+	return {}
 
 
 func story_objective_short() -> String:
@@ -385,6 +417,8 @@ func story_objective_short() -> String:
 			return "나무도끼를 가방(I) 슬롯에 장착해 보자"
 		"chop":
 			return "나무도끼로 나무를 베어보자"
+		"travel":
+			return "우체부 아저씨와 함께 마을로 가자 (동쪽)"
 	return ""
 
 
@@ -768,7 +802,7 @@ var quest := {}
 const TUTORIAL_ORDER := [
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
-	["quest", "퀘스트 창(J)을 열어 할 일을 확인하자"],
+	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
 	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
@@ -1089,6 +1123,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tool_level": tool_level,
 		"tool_slots": tool_slots,
 		"tree_regrow": tree_regrow,
+		"player_name": player_name,
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,
