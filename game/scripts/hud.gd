@@ -86,6 +86,13 @@ func _build_hotbar() -> void:
 			var t: String = GameData.tool_slots[slot_i]
 			if t != "" and GameData.is_tool_unlocked(t):
 				main.set_tool(t))
+		b.gui_input.connect(func(ev: InputEvent) -> void:
+			if ev is InputEventMouseButton and ev.pressed \
+					and ev.button_index == MOUSE_BUTTON_RIGHT \
+					and GameData.tool_slots[slot_i] != "":
+				GameData.tool_slots[slot_i] = ""
+				Sound.play_sfx("sfx_ui")
+				_refresh_hotbar())
 		b.set_drag_forwarding(
 			func(_pos: Vector2) -> Variant:
 				var t: String = GameData.tool_slots[slot_i]
@@ -99,8 +106,18 @@ func _build_hotbar() -> void:
 				b.set_drag_preview(pv)
 				return {"kind": "tool_slot", "from": slot_i},
 			func(_pos: Vector2, data: Variant) -> bool:
-				return typeof(data) == TYPE_DICTIONARY and data.get("kind") == "tool_slot",
+				return typeof(data) == TYPE_DICTIONARY \
+					and data.get("kind") in ["tool_slot", "tool_pick"],
 			func(_pos: Vector2, data: Variant) -> void:
+				if data.get("kind") == "tool_pick":
+					var t2: String = str(data.tool)
+					for i2 in GameData.tool_slots.size():
+						if i2 != slot_i and GameData.tool_slots[i2] == t2:
+							GameData.tool_slots[i2] = ""
+					GameData.tool_slots[slot_i] = t2
+					Sound.play_sfx("sfx_place")
+					_refresh_hotbar()
+					return
 				var from_i := int(data.from)
 				if from_i != slot_i:
 					var tmp: String = GameData.tool_slots[from_i]
