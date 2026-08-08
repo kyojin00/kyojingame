@@ -30,6 +30,7 @@ var _slot_normal: StyleBoxFlat
 var _slot_selected: StyleBoxFlat
 var _slot_moving: StyleBoxFlat
 var _move_from := -1  # 우클릭으로 이동 중인 슬롯 (-1 = 없음)
+var _hover_slots: Array = []  # 툴팁 판정용 [{b, title, body}]
 
 
 func _ready() -> void:
@@ -121,15 +122,31 @@ func close() -> void:
 func _process(delta: float) -> void:
 	if not visible:
 		return
+	_update_hover_tip()
 	if tip_panel.visible:
 		var mp := get_viewport().get_mouse_position()
 		tip_panel.position = Vector2(
 			minf(mp.x + 14.0, 960.0 - tip_panel.size.x - 8.0),
 			minf(mp.y + 16.0, 540.0 - tip_panel.size.y - 8.0))
 	_refresh_timer -= delta
-	if _refresh_timer <= 0.0:
+	if _refresh_timer <= 0.0 and not get_viewport().gui_is_dragging():
 		_refresh_timer = 0.5
 		_rebuild()
+
+
+# 이벤트 대신 매 프레임 마우스 위치로 판정한다
+# (리빌드로 버튼이 교체돼도 툴팁이 끊기지 않는다)
+func _update_hover_tip() -> void:
+	if get_viewport().gui_is_dragging():
+		_hide_tip()
+		return
+	var mp := get_viewport().get_mouse_position()
+	for h in _hover_slots:
+		var b: Button = h.b
+		if is_instance_valid(b) and b.get_global_rect().has_point(mp):
+			_show_tip(str(h.title), str(h.body))
+			return
+	_hide_tip()
 
 
 func _line(text: String, color := Color(0.9, 0.88, 0.95)) -> void:
@@ -140,6 +157,7 @@ func _line(text: String, color := Color(0.9, 0.88, 0.95)) -> void:
 
 
 func _rebuild() -> void:
+	_hover_slots.clear()
 	for c in items_box.get_children():
 		c.queue_free()
 
@@ -213,10 +231,9 @@ func _mk_tool_slot(slot_i: int) -> Button:
 			Sound.play_sfx("sfx_ui")
 			_rebuild())
 	if unlocked:
-		b.mouse_entered.connect(func() -> void:
-			var parts := str(TOOL_DESC.get(t, t)).split(" — ")
-			_show_tip(parts[0], parts[1] if parts.size() > 1 else ""))
-		b.mouse_exited.connect(func() -> void: _hide_tip())
+		var parts := str(TOOL_DESC.get(t, t)).split(" — ")
+		_hover_slots.append({"b": b, "title": parts[0],
+			"body": parts[1] if parts.size() > 1 else ""})
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var tt: String = GameData.tool_slots[slot_i]
@@ -250,10 +267,9 @@ func _mk_pick_slot(t: String) -> Button:
 	b.add_theme_stylebox_override("normal", _slot_normal)
 	b.add_theme_stylebox_override("hover", _slot_selected)
 	b.add_theme_stylebox_override("pressed", _slot_normal)
-	b.mouse_entered.connect(func() -> void:
-		var parts := str(TOOL_DESC.get(t, t)).split(" — ")
-		_show_tip(parts[0], parts[1] if parts.size() > 1 else ""))
-	b.mouse_exited.connect(func() -> void: _hide_tip())
+	var parts := str(TOOL_DESC.get(t, t)).split(" — ")
+	_hover_slots.append({"b": b, "title": parts[0],
+		"body": parts[1] if parts.size() > 1 else ""})
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var pv := TextureRect.new()
@@ -298,11 +314,8 @@ func _mk_item_slot(e: Dictionary) -> Control:
 	b.add_theme_stylebox_override("hover", _slot_selected)
 	b.add_theme_stylebox_override("pressed", _slot_normal)
 	if e.is_empty():
-		b.mouse_entered.connect(func() -> void: _hide_tip())
 		return b
-	b.mouse_entered.connect(func() -> void:
-		_show_tip(str(e.tip), str(e.get("desc", ""))))
-	b.mouse_exited.connect(func() -> void: _hide_tip())
+	_hover_slots.append({"b": b, "title": str(e.tip), "body": str(e.get("desc", ""))})
 	if e.has("icon") and main.tex.has(e.icon):
 		b.icon = main.tex[e.icon]
 	else:
