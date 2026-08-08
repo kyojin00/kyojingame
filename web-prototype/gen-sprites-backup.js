@@ -1586,16 +1586,19 @@ for (const [season, set] of Object.entries(GRASS_SETS)) {
   const wall = hex('#c9a56b'), roof = hex('#a5402f'), roofDark = hex('#8c3325');
   const door = hex('#6b4423'), knob = hex('#ffd75e'), glass = hex('#9ecbe8');
   // 벽
-  fillRect(png, 4, 16, 72, 46, wall);
+  fillRect(png, 4, 16, 72, 48, wall);
   // 지붕 (삼각형)
   for (let y = 0; y < 20; y++) {
     const half = Math.floor((y / 19) * 40);
     fillRect(png, 40 - half, y, half * 2, 1, roof);
   }
   fillRect(png, 0, 19, 80, 3, roofDark);
-  // 문
-  fillRect(png, 34, 44, 12, 18, door);
-  setPx(png, 43, 53, knob); setPx(png, 42, 53, knob);
+  // 문 (캐릭터와 1:1 — 20x30 아트 = 월드 64x96)
+  fillRect(png, 29, 33, 22, 31, hex('#4a2f16'));
+  fillRect(png, 30, 34, 20, 30, door);
+  [35, 41, 47].forEach((dx) => fillRect(png, dx, 35, 1, 29, hex('#5b3a1e')));
+  fillRect(png, 30, 34, 20, 1, hex('#7a4e28'));
+  fillRect(png, 46, 48, 2, 2, knob);
   // 창문
   [[12, 28], [56, 28]].forEach(([x, y]) => {
     fillRect(png, x, y, 12, 9, glass);

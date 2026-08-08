@@ -102,14 +102,51 @@ func _mk_button(text: String, cb: Callable) -> Button:
 	return b
 
 
+var gender_panel: PanelContainer = null
+
+
 func _on_continue() -> void:
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
 func _on_new_game() -> void:
+	settings_panel.visible = false
+	mp_panel.visible = false
+	if gender_panel == null:
+		_build_gender_panel()
+	gender_panel.visible = not gender_panel.visible
+
+
+func _start_new(g: String) -> void:
+	GameData.gender = g
 	if FileAccess.file_exists(GameData.SAVE_PATH):
 		DirAccess.remove_absolute(GameData.SAVE_PATH)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+func _build_gender_panel() -> void:
+	gender_panel = PanelContainer.new()
+	gender_panel.visible = false
+	gender_panel.position = Vector2(345, 205)
+	gender_panel.custom_minimum_size = Vector2(270, 0)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
+	style.border_color = Color(0.42, 0.36, 0.55)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(12)
+	gender_panel.add_theme_stylebox_override("panel", style)
+	add_child(gender_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	gender_panel.add_child(v)
+	var l := Label.new()
+	l.text = "누구로 시작할까?"
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_color_override("font_color", Color("ffd75e"))
+	v.add_child(l)
+	v.add_child(_mk_button("남자아이", func() -> void: _start_new("m")))
+	v.add_child(_mk_button("여자아이", func() -> void: _start_new("f")))
 
 
 func _on_settings() -> void:
@@ -356,3 +393,8 @@ func _process(_delta: float) -> void:
 		keys_panel.visible = false
 	elif _shot_frames == 40:
 		_on_new_game()
+	elif _shot_frames == 44:
+		var img3 := get_viewport().get_texture().get_image()
+		img3.save_png(OS.get_environment("KYOJIN_SHOT") + "_gender.png")
+	elif _shot_frames == 46:
+		_start_new("f")

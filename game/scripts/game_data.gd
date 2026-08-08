@@ -366,6 +366,13 @@ const PETS := {
 const PET_IDS := ["dog", "cat", "owl", "rabbit"]
 var owned_pets: Array = []
 var active_pet := ""
+var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
+
+
+func player_tex(part: String) -> String:
+	# 성별에 맞는 플레이어 텍스처 이름
+	return ("player_f_" if gender == "f" else "player_") + part
+
 
 
 func pet_speed_mult() -> float:
@@ -1032,6 +1039,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"barn_built": barn_built,
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
+		"gender": gender,
 		"tile": 32,
 		"player": [player_pos.x, player_pos.y],
 		"grid": grid_data,

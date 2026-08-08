@@ -86,6 +86,28 @@ func _build_hotbar() -> void:
 			var t: String = GameData.tool_slots[slot_i]
 			if t != "" and GameData.is_tool_unlocked(t):
 				main.set_tool(t))
+		b.set_drag_forwarding(
+			func(_pos: Vector2) -> Variant:
+				var t: String = GameData.tool_slots[slot_i]
+				if t == "" or not GameData.is_tool_unlocked(t):
+					return null
+				var pv := TextureRect.new()
+				pv.texture = main.tex[TOOL_ICONS[t]]
+				pv.custom_minimum_size = Vector2(30, 30)
+				pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				pv.stretch_mode = TextureRect.STRETCH_SCALE
+				b.set_drag_preview(pv)
+				return {"kind": "tool_slot", "from": slot_i},
+			func(_pos: Vector2, data: Variant) -> bool:
+				return typeof(data) == TYPE_DICTIONARY and data.get("kind") == "tool_slot",
+			func(_pos: Vector2, data: Variant) -> void:
+				var from_i := int(data.from)
+				if from_i != slot_i:
+					var tmp: String = GameData.tool_slots[from_i]
+					GameData.tool_slots[from_i] = GameData.tool_slots[slot_i]
+					GameData.tool_slots[slot_i] = tmp
+					Sound.play_sfx("sfx_place")
+					_refresh_hotbar())
 		hotbar_panel.add_child(b)
 		slot_buttons.append(b)
 

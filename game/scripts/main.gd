@@ -86,6 +86,9 @@ const TEXTURE_NAMES := [
 	"player_down_0", "player_down_1", "player_up_0", "player_up_1",
 	"player_side_0", "player_side_1",
 	"player_down_idle", "player_up_idle", "player_side_idle",
+	"player_f_down_0", "player_f_down_1", "player_f_up_0", "player_f_up_1",
+	"player_f_side_0", "player_f_side_1",
+	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
@@ -452,8 +455,8 @@ func _spawn_objects() -> void:
 		var hn := _make_object(tex["house"],
 			Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -256))
 		var hspr: Sprite2D = hn.get_child(0)
-		hspr.scale = Vector2(0.7, 0.7)
-		hspr.offset.x = 80.0 / 0.7 - 160.0
+		hspr.scale = Vector2(0.8, 0.8)  # 문이 캐릭터와 1:1이 되는 크기
+		hspr.offset.x = 80.0 / 0.8 - 160.0
 		obj_nodes[anchor] = hn
 		world.add_child(hn)
 	for pos: Vector2i in objects:
@@ -1774,6 +1777,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.minutes = float(d.minutes)
 	GameData.money = int(d.money)
 	GameData.energy = float(d.energy)
+	GameData.gender = str(d.get("gender", "m"))
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):

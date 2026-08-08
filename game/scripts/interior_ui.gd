@@ -284,11 +284,11 @@ func _update_sprite() -> void:
 	player_sprite.flip_h = false
 	match pdir:
 		"down":
-			tex_name = "player_down_" + suffix
+			tex_name = GameData.player_tex("down_" + suffix)
 		"up":
-			tex_name = "player_up_" + suffix
+			tex_name = GameData.player_tex("up_" + suffix)
 		_:
-			tex_name = "player_side_" + suffix
+			tex_name = GameData.player_tex("side_" + suffix)
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
 	player_sprite.position = ppos + Vector2(-16, -47)

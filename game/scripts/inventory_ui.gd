@@ -98,84 +98,152 @@ func _rebuild() -> void:
 		_slot_moving.border_color = Color(0.45, 0.9, 0.5)
 		_slot_moving.set_border_width_all(2)
 
-	# 도구 슬롯 (좌클릭: 선택 / 우클릭: 슬롯 이동 시작 → 다른 슬롯 좌클릭으로 교환)
-	_line("[도구]  우클릭 → 다른 슬롯 클릭: 위치 교환", Color(0.65, 0.85, 0.6))
+	# 도구 슬롯: 드래그로 원하는 칸에 배치 (좌클릭: 선택)
+	_line("[도구]  드래그: 위치 이동 · 좌클릭: 선택", Color(0.65, 0.85, 0.6))
 	var tool_row := HBoxContainer.new()
 	tool_row.add_theme_constant_override("separation", 4)
 	for i in GameData.tool_slots.size():
-		var t: String = GameData.tool_slots[i]
-		var unlocked: bool = t != "" and GameData.is_tool_unlocked(t)
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(40, 40)
-		b.focus_mode = Control.FOCUS_NONE
-		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.expand_icon = true  # 텍스처 해상도와 무관하게 버튼 크기에 맞춤
-		b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
-		if _move_from == i:
-			b.add_theme_stylebox_override("normal", _slot_moving)
-		else:
-			b.add_theme_stylebox_override("normal",
-				_slot_selected if (t != "" and GameData.tool == t) else _slot_normal)
-		b.add_theme_stylebox_override("hover", _slot_normal)
-		b.add_theme_stylebox_override("pressed", _slot_selected)
-		var slot_i := i
-		b.gui_input.connect(func(ev: InputEvent) -> void:
-			if ev is InputEventMouseButton and ev.pressed:
-				if ev.button_index == MOUSE_BUTTON_RIGHT:
-					# 이동 모드 시작/취소
-					_move_from = -1 if _move_from == slot_i else slot_i
-					Sound.play_sfx("sfx_ui")
-					_rebuild()
-				elif ev.button_index == MOUSE_BUTTON_LEFT:
-					if _move_from >= 0 and _move_from != slot_i:
-						var tmp: String = GameData.tool_slots[_move_from]
-						GameData.tool_slots[_move_from] = GameData.tool_slots[slot_i]
-						GameData.tool_slots[slot_i] = tmp
-						_move_from = -1
-						Sound.play_sfx("sfx_place")
-						_rebuild()
-					elif _move_from < 0 and unlocked:
-						main.set_tool(GameData.tool_slots[slot_i])
-						_rebuild())
-		var num := Label.new()
-		num.text = str(i + 1) if i < 9 else ""
-		num.position = Vector2(2, -4)
-		num.add_theme_color_override("font_color", Color(0.62, 0.58, 0.75))
-		num.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
-		num.add_theme_constant_override("outline_size", 2)
-		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(num)
-		tool_row.add_child(b)
+		tool_row.add_child(_mk_tool_slot(i))
 	items_box.add_child(tool_row)
 
-	_line("소지금 %dG   목재 %d   석재 %d" % [GameData.money, GameData.wood, GameData.stone],
-		Color("ffd75e"))
+	_line("소지금 %dG" % GameData.money, Color("ffd75e"))
 
-	var any_seed := false
+	# 아이템 그리드 (12 x 4): 얻은 것들이 자동으로 채워진다
+	var entries := _item_entries()
+	var grid := GridContainer.new()
+	grid.columns = 12
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	for i in 48:
+		grid.add_child(_mk_item_slot(entries[i] if i < entries.size() else {}))
+	items_box.add_child(grid)
+
+
+func _mk_tool_slot(slot_i: int) -> Button:
+	var t: String = GameData.tool_slots[slot_i]
+	var unlocked: bool = t != "" and GameData.is_tool_unlocked(t)
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(40, 40)
+	b.focus_mode = Control.FOCUS_NONE
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.expand_icon = true
+	b.icon = main.tex[TOOL_ICONS[t]] if unlocked else null
+	b.add_theme_stylebox_override("normal",
+		_slot_selected if (t != "" and GameData.tool == t) else _slot_normal)
+	b.add_theme_stylebox_override("hover", _slot_normal)
+	b.add_theme_stylebox_override("pressed", _slot_selected)
+	b.pressed.connect(func() -> void:
+		if unlocked:
+			main.set_tool(t)
+			_rebuild())
+	b.set_drag_forwarding(
+		func(_pos: Vector2) -> Variant:
+			var tt: String = GameData.tool_slots[slot_i]
+			if tt == "" or not GameData.is_tool_unlocked(tt):
+				return null
+			var pv := TextureRect.new()
+			pv.texture = main.tex[TOOL_ICONS[tt]]
+			pv.custom_minimum_size = Vector2(36, 36)
+			pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			pv.stretch_mode = TextureRect.STRETCH_SCALE
+			b.set_drag_preview(pv)
+			return {"kind": "tool_slot", "from": slot_i},
+		func(_pos: Vector2, data: Variant) -> bool:
+			return typeof(data) == TYPE_DICTIONARY and data.get("kind") == "tool_slot",
+		func(_pos: Vector2, data: Variant) -> void:
+			_swap_slots(int(data.from), slot_i))
+	return b
+
+
+func _swap_slots(from_i: int, to_i: int) -> void:
+	if from_i == to_i:
+		return
+	var tmp: String = GameData.tool_slots[from_i]
+	GameData.tool_slots[from_i] = GameData.tool_slots[to_i]
+	GameData.tool_slots[to_i] = tmp
+	Sound.play_sfx("sfx_place")
+	_rebuild()
+
+
+func _mk_item_slot(e: Dictionary) -> Control:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(40, 40)
+	b.focus_mode = Control.FOCUS_NONE
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.expand_icon = true
+	b.add_theme_stylebox_override("normal", _slot_normal)
+	b.add_theme_stylebox_override("hover", _slot_selected)
+	b.add_theme_stylebox_override("pressed", _slot_normal)
+	if e.is_empty():
+		return b
+	b.tooltip_text = str(e.tip)
+	if e.has("icon") and main.tex.has(e.icon):
+		b.icon = main.tex[e.icon]
+	else:
+		var tag := Label.new()
+		tag.text = str(e.label)
+		tag.position = Vector2(11, 4)
+		tag.add_theme_color_override("font_color", e.get("color", Color(0.9, 0.88, 0.95)))
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(tag)
+	var cnt := Label.new()
+	cnt.text = str(e.count)
+	cnt.add_theme_font_size_override("font_size", 16)
+	cnt.position = Vector2(18, 20)
+	cnt.size = Vector2(20, 18)
+	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cnt.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
+	cnt.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
+	cnt.add_theme_constant_override("outline_size", 3)
+	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(cnt)
+	return b
+
+
+func _item_entries() -> Array:
+	var out: Array = []
+	if GameData.wood > 0:
+		out.append({"icon": "icon_wood", "count": GameData.wood,
+			"tip": "목재 x%d" % GameData.wood})
+	if GameData.stone > 0:
+		out.append({"icon": "icon_stone", "count": GameData.stone,
+			"tip": "석재 x%d" % GameData.stone})
 	for id in GameData.CROP_IDS:
 		if GameData.seeds[id] > 0:
-			if not any_seed:
-				_line("[씨앗]", Color(0.65, 0.85, 0.6))
-				any_seed = true
-			_line("  %s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]])
-
-	var any_crop := false
+			out.append({"icon": "icon_seed", "count": GameData.seeds[id],
+				"tip": "%s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]]})
 	for id in GameData.CROP_IDS:
-		if GameData.produce[id] > 0:
-			if not any_crop:
-				_line("[수확물]", Color(0.65, 0.85, 0.6))
-				any_crop = true
-			_line("  %s x%d (개당 %dG)" % [GameData.CROPS[id].name, GameData.produce[id],
-				GameData.CROPS[id].sell_price])
-
-	var any_item := false
+		var n := int(GameData.produce[id])
+		if n > 0:
+			out.append({"icon": "mature_" + id, "count": n,
+				"tip": "%s x%d (개당 %dG)" % [GameData.CROPS[id].name, n,
+					GameData.CROPS[id].sell_price]})
+		var ns := int(GameData.produce_silver.get(id, 0))
+		if ns > 0:
+			out.append({"icon": "mature_" + id, "count": ns,
+				"tip": "%s (은품질) x%d" % [GameData.CROPS[id].name, ns]})
+		var ng := int(GameData.produce_gold.get(id, 0))
+		if ng > 0:
+			out.append({"icon": "mature_" + id, "count": ng,
+				"tip": "%s (금품질) x%d" % [GameData.CROPS[id].name, ng]})
 	for id in GameData.ITEM_IDS:
-		if GameData.items[id] > 0:
-			if not any_item:
-				_line("[생산물/물고기]", Color(0.65, 0.85, 0.6))
-				any_item = true
-			_line("  %s x%d (개당 %dG)" % [GameData.ITEMS[id].name, GameData.items[id],
-				GameData.ITEMS[id].sell])
-
-	if not (any_seed or any_crop or any_item):
-		_line("아직 가진 것이 별로 없다. 농사를 시작해보자!")
+		var n2 := int(GameData.items[id])
+		if n2 <= 0:
+			continue
+		var def: Dictionary = GameData.ITEMS[id]
+		var e := {"count": n2, "tip": "%s x%d" % [def.name, n2],
+			"label": str(def.name).left(1)}
+		for cand in [id, id + "_0", "forage_" + id]:
+			if main.tex.has(cand):
+				e["icon"] = cand
+				break
+		if id.begins_with("fish_"):
+			e["color"] = Color(0.5, 0.75, 1.0)
+		elif id.begins_with("dish_"):
+			e["color"] = Color(1.0, 0.75, 0.4)
+		elif bool(def.get("legend", false)):
+			e["color"] = Color(1.0, 0.85, 0.4)
+		else:
+			e["color"] = Color(0.85, 0.82, 0.95)
+		out.append(e)
+	return out
