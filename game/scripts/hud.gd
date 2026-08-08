@@ -150,8 +150,11 @@ func refresh() -> void:
 
 	# 우측 퀘스트 트래커 (짧은 문구)
 	var track := []
+	var story_obj := GameData.story_objective_short()
 	var obj := GameData.tutorial_objective_short()
-	if obj != "":
+	if story_obj != "":
+		track.append("목표: " + story_obj)
+	elif obj != "":
 		track.append("목표: " + obj)
 	var q: Dictionary = GameData.quest
 	if not q.is_empty() and bool(q.accepted):

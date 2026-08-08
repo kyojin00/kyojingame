@@ -367,6 +367,20 @@ const PET_IDS := ["dog", "cat", "owl", "rabbit"]
 var owned_pets: Array = []
 var active_pet := ""
 var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
+# 메인 스토리 1 「우체부 아저씨와의 첫 만남」 진행 단계
+# enter: 숲에 들어가 보자 / approach: 우체부 접근·대화 / chop: 나무를 베어보자 / done: 완료
+var story_phase := "done"
+
+
+func story_objective_short() -> String:
+	match story_phase:
+		"enter":
+			return "우거진 숲으로 들어가 보자"
+		"approach":
+			return "우체부 아저씨의 이야기를 듣자"
+		"chop":
+			return "나무를 1그루 베어보자"
+	return ""
 
 
 func player_tex(part: String) -> String:
@@ -386,6 +400,17 @@ func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
 	if suffix == "idle":
 		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
+
+
+func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
+	# 앞모습. 남자: 걷는 중엔 4프레임 걷기(6fps), 멈추면 정지 프레임.
+	if gender == "m":
+		if not is_moving:
+			return player_idle_tex("down")
+		return "player_down_walk_%d" % (int(t * 6.0) % 4)
+	if suffix == "idle":
+		return player_tex("down_idle")
+	return player_tex("down_" + suffix)
 
 
 func player_idle_tex(dirn: String) -> String:
@@ -1061,6 +1086,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
 		"gender": gender,
+		"main_story": story_phase,
 		"tile": 32,
 		"player": [player_pos.x, player_pos.y],
 		"grid": grid_data,

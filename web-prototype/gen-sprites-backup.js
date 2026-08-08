@@ -1358,6 +1358,8 @@ const NPCS = {
   blacksmith: { H: '#2b2b30', h: '#3d3d44', S: '#6e6e78', s: '#54545c' },
   rancher: { H: '#7a4a2b', h: '#8f5c38', S: '#d9a53c', s: '#b2842c' },
   chief: { H: '#d8d8d2', h: '#e8e8e2', S: '#3a4a7d', s: '#2b3760' },
+  // 우체부 아저씨: 회갈색 머리, 하늘색 제복
+  postman: { H: '#6b5d4f', h: '#7d6e5e', S: '#4a7ab5', s: '#37619c' },
 };
 const PLAYER_FRAMES = {
   down_0: 'playerDown0', down_1: 'playerDown1',

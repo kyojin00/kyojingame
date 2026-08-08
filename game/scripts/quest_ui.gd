@@ -72,6 +72,23 @@ func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
 
+	# 메인 스토리 1
+	if GameData.story_phase != "done" or GameData.tutorial.get("active", false):
+		_line("[메인 스토리 1 — 우체부 아저씨와의 첫 만남]", Color(0.65, 0.85, 0.6))
+		var ph: String = GameData.story_phase
+		var q1_done := ph != "enter"
+		var q2_done := ph == "done"
+		_line(("  V " if q1_done else "  > ") + "우거진 숲에 들어가 보자",
+			Color(0.5, 0.62, 0.5) if q1_done else Color("ffd75e"))
+		if ph == "approach":
+			_line("  > 우체부 아저씨의 이야기를 듣자", Color("ffd75e"))
+		if ph in ["chop", "done"]:
+			_line(("  V " if q2_done else "  > ") + "나무를 1그루 베어보자",
+				Color(0.5, 0.62, 0.5) if q2_done else Color("ffd75e"))
+		elif ph in ["enter", "approach"]:
+			_line("  - ???", Color(0.5, 0.48, 0.6))
+		_line("")
+
 	# 튜토리얼 진행 상황
 	_line("[튜토리얼]", Color(0.65, 0.85, 0.6))
 	if not GameData.tutorial.get("active", false):

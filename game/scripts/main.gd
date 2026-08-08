@@ -98,6 +98,8 @@ const TEXTURE_NAMES := [
 	"player_side_walk_12", "player_side_walk_13", "player_side_walk_14",
 	"player_side_walk_15", "player_side_walk_16", "player_side_walk_17",
 	"player_side_walk_18", "player_side_walk_19",
+	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
+	"player_down_walk_3",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
@@ -109,6 +111,9 @@ const TEXTURE_NAMES := [
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
 	"pet_dog_0", "pet_dog_1", "pet_cat_0", "pet_cat_1",
 	"pet_owl_0", "pet_owl_1", "pet_rabbit_0", "pet_rabbit_1",
+	"npc_postman_down_0", "npc_postman_down_1", "npc_postman_up_0",
+	"npc_postman_up_1", "npc_postman_side_0", "npc_postman_side_1",
+	"npc_postman_portrait_normal", "npc_postman_portrait_happy",
 	"npc_merchant_down_0", "npc_merchant_down_1", "npc_merchant_up_0",
 	"npc_merchant_up_1", "npc_merchant_side_0", "npc_merchant_side_1",
 	"npc_fisher_down_0", "npc_fisher_down_1", "npc_fisher_up_0",
@@ -288,6 +293,7 @@ func _ready() -> void:
 		# 게스트: 로컬 저장 대신 호스트 스냅샷을 기다린다
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
+		GameData.story_phase = "done"
 		GameData.unlock_all_tools()
 		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 16,
 			START_TILE.y * TILE + 16)
@@ -307,14 +313,18 @@ func _ready() -> void:
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		GameData.reset_all()
-		hud.show_message("교진 마을에 도착했다. 할아버지의 집에서 눈을 뜬다...")
-		# 새 게임은 물려받은 집 안에서 눈을 뜨며 시작한다 (문 앞 위치로 준비)
-		player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
-		if (_shot_path == "" and OS.get_environment("KYOJIN_MP") == "") \
-				or OS.get_environment("KYOJIN_STORY") != "":
-			interior.open.call_deferred()
-			_show_intro.call_deferred()
-		if _shot_path != "" or OS.get_environment("KYOJIN_MP") != "":
+		var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
+		if (_shot_path == "" and OS.get_environment("KYOJIN_MP") == "") or story_shot:
+			# 메인 스토리 1: 울창한 숲 동남쪽 구석에서 시작한다
+			GameData.story_phase = "enter"
+			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
+			_plant_story_forest()
+			hud.show_message("우거진 숲... 이 너머에 앞으로 지낼 집터가 있다.")
+			if not story_shot:
+				_show_intro.call_deferred()
+		else:
+			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
+		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 	_spawn_objects()
 	_apply_season_visuals()
@@ -643,7 +653,7 @@ func can_use_tile(t: Vector2i) -> bool:
 
 
 func ui_open() -> bool:
-	return shop.visible or summary.visible or sleep_dialog.visible \
+	return story_cutscene or shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or cooking_ui.visible or quest_ui.visible or note_ui.visible \
@@ -917,6 +927,7 @@ func use_tool() -> void:
 						wood_got += 1
 					GameData.wood += wood_got
 					hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
+					_story_tree_chopped()
 					tutorial_notify("chop")
 					gain_skill("forest", 6.0)
 					if randf() < 0.02:
@@ -1128,6 +1139,137 @@ func _building_kind_at(t: Vector2i) -> String:
 
 
 # ---- 오프닝 스토리 / 튜토리얼 ----
+
+# ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
+const STORY_SPAWN := Vector2i(26, 17)      # 숲 속 시작 지점 (홈 부지 동남쪽)
+const STORY_LANE_Y := 17                   # 우체부가 걸어오는 길
+var story_cutscene := false                # 컷신 중 조작 잠금
+var _postman: Node2D = null
+var _postman_spr: Sprite2D = null
+var _postman_state := ""                   # approach / talk / leave
+var _postman_anim := 0.0
+var _story_t := 0.0
+
+
+func _plant_story_forest() -> void:
+	# 홈 부지 동남쪽을 빽빽한 숲으로 채운다 (스폰 공터/우체부 길만 남김)
+	for y in range(8, 20):
+		for x in range(10, 30):
+			var pos := Vector2i(x, y)
+			if grid[y][x].ground != "grass" or objects.has(pos):
+				continue
+			if Vector2(STORY_SPAWN).distance_to(Vector2(pos)) <= 2.2:
+				continue  # 스폰 공터
+			if y == STORY_LANE_Y and x >= 18 and x <= 25:
+				continue  # 우체부 길
+			if _hash01(x, y) < 0.07:
+				continue  # 자연스러운 틈
+			objects[pos] = {"kind": "tree", "hp": TREE_HP}
+
+
+func _story_update(delta: float) -> void:
+	if GameData.story_phase == "done" or Net.is_guest():
+		return
+	_story_t += delta
+	var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
+	match GameData.story_phase:
+		"enter":
+			if story_shot and absf(_story_t - 0.6) < delta:
+				_snap_story("story_forest")
+			# 몇 걸음 걷기만 하면 퀘스트 1 완료
+			if player.walked >= 96.0 or (story_shot and _story_t > 0.8):
+				GameData.story_phase = "approach"
+				Sound.play_sfx("sfx_catch")
+				hud.show_message("퀘스트 완료: 우거진 숲에 들어가 보자!")
+				_spawn_postman()
+		"approach":
+			_update_postman(delta, story_shot)
+		"chop":
+			_update_postman(delta, story_shot)  # 떠나는 중일 수 있다
+
+
+func _spawn_postman() -> void:
+	_postman = Node2D.new()
+	_postman.position = Vector2(18 * TILE + 16, STORY_LANE_Y * TILE + 16)
+	_postman_spr = Sprite2D.new()
+	_postman_spr.centered = false
+	_postman_spr.offset = Vector2(-16, -47)
+	_postman_spr.scale = Vector2(2, 2)
+	_postman_spr.texture = tex["npc_postman_side_0"]
+	_postman.add_child(_postman_spr)
+	world.add_child(_postman)
+	_postman_state = "approach"
+	story_cutscene = true
+
+
+func _update_postman(delta: float, story_shot: bool) -> void:
+	if _postman == null:
+		return
+	_postman_anim += delta
+	match _postman_state:
+		"approach":
+			# 멀리서 뚜벅뚜벅 걸어와 말을 건다
+			var to_player := player.position - _postman.position
+			if to_player.length() > 44.0:
+				var spd := 150.0 if story_shot else 45.0
+				_postman.position += to_player.normalized() * spd * delta
+				_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
+				_postman_spr.flip_h = to_player.x < 0
+				if story_shot and absf(_story_t - 1.4) < delta:
+					_snap_story("story_postman")
+			else:
+				_postman_state = "talk"
+				_postman_spr.texture = tex["npc_postman_side_0"]
+				_start_postman_dialog()
+				if story_shot:
+					_snap_story.call_deferred("story_dialog")
+		"leave":
+			_postman.position += Vector2.LEFT * 55.0 * delta
+			_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
+			_postman_spr.flip_h = true
+			if _postman.position.x < 15 * TILE:
+				_postman.queue_free()
+				_postman = null
+
+
+func _start_postman_dialog() -> void:
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+		{"text": "「아이고, 드디어 왔구먼.」"},
+		{"text": "「그런데 이 길을 그냥 지나가기는 쉽지 않을 거야.」"},
+		{"text": "「나무가 너무 빽빽하게 자라 있거든.」"},
+		{"text": "「이걸 가져가게.」", "event": _story_give_axe},
+		{"text": "「이걸로 나무를 조금 정리하면 길을 만들 수 있을 거야.」",
+			"portrait": tex["npc_postman_portrait_happy"]},
+	], _end_postman_dialog)
+
+
+func _story_give_axe() -> void:
+	if not GameData.is_tool_unlocked("axe"):
+		GameData.unlocked_tools.append("axe")
+	Sound.play_sfx("sfx_catch")
+	hud.show_message("나무도끼를 받았다! (도끼 획득)")
+
+
+func _end_postman_dialog() -> void:
+	story_cutscene = false
+	GameData.story_phase = "chop"
+	hud.show_message("새 퀘스트: 나무를 1그루 베어보자 (도끼: 5번 슬롯)")
+	if _postman != null:
+		_postman_state = "leave"
+
+
+func _story_tree_chopped() -> void:
+	if GameData.story_phase != "chop":
+		return
+	GameData.story_phase = "done"
+	Sound.play_sfx("sfx_catch")
+	hud.show_message("퀘스트 완료: 나무를 베어보자! 이제 집터까지 길을 열자.")
+
+
+func _snap_story(name: String) -> void:
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(_shot_path + name + ".png")
+
 
 const STORY_PAGES := [
 	["탐험가 할아버지", "나의 할아버지는 유명한 탐험가이자\n연금술 연구자였다.\n\n평생 신비한 생명체와 전설 속 재료를 찾아\n세계 곳곳을 누비셨다."],
@@ -1344,6 +1486,11 @@ func _end_intro() -> void:
 func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
+	GameData.story_phase = "done"
+	if _postman != null:
+		_postman.queue_free()
+		_postman = null
+	story_cutscene = false
 	_end_intro()
 
 
@@ -1789,6 +1936,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.money = int(d.money)
 	GameData.energy = float(d.energy)
 	GameData.gender = str(d.get("gender", "m"))
+	GameData.story_phase = str(d.get("main_story", "done"))
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):
@@ -1884,6 +2032,7 @@ func _apply_save(d: Dictionary) -> void:
 # ---- 루프 ----
 
 func _process(delta: float) -> void:
+	_story_update(delta)
 	if not ui_open() or interior_only_open():
 		if not Net.is_guest():
 			# 시간은 호스트/솔로만 진행 (게스트는 동기화 수신)
@@ -1985,6 +2134,14 @@ func _update_night() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.is_guest() and not _net_ready:
 		return  # 접속 완료 전에는 조작 금지
+	if story_cutscene and _postman_state == "approach" and _postman != null \
+			and event.is_action_pressed("ui_cancel"):
+		# 걸어오는 연출 스킵: 우체부가 바로 도착해 말을 건다
+		_postman.position = player.position + Vector2(-44, 0)
+		_postman_state = "talk"
+		_start_postman_dialog()
+		get_viewport().set_input_as_handled()
+		return
 	if story_layer != null:
 		# 스토리 연출 중 ESC = 스킵. 텍스트만 건너뛰고 후속 이벤트는 그대로 진행된다.
 		if event.is_action_pressed("ui_cancel"):
