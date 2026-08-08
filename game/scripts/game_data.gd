@@ -379,7 +379,7 @@ func player_side_tex(suffix: String, t: float) -> String:
 	if suffix == "idle":
 		return player_idle_tex("side")
 	if gender == "m":
-		return "player_side_walk_%d" % (int(t * 12.0) % 10)
+		return "player_side_walk_%d" % (int(t * 16.0) % 20)
 	return player_tex("side_" + suffix)
 
 
