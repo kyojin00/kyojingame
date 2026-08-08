@@ -41,7 +41,7 @@ func _ready() -> void:
 	add_child(canvas)
 	player_sprite = Sprite2D.new()
 	player_sprite.centered = false
-	player_sprite.scale = Vector2(2, 2)
+	player_sprite.scale = Vector2(0.5, 0.5)
 	add_child(player_sprite)
 
 
@@ -340,16 +340,16 @@ func _dir_vec() -> Vector2:
 
 
 func _update_sprite() -> void:
-	var frame := (int(anim_time * 6.0) % 2) if moving else 0
+	var suffix := str(int(anim_time * 6.0) % 2) if moving else "idle"
 	var tex_name := ""
 	player_sprite.flip_h = false
 	match pdir:
 		"down":
-			tex_name = "player_down_%d" % frame
+			tex_name = "player_down_" + suffix
 		"up":
-			tex_name = "player_up_%d" % frame
+			tex_name = "player_up_" + suffix
 		_:
-			tex_name = "player_side_%d" % frame
+			tex_name = "player_side_" + suffix
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
 	player_sprite.position = ppos + Vector2(-16, -42)

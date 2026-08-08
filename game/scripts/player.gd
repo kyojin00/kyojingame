@@ -66,15 +66,15 @@ func _blocked(p: Vector2) -> bool:
 
 
 func _update_sprite() -> void:
-	var frame := (int(anim_time * 6.0) % 2) if moving else 0
+	var suffix := str(int(anim_time * 6.0) % 2) if moving else "idle"
 	var tex_name := ""
 	sprite.flip_h = false
 	match dir:
 		"down":
-			tex_name = "player_down_%d" % frame
+			tex_name = "player_down_" + suffix
 		"up":
-			tex_name = "player_up_%d" % frame
+			tex_name = "player_up_" + suffix
 		_:
-			tex_name = "player_side_%d" % frame
+			tex_name = "player_side_" + suffix
 			sprite.flip_h = dir == "left"
 	sprite.texture = main.tex[tex_name]

@@ -13,8 +13,8 @@ var sprite: Sprite2D
 func _ready() -> void:
 	sprite = Sprite2D.new()
 	sprite.centered = false
-	sprite.offset = Vector2(-16, -47)
-	sprite.scale = Vector2(2, 2)
+	sprite.offset = Vector2(-64, -188)
+	sprite.scale = Vector2(0.5, 0.5)
 	sprite.modulate = tint
 	add_child(sprite)
 	target_pos = position
@@ -43,15 +43,15 @@ func _process(delta: float) -> void:
 
 
 func _update_sprite() -> void:
-	var frame := (int(anim_time * 6.0) % 2) if moving else 0
+	var suffix := str(int(anim_time * 6.0) % 2) if moving else "idle"
 	var tex_name := ""
 	sprite.flip_h = false
 	match dir:
 		"down":
-			tex_name = "player_down_%d" % frame
+			tex_name = "player_down_" + suffix
 		"up":
-			tex_name = "player_up_%d" % frame
+			tex_name = "player_up_" + suffix
 		_:
-			tex_name = "player_side_%d" % frame
+			tex_name = "player_side_" + suffix
 			sprite.flip_h = dir == "left"
 	sprite.texture = main.tex[tex_name]

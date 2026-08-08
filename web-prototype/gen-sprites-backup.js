@@ -1345,9 +1345,8 @@ const NEW_PLAYER = {
   ],
 };
 const PLAYER_VEST = { S: '#6f7d3c', s: '#575f2e' };  // 플레이어 전용 올리브 조끼
-for (const [frame, rows] of Object.entries(NEW_PLAYER)) {
-  spriteToPng(rows, 'player_' + frame, PLAYER_VEST);
-}
+// 플레이어 스프라이트는 사용자 원본 도트(128x192, game/assets/ref/)에서 변환한
+// PNG를 직접 사용하므로 여기서 다시 생성하지 않는다 (NEW_PLAYER 데이터는 NPC 스왑용으로 유지).
 
 // NPC (플레이어 도트의 팔레트 스왑: 머리/셔츠 색)
 const NPCS = {

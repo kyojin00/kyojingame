@@ -85,6 +85,7 @@ var _weather_override := -1
 const TEXTURE_NAMES := [
 	"player_down_0", "player_down_1", "player_up_0", "player_up_1",
 	"player_side_0", "player_side_1",
+	"player_down_idle", "player_up_idle", "player_side_idle",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
