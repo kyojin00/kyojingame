@@ -1578,12 +1578,24 @@ func _end_postman_dialog() -> void:
 func _story_tree_chopped() -> void:
 	if GameData.story_phase != "chop":
 		return
-	# 퀘3 완료 -> 이제 우체부 아저씨와 함께 숲을 개척하며 마을로 간다
+	# 퀘3 완료 (보상: 목재) -> 완료 연출 후 우체부 아저씨의 다음 대화로 자동 연결
 	GameData.story_phase = "travel"
 	_apply_story_camera()
 	_apply_story_visibility()
 	hud.quest_toast("나무를 베어보자")
-	hud.show_message("우체부 아저씨와 함께 숲을 개척해 마을(동쪽)로 가자!", 6.0)
+	hud.reward_toast("목재 × %d" % WOOD_PER_TREE, tex["icon_wood"])
+	get_tree().create_timer(1.6).timeout.connect(_start_travel_dialog)
+
+
+func _start_travel_dialog() -> void:
+	# 벌목 퀘스트 완료 직후 자동으로 이어지는 대화
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
+		{"text": "「오, 제법이구먼! 좋은 목재도 얻었고 말이야.」"},
+		{"text": "「이렇게 나무를 베어 길을 만들면서 가면 되겠네.」"},
+		{"text": "「%s, 마을은 동쪽일세. 함께 가세나.」" % nm},
+	], func() -> void:
+		hud.show_message("우체부 아저씨와 함께 숲을 개척해 마을(동쪽)로 가자!", 6.0))
 
 
 # ---- 밤 몬스터: 지네 (21시 이후 야외에서 등장, 아침에 사라진다) ----
