@@ -119,11 +119,17 @@ func _draw_map() -> void:
 				oy + n.position.y / 32.0 * CELL - 1, 3, 3), Color(0.95, 0.55, 0.75))
 
 	# 시설 라벨 (그 위치를 발견했을 때만)
-	_place_label(63, 14, "우리집", ox, oy)
-	_place_label(74, 1, "마을", ox, oy)
-	_place_label(73, 15, "광장", ox, oy)
+	_place_label(63, 3, "우리집", ox, oy)
+	_place_label(74, 13, "중앙 광장", ox, oy)
+	_place_label(74, 26, "낚시터", ox, oy)
 	_place_label(40, 27, "호수", ox, oy)
 	_place_label(50, 1, "동굴", ox, oy)
+	# 지어진 마을 건물만 이름을 보여준다 (빈 부지는 표시하지 않는다)
+	for pid: String in GameData.village_built:
+		if not main.VILLAGE_PLOTS.has(pid):
+			continue
+		var a: Vector2i = main.VILLAGE_PLOTS[pid].anchor
+		_place_label(a.x, a.y, str(main.VILLAGE_PLOTS[pid].name), ox, oy)
 
 	# 내 위치: 눈에 잘 띄는 마커 (고리 + 깜빡이는 점 + 라벨)
 	var pp := Vector2(ox + main.player.position.x / 32.0 * CELL,

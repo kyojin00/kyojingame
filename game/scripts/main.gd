@@ -107,6 +107,7 @@ const TEXTURE_NAMES := [
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
+	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
@@ -156,24 +157,55 @@ const PARCEL_SIGNS := {
 	"plains": Vector2i(2, 40),
 	"deepforest": Vector2i(46, 40),
 }
-# 건물 앵커(좌상단 5x4) -> 종류
-# 우리집: 스토리 1 완료 후 마을 서쪽 집터(E)에서 목재로 직접 짓는다
-const HOME_ANCHOR := Vector2i(61, 15)
-const HOME_SITE := Vector2i(63, 17)  # 집터 표지판 위치
-const BUILDINGS := {
-	Vector2i(63, 3): "general",  # 잡화점 (씨앗/판매)
-	Vector2i(70, 3): "ranch",    # 목장 상회 (동물)
-	Vector2i(77, 3): "smith",    # 대장간 (강화)
-	Vector2i(63, 10): "fish",    # 수산시장 (도감/판매)
-	Vector2i(77, 10): "npc_house",
-}
-const BUILDING_NAMES := {
-	"home": "집", "general": "잡화점", "ranch": "목장 상회",
-	"smith": "대장간", "fish": "수산시장", "npc_house": "철수네 집",
-}
-const BOARD_POS := Vector2i(75, 17)
+# ---- 교진 마을 ----
+# 마을에는 처음에 건물이 하나도 없다.
+# 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
+# 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
 const VILLAGE_REGION := Rect2i(60, 0, 30, 30)
-const ROAD := Rect2i(30, 8, 30, 2)  # 농장 -> 마을 공용 길
+const ROAD := Rect2i(30, 8, 30, 2)         # 농장/숲 -> 마을 공용 길
+const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 큰길 (2칸)
+const PLAZA := Rect2i(68, 12, 14, 10)      # 중앙 광장 (아주 넓은 평지)
+const FOUNTAIN := Rect2i(73, 15, 4, 4)     # 광장 중앙 분수
+const FOUNTAIN_DECO := Vector2i(74, 17)    # 분수 조형물 (분수 한가운데)
+const VILLAGE_RIVER_Y := 27                # 마을 남쪽 외곽을 흐르는 강 (2칸)
+const DOCK_Y := 26                         # 강가 낚시터(부두)
+const BOARD_POS := Vector2i(77, 12)        # 광장 게시판 (오늘의 의뢰)
+const PLAZA_LAMPS := [Vector2i(69, 13), Vector2i(80, 13),
+	Vector2i(69, 20), Vector2i(80, 20)]
+const PLAZA_BENCHES := [Vector2i(71, 16), Vector2i(71, 18),
+	Vector2i(78, 16), Vector2i(78, 18)]
+
+# 우리집: 스토리 1 완료 후 마을 서쪽 집터(E)에서 목재로 직접 짓는다
+const HOME_ANCHOR := Vector2i(61, 4)
+const HOME_SITE := Vector2i(63, 6)  # 집터 표지판 위치
+
+# 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
+# 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.
+const VILLAGE_PLOTS := {
+	"post":    {"anchor": Vector2i(68, 4),  "name": "우체국"},
+	"general": {"anchor": Vector2i(77, 4),  "name": "잡화점"},
+	"smith":   {"anchor": Vector2i(61, 11), "name": "대장간"},
+	"lab":     {"anchor": Vector2i(82, 11), "name": "연구소"},
+	"inn":     {"anchor": Vector2i(61, 18), "name": "여관"},
+	"library": {"anchor": Vector2i(82, 18), "name": "도서관"},
+	"ranch":   {"anchor": Vector2i(67, 22), "name": "목장 상회"},
+	"fish":    {"anchor": Vector2i(77, 22), "name": "수산시장"},
+}
+# 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
+# (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
+const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
+const VILLAGE_BUILD_COST := {   # [목재, 석재]
+	"post": [30, 10], "general": [50, 20], "smith": [60, 50],
+	"ranch": [80, 40], "fish": [100, 60],
+}
+# 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
+const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
+	"ranch": "rancher", "fish": "fisher"}
+const BUILDING_NAMES := {
+	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
+	"lab": "연구소", "inn": "여관", "library": "도서관",
+	"ranch": "목장 상회", "fish": "수산시장",
+}
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 const UI_FONT := preload("res://assets/fonts/Galmuri11.ttf")
 const UI_FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
@@ -260,21 +292,9 @@ func _ready() -> void:
 	cave.main = self
 	add_child(cave)
 
-	# NPC들: 각자 자기 가게/구역 근처를 배회한다
-	var npc_spawns := {
-		"merchant": Vector2i(66, 12), "fisher": Vector2i(66, 16),
-		"blacksmith": Vector2i(79, 8), "rancher": Vector2i(72, 8),
-		"chief": Vector2i(75, 15),
-	}
-	for npc_id in npc_spawns:
-		var n: Node2D = preload("res://scripts/npc.gd").new()
-		n.main = self
-		n.id = npc_id
-		n.region = VILLAGE_REGION
-		var sp: Vector2i = npc_spawns[npc_id]
-		n.position = Vector2(sp.x * TILE + 16, sp.y * TILE + 16)
-		npcs.append(n)
-		world.add_child(n)
+	# 마을 사람들: 이장만 처음부터 광장에 있고,
+	# 나머지는 자기 건물이 지어진 뒤에 마을에 자리를 잡는다
+	_spawn_npc("chief", Vector2i(71, 20))
 
 	sleep_dialog = ConfirmationDialog.new()
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
@@ -358,6 +378,7 @@ func _ready() -> void:
 				for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
 					objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
 			objects.erase(HOME_SITE)
+	_sync_village_npcs()
 	_spawn_objects()
 	_apply_season_visuals()
 	if GameData.quest.is_empty():
@@ -407,7 +428,7 @@ func _build_map() -> void:
 				"crop_id": "", "crop_day": 0.0, "dead": false})
 		grid.append(row)
 
-	# 연못들 (숲/깊은 숲) + 강 + 마을 분수대 — 시작 부지의 연못은 없앴다
+	# 연못들 (숲/깊은 숲) — 시작 부지의 연못은 없앴다
 	for y in range(28, 35):
 		for x in range(45, 53):
 			grid[y][x].ground = "water"
@@ -417,34 +438,16 @@ func _build_map() -> void:
 	for y in range(48, 54):          # 깊은 숲 연못
 		for x in range(70, 79):
 			grid[y][x].ground = "water"
-	for y in range(17, 19):          # 마을 분수대
-		for x in range(71, 73):
-			grid[y][x].ground = "water"
 
-	# 길: 농장 -> 마을 도로 + 마을 광장/거리
+	_build_village()
+
+	# 농장 -> 마을 공용 길
 	for y in range(ROAD.position.y, ROAD.end.y):
 		for x in range(ROAD.position.x, ROAD.end.x):
 			grid[y][x].ground = "path"
-	for y in range(8, 10):           # 마을 안 도로
-		for x in range(60, 84):
-			grid[y][x].ground = "path"
-	for y in range(15, 22):          # 광장
-		for x in range(68, 78):
-			if grid[y][x].ground == "grass":
-				grid[y][x].ground = "path"
-	for y in range(10, 15):          # 광장-도로 연결
-		for x in range(72, 74):
-			grid[y][x].ground = "path"
 
-	# 건물들 (각 5x4 타일) + 출하 상자 + 퀘스트 게시판 + 동굴
-	for anchor: Vector2i in BUILDINGS:
-		for y in range(anchor.y, anchor.y + 4):
-			for x in range(anchor.x, anchor.x + 5):
-				objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
-	# 우리집은 처음엔 집터뿐 — 스토리 1 완료 후 직접 짓는다
-	objects[HOME_SITE] = {"kind": "housesite", "hp": 0}
+	# 출하 상자(농장) + 동굴
 	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
-	objects[BOARD_POS] = {"kind": "board", "hp": 0}
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
 	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
@@ -489,11 +492,93 @@ func _build_map() -> void:
 			elif h < 0.075:
 				objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 
-	# 마을 장식: 광장 둘레 나무
-	for deco_pos in [Vector2i(67, 14), Vector2i(78, 14), Vector2i(67, 22), Vector2i(78, 22),
-			Vector2i(85, 6), Vector2i(85, 20)]:
-		if not objects.has(deco_pos) and grid[deco_pos.y][deco_pos.x].ground == "grass":
-			objects[deco_pos] = {"kind": "tree", "hp": TREE_HP}
+
+# 교진 마을: 건물은 하나도 짓지 않는다.
+# 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
+func _build_village() -> void:
+	# 마을을 가로지르는 큰길 (서쪽 입구 -> 동쪽)
+	for y in range(MAIN_STREET_Y, MAIN_STREET_Y + 2):
+		for x in range(60, 87):
+			grid[y][x].ground = "path"
+	# 중앙 광장 (아주 넓은 평지)
+	for y in range(PLAZA.position.y, PLAZA.end.y):
+		for x in range(PLAZA.position.x, PLAZA.end.x):
+			grid[y][x].ground = "path"
+	# 광장에서 사방으로 퍼져나가는 길
+	for x in [74, 75]:
+		for y in range(1, PLAZA.position.y):         # 북쪽 길
+			grid[y][x].ground = "path"
+		for y in range(PLAZA.end.y, DOCK_Y + 1):     # 남쪽 길 (강가까지)
+			grid[y][x].ground = "path"
+	for y in [16, 17]:
+		for x in range(61, PLAZA.position.x):        # 서쪽 길
+			grid[y][x].ground = "path"
+		for x in range(PLAZA.end.x, 87):             # 동쪽 길
+			grid[y][x].ground = "path"
+	# 광장 한가운데 분수
+	for y in range(FOUNTAIN.position.y, FOUNTAIN.end.y):
+		for x in range(FOUNTAIN.position.x, FOUNTAIN.end.x):
+			grid[y][x].ground = "water"
+
+	# 마을 바깥쪽을 따라 흐르는 강 (광장을 가로막지 않는다)
+	for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
+		for x in range(46, 89):
+			grid[y][x].ground = "water"
+	for x in [87, 88]:
+		for y in range(1, VILLAGE_RIVER_Y):
+			grid[y][x].ground = "water"
+	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 부두 (시설은 없다)
+	for x in range(72, 78):
+		grid[DOCK_Y][x].ground = "path"
+	for x in range(73, 77):
+		grid[VILLAGE_RIVER_Y][x].ground = "path"
+	# 강 건너 남쪽 부지로 이어지는 작은 다리
+	for x in [63, 64]:
+		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
+			grid[y][x].ground = "path"
+
+	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
+	objects[HOME_SITE] = {"kind": "housesite", "hp": 0}
+	objects[BOARD_POS] = {"kind": "board", "hp": 0}
+	objects[FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
+	for p: Vector2i in PLAZA_LAMPS:
+		objects[p] = {"kind": "deco_lamp", "hp": 0}
+	for p: Vector2i in PLAZA_BENCHES:
+		objects[p] = {"kind": "deco_bench", "hp": 0}
+	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
+	for x in range(60, 89):
+		for y in [1, 29]:
+			var rim := Vector2i(x, y)
+			if grid[y][x].ground == "grass" and not objects.has(rim) \
+					and _hash01(x * 5 + 3, y * 7 + 2) < 0.55:
+				objects[rim] = {"kind": "tree", "hp": TREE_HP}
+
+
+func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
+	var n: Node2D = preload("res://scripts/npc.gd").new()
+	n.main = self
+	n.id = npc_id
+	n.region = VILLAGE_REGION
+	n.position = Vector2(tile.x * TILE + 16, tile.y * TILE + 16)
+	npcs.append(n)
+	world.add_child(n)
+
+
+func _sync_village_npcs() -> void:
+	# 건물이 생기면 그 건물의 주인이 마을에 나타난다 (없는 건물의 주인은 아직 없다)
+	for pid: String in VILLAGE_NPC:
+		if not GameData.village_built.has(pid):
+			continue
+		var nid: String = VILLAGE_NPC[pid]
+		var found := false
+		for n in npcs:
+			if n.id == nid:
+				found = true
+				break
+		if found:
+			continue
+		var a: Vector2i = VILLAGE_PLOTS[pid].anchor
+		_spawn_npc(nid, Vector2i(a.x + 2, a.y + 4))  # 자기 건물 문 앞
 
 
 func _spawn_objects() -> void:
@@ -501,8 +586,9 @@ func _spawn_objects() -> void:
 		n.queue_free()
 	obj_nodes.clear()
 	tree_sprites.clear()
-	for anchor: Vector2i in BUILDINGS:
-		_spawn_house_node(anchor)
+	for pid: String in GameData.village_built:
+		if VILLAGE_PLOTS.has(pid):
+			_spawn_house_node(VILLAGE_PLOTS[pid].anchor)  # 지은 뒤에만 존재
 	if GameData.house_lv >= 1:
 		_spawn_house_node(HOME_ANCHOR)  # 지은 뒤에만 존재
 	for pos: Vector2i in objects:
@@ -525,6 +611,7 @@ func _spawn_house_node(anchor: Vector2i) -> void:
 const OBJECT_SCALES := {
 	"tree": 2.0, "rock": 1.4, "bigrock": 3.0, "cave": 1.5, "worldtree": 1.6,
 	"barn": 1.5, "forage_berry": 1.2, "forage_herb": 1.2,
+	"deco_fountain": 1.4, "deco_lamp": 1.0, "deco_bench": 1.0,
 }
 const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
 
@@ -567,6 +654,14 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -88)
 		"barn_block":
 			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
+		"deco_fountain":
+			texture = tex["deco_fountain"]  # 광장 분수 조형물 (분수 한가운데)
+			offset = Vector2(0, -160)
+		"deco_lamp":
+			texture = tex["deco_lamp"]
+			offset = Vector2(0, -128)
+		"deco_bench":
+			texture = tex["deco_bench"]
 	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
@@ -583,6 +678,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			spr.flip_h = _hash01(pos.x * 3 + 5, pos.y * 11 + 7) > 0.5  # 좌우 변형
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
+		if kind == "deco_fountain":
+			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
 	obj_nodes[pos] = node
 	if kind == "tree":
 		tree_sprites.append(node.get_child(0))
@@ -1260,8 +1357,12 @@ func interact() -> void:
 					shop.open("upgrade", ["upgrade"])
 				"fish":
 					shop.open("codex", ["codex"])
+				"post":
+					hud.show_message("우체국이다. 우체부 아저씨가 편지를 정리하고 있다.")
 				_:
-					hud.show_message("철수네 집이다. 낚시하러 갔는지 조용하다.")
+					var bk2 := _building_kind_at(t)
+					hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %
+						BUILDING_NAMES.get(bk2, "건물"))
 			return
 	# 자연물: E키가 기본 상호작용 (나무=도끼 벌목, 돌=곡괭이 채광)
 	var tobj: Variant = objects.get(target_tile())
@@ -1313,9 +1414,13 @@ func _building_kind_at(t: Vector2i) -> String:
 	if GameData.house_lv >= 1 and t.x >= HOME_ANCHOR.x and t.x < HOME_ANCHOR.x + 5 \
 			and t.y >= HOME_ANCHOR.y and t.y < HOME_ANCHOR.y + 4:
 		return "home"
-	for a: Vector2i in BUILDINGS:
+	# 마을 건물은 실제로 지어진 것만 존재한다
+	for pid: String in GameData.village_built:
+		if not VILLAGE_PLOTS.has(pid):
+			continue
+		var a: Vector2i = VILLAGE_PLOTS[pid].anchor
 		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
-			return BUILDINGS[a]
+			return pid
 	return ""
 
 
@@ -1359,7 +1464,7 @@ func _apply_story_visibility() -> void:
 	# 마을로 이동하는 travel 단계부터는 마을이 보여야 하므로 표시한다.
 	var show := GameData.story_phase not in ["enter", "approach", "equip", "chop", "path", "map", "rock"]
 	for pos: Vector2i in obj_nodes:
-		# BUILDINGS 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
+		# 부지 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = objects[pos].kind if objects.has(pos) else "house"
 		if kind in ["house", "housesite", "bin", "board", "sign", "barn", "barn_block", "cave"]:
 			obj_nodes[pos].visible = show
@@ -1883,6 +1988,56 @@ func _build_house() -> void:
 	save_now()
 
 
+# ---- 마을 발전 (빈 부지에 건물을 하나씩 세운다) ----
+# 처음 마을에는 건물이 하나도 없다. 이장에게 이야기하면 정해진 순서대로
+# 재료를 모아 건물을 짓고, 그때마다 마을의 모습과 기능이 늘어난다.
+
+func _next_village_build() -> String:
+	for pid in VILLAGE_BUILD_ORDER:
+		if not GameData.village_built.has(pid):
+			return pid
+	return ""
+
+
+func _open_village_build_dialog() -> void:
+	var pid := _next_village_build()
+	if pid == "":
+		dialog.open("마을 발전",
+			"지금 지을 수 있는 건물은 다 세웠네.\n마을이 제법 그럴듯해졌구먼!")
+		return
+	var plot: Dictionary = VILLAGE_PLOTS[pid]
+	var cost: Array = VILLAGE_BUILD_COST[pid]
+	dialog.open("마을 발전 — %s" % plot.name,
+		"%s(을)를 지을 자리는 이미 비워 두었네.\n재료만 모아 오면 마을 사람들과 함께 세우겠네.\n\n필요 재료: 목재 %d (보유 %d) · 석재 %d (보유 %d)" %
+			[plot.name, cost[0], GameData.wood, cost[1], GameData.stone], [
+		["%s 짓기" % plot.name, _build_village_building.bind(pid)],
+		["나중에", null],
+	])
+
+
+func _build_village_building(pid: String) -> void:
+	var plot: Dictionary = VILLAGE_PLOTS[pid]
+	var cost: Array = VILLAGE_BUILD_COST[pid]
+	if GameData.wood < int(cost[0]) or GameData.stone < int(cost[1]):
+		dialog.set_body("재료가 아직 부족하네...\n\n목재 %d/%d · 석재 %d/%d" %
+			[GameData.wood, cost[0], GameData.stone, cost[1]])
+		return
+	GameData.wood -= int(cost[0])
+	GameData.stone -= int(cost[1])
+	GameData.village_built.append(pid)
+	var a: Vector2i = plot.anchor
+	for y in range(a.y, a.y + 4):
+		for x in range(a.x, a.x + 5):
+			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+	_spawn_house_node(a)
+	_sync_village_npcs()
+	Sound.play_sfx("sfx_place")
+	hud.quest_toast("%s 완공!" % plot.name)
+	dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼." % plot.name)
+	queue_redraw()
+	save_now()
+
+
 # 동행 중 우체부에게 말을 걸면 지금 단계에 맞는 짧은 안내를 해 준다.
 # 도끼 사용법 설명은 아직 장착 전(equip 단계)에만 나온다 — 이후엔 반복하지 않는다.
 func _talk_to_postman() -> void:
@@ -2340,11 +2495,15 @@ func _talk_to(npc: Node2D) -> void:
 		gain_legend("memory_piece")
 		if Net.is_host():
 			_broadcast_stats()
+	var choices := [
+		["선물하기", _give_gift.bind(npc.id)],
+		["대화 끝", null],
+	]
+	# 이장은 마을 발전(빈 부지에 건물 세우기)을 맡고 있다
+	if npc.id == "chief" and GameData.story_phase == "done":
+		choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
 	dialog.open_seq(title, _npc_portrait(npc.id), [
-		{"text": line, "choices": [
-			["선물하기", _give_gift.bind(npc.id)],
-			["대화 끝", null],
-		]},
+		{"text": line, "choices": choices},
 	])
 
 
@@ -2705,6 +2864,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.story_phase = str(d.get("main_story", "done"))
 	GameData.tree_regrow = d.get("tree_regrow", [])
 	GameData.player_name = str(d.get("player_name", ""))
+	GameData.village_built = d.get("village_built", [])
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))
 	GameData.explored = {}
@@ -3279,9 +3439,14 @@ func nav_target() -> Variant:
 		return null  # 숲 구간에서는 화살표를 띄우지 않는다
 	match GameData.tutorial_current_flag():
 		"slept":
-			return Vector2(63 * TILE + 16, 19 * TILE + 16)   # 우리집 문 앞 (마을 서쪽)
+			# 우리집(마을 서쪽) 문 앞 — 아직 안 지었으면 집터로 안내한다
+			return Vector2(HOME_ANCHOR.x * TILE + 2 * TILE + 16,
+				(HOME_ANCHOR.y + 4) * TILE + 16)
 		"shop":
-			return Vector2(65 * TILE + 16, 7 * TILE + 16)    # 마을 잡화점 앞
+			if not GameData.village_built.has("general"):
+				return null  # 잡화점은 마을 발전으로 지어야 생긴다
+			var ga: Vector2i = VILLAGE_PLOTS["general"].anchor
+			return Vector2((ga.x + 2) * TILE + 16, (ga.y + 4) * TILE + 16)
 		"fish":
 			return Vector2(40 * TILE + 16, 27 * TILE + 16)   # 호수 (숲과 호수 부지)
 		"chop":
@@ -3394,7 +3559,7 @@ func _debug_tick() -> void:
 		73: _save_shot("_map.png")
 		74:
 			map_ui.close()
-			player.position = Vector2(74 * TILE + 16, 17 * TILE + 16)
+			player.position = Vector2(76 * TILE + 16, 12 * TILE + 16)
 			player.dir = "right"                       # 마을 광장 게시판 앞으로
 			for n in npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
 				n.position = Vector2(62 * TILE + 16, 25 * TILE + 16)
@@ -3402,6 +3567,10 @@ func _debug_tick() -> void:
 		78: _send_key(KEY_E)
 		84: _save_shot("_quest.png")
 		86: dialog.close()
+		87:
+			player.position = Vector2(74 * TILE + 16, 20 * TILE + 16)
+			player.dir = "up"                          # 중앙 광장(건물 없는 초기 마을)
+		89: _save_shot("_village.png")
 		90:
 			player.position = npcs[0].position + Vector2(12, 0)
 		94: _send_key(KEY_E)                           # NPC 대화
@@ -3447,7 +3616,17 @@ func _debug_tick() -> void:
 			GameData.affinity["merchant"] = 60
 			note_ui.toggle()                           # 연구 노트(N) 확인
 		176: _save_shot("_note.png")
-		178: get_tree().quit()
+		178:
+			note_ui.close()
+			GameData.wood = 999                        # 마을 발전(건설) 확인
+			GameData.stone = 999
+			_build_village_building("post")
+			_build_village_building("general")
+			dialog.close()
+			player.position = Vector2(74 * TILE + 16, 11 * TILE + 16)
+			player.dir = "up"
+		182: _save_shot("_village2.png")
+		184: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

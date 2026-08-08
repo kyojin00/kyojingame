@@ -376,6 +376,11 @@ var tree_regrow: Array = []
 # 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
 var player_name := ""
 
+# 마을 발전: 처음 마을에는 건물이 하나도 없다.
+# 이장에게 이야기해 재료를 모으면 빈 부지에 건물이 하나씩 세워진다.
+# (건물 id는 main.gd의 VILLAGE_PLOTS 키)
+var village_built: Array = []
+
 # 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
 var house_lv := 0
 var has_bed := false  # 침대는 직접 제작해야 잠을 잘 수 있다
@@ -893,7 +898,7 @@ const TUTORIAL_ORDER := [
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
 	["build", "울타리나 스프링클러를 설치해보자"],
 	["fish", "낚싯대로 물가에서 물고기를 낚자"],
-	["shop", "마을 잡화점에 들어가 보자(E) - 도감도 구경!"],
+	["shop", "이장에게 「마을 발전」을 이야기해 잡화점을 세우자"],
 ]
 # 목표 달성 시 해금되는 도구
 const TUTORIAL_UNLOCKS := {
@@ -1095,6 +1100,7 @@ func reset_all() -> void:
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
 	tree_regrow = []
+	village_built = []
 	house_lv = 0
 	has_bed = false
 	explored = {}
@@ -1210,6 +1216,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tool_slots": tool_slots,
 		"tree_regrow": tree_regrow,
 		"player_name": player_name,
+		"village_built": village_built,
 		"house_lv": house_lv,
 		"has_bed": has_bed,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
