@@ -398,6 +398,23 @@ func is_night() -> bool:
 func is_deep_night() -> bool:
 	return minutes >= 21.0 * 60.0  # 21시: 위험한 밤 몬스터 등장
 
+# ---- 지도 탐사 (fog of war) ----
+# 실제로 가 본 지역만 지도에 표시된다. 청크(8타일) 단위로 기록.
+const EXPLORE_CHUNK := 8
+var explored := {}  # Vector2i(청크 좌표) -> true
+
+
+func mark_explored_at(t: Vector2i) -> void:
+	var c := Vector2i(t.x / EXPLORE_CHUNK, t.y / EXPLORE_CHUNK)
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			explored[c + Vector2i(dx, dy)] = true
+
+
+func is_explored_tile(x: int, y: int) -> bool:
+	return explored.has(Vector2i(x / EXPLORE_CHUNK, y / EXPLORE_CHUNK))
+
+
 # 메인 스토리 1 퀘스트 순서 (기준 문서: game/docs/quests.md)
 # {이름, 해야 하는 일, 스토리} — Q 상세 창과 목록 모두 여기서 가져온다
 const STORY1_QUESTS := [
@@ -413,14 +430,21 @@ const STORY1_QUESTS := [
 	{"name": "나무를 베어보자",
 		"task": "도끼를 선택(숫자키)하고 나무를 클릭한 뒤 E 키로 베어보자",
 		"story": "도끼를 장착했다. 길을 막는 나무를 베어 마을로 가는 길을 만들자."},
+	{"name": "숲길을 나아가자",
+		"task": "나무를 베며 숲길을 따라 나아가자 (화살표 방향)",
+		"story": "첫 나무를 베어 길이 열리기 시작했다. 아저씨와 함께 숲길을 따라 앞으로 나아가자."},
+	{"name": "지도를 확인해보자",
+		"task": "M 키를 눌러 지도를 열어 보자",
+		"story": "숲길이 여러 갈래로 갈라졌다. 어느 길로 가야 할까? 아저씨가 알려준 대로 지도에서 우리 위치와 가 본 곳을 확인해 보자."},
 	{"name": "마을로 이동",
-		"task": "우체부 아저씨와 함께 숲을 개척해 마을(동쪽)에 도착하자",
-		"story": "길이 열리기 시작했다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
+		"task": "우체부 아저씨와 함께 마을 방향으로 가자 (화살표 방향)",
+		"story": "지도로 마을 방향을 확인했다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
 		"task": "마을 이장을 찾아가자",
 		"story": "드디어 마을이 보인다. 우체부 아저씨가 이장님께 편지를 전하면 긴 여정이 끝난다."},
 ]
-const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3, "travel": 4}
+const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3,
+	"path": 4, "map": 5, "travel": 6}
 
 
 func story_current_quest() -> Dictionary:
@@ -439,8 +463,12 @@ func story_objective_short() -> String:
 			return "나무도끼를 가방(I) 슬롯에 장착해 보자"
 		"chop":
 			return "나무도끼로 나무를 베어보자"
+		"path":
+			return "숲길을 따라 나아가자 (화살표 방향)"
+		"map":
+			return "M 키를 눌러 지도를 열어 보자"
 		"travel":
-			return "우체부 아저씨와 함께 마을로 가자 (동쪽)"
+			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
 	return ""
 
 
@@ -1048,6 +1076,7 @@ func reset_all() -> void:
 	tree_regrow = []
 	house_lv = 0
 	has_bed = false
+	explored = {}
 	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
@@ -1159,6 +1188,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"player_name": player_name,
 		"house_lv": house_lv,
 		"has_bed": has_bed,
+		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,

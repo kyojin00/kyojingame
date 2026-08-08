@@ -317,7 +317,7 @@ func _ready() -> void:
 		# 스토리 도중 저장했다면 우체부 아저씨가 계속 동행한다
 		if GameData.story_phase == "approach":
 			_spawn_postman()  # 아직 대화 전 -> 다시 걸어와 말을 건다
-		elif GameData.story_phase in ["equip", "chop", "travel"]:
+		elif GameData.story_phase in ["equip", "chop", "path", "map", "travel"]:
 			_spawn_postman()
 			story_cutscene = false
 			_postman_state = "follow"
@@ -348,6 +348,9 @@ func _ready() -> void:
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용
 			GameData.has_bed = true
+			for cy in range(0, MAP_H / GameData.EXPLORE_CHUNK + 1):
+				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
+					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
 			for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
 				for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
 					objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
@@ -1296,6 +1299,7 @@ func _building_kind_at(t: Vector2i) -> String:
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
 const STORY_SPAWN := Vector2i(2, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
 const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
+const STORY_FORK := Vector2i(20, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
 var story_cutscene := false                # 컷신 중 조작 잠금
 var _postman: Node2D = null
 var _postman_spr: Sprite2D = null
@@ -1308,7 +1312,7 @@ func _apply_story_camera() -> void:
 	# 숲 구간(마을 이동 전)에는 시작 숲 한 화면(30x17타일)에 카메라를 고정한다.
 	# 마을로 이동하는 travel 단계부터는 전체 맵 카메라로 풀린다.
 	var cam: Camera2D = player.get_node("Camera")
-	if GameData.story_phase in ["enter", "approach", "equip", "chop"]:
+	if GameData.story_phase in ["enter", "approach", "equip", "chop", "path", "map"]:
 		cam.limit_left = 0
 		cam.limit_top = 6 * TILE
 		cam.limit_right = 30 * TILE
@@ -1325,7 +1329,7 @@ func _apply_story_camera() -> void:
 func _apply_story_visibility() -> void:
 	# 숲 구간(마을 이동 전)엔 집/건물류가 어느 방향에서도 보이지 않는다.
 	# 마을로 이동하는 travel 단계부터는 마을이 보여야 하므로 표시한다.
-	var show := GameData.story_phase not in ["enter", "approach", "equip", "chop"]
+	var show := GameData.story_phase not in ["enter", "approach", "equip", "chop", "path", "map"]
 	for pos: Vector2i in obj_nodes:
 		# BUILDINGS 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = objects[pos].kind if objects.has(pos) else "house"
@@ -1343,6 +1347,16 @@ func _plant_story_forest() -> void:
 				continue
 			if y == STORY_LANE_Y and x <= 7:
 				continue  # 숲 입구 + 우체부 길
+			# 갈림길: 갈림길 지점에서 길이 북/남/동 세 방향으로 갈라진다
+			if x == STORY_FORK.x and y >= 8:
+				grid[y][x].ground = "path"
+				continue
+			if y == STORY_LANE_Y and x >= STORY_FORK.x:
+				grid[y][x].ground = "path"  # 동쪽 길
+				continue
+			if y == 8 and x >= STORY_FORK.x:
+				grid[y][x].ground = "path"  # 북쪽 길 -> 큰길과 연결
+				continue
 			var h := _hash01(x, y)
 			if h < 0.045:
 				grid[y][x].ground = "path"  # 드문드문 흙바닥 자국
@@ -1405,6 +1419,21 @@ func _story_update(delta: float) -> void:
 				hud.show_message("숫자키로 도끼를 선택하고, 나무를 클릭한 뒤 E로 베어보자!", 6.0)
 		"chop":
 			_update_postman(delta, story_shot)
+		"path":
+			_update_postman(delta, story_shot)
+			# 갈림길 중앙에 도착하면 지도 안내 대화 시작
+			if not dialog.visible and player.position.distance_to(
+					Vector2(STORY_FORK.x * TILE + 16, STORY_FORK.y * TILE + 16)) < 44.0:
+				_start_fork_dialog()
+		"map":
+			_update_postman(delta, story_shot)
+			# 지도 UI가 실제로 열린 것을 확인해야 퀘스트 완료
+			if map_ui.visible and not _story_map_opened:
+				_story_map_opened = true
+			elif _story_map_opened and not map_ui.visible and not dialog.visible:
+				hud.quest_toast("지도를 확인해보자")
+				GameData.story_phase = "travel"  # 대화는 토스트 뒤에 이어진다
+				get_tree().create_timer(1.4).timeout.connect(_after_map_dialog)
 		"travel":
 			_update_postman(delta, story_shot)
 			# 마을 이장 근처에 도착하면 편지 전달 컷신
@@ -1585,28 +1614,57 @@ func _end_postman_dialog() -> void:
 		_postman_state = "follow"  # 우체부는 떠나지 않고 마을까지 동행한다
 
 
+var _story_map_opened := false
+var _last_explore_tile := Vector2i(-999, -999)
+
+
 func _story_tree_chopped() -> void:
 	if GameData.story_phase != "chop":
 		return
-	# 퀘3 완료 (보상: 목재) -> 완료 연출 후 우체부 아저씨의 다음 대화로 자동 연결
-	GameData.story_phase = "travel"
-	_apply_story_camera()
-	_apply_story_visibility()
+	# 벌목 퀘스트 완료 (보상: 목재) -> 완료 연출 후 우체부 아저씨의 다음 대화로 자동 연결.
+	# 아직 마을로 가지 않는다 — 숲길을 개척하며 갈림길까지 함께 이동한다.
+	GameData.story_phase = "path"
 	hud.quest_toast("나무를 베어보자")
 	hud.reward_toast("목재 × %d" % WOOD_PER_TREE, tex["icon_wood"])
 	get_tree().create_timer(1.6).timeout.connect(_start_travel_dialog)
 
 
 func _start_travel_dialog() -> void:
-	# 벌목 퀘스트 완료 직후 자동으로 이어지는 대화
+	# 벌목 퀘스트 완료 직후 자동으로 이어지는 대화 (첫 벌목 직후 1회)
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
 		{"text": "「오, 제법이구먼! 좋은 목재도 얻었고 말이야.」"},
 		{"text": "「도구를 사용해야만 나무를 벨 수 있다는 걸 기억하게.」"},
 		{"text": "「이렇게 나무를 베어 길을 만들면서 가면 되겠네.」"},
-		{"text": "「%s, 마을은 동쪽일세. 함께 가세나.」" % nm},
+		{"text": "「%s, 이 숲길을 따라 가보세. 막힌 나무는 자네가 부탁하네.」" % nm},
 	], func() -> void:
-		hud.show_message("우체부 아저씨와 함께 숲을 개척해 마을(동쪽)로 가자!", 6.0))
+		hud.show_message("화살표를 따라 숲길을 개척하며 나아가자!", 6.0))
+
+
+func _start_fork_dialog() -> void:
+	# 갈림길 도착: 우체부 아저씨가 길을 둘러본 뒤 지도를 알려준다 (퀘스트: 지도 확인)
+	story_cutscene = true
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+		{"text": "(우체부 아저씨가 갈라진 길을 둘러본다...)"},
+		{"text": "「길이 여러 갈래로 나뉘었구먼.」"},
+		{"text": "「이럴 때는 지도를 확인하는 게 좋다네.」"},
+		{"text": "「M 키를 누르면 지도를 볼 수 있어.」"},
+		{"text": "「지도에서는 자네가 지금 어디에 있는지와, 지금까지 가본 곳들을 확인할 수 있다네.」"},
+	], func() -> void:
+		story_cutscene = false
+		GameData.story_phase = "map"
+		hud.show_message("새 퀘스트: M 키를 눌러 지도를 열어 보자", 6.0))
+
+
+func _after_map_dialog() -> void:
+	# 지도를 확인한 뒤: 마을 방향을 함께 확인하고 이동 시작
+	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
+		{"text": "「이제 우리가 어디쯤 있는지 알겠나?」"},
+		{"text": "「마을은 이쪽 방향일세. 계속 가보세.」"},
+	], func() -> void:
+		_apply_story_camera()
+		_apply_story_visibility()
+		hud.show_message("우체부 아저씨와 함께 마을로 가자! (화살표 방향)", 6.0))
 
 
 # ---- 밤 몬스터: 지네 (21시 이후 야외에서 등장, 아침에 사라진다) ----
@@ -1705,6 +1763,14 @@ func _talk_to_postman() -> void:
 		"chop":
 			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
 				{"text": "「도끼를 챙겼구먼. 앞의 나무를 골라 베어보게.」"},
+			], Callable())
+		"path":
+			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+				{"text": "「이 숲길을 따라 가보세. 막힌 나무는 자네가 부탁하네.」"},
+			], Callable())
+		"map":
+			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+				{"text": "「M 키를 누르면 지도를 볼 수 있다네.」"},
 			], Callable())
 		_:
 			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
@@ -2473,6 +2539,9 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.player_name = str(d.get("player_name", ""))
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))
+	GameData.explored = {}
+	for c in d.get("explored", []):
+		GameData.explored[Vector2i(int(c[0]), int(c[1]))] = true
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):
@@ -2596,6 +2665,9 @@ func _process(delta: float) -> void:
 			_growth_timer = 0.0
 		_update_mouse_target()
 		_update_fishing(delta)
+		if player_tile() != _last_explore_tile:
+			_last_explore_tile = player_tile()
+			GameData.mark_explored_at(_last_explore_tile)
 		if player.walked > 40.0:
 			tutorial_notify("moved")
 	weather_time += delta
@@ -3018,6 +3090,9 @@ func _context_hint() -> Array:
 
 # 현재 목표에 목적지가 있으면 플레이어 주위에 방향 화살표를 띄운다
 func nav_target() -> Variant:
+	if GameData.story_phase == "path":
+		# 갈림길까지 숲길 안내
+		return Vector2(STORY_FORK.x * TILE + 16, STORY_FORK.y * TILE + 16)
 	if GameData.story_phase == "travel":
 		# 마을 이장에게 가는 길 안내
 		var chief := _story_chief()

@@ -124,8 +124,8 @@ func _rebuild() -> void:
 
 	# 메인 스토리 1 전체 퀘스트 목록 (완료 후에도 기록으로 남는다)
 	_line("[메인 스토리 1 — 우체부 아저씨와의 첫 만남]", COL_HEAD)
-	var cur_idx: int = 6 if ph == "done" \
-		else int(GameData.STORY1_PHASE_IDX.get(ph, 6))
+	var cur_idx: int = 8 if ph == "done" \
+		else int(GameData.STORY1_PHASE_IDX.get(ph, 8))
 	for i in GameData.STORY1_QUESTS.size():
 		var qd: Dictionary = GameData.STORY1_QUESTS[i]
 		if ph == "done" or i < cur_idx:
