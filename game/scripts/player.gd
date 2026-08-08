@@ -102,3 +102,10 @@ func _update_sprite() -> void:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			sprite.flip_h = dir == "left"
 	sprite.texture = main.tex[tex_name]
+	# 서 있을 때 숨쉬기: 프레임 대신 세로 스케일을 살짝 키웠다 줄인다
+	# (스프라이트 offset이 발 기준이라 발은 그대로, 머리만 오르내린다)
+	if not moving:
+		var b := 1.0 + 0.018 * sin(Time.get_ticks_msec() / 1000.0 * 2.2)
+		sprite.scale = Vector2(0.5, 0.5 * b)
+	else:
+		sprite.scale = Vector2(0.5, 0.5)

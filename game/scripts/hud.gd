@@ -19,6 +19,8 @@ const TOOL_SKILL := {
 }
 # 나무 프레임 팔레트
 const WOOD_TEXT := Color(0.29, 0.16, 0.06)
+# 작은 글씨용 갈무리9 (작은 크기에서 뭉개지지 않게)
+const FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
 
 var main: Node2D
 var msg_timer := 0.0
@@ -126,6 +128,7 @@ func _show_next_toast() -> void:
 	head.text = str(d.head)
 	head.position = Vector2(44 if has_icon else 12, 4)
 	head.size = Vector2(tw - 50, 16)
+	head.add_theme_font_override("font", FONT_SMALL)
 	head.add_theme_font_size_override("font_size", 12)
 	head.add_theme_color_override("font_color", d.head_col)
 	_toast.add_child(head)
@@ -133,6 +136,7 @@ func _show_next_toast() -> void:
 	body.text = str(d.body)
 	body.position = Vector2(44 if has_icon else 12, 21)
 	body.size = Vector2(tw - 50, 18)
+	body.add_theme_font_override("font", FONT_SMALL)
 	body.add_theme_font_size_override("font_size", 13)
 	body.add_theme_color_override("font_color", WOOD_TEXT)
 	_toast.add_child(body)

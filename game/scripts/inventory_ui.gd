@@ -258,6 +258,7 @@ func _mk_tool_slot(slot_i: int) -> Button:
 	var num := Label.new()  # 슬롯 번호 = 숫자키
 	num.text = str(slot_i + 1)
 	num.position = Vector2(3, 0)
+	num.add_theme_font_override("font", preload("res://assets/fonts/Galmuri9.ttf"))
 	num.add_theme_font_size_override("font_size", 10)
 	num.add_theme_color_override("font_color", Color(0.75, 0.7, 0.85, 0.75))
 	num.mouse_filter = Control.MOUSE_FILTER_IGNORE

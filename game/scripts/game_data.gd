@@ -450,49 +450,45 @@ func player_tex(part: String) -> String:
 
 
 func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 옆모습. 남자: 걷는 중엔 8프레임 걷기(12fps), 멈추면 숨쉬기 모션.
+	# 옆모습. 남자: 걷는 중엔 6프레임 걷기(9fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("side")
-		return "player_side_walk_%d" % (int(t * 12.0) % 8)
+		return "player_side_walk_%d" % (int(t * 9.0) % 6)
 	if suffix == "idle":
 		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
 
 
 func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 앞모습. 남자: 걷는 중엔 8프레임 걷기(12fps), 멈추면 숨쉬기 모션.
+	# 앞모습. 남자: 걷는 중엔 6프레임 걷기(9fps), 멈추면 숨쉬기(스케일) 모션.
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("down")
-		return "player_down_walk_%d" % (int(t * 12.0) % 8)
+		return "player_down_walk_%d" % (int(t * 9.0) % 6)
 	if suffix == "idle":
 		return player_tex("down_idle")
 	return player_tex("down_" + suffix)
 
 
 func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 뒷모습. 남자: 걷는 중엔 8프레임 걷기(12fps), 멈추면 정지 프레임.
+	# 뒷모습. 남자: 걷는 중엔 6프레임 걷기(9fps), 멈추면 숨쉬기(스케일) 모션.
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("up")
-		return "player_up_walk_%d" % (int(t * 12.0) % 8)
+		return "player_up_walk_%d" % (int(t * 9.0) % 6)
 	if suffix == "idle":
 		return player_tex("up_idle")
 	return player_tex("up_" + suffix)
 
 
-# 옆 서기: 4프레임을 왕복(핑퐁)해 6단계 숨쉬기 루프를 만든다
-const SIDE_IDLE_SEQ := [0, 1, 2, 3, 2, 1]
-
-
 func player_idle_tex(dirn: String) -> String:
-	# 대기 모션 (0.3초/단계): 앞모습 6프레임, 옆모습 4프레임 핑퐁
+	# 대기: 단일 서기 프레임. 숨쉬기는 스프라이트 세로 스케일로 연출한다 (player.gd)
 	if gender == "m" and dirn == "down":
-		return "player_down_idle_%d" % (int(Time.get_ticks_msec() / 300.0) % 6)
+		return "player_down_idle_0"
 	if gender == "m" and dirn == "side":
-		return "player_side_idle_%d" % SIDE_IDLE_SEQ[int(Time.get_ticks_msec() / 300.0) % 6]
+		return "player_side_idle_0"
 	return player_tex(dirn + "_idle")
 
 

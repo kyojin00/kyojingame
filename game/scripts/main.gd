@@ -89,19 +89,13 @@ const TEXTURE_NAMES := [
 	"player_f_down_0", "player_f_down_1", "player_f_up_0", "player_f_up_1",
 	"player_f_side_0", "player_f_side_1",
 	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
-	"player_side_idle_0", "player_side_idle_1", "player_side_idle_2",
-	"player_side_idle_3",
-	"player_down_idle_0", "player_down_idle_1", "player_down_idle_2",
-	"player_down_idle_3", "player_down_idle_4", "player_down_idle_5",
+	"player_side_idle_0", "player_down_idle_0",
 	"player_side_walk_0", "player_side_walk_1", "player_side_walk_2",
 	"player_side_walk_3", "player_side_walk_4", "player_side_walk_5",
-	"player_side_walk_6", "player_side_walk_7",
 	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
 	"player_down_walk_3", "player_down_walk_4", "player_down_walk_5",
-	"player_down_walk_6", "player_down_walk_7",
 	"player_up_walk_0", "player_up_walk_1", "player_up_walk_2",
 	"player_up_walk_3", "player_up_walk_4", "player_up_walk_5",
-	"player_up_walk_6", "player_up_walk_7",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
@@ -177,7 +171,9 @@ const BUILDING_NAMES := {
 const BOARD_POS := Vector2i(75, 17)
 const VILLAGE_REGION := Rect2i(60, 0, 30, 30)
 const ROAD := Rect2i(30, 8, 30, 2)  # 농장 -> 마을 공용 길
-const UI_FONT := preload("res://assets/fonts/Galmuri9.ttf")
+# 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
+const UI_FONT := preload("res://assets/fonts/Galmuri11.ttf")
+const UI_FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
 
 var npcs: Array = []
 
@@ -1142,6 +1138,11 @@ func use_tool() -> void:
 
 
 func interact() -> void:
+	# 동행 중인 우체부 아저씨에게 말 걸기 (진행 단계별 보조 대화)
+	if _postman != null and _postman_state == "follow" \
+			and (player.position - _postman.position).length() < 56.0:
+		_talk_to_postman()
+		return
 	# 가까운 NPC와 대화
 	var npc := nearby_npc()
 	if npc != null:
@@ -1665,6 +1666,26 @@ func _build_house() -> void:
 		GameData.BED_WOOD)
 	hud.quest_toast("집 짓기")
 	save_now()
+
+
+# 동행 중 우체부에게 말을 걸면 지금 단계에 맞는 짧은 안내를 해 준다.
+# 도끼 사용법 설명은 아직 장착 전(equip 단계)에만 나온다 — 이후엔 반복하지 않는다.
+func _talk_to_postman() -> void:
+	match GameData.story_phase:
+		"equip":
+			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+				{"text": "「그건 나무를 베기 위한 도구라네.」"},
+				{"text": "「숲을 지나가려면 그 도끼로 나무를 베어 길을 만들어야 할 걸세.」"},
+				{"text": "「가방(I)을 열어 도끼를 슬롯에 넣으면 쓸 수 있네.」"},
+			], Callable())
+		"chop":
+			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
+				{"text": "「도끼를 챙겼구먼. 앞의 나무를 골라 베어보게.」"},
+			], Callable())
+		_:
+			dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
+				{"text": "「마을은 동쪽일세. 같이 가세나.」"},
+			], Callable())
 
 
 func _story_chief() -> Node2D:
@@ -2893,10 +2914,10 @@ func _draw_overlay() -> void:
 	for ft in float_texts:
 		var a: float = clampf(1.4 - ft.t, 0.0, 1.0)
 		var p: Vector2 = ft.pos + Vector2(0, -ft.t * 26.0)
-		var tw: float = UI_FONT.get_string_size(ft.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		overlay.draw_string_outline(UI_FONT, p + Vector2(-tw / 2.0, 0), ft.text,
+		var tw: float = UI_FONT_SMALL.get_string_size(ft.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+		overlay.draw_string_outline(UI_FONT_SMALL, p + Vector2(-tw / 2.0, 0), ft.text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 3, Color(0.05, 0.04, 0.08, a))
-		overlay.draw_string(UI_FONT, p + Vector2(-tw / 2.0, 0), ft.text,
+		overlay.draw_string(UI_FONT_SMALL, p + Vector2(-tw / 2.0, 0), ft.text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.65, 0.95, 0.5, a))
 
 	_draw_context_hint()
