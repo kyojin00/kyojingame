@@ -17,8 +17,6 @@ const WOOD_TEXT := Color(0.29, 0.16, 0.06)
 
 var main: Node2D
 var msg_timer := 0.0
-var wood_label: Label
-var stone_label: Label
 
 var hotbar_panel: Panel
 var slot_buttons: Array = []
@@ -28,7 +26,7 @@ var _slot_selected: StyleBoxFlat
 @onready var day_label: Label = $ClockPanel/DayLabel
 @onready var clock_label: Label = $ClockPanel/ClockLabel
 @onready var money_label: Label = $ClockPanel/MoneyLabel
-@onready var energy_bar: ProgressBar = $ClockPanel/EnergyBar
+@onready var energy_bar: ProgressBar = $EnergyPanel/EnergyBar
 @onready var msg_label: Label = $Message
 @onready var objective_label: Label = $TrackerPanel/Objective
 @onready var tool_name: Label = $ToolName
@@ -44,12 +42,11 @@ func _wood_style() -> StyleBoxFlat:
 
 
 func _ready() -> void:
-	wood_label = _mk_resource("icon_wood")
-	stone_label = _mk_resource("icon_stone")
 	$ClockPanel/CoinIcon.texture = main.tex["icon_coin"]
-	$ClockPanel/HeartIcon.texture = main.tex["icon_heart"]
+	$EnergyPanel/HeartIcon.texture = main.tex["icon_heart"]
 	$ClockPanel.add_theme_stylebox_override("panel", _wood_style())
 	$TrackerPanel.add_theme_stylebox_override("panel", _wood_style())
+	$EnergyPanel.add_theme_stylebox_override("panel", _wood_style())
 	_build_hotbar()
 
 
@@ -67,20 +64,20 @@ func _build_hotbar() -> void:
 	_slot_selected.set_border_width_all(2)
 
 	var slot_count: int = GameData.tool_slots.size()
-	var slot_w := 40
-	var sep := 3
-	var pad := 9
+	var slot_w := 32
+	var sep := 2
+	var pad := 6
 	var width := slot_count * slot_w + (slot_count - 1) * sep + pad * 2
 	hotbar_panel = Panel.new()
 	hotbar_panel.add_theme_stylebox_override("panel", _wood_style())
-	hotbar_panel.position = Vector2((960 - width) / 2.0, 480.0)
-	hotbar_panel.size = Vector2(width, 58)
+	hotbar_panel.position = Vector2((960 - width) / 2.0, 490.0)
+	hotbar_panel.size = Vector2(width, 44)
 	add_child(hotbar_panel)
 
 	for i in slot_count:
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(slot_w, 40)
-		b.position = Vector2(pad + i * (slot_w + sep), 9)
+		b.custom_minimum_size = Vector2(slot_w, 32)
+		b.position = Vector2(pad + i * (slot_w + sep), 6)
 		b.focus_mode = Control.FOCUS_NONE
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.expand_icon = true  # 텍스처 해상도와 무관하게 버튼 크기에 맞춤
@@ -89,13 +86,6 @@ func _build_hotbar() -> void:
 			var t: String = GameData.tool_slots[slot_i]
 			if t != "" and GameData.is_tool_unlocked(t):
 				main.set_tool(t))
-		if i < 9:
-			var num := Label.new()
-			num.text = str(i + 1)
-			num.position = Vector2(2, -6)
-			num.add_theme_color_override("font_color", Color(0.5, 0.32, 0.14))
-			num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			b.add_child(num)
 		hotbar_panel.add_child(b)
 		slot_buttons.append(b)
 
@@ -112,26 +102,12 @@ func _refresh_hotbar() -> void:
 		b.add_theme_stylebox_override("pressed", _slot_selected)
 
 
-func _mk_resource(icon: String) -> Label:
-	var rect := TextureRect.new()
-	rect.texture = main.tex[icon]
-	rect.stretch_mode = TextureRect.STRETCH_KEEP
-	$Resources.add_child(rect)
-	var l := Label.new()
-	l.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.12))
-	l.add_theme_constant_override("outline_size", 2)
-	$Resources.add_child(l)
-	return l
-
-
 func refresh() -> void:
 	day_label.text = "%s %d일 %s" % [GameData.season_name(), GameData.day_in_season(),
 		GameData.weather_icon(main.weather_now())]
 	clock_label.text = GameData.clock_text()
 	money_label.text = "%dG" % GameData.money
 	energy_bar.value = GameData.energy
-	wood_label.text = str(GameData.wood)
-	stone_label.text = str(GameData.stone)
 
 	# 우측 퀘스트 트래커 (짧은 문구)
 	var track := []
