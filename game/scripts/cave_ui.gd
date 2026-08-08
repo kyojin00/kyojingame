@@ -150,8 +150,8 @@ func _process(delta: float) -> void:
 	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	moving = v != Vector2.ZERO
 	if moving:
-		if absf(v.x) > absf(v.y):
-			pdir = "right" if v.x > 0 else "left"
+		if v.x != 0.0:
+			pdir = "right" if v.x > 0 else "left"  # 대각선 포함 옆모습
 		else:
 			pdir = "down" if v.y > 0 else "up"
 		var np := ppos + v * 170.0 * delta
