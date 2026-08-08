@@ -1543,14 +1543,17 @@ func _show_name_input() -> void:
 
 
 func _start_postman_dialog2() -> void:
-	# 2부: 닉네임으로 부르며 동행 제안 + 도끼 전달 + 퀘스트 확인 방법 안내
+	# 2부: 닉네임으로 부르며 동행 제안 -> 숲을 바라보며 상황 설명 -> 도끼 전달 -> 퀘스트 안내
 	var nm := GameData.player_name
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
 		{"text": "「%s(이)라... 좋은 이름이구먼.」" % nm,
 			"portrait": tex["npc_postman_portrait_happy"]},
 		{"text": "「그렇다면 같이 가는 게 어떻겠나?」"},
 		{"text": "「자네가 길을 만들고, 나는 옆에서 도와주지.」"},
-		{"text": "「%s, 이걸 가져가게.」" % nm, "event": _story_give_axe},
+		{"text": "(우체부 아저씨가 우거진 숲을 잠시 바라본다...)"},
+		{"text": "「이 숲은 나무가 너무 많아서 그냥 지나가기는 힘들겠구먼.」"},
+		{"text": "「안전하게 지나가려면 길을 조금 만들어야 할 것 같네.」"},
+		{"text": "「%s, 이 나무도끼를 한번 사용해보게.」" % nm, "event": _story_give_axe},
 		{"text": "「지금 자네가 해야 할 일은 오른쪽 위에 간단하게 적혀 있을 걸세.」"},
 		{"text": "「자세한 내용을 보고 싶다면 Q 키를 눌러보게.」"},
 	], _end_postman_dialog)
