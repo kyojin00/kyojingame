@@ -374,6 +374,15 @@ func player_tex(part: String) -> String:
 	return ("player_f_" if gender == "f" else "player_") + part
 
 
+func player_side_tex(suffix: String, t: float) -> String:
+	# 옆모습: 남자는 10프레임 풀 걷기 사이클 (12fps), 대기는 숨쉬기 모션
+	if suffix == "idle":
+		return player_idle_tex("side")
+	if gender == "m":
+		return "player_side_walk_%d" % (int(t * 12.0) % 10)
+	return player_tex("side_" + suffix)
+
+
 func player_idle_tex(dirn: String) -> String:
 	# 대기 모션: 남자 옆모습은 5프레임 숨쉬기 애니메이션 (0.4초/프레임)
 	if gender == "m" and dirn == "side":
