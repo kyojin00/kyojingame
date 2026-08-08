@@ -22,7 +22,9 @@ const TOOL_DESC := {
 
 var main: Node2D
 var items_box: VBoxContainer
-var info_label: Label
+var tip_panel: PanelContainer
+var tip_title: Label
+var tip_body: Label
 var _refresh_timer := 0.0
 var _slot_normal: StyleBoxFlat
 var _slot_selected: StyleBoxFlat
@@ -57,28 +59,52 @@ func _ready() -> void:
 	v.add_child(title)
 
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(525, 235)
+	scroll.custom_minimum_size = Vector2(525, 270)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()
 	items_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(items_box)
 
-	info_label = Label.new()
-	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info_label.custom_minimum_size = Vector2(525, 46)
-	info_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	v.add_child(info_label)
-	_show_info("")
+	# 마우스를 따라다니는 아이템 툴팁 카드
+	tip_panel = PanelContainer.new()
+	tip_panel.visible = false
+	tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_panel.z_index = 10
+	var tstyle := StyleBoxFlat.new()
+	tstyle.bg_color = Color(0.1, 0.08, 0.14, 0.98)
+	tstyle.border_color = Color(1, 0.84, 0.37)
+	tstyle.set_border_width_all(2)
+	tstyle.set_corner_radius_all(4)
+	tstyle.set_content_margin_all(8)
+	tip_panel.add_theme_stylebox_override("panel", tstyle)
+	var tv := VBoxContainer.new()
+	tv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tv.add_theme_constant_override("separation", 2)
+	tip_panel.add_child(tv)
+	tip_title = Label.new()
+	tip_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_title.add_theme_color_override("font_color", Color("ffd75e"))
+	tv.add_child(tip_title)
+	tip_body = Label.new()
+	tip_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_body.custom_minimum_size = Vector2(250, 0)
+	tip_body.add_theme_color_override("font_color", Color(0.88, 0.85, 0.95))
+	tv.add_child(tip_body)
+	add_child(tip_panel)
 
 
-func _show_info(text: String) -> void:
-	if text == "":
-		info_label.text = "슬롯에 마우스를 올리면 상세 정보가 나온다"
-		info_label.add_theme_color_override("font_color", Color(0.55, 0.52, 0.68))
-	else:
-		info_label.text = text
-		info_label.add_theme_color_override("font_color", Color(1, 0.93, 0.75))
+func _show_tip(title: String, body: String) -> void:
+	tip_title.text = title
+	tip_body.text = body
+	tip_body.visible = body != ""
+	tip_panel.reset_size()
+	tip_panel.visible = true
+
+
+func _hide_tip() -> void:
+	tip_panel.visible = false
 
 
 func toggle() -> void:
@@ -95,6 +121,11 @@ func close() -> void:
 func _process(delta: float) -> void:
 	if not visible:
 		return
+	if tip_panel.visible:
+		var mp := get_viewport().get_mouse_position()
+		tip_panel.position = Vector2(
+			minf(mp.x + 14.0, 960.0 - tip_panel.size.x - 8.0),
+			minf(mp.y + 16.0, 540.0 - tip_panel.size.y - 8.0))
 	_refresh_timer -= delta
 	if _refresh_timer <= 0.0:
 		_refresh_timer = 0.5
@@ -183,8 +214,9 @@ func _mk_tool_slot(slot_i: int) -> Button:
 			_rebuild())
 	if unlocked:
 		b.mouse_entered.connect(func() -> void:
-			_show_info(TOOL_DESC.get(t, t)))
-		b.mouse_exited.connect(func() -> void: _show_info(""))
+			var parts := str(TOOL_DESC.get(t, t)).split(" — ")
+			_show_tip(parts[0], parts[1] if parts.size() > 1 else ""))
+		b.mouse_exited.connect(func() -> void: _hide_tip())
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var tt: String = GameData.tool_slots[slot_i]
@@ -218,8 +250,10 @@ func _mk_pick_slot(t: String) -> Button:
 	b.add_theme_stylebox_override("normal", _slot_normal)
 	b.add_theme_stylebox_override("hover", _slot_selected)
 	b.add_theme_stylebox_override("pressed", _slot_normal)
-	b.mouse_entered.connect(func() -> void: _show_info(TOOL_DESC.get(t, t)))
-	b.mouse_exited.connect(func() -> void: _show_info(""))
+	b.mouse_entered.connect(func() -> void:
+		var parts := str(TOOL_DESC.get(t, t)).split(" — ")
+		_show_tip(parts[0], parts[1] if parts.size() > 1 else ""))
+	b.mouse_exited.connect(func() -> void: _hide_tip())
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var pv := TextureRect.new()
@@ -264,11 +298,11 @@ func _mk_item_slot(e: Dictionary) -> Control:
 	b.add_theme_stylebox_override("hover", _slot_selected)
 	b.add_theme_stylebox_override("pressed", _slot_normal)
 	if e.is_empty():
-		b.mouse_entered.connect(func() -> void: _show_info(""))
+		b.mouse_entered.connect(func() -> void: _hide_tip())
 		return b
-	b.tooltip_text = str(e.tip)
-	b.mouse_entered.connect(func() -> void: _show_info(str(e.get("info", e.tip))))
-	b.mouse_exited.connect(func() -> void: _show_info(""))
+	b.mouse_entered.connect(func() -> void:
+		_show_tip(str(e.tip), str(e.get("desc", ""))))
+	b.mouse_exited.connect(func() -> void: _hide_tip())
 	if e.has("icon") and main.tex.has(e.icon):
 		b.icon = main.tex[e.icon]
 	else:
@@ -297,35 +331,34 @@ func _item_entries() -> Array:
 	if GameData.wood > 0:
 		out.append({"icon": "icon_wood", "count": GameData.wood,
 			"tip": "목재 x%d" % GameData.wood,
-			"info": "목재 x%d — 나무를 베면 얻는다. 울타리·스프링클러·축사 재료" % GameData.wood})
+			"desc": "나무를 베면 얻는다. 울타리·스프링클러·축사 재료"})
 	if GameData.stone > 0:
 		out.append({"icon": "icon_stone", "count": GameData.stone,
 			"tip": "석재 x%d" % GameData.stone,
-			"info": "석재 x%d — 바위를 캐면 얻는다. 스프링클러·축사 재료" % GameData.stone})
+			"desc": "바위를 캐면 얻는다. 스프링클러·축사 재료"})
 	for id in GameData.CROP_IDS:
 		if GameData.seeds[id] > 0:
 			out.append({"icon": "icon_seed", "count": GameData.seeds[id],
 				"tip": "%s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]],
-				"info": "%s 씨앗 x%d — 밭(호미로 간 땅)에 심자. 수확까지 %d일" %
-					[GameData.CROPS[id].name, GameData.seeds[id], int(GameData.CROPS[id].grow_days)]})
+				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일" % int(GameData.CROPS[id].grow_days)})
 	for id in GameData.CROP_IDS:
 		var n := int(GameData.produce[id])
 		if n > 0:
 			out.append({"icon": "mature_" + id, "count": n,
 				"tip": "%s x%d (개당 %dG)" % [GameData.CROPS[id].name, n,
 					GameData.CROPS[id].sell_price],
-				"info": "%s x%d — 판매가 %dG. 출하 상자에 넣으면 다음 날 아침 정산된다" %
-					[GameData.CROPS[id].name, n, GameData.CROPS[id].sell_price]})
+				"desc": "판매가 %dG · 출하 상자에 넣으면 다음 날 아침 정산된다" %
+					GameData.CROPS[id].sell_price})
 		var ns := int(GameData.produce_silver.get(id, 0))
 		if ns > 0:
 			out.append({"icon": "mature_" + id, "count": ns,
 				"tip": "%s (은품질) x%d" % [GameData.CROPS[id].name, ns],
-				"info": "%s (은품질) x%d — 일반보다 비싸게 팔린다" % [GameData.CROPS[id].name, ns]})
+				"desc": "은품질 — 일반보다 비싸게 팔린다"})
 		var ng := int(GameData.produce_gold.get(id, 0))
 		if ng > 0:
 			out.append({"icon": "mature_" + id, "count": ng,
 				"tip": "%s (금품질) x%d" % [GameData.CROPS[id].name, ng],
-				"info": "%s (금품질) x%d — 최고 품질! 가장 비싸게 팔린다" % [GameData.CROPS[id].name, ng]})
+				"desc": "금품질 — 최고 품질! 가장 비싸게 팔린다"})
 	for id in GameData.ITEM_IDS:
 		var n2 := int(GameData.items[id])
 		if n2 <= 0:
@@ -356,7 +389,6 @@ func _item_entries() -> Array:
 		else:
 			e["color"] = Color(0.85, 0.82, 0.95)
 			extra = "판매가 %dG" % int(def.sell) if int(def.sell) > 0 else ""
-		e["info"] = "%s x%d — %s" % [def.name, n2, extra] if extra != "" \
-			else "%s x%d" % [def.name, n2]
+		e["desc"] = extra
 		out.append(e)
 	return out
