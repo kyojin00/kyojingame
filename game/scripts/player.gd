@@ -10,7 +10,8 @@ var moving := false
 var anim_time := 0.0
 var step_timer := 0.0
 var step_alt := false
-var walked := 0.0  # 튜토리얼 이동 체크용 누적 거리
+var walked := 0.0  # 이동 체크용 누적 거리
+var bumped := false  # 이동하려 했지만 완전히 막혔는가 (스토리 연출용)
 
 @onready var sprite: Sprite2D = $Sprite
 
@@ -41,6 +42,7 @@ func _process(delta: float) -> void:
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
 		v = v * SPEED * GameData.pet_speed_mult() * delta  # 강아지 펫: 이동 속도 증가
+		var before := position
 		# 이미 끼어 있으면(설치물 등) 충돌을 무시하고 빠져나올 수 있게 한다
 		var stuck := _blocked(position)
 		if not _blocked(position + Vector2(v.x, 0)) \
@@ -49,6 +51,7 @@ func _process(delta: float) -> void:
 		if not _blocked(position + Vector2(0, v.y)) \
 				or (stuck and _loose_ok(position + Vector2(0, v.y))):
 			position.y += v.y
+		bumped = (position - before).length() < 0.01
 		anim_time += delta
 		walked += SPEED * delta
 		step_timer -= delta
@@ -58,6 +61,7 @@ func _process(delta: float) -> void:
 			Sound.play_sfx("sfx_step1" if step_alt else "sfx_step0", 0.2)
 	else:
 		step_timer = 0.15
+		bumped = false
 	_update_sprite()
 
 

@@ -380,8 +380,8 @@ var player_name := ""
 # {이름, 해야 하는 일, 스토리} — Q 상세 창과 목록 모두 여기서 가져온다
 const STORY1_QUESTS := [
 	{"name": "숲 안으로 들어가보기",
-		"task": "우거진 숲 안으로 들어가 보자",
-		"story": "새로운 생활을 위해 교진 마을로 향하는 길. 마을 앞이 나무가 빽빽한 숲으로 막혀 있다."},
+		"task": "숲 안으로 들어가 보자",
+		"story": "할아버지가 집으로 가는 길이 힘들 거라고 했던 이유를 이제야 알 것 같다. 그래도 집으로 가기 위해서는 이 숲을 지나가야 한다."},
 	{"name": "우체부 아저씨와의 만남",
 		"task": "우체부 아저씨의 이야기를 듣자",
 		"story": "숲 속에서 우체부 아저씨가 다가와 말을 걸었다. 그도 마을로 가는 길이라고 한다."},
@@ -428,43 +428,49 @@ func player_tex(part: String) -> String:
 
 
 func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 옆모습. 남자: 걷는 중엔 20프레임 걷기만(8fps), 멈추면 숨쉬기 모션.
+	# 옆모습. 남자: 걷는 중엔 8프레임 걷기(12fps), 멈추면 숨쉬기 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("side")
-		return "player_side_walk_%d" % (int(t * 6.0) % 4)
+		return "player_side_walk_%d" % (int(t * 12.0) % 8)
 	if suffix == "idle":
 		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
 
 
 func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 앞모습. 남자: 걷는 중엔 4프레임 걷기(6fps), 멈추면 정지 프레임.
+	# 앞모습. 남자: 걷는 중엔 8프레임 걷기(12fps), 멈추면 숨쉬기 모션.
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("down")
-		return "player_down_walk_%d" % (int(t * 6.0) % 4)
+		return "player_down_walk_%d" % (int(t * 12.0) % 8)
 	if suffix == "idle":
 		return player_tex("down_idle")
 	return player_tex("down_" + suffix)
 
 
 func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 뒷모습. 남자: 걷는 중엔 4프레임 걷기(6fps), 멈추면 정지 프레임.
+	# 뒷모습. 남자: 걷는 중엔 8프레임 걷기(12fps), 멈추면 정지 프레임.
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("up")
-		return "player_up_walk_%d" % (int(t * 6.0) % 4)
+		return "player_up_walk_%d" % (int(t * 12.0) % 8)
 	if suffix == "idle":
 		return player_tex("up_idle")
 	return player_tex("up_" + suffix)
 
 
+# 옆 서기: 4프레임을 왕복(핑퐁)해 6단계 숨쉬기 루프를 만든다
+const SIDE_IDLE_SEQ := [0, 1, 2, 3, 2, 1]
+
+
 func player_idle_tex(dirn: String) -> String:
-	# 대기 모션: 남자 옆/앞모습은 4프레임 숨쉬기 애니메이션 (0.4초/프레임)
-	if gender == "m" and dirn in ["side", "down"]:
-		return "player_%s_idle_%d" % [dirn, int(Time.get_ticks_msec() / 400.0) % 4]
+	# 대기 모션 (0.3초/단계): 앞모습 6프레임, 옆모습 4프레임 핑퐁
+	if gender == "m" and dirn == "down":
+		return "player_down_idle_%d" % (int(Time.get_ticks_msec() / 300.0) % 6)
+	if gender == "m" and dirn == "side":
+		return "player_side_idle_%d" % SIDE_IDLE_SEQ[int(Time.get_ticks_msec() / 300.0) % 6]
 	return player_tex(dirn + "_idle")
 
 
@@ -807,7 +813,7 @@ const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
-	["slept", "집(북서쪽)에 들어가 침대에서 잠자기"],
+	["slept", "집(마을 서쪽)에 들어가 침대에서 잠자기"],
 	["harvest", "다 자란 작물을 수확하자 - 매일 물주기!"],
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],

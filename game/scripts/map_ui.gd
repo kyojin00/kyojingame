@@ -115,10 +115,10 @@ func _draw_map() -> void:
 		_label(rect.get_center() + Vector2(0, 10), "%dG" % GameData.PARCELS[pid].price)
 
 	# 라벨
-	_label(Vector2(ox + 4.0 * CELL, oy + 1.0 * CELL - 2), "우리집")
+	_label(Vector2(ox + 63.0 * CELL, oy + 14.0 * CELL - 2), "우리집")
 	_label(Vector2(ox + 74.0 * CELL, oy + 1.0 * CELL - 2), "마을")
 	_label(Vector2(ox + 73.0 * CELL, oy + 15.0 * CELL - 4), "광장")
-	_label(Vector2(ox + 25.0 * CELL, oy + 13.0 * CELL - 2), "연못")
+	_label(Vector2(ox + 40.0 * CELL, oy + 27.0 * CELL - 2), "호수")
 	_label(Vector2(ox + 50.0 * CELL, oy + 1.0 * CELL - 2), "동굴")
 	_label(Vector2(ox + main.player.position.x / 32.0 * CELL, oy + main.player.position.y / 32.0 * CELL - 8), "내 위치")
 

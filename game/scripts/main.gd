@@ -92,13 +92,16 @@ const TEXTURE_NAMES := [
 	"player_side_idle_0", "player_side_idle_1", "player_side_idle_2",
 	"player_side_idle_3",
 	"player_down_idle_0", "player_down_idle_1", "player_down_idle_2",
-	"player_down_idle_3",
+	"player_down_idle_3", "player_down_idle_4", "player_down_idle_5",
 	"player_side_walk_0", "player_side_walk_1", "player_side_walk_2",
-	"player_side_walk_3",
+	"player_side_walk_3", "player_side_walk_4", "player_side_walk_5",
+	"player_side_walk_6", "player_side_walk_7",
 	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
-	"player_down_walk_3",
+	"player_down_walk_3", "player_down_walk_4", "player_down_walk_5",
+	"player_down_walk_6", "player_down_walk_7",
 	"player_up_walk_0", "player_up_walk_1", "player_up_walk_2",
-	"player_up_walk_3",
+	"player_up_walk_3", "player_up_walk_4", "player_up_walk_5",
+	"player_up_walk_6", "player_up_walk_7",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
@@ -157,7 +160,7 @@ const PARCEL_SIGNS := {
 }
 # 건물 앵커(좌상단 5x4) -> 종류
 const BUILDINGS := {
-	Vector2i(2, 1): "home",      # 우리집 (취침)
+	Vector2i(61, 15): "home",    # 우리집 (취침) — 마을 서쪽, 숲을 지나야 도착한다
 	Vector2i(63, 3): "general",  # 잡화점 (씨앗/판매)
 	Vector2i(70, 3): "ranch",    # 목장 상회 (동물)
 	Vector2i(77, 3): "smith",    # 대장간 (강화)
@@ -1291,8 +1294,6 @@ func _plant_story_forest() -> void:
 			var pos := Vector2i(x, y)
 			if grid[y][x].ground != "grass" or objects.has(pos):
 				continue
-			if x >= 3 and x <= 10 and y <= 7:
-				continue  # 집터 앞 공터 (집은 화면 밖, 문 진입로 확보)
 			if y == STORY_LANE_Y and x <= 7:
 				continue  # 숲 입구 + 우체부 길
 			var h := _hash01(x, y)
@@ -1328,12 +1329,24 @@ func _story_update(delta: float) -> void:
 				quest_ui.close()
 			if story_shot and absf(_story_t - 0.7) < delta:
 				_snap_story("story_forest")
-			# 숲 안으로 일정 거리만 들어가면 퀘스트 1 완료
-			if player_tile().x >= 5 or player.walked >= 160.0 \
-					or (story_shot and _story_t > 0.8):
+			# 숲으로 걷다가 나무에 정면으로 막히는 순간 퀘스트 1 완료
+			var hit_tree := false
+			if player.moving and player.bumped:
+				var dirs := {"down": Vector2i(0, 1), "up": Vector2i(0, -1),
+					"left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
+				var ahead: Variant = objects.get(player_tile() + dirs[player.dir])
+				hit_tree = ahead != null and ahead.kind == "tree"
+			if hit_tree or (story_shot and _story_t > 0.8):
 				GameData.story_phase = "approach"
-				hud.quest_toast("숲 안으로 들어가보기")
-				_spawn_postman()
+				hud.show_message("더 이상 갈 수 없는 길인 것 같다.", 4.0)
+				if story_shot:
+					hud.quest_toast("숲 안으로 들어가보기")
+					_spawn_postman()
+				else:
+					# 자막을 읽을 시간을 준 뒤 완료 처리 + 우체부 등장
+					get_tree().create_timer(1.3).timeout.connect(func() -> void:
+						hud.quest_toast("숲 안으로 들어가보기")
+						_spawn_postman())
 		"approach":
 			_update_postman(delta, story_shot)
 		"equip":
@@ -1778,6 +1791,26 @@ func _end_intro() -> void:
 	hud.visible = true
 	var tw := create_tween()
 	tw.tween_property(fade_rect, "color:a", 0.0, 0.6)
+	# 숲 앞에서 잠시 멈춰 할아버지의 말을 떠올리는 연출 (퀘스트 1은 그 후에 시작)
+	if GameData.story_phase == "enter":
+		tw.tween_callback(_start_forest_monologue)
+
+
+func _start_forest_monologue() -> void:
+	story_cutscene = true
+	dialog.open_seq("나", null, [
+		{"text": "(눈앞에 우거진 숲이 펼쳐져 있다...)"},
+		{"text": "(문득, 할아버지가 하셨던 말이 떠오른다.)"},
+		{"text": "『집으로 가는 길이 조금 힘들 거다.』"},
+		{"text": "(그때는 무슨 뜻인지 몰랐는데...)"},
+		{"text": "(...이제야 알 것 같다.)"},
+		{"text": "(그래도 집으로 가려면, 이 숲을 지나가는 수밖에 없다.)"},
+	], _end_forest_monologue)
+
+
+func _end_forest_monologue() -> void:
+	story_cutscene = false
+	hud.show_message("퀘스트 시작: 숲 안으로 들어가 보자", 6.0)
 
 
 func _skip_tutorial() -> void:
@@ -2821,11 +2854,11 @@ func nav_target() -> Variant:
 		return null  # 숲 구간에서는 화살표를 띄우지 않는다
 	match GameData.tutorial_current_flag():
 		"slept":
-			return Vector2(4 * TILE + 16, 5 * TILE + 16)     # 농장 집 문 앞
+			return Vector2(63 * TILE + 16, 19 * TILE + 16)   # 우리집 문 앞 (마을 서쪽)
 		"shop":
 			return Vector2(65 * TILE + 16, 7 * TILE + 16)    # 마을 잡화점 앞
 		"fish":
-			return Vector2(25 * TILE + 16, 12 * TILE + 16)   # 연못가
+			return Vector2(40 * TILE + 16, 27 * TILE + 16)   # 호수 (숲과 호수 부지)
 		"chop":
 			return _nearest_object_pos("tree")
 		"mine":
