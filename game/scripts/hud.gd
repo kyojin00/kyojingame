@@ -61,7 +61,106 @@ func _ready() -> void:
 	$ClockPanel.add_theme_stylebox_override("panel", _wood_style())
 	$EnergyPanel.add_theme_stylebox_override("panel", _wood_style())
 	_build_tracker_scroll()
+	_build_minimap()
 	_build_hotbar()
+
+
+# ---- 미니맵 (좌측 상단) ----
+#
+# M키 지도는 맵 전체를 보여주고, 이쪽은 **내 주변만** 항상 띄워 둔다.
+# 90x60을 다 담으면 타일이 2px도 안 돼 알아볼 수 없기 때문이다.
+# 안개(가 본 곳만 보이기) 규칙은 M키 지도와 똑같이 map_ui에 맡긴다.
+const MM_TX := 31          # 가로로 보이는 타일 수 (플레이어가 한가운데)
+const MM_TY := 21
+const MM_CELL := 5.0
+const MM_FOG := Color(0.05, 0.05, 0.08)
+
+var minimap_panel: Panel
+var minimap: Control
+
+
+func _build_minimap() -> void:
+	minimap_panel = Panel.new()
+	minimap_panel.add_theme_stylebox_override("panel", _wood_style())
+	minimap_panel.position = Vector2(6, 5)
+	minimap_panel.size = Vector2(MM_TX * MM_CELL + 8, MM_TY * MM_CELL + 8)
+	minimap_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(minimap_panel)
+
+	minimap = Control.new()
+	minimap.position = Vector2(4, 4)
+	minimap.size = Vector2(MM_TX * MM_CELL, MM_TY * MM_CELL)
+	minimap.clip_contents = true
+	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	minimap.draw.connect(_draw_minimap)
+	minimap_panel.add_child(minimap)
+
+
+func _minimap_color(x: int, y: int) -> Color:
+	var cell: Dictionary = main.grid[y][x]
+	if cell.ground == "water":
+		return Color(0.26, 0.45, 0.68)
+	if cell.ground == "path":
+		return Color(0.72, 0.62, 0.44)
+	if cell.ground == "soil":
+		return Color(0.42, 0.31, 0.19)
+	match GameData.season():
+		GameData.WINTER:
+			return Color(0.82, 0.85, 0.9)
+		GameData.FALL:
+			return Color(0.62, 0.5, 0.3)
+	return Color(0.32, 0.52, 0.27)
+
+
+func _draw_minimap() -> void:
+	var pt: Vector2i = main.player_tile()
+	var x0: int = pt.x - MM_TX / 2
+	var y0: int = pt.y - MM_TY / 2
+	minimap.draw_rect(Rect2(Vector2.ZERO, minimap.size), MM_FOG)
+
+	for ty in MM_TY:
+		for tx in MM_TX:
+			var x: int = x0 + tx
+			var y: int = y0 + ty
+			if x < 0 or y < 0 or x >= main.MAP_W or y >= main.MAP_H:
+				continue  # 맵 밖은 안개색 그대로
+			if not main.map_ui._visible_tile(x, y):
+				continue
+			var r := Rect2(tx * MM_CELL, ty * MM_CELL, MM_CELL, MM_CELL)
+			minimap.draw_rect(r, _minimap_color(x, y))
+			var obj: Variant = main.objects.get(Vector2i(x, y))
+			if obj != null:
+				minimap.draw_rect(r, MM_OBJ_COLORS.get(obj.kind, Color(0.5, 0.4, 0.3)))
+
+	# 사람·동물은 점 하나로 (플레이어는 한가운데 흰 점)
+	for n in main.npcs:
+		if n.visible:
+			_mm_dot(n.position, x0, y0, Color(0.97, 0.55, 0.75))
+	for a in main.animals:
+		_mm_dot(a.position, x0, y0, Color(0.97, 0.97, 0.92))
+	var c := Vector2((MM_TX / 2) * MM_CELL, (MM_TY / 2) * MM_CELL)
+	minimap.draw_rect(Rect2(c - Vector2(1, 1), Vector2(MM_CELL + 2, MM_CELL + 2)),
+		Color(0.1, 0.08, 0.06))
+	minimap.draw_rect(Rect2(c, Vector2(MM_CELL, MM_CELL)), Color(1, 1, 1))
+
+
+const MM_OBJ_COLORS := {
+	"tree": Color(0.09, 0.24, 0.1), "worldtree": Color(0.35, 0.7, 0.45),
+	"rock": Color(0.55, 0.55, 0.6), "bigrock": Color(0.45, 0.45, 0.5),
+	"house": Color(0.62, 0.28, 0.2), "art_block": Color(0.62, 0.28, 0.2),
+	"barn": Color(0.66, 0.42, 0.24), "barn_block": Color(0.66, 0.42, 0.24),
+	"bin": Color(0.85, 0.6, 0.25), "board": Color(0.95, 0.8, 0.35),
+	"cave": Color(0.2, 0.16, 0.2), "sign": Color(0.9, 0.76, 0.4),
+	"forage_berry": Color(0.85, 0.3, 0.4), "forage_herb": Color(0.5, 0.8, 0.4),
+	"deco_fountain": Color(0.4, 0.66, 0.85),
+}
+
+
+func _mm_dot(pos: Vector2, x0: int, y0: int, col: Color) -> void:
+	var p := Vector2((pos.x / 32.0 - x0) * MM_CELL, (pos.y / 32.0 - y0) * MM_CELL)
+	if p.x < 0 or p.y < 0 or p.x > minimap.size.x or p.y > minimap.size.y:
+		return
+	minimap.draw_rect(Rect2(p - Vector2(1.5, 1.5), Vector2(4, 4)), col)
 
 
 # ---- 퀘스트 트래커: 픽셀아트 두루마리 ----
@@ -325,6 +424,12 @@ func show_message(text: String, dur := 2.5) -> void:
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	if minimap_panel != null and main != null:
+		# 실내(집·동굴·가게 방)에서는 바깥 지도를 띄우지 않는다
+		minimap_panel.visible = not (main.interior.visible or main.cave.visible
+			or (main.shop_room != null and main.shop_room.visible))
+		if minimap_panel.visible:
+			minimap.queue_redraw()
 	if msg_label.visible:
 		msg_timer -= delta
 		if msg_timer <= 0.0:

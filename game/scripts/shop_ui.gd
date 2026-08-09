@@ -12,6 +12,7 @@ var allowed: Array = TAB_BUTTONS.keys()
 var shop_title := "상점"
 var _head: Label
 var _money: Label
+var _money_icon: TextureRect
 
 @onready var items_box: VBoxContainer = $Panel/V/Scroll/Items
 
@@ -59,12 +60,26 @@ func _style_panel() -> void:
 	v.add_child(_head)
 	v.move_child(_head, 0)
 
+	# 소지금은 동전 아이콘 + 숫자 (글자 'G' 대신 그림으로 읽히게)
+	var mbox := HBoxContainer.new()
+	mbox.alignment = BoxContainer.ALIGNMENT_END
+	mbox.add_theme_constant_override("separation", 4)
+	v.add_child(mbox)
+	v.move_child(mbox, 1)
+
+	_money_icon = TextureRect.new()
+	_money_icon.custom_minimum_size = Vector2(20, 20)
+	_money_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_money_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_money_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mbox.add_child(_money_icon)
+
 	_money = Label.new()
 	_money.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_money.add_theme_font_size_override("font_size", 16)
 	_money.add_theme_color_override("font_color", Color(1, 0.93, 0.72))
-	v.add_child(_money)
-	v.move_child(_money, 1)
+	_money.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mbox.add_child(_money)
 
 	$Panel/V/Scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	items_box.add_theme_constant_override("separation", 3)
@@ -98,9 +113,46 @@ func _style_tabs() -> void:
 	cb.add_theme_stylebox_override("hover", _tab_style(true))
 
 
-# 목록 한 줄: 아이콘 + 이름/설명 + 오른쪽 버튼
+# 값은 글자 대신 아이콘으로 읽힌다: 골드는 동전, 목재는 통나무, 광석은 광석.
+# costs = [["coin", 250], ["wood", 5], ["ore", 3]] 처럼 넘긴다.
+const COST_ICONS := {"coin": "icon_coin", "wood": "icon_wood",
+	"stone": "icon_stone", "ore": "ore"}
+
+
+func _cost_box(costs: Array, enough := true) -> HBoxContainer:
+	var box := HBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	box.alignment = BoxContainer.ALIGNMENT_END
+	for c in costs:
+		var kind: String = c[0]
+		var amount: int = int(c[1])
+		if amount <= 0:
+			continue
+		var ic := TextureRect.new()
+		ic.custom_minimum_size = Vector2(18, 18)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		if main != null and main.tex.has(COST_ICONS[kind]):
+			ic.texture = main.tex[COST_ICONS[kind]]
+		box.add_child(ic)
+		var l := Label.new()
+		l.text = str(amount)
+		l.add_theme_font_size_override("font_size", 15)
+		# 못 사면 붉게 — 무엇이 모자란지 한눈에 보인다
+		l.add_theme_color_override("font_color",
+			Color(1, 0.88, 0.5) if enough else Color(0.95, 0.5, 0.45))
+		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		box.add_child(l)
+		var pad := Control.new()
+		pad.custom_minimum_size = Vector2(6, 0)
+		box.add_child(pad)
+	return box
+
+
+# 목록 한 줄: 아이콘 + 이름/설명 + (값 아이콘) + 오른쪽 버튼
 func _mk_row(icon_name: String, title_text: String, sub_text: String,
-		btn: Button = null) -> PanelContainer:
+		btn: Button = null, costs: Array = []) -> PanelContainer:
 	var wrap := PanelContainer.new()
 	var st := StyleBoxFlat.new()
 	st.bg_color = ROW_BG
@@ -139,8 +191,11 @@ func _mk_row(icon_name: String, title_text: String, sub_text: String,
 		sl.add_theme_color_override("font_color", Color(0.85, 0.78, 0.66))
 		col.add_child(sl)
 
+	if not costs.is_empty():
+		h.add_child(_cost_box(costs, btn == null or not btn.disabled))
+
 	if btn != null:
-		btn.custom_minimum_size = Vector2(120, 30)
+		btn.custom_minimum_size = Vector2(84 if not costs.is_empty() else 120, 30)
 		btn.add_theme_font_size_override("font_size", 15)
 		btn.add_theme_stylebox_override("normal", _tab_style(false))
 		btn.add_theme_stylebox_override("hover", _tab_style(true))
@@ -196,7 +251,9 @@ func _rebuild() -> void:
 	_style_tabs()
 	if _head != null:
 		_head.text = "- %s -" % shop_title
-		_money.text = "소지금 %dG" % GameData.money
+		_money.text = "%d" % GameData.money
+		if main != null and main.tex.has("icon_coin"):
+			_money_icon.texture = main.tex["icon_coin"]
 
 	if tab == "buy":
 		for id in GameData.CROP_IDS:
@@ -204,10 +261,11 @@ func _rebuild() -> void:
 			if GameData.season() not in def.seasons:
 				continue  # 제철 씨앗만 판매
 			var price := GameData.seed_price(id)
-			var b := _mk_button("%dG 구매" % price, _on_buy.bind(id))
+			var b := _mk_button("구매", _on_buy.bind(id))
 			b.disabled = GameData.money < price
 			items_box.add_child(_mk_row("icon_seed", "%s 씨앗" % def.name,
-				"보유 %d개 · 수확까지 %d시간" % [GameData.seeds[id], def.grow_days], b))
+				"보유 %d개 · 수확까지 %d시간" % [GameData.seeds[id], def.grow_days], b,
+				[["coin", price]]))
 		if GameData.merchant_discount():
 			_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
 	elif tab == "sell":
@@ -226,7 +284,8 @@ func _rebuild() -> void:
 			if gold > 0:
 				qtxt += " · 금 %d" % gold
 			items_box.add_child(_mk_row("mature_" + id, "%s x%d" % [def.name, count], qtxt,
-				_mk_button("%dG 전부 판매" % GameData.produce_sell_value(id), _on_sell.bind(id))))
+				_mk_button("전부 판매", _on_sell.bind(id)),
+				[["coin", GameData.produce_sell_value(id)]]))
 		for id in GameData.ITEM_IDS:
 			var count: int = GameData.items[id]
 			if count <= 0 or GameData.ITEMS[id].get("legend", false):
@@ -235,7 +294,8 @@ func _rebuild() -> void:
 			var def: Dictionary = GameData.ITEMS[id]
 			items_box.add_child(_mk_row(id, "%s x%d" % [def.name, count],
 				"개당 %dG" % def.sell,
-				_mk_button("%dG 전부 판매" % (def.sell * count), _on_sell_item.bind(id))))
+				_mk_button("전부 판매", _on_sell_item.bind(id)),
+				[["coin", def.sell * count]]))
 		if not any:
 			_note("팔 수 있는 것이 없다. 수확물·생산물이 여기에 표시된다.")
 	elif tab == "animal":
@@ -245,10 +305,10 @@ func _rebuild() -> void:
 			for a in main.animals:
 				if a.type == id:
 					count += 1
-			var b := _mk_button("%dG 입양" % def.price, _on_buy_animal.bind(id))
+			var b := _mk_button("입양", _on_buy_animal.bind(id))
 			b.disabled = GameData.money < def.price or main.animals.size() >= GameData.max_animals()
 			items_box.add_child(_mk_row("%s_0" % id, "%s x%d" % [def.name, count],
-				"%s 생산" % GameData.ITEMS[def.product].name, b))
+				"%s 생산" % GameData.ITEMS[def.product].name, b, [["coin", def.price]]))
 		_note("동물은 E로 쓰다듬으면 다음 날 아침 생산물을 준다. (최대 %d마리)"
 			% GameData.max_animals())
 
@@ -257,29 +317,30 @@ func _rebuild() -> void:
 			items_box.add_child(_mk_row("barn", "축사 완공!",
 				"동물 %d마리 · 굳은 날 자동 배부름" % GameData.BARN_MAX_ANIMALS))
 		else:
-			var bb := _mk_button("%dG+목재%d"
-				% [GameData.BARN_COST_MONEY, GameData.BARN_COST_WOOD],
-				func() -> void:
+			var bb := _mk_button("건설", func() -> void:
 					main.build_barn()
 					_rebuild())
 			bb.disabled = GameData.money < GameData.BARN_COST_MONEY \
 				or GameData.wood < GameData.BARN_COST_WOOD
 			items_box.add_child(_mk_row("barn", "축사 건설",
-				"동물 %d마리 · 비 오는 날 자동 배부름" % GameData.BARN_MAX_ANIMALS, bb))
+				"동물 %d마리 · 비 오는 날 자동 배부름" % GameData.BARN_MAX_ANIMALS, bb,
+				[["coin", GameData.BARN_COST_MONEY], ["wood", GameData.BARN_COST_WOOD]]))
 
 		_note("— 펫 입양 (한 마리만 데리고 다닌다) —")
 		for pid in GameData.PET_IDS:
 			var pdef: Dictionary = GameData.PETS[pid]
 			var pb: Button
+			var pcost: Array = []
 			if not GameData.owned_pets.has(pid):
-				pb = _mk_button("%dG 입양" % pdef.price, _on_buy_pet.bind(pid))
+				pb = _mk_button("입양", _on_buy_pet.bind(pid))
 				pb.disabled = GameData.money < int(pdef.price)
+				pcost = [["coin", int(pdef.price)]]
 			elif GameData.active_pet == pid:
 				pb = _mk_button("쉬게 하기", _on_select_pet.bind(""))
 			else:
 				pb = _mk_button("데려가기", _on_select_pet.bind(pid))
 			items_box.add_child(_mk_row("pet_%s_0" % pid, str(pdef.name),
-				str(pdef.passive), pb))
+				str(pdef.passive), pb, pcost))
 	elif tab == "codex":
 		_note("— 물고기 도감 —")
 		for f in GameData.FISH:
@@ -323,12 +384,7 @@ func _rebuild() -> void:
 					stat_line))
 				continue
 			var next: Dictionary = levels[level - 1]
-			var cost_text := "%dG" % next.money
-			if int(next.wood) > 0:
-				cost_text += " 목재%d" % next.wood
-			if int(next.ore) > 0:
-				cost_text += " 광석%d" % next.ore
-			var b := _mk_button(cost_text, _on_upgrade.bind(id))
+			var b := _mk_button("강화", _on_upgrade.bind(id))
 			b.disabled = GameData.money < next.money or GameData.wood < next.wood \
 				or GameData.items["ore"] < next.ore
 			var gain := GameData.tool_stat_gain_text(id)
@@ -336,7 +392,9 @@ func _rebuild() -> void:
 			if gain != "":
 				sub = "%s   (%s)" % [next.desc, gain]
 			items_box.add_child(_mk_row(icon,
-				"%s Lv.%d → %d" % [up.name, level, level + 1], sub, b))
+				"%s Lv.%d → %d" % [up.name, level, level + 1], sub, b,
+				[["coin", int(next.money)], ["wood", int(next.wood)],
+				["ore", int(next.ore)]]))
 		_note("광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d · 스프링클러: 목재 %d+석재 %d" % [
 			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD,
 			GameData.SPRINKLER_COST_STONE])

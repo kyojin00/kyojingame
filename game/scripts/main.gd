@@ -176,6 +176,17 @@ const FOUNTAIN := Rect2i(73, 15, 4, 4)     # 광장 중앙 분수
 const FOUNTAIN_DECO := Vector2i(74, 17)    # 분수 조형물 (분수 한가운데)
 const VILLAGE_RIVER_Y := 27                # 마을 남쪽 외곽을 흐르는 강 (2칸)
 const DOCK_Y := 26                         # 강가 낚시터(부두)
+# ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
+# 나무 부두 + 강가 마당 + 표지판/가로등/벤치. 「낚시」 목표는 여기서 진행한다.
+const FISH_YARD_X0 := 71
+const FISH_YARD_X1 := 78
+const PIER_X0 := 73
+const PIER_X1 := 76
+const FISH_SIGN := Vector2i(71, 25)
+const FISH_LAMPS := [Vector2i(72, 25), Vector2i(77, 25)]
+const FISH_BENCH := Vector2i(78, 26)
+const FISH_SPOT := Rect2i(70, 24, 10, 5)   # 이 안이면 「낚시터에 있다」
+const FISH_CLEAR := Rect2i(68, 23, 14, 9)  # 이 안에는 나무/돌을 두지 않는다
 const BOARD_POS := Vector2i(77, 12)        # 광장 게시판 (오늘의 의뢰)
 const PLAZA_LAMPS := [Vector2i(69, 13), Vector2i(80, 13),
 	Vector2i(69, 20), Vector2i(80, 20)]
@@ -518,6 +529,16 @@ func _build_map() -> void:
 				if _nature_clear(pos, "rock"):
 					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 
+	# 낚시터 둘레는 마지막에 비운다 — 나무/돌 그림이 부두와 강을 덮으면 안 된다.
+	# (자연물 배치가 모두 끝난 뒤라야 확실히 비워진다)
+	for p: Vector2i in objects.keys():
+		if FISH_CLEAR.has_point(p):
+			objects.erase(p)
+	objects[FISH_SIGN] = {"kind": "sign", "hp": 0}
+	for p: Vector2i in FISH_LAMPS:
+		objects[p] = {"kind": "deco_lamp", "hp": 0}
+	objects[FISH_BENCH] = {"kind": "deco_bench", "hp": 0}
+
 
 # 교진 마을: 건물은 하나도 짓지 않는다.
 # 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
@@ -553,11 +574,17 @@ func _build_village() -> void:
 	for x in [87, 88]:
 		for y in range(1, VILLAGE_RIVER_Y):
 			grid[y][x].ground = "water"
-	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 부두 (시설은 없다)
-	for x in range(72, 78):
-		grid[DOCK_Y][x].ground = "path"
-	for x in range(73, 77):
-		grid[VILLAGE_RIVER_Y][x].ground = "path"
+	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 나무 부두.
+	# 「낚시」 목표는 여기서 진행한다 (물가는 여러 곳이지만 낚시터는 여기 하나뿐).
+	for x in range(FISH_YARD_X0, FISH_YARD_X1 + 1):
+		for y in [DOCK_Y - 1, DOCK_Y]:
+			grid[y][x].ground = "path"
+	# 부두는 T자 — 강 위 첫 줄을 가로로 깔고, 가운데 두 칸을 한 줄 더 내민다.
+	# 그 끝에 서서 좌우의 물을 보고 낚싯대를 던진다.
+	for x in range(PIER_X0, PIER_X1 + 1):
+		grid[VILLAGE_RIVER_Y][x].ground = "dock"
+	for x in [PIER_X0 + 1, PIER_X1 - 1]:
+		grid[VILLAGE_RIVER_Y + 1][x].ground = "dock"
 	# 강 건너 남쪽 부지로 이어지는 작은 다리
 	for x in [63, 64]:
 		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
@@ -1089,11 +1116,20 @@ func cancel_fishing() -> void:
 	fishing_state = ""
 
 
+func at_fishing_spot() -> bool:
+	return FISH_SPOT.has_point(player_tile())
+
+
 func _start_fishing() -> void:
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H \
 			or grid[t.y][t.x].ground != "water":
 		hud.show_message("물가를 보고 낚싯대를 던지자.")
+		return
+	# 「낚시」 목표를 받은 동안에는 마을 남쪽 낚시터에서 배운다.
+	# (목표를 끝낸 뒤에는 어느 물가에서든 낚을 수 있다)
+	if GameData.tutorial_current_flag() == "fish" and not at_fishing_spot():
+		hud.show_message("마을 남쪽 강가의 낚시터로 가자! 부두에서 낚싯대를 던진다. (지도 M)", 4.0)
 		return
 	if not can_use_tile(t):
 		hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
@@ -1201,6 +1237,20 @@ func _affected_tiles(base: Vector2i) -> Array:
 
 
 # 다 자란 작물은 도구 없이 바로 딴다 (바구니 같은 수확 도구는 없앴다)
+# 지금 든 도구가 이 칸에서 할 일이 있는가 (있으면 수확보다 도구가 먼저)
+func _tool_has_job(t: Vector2i) -> bool:
+	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
+		return false
+	var cell: Dictionary = grid[t.y][t.x]
+	match GameData.tool:
+		"water":
+			# 마른 밭이면 물주기. 작물이 덜 자랐든 다 자랐든 상관없다
+			return cell.ground == "soil" and not bool(cell.watered)
+		"hoe":
+			return bool(cell.dead)  # 시든 작물 정리
+	return false
+
+
 func _try_harvest(t: Vector2i) -> bool:
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return false
@@ -1242,8 +1292,11 @@ func _try_harvest(t: Vector2i) -> bool:
 
 
 func use_tool() -> void:
-	# 수확은 무엇을 들고 있든 된다
-	if _try_harvest(target_tile()):
+	# 수확은 무엇을 들고 있든 된다.
+	# 단 지금 든 도구가 그 칸에서 할 일이 있으면 도구가 먼저다 —
+	# 물뿌리개로 덜 자란 작물에 물을 주려는데 "아직 다 자라지 않았다"로
+	# 막히면 안 된다.
+	if not _tool_has_job(target_tile()) and _try_harvest(target_tile()):
 		return
 	# 그 밖의 도구는 슬롯에 장착하고 직접 선택해 손에 든 상태여야만 쓸 수 있다
 	if not _remote_acting and not GameData.tool_slots.has(GameData.tool):
@@ -1504,6 +1557,15 @@ func use_tool() -> void:
 # 채집·벌목·채광 대상이 되는 것들
 const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
 
+# E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
+const WORK_LOCK_TIME := 0.9
+var _work_lock := 0.0
+
+const FACE_VECS := {
+	"down": Vector2(0, 1), "up": Vector2(0, -1),
+	"left": Vector2(-1, 0), "right": Vector2(1, 0),
+}
+
 
 # 앞으로 못 가게 막고 있는 오브젝트 칸을 찾는다.
 # 그림이 큰 오브젝트는 옆 칸에 있어도 길을 막기 때문에, 앞 칸이 비어 있는데
@@ -1547,6 +1609,12 @@ func interact() -> void:
 	if aim != null and not bool(aim.get("young", false)) \
 			and ((aim.kind == "tree" and GameData.tool == "axe")
 			or (aim.kind in ["rock", "bigrock"] and GameData.tool == "pickaxe")):
+		_work_lock = WORK_LOCK_TIME  # 캐는 중 — 잠시 E는 무조건 도구다
+		use_tool()
+		return
+	# 캐던 나무/돌이 마지막 한 방에 부서져도, 이어 누른 E가 대화로 새지 않는다
+	# (E는 캐기와 말 걸기를 겸하므로 연타 도중 말이 걸리면 곤란하다)
+	if _work_lock > 0.0:
 		use_tool()
 		return
 	# 나무·돌·채집물을 조준하고 있으면 대화보다 채집이 우선이다
@@ -1625,6 +1693,11 @@ func interact() -> void:
 		if obj.kind == "board":
 			_open_quest_board()
 			return
+		if obj.kind == "sign" and t == FISH_SIGN:
+			dialog.open("낚시터", "교진 마을 낚시터.\n\n부두 끝에 서서 강을 보고 낚싯대(E)를 던지면 된다.\n"
+				+ "입질(!)이 오면 다시 E!\n\n붕어 · 잉어 · 메기... 그리고 아주 드물게\n황금잉어가 올라온다고 한다.",
+				[["알겠다", null]])
+			return
 		if obj.kind == "cave":
 			cave.open()
 			return
@@ -1669,12 +1742,24 @@ func _tile_overlaps_player(t: Vector2i) -> bool:
 
 
 func nearby_npc() -> Node2D:
+	# 말은 **바라보는 쪽**에 있는 사람에게만 걸린다.
+	# 옆이나 뒤에 서 있는 사람 때문에 E가 대화로 새면 캐기가 끊긴다.
+	var f: Vector2 = FACE_VECS[player.dir]
+	var best: Node2D = null
+	var best_d := 1e9
 	for n in npcs:
 		if not n.visible:
 			continue  # 집에 들어간 NPC와는 만날 수 없다
-		if (n.position - player.position).length() < 48.0:
-			return n
-	return null
+		var v: Vector2 = n.position - player.position
+		var d := v.length()
+		if d >= 48.0:
+			continue
+		if d > 14.0 and v.normalized().dot(f) < 0.35:
+			continue
+		if d < best_d:
+			best_d = d
+			best = n
+	return best
 
 
 func nearby_animal() -> Node2D:
@@ -3465,6 +3550,7 @@ func _apply_save(d: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_story_update(delta)
+	_work_lock = maxf(_work_lock - delta, 0.0)
 	for ft in float_texts:
 		ft.t += delta
 	float_texts = float_texts.filter(func(ft: Dictionary) -> bool: return ft.t < 1.3)
@@ -3806,13 +3892,24 @@ func _draw() -> void:
 				t = tex["water_%d" % water_frame]
 			elif cell.ground == "soil":
 				t = tex["soil_wet"] if cell.watered else tex["soil_dry"]
-			elif cell.ground == "path":
+			elif cell.ground == "path" or cell.ground == "dock":
 				t = tex["path"]
 			else:
 				t = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
 			# 텍스처 해상도와 무관하게 타일 칸에 맞춰 그린다 (64px 아트 → 1080p에서 1:1)
 			var tile_rect := Rect2(Vector2(x * TILE, y * TILE), Vector2(TILE, TILE))
-			draw_texture_rect(t, tile_rect, false)
+			if cell.ground == "dock":
+				# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
+				draw_texture_rect(tex["water_%d" % water_frame], tile_rect, false)
+				draw_rect(Rect2(tile_rect.position + Vector2(0, 2),
+					Vector2(TILE, TILE - 4)), Color(0.55, 0.38, 0.22))
+				for i in 3:
+					draw_rect(Rect2(tile_rect.position + Vector2(0, 2 + i * 9),
+						Vector2(TILE, 1)), Color(0.38, 0.25, 0.14))
+				draw_rect(Rect2(tile_rect.position + Vector2(0, 2), Vector2(TILE, 2)),
+					Color(0.68, 0.5, 0.3))
+			else:
+				draw_texture_rect(t, tile_rect, false)
 			if cell.crop_id != "":
 				draw_texture_rect(_crop_texture(cell), tile_rect, false)
 
@@ -3912,6 +4009,9 @@ func _context_hint() -> Array:
 				return ["E: 판매", above_tile]
 			"board":
 				return ["E: 의뢰 게시판", above_tile]
+			"sign":
+				if t == FISH_SIGN:
+					return ["E: 낚시터 안내", above_tile]
 			"cave":
 				return ["E: 동굴 탐험", above_tile]
 			"worldtree":
@@ -3948,7 +4048,7 @@ func _context_hint() -> Array:
 			text += " · 물주기!"
 		return [text, above_tile]
 	if cell.ground == "water" and GameData.tool == "rod":
-		return ["Space: 낚시", above_tile]
+		return ["E: 낚시", above_tile]
 	return []
 
 
@@ -4199,7 +4299,13 @@ func _debug_tick() -> void:
 			_send_key_release(KEY_D)
 			player.position = Vector2(88 * TILE + 16, 2 * TILE + 16)  # 맵 끝 배경 확인
 		213: _save_shot("_edge.png")                    # 맵 밖 배경 + 가운데 정렬
-		215: get_tree().quit()
+		214:
+			# 낚시터 (마을 남쪽 강가 부두)
+			player.position = Vector2(74 * TILE + 16, DOCK_Y * TILE + 16)
+			player.dir = "down"
+			set_tool("rod")
+		217: _save_shot("_pier.png")
+		219: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

@@ -22,6 +22,7 @@ var title_label: Label
 var body_label: Label
 var buttons_box: HBoxContainer
 var portrait: TextureRect
+var skip_btn: Button
 
 var _seq: Array = []
 var _seq_idx := -1
@@ -38,6 +39,8 @@ const BOTTOM_MARGIN := 56          # 아래 핫바를 가리지 않는 높이
 const FONT_TITLE := 17
 const FONT_BODY := 17
 const FONT_BTN := 15
+const FONT_SKIP := 13
+const SKIP_W := 76
 const PORTRAIT := 64
 
 
@@ -89,13 +92,36 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", 6)
 	h.add_child(v)
 
+	# 제목 줄: 가운데 화자 이름 + 오른쪽 끝 건너뛰기 버튼.
+	# 버튼이 이름을 밀어내지 않도록 왼쪽에 같은 폭의 빈 칸을 둔다.
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 4)
+	v.add_child(top)
+
+	var lpad := Control.new()
+	lpad.custom_minimum_size = Vector2(SKIP_W, 0)
+	top.add_child(lpad)
+
 	title_label = Label.new()
 	title_label.add_theme_color_override("font_color", Color("ffd75e"))
 	title_label.add_theme_font_size_override("font_size", FONT_TITLE)
 	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(title_label)
+	top.add_child(title_label)
+
+	# 대사가 여러 줄 남았을 때만 보인다 (ESC와 같은 동작)
+	skip_btn = Button.new()
+	skip_btn.text = "건너뛰기 >>"
+	skip_btn.tooltip_text = "이 대화를 건너뛴다 (ESC)"
+	skip_btn.add_theme_font_size_override("font_size", FONT_SKIP)
+	skip_btn.add_theme_color_override("font_color", Color(0.72, 0.68, 0.82))
+	skip_btn.custom_minimum_size = Vector2(SKIP_W, 0)
+	skip_btn.focus_mode = Control.FOCUS_NONE
+	skip_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	skip_btn.visible = false
+	skip_btn.pressed.connect(skip_seq)
+	top.add_child(skip_btn)
 
 	body_label = Label.new()
 	body_label.add_theme_font_size_override("font_size", FONT_BODY)
@@ -119,6 +145,8 @@ func open(title_text: String, body_text: String, buttons: Array,
 		portrait_tex: Texture2D = null) -> void:
 	title_label.text = title_text
 	body_label.text = body_text
+	# 일반 안내창에는 건너뛸 대사가 없다 — 시퀀스가 다시 켜 준다
+	skip_btn.visible = false
 	portrait.texture = portrait_tex
 	portrait.visible = portrait_tex != null
 	for c in buttons_box.get_children():
@@ -204,6 +232,20 @@ func _advance_seq() -> void:
 		btns = [["대화 끝", _end_seq]]
 	open(str(e.get("name", _seq_name)), str(e.text), btns,
 		e.get("portrait", _seq_portrait))
+	skip_btn.visible = _can_skip()
+
+
+# 건너뛰기는 "남은 대사를 접는" 기능이다. 그래서
+#  - 마지막 대사(더 접을 게 없다)에는 보이지 않고
+#  - 남은 대사에 선택지가 있으면 그 선택을 건너뛸 수 없으므로 숨긴다
+func _can_skip() -> bool:
+	if _seq_idx < 0 or _seq_idx >= _seq.size() - 1:
+		return false
+	for i in range(_seq_idx + 1, _seq.size()):
+		var e: Dictionary = _seq[i]
+		if e.has("choices"):
+			return false
+	return true
 
 
 func skip_seq() -> void:

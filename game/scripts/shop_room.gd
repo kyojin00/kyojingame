@@ -10,7 +10,7 @@ extends CanvasLayer
 
 const ROOM := Rect2(120, 75, 720, 384)   # 방 전체 (벽 포함)
 const FLOOR_TOP := 156.0                 # 벽 아래부터 바닥
-const COUNTER := Rect2(276, 186, 408, 54)
+const COUNTER := Rect2(276, 252, 408, 54)  # 주인이 뒤에 설 자리를 벽 아래에 남긴다
 const EXIT_X := Vector2(432, 528)        # 아랫벽 문 구간
 
 const ROOMS := {
@@ -175,26 +175,47 @@ func _update_sprite() -> void:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
-	player_sprite.position = ppos + Vector2(-16, -47)
+	# 원본은 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
+	# (예전 값은 몸통을 ppos에 두어 발이 방 밖으로 삐져나왔다)
+	player_sprite.position = ppos + Vector2(-32, -95)
 
 
 func _draw_room() -> void:
 	var d := _def()
 	var wall: Color = d.wall
-	# 벽
+	var f: Font = main.UI_FONT
+
+	# ---- 벽 ----
 	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, FLOOR_TOP - ROOM.position.y)),
 		wall)
-	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, 8)), wall.darkened(0.35))
-	# 간판
-	var sign_rect := Rect2(ROOM.position.x + 24, 92, 230, 44)   # 주인과 겹치지 않게 왼쪽 벽
-	canvas.draw_rect(sign_rect, wall.darkened(0.45))
-	canvas.draw_rect(sign_rect.grow(-4), wall.lightened(0.25))
-	var f: Font = main.UI_FONT
+	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, 10)), wall.darkened(0.4))
+	# 벽 아래 굽도리 — 벽과 바닥의 경계를 또렷하게
+	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP - 12, ROOM.size.x, 12),
+		wall.darkened(0.22))
+	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP - 12, ROOM.size.x, 3),
+		wall.lightened(0.18))
+
+	# 창문 두 개 (좌우 대칭)
+	for wx in [ROOM.position.x + 74.0, ROOM.end.x - 194.0]:
+		var wr := Rect2(wx, 96, 120, 40)
+		canvas.draw_rect(wr.grow(4), wall.darkened(0.45))
+		canvas.draw_rect(wr, Color(0.55, 0.72, 0.85))
+		canvas.draw_rect(Rect2(wr.position, Vector2(wr.size.x, 12)), Color(0.68, 0.82, 0.92))
+		canvas.draw_rect(Rect2(wr.get_center().x - 2, wr.position.y, 4, wr.size.y),
+			wall.darkened(0.4))
+		canvas.draw_rect(Rect2(wr.position.x, wr.get_center().y - 2, wr.size.x, 4),
+			wall.darkened(0.4))
+
+	# 가운데 간판 (주인은 그 아래 계산대 뒤에 선다)
+	var sign_rect := Rect2(360, 88, 240, 48)
+	canvas.draw_rect(sign_rect.grow(3), Color(0.16, 0.11, 0.07))
+	canvas.draw_rect(sign_rect, wall.darkened(0.42))
+	canvas.draw_rect(sign_rect.grow(-5), wall.lightened(0.22))
 	var tw: float = f.get_string_size(str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-	canvas.draw_string(f, Vector2(sign_rect.get_center().x - tw / 2.0, 124),
+	canvas.draw_string(f, Vector2(sign_rect.get_center().x - tw / 2.0, 122),
 		str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
 
-	# 바닥 (타일)
+	# ---- 바닥 ----
 	var floor_c: Color = d.floor
 	var y := FLOOR_TOP
 	var row := 0
@@ -210,27 +231,47 @@ func _draw_room() -> void:
 			col += 1
 		y += h
 		row += 1
+	# 벽 그림자 (바닥 위쪽을 살짝 어둡게 — 실내 느낌)
+	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP, ROOM.size.x, 14),
+		Color(0, 0, 0, 0.16))
+
+	# 계산대 앞 깔개 — 손님이 서는 자리를 알려 준다
+	var rug := Rect2(348, 320, 264, 96)
+	canvas.draw_rect(rug, Color(0.62, 0.26, 0.24, 0.55))
+	canvas.draw_rect(rug.grow(-8), Color(0.75, 0.38, 0.32, 0.5))
+	canvas.draw_rect(rug, Color(0.35, 0.16, 0.14, 0.5), false, 2.0)
 
 	_draw_deco(str(d.deco), wall)
 
-	# 계산대
+	# ---- 계산대 ----
+	canvas.draw_rect(Rect2(COUNTER.position.x, COUNTER.end.y, COUNTER.size.x, 10),
+		Color(0, 0, 0, 0.22))                                   # 바닥 그림자
 	canvas.draw_rect(COUNTER.grow(2), Color(0.2, 0.14, 0.1))
 	canvas.draw_rect(COUNTER, d.counter)
-	canvas.draw_rect(Rect2(COUNTER.position, Vector2(COUNTER.size.x, 8)),
-		Color(d.counter).lightened(0.3))
+	canvas.draw_rect(Rect2(COUNTER.position, Vector2(COUNTER.size.x, 9)),
+		Color(d.counter).lightened(0.32))                       # 상판 하이라이트
+	for i in 6:                                                 # 앞면 판자 이음매
+		canvas.draw_rect(Rect2(COUNTER.position.x + 24 + i * 64, COUNTER.position.y + 12,
+			2, COUNTER.size.y - 14), Color(d.counter).darkened(0.28))
 
-	# 주인 (계산대 뒤)
+	# ---- 주인 (계산대 뒤) ----
 	var kt := "npc_%s_down_0" % str(d.keeper)
 	if main.tex.has(kt):
+		canvas.draw_rect(Rect2(COUNTER.get_center().x - 26, COUNTER.position.y - 8, 52, 10),
+			Color(0, 0, 0, 0.2))                                # 발밑 그림자
 		canvas.draw_texture_rect(main.tex[kt],
-			Rect2(COUNTER.get_center().x - 32, COUNTER.position.y - 96, 64, 96), false)
+			Rect2(COUNTER.get_center().x - 32, COUNTER.position.y - 100, 64, 96), false)
 
-	# 아랫문
-	canvas.draw_rect(Rect2(EXIT_X.x, ROOM.end.y - 10, EXIT_X.y - EXIT_X.x, 10),
-		Color(0.35, 0.24, 0.14))
-	var ew: float = f.get_string_size("나가기", HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-	canvas.draw_string(f, Vector2((EXIT_X.x + EXIT_X.y) / 2.0 - ew / 2.0, ROOM.end.y + 18),
-		"나가기", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.8, 0.75, 0.7))
+	# ---- 아랫문 (문틀 + 매트) ----
+	var dw: float = EXIT_X.y - EXIT_X.x
+	canvas.draw_rect(Rect2(EXIT_X.x - 6, ROOM.end.y - 16, dw + 12, 16),
+		Color(0.24, 0.16, 0.1))
+	canvas.draw_rect(Rect2(EXIT_X.x, ROOM.end.y - 12, dw, 12), Color(0.45, 0.31, 0.18))
+	canvas.draw_rect(Rect2(EXIT_X.x + 12, ROOM.end.y - 34, dw - 24, 20),
+		Color(0.38, 0.3, 0.24, 0.75))                           # 현관 매트
+	var ew: float = f.get_string_size("나가기 ▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+	canvas.draw_string(f, Vector2((EXIT_X.x + EXIT_X.y) / 2.0 - ew / 2.0, ROOM.end.y + 20),
+		"나가기 ▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.8, 0.74))
 
 	if _at_counter():
 		var ht := "E: %s" % str(d.hint)
@@ -266,11 +307,11 @@ func _draw_deco(kind: String, wall: Color) -> void:
 					Color(0.7, 0.58, 0.22))
 			canvas.draw_rect(Rect2(716, 220, 92, 80), Color(0.5, 0.36, 0.2))    # 여물통
 		"crate":
-			for i in 3:
-				var cx := 150.0 + i * 60.0
-				canvas.draw_rect(Rect2(cx, 300, 54, 44), Color(0.55, 0.42, 0.28))
-				canvas.draw_rect(Rect2(cx + 4, 292, 46, 12), Color(0.7, 0.85, 0.95))
-			canvas.draw_rect(Rect2(716, 296, 92, 48), Color(0.55, 0.42, 0.28))
+			for i in 2:
+				var cx := 152.0 + i * 60.0
+				canvas.draw_rect(Rect2(cx, 320, 52, 44), Color(0.55, 0.42, 0.28))
+				canvas.draw_rect(Rect2(cx + 4, 312, 44, 12), Color(0.7, 0.85, 0.95))
+			canvas.draw_rect(Rect2(716, 320, 92, 48), Color(0.55, 0.42, 0.28))
 		"mail":
 			for i in 4:
 				for j in 3:
