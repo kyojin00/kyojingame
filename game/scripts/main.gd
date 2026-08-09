@@ -4029,7 +4029,9 @@ func _debug_tick() -> void:
 			GameData.tool_level["axe"] = 2
 		146: inventory_ui.hover_stat_tool()             # 장비 능력치 툴팁 확인
 		148: _save_shot("_inv.png")
-		150:
+		149: inventory_ui.show_tab("res")               # 자원 탭 확인
+		151: _save_shot("_inv2.png")
+		152:
 			inventory_ui.close()
 			GameData.owned_pets = ["dog"]              # 펫 확인
 			GameData.active_pet = "dog"

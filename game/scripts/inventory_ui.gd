@@ -32,6 +32,12 @@ var _slot_moving: StyleBoxFlat
 var _move_from := -1  # 우클릭으로 이동 중인 슬롯 (-1 = 없음)
 var _hover_slots: Array = []  # 툴팁 판정용 [{b, tool, title, body}]
 var _forced_tip := ""         # 검증 하네스에서 툴팁을 고정할 도구 id
+# 탭: 한 번에 한 종류만 보여 준다 (아이템이 늘어나도 밀리지 않게)
+const TABS := [
+	["tool", "도구"], ["seed", "씨앗"], ["crop", "작물"],
+	["res", "자원"], ["food", "요리"],
+]
+var _tab := "tool"
 
 
 func _ready() -> void:
@@ -41,7 +47,7 @@ func _ready() -> void:
 	# 가죽 가방을 펼친 듯한 패널 (덮개 + 버클 + 재봉선)
 	var panel := PanelContainer.new()
 	panel.position = Vector2(203, 92)
-	panel.custom_minimum_size = Vector2(555, 345)
+	panel.custom_minimum_size = Vector2(555, 384)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.55, 0.36, 0.2, 0.98)
 	style.border_color = Color(0.29, 0.18, 0.09)
@@ -98,6 +104,7 @@ func _ready() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(525, 270)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()
 	items_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -180,7 +187,17 @@ func close() -> void:
 
 # 검증 하네스용: 능력치가 있는 도구의 툴팁을 띄워 둔다
 # (헤드리스에서는 마우스를 옮겨도 커서 위치가 갱신되지 않는다)
+# 검증 하네스용: 탭을 바꿔 캡처한다
+func show_tab(id: String) -> void:
+	_forced_tip = ""
+	_hide_tip()
+	_tab = id
+	_rebuild()
+
+
 func hover_stat_tool() -> void:
+	_tab = "tool"
+	_rebuild()
 	for h in _hover_slots:
 		if GameData.TOOL_STATS.has(str(h.get("tool", ""))):
 			_forced_tip = str(h.tool)
@@ -259,26 +276,171 @@ func _rebuild() -> void:
 		tool_row.add_child(_mk_tool_slot(i))
 	items_box.add_child(tool_row)
 
-	# 보유 도구: 여기서 드래그해서 슬롯에 넣는다
-	_line("[보유 도구]  드래그해서 위 슬롯이나 하단바에 넣기", Color(0.65, 0.85, 0.6))
-	var pick_row := HBoxContainer.new()
-	pick_row.add_theme_constant_override("separation", 4)
-	for t in TOOLS:
-		if GameData.is_tool_unlocked(t):
-			pick_row.add_child(_mk_pick_slot(t))
-	items_box.add_child(pick_row)
-
 	_line("소지금 %dG" % GameData.money, Color("ffd75e"))
 
-	# 아이템 그리드 (12 x 4): 얻은 것들이 자동으로 채워진다
-	var entries := _item_entries()
-	var grid := GridContainer.new()
-	grid.columns = 12
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
-	for i in 48:
-		grid.add_child(_mk_item_slot(entries[i] if i < entries.size() else {}))
-	items_box.add_child(grid)
+	# 탭 줄
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 4)
+	for pair in TABS:
+		tabs.add_child(_mk_tab_button(str(pair[0]), str(pair[1])))
+	items_box.add_child(tabs)
+
+	var sep := ColorRect.new()
+	sep.color = Color(0.29, 0.18, 0.09)
+	sep.custom_minimum_size = Vector2(0, 2)
+	items_box.add_child(sep)
+
+	# 탭 내용
+	if _tab == "tool":
+		_line("드래그해서 위 슬롯이나 하단바에 넣기", Color(0.35, 0.22, 0.1))
+		var any := false
+		for t in TOOLS:
+			if not GameData.is_tool_unlocked(t):
+				continue
+			any = true
+			items_box.add_child(_mk_tool_row(t))
+		if not any:
+			_line("아직 가진 도구가 없다.", Color(0.35, 0.22, 0.1))
+		return
+
+	var rows := 0
+	for e in _item_entries():
+		if str(e.get("tab", "res")) != _tab:
+			continue
+		rows += 1
+		items_box.add_child(_mk_item_row(e))
+	if rows == 0:
+		_line("여기에 담긴 것이 없다.", Color(0.35, 0.22, 0.1))
+
+
+func _mk_tab_button(id: String, label: String) -> Button:
+	var b := Button.new()
+	b.text = label
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(90, 26)
+	b.add_theme_font_size_override("font_size", 15)
+	var on := id == _tab
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.28, 0.19, 0.1) if on else Color(0.42, 0.29, 0.16)
+	st.border_color = Color(1, 0.84, 0.37) if on else Color(0.29, 0.18, 0.09)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(4)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st)
+	b.add_theme_stylebox_override("pressed", st)
+	b.add_theme_color_override("font_color",
+		Color(1, 0.9, 0.6) if on else Color(0.9, 0.85, 0.78))
+	b.pressed.connect(func() -> void:
+		_tab = id
+		Sound.play_sfx("sfx_ui")
+		_rebuild())
+	return b
+
+
+# 한 줄짜리 목록 칸 (아이콘 + 이름 + 오른쪽 값)
+func _mk_row(icon: Texture2D, name_text: String, right_text: String,
+		name_color := Color(0.96, 0.93, 0.88)) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(0, 34)
+	b.focus_mode = Control.FOCUS_NONE
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.35, 0.23, 0.12, 0.55)
+	st.set_corner_radius_all(3)
+	st.set_content_margin_all(4)
+	var st2 := st.duplicate()
+	st2.bg_color = Color(0.5, 0.34, 0.18, 0.85)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st2)
+	b.add_theme_stylebox_override("pressed", st2)
+
+	var h := HBoxContainer.new()
+	h.set_anchors_preset(Control.PRESET_FULL_RECT)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_theme_constant_override("separation", 8)
+	h.offset_left = 6
+	h.offset_right = -6
+	b.add_child(h)
+
+	if icon != null:
+		var ic := TextureRect.new()
+		ic.custom_minimum_size = Vector2(28, 28)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.texture = icon
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(ic)
+	else:
+		# 아직 그림이 없는 아이템은 이름 첫 글자로 대신한다
+		var ph := Label.new()
+		ph.custom_minimum_size = Vector2(28, 28)
+		ph.text = name_text.left(1)
+		ph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ph.add_theme_color_override("font_color", name_color)
+		ph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(ph)
+
+	var nl := Label.new()
+	nl.text = name_text
+	nl.clip_text = true          # 이름이 길어도 창을 밀지 않는다
+	nl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nl.add_theme_font_size_override("font_size", 16)
+	nl.add_theme_color_override("font_color", name_color)
+	nl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(nl)
+
+	var rl := Label.new()
+	rl.text = right_text
+	rl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	rl.add_theme_font_size_override("font_size", 16)
+	rl.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
+	rl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(rl)
+	return b
+
+
+func _mk_tool_row(t: String) -> Button:
+	var st: Dictionary = GameData.tool_stats(t)
+	var right := ""
+	if GameData.TOOL_STATS.has(t):
+		right = "위력 %s · 범위 %s" % [
+			GameData.fmt_stat(st.power), GameData.fmt_stat(st.reach)]
+	var lv: int = int(GameData.tool_level.get(t, 1))
+	var nm: String = GameData.TOOL_KOR.get(t, t)
+	if GameData.TOOL_STATS.has(t):
+		nm += "  Lv.%d" % lv
+	var b := _mk_row(main.hud.tool_icon(t), nm, right)
+	var tip := _tool_tip(t)
+	_hover_slots.append({"b": b, "tool": t, "title": tip.title, "body": tip.body})
+	b.pressed.connect(func() -> void:
+		main.set_tool(t)
+		_rebuild())
+	b.set_drag_forwarding(
+		func(_pos: Vector2) -> Variant:
+			var pv := TextureRect.new()
+			pv.texture = main.hud.tool_icon(t)
+			pv.custom_minimum_size = Vector2(36, 36)
+			pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			pv.stretch_mode = TextureRect.STRETCH_SCALE
+			b.set_drag_preview(pv)
+			return {"kind": "tool_pick", "tool": t},
+		func(_pos: Vector2, _data: Variant) -> bool: return false,
+		func(_pos: Vector2, _data: Variant) -> void: pass)
+	return b
+
+
+func _mk_item_row(e: Dictionary) -> Button:
+	var icon: Texture2D = null
+	if e.has("icon") and main.tex.has(e.icon):
+		icon = main.tex[e.icon]
+	var right := "x%d" % int(e.count)
+	if int(e.get("sell", 0)) > 0:
+		right = "x%d   %dG" % [int(e.count), int(e.sell)]
+	var b := _mk_row(icon, str(e.name), right, e.get("color", Color(0.96, 0.93, 0.88)))
+	_hover_slots.append({"b": b, "title": str(e.tip), "body": str(e.get("desc", ""))})
+	return b
 
 
 func _mk_tool_slot(slot_i: int) -> Button:
@@ -339,32 +501,6 @@ func _mk_tool_slot(slot_i: int) -> Button:
 	return b
 
 
-func _mk_pick_slot(t: String) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(40, 40)
-	b.focus_mode = Control.FOCUS_NONE
-	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.expand_icon = true
-	b.icon = main.hud.tool_icon(t)
-	b.add_theme_stylebox_override("normal", _slot_normal)
-	b.add_theme_stylebox_override("hover", _slot_selected)
-	b.add_theme_stylebox_override("pressed", _slot_normal)
-	var tip := _tool_tip(t)
-	_hover_slots.append({"b": b, "tool": t, "title": tip.title, "body": tip.body})
-	b.set_drag_forwarding(
-		func(_pos: Vector2) -> Variant:
-			var pv := TextureRect.new()
-			pv.texture = main.hud.tool_icon(t)
-			pv.custom_minimum_size = Vector2(36, 36)
-			pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			pv.stretch_mode = TextureRect.STRETCH_SCALE
-			b.set_drag_preview(pv)
-			return {"kind": "tool_pick", "tool": t},
-		func(_pos: Vector2, _data: Variant) -> bool: return false,
-		func(_pos: Vector2, _data: Variant) -> void: pass)
-	return b
-
-
 func _place_tool(t: String, slot_i: int) -> void:
 	# 같은 도구가 다른 칸에 있으면 그 칸을 비운다 (중복 방지)
 	for i in GameData.tool_slots.size():
@@ -385,104 +521,78 @@ func _swap_slots(from_i: int, to_i: int) -> void:
 	_rebuild()
 
 
-func _mk_item_slot(e: Dictionary) -> Control:
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(40, 40)
-	b.focus_mode = Control.FOCUS_NONE
-	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	b.expand_icon = true
-	b.add_theme_stylebox_override("normal", _slot_normal)
-	b.add_theme_stylebox_override("hover", _slot_selected)
-	b.add_theme_stylebox_override("pressed", _slot_normal)
-	if e.is_empty():
-		return b
-	_hover_slots.append({"b": b, "title": str(e.tip), "body": str(e.get("desc", ""))})
-	if e.has("icon") and main.tex.has(e.icon):
-		b.icon = main.tex[e.icon]
-	else:
-		var tag := Label.new()
-		tag.text = str(e.label)
-		tag.position = Vector2(11, 4)
-		tag.add_theme_color_override("font_color", e.get("color", Color(0.9, 0.88, 0.95)))
-		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		b.add_child(tag)
-	var cnt := Label.new()
-	cnt.text = str(e.count)
-	cnt.add_theme_font_size_override("font_size", 16)
-	cnt.position = Vector2(18, 20)
-	cnt.size = Vector2(20, 18)
-	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	cnt.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
-	cnt.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.08))
-	cnt.add_theme_constant_override("outline_size", 3)
-	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(cnt)
-	return b
-
-
 func _item_entries() -> Array:
+	# 각 항목: tab(어느 탭에 들어가는지) · name · count · sell · icon · tip · desc
 	var out: Array = []
 	if GameData.wood > 0:
-		out.append({"icon": "icon_wood", "count": GameData.wood,
-			"tip": "목재 x%d" % GameData.wood,
+		out.append({"tab": "res", "icon": "icon_wood", "name": "목재",
+			"count": GameData.wood, "tip": "목재 x%d" % GameData.wood,
 			"desc": "나무를 베면 얻는다. 울타리·스프링클러·축사 재료"})
 	if GameData.stone > 0:
-		out.append({"icon": "icon_stone", "count": GameData.stone,
-			"tip": "석재 x%d" % GameData.stone,
+		out.append({"tab": "res", "icon": "icon_stone", "name": "석재",
+			"count": GameData.stone, "tip": "석재 x%d" % GameData.stone,
 			"desc": "바위를 캐면 얻는다. 스프링클러·축사 재료"})
 	for id in GameData.CROP_IDS:
 		if GameData.seeds[id] > 0:
-			out.append({"icon": "icon_seed", "count": GameData.seeds[id],
+			out.append({"tab": "seed", "icon": "icon_seed",
+				"name": "%s 씨앗" % GameData.CROPS[id].name, "count": GameData.seeds[id],
 				"tip": "%s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]],
-				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일" % int(GameData.CROPS[id].grow_days)})
+				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일"
+					% int(GameData.CROPS[id].grow_days)})
 	for id in GameData.CROP_IDS:
+		var def: Dictionary = GameData.CROPS[id]
 		var n := int(GameData.produce[id])
 		if n > 0:
-			out.append({"icon": "mature_" + id, "count": n,
-				"tip": "%s x%d (개당 %dG)" % [GameData.CROPS[id].name, n,
-					GameData.CROPS[id].sell_price],
-				"desc": "판매가 %dG · 출하 상자에 넣으면 다음 날 아침 정산된다" %
-					GameData.CROPS[id].sell_price})
+			out.append({"tab": "crop", "icon": "mature_" + id, "name": str(def.name),
+				"count": n, "sell": int(def.sell_price),
+				"tip": "%s x%d (개당 %dG)" % [def.name, n, def.sell_price],
+				"desc": "출하 상자에 넣으면 다음 날 아침 정산된다"})
 		var ns := int(GameData.produce_silver.get(id, 0))
 		if ns > 0:
-			out.append({"icon": "mature_" + id, "count": ns,
-				"tip": "%s (은품질) x%d" % [GameData.CROPS[id].name, ns],
-				"desc": "은품질 — 일반보다 비싸게 팔린다"})
+			out.append({"tab": "crop", "icon": "mature_" + id,
+				"name": "%s (은)" % def.name, "count": ns,
+				"sell": int(def.sell_price * 1.25), "color": Color(0.85, 0.88, 0.95),
+				"tip": "%s (은품질) x%d" % [def.name, ns],
+				"desc": "은품질 — 일반보다 비싸게 팔린다 (1.25배)"})
 		var ng := int(GameData.produce_gold.get(id, 0))
 		if ng > 0:
-			out.append({"icon": "mature_" + id, "count": ng,
-				"tip": "%s (금품질) x%d" % [GameData.CROPS[id].name, ng],
-				"desc": "금품질 — 최고 품질! 가장 비싸게 팔린다"})
+			out.append({"tab": "crop", "icon": "mature_" + id,
+				"name": "%s (금)" % def.name, "count": ng,
+				"sell": int(def.sell_price * 1.5), "color": Color(1.0, 0.88, 0.45),
+				"tip": "%s (금품질) x%d" % [def.name, ng],
+				"desc": "금품질 — 최고 품질! 가장 비싸게 팔린다 (1.5배)"})
 	for id in GameData.ITEM_IDS:
 		var n2 := int(GameData.items[id])
 		if n2 <= 0:
 			continue
-		var def: Dictionary = GameData.ITEMS[id]
-		var e := {"count": n2, "tip": "%s x%d" % [def.name, n2],
-			"label": str(def.name).left(1)}
+		var idef: Dictionary = GameData.ITEMS[id]
+		var e := {"tab": "res", "name": str(idef.name), "count": n2,
+			"sell": int(idef.get("sell", 0)),
+			"tip": "%s x%d" % [idef.name, n2]}
 		for cand in [id, id + "_0", "forage_" + id]:
 			if main.tex.has(cand):
 				e["icon"] = cand
 				break
-		var extra := ""
-		if bool(def.get("legend", false)):
+		if bool(idef.get("legend", false)):
 			e["color"] = Color(1.0, 0.85, 0.4)
-			extra = "전설의 재료 — 연구 노트의 마지막 연금술에 쓰인다 (판매 불가)"
+			e["sell"] = 0
+			e["desc"] = "전설의 재료 — 연구 노트의 마지막 연금술에 쓰인다 (판매 불가)"
 		elif id.begins_with("fish_"):
+			e["tab"] = "food"
 			e["color"] = Color(0.5, 0.75, 1.0)
-			extra = "낚시로 잡은 물고기 · 판매가 %dG" % int(def.sell)
+			e["desc"] = "낚시로 잡은 물고기"
 		elif id.begins_with("dish_"):
+			e["tab"] = "food"
 			e["color"] = Color(1.0, 0.75, 0.4)
-			extra = "요리 — 먹으면 체력을 회복한다 · 판매가 %dG" % int(def.sell)
+			e["desc"] = "요리 — 먹으면 체력을 회복한다"
 		elif id in ["ore", "gem", "star_ore", "ghost_essence"]:
 			e["color"] = Color(0.8, 0.8, 0.9)
-			extra = "동굴에서 얻었다 · 판매가 %dG" % int(def.sell)
+			e["desc"] = "동굴에서 얻었다"
 		elif id in ["egg", "milk"]:
 			e["color"] = Color(0.95, 0.9, 0.8)
-			extra = "축사 동물이 준 선물 · 판매가 %dG" % int(def.sell)
+			e["desc"] = "축사 동물이 준 선물"
 		else:
 			e["color"] = Color(0.85, 0.82, 0.95)
-			extra = "판매가 %dG" % int(def.sell) if int(def.sell) > 0 else ""
-		e["desc"] = extra
+			e["desc"] = "채집·수집품"
 		out.append(e)
 	return out
