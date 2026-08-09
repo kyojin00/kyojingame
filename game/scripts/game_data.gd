@@ -473,7 +473,7 @@ func story_objective_short() -> String:
 			return "흙길을 막고 선 나무를 베어보자"
 		"path":
 			if story_gates_left > 0:
-				return "흙길을 막은 나무를 베며 나아가자 (남은 나무 %d그루)" % story_gates_left
+				return "길을 막은 나무를 베며 나아가자 (남은 길목 %d곳)" % story_gates_left
 			return "열린 숲길을 따라 갈림길까지 가자"
 		"map":
 			return "M 키를 눌러 지도를 열어 보자"
