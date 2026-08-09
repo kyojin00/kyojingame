@@ -76,6 +76,7 @@ var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
 var cave: CanvasLayer
+var shop_room: CanvasLayer
 var pet: Node2D
 var fade_rect: ColorRect
 
@@ -299,6 +300,10 @@ func _ready() -> void:
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
 	add_child(cave)
+
+	shop_room = preload("res://scripts/shop_room.gd").new()
+	shop_room.main = self
+	add_child(shop_room)
 
 	# 마을 사람들: 이장만 처음부터 광장에 있고,
 	# 나머지는 자기 건물이 지어진 뒤에 마을에 자리를 잡는다
@@ -701,22 +706,14 @@ func _door_kind_at(t: Vector2i) -> String:
 
 # 문으로 들어가면 열리는 것 (E로 눌렀을 때와 같다)
 func _enter_building(kind: String) -> void:
-	match kind:
-		"home":
-			interior.open()
-		"general":
-			shop.open("buy", ["buy", "sell"])
-		"ranch":
-			shop.open("animal", ["animal"])
-		"smith":
-			shop.open("upgrade", ["upgrade"])
-		"fish":
-			shop.open("codex", ["codex"])
-		"post":
-			hud.show_message("우체국이다. 우체부 아저씨가 편지를 정리하고 있다.")
-		_:
-			hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %
-				BUILDING_NAMES.get(kind, "건물"))
+	if kind == "home":
+		interior.open()
+		return
+	if shop_room.has_room(kind):
+		shop_room.open(kind)   # 가게마다 다른 방으로 들어간다
+		return
+	hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %
+		BUILDING_NAMES.get(kind, "건물"))
 
 
 func _spawn_house_node(anchor: Vector2i) -> void:
@@ -1028,6 +1025,7 @@ func ui_open() -> bool:
 	return story_cutscene or shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
+		or (shop_room != null and shop_room.visible) \
 		or cooking_ui.visible or quest_ui.visible or note_ui.visible \
 		or stats_ui.visible or _name_layer != null or _gift_layer != null \
 		or (story_layer != null and story_layer.visible)
@@ -1035,7 +1033,8 @@ func ui_open() -> bool:
 
 func interior_only_open() -> bool:
 	# 집/동굴 안에 있을 때는 시간이 흐른다 (다른 창이 겹치면 정지)
-	return (interior.visible or cave.visible) and not (shop.visible
+	return (interior.visible or cave.visible
+		or (shop_room != null and shop_room.visible)) and not (shop.visible
 		or summary.visible or sleep_dialog.visible or dialog.visible
 		or map_ui.visible or inventory_ui.visible)
 
@@ -4101,33 +4100,41 @@ func _debug_tick() -> void:
 			stats_ui.toggle()
 		179: stats_ui.scroll_to_bottom()               # 장비 능력치까지 확인
 		181: _save_shot("_stats.png")
-		182: stats_ui.close()
 		183:
+			stats_ui.close()
 			GameData.wood = 999                        # 마을 발전(건설) 확인
 			GameData.stone = 999
 			_build_village_building("post")
 			_build_village_building("general")
+			_build_village_building("smith")
 			dialog.close()
 			player.position = Vector2(74 * TILE + 16, 11 * TILE + 16)
 			player.dir = "up"
-		182: _save_shot("_village2.png")
-		184:
+		186: _save_shot("_village2.png")
+		187: shop_room.open("general")                 # 가게 방 (잡화점)
+		190: _save_shot("_shoproom.png")
+		191:
+			shop_room.close()
+			shop_room.open("smith")                    # 가게 방 (대장간)
+		194: _save_shot("_shoproom2.png")
+		195:
+			shop_room.close()
 			GameData.gender = "m"                      # 남자 캐릭터 뒷모습 걷기 확인
 			_send_key_press(KEY_W)
-		188: _save_shot("_boy_back.png")
-		189:
+		199: _save_shot("_boy_back.png")
+		200:
 			_send_key_release(KEY_W)
 			_send_key_press(KEY_S)                     # 앞모습 걷기 확인
-		193: _save_shot("_boy_front.png")
-		194:
+		204: _save_shot("_boy_front.png")
+		205:
 			_send_key_release(KEY_S)
 			_send_key_press(KEY_D)                     # 옆모습 걷기 확인
-		198: _save_shot("_boy_side.png")
-		199:
+		209: _save_shot("_boy_side.png")
+		210:
 			_send_key_release(KEY_D)
 			player.position = Vector2(88 * TILE + 16, 2 * TILE + 16)  # 맵 끝 배경 확인
-		202: _save_shot("_edge.png")                    # 맵 밖 배경 + 가운데 정렬
-		204: get_tree().quit()
+		213: _save_shot("_edge.png")                    # 맵 밖 배경 + 가운데 정렬
+		215: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
