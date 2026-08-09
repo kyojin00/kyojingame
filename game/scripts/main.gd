@@ -108,6 +108,12 @@ const TEXTURE_NAMES := [
 	"new_boy_side_walk_2", "new_boy_side_walk_3",
 	"new_boy_up_walk_0", "new_boy_up_walk_1",
 	"new_boy_up_walk_2", "new_boy_up_walk_3",
+	"egg", "golden_egg", "milk", "ore", "star_ore", "gem", "memory_piece",
+	"ghost_essence", "gold_crop", "world_branch",
+	"fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
+	"dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad",
+	"dish_punch", "dish_eggplant",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
@@ -144,7 +150,7 @@ const TEXTURE_NAMES := [
 	"forage_berry", "forage_herb", "bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
-	"icon_hoe", "icon_water", "icon_seed", "icon_basket", "icon_axe", "icon_axe_stone",
+	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
@@ -359,7 +365,7 @@ func _ready() -> void:
 			GameData.tool_slots = []
 			for i in GameData.TOOL_SLOT_COUNT:
 				GameData.tool_slots.append("")
-			GameData.tool = "hand"
+			GameData.tool = "hoe"
 			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
 			_plant_story_forest()
 			_apply_story_camera.call_deferred()
@@ -655,15 +661,62 @@ func _spawn_objects() -> void:
 		n.queue_free()
 	obj_nodes.clear()
 	tree_sprites.clear()
+	# 지은 뒤에만 존재한다. 문 칸은 비워 둔다 (구버전 저장도 여기서 열린다)
 	for pid: String in GameData.village_built:
 		if VILLAGE_PLOTS.has(pid):
-			_spawn_house_node(VILLAGE_PLOTS[pid].anchor)  # 지은 뒤에만 존재
+			objects.erase(door_tile(VILLAGE_PLOTS[pid].anchor))
+			_spawn_house_node(VILLAGE_PLOTS[pid].anchor)
 	if GameData.house_lv >= 1:
-		_spawn_house_node(HOME_ANCHOR)  # 지은 뒤에만 존재
+		objects.erase(door_tile(HOME_ANCHOR))
+		_spawn_house_node(HOME_ANCHOR)
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
 	_apply_story_visibility()
+
+
+# 건물 한 채: 5x4칸을 벽으로 채우고 그림을 세운다.
+# 문 칸(아래 가운데)만 비워 둬서 걸어 들어가면 자동으로 안으로 들어간다.
+func door_tile(anchor: Vector2i) -> Vector2i:
+	return anchor + Vector2i(2, 3)
+
+
+func _fill_building(anchor: Vector2i) -> void:
+	for y in range(anchor.y, anchor.y + 4):
+		for x in range(anchor.x, anchor.x + 5):
+			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
+	objects.erase(door_tile(anchor))
+	_spawn_house_node(anchor)
+
+
+# 이 칸이 다 지어진 건물의 문이면 그 건물 종류를 돌려준다
+func _door_kind_at(t: Vector2i) -> String:
+	if GameData.house_lv >= 1 and t == door_tile(HOME_ANCHOR):
+		return "home"
+	for pid: String in GameData.village_built:
+		if VILLAGE_PLOTS.has(pid) and t == door_tile(VILLAGE_PLOTS[pid].anchor):
+			return pid
+	return ""
+
+
+# 문으로 들어가면 열리는 것 (E로 눌렀을 때와 같다)
+func _enter_building(kind: String) -> void:
+	match kind:
+		"home":
+			interior.open()
+		"general":
+			shop.open("buy", ["buy", "sell"])
+		"ranch":
+			shop.open("animal", ["animal"])
+		"smith":
+			shop.open("upgrade", ["upgrade"])
+		"fish":
+			shop.open("codex", ["codex"])
+		"post":
+			hud.show_message("우체국이다. 우체부 아저씨가 편지를 정리하고 있다.")
+		_:
+			hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %
+				BUILDING_NAMES.get(kind, "건물"))
 
 
 func _spawn_house_node(anchor: Vector2i) -> void:
@@ -1130,15 +1183,58 @@ func _affected_tiles(base: Vector2i) -> Array:
 	return [base]
 
 
+# 다 자란 작물은 도구 없이 바로 딴다 (바구니 같은 수확 도구는 없앴다)
+func _try_harvest(t: Vector2i) -> bool:
+	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
+		return false
+	var cell: Dictionary = grid[t.y][t.x]
+	if cell.crop_id == "":
+		return false
+	if cell.dead:
+		hud.show_message("시들어버렸다... 호미로 정리하자.")
+		return true
+	var cid: String = cell.crop_id
+	var def: Dictionary = GameData.CROPS[cid]
+	if float(cell.crop_day) < _grow_total(def):
+		hud.show_message("아직 다 자라지 않았다.")
+		return true
+	var quality := GameData.roll_quality(GameData.total_luck())
+	GameData.add_produce(cid, quality)
+	GameData.today_harvest += 1
+	match quality:
+		2:
+			hud.show_message("금빛 %s 수확! (판매가 %dG)" % [def.name, int(def.sell_price * 1.5)])
+		1:
+			hud.show_message("은빛 %s 수확! (판매가 %dG)" % [def.name, int(def.sell_price * 1.25)])
+		_:
+			hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
+	cell.crop_id = ""
+	cell.crop_day = 0.0
+	cell.half_fed = false
+	Sound.play_sfx("sfx_harvest")
+	spawn_particles(t, "sparkle")
+	tutorial_notify("harvest")
+	gain_skill("farm", 8.0)
+	if int(GameData.crops_harvested.get(cid, 0)) == 0:
+		hud.show_message("연구 노트에 '%s' 기록이 추가됐다! (N)" % def.name)
+	GameData.crops_harvested[cid] = int(GameData.crops_harvested.get(cid, 0)) + 1
+	if randf() < 0.02:
+		gain_legend("gold_crop")
+	queue_redraw()
+	return true
+
+
 func use_tool() -> void:
-	# 도구는 슬롯에 장착하고 직접 선택해 손에 든 상태여야만 쓸 수 있다 (맨손 수확 제외)
-	if not _remote_acting and GameData.tool != "hand" \
-			and not GameData.tool_slots.has(GameData.tool):
+	# 수확은 무엇을 들고 있든 된다
+	if _try_harvest(target_tile()):
+		return
+	# 그 밖의 도구는 슬롯에 장착하고 직접 선택해 손에 든 상태여야만 쓸 수 있다
+	if not _remote_acting and not GameData.tool_slots.has(GameData.tool):
 		hud.show_message("가방(I)에서 도구를 슬롯에 장착하고 숫자키로 선택하자!")
 		return
 	# 도구를 쓰면 장비의 「기력 소모」만큼 힘이 든다.
 	# 밤에는 그대로, 낮에는 가볍게. (수확은 맨손이라 들지 않는다)
-	if not _remote_acting and GameData.tool != "hand":
+	if not _remote_acting:
 		var night := GameData.is_night()
 		var cost := GameData.tool_stat(GameData.tool, "stamina") \
 			* (GameData.STAMINA_NIGHT_MULT if night else GameData.STAMINA_DAY_MULT)
@@ -1234,40 +1330,6 @@ func use_tool() -> void:
 			spawn_particles(t, "seed")
 			tutorial_notify("plant")
 			gain_skill("farm", 2.0)
-		"hand":
-			if cell.crop_id != "":
-				if cell.dead:
-					hud.show_message("시들어버렸다... 호미로 정리하자.")
-					return
-				var def: Dictionary = GameData.CROPS[cell.crop_id]
-				if float(cell.crop_day) >= _grow_total(def):
-					var quality := GameData.roll_quality(GameData.total_luck())
-					GameData.add_produce(cell.crop_id, quality)
-					GameData.today_harvest += 1
-					match quality:
-						2:
-							hud.show_message("금빛 %s 수확! (판매가 %dG)" %
-								[def.name, int(def.sell_price * 1.5)])
-						1:
-							hud.show_message("은빛 %s 수확! (판매가 %dG)" %
-								[def.name, int(def.sell_price * 1.25)])
-						_:
-							hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
-					cell.crop_id = ""
-					cell.crop_day = 0.0
-					cell.half_fed = false
-					Sound.play_sfx("sfx_harvest")
-					spawn_particles(t, "sparkle")
-					tutorial_notify("harvest")
-					gain_skill("farm", 8.0)
-					if int(GameData.crops_harvested.get(cell.crop_id, 0)) == 0:
-						hud.show_message("연구 노트에 '%s' 기록이 추가됐다! (N)" % def.name)
-					GameData.crops_harvested[cell.crop_id] = \
-						int(GameData.crops_harvested.get(cell.crop_id, 0)) + 1
-					if randf() < 0.02:
-						gain_legend("gold_crop")
-				else:
-					hud.show_message("아직 다 자라지 않았다.")
 		"axe":
 			if obj == null:
 				hud.show_message("벨 것이 없다.")
@@ -1512,23 +1574,7 @@ func interact() -> void:
 			cave.open()
 			return
 		if obj.kind == "house":
-			match _building_kind_at(t):
-				"home":
-					interior.open()  # 우리집 입장
-				"general":
-					shop.open("buy", ["buy", "sell"])
-				"ranch":
-					shop.open("animal", ["animal"])
-				"smith":
-					shop.open("upgrade", ["upgrade"])
-				"fish":
-					shop.open("codex", ["codex"])
-				"post":
-					hud.show_message("우체국이다. 우체부 아저씨가 편지를 정리하고 있다.")
-				_:
-					var bk2 := _building_kind_at(t)
-					hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %
-						BUILDING_NAMES.get(bk2, "건물"))
+			_enter_building(_building_kind_at(t))
 			return
 	# 자연물: E키가 기본 상호작용 (나무=도끼 벌목, 돌=곡괭이 채광)
 	var tobj: Variant = objects.get(target_tile())
@@ -1548,12 +1594,11 @@ func interact() -> void:
 		return
 	# 그 밖에는 손에 든 것을 그대로 쓴다 — 호미로 밭 갈기, 씨앗 심기, 물 주기,
 	# 수확, 낚시까지 전부 E 하나로 된다 (좌클릭과 같은 동작).
-	# 맨손이고 앞에 작물도 없으면 아무 일도 하지 않는다
-	# (걸어다니며 E를 눌러도 메시지가 뜨지 않게)
+	# 앞에 아무것도 없으면 조용히 지나간다 (걸어다니며 E를 눌러도 메시지 없음)
 	var tt := target_tile()
 	var crop_ahead: bool = tt.x >= 0 and tt.y >= 0 and tt.x < MAP_W and tt.y < MAP_H \
 		and grid[tt.y][tt.x].crop_id != ""
-	if GameData.tool != "hand" or GameData.current_seed_id() != "" or crop_ahead:
+	if crop_ahead or GameData.tool_slots.has(GameData.tool):
 		use_tool()
 
 
@@ -2322,10 +2367,7 @@ func _build_house() -> void:
 	GameData.house_lv = 1
 	tutorial_notify("home")
 	_remove_object(HOME_SITE)
-	for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
-		for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
-			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
-	_spawn_house_node(HOME_ANCHOR)
+	_fill_building(HOME_ANCHOR)
 	Sound.play_sfx("sfx_place")
 	dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
 		GameData.BED_WOOD)
@@ -2373,11 +2415,7 @@ func _build_village_building(pid: String) -> void:
 	GameData.wood -= int(cost[0])
 	GameData.stone -= int(cost[1])
 	GameData.village_built.append(pid)
-	var a: Vector2i = plot.anchor
-	for y in range(a.y, a.y + 4):
-		for x in range(a.x, a.x + 5):
-			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
-	_spawn_house_node(a)
+	_fill_building(plot.anchor)
 	_sync_village_npcs()
 	Sound.play_sfx("sfx_place")
 	hud.quest_toast("%s 완공!" % plot.name)
@@ -3393,6 +3431,13 @@ func _process(delta: float) -> void:
 		if player_tile() != _last_explore_tile:
 			_last_explore_tile = player_tile()
 			GameData.mark_explored_at(_last_explore_tile)
+			# 문 앞에 서면 그대로 들어간다 (E를 누르지 않아도 된다)
+			var dk := _door_kind_at(_last_explore_tile)
+			if dk != "" and not ui_open() and not Net.is_guest():
+				player.position = Vector2(_last_explore_tile.x * TILE + 16,
+					(_last_explore_tile.y + 1) * TILE + 16)
+				_last_explore_tile = player_tile()
+				_enter_building(dk)
 		if player.walked > 40.0:
 			tutorial_notify("moved")
 	weather_time += delta

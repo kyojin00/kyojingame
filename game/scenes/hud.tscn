@@ -15,7 +15,7 @@ border_color = Color(0.43, 0.24, 0.11, 1)
 bg_color = Color(0.48, 0.83, 0.35, 1)
 
 [node name="HUD" type="CanvasLayer"]
-layer = 10
+layer = 16
 script = ExtResource("1_hud")
 
 [node name="ClockPanel" type="Panel" parent="."]

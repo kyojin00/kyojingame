@@ -1,9 +1,9 @@
 # 인벤토리 (I): 도구 선택 + 보유 중인 씨앗/수확물/생산물/자원.
 extends CanvasLayer
 
-const TOOLS := ["hoe", "water", "seed", "hand", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+const TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
 const TOOL_ICONS := {
-	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed", "hand": "icon_basket",
+	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed",
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
 	"sprinkler": "sprinkler", "rod": "icon_rod",
 }
@@ -12,7 +12,6 @@ const TOOL_DESC := {
 	"hoe": "호미 — 잔디를 갈아 밭을 만든다",
 	"water": "물뿌리개 — 작물에 물을 준다",
 	"seed": "씨앗 주머니 — 밭에 씨앗을 심는다 (Tab: 종류 바꾸기)",
-	"hand": "바구니 — 다 자란 작물을 수확한다",
 	"axe": "도끼 — 나무를 벤다 (동굴에서는 무기)",
 	"pickaxe": "곡괭이 — 바위를 캔다",
 	"fence": "울타리 — 목재 1개로 설치한다",

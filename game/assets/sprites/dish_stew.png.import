@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cqykaos83m8r2"
-path="res://.godot/imported/icon_basket.png-8423abceba2b74c92e954721a9c1062d.ctex"
+uid="uid://ce6io3lxw5wyx"
+path="res://.godot/imported/dish_stew.png-4182b8bf7f8f203025e14d81d3fa9053.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/icon_basket.png"
-dest_files=["res://.godot/imported/icon_basket.png-8423abceba2b74c92e954721a9c1062d.ctex"]
+source_file="res://assets/sprites/dish_stew.png"
+dest_files=["res://.godot/imported/dish_stew.png-4182b8bf7f8f203025e14d81d3fa9053.ctex"]
 
 [params]
 

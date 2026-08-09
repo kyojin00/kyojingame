@@ -963,7 +963,7 @@ const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
-	["harvest", "다 자란 작물을 수확하자 - 매일 물주기!"],
+	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["home", "목재를 모았으니 집터(마을 서쪽)에 집을 짓자"],
 	["bed", "집 안에서 침대를 만들자"],
@@ -978,13 +978,13 @@ const TUTORIAL_ORDER := [
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"water": ["hand"],
 	"harvest": ["axe"],
 	"slept": ["pickaxe"],
 	"mine": ["fence", "sprinkler"],
 	"build": ["rod"],
 }
-const ALL_TOOLS := ["hoe", "water", "seed", "hand", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+# 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
+const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
 
 # 튜토리얼 목표 달성 보상 (도구 해금과 별개)
 const TUTORIAL_REWARDS := {
@@ -1020,7 +1020,7 @@ static func default_tool_slots() -> Array:
 var tool_slots: Array = default_tool_slots()
 # 슬롯은 자유 배치이므로 고정 번호를 붙이지 않는다 (가방에서 장착 후 숫자키 선택)
 const TOOL_KOR := {
-	"hoe": "호미", "water": "물뿌리개", "seed": "씨앗", "hand": "수확",
+	"hoe": "호미", "water": "물뿌리개", "seed": "씨앗",
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리",
 	"sprinkler": "스프링클러", "rod": "낚싯대",
 }
@@ -1048,7 +1048,7 @@ func fresh_tutorial() -> Dictionary:
 const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
-	"water": "물 주기 (2)", "harvest": "수확하기 (4)",
+	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
 	"home": "집 짓기 (집터 E)", "bed": "침대 만들기", "slept": "침대에서 자기",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
 	"fish": "낚시하기 (9)", "shop": "잡화점 가보기",

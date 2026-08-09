@@ -3,7 +3,7 @@
 extends CanvasLayer
 
 const TOOL_ICONS := {
-	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed", "hand": "icon_basket",
+	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed",
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
 	"sprinkler": "sprinkler", "rod": "icon_rod",
 }
@@ -15,13 +15,13 @@ func tool_icon(t: String) -> Texture2D:
 		return main.tex["icon_axe_stone"]
 	return main.tex[TOOL_ICONS[t]]
 const TOOL_LABELS := {
-	"hoe": "호미", "water": "물뿌리개", "hand": "수확",
+	"hoe": "호미", "water": "물뿌리개",
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리 (목재1)",
 	"sprinkler": "스프링클러 (목재2·석재2)", "rod": "낚싯대",
 }
 # 도구 -> 관련 숙련도
 const TOOL_SKILL := {
-	"hoe": "farm", "water": "farm", "seed": "farm", "hand": "farm",
+	"hoe": "farm", "water": "farm", "seed": "farm",
 	"axe": "forest", "pickaxe": "mine", "rod": "fish",
 }
 # 나무 프레임 팔레트
