@@ -1483,10 +1483,49 @@ func use_tool() -> void:
 	queue_redraw()
 
 
+# 채집·벌목·채광 대상이 되는 것들
+const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
+
+
+# 앞으로 못 가게 막고 있는 오브젝트 칸을 찾는다.
+# 그림이 큰 오브젝트는 옆 칸에 있어도 길을 막기 때문에, 앞 칸이 비어 있는데
+# 걸음이 막히는 경우가 생긴다. 그때 실제로 막고 있는 것을 캘 수 있게 한다.
+func _blocking_object_tile() -> Vector2i:
+	if player == null:
+		return Vector2i(-999, -999)
+	var dirs := {"down": Vector2(0, 1), "up": Vector2(0, -1),
+		"left": Vector2(-1, 0), "right": Vector2(1, 0)}
+	var probe: Vector2 = player.position + (dirs[player.dir] as Vector2) * 14.0
+	var pt := player_tile()
+	var best := Vector2i(-999, -999)
+	var best_d := 1e9
+	for dy in [-1, 0, 1]:
+		for dx in [-1, 0, 1]:
+			var n: Vector2i = pt + Vector2i(dx, dy)
+			if not objects.has(n) or not AIM_KINDS.has(objects[n].kind):
+				continue
+			var pad: Vector2 = OBJECT_PAD.get(objects[n].kind, Vector2.ZERO)
+			var r := Rect2(n.x * TILE - pad.x, n.y * TILE - pad.y,
+				TILE + pad.x * 2.0, TILE + pad.y * 2.0)
+			if not r.has_point(probe):
+				continue
+			var d: float = (Vector2(n.x * TILE + 16, n.y * TILE + 16) - player.position).length()
+			if d < best_d:
+				best_d = d
+				best = n
+	return best
+
+
 func interact() -> void:
 	# 맞는 도구를 들고 나무/돌을 조준 중이면 채집이 최우선
 	# (근처에 NPC가 있어도 대화가 끼어들지 않는다)
 	var aim: Variant = objects.get(target_tile())
+	if aim == null:
+		# 앞 칸은 비었는데 걸음이 막힌다면, 막고 있는 그 오브젝트를 대상으로 삼는다
+		var bt := _blocking_object_tile()
+		if bt.x != -999:
+			_sel_target = bt
+			aim = objects.get(bt)
 	if aim != null and not bool(aim.get("young", false)) \
 			and ((aim.kind == "tree" and GameData.tool == "axe")
 			or (aim.kind in ["rock", "bigrock"] and GameData.tool == "pickaxe")):
@@ -1494,7 +1533,6 @@ func interact() -> void:
 		return
 	# 나무·돌·채집물을 조준하고 있으면 대화보다 채집이 우선이다
 	# (옆에 사람이 서 있어도 E가 대화로 새지 않는다)
-	const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
 	var aiming_object: bool = aim != null and AIM_KINDS.has(aim.kind)
 	# 우체부 아저씨에게 말 걸기 (첫 만남 / 동행 중 보조 대화)
 	if not aiming_object and _postman != null and _postman_state == "wait" \
@@ -3840,6 +3878,11 @@ func _context_hint() -> Array:
 	if nearby_animal() != null:
 		return ["E: 쓰다듬기", above_player]
 	var t := target_tile()
+	if not objects.has(t):
+		# 앞 칸은 비었는데 걸음을 막고 있는 오브젝트가 있으면 그것을 가리킨다
+		var bt := _blocking_object_tile()
+		if bt.x != -999:
+			t = bt
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return []
 	var above_tile := Vector2(t.x * TILE + 16, t.y * TILE - 12)
