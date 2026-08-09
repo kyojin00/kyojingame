@@ -213,6 +213,8 @@ const BUILDING_NAMES := {
 	"ranch": "목장 상회", "fish": "수산시장",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
+# 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
+const CAMERA_ZOOM := 0.8                   # 1200 x 675 월드 픽셀 = 37.5 x 21 타일
 const UI_FONT := preload("res://assets/fonts/Galmuri11.ttf")
 const UI_FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
 
@@ -415,6 +417,7 @@ func _load_textures() -> void:
 
 func _setup_camera() -> void:
 	var cam: Camera2D = player.get_node("Camera")
+	cam.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
 	cam.limit_left = 0
 	cam.limit_top = 0
 	cam.limit_right = MAP_W * TILE
@@ -457,16 +460,16 @@ func _build_map() -> void:
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
 	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
-	# 테두리 나무 (그림이 크므로 한 칸씩 띄워 겹치지 않게 세운다)
+	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in MAP_W:
-		if x % 2 == 0 and not objects.has(Vector2i(x, 0)):
+		if x % 4 == 0 and not objects.has(Vector2i(x, 0)):
 			objects[Vector2i(x, 0)] = {"kind": "tree", "hp": TREE_HP}
-		if x % 2 == 0:
+		if x % 4 == 0:
 			objects[Vector2i(x, MAP_H - 1)] = {"kind": "tree", "hp": TREE_HP}
 	for y in MAP_H:
-		if y % 2 == 0 and not objects.has(Vector2i(0, y)):
+		if y % 4 == 0 and not objects.has(Vector2i(0, y)):
 			objects[Vector2i(0, y)] = {"kind": "tree", "hp": TREE_HP}
-		if y % 2 == 0 and not objects.has(Vector2i(MAP_W - 1, y)):
+		if y % 4 == 0 and not objects.has(Vector2i(MAP_W - 1, y)):
 			objects[Vector2i(MAP_W - 1, y)] = {"kind": "tree", "hp": TREE_HP}
 
 	# 부지 판매 표지판
@@ -489,18 +492,18 @@ func _build_map() -> void:
 				continue  # 마을/길은 비워둔다
 			var h := _hash01(x * 3 + 7, y * 5 + 11)
 			if deep_rect.has_point(pos):
-				# 깊은 숲은 빽빽하되, 그림이 겹치지 않게 한 칸씩은 띄운다
-				if h < 0.14:
-					if _nature_clear(pos, 1):
+				# 깊은 숲은 나무를 많이 두되, 그림이 겹치지 않는 선까지만 채운다
+				if h < 0.30:
+					if _nature_clear(pos, "tree"):
 						objects[pos] = {"kind": "tree", "hp": TREE_HP}
-				elif h < 0.19:
-					if _nature_clear(pos, 1):
+				elif h < 0.40:
+					if _nature_clear(pos, "rock"):
 						objects[pos] = {"kind": "rock", "hp": ROCK_HP}
-			elif h < 0.045:
-				if _nature_clear(pos, 2):
+			elif h < 0.10:
+				if _nature_clear(pos, "tree"):
 					objects[pos] = {"kind": "tree", "hp": TREE_HP}
-			elif h < 0.075:
-				if _nature_clear(pos, 1):
+			elif h < 0.16:
+				if _nature_clear(pos, "rock"):
 					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 
 
@@ -561,18 +564,27 @@ func _build_village() -> void:
 		for y in [1, 29]:
 			var rim := Vector2i(x, y)
 			if grid[y][x].ground == "grass" and not objects.has(rim) \
-					and _hash01(x * 5 + 3, y * 7 + 2) < 0.55 and _nature_clear(rim, 1):
+					and _hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
 				objects[rim] = {"kind": "tree", "hp": TREE_HP}
 
 
-# 자연물은 타일보다 크게 그려지므로, 서로 겹쳐 보이지 않게 최소 간격을 둔다.
-func _nature_clear(pos: Vector2i, dist: int) -> bool:
-	for dy in range(-dist, dist + 1):
-		for dx in range(-dist, dist + 1):
+# 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,
+# 두 오브젝트가 요구하는 간격 중 더 큰 값을 적용해 배치 가능 여부를 판단한다.
+func _nature_clear(pos: Vector2i, kind: String, override_dist := -1) -> bool:
+	var need_self: int = override_dist if override_dist >= 0 \
+		else int(NATURE_CLEAR.get(kind, 1))
+	for dy in range(-NATURE_CLEAR_MAX, NATURE_CLEAR_MAX + 1):
+		for dx in range(-NATURE_CLEAR_MAX, NATURE_CLEAR_MAX + 1):
 			var p := pos + Vector2i(dx, dy)
 			if p == pos or not objects.has(p):
 				continue
-			if objects[p].kind in NATURE_KINDS:
+			var k: String = objects[p].kind
+			if not NATURE_CLEAR.has(k):
+				continue
+			# 간격을 직접 지정한 구간(숲 등)은 그 값을 그대로 쓴다
+			var need: int = need_self if override_dist >= 0 \
+				else maxi(need_self, int(NATURE_CLEAR[k]))
+			if maxi(absi(dx), absi(dy)) <= need:
 				return false
 	return true
 
@@ -637,8 +649,13 @@ const OBJECT_SCALES := {
 	"barn": 1.8, "forage_berry": 1.5, "forage_herb": 1.5,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
-# 서로 겹쳐 보이면 안 되는 자연물 (배치 시 최소 간격을 둔다)
-const NATURE_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
+# 자연물이 서로 겹쳐 보이지 않도록 실제 그려지는 크기에서 뽑은 최소 간격(타일).
+# 나무는 약 3.9~4.5타일 폭으로 그려진다 → 일반 지역은 5타일 간격,
+# 숲 구간은 4타일 간격(살짝 맞닿는 정도)으로 촘촘하게 세운다.
+const NATURE_CLEAR := {
+	"tree": 4, "bigrock": 3, "rock": 2, "forage_berry": 2, "forage_herb": 2,
+}
+const NATURE_CLEAR_MAX := 4
 const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
 
 
@@ -692,9 +709,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
 	if kind == "tree":
-		# 크기 다양화 + 깊이감: 화면 뒤(위)쪽은 조금 작게, 앞(아래)쪽은 크게
-		sc *= 0.9 + _hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.25
-		sc *= 0.9 + 0.15 * (float(pos.y) / float(MAP_H))
+		# 크기는 조금씩만 다르게 — 편차가 크면 배치 간격을 지켜도 그림이 겹친다
+		sc *= 0.86 + _hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.14
 	elif kind == "rock":
 		# 큰 돌과 작은 돌이 섞이도록
 		sc *= 0.65 + _hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
@@ -1457,6 +1473,7 @@ const STORY_SPAWN := Vector2i(4, 16)       # 화면 왼쪽에서 시작 (집은 
 const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
 const STORY_FORK := Vector2i(20, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
 const STORY_ROCK := Vector2i(26, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
+const STORY_FOREST_W := 38                 # 스토리 숲의 가로 폭 (줌아웃 화면을 채운다)
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
@@ -1471,11 +1488,13 @@ func _apply_story_camera() -> void:
 	# 숲 구간(마을 이동 전)에는 시작 숲 한 화면(30x17타일)에 카메라를 고정한다.
 	# 마을로 이동하는 travel 단계부터는 전체 맵 카메라로 풀린다.
 	var cam: Camera2D = player.get_node("Camera")
+	cam.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
 	if GameData.story_phase in ["enter", "approach", "equip", "chop", "path", "map", "rock"]:
+		# 숲 구간은 시작 숲 한 화면에 고정한다 (줌아웃한 화면 크기에 맞춰 넉넉히)
 		cam.limit_left = 0
-		cam.limit_top = 6 * TILE
-		cam.limit_right = 30 * TILE
-		cam.limit_bottom = 6 * TILE + 540
+		cam.limit_top = TILE
+		cam.limit_right = STORY_FOREST_W * TILE
+		cam.limit_bottom = 23 * TILE
 		cam.position_smoothing_enabled = false
 	else:
 		cam.limit_left = 0
@@ -1504,7 +1523,7 @@ func _plant_story_forest() -> void:
 	# 주인공(왼쪽) 앞을 가로막는 울창한 숲: 나무 사이 간격은 불규칙하게,
 	# 곳곳에 큰 돌을 드문드문 섞어 자연스러운 숲 지형을 만든다.
 	for y in range(1, 23):
-		for x in range(4, 30):
+		for x in range(4, STORY_FOREST_W):
 			var pos := Vector2i(x, y)
 			if grid[y][x].ground != "grass" or objects.has(pos):
 				continue
@@ -1524,16 +1543,20 @@ func _plant_story_forest() -> void:
 			if h < 0.045:
 				grid[y][x].ground = "path"  # 드문드문 흙바닥 자국
 				continue
-			if h < 0.5:
+			if h < 0.35:
 				continue  # 나무 사이 이동 공간 (불규칙한 빈 풀밭)
-			if not _nature_clear(pos, 1):
-				continue  # 자연물끼리 붙어서 그림이 겹치지 않게 한 칸은 띄운다
-			if h < 0.57:
+			if h < 0.45:
 				# 풀/낮은 풀숲/작은 식물 (열매 덤불·약초) — 드문드문
-				objects[pos] = {"kind": "forage_herb" if h < 0.535 else "forage_berry", "hp": 0}
+				if _nature_clear(pos, "forage_berry"):
+					objects[pos] = {"kind": "forage_herb" if h < 0.40 else "forage_berry",
+						"hp": 0}
 			elif h > 0.94:
-				objects[pos] = {"kind": "rock", "hp": ROCK_HP}  # 큰 돌/작은 돌 (크기 랜덤)
+				if _nature_clear(pos, "rock"):
+					objects[pos] = {"kind": "rock", "hp": ROCK_HP}  # 큰 돌/작은 돌
 			else:
+				# 숲 구간은 나무를 촘촘히 세우되(4칸 간격) 그림은 겹치지 않는다
+				if not _nature_clear(pos, "tree", 3):
+					continue
 				var tr := {"kind": "tree", "hp": TREE_HP}
 				if _hash01(x * 17 + 2, y * 23 + 5) < 0.15:
 					tr["apple"] = true  # 일부 나무만 사과 3개가 열린다
@@ -2156,7 +2179,21 @@ func _start_delivery_dialog() -> void:
 		{"text": "「여기 %s(이)가 길을 열어 준 덕분입니다.」" % nm},
 		{"text": "「%s(이)라고 했나. 교진 마을에 온 것을 환영하네!」" % nm,
 			"name": "이장 덕수", "portrait": chief_happy},
+		{"text": "「마을 서쪽 큰길가에 빈 집터가 하나 있네. 자네가 쓰게.」",
+			"name": "이장 덕수", "portrait": chief_happy},
+		{"text": "「그리고 이건 새로 온 사람에게 주는 우리 마을의 선물일세.」",
+			"name": "이장 덕수", "portrait": chief_normal, "event": _story_give_hoe},
+		{"text": "「호미로 땅을 갈아 밭을 만들면, 이 마을에서 살아갈 수 있을 걸세.」",
+			"name": "이장 덕수", "portrait": chief_happy},
 	], _end_delivery)
+
+
+func _story_give_hoe() -> void:
+	# 정착 준비: 이장이 환영 선물로 호미를 건넨다 (밭갈기 목표의 시작)
+	if not GameData.is_tool_unlocked("hoe"):
+		GameData.unlocked_tools.append("hoe")
+	hud.reward_toast("호미 × 1", tex["icon_hoe"])
+	hud.show_message("호미는 가방(I)에서 슬롯에 넣어야 쓸 수 있다.", 5.0)
 
 
 func _end_delivery() -> void:
@@ -2165,7 +2202,9 @@ func _end_delivery() -> void:
 	_apply_story_camera()
 	_apply_story_visibility()
 	hud.quest_toast("이장에게 편지 전달")
-	hud.show_message("메인 스토리 1 완료! 마을 서쪽 집터(E)에 집을 지어 정착하자.", 6.0)
+	if not GameData.is_tool_unlocked("hoe"):
+		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
+	hud.show_message("메인 스토리 1 완료! 호미로 밭을 갈고, 집터(E)에 집을 지어 정착하자.", 6.0)
 	if _postman != null:
 		_postman_state = "leave"
 	save_now()
