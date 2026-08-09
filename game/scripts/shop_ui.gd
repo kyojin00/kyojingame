@@ -222,11 +222,16 @@ func _rebuild() -> void:
 			var l := Label.new()
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(l)
+			var st: Dictionary = GameData.tool_stats(id)
 			if level - 1 >= levels.size():
-				l.text = "%s Lv%d (최대)" % [up.name, level]
+				l.text = "%s Lv%d (최대) — 위력 %s · 범위 %s" % [up.name, level,
+					GameData.fmt_stat(st.power), GameData.fmt_stat(st.reach)]
 			else:
 				var next: Dictionary = levels[level - 1]
+				var gain := GameData.tool_stat_gain_text(id)
 				l.text = "%s Lv%d→%d: %s" % [up.name, level, level + 1, next.desc]
+				if gain != "":
+					l.text += "  (%s)" % gain
 				var cost_text := "%dG" % next.money
 				if int(next.wood) > 0:
 					cost_text += "+목재%d" % next.wood

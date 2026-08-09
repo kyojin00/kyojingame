@@ -1083,8 +1083,8 @@ func _on_fishing_finished(success: bool) -> void:
 
 
 func _affected_tiles(base: Vector2i) -> Array:
-	# Lv2 호미/물뿌리개: 전방 3칸 / Lv3: 3x3 범위
-	var lvl: int = GameData.tool_level.get(GameData.tool, 1)
+	# 장비 능력치의 「범위」를 그대로 쓴다 (1=1칸 / 2=전방 3칸 / 3=3x3)
+	var lvl := int(GameData.tool_stat(GameData.tool, "reach"))
 	if lvl >= 3:
 		var out := []
 		for dy in range(-1, 2):
@@ -1105,7 +1105,9 @@ func use_tool() -> void:
 		return
 	# 밤 채집 패널티: 어두워서 몸이 무겁고(기력 소모) 손이 무디다 (숙련도 절반)
 	if not _remote_acting and GameData.is_night() and GameData.tool != "hand":
-		GameData.energy = maxf(0.0, GameData.energy - 4.0)
+		# 밤에는 장비의 「기력 소모」만큼 힘이 더 든다
+		GameData.energy = maxf(0.0,
+			GameData.energy - maxf(1.0, GameData.tool_stat(GameData.tool, "stamina")))
 		if randf() < 0.15:
 			hud.show_message("어두워서 일이 손에 잡히지 않는다... 슬슬 돌아가서 쉬자.")
 	var t := target_tile()
@@ -1203,7 +1205,7 @@ func use_tool() -> void:
 					return
 				var def: Dictionary = GameData.CROPS[cell.crop_id]
 				if float(cell.crop_day) >= _grow_total(def):
-					var quality := GameData.roll_quality()
+					var quality := GameData.roll_quality(GameData.total_luck())
 					GameData.add_produce(cell.crop_id, quality)
 					GameData.today_harvest += 1
 					match quality:
@@ -1238,7 +1240,7 @@ func use_tool() -> void:
 				if bool(obj.get("young", false)):
 					hud.show_message("아직 어린 나무다. 다 자라면 벨 수 있다.")
 					return
-				obj.hp -= 3 if int(GameData.tool_level.get("axe", 1)) >= 2 else 1
+				obj.hp -= int(GameData.tool_stat("axe", "power"))
 				Sound.play_sfx("sfx_chop", 0.15)
 				spawn_particles(t, "wood")
 				_refresh_tree_sprite(t)
@@ -1295,7 +1297,7 @@ func use_tool() -> void:
 				hud.show_message("캘 것이 없다.")
 				return
 			if obj.kind == "rock":
-				obj.hp -= 2 if int(GameData.tool_level.get("pickaxe", 1)) >= 2 else 1
+				obj.hp -= int(GameData.tool_stat("pickaxe", "power"))
 				Sound.play_sfx("sfx_pick", 0.15)
 				spawn_particles(t, "stone")
 				if obj.hp <= 0:
@@ -1591,6 +1593,8 @@ const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따�
 const VILLAGE_EXIT_X := 74                 # 우체부가 빠져나가는 마을 북쪽 길
 var _postman_anim := 0.0
 var _postman_wait_t := 0.0
+var _postman_path: Array = []      # 퇴장 경로 (지나갈 칸의 중심 좌표)
+var _postman_fade := 1.0
 var _story_t := 0.0
 
 
@@ -1928,22 +1932,31 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 				_postman_spr.flip_h = false
 				_start_delivery_dialog()
 		"leave":
-			# 편지를 전하고 나면 마을 북쪽 길로 걸어 나간다 (광장에 계속 서 있지 않는다)
-			var road_x := VILLAGE_EXIT_X * TILE + 16.0
-			var far_from_road: bool = absf(_postman.position.x - road_x) > 6.0
-			var goal := Vector2(road_x, _postman.position.y) if far_from_road \
-				else Vector2(road_x, -96.0)
-			var to4 := goal - _postman.position
+			# 편지를 전하고 나면 마을 북쪽 길을 따라 걸어 나간다.
+			# 길찾기로 낸 경로를 밟으므로 분수·벤치·건물을 뚫고 지나가지 않는다.
+			if _postman_path.is_empty():
+				# 길 끝에 닿았다 — 그 자리에서 서서히 사라진다
+				_postman_fade = maxf(0.0, _postman_fade - delta * 2.5)
+				_postman_spr.modulate.a = _postman_fade
+				_postman_spr.texture = tex["npc_postman_up_%d" % (int(_postman_anim * 5.0) % 2)]
+				if _postman_fade <= 0.0:
+					_postman.queue_free()
+					_postman = null
+				return
+			var step: Vector2 = _postman_path[0]
+			var to4 := step - _postman.position
+			if to4.length() <= 4.0:
+				_postman.position = step
+				_postman_path.remove_at(0)
+				return
 			_postman.position += to4.normalized() * 70.0 * delta
-			if far_from_road:
+			if absf(to4.x) > absf(to4.y):
 				_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
 				_postman_spr.flip_h = to4.x < 0
 			else:
-				_postman_spr.texture = tex["npc_postman_up_%d" % (int(_postman_anim * 5.0) % 2)]
+				_postman_spr.texture = tex["npc_postman_%s_%d"
+					% ["up" if to4.y < 0.0 else "down", int(_postman_anim * 5.0) % 2]]
 				_postman_spr.flip_h = false
-			if _postman.position.y < -80.0:
-				_postman.queue_free()
-				_postman = null
 
 
 func _start_postman_dialog() -> void:
@@ -2396,6 +2409,37 @@ func _update_u_intro() -> void:
 		hud.quest_toast("자신의 능력 확인해보기")
 
 
+# 지나갈 수 있는 칸만 밟는 최단 경로 (BFS). 반환값은 칸 중심의 월드 좌표 배열.
+# 길이 아예 없으면 빈 배열을 돌려준다.
+func _tile_path(start: Vector2i, goal: Vector2i) -> Array:
+	if start == goal:
+		return []
+	var prev := {start: start}
+	var queue: Array[Vector2i] = [start]
+	var head := 0
+	var found := false
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
+		if cur == goal:
+			found = true
+			break
+		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cur + d
+			if prev.has(n) or not is_passable(n):
+				continue
+			prev[n] = cur
+			queue.append(n)
+	if not found:
+		return []
+	var path: Array = []
+	var at := goal
+	while at != start:
+		path.push_front(Vector2(at.x * TILE + 16, at.y * TILE + 16))
+		at = prev[at]
+	return path
+
+
 func _story_chief() -> Node2D:
 	for n in npcs:
 		if n.id == "chief":
@@ -2441,6 +2485,10 @@ func _end_delivery() -> void:
 		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
 	hud.show_message("메인 스토리 1 완료! 호미로 밭을 갈고, 집터(E)에 집을 지어 정착하자.", 6.0)
 	if _postman != null:
+		_postman_path = _tile_path(
+			Vector2i(int(_postman.position.x / TILE), int(_postman.position.y / TILE)),
+			Vector2i(VILLAGE_EXIT_X, 1))
+		_postman_fade = 1.0
 		_postman_state = "leave"
 	save_now()
 
@@ -3932,8 +3980,15 @@ func _debug_tick() -> void:
 			GameData.affinity["merchant"] = 60
 			note_ui.toggle()                           # 연구 노트(N) 확인
 		176: _save_shot("_note.png")
-		178:
+		177:
 			note_ui.close()
+			GameData.tool_level["axe"] = 2             # 장비 능력치 확인
+			GameData.tool_level["hoe"] = 3
+			stats_ui.toggle()
+		179: stats_ui.scroll_to_bottom()               # 장비 능력치까지 확인
+		181: _save_shot("_stats.png")
+		182: stats_ui.close()
+		183:
 			GameData.wood = 999                        # 마을 발전(건설) 확인
 			GameData.stone = 999
 			_build_village_building("post")

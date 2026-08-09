@@ -236,6 +236,82 @@ const FENCE_COST_WOOD := 1
 const SPRINKLER_COST_WOOD := 2
 const SPRINKLER_COST_STONE := 2
 
+# ---- 장비 능력치 (대장간 시스템의 토대) ----
+#
+# 도구는 저마다 능력치를 가지고, 강화 단계(tool_level)마다 값이 오른다.
+# 앞으로 대장간에서 새 장비를 만들면 이 표에 항목만 추가하면 되고,
+# 게임 쪽은 tool_stats()가 돌려주는 값만 보므로 손댈 곳이 없다.
+#
+#   power   위력   — 나무/돌에 한 번에 주는 타격, 동굴에서의 공격력
+#   reach   범위   — 한 번에 다루는 칸 수 (1=1칸 / 2=전방 3칸 / 3=3x3)
+#   stamina 소모   — 한 번 쓸 때 드는 기력 (낮에는 아직 쓰지 않는다)
+#   luck    행운   — 좋은 등급/희귀 산출 확률 보정 (%p)
+const STAT_NAMES := {
+	"power": "위력", "reach": "범위", "stamina": "기력 소모", "luck": "행운",
+}
+# base = Lv1 값 / grow = 강화 1단계마다 더해지는 값
+const TOOL_STATS := {
+	"hoe":     {"base": {"power": 1, "reach": 1, "stamina": 3, "luck": 0},
+		"grow": {"reach": 1, "stamina": -0.5}},
+	"water":   {"base": {"power": 1, "reach": 1, "stamina": 2, "luck": 0},
+		"grow": {"reach": 1, "stamina": -0.5}},
+	"axe":     {"base": {"power": 1, "reach": 1, "stamina": 4, "luck": 0},
+		"grow": {"power": 2, "stamina": -0.5, "luck": 1}},
+	"pickaxe": {"base": {"power": 1, "reach": 1, "stamina": 4, "luck": 0},
+		"grow": {"power": 1, "stamina": -0.5, "luck": 1}},
+	"rod":     {"base": {"power": 1, "reach": 1, "stamina": 2, "luck": 1},
+		"grow": {}},
+}
+
+
+# 지금 단계에서의 장비 능력치. 표에 없는 도구는 기본값을 돌려준다.
+func tool_stats(tool_id: String) -> Dictionary:
+	var out := {"power": 1.0, "reach": 1.0, "stamina": 0.0, "luck": 0.0}
+	if not TOOL_STATS.has(tool_id):
+		return out
+	var def: Dictionary = TOOL_STATS[tool_id]
+	var steps: int = maxi(0, int(tool_level.get(tool_id, 1)) - 1)
+	for k in out:
+		out[k] = float(def.base.get(k, out[k])) + float(def.grow.get(k, 0.0)) * steps
+	out.power = maxf(1.0, out.power)
+	out.reach = maxf(1.0, out.reach)
+	out.stamina = maxf(0.0, out.stamina)
+	return out
+
+
+# 능력치 숫자 표기: 정수는 그대로, 소수는 소수 첫째 자리까지
+func fmt_stat(v: float) -> String:
+	return str(int(round(v))) if is_equal_approx(v, round(v)) else "%.1f" % v
+
+
+func tool_stat(tool_id: String, stat: String) -> float:
+	return float(tool_stats(tool_id).get(stat, 0.0))
+
+
+# 슬롯에 장착한 장비들의 행운 합계 (등급/희귀 산출 보정)
+func total_luck() -> float:
+	var sum := 0.0
+	for t in tool_slots:
+		if t != "" and TOOL_STATS.has(t):
+			sum += tool_stat(t, "luck")
+	return sum
+
+
+# 강화 한 단계로 어떤 능력치가 얼마나 오르는지 (상점 표시용)
+func tool_stat_gain_text(tool_id: String) -> String:
+	if not TOOL_STATS.has(tool_id):
+		return ""
+	var parts: Array[String] = []
+	var grow: Dictionary = TOOL_STATS[tool_id].grow
+	for k in grow:
+		var v := float(grow[k])
+		if is_zero_approx(v):
+			continue
+		parts.append("%s %s%s" % [STAT_NAMES.get(k, k),
+			"+" if v > 0.0 else "", fmt_stat(v)])
+	return " · ".join(parts)
+
+
 # 업그레이드 정의: levels[현재레벨-1] = 다음 레벨 비용/효과
 const UPGRADES := {
 	"hoe": {"name": "호미", "levels": [
@@ -722,11 +798,12 @@ func can_final_alchemy() -> bool:
 
 
 # 수확 품질 굴리기: 0=일반 1=은 2=금 (농사 숙련도가 높을수록 좋다)
-func roll_quality() -> int:
+func roll_quality(luck := 0.0) -> int:
+	# luck 은 장비 능력치(행운)에서 오는 보정값 (%p)
 	var lv := skill_lv("farm")
-	if randf() < 0.02 + lv * 0.008:
+	if randf() < 0.02 + lv * 0.008 + luck * 0.01:
 		return 2
-	if randf() < 0.08 + lv * 0.02:
+	if randf() < 0.08 + lv * 0.02 + luck * 0.02:
 		return 1
 	return 0
 
