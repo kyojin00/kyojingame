@@ -3,7 +3,7 @@ extends CanvasLayer
 
 const TAB_BUTTONS := {
 	"buy": "BuyBtn", "sell": "SellBtn", "animal": "AnimalBtn",
-	"upgrade": "UpgradeBtn", "codex": "CodexBtn",
+	"upgrade": "UpgradeBtn", "craft": "CraftBtn", "codex": "CodexBtn",
 }
 
 var main: Node2D
@@ -31,6 +31,7 @@ func _ready() -> void:
 	$Panel/V/Tabs/SellBtn.pressed.connect(_on_tab.bind("sell"))
 	$Panel/V/Tabs/AnimalBtn.pressed.connect(_on_tab.bind("animal"))
 	$Panel/V/Tabs/UpgradeBtn.pressed.connect(_on_tab.bind("upgrade"))
+	$Panel/V/Tabs/CraftBtn.pressed.connect(_on_tab.bind("craft"))
 	$Panel/V/Tabs/CodexBtn.pressed.connect(_on_tab.bind("codex"))
 	$Panel/V/Tabs/CloseBtn.pressed.connect(close)
 
@@ -369,6 +370,29 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("", "???", "집 조리대에서 만들어보자"))
 		_note("낚싯대를 들고 물가에서 E! 입질(!)이 오면 다시 E!\n"
 			+ "철수와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
+	elif tab == "craft":
+		# 대장간 제작: 부위별로 묶어 보여 준다
+		for slot: String in GameData.GEAR_SLOTS:
+			var eq: String = str(GameData.equipped.get(slot, ""))
+			_note("— %s (%s) —" % [GameData.GEAR_SLOT_NAMES[slot],
+				GameData.GEAR[eq].name if eq != "" else "없음"])
+			for gid: String in GameData.GEAR_IDS:
+				var g: Dictionary = GameData.GEAR[gid]
+				if str(g.slot) != slot:
+					continue
+				var sub: String = "%s · %s" % [GameData.gear_stat_text(gid), g.desc]
+				if GameData.owned_gear.has(gid):
+					if eq == gid:
+						items_box.add_child(_mk_row(gid, "%s (장착 중)" % g.name, sub,
+							_mk_button("해제", _on_unequip.bind(slot))))
+					else:
+						items_box.add_child(_mk_row(gid, g.name, sub,
+							_mk_button("장착", _on_equip.bind(gid))))
+					continue
+				var cb := _mk_button("제작", _on_craft.bind(gid))
+				cb.disabled = not GameData.can_craft_gear(gid)
+				items_box.add_child(_mk_row(gid, g.name, sub, cb, _gear_cost(gid)))
+		_note("장비는 만들면 바로 장착된다. 가방(I)의 「장비」 탭에서도 바꿀 수 있다.")
 	else:
 		for id in GameData.UPGRADES:
 			var up: Dictionary = GameData.UPGRADES[id]
@@ -398,6 +422,37 @@ func _rebuild() -> void:
 		_note("광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d · 스프링클러: 목재 %d+석재 %d" % [
 			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD,
 			GameData.SPRINKLER_COST_STONE])
+
+
+func _gear_cost(gid: String) -> Array:
+	var cost: Dictionary = GameData.GEAR[gid].cost
+	var out: Array = []
+	for k: String in ["money", "wood", "stone", "ore"]:
+		if cost.has(k):
+			out.append(["coin" if k == "money" else k, int(cost[k])])
+	# 별빛 광석·보석은 아이콘 표가 없어 설명 줄로만 알린다
+	return out
+
+
+func _on_craft(gid: String) -> void:
+	if not GameData.craft_gear(gid):
+		return
+	Sound.play_sfx("sfx_place")
+	if main != null:
+		main.hud.show_message("%s 완성! 바로 장착했다." % GameData.GEAR[gid].name)
+	_rebuild()
+
+
+func _on_equip(gid: String) -> void:
+	GameData.equip_gear(gid)
+	Sound.play_sfx("sfx_ui")
+	_rebuild()
+
+
+func _on_unequip(slot: String) -> void:
+	GameData.unequip_slot(slot)
+	Sound.play_sfx("sfx_ui")
+	_rebuild()
 
 
 func _on_buy(id: String) -> void:

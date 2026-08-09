@@ -25,8 +25,8 @@ const ROOMS := {
 		"name": "대장간", "keeper": "blacksmith",
 		"wall": Color(0.3, 0.26, 0.27), "floor": Color(0.4, 0.36, 0.36),
 		"counter": Color(0.32, 0.28, 0.26), "deco": "forge",
-		"tab": "upgrade", "tabs": ["upgrade"],
-		"hint": "도구를 강화한다.",
+		"tab": "upgrade", "tabs": ["upgrade", "craft"],
+		"hint": "도구를 강화하고 장비를 만든다.",
 	},
 	"ranch": {
 		"name": "목장 상회", "keeper": "rancher",

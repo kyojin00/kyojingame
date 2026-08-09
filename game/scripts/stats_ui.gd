@@ -125,9 +125,24 @@ func _rebuild() -> void:
 			parts.append("%s %s" % [GameData.STAT_NAMES[k], GameData.fmt_stat(st[k])])
 		_line("%s Lv.%d — %s" % [GameData.TOOL_KOR.get(tid, tid), lv, " · ".join(parts)],
 			Color("ffd75e"))
-	_line("  행운 합계 %s (장착 중인 장비)" % GameData.fmt_stat(GameData.total_luck()))
+	_line("  행운 합계 %s (도구 + 장비)" % GameData.fmt_stat(GameData.total_luck()))
 	for h in GameData.STAT_HELP:
 		_line("  %s" % h, Color(0.62, 0.58, 0.75))
+
+	# 대장간에서 만든 장비 (도구 강화와 별개로 붙는 능력치)
+	_line("")
+	_line("[착용 장비] 대장간에서 만들어 가방(I)의 장비 탭에서 바꾼다",
+		Color(0.62, 0.58, 0.75))
+	for slot: String in GameData.GEAR_SLOTS:
+		var gid: String = str(GameData.equipped.get(slot, ""))
+		var nm: String = GameData.GEAR[gid].name if gid != "" else "없음"
+		var st2: String = GameData.gear_stat_text(gid) if gid != "" else ""
+		_line("%s — %s%s" % [GameData.GEAR_SLOT_NAMES[slot], nm,
+			("  (%s)" % st2) if st2 != "" else ""], Color("ffd75e"))
+	_line("  위력은 동굴 공격력, 방어는 받는 피해, 기력 절약은 도구 소모,",
+		Color(0.62, 0.58, 0.75))
+	_line("  행운은 품질·추가 수확, 이동 속도는 걷는 속도에 그대로 적용된다.",
+		Color(0.62, 0.58, 0.75))
 
 	_line("")
 	if GameData.active_pet != "":

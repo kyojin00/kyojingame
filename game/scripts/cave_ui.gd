@@ -206,7 +206,8 @@ func _process(delta: float) -> void:
 		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 24.0:
 			hurt_cd = 0.9
 			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0, "treant": 20.0}[m.type]
-			GameData.energy -= dmg * GameData.pet_cave_def_mult()  # 부엉이 펫: 피해 감소
+			# 부엉이 펫 + 방어구가 받는 피해를 줄인다
+			GameData.energy -= dmg * GameData.pet_cave_def_mult() * GameData.gear_defense_mult()
 			Sound.play_sfx("sfx_miss")
 			# 넉백은 막히지 않은 곳으로만 (벽/바위 끼임 방지)
 			var kb: Vector2 = ppos + (ppos - m.pos).normalized() * 20.0
@@ -244,8 +245,9 @@ func _attack() -> void:
 	swing_t = 0.15
 	Sound.play_sfx("sfx_chop", 0.2)
 	var reach := ppos + _dir_vec() * 28.0
-	# 공격력 = 도끼의 「위력」 + 전투 숙련도 보정
-	var dmg: float = GameData.tool_stat("axe", "power") + GameData.combat_bonus()
+	# 공격력 = 도끼의 「위력」 + 전투 숙련도 + 장착한 무기
+	var dmg: float = GameData.tool_stat("axe", "power") + GameData.combat_bonus() \
+		+ GameData.gear_stat("power")
 	# 몬스터 타격
 	for m in monsters:
 		if (m.pos - reach).length() < 28.0 or (m.pos - ppos).length() < 24.0:

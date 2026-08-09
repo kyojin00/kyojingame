@@ -153,6 +153,10 @@ const TEXTURE_NAMES := [
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
+	# 대장간 장비 (무기·방어구·장신구)
+	"gear_sword_wood", "gear_sword_iron", "gear_sword_star",
+	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
+	"gear_charm_clover", "gear_charm_ember", "gear_charm_wind",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
@@ -1387,7 +1391,8 @@ func use_tool() -> void:
 	if not _remote_acting:
 		var night := GameData.is_night()
 		var cost := GameData.tool_stat(GameData.tool, "stamina") \
-			* (GameData.STAMINA_NIGHT_MULT if night else GameData.STAMINA_DAY_MULT)
+			* (GameData.STAMINA_NIGHT_MULT if night else GameData.STAMINA_DAY_MULT) \
+			* GameData.gear_stamina_mult()   # 장신구: 기력 절약
 		if cost > 0.0:
 			GameData.energy = maxf(0.0, GameData.energy - cost)
 		if night and randf() < 0.15:
@@ -1650,6 +1655,49 @@ const FACE_VECS := {
 # 앞으로 못 가게 막고 있는 오브젝트 칸을 찾는다.
 # 그림이 큰 오브젝트는 옆 칸에 있어도 길을 막기 때문에, 앞 칸이 비어 있는데
 # 걸음이 막히는 경우가 생긴다. 그때 실제로 막고 있는 것을 캘 수 있게 한다.
+# 지금 든 도구로 캘 수 있는 것이 바로 옆(대각선 포함)에 있으면 그 칸.
+#
+# 오브젝트 그림이 타일보다 크다 보니 「바위 옆에 붙어 섰는데 정면은 빈 칸」인
+# 상황이 자주 생긴다. 그때 E가 헛돌지 않도록, 도구에 맞는 대상이 옆에 있으면
+# 그쪽을 잡아 준다 (가장 가까운 것 하나).
+func _tool_target_nearby() -> Vector2i:
+	if player == null:
+		return Vector2i(-999, -999)
+	var want: Array = []
+	match GameData.tool:
+		"axe":
+			want = ["tree"]
+		"pickaxe":
+			want = ["rock", "bigrock"]
+		_:
+			return Vector2i(-999, -999)
+	var pt := player_tile()
+	var best := Vector2i(-999, -999)
+	var best_d := 1e9
+	for dy in [-1, 0, 1]:
+		for dx in [-1, 0, 1]:
+			var n: Vector2i = pt + Vector2i(dx, dy)
+			var obj: Variant = objects.get(n)
+			if obj == null or not want.has(obj.kind) or bool(obj.get("young", false)):
+				continue
+			var d: float = (Vector2(n.x * TILE + 16, n.y * TILE + 16) - player.position).length()
+			if d < best_d:
+				best_d = d
+				best = n
+	return best
+
+
+# 그 칸 쪽으로 몸을 돌린다 (우세한 축 기준, 대각선이면 좌우 우선)
+func _face_tile(t: Vector2i) -> void:
+	var d := t - player_tile()
+	if d == Vector2i.ZERO:
+		return
+	if absi(d.x) >= absi(d.y):
+		player.dir = "right" if d.x > 0 else "left"
+	else:
+		player.dir = "down" if d.y > 0 else "up"
+
+
 func _blocking_object_tile() -> Vector2i:
 	if player == null:
 		return Vector2i(-999, -999)
@@ -1686,6 +1734,13 @@ func interact() -> void:
 		if bt.x != -999:
 			_sel_target = bt
 			aim = objects.get(bt)
+	if aim == null:
+		# 도구에 맞는 대상이 옆에 있으면 그쪽을 본다 (그림이 커서 정면이 어긋날 때)
+		var nt := _tool_target_nearby()
+		if nt.x != -999:
+			_sel_target = nt
+			_face_tile(nt)
+			aim = objects.get(nt)
 	if aim != null and not bool(aim.get("young", false)) \
 			and ((aim.kind == "tree" and GameData.tool == "axe")
 			or (aim.kind in ["rock", "bigrock"] and GameData.tool == "pickaxe")):
@@ -3630,6 +3685,11 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
+	GameData.owned_gear = d.get("owned_gear", []).duplicate()
+	for slot: String in GameData.GEAR_SLOTS:
+		var gid: String = str(d.get("equipped", {}).get(slot, ""))
+		# 없는 장비를 끼고 있는 저장은 무시한다 (표에서 빠진 장비 등)
+		GameData.equipped[slot] = gid if GameData.owned_gear.has(gid) else ""
 	GameData.unlocked_tools = d.get("unlocked_tools", GameData.ALL_TOOLS.duplicate())
 	for k in d.get("mob_kills", {}):
 		GameData.mob_kills[k] = int(d.mob_kills[k])
@@ -3896,7 +3956,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			"ranch":
 				shop.open("animal", ["animal"])
 			"smith":
-				shop.open("upgrade", ["upgrade"])
+				shop.open("upgrade", ["upgrade", "craft"])
 			"fish":
 				shop.open("codex", ["codex"])
 			_:
@@ -4497,6 +4557,11 @@ func _debug_tick() -> void:
 			objects[gap + Vector2i(0, 1)] = {"kind": "bigrock", "hp": BIGROCK_HP}
 			print("BIGROCK_GAP_OK=", is_passable_px(
 				Vector2(gap.x * TILE + 16, gap.y * TILE + 16)))
+			# 회귀 검사: 바위 옆에 서서 다른 쪽을 보고 있어도 E로 캘 수 있어야 한다
+			player.position = Vector2(gap.x * TILE + 16, gap.y * TILE + 16)
+			player.dir = "left"
+			set_tool("pickaxe")
+			print("ROCK_SIDE_TARGET_OK=", _tool_target_nearby().x != -999)
 			objects.erase(gap + Vector2i(0, -1))
 			objects.erase(gap + Vector2i(0, 1))
 		220:
@@ -4522,6 +4587,27 @@ func _debug_tick() -> void:
 			GameData.minutes = 13.0 * 60.0       # 낮: 다들 광장으로 모인다
 			dialog.close()
 			player.position = Vector2(74 * TILE + 16, 17 * TILE + 16)
+		300:
+			# 대장간 장비: 제작 -> 자동 장착 -> 능력치 적용까지 확인
+			GameData.money = 100000
+			GameData.wood = 500
+			GameData.stone = 500
+			GameData.items["ore"] = 100
+			var made: bool = GameData.craft_gear("gear_sword_iron")
+			GameData.craft_gear("gear_vest_leather")
+			GameData.craft_gear("gear_charm_ember")
+			print("GEAR_CRAFT_OK=", made, " power=", GameData.gear_stat("power"),
+				" def_mult=", GameData.gear_defense_mult(),
+				" stam_mult=", GameData.gear_stamina_mult())
+			shop.open("upgrade", ["upgrade", "craft"], "대장간")
+			shop._on_tab("craft")
+		303: _save_shot("_craft.png")
+		304:
+			shop.close()
+			inventory_ui.toggle()
+			inventory_ui.show_tab("gear")
+		307: _save_shot("_gear.png")
+		308: inventory_ui.close()
 		330:
 			var where := []
 			for n in npcs:

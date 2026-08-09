@@ -33,7 +33,7 @@ var _hover_slots: Array = []  # 툴팁 판정용 [{b, tool, title, body}]
 var _forced_tip := ""         # 검증 하네스에서 툴팁을 고정할 도구 id
 # 탭: 한 번에 한 종류만 보여 준다 (아이템이 늘어나도 밀리지 않게)
 const TABS := [
-	["tool", "도구"], ["seed", "씨앗"], ["crop", "작물"],
+	["tool", "도구"], ["gear", "장비"], ["seed", "씨앗"], ["crop", "작물"],
 	["res", "자원"], ["food", "요리"],
 ]
 var _tab := "tool"
@@ -302,6 +302,10 @@ func _rebuild() -> void:
 			_line("아직 가진 도구가 없다.", Color(0.35, 0.22, 0.1))
 		return
 
+	if _tab == "gear":
+		_build_gear_tab()
+		return
+
 	var rows := 0
 	for e in _item_entries():
 		if str(e.get("tab", "res")) != _tab:
@@ -310,6 +314,56 @@ func _rebuild() -> void:
 		items_box.add_child(_mk_item_row(e))
 	if rows == 0:
 		_line("여기에 담긴 것이 없다.", Color(0.35, 0.22, 0.1))
+
+
+# 장비 탭: 지금 낀 것 + 합계 능력치 + 가진 장비 (눌러서 장착/해제)
+func _build_gear_tab() -> void:
+	_line("[장착 중]", Color(0.65, 0.85, 0.6))
+	for slot: String in GameData.GEAR_SLOTS:
+		var gid: String = str(GameData.equipped.get(slot, ""))
+		var slot_name: String = GameData.GEAR_SLOT_NAMES[slot]
+		if gid == "":
+			items_box.add_child(_mk_row(null, "%s — 없음" % slot_name, "",
+				Color(0.72, 0.66, 0.6)))
+			continue
+		var row := _mk_row(main.tex.get(gid), "%s · %s" % [slot_name, GameData.GEAR[gid].name],
+			"해제")
+		row.pressed.connect(func() -> void:
+			GameData.unequip_slot(slot)
+			Sound.play_sfx("sfx_ui")
+			_rebuild())
+		items_box.add_child(row)
+
+	# 합계 — 이 숫자가 실제로 게임에 적용된다
+	var totals: Array[String] = []
+	for k: String in ["power", "defense", "stamina", "luck", "speed"]:
+		var v := GameData.gear_stat(k)
+		if v == 0.0:
+			continue
+		var unit := "%" if k in ["defense", "stamina", "speed"] else ""
+		totals.append("%s +%s%s" % [GameData.GEAR_STAT_NAMES[k], GameData.fmt_stat(v), unit])
+	_line("합계: " + (" · ".join(totals) if not totals.is_empty() else "없음"),
+		Color(0.35, 0.22, 0.1))
+
+	_line("[가진 장비]  눌러서 장착", Color(0.65, 0.85, 0.6))
+	var any := false
+	for gid: String in GameData.GEAR_IDS:
+		if not GameData.owned_gear.has(gid):
+			continue
+		any = true
+		var g: Dictionary = GameData.GEAR[gid]
+		var worn: bool = str(GameData.equipped.get(str(g.slot), "")) == gid
+		var row2 := _mk_row(main.tex.get(gid), str(g.name),
+			GameData.gear_stat_text(gid),
+			Color(1, 0.88, 0.55) if worn else Color(0.96, 0.93, 0.88))
+		if not worn:
+			row2.pressed.connect(func() -> void:
+				GameData.equip_gear(gid)
+				Sound.play_sfx("sfx_ui")
+				_rebuild())
+		items_box.add_child(row2)
+	if not any:
+		_line("아직 장비가 없다. 대장간(제작 탭)에서 만들 수 있다.", Color(0.35, 0.22, 0.1))
 
 
 func _mk_tab_button(id: String, label: String) -> Button:

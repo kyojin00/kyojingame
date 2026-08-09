@@ -57,6 +57,11 @@ layout_mode = 2
 focus_mode = 0
 text = "강화"
 
+[node name="CraftBtn" type="Button" parent="Panel/V/Tabs"]
+layout_mode = 2
+focus_mode = 0
+text = "제작"
+
 [node name="CodexBtn" type="Button" parent="Panel/V/Tabs"]
 layout_mode = 2
 focus_mode = 0

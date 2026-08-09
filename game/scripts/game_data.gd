@@ -312,7 +312,163 @@ func total_luck() -> float:
 	for t in tool_slots:
 		if t != "" and TOOL_STATS.has(t):
 			sum += tool_stat(t, "luck")
+	return sum + gear_stat("luck")
+
+
+# ==== 대장간: 장비 제작 · 장착 ====
+#
+# 도구 강화(UPGRADES)와는 별개다. 도구는 「무엇을 하느냐」를 정하고,
+# 장비는 「얼마나 잘 하느냐」를 정한다. 세 부위를 하나씩 장착한다.
+#
+# 능력치가 실제로 하는 일:
+#   power   동굴 공격력 +          defense 동굴에서 받는 피해 -%
+#   stamina 도구 기력 소모 -%      luck    품질·추가 수확·희귀 물고기
+#   speed   이동 속도 +%
+# 새 장비를 넣을 때는 GEAR에 한 줄만 더하면 된다.
+const GEAR_SLOTS := ["weapon", "armor", "charm"]
+const GEAR_SLOT_NAMES := {"weapon": "무기", "armor": "방어구", "charm": "장신구"}
+const GEAR_STAT_NAMES := {
+	"power": "위력", "defense": "방어", "stamina": "기력 절약",
+	"luck": "행운", "speed": "이동 속도",
+}
+const GEAR := {
+	# ---- 무기: 동굴 공격력 ----
+	"gear_sword_wood": {"name": "나무 검", "slot": "weapon", "tier": 1,
+		"stats": {"power": 2.0},
+		"cost": {"money": 300, "wood": 20, "stone": 5},
+		"desc": "무쇠 아저씨가 연습용으로 깎아 준 검."},
+	"gear_sword_iron": {"name": "무쇠 검", "slot": "weapon", "tier": 2,
+		"stats": {"power": 5.0},
+		"cost": {"money": 1200, "ore": 10, "stone": 10},
+		"desc": "제대로 벼려 낸 검. 동굴이 한결 수월해진다."},
+	"gear_sword_star": {"name": "별빛 검", "slot": "weapon", "tier": 3,
+		"stats": {"power": 10.0, "luck": 2.0},
+		"cost": {"money": 4000, "star_ore": 3, "ore": 20},
+		"desc": "별빛 광석을 녹여 만든 검. 어둠 속에서 옅게 빛난다."},
+	# ---- 방어구: 받는 피해 ----
+	"gear_vest_leather": {"name": "가죽 조끼", "slot": "armor", "tier": 1,
+		"stats": {"defense": 10.0},
+		"cost": {"money": 400, "wood": 15, "stone": 10},
+		"desc": "가볍고 튼튼하다. 첫 동굴에 딱 맞다."},
+	"gear_vest_iron": {"name": "무쇠 갑옷", "slot": "armor", "tier": 2,
+		"stats": {"defense": 25.0, "speed": -3.0},
+		"cost": {"money": 1500, "ore": 15, "stone": 20},
+		"desc": "묵직한 만큼 확실하다. 조금 느려진다."},
+	"gear_vest_star": {"name": "별빛 갑옷", "slot": "armor", "tier": 3,
+		"stats": {"defense": 40.0},
+		"cost": {"money": 5000, "star_ore": 2, "gem": 1, "ore": 25},
+		"desc": "별빛을 짜 넣어 무겁지 않다."},
+	# ---- 장신구: 생활 능력치 ----
+	"gear_charm_clover": {"name": "네잎클로버", "slot": "charm", "tier": 1,
+		"stats": {"luck": 3.0},
+		"cost": {"money": 300, "wood": 10},
+		"desc": "행운이 따른다. 좋은 품질이 더 자주 나온다."},
+	"gear_charm_ember": {"name": "불씨 부적", "slot": "charm", "tier": 2,
+		"stats": {"stamina": 20.0},
+		"cost": {"money": 1000, "ore": 8, "stone": 10},
+		"desc": "일이 덜 고되다. 도구 기력 소모가 준다."},
+	"gear_charm_wind": {"name": "바람 부적", "slot": "charm", "tier": 3,
+		"stats": {"speed": 12.0, "luck": 1.0},
+		"cost": {"money": 2500, "gem": 1, "ore": 10},
+		"desc": "발걸음이 가벼워진다."},
+}
+const GEAR_IDS := ["gear_sword_wood", "gear_sword_iron", "gear_sword_star",
+	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
+	"gear_charm_clover", "gear_charm_ember", "gear_charm_wind"]
+
+var owned_gear: Array = []
+var equipped := {"weapon": "", "armor": "", "charm": ""}
+
+
+# 장착 중인 장비의 능력치 합
+func gear_stat(key: String) -> float:
+	var sum := 0.0
+	for slot: String in GEAR_SLOTS:
+		var gid: String = str(equipped.get(slot, ""))
+		if gid != "" and GEAR.has(gid):
+			sum += float(GEAR[gid].stats.get(key, 0.0))
 	return sum
+
+
+func gear_speed_mult() -> float:
+	return clampf(1.0 + gear_stat("speed") / 100.0, 0.5, 2.0)
+
+
+# 도구 기력 소모 배수 (기력 절약이 높을수록 적게 든다)
+func gear_stamina_mult() -> float:
+	return clampf(1.0 - gear_stat("stamina") / 100.0, 0.2, 1.0)
+
+
+# 동굴에서 받는 피해 배수
+func gear_defense_mult() -> float:
+	return clampf(1.0 - gear_stat("defense") / 100.0, 0.2, 1.0)
+
+
+func gear_stat_text(gid: String) -> String:
+	if not GEAR.has(gid):
+		return ""
+	var parts: Array[String] = []
+	var st: Dictionary = GEAR[gid].stats
+	for k: String in ["power", "defense", "stamina", "luck", "speed"]:
+		if not st.has(k):
+			continue
+		var v := float(st[k])
+		var unit := "%" if k in ["defense", "stamina", "speed"] else ""
+		parts.append("%s %s%s%s" % [GEAR_STAT_NAMES[k], "+" if v > 0.0 else "",
+			fmt_stat(v), unit])
+	return " · ".join(parts)
+
+
+func gear_cost_text(gid: String) -> String:
+	if not GEAR.has(gid):
+		return ""
+	var names := {"money": "G", "wood": "목재", "stone": "석재",
+		"ore": "광석", "star_ore": "별빛 광석", "gem": "보석"}
+	var parts: Array[String] = []
+	for k: String in GEAR[gid].cost:
+		var n: int = int(GEAR[gid].cost[k])
+		parts.append("%dG" % n if k == "money" else "%s %d" % [names.get(k, k), n])
+	return " · ".join(parts)
+
+
+func can_craft_gear(gid: String) -> bool:
+	if not GEAR.has(gid) or owned_gear.has(gid):
+		return false
+	var cost: Dictionary = GEAR[gid].cost
+	if money < int(cost.get("money", 0)):
+		return false
+	if wood < int(cost.get("wood", 0)) or stone < int(cost.get("stone", 0)):
+		return false
+	for k: String in ["ore", "star_ore", "gem"]:
+		if int(items.get(k, 0)) < int(cost.get(k, 0)):
+			return false
+	return true
+
+
+# 만들면 바로 장착한다 (같은 부위의 이전 장비는 그대로 가지고 있는다)
+func craft_gear(gid: String) -> bool:
+	if not can_craft_gear(gid):
+		return false
+	var cost: Dictionary = GEAR[gid].cost
+	money -= int(cost.get("money", 0))
+	today_spent += int(cost.get("money", 0))
+	wood -= int(cost.get("wood", 0))
+	stone -= int(cost.get("stone", 0))
+	for k: String in ["ore", "star_ore", "gem"]:
+		items[k] = int(items.get(k, 0)) - int(cost.get(k, 0))
+	owned_gear.append(gid)
+	equipped[str(GEAR[gid].slot)] = gid
+	return true
+
+
+func equip_gear(gid: String) -> void:
+	if GEAR.has(gid) and owned_gear.has(gid):
+		equipped[str(GEAR[gid].slot)] = gid
+
+
+func unequip_slot(slot: String) -> void:
+	if equipped.has(slot):
+		equipped[slot] = ""
 
 
 # 강화 한 단계로 어떤 능력치가 얼마나 오르는지 (상점 표시용)
@@ -1299,6 +1455,8 @@ func reset_all() -> void:
 	tutorial = fresh_tutorial()
 	grandpa_step = 0
 	grandpa_seen = false
+	owned_gear = []
+	equipped = {"weapon": "", "armor": "", "charm": ""}
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
 	tree_regrow = []
@@ -1410,6 +1568,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
+		"owned_gear": owned_gear,
+		"equipped": equipped,
 		"grandpa_step": grandpa_step,
 		"grandpa_seen": grandpa_seen,
 		"unlocked_tools": unlocked_tools,
