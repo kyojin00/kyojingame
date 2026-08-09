@@ -83,28 +83,16 @@ var _shot_frames := 0
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
-	"player_down_0", "player_down_1", "player_up_0", "player_up_1",
-	"player_side_0", "player_side_1",
-	"player_down_idle", "player_up_idle", "player_side_idle",
 	"player_f_down_0", "player_f_down_1", "player_f_up_0", "player_f_up_1",
 	"player_f_side_0", "player_f_side_1",
 	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
-	"player_side_idle_0", "player_down_idle_0", "player_casual_down_idle",
-	"player_casual_side_idle", "player_casual_side_walk_0", "player_casual_side_walk_1",
-	"player_casual_side_walk_2", "player_casual_side_walk_3", "player_casual_side_walk_4",
-	"player_casual_side_walk_5",
-	"player_casual_up_idle", "player_casual_up_walk_0", "player_casual_up_walk_1",
-	"player_casual_up_walk_2", "player_casual_up_walk_3", "player_casual_up_walk_4",
-	"player_casual_up_walk_5",
-	"player_casual_down_walk_0", "player_casual_down_walk_1",
-	"player_casual_down_walk_2", "player_casual_down_walk_3",
-	"player_casual_down_walk_4", "player_casual_down_walk_5",
-	"player_side_walk_0", "player_side_walk_1", "player_side_walk_2",
-	"player_side_walk_3", "player_side_walk_4", "player_side_walk_5",
-	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
-	"player_down_walk_3", "player_down_walk_4", "player_down_walk_5",
-	"player_up_walk_0", "player_up_walk_1", "player_up_walk_2",
-	"player_up_walk_3", "player_up_walk_4", "player_up_walk_5",
+	"new_boy_down_idle", "new_boy_side_idle", "new_boy_up_idle",
+	"new_boy_down_walk_0", "new_boy_down_walk_1",
+	"new_boy_down_walk_2", "new_boy_down_walk_3",
+	"new_boy_side_walk_0", "new_boy_side_walk_1",
+	"new_boy_side_walk_2", "new_boy_side_walk_3",
+	"new_boy_up_walk_0", "new_boy_up_walk_1",
+	"new_boy_up_walk_2", "new_boy_up_walk_3",
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
 	"mature_tomato", "mature_corn", "mature_watermelon",
@@ -3846,16 +3834,19 @@ func _debug_tick() -> void:
 			player.dir = "up"
 		182: _save_shot("_village2.png")
 		184:
-			GameData.gender = "m"                      # 평상복 뒷모습 걷기 확인
-			GameData.outfit = "casual"
+			GameData.gender = "m"                      # 남자 캐릭터 뒷모습 걷기 확인
 			_send_key_press(KEY_W)
-		188: _save_shot("_casual_back.png")
+		188: _save_shot("_boy_back.png")
 		189:
 			_send_key_release(KEY_W)
-			_send_key_press(KEY_S)                     # 평상복 앞모습 걷기 확인
-		193: _save_shot("_casual_front.png")
-		194: _send_key_release(KEY_S)
-		196: get_tree().quit()
+			_send_key_press(KEY_S)                     # 앞모습 걷기 확인
+		193: _save_shot("_boy_front.png")
+		194:
+			_send_key_release(KEY_S)
+			_send_key_press(KEY_D)                     # 옆모습 걷기 확인
+		198: _save_shot("_boy_side.png")
+		199: _send_key_release(KEY_D)
+		201: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

@@ -491,45 +491,39 @@ func story_objective_short() -> String:
 
 
 func player_tex(part: String) -> String:
-	# 성별에 맞는 플레이어 텍스처 이름
-	return ("player_f_" if gender == "f" else "player_") + part
+	# 여자 캐릭터 텍스처 이름 (남자는 new_boy_* 를 그대로 쓴다)
+	return "player_f_" + part
 
 
 func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 옆모습. 남자: 걷는 중엔 6프레임 걷기(9fps), 멈추면 숨쉬기(스케일) 모션.
+	# 옆모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
 	if gender == "m":
 		if not is_moving:
-			return player_idle_tex("side")
-		if outfit == "casual":
-			return "player_casual_side_walk_%d" % (int(t * 9.0) % 6)
-		return "player_side_walk_%d" % (int(t * 9.0) % 6)
+			return "new_boy_side_idle"
+		return "new_boy_side_walk_%d" % (int(t * 8.0) % 4)
 	if suffix == "idle":
 		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
 
 
 func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 앞모습. 남자: 걷는 중엔 6프레임 걷기(9fps), 멈추면 숨쉬기(스케일) 모션.
+	# 앞모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	if gender == "m":
 		if not is_moving:
-			return player_idle_tex("down")
-		if outfit == "casual":
-			return "player_casual_down_walk_%d" % (int(t * 9.0) % 6)
-		return "player_down_walk_%d" % (int(t * 9.0) % 6)
+			return "new_boy_down_idle"
+		return "new_boy_down_walk_%d" % (int(t * 8.0) % 4)
 	if suffix == "idle":
 		return player_tex("down_idle")
 	return player_tex("down_" + suffix)
 
 
 func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 뒷모습. 남자: 걷는 중엔 6프레임 걷기(9fps), 멈추면 숨쉬기(스케일) 모션.
+	# 뒷모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	if gender == "m":
 		if not is_moving:
-			return player_idle_tex("up")
-		if outfit == "casual":
-			return "player_casual_up_walk_%d" % (int(t * 9.0) % 6)
-		return "player_up_walk_%d" % (int(t * 9.0) % 6)
+			return "new_boy_up_idle"
+		return "new_boy_up_walk_%d" % (int(t * 8.0) % 4)
 	if suffix == "idle":
 		return player_tex("up_idle")
 	return player_tex("up_" + suffix)
@@ -545,23 +539,12 @@ var story_gates_left := 0
 # 0=바위 발견 전 / 1=곡괭이 받음(채광 중) / 2=바위 제거(곡괭이 돌려주기 대기) / 3=완료
 var story_rock_state := 0
 
-# 의상 (커스텀 시스템 초안): farm=농부 작업복 / casual=평상복
-# 평상복은 아직 정면 서기 1장뿐 — 나머지 방향/걷기는 농부 복장으로 표시된다
-var outfit := "farm"
-
 
 func player_idle_tex(dirn: String) -> String:
 	# 대기: 단일 서기 프레임. 숨쉬기는 스프라이트 세로 스케일로 연출한다 (player.gd)
-	if gender == "m" and dirn == "down":
-		if outfit == "casual":
-			return "player_casual_down_idle"
-		return "player_down_idle_0"
-	if gender == "m" and dirn == "side":
-		return "player_casual_side_idle" if outfit == "casual" else "player_side_idle_0"
-	if gender == "m" and dirn == "up" and outfit == "casual":
-		return "player_casual_up_idle"
+	if gender == "m":
+		return "new_boy_%s_idle" % dirn
 	return player_tex(dirn + "_idle")
-
 
 
 func pet_speed_mult() -> float:
