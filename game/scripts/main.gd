@@ -1535,44 +1535,48 @@ func _building_kind_at(t: Vector2i) -> String:
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(4, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
+const STORY_SPAWN := Vector2i(18, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
 const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
-const STORY_FORK := Vector2i(20, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
-const STORY_ROCK := Vector2i(26, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
-const STORY_FOREST_W := 38                 # 스토리 숲의 가로 폭 (줌아웃 화면을 채운다)
+const STORY_FORK := Vector2i(34, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
+const STORY_ROCK := Vector2i(40, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
+# 스토리 숲의 가로 폭. 화면(37.5칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
+# 옆으로 움직인다. 숲길(x 4~33) 동쪽은 들어갈 수 없는 배경 숲이다.
+const STORY_FOREST_W := 58
 # 숲길은 4줄 폭의 흙길. 양옆은 울타리로 막혀 있어 길을 벗어날 수 없다.
 const STORY_ROAD_Y0 := 15
 const STORY_ROAD_Y1 := 18                  # 15·16·17·18 = 4줄
-const STORY_ROAD_X0 := 4
-const STORY_ROAD_X1 := 33
-const STORY_LINK_X := 30                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
+const STORY_ROAD_X0 := 18
+const STORY_ROAD_X1 := 47
+const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
-const STORY_GATE_XS := [11, 16, 22, 28]
+const STORY_GATE_XS := [25, 30, 36, 42]
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
 var _postman: Node2D = null
 var _postman_spr: Sprite2D = null
 var _postman_state := ""                   # approach / wait / talk / follow / leave
-const POSTMAN_STOP_DIST := 76.0            # 걸어와서 멈춰 서는 거리
-const POSTMAN_TALK_DIST := 104.0           # E로 말을 걸 수 있는 거리
+const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)
+const POSTMAN_TALK_DIST := 60.0            # E로 말을 걸 수 있는 거리
+const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따라온다
 var _postman_anim := 0.0
+var _postman_wait_t := 0.0
 var _story_t := 0.0
 
 
 func _apply_story_camera() -> void:
-	# 숲 구간(마을 이동 전)에는 시작 숲 한 화면(30x17타일)에 카메라를 고정한다.
+	# 숲 구간(마을 이동 전)에는 카메라를 숲 안에 가둔다.
+	# 숲이 화면보다 넓으므로 주인공을 따라 옆으로 스크롤된다.
 	# 마을로 이동하는 travel 단계부터는 전체 맵 카메라로 풀린다.
 	var cam: Camera2D = player.get_node("Camera")
 	cam.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
 	if GameData.story_phase in ["enter", "approach", "equip", "chop", "path", "map", "rock"]:
-		# 숲 구간은 시작 숲 한 화면에 고정한다 (줌아웃한 화면 크기에 맞춰 넉넉히)
 		cam.limit_left = 0
 		cam.limit_top = TILE
 		cam.limit_right = STORY_FOREST_W * TILE
 		cam.limit_bottom = 23 * TILE
-		cam.position_smoothing_enabled = false
+		cam.position_smoothing_enabled = true
 	else:
 		cam.limit_left = 0
 		cam.limit_top = 0
@@ -1593,10 +1597,6 @@ func _apply_story_visibility() -> void:
 
 
 func _plant_story_forest() -> void:
-	# 숲 입구(우체부가 걸어오는 길)는 테두리 나무까지 치워 시야를 확보한다
-	for yy in [STORY_LANE_Y - 1, STORY_LANE_Y, STORY_LANE_Y + 1]:
-		objects.erase(Vector2i(0, yy))
-		objects.erase(Vector2i(1, yy))
 	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래 + 마을 큰길 연결로)
 	#    길을 내면서 그 자리에 미리 생성된 나무·돌은 치운다 (길이 막히면 안 된다)
 	for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):
@@ -1610,6 +1610,9 @@ func _plant_story_forest() -> void:
 			_carve_road(Vector2i(x, y))
 	for y in range(9, STORY_ROAD_Y0):               # 마을 큰길로 오르는 연결로
 		for x in range(STORY_LINK_X, STORY_LINK_X + 4):
+			_carve_road(Vector2i(x, y))
+	for y in [8, 9]:                                # 숲을 빠져나와 마을 큰길로 이어지는 길
+		for x in range(STORY_LINK_X, 60):
 			_carve_road(Vector2i(x, y))
 
 	# ② 길 양옆은 울타리로 막는다 — 길을 벗어날 수 없다 (숲으로는 못 들어간다)
@@ -1633,8 +1636,9 @@ func _plant_story_forest() -> void:
 	for y in range(9, STORY_ROAD_Y0):               # 연결로 양옆
 		_story_fence(Vector2i(STORY_LINK_X - 1, y))
 		_story_fence(Vector2i(STORY_LINK_X + 4, y))
-	for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):   # 본길 동쪽 끝
+	for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):   # 본길 양 끝
 		_story_fence(Vector2i(STORY_ROAD_X1 + 1, y))
+		_story_fence(Vector2i(STORY_ROAD_X0 - 1, y))
 
 	# ③ 길을 가로막고 선 나무 줄 — 베어야만 지나갈 수 있다
 	for gx: int in STORY_GATE_XS:
@@ -1730,6 +1734,9 @@ func _story_update(delta: float) -> void:
 				var ahead: Variant = objects.get(player_tile() + dirs[player.dir])
 				hit_tree = ahead != null and ahead.kind == "tree"
 			if hit_tree or (story_shot and _story_t > 0.8):
+				if story_shot:   # 실제 플레이처럼 첫 나무 줄 앞까지 걸어와 있게 한다
+					player.position = Vector2(
+						(STORY_GATE_XS[0] - 1) * TILE + 16, STORY_LANE_Y * TILE + 16)
 				GameData.story_phase = "approach"
 				hud.show_message("더 이상 갈 수 없는 길인 것 같다.", 4.0)
 				if story_shot:
@@ -1743,7 +1750,16 @@ func _story_update(delta: float) -> void:
 		"approach":
 			_update_postman(delta, story_shot)
 			if story_shot and _postman_state == "wait":
-				_send_key(KEY_E)   # 실제 플레이와 같은 경로로 말을 건다
+				# 실제 플레이와 같은 경로: 느낌표를 보고 걸어가서 E로 말을 건다
+				_postman_wait_t += delta
+				if _postman_wait_t >= 0.5 and _postman_wait_t - delta < 0.5:
+					_snap_story("story_bang")     # 머리 위 느낌표 확인
+				elif _postman_wait_t > 0.6:
+					if (player.position - _postman.position).length() > POSTMAN_TALK_DIST - 8.0:
+						player.position = player.position.move_toward(
+							_postman.position, 220.0 * delta)
+					else:
+						_send_key(KEY_E)
 		"equip":
 			_update_postman(delta, story_shot)
 			# 받은 나무도끼를 가방에서 빠른 슬롯에 넣으면 퀘스트 2 완료
@@ -1791,7 +1807,7 @@ func _story_update(delta: float) -> void:
 
 func _spawn_postman() -> void:
 	_postman = Node2D.new()
-	_postman.position = Vector2(36, STORY_LANE_Y * TILE + 16)  # 화면 왼쪽 끝
+	_postman.position = Vector2(STORY_ROAD_X0 * TILE + 16, STORY_LANE_Y * TILE + 16)
 	_postman_spr = Sprite2D.new()
 	_postman_spr.centered = false
 	# 플레이어와 같은 밀도의 도트. 어른이라 주인공보다 조금 크게 그린다.
@@ -1828,11 +1844,11 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 				_postman_spr.flip_h = to_player.x < 0
 				if not story_shot:
 					hud.show_message(
-						"우체부 아저씨가 다가왔다. 가까이서 E를 눌러 말을 걸어보자.", 6.0)
+						"누군가 말을 걸고 싶어 한다. 가까이 가서 E를 눌러보자.", 6.0)
 		"wait":
-			# 말을 걸 때까지 옆에서 기다린다 (플레이어가 멀어지면 다시 따라간다)
+			# 느낌표를 띄운 채 서서 기다린다 (많이 멀어지면 다시 따라간다)
 			var to_wait := player.position - _postman.position
-			if to_wait.length() > POSTMAN_TALK_DIST:
+			if to_wait.length() > POSTMAN_REFOLLOW_DIST:
 				_postman_state = "approach"
 			else:
 				_postman_spr.texture = tex["npc_postman_side_0"]
@@ -3568,6 +3584,10 @@ func _draw_overlay() -> void:
 			overlay.draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
 			overlay.draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
 
+	# 말을 걸어 달라는 표시: 머리 위에서 통통 튀는 느낌표
+	if _postman != null and _postman_state == "wait" and not ui_open():
+		_draw_bang(_postman.position + Vector2(0, -136))
+
 	for pt in particles:
 		overlay.draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
 
@@ -3583,6 +3603,17 @@ func _draw_overlay() -> void:
 
 	_draw_context_hint()
 	_draw_weather()
+
+
+# 머리 위 느낌표 (도트 그대로 — 굵은 막대 + 점)
+func _draw_bang(pos: Vector2) -> void:
+	var bob := absf(sin(weather_time * 4.0)) * 6.0
+	var p := pos + Vector2(0, -bob)
+	var body := Rect2(p + Vector2(-3, 0), Vector2(6, 20))
+	var dot := Rect2(p + Vector2(-3, 24), Vector2(6, 7))
+	for r: Rect2 in [body, dot]:
+		overlay.draw_rect(r.grow(2.0), Color(0.12, 0.08, 0.05, 0.92))  # 외곽선
+		overlay.draw_rect(r, Color(1.0, 0.86, 0.25))
 
 
 # 타겟 타일/주변 상황에 맞는 안내 문구를 월드에 띄운다
@@ -3654,6 +3685,8 @@ func _context_hint() -> Array:
 
 # 현재 목표에 목적지가 있으면 플레이어 주위에 방향 화살표를 띄운다
 func nav_target() -> Variant:
+	if GameData.story_phase == "approach" and _postman != null:
+		return _postman.position          # 첫 만남: 우체부에게 가는 길 안내
 	if GameData.story_phase == "path":
 		# 갈림길까지 숲길 안내
 		return Vector2(STORY_FORK.x * TILE + 16, STORY_FORK.y * TILE + 16)
