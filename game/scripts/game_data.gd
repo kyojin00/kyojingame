@@ -512,6 +512,8 @@ func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("down")
+		if outfit == "casual":
+			return "player_casual_down_walk_%d" % (int(t * 9.0) % 6)
 		return "player_down_walk_%d" % (int(t * 9.0) % 6)
 	if suffix == "idle":
 		return player_tex("down_idle")
