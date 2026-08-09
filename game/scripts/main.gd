@@ -21,9 +21,24 @@ func _grow_total(def: Dictionary) -> float:
 	return float(def.grow_days) * 60.0
 
 
+# 절반까지 자란 작물은 물을 한 번 더 받아야 계속 자란다 (성장 체크포인트)
+const GROW_CHECKPOINT := 0.5
+
+
+# 이 칸의 작물이 체크포인트에서 물을 기다리며 멈춰 있는가
+func _crop_thirsty(cell: Dictionary) -> bool:
+	if cell.crop_id == "" or cell.dead or bool(cell.get("half_fed", false)):
+		return false
+	return float(cell.crop_day) >= _grow_total(GameData.CROPS[cell.crop_id]) * GROW_CHECKPOINT
+
+
 func _wet(cell: Dictionary, minutes: float) -> void:
 	cell.wet_min = maxf(float(cell.wet_min), minutes)
 	cell.watered = true
+	# 절반까지 자란 뒤에 받은 물만 체크포인트를 통과시킨다
+	# (심을 때 내린 비로 미리 통과되지 않도록 성장률을 직접 본다)
+	if _crop_thirsty(cell):
+		cell.half_fed = true
 
 # grid[y][x] = {ground, watered, crop_id, crop_day, dead}
 var grid: Array = []
@@ -413,7 +428,7 @@ func _build_map() -> void:
 		for x in MAP_W:
 			# crop_day = 누적 성장 시간(게임 분), wet_min = 남은 젖음 시간(게임 분)
 			row.append({"ground": "grass", "watered": false, "wet_min": 0.0,
-				"crop_id": "", "crop_day": 0.0, "dead": false})
+				"crop_id": "", "crop_day": 0.0, "dead": false, "half_fed": false})
 		grid.append(row)
 
 	# 연못들 (숲/깊은 숲) — 시작 부지의 연못은 없앴다
@@ -1096,9 +1111,6 @@ func use_tool() -> void:
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return
-	if not can_use_tile(t):
-		hud.show_message("아직 구입하지 않은 부지다. 표지판(E)에서 구입하자!")
-		return
 	var cell: Dictionary = grid[t.y][t.x]
 	var obj: Variant = objects.get(t)
 	var seed_now := GameData.current_seed_id()
@@ -1110,6 +1122,7 @@ func use_tool() -> void:
 				cell.crop_id = ""
 				cell.crop_day = 0
 				cell.dead = false
+				cell.half_fed = false
 				Sound.play_sfx("sfx_hoe", 0.1)
 				hud.show_message("시든 작물을 정리했다.")
 			elif obj != null:
@@ -1138,18 +1151,23 @@ func use_tool() -> void:
 					tutorial_notify("till")
 		"water":
 			var worked := false
+			var revived := false
 			for pos: Vector2i in _affected_tiles(t):
 				if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
 					continue
 				var c: Dictionary = grid[pos.y][pos.x]
+				var was_thirsty := _crop_thirsty(c)
 				if c.ground == "soil" and not objects.has(pos) \
-						and float(c.wet_min) < WET_MANUAL - 1.0:
+						and (float(c.wet_min) < WET_MANUAL - 1.0 or was_thirsty):
 					_wet(c, WET_MANUAL)
 					spawn_particles(pos, "water")
 					worked = true
+					revived = revived or was_thirsty
 			if worked:
 				Sound.play_sfx("sfx_water", 0.1)
 				tutorial_notify("water")
+				if revived:
+					hud.show_message("물을 머금은 작물이 다시 자라기 시작했다!", 4.0)
 			elif grid[t.y][t.x].ground != "soil":
 				hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
@@ -1171,6 +1189,7 @@ func use_tool() -> void:
 			cell.crop_id = id
 			cell.crop_day = 0.0
 			cell.dead = false
+			cell.half_fed = false
 			if weather_now() == GameData.WEATHER_RAIN:
 				_wet(cell, WET_ALL_DAY)
 			Sound.play_sfx("sfx_seed", 0.1)
@@ -1198,6 +1217,7 @@ func use_tool() -> void:
 							hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
 					cell.crop_id = ""
 					cell.crop_day = 0.0
+					cell.half_fed = false
 					Sound.play_sfx("sfx_harvest")
 					spawn_particles(t, "sparkle")
 					tutorial_notify("harvest")
@@ -1488,7 +1508,15 @@ func interact() -> void:
 		else:
 			hud.show_message("곡괭이가 필요하다. 숫자키로 곡괭이를 선택하자!")
 		return
-	# 상호작용 대상이 없으면 조용히 무시한다 (걸어다니며 E를 눌러도 메시지 없음)
+	# 그 밖에는 손에 든 것을 그대로 쓴다 — 호미로 밭 갈기, 씨앗 심기, 물 주기,
+	# 수확, 낚시까지 전부 E 하나로 된다 (좌클릭과 같은 동작).
+	# 맨손이고 앞에 작물도 없으면 아무 일도 하지 않는다
+	# (걸어다니며 E를 눌러도 메시지가 뜨지 않게)
+	var tt := target_tile()
+	var crop_ahead: bool = tt.x >= 0 and tt.y >= 0 and tt.x < MAP_W and tt.y < MAP_H \
+		and grid[tt.y][tt.x].crop_id != ""
+	if GameData.tool != "hand" or GameData.current_seed_id() != "" or crop_ahead:
+		use_tool()
 
 
 # 설치 타일이 플레이어(원격 포함) 발밑과 겹치면 끼이므로 설치를 막는다
@@ -1560,6 +1588,7 @@ var _postman_state := ""                   # approach / wait / talk / follow / l
 const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)
 const POSTMAN_TALK_DIST := 60.0            # E로 말을 걸 수 있는 거리
 const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따라온다
+const VILLAGE_EXIT_X := 74                 # 우체부가 빠져나가는 마을 북쪽 길
 var _postman_anim := 0.0
 var _postman_wait_t := 0.0
 var _story_t := 0.0
@@ -1703,6 +1732,10 @@ func _refresh_story_gates() -> void:
 
 func _story_update(delta: float) -> void:
 	if GameData.story_phase == "done" or Net.is_guest():
+		# 스토리가 끝나도 우체부가 남아 있으면 떠나는 연출은 계속 돌린다
+		# (예전에는 여기서 바로 빠져나가 편지를 전한 자리에 그대로 서 있었다)
+		if not Net.is_guest() and _postman != null:
+			_update_postman(delta, false)
 		return
 	_story_t += delta
 	var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
@@ -1895,10 +1928,20 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 				_postman_spr.flip_h = false
 				_start_delivery_dialog()
 		"leave":
-			_postman.position += Vector2.LEFT * 55.0 * delta
-			_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
-			_postman_spr.flip_h = true
-			if _postman.position.x < -32.0:
+			# 편지를 전하고 나면 마을 북쪽 길로 걸어 나간다 (광장에 계속 서 있지 않는다)
+			var road_x := VILLAGE_EXIT_X * TILE + 16.0
+			var far_from_road: bool = absf(_postman.position.x - road_x) > 6.0
+			var goal := Vector2(road_x, _postman.position.y) if far_from_road \
+				else Vector2(road_x, -96.0)
+			var to4 := goal - _postman.position
+			_postman.position += to4.normalized() * 70.0 * delta
+			if far_from_road:
+				_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
+				_postman_spr.flip_h = to4.x < 0
+			else:
+				_postman_spr.texture = tex["npc_postman_up_%d" % (int(_postman_anim * 5.0) % 2)]
+				_postman_spr.flip_h = false
+			if _postman.position.y < -80.0:
 				_postman.queue_free()
 				_postman = null
 
@@ -3097,7 +3140,8 @@ func save_now() -> void:
 		var row := []
 		for x in MAP_W:
 			var c: Dictionary = grid[y][x]
-			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day), 1 if c.dead else 0])
+			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day),
+				1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
 		g.append(row)
 	var objs := []
 	for pos: Vector2i in objects:
@@ -3217,6 +3261,7 @@ func _apply_save(d: Dictionary) -> void:
 				growth *= 60.0
 			cell.crop_day = growth
 			cell.dead = s.size() > 4 and int(s[4]) == 1
+			cell.half_fed = s.size() > 5 and int(s[5]) == 1
 	if d.has("objects"):
 		objects.clear()
 		for o in d.objects:
@@ -3289,9 +3334,12 @@ func _growth_tick(game_minutes: float) -> void:
 				cell.wet_min = 0.0
 				cell.watered = false
 				changed = true
-			if cell.crop_id != "" and not cell.dead:
+			if cell.crop_id != "" and not cell.dead and not _crop_thirsty(cell):
 				var before_stage := _crop_texture(cell)
 				cell.crop_day = float(cell.crop_day) + game_minutes * GameData.farm_growth_mult()
+				# 절반을 막 넘겼다면 여기서 멈춘다 — 물을 한 번 더 줘야 한다
+				if _crop_thirsty(cell):
+					changed = true
 				if _crop_texture(cell) != before_stage:
 					changed = true
 	if changed:
@@ -3675,7 +3723,9 @@ func _context_hint() -> Array:
 		if pct >= 1.0:
 			return ["수확!", above_tile]
 		var text := "성장 %d%%" % int(pct * 100.0)
-		if not cell.watered:
+		if _crop_thirsty(cell):
+			text += " · 물을 한 번 더!"
+		elif not cell.watered:
 			text += " · 물주기!"
 		return [text, above_tile]
 	if cell.ground == "water" and GameData.tool == "rod":
@@ -3803,12 +3853,12 @@ func _debug_tick() -> void:
 		return
 	match _shot_frames:
 		10: _send_key(KEY_1)
-		14: _send_key(KEY_SPACE)                       # 아래 타일 밭 갈기
+		14: _send_key(KEY_E)                           # 아래 타일 밭 갈기 (E로도 된다)
 		18: _send_click(Vector2((START_TILE.x + 1) * TILE + 16, START_TILE.y * TILE + 16))
 		22: _send_key(KEY_2)
 		26: _send_key(KEY_SPACE)                       # 물 주기
 		30: _send_key(KEY_3)
-		34: _send_key(KEY_SPACE)                       # 씨앗 심기
+		34: _send_key(KEY_E)                           # 씨앗 심기 (E로도 된다)
 		36:
 			GameData.wood = 5                          # 설치 테스트용 자원 지급
 			GameData.stone = 5
@@ -3874,7 +3924,7 @@ func _debug_tick() -> void:
 		160: _send_key(KEY_SPACE)                      # 공격 모션
 		162: _save_shot("_cave.png")
 		164: cave.close()
-		166: quest_ui.toggle()                         # 퀘스트 창(J) 확인
+		166: quest_ui.toggle()                         # 퀘스트 창(Q) 확인
 		170: _save_shot("_questwin.png")
 		172:
 			quest_ui.close()
@@ -3961,7 +4011,8 @@ func _make_snapshot_json() -> String:
 		var row := []
 		for x in MAP_W:
 			var c: Dictionary = grid[y][x]
-			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day), 1 if c.dead else 0])
+			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day),
+				1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
 		g.append(row)
 	var objs := []
 	for pos: Vector2i in objects:
@@ -4061,7 +4112,8 @@ func _broadcast_area(center: Vector2i) -> void:
 			if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
 				continue
 			var c: Dictionary = grid[pos.y][pos.x]
-			cells.append([pos.x, pos.y, c.ground, int(c.wet_min), c.crop_id, int(c.crop_day), 1 if c.dead else 0])
+			cells.append([pos.x, pos.y, c.ground, int(c.wet_min), c.crop_id,
+				int(c.crop_day), 1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
 			if objects.has(pos):
 				var o: Dictionary = objects[pos]
 				objs.append([pos.x, pos.y, o.kind, o.hp])
@@ -4078,6 +4130,7 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 		c.crop_id = entry[4]
 		c.crop_day = float(entry[5])
 		c.dead = int(entry[6]) == 1
+		c.half_fed = entry.size() > 7 and int(entry[7]) == 1
 	# 영역 내 오브젝트: 목록에 없는 건 제거, 있는 건 갱신/추가
 	var present := {}
 	for o in objs:

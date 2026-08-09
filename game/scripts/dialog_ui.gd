@@ -31,56 +31,86 @@ var _seq_on_end := Callable()
 var _seq_has_choices := false
 
 
+# 대화창은 화면 아래 가운데에 고정하고, 내용 높이만큼만 커진다.
+# (예전에는 645x210으로 고정이라 짧은 대사에서도 빈 공간이 크게 남았다)
+const PANEL_W := 520
+const BOTTOM_MARGIN := 56          # 아래 핫바를 가리지 않는 높이
+const FONT_TITLE := 17
+const FONT_BODY := 17
+const FONT_BTN := 15
+const PORTRAIT := 64
+
+
 func _ready() -> void:
 	layer = 25
 	visible = false
 
+	var root := Control.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(root)
+
 	var panel := PanelContainer.new()
-	panel.position = Vector2(158, 285)
-	panel.custom_minimum_size = Vector2(645, 210)
+	# 가로 가운데 정렬 + 아래쪽 고정. 내용이 길어지면 위로 자란다.
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 1.0
+	panel.anchor_bottom = 1.0
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	panel.offset_left = -PANEL_W / 2.0
+	panel.offset_right = PANEL_W / 2.0
+	panel.offset_top = -BOTTOM_MARGIN
+	panel.offset_bottom = -BOTTOM_MARGIN
+	panel.custom_minimum_size = Vector2(PANEL_W, 0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
 	style.border_color = Color(0.42, 0.36, 0.55)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(4)
-	style.set_content_margin_all(10)
+	style.set_content_margin_all(9)
 	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
+	root.add_child(panel)
 
 	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 10)
+	h.add_theme_constant_override("separation", 9)
 	panel.add_child(h)
 
 	portrait = TextureRect.new()
-	portrait.custom_minimum_size = Vector2(96, 96)
+	portrait.custom_minimum_size = Vector2(PORTRAIT, PORTRAIT)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	portrait.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	portrait.visible = false
 	h.add_child(portrait)
 
 	var v := VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 6)
 	h.add_child(v)
 
 	title_label = Label.new()
 	title_label.add_theme_color_override("font_color", Color("ffd75e"))
+	title_label.add_theme_font_size_override("font_size", FONT_TITLE)
 	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(title_label)
 
 	body_label = Label.new()
+	body_label.add_theme_font_size_override("font_size", FONT_BODY)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# 초상화(64px)+여백을 빼고 화면 안에 들어오는 고정 폭
-	body_label.custom_minimum_size = Vector2(465, 90)
+	# 글자는 상자 한가운데에 놓는다 (가로·세로 모두)
+	body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	body_label.custom_minimum_size = Vector2(0, 44)
 	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body_label)
 
 	buttons_box = HBoxContainer.new()
 	buttons_box.add_theme_constant_override("separation", 8)
-	buttons_box.alignment = BoxContainer.ALIGNMENT_END
+	buttons_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(buttons_box)
 
 
@@ -96,6 +126,7 @@ func open(title_text: String, body_text: String, buttons: Array,
 	for b in buttons:
 		var btn := Button.new()
 		btn.text = b[0]
+		btn.add_theme_font_size_override("font_size", FONT_BTN)
 		btn.focus_mode = Control.FOCUS_NONE
 		if b[1] != null:
 			btn.pressed.connect(b[1])

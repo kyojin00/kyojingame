@@ -942,18 +942,27 @@ func fresh_tutorial() -> Dictionary:
 
 
 # 우측 트래커용 짧은 목표 문구
+# %s 는 실제로 설정된 키로 바뀐다 (키 재설정을 따라간다)
 const TUTORIAL_SHORT := {
-	"moved": "움직여보기 (WASD)", "map": "지도 열기 (M)", "quest": "퀘스트 창 (J)",
-	"note": "연구 노트 (N)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
+	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
+	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
 	"water": "물 주기 (2)", "slept": "침대에서 자기", "harvest": "수확하기 (4)",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
 	"fish": "낚시하기 (9)", "shop": "잡화점 가보기",
 }
 
 
+const TUTORIAL_SHORT_KEY := {"map": "open_map", "quest": "open_quest", "note": "open_note"}
+
+
 func tutorial_objective_short() -> String:
 	var flag := tutorial_current_flag()
-	return String(TUTORIAL_SHORT.get(flag, "")) if flag != "" else ""
+	if flag == "":
+		return ""
+	var txt := String(TUTORIAL_SHORT.get(flag, ""))
+	if TUTORIAL_SHORT_KEY.has(flag):
+		txt = txt % key_label(TUTORIAL_SHORT_KEY[flag])
+	return txt
 
 
 func tutorial_objective() -> String:
