@@ -3961,6 +3961,8 @@ func _debug_tick() -> void:
 			cooking_ui.close()
 			interior.close()
 			inventory_ui.toggle()                      # 인벤토리(도구/능력치) 확인
+			GameData.tool_level["axe"] = 2
+		146: inventory_ui.hover_stat_tool()             # 장비 능력치 툴팁 확인
 		148: _save_shot("_inv.png")
 		150:
 			inventory_ui.close()

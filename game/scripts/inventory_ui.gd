@@ -30,7 +30,8 @@ var _slot_normal: StyleBoxFlat
 var _slot_selected: StyleBoxFlat
 var _slot_moving: StyleBoxFlat
 var _move_from := -1  # 우클릭으로 이동 중인 슬롯 (-1 = 없음)
-var _hover_slots: Array = []  # 툴팁 판정용 [{b, title, body}]
+var _hover_slots: Array = []  # 툴팁 판정용 [{b, tool, title, body}]
+var _forced_tip := ""         # 검증 하네스에서 툴팁을 고정할 도구 id
 
 
 func _ready() -> void:
@@ -125,10 +126,32 @@ func _ready() -> void:
 	tip_body = Label.new()
 	tip_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tip_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip_body.custom_minimum_size = Vector2(250, 0)
+	tip_body.custom_minimum_size = Vector2(292, 0)
 	tip_body.add_theme_color_override("font_color", Color(0.88, 0.85, 0.95))
 	tv.add_child(tip_body)
 	add_child(tip_panel)
+
+
+# 도구 툴팁: 설명 + 지금 단계의 세부 능력치
+# (능력치가 없는 것 — 씨앗·바구니·울타리·스프링클러 — 은 설명만 나온다)
+func _tool_tip(t: String) -> Dictionary:
+	var parts := str(TOOL_DESC.get(t, t)).split(" — ")
+	var title: String = parts[0]
+	var body: String = parts[1] if parts.size() > 1 else ""
+	if GameData.TOOL_STATS.has(t):
+		var lv: int = int(GameData.tool_level.get(t, 1))
+		var st: Dictionary = GameData.tool_stats(t)
+		title += "  Lv.%d" % lv
+		body += "\n\n%s %s  ·  %s %s\n%s %s  ·  %s %s" % [
+			GameData.STAT_NAMES.power, GameData.fmt_stat(st.power),
+			GameData.STAT_NAMES.reach, GameData.fmt_stat(st.reach),
+			GameData.STAT_NAMES.stamina, GameData.fmt_stat(st.stamina),
+			GameData.STAT_NAMES.luck, GameData.fmt_stat(st.luck)]
+		var gain := GameData.tool_stat_gain_text(t)
+		if gain != "" and GameData.UPGRADES.has(t) \
+				and lv - 1 < int(GameData.UPGRADES[t].levels.size()):
+			body += "\n강화 시  %s" % gain
+	return {"title": title, "body": body}
 
 
 func _show_tip(title: String, body: String) -> void:
@@ -152,17 +175,29 @@ func toggle() -> void:
 func close() -> void:
 	visible = false
 	_move_from = -1
+	_forced_tip = ""
+
+
+# 검증 하네스용: 능력치가 있는 도구의 툴팁을 띄워 둔다
+# (헤드리스에서는 마우스를 옮겨도 커서 위치가 갱신되지 않는다)
+func hover_stat_tool() -> void:
+	for h in _hover_slots:
+		if GameData.TOOL_STATS.has(str(h.get("tool", ""))):
+			_forced_tip = str(h.tool)
+			return
 
 
 func _process(delta: float) -> void:
 	if not visible:
 		return
 	_update_hover_tip()
-	if tip_panel.visible:
+	if tip_panel.visible and _forced_tip == "":
 		var mp := get_viewport().get_mouse_position()
 		tip_panel.position = Vector2(
 			minf(mp.x + 14.0, 960.0 - tip_panel.size.x - 8.0),
 			minf(mp.y + 16.0, 540.0 - tip_panel.size.y - 8.0))
+	elif tip_panel.visible:
+		tip_panel.position = Vector2(600, 150)
 	_refresh_timer -= delta
 	if _refresh_timer <= 0.0 and not get_viewport().gui_is_dragging():
 		_refresh_timer = 0.5
@@ -172,6 +207,10 @@ func _process(delta: float) -> void:
 # 이벤트 대신 매 프레임 마우스 위치로 판정한다
 # (리빌드로 버튼이 교체돼도 툴팁이 끊기지 않는다)
 func _update_hover_tip() -> void:
+	if _forced_tip != "":
+		var ft := _tool_tip(_forced_tip)
+		_show_tip(ft.title, ft.body)
+		return
 	if get_viewport().gui_is_dragging():
 		_hide_tip()
 		return
@@ -275,9 +314,8 @@ func _mk_tool_slot(slot_i: int) -> Button:
 			Sound.play_sfx("sfx_ui")
 			_rebuild())
 	if unlocked:
-		var parts := str(TOOL_DESC.get(t, t)).split(" — ")
-		_hover_slots.append({"b": b, "title": parts[0],
-			"body": parts[1] if parts.size() > 1 else ""})
+		var tip := _tool_tip(t)
+		_hover_slots.append({"b": b, "tool": t, "title": tip.title, "body": tip.body})
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var tt: String = GameData.tool_slots[slot_i]
@@ -311,9 +349,8 @@ func _mk_pick_slot(t: String) -> Button:
 	b.add_theme_stylebox_override("normal", _slot_normal)
 	b.add_theme_stylebox_override("hover", _slot_selected)
 	b.add_theme_stylebox_override("pressed", _slot_normal)
-	var parts := str(TOOL_DESC.get(t, t)).split(" — ")
-	_hover_slots.append({"b": b, "title": parts[0],
-		"body": parts[1] if parts.size() > 1 else ""})
+	var tip := _tool_tip(t)
+	_hover_slots.append({"b": b, "tool": t, "title": tip.title, "body": tip.body})
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var pv := TextureRect.new()
