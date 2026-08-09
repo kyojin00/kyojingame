@@ -1683,6 +1683,16 @@ func _story_update(delta: float) -> void:
 	if GameData.story_phase == "done" or Net.is_guest():
 		return
 	_story_t += delta
+	# 안전장치: 어떤 이유로든 연출이 끊겨 조작이 잠긴 채 남으면 풀어 준다.
+	# (우체부가 걸어오는 중 / 편지 전달 중에는 원래 잠겨 있어야 한다)
+	if story_cutscene and not dialog.visible and _name_layer == null \
+			and _postman_state != "approach" and _postman_state != "deliver":
+		_cutscene_idle += delta
+		if _cutscene_idle > 1.5:
+			_cutscene_idle = 0.0
+			story_cutscene = false
+	else:
+		_cutscene_idle = 0.0
 	var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
 	match GameData.story_phase:
 		"enter":
@@ -1740,6 +1750,10 @@ func _story_update(delta: float) -> void:
 				get_tree().create_timer(1.4).timeout.connect(_after_map_dialog)
 		"rock":
 			_update_postman(delta, story_shot)
+			# 안전장치: 곡괭이 대화가 도중에 끊겼으면 조작이 잠긴 채로 두지 않는다
+			if _rock_intro_started and GameData.story_rock_state == 0 \
+					and not dialog.visible:
+				_end_rock_intro()
 			# 길을 막은 커다란 바위를 발견하면 우체부 아저씨가 곡괭이를 보여준다
 			if GameData.story_rock_state == 0 and not dialog.visible and not ui_open() \
 					and objects.has(STORY_ROCK) and player.position.distance_to(
@@ -1941,6 +1955,7 @@ func _end_postman_dialog() -> void:
 		_postman_state = "follow"  # 우체부는 떠나지 않고 마을까지 동행한다
 
 
+var _cutscene_idle := 0.0
 var _story_snapped := false
 var _story_map_opened := false
 var _last_explore_tile := Vector2i(-999, -999)
@@ -1959,6 +1974,10 @@ func _story_tree_chopped() -> void:
 
 func _start_travel_dialog() -> void:
 	# 벌목 퀘스트 완료 직후 자동으로 이어지는 대화 (첫 벌목 직후 1회)
+	# 다른 연출이 진행 중이면 그 대화를 덮어쓰지 않고 기다린다
+	if dialog.visible or ui_open():
+		get_tree().create_timer(1.0).timeout.connect(_start_travel_dialog)
+		return
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
 		{"text": "「오, 제법이구먼! 좋은 목재도 얻었고 말이야.」"},
@@ -1986,6 +2005,11 @@ func _start_fork_dialog() -> void:
 
 func _after_map_dialog() -> void:
 	# 지도를 확인한 뒤: 마을 방향을 함께 확인하고 이동 재개 (아직 숲길 — 카메라 잠금 유지)
+	if GameData.story_phase != "rock" or _rock_intro_started:
+		return  # 이미 다음 연출(바위)로 넘어갔다면 건너뛴다
+	if dialog.visible or ui_open():
+		get_tree().create_timer(1.0).timeout.connect(_after_map_dialog)
+		return
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_happy"], [
 		{"text": "「이제 우리가 어디쯤 있는지 알겠나?」"},
 		{"text": "「마을은 이쪽 방향일세. 계속 가보세.」"},
@@ -1995,9 +2019,13 @@ func _after_map_dialog() -> void:
 
 # ---- 퀘스트 5 「마을로 가는 길을 열어보자」 (커다란 바위 / 곡괭이) ----
 
+var _rock_intro_started := false
+
+
 func _start_rock_dialog() -> void:
 	# 커다란 바위 발견: 우체부 아저씨가 곡괭이 채광을 보여준 뒤 곡괭이를 건네준다
 	story_cutscene = true
+	_rock_intro_started = true
 	_postman_state = "mine_demo"  # 대사가 진행되는 동안 바위 옆으로 걸어간다
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
 		{"text": "「이런, 하필 여기서 길이 막혀버렸구먼.」"},
@@ -2008,14 +2036,20 @@ func _start_rock_dialog() -> void:
 		{"text": "(우체부 아저씨가 곡괭이로 바위를 몇 번 캐 보인다...)", "event": _rock_demo},
 		{"text": "「자, 한번 자네가 직접 해보게.」", "event": _story_give_pickaxe},
 		{"text": "「바위도 나무와 마찬가지로 대상에 가까이 가서 E 키를 누르면 캘 수 있다네.」"},
-	], func() -> void:
-		story_cutscene = false
-		GameData.story_rock_state = 1
-		if not GameData.is_tool_unlocked("pickaxe"):
-			GameData.unlocked_tools.append("pickaxe")  # 대화를 스킵해도 지급 보장
-		if _postman != null:
-			_postman_state = "follow"
-		hud.show_message("곡괭이를 가방(I) 슬롯에 장착하고, 바위를 클릭한 뒤 E로 캐보자!", 6.0))
+	], _end_rock_intro)
+
+
+# 곡괭이 전달 마무리 — 대화가 도중에 끊겨도 여기로 복구된다
+func _end_rock_intro() -> void:
+	if GameData.story_rock_state != 0:
+		return
+	story_cutscene = false
+	GameData.story_rock_state = 1
+	if not GameData.is_tool_unlocked("pickaxe"):
+		GameData.unlocked_tools.append("pickaxe")  # 대화를 스킵해도 지급 보장
+	if _postman != null:
+		_postman_state = "follow"
+	hud.show_message("곡괭이를 가방(I) 슬롯에 장착하고, 바위를 클릭한 뒤 E로 캐보자!", 6.0)
 
 
 func _rock_demo() -> void:
