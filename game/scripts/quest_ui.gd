@@ -188,22 +188,3 @@ func _rebuild() -> void:
 		if prog.ratio >= 0.5:
 			_line("    노트에 숨겨진 메모가 나타나기 시작했다...", COL_NOW)
 
-	# 마을 탐사 (부지)
-	_line("")
-	_line("[마을 탐사]", COL_HEAD)
-	var total := 0
-	var owned := 0
-	var next_pid := ""
-	for pid in GameData.PARCELS:
-		total += 1
-		if GameData.owned_parcels.has(pid):
-			owned += 1
-		elif next_pid == "":
-			next_pid = pid
-	if next_pid == "":
-		_line("  할아버지가 조사하던 곳을 전부 되찾았다. (%d/%d)" % [owned, total], COL_NOW)
-	else:
-		var pdef: Dictionary = GameData.PARCELS[next_pid]
-		_line("  할아버지의 탐사 흔적을 따라 부지를 되찾자 (%d/%d)" % [owned, total])
-		_line("    다음: %s (%dG) · 지도(%s)에서 확인" %
-			[pdef.name, int(pdef.price), GameData.key_label("open_map")], COL_SUB)

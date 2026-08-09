@@ -814,29 +814,11 @@ var items := {}
 var fish_caught := {}  # 도감용 누적 기록
 
 # ---- 부지 ----
-# 시작 부지(home) 외에는 표지판에서 구입해야 사용할 수 있다 (이동은 자유)
-const PARCELS := {
-	"east": {"name": "동쪽 들판", "rect": [30, 0, 30, 20], "price": 3000},
-	"south": {"name": "남쪽 들판", "rect": [0, 20, 30, 20], "price": 8000},
-	"forest": {"name": "숲과 호수", "rect": [30, 20, 30, 20], "price": 15000},
-	"river": {"name": "강변 부지", "rect": [60, 30, 30, 10], "price": 20000},
-	"plains": {"name": "황금 평야", "rect": [0, 40, 45, 20], "price": 30000},
-	"deepforest": {"name": "깊은 숲", "rect": [45, 40, 45, 20], "price": 50000},
-}
-var owned_parcels: Array = ["home"]
+# 부지 구입 시스템은 삭제했다. 맵은 처음부터 전부 오갈 수 있고,
+# 다음 마을은 이후 이야기(스토리)로 열린다.
 
-
-func parcel_at(x: int, y: int) -> String:
-	for id in PARCELS:
-		var r: Array = PARCELS[id].rect
-		if x >= r[0] and x < r[0] + r[2] and y >= r[1] and y < r[1] + r[3]:
-			return id
-	return "home"
-
-
-func is_tile_owned(x: int, y: int) -> bool:
-	var p := parcel_at(x, y)
-	return p == "home" or owned_parcels.has(p)
+func is_tile_owned(_x: int, _y: int) -> bool:
+	return true
 
 
 # ---- NPC / 퀘스트 ----
@@ -1119,7 +1101,6 @@ func reset_all() -> void:
 	story_rock_state = 0
 	story_gates_left = 0
 	tool_slots = default_tool_slots()
-	owned_parcels = ["home"]
 	reset_daily()
 
 
@@ -1220,7 +1201,6 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"quest": quest,
 		"tutorial": tutorial,
 		"unlocked_tools": unlocked_tools,
-		"owned_parcels": owned_parcels,
 		"wood": wood,
 		"stone": stone,
 		"tool_level": tool_level,
@@ -1273,7 +1253,6 @@ func build_stats() -> Dictionary:
 		"seeds": seeds, "produce": produce, "items": items,
 		"fish_caught": fish_caught, "mob_kills": mob_kills, "affinity": affinity,
 		"quest": quest, "tool_level": tool_level,
-		"owned_parcels": owned_parcels,
 		"skills": skills, "furniture": furniture,
 		"recipes_cooked": recipes_cooked, "ending_seen": ending_seen,
 		"crops_harvested": crops_harvested, "minerals_found": minerals_found,
@@ -1302,7 +1281,6 @@ func apply_stats(d: Dictionary) -> void:
 		affinity[k] = int(d.affinity[k])
 	for k in d.get("tool_level", {}):
 		tool_level[k] = int(d.tool_level[k])
-	owned_parcels = d.get("owned_parcels", owned_parcels)
 	apply_skills_data(d.get("skills", {}))
 	if d.has("furniture"):
 		apply_furniture_data(d.furniture)

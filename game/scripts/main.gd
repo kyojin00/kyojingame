@@ -154,15 +154,6 @@ const START_TILE := Vector2i(14, 10)
 const CAVE_POS := Vector2i(50, 1)
 const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
 const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
-# 부지 표지판: 잠긴 부지의 경계 안쪽 (밖에서 E로 조준 가능)
-const PARCEL_SIGNS := {
-	"east": Vector2i(30, 7),
-	"south": Vector2i(9, 20),
-	"forest": Vector2i(30, 25),
-	"river": Vector2i(61, 30),
-	"plains": Vector2i(2, 40),
-	"deepforest": Vector2i(46, 40),
-}
 # ---- 교진 마을 ----
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
@@ -472,13 +463,8 @@ func _build_map() -> void:
 		if y % 4 == 0 and not objects.has(Vector2i(MAP_W - 1, y)):
 			objects[Vector2i(MAP_W - 1, y)] = {"kind": "tree", "hp": TREE_HP}
 
-	# 부지 판매 표지판
-	for pid in PARCEL_SIGNS:
-		objects[PARCEL_SIGNS[pid]] = {"kind": "sign", "hp": 0}
-
-	# 흩어진 나무/돌 (결정적 해시 배치, 깊은 숲은 빽빽하게)
-	var deep: Array = GameData.PARCELS["deepforest"].rect
-	var deep_rect := Rect2i(deep[0], deep[1], deep[2], deep[3])
+	# 흩어진 나무/돌 (결정적 해시 배치, 남동쪽 깊은 숲은 더 빽빽하게)
+	var deep_rect := Rect2i(45, 40, 45, 20)
 	for y in range(1, MAP_H - 1):
 		for x in range(1, MAP_W - 1):
 			var pos := Vector2i(x, y)
@@ -695,6 +681,19 @@ const NATURE_CLEAR := {
 const NATURE_CLEAR_MAX := 4
 const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
 
+# 오브젝트가 실제로 막는 크기(픽셀). 기준 칸(32px) 밖으로 얼마나 더 넓히는지다.
+# 그림이 타일보다 훨씬 크기 때문에, 칸 하나만 막으면 캐릭터가 나무 밑동/바위 속으로
+# 파고들어 겹쳐 보인다. 그래서 그림 크기에 맞춰 밑동 판정을 넓힌다.
+# 다만 한 칸짜리 통로는 계속 지나갈 수 있어야 하므로(플레이어 몸 폭 12px),
+# 한 변에 6px(양쪽 12px, 남는 폭 20px)을 넘지 않게 잡는다.
+const OBJECT_PAD := {
+	"tree": Vector2(6, 6), "bigrock": Vector2(6, 6), "rock": Vector2(5, 4),
+	"cave": Vector2(6, 4), "worldtree": Vector2(6, 4), "barn": Vector2(4, 3),
+	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
+	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
+	"bin": Vector2(3, 2), "board": Vector2(3, 2), "sign": Vector2(3, 2),
+}
+
 
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var offset := Vector2(0, -64)
@@ -855,7 +854,25 @@ func _tile_accessible(t: Vector2i) -> bool:
 
 
 func is_passable_px(p: Vector2) -> bool:
-	return is_passable(Vector2i(int(floor(p.x / TILE)), int(floor(p.y / TILE))))
+	var t := Vector2i(int(floor(p.x / TILE)), int(floor(p.y / TILE)))
+	if not is_passable(t):
+		return false
+	# 옆 칸 오브젝트라도 그림(밑동) 안쪽이면 들어갈 수 없다 — 캐릭터가 겹쳐 보이지 않게
+	for dy in [-1, 0, 1]:
+		for dx in [-1, 0, 1]:
+			if dx == 0 and dy == 0:
+				continue
+			var n := t + Vector2i(dx, dy)
+			if not objects.has(n):
+				continue
+			var pad: Vector2 = OBJECT_PAD.get(objects[n].kind, Vector2.ZERO)
+			if pad == Vector2.ZERO:
+				continue
+			var r := Rect2(n.x * TILE - pad.x, n.y * TILE - pad.y,
+				TILE + pad.x * 2.0, TILE + pad.y * 2.0)
+			if r.has_point(p):
+				return false
+	return true
 
 
 func is_passable_px_loose(p: Vector2) -> bool:
@@ -1440,9 +1457,6 @@ func interact() -> void:
 		if obj.kind == "board":
 			_open_quest_board()
 			return
-		if obj.kind == "sign":
-			_open_parcel_dialog(GameData.parcel_at(t.x, t.y))
-			return
 		if obj.kind == "cave":
 			cave.open()
 			return
@@ -1589,18 +1603,19 @@ func _plant_story_forest() -> void:
 		objects.erase(Vector2i(0, yy))
 		objects.erase(Vector2i(1, yy))
 	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래 + 마을 큰길 연결로)
+	#    길을 내면서 그 자리에 미리 생성된 나무·돌은 치운다 (길이 막히면 안 된다)
 	for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):
 		for x in range(STORY_ROAD_X0, STORY_ROAD_X1 + 1):
-			grid[y][x].ground = "path"
+			_carve_road(Vector2i(x, y))
 	for y in range(10, STORY_ROAD_Y0):              # 북쪽 갈래 (막다른 길)
 		for x in range(STORY_FORK.x - 1, STORY_FORK.x + 3):
-			grid[y][x].ground = "path"
+			_carve_road(Vector2i(x, y))
 	for y in range(STORY_ROAD_Y1 + 1, 22):          # 남쪽 갈래 (막다른 길)
 		for x in range(STORY_FORK.x - 1, STORY_FORK.x + 3):
-			grid[y][x].ground = "path"
+			_carve_road(Vector2i(x, y))
 	for y in range(9, STORY_ROAD_Y0):               # 마을 큰길로 오르는 연결로
 		for x in range(STORY_LINK_X, STORY_LINK_X + 4):
-			grid[y][x].ground = "path"
+			_carve_road(Vector2i(x, y))
 
 	# ② 길 양옆은 울타리로 막는다 — 길을 벗어날 수 없다 (숲으로는 못 들어간다)
 	for x in range(STORY_ROAD_X0, STORY_ROAD_X1 + 2):
@@ -1656,6 +1671,14 @@ func _plant_story_forest() -> void:
 					objects[pos] = {"kind": "forage_herb" if h < 0.895 else "forage_berry",
 						"hp": 0}
 	_refresh_story_gates()
+
+
+# 길을 낸다: 흙바닥으로 바꾸고, 그 자리에 있던 오브젝트는 치운다
+func _carve_road(pos: Vector2i) -> void:
+	if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
+		return
+	grid[pos.y][pos.x].ground = "path"
+	objects.erase(pos)
 
 
 # 스토리용 울타리: 길을 벗어나지 못하게 막는다 (도끼로 걷어낼 수 없다)
@@ -2367,33 +2390,6 @@ const STORY_PAGES := [
 	["교진 마을로", "할아버지가 무엇을 찾고 계셨는지,\n나는 아직 아무것도 모른다.\n\n하지만 상자 속 빈 노트가\n왠지 나를 부르는 것 같았다.\n\n나는 짐을 싸서 교진 마을로 향했다."],
 	["물려받은 농장", "마을 어귀, 할아버지가 머물던 작은 농장.\n오래 방치되어 잡초가 무성하고\n시설은 낡아 있었다.\n\n당분간은... 여기서 살아가 보자.\n농사도 짓고, 이웃도 사귀면서."],
 ]
-# 부지를 열 때마다 한 장(章)씩 이어지는 마을 확장 스토리
-const PARCEL_STORIES := {
-	"east": [
-		["제1장 · 동쪽 들판", "표지판 너머 풀숲에서\n비바람에 삭은 팻말을 발견했다.\n\n'관찰 지점 1 — 이 들판의 흙은 특별하다.'\n\n...할아버지의 글씨다."],
-		["제1장 · 동쪽 들판", "할아버지는 이 마을의 밭을\n연구하고 계셨던 걸까?\n\n노트에 팻말의 내용을 옮겨 적었다.\n남쪽 들판에도 뭔가 있을지 모른다."],
-	],
-	"south": [
-		["제2장 · 남쪽 들판", "들판 한가운데, 돌로 쌓은 화덕 터.\n재 속에서 그을린 유리병 조각이 나왔다.\n\n병 바닥에 조그맣게 새겨진 글자.\n'시료 34 — 실패.'"],
-		["제2장 · 남쪽 들판", "실패, 실패, 실패...\n할아버지는 대체 여기서\n무엇을 만들고 계셨던 걸까.\n\n바람을 타고 숲과 호수의\n물 냄새가 실려 온다."],
-	],
-	"forest": [
-		["제3장 · 숲과 호수", "호숫가 바위에 오래된 낚시 의자.\n철수 아저씨가 말했던,\n할아버지가 밤새 낚시하던 자리다.\n\n의자 밑에 방수포로 싼 쪽지가 있었다."],
-		["제3장 · 숲과 호수", "'달빛을 먹은 황금잉어.\n비늘이 아니라, 그 존재 자체가 재료다.\n놓아주어도 기록은 남는다.'\n\n...할아버지는 물고기조차\n연구의 눈으로 보고 계셨다."],
-	],
-	"river": [
-		["제4장 · 강변", "낡은 나루터 기둥에\n노끈으로 묶인 양철통이 매달려 있다.\n\n안에는 물에 불은 지도 한 장.\n강 상류에 X 표시가 되어 있다."],
-		["제4장 · 강변", "X 옆에 흘려 쓴 메모.\n\n'물은 모든 것을 기억한다.\n상류의 평야, 그 아래의 동굴.\n일곱 중 몇은 거기에 있다.'\n\n...일곱? 일곱이 뭘까."],
-	],
-	"plains": [
-		["제5장 · 황금 평야", "바람이 지나갈 때마다\n풀이 금빛으로 일렁이는 평야.\n\n무너진 돌담 아래에서\n녹슨 실험 도구 상자를 찾았다."],
-		["제5장 · 황금 평야", "상자 안쪽 뚜껑에 적힌 문장.\n\n'재료는 사는 것이 아니라 얻어지는 것.\n땀에서, 물에서, 어둠에서, 그리고 마음에서.'\n\n남은 곳은... 깊은 숲뿐이다."],
-	],
-	"deepforest": [
-		["마지막 장 · 깊은 숲", "아름드리 나무가 하늘을 가리는 깊은 숲.\n숲의 가장 깊은 곳, 거대한 고목 아래에\n작은 오두막의 잔해가 있었다.\n\n할아버지의 마지막 연구 캠프다."],
-		["마지막 장 · 깊은 숲", "무너진 책상 위, 마지막 일지.\n\n'세계수는 보았다. 재료도 거의 모았다.\n하지만 시간이... 시간이 부족하구나.'\n\n일지의 나머지는 찢겨 있었다.\n연구 노트를 더 채우면, 알 수 있을까."],
-	],
-}
 
 # 진 엔딩: 전설 재료 7종을 모아 최후의 연금술로 '유니콘의 뿔'을 완성한다.
 # (최종 목표는 게임 내에서 이 순간까지 절대 공개되지 않는다)
@@ -2406,7 +2402,7 @@ const ENDING_PAGES := [
 
 var _story_idx := 0
 var _story_pages: Array = []
-var _story_mode := "intro"  # "intro": 오프닝 / "parcel": 부지 스토리 / "ending": 엔딩
+var _story_mode := "intro"  # "intro": 오프닝 / "ending": 엔딩
 var story_layer: CanvasLayer
 var _story_title: Label
 var _story_body: Label
@@ -2418,17 +2414,6 @@ func _show_intro() -> void:
 	fade_rect.color.a = 0.0  # 농장이 보이는 채로 편지지 연출
 	_story_mode = "intro"
 	_story_pages = STORY_PAGES
-	_build_story_ui()
-	_story_idx = 0
-	_show_story_page()
-
-
-func show_parcel_story(pid: String) -> void:
-	if not PARCEL_STORIES.has(pid) or story_layer != null:
-		return
-	hud.visible = false
-	_story_mode = "parcel"
-	_story_pages = PARCEL_STORIES[pid]
 	_build_story_ui()
 	_story_idx = 0
 	_show_story_page()
@@ -2494,8 +2479,7 @@ func _show_story_page() -> void:
 		_story_title.text = page[0]
 		_story_body.text = page[1]
 		if _story_mode != "intro" and _story_idx == _story_pages.size() - 1:
-			_story_add_button("탐험 시작!" if _story_mode == "parcel"
-				else "농장 생활 계속하기", _close_story)
+			_story_add_button("농장 생활 계속하기", _close_story)
 		else:
 			_story_add_button("다음 >", _next_story_page)
 			_story_add_button("건너뛰기 >>", func() -> void:
@@ -2649,43 +2633,6 @@ func tutorial_notify(flag: String) -> void:
 	dialog.open("기본 안내 완료!",
 		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nB: 상점 (씨앗/판매/동물/강화/도감 탭)\nE: 상호작용 (대화/취침/판매/쓰다듬기)\nTab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n동쪽 마을의 주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
 		[["좋아!", null]])
-
-
-# ---- 부지 구입 ----
-
-func _open_parcel_dialog(pid: String) -> void:
-	if pid == "home" or GameData.owned_parcels.has(pid):
-		hud.show_message("내 부지다! 마음껏 가꾸자.")
-		return
-	var def: Dictionary = GameData.PARCELS[pid]
-	Sound.play_sfx("sfx_ui")
-	dialog.open("부지 판매: %s" % def.name,
-		"가격: %dG (소지금 %dG)\n구입하면 이 구역에서 농사, 벌목, 채광,\n낚시를 할 수 있다!" % [def.price, GameData.money],
-		[["구입하기", _buy_parcel.bind(pid)], ["닫기", null]])
-
-
-func _buy_parcel(pid: String) -> void:
-	var def: Dictionary = GameData.PARCELS[pid]
-	if GameData.owned_parcels.has(pid):
-		return
-	if GameData.money < def.price:
-		dialog.set_body("돈이 부족하다... (가격 %dG, 소지금 %dG)" % [def.price, GameData.money])
-		return
-	GameData.money -= def.price
-	GameData.today_spent += int(def.price)
-	GameData.owned_parcels.append(pid)
-	Sound.play_sfx("sfx_coin")
-	if Net.is_guest():
-		_req_shop.rpc_id(1, "parcel", pid)
-	elif Net.is_host():
-		_broadcast_stats()
-	queue_redraw()
-	# 구입한 사람에게 이 부지의 장(章) 스토리를 보여준다
-	if not _remote_acting:
-		dialog.close()
-		show_parcel_story(pid)
-	else:
-		dialog.set_body("'%s' 구입 완료!\n이제 이 땅은 우리 농장이다!" % def.name)
 
 
 # ---- NPC 대화 / 선물 / 퀘스트 ----
@@ -3189,8 +3136,6 @@ func _apply_save(d: Dictionary) -> void:
 	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.unlocked_tools = d.get("unlocked_tools", GameData.ALL_TOOLS.duplicate())
-	# 구버전(부지 도입 전) 저장은 전체 부지 소유로 간주
-	GameData.owned_parcels = d.get("owned_parcels", ["home", "east", "south", "forest"])
 	for k in d.get("mob_kills", {}):
 		GameData.mob_kills[k] = int(d.mob_kills[k])
 	GameData.apply_skills_data(d.get("skills", {}))
@@ -3594,16 +3539,6 @@ func _draw() -> void:
 				draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 					Color(1, 1, 1, 0.6), false, 1.0)
 
-	# 미구매 부지: 어둑한 오버레이 + 금색 경계 (스토리 중에는 표시하지 않는다)
-	if GameData.story_phase != "done":
-		return
-	for pid in GameData.PARCELS:
-		if GameData.owned_parcels.has(pid):
-			continue
-		var r: Array = GameData.PARCELS[pid].rect
-		var rect := Rect2(r[0] * TILE, r[1] * TILE, r[2] * TILE, r[3] * TILE)
-		draw_rect(rect, Color(0.08, 0.04, 0.15, 0.18))
-		draw_rect(rect, Color(1, 0.85, 0.4, 0.45), false, 1.0)
 
 
 # 건물/오브젝트 위에 그려야 하는 것들 (안내 텍스트·화살표·파티클·날씨)
@@ -3665,11 +3600,6 @@ func _context_hint() -> Array:
 				return ["E: 판매", above_tile]
 			"board":
 				return ["E: 의뢰 게시판", above_tile]
-			"sign":
-				var pid := GameData.parcel_at(t.x, t.y)
-				if not GameData.owned_parcels.has(pid):
-					return ["E: 부지 구입 (%dG)" % GameData.PARCELS[pid].price, above_tile]
-				return ["내 부지", above_tile]
 			"cave":
 				return ["E: 동굴 탐험", above_tile]
 			"worldtree":
@@ -3873,14 +3803,7 @@ func _debug_tick() -> void:
 		104:
 			_close_gift_picker()
 			dialog.close()
-			player.position = Vector2(30 * TILE + 16, 8 * TILE + 16)
-			player.dir = "up"                          # 동쪽 부지 표지판 앞 (길 위)
 			GameData.money = 200000
-		106: _send_key(KEY_E)                          # 부지 구입 대화
-		112: _save_shot("_parcel.png")
-		114: _buy_parcel("east")
-		118: _save_shot("_parcel2.png")                # 부지 장(章) 스토리 확인
-		120: _close_story()
 		122: interior.open()                           # 집 내부 확인
 		128: _save_shot("_house.png")
 		129: _send_key(KEY_F)                          # 꾸미기 모드
@@ -4188,10 +4111,6 @@ func _req_shop(op: String, id: String) -> void:
 			shop._on_select_pet(id)
 		"upgrade":
 			shop._on_upgrade(id)
-		"parcel":
-			if not GameData.owned_parcels.has(id) and GameData.money >= GameData.PARCELS[id].price:
-				GameData.money -= GameData.PARCELS[id].price
-				GameData.owned_parcels.append(id)
 	_broadcast_stats()
 
 
