@@ -2,8 +2,12 @@ const fs=require('fs'),{PNG}=require('pngjs');
 const REF='/home/user/kyojingame/game/assets/ref/new_boy/';
 const OUT='/home/user/kyojingame/game/assets/sprites/';
 const FW=128, FH=192;
-const HAIR_TOP_Y=27;   // 앞머리 덩어리 꼭대기가 놓일 행
-const HAIR_H=163;      // 앞머리 꼭대기 ~ 발바닥 (모든 방향 공통 기준)
+const FOOT_Y=190;      // 발바닥이 놓일 행
+const HEAD_H=59.5;     // 앞머리 꼭대기 ~ 목 (모든 방향 공통 크기 기준)
+// 크기 기준을 "머리 높이"로 잡는다.
+// 앞머리~발바닥으로 맞추면 원본마다 다리를 굽힌 정도가 달라서
+// (특히 옆모습 걷기는 몸이 8% 짧게 그려져 있다) 머리 크기가 방향마다 튄다.
+// 머리는 자세와 상관없이 일정하므로, 머리를 맞추면 캐릭터 크기가 같아 보인다.
 const load=f=>PNG.sync.read(fs.readFileSync(REF+f));
 
 // 세로로 빈 칸을 찾아 프레임을 나눈다
@@ -22,8 +26,13 @@ function scan(p,x0,x1){
     rw[y]=r<0?0:r-l+1; if(r>=0){ if(y0<0)y0=y; y1=y; } }
   const maxW=Math.max(...rw);
   let hairTop=y0; for(let y=y0;y<=y1;y++) if(rw[y]>=maxW*0.55){ hairTop=y; break; }
-  return {y0,y1,hairTop,hairH:y1-hairTop+1};
+  // 목: 머리 아래 28~52% 구간에서 실루엣이 가장 좁아지는 행
+  const a=hairTop+Math.round((y1-hairTop)*0.28), b=hairTop+Math.round((y1-hairTop)*0.52);
+  let neck=a, nw=1e9;
+  for(let y=a;y<=b;y++) if(rw[y]<nw){ nw=rw[y]; neck=y; }
+  return {y0,y1,hairTop,hairH:y1-hairTop+1,headH:neck-hairTop+1};
 }
+const median=a=>{ const v=a.slice().sort((x,y)=>x-y); return v[v.length>>1]; };
 // 허리(반바지) 띠의 무게중심 x — 걷는 동안 가장 덜 흔들리는 기준점
 function hipX(p,x0,x1,m){
   const {width:W,data:D}=p; const a=m.hairTop+Math.round(m.hairH*0.60), b=m.hairTop+Math.round(m.hairH*0.72);
@@ -34,7 +43,7 @@ function hipX(p,x0,x1,m){
 function sample(p,x0,x1,ax,ay,s,tx,ty){
   const {width:W,height:H,data:D}=p;
   const sx0=ax+(tx-64)/s, sx1=ax+(tx+1-64)/s;
-  const sy0=ay+(ty-HAIR_TOP_Y)/s, sy1=ay+(ty+1-HAIR_TOP_Y)/s;
+  const sy0=ay+(ty-FOOT_Y)/s, sy1=ay+(ty+1-FOOT_Y)/s;
   const ix0=Math.max(x0,Math.floor(sx0)), ix1=Math.min(x1,Math.ceil(sx1)-1);
   const iy0=Math.max(0,Math.floor(sy0)), iy1=Math.min(H-1,Math.ceil(sy1)-1);
   let tot=0,op=0; const bk={};
@@ -57,12 +66,14 @@ function addSheet(file,names){
   const p=load(file), runs=columns(p);
   if(runs.length!==names.length) throw new Error(file+' 프레임 수 '+runs.length);
   const ms=runs.map(r=>scan(p,r[0],r[1]));
-  const s=HAIR_H/Math.max(...ms.map(m=>m.hairH));       // 시트 안에서 한 배율
-  runs.forEach((r,i)=>jobs.push({name:names[i],px:render(p,r[0],r[1],hipX(p,r[0],r[1],ms[i]),ms[i].hairTop,s)}));
+  // 시트 안에서는 한 배율(머리 크기의 중앙값)·한 바닥선(가장 낮은 발)
+  const s=HEAD_H/median(ms.map(m=>m.headH));
+  const ground=Math.max(...ms.map(m=>m.y1));
+  runs.forEach((r,i)=>jobs.push({name:names[i],px:render(p,r[0],r[1],hipX(p,r[0],r[1],ms[i]),ground,s)}));
 }
 function addOne(file,name){
-  const p=load(file), m=scan(p,0,p.width-1), s=HAIR_H/m.hairH;
-  jobs.push({name,px:render(p,0,p.width-1,hipX(p,0,p.width-1,m),m.hairTop,s)});
+  const p=load(file), m=scan(p,0,p.width-1), s=HEAD_H/m.headH;
+  jobs.push({name,px:render(p,0,p.width-1,hipX(p,0,p.width-1,m),m.y1,s)});
 }
 addOne('front_idle.png','new_boy_down_idle');
 addOne('back_idle.png','new_boy_up_idle');

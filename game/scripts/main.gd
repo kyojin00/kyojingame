@@ -1377,7 +1377,12 @@ func interact() -> void:
 	# (옆에 사람이 서 있어도 E가 대화로 새지 않는다)
 	const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
 	var aiming_object: bool = aim != null and AIM_KINDS.has(aim.kind)
-	# 동행 중인 우체부 아저씨에게 말 걸기 (진행 단계별 보조 대화)
+	# 우체부 아저씨에게 말 걸기 (첫 만남 / 동행 중 보조 대화)
+	if not aiming_object and _postman != null and _postman_state == "wait" \
+			and (player.position - _postman.position).length() < POSTMAN_TALK_DIST:
+		_postman_state = "talk"
+		_start_postman_dialog()
+		return
 	if not aiming_object and _postman != null and _postman_state == "follow" \
 			and (player.position - _postman.position).length() < 48.0:
 		_talk_to_postman()
@@ -1549,7 +1554,9 @@ const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 �
 var story_cutscene := false                # 컷신 중 조작 잠금
 var _postman: Node2D = null
 var _postman_spr: Sprite2D = null
-var _postman_state := ""                   # approach / talk / leave
+var _postman_state := ""                   # approach / wait / talk / follow / leave
+const POSTMAN_STOP_DIST := 76.0            # 걸어와서 멈춰 서는 거리
+const POSTMAN_TALK_DIST := 104.0           # E로 말을 걸 수 있는 거리
 var _postman_anim := 0.0
 var _story_t := 0.0
 
@@ -1694,17 +1701,17 @@ func _story_update(delta: float) -> void:
 	if GameData.story_phase == "done" or Net.is_guest():
 		return
 	_story_t += delta
+	var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
 	# 안전장치: 어떤 이유로든 연출이 끊겨 조작이 잠긴 채 남으면 풀어 준다.
-	# (우체부가 걸어오는 중 / 편지 전달 중에는 원래 잠겨 있어야 한다)
+	# (편지 전달 중에는 원래 잠겨 있어야 한다)
 	if story_cutscene and not dialog.visible and _name_layer == null \
-			and _postman_state != "approach" and _postman_state != "deliver":
+			and _postman_state != "deliver":
 		_cutscene_idle += delta
 		if _cutscene_idle > 1.5:
 			_cutscene_idle = 0.0
 			story_cutscene = false
 	else:
 		_cutscene_idle = 0.0
-	var story_shot := _shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
 	match GameData.story_phase:
 		"enter":
 			# (검증용) t를 지나는 첫 프레임에만 1회 발동
@@ -1735,6 +1742,8 @@ func _story_update(delta: float) -> void:
 						_spawn_postman())
 		"approach":
 			_update_postman(delta, story_shot)
+			if story_shot and _postman_state == "wait":
+				_send_key(KEY_E)   # 실제 플레이와 같은 경로로 말을 건다
 		"equip":
 			_update_postman(delta, story_shot)
 			# 받은 나무도끼를 가방에서 빠른 슬롯에 넣으면 퀘스트 2 완료
@@ -1792,7 +1801,7 @@ func _spawn_postman() -> void:
 	_postman.add_child(_postman_spr)
 	world.add_child(_postman)
 	_postman_state = "approach"
-	story_cutscene = true
+	# 걸어오는 동안 조작을 잠그지 않는다 — 직접 다가가 E로 말을 건다
 	if _shot_path != "" and OS.get_environment("KYOJIN_STORY") != "":
 		get_tree().create_timer(0.2).timeout.connect(
 			func() -> void: _snap_story("story_postman"))
@@ -1804,21 +1813,31 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 	_postman_anim += delta
 	match _postman_state:
 		"approach":
-			# 멀리서 뚜벅뚜벅 걸어와 말을 건다
+			# 멀리서 뚜벅뚜벅 걸어온다. 검증 시퀀스만 붙자마자 대화를 시작하고,
+			# 실제 플레이에서는 옆에 서서 기다린다 (플레이어가 E로 말을 건다)
 			var to_player := player.position - _postman.position
-			if to_player.length() > 44.0:
-				var spd := 55.0 if story_shot else 45.0
+			if to_player.length() > POSTMAN_STOP_DIST:
+				var far := to_player.length() > 320.0   # 멀어지면 서둘러 따라온다
+				var spd := 90.0 if story_shot else (110.0 if far else 45.0)
 				_postman.position += to_player.normalized() * spd * delta
 				_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
 				_postman_spr.flip_h = to_player.x < 0
 			else:
-				_postman_state = "talk"
+				_postman_state = "wait"
 				_postman_spr.texture = tex["npc_postman_side_0"]
-				_start_postman_dialog()
-				if story_shot:
-					# 대화창이 실제로 그려진 뒤에 캡처한다
-					get_tree().create_timer(0.25).timeout.connect(
-						func() -> void: _snap_story("story_dialog"))
+				_postman_spr.flip_h = to_player.x < 0
+				if not story_shot:
+					hud.show_message(
+						"우체부 아저씨가 다가왔다. 가까이서 E를 눌러 말을 걸어보자.", 6.0)
+		"wait":
+			# 말을 걸 때까지 옆에서 기다린다 (플레이어가 멀어지면 다시 따라간다)
+			var to_wait := player.position - _postman.position
+			if to_wait.length() > POSTMAN_TALK_DIST:
+				_postman_state = "approach"
+			else:
+				_postman_spr.texture = tex["npc_postman_side_0"]
+				if absf(to_wait.x) > 4.0:
+					_postman_spr.flip_h = to_wait.x < 0
 		"follow":
 			# 마을까지 동행: 주인공 옆에서 함께 걷고, 개척하는 동안 기다린다
 			var to := player.position + Vector2(-42, 6) - _postman.position
@@ -1870,6 +1889,9 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 
 func _start_postman_dialog() -> void:
 	# 1부: 인사 -> 이름 질문. 이름 입력 후 2부로 이어진다.
+	if _shot_path != "" and OS.get_environment("KYOJIN_STORY") != "":
+		get_tree().create_timer(0.25).timeout.connect(
+			func() -> void: _snap_story("story_dialog"))
 	dialog.open_seq("우체부 아저씨", tex["npc_postman_portrait_normal"], [
 		{"text": "「자네도 마을로 가는 길인가?」"},
 		{"text": "「나도 마을에 가야 하는데 말이야.」"},
@@ -3573,6 +3595,10 @@ func _context_hint() -> Array:
 		return ["지금이다!", above_player]
 	if fishing_state == "waiting":
 		return []
+	# 첫 만남: 걸어와서 기다리는 우체부 아저씨 머리 위에 안내를 띄운다
+	if _postman != null and _postman_state == "wait" \
+			and (player.position - _postman.position).length() < POSTMAN_TALK_DIST:
+		return ["E: 말 걸기", _postman.position + Vector2(0, -112)]
 	if nearby_npc() != null:
 		return ["E: 대화", above_player]
 	if nearby_animal() != null:
