@@ -499,10 +499,10 @@ func _build_map() -> void:
 				elif h < 0.40:
 					if _nature_clear(pos, "rock"):
 						objects[pos] = {"kind": "rock", "hp": ROCK_HP}
-			elif h < 0.10:
+			elif h < 0.06:
 				if _nature_clear(pos, "tree"):
 					objects[pos] = {"kind": "tree", "hp": TREE_HP}
-			elif h < 0.16:
+			elif h < 0.12:
 				if _nature_clear(pos, "rock"):
 					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 
@@ -581,12 +581,45 @@ func _nature_clear(pos: Vector2i, kind: String, override_dist := -1) -> bool:
 			var k: String = objects[p].kind
 			if not NATURE_CLEAR.has(k):
 				continue
-			# 간격을 직접 지정한 구간(숲 등)은 그 값을 그대로 쓴다
+			if override_dist < 0 and (kind == "tree" or k == "tree"):
+				# 나무는 "옆으로 나란히" 놓일 때만 지저분하게 겹친다.
+				# 앞뒤로 겹치는 건 앞 나무가 뒤를 가려 주므로 깊은 숲처럼 보인다.
+				if absi(dx) <= TREE_DX and absi(dy) <= TREE_DY:
+					return false
+				continue
 			var need: int = need_self if override_dist >= 0 \
 				else maxi(need_self, int(NATURE_CLEAR[k]))
 			if maxi(absi(dx), absi(dy)) <= need:
 				return false
 	return true
+
+
+# 빽빽한 숲에서는 앞쪽(아래) 나무가 주인공을 가린다.
+# 가리는 나무만 잠깐 비치게 해서 자기 위치를 항상 볼 수 있게 한다.
+var _faded_trees: Array = []
+
+
+func _update_tree_fade() -> void:
+	for spr in _faded_trees:
+		if is_instance_valid(spr):
+			spr.modulate.a = 1.0
+	_faded_trees.clear()
+	if player == null or interior.visible or cave.visible:
+		return
+	var t := player_tile()
+	for dy in range(0, 4):
+		for dx in range(-2, 3):
+			var p := t + Vector2i(dx, dy)
+			if not obj_nodes.has(p) or not objects.has(p):
+				continue
+			if objects[p].kind != "tree":
+				continue
+			var node: Node2D = obj_nodes[p]
+			if node.position.y <= player.position.y:
+				continue  # 뒤쪽 나무는 주인공을 가리지 않는다
+			var spr: Sprite2D = node.get_child(0)
+			spr.modulate.a = 0.45
+			_faded_trees.append(spr)
 
 
 func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
@@ -649,9 +682,13 @@ const OBJECT_SCALES := {
 	"barn": 1.8, "forage_berry": 1.5, "forage_herb": 1.5,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
-# 자연물이 서로 겹쳐 보이지 않도록 실제 그려지는 크기에서 뽑은 최소 간격(타일).
-# 나무는 약 3.9~4.5타일 폭으로 그려진다 → 일반 지역은 5타일 간격,
-# 숲 구간은 4타일 간격(살짝 맞닿는 정도)으로 촘촘하게 세운다.
+# 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
+#
+# 나무는 "옆으로 나란히" 있을 때만 그림이 지저분하게 겹친다.
+# 앞뒤(위아래)로 겹치는 것은 y정렬로 앞 나무가 뒤 나무를 가려 주므로
+# 오히려 깊은 숲처럼 보인다. 그래서 가로 간격만 넓게 잡고 세로는 촘촘히 둔다.
+const TREE_DX := 4   # 가로로 4칸 이내이면서
+const TREE_DY := 1   # 세로로 1칸 이내면 나란히 겹쳐 보인다 -> 금지
 const NATURE_CLEAR := {
 	"tree": 4, "bigrock": 3, "rock": 2, "forage_berry": 2, "forage_herb": 2,
 }
@@ -709,8 +746,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
 	if kind == "tree":
-		# 크기는 조금씩만 다르게 — 편차가 크면 배치 간격을 지켜도 그림이 겹친다
-		sc *= 0.86 + _hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.14
+		# 크기 편차는 5칸 간격 안에서 겹치지 않는 범위까지만 (숲에서는 덩어리감을 준다)
+		sc *= 0.82 + _hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.26
 	elif kind == "rock":
 		# 큰 돌과 작은 돌이 섞이도록
 		sc *= 0.65 + _hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
@@ -1474,6 +1511,18 @@ const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오
 const STORY_FORK := Vector2i(20, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
 const STORY_ROCK := Vector2i(26, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
 const STORY_FOREST_W := 38                 # 스토리 숲의 가로 폭 (줌아웃 화면을 채운다)
+const STORY_WALL_X := 11                   # 퀘스트 1에서 길을 막는 나무 벽
+const STORY_LINK_X := 33                   # 숲길 -> 마을 큰길로 이어지는 지점
+# 숲 미로: 지나갈 수 있는 통로 (여기 말고는 전부 빽빽한 나무)
+const STORY_MAZE_PATH := [
+	Vector2i(12, 16), Vector2i(13, 16), Vector2i(14, 16),
+	Vector2i(14, 15), Vector2i(14, 14), Vector2i(14, 13), Vector2i(14, 12),
+	Vector2i(15, 12), Vector2i(16, 12), Vector2i(17, 12),
+	Vector2i(17, 13), Vector2i(17, 14), Vector2i(17, 15), Vector2i(17, 16),
+	Vector2i(18, 16), Vector2i(19, 16),
+]
+# 통로 위의 길목 — 베어야만 열린다 (「나무를 베며 숲길을 나아가자」)
+const STORY_MAZE_GATES := [Vector2i(13, 16), Vector2i(14, 13), Vector2i(17, 15)]
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
@@ -1520,54 +1569,53 @@ func _plant_story_forest() -> void:
 	for yy in [STORY_LANE_Y - 1, STORY_LANE_Y, STORY_LANE_Y + 1]:
 		objects.erase(Vector2i(0, yy))
 		objects.erase(Vector2i(1, yy))
-	# 주인공(왼쪽) 앞을 가로막는 울창한 숲: 나무 사이 간격은 불규칙하게,
-	# 곳곳에 큰 돌을 드문드문 섞어 자연스러운 숲 지형을 만든다.
+	# ① 갈림길 이후의 숲길을 먼저 낸다
+	#    (갈림길 세로줄 + 동쪽 길 + 마을 큰길로 올라가는 연결로)
+	for y in range(8, 23):
+		grid[y][STORY_FORK.x].ground = "path"
+	for x in range(STORY_FORK.x, STORY_LINK_X + 1):
+		grid[STORY_LANE_Y][x].ground = "path"
+	for y in range(9, STORY_LANE_Y + 1):
+		grid[y][STORY_LINK_X].ground = "path"
+
+	# ② 숲 미로: 통로로 지정한 칸만 비우고 나머지는 나무로 꽉 채운다.
+	#    길목(GATES)에는 나무를 세워 두어, 베어야만 앞으로 나아갈 수 있다.
+	var corridor := {}
+	for c: Vector2i in STORY_MAZE_PATH:
+		corridor[c] = true
+	var gates := {}
+	for g: Vector2i in STORY_MAZE_GATES:
+		gates[g] = true
 	for y in range(1, 23):
-		for x in range(4, STORY_FOREST_W):
+		for x in range(STORY_WALL_X, STORY_FOREST_W):
 			var pos := Vector2i(x, y)
 			if grid[y][x].ground != "grass" or objects.has(pos):
 				continue
-			if y == STORY_LANE_Y and x <= 7:
-				continue  # 숲 입구 + 우체부 길
-			# 갈림길: 갈림길 지점에서 길이 북/남/동 세 방향으로 갈라진다
-			if x == STORY_FORK.x and y >= 8:
-				grid[y][x].ground = "path"
+			if corridor.has(pos) and not gates.has(pos):
+				continue  # 지나갈 수 있는 통로
+			var tr := {"kind": "tree", "hp": TREE_HP}
+			if _hash01(x * 17 + 2, y * 23 + 5) < 0.10:
+				tr["apple"] = true  # 일부 나무에만 사과 3개가 열린다
+			objects[pos] = tr
+
+	# ③ 시작 빈터: 주인공이 움직이고 우체부와 만나는 자리 (나무 없이 돌·덤불만)
+	for y in range(1, 23):
+		for x in range(3, STORY_WALL_X):
+			var p2 := Vector2i(x, y)
+			if grid[y][x].ground != "grass" or objects.has(p2):
 				continue
-			if y == STORY_LANE_Y and x >= STORY_FORK.x:
-				grid[y][x].ground = "path"  # 동쪽 길
-				continue
-			if y == 8 and x >= STORY_FORK.x:
-				grid[y][x].ground = "path"  # 북쪽 길 -> 큰길과 연결
-				continue
+			if y == STORY_LANE_Y:
+				continue  # 우체부가 걸어오는 길
 			var h := _hash01(x, y)
-			if h < 0.045:
-				grid[y][x].ground = "path"  # 드문드문 흙바닥 자국
-				continue
-			if h < 0.35:
-				continue  # 나무 사이 이동 공간 (불규칙한 빈 풀밭)
-			if h < 0.45:
-				# 풀/낮은 풀숲/작은 식물 (열매 덤불·약초) — 드문드문
-				if _nature_clear(pos, "forage_berry"):
-					objects[pos] = {"kind": "forage_herb" if h < 0.40 else "forage_berry",
-						"hp": 0}
-			elif h > 0.94:
-				if _nature_clear(pos, "rock"):
-					objects[pos] = {"kind": "rock", "hp": ROCK_HP}  # 큰 돌/작은 돌
-			else:
-				# 숲 구간은 나무를 촘촘히 세우되(4칸 간격) 그림은 겹치지 않는다
-				if not _nature_clear(pos, "tree", 3):
-					continue
-				var tr := {"kind": "tree", "hp": TREE_HP}
-				if _hash01(x * 17 + 2, y * 23 + 5) < 0.15:
-					tr["apple"] = true  # 일부 나무만 사과 3개가 열린다
-				objects[pos] = tr
-	# 퀘스트 5: 동쪽 길 한가운데를 커다란 바위가 완전히 가로막는다
-	# (위아래는 나무가 빽빽해 돌아갈 수 없다 — 바위를 캐야만 지나갈 수 있다)
+			if h > 0.93 and _nature_clear(p2, "rock"):
+				objects[p2] = {"kind": "rock", "hp": ROCK_HP}
+			elif h > 0.84 and _nature_clear(p2, "forage_berry"):
+				objects[p2] = {"kind": "forage_herb" if h < 0.885 else "forage_berry",
+					"hp": 0}
+
+	# ④ 퀘스트 5: 동쪽 숲길 한가운데를 커다란 바위가 완전히 가로막는다
+	#    (위아래는 빽빽한 숲이라 돌아갈 수 없다 — 바위를 캐야만 지나갈 수 있다)
 	objects[STORY_ROCK] = {"kind": "bigrock", "hp": BIGROCK_HP}
-	for dy in [-2, -1, 1, 2]:
-		var wall := Vector2i(STORY_ROCK.x, STORY_ROCK.y + dy)
-		if not objects.has(wall):
-			objects[wall] = {"kind": "tree", "hp": TREE_HP}
 
 
 func _story_update(delta: float) -> void:
@@ -3147,6 +3195,7 @@ func _process(delta: float) -> void:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	_update_particles(delta)
 	_update_night_mobs(delta)
+	_update_tree_fade()
 	_update_u_intro()
 	_net_process(delta)
 	_update_night()
