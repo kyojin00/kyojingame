@@ -221,6 +221,29 @@ const VILLAGE_BUILD_COST := {   # [목재, 석재]
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 	"ranch": "rancher", "fish": "fisher"}
+# ---- NPC 하루 일과 ----
+#
+# 시간대마다 갈 곳이 바뀐다. 목적지까지는 길찾기로 걸어가고,
+# 도착하면 그 둘레를 어슬렁거린다. 19시(저녁)에는 기존대로 집에 들어간다.
+# 새 NPC를 넣을 때는 이 세 표에 한 줄씩만 더하면 된다.
+#   [시작 시각, 장소] — 시각 순서대로 적는다
+const NPC_SCHEDULE := {
+	"chief":      [[6, "home"], [9, "board"], [12, "plaza"], [16, "board"]],
+	"merchant":   [[6, "home"], [9, "work"], [13, "plaza"], [15, "work"]],
+	"blacksmith": [[6, "home"], [9, "work"], [14, "plaza"], [16, "work"]],
+	"rancher":    [[6, "home"], [8, "work"], [12, "plaza"], [15, "work"]],
+	"fisher":     [[6, "home"], [8, "pier"], [13, "plaza"], [15, "pier"]],
+}
+# 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
+const NPC_PLAZA := {
+	"chief": Vector2i(74, 13), "merchant": Vector2i(70, 15),
+	"blacksmith": Vector2i(80, 15), "rancher": Vector2i(70, 19),
+	"fisher": Vector2i(80, 19),
+}
+# 건물이 없는 NPC(이장)의 집 자리
+const NPC_HOME := {"chief": Vector2i(72, 20)}
+const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
+
 const BUILDING_NAMES := {
 	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
 	"lab": "연구소", "inn": "여관", "library": "도서관",
@@ -673,6 +696,46 @@ func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
 	n.position = Vector2(tile.x * TILE + 16, tile.y * TILE + 16)
 	npcs.append(n)
 	world.add_child(n)
+
+
+# 지금 시각에 이 NPC가 있어야 할 장소 이름 ("home"/"work"/"plaza"/"board"/"pier")
+func npc_place_now(npc_id: String) -> String:
+	var plan: Array = NPC_SCHEDULE.get(npc_id, [])
+	if plan.is_empty():
+		return ""
+	var hour := GameData.minutes / 60.0
+	var place: String = plan[0][1]
+	for entry: Array in plan:
+		if hour >= float(entry[0]):
+			place = entry[1]
+	return place
+
+
+# 장소 이름 -> 실제 타일. 갈 수 없는 자리면 둘레에서 걸을 수 있는 칸을 찾는다.
+func npc_place_tile(npc_id: String, place: String) -> Vector2i:
+	var t := Vector2i(-999, -999)
+	match place:
+		"plaza":
+			t = NPC_PLAZA.get(npc_id, Vector2i(74, 13))
+		"board":
+			t = BOARD_POS + Vector2i(0, 1)
+		"pier":
+			t = Vector2i(FISH_PIERS[0].x, DOCK_Y)
+		_:
+			# 자기 건물 문 앞 (집도 일터도 같은 건물이다)
+			for pid: String in VILLAGE_NPC:
+				if VILLAGE_NPC[pid] == npc_id and GameData.village_built.has(pid):
+					t = door_tile(VILLAGE_PLOTS[pid].anchor) + Vector2i(0, 1)
+					break
+			if t.x == -999:
+				t = NPC_HOME.get(npc_id, Vector2i(72, 20))
+	if is_passable(t):
+		return t
+	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0),
+			Vector2i(0, 2), Vector2i(2, 0), Vector2i(-2, 0)]:
+		if is_passable(t + d):
+			return t + d
+	return t
 
 
 func _sync_village_npcs() -> void:
@@ -2986,7 +3049,82 @@ func tutorial_notify(flag: String) -> void:
 	tut["active"] = false
 	dialog.open("기본 안내 완료!",
 		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nB: 상점 (씨앗/판매/동물/강화/도감 탭)\nE: 상호작용 (대화/취침/판매/쓰다듬기)\nTab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n동쪽 마을의 주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
-		[["좋아!", null]])
+		[["좋아!", _open_grandpa_letter]])
+
+
+# ---- 할아버지의 부탁 ----
+#
+# 기본 안내가 끝나면 노트에서 할아버지의 부탁이 하나씩 떠오른다.
+# 조건을 채우면 다음 부탁이 이어지고, 일곱을 다 들어주면
+# 마지막 부탁(최후의 연금술)이 남는다.
+var _grandpa_timer := 0.0
+
+
+func _open_grandpa_letter() -> void:
+	dialog.close()
+	var q: Dictionary = GameData.grandpa_current()
+	if q.is_empty():
+		return
+	GameData.grandpa_seen = true
+	Sound.play_sfx("sfx_ui")
+	dialog.open("할아버지의 부탁 — %s" % q.name,
+		"%s\n\n· %s" % [q.letter, q.desc],
+		[["해보겠습니다", null]], tex.get("icon_note"))
+
+
+func _grandpa_update(delta: float) -> void:
+	if GameData.tutorial.get("active", false) or ui_open():
+		return
+	if not GameData.grandpa_seen and not GameData.grandpa_all_done():
+		_grandpa_timer = 0.0
+		_open_grandpa_letter()
+		return
+	_grandpa_timer += delta
+	if _grandpa_timer < 0.5:
+		return
+	_grandpa_timer = 0.0
+	if not GameData.grandpa_ready():
+		return
+	_finish_grandpa()
+
+
+func _finish_grandpa() -> void:
+	var q: Dictionary = GameData.grandpa_current()
+	if q.is_empty():
+		return
+	GameData.grandpa_step += 1
+	Sound.play_sfx("sfx_catch")
+	var parts := []
+	var reward: Dictionary = q.get("reward", {})
+	if reward.has("money"):
+		GameData.money += int(reward.money)
+		parts.append("%dG" % int(reward.money))
+	if reward.has("wood"):
+		GameData.wood += int(reward.wood)
+		parts.append("목재 %d" % int(reward.wood))
+	if reward.has("stone"):
+		GameData.stone += int(reward.stone)
+		parts.append("석재 %d" % int(reward.stone))
+	if reward.has("seeds"):
+		for sid in reward.seeds:
+			GameData.seeds[sid] += int(reward.seeds[sid])
+			parts.append("%s 씨앗 x%d" % [GameData.CROPS[sid].name, int(reward.seeds[sid])])
+	if not parts.is_empty():
+		hud.reward_toast(", ".join(parts), tex["icon_coin"])
+	hud.quest_toast("할아버지의 부탁 — %s" % q.name)
+	if Net.is_host():
+		_broadcast_stats()
+	save_now()
+
+	# 다음 부탁 편지를 바로 이어서 보여 준다
+	if GameData.grandpa_all_done():
+		dialog.open("할아버지의 마지막 부탁",
+			"노트의 빈 장이 스스로 넘어가며,\n마지막 한 장에 이렇게 적혀 있었다.\n\n"
+			+ "\"여기까지 와 주어 고맙구나.\n남은 것은 하나 — 세상에 없는 재료를 만드는 일.\n"
+			+ "일곱 가지 전설의 재료를 모으거라.\n노트(N)가 길을 알려 줄 게다.\"",
+			[["반드시 찾아낼게요", null]], tex.get("icon_note"))
+	else:
+		_open_grandpa_letter()
 
 
 # ---- NPC 대화 / 선물 / 퀘스트 ----
@@ -3490,6 +3628,8 @@ func _apply_save(d: Dictionary) -> void:
 		}
 	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
 	GameData.tutorial = d.get("tutorial", {"active": false})
+	GameData.grandpa_step = int(d.get("grandpa_step", 0))
+	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
 	GameData.unlocked_tools = d.get("unlocked_tools", GameData.ALL_TOOLS.duplicate())
 	for k in d.get("mob_kills", {}):
 		GameData.mob_kills[k] = int(d.mob_kills[k])
@@ -3568,6 +3708,8 @@ func _apply_save(d: Dictionary) -> void:
 func _process(delta: float) -> void:
 	_story_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
+	if GameData.story_phase == "done":
+		_grandpa_update(delta)
 	for ft in float_texts:
 		ft.t += delta
 	float_texts = float_texts.filter(func(ft: Dictionary) -> bool: return ft.t < 1.3)
@@ -4357,7 +4499,36 @@ func _debug_tick() -> void:
 				Vector2(gap.x * TILE + 16, gap.y * TILE + 16)))
 			objects.erase(gap + Vector2i(0, -1))
 			objects.erase(gap + Vector2i(0, 1))
-		219: get_tree().quit()
+		220:
+			# 할아버지의 부탁: 기본 안내가 끝나면 첫 편지가 뜬다
+			GameData.tutorial = {"active": false}
+			GameData.grandpa_step = 0
+			GameData.grandpa_seen = false
+			dialog.close()
+		222: _save_shot("_grandpa.png")
+		223:
+			# 조건을 채우면 다음 부탁으로 넘어간다
+			GameData.crops_harvested = {"potato": 1, "carrot": 1, "strawberry": 1}
+			dialog.close()
+		# 진행도 확인은 0.5초 간격으로 도니 프레임을 넉넉히 준다
+		260: print("GRANDPA_STEP=", GameData.grandpa_step)
+		261:
+			# NPC 하루 일과: 시각별로 갈 곳이 바뀌는지 확인
+			var sched := []
+			for h in [7, 10, 13, 17]:
+				GameData.minutes = h * 60.0
+				sched.append("%d시=%s" % [h, npc_place_now("merchant")])
+			print("NPC_SCHEDULE=", ", ".join(sched))
+			GameData.minutes = 13.0 * 60.0       # 낮: 다들 광장으로 모인다
+			dialog.close()
+			player.position = Vector2(74 * TILE + 16, 17 * TILE + 16)
+		330:
+			var where := []
+			for n in npcs:
+				where.append("%s:%s" % [n.id, n.place])
+			print("NPC_PLACES=", ", ".join(where))
+			_save_shot("_npcday.png")
+		333: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

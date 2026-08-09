@@ -173,18 +173,40 @@ func _rebuild() -> void:
 			_line("  [미수락] %s %d개 납품 - 보상 %dG" % [crop_name, int(q.qty), int(q.reward)])
 			_line("    마을 광장 게시판(E)에서 수락하자.", COL_SUB)
 
-	# 할아버지의 부탁 (진짜 목표는 끝까지 밝히지 않는다)
+	# 할아버지의 부탁 — 기본 안내가 끝난 뒤 이어지는 본 게임의 길잡이.
+	# 다음 부탁은 미리 보여주지 않는다 (받았을 때 편지로 읽는다).
 	_line("")
 	_line("[할아버지의 부탁]", COL_HEAD)
+	if GameData.tutorial.get("active", false):
+		_line("  마을 생활 안내를 마치면 노트에서 떠오른다.", COL_DIM)
+	else:
+		var step: int = GameData.grandpa_step
+		for i in GameData.GRANDPA_QUESTS.size():
+			var gq: Dictionary = GameData.GRANDPA_QUESTS[i]
+			if i < step:
+				_line("  V %s (완료)" % gq.name, COL_DONE)
+			elif i == step:
+				var now: int = mini(GameData.grandpa_count(str(gq.count)), int(gq.goal))
+				_line("  > %s — %s" % [gq.name, gq.desc], COL_NOW)
+				_line("    %d/%d" % [now, int(gq.goal)], COL_SUB)
+			else:
+				_line("  - ???", COL_DIM)
+				break
+
+	# 마지막 부탁: 최후의 연금술 (진짜 목표는 여기까지 와야 밝혀진다)
 	var prog: Dictionary = GameData.note_progress()
+	_line("")
 	if GameData.ending_seen:
 		_line("  할아버지의 꿈을 완성했다.", COL_NOW)
 		_line("    교진 마을의 나날은 계속된다.", COL_SUB)
+	elif GameData.grandpa_all_done():
+		_line("  [마지막 부탁] 일곱 전설의 재료를 모아 최후의 연금술을", COL_NOW)
+		_line("    기록 %d/%d (%d%%) — 연구 노트(%s)를 보자" % [int(prog.filled),
+			int(prog.total), int(prog.ratio * 100.0),
+			GameData.key_label("open_note")], COL_SUB)
 	else:
 		_line("  연구 노트(%s)를 채워 할아버지의 흔적을 따라가자" %
 			GameData.key_label("open_note"))
 		_line("    기록 %d/%d (%d%%)" % [int(prog.filled), int(prog.total),
 			int(prog.ratio * 100.0)], COL_SUB)
-		if prog.ratio >= 0.5:
-			_line("    노트에 숨겨진 메모가 나타나기 시작했다...", COL_NOW)
 

@@ -387,6 +387,11 @@ func refresh() -> void:
 		track.append("목표: " + story_obj)
 	elif obj != "":
 		track.append("목표: " + obj)
+	else:
+		# 기본 안내가 끝나면 할아버지의 부탁이 그 자리를 잇는다
+		var gl := GameData.grandpa_line()
+		if gl != "":
+			track.append(gl)
 	if GameData.u_intro_state == 1:
 		track.append("목표: U 키로 능력치를 확인해 보자")
 	var q: Dictionary = GameData.quest

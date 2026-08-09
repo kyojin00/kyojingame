@@ -1086,6 +1086,109 @@ func tutorial_current_flag() -> String:
 	return ""
 
 
+# ---- 할아버지의 부탁 ----
+#
+# 기본 안내(튜토리얼)가 끝나면 이어지는 본 게임의 길잡이.
+# 할아버지가 노트에 남긴 부탁을 하나씩 들어주며 빈 장을 채워 간다.
+# 새 부탁을 넣을 때는 이 표에 한 줄만 더하면 된다.
+#   count: 지금까지 얼마나 했는지 세는 방법 (아래 grandpa_count 참고)
+const GRANDPA_QUESTS := [
+	{"id": "crops", "count": "crop_kinds", "goal": 3,
+		"name": "밭에서 시작한다",
+		"desc": "작물 3종류를 수확해 노트에 기록하자",
+		"letter": "\"농사는 땅과 나누는 대화란다.\n무엇을 심어도 좋으니, 서로 다른 작물 셋을\n네 손으로 거둬 노트에 적어 두렴.\"",
+		"reward": {"money": 500, "seeds": {"tomato": 3}}},
+	{"id": "fish", "count": "fish_kinds", "goal": 3,
+		"name": "강가의 기록",
+		"desc": "물고기 3종류를 낚아 노트에 기록하자",
+		"letter": "\"물속에도 답이 있다.\n마을 남쪽 낚시터에서 서로 다른 물고기 셋을\n낚아 보렴. 기다림도 연구의 일부란다.\"",
+		"reward": {"money": 800}},
+	{"id": "forage", "count": "forage_kinds", "goal": 3,
+		"name": "숲의 기록",
+		"desc": "채집물·곤충 3종류를 모아 노트에 기록하자",
+		"letter": "\"숲은 아무것도 팔지 않지만 모든 것을 준단다.\n열매든 풀이든 벌레든, 서로 다른 셋을 찾아\n노트에 붙여 두렴.\"",
+		"reward": {"money": 1000, "stone": 10}},
+	{"id": "mine", "count": "mob_kills", "goal": 10,
+		"name": "땅속의 기록",
+		"desc": "동굴에서 몬스터를 10마리 물리치자",
+		"letter": "\"동굴 깊은 곳의 것들은 사납지만,\n그 몸에서 나오는 것 또한 재료다.\n조심하되 물러서지는 말거라.\"",
+		"reward": {"money": 1500, "wood": 20}},
+	{"id": "cook", "count": "recipe_kinds", "goal": 3,
+		"name": "부엌의 기록",
+		"desc": "요리를 3종류 만들어 보자",
+		"letter": "\"불과 물과 시간을 다루는 일 —\n요리야말로 가장 오래된 연금술이란다.\n세 가지를 만들어 먹어 보렴.\"",
+		"reward": {"money": 2000}},
+	{"id": "friend", "count": "best_affinity", "goal": 50,
+		"name": "사람의 기록",
+		"desc": "마을 사람과 친해지자 (호감도 50)",
+		"letter": "\"내가 끝내 못 채운 장이 사람이었다.\n마을 사람 하나와 진하게 친해져 보렴.\n선물도 좋고, 매일 인사도 좋다.\"",
+		"reward": {"money": 2500}},
+	{"id": "note", "count": "note_percent", "goal": 50,
+		"name": "절반의 노트",
+		"desc": "연구 노트를 절반(50%)까지 채우자",
+		"letter": "\"여기까지 왔다면 이제 알 게다.\n노트의 절반을 채우면, 남은 장이 무엇을 원하는지\n스스로 보이기 시작할 거야.\"",
+		"reward": {"money": 3000}},
+]
+
+var grandpa_step := 0        # 지금 받은 부탁 번호 (GRANDPA_QUESTS의 인덱스)
+var grandpa_seen := false    # 첫 부탁 편지를 읽었는가
+
+
+# 부탁마다 「지금까지 얼마나 했는지」를 센다
+func grandpa_count(kind: String) -> int:
+	match kind:
+		"crop_kinds":
+			return crops_harvested.size()
+		"fish_kinds":
+			return fish_caught.size()
+		"forage_kinds":
+			return forage_caught.size()
+		"mob_kills":
+			var n := 0
+			for k in mob_kills:
+				n += int(mob_kills[k])
+			return n
+		"recipe_kinds":
+			return recipes_cooked.size()
+		"best_affinity":
+			var best := 0
+			for k in affinity:
+				best = maxi(best, int(affinity[k]))
+			return best
+		"note_percent":
+			var p: Dictionary = note_progress()
+			if int(p.total) <= 0:
+				return 0
+			return int(round(float(p.filled) * 100.0 / float(p.total)))
+	return 0
+
+
+func grandpa_all_done() -> bool:
+	return grandpa_step >= GRANDPA_QUESTS.size()
+
+
+func grandpa_current() -> Dictionary:
+	if tutorial.get("active", false) or grandpa_all_done():
+		return {}
+	return GRANDPA_QUESTS[grandpa_step]
+
+
+# 지금 부탁을 다 했는가 (진행도가 목표에 닿았는가)
+func grandpa_ready() -> bool:
+	var q := grandpa_current()
+	if q.is_empty():
+		return false
+	return grandpa_count(str(q.count)) >= int(q.goal)
+
+
+func grandpa_line() -> String:
+	var q := grandpa_current()
+	if q.is_empty():
+		return ""
+	var now: int = mini(grandpa_count(str(q.count)), int(q.goal))
+	return "할아버지의 부탁: %s (%d/%d)" % [q.name, now, int(q.goal)]
+
+
 func merchant_discount() -> bool:
 	return int(affinity["merchant"]) >= 50
 
@@ -1194,6 +1297,8 @@ func reset_all() -> void:
 	_reset_skills()
 	furniture = default_furniture()
 	tutorial = fresh_tutorial()
+	grandpa_step = 0
+	grandpa_seen = false
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
 	tree_regrow = []
@@ -1305,6 +1410,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
+		"grandpa_step": grandpa_step,
+		"grandpa_seen": grandpa_seen,
 		"unlocked_tools": unlocked_tools,
 		"wood": wood,
 		"stone": stone,
