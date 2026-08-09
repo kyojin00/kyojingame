@@ -43,11 +43,12 @@ func _process(delta: float) -> void:
 	anim_time += delta
 	if moving:
 		var d := target - position
-		if d.length() < 1.5:
+		if d.length() < 2.0:
 			moving = false
-			wait = randf_range(1.5, 4.0)
+			position = target
+			wait = randf_range(0.4, 1.8)   # 잠깐 멈췄다가 다시 걷는다
 		else:
-			var step := d.normalized() * 40.0 * delta
+			var step := d.normalized() * 52.0 * delta
 			if absf(step.x) > absf(step.y):
 				dir = "right" if step.x > 0 else "left"
 			else:
@@ -60,17 +61,27 @@ func _process(delta: float) -> void:
 	_update_sprite()
 
 
+# 마을 안을 자유롭게 돌아다닌다 (타일 크기는 main.TILE 기준)
 func _pick_target() -> void:
-	var t := Vector2i(int(floor(position.x / 16.0)), int(floor(position.y / 16.0)))
+	var ts: int = main.TILE
+	var t := Vector2i(int(floor(position.x / ts)), int(floor(position.y / ts)))
 	var dirs := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 	dirs.shuffle()
-	for d in dirs:
-		var n: Vector2i = t + d
-		if region.has_point(n) and main.is_passable(n):
-			target = Vector2(n.x * 16 + 8, n.y * 16 + 8)
+	for d: Vector2i in dirs:
+		# 한 번에 1~3칸씩 이어서 걷는다 (가다 서다 하는 모습이 자연스럽다)
+		var n := t
+		var steps := 0
+		for i in randi_range(1, 3):
+			var nx: Vector2i = n + d
+			if not region.has_point(nx) or not main.is_passable(nx):
+				break
+			n = nx
+			steps += 1
+		if steps > 0:
+			target = Vector2(n.x * ts + ts / 2.0, n.y * ts + ts / 2.0)
 			moving = true
 			return
-	wait = 1.0
+	wait = 0.6
 
 
 func _update_sprite() -> void:

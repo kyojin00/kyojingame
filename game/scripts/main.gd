@@ -457,16 +457,16 @@ func _build_map() -> void:
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
 	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
-	# 테두리 나무
+	# 테두리 나무 (그림이 크므로 한 칸씩 띄워 겹치지 않게 세운다)
 	for x in MAP_W:
-		if _hash01(x, 0) < 0.75 and not objects.has(Vector2i(x, 0)):
+		if x % 2 == 0 and not objects.has(Vector2i(x, 0)):
 			objects[Vector2i(x, 0)] = {"kind": "tree", "hp": TREE_HP}
-		if _hash01(x, MAP_H - 1) < 0.75:
+		if x % 2 == 0:
 			objects[Vector2i(x, MAP_H - 1)] = {"kind": "tree", "hp": TREE_HP}
 	for y in MAP_H:
-		if _hash01(0, y) < 0.75 and not objects.has(Vector2i(0, y)):
+		if y % 2 == 0 and not objects.has(Vector2i(0, y)):
 			objects[Vector2i(0, y)] = {"kind": "tree", "hp": TREE_HP}
-		if _hash01(MAP_W - 1, y) < 0.75 and not objects.has(Vector2i(MAP_W - 1, y)):
+		if y % 2 == 0 and not objects.has(Vector2i(MAP_W - 1, y)):
 			objects[Vector2i(MAP_W - 1, y)] = {"kind": "tree", "hp": TREE_HP}
 
 	# 부지 판매 표지판
@@ -489,14 +489,19 @@ func _build_map() -> void:
 				continue  # 마을/길은 비워둔다
 			var h := _hash01(x * 3 + 7, y * 5 + 11)
 			if deep_rect.has_point(pos):
+				# 깊은 숲은 빽빽하되, 그림이 겹치지 않게 한 칸씩은 띄운다
 				if h < 0.14:
-					objects[pos] = {"kind": "tree", "hp": TREE_HP}
+					if _nature_clear(pos, 1):
+						objects[pos] = {"kind": "tree", "hp": TREE_HP}
 				elif h < 0.19:
-					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
+					if _nature_clear(pos, 1):
+						objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 			elif h < 0.045:
-				objects[pos] = {"kind": "tree", "hp": TREE_HP}
+				if _nature_clear(pos, 2):
+					objects[pos] = {"kind": "tree", "hp": TREE_HP}
 			elif h < 0.075:
-				objects[pos] = {"kind": "rock", "hp": ROCK_HP}
+				if _nature_clear(pos, 1):
+					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
 
 
 # 교진 마을: 건물은 하나도 짓지 않는다.
@@ -556,8 +561,20 @@ func _build_village() -> void:
 		for y in [1, 29]:
 			var rim := Vector2i(x, y)
 			if grid[y][x].ground == "grass" and not objects.has(rim) \
-					and _hash01(x * 5 + 3, y * 7 + 2) < 0.55:
+					and _hash01(x * 5 + 3, y * 7 + 2) < 0.55 and _nature_clear(rim, 1):
 				objects[rim] = {"kind": "tree", "hp": TREE_HP}
+
+
+# 자연물은 타일보다 크게 그려지므로, 서로 겹쳐 보이지 않게 최소 간격을 둔다.
+func _nature_clear(pos: Vector2i, dist: int) -> bool:
+	for dy in range(-dist, dist + 1):
+		for dx in range(-dist, dist + 1):
+			var p := pos + Vector2i(dx, dy)
+			if p == pos or not objects.has(p):
+				continue
+			if objects[p].kind in NATURE_KINDS:
+				return false
+	return true
 
 
 func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
@@ -615,10 +632,13 @@ func _spawn_house_node(anchor: Vector2i) -> void:
 
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
 const OBJECT_SCALES := {
-	"tree": 2.0, "rock": 1.4, "bigrock": 3.0, "cave": 1.5, "worldtree": 1.6,
-	"barn": 1.5, "forage_berry": 1.2, "forage_herb": 1.2,
-	"deco_fountain": 1.4, "deco_lamp": 1.0, "deco_bench": 1.0,
+	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
+	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
+	"barn": 1.8, "forage_berry": 1.5, "forage_herb": 1.5,
+	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
+# 서로 겹쳐 보이면 안 되는 자연물 (배치 시 최소 간격을 둔다)
+const NATURE_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
 const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
 
 
@@ -852,7 +872,7 @@ func ui_open() -> bool:
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or cooking_ui.visible or quest_ui.visible or note_ui.visible \
-		or stats_ui.visible or _name_layer != null \
+		or stats_ui.visible or _name_layer != null or _gift_layer != null \
 		or (story_layer != null and story_layer.visible)
 
 
@@ -1433,7 +1453,7 @@ func _building_kind_at(t: Vector2i) -> String:
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(2, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
+const STORY_SPAWN := Vector2i(4, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
 const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
 const STORY_FORK := Vector2i(20, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
 const STORY_ROCK := Vector2i(26, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
@@ -1477,6 +1497,10 @@ func _apply_story_visibility() -> void:
 
 
 func _plant_story_forest() -> void:
+	# 숲 입구(우체부가 걸어오는 길)는 테두리 나무까지 치워 시야를 확보한다
+	for yy in [STORY_LANE_Y - 1, STORY_LANE_Y, STORY_LANE_Y + 1]:
+		objects.erase(Vector2i(0, yy))
+		objects.erase(Vector2i(1, yy))
 	# 주인공(왼쪽) 앞을 가로막는 울창한 숲: 나무 사이 간격은 불규칙하게,
 	# 곳곳에 큰 돌을 드문드문 섞어 자연스러운 숲 지형을 만든다.
 	for y in range(1, 23):
@@ -1502,6 +1526,8 @@ func _plant_story_forest() -> void:
 				continue
 			if h < 0.5:
 				continue  # 나무 사이 이동 공간 (불규칙한 빈 풀밭)
+			if not _nature_clear(pos, 1):
+				continue  # 자연물끼리 붙어서 그림이 겹치지 않게 한 칸은 띄운다
 			if h < 0.57:
 				# 풀/낮은 풀숲/작은 식물 (열매 덤불·약초) — 드문드문
 				objects[pos] = {"kind": "forage_herb" if h < 0.535 else "forage_berry", "hp": 0}
@@ -1599,16 +1625,20 @@ func _story_update(delta: float) -> void:
 
 func _spawn_postman() -> void:
 	_postman = Node2D.new()
-	_postman.position = Vector2(16, STORY_LANE_Y * TILE + 16)  # 화면 왼쪽 끝
+	_postman.position = Vector2(36, STORY_LANE_Y * TILE + 16)  # 화면 왼쪽 끝
 	_postman_spr = Sprite2D.new()
 	_postman_spr.centered = false
-	_postman_spr.offset = Vector2(-16, -47)
-	_postman_spr.scale = Vector2(2, 2)
+	# 플레이어와 같은 밀도의 도트. 어른이라 주인공보다 조금 크게 그린다.
+	_postman_spr.offset = Vector2(-64, -188)
+	_postman_spr.scale = Vector2(0.56, 0.56)
 	_postman_spr.texture = tex["npc_postman_side_0"]
 	_postman.add_child(_postman_spr)
 	world.add_child(_postman)
 	_postman_state = "approach"
 	story_cutscene = true
+	if _shot_path != "" and OS.get_environment("KYOJIN_STORY") != "":
+		get_tree().create_timer(0.2).timeout.connect(
+			func() -> void: _snap_story("story_postman"))
 
 
 func _update_postman(delta: float, story_shot: bool) -> void:
@@ -1620,18 +1650,18 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 			# 멀리서 뚜벅뚜벅 걸어와 말을 건다
 			var to_player := player.position - _postman.position
 			if to_player.length() > 44.0:
-				var spd := 150.0 if story_shot else 45.0
+				var spd := 55.0 if story_shot else 45.0
 				_postman.position += to_player.normalized() * spd * delta
 				_postman_spr.texture = tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
 				_postman_spr.flip_h = to_player.x < 0
-				if story_shot and absf(_story_t - 1.4) < delta:
-					_snap_story("story_postman")
 			else:
 				_postman_state = "talk"
 				_postman_spr.texture = tex["npc_postman_side_0"]
 				_start_postman_dialog()
 				if story_shot:
-					_snap_story.call_deferred("story_dialog")
+					# 대화창이 실제로 그려진 뒤에 캡처한다
+					get_tree().create_timer(0.25).timeout.connect(
+						func() -> void: _snap_story("story_dialog"))
 		"follow":
 			# 마을까지 동행: 주인공 옆에서 함께 걷고, 개척하는 동안 기다린다
 			var to := player.position + Vector2(-42, 6) - _postman.position
@@ -1779,6 +1809,7 @@ func _end_postman_dialog() -> void:
 		_postman_state = "follow"  # 우체부는 떠나지 않고 마을까지 동행한다
 
 
+var _story_snapped := false
 var _story_map_opened := false
 var _last_explore_tile := Vector2i(-999, -999)
 
@@ -2502,7 +2533,7 @@ func _talk_to(npc: Node2D) -> void:
 		if Net.is_host():
 			_broadcast_stats()
 	var choices := [
-		["선물하기", _give_gift.bind(npc.id)],
+		["선물하기", _open_gift_picker.bind(npc.id)],
 		["대화 끝", null],
 	]
 	# 이장은 마을 발전(빈 부지에 건물 세우기)을 맡고 있다
@@ -2519,26 +2550,90 @@ func _npc_portrait(npc_id: String, happy := false) -> Texture2D:
 	return tex["npc_%s_portrait_%s" % [npc_id, expr]]
 
 
-func _give_gift(npc_id: String) -> void:
-	# 수확물/아이템 중 하나를 선물한다
-	var gift_name := ""
-	for id in GameData.CROP_IDS:
-		if GameData.produce[id] > 0:
-			GameData.produce[id] -= 1
-			gift_name = GameData.CROPS[id].name
-			break
-	if gift_name == "":
-		for id in GameData.ITEM_IDS:
-			if GameData.items[id] > 0:
-				GameData.items[id] -= 1
-				gift_name = GameData.ITEMS[id].name
-				break
-	if gift_name == "":
+var _gift_layer: CanvasLayer = null
+
+
+# 선물은 플레이어가 직접 고른다 — 가진 수확물/생산물 목록에서 선택
+func _open_gift_picker(npc_id: String) -> void:
+	var entries: Array = []
+	for id: String in GameData.CROP_IDS:
+		if int(GameData.produce.get(id, 0)) > 0:
+			entries.append(["produce", id, str(GameData.CROPS[id].name),
+				int(GameData.produce[id])])
+	for id: String in GameData.ITEM_IDS:
+		if int(GameData.items.get(id, 0)) > 0:
+			entries.append(["item", id, str(GameData.ITEMS[id].name),
+				int(GameData.items[id])])
+	if entries.is_empty():
 		dialog.set_body("선물할 것이 없다... 수확물이나 생산물이 필요하다.")
+		return
+	_close_gift_picker()
+	_gift_layer = CanvasLayer.new()
+	_gift_layer.layer = 30
+	var panel := Panel.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.91, 0.71, 0.42, 0.98)
+	st.border_color = Color(0.43, 0.24, 0.11)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(4)
+	panel.add_theme_stylebox_override("panel", st)
+	panel.position = Vector2(300, 110)
+	panel.size = Vector2(360, 320)
+	_gift_layer.add_child(panel)
+	var lab := Label.new()
+	lab.text = "무엇을 선물할까?"
+	lab.position = Vector2(0, 8)
+	lab.size = Vector2(360, 24)
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.add_theme_color_override("font_color", Color(0.29, 0.16, 0.06))
+	panel.add_child(lab)
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(14, 38)
+	scroll.size = Vector2(332, 234)
+	panel.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.custom_minimum_size = Vector2(322, 0)
+	list.add_theme_constant_override("separation", 4)
+	scroll.add_child(list)
+	for e: Array in entries:
+		var btn := Button.new()
+		btn.text = "%s  x%d" % [e[2], e[3]]
+		btn.custom_minimum_size = Vector2(322, 30)
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.pressed.connect(_give_gift.bind(npc_id, str(e[0]), str(e[1])))
+		list.add_child(btn)
+	var cancel := Button.new()
+	cancel.text = "그만두기"
+	cancel.position = Vector2(130, 280)
+	cancel.size = Vector2(100, 28)
+	cancel.focus_mode = Control.FOCUS_NONE
+	cancel.pressed.connect(_close_gift_picker)
+	panel.add_child(cancel)
+	add_child(_gift_layer)
+
+
+func _close_gift_picker() -> void:
+	if _gift_layer != null:
+		_gift_layer.queue_free()
+		_gift_layer = null
+
+
+func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
+	# 고른 선물을 건넨다
+	var gift_name := ""
+	if kind == "produce" and int(GameData.produce.get(item_id, 0)) > 0:
+		GameData.produce[item_id] -= 1
+		gift_name = str(GameData.CROPS[item_id].name)
+	elif kind == "item" and int(GameData.items.get(item_id, 0)) > 0:
+		GameData.items[item_id] -= 1
+		gift_name = str(GameData.ITEMS[item_id].name)
+	_close_gift_picker()
+	if gift_name == "":
+		dialog.set_body("그건 이제 가지고 있지 않다...")
 		return
 	var before := int(GameData.affinity[npc_id])
 	if Net.is_guest():
-		_req_gift.rpc_id(1, npc_id)  # 호스트가 차감/가산 후 통계 전파
+		_req_gift.rpc_id(1, npc_id, kind, item_id)  # 호스트가 차감/가산 후 전파
 	GameData.affinity[npc_id] = before + 10
 	Sound.play_sfx("sfx_heart")
 	if Net.is_host():
@@ -3534,10 +3629,12 @@ func _debug_tick() -> void:
 		return  # 접속 완료 후부터 시퀀스 시작
 	_shot_frames += 1
 	if OS.get_environment("KYOJIN_STORY") != "":
-		# 스토리 화면만 캡처하고 종료
-		if _shot_frames == 30:
+		# 스토리 화면만 캡처하고 종료 (프레임 수가 아니라 스토리 진행 시간 기준 —
+		# 헤드리스 환경은 프레임 속도가 들쭉날쭉하다)
+		if not _story_snapped and _story_t >= 3.2:
+			_story_snapped = true
 			_save_shot("_story.png")
-		elif _shot_frames == 34:
+		elif _story_snapped and _story_t >= 3.8:
 			get_tree().quit()
 		return
 	match _shot_frames:
@@ -3581,7 +3678,13 @@ func _debug_tick() -> void:
 			player.position = npcs[0].position + Vector2(12, 0)
 		94: _send_key(KEY_E)                           # NPC 대화
 		100: _save_shot("_npc.png")
-		102:
+		101:
+			GameData.produce["potato"] = 3             # 선물 고르기 확인
+			GameData.items["egg"] = 2
+			_open_gift_picker("chief")
+		103: _save_shot("_gift.png")
+		104:
+			_close_gift_picker()
 			dialog.close()
 			player.position = Vector2(30 * TILE + 16, 8 * TILE + 16)
 			player.dir = "up"                          # 동쪽 부지 표지판 앞 (길 위)
@@ -4028,22 +4131,18 @@ func _req_furniture(furn_json: String, money_delta: int) -> void:
 
 
 @rpc("any_peer", "reliable")
-func _req_gift(npc_id: String) -> void:
+func _req_gift(npc_id: String, kind: String, item_id: String) -> void:
 	if not Net.is_host():
 		return
-	# 게스트 로컬과 같은 규칙: 첫 번째 보유 품목을 선물
-	for id in GameData.CROP_IDS:
-		if GameData.produce[id] > 0:
-			GameData.produce[id] -= 1
-			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
-			_broadcast_stats()
-			return
-	for id in GameData.ITEM_IDS:
-		if GameData.items[id] > 0:
-			GameData.items[id] -= 1
-			GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
-			_broadcast_stats()
-			return
+	# 게스트가 직접 고른 품목을 차감한다
+	if kind == "produce" and int(GameData.produce.get(item_id, 0)) > 0:
+		GameData.produce[item_id] -= 1
+	elif kind == "item" and int(GameData.items.get(item_id, 0)) > 0:
+		GameData.items[item_id] -= 1
+	else:
+		return
+	GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+	_broadcast_stats()
 
 
 @rpc("any_peer", "reliable")
