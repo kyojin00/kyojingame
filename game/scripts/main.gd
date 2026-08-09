@@ -409,13 +409,25 @@ func _load_textures() -> void:
 		tex[n] = load("res://assets/sprites/%s.png" % n)
 
 
+# 맵 밖 배경 색조 (어두운 숲처럼 보이게)
+const OUT_TINT := Color(0.42, 0.47, 0.42)
+const OUT_TREE_TINT := Color(0.34, 0.4, 0.35)
+
+
+# 맵 끝에서도 주인공이 화면 가운데 오도록 카메라 제한을 맵 밖까지 넉넉히 둔다
+# (바깥은 _draw가 어두운 숲 배경으로 채운다)
+func _free_camera_limits(cam: Camera2D) -> void:
+	const OUT := 40 * TILE
+	cam.limit_left = -OUT
+	cam.limit_top = -OUT
+	cam.limit_right = MAP_W * TILE + OUT
+	cam.limit_bottom = MAP_H * TILE + OUT
+
+
 func _setup_camera() -> void:
 	var cam: Camera2D = player.get_node("Camera")
 	cam.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
-	cam.limit_left = 0
-	cam.limit_top = 0
-	cam.limit_right = MAP_W * TILE
-	cam.limit_bottom = MAP_H * TILE
+	_free_camera_limits(cam)
 
 
 # ---- 맵 ----
@@ -662,6 +674,23 @@ func _spawn_house_node(anchor: Vector2i) -> void:
 	hspr.offset.x = 80.0 / 0.8 - 160.0
 	obj_nodes[anchor] = hn
 	world.add_child(hn)
+	# 집 그림은 5x4칸보다 크게 그려진다 (양옆 1칸, 위 2칸 더 덮는다).
+	# 그 칸도 막아 두지 않으면 벽 안쪽으로 걸어 들어가진다.
+	_block_under_art(Rect2i(anchor.x - 1, anchor.y - 2, 7, 6),
+		Rect2i(anchor.x, anchor.y, 5, 4))
+
+
+# 그림이 덮는 칸(area) 중 건물 본체(core)가 아닌 칸을 보이지 않는 벽으로 막는다.
+# 이미 다른 것이 놓인 칸은 건드리지 않는다.
+func _block_under_art(area: Rect2i, core: Rect2i) -> void:
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			var pos := Vector2i(x, y)
+			if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+				continue
+			if core.has_point(pos) or objects.has(pos):
+				continue
+			objects[pos] = {"kind": "art_block", "hp": 0, "fixed": true}
 
 
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
@@ -736,6 +765,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -88)
 		"barn_block":
 			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
+		"art_block":
+			pass  # 건물 그림이 덮는 칸 (통행 차단용, 그림 없음)
 		"deco_fountain":
 			texture = tex["deco_fountain"]  # 광장 분수 조형물 (분수 한가운데)
 			offset = Vector2(0, -160)
@@ -1025,6 +1056,8 @@ func build_barn() -> void:
 	GameData.wood -= GameData.BARN_COST_WOOD
 	_place_object(BARN_POS, "barn", 0)
 	objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
+	_block_under_art(Rect2i(BARN_POS.x - 1, BARN_POS.y - 1, 4, 2),
+		Rect2i(BARN_POS.x, BARN_POS.y, 2, 1))
 	Sound.play_sfx("sfx_place")
 	hud.show_message("축사 완공! 동물을 %d마리까지 키울 수 있다." % GameData.BARN_MAX_ANIMALS)
 	if Net.is_host():
@@ -1614,10 +1647,7 @@ func _apply_story_camera() -> void:
 		cam.limit_bottom = 23 * TILE
 		cam.position_smoothing_enabled = true
 	else:
-		cam.limit_left = 0
-		cam.limit_top = 0
-		cam.limit_right = MAP_W * TILE
-		cam.limit_bottom = MAP_H * TILE
+		_free_camera_limits(cam)
 		cam.position_smoothing_enabled = true
 
 
@@ -1628,7 +1658,8 @@ func _apply_story_visibility() -> void:
 	for pos: Vector2i in obj_nodes:
 		# 부지 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = objects[pos].kind if objects.has(pos) else "house"
-		if kind in ["house", "housesite", "bin", "board", "sign", "barn", "barn_block", "cave"]:
+		if kind in ["house", "housesite", "bin", "board", "sign", "barn", "barn_block",
+				"art_block", "cave"]:
 			obj_nodes[pos].visible = show
 
 
@@ -2281,12 +2312,15 @@ func _open_build_dialog() -> void:
 
 
 func _build_house() -> void:
+	if GameData.house_lv > 0:
+		return  # 이미 지은 집 — 두 번 지어지지 않는다
 	if GameData.wood < GameData.HOUSE_BUILD_WOOD:
 		dialog.set_body("목재가 부족하다... (%d/%d)\n도끼로 나무를 베어 목재를 모으자." %
 			[GameData.wood, GameData.HOUSE_BUILD_WOOD])
 		return
 	GameData.wood -= GameData.HOUSE_BUILD_WOOD
 	GameData.house_lv = 1
+	tutorial_notify("home")
 	_remove_object(HOME_SITE)
 	for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
 		for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
@@ -2295,6 +2329,7 @@ func _build_house() -> void:
 	Sound.play_sfx("sfx_place")
 	dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
 		GameData.BED_WOOD)
+	dialog.set_buttons([["좋아!", null]])
 	hud.quest_toast("집 짓기")
 	save_now()
 
@@ -2329,6 +2364,8 @@ func _open_village_build_dialog() -> void:
 func _build_village_building(pid: String) -> void:
 	var plot: Dictionary = VILLAGE_PLOTS[pid]
 	var cost: Array = VILLAGE_BUILD_COST[pid]
+	if GameData.village_built.has(pid):
+		return  # 이미 세운 건물 — 버튼을 또 눌러도 재료가 사라지지 않는다
 	if GameData.wood < int(cost[0]) or GameData.stone < int(cost[1]):
 		dialog.set_body("재료가 아직 부족하네...\n\n목재 %d/%d · 석재 %d/%d" %
 			[GameData.wood, cost[0], GameData.stone, cost[1]])
@@ -2345,6 +2382,7 @@ func _build_village_building(pid: String) -> void:
 	Sound.play_sfx("sfx_place")
 	hud.quest_toast("%s 완공!" % plot.name)
 	dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼." % plot.name)
+	dialog.set_buttons([["좋군요!", null]])
 	queue_redraw()
 	save_now()
 
@@ -3280,6 +3318,8 @@ func _apply_save(d: Dictionary) -> void:
 	if GameData.barn_built and not objects.has(BARN_POS):
 		objects[BARN_POS] = {"kind": "barn", "hp": 0}
 		objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
+		_block_under_art(Rect2i(BARN_POS.x - 1, BARN_POS.y - 1, 4, 2),
+			Rect2i(BARN_POS.x, BARN_POS.y, 2, 1))
 	var anim_scale := float(TILE) / float(d.get("tile", 16))
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])) * anim_scale, int(a[3]) == 1)
@@ -3629,12 +3669,34 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 func _draw() -> void:
 	# 카메라에 보이는 타일만 그린다 (90x60 맵 컬링)
 	var vis: Rect2 = get_canvas_transform().affine_inverse() * get_viewport_rect()
-	var x0 := maxi(0, int(vis.position.x / TILE) - 1)
-	var y0 := maxi(0, int(vis.position.y / TILE) - 1)
-	var x1 := mini(MAP_W, int(vis.end.x / TILE) + 2)
-	var y1 := mini(MAP_H, int(vis.end.y / TILE) + 2)
+	var vx0 := int(floor(vis.position.x / TILE)) - 1
+	var vy0 := int(floor(vis.position.y / TILE)) - 1
+	var vx1 := int(vis.end.x / TILE) + 2
+	var vy1 := int(vis.end.y / TILE) + 2
+	var x0 := maxi(0, vx0)
+	var y0 := maxi(0, vy0)
+	var x1 := mini(MAP_W, vx1)
+	var y1 := mini(MAP_H, vy1)
 
 	var grass_prefix := "grass_" + GameData.season_key() + "_"
+
+	# 맵 바깥: 화면 가장자리가 비지 않도록 어두운 숲을 깔아 둔다.
+	# (카메라 제한을 풀어 주인공을 항상 화면 가운데 두기 위한 배경)
+	for y in range(vy0, vy1):
+		for x in range(vx0, vx1):
+			if x >= 0 and y >= 0 and x < MAP_W and y < MAP_H:
+				continue
+			var gt: Texture2D = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
+			draw_texture_rect(gt, Rect2(Vector2(x * TILE, y * TILE), Vector2(TILE, TILE)),
+				false, OUT_TINT)
+			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다
+			if x % 3 == 0 and y % 2 == 0 and _hash01(x * 5 + 1, y * 7 + 3) < 0.55:
+				var ot: Texture2D = tex["tree_01"]
+				var osc := 1.5
+				draw_texture_rect(ot, Rect2(
+					Vector2(x * TILE + 16 - ot.get_width() * osc / 2.0,
+						(y + 1) * TILE - ot.get_height() * osc),
+					ot.get_size() * osc), false, OUT_TREE_TINT)
 	for y in range(y0, y1):
 		for x in range(x0, x1):
 			var cell: Dictionary = grid[y][x]
@@ -3804,7 +3866,7 @@ func nav_target() -> Variant:
 	if GameData.story_phase != "done":
 		return null  # 숲 구간에서는 화살표를 띄우지 않는다
 	match GameData.tutorial_current_flag():
-		"slept":
+		"home", "bed", "slept":
 			# 우리집(마을 서쪽) 문 앞 — 아직 안 지었으면 집터로 안내한다
 			return Vector2(HOME_ANCHOR.x * TILE + 2 * TILE + 16,
 				(HOME_ANCHOR.y + 4) * TILE + 16)
@@ -4014,8 +4076,11 @@ func _debug_tick() -> void:
 			_send_key_release(KEY_S)
 			_send_key_press(KEY_D)                     # 옆모습 걷기 확인
 		198: _save_shot("_boy_side.png")
-		199: _send_key_release(KEY_D)
-		201: get_tree().quit()
+		199:
+			_send_key_release(KEY_D)
+			player.position = Vector2(88 * TILE + 16, 2 * TILE + 16)  # 맵 끝 배경 확인
+		202: _save_shot("_edge.png")                    # 맵 밖 배경 + 가운데 정렬
+		204: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

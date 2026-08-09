@@ -140,6 +140,23 @@ func set_body(text: String) -> void:
 	body_label.text = text
 
 
+# 본문은 그대로 두고 버튼만 갈아 끼운다
+# (건설·제작이 끝난 뒤 「짓기」 버튼을 치워 두 번 눌리지 않게 한다)
+func set_buttons(buttons: Array) -> void:
+	for c in buttons_box.get_children():
+		c.queue_free()
+	for b in buttons:
+		var btn := Button.new()
+		btn.text = b[0]
+		btn.add_theme_font_size_override("font_size", FONT_BTN)
+		btn.focus_mode = Control.FOCUS_NONE
+		if b[1] != null:
+			btn.pressed.connect(b[1])
+		else:
+			btn.pressed.connect(close)
+		buttons_box.add_child(btn)
+
+
 func set_portrait(tex: Texture2D) -> void:
 	portrait.texture = tex
 	portrait.visible = tex != null

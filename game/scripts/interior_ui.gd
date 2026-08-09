@@ -188,19 +188,25 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _craft_bed() -> void:
+	if GameData.has_bed:
+		return  # 이미 만든 침대
 	if GameData.wood < GameData.BED_WOOD:
 		main.dialog.set_body("목재가 부족하다... (%d/%d)\n도끼로 나무를 베어 목재를 모으자." %
 			[GameData.wood, GameData.BED_WOOD])
 		return
 	GameData.wood -= GameData.BED_WOOD
 	GameData.has_bed = true
+	main.tutorial_notify("bed")
 	Sound.play_sfx("sfx_place")
 	main.dialog.set_body("포근한 침대 완성!\n이제 밤이 되면 여기서 잘 수 있다.")
+	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("침대 만들기")
 	main.save_now()
 
 
 func _upgrade_house() -> void:
+	if GameData.house_lv >= 2:
+		return  # 이미 확장한 집
 	if GameData.wood < GameData.HOUSE_UPGRADE_WOOD \
 			or GameData.stone < GameData.HOUSE_UPGRADE_STONE:
 		main.dialog.set_body("재료가 부족하다...\n(보유: 목재 %d/%d · 석재 %d/%d)" %
@@ -212,6 +218,7 @@ func _upgrade_house() -> void:
 	GameData.house_lv = 2
 	Sound.play_sfx("sfx_place")
 	main.dialog.set_body("집 확장 완료!\n부엌(요리)과 꾸미기(F)를 쓸 수 있다.")
+	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("집 확장")
 	main.save_now()
 

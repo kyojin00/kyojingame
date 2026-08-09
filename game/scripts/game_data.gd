@@ -47,6 +47,13 @@ const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
 const SAVE_PATH := "user://kyojin_farm_save.json"
 
+# ---- 개발/테스트용 치트 (출시 전에 DEV_MODE를 false로 되돌린다) ----
+# 켜져 있으면 새 게임 시작 시 소지금과 기본 아이템을 잔뜩 들고 시작한다.
+const DEV_MODE := true
+const DEV_MONEY := 100000000
+const DEV_STOCK := 10000        # 목재·석재·씨앗·아이템 개수
+const START_MONEY := 500        # 출시용 시작 소지금
+
 # ---- 키 설정 (사람마다 다르게 바꿀 수 있다) ----
 const KEYBIND_PATH := "user://keybinds.json"
 # [액션, 설명] — 이 목록이 설정 화면의 키 안내 겸 리바인딩 대상
@@ -222,7 +229,7 @@ func load_settings() -> void:
 var day := 1
 var minutes := DAY_START
 # 개발용 시작 자금 (출시 전 500으로 되돌릴 것!)
-var money := 100000000
+var money := DEV_MONEY if DEV_MODE else START_MONEY
 var energy := ENERGY_MAX
 var tool := "hoe"
 var seed_index := 0
@@ -956,20 +963,24 @@ const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
-	["slept", "집터(마을 서쪽)에 집을 짓고, 침대를 만들어 잠자기"],
 	["harvest", "다 자란 작물을 수확하자 - 매일 물주기!"],
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
+	["home", "목재를 모았으니 집터(마을 서쪽)에 집을 짓자"],
+	["bed", "집 안에서 침대를 만들자"],
+	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
 	["build", "울타리나 스프링클러를 설치해보자"],
 	["fish", "낚싯대로 물가에서 물고기를 낚자"],
 	["shop", "이장에게 「마을 발전」을 이야기해 잡화점을 세우자"],
 ]
 # 목표 달성 시 해금되는 도구
+# 목표를 달성하면 다음 단계에서 쓸 도구가 열린다 (순서와 어긋나지 않게)
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"slept": ["hand"],
-	"harvest": ["axe", "pickaxe"],
+	"water": ["hand"],
+	"harvest": ["axe"],
+	"slept": ["pickaxe"],
 	"mine": ["fence", "sprinkler"],
 	"build": ["rod"],
 }
@@ -984,9 +995,11 @@ const TUTORIAL_REWARDS := {
 	"till": {"money": 30},
 	"plant": {"money": 50},
 	"water": {"money": 100},
-	"slept": {"seeds": {"carrot": 2}},
 	"harvest": {"money": 100},
 	"chop": {"wood": 5},
+	"home": {"money": 200},
+	"bed": {"seeds": {"carrot": 2}},
+	"slept": {"money": 150},
 	"mine": {"stone": 5},
 	"build": {"money": 150},
 	"fish": {"money": 200},
@@ -1035,7 +1048,8 @@ func fresh_tutorial() -> Dictionary:
 const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
-	"water": "물 주기 (2)", "slept": "침대에서 자기", "harvest": "수확하기 (4)",
+	"water": "물 주기 (2)", "harvest": "수확하기 (4)",
+	"home": "집 짓기 (집터 E)", "bed": "침대 만들기", "slept": "침대에서 자기",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
 	"fish": "낚시하기 (9)", "shop": "잡화점 가보기",
 }
@@ -1140,7 +1154,7 @@ func reset_daily() -> void:
 func reset_all() -> void:
 	day = 1
 	minutes = DAY_START
-	money = 100000000  # 개발용 (출시 전 500으로!)
+	money = DEV_MONEY if DEV_MODE else START_MONEY
 	energy = ENERGY_MAX
 	tool = "hoe"
 	seed_index = 0
@@ -1168,6 +1182,15 @@ func reset_all() -> void:
 		items[id] = 0
 	for k in affinity:
 		affinity[k] = 0
+	if DEV_MODE:
+		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
+		wood = DEV_STOCK
+		stone = DEV_STOCK
+		for id in CROP_IDS:
+			seeds[id] = DEV_STOCK
+			produce[id] = DEV_STOCK
+		for id in ITEM_IDS:
+			items[id] = DEV_STOCK
 	_reset_skills()
 	furniture = default_furniture()
 	tutorial = fresh_tutorial()
