@@ -1244,8 +1244,10 @@ func _tool_has_job(t: Vector2i) -> bool:
 	var cell: Dictionary = grid[t.y][t.x]
 	match GameData.tool:
 		"water":
-			# 마른 밭이면 물주기. 작물이 덜 자랐든 다 자랐든 상관없다
-			return cell.ground == "soil" and not bool(cell.watered)
+			# 밭이면 언제든 물을 줄 수 있다.
+			# 비가 와서 이미 젖어 있어도 「50% 체크포인트」 물주기는 남아 있으므로
+			# 젖었는지로 판단하면 안 된다 (물뿌리개를 들었는데 수확이 가로챈다)
+			return cell.ground == "soil"
 		"hoe":
 			return bool(cell.dead)  # 시든 작물 정리
 	return false
@@ -4113,14 +4115,22 @@ func _draw_nav_arrow() -> void:
 	var to: Vector2 = target - player.position
 	if to.length() < 40.0:
 		return  # 목적지 근처에서는 숨긴다
+	# 길라잡이 화살표는 한눈에 들어와야 한다 — 크게 그리고 검은 테두리를 두른다
 	var dirv := to.normalized()
-	var bob := sin(weather_time * 6.0) * 2.0
-	var base := player.position + Vector2(0, -80) + dirv * (24.0 + bob)
-	var tip := base + dirv * 7.0
-	var left := base + dirv.rotated(2.6) * 4.0
-	var right := base + dirv.rotated(-2.6) * 4.0
-	overlay.draw_colored_polygon(PackedVector2Array([tip, left, right]),
-		Color(1, 0.85, 0.3, 0.95))
+	var bob := sin(weather_time * 6.0) * 4.0
+	var base := player.position + Vector2(0, -84) + dirv * (44.0 + bob)
+	var tip := base + dirv * 20.0
+	var left := base + dirv.rotated(2.5) * 13.0
+	var right := base + dirv.rotated(-2.5) * 13.0
+	var tail := base - dirv * 3.0
+	var edge := 3.0
+	overlay.draw_colored_polygon(PackedVector2Array([
+		tip + dirv * edge,
+		left + dirv.rotated(2.5) * edge,
+		tail - dirv * edge,
+		right + dirv.rotated(-2.5) * edge]), Color(0.12, 0.08, 0.04, 0.85))
+	overlay.draw_colored_polygon(PackedVector2Array([tip, left, tail, right]),
+		Color(1, 0.85, 0.3, 0.97))
 
 
 func _draw_context_hint() -> void:
@@ -4305,6 +4315,23 @@ func _debug_tick() -> void:
 			player.dir = "down"
 			set_tool("rod")
 		217: _save_shot("_pier.png")
+		218:
+			# 회귀 검사: 비가 와서 이미 젖은 밭에서도 「50% 물주기」가 되어야 한다
+			var wt := player_tile() + Vector2i(0, 1)
+			var wc: Dictionary = grid[wt.y][wt.x]
+			objects.erase(wt)
+			wc.ground = "soil"
+			wc.crop_id = "potato"
+			wc.crop_day = _grow_total(GameData.CROPS["potato"]) * 0.7
+			wc.dead = false
+			_wet(wc, WET_ALL_DAY)      # 비로 이미 젖은 상태
+			wc.half_fed = false        # 아직 체크포인트 물은 안 줬다
+			set_tool("water")
+			_sel_target = wt
+			player.dir = "down"
+			interact()
+			print("WATER_CHECKPOINT_OK=", wc.half_fed)
+			_sel_target = Vector2i(-999, -999)
 		219: get_tree().quit()
 
 
