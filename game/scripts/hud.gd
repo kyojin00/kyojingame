@@ -392,6 +392,10 @@ func refresh() -> void:
 		var gl := GameData.grandpa_line()
 		if gl != "":
 			track.append(gl)
+	# 축제날은 그날 할 일을 맨 위로 올린다
+	var fl := GameData.festival_line()
+	if fl != "":
+		track.push_front("★ " + fl)
 	if GameData.u_intro_state == 1:
 		track.append("목표: U 키로 능력치를 확인해 보자")
 	var q: Dictionary = GameData.quest

@@ -246,6 +246,8 @@ const NPC_PLAZA := {
 }
 # 건물이 없는 NPC(이장)의 집 자리
 const NPC_HOME := {"chief": Vector2i(72, 20)}
+# 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
+const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
 
 const BUILDING_NAMES := {
@@ -704,6 +706,11 @@ func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
 
 # 지금 시각에 이 NPC가 있어야 할 장소 이름 ("home"/"work"/"plaza"/"board"/"pier")
 func npc_place_now(npc_id: String) -> String:
+	# 축제날에는 일과를 접고 다 같이 축제 자리로 모인다
+	var fest: Dictionary = GameData.festival_today()
+	if not fest.is_empty() and GameData.minutes >= GameData.FEST_START \
+			and GameData.minutes < GameData.FEST_END:
+		return str(fest.place)
 	var plan: Array = NPC_SCHEDULE.get(npc_id, [])
 	if plan.is_empty():
 		return ""
@@ -724,7 +731,9 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 		"board":
 			t = BOARD_POS + Vector2i(0, 1)
 		"pier":
-			t = Vector2i(FISH_PIERS[0].x, DOCK_Y)
+			# 낚시대회 때는 다섯이 한 칸에 겹치지 않게 강가 마당에 나란히 선다
+			var i: int = maxi(0, NPC_PIER_ORDER.find(npc_id))
+			t = Vector2i(FISH_YARD_X0 + 2 + i * 3, DOCK_Y - 1)
 		_:
 			# 자기 건물 문 앞 (집도 일터도 같은 건물이다)
 			for pid: String in VILLAGE_NPC:
@@ -1290,6 +1299,12 @@ func _on_fishing_finished(success: bool) -> void:
 		spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
 		tutorial_notify("fish")
+		# 여름 낚시대회: 대회 시간 안에 낚시터에서 낚은 것만 센다
+		if GameData.festival_open() and str(GameData.festival_today().id) == "fishing" \
+				and at_fishing_spot():
+			GameData.fest_fish += 1
+			if GameData.fest_fish == 5:
+				hud.show_message("5마리! 이장에게 결과를 알리자.", 4.0)
 		gain_skill("fish", 10.0)
 		if Net.is_guest():
 			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
@@ -1685,6 +1700,38 @@ func _tool_target_nearby() -> Vector2i:
 				best_d = d
 				best = n
 	return best
+
+
+# 축제날 장식: 모이는 자리 위로 삼각 깃발 줄을 걸고 계절 색을 쓴다.
+# (아트를 새로 그리지 않고 도형만으로 「오늘은 다른 날」임을 알린다)
+const FEST_COLORS := {
+	"flower": [Color(1, 0.72, 0.82), Color(1, 0.9, 0.55), Color(0.78, 0.9, 1)],
+	"fishing": [Color(0.5, 0.82, 1), Color(1, 0.95, 0.6), Color(0.6, 1, 0.85)],
+	"harvest": [Color(1, 0.68, 0.32), Color(0.95, 0.85, 0.4), Color(0.85, 0.45, 0.3)],
+	"star": [Color(0.75, 0.85, 1), Color(1, 1, 0.95), Color(0.6, 0.7, 1)],
+}
+
+
+func _draw_festival() -> void:
+	var f: Dictionary = GameData.festival_today()
+	if f.is_empty() or GameData.minutes >= GameData.FEST_END:
+		return
+	var cols: Array = FEST_COLORS.get(str(f.id), FEST_COLORS.flower)
+	# 깃발 줄을 거는 구간 (모이는 자리 위)
+	var x0: int = FISH_YARD_X0 if str(f.place) == "pier" else PLAZA.position.x
+	var x1: int = FISH_YARD_X1 if str(f.place) == "pier" else PLAZA.end.x - 1
+	var y: int = DOCK_Y - 2 if str(f.place) == "pier" else PLAZA.position.y
+	var top := float(y) * TILE
+	for i in range(x0, x1):
+		var px := float(i) * TILE
+		# 줄은 살짝 늘어지게 (사인 곡선)
+		var sag := sin(float(i - x0) / 3.0) * 4.0 + 6.0
+		overlay.draw_line(Vector2(px, top + sag), Vector2(px + TILE, top + sag + 1.0),
+			Color(0.35, 0.26, 0.18), 2.0)
+		var c: Color = cols[(i - x0) % cols.size()]
+		var a := Vector2(px + 8, top + sag + 2)
+		overlay.draw_colored_polygon(PackedVector2Array([
+			a, a + Vector2(14, 0), a + Vector2(7, 16)]), c)
 
 
 # 그 칸 쪽으로 몸을 돌린다 (우세한 축 기준, 대각선이면 좌우 우선)
@@ -3189,6 +3236,14 @@ func _talk_to(npc: Node2D) -> void:
 	if not npc.talked_today:
 		npc.talked_today = true
 		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
+	# 봄 꽃놀이: 말을 건 사람을 하나씩 세어 둔다
+	if GameData.festival_open() and str(GameData.festival_today().id) == "flower" \
+			and not GameData.fest_greeted.has(npc.id):
+		GameData.fest_greeted.append(npc.id)
+		spawn_particles(player_tile(), "sparkle")
+		if GameData.fest_greeted.size() >= GameData.NPCS.size():
+			_finish_festival()
+			return
 	var lines: Array = def.lines
 	var line: String = lines[randi() % lines.size()]
 	var aff := mini(int(GameData.affinity[npc.id]), 100)
@@ -3215,9 +3270,119 @@ func _talk_to(npc: Node2D) -> void:
 	# 이장은 마을 발전(빈 부지에 건물 세우기)을 맡고 있다
 	if npc.id == "chief" and GameData.story_phase == "done":
 		choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
+	# 축제날에는 이장이 진행을 맡는다
+	if npc.id == "chief" and GameData.festival_open():
+		choices.insert(0, ["축제 이야기", _open_festival_dialog])
 	dialog.open_seq(title, _npc_portrait(npc.id), [
 		{"text": line, "choices": choices},
 	])
+
+
+# ---- 계절 축제 ----
+#
+# 이장에게 「축제 이야기」를 하면 열린다. 참가 방식은 축제마다 다르다:
+#   봄   주민 모두와 인사 (대화하면 저절로 센다)
+#   여름 낚시터에서 물고기 5마리 (낚으면 저절로 센다)
+#   가을 작물 하나 출품 / 겨울 요리 하나 나눠 주기 (여기서 고른다)
+func _open_festival_dialog() -> void:
+	var f: Dictionary = GameData.festival_today()
+	if f.is_empty():
+		return
+	var p := GameData.festival_progress()
+	var body: String = "%s\n\n· %s" % [f.desc, f.goal]
+	var btns: Array = [["알겠습니다", null]]
+	match str(f.id):
+		"flower", "fishing":
+			body += "\n  지금 %d / %d" % [mini(int(p[0]), int(p[1])), int(p[1])]
+			if int(p[0]) >= int(p[1]):
+				btns = [["결과 보고하기", _finish_festival]]
+		"harvest":
+			var best := _best_produce()
+			if best == "":
+				body += "\n\n(수확한 작물이 없다. 하나 거둬 오자!)"
+			else:
+				body += "\n\n출품할 작물: %s" % GameData.CROPS[best].name
+				btns = [["출품하기", _submit_harvest], ["나중에", null]]
+		"star":
+			var dish := _first_dish()
+			if dish == "":
+				body += "\n\n(가진 요리가 없다. 집 조리대에서 만들어 오자!)"
+			else:
+				body += "\n\n나눠 줄 요리: %s" % GameData.ITEMS[dish].name
+				btns = [["나눠 주기", _submit_dish], ["나중에", null]]
+	dialog.open("%s — 이장 덕수" % f.name, body, btns, _npc_portrait("chief", true))
+
+
+# 가진 것 중 가장 좋은 작물 (금 > 은 > 일반)
+func _best_produce() -> String:
+	for kind: String in ["produce_gold", "produce_silver", "produce"]:
+		var d: Dictionary = GameData.get(kind)
+		for cid: String in GameData.CROP_IDS:
+			if int(d.get(cid, 0)) > 0:
+				return cid
+	return ""
+
+
+func _first_dish() -> String:
+	for rid: String in GameData.RECIPE_IDS:
+		if int(GameData.items.get(rid, 0)) > 0:
+			return rid
+	return ""
+
+
+func _submit_harvest() -> void:
+	var cid := _best_produce()
+	if cid == "":
+		return
+	# 품질이 높을수록 상금이 오른다
+	var bonus := 1.0
+	var grade := "일반"
+	if int(GameData.produce_gold.get(cid, 0)) > 0:
+		GameData.produce_gold[cid] = int(GameData.produce_gold[cid]) - 1
+		bonus = 2.0
+		grade = "금빛"
+	elif int(GameData.produce_silver.get(cid, 0)) > 0:
+		GameData.produce_silver[cid] = int(GameData.produce_silver[cid]) - 1
+		bonus = 1.5
+		grade = "은빛"
+	GameData.produce[cid] = maxi(0, int(GameData.produce[cid]) - 1)
+	_finish_festival(bonus, "%s %s로 출품했다!" % [grade, GameData.CROPS[cid].name])
+
+
+func _submit_dish() -> void:
+	var rid := _first_dish()
+	if rid == "":
+		return
+	GameData.items[rid] = int(GameData.items[rid]) - 1
+	# 요리를 나누면 모두와 조금씩 가까워진다
+	for nid: String in GameData.affinity:
+		GameData.affinity[nid] = mini(int(GameData.affinity[nid]) + 3, 100)
+	_finish_festival(1.0, "%s를 나눠 먹었다! 모두와 조금 가까워졌다." % GameData.ITEMS[rid].name)
+
+
+func _finish_festival(bonus := 1.0, extra := "") -> void:
+	var f: Dictionary = GameData.festival_today()
+	if f.is_empty() or GameData.fest_done:
+		return
+	GameData.fest_done = true
+	if not GameData.fest_history.has(str(f.id)):
+		GameData.fest_history.append(str(f.id))
+	var money := int(int(f.reward.get("money", 0)) * bonus)
+	GameData.money += money
+	GameData.today_earned += money
+	# 봄 꽃놀이는 인사를 나눈 만큼 모두와 가까워진다
+	if str(f.id) == "flower":
+		for nid: String in GameData.affinity:
+			GameData.affinity[nid] = mini(int(GameData.affinity[nid]) + 5, 100)
+	Sound.play_sfx("sfx_catch")
+	hud.quest_toast(str(f.name))
+	hud.reward_toast("%dG" % money, tex["icon_coin"])
+	if Net.is_host():
+		_broadcast_stats()
+	save_now()
+	dialog.open(str(f.name), "%s%s\n\n상금 %dG를 받았다.\n\n내년에도 또 만나자!"
+		% [extra, "\n" if extra != "" else "", money], [["좋았어!", null]],
+		_npc_portrait("chief", true))
 
 
 func _npc_portrait(npc_id: String, happy := false) -> Texture2D:
@@ -3521,6 +3686,12 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n%s %d개를 얻었다!" % [GameData.ITEMS[product].name, collected[product]]
 	if season_changed:
 		note += "\n%s이 시작됐다!" % GameData.season_name()
+	# 오늘 축제가 있으면 아침에 알려 준다 (하루 계획을 세울 수 있게)
+	GameData.reset_festival_state()
+	var fest: Dictionary = GameData.festival_today()
+	if not fest.is_empty():
+		note += "\n\n★ 오늘은 %s! (9시~18시, %s)\n%s" % [fest.name,
+			"낚시터" if str(fest.place) == "pier" else "마을 광장", fest.goal]
 	if wilted > 0:
 		note += "\n작물 %d개가 시들어버렸다..." % wilted
 	match weather_now():
@@ -3685,6 +3856,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
+	GameData.fest_history = d.get("fest_history", []).duplicate()
 	GameData.owned_gear = d.get("owned_gear", []).duplicate()
 	for slot: String in GameData.GEAR_SLOTS:
 		var gid: String = str(d.get("equipped", {}).get(slot, ""))
@@ -4148,6 +4320,7 @@ func _draw() -> void:
 # 건물/오브젝트 위에 그려야 하는 것들 (안내 텍스트·화살표·파티클·날씨)
 func _draw_overlay() -> void:
 	_draw_nav_arrow()
+	_draw_festival()
 
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if player != null:
@@ -4608,6 +4781,28 @@ func _debug_tick() -> void:
 			inventory_ui.show_tab("gear")
 		307: _save_shot("_gear.png")
 		308: inventory_ui.close()
+		310:
+			# 계절 축제: 봄 꽃놀이 날로 옮겨 장식·모임·진행을 확인
+			GameData.day = 14
+			GameData.minutes = 11.0 * 60.0
+			GameData.reset_festival_state()
+			var ft: Dictionary = GameData.festival_today()
+			print("FESTIVAL_TODAY=", ft.get("name", "없음"),
+				" open=", GameData.festival_open(),
+				" npc_place=", npc_place_now("merchant"))
+			player.position = Vector2(74 * TILE + 16, 14 * TILE + 16)
+			_apply_season_visuals()
+		313: _save_shot("_festival.png")
+		314:
+			# 인사를 다 채우면 축제가 끝나고 상금이 나온다
+			for nid: String in GameData.NPCS:
+				if not GameData.fest_greeted.has(nid):
+					GameData.fest_greeted.append(nid)
+			_finish_festival()
+			print("FESTIVAL_DONE=", GameData.fest_done,
+				" history=", ", ".join(GameData.fest_history))
+		316: _save_shot("_festival2.png")
+		317: dialog.close()
 		330:
 			var where := []
 			for n in npcs:

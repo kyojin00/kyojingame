@@ -155,6 +155,36 @@ func _rebuild() -> void:
 				_line("  - " + pair[1], COL_DIM)
 		_line("")
 
+	# 계절 축제 (계절마다 하루)
+	_line("[계절 축제]", COL_HEAD)
+	var ft: Dictionary = GameData.festival_today()
+	if ft.is_empty():
+		var next_name := ""
+		var next_in := 0
+		for i in range(1, GameData.DAYS_PER_SEASON * 4 + 1):
+			var f2: Dictionary = GameData.festival_of_day(GameData.day + i)
+			if not f2.is_empty():
+				next_name = str(f2.name)
+				next_in = i
+				break
+		if next_name != "":
+			_line("  다음 축제: %s — %d일 뒤" % [next_name, next_in], COL_SUB)
+	else:
+		_line("  오늘은 %s! (9시~18시, %s)" % [ft.name,
+			"낚시터" if str(ft.place) == "pier" else "마을 광장"], COL_NOW)
+		_line("    %s" % ft.goal, COL_SUB)
+		if GameData.fest_done:
+			_line("    참가 완료!", COL_DONE)
+		else:
+			_line("    이장에게 「축제 이야기」로 진행한다.", COL_SUB)
+	for sid in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
+		var f3: Dictionary = GameData.FESTIVALS[sid]
+		var seen: bool = GameData.fest_history.has(str(f3.id))
+		_line("  %s %s %d일 — %s" % ["V" if seen else "-",
+			GameData.SEASON_NAMES[sid], int(f3.day), f3.name],
+			COL_DONE if seen else COL_DIM)
+	_line("")
+
 	# 오늘의 의뢰 (마을 광장 게시판)
 	_line("[오늘의 의뢰]", COL_HEAD)
 	var q: Dictionary = GameData.quest

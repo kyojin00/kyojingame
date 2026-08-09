@@ -1455,6 +1455,8 @@ func reset_all() -> void:
 	tutorial = fresh_tutorial()
 	grandpa_step = 0
 	grandpa_seen = false
+	fest_history = []
+	reset_festival_state()
 	owned_gear = []
 	equipped = {"weapon": "", "armor": "", "charm": ""}
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
@@ -1473,6 +1475,102 @@ func reset_all() -> void:
 
 
 # ---- 계절/날씨 ----
+
+# ==== 계절 축제 ====
+#
+# 계절마다 한 번, 정해진 날에 마을이 축제를 연다. 계절이 바뀌어도 할 일이
+# 그대로이던 문제를 메우는 장치다. 그날은 마을 사람들이 모두 한 곳에 모인다.
+#
+#   day    그 계절의 며칠째인가 (1~28)
+#   place  모이는 곳 ("plaza" / "pier") — NPC 일과가 이날은 여기로 덮인다
+#   goal   무엇을 하면 되는가 (참가 방식은 축제마다 다르다)
+# 새 축제를 넣을 때는 이 표에 한 줄만 더하면 된다.
+const FEST_START := 9.0 * 60.0    # 9시 시작
+const FEST_END := 18.0 * 60.0     # 18시 종료
+const FESTIVALS := {
+	SPRING: {"id": "flower", "name": "봄 꽃놀이", "day": 14, "place": "plaza",
+		"goal": "마을 사람 모두와 인사하기",
+		"desc": "광장에 봄꽃을 늘어놓고 다 같이 모이는 날.\n"
+			+ "마을 사람 모두에게 말을 걸어 인사하자.",
+		"reward": {"money": 1200}},
+	SUMMER: {"id": "fishing", "name": "여름 낚시대회", "day": 14, "place": "pier",
+		"goal": "낚시터에서 물고기 5마리 낚기",
+		"desc": "낚시터에서 열리는 마을 대회.\n"
+			+ "해가 지기 전까지 물고기를 많이 낚는 사람이 이긴다.",
+		"reward": {"money": 1500}},
+	FALL: {"id": "harvest", "name": "가을 수확제", "day": 14, "place": "plaza",
+		"goal": "가장 좋은 작물 하나 출품하기",
+		"desc": "한 해 농사를 겨루는 날.\n"
+			+ "가장 자신 있는 작물 하나를 광장에 출품하자.",
+		"reward": {"money": 1000}},
+	WINTER: {"id": "star", "name": "겨울 별빛제", "day": 14, "place": "plaza",
+		"goal": "요리 하나 나눠 주기",
+		"desc": "가장 긴 밤을 함께 넘기는 날.\n"
+			+ "직접 만든 요리를 하나 가져와 나누자.",
+		"reward": {"money": 1300}},
+}
+
+# 오늘의 축제 진행 상태 (날이 바뀌면 초기화된다)
+var fest_state_day := -1     # 이 상태가 어느 날짜의 것인가
+var fest_greeted: Array = [] # 봄: 인사한 주민
+var fest_fish := 0           # 여름: 대회 중 낚은 수
+var fest_done := false       # 오늘 축제를 끝냈는가
+var fest_history: Array = [] # 지금까지 참가한 축제 id
+
+
+func festival_of_day(d: int) -> Dictionary:
+	var f: Dictionary = FESTIVALS.get(season_of_day(d), {})
+	if f.is_empty() or (d - 1) % DAYS_PER_SEASON + 1 != int(f.day):
+		return {}
+	return f
+
+
+func festival_today() -> Dictionary:
+	return festival_of_day(day)
+
+
+# 지금 축제가 열려 있는가 (그날 + 시간대 안 + 아직 안 끝냄)
+func festival_open() -> bool:
+	if festival_today().is_empty() or fest_done:
+		return false
+	return minutes >= FEST_START and minutes < FEST_END
+
+
+func reset_festival_state() -> void:
+	fest_state_day = day
+	fest_greeted = []
+	fest_fish = 0
+	fest_done = false
+
+
+# 오늘 축제의 진행도 [지금, 목표]. 목표가 없는 축제는 [0, 0]
+func festival_progress() -> Array:
+	var f := festival_today()
+	if f.is_empty():
+		return [0, 0]
+	match str(f.id):
+		"flower":
+			return [fest_greeted.size(), NPCS.size()]
+		"fishing":
+			return [fest_fish, 5]
+	return [0, 0]
+
+
+func festival_line() -> String:
+	var f := festival_today()
+	if f.is_empty():
+		return ""
+	if fest_done:
+		return "%s — 잘 즐겼다!" % f.name
+	if minutes < FEST_START:
+		return "오늘은 %s! (9시 시작)" % f.name
+	if minutes >= FEST_END:
+		return "%s — 오늘은 끝났다" % f.name
+	var p := festival_progress()
+	if int(p[1]) > 0:
+		return "%s: %s (%d/%d)" % [f.name, f.goal, mini(int(p[0]), int(p[1])), int(p[1])]
+	return "%s: %s" % [f.name, f.goal]
+
 
 func season_of_day(d: int) -> int:
 	return int(floor((d - 1) / float(DAYS_PER_SEASON))) % 4
@@ -1568,6 +1666,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
+		"fest_history": fest_history,
 		"owned_gear": owned_gear,
 		"equipped": equipped,
 		"grandpa_step": grandpa_step,
