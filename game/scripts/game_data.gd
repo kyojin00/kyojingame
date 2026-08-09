@@ -38,6 +38,10 @@ const CROP_IDS := [
 ]
 
 const ENERGY_MAX := 100.0  # 체력 (동굴 전투용. 밖에서는 천천히 자연 회복)
+# 도구를 한 번 쓸 때 드는 기력 = 장비의 「기력 소모」 x 배율.
+# 낮에는 가볍게, 밤에는 그대로 든다 (밤일이 힘들다)
+const STAMINA_DAY_MULT := 0.25
+const STAMINA_NIGHT_MULT := 1.0
 const DAY_START := 6.0 * 60.0   # 오전 6시
 const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
@@ -249,6 +253,13 @@ const SPRINKLER_COST_STONE := 2
 const STAT_NAMES := {
 	"power": "위력", "reach": "범위", "stamina": "기력 소모", "luck": "행운",
 }
+# 각 능력치가 실제로 무엇에 걸리는지 (능력치 창 안내용)
+const STAT_HELP := [
+	"위력 — 나무·돌 타격량, 동굴 공격력",
+	"범위 — 한 번에 다루는 칸 수 (1칸 / 전방 3칸 / 3x3)",
+	"기력 소모 — 도구를 쓸 때 드는 체력 (밤에는 그대로, 낮에는 1/4)",
+	"행운 — 작물 등급, 목재·석재 추가 산출, 희귀 물고기 확률",
+]
 # base = Lv1 값 / grow = 강화 1단계마다 더해지는 값
 const TOOL_STATS := {
 	"hoe":     {"base": {"power": 1, "reach": 1, "stamina": 3, "luck": 0},
@@ -396,7 +407,8 @@ func fish_wait_mult() -> float:
 
 # 벌목/채광 레벨에 따른 추가 획득 확률
 func bonus_drop_chance(id: String) -> float:
-	return 0.06 * (skill_lv(id) - 1)
+	# 숙련도 + 장비 행운 (행운 1당 +3%p)
+	return 0.06 * (skill_lv(id) - 1) + total_luck() * 0.03
 
 
 func combat_bonus() -> float:
@@ -1092,13 +1104,14 @@ func make_daily_quest() -> void:
 
 
 func pick_fish() -> Array:
-	var r := randf()
+	# 장비 행운이 높을수록 흔한 물고기 쪽 확률을 덜어 뒤쪽(희귀)으로 넘긴다
+	var r := randf() * (1.0 + total_luck() * 0.06)
 	var acc := 0.0
 	for f in FISH:
 		acc += f[1]
 		if r <= acc:
 			return f
-	return FISH[0]
+	return FISH[FISH.size() - 1]
 
 # 일별 통계 (결산 화면용, 매일 아침 리셋)
 var today_harvest := 0

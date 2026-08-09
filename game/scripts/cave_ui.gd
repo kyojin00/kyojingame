@@ -244,8 +244,8 @@ func _attack() -> void:
 	swing_t = 0.15
 	Sound.play_sfx("sfx_chop", 0.2)
 	var reach := ppos + _dir_vec() * 28.0
-	# 도끼 강화 = 공격력 2배, 전투 숙련도 = +0.5/Lv
-	var dmg: float = 1 + (int(GameData.tool_level.get("axe", 1)) - 1) + GameData.combat_bonus()
+	# 공격력 = 도끼의 「위력」 + 전투 숙련도 보정
+	var dmg: float = GameData.tool_stat("axe", "power") + GameData.combat_bonus()
 	# 몬스터 타격
 	for m in monsters:
 		if (m.pos - reach).length() < 28.0 or (m.pos - ppos).length() < 24.0:

@@ -1103,12 +1103,15 @@ func use_tool() -> void:
 			and not GameData.tool_slots.has(GameData.tool):
 		hud.show_message("가방(I)에서 도구를 슬롯에 장착하고 숫자키로 선택하자!")
 		return
-	# 밤 채집 패널티: 어두워서 몸이 무겁고(기력 소모) 손이 무디다 (숙련도 절반)
-	if not _remote_acting and GameData.is_night() and GameData.tool != "hand":
-		# 밤에는 장비의 「기력 소모」만큼 힘이 더 든다
-		GameData.energy = maxf(0.0,
-			GameData.energy - maxf(1.0, GameData.tool_stat(GameData.tool, "stamina")))
-		if randf() < 0.15:
+	# 도구를 쓰면 장비의 「기력 소모」만큼 힘이 든다.
+	# 밤에는 그대로, 낮에는 가볍게. (수확은 맨손이라 들지 않는다)
+	if not _remote_acting and GameData.tool != "hand":
+		var night := GameData.is_night()
+		var cost := GameData.tool_stat(GameData.tool, "stamina") \
+			* (GameData.STAMINA_NIGHT_MULT if night else GameData.STAMINA_DAY_MULT)
+		if cost > 0.0:
+			GameData.energy = maxf(0.0, GameData.energy - cost)
+		if night and randf() < 0.15:
 			hud.show_message("어두워서 일이 손에 잡히지 않는다... 슬슬 돌아가서 쉬자.")
 	var t := target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:

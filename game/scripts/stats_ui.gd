@@ -126,6 +126,8 @@ func _rebuild() -> void:
 		_line("%s Lv.%d — %s" % [GameData.TOOL_KOR.get(tid, tid), lv, " · ".join(parts)],
 			Color("ffd75e"))
 	_line("  행운 합계 %s (장착 중인 장비)" % GameData.fmt_stat(GameData.total_luck()))
+	for h in GameData.STAT_HELP:
+		_line("  %s" % h, Color(0.62, 0.58, 0.75))
 
 	_line("")
 	if GameData.active_pet != "":
