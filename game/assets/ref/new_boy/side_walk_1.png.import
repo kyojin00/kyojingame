@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://butapu67csniq"
-path="res://.godot/imported/preview_side_walk.png-260f20662858780deff3ee6aae837aa0.ctex"
+uid="uid://de8f57alh5ce5"
+path="res://.godot/imported/side_walk_1.png-336152a9262ac8d59fa0f0ce68222084.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ref/new_boy/preview_side_walk.png"
-dest_files=["res://.godot/imported/preview_side_walk.png-260f20662858780deff3ee6aae837aa0.ctex"]
+source_file="res://assets/ref/new_boy/side_walk_1.png"
+dest_files=["res://.godot/imported/side_walk_1.png-336152a9262ac8d59fa0f0ce68222084.ctex"]
 
 [params]
 

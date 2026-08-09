@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://butapu67csniq"
-path="res://.godot/imported/preview_side_walk.png-260f20662858780deff3ee6aae837aa0.ctex"
+uid="uid://b4i3ceev70c6d"
+path="res://.godot/imported/down_idle.png-c324e1242b2bd85d88c17fc9b8895c52.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ref/new_boy/preview_side_walk.png"
-dest_files=["res://.godot/imported/preview_side_walk.png-260f20662858780deff3ee6aae837aa0.ctex"]
+source_file="res://assets/ref/new_boy/down_idle.png"
+dest_files=["res://.godot/imported/down_idle.png-c324e1242b2bd85d88c17fc9b8895c52.ctex"]
 
 [params]
 
