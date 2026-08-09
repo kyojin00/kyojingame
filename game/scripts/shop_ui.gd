@@ -9,17 +9,153 @@ const TAB_BUTTONS := {
 var main: Node2D
 var tab := "buy"
 var allowed: Array = TAB_BUTTONS.keys()
+var shop_title := "상점"
+var _head: Label
+var _money: Label
 
 @onready var items_box: VBoxContainer = $Panel/V/Scroll/Items
 
+# 가방 창과 같은 나무 결 톤으로 맞춘다
+const WOOD_BG := Color(0.55, 0.36, 0.2, 0.98)
+const WOOD_EDGE := Color(0.29, 0.18, 0.09)
+const TAB_ON := Color(0.28, 0.19, 0.1)
+const TAB_OFF := Color(0.42, 0.29, 0.16)
+const ROW_BG := Color(0.35, 0.23, 0.12, 0.55)
+const ROW_HL := Color(0.5, 0.34, 0.18, 0.85)
+
 
 func _ready() -> void:
+	_style_panel()
 	$Panel/V/Tabs/BuyBtn.pressed.connect(_on_tab.bind("buy"))
 	$Panel/V/Tabs/SellBtn.pressed.connect(_on_tab.bind("sell"))
 	$Panel/V/Tabs/AnimalBtn.pressed.connect(_on_tab.bind("animal"))
 	$Panel/V/Tabs/UpgradeBtn.pressed.connect(_on_tab.bind("upgrade"))
 	$Panel/V/Tabs/CodexBtn.pressed.connect(_on_tab.bind("codex"))
 	$Panel/V/Tabs/CloseBtn.pressed.connect(close)
+
+
+# 창 전체를 가방 창과 같은 결로 다듬는다 (가운데 정렬 + 나무 패널 + 머리글)
+func _style_panel() -> void:
+	var panel: PanelContainer = $Panel
+	panel.offset_left = 200.0
+	panel.offset_top = 56.0
+	panel.offset_right = 760.0
+	panel.offset_bottom = 470.0
+	var st := StyleBoxFlat.new()
+	st.bg_color = WOOD_BG
+	st.border_color = WOOD_EDGE
+	st.set_border_width_all(4)
+	st.set_corner_radius_all(14)
+	st.set_content_margin_all(12)
+	panel.add_theme_stylebox_override("panel", st)
+
+	var v: VBoxContainer = $Panel/V
+	v.add_theme_constant_override("separation", 6)
+
+	_head = Label.new()
+	_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_head.add_theme_font_size_override("font_size", 20)
+	_head.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
+	v.add_child(_head)
+	v.move_child(_head, 0)
+
+	_money = Label.new()
+	_money.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_money.add_theme_font_size_override("font_size", 16)
+	_money.add_theme_color_override("font_color", Color(1, 0.93, 0.72))
+	v.add_child(_money)
+	v.move_child(_money, 1)
+
+	$Panel/V/Scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	items_box.add_theme_constant_override("separation", 3)
+	$Panel/V/Tabs.add_theme_constant_override("separation", 4)
+
+
+func _tab_style(on: bool) -> StyleBoxFlat:
+	var st := StyleBoxFlat.new()
+	st.bg_color = TAB_ON if on else TAB_OFF
+	st.border_color = Color(1, 0.84, 0.37) if on else WOOD_EDGE
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(4)
+	st.set_content_margin_all(4)
+	return st
+
+
+func _style_tabs() -> void:
+	for key: String in TAB_BUTTONS:
+		var b: Button = get_node("Panel/V/Tabs/" + TAB_BUTTONS[key])
+		var on := key == tab
+		b.custom_minimum_size = Vector2(76, 28)
+		b.add_theme_font_size_override("font_size", 15)
+		b.add_theme_stylebox_override("normal", _tab_style(on))
+		b.add_theme_stylebox_override("hover", _tab_style(on))
+		b.add_theme_stylebox_override("pressed", _tab_style(true))
+		b.add_theme_color_override("font_color",
+			Color(1, 0.9, 0.6) if on else Color(0.9, 0.85, 0.78))
+	var cb: Button = $Panel/V/Tabs/CloseBtn
+	cb.custom_minimum_size = Vector2(32, 28)
+	cb.add_theme_stylebox_override("normal", _tab_style(false))
+	cb.add_theme_stylebox_override("hover", _tab_style(true))
+
+
+# 목록 한 줄: 아이콘 + 이름/설명 + 오른쪽 버튼
+func _mk_row(icon_name: String, title_text: String, sub_text: String,
+		btn: Button = null) -> PanelContainer:
+	var wrap := PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = ROW_BG
+	st.set_corner_radius_all(3)
+	st.set_content_margin_all(5)
+	wrap.add_theme_stylebox_override("panel", st)
+
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 8)
+	wrap.add_child(h)
+
+	var ic := TextureRect.new()
+	ic.custom_minimum_size = Vector2(28, 28)
+	ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if main != null and icon_name != "" and main.tex.has(icon_name):
+		ic.texture = main.tex[icon_name]
+	h.add_child(ic)
+
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 0)
+	h.add_child(col)
+
+	var t := Label.new()
+	t.text = title_text
+	t.clip_text = true
+	t.add_theme_font_size_override("font_size", 16)
+	t.add_theme_color_override("font_color", Color(0.98, 0.95, 0.9))
+	col.add_child(t)
+	if sub_text != "":
+		var sl := Label.new()
+		sl.text = sub_text
+		sl.clip_text = true
+		sl.add_theme_font_size_override("font_size", 13)
+		sl.add_theme_color_override("font_color", Color(0.85, 0.78, 0.66))
+		col.add_child(sl)
+
+	if btn != null:
+		btn.custom_minimum_size = Vector2(120, 30)
+		btn.add_theme_font_size_override("font_size", 15)
+		btn.add_theme_stylebox_override("normal", _tab_style(false))
+		btn.add_theme_stylebox_override("hover", _tab_style(true))
+		btn.add_theme_stylebox_override("pressed", _tab_style(true))
+		h.add_child(btn)
+	return wrap
+
+
+func _note(text: String) -> void:
+	var l := Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color", Color(0.34, 0.22, 0.1))
+	items_box.add_child(l)
 
 
 func _on_tab(t: String) -> void:
@@ -30,8 +166,9 @@ func _on_tab(t: String) -> void:
 
 
 # allowed_tabs: 이 가게에서 쓸 수 있는 탭 (비우면 t 하나만)
-func open(t: String, allowed_tabs: Array = []) -> void:
+func open(t: String, allowed_tabs: Array = [], title := "") -> void:
 	tab = t
+	shop_title = title if title != "" else "상점"
 	allowed = allowed_tabs if not allowed_tabs.is_empty() else [t]
 	for key in TAB_BUTTONS:
 		get_node("Panel/V/Tabs/" + TAB_BUTTONS[key]).visible = allowed.has(key)
@@ -56,26 +193,23 @@ func _mk_button(text: String, on_pressed: Callable) -> Button:
 func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
+	_style_tabs()
+	if _head != null:
+		_head.text = "- %s -" % shop_title
+		_money.text = "소지금 %dG" % GameData.money
 
 	if tab == "buy":
 		for id in GameData.CROP_IDS:
 			var def: Dictionary = GameData.CROPS[id]
 			if GameData.season() not in def.seasons:
 				continue  # 제철 씨앗만 판매
-			var row := HBoxContainer.new()
-			var l := Label.new()
-			l.text = "%s 씨앗(보유%d) 성장 %d시간" % [def.name, GameData.seeds[id], def.grow_days]
-			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(l)
 			var price := GameData.seed_price(id)
 			var b := _mk_button("%dG 구매" % price, _on_buy.bind(id))
 			b.disabled = GameData.money < price
-			row.add_child(b)
-			items_box.add_child(row)
+			items_box.add_child(_mk_row("icon_seed", "%s 씨앗" % def.name,
+				"보유 %d개 · 수확까지 %d시간" % [GameData.seeds[id], def.grow_days], b))
 		if GameData.merchant_discount():
-			var note := Label.new()
-			note.text = "민지와 친해져서 씨앗 10% 할인 중! ♥"
-			items_box.add_child(note)
+			_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
 	elif tab == "sell":
 		var any := false
 		for id in GameData.CROP_IDS:
@@ -84,38 +218,26 @@ func _rebuild() -> void:
 				continue
 			any = true
 			var def: Dictionary = GameData.CROPS[id]
-			var row := HBoxContainer.new()
-			var l := Label.new()
 			var silver := int(GameData.produce_silver.get(id, 0))
 			var gold := int(GameData.produce_gold.get(id, 0))
-			var qtxt := ""
-			if gold > 0:
-				qtxt += " 금%d" % gold
+			var qtxt := "일반 %d" % (count - silver - gold)
 			if silver > 0:
-				qtxt += " 은%d" % silver
-			l.text = "%s x%d%s" % [def.name, count, qtxt]
-			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(l)
-			row.add_child(_mk_button("%dG에 전부 판매" % GameData.produce_sell_value(id),
-				_on_sell.bind(id)))
-			items_box.add_child(row)
+				qtxt += " · 은 %d" % silver
+			if gold > 0:
+				qtxt += " · 금 %d" % gold
+			items_box.add_child(_mk_row("mature_" + id, "%s x%d" % [def.name, count], qtxt,
+				_mk_button("%dG 전부 판매" % GameData.produce_sell_value(id), _on_sell.bind(id))))
 		for id in GameData.ITEM_IDS:
 			var count: int = GameData.items[id]
 			if count <= 0 or GameData.ITEMS[id].get("legend", false):
 				continue  # 전설 재료는 팔 수 없다
 			any = true
 			var def: Dictionary = GameData.ITEMS[id]
-			var row := HBoxContainer.new()
-			var l := Label.new()
-			l.text = "%s x%d (개당 %dG)" % [def.name, count, def.sell]
-			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(l)
-			row.add_child(_mk_button("%dG에 전부 판매" % (def.sell * count), _on_sell_item.bind(id)))
-			items_box.add_child(row)
+			items_box.add_child(_mk_row(id, "%s x%d" % [def.name, count],
+				"개당 %dG" % def.sell,
+				_mk_button("%dG 전부 판매" % (def.sell * count), _on_sell_item.bind(id))))
 		if not any:
-			var empty := Label.new()
-			empty.text = "팔 수 있는 것이 없다. 수확물/생산물이 여기에 표시된다."
-			items_box.add_child(empty)
+			_note("팔 수 있는 것이 없다. 수확물·생산물이 여기에 표시된다.")
 	elif tab == "animal":
 		for id in GameData.ANIMALS:
 			var def: Dictionary = GameData.ANIMALS[id]
@@ -123,129 +245,101 @@ func _rebuild() -> void:
 			for a in main.animals:
 				if a.type == id:
 					count += 1
-			var row := HBoxContainer.new()
-			var l := Label.new()
-			l.text = "%s x%d - %s 생산" % [def.name, count, GameData.ITEMS[def.product].name]
-			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(l)
 			var b := _mk_button("%dG 입양" % def.price, _on_buy_animal.bind(id))
 			b.disabled = GameData.money < def.price or main.animals.size() >= GameData.max_animals()
-			row.add_child(b)
-			items_box.add_child(row)
-		var hint := Label.new()
-		hint.text = "동물은 E로 쓰다듬으면 다음 날 아침 생산물을 준다. (최대 %d마리)" % GameData.max_animals()
-		items_box.add_child(hint)
+			items_box.add_child(_mk_row("%s_0" % id, "%s x%d" % [def.name, count],
+				"%s 생산" % GameData.ITEMS[def.product].name, b))
+		_note("동물은 E로 쓰다듬으면 다음 날 아침 생산물을 준다. (최대 %d마리)"
+			% GameData.max_animals())
 
 		# 축사 건설
-		var brow := HBoxContainer.new()
-		var bl := Label.new()
-		bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		brow.add_child(bl)
 		if GameData.barn_built:
-			bl.text = "축사 완공! 동물 %d마리 + 굳은 날 자동 배부름" % GameData.BARN_MAX_ANIMALS
+			items_box.add_child(_mk_row("barn", "축사 완공!",
+				"동물 %d마리 · 굳은 날 자동 배부름" % GameData.BARN_MAX_ANIMALS))
 		else:
-			bl.text = "축사 건설: 동물 %d마리 + 비 오는 날 자동 배부름" % GameData.BARN_MAX_ANIMALS
-			var bb := _mk_button("%dG+목재%d" % [GameData.BARN_COST_MONEY, GameData.BARN_COST_WOOD],
+			var bb := _mk_button("%dG+목재%d"
+				% [GameData.BARN_COST_MONEY, GameData.BARN_COST_WOOD],
 				func() -> void:
 					main.build_barn()
 					_rebuild())
 			bb.disabled = GameData.money < GameData.BARN_COST_MONEY \
 				or GameData.wood < GameData.BARN_COST_WOOD
-			brow.add_child(bb)
-		items_box.add_child(brow)
+			items_box.add_child(_mk_row("barn", "축사 건설",
+				"동물 %d마리 · 비 오는 날 자동 배부름" % GameData.BARN_MAX_ANIMALS, bb))
 
-		var pet_title := Label.new()
-		pet_title.text = "\n- 펫 입양 (한 마리만 데리고 다닌다) -"
-		items_box.add_child(pet_title)
+		_note("— 펫 입양 (한 마리만 데리고 다닌다) —")
 		for pid in GameData.PET_IDS:
 			var pdef: Dictionary = GameData.PETS[pid]
-			var prow := HBoxContainer.new()
-			var pl := Label.new()
-			pl.text = "%s - %s" % [pdef.name, pdef.passive]
-			pl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			prow.add_child(pl)
+			var pb: Button
 			if not GameData.owned_pets.has(pid):
-				var pb := _mk_button("%dG 입양" % pdef.price, _on_buy_pet.bind(pid))
+				pb = _mk_button("%dG 입양" % pdef.price, _on_buy_pet.bind(pid))
 				pb.disabled = GameData.money < int(pdef.price)
-				prow.add_child(pb)
 			elif GameData.active_pet == pid:
-				prow.add_child(_mk_button("쉬게 하기", _on_select_pet.bind("")))
+				pb = _mk_button("쉬게 하기", _on_select_pet.bind(""))
 			else:
-				prow.add_child(_mk_button("데려가기", _on_select_pet.bind(pid)))
-			items_box.add_child(prow)
+				pb = _mk_button("데려가기", _on_select_pet.bind(pid))
+			items_box.add_child(_mk_row("pet_%s_0" % pid, str(pdef.name),
+				str(pdef.passive), pb))
 	elif tab == "codex":
-		var title := Label.new()
-		title.text = "- 물고기 도감 -"
-		items_box.add_child(title)
+		_note("— 물고기 도감 —")
 		for f in GameData.FISH:
 			var id: String = f[0]
 			var caught := int(GameData.fish_caught.get(id, 0))
-			var l := Label.new()
 			if caught > 0:
-				l.text = "%s - %d마리 낚음 (%dG)" % [GameData.ITEMS[id].name, caught, GameData.ITEMS[id].sell]
+				items_box.add_child(_mk_row(id, str(GameData.ITEMS[id].name),
+					"%d마리 낚음 · %dG" % [caught, GameData.ITEMS[id].sell]))
 			else:
-				l.text = "??? - 아직 낚지 못했다"
-			items_box.add_child(l)
-		var mob_title := Label.new()
-		mob_title.text = "\n- 몬스터 도감 -"
-		items_box.add_child(mob_title)
+				items_box.add_child(_mk_row("", "???", "아직 낚지 못했다"))
+		_note("— 몬스터 도감 —")
 		for mid in GameData.MOBS:
 			var kills := int(GameData.mob_kills.get(mid, 0))
-			var ml := Label.new()
 			if kills > 0:
-				ml.text = "%s - %d마리 처치. %s" % [GameData.MOBS[mid].name, kills, GameData.MOBS[mid].desc]
-				ml.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				items_box.add_child(_mk_row("%s_0" % mid, str(GameData.MOBS[mid].name),
+					"%d마리 처치 · %s" % [kills, GameData.MOBS[mid].desc]))
 			else:
-				ml.text = "??? - 동굴에서 만나보자"
-			items_box.add_child(ml)
-		var cook_title := Label.new()
-		cook_title.text = "\n- 요리 도감 -"
-		items_box.add_child(cook_title)
+				items_box.add_child(_mk_row("", "???", "동굴에서 만나보자"))
+		_note("— 요리 도감 —")
 		for rid in GameData.RECIPE_IDS:
 			var made := int(GameData.recipes_cooked.get(rid, 0))
-			var cl := Label.new()
 			if made > 0:
-				cl.text = "%s - %d번 요리 (%dG)" % [GameData.ITEMS[rid].name, made,
-					GameData.ITEMS[rid].sell]
+				items_box.add_child(_mk_row(rid, str(GameData.ITEMS[rid].name),
+					"%d번 요리 · %dG" % [made, GameData.ITEMS[rid].sell]))
 			else:
-				cl.text = "??? - 집 조리대에서 만들어보자"
-			items_box.add_child(cl)
-		var hint := Label.new()
-		hint.text = "\n낚싯대(9)를 들고 물가에서 Space! 입질(!)이 오면 다시 Space!\n철수와 친해지면(호감도 50+) 판정 구간이 넓어진다."
-		items_box.add_child(hint)
+				items_box.add_child(_mk_row("", "???", "집 조리대에서 만들어보자"))
+		_note("낚싯대를 들고 물가에서 E! 입질(!)이 오면 다시 E!\n"
+			+ "철수와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
 	else:
 		for id in GameData.UPGRADES:
 			var up: Dictionary = GameData.UPGRADES[id]
 			var levels: Array = up.levels
 			var level: int = GameData.tool_level.get(id, 1)
-			var row := HBoxContainer.new()
-			var l := Label.new()
-			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(l)
 			var st: Dictionary = GameData.tool_stats(id)
+			var stat_line := "위력 %s · 범위 %s · 기력 %s · 행운 %s" % [
+				GameData.fmt_stat(st.power), GameData.fmt_stat(st.reach),
+				GameData.fmt_stat(st.stamina), GameData.fmt_stat(st.luck)]
+			var icon: String = "icon_" + ("water" if id == "water" else id)
 			if level - 1 >= levels.size():
-				l.text = "%s Lv%d (최대) — 위력 %s · 범위 %s" % [up.name, level,
-					GameData.fmt_stat(st.power), GameData.fmt_stat(st.reach)]
-			else:
-				var next: Dictionary = levels[level - 1]
-				var gain := GameData.tool_stat_gain_text(id)
-				l.text = "%s Lv%d→%d: %s" % [up.name, level, level + 1, next.desc]
-				if gain != "":
-					l.text += "  (%s)" % gain
-				var cost_text := "%dG" % next.money
-				if int(next.wood) > 0:
-					cost_text += "+목재%d" % next.wood
-				if int(next.ore) > 0:
-					cost_text += "+광석%d" % next.ore
-				var b := _mk_button(cost_text, _on_upgrade.bind(id))
-				b.disabled = GameData.money < next.money or GameData.wood < next.wood \
-					or GameData.items["ore"] < next.ore
-				row.add_child(b)
-			items_box.add_child(row)
-		var hint := Label.new()
-		hint.text = "\n광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d /\n스프링클러: 목재 %d+석재 %d" % [
-			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD, GameData.SPRINKLER_COST_STONE]
-		items_box.add_child(hint)
+				items_box.add_child(_mk_row(icon, "%s Lv.%d (최대)" % [up.name, level],
+					stat_line))
+				continue
+			var next: Dictionary = levels[level - 1]
+			var cost_text := "%dG" % next.money
+			if int(next.wood) > 0:
+				cost_text += " 목재%d" % next.wood
+			if int(next.ore) > 0:
+				cost_text += " 광석%d" % next.ore
+			var b := _mk_button(cost_text, _on_upgrade.bind(id))
+			b.disabled = GameData.money < next.money or GameData.wood < next.wood \
+				or GameData.items["ore"] < next.ore
+			var gain := GameData.tool_stat_gain_text(id)
+			var sub := "%s → %s" % [stat_line, next.desc]
+			if gain != "":
+				sub = "%s   (%s)" % [next.desc, gain]
+			items_box.add_child(_mk_row(icon,
+				"%s Lv.%d → %d" % [up.name, level, level + 1], sub, b))
+		_note("광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d · 스프링클러: 목재 %d+석재 %d" % [
+			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD,
+			GameData.SPRINKLER_COST_STONE])
 
 
 func _on_buy(id: String) -> void:

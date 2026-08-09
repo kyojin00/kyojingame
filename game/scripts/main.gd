@@ -671,9 +671,11 @@ func _spawn_objects() -> void:
 		if VILLAGE_PLOTS.has(pid):
 			objects.erase(door_tile(VILLAGE_PLOTS[pid].anchor))
 			_spawn_house_node(VILLAGE_PLOTS[pid].anchor)
+			_trim_paths_under_building(VILLAGE_PLOTS[pid].anchor)
 	if GameData.house_lv >= 1:
 		objects.erase(door_tile(HOME_ANCHOR))
 		_spawn_house_node(HOME_ANCHOR)
+		_trim_paths_under_building(HOME_ANCHOR)
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
@@ -692,6 +694,22 @@ func _fill_building(anchor: Vector2i) -> void:
 			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
 	objects.erase(door_tile(anchor))
 	_spawn_house_node(anchor)
+	_trim_paths_under_building(anchor)
+
+
+# 건물이 덮은 자리에는 길을 그리지 않는다 — 길은 걸어 다닐 수 있는 곳에만 있어야 한다
+const BUILDING_KINDS := ["house", "art_block", "barn", "barn_block"]
+
+
+func _trim_paths_under_building(anchor: Vector2i) -> void:
+	var door := door_tile(anchor)
+	for y in range(anchor.y - 2, anchor.y + 4):
+		for x in range(anchor.x - 1, anchor.x + 6):
+			var pos := Vector2i(x, y)
+			if pos == door or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+				continue
+			if objects.has(pos) and BUILDING_KINDS.has(objects[pos].kind):
+				grid[y][x].ground = "grass"
 
 
 # 이 칸이 다 지어진 건물의 문이면 그 건물 종류를 돌려준다
@@ -2428,7 +2446,8 @@ func _open_village_build_dialog() -> void:
 	var pid := _next_village_build()
 	if pid == "":
 		dialog.open("마을 발전",
-			"지금 지을 수 있는 건물은 다 세웠네.\n마을이 제법 그럴듯해졌구먼!")
+			"지금 지을 수 있는 건물은 다 세웠네.\n마을이 제법 그럴듯해졌구먼!",
+			[["좋군요!", null]])
 		return
 	var plot: Dictionary = VILLAGE_PLOTS[pid]
 	var cost: Array = VILLAGE_BUILD_COST[pid]
@@ -4156,16 +4175,19 @@ func _debug_tick() -> void:
 		186: _save_shot("_village2.png")
 		187: shop_room.open("general")                 # 가게 방 (잡화점)
 		190: _save_shot("_shoproom.png")
-		191:
+		191: shop.open("buy", ["buy", "sell"], "잡화점")
+		193: _save_shot("_shop.png")
+		194: shop.close()
+		195:
 			shop_room.close()
 			shop_room.open("smith")                    # 가게 방 (대장간)
-		194: _save_shot("_shoproom2.png")
-		195:
+		197: _save_shot("_shoproom2.png")
+		198:
 			shop_room.close()
 			GameData.gender = "m"                      # 남자 캐릭터 뒷모습 걷기 확인
 			_send_key_press(KEY_W)
-		199: _save_shot("_boy_back.png")
-		200:
+		202: _save_shot("_boy_back.png")
+		203:
 			_send_key_release(KEY_W)
 			_send_key_press(KEY_S)                     # 앞모습 걷기 확인
 		204: _save_shot("_boy_front.png")

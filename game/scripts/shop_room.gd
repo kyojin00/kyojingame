@@ -147,7 +147,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if str(d.tab) == "":
 				main.hud.show_message(str(d.hint), 4.0)
 			else:
-				main.shop.open(str(d.tab), d.tabs)
+				main.shop.open(str(d.tab), d.tabs, str(d.name))
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_cancel"):
 		close()
