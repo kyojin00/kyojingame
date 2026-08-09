@@ -177,16 +177,18 @@ const FOUNTAIN_DECO := Vector2i(74, 17)    # 분수 조형물 (분수 한가운�
 const VILLAGE_RIVER_Y := 27                # 마을 남쪽 외곽을 흐르는 강 (2칸)
 const DOCK_Y := 26                         # 강가 낚시터(부두)
 # ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
-# 나무 부두 + 강가 마당 + 표지판/가로등/벤치. 「낚시」 목표는 여기서 진행한다.
-const FISH_YARD_X0 := 71
-const FISH_YARD_X1 := 78
-const PIER_X0 := 73
-const PIER_X1 := 76
-const FISH_SIGN := Vector2i(71, 25)
-const FISH_LAMPS := [Vector2i(72, 25), Vector2i(77, 25)]
-const FISH_BENCH := Vector2i(78, 26)
-const FISH_SPOT := Rect2i(70, 24, 10, 5)   # 이 안이면 「낚시터에 있다」
-const FISH_CLEAR := Rect2i(68, 23, 14, 9)  # 이 안에는 나무/돌을 두지 않는다
+# 강을 따라 길게 깔린 나무 데크 + 물 쪽으로 내민 부두 두 개 +
+# 강가 마당(표지판·가로등·벤치). 「낚시」 목표는 여기서 진행한다.
+const FISH_YARD_X0 := 67
+const FISH_YARD_X1 := 82
+const FISH_DECK_X0 := 68                   # 강 첫 줄(y=27)에 깔리는 데크
+const FISH_DECK_X1 := 81
+const FISH_PIERS := [Vector2i(70, 71), Vector2i(78, 79)]  # 물로 내민 부두 두 개 (x 구간)
+const FISH_SIGN := Vector2i(67, 25)
+const FISH_LAMPS := [Vector2i(69, 25), Vector2i(74, 25), Vector2i(80, 25)]
+const FISH_BENCHES := [Vector2i(72, 25), Vector2i(77, 25)]
+const FISH_SPOT := Rect2i(66, 23, 18, 7)   # 이 안이면 「낚시터에 있다」
+const FISH_CLEAR := Rect2i(64, 22, 22, 10) # 이 안에는 나무/돌을 두지 않는다
 const BOARD_POS := Vector2i(77, 12)        # 광장 게시판 (오늘의 의뢰)
 const PLAZA_LAMPS := [Vector2i(69, 13), Vector2i(80, 13),
 	Vector2i(69, 20), Vector2i(80, 20)]
@@ -537,7 +539,8 @@ func _build_map() -> void:
 	objects[FISH_SIGN] = {"kind": "sign", "hp": 0}
 	for p: Vector2i in FISH_LAMPS:
 		objects[p] = {"kind": "deco_lamp", "hp": 0}
-	objects[FISH_BENCH] = {"kind": "deco_bench", "hp": 0}
+	for p: Vector2i in FISH_BENCHES:
+		objects[p] = {"kind": "deco_bench", "hp": 0}
 
 
 # 교진 마을: 건물은 하나도 짓지 않는다.
@@ -577,14 +580,15 @@ func _build_village() -> void:
 	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 나무 부두.
 	# 「낚시」 목표는 여기서 진행한다 (물가는 여러 곳이지만 낚시터는 여기 하나뿐).
 	for x in range(FISH_YARD_X0, FISH_YARD_X1 + 1):
-		for y in [DOCK_Y - 1, DOCK_Y]:
+		for y in [DOCK_Y - 2, DOCK_Y - 1, DOCK_Y]:
 			grid[y][x].ground = "path"
-	# 부두는 T자 — 강 위 첫 줄을 가로로 깔고, 가운데 두 칸을 한 줄 더 내민다.
-	# 그 끝에 서서 좌우의 물을 보고 낚싯대를 던진다.
-	for x in range(PIER_X0, PIER_X1 + 1):
+	# 강 첫 줄에 데크를 길게 깔고, 거기서 부두 두 개를 물 쪽으로 내민다.
+	# 데크에서 아래를 보거나 부두 끝에서 좌우를 보고 낚싯대를 던진다.
+	for x in range(FISH_DECK_X0, FISH_DECK_X1 + 1):
 		grid[VILLAGE_RIVER_Y][x].ground = "dock"
-	for x in [PIER_X0 + 1, PIER_X1 - 1]:
-		grid[VILLAGE_RIVER_Y + 1][x].ground = "dock"
+	for p: Vector2i in FISH_PIERS:
+		for x in range(p.x, p.y + 1):
+			grid[VILLAGE_RIVER_Y + 1][x].ground = "dock"
 	# 강 건너 남쪽 부지로 이어지는 작은 다리
 	for x in [63, 64]:
 		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
@@ -813,9 +817,14 @@ const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 
 # 파고들어 겹쳐 보인다. 그래서 그림 크기에 맞춰 밑동 판정을 넓힌다.
 # 다만 한 칸짜리 통로는 계속 지나갈 수 있어야 하므로(플레이어 몸 폭 12px),
 # 한 변에 6px(양쪽 12px, 남는 폭 20px)을 넘지 않게 잡는다.
+#
+# 세로 여백(pad.y)은 특히 조심해야 한다. 같은 줄로 늘어선 오브젝트 사이의
+# 한 칸 틈은 계속 지나갈 수 있어야 하기 때문이다 (퀘스트 5의 바위벽처럼).
+# 위아래 오브젝트의 여백이 32px 틈을 다 먹지 않도록 pad.y는 12 이하로 잡는다.
 const OBJECT_PAD := {
-	"tree": Vector2(6, 6), "bigrock": Vector2(6, 6), "rock": Vector2(5, 4),
-	"cave": Vector2(6, 4), "worldtree": Vector2(6, 4), "barn": Vector2(4, 3),
+	# 커다란 바위는 그림이 3칸 폭이라 여백도 그만큼 넓다 (안으로 걸어 들어가지 않게)
+	"tree": Vector2(6, 6), "bigrock": Vector2(26, 8), "rock": Vector2(9, 6),
+	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
 	"bin": Vector2(3, 2), "board": Vector2(3, 2), "sign": Vector2(3, 2),
@@ -1118,6 +1127,12 @@ func cancel_fishing() -> void:
 
 func at_fishing_spot() -> bool:
 	return FISH_SPOT.has_point(player_tile())
+
+
+# 낚시터 안내 지점 — 왼쪽 부두 끝 (길라잡이 화살표가 여기를 가리킨다)
+func fishing_spot_center() -> Vector2:
+	var p: Vector2i = FISH_PIERS[0]
+	return Vector2(p.x * TILE + 16, (VILLAGE_RIVER_Y + 1) * TILE + 16)
 
 
 func _start_fishing() -> void:
@@ -4084,7 +4099,7 @@ func nav_target() -> Variant:
 			var ga: Vector2i = VILLAGE_PLOTS["general"].anchor
 			return Vector2((ga.x + 2) * TILE + 16, (ga.y + 4) * TILE + 16)
 		"fish":
-			return Vector2(40 * TILE + 16, 27 * TILE + 16)   # 호수 (숲과 호수 부지)
+			return fishing_spot_center()   # 마을 남쪽 낚시터 부두
 		"chop":
 			return _nearest_object_pos("tree")
 		"mine":
@@ -4332,6 +4347,16 @@ func _debug_tick() -> void:
 			interact()
 			print("WATER_CHECKPOINT_OK=", wc.half_fed)
 			_sel_target = Vector2i(-999, -999)
+
+			# 회귀 검사: 커다란 바위 사이의 한 칸 틈은 계속 지나갈 수 있어야 한다
+			# (퀘스트 5에서 바위 하나를 캐면 그 자리로 빠져나간다)
+			var gap := Vector2i(20, 40)
+			objects[gap + Vector2i(0, -1)] = {"kind": "bigrock", "hp": BIGROCK_HP}
+			objects[gap + Vector2i(0, 1)] = {"kind": "bigrock", "hp": BIGROCK_HP}
+			print("BIGROCK_GAP_OK=", is_passable_px(
+				Vector2(gap.x * TILE + 16, gap.y * TILE + 16)))
+			objects.erase(gap + Vector2i(0, -1))
+			objects.erase(gap + Vector2i(0, 1))
 		219: get_tree().quit()
 
 

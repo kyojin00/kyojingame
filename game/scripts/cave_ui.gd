@@ -361,7 +361,8 @@ func _update_sprite() -> void:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
-	player_sprite.position = ppos + Vector2(-16, -42)
+	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
+	player_sprite.position = ppos + Vector2(-32, -95)
 	player_sprite.modulate = Color(1, 0.55, 0.55) if hurt_cd > 0.6 else Color(1, 1, 1)
 
 

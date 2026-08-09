@@ -349,7 +349,9 @@ func _update_sprite() -> void:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
-	player_sprite.position = ppos + Vector2(-16, -47)
+	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
+	# (예전 값은 몸통을 ppos에 두어 발이 방 밖으로 삐져나왔다)
+	player_sprite.position = ppos + Vector2(-32, -95)
 	player_sprite.modulate.a = 0.4 if deco_mode else 1.0
 
 
