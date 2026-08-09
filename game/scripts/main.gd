@@ -93,6 +93,9 @@ const TEXTURE_NAMES := [
 	"player_casual_side_idle", "player_casual_side_walk_0", "player_casual_side_walk_1",
 	"player_casual_side_walk_2", "player_casual_side_walk_3", "player_casual_side_walk_4",
 	"player_casual_side_walk_5",
+	"player_casual_up_idle", "player_casual_up_walk_0", "player_casual_up_walk_1",
+	"player_casual_up_walk_2", "player_casual_up_walk_3", "player_casual_up_walk_4",
+	"player_casual_up_walk_5",
 	"player_side_walk_0", "player_side_walk_1", "player_side_walk_2",
 	"player_side_walk_3", "player_side_walk_4", "player_side_walk_5",
 	"player_down_walk_0", "player_down_walk_1", "player_down_walk_2",
@@ -3626,7 +3629,13 @@ func _debug_tick() -> void:
 			player.position = Vector2(74 * TILE + 16, 11 * TILE + 16)
 			player.dir = "up"
 		182: _save_shot("_village2.png")
-		184: get_tree().quit()
+		184:
+			GameData.gender = "m"                      # 평상복 뒷모습 걷기 확인
+			GameData.outfit = "casual"
+			_send_key_press(KEY_W)
+		188: _save_shot("_casual_back.png")
+		189: _send_key_release(KEY_W)
+		191: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

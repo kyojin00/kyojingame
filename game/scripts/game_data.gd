@@ -523,6 +523,8 @@ func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
 	if gender == "m":
 		if not is_moving:
 			return player_idle_tex("up")
+		if outfit == "casual":
+			return "player_casual_up_walk_%d" % (int(t * 9.0) % 6)
 		return "player_up_walk_%d" % (int(t * 9.0) % 6)
 	if suffix == "idle":
 		return player_tex("up_idle")
@@ -550,6 +552,8 @@ func player_idle_tex(dirn: String) -> String:
 		return "player_down_idle_0"
 	if gender == "m" and dirn == "side":
 		return "player_casual_side_idle" if outfit == "casual" else "player_side_idle_0"
+	if gender == "m" and dirn == "up" and outfit == "casual":
+		return "player_casual_up_idle"
 	return player_tex(dirn + "_idle")
 
 
