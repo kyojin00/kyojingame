@@ -1219,13 +1219,25 @@ func use_tool() -> void:
 				_refresh_tree_sprite(t)
 				if obj.hp <= 0:
 					_remove_object(t)
-					GameData.tree_regrow.append([t.x, t.y, 1])  # 다음 날 어린 나무가 돋는다
+					# 숲길을 막고 있던 나무는 다시 자라지 않는다 (길이 도로 막히면 안 된다)
+					var story_gate: bool = GameData.story_phase != "done" \
+						and t in STORY_MAZE_GATES
+					if not story_gate:
+						GameData.tree_regrow.append([t.x, t.y, 1])  # 다음 날 어린 나무
 					var wood_got := WOOD_PER_TREE
 					if randf() < GameData.bonus_drop_chance("forest"):
 						wood_got += 1
 					GameData.wood += wood_got
 					GameData.trees_chopped += 1
 					hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
+					# 숲길을 막고 있던 나무였다면 진행도를 갱신한다
+					if story_gate and GameData.story_gates_left > 0:
+						GameData.story_gates_left -= 1
+						if GameData.story_gates_left > 0:
+							hud.show_message("길이 조금 더 열렸다! (남은 나무 %d그루)"
+								% GameData.story_gates_left, 4.0)
+						else:
+							hud.show_message("숲길이 끝까지 열렸다! 갈림길로 가보자.", 4.0)
 					_story_tree_chopped()
 					tutorial_notify("chop")
 					gain_skill("forest", 3.0)
@@ -1350,14 +1362,18 @@ func interact() -> void:
 			or (aim.kind in ["rock", "bigrock"] and GameData.tool == "pickaxe")):
 		use_tool()
 		return
+	# 나무·돌·채집물을 조준하고 있으면 대화보다 채집이 우선이다
+	# (옆에 사람이 서 있어도 E가 대화로 새지 않는다)
+	const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
+	var aiming_object: bool = aim != null and AIM_KINDS.has(aim.kind)
 	# 동행 중인 우체부 아저씨에게 말 걸기 (진행 단계별 보조 대화)
-	if _postman != null and _postman_state == "follow" \
-			and (player.position - _postman.position).length() < 56.0:
+	if not aiming_object and _postman != null and _postman_state == "follow" \
+			and (player.position - _postman.position).length() < 48.0:
 		_talk_to_postman()
 		return
 	# 가까운 NPC와 대화
 	var npc := nearby_npc()
-	if npc != null:
+	if npc != null and not aiming_object:
 		_talk_to(npc)
 		return
 	# 가까운 동물 쓰다듬기(=먹이 주기)
@@ -1521,8 +1537,15 @@ const STORY_MAZE_PATH := [
 	Vector2i(17, 13), Vector2i(17, 14), Vector2i(17, 15), Vector2i(17, 16),
 	Vector2i(18, 16), Vector2i(19, 16),
 ]
-# 통로 위의 길목 — 베어야만 열린다 (「나무를 베며 숲길을 나아가자」)
-const STORY_MAZE_GATES := [Vector2i(13, 16), Vector2i(14, 13), Vector2i(17, 15)]
+# 흙길 한가운데 간간히 서서 길을 막는 나무들 — 베고 넘어가며 나아간다.
+# 첫 번째(벽)는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
+const STORY_MAZE_GATES := [
+	Vector2i(STORY_WALL_X, 16),                       # 빈터 끝 — 길을 막은 첫 나무
+	Vector2i(13, 16), Vector2i(14, 13), Vector2i(17, 15),  # 미로 통로
+	Vector2i(22, 16), Vector2i(24, 16),               # 갈림길 뒤 동쪽 숲길
+	Vector2i(29, 16), Vector2i(31, 16),               # 바위 너머
+	Vector2i(STORY_LINK_X, 12),                       # 마을 큰길로 오르는 연결로
+]
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
@@ -1569,8 +1592,12 @@ func _plant_story_forest() -> void:
 	for yy in [STORY_LANE_Y - 1, STORY_LANE_Y, STORY_LANE_Y + 1]:
 		objects.erase(Vector2i(0, yy))
 		objects.erase(Vector2i(1, yy))
-	# ① 갈림길 이후의 숲길을 먼저 낸다
-	#    (갈림길 세로줄 + 동쪽 길 + 마을 큰길로 올라가는 연결로)
+	# ① 숲길을 흙길로 먼저 낸다 — 어디로 가야 하는지 한눈에 보이게 한다.
+	#    (빈터에서 벽까지 → 미로 통로 → 갈림길 → 동쪽 길 → 마을 큰길 연결로)
+	for x in range(4, STORY_WALL_X + 1):
+		grid[STORY_LANE_Y][x].ground = "path"
+	for c: Vector2i in STORY_MAZE_PATH:
+		grid[c.y][c.x].ground = "path"
 	for y in range(8, 23):
 		grid[y][STORY_FORK.x].ground = "path"
 	for x in range(STORY_FORK.x, STORY_LINK_X + 1):
@@ -1578,25 +1605,21 @@ func _plant_story_forest() -> void:
 	for y in range(9, STORY_LANE_Y + 1):
 		grid[y][STORY_LINK_X].ground = "path"
 
-	# ② 숲 미로: 통로로 지정한 칸만 비우고 나머지는 나무로 꽉 채운다.
-	#    길목(GATES)에는 나무를 세워 두어, 베어야만 앞으로 나아갈 수 있다.
-	var corridor := {}
-	for c: Vector2i in STORY_MAZE_PATH:
-		corridor[c] = true
-	var gates := {}
-	for g: Vector2i in STORY_MAZE_GATES:
-		gates[g] = true
+	# ② 숲 미로: 흙길이 아닌 곳은 전부 나무로 꽉 채운다
 	for y in range(1, 23):
 		for x in range(STORY_WALL_X, STORY_FOREST_W):
 			var pos := Vector2i(x, y)
 			if grid[y][x].ground != "grass" or objects.has(pos):
-				continue
-			if corridor.has(pos) and not gates.has(pos):
-				continue  # 지나갈 수 있는 통로
+				continue  # 흙길은 비워 둔다
 			var tr := {"kind": "tree", "hp": TREE_HP}
 			if _hash01(x * 17 + 2, y * 23 + 5) < 0.10:
 				tr["apple"] = true  # 일부 나무에만 사과 3개가 열린다
 			objects[pos] = tr
+
+	# ③ 흙길 위에 길을 막고 선 나무들 — 이것만 베면 길이 이어진다
+	for g: Vector2i in STORY_MAZE_GATES:
+		objects[g] = {"kind": "tree", "hp": TREE_HP}
+	GameData.story_gates_left = STORY_MAZE_GATES.size()
 
 	# ③ 시작 빈터: 주인공이 움직이고 우체부와 만나는 자리 (나무 없이 돌·덤불만)
 	for y in range(1, 23):
@@ -3061,6 +3084,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.trees_chopped = int(d.get("trees_chopped", 0))
 	GameData.u_intro_state = int(d.get("u_intro", 0))
 	GameData.story_rock_state = int(d.get("rock_state", 0))
+	GameData.story_gates_left = int(d.get("gates_left", 0))
 	GameData.wood = int(d.get("wood", 0))
 	GameData.stone = int(d.get("stone", 0))
 	for k in d.get("tool_level", {}):

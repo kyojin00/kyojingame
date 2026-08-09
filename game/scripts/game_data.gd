@@ -470,9 +470,11 @@ func story_objective_short() -> String:
 		"equip":
 			return "나무도끼를 가방(I) 슬롯에 장착해 보자"
 		"chop":
-			return "나무도끼로 나무를 베어보자"
+			return "흙길을 막고 선 나무를 베어보자"
 		"path":
-			return "숲길을 따라 나아가자 (화살표 방향)"
+			if story_gates_left > 0:
+				return "흙길을 막은 나무를 베며 나아가자 (남은 나무 %d그루)" % story_gates_left
+			return "열린 숲길을 따라 갈림길까지 가자"
 		"map":
 			return "M 키를 눌러 지도를 열어 보자"
 		"rock":
@@ -537,6 +539,8 @@ func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
 var trees_chopped := 0
 # U키 능력치 안내 단계: 0=대기 / 1=대사 완료(U 누르기 대기) / 2=창 열어봄 / 3=완료
 var u_intro_state := 0
+# 숲길을 막고 선 나무 중 아직 베지 않은 그루 수 (얼마나 더 파야 하는지 표시)
+var story_gates_left := 0
 # 퀘스트 5 「마을로 가는 길을 열어보자」 진행 단계:
 # 0=바위 발견 전 / 1=곡괭이 받음(채광 중) / 2=바위 제거(곡괭이 돌려주기 대기) / 3=완료
 var story_rock_state := 0
@@ -1113,6 +1117,7 @@ func reset_all() -> void:
 	trees_chopped = 0
 	u_intro_state = 0
 	story_rock_state = 0
+	story_gates_left = 0
 	tool_slots = default_tool_slots()
 	owned_parcels = ["home"]
 	reset_daily()
@@ -1229,6 +1234,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,
 		"rock_state": story_rock_state,
+		"gates_left": story_gates_left,
 		"skills": skills,
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,
