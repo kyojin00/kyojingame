@@ -49,6 +49,28 @@ const ROOMS := {
 		"tab": "", "tabs": [],
 		"hint": "우체부 아저씨가 편지를 정리하고 있다.",
 	},
+	# ---- 거래 창 대신 제 나름의 기능을 가진 방들 ----
+	"inn": {
+		"name": "여관", "keeper": "chief",
+		"wall": Color(0.44, 0.3, 0.3), "floor": Color(0.6, 0.44, 0.38),
+		"counter": Color(0.48, 0.32, 0.28), "deco": "beds",
+		"tab": "", "tabs": [], "action": "rest",
+		"hint": "한숨 돌리고 간다 (100G, 체력 회복)",
+	},
+	"lab": {
+		"name": "연구소", "keeper": "merchant",
+		"wall": Color(0.28, 0.34, 0.4), "floor": Color(0.46, 0.54, 0.58),
+		"counter": Color(0.3, 0.4, 0.46), "deco": "lab",
+		"tab": "", "tabs": [], "action": "breed",
+		"hint": "씨앗을 개량한다 (작물이 더 빨리·비싸게)",
+	},
+	"library": {
+		"name": "도서관", "keeper": "blacksmith",
+		"wall": Color(0.4, 0.34, 0.24), "floor": Color(0.58, 0.5, 0.36),
+		"counter": Color(0.44, 0.34, 0.22), "deco": "books",
+		"tab": "", "tabs": [], "action": "read",
+		"hint": "할아버지의 연구를 뒤쫓는다 (다음 전설 재료 힌트)",
+	},
 }
 
 var main: Node2D
@@ -144,7 +166,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("interact"):
 		if _at_counter():
 			var d := _def()
-			if str(d.tab) == "":
+			if str(d.get("action", "")) != "":
+				main.room_action(str(d.action))   # 여관·연구소·도서관
+			elif str(d.tab) == "":
 				main.hud.show_message(str(d.hint), 4.0)
 			else:
 				main.shop.open(str(d.tab), d.tabs, str(d.name))
@@ -319,3 +343,34 @@ func _draw_deco(kind: String, wall: Color) -> void:
 						wall.darkened(0.25))
 			canvas.draw_rect(Rect2(716, 250, 90, 60), Color(0.45, 0.36, 0.55))
 			canvas.draw_rect(Rect2(726, 240, 70, 14), Color(0.9, 0.88, 0.84))
+		"beds":
+			# 여관: 침대 두 개 + 협탁
+			for i in 2:
+				var by := 176.0 + i * 84.0
+				canvas.draw_rect(Rect2(148, by, 104, 62), Color(0.5, 0.36, 0.26))
+				canvas.draw_rect(Rect2(148, by, 104, 20), Color(0.92, 0.9, 0.86))
+				canvas.draw_rect(Rect2(148, by + 20, 104, 42), Color(0.72, 0.32, 0.3))
+				canvas.draw_rect(Rect2(258, by + 26, 26, 26), Color(0.42, 0.3, 0.22))
+			canvas.draw_rect(Rect2(716, 320, 92, 48), Color(0.5, 0.36, 0.26))
+		"lab":
+			# 연구소: 실험대 + 플라스크 + 씨앗 선반
+			canvas.draw_rect(Rect2(148, 300, 132, 56), Color(0.34, 0.4, 0.44))
+			for i in 3:
+				var fx := 158.0 + i * 42.0
+				canvas.draw_rect(Rect2(fx + 8, 272, 10, 14), Color(0.8, 0.9, 0.95))
+				canvas.draw_rect(Rect2(fx, 286, 26, 16), Color(0.5, 0.86, 0.6))
+			canvas.draw_rect(Rect2(716, 300, 92, 12), Color(0.34, 0.4, 0.44))
+			canvas.draw_rect(Rect2(716, 340, 92, 12), Color(0.34, 0.4, 0.44))
+			for i in 3:
+				canvas.draw_rect(Rect2(722 + i * 28, 284, 20, 16), Color(0.7, 0.6, 0.35))
+		"books":
+			# 도서관: 책장 두 벌 (책등 색을 섞는다)
+			var spine := [Color(0.7, 0.3, 0.28), Color(0.32, 0.44, 0.62),
+				Color(0.4, 0.56, 0.36), Color(0.66, 0.54, 0.28)]
+			for side in [148.0, 700.0]:
+				for r in 3:
+					var sy := 262.0 + r * 40.0
+					canvas.draw_rect(Rect2(side, sy + 26, 116, 8), wall.darkened(0.35))
+					for i in 9:
+						canvas.draw_rect(Rect2(side + 4 + i * 12, sy, 9, 26),
+							spine[(i + r) % spine.size()])

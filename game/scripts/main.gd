@@ -18,7 +18,8 @@ const WET_ALL_DAY := 1200.0
 
 # 작물 성숙에 필요한 누적 성장 시간 (게임 분) — grow_days를 '시간'으로 해석
 func _grow_total(def: Dictionary) -> float:
-	return float(def.grow_days) * 60.0
+	# 연구소에서 개량한 씨앗은 더 빨리 자란다 (최소 40%까지)
+	return float(def.grow_days) * 60.0 * GameData.breed_grow_mult()
 
 
 # 절반까지 자란 작물은 물을 한 번 더 받아야 계속 자란다 (성장 체크포인트)
@@ -173,14 +174,14 @@ const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
 # 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
-const VILLAGE_REGION := Rect2i(60, 0, 30, 30)
+const VILLAGE_REGION := Rect2i(60, 0, 30, 34)   # 건물 사이를 넓히려고 남쪽으로 늘렸다
 const ROAD := Rect2i(30, 8, 30, 2)         # 농장/숲 -> 마을 공용 길
 const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 큰길 (2칸)
 const PLAZA := Rect2i(68, 12, 14, 10)      # 중앙 광장 (아주 넓은 평지)
 const FOUNTAIN := Rect2i(73, 15, 4, 4)     # 광장 중앙 분수
 const FOUNTAIN_DECO := Vector2i(74, 17)    # 분수 조형물 (분수 한가운데)
-const VILLAGE_RIVER_Y := 27                # 마을 남쪽 외곽을 흐르는 강 (2칸)
-const DOCK_Y := 26                         # 강가 낚시터(부두)
+const VILLAGE_RIVER_Y := 31                # 마을 남쪽 외곽을 흐르는 강 (2칸)
+const DOCK_Y := 30                         # 강가 낚시터(부두)
 # ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
 # 강을 따라 길게 깔린 나무 데크 + 물 쪽으로 내민 부두 두 개 +
 # 강가 마당(표지판·가로등·벤치). 「낚시」 목표는 여기서 진행한다.
@@ -189,11 +190,11 @@ const FISH_YARD_X1 := 82
 const FISH_DECK_X0 := 68                   # 강 첫 줄(y=27)에 깔리는 데크
 const FISH_DECK_X1 := 81
 const FISH_PIERS := [Vector2i(70, 71), Vector2i(78, 79)]  # 물로 내민 부두 두 개 (x 구간)
-const FISH_SIGN := Vector2i(67, 25)
-const FISH_LAMPS := [Vector2i(69, 25), Vector2i(74, 25), Vector2i(80, 25)]
-const FISH_BENCHES := [Vector2i(72, 25), Vector2i(77, 25)]
-const FISH_SPOT := Rect2i(66, 23, 18, 7)   # 이 안이면 「낚시터에 있다」
-const FISH_CLEAR := Rect2i(64, 22, 22, 10) # 이 안에는 나무/돌을 두지 않는다
+const FISH_SIGN := Vector2i(67, 29)
+const FISH_LAMPS := [Vector2i(69, 29), Vector2i(74, 29), Vector2i(80, 29)]
+const FISH_BENCHES := [Vector2i(72, 29), Vector2i(77, 29)]
+const FISH_SPOT := Rect2i(66, 27, 18, 7)   # 이 안이면 「낚시터에 있다」
+const FISH_CLEAR := Rect2i(64, 26, 22, 10) # 이 안에는 나무/돌을 두지 않는다
 const BOARD_POS := Vector2i(77, 12)        # 광장 게시판 (오늘의 의뢰)
 const PLAZA_LAMPS := [Vector2i(69, 13), Vector2i(80, 13),
 	Vector2i(69, 20), Vector2i(80, 20)]
@@ -206,16 +207,26 @@ const HOME_SITE := Vector2i(63, 6)  # 집터 표지판 위치
 
 # 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
 # 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.
+# 건물은 5x4칸 그림에 둘레 마당까지 합쳐 한 채가 7x6칸을 차지한다.
+# 북쪽 한 줄 + 서/동 두 줄로 벌려 놓아 서로 붙어 보이지 않는다.
 const VILLAGE_PLOTS := {
-	"post":    {"anchor": Vector2i(68, 4),  "name": "우체국"},
-	"general": {"anchor": Vector2i(77, 4),  "name": "잡화점"},
-	"smith":   {"anchor": Vector2i(61, 11), "name": "대장간"},
-	"lab":     {"anchor": Vector2i(82, 11), "name": "연구소"},
-	"inn":     {"anchor": Vector2i(61, 18), "name": "여관"},
-	"library": {"anchor": Vector2i(82, 18), "name": "도서관"},
-	"ranch":   {"anchor": Vector2i(67, 22), "name": "목장 상회"},
-	"fish":    {"anchor": Vector2i(77, 22), "name": "수산시장"},
+	# 북쪽 줄 (큰길 위쪽)
+	"post":    {"anchor": Vector2i(63, 3),  "name": "우체국"},
+	"general": {"anchor": Vector2i(71, 3),  "name": "잡화점"},
+	"lab":     {"anchor": Vector2i(79, 3),  "name": "연구소"},
+	# 서쪽 줄 (서쪽 세로 길가)
+	"smith":   {"anchor": Vector2i(61, 10), "name": "대장간"},
+	"ranch":   {"anchor": Vector2i(61, 18), "name": "목장 상회"},
+	"inn":     {"anchor": Vector2i(61, 26), "name": "여관"},
+	# 동쪽 줄 (동쪽 세로 길가)
+	"library": {"anchor": Vector2i(84, 11), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(84, 19), "name": "수산시장"},
 }
+# 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
+const YARD_PAD := 1
+# 서쪽·동쪽 건물 줄 앞을 지나는 세로 길
+const WEST_LANE_X := 67
+const EAST_LANE_X := 82
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
@@ -584,17 +595,17 @@ func _build_village() -> void:
 	for y in range(PLAZA.position.y, PLAZA.end.y):
 		for x in range(PLAZA.position.x, PLAZA.end.x):
 			grid[y][x].ground = "path"
-	# 광장에서 사방으로 퍼져나가는 길
+	# 광장 <-> 큰길을 잇는 북쪽 길, 광장 <-> 낚시터를 잇는 남쪽 길
 	for x in [74, 75]:
-		for y in range(1, PLAZA.position.y):         # 북쪽 길
+		for y in range(MAIN_STREET_Y, PLAZA.position.y):
 			grid[y][x].ground = "path"
-		for y in range(PLAZA.end.y, DOCK_Y + 1):     # 남쪽 길 (강가까지)
+		for y in range(PLAZA.end.y, DOCK_Y + 1):
 			grid[y][x].ground = "path"
-	for y in [16, 17]:
-		for x in range(61, PLAZA.position.x):        # 서쪽 길
-			grid[y][x].ground = "path"
-		for x in range(PLAZA.end.x, 87):             # 동쪽 길
-			grid[y][x].ground = "path"
+	# 서쪽·동쪽 건물 줄 앞을 지나는 세로 길 (마당 문이 여기로 붙는다)
+	for y in range(MAIN_STREET_Y, DOCK_Y):
+		grid[y][WEST_LANE_X].ground = "path"
+	for y in range(MAIN_STREET_Y, PLAZA.end.y + 2):
+		grid[y][EAST_LANE_X].ground = "path"
 	# 광장 한가운데 분수
 	for y in range(FOUNTAIN.position.y, FOUNTAIN.end.y):
 		for x in range(FOUNTAIN.position.x, FOUNTAIN.end.x):
@@ -624,6 +635,11 @@ func _build_village() -> void:
 		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
 			grid[y][x].ground = "path"
 
+	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
+	for pid: String in GameData.village_built:
+		if VILLAGE_PLOTS.has(pid):
+			_place_building_tiles(VILLAGE_PLOTS[pid].anchor)
+
 	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
 	objects[HOME_SITE] = {"kind": "housesite", "hp": 0}
 	objects[BOARD_POS] = {"kind": "board", "hp": 0}
@@ -634,11 +650,72 @@ func _build_village() -> void:
 		objects[p] = {"kind": "deco_bench", "hp": 0}
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
 	for x in range(60, 89):
-		for y in [1, 29]:
+		for y in [1, 33]:
 			var rim := Vector2i(x, y)
 			if grid[y][x].ground == "grass" and not objects.has(rim) \
 					and _hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
 				objects[rim] = {"kind": "tree", "hp": TREE_HP}
+
+
+# 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
+# 문 앞 한 줄만 터 두고, 거기서 가장 가까운 길까지 흙길을 잇는다.
+func _build_yard(anchor: Vector2i) -> void:
+	var door := door_tile(anchor)
+	var yard := Rect2i(anchor.x - YARD_PAD, anchor.y - YARD_PAD,
+		5 + YARD_PAD * 2, 4 + YARD_PAD * 2)
+	# 마당 안은 잔디 (길이 건물 밑으로 지나가지 않게)
+	for y in range(yard.position.y, yard.end.y):
+		for x in range(yard.position.x, yard.end.x):
+			if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+				continue
+			grid[y][x].ground = "grass"
+	# 울타리: 마당 테두리. 문 앞 칸만 비운다
+	for y in range(yard.position.y, yard.end.y):
+		for x in range(yard.position.x, yard.end.x):
+			var edge: bool = x == yard.position.x or x == yard.end.x - 1 \
+				or y == yard.position.y or y == yard.end.y - 1
+			if not edge or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+				continue
+			if x == door.x:
+				continue  # 드나드는 통로
+			if objects.has(Vector2i(x, y)):
+				continue
+			objects[Vector2i(x, y)] = {"kind": "fence", "hp": 0, "fixed": true}
+	# 문 앞에서 가장 가까운 길까지 흙길을 낸다
+	_connect_to_road(Vector2i(door.x, yard.end.y - 1))
+
+
+# 이 칸에서 가장 가까운 길까지 흙길을 깐다 (오브젝트가 없는 칸만 지난다)
+func _connect_to_road(from: Vector2i) -> void:
+	if from.x < 0 or from.y < 0 or from.x >= MAP_W or from.y >= MAP_H:
+		return
+	if grid[from.y][from.x].ground == "path":
+		return
+	var prev := {from: from}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	var goal := Vector2i(-999, -999)
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
+		if grid[cur.y][cur.x].ground == "path" and cur != from:
+			goal = cur
+			break
+		for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+			var n: Vector2i = cur + d
+			if prev.has(n) or not VILLAGE_REGION.has_point(n):
+				continue
+			if objects.has(n) or grid[n.y][n.x].ground == "water":
+				continue
+			prev[n] = cur
+			queue.append(n)
+	if goal.x == -999:
+		return
+	var at := goal
+	while at != from:
+		grid[at.y][at.x].ground = "path"
+		at = prev[at]
+	grid[from.y][from.x].ground = "path"
 
 
 # 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,
@@ -796,13 +873,20 @@ func door_tile(anchor: Vector2i) -> Vector2i:
 	return anchor + Vector2i(2, 3)
 
 
-func _fill_building(anchor: Vector2i) -> void:
+# 건물이 차지하는 칸과 마당만 만든다 (그림 노드는 _spawn_objects가 세운다).
+# 맵을 만드는 단계에서는 아직 world 노드가 없으므로 이쪽만 부른다.
+func _place_building_tiles(anchor: Vector2i) -> void:
 	for y in range(anchor.y, anchor.y + 4):
 		for x in range(anchor.x, anchor.x + 5):
 			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
 	objects.erase(door_tile(anchor))
-	_spawn_house_node(anchor)
 	_trim_paths_under_building(anchor)
+	_build_yard(anchor)
+
+
+func _fill_building(anchor: Vector2i) -> void:
+	_place_building_tiles(anchor)
+	_spawn_house_node(anchor)
 
 
 # 건물이 덮은 자리에는 길을 그리지 않는다 — 길은 걸어 다닐 수 있는 곳에만 있어야 한다
@@ -3279,6 +3363,97 @@ func _talk_to(npc: Node2D) -> void:
 	])
 
 
+# ---- 여관 · 연구소 · 도서관 ----
+#
+# 거래 창이 없는 방들. 계산대 앞에서 E를 누르면 각자의 일을 한다.
+const INN_REST_COST := 100
+const INN_REST_HOURS := 3.0
+
+
+func room_action(kind: String) -> void:
+	match kind:
+		"rest":
+			_open_inn_dialog()
+		"breed":
+			_open_lab_dialog()
+		"read":
+			_open_library_dialog()
+
+
+func _open_inn_dialog() -> void:
+	var can: bool = GameData.money >= INN_REST_COST
+	var body := "따뜻한 방과 국 한 그릇.\n\n%d골드에 %d시간 쉬어 가면\n체력이 가득 찬다." \
+		% [INN_REST_COST, int(INN_REST_HOURS)]
+	if not can:
+		body += "\n\n(소지금이 모자란다)"
+	dialog.open("여관", body,
+		[["쉬어 간다", _do_rest]] if can else [["다음에", null]])
+
+
+func _do_rest() -> void:
+	if GameData.money < INN_REST_COST:
+		return
+	GameData.money -= INN_REST_COST
+	GameData.today_spent += INN_REST_COST
+	GameData.energy = GameData.ENERGY_MAX
+	# 쉬는 만큼 시간이 흐른다 (밤을 넘기지는 않는다)
+	GameData.minutes = minf(GameData.minutes + INN_REST_HOURS * 60.0,
+		GameData.DAY_END - 60.0)
+	Sound.play_sfx("sfx_sleep")
+	save_now()
+	dialog.open("여관", "푹 쉬었다!\n체력이 가득 찼다.", [["고맙습니다", null]])
+
+
+func _open_lab_dialog() -> void:
+	var lv: int = GameData.breed_level
+	var body := "지금 개량 단계: %d / %d\n성장 %d%% 단축 · 판매가 %d%% 상승" % [lv,
+		GameData.BREED_MAX, int(round((1.0 - GameData.breed_grow_mult()) * 100.0)),
+		int(round((GameData.breed_price_mult() - 1.0) * 100.0))]
+	var cost := GameData.breed_next_cost()
+	if cost.is_empty():
+		dialog.open("연구소", body + "\n\n더 개량할 것이 없다. 최고 단계다!",
+			[["훌륭하군요", null]])
+		return
+	body += "\n\n다음 단계: %dG · 광석 %d" % [int(cost[0]), int(cost[1])]
+	var ok: bool = GameData.money >= int(cost[0]) \
+		and int(GameData.items.get("ore", 0)) >= int(cost[1])
+	if not ok:
+		body += "\n(재료가 모자란다)"
+	dialog.open("연구소 — 씨앗 개량", body,
+		[["개량하기", _do_breed], ["나중에", null]] if ok else [["다음에", null]])
+
+
+func _do_breed() -> void:
+	var cost := GameData.breed_next_cost()
+	if cost.is_empty() or GameData.money < int(cost[0]) \
+			or int(GameData.items.get("ore", 0)) < int(cost[1]):
+		return
+	GameData.money -= int(cost[0])
+	GameData.today_spent += int(cost[0])
+	GameData.items["ore"] = int(GameData.items["ore"]) - int(cost[1])
+	GameData.breed_level += 1
+	Sound.play_sfx("sfx_catch")
+	save_now()
+	hud.quest_toast("씨앗 개량 %d단계!" % GameData.breed_level)
+	_open_lab_dialog()
+
+
+# 도서관: 아직 못 구한 전설 재료 중 하나의 힌트를 짚어 준다
+func _open_library_dialog() -> void:
+	var left: Array = []
+	for leg: Array in GameData.LEGENDS:
+		if int(GameData.items.get(str(leg[0]), 0)) <= 0:
+			left.append(leg)
+	if left.is_empty():
+		dialog.open("도서관", "일곱 재료를 모두 모았다.\n\n남은 것은 최후의 연금술뿐 —\n"
+			+ "연구 노트(N)를 펼쳐 보자.", [["가보겠습니다", null]])
+		return
+	var pick: Array = left[GameData.day % left.size()]
+	dialog.open("도서관", "먼지 쌓인 책 사이에서\n할아버지의 메모를 찾았다.\n\n"
+		+ "「%s」 — %s\n\n· %s에서 찾을 수 있다." % [GameData.ITEMS[pick[0]].name,
+		pick[2], pick[1]], [["기억해 두자", null]])
+
+
 # ---- 계절 축제 ----
 #
 # 이장에게 「축제 이야기」를 하면 열린다. 참가 방식은 축제마다 다르다:
@@ -3857,6 +4032,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
+	GameData.breed_level = int(d.get("breed_level", 0))
 	GameData.fest_history = d.get("fest_history", []).duplicate()
 	GameData.owned_gear = d.get("owned_gear", []).duplicate()
 	for slot: String in GameData.GEAR_SLOTS:
@@ -4804,6 +4980,35 @@ func _debug_tick() -> void:
 				" history=", ", ".join(GameData.fest_history))
 		316: _save_shot("_festival2.png")
 		317: dialog.close()
+		318:
+			# 여관·연구소·도서관: 새 방 세 곳
+			shop_room.open("lab")
+			room_action("breed")
+		320: _save_shot("_lab.png")
+		321:
+			GameData.money = 100000
+			GameData.items["ore"] = 100
+			_do_breed()
+			dialog.close()
+			shop_room.close()
+			shop_room.open("library")
+			room_action("read")
+			print("BREED_LEVEL=", GameData.breed_level,
+				" grow=", GameData.breed_grow_mult(),
+				" price=", GameData.breed_price_mult())
+		323: _save_shot("_library.png")
+		324:
+			dialog.close()
+			shop_room.close()
+			shop_room.open("inn")
+			GameData.energy = 20.0
+			room_action("rest")
+		326: _save_shot("_inn.png")
+		327:
+			_do_rest()
+			print("INN_REST_OK=", GameData.energy >= GameData.ENERGY_MAX)
+			dialog.close()
+			shop_room.close()
 		330:
 			var where := []
 			for n in npcs:

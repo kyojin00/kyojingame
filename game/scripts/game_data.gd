@@ -630,7 +630,10 @@ var player_name := ""
 # 마을 발전: 처음 마을에는 건물이 하나도 없다.
 # 이장에게 이야기해 재료를 모으면 빈 부지에 건물이 하나씩 세워진다.
 # (건물 id는 main.gd의 VILLAGE_PLOTS 키)
-var village_built: Array = []
+# 마을은 처음부터 다 세워져 있다. (건물 목록은 main.VILLAGE_PLOTS와 같아야 한다)
+const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
+	"library", "fish"]
+var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
 
 # 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
 var house_lv := 0
@@ -885,6 +888,29 @@ const LEGENDS := [
 	["memory_piece", "교류", "마을 사람과 마음이 통하면(호감도 100) 건네받게 될 것."],
 ]
 
+# ---- 연구소: 씨앗 개량 ----
+# 단계를 올릴수록 모든 작물이 조금씩 빨리 자라고 조금씩 비싸게 팔린다.
+# (작물마다 따로 관리하면 표가 커지므로 마을 전체에 걸리는 한 줄짜리 강화로 둔다)
+const BREED_MAX := 5
+const BREED_COST := [1500, 3000, 5000, 8000, 12000]   # 단계별 연구비
+const BREED_ORE := [0, 3, 6, 10, 15]                  # 단계별 광석
+var breed_level := 0
+
+
+func breed_grow_mult() -> float:
+	return 1.0 - 0.12 * breed_level     # 한 단계마다 성장 12% 단축
+
+
+func breed_price_mult() -> float:
+	return 1.0 + 0.08 * breed_level     # 한 단계마다 판매가 8% 상승
+
+
+func breed_next_cost() -> Array:
+	if breed_level >= BREED_MAX:
+		return []
+	return [BREED_COST[breed_level], BREED_ORE[breed_level]]
+
+
 # ---- 요리: 재료(작물/아이템) -> 요리 아이템. energy = 먹었을 때 회복량 ----
 const RECIPES := {
 	"dish_baked_potato": {"needs": {"potato": 2}, "energy": 30},
@@ -1007,7 +1033,8 @@ func consume_produce(id: String, n: int) -> void:
 
 # 보유 전량 판매 가치 (은 1.25배 / 금 1.5배)
 func produce_sell_value(id: String) -> int:
-	var price: int = CROPS[id].sell_price
+	# 연구소 개량 단계만큼 값이 오른다
+	var price: int = int(CROPS[id].sell_price * breed_price_mult())
 	var silver := int(produce_silver.get(id, 0))
 	var gold := int(produce_gold.get(id, 0))
 	var normal: int = int(produce[id]) - silver - gold
@@ -1128,7 +1155,7 @@ const TUTORIAL_ORDER := [
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
 	["build", "울타리나 스프링클러를 설치해보자"],
 	["fish", "마을 남쪽 낚시터(부두)에서 물고기를 낚자"],
-	["shop", "이장에게 「마을 발전」을 이야기해 잡화점을 세우자"],
+	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
 # 목표 달성 시 해금되는 도구
 # 목표를 달성하면 다음 단계에서 쓸 도구가 열린다 (순서와 어긋나지 않게)
@@ -1456,6 +1483,7 @@ func reset_all() -> void:
 	tutorial = fresh_tutorial()
 	grandpa_step = 0
 	grandpa_seen = false
+	breed_level = 0
 	fest_history = []
 	reset_festival_state()
 	owned_gear = []
@@ -1463,7 +1491,8 @@ func reset_all() -> void:
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
 	tree_regrow = []
-	village_built = []
+	# 마을은 처음부터 다 세워져 있다 (건물을 하나씩 짓는 단계는 없앴다)
+	village_built = ALL_VILLAGE_PLOTS.duplicate()
 	house_lv = 0
 	has_bed = false
 	explored = {}
@@ -1667,6 +1696,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
+		"breed_level": breed_level,
 		"fest_history": fest_history,
 		"owned_gear": owned_gear,
 		"equipped": equipped,
