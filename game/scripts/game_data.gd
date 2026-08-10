@@ -570,12 +570,13 @@ func fish_wait_mult() -> float:
 
 # 벌목/채광 레벨에 따른 추가 획득 확률
 func bonus_drop_chance(id: String) -> float:
-	# 숙련도 + 장비 행운 (행운 1당 +3%p)
-	return 0.06 * (skill_lv(id) - 1) + total_luck() * 0.03
+	# 숙련도 + 장비 행운 (행운 1당 +3%p) + 오늘의 약효
+	var base := 0.06 * (skill_lv(id) - 1) + total_luck() * 0.03
+	return base + (0.15 if has_potion("luck") else 0.0)
 
 
 func combat_bonus() -> float:
-	return 0.5 * (skill_lv("combat") - 1)
+	return 0.5 * (skill_lv("combat") - 1) + (3.0 if has_potion("ember") else 0.0)
 
 
 func cook_energy_mult() -> float:
@@ -801,12 +802,16 @@ func player_idle_tex(dirn: String) -> String:
 	return player_tex(dirn + "_idle")
 
 
+# 이동 속도 보정 (펫 + 바람 물약)
 func pet_speed_mult() -> float:
-	return 1.1 if active_pet == "dog" else 1.0
+	var m := 1.1 if active_pet == "dog" else 1.0
+	return m * (1.25 if has_potion("swift") else 1.0)
 
 
+# 동굴에서 받는 피해 배율 (펫 + 수호 물약)
 func pet_cave_def_mult() -> float:
-	return 0.75 if active_pet == "owl" else 1.0
+	var m := 0.75 if active_pet == "owl" else 1.0
+	return m * (0.6 if has_potion("guard") else 1.0)
 
 
 # ---- 동물 ----
@@ -858,12 +863,23 @@ const ITEMS := {
 	"ghost_essence": {"name": "유령의 정수", "sell": 0, "legend": true},
 	"golden_egg": {"name": "황금 달걀", "sell": 0, "legend": true},
 	"memory_piece": {"name": "할아버지의 기억 조각", "sell": 0, "legend": true},
+	# 연금술 결과물 (조합대에서 만든다)
+	"potion_energy": {"name": "원기 물약", "sell": 180},
+	"potion_luck": {"name": "행운의 물", "sell": 220},
+	"potion_swift": {"name": "바람 물약", "sell": 200},
+	"potion_ember": {"name": "불꽃 물약", "sell": 240},
+	"potion_grow": {"name": "성장 물약", "sell": 260},
+	"potion_guard": {"name": "수호 물약", "sell": 260},
+	"potion_moon": {"name": "달빛의 물", "sell": 400},
+	"sludge": {"name": "탁한 앙금", "sell": 5},
 }
 const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
 	"ore", "gem", "star_shard", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
 	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
-	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece"]
+	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
+	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
+	"potion_guard", "potion_moon", "sludge"]
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
 const FORAGE_IDS := ["forage_berry", "forage_herb"]
@@ -887,6 +903,198 @@ const LEGENDS := [
 	["golden_egg", "목장", "사랑받은 닭은 아주 가끔 황금빛 알을 낳는다."],
 	["memory_piece", "교류", "마을 사람과 마음이 통하면(호감도 100) 건네받게 될 것."],
 ]
+
+# ---- 연금술 (조합대) ----
+#
+# 요리는 「정해진 레시피를 보고 만드는」 것이고, 연금술은 그 반대다.
+# 재료마다 다섯 속성(빛/물/불/흙/생명)이 숨어 있고, 조합대에 **세 가지**를
+# 올려 돌리면 속성 합계로 결과가 정해진다. 조건에 맞는 조합법이 있으면
+# 물약이 나오면서 그 조합법을 **알아낸다**. 아니면 탁한 앙금만 남는다.
+#
+# 조합법을 손에 넣는 길은 두 가지다:
+#   1) 직접 실험해서 맞히기
+#   2) 나무·바위·몬스터에서 낡은 조합법이 드물게 나온다 (ALCHEMY_DROP)
+#
+# 새 물약을 넣을 때는 FORMULAS에 한 줄 + ITEMS에 한 줄이면 된다.
+const ELEMENTS := ["light", "water", "fire", "earth", "life"]
+const ELEMENT_NAMES := {
+	"light": "빛", "water": "물", "fire": "불", "earth": "흙", "life": "생명",
+}
+
+# 조합대에 올릴 수 있는 재료와 그 속성 (없는 속성은 0)
+# 작물은 CROPS의 id, 그 밖은 ITEMS의 id를 그대로 쓴다.
+const REAGENTS := {
+	# 작물
+	"potato": {"earth": 2},
+	"carrot": {"earth": 1, "life": 1},
+	"strawberry": {"life": 2, "water": 1},
+	"tomato": {"fire": 2, "life": 1},
+	"corn": {"light": 1, "earth": 1},
+	"watermelon": {"water": 3},
+	"pumpkin": {"earth": 2, "fire": 1},
+	"eggplant": {"earth": 1, "water": 1},
+	"cabbage": {"life": 2},
+	"winter_radish": {"earth": 2, "water": 1},
+	# 축산물 · 물고기
+	"egg": {"life": 2},
+	"milk": {"life": 1, "water": 1},
+	"fish_crucian": {"water": 2},
+	"fish_carp": {"water": 2, "life": 1},
+	"fish_catfish": {"water": 3, "earth": 1},
+	# 광물
+	"ore": {"earth": 2, "fire": 2},
+	"gem": {"light": 2, "fire": 1},
+	"star_shard": {"light": 3},
+	# 채집물 · 곤충
+	"forage_berry": {"life": 1, "water": 1},
+	"forage_herb": {"life": 2, "earth": 1},
+	"bug_butterfly": {"light": 1, "life": 1},
+	"bug_dragonfly": {"light": 1, "water": 1},
+	"bug_firefly": {"light": 2, "life": 1},
+}
+
+# 조합대에 올리는 재료 수 (고정)
+const ALCHEMY_SLOTS := 3
+
+# 조합법. need = 속성 합계가 이 값 **이상**이어야 한다.
+# 여러 조합법이 동시에 맞으면 **까다로운 쪽(need 합계가 큰 쪽)** 이 이긴다.
+# effect: drink(마시기)로 나타나는 효과. today = 그날 밤까지 이어지는 약효.
+const FORMULAS := {
+	"potion_energy": {
+		"name": "원기 물약", "need": {"life": 4},
+		"effect": "체력을 크게 회복한다 (+60)",
+		"note": "생명이 진하게 모이면 몸이 다시 움직인다.",
+	},
+	"potion_luck": {
+		"name": "행운의 물", "need": {"light": 3, "life": 2}, "today": "luck",
+		"effect": "오늘 하루 채집·채광 부산물이 더 나온다",
+		"note": "빛과 생명을 섞으면 손끝에 운이 붙는다.",
+	},
+	"potion_swift": {
+		"name": "바람 물약", "need": {"light": 2, "water": 3}, "today": "swift",
+		"effect": "오늘 하루 이동 속도 +25%",
+		"note": "물이 빛을 타고 흐르면 발이 가벼워진다.",
+	},
+	"potion_ember": {
+		"name": "불꽃 물약", "need": {"fire": 4, "earth": 2}, "today": "ember",
+		"effect": "오늘 하루 전투 공격력 +3",
+		"note": "땅속의 불을 그러모으면 팔에 힘이 실린다.",
+	},
+	"potion_guard": {
+		"name": "수호 물약", "need": {"earth": 5, "fire": 2}, "today": "guard",
+		"effect": "오늘 하루 동굴에서 받는 피해 -40%",
+		"note": "굳은 땅은 무엇도 뚫지 못한다.",
+	},
+	"potion_grow": {
+		"name": "성장 물약", "need": {"life": 3, "water": 3, "earth": 2}, "today": "grow",
+		"effect": "오늘 하루 작물이 20% 빨리 자란다",
+		"note": "생명·물·흙. 밭에 필요한 것은 결국 이 셋뿐이다.",
+	},
+	"potion_moon": {
+		"name": "달빛의 물", "need": {"light": 6, "water": 2}, "today": "luck",
+		"effect": "밭 전체에 물을 주고, 오늘 하루 행운이 붙는다",
+		"note": "달빛을 병에 담을 수 있다면. 별빛 조각이 필요할 것이다.",
+	},
+}
+const FORMULA_IDS := ["potion_energy", "potion_luck", "potion_swift", "potion_ember",
+	"potion_guard", "potion_grow", "potion_moon"]
+const ALCHEMY_FAIL := "sludge"
+const POTION_ENERGY_HEAL := 60.0
+
+# 낡은 조합법이 나올 확률 (아직 모르는 것이 남아 있을 때만)
+const ALCHEMY_DROP := {"tree": 0.03, "rock": 0.03, "bigrock": 0.12, "mob": 0.06}
+
+var alchemy_known: Array = []   # 알아낸 조합법 id
+var alchemy_brews := {}         # 조합법 id -> 만든 횟수
+var alchemy_fails := 0          # 실패해서 앙금만 남은 횟수
+var potion_today := {}          # 오늘 걸린 약효 (key -> true, 자고 나면 사라진다)
+
+
+func reagent_elements(id: String) -> Dictionary:
+	return REAGENTS.get(id, {})
+
+
+# 조합대에 올린 재료들의 속성 합계
+func mix_elements(ids: Array) -> Dictionary:
+	var sum := {}
+	for e in ELEMENTS:
+		sum[e] = 0
+	for id: String in ids:
+		var el: Dictionary = reagent_elements(id)
+		for e: String in el:
+			sum[e] = int(sum[e]) + int(el[e])
+	return sum
+
+
+func _need_total(id: String) -> int:
+	var t := 0
+	for e: String in FORMULAS[id].need:
+		t += int(FORMULAS[id].need[e])
+	return t
+
+
+# 이 속성 합계로 만들어지는 조합법 ("" = 실패).
+# 조건을 만족하는 것이 여럿이면 가장 까다로운 쪽이 나온다.
+func match_formula(ids: Array) -> String:
+	var sum := mix_elements(ids)
+	var best := ""
+	var best_total := -1
+	for fid: String in FORMULA_IDS:
+		var ok := true
+		for e: String in FORMULAS[fid].need:
+			if int(sum.get(e, 0)) < int(FORMULAS[fid].need[e]):
+				ok = false
+				break
+		if not ok:
+			continue
+		var t := _need_total(fid)
+		if t > best_total:
+			best_total = t
+			best = fid
+	return best
+
+
+func knows_formula(id: String) -> bool:
+	return alchemy_known.has(id)
+
+
+func learn_formula(id: String) -> bool:
+	if not FORMULAS.has(id) or alchemy_known.has(id):
+		return false
+	alchemy_known.append(id)
+	return true
+
+
+func unknown_formulas() -> Array:
+	var out: Array = []
+	for fid: String in FORMULA_IDS:
+		if not alchemy_known.has(fid):
+			out.append(fid)
+	return out
+
+
+# 조합법에 필요한 속성을 사람이 읽는 글로
+func formula_need_text(id: String) -> String:
+	var parts: Array[String] = []
+	for e: String in FORMULAS[id].need:
+		parts.append("%s %d+" % [ELEMENT_NAMES[e], int(FORMULAS[id].need[e])])
+	return " · ".join(parts)
+
+
+# ---- 약효 (오늘 하루) ----
+
+func has_potion(key: String) -> bool:
+	return bool(potion_today.get(key, false))
+
+
+func potion_text() -> String:
+	var parts: Array[String] = []
+	for fid: String in FORMULA_IDS:
+		var key: String = str(FORMULAS[fid].get("today", ""))
+		if key != "" and has_potion(key):
+			parts.append(str(FORMULAS[fid].name))
+	return " · ".join(parts)
+
 
 # ---- 광산 깊이 ----
 #
@@ -929,8 +1137,10 @@ var riding := false
 var horse_tile := Vector2i(14, 12)   # 세워 둔 자리
 
 
+# 작물 성장에 걸리는 시간 배율 (씨앗 개량 + 성장 물약. 작을수록 빨리 자란다)
 func breed_grow_mult() -> float:
-	return 1.0 - 0.12 * breed_level     # 한 단계마다 성장 12% 단축
+	var m := 1.0 - 0.12 * breed_level   # 한 단계마다 성장 12% 단축
+	return m * (0.8 if has_potion("grow") else 1.0)
 
 
 func breed_price_mult() -> float:
@@ -1467,6 +1677,7 @@ func reset_daily() -> void:
 	today_harvest = 0
 	today_earned = 0
 	today_spent = 0
+	potion_today = {}   # 약효는 그날 밤까지만 간다
 
 
 # 새 게임 시작 시 전체 초기화 (오토로드는 씬 전환에도 유지되므로 필수)
@@ -1492,6 +1703,10 @@ func reset_all() -> void:
 	produce_silver = {}
 	produce_gold = {}
 	barn_built = false
+	alchemy_known = []
+	alchemy_brews = {}
+	alchemy_fails = 0
+	potion_today = {}
 	owned_pets = []
 	active_pet = ""
 	for id in CROP_IDS:
@@ -1733,6 +1948,10 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity": affinity,
 		"quest": quest,
 		"tutorial": tutorial,
+		"alchemy_known": alchemy_known,
+		"alchemy_brews": alchemy_brews,
+		"alchemy_fails": alchemy_fails,
+		"potion_today": potion_today,
 		"breed_level": breed_level,
 		"greenhouse_built": greenhouse_built,
 		"has_horse": has_horse,

@@ -638,6 +638,14 @@ func _item_entries() -> Array:
 			e["tab"] = "food"
 			e["color"] = Color(1.0, 0.75, 0.4)
 			e["desc"] = "요리 — 먹으면 체력을 회복한다"
+		elif id.begins_with("potion_"):
+			e["tab"] = "food"
+			e["color"] = Color(0.75, 0.7, 1.0)
+			e["desc"] = "연금술 물약 — 집 조합대에서 마신다 (%s)" \
+				% str(GameData.FORMULAS[id].effect)
+		elif id == "sludge":
+			e["color"] = Color(0.6, 0.56, 0.5)
+			e["desc"] = "조합에 실패해 남은 앙금. 팔면 푼돈은 된다"
 		elif id in ["ore", "gem", "star_ore", "ghost_essence"]:
 			e["color"] = Color(0.8, 0.8, 0.9)
 			e["desc"] = "동굴에서 얻었다"

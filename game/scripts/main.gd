@@ -74,6 +74,7 @@ var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
 var interior: CanvasLayer
 var cooking_ui: CanvasLayer
+var alchemy_ui: CanvasLayer
 var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
@@ -128,6 +129,9 @@ const TEXTURE_NAMES := [
 	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
+	# 연금술 물약 (조합대 결과물)
+	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
+	"potion_grow", "potion_guard", "potion_moon", "sludge",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
 	"pet_dog_0", "pet_dog_1", "pet_cat_0", "pet_cat_1",
 	"pet_owl_0", "pet_owl_1", "pet_rabbit_0", "pet_rabbit_1",
@@ -433,6 +437,9 @@ func _ready() -> void:
 	cooking_ui = preload("res://scripts/cooking_ui.gd").new()
 	cooking_ui.main = self
 	add_child(cooking_ui)
+	alchemy_ui = preload("res://scripts/alchemy_ui.gd").new()
+	alchemy_ui.main = self
+	add_child(alchemy_ui)
 
 	quest_ui = preload("res://scripts/quest_ui.gd").new()
 	quest_ui.main = self
@@ -1385,7 +1392,7 @@ func ui_open() -> bool:
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or (shop_room != null and shop_room.visible) \
-		or cooking_ui.visible or quest_ui.visible or note_ui.visible \
+		or cooking_ui.visible or alchemy_ui.visible or quest_ui.visible or note_ui.visible \
 		or stats_ui.visible or _name_layer != null or _gift_layer != null \
 		or (story_layer != null and story_layer.visible)
 
@@ -1762,6 +1769,7 @@ func use_tool() -> void:
 					GameData.wood += wood_got
 					GameData.trees_chopped += 1
 					hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
+					_maybe_drop_recipe("tree")
 					# 길목을 뚫었다면 진행도를 갱신한다
 					if story_gate:
 						var before_gates := int(GameData.story_gates_left)
@@ -1811,6 +1819,7 @@ func use_tool() -> void:
 						stone_got += 1
 					GameData.stone += stone_got
 					hud.show_message("돌을 캤다! 석재 +%d" % stone_got)
+					_maybe_drop_recipe("rock")
 					tutorial_notify("mine")
 					gain_skill("mine", 6.0)
 				else:
@@ -1824,6 +1833,7 @@ func use_tool() -> void:
 					_remove_object(t)
 					GameData.stone += BIGROCK_STONE
 					hud.show_message("커다란 바위를 캐냈다! 돌 +%d" % BIGROCK_STONE)
+					_maybe_drop_recipe("bigrock")
 					gain_skill("mine", 4.0)
 					_story_rock_mined()
 				else:
@@ -3428,7 +3438,7 @@ func tutorial_notify(flag: String) -> void:
 			return
 	tut["active"] = false
 	dialog.open("기본 안내 완료!",
-		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nE: 상호작용 (대화/가게 들어가기/취침/쓰다듬기)\nF: 말 타기 / Tab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n사고 파는 일은 마을 가게 **안** 계산대에서 E.\n주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
+		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nE: 상호작용 (대화/가게 들어가기/취침/쓰다듬기)\nF: 말 타기 / Tab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n집 안 **조합대(E)** 에서는 연금술을 할 수 있다.\n사고 파는 일은 마을 가게 **안** 계산대에서 E.\n주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
 		[["좋아!", _open_grandpa_letter]])
 
 
@@ -4324,6 +4334,12 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
+	GameData.alchemy_known = d.get("alchemy_known", [])
+	for k in d.get("alchemy_brews", {}):
+		GameData.alchemy_brews[k] = int(d.alchemy_brews[k])
+	GameData.alchemy_fails = int(d.get("alchemy_fails", 0))
+	for k in d.get("potion_today", {}):
+		GameData.potion_today[k] = bool(d.potion_today[k])
 	GameData.breed_level = int(d.get("breed_level", 0))
 	GameData.greenhouse_built = bool(d.get("greenhouse_built", false))
 	GameData.has_horse = bool(d.get("has_horse", false))
@@ -5484,7 +5500,73 @@ func _debug_tick() -> void:
 			print("MIGRATE_OK=", left.is_empty()
 					and objects.get(BARN_POS, {}).get("kind", "") == "barn",
 				" leftovers=", left, " player_free=", is_passable(player_tile()))
-		358: get_tree().quit()
+		358:
+			# 연금술: 실험 -> 발견 -> 약효 -> 조합법 드랍
+			GameData.alchemy_known = []
+			GameData.alchemy_brews = {}
+			GameData.potion_today = {}
+			for rid: String in GameData.REAGENTS:
+				if GameData.CROPS.has(rid):
+					GameData.produce[rid] = 20
+				else:
+					GameData.items[rid] = 20
+			for fid: String in GameData.FORMULA_IDS:
+				GameData.items[fid] = 0
+			# 모든 조합법이 실제로 만들 수 있는 조합을 가지고 있는가
+			# (표만 고치고 재료를 안 넣으면 영영 못 만드는 조합법이 생긴다)
+			alchemy_ui.main = self
+			var unreachable := []
+			for fid: String in GameData.FORMULA_IDS:
+				if alchemy_ui._auto_pick(fid).is_empty():
+					unreachable.append(fid)
+			print("ALCHEMY_REACHABLE_OK=", unreachable.is_empty(),
+				" unreachable=", unreachable)
+			# 실패 조합: 물만 잔뜩 넣으면 아무것도 안 나와야 한다
+			var dud := GameData.match_formula(["potato", "potato", "potato"])
+			# 발견: 원기 물약 (생명 4 이상)
+			var trio := ["egg", "egg", "cabbage"]
+			var got := GameData.match_formula(trio)
+			do_brew(trio)
+			print("ALCHEMY_BREW: dud=\"", dud, "\" got=", got,
+				" learned=", GameData.knows_formula("potion_energy"),
+				" bottles=", int(GameData.items["potion_energy"]))
+		360:
+			dialog.close()
+			# 약효: 바람 물약을 마시면 이동 속도 배율이 오른다
+			var spd0: float = GameData.pet_speed_mult()
+			GameData.learn_formula("potion_swift")
+			GameData.items["potion_swift"] = 1
+			do_drink("potion_swift")
+			print("POTION_BUFF: speed ", spd0, " -> ", GameData.pet_speed_mult(),
+				" luck=", GameData.bonus_drop_chance("mine"))
+			GameData.reset_daily()
+			print("POTION_CLEAR_OK=", not GameData.has_potion("swift"))
+			# 조합법 드랍: 확률을 1로 올려 실제로 습득되는지 본다
+			GameData.alchemy_known = ["potion_energy"]
+			var before_n: int = GameData.alchemy_known.size()
+			for i in 40:
+				_maybe_drop_recipe("bigrock")
+			print("RECIPE_DROP_OK=", GameData.alchemy_known.size() > before_n,
+				" known=", GameData.alchemy_known.size(), "/", GameData.FORMULA_IDS.size())
+			for fid2: String in GameData.FORMULA_IDS:
+				GameData.learn_formula(fid2)
+				GameData.items[fid2] = 2
+			# 마지막 연금술 버튼이 조합대에 살아 있는지 (연구 노트에서 옮겼다)
+			for leg in GameData.LEGENDS:
+				GameData.items[leg[0]] = 1
+			print("FINAL_ALCHEMY_OK=", GameData.can_final_alchemy(),
+				" legends=", GameData.legends_owned(), "/", GameData.LEGENDS.size())
+			interior.open()
+			alchemy_ui.open()
+		362: _save_shot("_alchemy.png")
+		363:
+			alchemy_ui.close()
+			interior.close()
+			note_ui.toggle()
+			note_ui.scroll.scroll_vertical = 1120   # 연금술 페이지까지 내린다
+		365: _save_shot("_note2.png")
+		366: note_ui.close()
+		368: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -5765,6 +5847,7 @@ func _req_feed(index: int) -> void:
 # 몬스터 처치 기록 (도감용)
 func record_kill(mob: String) -> void:
 	GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
+	_maybe_drop_recipe("mob")
 	if Net.is_guest():
 		_req_kill.rpc_id(1, mob)
 	elif Net.is_host():
@@ -5824,6 +5907,89 @@ func _req_cook(id: String) -> void:
 		return
 	if GameData.RECIPES.has(id) and GameData.cook(id):
 		_broadcast_stats()
+
+
+# ---- 연금술 (집 안 조합대) ----
+#
+# 재료 3가지를 올리고 돌린다. 속성 합계가 어느 조합법의 조건을 넘으면
+# 그 물약이 나오고 조합법을 알아낸다. 아니면 탁한 앙금만 남는다.
+# 재료는 성공하든 실패하든 없어진다 — 실험에는 값이 따른다.
+func do_brew(ids: Array) -> void:
+	if ids.size() != GameData.ALCHEMY_SLOTS:
+		return
+	for id: String in ids:
+		if GameData.ingredient_count(id) <= 0:
+			hud.show_message("재료가 부족하다.")
+			return
+	for id: String in ids:
+		if GameData.CROPS.has(id):
+			GameData.consume_produce(id, 1)
+		else:
+			GameData.items[id] -= 1
+	var fid := GameData.match_formula(ids)
+	if fid == "":
+		GameData.items[GameData.ALCHEMY_FAIL] += 1
+		GameData.alchemy_fails += 1
+		Sound.play_sfx("sfx_ui")
+		hud.show_message("탁한 앙금만 남았다... 속성이 모자란 것 같다.", 3.5)
+		return
+	GameData.items[fid] += 1
+	GameData.alchemy_brews[fid] = int(GameData.alchemy_brews.get(fid, 0)) + 1
+	Sound.play_sfx("sfx_buy")
+	if GameData.learn_formula(fid):
+		# 처음 맞힌 순간이 이 시스템의 알맹이다 — 크게 알린다
+		hud.quest_toast("새 조합법 발견!")
+		dialog.open("연금술 — 새 조합법",
+			"**%s** 을(를) 만들어냈다!\n\n%s\n\n필요한 속성: %s\n조합법이 연구 노트(N)에 적혔다."
+				% [GameData.FORMULAS[fid].name, GameData.FORMULAS[fid].effect,
+				GameData.formula_need_text(fid)],
+			[["좋아", null]])
+	else:
+		hud.show_message("'%s' 완성!" % GameData.FORMULAS[fid].name)
+	gain_skill("cook", 6.0)
+	save_now()
+
+
+# 물약 마시기: 즉효 + 그날 밤까지 가는 약효
+func do_drink(fid: String) -> void:
+	if int(GameData.items[fid]) <= 0:
+		return
+	GameData.items[fid] -= 1
+	var def: Dictionary = GameData.FORMULAS[fid]
+	Sound.play_sfx("sfx_harvest")
+	if fid == "potion_energy":
+		GameData.energy = minf(GameData.ENERGY_MAX,
+			GameData.energy + GameData.POTION_ENERGY_HEAL)
+	elif fid == "potion_moon":
+		var wet := 0
+		for y in MAP_H:
+			for x in MAP_W:
+				var cell: Dictionary = grid[y][x]
+				if cell.ground == "soil" and not cell.watered:
+					_wet(cell, WET_ALL_DAY)
+					wet += 1
+		hud.show_message("달빛이 밭 %d칸을 적셨다." % wet, 3.0)
+	var key: String = str(def.get("today", ""))
+	if key != "":
+		GameData.potion_today[key] = true
+	hud.show_message("%s을(를) 마셨다 — %s" % [def.name, def.effect], 4.0)
+	queue_redraw()
+
+
+# 나무·바위·몬스터에서 아주 가끔 나오는 「낡은 조합법」.
+# 실험으로 직접 맞히는 길 말고, 돌아다니다 얻는 두 번째 길이다.
+func _maybe_drop_recipe(source: String) -> void:
+	var left: Array = GameData.unknown_formulas()
+	if left.is_empty():
+		return
+	if randf() >= float(GameData.ALCHEMY_DROP.get(source, 0.0)):
+		return
+	var fid: String = left[randi() % left.size()]
+	GameData.learn_formula(fid)
+	Sound.play_sfx("sfx_ui")
+	hud.quest_toast("낡은 조합법을 주웠다")
+	hud.show_message("「%s」 조합법을 알아냈다! (%s) — 집 조합대에서 만들 수 있다"
+		% [GameData.FORMULAS[fid].name, GameData.formula_need_text(fid)], 5.0)
 
 
 func do_eat(id: String) -> void:

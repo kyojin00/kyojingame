@@ -5,6 +5,8 @@ const ROOM := Rect2(120, 75, 720, 390)  # 방 전체 (벽 포함)
 const FLOOR_TOP := 156.0                # 벽 아래부터 바닥
 const BED := Rect2(156, 162, 69, 99)
 const KITCHEN := Rect2(600, 117, 93, 39)  # 조리대 (윗벽에 붙박이)
+# 연금술 조합대 (윗벽, 조리대 반대편). 왼쪽 창문(x 270~330)을 가리지 않는 자리다.
+const ALCHEMY := Rect2(345, 117, 108, 39)
 const EXIT_X := Vector2(408, 552)       # 아랫벽 문 구간
 const GRID := 12.0                      # 꾸미기 배치 격자
 
@@ -143,13 +145,16 @@ func _can_place(f: Dictionary) -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or main.dialog.visible or main.sleep_dialog.visible \
-			or main.cooking_ui.visible:
+			or main.cooking_ui.visible or main.alchemy_ui.visible:
 		return
 	if deco_mode:
 		_deco_input(event)
 		return
 	if event.is_action_pressed("interact"):
-		if (ppos - KITCHEN.get_center()).length() < 69.0:
+		if (ppos - ALCHEMY.get_center()).length() < 75.0:
+			main.alchemy_ui.open()
+			get_viewport().set_input_as_handled()
+		elif (ppos - KITCHEN.get_center()).length() < 69.0:
 			if GameData.house_lv >= 2:
 				main.cooking_ui.open()
 			else:
@@ -174,7 +179,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					["닫기", null],
 				])
 		else:
-			main.hud.show_message("침대 E: 잠자기 · 조리대 E: 요리 · F: 꾸미기")
+			main.hud.show_message("침대 E: 잠자기 · 조리대 E: 요리 · 조합대 E: 연금술 · F: 꾸미기")
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and _key_of(event) == KEY_F:
 		if GameData.house_lv < 2:
@@ -381,6 +386,28 @@ func _draw_room() -> void:
 		y += h
 		row += 1
 
+	# 연금술 조합대 (고정) — 할아버지가 쓰던 자리
+	canvas.draw_rect(ALCHEMY, Color(0.34, 0.28, 0.42))
+	canvas.draw_rect(Rect2(ALCHEMY.position, Vector2(ALCHEMY.size.x, 6)),
+		Color(0.5, 0.44, 0.62))
+	# 증류기(가운데) + 양옆 플라스크 세 병
+	canvas.draw_rect(Rect2(ALCHEMY.position.x + 46, ALCHEMY.position.y - 16, 16, 17),
+		Color(0.72, 0.76, 0.8))
+	canvas.draw_rect(Rect2(ALCHEMY.position.x + 49, ALCHEMY.position.y - 8, 10, 8),
+		Color(0.55, 0.35, 0.7))
+	canvas.draw_rect(Rect2(ALCHEMY.position.x + 51, ALCHEMY.position.y - 22, 6, 6),
+		Color(0.62, 0.66, 0.72))
+	var vials := [Color(0.9, 0.4, 0.38), Color(0.4, 0.75, 0.5), Color(0.45, 0.65, 0.95)]
+	for i in 3:
+		var vx: float = ALCHEMY.position.x + 10.0 + i * 14.0
+		canvas.draw_rect(Rect2(vx, ALCHEMY.position.y - 11, 7, 12), Color(0.78, 0.82, 0.86))
+		canvas.draw_rect(Rect2(vx, ALCHEMY.position.y - 5, 7, 6), vials[i])
+	# 펼쳐 둔 노트
+	canvas.draw_rect(Rect2(ALCHEMY.end.x - 26, ALCHEMY.position.y + 1, 20, 5),
+		Color(0.9, 0.86, 0.72))
+	canvas.draw_rect(Rect2(ALCHEMY.end.x - 17, ALCHEMY.position.y + 1, 1, 5),
+		Color(0.6, 0.5, 0.36))
+
 	# 주방 조리대 (고정)
 	canvas.draw_rect(KITCHEN, Color(0.52, 0.36, 0.22))
 	canvas.draw_rect(Rect2(KITCHEN.position, Vector2(KITCHEN.size.x, 6)), Color(0.72, 0.7, 0.68))
@@ -426,7 +453,7 @@ func _draw_room() -> void:
 	if deco_mode:
 		_draw_deco_ui()
 	else:
-		var guide := "E: 잠자기/요리 · F: 꾸미기 · 아랫문: 나가기"
+		var guide := "E: 잠자기/요리/연금술 · F: 꾸미기 · 아랫문: 나가기"
 		if not GameData.has_bed:
 			guide = "침대 자리 E: 침대 만들기 · 아랫문: 나가기"
 		elif GameData.house_lv < 2:

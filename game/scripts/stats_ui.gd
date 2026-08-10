@@ -144,6 +144,19 @@ func _rebuild() -> void:
 	_line("  행운은 품질·추가 수확, 이동 속도는 걷는 속도에 그대로 적용된다.",
 		Color(0.62, 0.58, 0.75))
 
+	# 오늘 마신 물약 — 하루 종일 가는 효과라 어딘가에 보여야 한다
+	_line("")
+	var buff: String = GameData.potion_text()
+	if buff != "":
+		_line("[오늘의 약효] %s" % buff, Color(0.7, 0.9, 0.75))
+		for fid: String in GameData.FORMULA_IDS:
+			var key: String = str(GameData.FORMULAS[fid].get("today", ""))
+			if key != "" and GameData.has_potion(key):
+				_line("  %s" % GameData.FORMULAS[fid].effect, Color(0.62, 0.58, 0.75))
+	else:
+		_line("[오늘의 약효] 없음 — 집 조합대에서 물약을 만들어 마셔 보자",
+			Color(0.62, 0.58, 0.75))
+
 	_line("")
 	if GameData.active_pet != "":
 		var pdef: Dictionary = GameData.PETS[GameData.active_pet]

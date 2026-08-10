@@ -4,6 +4,7 @@ extends CanvasLayer
 
 var main: Node2D
 var items_box: VBoxContainer
+var scroll: ScrollContainer
 var _refresh_timer := 0.0
 
 
@@ -34,7 +35,7 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
 
-	var scroll := ScrollContainer.new()
+	scroll = ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(510, 306)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
@@ -155,6 +156,21 @@ func _rebuild() -> void:
 		else:
 			_line("  ??? — 조리대에서 실험해 보자", DIM)
 
+	# 연금술 (조합대에서 알아낸 것)
+	_line("")
+	_head("[연금술 조합법]")
+	for fid in GameData.FORMULA_IDS:
+		var def: Dictionary = GameData.FORMULAS[fid]
+		if GameData.knows_formula(fid):
+			var made := int(GameData.alchemy_brews.get(fid, 0))
+			_line("  %s — %s" % [def.name, GameData.formula_need_text(fid)])
+			_line("   \"%s\"" % def.note, Color(0.35, 0.27, 0.16))
+			_line("   %s (지금까지 %d병)" % [def.effect, made], DIM)
+		else:
+			_line("  ??? — 재료 셋을 조합대에 올려 실험해 보자", DIM)
+	if GameData.alchemy_fails > 0:
+		_line("  (실패해서 앙금만 남은 적: %d번)" % GameData.alchemy_fails, DIM)
+
 	# 주민 이야기
 	_line("")
 	_head("[주민 이야기]")
@@ -198,16 +214,12 @@ func _rebuild() -> void:
 		_line("")
 		_head("[마지막 연금술]")
 		_line("  일곱 재료: %d / %d" % [GameData.legends_owned(), GameData.LEGENDS.size()])
-		var b := Button.new()
-		b.text = "연구실 책상에서 마지막 연금술을 시작한다"
-		b.focus_mode = Control.FOCUS_NONE
-		b.disabled = not GameData.can_final_alchemy()
-		b.pressed.connect(func() -> void:
-			close()
-			main.show_ending())
-		items_box.add_child(b)
+		if GameData.can_final_alchemy():
+			_line("  모두 모았다. **집 조합대**에서 마지막 연금술을 시작할 수 있다.", GOLD)
+		else:
+			_line("  일곱이 다 모이면 집 조합대에서 마지막 연금술을 시작할 수 있다.", DIM)
 	elif GameData.ending_seen:
 		_line("")
 		_head("[유니콘의 뿔]")
-		_line("  세상에 단 하나뿐인 뿔이 연구실에서 빛나고 있다.", GOLD)
+		_line("  세상에 단 하나뿐인 뿔이 집 조합대 위에서 빛나고 있다.", GOLD)
 		_line("  할아버지의 꿈은 완성되었다. 이야기는 계속된다.", DIM)
