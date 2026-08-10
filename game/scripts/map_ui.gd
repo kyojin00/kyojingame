@@ -212,7 +212,7 @@ func _draw_map() -> void:
 	# 시설 라벨 (그 위치를 발견했을 때만)
 	_place_label(63, 3, "우리집")
 	_place_label(74, 13, "중앙 광장")
-	_place_label(74, 30, "낚시터")
+	_place_label(74, 34, "낚시터")
 	_place_label(40, 27, "호수")
 	_place_label(50, 1, "동굴")
 	# 지어진 마을 건물만 이름을 보여준다 (빈 부지는 표시하지 않는다)

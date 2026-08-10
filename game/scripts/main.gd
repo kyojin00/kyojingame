@@ -183,27 +183,27 @@ const GREENHOUSE_COST_MONEY := 5000
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
 # 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
-const VILLAGE_REGION := Rect2i(60, 0, 30, 34)   # 건물 사이를 넓히려고 남쪽으로 늘렸다
+const VILLAGE_REGION := Rect2i(60, 0, 30, 38)   # 건물 사이를 넓히려고 남쪽으로 늘렸다
 const ROAD := Rect2i(30, 8, 30, 2)         # 농장/숲 -> 마을 공용 길
 const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 큰길 (2칸)
 const PLAZA := Rect2i(68, 12, 14, 10)      # 중앙 광장 (아주 넓은 평지)
 const FOUNTAIN := Rect2i(73, 15, 4, 4)     # 광장 중앙 분수
 const FOUNTAIN_DECO := Vector2i(74, 17)    # 분수 조형물 (분수 한가운데)
-const VILLAGE_RIVER_Y := 31                # 마을 남쪽 외곽을 흐르는 강 (2칸)
-const DOCK_Y := 30                         # 강가 낚시터(부두)
+const VILLAGE_RIVER_Y := 35                # 마을 남쪽 외곽을 흐르는 강 (2칸)
+const DOCK_Y := 34                         # 강가 낚시터(부두)
 # ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
 # 강을 따라 길게 깔린 나무 데크 + 물 쪽으로 내민 부두 두 개 +
 # 강가 마당(표지판·가로등·벤치). 「낚시」 목표는 여기서 진행한다.
-const FISH_YARD_X0 := 67
-const FISH_YARD_X1 := 82
-const FISH_DECK_X0 := 68                   # 강 첫 줄(y=27)에 깔리는 데크
-const FISH_DECK_X1 := 81
-const FISH_PIERS := [Vector2i(70, 71), Vector2i(78, 79)]  # 물로 내민 부두 두 개 (x 구간)
-const FISH_SIGN := Vector2i(67, 29)
-const FISH_LAMPS := [Vector2i(69, 29), Vector2i(74, 29), Vector2i(80, 29)]
-const FISH_BENCHES := [Vector2i(72, 29), Vector2i(77, 29)]
-const FISH_SPOT := Rect2i(66, 27, 18, 7)   # 이 안이면 「낚시터에 있다」
-const FISH_CLEAR := Rect2i(64, 26, 22, 10) # 이 안에는 나무/돌을 두지 않는다
+const FISH_YARD_X0 := 68
+const FISH_YARD_X1 := 86
+const FISH_DECK_X0 := 69                   # 강 첫 줄(y=27)에 깔리는 데크
+const FISH_DECK_X1 := 85
+const FISH_PIERS := [Vector2i(70, 71), Vector2i(77, 78), Vector2i(83, 84)]  # 물로 내민 부두 (x 구간)
+const FISH_SIGN := Vector2i(68, 33)
+const FISH_LAMPS := [Vector2i(70, 32), Vector2i(76, 32), Vector2i(81, 32), Vector2i(86, 32)]
+const FISH_BENCHES := [Vector2i(73, 33), Vector2i(79, 33), Vector2i(84, 33)]
+const FISH_SPOT := Rect2i(67, 30, 21, 9)   # 이 안이면 「낚시터에 있다」
+const FISH_CLEAR := Rect2i(67, 29, 23, 11) # 이 안에는 나무/돌을 두지 않는다
 const BOARD_POS := Vector2i(77, 12)        # 광장 게시판 (오늘의 의뢰)
 const PLAZA_LAMPS := [Vector2i(69, 13), Vector2i(80, 13),
 	Vector2i(69, 20), Vector2i(80, 20)]
@@ -220,16 +220,16 @@ const HOME_SITE := Vector2i(63, 6)  # 집터 표지판 위치
 # 북쪽 한 줄 + 서/동 두 줄로 벌려 놓아 서로 붙어 보이지 않는다.
 const VILLAGE_PLOTS := {
 	# 북쪽 줄 (큰길 위쪽)
-	"post":    {"anchor": Vector2i(63, 3),  "name": "우체국"},
-	"general": {"anchor": Vector2i(71, 3),  "name": "잡화점"},
-	"lab":     {"anchor": Vector2i(79, 3),  "name": "연구소"},
+	"post":    {"anchor": Vector2i(61, 3),  "name": "우체국"},
+	"general": {"anchor": Vector2i(72, 3),  "name": "잡화점"},
+	"lab":     {"anchor": Vector2i(83, 3),  "name": "연구소"},
 	# 서쪽 줄 (서쪽 세로 길가)
 	"smith":   {"anchor": Vector2i(61, 10), "name": "대장간"},
-	"ranch":   {"anchor": Vector2i(61, 18), "name": "목장 상회"},
-	"inn":     {"anchor": Vector2i(61, 26), "name": "여관"},
+	"ranch":   {"anchor": Vector2i(61, 20), "name": "목장 상회"},
+	"inn":     {"anchor": Vector2i(61, 30), "name": "여관"},
 	# 동쪽 줄 (동쪽 세로 길가)
-	"library": {"anchor": Vector2i(84, 11), "name": "도서관"},
-	"fish":    {"anchor": Vector2i(84, 19), "name": "수산시장"},
+	"library": {"anchor": Vector2i(84, 12), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(84, 22), "name": "수산시장"},
 }
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
@@ -622,7 +622,7 @@ func _build_village() -> void:
 	# 서쪽·동쪽 건물 줄 앞을 지나는 세로 길 (마당 문이 여기로 붙는다)
 	for y in range(MAIN_STREET_Y, DOCK_Y):
 		grid[y][WEST_LANE_X].ground = "path"
-	for y in range(MAIN_STREET_Y, PLAZA.end.y + 2):
+	for y in range(MAIN_STREET_Y, DOCK_Y - 4):
 		grid[y][EAST_LANE_X].ground = "path"
 	# 광장 한가운데 분수
 	for y in range(FOUNTAIN.position.y, FOUNTAIN.end.y):
@@ -639,7 +639,7 @@ func _build_village() -> void:
 	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 나무 부두.
 	# 「낚시」 목표는 여기서 진행한다 (물가는 여러 곳이지만 낚시터는 여기 하나뿐).
 	for x in range(FISH_YARD_X0, FISH_YARD_X1 + 1):
-		for y in [DOCK_Y - 2, DOCK_Y - 1, DOCK_Y]:
+		for y in [DOCK_Y - 3, DOCK_Y - 2, DOCK_Y - 1, DOCK_Y]:
 			grid[y][x].ground = "path"
 	# 강 첫 줄에 데크를 길게 깔고, 거기서 부두 두 개를 물 쪽으로 내민다.
 	# 데크에서 아래를 보거나 부두 끝에서 좌우를 보고 낚싯대를 던진다.
@@ -668,7 +668,7 @@ func _build_village() -> void:
 		objects[p] = {"kind": "deco_bench", "hp": 0}
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
 	for x in range(60, 89):
-		for y in [1, 33]:
+		for y in [1, 37]:
 			var rim := Vector2i(x, y)
 			if grid[y][x].ground == "grass" and not objects.has(rim) \
 					and _hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
