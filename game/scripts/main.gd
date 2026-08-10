@@ -175,8 +175,27 @@ const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
 const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
 # ---- 탈 것 (말) ----
 #
-# 목장 상회에서 사면 농장에 말이 서 있다. E로 타면 훨씬 빨라지고,
-# 탄 동안에는 도구를 쓸 수 없다 (E를 누르면 내린다).
+# 목장 상회에서 사면 그 자리 근처에 말이 서 있다. **F로 타고 내린다.**
+# 탄 동안에는 도구를 쓸 수 없다.
+func toggle_ride() -> void:
+	if GameData.riding:
+		dismount_horse()
+		return
+	if not GameData.has_horse:
+		hud.show_message("아직 말이 없다. 목장 상회에서 살 수 있다.")
+		return
+	# 가까이 있는 말에 올라탄다 (정확히 그 칸에 서 있지 않아도 된다)
+	var here := player_tile()
+	for r in range(0, 3):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var t: Vector2i = here + Vector2i(dx, dy)
+				var o: Variant = objects.get(t)
+				if o != null and o.kind == "horse":
+					_mount_horse(t)
+					return
+	hud.show_message("말이 근처에 없다. 말을 세워 둔 곳으로 가자.")
+
 func _mount_horse(t: Vector2i) -> void:
 	objects.erase(t)
 	if obj_nodes.has(t):
@@ -184,17 +203,32 @@ func _mount_horse(t: Vector2i) -> void:
 		obj_nodes.erase(t)
 	GameData.riding = true
 	Sound.play_sfx("sfx_place")
-	hud.show_message("말에 올라탔다! E로 내린다.", 3.0)
+	hud.show_message("말에 올라탔다! F로 내린다.", 3.0)
 	queue_redraw()
 
 
 # 산 직후: 세워 둔 자리에 말을 놓는다
 func place_horse() -> void:
-	if objects.has(GameData.horse_tile):
-		return
-	objects[GameData.horse_tile] = {"kind": "horse", "hp": 0}
-	_spawn_object_node(GameData.horse_tile, "horse")
+	# 산 자리 근처의 빈 칸에 세운다.
+	# (예전에는 고정 자리에 두어, 그 칸이 막혀 있으면 말이 아예 나오지 않았다)
+	var spot := _free_spot_near(player_tile())
+	GameData.horse_tile = spot
+	objects[spot] = {"kind": "horse", "hp": 0}
+	_spawn_object_node(spot, "horse")
 	queue_redraw()
+
+
+# 이 칸 둘레에서 오브젝트가 없고 걸어갈 수 있는 자리를 찾는다
+func _free_spot_near(from: Vector2i) -> Vector2i:
+	for r in range(1, 6):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if absi(dx) != r and absi(dy) != r:
+					continue          # 껍질만 훑는다 (가까운 곳부터)
+				var t: Vector2i = from + Vector2i(dx, dy)
+				if not objects.has(t) and is_passable(t):
+					return t
+	return from
 
 
 func dismount_horse() -> void:
@@ -203,13 +237,7 @@ func dismount_horse() -> void:
 	GameData.riding = false
 	# 지금 자리 근처의 빈 칸에 말을 세운다
 	var here := player_tile()
-	var spot := here
-	if objects.has(spot):
-		for d: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0),
-				Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1)]:
-			if not objects.has(here + d) and is_passable(here + d):
-				spot = here + d
-				break
+	var spot: Vector2i = here if not objects.has(here) else _free_spot_near(here)
 	GameData.horse_tile = spot
 	objects[spot] = {"kind": "horse", "hp": 0}
 	_spawn_object_node(spot, "horse")
@@ -265,9 +293,10 @@ const PLAZA_LAMPS := [Vector2i(71, 15), Vector2i(84, 15),
 const PLAZA_BENCHES := [Vector2i(73, 19), Vector2i(73, 21),
 	Vector2i(83, 19), Vector2i(83, 21)]
 
-# 우리집: 스토리 1 완료 후 마을 서쪽 집터(E)에서 목재로 직접 짓는다
-const HOME_ANCHOR := Vector2i(61, 4)
-const HOME_SITE := Vector2i(63, 6)  # 집터 표지판 위치
+# 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
+# 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
+const HOME_ANCHOR := Vector2i(71, 28)
+const HOME_SITE := Vector2i(73, 30)  # 집터 표지판 (건물 그림 한가운데)
 
 # 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
 # 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.
@@ -573,9 +602,8 @@ func _build_map() -> void:
 	for y in range(28, 35):
 		for x in range(45, 53):
 			grid[y][x].ground = "water"
-	for y in range(34, 36):          # 강변 부지의 강
-		for x in range(60, 90):
-			grid[y][x].ground = "water"
+	# (y 34~35의 옛 개천은 없앴다 — 마을이 넓어지면서 광장 남쪽을 갈라 놓았다.
+	#  마을 강은 남쪽 외곽 VILLAGE_RIVER_Y 하나뿐이다)
 	for y in range(48, 54):          # 깊은 숲 연못
 		for x in range(70, 79):
 			grid[y][x].ground = "water"
@@ -1455,7 +1483,8 @@ func build_barn() -> void:
 	_block_under_art(Rect2i(BARN_POS.x - 1, BARN_POS.y - 1, 4, 2),
 		Rect2i(BARN_POS.x, BARN_POS.y, 2, 1))
 	Sound.play_sfx("sfx_place")
-	hud.show_message("축사 완공! 동물을 %d마리까지 키울 수 있다." % GameData.BARN_MAX_ANIMALS)
+	hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지."
+		% GameData.BARN_MAX_ANIMALS, 5.0)
 	if Net.is_host():
 		_broadcast_stats()
 
@@ -1903,6 +1932,32 @@ func _tool_target_nearby() -> Vector2i:
 	return best
 
 
+# 건물 이름표: 지붕 위에 작은 나무 간판을 걸어 어느 집인지 바로 알게 한다.
+# (가게 그림이 모두 같아서 이름이 없으면 구분이 되지 않는다)
+func _draw_building_signs() -> void:
+	var f: Font = UI_FONT_SMALL
+	for pid: String in GameData.village_built:
+		if not VILLAGE_PLOTS.has(pid):
+			continue
+		var a: Vector2i = VILLAGE_PLOTS[pid].anchor
+		_draw_name_plate(f, str(VILLAGE_PLOTS[pid].name),
+			Vector2((a.x + 2) * TILE + 16, a.y * TILE - 6))
+	if GameData.house_lv >= 1:
+		_draw_name_plate(f, "우리집",
+			Vector2((HOME_ANCHOR.x + 2) * TILE + 16, HOME_ANCHOR.y * TILE - 6))
+
+
+func _draw_name_plate(f: Font, text: String, at: Vector2) -> void:
+	var w: float = f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var box := Rect2(at.x - w / 2.0 - 5, at.y - 13, w + 10, 17)
+	overlay.draw_rect(box.grow(1), Color(0.24, 0.15, 0.08, 0.95))
+	overlay.draw_rect(box, Color(0.86, 0.7, 0.44, 0.96))
+	overlay.draw_rect(Rect2(box.position, Vector2(box.size.x, 3)),
+		Color(0.95, 0.82, 0.58, 0.96))
+	overlay.draw_string(f, Vector2(at.x - w / 2.0, at.y), text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.3, 0.18, 0.07))
+
+
 # 축제날 장식: 모이는 자리 위로 삼각 깃발 줄을 걸고 계절 색을 쓴다.
 # (아트를 새로 그리지 않고 도형만으로 「오늘은 다른 날」임을 알린다)
 const FEST_COLORS := {
@@ -1973,7 +2028,7 @@ func _blocking_object_tile() -> Vector2i:
 
 
 func interact() -> void:
-	# 말을 타고 있으면 E는 「내리기」다 (탄 채로는 일을 할 수 없다)
+	# 말을 타고 있으면 E도 「내리기」로 친다 (기본은 F)
 	if GameData.riding:
 		dismount_horse()
 		return
@@ -2097,7 +2152,7 @@ func interact() -> void:
 				[["알겠다", null]])
 			return
 		if obj.kind == "horse":
-			_mount_horse(t)
+			_mount_horse(t)   # 말 칸에서 E를 눌러도 탄다 (F가 기본)
 			return
 		if obj.kind == "cave":
 			_open_mine_dialog()
@@ -4533,6 +4588,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		set_tool("seed")
 	elif event.is_action_pressed("use_tool"):
 		use_tool()
+	elif event.is_action_pressed("mount"):
+		toggle_ride()
 	elif event.is_action_pressed("interact"):
 		interact()
 	elif event.is_action_pressed("open_shop"):
@@ -4738,6 +4795,7 @@ func _draw_overlay() -> void:
 	_draw_nav_arrow()
 	_draw_festival()
 	_draw_greenhouse()
+	_draw_building_signs()
 
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if player != null:
@@ -4819,7 +4877,7 @@ func _context_hint() -> Array:
 			"board":
 				return ["E: 의뢰 게시판", above_tile]
 			"horse":
-				return ["E: 말 타기", above_tile]
+				return ["F: 말 타기", above_tile]
 			"sign":
 				if t == FISH_SIGN:
 					return ["E: 낚시터 안내", above_tile]
@@ -5350,7 +5408,31 @@ func _debug_tick() -> void:
 			dismount_horse()
 			print("HORSE_DISMOUNT_OK=", not GameData.riding
 				and objects.has(GameData.horse_tile))
-		349: get_tree().quit()
+		349:
+			# 우리집 자리: 마을 건물 마당과 한 칸도 겹치면 안 된다
+			var home_yard := Rect2i(HOME_ANCHOR - Vector2i(YARD_PAD, YARD_PAD),
+				Vector2i(5 + YARD_PAD * 2, 4 + YARD_PAD * 2))
+			var clash := ""
+			for pid: String in VILLAGE_PLOTS:
+				var a: Vector2i = VILLAGE_PLOTS[pid].anchor
+				var yard := Rect2i(a - Vector2i(YARD_PAD, YARD_PAD),
+					Vector2i(5 + YARD_PAD * 2, 4 + YARD_PAD * 2))
+				if home_yard.intersects(yard):
+					clash += pid + " "
+			print("HOME_CLEAR_OK=", clash == "", " clash=", clash,
+				" plaza_overlap=", home_yard.intersects(PLAZA))
+			# 지어 놓고 바깥 모습도 남긴다 (이름표 확인)
+			GameData.house_lv = maxi(GameData.house_lv, 1)
+			_remove_object(HOME_SITE)
+			_fill_building(HOME_ANCHOR)
+			_spawn_house_node(HOME_ANCHOR)
+			GameData.day = 1                 # 봄으로 되돌려 눈 없이 찍는다
+			_apply_season_visuals()
+			player.position = Vector2((HOME_ANCHOR.x + 2) * TILE + 16,
+				(HOME_ANCHOR.y + 4) * TILE + 16)
+			(player.get_node("Camera") as Camera2D).reset_smoothing()
+		351: _save_shot("_home.png")
+		353: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

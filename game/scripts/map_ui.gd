@@ -48,8 +48,8 @@ func _ready() -> void:
 
 
 func open() -> void:
+	# 배율과 위치는 닫아도 그대로 둔다 (R로 처음 크기로 되돌린다)
 	visible = true
-	reset_view()
 	canvas.queue_redraw()
 
 
@@ -212,7 +212,13 @@ func _draw_map() -> void:
 			_dot(n.position, dot, Color(0.95, 0.55, 0.75))
 
 	# 시설 라벨 (그 위치를 발견했을 때만)
-	_place_label(63, 3, "우리집")
+	_place_label(73, 28, "우리집")
+	_place_label(12, 8, "농장")
+	if GameData.barn_built:
+		_place_label(main.BARN_POS.x, main.BARN_POS.y, "축사")
+	if GameData.greenhouse_built:
+		_place_label(main.GREENHOUSE.position.x + 4,
+			main.GREENHOUSE.position.y + 3, "온실")
 	_place_label(74, 13, "중앙 광장")
 	_place_label(74, 34, "낚시터")
 	_place_label(40, 27, "호수")

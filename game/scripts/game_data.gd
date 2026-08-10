@@ -64,6 +64,7 @@ const BINDABLE_ACTIONS := [
 	["move_right", "오른쪽으로 이동"],
 	["use_tool", "도구 사용 / 낚시 / 공격"],
 	["interact", "상호작용 (대화/입장/줍기)"],
+	["mount", "말 타기 / 내리기"],
 	["open_shop", "상점 (상점 근처에서)"],
 	["cycle_seed", "씨앗 바꾸기"],
 	["open_inventory", "가방 (도구/능력치)"],
