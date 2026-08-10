@@ -368,12 +368,7 @@ func _refresh_hotbar() -> void:
 func refresh() -> void:
 	# 컴팩트 날씨/날짜/시간: "☀ 맑음" / "봄 1일 · 오전 8:30"
 	var w: int = main.weather_now()
-	var wname := "맑음"
-	if w == GameData.WEATHER_RAIN:
-		wname = "비"
-	elif w == GameData.WEATHER_SNOW:
-		wname = "눈"
-	day_label.text = "%s %s" % [GameData.weather_icon(w), wname]
+	day_label.text = "%s %s" % [GameData.weather_icon(w), GameData.weather_name(w)]
 	clock_label.text = "%s %d일 · %s" % [GameData.season_name(),
 		GameData.day_in_season(), GameData.clock_text()]
 	money_label.text = "%dG" % GameData.money

@@ -16,6 +16,13 @@ const STONE_PER_ROCK := 2
 # 스프링클러는 이 값을 계속 다시 채워 줘서 사실상 마르지 않는다.
 const WET_MANUAL := 360.0
 const WET_ALL_DAY := 1200.0
+# 날씨가 그날 할 일을 바꾸는 값들 (weather.md 참고)
+const STORM_CROP_HURT := 0.25      # 폭풍이 지나간 아침, 작물 한 칸이 주저앉을 확률
+const STORM_WOOD_MIN := 12         # 부러진 가지 (목재)
+const STORM_WOOD_MAX := 30
+const FORAGE_CAP := 12             # 들판에 동시에 있는 채집물 수
+const FORAGE_CAP_FOG := 26         # 안개 낀 날
+const STAR_FIREFLY_COUNT := 9      # 별밤의 반딧불이 (평소 3)
 
 
 # 작물 성숙에 필요한 누적 성장 시간 (게임 분) — grow_days를 '시간'으로 해석
@@ -1014,6 +1021,7 @@ func _spawn_objects() -> void:
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
+	_recount_pasture()   # 불러온 세이브의 울타리도 목초지로 인정한다
 	_apply_story_visibility()
 
 
@@ -1498,8 +1506,9 @@ func build_barn() -> void:
 	_place_object(BARN_POS, "barn", 0)
 	_block_barn_art()
 	Sound.play_sfx("sfx_place")
-	hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지."
-		% GameData.BARN_MAX_ANIMALS, 5.0)
+	hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지.\n"
+		% GameData.BARN_MAX_ANIMALS
+		+ "울타리로 빈틈없이 둘러싸 **목초지**를 만들면 알아서 배부르다.", 6.0)
 	if Net.is_host():
 		_broadcast_stats()
 
@@ -1689,7 +1698,7 @@ func use_tool() -> void:
 					if objects.has(pos) or c.ground != "grass":
 						continue
 					c.ground = "soil"
-					if weather_now() == GameData.WEATHER_RAIN:
+					if GameData.weather_wet(weather_now()):
 						_wet(c, WET_ALL_DAY)
 					spawn_particles(pos, "dirt")
 					worked = true
@@ -1738,7 +1747,7 @@ func use_tool() -> void:
 			cell.crop_day = 0.0
 			cell.dead = false
 			cell.half_fed = false
-			if weather_now() == GameData.WEATHER_RAIN:
+			if GameData.weather_wet(weather_now()):
 				_wet(cell, WET_ALL_DAY)
 			Sound.play_sfx("sfx_seed", 0.1)
 			spawn_particles(t, "seed")
@@ -1801,6 +1810,7 @@ func use_tool() -> void:
 					return
 				_remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
+				_recount_pasture()   # 울타리를 걷으면 목초지가 풀린다
 				Sound.play_sfx("sfx_place")
 				hud.show_message("울타리를 회수했다.")
 			else:
@@ -1859,6 +1869,13 @@ func use_tool() -> void:
 			GameData.wood -= GameData.FENCE_COST_WOOD
 			_place_object(t, "fence", 0)
 			Sound.play_sfx("sfx_place")
+			var was: int = pasture.size()
+			_recount_pasture()
+			if pasture.size() > was:
+				hud.quest_toast("목초지 완성!")
+				hud.show_message(
+					"울타리가 닫혔다! 목초지 %d칸 — 안에 있는 동물은 알아서 배부르고 "
+					% pasture.size() + "생산물도 더 준다.", 5.0)
 			tutorial_notify("build")
 		"sprinkler":
 			if obj != null or cell.ground == "water" or cell.crop_id != "" \
@@ -4112,8 +4129,21 @@ func _next_day(passed_out: bool) -> void:
 					wilted += 1
 		_apply_season_visuals()
 
-	# 비 오는 날은 밭이 하루 종일 젖어 있다
-	if weather_now() == GameData.WEATHER_RAIN:
+	# 폭풍이 지나간 아침: 자란 작물 일부가 상하고, 대신 목재가 잔뜩 떨어져 있다
+	var storm_hurt := 0
+	var storm_wood := 0
+	if weather_now() == GameData.WEATHER_STORM:
+		for y in MAP_H:
+			for x in MAP_W:
+				var sc: Dictionary = grid[y][x]
+				if sc.crop_id != "" and not sc.dead and randf() < STORM_CROP_HURT:
+					sc.crop_day = maxf(0.0, float(sc.crop_day) - 60.0 * 12.0)
+					storm_hurt += 1
+		storm_wood = randi_range(STORM_WOOD_MIN, STORM_WOOD_MAX)
+		GameData.wood += storm_wood
+
+	# 비·폭풍이 온 날은 밭이 하루 종일 젖어 있다
+	if GameData.weather_wet(weather_now()):
 		for y in MAP_H:
 			for x in MAP_W:
 				if grid[y][x].ground == "soil":
@@ -4122,18 +4152,31 @@ func _next_day(passed_out: bool) -> void:
 	_sprinkler_tick()
 
 	# 축사가 있으면 굳은 날씨에도 동물들이 알아서 배부르다
-	if GameData.barn_built and weather_now() != GameData.WEATHER_SUN:
+	if GameData.barn_built and GameData.weather_harsh(weather_now()):
 		for a2 in animals:
 			a2.fed = true
+
+	# 목초지(울타리로 둘러싼 곳)의 동물은 알아서 배부르다
+	_recount_pasture()
+	var penned := 0
+	for a3 in animals:
+		if in_pasture(Vector2i(int(a3.position.x / TILE), int(a3.position.y / TILE))):
+			a3.fed = true
+			penned += 1
 
 	# 동물 생산물 수거
 	var collected := {}
 	for a in animals:
 		if a.fed:
+			var in_pen: bool = in_pasture(Vector2i(int(a.position.x / TILE),
+				int(a.position.y / TILE)))
 			var product: String = GameData.ANIMALS[a.type].product
-			GameData.items[product] += 1
-			collected[product] = int(collected.get(product, 0)) + 1
-			if a.type == "chicken" and randf() < 0.03 and int(GameData.items["golden_egg"]) == 0:
+			var n_out := 2 if (in_pen and randf() < PASTURE_BONUS) else 1
+			GameData.items[product] += n_out
+			collected[product] = int(collected.get(product, 0)) + n_out
+			var egg_chance: float = PASTURE_GOLDEN_EGG if in_pen else 0.03
+			if a.type == "chicken" and randf() < egg_chance \
+					and int(GameData.items["golden_egg"]) == 0:
 				GameData.items["golden_egg"] += 1
 				collected["golden_egg"] = 1
 		a.fed = false
@@ -4166,11 +4209,15 @@ func _next_day(passed_out: bool) -> void:
 			"낚시터" if str(fest.place) == "pier" else "마을 광장", fest.goal]
 	if wilted > 0:
 		note += "\n작물 %d개가 시들어버렸다..." % wilted
-	match weather_now():
-		GameData.WEATHER_RAIN:
-			note += "\n오늘은 비가 온다. 물주기는 쉬자! ☔"
-		GameData.WEATHER_SNOW:
-			note += "\n함박눈이 내린다. ☃"
+	if storm_hurt > 0:
+		note += "\n폭풍에 작물 %d개가 주저앉았다 (성장이 되돌아갔다)." % storm_hurt
+	if storm_wood > 0:
+		note += "\n부러진 가지를 주웠다. 목재 +%d" % storm_wood
+	if penned > 0:
+		note += "\n목초지의 동물 %d마리는 알아서 배불리 먹었다." % penned
+	var wnote: String = str(GameData.weather_def(weather_now()).note)
+	if wnote != "":
+		note += "\n%s %s" % [GameData.weather_icon(weather_now()), wnote]
 	if passed_out:
 		note += "\n쓰러져서 기력이 절반만 회복됐다..."
 
@@ -4203,12 +4250,16 @@ func _respawn_resources() -> void:
 
 # 아침마다 열매/약초가 풀밭에 돋아난다 (최대 12개 유지)
 func _respawn_forage() -> void:
+	# 안개 낀 날은 발밑이 잘 보인다 — 채집물이 훨씬 많이 돋는다
+	var fog: bool = weather_now() == GameData.WEATHER_FOG
+	var cap := FORAGE_CAP_FOG if fog else FORAGE_CAP
+	var tries := 20 if fog else 8
 	var count := 0
 	for pos in objects:
 		if String(objects[pos].kind).begins_with("forage_"):
 			count += 1
-	for attempt in 8:
-		if count >= 12:
+	for attempt in tries:
+		if count >= cap:
 			break
 		var pos := Vector2i(randi_range(1, MAP_W - 2), randi_range(1, MAP_H - 2))
 		var cell: Dictionary = grid[pos.y][pos.x]
@@ -4229,11 +4280,14 @@ func _spawn_bugs() -> void:
 	for bnode in bugs:
 		bnode.queue_free()
 	bugs.clear()
+	# 별밤에는 「빛을 품은 것」이 계절을 가리지 않고 잔뜩 나온다 (연금술 빛 재료)
+	var starry: bool = weather_now() == GameData.WEATHER_STAR
 	for bid in GameData.BUGS:
 		var cond: Dictionary = GameData.BUGS[bid]
-		if GameData.season() not in cond.seasons:
+		var light_bug: bool = bid == "bug_firefly"
+		if GameData.season() not in cond.seasons and not (starry and light_bug):
 			continue
-		for i in 3:
+		for i in (STAR_FIREFLY_COUNT if (starry and light_bug) else 3):
 			var bnode: Node2D = preload("res://scripts/bug.gd").new()
 			bnode.main = self
 			bnode.bug_id = bid
@@ -4496,6 +4550,83 @@ func _process(delta: float) -> void:
 
 
 # 젖은 밭 위 작물은 실시간으로 자라고, 물기는 서서히 마른다
+# ---- 목초지 ----
+#
+# 울타리(또는 나무·바위 같은 막힌 것)로 **완전히 둘러싸인 빈 공간**을 목초지로 본다.
+# 판정은 간단하다: 지도 가장자리에서 물을 흘려 보내고(flood fill), 그 물이 닿지
+# 못한 칸이 곧 「갇힌 칸」이다. 울타리를 어떤 모양으로 쳐도 알아서 맞는다.
+#
+# 목초지 안의 동물은 밖으로 나가지 않고(울타리가 막는다), 아침마다 알아서
+# 배부르며, 생산물이 가끔 하나 더 나온다. — 울타리를 칠 이유가 생긴다.
+var pasture := {}                      # Vector2i -> true (갇힌 칸)
+const PASTURE_MAX := 900               # 이보다 넓으면 「가둔 것」으로 치지 않는다
+const PASTURE_BONUS := 0.35            # 생산물이 하나 더 나올 확률
+const PASTURE_GOLDEN_EGG := 0.09       # 목초지 닭의 황금 달걀 확률 (평소 0.03)
+
+
+func _blocks_pasture(t: Vector2i) -> bool:
+	return objects.has(t) or grid[t.y][t.x].ground == "water"
+
+
+func _recount_pasture() -> void:
+	pasture.clear()
+	# ① 가장자리에서 흘려보내 「바깥」을 표시한다
+	var outside := {}
+	var queue: Array[Vector2i] = []
+	for x in MAP_W:
+		for y in [0, MAP_H - 1]:
+			var t := Vector2i(x, y)
+			if not _blocks_pasture(t) and not outside.has(t):
+				outside[t] = true
+				queue.append(t)
+	for y2 in MAP_H:
+		for x2 in [0, MAP_W - 1]:
+			var t2 := Vector2i(x2, y2)
+			if not _blocks_pasture(t2) and not outside.has(t2):
+				outside[t2] = true
+				queue.append(t2)
+	var head := 0
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cur + d
+			if n.x < 0 or n.y < 0 or n.x >= MAP_W or n.y >= MAP_H:
+				continue
+			if outside.has(n) or _blocks_pasture(n):
+				continue
+			outside[n] = true
+			queue.append(n)
+	# ② 바깥에 닿지 못한 빈 칸 = 갇힌 칸. 덩어리별로 크기를 재서 너무 넓으면 뺀다
+	var seen := {}
+	for y3 in MAP_H:
+		for x3 in MAP_W:
+			var t3 := Vector2i(x3, y3)
+			if seen.has(t3) or outside.has(t3) or _blocks_pasture(t3):
+				continue
+			var blob: Array[Vector2i] = [t3]
+			seen[t3] = true
+			var h2 := 0
+			while h2 < blob.size():
+				var c2: Vector2i = blob[h2]
+				h2 += 1
+				for d2 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n2: Vector2i = c2 + d2
+					if n2.x < 0 or n2.y < 0 or n2.x >= MAP_W or n2.y >= MAP_H:
+						continue
+					if seen.has(n2) or _blocks_pasture(n2):
+						continue
+					seen[n2] = true
+					blob.append(n2)
+			if blob.size() <= PASTURE_MAX:
+				for c3: Vector2i in blob:
+					pasture[c3] = true
+
+
+func in_pasture(t: Vector2i) -> bool:
+	return pasture.has(t)
+
+
 # 스프링클러: 설치해 두면 둘레 네 칸을 **계속** 적신다.
 # 예전에는 아침에 딱 한 번만 뿌렸다 — 그래서 방금 설치한 스프링클러도,
 # 낮에 새로 간 밭도 다음 날이 되어야 물이 갔다.
@@ -4547,8 +4678,10 @@ func _update_night() -> void:
 	var start := 18.0 * 60.0
 	var a := clampf((GameData.minutes - start) / (6.0 * 60.0), 0.0, 1.0)
 	var c := Color(1, 1, 1).lerp(Color(0.5, 0.48, 0.72), a)
-	if weather_now() == GameData.WEATHER_RAIN:
+	if weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]:
 		c *= Color(0.78, 0.8, 0.88)  # 비 오는 날은 어둑하게
+	elif weather_now() == GameData.WEATHER_FOG:
+		c *= Color(0.86, 0.88, 0.9)  # 안개 낀 날은 색이 옅다
 	night.color = c
 
 
@@ -5052,11 +5185,62 @@ func _draw_weather() -> void:
 			var sx := fposmod(_hash01(i, 1) * full_w + sin(weather_time * 1.5 + i) * 12.0, full_w)
 			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 35.0, full_h) - 5.0
 			overlay.draw_rect(Rect2(Vector2(sx, sy), Vector2(1, 1)), Color(1, 1, 1, 0.85))
+	elif w == GameData.WEATHER_STORM:
+		# 굵고 비스듬한 빗줄기 + 이따금 번쩍
+		for i in 620:
+			var sx := _hash01(i, 1) * full_w - 10.0
+			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 520.0, full_h) - 5.0
+			overlay.draw_line(Vector2(sx - 9, sy - 20), Vector2(sx, sy),
+				Color(0.78, 0.85, 1.0, 0.85), 2.0)
+		var flash := fposmod(weather_time, 5.2)
+		if flash < 0.18:
+			overlay.draw_rect(_camera_rect(), Color(1, 1, 1, 0.45 * (1.0 - flash / 0.18)))
+	elif w == GameData.WEATHER_FOG:
+		# 가장자리로 갈수록 짙어지는 안개 (가까운 곳만 또렷하다)
+		var view2 := _camera_rect()
+		overlay.draw_rect(view2, Color(0.87, 0.89, 0.93, 0.34))
+		var band: float = view2.size.y * 0.1
+		for i in 5:
+			var inset: float = band * float(i)
+			var r := Rect2(view2.position + Vector2(inset * 1.7, inset),
+				view2.size - Vector2(inset * 3.4, inset * 2.0))
+			if r.size.x <= band or r.size.y <= band:
+				break
+			overlay.draw_rect(r, Color(0.9, 0.92, 0.95, 0.13), false, band)
+		# 흘러가는 안개 띠
+		for i in 16:
+			var by := view2.position.y + fposmod(_hash01(i, 3) * view2.size.y
+				+ weather_time * 7.0, view2.size.y)
+			var bh: float = 12.0 + _hash01(i, 4) * 30.0
+			overlay.draw_rect(Rect2(view2.position.x, by, view2.size.x, bh),
+				Color(0.95, 0.96, 0.98, 0.16))
+	elif w == GameData.WEATHER_STAR and GameData.minutes >= 17.0 * 60.0:
+		# 별밤: 해가 지면 하늘빛 알갱이가 반짝인다
+		var view3 := _camera_rect()
+		for i in 210:
+			var px2 := view3.position.x + _hash01(i, 5) * view3.size.x
+			var py2 := view3.position.y + _hash01(i, 6) * view3.size.y
+			var tw: float = 0.35 + 0.65 * absf(sin(weather_time * 1.8 + float(i) * 1.7))
+			overlay.draw_rect(Rect2(px2, py2, 3, 3), Color(1, 0.99, 0.88, tw))
+			if _hash01(i, 7) > 0.86:   # 몇 개는 십자로 크게 반짝인다
+				overlay.draw_rect(Rect2(px2 - 3, py2 + 1, 9, 1), Color(1, 1, 0.92, tw * 0.8))
+				overlay.draw_rect(Rect2(px2 + 1, py2 - 3, 1, 9), Color(1, 1, 0.92, tw * 0.8))
+
+
+# 지금 화면에 보이는 월드 범위 (화면 전체를 덮는 효과에 쓴다)
+func _camera_rect() -> Rect2:
+	var half := Vector2(960.0, 540.0) / (2.0 * CAMERA_ZOOM)
+	return Rect2(player.position - half, half * 2.0)
 
 
 # ---- 검증 시퀀스 ----
 # 키/마우스 이벤트를 실제 InputMap 경로로 흘려보내
 # 밭갈기->클릭 경작->물주기->파종->자원->설치->상점->결산까지 자동 재생한다.
+#
+# ※ 단계 번호는 match의 값이다. **절대 겹치면 안 된다** —
+#    같은 번호를 두 번 쓰면 뒤에 쓴 쪽이 통째로 죽은 코드가 되고,
+#    검사가 조용히 사라진다 (실제로 세 번 당했다).
+#    새 단계를 넣기 전에: grep -n "^\t\t[0-9]\+:" 로 빈 번호를 확인할 것.
 
 func _debug_tick() -> void:
 	if Net.is_guest() and not _net_ready:
@@ -5544,6 +5728,45 @@ func _debug_tick() -> void:
 			print("MIGRATE_OK=", left.is_empty()
 					and objects.get(BARN_POS, {}).get("kind", "") == "barn",
 				" leftovers=", left, " player_free=", is_passable(player_tile()))
+		355:
+			# 날씨 표: 계절마다 뽑히는 날씨가 실제로 다 나오는가
+			var seen_w := {}
+			for d in range(1, GameData.DAYS_PER_SEASON * 4 + 1):
+				seen_w[GameData.weather_of_day(d)] = true
+			var missing := []
+			for wid: int in GameData.WEATHER_IDS:
+				if not seen_w.has(wid):
+					missing.append(GameData.weather_name(wid))
+			print("WEATHER_ALL_OK=", missing.is_empty(), " 못 나온 날씨=", missing,
+				" 1년치 종류=", seen_w.size())
+			# 폭풍/비는 밭이 젖는 날, 안개/별밤은 아니다
+			print("WEATHER_WET_OK=", GameData.weather_wet(GameData.WEATHER_STORM)
+					and GameData.weather_wet(GameData.WEATHER_RAIN)
+					and not GameData.weather_wet(GameData.WEATHER_FOG)
+					and not GameData.weather_wet(GameData.WEATHER_STAR),
+				" harsh(안개)=", GameData.weather_harsh(GameData.WEATHER_FOG))
+		359:
+			# 목초지: 울타리로 네모나게 둘러싸면 그 안이 갇힌 칸이 되어야 한다
+			var p0 := Vector2i(16, 16)
+			for yy in range(p0.y - 1, p0.y + 4):
+				for xx in range(p0.x - 1, p0.x + 4):
+					objects.erase(Vector2i(xx, yy))
+			_recount_pasture()
+			var before_pen: int = pasture.size()
+			for i in 5:
+				objects[Vector2i(p0.x - 1 + i, p0.y - 1)] = {"kind": "fence", "hp": 0}
+				objects[Vector2i(p0.x - 1 + i, p0.y + 3)] = {"kind": "fence", "hp": 0}
+				objects[Vector2i(p0.x - 1, p0.y - 1 + i)] = {"kind": "fence", "hp": 0}
+				objects[Vector2i(p0.x + 3, p0.y - 1 + i)] = {"kind": "fence", "hp": 0}
+			_recount_pasture()
+			var closed: int = pasture.size()
+			var inside: bool = in_pasture(p0 + Vector2i(1, 1))
+			# 문을 하나 내면 (울타리 한 칸 걷어내면) 목초지가 풀려야 한다
+			objects.erase(Vector2i(p0.x + 1, p0.y - 1))
+			_recount_pasture()
+			print("PASTURE_OK=", inside and closed > before_pen,
+				" 닫았을 때=", closed - before_pen, "칸  문 내면=",
+				pasture.size() - before_pen, "칸  OPEN_OK=", not in_pasture(p0 + Vector2i(1, 1)))
 		357:
 			# 스프링클러: 설치하면 바로, 그리고 계속 물을 준다
 			var sp := Vector2i(20, 20)
@@ -5629,7 +5852,24 @@ func _debug_tick() -> void:
 			note_ui.scroll.scroll_vertical = 1120   # 연금술 페이지까지 내린다
 		365: _save_shot("_note2.png")
 		366: note_ui.close()
-		368: get_tree().quit()
+		369:
+			# 새 날씨 세 가지를 눈으로 확인한다 (안개 · 폭풍 · 별밤)
+			note_ui.close()
+			dialog.close()
+			GameData.day = 1
+			_apply_season_visuals()
+			player.position = Vector2(16 * TILE + 16, 12 * TILE + 16)
+			(player.get_node("Camera") as Camera2D).reset_smoothing()
+			GameData.minutes = 14.0 * 60.0
+			_weather_override = GameData.WEATHER_FOG
+		371: _save_shot("_weather_fog.png")
+		372: _weather_override = GameData.WEATHER_STORM
+		374: _save_shot("_weather_storm.png")
+		375:
+			_weather_override = GameData.WEATHER_STAR
+			GameData.minutes = 22.0 * 60.0   # 별은 밤에 뜬다
+		377: _save_shot("_weather_star.png")
+		378: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

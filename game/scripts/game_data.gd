@@ -15,6 +15,9 @@ const DAYS_PER_SEASON := 28
 const WEATHER_SUN := 0
 const WEATHER_RAIN := 1
 const WEATHER_SNOW := 2
+const WEATHER_FOG := 3
+const WEATHER_STORM := 4
+const WEATHER_STAR := 5
 
 # ---- 작물 ----
 # grow_days = 성장에 필요한 게임 시간(시). 초반 작물은 빨리, 비쌀수록 오래.
@@ -1874,24 +1877,79 @@ func day_in_season() -> int:
 	return (day - 1) % DAYS_PER_SEASON + 1
 
 
+# 날씨 표. 새 날씨를 넣을 때는 여기에 한 줄이면 된다.
+#   seasons = 나오는 계절 · weight = 뽑힐 무게 (맑음 대비)
+#   wet     = 밭이 하루 종일 젖어 있는가 (물주기를 안 해도 된다)
+#   harsh   = 궂은 날씨 (축사가 있으면 동물이 알아서 배부르다)
+#
+# 날씨가 그날 **무엇을 할지**를 바꾸는 것이 요점이다:
+#   안개 = 채집 · 폭풍 = 목재(대신 밭이 상한다) · 별밤 = 빛 속성 재료
+const WEATHERS := {
+	WEATHER_SUN: {"name": "맑음", "icon": "☀", "weight": 100,
+		"seasons": [SPRING, SUMMER, FALL, WINTER], "wet": false, "harsh": false,
+		"note": ""},
+	WEATHER_RAIN: {"name": "비", "icon": "☔", "weight": 26,
+		"seasons": [SPRING, SUMMER, FALL], "wet": true, "harsh": true,
+		"note": "오늘은 비가 온다. 물주기는 쉬자!"},
+	WEATHER_SNOW: {"name": "눈", "icon": "☃", "weight": 40,
+		"seasons": [WINTER], "wet": false, "harsh": true,
+		"note": "함박눈이 내린다."},
+	WEATHER_FOG: {"name": "안개", "icon": "≋", "weight": 16,
+		"seasons": [SPRING, FALL, WINTER], "wet": false, "harsh": false,
+		"note": "짙은 안개. 멀리는 안 보여도 발밑의 것들이 잘 보인다 — 채집하기 좋은 날."},
+	WEATHER_STORM: {"name": "폭풍", "icon": "⚡", "weight": 11,
+		"seasons": [SUMMER, FALL], "wet": true, "harsh": true,
+		"note": "밤새 폭풍이 몰아쳤다. 밭이 상했지만 부러진 가지가 잔뜩 떨어져 있다."},
+	WEATHER_STAR: {"name": "별밤", "icon": "✦", "weight": 13,
+		"seasons": [SPRING, SUMMER, FALL, WINTER], "wet": false, "harsh": false,
+		"note": "별이 유난히 밝다. 빛을 품은 것들이 나오는 밤이다."},
+}
+const WEATHER_IDS := [WEATHER_SUN, WEATHER_RAIN, WEATHER_SNOW,
+	WEATHER_FOG, WEATHER_STORM, WEATHER_STAR]
+
+
 func weather_of_day(d: int) -> int:
 	# 날짜 기반 결정적 해시 → 저장할 필요 없이 항상 같은 날씨
 	var h := fposmod(sin(float(d) * 127.1 + 311.7) * 43758.5453, 1.0)
-	if season_of_day(d) == WINTER:
-		return WEATHER_SNOW if h < 0.35 else WEATHER_SUN
-	return WEATHER_RAIN if h < 0.25 else WEATHER_SUN
+	var s := season_of_day(d)
+	var total := 0.0
+	for w: int in WEATHER_IDS:
+		if s in WEATHERS[w].seasons:
+			total += float(WEATHERS[w].weight)
+	var r := h * total
+	for w: int in WEATHER_IDS:
+		if s not in WEATHERS[w].seasons:
+			continue
+		r -= float(WEATHERS[w].weight)
+		if r <= 0.0:
+			return w
+	return WEATHER_SUN
 
 
 func weather_today() -> int:
 	return weather_of_day(day)
 
 
+func weather_def(w: int) -> Dictionary:
+	return WEATHERS.get(w, WEATHERS[WEATHER_SUN])
+
+
 func weather_icon(w: int) -> String:
-	if w == WEATHER_RAIN:
-		return "☔"
-	if w == WEATHER_SNOW:
-		return "☃"
-	return "☀"
+	return str(weather_def(w).icon)
+
+
+func weather_name(w: int) -> String:
+	return str(weather_def(w).name)
+
+
+# 밭이 하루 종일 젖어 있는 날인가 (비 · 폭풍)
+func weather_wet(w: int) -> bool:
+	return bool(weather_def(w).wet)
+
+
+# 궂은 날인가 (축사가 동물을 알아서 먹이는 날 — 비 · 눈 · 폭풍)
+func weather_harsh(w: int) -> bool:
+	return bool(weather_def(w).harsh)
 
 
 # ---- 씨앗 ----
