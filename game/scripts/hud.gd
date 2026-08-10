@@ -149,7 +149,7 @@ const MM_OBJ_COLORS := {
 	"rock": Color(0.55, 0.55, 0.6), "bigrock": Color(0.45, 0.45, 0.5),
 	"house": Color(0.62, 0.28, 0.2), "art_block": Color(0.62, 0.28, 0.2),
 	"barn": Color(0.66, 0.42, 0.24), "barn_block": Color(0.66, 0.42, 0.24),
-	"bin": Color(0.85, 0.6, 0.25), "board": Color(0.95, 0.8, 0.35),
+	"board": Color(0.95, 0.8, 0.35),
 	"cave": Color(0.2, 0.16, 0.2), "sign": Color(0.9, 0.76, 0.4),
 	"forage_berry": Color(0.85, 0.3, 0.4), "forage_herb": Color(0.5, 0.8, 0.4),
 	"deco_fountain": Color(0.4, 0.66, 0.85),

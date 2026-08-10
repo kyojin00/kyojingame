@@ -599,7 +599,7 @@ func _item_entries() -> Array:
 			out.append({"tab": "crop", "icon": "mature_" + id, "name": str(def.name),
 				"count": n, "sell": int(def.sell_price),
 				"tip": "%s x%d (개당 %dG)" % [def.name, n, def.sell_price],
-				"desc": "출하 상자에 넣으면 다음 날 아침 정산된다"})
+				"desc": "마을 잡화점(판매 탭)에 팔 수 있다"})
 		var ns := int(GameData.produce_silver.get(id, 0))
 		if ns > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id,

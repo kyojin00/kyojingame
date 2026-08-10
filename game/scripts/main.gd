@@ -44,7 +44,7 @@ func _wet(cell: Dictionary, minutes: float) -> void:
 
 # grid[y][x] = {ground, watered, crop_id, crop_day, dead}
 var grid: Array = []
-# Vector2i -> {kind: "tree"|"rock"|"house"|"bin"|"fence"|"sprinkler", hp: int}
+# Vector2i -> {kind: "tree"|"rock"|"house"|"fence"|"sprinkler", hp: int}
 var objects: Dictionary = {}
 var obj_nodes: Dictionary = {}  # Vector2i -> Node2D (설치/제거 가능한 오브젝트만)
 
@@ -124,7 +124,7 @@ const TEXTURE_NAMES := [
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
-	"rock", "bin", "house", "fence", "sprinkler", "board", "sign",
+	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
@@ -176,7 +176,6 @@ const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
 # 위로 5칸 반 · 좌우로 3칸씩 뻗는다 (7 x 5.5칸). BARN_ART 참고.
 const BARN_POS := Vector2i(10, 6)
 const BARN_ART := Rect2i(-3, -4, 7, 5)   # BARN_POS 기준 그림이 덮는 칸
-const BIN_POS := Vector2i(16, 10)        # 출하 상자 (축사 그림 밖 · 시작 자리 옆)
 const HORSE_HOME := Vector2i(10, 9)      # 산 말을 세워 두는 자리 (축사 앞마당)
 # ---- 탈 것 (말) ----
 #
@@ -621,8 +620,7 @@ func _build_map() -> void:
 		for x in range(ROAD.position.x, ROAD.end.x):
 			grid[y][x].ground = "path"
 
-	# 출하 상자(농장) + 동굴
-	objects[BIN_POS] = {"kind": "bin", "hp": 0}
+	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
 	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
@@ -646,7 +644,7 @@ func _build_map() -> void:
 			if objects.has(pos) or grid[y][x].ground != "grass":
 				continue
 			if x >= 1 and x <= 10 and y >= 0 and y <= 6:
-				continue  # 집/출하상자 주변은 비워둔다
+				continue  # 축사 주변은 비워둔다
 			if abs(x - START_TILE.x) <= 3 and abs(y - START_TILE.y) <= 3:
 				continue  # 시작 지점 주변도 비워둔다
 			if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
@@ -1133,7 +1131,7 @@ const OBJECT_PAD := {
 	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
-	"bin": Vector2(3, 2), "board": Vector2(3, 2), "sign": Vector2(3, 2),
+	"board": Vector2(3, 2), "sign": Vector2(3, 2),
 }
 
 
@@ -1148,8 +1146,6 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = tex["rock"]
 		"bigrock":
 			texture = tex["rock"]  # 같은 바위 그림을 크게 그린다 (퀘스트 5)
-		"bin":
-			texture = tex["bin"]
 		"housesite":
 			texture = tex["sign"]  # 집터 표지판
 		"board":
@@ -2148,9 +2144,6 @@ func interact() -> void:
 		if obj.kind == "housesite":
 			_open_build_dialog()
 			return
-		if obj.kind == "bin":
-			shop.open("sell", ["sell"])
-			return
 		if obj.kind == "board":
 			_open_quest_board()
 			return
@@ -2310,7 +2303,7 @@ func _apply_story_visibility() -> void:
 	for pos: Vector2i in obj_nodes:
 		# 부지 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = objects[pos].kind if objects.has(pos) else "house"
-		if kind in ["house", "housesite", "bin", "board", "sign", "barn", "barn_block",
+		if kind in ["house", "housesite", "board", "sign", "barn", "barn_block",
 				"art_block", "cave"]:
 			obj_nodes[pos].visible = show
 
@@ -4417,7 +4410,7 @@ func _apply_save(d: Dictionary) -> void:
 
 
 # 옛 저장 정리: 축사를 크게 다시 그리면서 자리를 옮겼고,
-# 출하 상자는 축사 그림 밑에 깔려 있어 밖으로 뺐다.
+# 농장의 출하 상자는 아예 없앴다 (판매는 마을 잡화점에서 한다).
 # 오브젝트는 통째로 저장되므로, 불러올 때 한 번 자리를 맞춰 준다.
 func _migrate_farm_layout() -> void:
 	const OLD_BARN := Vector2i(10, 3)
@@ -4428,7 +4421,6 @@ func _migrate_farm_layout() -> void:
 			objects.erase(p)
 		elif kind == "art_block" and OLD_BARN_ART.has_point(p) and p != OLD_BARN:
 			objects.erase(p)
-	objects[BIN_POS] = {"kind": "bin", "hp": 0}
 	if GameData.barn_built:
 		objects[BARN_POS] = {"kind": "barn", "hp": 0}
 		_block_barn_art()
@@ -4628,8 +4620,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		match _near_shop():
 			"general":
 				shop.open("buy", ["buy", "sell"])
-			"bin":
-				shop.open("sell", ["sell"])
 			"ranch":
 				shop.open("animal", ["animal"])
 			"smith":
@@ -4637,7 +4627,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			"fish":
 				shop.open("codex", ["codex"])
 			_:
-				hud.show_message("상점은 마을에! 상점 건물이나 출하 상자 근처에서 열 수 있다.")
+				hud.show_message("상점은 마을에! 상점 건물 근처에서 열 수 있다. (판매는 잡화점)")
 	elif event.is_action_pressed("save_game"):
 		save_now()
 		hud.show_message("저장했다!")
@@ -4654,7 +4644,7 @@ func _back_to_title() -> void:
 	get_tree().change_scene_to_file("res://scenes/title.tscn")
 
 
-# 상점 건물/출하 상자 근처인가 (B키 사용 조건)
+# 상점 건물 근처인가 (B키 사용 조건)
 # 근처 가게 종류 반환 ("" = 없음). B키가 그 가게에 맞는 탭만 연다
 func _near_shop() -> String:
 	var p := player_tile()
@@ -4664,9 +4654,6 @@ func _near_shop() -> String:
 			var bk := _building_kind_at(t)
 			if bk in ["general", "ranch", "smith", "fish"]:
 				return bk
-			var obj: Variant = objects.get(t)
-			if obj != null and obj.kind == "bin":
-				return "bin"
 	return ""
 
 
@@ -4904,8 +4891,6 @@ func _context_hint() -> Array:
 	var obj: Variant = objects.get(t)
 	if obj != null:
 		match obj.kind:
-			"bin":
-				return ["E: 판매", above_tile]
 			"board":
 				return ["E: 의뢰 게시판", above_tile]
 			"horse":
@@ -5486,10 +5471,12 @@ func _debug_tick() -> void:
 						BARN_POS.x + BARN_ART.end.x):
 					if not objects.has(Vector2i(ax, ay)):
 						art_ok = false
-			var bin_clear: bool = not Rect2i(BARN_POS + BARN_ART.position,
-				BARN_ART.size).has_point(BIN_POS)
+			var no_bin := true
+			for q: Vector2i in objects:
+				if objects[q].kind == "bin":
+					no_bin = false
 			print("BARN_ART_OK=", art_ok, " size=", BARN_ART.size,
-				" BIN_CLEAR_OK=", bin_clear, " bin=", BIN_POS)
+				" NO_BIN_OK=", no_bin)
 			print("HORSE_PARK=", GameData.horse_tile, " at_farm=",
 				GameData.horse_tile.distance_to(Vector2(HORSE_HOME)) <= 2.0)
 			player.position = Vector2((BARN_POS.x + 3) * TILE + 16,
@@ -5505,7 +5492,6 @@ func _debug_tick() -> void:
 			objects[stale[2]] = {"kind": "barn_block", "hp": 0}
 			objects[stale[3]] = {"kind": "art_block", "hp": 0}
 			objects[stale[4]] = {"kind": "art_block", "hp": 0}
-			objects.erase(BIN_POS)
 			player.position = Vector2(BARN_POS.x * TILE + 16, BARN_POS.y * TILE + 16)
 			_migrate_farm_layout()
 			# 옛 자리의 상자/축사는 사라지고, 새 축사 그림 칸은 art_block이어야 한다
@@ -5513,7 +5499,7 @@ func _debug_tick() -> void:
 			var left := []
 			for q: Vector2i in objects:
 				var k: String = objects[q].kind
-				if k == "bin" and q != BIN_POS:
+				if k == "bin":
 					left.append("bin%s" % q)
 				elif (k == "barn" or k == "barn_block") and q != BARN_POS:
 					left.append("%s%s" % [k, q])
@@ -5521,7 +5507,6 @@ func _debug_tick() -> void:
 						and not art.has_point(q):
 					left.append("art%s" % q)
 			print("MIGRATE_OK=", left.is_empty()
-					and objects.get(BIN_POS, {}).get("kind", "") == "bin"
 					and objects.get(BARN_POS, {}).get("kind", "") == "barn",
 				" leftovers=", left, " player_free=", is_passable(player_tile()))
 		358: get_tree().quit()

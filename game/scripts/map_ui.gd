@@ -193,8 +193,6 @@ func _draw_map() -> void:
 				c = Color(0.55, 0.55, 0.6)
 			"house", "art_block":
 				c = Color(0.62, 0.28, 0.2)
-			"bin":
-				c = Color(0.85, 0.6, 0.25)
 			"board", "sign":
 				c = Color(0.95, 0.8, 0.35)
 			_:
