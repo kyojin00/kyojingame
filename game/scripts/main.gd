@@ -243,6 +243,7 @@ const PLAZA := Rect2i(70, 14, 16, 12)      # 중앙 광장 (아주 넓은 평지
 const FOUNTAIN := Rect2i(76, 18, 4, 4)     # 광장 중앙 분수
 const FOUNTAIN_DECO := Vector2i(77, 20)    # 분수 조형물 (분수 한가운데)
 const VILLAGE_RIVER_Y := 40
+const EAST_RIVER_X := 97                   # 마을 동쪽 바깥을 흐르는 강 (2칸)
 const RIVER_ROWS := 4                      # 강 폭 (낚시터를 깊게 하려고 넓혔다)                # 마을 남쪽 외곽을 흐르는 강 (2칸)
 const DOCK_Y := 39                         # 강가 낚시터(부두)
 # ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
@@ -687,7 +688,7 @@ func _build_village() -> void:
 	for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + RIVER_ROWS):
 		for x in range(46, 89):
 			grid[y][x].ground = "water"
-	for x in [87, 88]:
+	for x in [EAST_RIVER_X, EAST_RIVER_X + 1]:
 		for y in range(1, VILLAGE_RIVER_Y):
 			grid[y][x].ground = "water"
 	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 나무 부두.
@@ -707,6 +708,10 @@ func _build_village() -> void:
 	for x in [63, 64]:
 		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + RIVER_ROWS):
 			grid[y][x].ground = "path"
+
+	# 길이 물 위를 지나야 하면 다리를 놓는다.
+	# (강을 옮기거나 길을 늘릴 때 길이 끊기는 일을 없앤다)
+	_bridge_roads()
 
 	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
 	for pid: String in GameData.village_built:
@@ -728,6 +733,38 @@ func _build_village() -> void:
 			if grid[y][x].ground == "grass" and not objects.has(rim) \
 					and _hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
 				objects[rim] = {"kind": "tree", "hp": TREE_HP}
+
+
+# 인도가 지나야 할 자리가 물이면 나무 다리를 놓는다.
+# 길을 먼저 깔고 강을 나중에 그리므로, 강이 덮어 버린 자리를 여기서 되살린다.
+func _bridge_roads() -> void:
+	var lines: Array = []
+	# 큰길 (가로 3줄)
+	for i in ROAD_W:
+		lines.append([Vector2i(60, MAIN_STREET_Y + i), Vector2i(98, MAIN_STREET_Y + i)])
+	# 세로 인도 3종 (각 3줄). 구간은 길을 깔 때와 똑같이 잡는다 —
+	# 광장 안은 이미 평지이므로 지나가지 않는다 (분수 위에 다리가 놓이면 안 된다).
+	for i in ROAD_W:
+		lines.append([Vector2i(NS_LANE_X + i, MAIN_STREET_Y),
+			Vector2i(NS_LANE_X + i, PLAZA.position.y - 1)])
+		lines.append([Vector2i(NS_LANE_X + i, PLAZA.end.y),
+			Vector2i(NS_LANE_X + i, DOCK_Y)])
+		lines.append([Vector2i(WEST_LANE_X + i, MAIN_STREET_Y),
+			Vector2i(WEST_LANE_X + i, DOCK_Y - 1)])
+		lines.append([Vector2i(EAST_LANE_X + i, MAIN_STREET_Y),
+			Vector2i(EAST_LANE_X + i, DOCK_Y - 1)])
+	for line: Array in lines:
+		var a: Vector2i = line[0]
+		var b: Vector2i = line[1]
+		var step := Vector2i(signi(b.x - a.x), signi(b.y - a.y))
+		var at := a
+		while true:
+			if at.x >= 0 and at.y >= 0 and at.x < MAP_W and at.y < MAP_H \
+					and grid[at.y][at.x].ground == "water":
+				grid[at.y][at.x].ground = "dock"   # 나무 다리
+			if at == b:
+				break
+			at += step
 
 
 # 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
