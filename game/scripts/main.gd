@@ -1790,11 +1790,12 @@ func _tool_target_nearby() -> Vector2i:
 			want = ["rock", "bigrock"]
 		_:
 			return Vector2i(-999, -999)
+	# 두 칸까지 본다. 커다란 바위는 충돌 박스가 넓어 한 칸 밖에 못 서는 경우가 있다.
 	var pt := player_tile()
 	var best := Vector2i(-999, -999)
 	var best_d := 1e9
-	for dy in [-1, 0, 1]:
-		for dx in [-1, 0, 1]:
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
 			var n: Vector2i = pt + Vector2i(dx, dy)
 			var obj: Variant = objects.get(n)
 			if obj == null or not want.has(obj.kind) or bool(obj.get("young", false)):
@@ -1885,10 +1886,14 @@ func interact() -> void:
 		if bt.x != -999:
 			_sel_target = bt
 			aim = objects.get(bt)
+	var forced := Vector2i(-999, -999)
 	if aim == null:
-		# 도구에 맞는 대상이 옆에 있으면 그쪽을 본다 (그림이 커서 정면이 어긋날 때)
+		# 도구에 맞는 대상이 가까이 있으면 그쪽을 본다 (그림이 커서 정면이 어긋날 때).
+		# 찾은 칸은 _target_override로 그대로 넘긴다 — target_tile()의 한 칸 제한에
+		# 걸려 도구가 엉뚱한 빈 칸을 때리지 않게 한다.
 		var nt := _tool_target_nearby()
 		if nt.x != -999:
+			forced = nt
 			_sel_target = nt
 			_face_tile(nt)
 			aim = objects.get(nt)
@@ -1896,7 +1901,11 @@ func interact() -> void:
 			and ((aim.kind == "tree" and GameData.tool == "axe")
 			or (aim.kind in ["rock", "bigrock"] and GameData.tool == "pickaxe")):
 		_work_lock = WORK_LOCK_TIME  # 캐는 중 — 잠시 E는 무조건 도구다
+		var prev := _target_override
+		if forced.x != -999:
+			_target_override = forced
 		use_tool()
+		_target_override = prev
 		return
 	# 캐던 나무/돌이 마지막 한 방에 부서져도, 이어 누른 E가 대화로 새지 않는다
 	# (E는 캐기와 말 걸기를 겸하므로 연타 도중 말이 걸리면 곤란하다)
@@ -5153,13 +5162,66 @@ func _debug_tick() -> void:
 			print("GREENHOUSE_OK=", GameData.greenhouse_built,
 				" winter_plantable=", in_greenhouse(GREENHOUSE.position))
 		331: _save_shot("_greenhouse.png")
-		330:
+		332:
+			# 지도 휠·끌기: 이벤트가 실제로 map_ui까지 닿는지 확인한다.
+			# (Control의 mouse_filter가 STOP이면 _unhandled_input이 아예 안 불린다)
+			map_ui.open()
+			_push_mouse_button(MOUSE_BUTTON_WHEEL_UP, Vector2(480, 270), true)
+		333:
+			var zoomed: bool = map_ui.zoom > 1.0
+			_push_mouse_button(MOUSE_BUTTON_LEFT, Vector2(400, 270), true)
+			var mm := InputEventMouseMotion.new()
+			mm.position = Vector2(440, 290)
+			mm.relative = Vector2(40, 20)
+			get_viewport().push_input(mm)
+			_push_mouse_button(MOUSE_BUTTON_LEFT, Vector2(440, 290), false)
+			print("MAP_ZOOM_OK=", zoomed, " MAP_DRAG_OK=", map_ui.pan != Vector2.ZERO)
+		335: _save_shot("_mapdrag.png")
+		336: map_ui.close()
+		338:
+			# 퀘스트 5 재현: 바위벽 앞까지 실제 이동 판정으로 붙은 뒤 E
+			var rx := 30
+			var ry := 40
+			# 주변을 비운다 — 흩어진 돌이 먼저 잡히면 무엇을 쟀는지 알 수 없다
+			for cy in range(ry - 4, ry + 5):
+				for cx in range(rx - 4, rx + 5):
+					objects.erase(Vector2i(cx, cy))
+			for yy in range(ry - 2, ry + 3):
+				var rp := Vector2i(rx, yy)
+				objects[rp] = {"kind": "bigrock", "hp": BIGROCK_HP}
+				_spawn_object_node(rp, "bigrock")
+			_sel_target = Vector2i(-999, -999)
+			_mouse_target = Vector2i(-999, -999)
+			set_tool("pickaxe")
+			var py := ry * TILE + 16.0
+			var px := (rx - 3) * TILE + 16.0
+			while is_passable_px(Vector2(px + 1.0, py)):
+				px += 1.0                       # 막힐 때까지 오른쪽으로 (실제 이동과 같은 판정)
+			player.position = Vector2(px, py)
+			player.dir = "right"
+			var before: int = int(objects[Vector2i(rx, ry)].hp)
+			interact()
+			var after: int = int(objects.get(Vector2i(rx, ry), {"hp": -1}).hp)
+			print("ROCK_WALL: player_tile=", player_tile(), " rock_x=", rx,
+				" target=", target_tile(), " hp ", before, "->", after,
+				" MINED_OK=", after != before)
+			# 더 나쁜 상황: 두 칸 떨어져 반대쪽을 보고 있어도 캘 수 있어야 한다
+			_work_lock = 0.0
+			_sel_target = Vector2i(-999, -999)
+			player.position = Vector2((rx - 2) * TILE + 16, py)
+			player.dir = "left"
+			var b2: int = int(objects[Vector2i(rx, ry)].hp)
+			interact()
+			var a2: int = int(objects.get(Vector2i(rx, ry), {"hp": -1}).hp)
+			print("ROCK_FAR: player_tile=", player_tile(), " (두 칸 떨어져 반대쪽 보기) hp ",
+				b2, "->", a2, " MINED_OK=", a2 != b2)
+		340:
 			var where := []
 			for n in npcs:
 				where.append("%s:%s" % [n.id, n.place])
 			print("NPC_PLACES=", ", ".join(where))
 			_save_shot("_npcday.png")
-		333: get_tree().quit()
+		342: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -5599,6 +5661,15 @@ func _net_new_day(json: String, title_text: String, body: String) -> void:
 
 func _send_key(code: Key) -> void:
 	_send_key_press(code)
+
+
+# 마우스 버튼을 뷰포트에 그대로 밀어 넣는다 (GUI 단계까지 거치는 진짜 경로)
+func _push_mouse_button(button: MouseButton, pos: Vector2, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = button
+	ev.position = pos
+	ev.pressed = pressed
+	get_viewport().push_input(ev)
 
 
 func _send_key_press(code: Key) -> void:

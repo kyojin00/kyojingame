@@ -29,13 +29,18 @@ func _ready() -> void:
 	layer = 22
 	visible = false
 
+	# 두 Control 모두 마우스를 통과시켜야 한다.
+	# 기본값(STOP)이면 GUI 단계에서 이벤트를 먹어 _unhandled_input이 아예 안 불리고,
+	# 휠 확대와 끌기가 통째로 죽는다.
 	var bg := ColorRect.new()
 	bg.color = Color(0.06, 0.05, 0.1, 0.92)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	canvas = Control.new()
 	canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.draw.connect(_draw_map)
 	add_child(canvas)
 
