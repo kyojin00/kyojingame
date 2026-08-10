@@ -188,20 +188,23 @@ func _rebuild() -> void:
 	# 오늘의 의뢰 (마을 광장 게시판)
 	_line("[오늘의 의뢰]", COL_HEAD)
 	var q: Dictionary = GameData.quest
-	if q.is_empty():
+	if not q.is_empty():
+		var iname: String = GameData.item_display_name(str(q.item))
+		var have := GameData.ingredient_count(str(q.item))
+		var status := "달성! 게시판(마을 광장)에서 납품하자." \
+			if have >= int(q.qty) else "진행 중"
+		_line("  [%s] %s %d개 납품 - 보상 %dG" % [q.get("label", "납품"), iname,
+			int(q.qty), int(q.reward)])
+		_line("    보유 %d/%d · %s" % [mini(have, int(q.qty)), int(q.qty), status],
+			COL_NOW if have >= int(q.qty) else COL_SUB)
+	elif GameData.quest_offers.is_empty():
 		_line("  오늘 의뢰는 없다. 내일 게시판을 확인하자.")
 	else:
-		var crop_name: String = GameData.CROPS[q.crop].name
-		if bool(q.accepted):
-			var have := int(GameData.produce[q.crop])
-			var status := "달성! 게시판(마을 광장)에서 납품하자." \
-				if have >= int(q.qty) else "진행 중"
-			_line("  %s %d개 납품 - 보상 %dG" % [crop_name, int(q.qty), int(q.reward)])
-			_line("    보유 %d/%d · %s" % [mini(have, int(q.qty)), int(q.qty), status],
-				COL_NOW if have >= int(q.qty) else COL_SUB)
-		else:
-			_line("  [미수락] %s %d개 납품 - 보상 %dG" % [crop_name, int(q.qty), int(q.reward)])
-			_line("    마을 광장 게시판(E)에서 수락하자.", COL_SUB)
+		_line("  게시판에 세 건이 붙어 있다. 하나만 고를 수 있다.", COL_SUB)
+		for o: Dictionary in GameData.quest_offers:
+			_line("  · [%s] %s %d개 - %dG" % [o.label,
+				GameData.item_display_name(str(o.item)), int(o.qty), int(o.reward)])
+		_line("    마을 광장 게시판(E)에서 골라 수락하자.", COL_SUB)
 
 	# 할아버지의 부탁 — 기본 안내가 끝난 뒤 이어지는 본 게임의 길잡이.
 	# 다음 부탁은 미리 보여주지 않는다 (받았을 때 편지로 읽는다).

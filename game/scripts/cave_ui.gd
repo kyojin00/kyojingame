@@ -62,12 +62,65 @@ func open(wt: bool = false, start_floor: int = 1) -> void:
 	if worldtree:
 		main.hud.show_message("세계수 동굴... 공기가 다르다. 3층에 수호자가 있다!")
 	else:
-		main.hud.show_message("동굴 %d층. Space: 공격 · 슬라임을 모두 잡자!" % floor_num)
+		main.hud.show_message("동굴 %d층 — %s\nSpace: 공격 · 몬스터를 모두 잡자!"
+			% [floor_num, floor_title()], 4.0)
+		if special != "":
+			main.hud.quest_toast(str(SPECIALS[special].name))
 
 
 func close() -> void:
 	visible = false
 	Sound.play_sfx("sfx_place")
+
+
+# 층 유형 — 예전에는 모든 층이 「테두리 + 8% 기둥」으로 똑같이 생겨서,
+# 1층이든 30층이든 눈에 보이는 것이 같았다.
+const LAYOUTS := ["open", "pillars", "maze", "cavern"]
+const LAYOUT_NAMES := {
+	"open": "너른 굴", "pillars": "돌기둥 숲", "maze": "좁은 갱도", "cavern": "동공",
+}
+# 드물게 층 전체가 특별해진다
+const SPECIALS := {
+	"vein": {"name": "광맥방", "hint": "벽마다 광석이 박혀 있다!"},
+	"grove": {"name": "이끼방", "hint": "축축한 이끼 사이로 약초가 자란다."},
+	"treasure": {"name": "보물방", "hint": "상자가 먼저 보인다. 조심해서 열자."},
+}
+const SPECIAL_CHANCE := 0.26
+
+var layout := "open"
+var special := ""
+var reachable := {}      # 입구에서 걸어 닿는 칸 (여기에만 무언가를 놓는다)
+
+
+func floor_title() -> String:
+	var t: String = str(LAYOUT_NAMES.get(layout, ""))
+	if special != "":
+		t += " · " + str(SPECIALS[special].name)
+	return t
+
+
+func _wall_at(x: int, y: int) -> void:
+	walls[Vector2i(x, y)] = true
+
+
+# 입구에서 실제로 걸어 닿는 칸만 남긴다.
+# (미로/동공은 벽 배치에 따라 섬이 생길 수 있다 — 거기에 계단을 놓으면 갇힌다)
+func _mark_reachable() -> void:
+	reachable.clear()
+	var queue: Array[Vector2i] = [entry_pos]
+	reachable[entry_pos] = true
+	var head := 0
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
+		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var n: Vector2i = cur + d
+			if n.x < 1 or n.y < 1 or n.x >= GW - 1 or n.y >= GH - 1:
+				continue
+			if reachable.has(n) or walls.has(n):
+				continue
+			reachable[n] = true
+			queue.append(n)
 
 
 func _gen_floor() -> void:
@@ -76,18 +129,70 @@ func _gen_floor() -> void:
 	monsters.clear()
 	chest_pos = Vector2i(-1, -1)
 	stairs_pos = Vector2i(-1, -1)
-	# 테두리 벽 + 랜덤 기둥
+
+	# 층마다 모양을 바꾼다 (세계수 동굴은 언제나 너른 굴)
+	layout = "open" if worldtree else LAYOUTS[randi() % LAYOUTS.size()]
+	special = ""
+	if not worldtree and floor_num > 1 and randf() < SPECIAL_CHANCE:
+		var keys: Array = SPECIALS.keys()
+		special = str(keys[randi() % keys.size()])
+
+	# 테두리
 	for y in GH:
 		for x in GW:
 			if x == 0 or y == 0 or x == GW - 1 or y == GH - 1:
-				walls[Vector2i(x, y)] = true
-			elif randf() < 0.08 and Vector2i(x, y).distance_to(entry_pos) > 3.0:
-				walls[Vector2i(x, y)] = true
-	# 광석
-	for i in 2 + floor_num / 2:
+				_wall_at(x, y)
+	# 유형별 속 채우기
+	match layout:
+		"pillars":
+			# 규칙적인 돌기둥 (사이는 언제나 지나갈 수 있다)
+			for y in range(2, GH - 2, 3):
+				for x in range(2, GW - 2, 3):
+					if randf() < 0.85:
+						_wall_at(x + (randi() % 2), y)
+		"maze":
+			# 격자 미로: 짝수 칸을 기둥으로 두면 통로가 반드시 이어진다
+			for y in range(2, GH - 2, 2):
+				for x in range(2, GW - 2, 2):
+					_wall_at(x, y)
+					var d: Vector2i = [Vector2i(1, 0), Vector2i(-1, 0),
+						Vector2i(0, 1), Vector2i(0, -1)][randi() % 4]
+					if randf() < 0.6:
+						_wall_at(x + d.x, y + d.y)
+		"cavern":
+			# 큼직한 바위 덩어리 몇 개
+			for i in randi_range(3, 5):
+				var cx := randi_range(3, GW - 5)
+				var cy := randi_range(2, GH - 4)
+				for dy in randi_range(2, 3):
+					for dx in randi_range(2, 4):
+						_wall_at(cx + dx, cy + dy)
+		_:
+			for y in range(1, GH - 1):
+				for x in range(1, GW - 1):
+					if randf() < 0.08 and Vector2i(x, y).distance_to(entry_pos) > 3.0:
+						_wall_at(x, y)
+	# 입구 둘레는 언제나 비워 둔다
+	for dy in range(-1, 2):
+		for dx in range(-1, 3):
+			walls.erase(entry_pos + Vector2i(dx, dy))
+	_mark_reachable()
+
+	# 광석 (광맥방은 세 배)
+	var ore_n := 2 + floor_num / 2
+	if special == "vein":
+		ore_n *= 3
+	for i in ore_n:
 		var p := _free_tile(3.0)
 		if p.x >= 0:
 			ores[p] = true
+
+	# 보물방은 상자가 처음부터 놓여 있다
+	if special == "treasure":
+		var cp := _free_tile(4.0)
+		if cp.x >= 0:
+			chest_pos = cp
+
 	# 몬스터 (층이 깊어질수록 종류/수 증가, 세계수 동굴은 2배 강함)
 	var hp_mult := 2 if worldtree else 1
 	if worldtree and floor_num == 3:
@@ -96,14 +201,20 @@ func _gen_floor() -> void:
 		_spawn_mob("ghost", 4)
 		_spawn_mob("ghost", 4)
 	else:
-		for i in 2 + floor_num:
+		# 이끼방은 조용하다 (대신 얻는 것도 다르다)
+		var mob_scale := 0.5 if special == "grove" else 1.0
+		for i in int((2 + floor_num) * mob_scale):
 			_spawn_mob("slime", (1 + int(floor_num / 3.0)) * hp_mult)
 		if floor_num >= 2 or worldtree:
-			for i in 1 + int(floor_num / 2.0):
+			for i in int((1 + int(floor_num / 2.0)) * mob_scale):
 				_spawn_mob("bat", 1 * hp_mult)
 		if floor_num >= 4 or (worldtree and floor_num >= 2):
-			for i in maxi(1, int((floor_num - 2) / 2.0)):
+			for i in maxi(1, int((floor_num - 2) / 2.0 * mob_scale)):
 				_spawn_mob("ghost", (2 + int(floor_num / 4.0)) * hp_mult)
+		# 다섯 층마다 미니보스 — 승강기 층이 「도달했다」는 느낌이 나게
+		if not worldtree and floor_num % 5 == 0:
+			_spawn_mob("treant", 12 + floor_num * 2)
+
 	ppos = Vector2(OX + (entry_pos.x + 0.5) * TS, OY + (entry_pos.y + 0.5) * TS)
 	pdir = "right"
 
@@ -120,12 +231,18 @@ func _spawn_mob(type: String, hp: int) -> void:
 	})
 
 
+# 입구에서 걸어 닿는 빈 칸을 고른다.
+# 닿지 않는 칸에 계단이나 상자를 놓으면 층을 못 넘어간다.
 func _free_tile(min_dist: float) -> Vector2i:
-	for attempt in 40:
+	for attempt in 60:
 		var p := Vector2i(randi_range(1, GW - 2), randi_range(1, GH - 2))
-		if not walls.has(p) and not ores.has(p) and p != entry_pos \
+		if reachable.has(p) and not ores.has(p) and p != chest_pos and p != entry_pos \
 				and float(p.distance_to(entry_pos)) >= min_dist:
 			return p
+	# 멀리 떨어진 자리를 못 찾았으면 거리 조건을 풀고 아무 데나
+	for p2: Vector2i in reachable:
+		if not ores.has(p2) and p2 != entry_pos and p2 != chest_pos:
+			return p2
 	return Vector2i(-1, -1)
 
 
@@ -312,6 +429,10 @@ func _interact() -> void:
 	if chest_pos.x >= 0 and pt.distance_to(chest_pos) < 1.8:
 		var ore_n := 2 + floor_num
 		var gem_n := maxi(0, floor_num - 2)
+		if special == "vein":
+			ore_n *= 2
+		elif special == "treasure":
+			gem_n += 2 + floor_num / 3
 		main.gain_item("ore", ore_n)
 		if gem_n > 0:
 			main.gain_item("gem", gem_n)
@@ -319,6 +440,13 @@ func _interact() -> void:
 		var msg := "상자에서 광석 %d개" % ore_n
 		if gem_n > 0:
 			msg += ", 보석 %d개" % gem_n
+		# 이끼방에서는 약초가 함께 나온다 (연금술 생명 재료)
+		if special == "grove":
+			var herb := 3 + floor_num / 2
+			main.gain_item("forage_herb", herb)
+			GameData.forage_caught["forage_herb"] = \
+				int(GameData.forage_caught.get("forage_herb", 0)) + herb
+			msg += ", 약초 %d개" % herb
 		main.hud.show_message(msg + "를 얻었다!")
 		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
 		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
@@ -338,10 +466,15 @@ func _interact() -> void:
 			GameData.mine_reach(floor_num)
 		_gen_floor()
 		Sound.play_sfx("sfx_place")
-		var msg2 := "동굴 %d층으로 내려간다... 더 위험해졌다!" % floor_num
+		var msg2 := "동굴 %d층 — %s" % [floor_num, floor_title()]
+		if special != "":
+			msg2 += "\n" + str(SPECIALS[special].hint)
+			main.hud.quest_toast(str(SPECIALS[special].name))
+		if not worldtree and floor_num % 5 == 0:
+			msg2 += "\n무언가 커다란 것이 버티고 있다..."
 		if not worldtree and floor_num % GameData.MINE_ELEVATOR_STEP == 0:
 			msg2 += "\n승강기 층! 다음부터 여기서 시작할 수 있다."
-		main.hud.show_message(msg2, 4.0)
+		main.hud.show_message(msg2, 4.5)
 
 
 func _dir_vec() -> Vector2:

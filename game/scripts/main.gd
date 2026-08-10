@@ -558,7 +558,7 @@ func _ready() -> void:
 	_sync_village_npcs()
 	_spawn_objects()
 	_apply_season_visuals()
-	if GameData.quest.is_empty():
+	if GameData.quest.is_empty() and GameData.quest_offers.is_empty():
 		GameData.make_daily_quest()
 
 	_setup_fade(loaded.size() > 0 or _shot_path != "")
@@ -1541,6 +1541,8 @@ func gain_skill(id: String, amount: float) -> void:
 
 
 func _on_fishing_finished(success: bool) -> void:
+	if pending_fish.is_empty():
+		return          # 무엇이 물었는지 모르는 채로 끝났다 (있어선 안 되는 경우)
 	if success:
 		var id: String = pending_fish[0]
 		var def: Dictionary = GameData.ITEMS[id]
@@ -1907,7 +1909,9 @@ func use_tool() -> void:
 					var zone: float = pending_fish[2]
 					if int(GameData.affinity["fisher"]) >= 50:
 						zone *= 1.25
-					fishing_ui.start(zone)
+					# 귀한 물고기일수록 여러 번 · 좁게 · 빠르게 (game_data.FISH)
+					fishing_ui.start(zone, int(pending_fish[3]), float(pending_fish[4]),
+						str(GameData.FISH_HINT.get(str(pending_fish[0]), "")))
 	# 멀티: 내 행동을 다른 플레이어에게 반영 (낚싯대는 로컬 진행)
 	if not _remote_acting:
 		if Net.is_guest() and GameData.tool != "rod":
@@ -3985,47 +3989,64 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 	dialog.set_body(body)
 
 
+# 게시판: 아직 안 골랐으면 오늘 붙은 의뢰 셋 중 하나를 고르고,
+# 고른 뒤에는 진행 상황/납품을 보여 준다.
 func _open_quest_board() -> void:
 	var q: Dictionary = GameData.quest
 	if q.is_empty():
-		dialog.open("의뢰 게시판", "오늘은 새 의뢰가 없다.", [["닫기", null]])
+		if GameData.quest_offers.is_empty():
+			dialog.open("의뢰 게시판", "오늘은 새 의뢰가 없다.", [["닫기", null]])
+			return
+		var text := "[오늘의 의뢰] 하나만 고를 수 있습니다.\n"
+		var btns: Array = []
+		for i in GameData.quest_offers.size():
+			var o: Dictionary = GameData.quest_offers[i]
+			var have: int = GameData.ingredient_count(str(o.item))
+			text += "\n%d. [%s] %s %d개  —  %dG  (보유 %d)" % [i + 1, o.label,
+				GameData.item_display_name(str(o.item)), int(o.qty), int(o.reward), have]
+			btns.append(["%d번" % (i + 1), _accept_quest.bind(i)])
+		btns.append(["닫기", null])
+		dialog.open("의뢰 게시판", text, btns)
 		return
-	var crop: Dictionary = GameData.CROPS[q.crop]
-	var text := "[납품 의뢰]\n%s %d개를 모아 오면 %dG를 드립니다." % [crop.name, q.qty, q.reward]
-	if not q.accepted:
-		dialog.open("의뢰 게시판", text, [
-			["수락", _accept_quest],
-			["닫기", null],
-		])
-	elif GameData.produce[q.crop] >= q.qty:
-		dialog.open("의뢰 게시판", text + "\n(보유: %d개 - 납품 가능!)" % GameData.produce[q.crop], [
+	var iid: String = str(q.item)
+	var have2: int = GameData.ingredient_count(iid)
+	var text2 := "[납품 의뢰]\n%s %d개를 모아 오면 %dG를 드립니다." % [
+		GameData.item_display_name(iid), int(q.qty), int(q.reward)]
+	if have2 >= int(q.qty):
+		dialog.open("의뢰 게시판", text2 + "\n(보유 %d개 — 납품 가능!)" % have2, [
 			["납품하기", _turn_in_quest],
 			["닫기", null],
 		])
 	else:
-		dialog.open("의뢰 게시판", text + "\n(진행중: %d/%d개)" % [GameData.produce[q.crop], q.qty],
+		dialog.open("의뢰 게시판", text2 + "\n(진행중: %d/%d개)" % [have2, int(q.qty)],
 			[["닫기", null]])
 
 
-func _accept_quest() -> void:
-	GameData.quest.accepted = true
+func _accept_quest(i: int) -> void:
+	GameData.accept_offer(i)
 	if Net.is_guest():
 		_req_quest.rpc_id(1, "accept")
 	elif Net.is_host():
 		_broadcast_stats()
-	dialog.set_body("의뢰를 수락했다! 작물을 모아서 다시 오자.")
+	save_now()
+	dialog.set_body("의뢰를 수락했다!\n%s %d개를 모아서 다시 오자." % [
+		GameData.item_display_name(str(GameData.quest.item)), int(GameData.quest.qty)])
 
 
 func _turn_in_quest() -> void:
 	var q: Dictionary = GameData.quest
-	GameData.consume_produce(q.crop, int(q.qty))
-	GameData.money += q.reward
+	var iid: String = str(q.item)
+	if GameData.ingredient_count(iid) < int(q.qty):
+		return
+	GameData.consume_ingredient(iid, int(q.qty))
+	GameData.money += int(q.reward)
 	GameData.today_earned += int(q.reward)
 	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
 	Sound.play_sfx("sfx_coin")
 	hud.reward_toast("%dG" % int(q.reward), tex["icon_coin"])
-	dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % q.reward)
+	dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % int(q.reward))
 	GameData.quest = {}
+	save_now()
 	if Net.is_guest():
 		_req_quest.rpc_id(1, "turnin")
 	elif Net.is_host():
@@ -4191,7 +4212,8 @@ func _next_day(passed_out: bool) -> void:
 	# NPC 일일 상태 리셋 + 새 의뢰
 	for n in npcs:
 		n.talked_today = false
-	if GameData.quest.is_empty() or not GameData.quest.get("accepted", false):
+	# 수락해 둔 의뢰는 다음 날까지 이어진다. 안 골랐으면 새로 세 건이 붙는다
+	if GameData.quest.is_empty():
 		GameData.make_daily_quest()
 
 	save_now()
@@ -4374,10 +4396,17 @@ func _apply_save(d: Dictionary) -> void:
 	for k in d.get("affinity", {}):
 		GameData.affinity[k] = int(d.affinity[k])
 	if d.has("quest") and typeof(d.quest) == TYPE_DICTIONARY and not d.quest.is_empty():
+		# 옛 저장은 「crop」이었다 (작물 납품 한 종류뿐이던 시절)
 		GameData.quest = {
-			"crop": d.quest.crop, "qty": int(d.quest.qty),
+			"item": str(d.quest.get("item", d.quest.get("crop", ""))),
+			"kind": str(d.quest.get("kind", "crop")),
+			"label": str(d.quest.get("label", "작물")),
+			"qty": int(d.quest.qty),
 			"reward": int(d.quest.reward), "accepted": bool(d.quest.accepted),
 		}
+		if str(GameData.quest.item) == "":
+			GameData.quest = {}
+	GameData.quest_offers = d.get("quest_offers", [])
 	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
 	GameData.tutorial = d.get("tutorial", {"active": false})
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
@@ -5745,6 +5774,111 @@ func _debug_tick() -> void:
 					and not GameData.weather_wet(GameData.WEATHER_FOG)
 					and not GameData.weather_wet(GameData.WEATHER_STAR),
 				" harsh(안개)=", GameData.weather_harsh(GameData.WEATHER_FOG))
+		367:
+			# 낚시: 귀한 물고기는 여러 번 맞혀야 하고, 두 번 놓치면 도망간다
+			var hooked := [0]
+			pending_fish = GameData.FISH[0]   # 판정 성공 시 main이 실제로 처리한다
+			var fin := func(ok: bool) -> void: hooked[0] = 1 if ok else -1
+			fishing_ui.finished.connect(fin)
+			var ev_hook := InputEventAction.new()
+			ev_hook.action = "use_tool"
+			ev_hook.pressed = true
+			# ① 3단계 물고기(황금잉어) — 구간을 화면 전체로 열어 세 번 다 맞힌다
+			fishing_ui.start(30.0, 3, 1.5, "테스트")
+			var mid_ok := true
+			for i in 3:
+				fishing_ui.zone_x = 0.0
+				fishing_ui.zone_w = fishing_ui.BAR_W
+				if i < 2 and not fishing_ui.visible:
+					mid_ok = false          # 아직 끝나면 안 된다
+				fishing_ui._input(ev_hook)
+			print("FISH_STAGES_OK=", hooked[0] == 1 and mid_ok,
+				" 단계=", fishing_ui.stages_total)
+			# ② 두 번 놓치면 도망 (한 번은 봐준다)
+			hooked[0] = 0
+			fishing_ui.start(30.0, 2, 1.0, "테스트")
+			fishing_ui.zone_x = -999.0
+			fishing_ui.zone_w = 1.0
+			fishing_ui._input(ev_hook)
+			var alive_after_1: bool = fishing_ui.visible and hooked[0] == 0
+			fishing_ui.zone_x = -999.0
+			fishing_ui.zone_w = 1.0
+			fishing_ui._input(ev_hook)
+			print("FISH_MISS_OK=", alive_after_1 and hooked[0] == -1,
+				" (한 번 놓쳐도 계속=", alive_after_1, ")")
+			fishing_ui.finished.disconnect(fin)
+			# 화면용: 황금잉어 판정을 한 번 맞힌 상태로 띄워 둔다
+			fishing_ui.start(34.0, 3, 1.5, str(GameData.FISH_HINT["fish_golden"]))
+			fishing_ui.zone_x = 0.0
+			fishing_ui.zone_w = fishing_ui.BAR_W
+			fishing_ui._input(ev_hook)
+		368:
+			_save_shot("_fishing.png")
+			fishing_ui.visible = false
+			pending_fish = []
+		364:
+			# 동굴 층: 유형이 실제로 섞여 나오고, 계단/상자가 늘 걸어 닿는 곳에 있는가
+			cave.main = self
+			cave.worldtree = false
+			var seen_layout := {}
+			var seen_special := {}
+			var unreachable_n := 0
+			for f in range(1, 41):
+				cave.floor_num = f
+				cave._gen_floor()
+				seen_layout[cave.layout] = true
+				if cave.special != "":
+					seen_special[cave.special] = true
+				# 계단 자리를 실제로 뽑아 보고 걸어 닿는지 확인한다
+				var sp2: Vector2i = cave._free_tile(0.0)
+				if sp2.x < 0 or not cave.reachable.has(sp2):
+					unreachable_n += 1
+			print("CAVE_LAYOUT_OK=", seen_layout.size() >= 3,
+				" 유형=", seen_layout.keys(), " 희귀방=", seen_special.keys())
+			print("CAVE_REACHABLE_OK=", unreachable_n == 0,
+				" 못 닿는 층=", unreachable_n, "/40")
+			# 5층마다 미니보스가 서 있는가
+			cave.floor_num = 10
+			cave._gen_floor()
+			var boss := 0
+			for m in cave.monsters:
+				if str(m.type) == "treant":
+					boss += 1
+			print("CAVE_MINIBOSS_OK=", boss >= 1, " 10층 보스=", boss)
+		361:
+			# 의뢰: 종류가 여러 가지로 붙고, 골라서 수락 -> 납품까지 되는가
+			GameData.quest = {}
+			GameData.recipes_cooked["dish_soup"] = 1     # 요리 의뢰 후보를 연다
+			GameData.learn_formula("potion_energy")      # 물약 의뢰 후보를 연다
+			var kinds_seen := {}
+			for d4 in range(1, GameData.DAYS_PER_SEASON * 4 + 1):
+				GameData.day = d4
+				GameData.make_daily_quest()
+				for o: Dictionary in GameData.quest_offers:
+					kinds_seen[str(o.kind)] = true
+			GameData.day = 1
+			GameData.make_daily_quest()
+			print("QUEST_KINDS_OK=", kinds_seen.size() >= 5,
+				" 1년치 종류=", kinds_seen.keys(),
+				" 오늘 붙은 건수=", GameData.quest_offers.size())
+			# 골라 수락 -> 물건을 채우고 -> 납품
+			var off: Dictionary = GameData.quest_offers[0]
+			var qitem: String = str(off.item)
+			var qneed: int = int(off.qty)
+			GameData.accept_offer(0)
+			if GameData.CROPS.has(qitem):
+				GameData.produce[qitem] = qneed
+			else:
+				GameData.items[qitem] = qneed
+			var money0: int = GameData.money
+			var left0: int = GameData.ingredient_count(qitem)
+			_turn_in_quest()
+			print("QUEST_TURNIN_OK=", GameData.quest.is_empty()
+					and GameData.money == money0 + int(off.reward)
+					and GameData.ingredient_count(qitem) == left0 - qneed,
+				" 품목=", GameData.item_display_name(qitem), " x", qneed,
+				" 보상=", int(off.reward))
+			dialog.close()
 		359:
 			# 목초지: 울타리로 네모나게 둘러싸면 그 안이 갇힌 칸이 되어야 한다
 			var p0 := Vector2i(16, 16)
@@ -5869,7 +6003,13 @@ func _debug_tick() -> void:
 			_weather_override = GameData.WEATHER_STAR
 			GameData.minutes = 22.0 * 60.0   # 별은 밤에 뜬다
 		377: _save_shot("_weather_star.png")
-		378: get_tree().quit()
+		379:
+			GameData.quest = {}
+			GameData.make_daily_quest()
+			_weather_override = -1
+			_open_quest_board()
+		381: _save_shot("_board.png")
+		383: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
@@ -6361,9 +6501,10 @@ func _req_quest(op: String) -> void:
 		GameData.quest.accepted = true
 	elif op == "turnin" and not GameData.quest.is_empty():
 		var q: Dictionary = GameData.quest
-		if GameData.produce[q.crop] >= q.qty:
-			GameData.produce[q.crop] -= q.qty
-			GameData.money += q.reward
+		var iid: String = str(q.item)
+		if GameData.ingredient_count(iid) >= int(q.qty):
+			GameData.consume_ingredient(iid, int(q.qty))
+			GameData.money += int(q.reward)
 			GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
 			GameData.quest = {}
 	_broadcast_stats()

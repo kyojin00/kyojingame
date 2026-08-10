@@ -393,10 +393,9 @@ func refresh() -> void:
 		track.push_front("★ " + fl)
 	if GameData.u_intro_state == 1:
 		track.append("목표: U 키로 능력치를 확인해 보자")
-	var q: Dictionary = GameData.quest
-	if not q.is_empty() and bool(q.accepted):
-		track.append("의뢰: %s %d/%d" % [GameData.CROPS[q.crop].name,
-			mini(int(GameData.produce[q.crop]), int(q.qty)), int(q.qty)])
+	var qline: String = GameData.quest_line()
+	if qline != "":
+		track.append("의뢰: " + qline)
 	track.append("%s: 퀘스트 창" % GameData.key_label("open_quest"))
 	objective_label.text = "\n".join(track)
 

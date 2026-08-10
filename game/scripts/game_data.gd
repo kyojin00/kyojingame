@@ -1311,12 +1311,20 @@ func cook(id: String) -> bool:
 	return true
 
 # 낚시: [아이템 id, 확률 가중치, 타이밍 존 폭(px)]
+# [id, 나올 확률(무게), 판정 구간 너비, 성공 횟수, 커서 속도 배율]
+# 귀한 물고기일수록 구간이 좁고 · 여러 번 맞혀야 하고 · 커서가 빠르다.
+# 황금잉어는 세 번을 이어서 맞혀야 올라온다.
 const FISH := [
-	["fish_crucian", 0.45, 93.0],
-	["fish_carp", 0.30, 69.0],
-	["fish_catfish", 0.18, 48.0],
-	["fish_golden", 0.07, 27.0],
+	["fish_crucian", 0.45, 96.0, 1, 1.0],
+	["fish_carp", 0.30, 72.0, 2, 1.12],
+	["fish_catfish", 0.18, 54.0, 2, 1.3],
+	["fish_golden", 0.07, 34.0, 3, 1.5],
 ]
+# 물고기가 얼마나 세게 무는지 (판정 전 귀띔)
+const FISH_HINT := {
+	"fish_crucian": "가볍게 톡 —", "fish_carp": "제법 당긴다!",
+	"fish_catfish": "묵직하다!!", "fish_golden": "낚싯대가 휜다!!!",
+}
 
 var items := {}
 var fish_caught := {}  # 도감용 누적 기록
@@ -1629,24 +1637,123 @@ func seed_price(id: String) -> int:
 	return p
 
 
+# ---- 오늘의 의뢰 ----
+#
+# 예전에는 「제철 작물 N개 납품」 한 종류뿐이었다. 물고기·광물·채집물·요리·물약이
+# 다 있는데 하나도 쓰이지 않았다. 이제 종류를 표로 두고, 게시판에서
+# **세 가지 중 하나를 골라** 받는다.
+#
+# 새 의뢰 종류를 넣을 때는 이 표에 한 줄 + quest_pool에 분기 하나면 된다.
+const QUEST_KINDS := [
+	{"id": "crop", "label": "작물", "qmin": 3, "qmax": 7, "pay": 1.5},
+	{"id": "fish", "label": "물고기", "qmin": 2, "qmax": 4, "pay": 2.0},
+	{"id": "forage", "label": "채집물", "qmin": 3, "qmax": 6, "pay": 2.4},
+	{"id": "mineral", "label": "광물", "qmin": 3, "qmax": 8, "pay": 1.8},
+	{"id": "dish", "label": "요리", "qmin": 1, "qmax": 2, "pay": 2.2},
+	{"id": "potion", "label": "물약", "qmin": 1, "qmax": 2, "pay": 2.2},
+]
+const QUEST_OFFER_COUNT := 3
+
+var quest_offers: Array = []   # 오늘 게시판에 붙은 의뢰들 (하나만 고를 수 있다)
+
+
+# 작물 id든 아이템 id든 이름을 준다
+func item_display_name(id: String) -> String:
+	if CROPS.has(id):
+		return str(CROPS[id].name)
+	if ITEMS.has(id):
+		return str(ITEMS[id].name)
+	return id
+
+
+func item_value(id: String) -> int:
+	if CROPS.has(id):
+		return int(CROPS[id].sell_price)
+	return int(ITEMS.get(id, {}).get("sell", 50))
+
+
+# 의뢰 납품 등으로 가진 것을 덜어낸다 (작물은 품질 낮은 것부터)
+func consume_ingredient(id: String, n: int) -> void:
+	if CROPS.has(id):
+		consume_produce(id, n)
+	else:
+		items[id] = maxi(0, int(items[id]) - n)
+
+
+# 이 종류로 낼 수 있는 후보들 (지금 상태에서 말이 되는 것만)
+func quest_pool(kind: String) -> Array:
+	var out: Array = []
+	match kind:
+		"crop":
+			for id: String in CROP_IDS:
+				if season() in CROPS[id].seasons:
+					out.append(id)
+		"fish":
+			for f in FISH:
+				if str(f[0]) != "fish_golden":   # 전설급은 의뢰로 내지 않는다
+					out.append(str(f[0]))
+		"forage":
+			out = FORAGE_IDS + BUG_IDS
+		"mineral":
+			out = ["ore", "gem"]
+		"dish":
+			# 한 번이라도 만들어 본 요리만 의뢰로 나온다
+			for rid: String in RECIPE_IDS:
+				if int(recipes_cooked.get(rid, 0)) > 0:
+					out.append(rid)
+		"potion":
+			# 조합법을 알아낸 물약만
+			for fid: String in alchemy_known:
+				out.append(fid)
+	return out
+
+
 func make_daily_quest() -> void:
-	# 오늘 계절 작물 중 하나 납품 퀘스트 (날짜 해시로 결정적)
-	var pool := []
-	for id in CROP_IDS:
-		if season() in CROPS[id].seasons:
-			pool.append(id)
-	if pool.is_empty():
+	quest_offers = []
+	var kinds: Array = []
+	for k in QUEST_KINDS:
+		if not quest_pool(str(k.id)).is_empty():
+			kinds.append(k)
+	if kinds.is_empty():
 		quest = {}
 		return
-	var h := fposmod(sin(float(day) * 73.7 + 17.3) * 43758.5453, 1.0)
-	var crop: String = pool[int(h * pool.size()) % pool.size()]
-	var qty := 3 + int(h * 97.0) % 4
-	quest = {
-		"crop": crop,
-		"qty": qty,
-		"reward": int(CROPS[crop].sell_price * qty * 1.5),
-		"accepted": false,
-	}
+	# 날짜 해시로 결정적 — 같은 날은 언제나 같은 의뢰가 붙는다
+	var used := {}
+	for i in QUEST_OFFER_COUNT:
+		var h := fposmod(sin(float(day) * 73.7 + float(i) * 41.3 + 17.3) * 43758.5453, 1.0)
+		var k: Dictionary = kinds[int(h * 1000.0) % kinds.size()]
+		var pool: Array = quest_pool(str(k.id))
+		var item: String = str(pool[int(h * 997.0) % pool.size()])
+		if used.has(item):
+			continue                       # 같은 물건이 두 번 붙지 않게
+		used[item] = true
+		var span: int = int(k.qmax) - int(k.qmin) + 1
+		var qty: int = int(k.qmin) + int(h * 89.0) % span
+		quest_offers.append({
+			"item": item,
+			"kind": str(k.id),
+			"label": str(k.label),
+			"qty": qty,
+			"reward": maxi(50, int(item_value(item) * qty * float(k.pay))),
+		})
+	quest = {}
+
+
+func accept_offer(i: int) -> void:
+	if i < 0 or i >= quest_offers.size():
+		return
+	quest = quest_offers[i].duplicate()
+	quest["accepted"] = true
+	quest_offers = []
+
+
+# 진행 중인 의뢰 한 줄 요약 ("" = 없음)
+func quest_line() -> String:
+	if quest.is_empty() or not bool(quest.get("accepted", false)):
+		return ""
+	var id: String = str(quest.item)
+	return "%s %d/%d" % [item_display_name(id),
+		mini(ingredient_count(id), int(quest.qty)), int(quest.qty)]
 
 
 func pick_fish() -> Array:
@@ -1695,6 +1802,7 @@ func reset_all() -> void:
 	stone = 0
 	tool_level = {"hoe": 1, "water": 1, "axe": 1, "pickaxe": 1}
 	quest = {}
+	quest_offers = []
 	fish_caught = {}
 	mob_kills = {}
 	recipes_cooked = {}
@@ -2005,6 +2113,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"mob_kills": mob_kills,
 		"affinity": affinity,
 		"quest": quest,
+		"quest_offers": quest_offers,
 		"tutorial": tutorial,
 		"alchemy_known": alchemy_known,
 		"alchemy_brews": alchemy_brews,
