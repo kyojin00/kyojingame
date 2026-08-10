@@ -213,12 +213,19 @@ func _draw_map() -> void:
 
 	# 시설 라벨 (그 위치를 발견했을 때만)
 	_place_label(73, 28, "우리집")
-	_place_label(12, 8, "농장")
+	_place_label(18, 14, "농장")
 	if GameData.barn_built:
 		_place_label(main.BARN_POS.x, main.BARN_POS.y, "축사")
 	if GameData.greenhouse_built:
 		_place_label(main.GREENHOUSE.position.x + 4,
 			main.GREENHOUSE.position.y + 3, "온실")
+	# 세워 둔 말 (타고 있는 동안에는 내 위치와 같으므로 표시하지 않는다)
+	if GameData.has_horse and not GameData.riding:
+		var h: Vector2i = GameData.horse_tile
+		canvas.draw_rect(Rect2(_ox + h.x * _cell - 2, _oy + h.y * _cell - 2,
+			_cell + 4, _cell + 4), Color(0.62, 0.42, 0.24))
+		# 글씨는 아래쪽에 — 위에 두면 「농장」·「축사」 라벨과 겹쳐 읽을 수 없다
+		_label(Vector2(_ox + h.x * _cell, _oy + h.y * _cell + _cell + 20), "말")
 	_place_label(74, 13, "중앙 광장")
 	_place_label(74, 34, "낚시터")
 	_place_label(40, 27, "호수")

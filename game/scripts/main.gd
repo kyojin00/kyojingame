@@ -172,7 +172,12 @@ const TEXTURE_NAMES := [
 const START_TILE := Vector2i(14, 10)
 const CAVE_POS := Vector2i(50, 1)
 const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
-const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
+# 축사(구입 시 농장에 건설). 이 칸이 축사 **문 칸**이고, 그림은 여기서
+# 위로 5칸 반 · 좌우로 3칸씩 뻗는다 (7 x 5.5칸). BARN_ART 참고.
+const BARN_POS := Vector2i(10, 6)
+const BARN_ART := Rect2i(-3, -4, 7, 5)   # BARN_POS 기준 그림이 덮는 칸
+const BIN_POS := Vector2i(16, 10)        # 출하 상자 (축사 그림 밖 · 시작 자리 옆)
+const HORSE_HOME := Vector2i(10, 9)      # 산 말을 세워 두는 자리 (축사 앞마당)
 # ---- 탈 것 (말) ----
 #
 # 목장 상회에서 사면 그 자리 근처에 말이 서 있다. **F로 타고 내린다.**
@@ -207,11 +212,12 @@ func _mount_horse(t: Vector2i) -> void:
 	queue_redraw()
 
 
-# 산 직후: 세워 둔 자리에 말을 놓는다
+# 산 직후: 축사 앞마당(HORSE_HOME)에 말을 세운다.
+# 말은 목장 상회 **실내**에서 사기 때문에 player_tile()을 쓰면 마을 한복판에
+# 서 있게 된다 — 「농장에 세워 뒀다」는 안내와 어긋나 말을 못 찾았다.
 func place_horse() -> void:
-	# 산 자리 근처의 빈 칸에 세운다.
-	# (예전에는 고정 자리에 두어, 그 칸이 막혀 있으면 말이 아예 나오지 않았다)
-	var spot := _free_spot_near(player_tile())
+	var spot := HORSE_HOME if not objects.has(HORSE_HOME) and is_passable(HORSE_HOME) \
+		else _free_spot_near(HORSE_HOME)
 	GameData.horse_tile = spot
 	objects[spot] = {"kind": "horse", "hp": 0}
 	_spawn_object_node(spot, "horse")
@@ -616,7 +622,7 @@ func _build_map() -> void:
 			grid[y][x].ground = "path"
 
 	# 출하 상자(농장) + 동굴
-	objects[Vector2i(9, 4)] = {"kind": "bin", "hp": 0}
+	objects[BIN_POS] = {"kind": "bin", "hp": 0}
 	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
 	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
@@ -1096,7 +1102,7 @@ func _block_under_art(area: Rect2i, core: Rect2i) -> void:
 const OBJECT_SCALES := {
 	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
 	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
-	"barn": 1.8, "forage_berry": 1.5, "forage_herb": 1.5,
+	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
@@ -1166,7 +1172,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -100)
 		"barn":
 			texture = tex["barn"]
-			offset = Vector2(0, -88)
+			offset = Vector2(0, -texture.get_height())   # 밑변을 문 칸 아래에 맞춘다
 		"barn_block":
 			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
 		"art_block":
@@ -1471,6 +1477,13 @@ func _update_fishing(delta: float) -> void:
 			hud.show_message("물고기가 도망갔다...")
 
 
+# 축사 그림이 덮는 칸을 막는다 (그림 안으로 걸어 들어가지 않게).
+# 그림 크기가 바뀌면 BARN_ART만 고치면 된다.
+func _block_barn_art() -> void:
+	_block_under_art(Rect2i(BARN_POS + BARN_ART.position, BARN_ART.size),
+		Rect2i(BARN_POS, Vector2i.ONE))
+
+
 # 축사 건설: 농장 고정 위치에 세워진다 (동물 16마리 + 굳은 날씨 자동 배부름)
 func build_barn() -> void:
 	if GameData.barn_built:
@@ -1479,9 +1492,7 @@ func build_barn() -> void:
 	GameData.money -= GameData.BARN_COST_MONEY
 	GameData.wood -= GameData.BARN_COST_WOOD
 	_place_object(BARN_POS, "barn", 0)
-	objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
-	_block_under_art(Rect2i(BARN_POS.x - 1, BARN_POS.y - 1, 4, 2),
-		Rect2i(BARN_POS.x, BARN_POS.y, 2, 1))
+	_block_barn_art()
 	Sound.play_sfx("sfx_place")
 	hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지."
 		% GameData.BARN_MAX_ANIMALS, 5.0)
@@ -4356,9 +4367,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.barn_built = bool(d.get("barn_built", false))
 	if GameData.barn_built and not objects.has(BARN_POS):
 		objects[BARN_POS] = {"kind": "barn", "hp": 0}
-		objects[BARN_POS + Vector2i(1, 0)] = {"kind": "barn_block", "hp": 0}
-		_block_under_art(Rect2i(BARN_POS.x - 1, BARN_POS.y - 1, 4, 2),
-			Rect2i(BARN_POS.x, BARN_POS.y, 2, 1))
+		_block_barn_art()
 	var anim_scale := float(TILE) / float(d.get("tile", 16))
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])) * anim_scale, int(a[3]) == 1)
@@ -4404,6 +4413,29 @@ func _apply_save(d: Dictionary) -> void:
 			if o.size() > 7 and int(o[7]) == 1:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
 			objects[Vector2i(int(o[0]), int(o[1]))] = od
+		_migrate_farm_layout()
+
+
+# 옛 저장 정리: 축사를 크게 다시 그리면서 자리를 옮겼고,
+# 출하 상자는 축사 그림 밑에 깔려 있어 밖으로 뺐다.
+# 오브젝트는 통째로 저장되므로, 불러올 때 한 번 자리를 맞춰 준다.
+func _migrate_farm_layout() -> void:
+	const OLD_BARN := Vector2i(10, 3)
+	const OLD_BARN_ART := Rect2i(9, 2, 4, 2)
+	for p: Vector2i in objects.keys():
+		var kind: String = objects[p].kind
+		if kind == "bin" or kind == "barn" or kind == "barn_block":
+			objects.erase(p)
+		elif kind == "art_block" and OLD_BARN_ART.has_point(p) and p != OLD_BARN:
+			objects.erase(p)
+	objects[BIN_POS] = {"kind": "bin", "hp": 0}
+	if GameData.barn_built:
+		objects[BARN_POS] = {"kind": "barn", "hp": 0}
+		_block_barn_art()
+		# 새 축사 그림 자리에 서 있던 세이브라면 밖으로 꺼내 준다 (갇히지 않게)
+		if not is_passable(player_tile()):
+			var out := _free_spot_near(BARN_POS + Vector2i(0, 2))
+			player.position = Vector2(out.x * TILE + 16, out.y * TILE + 16)
 
 
 # ---- 루프 ----
@@ -5332,6 +5364,10 @@ func _debug_tick() -> void:
 		332:
 			# 지도 휠·끌기: 이벤트가 실제로 map_ui까지 닿는지 확인한다.
 			# (Control의 mouse_filter가 STOP이면 _unhandled_input이 아예 안 불린다)
+			# 세워 둔 말이 지도에 표시되는지도 함께 본다
+			GameData.has_horse = true
+			GameData.riding = false
+			GameData.horse_tile = HORSE_HOME
 			map_ui.open()
 			_push_mouse_button(MOUSE_BUTTON_WHEEL_UP, Vector2(480, 270), true)
 		333:
@@ -5432,7 +5468,63 @@ func _debug_tick() -> void:
 				(HOME_ANCHOR.y + 4) * TILE + 16)
 			(player.get_node("Camera") as Camera2D).reset_smoothing()
 		351: _save_shot("_home.png")
-		353: get_tree().quit()
+		352:
+			# 축사: 그림 크기 · 주변 정리 · 말 세우기
+			GameData.money = 99999
+			GameData.wood = 999
+			GameData.barn_built = false
+			GameData.has_horse = false
+			GameData.riding = false
+			build_barn()
+			place_horse()
+			GameData.has_horse = true
+			# 그림이 덮는 칸이 모두 막혀 있는가 (안으로 걸어 들어가면 안 된다)
+			var art_ok := true
+			for ay in range(BARN_POS.y + BARN_ART.position.y,
+					BARN_POS.y + BARN_ART.end.y):
+				for ax in range(BARN_POS.x + BARN_ART.position.x,
+						BARN_POS.x + BARN_ART.end.x):
+					if not objects.has(Vector2i(ax, ay)):
+						art_ok = false
+			var bin_clear: bool = not Rect2i(BARN_POS + BARN_ART.position,
+				BARN_ART.size).has_point(BIN_POS)
+			print("BARN_ART_OK=", art_ok, " size=", BARN_ART.size,
+				" BIN_CLEAR_OK=", bin_clear, " bin=", BIN_POS)
+			print("HORSE_PARK=", GameData.horse_tile, " at_farm=",
+				GameData.horse_tile.distance_to(Vector2(HORSE_HOME)) <= 2.0)
+			player.position = Vector2((BARN_POS.x + 3) * TILE + 16,
+				(BARN_POS.y + 4) * TILE + 16)
+			(player.get_node("Camera") as Camera2D).reset_smoothing()
+		354: _save_shot("_barn.png")
+		356:
+			# 옛 세이브 정리: 예전 자리의 출하 상자·축사가 남지 않아야 한다
+			var stale := [Vector2i(9, 4), Vector2i(10, 3), Vector2i(11, 3),
+				Vector2i(9, 2), Vector2i(12, 3)]
+			objects[stale[0]] = {"kind": "bin", "hp": 0}
+			objects[stale[1]] = {"kind": "barn", "hp": 0}
+			objects[stale[2]] = {"kind": "barn_block", "hp": 0}
+			objects[stale[3]] = {"kind": "art_block", "hp": 0}
+			objects[stale[4]] = {"kind": "art_block", "hp": 0}
+			objects.erase(BIN_POS)
+			player.position = Vector2(BARN_POS.x * TILE + 16, BARN_POS.y * TILE + 16)
+			_migrate_farm_layout()
+			# 옛 자리의 상자/축사는 사라지고, 새 축사 그림 칸은 art_block이어야 한다
+			var art := Rect2i(BARN_POS + BARN_ART.position, BARN_ART.size)
+			var left := []
+			for q: Vector2i in objects:
+				var k: String = objects[q].kind
+				if k == "bin" and q != BIN_POS:
+					left.append("bin%s" % q)
+				elif (k == "barn" or k == "barn_block") and q != BARN_POS:
+					left.append("%s%s" % [k, q])
+				elif k == "art_block" and Rect2i(9, 2, 4, 2).has_point(q) \
+						and not art.has_point(q):
+					left.append("art%s" % q)
+			print("MIGRATE_OK=", left.is_empty()
+					and objects.get(BIN_POS, {}).get("kind", "") == "bin"
+					and objects.get(BARN_POS, {}).get("kind", "") == "barn",
+				" leftovers=", left, " player_free=", is_passable(player_tile()))
+		358: get_tree().quit()
 
 
 # ==== 멀티플레이 ====

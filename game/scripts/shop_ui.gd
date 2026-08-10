@@ -530,7 +530,9 @@ func _on_buy_horse() -> void:
 	GameData.has_horse = true
 	if main != null:
 		main.place_horse()
-		main.hud.show_message("말을 샀다! 농장에 세워 두었다. E로 탄다.", 4.0)
+		main.hud.show_message(
+			"말을 샀다! **농장(맵 서쪽) 축사 앞** 에 세워 두었다.\n"
+			+ "가까이 가서 **F** 를 누르면 탄다. (지도 M에 「말」로 표시된다)", 6.0)
 	_rebuild()
 
 
