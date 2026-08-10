@@ -20,6 +20,7 @@ var zoom := 1.0
 var pan := Vector2.ZERO       # 기본 위치에서 얼마나 밀었는지 (화면 픽셀)
 var _drag := false
 var _drag_from := Vector2.ZERO
+var _hud_was := true          # 지도를 열기 전 HUD 표시 상태
 
 # 이번 프레임의 그리기 기준 (셀 크기 / 원점) — 그릴 때 한 번 계산해 둔다
 var _cell := 8.0
@@ -50,12 +51,21 @@ func _ready() -> void:
 func open() -> void:
 	# 배율과 위치는 닫아도 그대로 둔다 (R로 처음 크기로 되돌린다)
 	visible = true
+	_drag = false
+	# 지도를 보는 동안에는 HUD를 감춘다.
+	# 미니맵·시계가 큰 지도 위에 겹쳐 보이는 것도 그렇지만, 무엇보다
+	# 하단 핫바가 **버튼**이라 그 위에서 마우스를 놓으면 버튼이 이벤트를 먹는다.
+	if main != null and main.hud != null:
+		_hud_was = main.hud.visible
+		main.hud.visible = false
 	canvas.queue_redraw()
 
 
 func close() -> void:
 	visible = false
 	_drag = false
+	if main != null and main.hud != null:
+		main.hud.visible = _hud_was
 
 
 func toggle() -> void:
@@ -87,13 +97,18 @@ func _zoom_at(m: Vector2, factor: float) -> void:
 	_clamp_pan()
 
 
-# 지도가 화면 밖으로 완전히 사라지지 않게 한다
+# 지도를 화면 안에 붙들어 둔다.
+#
+# 예전에는 「지도 크기의 절반」까지 밀 수 있었다. 그래서 기본 배율에서도
+# 지도가 화면 한쪽으로 확 밀려 나가 절반이 빈 공간이 됐다 — 끌기가 고장 난 것처럼 보인다.
+# 지금은 지도가 화면보다 크면 **가장자리가 화면 안으로 들어오지 않게**(구석까지 볼 수 있다),
+# 화면보다 작으면 **화면 밖으로 나가지 않게** 묶는다. 두 경우가 같은 식이 된다.
 func _clamp_pan() -> void:
 	var c := _base_cell() * zoom
-	var half_w: float = int(main.MAP_W) * c / 2.0
-	var half_h: float = int(main.MAP_H) * c / 2.0
-	pan.x = clampf(pan.x, -half_w, half_w)
-	pan.y = clampf(pan.y, -half_h, half_h)
+	var lim_x: float = absf(float(main.MAP_W) * c - 960.0) / 2.0
+	var lim_y: float = absf(float(main.MAP_H) * c - 540.0) / 2.0
+	pan.x = clampf(pan.x, -lim_x, lim_x)
+	pan.y = clampf(pan.y, -lim_y, lim_y)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -112,7 +127,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_drag_from = mb.position
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion and _drag:
-		pan += (event as InputEventMouseMotion).relative
+		var mm := event as InputEventMouseMotion
+		pan += mm.relative
+		_drag_from = mm.position
 		_clamp_pan()
 		get_viewport().set_input_as_handled()
 	elif event is InputEventKey and (event as InputEventKey).pressed \
@@ -121,9 +138,37 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+# 끌기를 끝내는 일은 세 겹으로 막아 둔다.
+# 「눌림 해제」를 _unhandled_input에만 맡기면, 마우스를 먹는 Control 위에서
+# 버튼을 놓았을 때 그 이벤트가 영영 오지 않아 지도가 계속 마우스를 따라다녔다.
+#
+# ① _input — GUI보다 **먼저** 오므로 핫바 버튼 위에서 놓아도 놓치지 않는다.
+#    (여기서는 이벤트를 소비하지 않는다. 다른 UI 조작을 방해하면 안 된다)
+func _input(event: InputEvent) -> void:
+	if not visible or not _drag:
+		return
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+			_drag = false
+
+
+# ② 매 프레임 실제 버튼 상태 확인 — 창 밖에서 놓아 이벤트가 아예 없는 경우
+func _stop_drag_if_released() -> void:
+	if _drag and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_drag = false
+
+
+# ③ 창이 포커스를 잃으면 (Alt+Tab 등) 끌기를 놓는다
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_drag = false
+
+
 func _process(delta: float) -> void:
 	if visible:
 		blink += delta
+		_stop_drag_if_released()
 		canvas.queue_redraw()
 
 

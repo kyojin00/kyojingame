@@ -12,7 +12,8 @@ const ROCK_HP := 2
 const WOOD_PER_TREE := 3
 const STONE_PER_ROCK := 2
 
-# 물 지속 시간 (게임 분): 손 물주기 6시간, 비/스프링클러는 하루 종일
+# 물 지속 시간 (게임 분): 손 물주기 6시간, 비는 하루 종일.
+# 스프링클러는 이 값을 계속 다시 채워 줘서 사실상 마르지 않는다.
 const WET_MANUAL := 360.0
 const WET_ALL_DAY := 1200.0
 
@@ -1871,8 +1872,9 @@ func use_tool() -> void:
 			GameData.wood -= GameData.SPRINKLER_COST_WOOD
 			GameData.stone -= GameData.SPRINKLER_COST_STONE
 			_place_object(t, "sprinkler", 0)
+			_sprinkle(t)                      # 설치하자마자 바로 적신다
 			Sound.play_sfx("sfx_place")
-			hud.show_message("스프링클러 설치! 매일 아침 주변 4칸에 물을 준다.")
+			hud.show_message("스프링클러 설치! 주변 4칸에 계속 물을 준다.")
 			tutorial_notify("build")
 		"rod":
 			match fishing_state:
@@ -4117,15 +4119,7 @@ func _next_day(passed_out: bool) -> void:
 				if grid[y][x].ground == "soil":
 					_wet(grid[y][x], WET_ALL_DAY)
 
-	# 스프링클러는 주변 4칸을 하루 종일 적신다
-	for pos: Vector2i in objects:
-		if objects[pos].kind != "sprinkler":
-			continue
-		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var n: Vector2i = pos + d
-			if n.x >= 0 and n.y >= 0 and n.x < MAP_W and n.y < MAP_H \
-					and grid[n.y][n.x].ground == "soil":
-				_wet(grid[n.y][n.x], WET_ALL_DAY)
+	_sprinkler_tick()
 
 	# 축사가 있으면 굳은 날씨에도 동물들이 알아서 배부르다
 	if GameData.barn_built and weather_now() != GameData.WEATHER_SUN:
@@ -4502,7 +4496,26 @@ func _process(delta: float) -> void:
 
 
 # 젖은 밭 위 작물은 실시간으로 자라고, 물기는 서서히 마른다
+# 스프링클러: 설치해 두면 둘레 네 칸을 **계속** 적신다.
+# 예전에는 아침에 딱 한 번만 뿌렸다 — 그래서 방금 설치한 스프링클러도,
+# 낮에 새로 간 밭도 다음 날이 되어야 물이 갔다.
+func _sprinkle(pos: Vector2i) -> void:
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var n: Vector2i = pos + d
+		if n.x < 0 or n.y < 0 or n.x >= MAP_W or n.y >= MAP_H:
+			continue
+		if grid[n.y][n.x].ground == "soil":
+			_wet(grid[n.y][n.x], WET_ALL_DAY)
+
+
+func _sprinkler_tick() -> void:
+	for pos: Vector2i in objects:
+		if objects[pos].kind == "sprinkler":
+			_sprinkle(pos)
+
+
 func _growth_tick(game_minutes: float) -> void:
+	_sprinkler_tick()
 	var changed := false
 	for y in MAP_H:
 		for x in MAP_W:
@@ -5355,6 +5368,37 @@ func _debug_tick() -> void:
 			get_viewport().push_input(mm)
 			_push_mouse_button(MOUSE_BUTTON_LEFT, Vector2(440, 290), false)
 			print("MAP_ZOOM_OK=", zoomed, " MAP_DRAG_OK=", map_ui.pan != Vector2.ZERO)
+			# 회귀 검사: 끌던 손을 **HUD 핫바 위에서** 놓아도 끌기가 끝나야 한다.
+			# 핫바는 진짜 Button이라 GUI 단계에서 「놓기」를 먹어 버린다 —
+			# 그러면 지도가 손을 뗀 뒤에도 마우스를 계속 따라다녔다.
+			# HUD를 일부러 다시 켜서 그때 상황을 그대로 재현한다.
+			hud.visible = true
+			map_ui._drag = true
+			_push_mouse_button(MOUSE_BUTTON_LEFT, Vector2(480, 512), false)
+			var stuck: bool = map_ui._drag
+			var pan_before: Vector2 = map_ui.pan
+			var mm2 := InputEventMouseMotion.new()
+			mm2.position = Vector2(520, 330)
+			mm2.relative = Vector2(80, 40)
+			get_viewport().push_input(mm2)
+			print("MAP_DRAG_RELEASE_OK=", not stuck and map_ui.pan == pan_before)
+			hud.visible = false
+			# 회귀 검사: 아무리 세게 끌어도 지도가 화면 밖으로 밀려나면 안 된다.
+			# (예전 규칙은 지도 크기의 절반까지 허용해서, 기본 배율에서도
+			#  지도가 한쪽으로 확 밀려 나가 절반이 빈 화면이 됐다)
+			map_ui._drag = true
+			for i in 6:
+				var big := InputEventMouseMotion.new()
+				big.position = Vector2(900, 500)
+				big.relative = Vector2(900, 500)
+				get_viewport().push_input(big)
+			map_ui._drag = false
+			var pc: float = map_ui._base_cell() * map_ui.zoom
+			var org: Vector2 = map_ui._origin(pc)
+			var mrect := Rect2(org, Vector2(MAP_W * pc, MAP_H * pc))
+			print("MAP_PAN_LIMIT_OK=", mrect.has_point(Vector2(480, 270)),
+				" pan=", map_ui.pan.round(), " map=", mrect.size.round())
+			map_ui.reset_view()
 		335: _save_shot("_mapdrag.png")
 		336: map_ui.close()
 		338:
@@ -5500,6 +5544,25 @@ func _debug_tick() -> void:
 			print("MIGRATE_OK=", left.is_empty()
 					and objects.get(BARN_POS, {}).get("kind", "") == "barn",
 				" leftovers=", left, " player_free=", is_passable(player_tile()))
+		357:
+			# 스프링클러: 설치하면 바로, 그리고 계속 물을 준다
+			var sp := Vector2i(20, 20)
+			for d2 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				objects.erase(sp + d2)
+				grid[sp.y + d2.y][sp.x + d2.x].ground = "soil"
+				grid[sp.y + d2.y][sp.x + d2.x].wet_min = 0.0
+				grid[sp.y + d2.y][sp.x + d2.x].watered = false
+			objects.erase(sp)
+			_place_object(sp, "sprinkler", 0)
+			_sprinkle(sp)
+			var wet_now: bool = grid[sp.y][sp.x + 1].watered
+			# 하루가 지나 마른 뒤에도, 낮에 새로 간 밭까지 다시 적셔야 한다
+			for d3 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				grid[sp.y + d3.y][sp.x + d3.x].wet_min = 0.0
+				grid[sp.y + d3.y][sp.x + d3.x].watered = false
+			_sprinkler_tick()
+			print("SPRINKLER_NOW_OK=", wet_now,
+				" SPRINKLER_KEEPS_OK=", grid[sp.y][sp.x + 1].watered)
 		358:
 			# 연금술: 실험 -> 발견 -> 약효 -> 조합법 드랍
 			GameData.alchemy_known = []
