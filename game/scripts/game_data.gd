@@ -65,7 +65,6 @@ const BINDABLE_ACTIONS := [
 	["use_tool", "도구 사용 / 낚시 / 공격"],
 	["interact", "상호작용 (대화/입장/줍기)"],
 	["mount", "말 타기 / 내리기"],
-	["open_shop", "상점 (상점 근처에서)"],
 	["cycle_seed", "씨앗 바꾸기"],
 	["open_inventory", "가방 (도구/능력치)"],
 	["open_map", "지도"],
@@ -1122,7 +1121,7 @@ func is_tile_owned(_x: int, _y: int) -> bool:
 const NPCS := {
 	"merchant": {"name": "민지", "lines": [
 		"어서 와! 오늘도 농사는 잘 되고 있어?",
-		"제철 씨앗이 제일 잘 자라. 상점(B)에 들러!",
+		"제철 씨앗이 제일 잘 자라. 가게 안으로 들어와!",
 		"거둔 작물은 우리 가게로 가져와. 내가 좋은 값에 사줄게.",
 		"스프링클러를 만들면 아침 물주기가 편해져.",
 	],

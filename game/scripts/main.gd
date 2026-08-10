@@ -1712,7 +1712,7 @@ func use_tool() -> void:
 		"seed":
 			var id := _forced_seed if _forced_seed != "" else GameData.current_seed_id()
 			if id == "":
-				hud.show_message("씨앗이 없다. 상점(B)에서 사자.")
+				hud.show_message("씨앗이 없다. 마을 잡화점에서 사자.")
 				return
 			if cell.ground != "soil" or obj != null:
 				hud.show_message("먼저 호미로 밭을 갈자.")
@@ -3428,7 +3428,7 @@ func tutorial_notify(flag: String) -> void:
 			return
 	tut["active"] = false
 	dialog.open("기본 안내 완료!",
-		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nB: 상점 (씨앗/판매/동물/강화/도감 탭)\nE: 상호작용 (대화/취침/판매/쓰다듬기)\nTab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n동쪽 마을의 주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
+		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nE: 상호작용 (대화/가게 들어가기/취침/쓰다듬기)\nF: 말 타기 / Tab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n사고 파는 일은 마을 가게 **안** 계산대에서 E.\n주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
 		[["좋아!", _open_grandpa_letter]])
 
 
@@ -4616,18 +4616,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		toggle_ride()
 	elif event.is_action_pressed("interact"):
 		interact()
-	elif event.is_action_pressed("open_shop"):
-		match _near_shop():
-			"general":
-				shop.open("buy", ["buy", "sell"])
-			"ranch":
-				shop.open("animal", ["animal"])
-			"smith":
-				shop.open("upgrade", ["upgrade", "craft"])
-			"fish":
-				shop.open("codex", ["codex"])
-			_:
-				hud.show_message("상점은 마을에! 상점 건물 근처에서 열 수 있다. (판매는 잡화점)")
 	elif event.is_action_pressed("save_game"):
 		save_now()
 		hud.show_message("저장했다!")
@@ -4642,19 +4630,6 @@ func _back_to_title() -> void:
 	Sound.stop_bgm()
 	Net.reset()
 	get_tree().change_scene_to_file("res://scenes/title.tscn")
-
-
-# 상점 건물 근처인가 (B키 사용 조건)
-# 근처 가게 종류 반환 ("" = 없음). B키가 그 가게에 맞는 탭만 연다
-func _near_shop() -> String:
-	var p := player_tile()
-	for dy in range(-3, 4):
-		for dx in range(-3, 4):
-			var t := p + Vector2i(dx, dy)
-			var bk := _building_kind_at(t)
-			if bk in ["general", "ranch", "smith", "fish"]:
-				return bk
-	return ""
 
 
 func _click_at(pos: Vector2, dbl: bool) -> void:

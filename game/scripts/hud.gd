@@ -410,7 +410,7 @@ func refresh() -> void:
 	if GameData.tool == "seed":
 		var id := GameData.current_seed_id()
 		if id == "":
-			tool_name.text = "씨앗 없음 - 상점(%s)에서 사자" % GameData.key_label("open_shop")
+			tool_name.text = "씨앗 없음 - 마을 잡화점에서 사자"
 		else:
 			tool_name.text = "%s 씨앗 x%d (%s: 바꾸기)" % [GameData.CROPS[id].name,
 				GameData.seeds[id], GameData.key_label("cycle_seed")]
