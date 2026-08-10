@@ -157,6 +157,7 @@ const TEXTURE_NAMES := [
 	"gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
 	"gear_charm_clover", "gear_charm_ember", "gear_charm_wind",
+	"star_shard",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",

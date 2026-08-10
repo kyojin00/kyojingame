@@ -122,6 +122,15 @@ const ICONS = {
   fish_golden:  () => fish(C.gold, C.cream, true),
   ore:      () => rockShape(C.grey, C.brown, null),
   star_ore: () => rockShape(C.grey2, C.blue, C.ice),
+  star_shard: () => {   // 별빛 조각 — 대장간 재료 (전설 별빛 광석과 다르다)
+    const c = newCanvas();
+    for (let y = 3; y <= 12; y++) { const w = 5 - Math.abs(y - 8) * 0.5;
+      for (let x = -w; x <= w; x++) px(c, 8 + Math.round(x), y, C.blue); }
+    for (let y = 4; y <= 11; y++) px(c, 7, y, C.ice);
+    px(c, 8, 3, C.white); px(c, 8, 12, C.white);
+    px(c, 11, 5, C.white); px(c, 5, 10, C.white);
+    return c;
+  },
   gem:      () => gemShape(C.cyan, C.blue2),
   memory_piece: () => gemShape(C.gold, C.gold2),
   ghost_essence: () => { const c = jar(C.ice); px(c, 7, 9, C.white); px(c, 9, 11, C.white); return c; },

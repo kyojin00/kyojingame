@@ -117,7 +117,7 @@ func _style_tabs() -> void:
 # 값은 글자 대신 아이콘으로 읽힌다: 골드는 동전, 목재는 통나무, 광석은 광석.
 # costs = [["coin", 250], ["wood", 5], ["ore", 3]] 처럼 넘긴다.
 const COST_ICONS := {"coin": "icon_coin", "wood": "icon_wood",
-	"stone": "icon_stone", "ore": "ore"}
+	"stone": "icon_stone", "ore": "ore", "star_shard": "star_shard", "gem": "gem"}
 
 
 func _cost_box(costs: Array, enough := true) -> HBoxContainer:
@@ -427,10 +427,9 @@ func _rebuild() -> void:
 func _gear_cost(gid: String) -> Array:
 	var cost: Dictionary = GameData.GEAR[gid].cost
 	var out: Array = []
-	for k: String in ["money", "wood", "stone", "ore"]:
+	for k: String in ["money", "wood", "stone", "ore", "star_shard", "gem"]:
 		if cost.has(k):
 			out.append(["coin" if k == "money" else k, int(cost[k])])
-	# 별빛 광석·보석은 아이콘 표가 없어 설명 줄로만 알린다
 	return out
 
 

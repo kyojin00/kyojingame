@@ -318,9 +318,13 @@ func _interact() -> void:
 		if gem_n > 0:
 			msg += ", 보석 %d개" % gem_n
 		main.hud.show_message(msg + "를 얻었다!")
-		# 깊은 층(5층+)의 상자에서는 별빛 광석이 나온다
+		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
+		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
 		if floor_num >= 5:
 			main.gain_legend("star_ore")
+			var shards: int = 1 + int((floor_num - 5) / 3.0)
+			main.gain_item("star_shard", shards)
+			main.hud.show_message("별빛 조각 %d개! 대장간에서 쓸 수 있다." % shards, 4.0)
 		chest_pos = Vector2i(-1, -1)
 		var sp := _free_tile(0.0)
 		stairs_pos = sp if sp.x >= 0 else Vector2i(GW / 2, GH / 2)

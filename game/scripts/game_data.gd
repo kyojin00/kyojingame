@@ -343,7 +343,7 @@ const GEAR := {
 		"desc": "제대로 벼려 낸 검. 동굴이 한결 수월해진다."},
 	"gear_sword_star": {"name": "별빛 검", "slot": "weapon", "tier": 3,
 		"stats": {"power": 10.0, "luck": 2.0},
-		"cost": {"money": 4000, "star_ore": 3, "ore": 20},
+		"cost": {"money": 4000, "star_shard": 3, "ore": 20},
 		"desc": "별빛 광석을 녹여 만든 검. 어둠 속에서 옅게 빛난다."},
 	# ---- 방어구: 받는 피해 ----
 	"gear_vest_leather": {"name": "가죽 조끼", "slot": "armor", "tier": 1,
@@ -356,7 +356,7 @@ const GEAR := {
 		"desc": "묵직한 만큼 확실하다. 조금 느려진다."},
 	"gear_vest_star": {"name": "별빛 갑옷", "slot": "armor", "tier": 3,
 		"stats": {"defense": 40.0},
-		"cost": {"money": 5000, "star_ore": 2, "gem": 1, "ore": 25},
+		"cost": {"money": 5000, "star_shard": 2, "gem": 1, "ore": 25},
 		"desc": "별빛을 짜 넣어 무겁지 않다."},
 	# ---- 장신구: 생활 능력치 ----
 	"gear_charm_clover": {"name": "네잎클로버", "slot": "charm", "tier": 1,
@@ -423,7 +423,7 @@ func gear_cost_text(gid: String) -> String:
 	if not GEAR.has(gid):
 		return ""
 	var names := {"money": "G", "wood": "목재", "stone": "석재",
-		"ore": "광석", "star_ore": "별빛 광석", "gem": "보석"}
+		"ore": "광석", "star_shard": "별빛 조각", "gem": "보석"}
 	var parts: Array[String] = []
 	for k: String in GEAR[gid].cost:
 		var n: int = int(GEAR[gid].cost[k])
@@ -439,7 +439,7 @@ func can_craft_gear(gid: String) -> bool:
 		return false
 	if wood < int(cost.get("wood", 0)) or stone < int(cost.get("stone", 0)):
 		return false
-	for k: String in ["ore", "star_ore", "gem"]:
+	for k: String in ["ore", "star_shard", "gem"]:
 		if int(items.get(k, 0)) < int(cost.get(k, 0)):
 			return false
 	return true
@@ -454,7 +454,7 @@ func craft_gear(gid: String) -> bool:
 	today_spent += int(cost.get("money", 0))
 	wood -= int(cost.get("wood", 0))
 	stone -= int(cost.get("stone", 0))
-	for k: String in ["ore", "star_ore", "gem"]:
+	for k: String in ["ore", "star_shard", "gem"]:
 		items[k] = int(items.get(k, 0)) - int(cost.get(k, 0))
 	owned_gear.append(gid)
 	equipped[str(GEAR[gid].slot)] = gid
@@ -831,6 +831,7 @@ const ITEMS := {
 	"fish_golden": {"name": "황금잉어", "sell": 300},
 	"ore": {"name": "광석", "sell": 50},
 	"gem": {"name": "보석", "sell": 220},
+	"star_shard": {"name": "별빛 조각", "sell": 300},
 	"dish_baked_potato": {"name": "구운 감자", "sell": 70},
 	"dish_soup": {"name": "야채 수프", "sell": 110},
 	"dish_jam": {"name": "딸기잼", "sell": 150},
@@ -856,7 +857,7 @@ const ITEMS := {
 	"memory_piece": {"name": "할아버지의 기억 조각", "sell": 0, "legend": true},
 }
 const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
-	"ore", "gem", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"ore", "gem", "star_shard", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
 	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece"]
