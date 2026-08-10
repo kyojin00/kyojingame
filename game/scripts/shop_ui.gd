@@ -313,6 +313,19 @@ func _rebuild() -> void:
 		_note("동물은 E로 쓰다듬으면 다음 날 아침 생산물을 준다. (최대 %d마리)"
 			% GameData.max_animals())
 
+		# 탈 것 — 넓어진 세상을 빠르게 다닌다
+		_note("— 탈 것 —")
+		if GameData.has_horse:
+			items_box.add_child(_mk_row("horse_side_0", "말",
+				"이동 속도 %d%% · 농장에 세워 두었다 (E로 탄다)"
+				% int(GameData.HORSE_SPEED_MULT * 100.0)))
+		else:
+			var hb := _mk_button("사기", _on_buy_horse)
+			hb.disabled = GameData.money < GameData.HORSE_PRICE
+			items_box.add_child(_mk_row("horse_side_0", "말",
+				"타면 훨씬 빨리 다닌다 (탄 동안에는 도구를 쓸 수 없다)", hb,
+				[["coin", GameData.HORSE_PRICE]]))
+
 		# 축사 건설
 		if GameData.barn_built:
 			items_box.add_child(_mk_row("barn", "축사 완공!",
@@ -502,6 +515,19 @@ func _on_buy_animal(id: String) -> void:
 	main.spawn_animal(id)
 	if main != null and not main._remote_acting:
 		main.net_shop("buy_animal", id)
+	_rebuild()
+
+
+func _on_buy_horse() -> void:
+	if GameData.has_horse or GameData.money < GameData.HORSE_PRICE:
+		return
+	Sound.play_sfx("sfx_coin")
+	GameData.money -= GameData.HORSE_PRICE
+	GameData.today_spent += GameData.HORSE_PRICE
+	GameData.has_horse = true
+	if main != null:
+		main.place_horse()
+		main.hud.show_message("말을 샀다! 농장에 세워 두었다. E로 탄다.", 4.0)
 	_rebuild()
 
 

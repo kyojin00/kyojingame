@@ -4,7 +4,9 @@
 # 조작: 마우스 휠 = 확대/축소 (커서 기준) · 끌기 = 이동 · R = 처음 크기로
 extends CanvasLayer
 
-const CELL := 8.0  # 배율 1일 때 타일당 픽셀 (90x60 맵, 화면 960x540)
+# 배율 1 = 맵 전체가 화면에 딱 들어오는 크기. 맵이 커져도 알아서 맞는다.
+func _base_cell() -> float:
+	return minf(920.0 / float(main.MAP_W), 496.0 / float(main.MAP_H))
 const FOG := Color(0.02, 0.02, 0.035)
 const ZOOM_MIN := 0.7
 const ZOOM_MAX := 5.0
@@ -20,7 +22,7 @@ var _drag := false
 var _drag_from := Vector2.ZERO
 
 # 이번 프레임의 그리기 기준 (셀 크기 / 원점) — 그릴 때 한 번 계산해 둔다
-var _cell := CELL
+var _cell := 8.0
 var _ox := 0.0
 var _oy := 0.0
 
@@ -76,10 +78,10 @@ func _origin(c: float) -> Vector2:
 
 # 커서 아래의 지점이 그대로 있도록 확대/축소한다
 func _zoom_at(m: Vector2, factor: float) -> void:
-	var c0 := CELL * zoom
+	var c0 := _base_cell() * zoom
 	var t := (m - _origin(c0)) / c0            # 커서가 가리키는 타일 좌표
 	zoom = clampf(zoom * factor, ZOOM_MIN, ZOOM_MAX)
-	var c1 := CELL * zoom
+	var c1 := _base_cell() * zoom
 	pan = m - t * c1 - Vector2((960.0 - main.MAP_W * c1) / 2.0,
 		(540.0 - main.MAP_H * c1) / 2.0 + 2.0)
 	_clamp_pan()
@@ -87,7 +89,7 @@ func _zoom_at(m: Vector2, factor: float) -> void:
 
 # 지도가 화면 밖으로 완전히 사라지지 않게 한다
 func _clamp_pan() -> void:
-	var c := CELL * zoom
+	var c := _base_cell() * zoom
 	var half_w: float = int(main.MAP_W) * c / 2.0
 	var half_h: float = int(main.MAP_H) * c / 2.0
 	pan.x = clampf(pan.x, -half_w, half_w)
@@ -138,7 +140,7 @@ func _visible_tile(x: int, y: int) -> bool:
 
 
 func _draw_map() -> void:
-	_cell = CELL * zoom
+	_cell = _base_cell() * zoom
 	var o := _origin(_cell)
 	_ox = o.x
 	_oy = o.y

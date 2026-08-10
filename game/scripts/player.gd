@@ -15,8 +15,20 @@ var bumped := false  # 이동하려 했지만 완전히 막혔는가 (스토리 
 
 @onready var sprite: Sprite2D = $Sprite
 
+# 탈 것: 캐릭터 밑에 깔리는 말 그림 (탔을 때만 보인다)
+var horse_sprite: Sprite2D
+
 
 func _ready() -> void:
+	horse_sprite = Sprite2D.new()
+	horse_sprite.centered = false
+	horse_sprite.scale = Vector2(0.8, 0.8)    # 사람보다 조금 크게
+	horse_sprite.offset = Vector2(-48, -70)   # 96x80을 발밑에 맞춘다
+	horse_sprite.visible = false
+	add_child(horse_sprite)
+	# 캐릭터보다 먼저 그린다 (자식 순서로 앞뒤를 정한다).
+	# z_index를 -1로 두면 지형(z=0)보다 먼저 그려져 땅 밑에 깔린다.
+	move_child(horse_sprite, 0)
 	_update_sprite()
 
 
@@ -41,8 +53,11 @@ func _process(delta: float) -> void:
 			dir = "right" if v.x > 0 else "left"
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
-		# 강아지 펫 + 장신구가 이동 속도를 올린다
-		v = v * SPEED * GameData.pet_speed_mult() * GameData.gear_speed_mult() * delta
+		# 강아지 펫 + 장신구 + 탈 것이 이동 속도를 올린다
+		var mult := GameData.pet_speed_mult() * GameData.gear_speed_mult()
+		if GameData.riding:
+			mult *= GameData.HORSE_SPEED_MULT
+		v = v * SPEED * mult * delta
 		var before := position
 		# 이미 끼어 있으면(설치물 등) 충돌을 무시하고 빠져나올 수 있게 한다
 		var stuck := _blocked(position)
@@ -110,3 +125,20 @@ func _update_sprite() -> void:
 		sprite.scale = Vector2(0.5, 0.5 * b)
 	else:
 		sprite.scale = Vector2(0.5, 0.5)
+
+	# 탈 것: 말을 발밑에 깔고 캐릭터를 안장 높이로 올린다
+	horse_sprite.visible = GameData.riding
+	if GameData.riding:
+		var hf := 1 if (moving and int(anim_time * 9.0) % 2 == 1) else 0
+		var hname := "horse_down_%d" % hf
+		horse_sprite.flip_h = false
+		match dir:
+			"up":
+				hname = "horse_up_%d" % hf
+			"left", "right":
+				hname = "horse_side_%d" % hf
+				horse_sprite.flip_h = dir == "left"
+		horse_sprite.texture = main.tex[hname]
+		sprite.position.y = -34.0     # 안장 위
+	else:
+		sprite.position.y = 0.0

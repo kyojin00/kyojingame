@@ -920,6 +920,14 @@ const BREED_ORE := [0, 3, 6, 10, 15]                  # 단계별 광석
 var breed_level := 0
 var greenhouse_built := false
 
+# ---- 탈 것 (말) ----
+# 목장 상회에서 산다. 타면 빨라지고, 도구는 쓸 수 없다 (E로 내린다).
+const HORSE_PRICE := 8000
+const HORSE_SPEED_MULT := 2.3
+var has_horse := false
+var riding := false
+var horse_tile := Vector2i(14, 12)   # 세워 둔 자리
+
 
 func breed_grow_mult() -> float:
 	return 1.0 - 0.12 * breed_level     # 한 단계마다 성장 12% 단축
@@ -1509,6 +1517,9 @@ func reset_all() -> void:
 	grandpa_seen = false
 	breed_level = 0
 	greenhouse_built = false
+	has_horse = false
+	riding = false
+	horse_tile = Vector2i(14, 12)
 	mine_deepest = 1
 	fest_history = []
 	reset_festival_state()
@@ -1724,6 +1735,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tutorial": tutorial,
 		"breed_level": breed_level,
 		"greenhouse_built": greenhouse_built,
+		"has_horse": has_horse,
+		"horse_tile": [horse_tile.x, horse_tile.y],
 		"mine_deepest": mine_deepest,
 		"fest_history": fest_history,
 		"owned_gear": owned_gear,

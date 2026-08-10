@@ -1,8 +1,9 @@
 # 메인 월드: 맵, 경작, 도구, 자원, 시간, 낮/밤을 관리한다.
 extends Node2D
 
-const MAP_W := 90
-const MAP_H := 60
+# 월드를 넓혔다. 마을·농장 좌표는 그대로 두고 남쪽·동쪽에 야생을 붙인다.
+const MAP_W := 120
+const MAP_H := 90
 const TILE := 32
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
@@ -159,6 +160,8 @@ const TEXTURE_NAMES := [
 	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
 	"gear_charm_clover", "gear_charm_ember", "gear_charm_wind",
 	"star_shard",
+	"horse_down_0", "horse_down_1", "horse_side_0", "horse_side_1",
+	"horse_up_0", "horse_up_1",
 	"grass_spring_0", "grass_spring_1", "grass_spring_2",
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
@@ -170,6 +173,51 @@ const START_TILE := Vector2i(14, 10)
 const CAVE_POS := Vector2i(50, 1)
 const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
 const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
+# ---- 탈 것 (말) ----
+#
+# 목장 상회에서 사면 농장에 말이 서 있다. E로 타면 훨씬 빨라지고,
+# 탄 동안에는 도구를 쓸 수 없다 (E를 누르면 내린다).
+func _mount_horse(t: Vector2i) -> void:
+	objects.erase(t)
+	if obj_nodes.has(t):
+		obj_nodes[t].queue_free()
+		obj_nodes.erase(t)
+	GameData.riding = true
+	Sound.play_sfx("sfx_place")
+	hud.show_message("말에 올라탔다! E로 내린다.", 3.0)
+	queue_redraw()
+
+
+# 산 직후: 세워 둔 자리에 말을 놓는다
+func place_horse() -> void:
+	if objects.has(GameData.horse_tile):
+		return
+	objects[GameData.horse_tile] = {"kind": "horse", "hp": 0}
+	_spawn_object_node(GameData.horse_tile, "horse")
+	queue_redraw()
+
+
+func dismount_horse() -> void:
+	if not GameData.riding:
+		return
+	GameData.riding = false
+	# 지금 자리 근처의 빈 칸에 말을 세운다
+	var here := player_tile()
+	var spot := here
+	if objects.has(spot):
+		for d: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0),
+				Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1)]:
+			if not objects.has(here + d) and is_passable(here + d):
+				spot = here + d
+				break
+	GameData.horse_tile = spot
+	objects[spot] = {"kind": "horse", "hp": 0}
+	_spawn_object_node(spot, "horse")
+	Sound.play_sfx("sfx_place")
+	hud.show_message("말에서 내렸다.", 2.0)
+	queue_redraw()
+
+
 # ---- 온실 ----
 # 농장 한켠의 유리집. 이 안에서는 계절을 타지 않는다 —
 # 아무 씨앗이나 심을 수 있고, 계절이 바뀌어도 시들지 않는다.
@@ -183,32 +231,38 @@ const GREENHOUSE_COST_MONEY := 5000
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
 # 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
-const VILLAGE_REGION := Rect2i(60, 0, 30, 38)   # 건물 사이를 넓히려고 남쪽으로 늘렸다
-const ROAD := Rect2i(30, 8, 30, 2)         # 농장/숲 -> 마을 공용 길
-const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 큰길 (2칸)
-const PLAZA := Rect2i(68, 12, 14, 10)      # 중앙 광장 (아주 넓은 평지)
-const FOUNTAIN := Rect2i(73, 15, 4, 4)     # 광장 중앙 분수
-const FOUNTAIN_DECO := Vector2i(74, 17)    # 분수 조형물 (분수 한가운데)
-const VILLAGE_RIVER_Y := 35                # 마을 남쪽 외곽을 흐르는 강 (2칸)
-const DOCK_Y := 34                         # 강가 낚시터(부두)
+const VILLAGE_REGION := Rect2i(60, 0, 40, 44)
+# 인도는 모두 3줄. 길 폭을 한 곳에서 정하고 건물은 이 선에 맞춰 놓는다.
+const ROAD_W := 3
+const WEST_LANE_X := 67                    # 서쪽 세로 인도 (x 67~69)
+const EAST_LANE_X := 86                    # 동쪽 세로 인도 (x 86~88)
+const NS_LANE_X := 77                      # 광장을 지나는 남북 인도 (x 77~79)
+const ROAD := Rect2i(30, 8, 30, 3)         # 농장/숲 -> 마을 공용 길 (3줄)
+const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 큰길 (y 8~10)
+const PLAZA := Rect2i(70, 14, 16, 12)      # 중앙 광장 (아주 넓은 평지)
+const FOUNTAIN := Rect2i(76, 18, 4, 4)     # 광장 중앙 분수
+const FOUNTAIN_DECO := Vector2i(77, 20)    # 분수 조형물 (분수 한가운데)
+const VILLAGE_RIVER_Y := 40
+const RIVER_ROWS := 4                      # 강 폭 (낚시터를 깊게 하려고 넓혔다)                # 마을 남쪽 외곽을 흐르는 강 (2칸)
+const DOCK_Y := 39                         # 강가 낚시터(부두)
 # ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
 # 강을 따라 길게 깔린 나무 데크 + 물 쪽으로 내민 부두 두 개 +
 # 강가 마당(표지판·가로등·벤치). 「낚시」 목표는 여기서 진행한다.
-const FISH_YARD_X0 := 68
-const FISH_YARD_X1 := 86
-const FISH_DECK_X0 := 69                   # 강 첫 줄(y=27)에 깔리는 데크
-const FISH_DECK_X1 := 85
-const FISH_PIERS := [Vector2i(70, 71), Vector2i(77, 78), Vector2i(83, 84)]  # 물로 내민 부두 (x 구간)
-const FISH_SIGN := Vector2i(68, 33)
-const FISH_LAMPS := [Vector2i(70, 32), Vector2i(76, 32), Vector2i(81, 32), Vector2i(86, 32)]
-const FISH_BENCHES := [Vector2i(73, 33), Vector2i(79, 33), Vector2i(84, 33)]
-const FISH_SPOT := Rect2i(67, 30, 21, 9)   # 이 안이면 「낚시터에 있다」
-const FISH_CLEAR := Rect2i(67, 29, 23, 11) # 이 안에는 나무/돌을 두지 않는다
-const BOARD_POS := Vector2i(77, 12)        # 광장 게시판 (오늘의 의뢰)
-const PLAZA_LAMPS := [Vector2i(69, 13), Vector2i(80, 13),
-	Vector2i(69, 20), Vector2i(80, 20)]
-const PLAZA_BENCHES := [Vector2i(71, 16), Vector2i(71, 18),
-	Vector2i(78, 16), Vector2i(78, 18)]
+const FISH_YARD_X0 := 70
+const FISH_YARD_X1 := 95
+const FISH_DECK_X0 := 71                   # 강 첫 줄(y=27)에 깔리는 데크
+const FISH_DECK_X1 := 94
+const FISH_PIERS := [Vector2i(72, 73), Vector2i(80, 81), Vector2i(88, 89)]  # 물로 내민 부두 (x 구간)
+const FISH_SIGN := Vector2i(70, 38)
+const FISH_LAMPS := [Vector2i(72, 37), Vector2i(79, 37), Vector2i(86, 37), Vector2i(93, 37)]
+const FISH_BENCHES := [Vector2i(75, 38), Vector2i(83, 38), Vector2i(91, 38)]
+const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있다」
+const FISH_CLEAR := Rect2i(69, 34, 30, 13) # 이 안에는 나무/돌을 두지 않는다
+const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
+const PLAZA_LAMPS := [Vector2i(71, 15), Vector2i(84, 15),
+	Vector2i(71, 24), Vector2i(84, 24)]
+const PLAZA_BENCHES := [Vector2i(73, 19), Vector2i(73, 21),
+	Vector2i(83, 19), Vector2i(83, 21)]
 
 # 우리집: 스토리 1 완료 후 마을 서쪽 집터(E)에서 목재로 직접 짓는다
 const HOME_ANCHOR := Vector2i(61, 4)
@@ -220,22 +274,19 @@ const HOME_SITE := Vector2i(63, 6)  # 집터 표지판 위치
 # 북쪽 한 줄 + 서/동 두 줄로 벌려 놓아 서로 붙어 보이지 않는다.
 const VILLAGE_PLOTS := {
 	# 북쪽 줄 (큰길 위쪽)
-	"post":    {"anchor": Vector2i(61, 3),  "name": "우체국"},
-	"general": {"anchor": Vector2i(72, 3),  "name": "잡화점"},
-	"lab":     {"anchor": Vector2i(83, 3),  "name": "연구소"},
+	"post":    {"anchor": Vector2i(62, 3),  "name": "우체국"},
+	"general": {"anchor": Vector2i(74, 3),  "name": "잡화점"},
+	"lab":     {"anchor": Vector2i(86, 3),  "name": "연구소"},
 	# 서쪽 줄 (서쪽 세로 길가)
-	"smith":   {"anchor": Vector2i(61, 10), "name": "대장간"},
-	"ranch":   {"anchor": Vector2i(61, 20), "name": "목장 상회"},
-	"inn":     {"anchor": Vector2i(61, 30), "name": "여관"},
+	"smith":   {"anchor": Vector2i(61, 13), "name": "대장간"},
+	"ranch":   {"anchor": Vector2i(61, 23), "name": "목장 상회"},
+	"inn":     {"anchor": Vector2i(61, 33), "name": "여관"},
 	# 동쪽 줄 (동쪽 세로 길가)
-	"library": {"anchor": Vector2i(84, 12), "name": "도서관"},
-	"fish":    {"anchor": Vector2i(84, 22), "name": "수산시장"},
+	"library": {"anchor": Vector2i(90, 14), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(90, 25), "name": "수산시장"},
 }
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
-# 서쪽·동쪽 건물 줄 앞을 지나는 세로 길
-const WEST_LANE_X := 67
-const EAST_LANE_X := 82
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
@@ -592,6 +643,8 @@ func _build_map() -> void:
 		for gx in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
 			objects.erase(Vector2i(gx, gy))
 	objects[GREENHOUSE_SIGN] = {"kind": "sign", "hp": 0}
+	if GameData.has_horse and not GameData.riding:
+		objects[GameData.horse_tile] = {"kind": "horse", "hp": 0}
 	if GameData.greenhouse_built:
 		for gy2 in range(GREENHOUSE.position.y, GREENHOUSE.end.y):
 			for gx2 in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
@@ -605,32 +658,33 @@ func _build_map() -> void:
 # 교진 마을: 건물은 하나도 짓지 않는다.
 # 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
 func _build_village() -> void:
-	# 마을을 가로지르는 큰길 (서쪽 입구 -> 동쪽)
-	for y in range(MAIN_STREET_Y, MAIN_STREET_Y + 2):
-		for x in range(60, 87):
+	# 마을을 가로지르는 큰길 (서쪽 입구 -> 동쪽) — 인도는 모두 3줄이다
+	for y in range(MAIN_STREET_Y, MAIN_STREET_Y + ROAD_W):
+		for x in range(60, 99):
 			grid[y][x].ground = "path"
 	# 중앙 광장 (아주 넓은 평지)
 	for y in range(PLAZA.position.y, PLAZA.end.y):
 		for x in range(PLAZA.position.x, PLAZA.end.x):
 			grid[y][x].ground = "path"
-	# 광장 <-> 큰길을 잇는 북쪽 길, 광장 <-> 낚시터를 잇는 남쪽 길
-	for x in [74, 75]:
+	# 남북 인도: 큰길 <-> 광장 <-> 낚시터 (3줄)
+	for i in ROAD_W:
+		var nx: int = NS_LANE_X + i
 		for y in range(MAIN_STREET_Y, PLAZA.position.y):
-			grid[y][x].ground = "path"
+			grid[y][nx].ground = "path"
 		for y in range(PLAZA.end.y, DOCK_Y + 1):
-			grid[y][x].ground = "path"
-	# 서쪽·동쪽 건물 줄 앞을 지나는 세로 길 (마당 문이 여기로 붙는다)
-	for y in range(MAIN_STREET_Y, DOCK_Y):
-		grid[y][WEST_LANE_X].ground = "path"
-	for y in range(MAIN_STREET_Y, DOCK_Y - 4):
-		grid[y][EAST_LANE_X].ground = "path"
+			grid[y][nx].ground = "path"
+	# 서쪽·동쪽 건물 줄 앞을 지나는 세로 인도 (마당 문이 여기로 붙는다, 3줄)
+	for i in ROAD_W:
+		for y in range(MAIN_STREET_Y, DOCK_Y):
+			grid[y][WEST_LANE_X + i].ground = "path"
+			grid[y][EAST_LANE_X + i].ground = "path"
 	# 광장 한가운데 분수
 	for y in range(FOUNTAIN.position.y, FOUNTAIN.end.y):
 		for x in range(FOUNTAIN.position.x, FOUNTAIN.end.x):
 			grid[y][x].ground = "water"
 
 	# 마을 바깥쪽을 따라 흐르는 강 (광장을 가로막지 않는다)
-	for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
+	for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + RIVER_ROWS):
 		for x in range(46, 89):
 			grid[y][x].ground = "water"
 	for x in [87, 88]:
@@ -647,10 +701,11 @@ func _build_village() -> void:
 		grid[VILLAGE_RIVER_Y][x].ground = "dock"
 	for p: Vector2i in FISH_PIERS:
 		for x in range(p.x, p.y + 1):
-			grid[VILLAGE_RIVER_Y + 1][x].ground = "dock"
+			for dy in range(1, RIVER_ROWS - 1):
+				grid[VILLAGE_RIVER_Y + dy][x].ground = "dock"
 	# 강 건너 남쪽 부지로 이어지는 작은 다리
 	for x in [63, 64]:
-		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + 2):
+		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + RIVER_ROWS):
 			grid[y][x].ground = "path"
 
 	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
@@ -667,8 +722,8 @@ func _build_village() -> void:
 	for p: Vector2i in PLAZA_BENCHES:
 		objects[p] = {"kind": "deco_bench", "hp": 0}
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
-	for x in range(60, 89):
-		for y in [1, 37]:
+	for x in range(60, 99):
+		for y in [1, 43]:
 			var rim := Vector2i(x, y)
 			if grid[y][x].ground == "grass" and not objects.has(rim) \
 					and _hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
@@ -934,6 +989,7 @@ func _door_kind_at(t: Vector2i) -> String:
 
 # 문으로 들어가면 열리는 것 (E로 눌렀을 때와 같다)
 func _enter_building(kind: String) -> void:
+	dismount_horse()   # 말을 타고 실내로 들어갈 수는 없다
 	if kind == "home":
 		interior.open()
 		return
@@ -1058,6 +1114,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -128)
 		"deco_bench":
 			texture = tex["deco_bench"]
+		"horse":
+			texture = tex["horse_side_0"]   # 세워 둔 말
+			offset = Vector2(0, -80)
 	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
@@ -1311,7 +1370,7 @@ func at_fishing_spot() -> bool:
 # 낚시터 안내 지점 — 왼쪽 부두 끝 (길라잡이 화살표가 여기를 가리킨다)
 func fishing_spot_center() -> Vector2:
 	var p: Vector2i = FISH_PIERS[0]
-	return Vector2(p.x * TILE + 16, (VILLAGE_RIVER_Y + 1) * TILE + 16)
+	return Vector2(p.x * TILE + 16, (VILLAGE_RIVER_Y + RIVER_ROWS - 2) * TILE + 16)
 
 
 func _start_fishing() -> void:
@@ -1877,6 +1936,10 @@ func _blocking_object_tile() -> Vector2i:
 
 
 func interact() -> void:
+	# 말을 타고 있으면 E는 「내리기」다 (탄 채로는 일을 할 수 없다)
+	if GameData.riding:
+		dismount_horse()
+		return
 	# 맞는 도구를 들고 나무/돌을 조준 중이면 채집이 최우선
 	# (근처에 NPC가 있어도 대화가 끼어들지 않는다)
 	var aim: Variant = objects.get(target_tile())
@@ -1995,6 +2058,9 @@ func interact() -> void:
 			dialog.open("낚시터", "교진 마을 낚시터.\n\n부두 끝에 서서 강을 보고 낚싯대(E)를 던지면 된다.\n"
 				+ "입질(!)이 오면 다시 E!\n\n붕어 · 잉어 · 메기... 그리고 아주 드물게\n황금잉어가 올라온다고 한다.",
 				[["알겠다", null]])
+			return
+		if obj.kind == "horse":
+			_mount_horse(t)
 			return
 		if obj.kind == "cave":
 			_open_mine_dialog()
@@ -4164,6 +4230,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
 	GameData.breed_level = int(d.get("breed_level", 0))
 	GameData.greenhouse_built = bool(d.get("greenhouse_built", false))
+	GameData.has_horse = bool(d.get("has_horse", false))
+	GameData.riding = false                      # 불러오면 언제나 내린 채로 시작
+	var ht: Array = d.get("horse_tile", [14, 12])
+	GameData.horse_tile = Vector2i(int(ht[0]), int(ht[1]))
 	GameData.mine_deepest = maxi(1, int(d.get("mine_deepest", 1)))
 	GameData.fest_history = d.get("fest_history", []).duplicate()
 	GameData.owned_gear = d.get("owned_gear", []).duplicate()
@@ -4711,6 +4781,8 @@ func _context_hint() -> Array:
 				return ["E: 판매", above_tile]
 			"board":
 				return ["E: 의뢰 게시판", above_tile]
+			"horse":
+				return ["E: 말 타기", above_tile]
 			"sign":
 				if t == FISH_SIGN:
 					return ["E: 낚시터 안내", above_tile]
@@ -5221,7 +5293,27 @@ func _debug_tick() -> void:
 				where.append("%s:%s" % [n.id, n.place])
 			print("NPC_PLACES=", ", ".join(where))
 			_save_shot("_npcday.png")
-		342: get_tree().quit()
+		344:
+			# 탈 것: 사기 -> 타기 -> 속도 -> 내리기
+			GameData.money = 99999
+			GameData.has_horse = false
+			GameData.riding = false
+			GameData.horse_tile = player_tile() + Vector2i(1, 0)
+			shop.main = self
+			shop._on_buy_horse()
+			var parked: bool = objects.has(GameData.horse_tile)
+			_mount_horse(GameData.horse_tile)
+			print("HORSE: parked=", parked, " riding=", GameData.riding)
+		346:
+			print("HORSE_DRAW: vis=", player.horse_sprite.visible,
+				" tex=", player.horse_sprite.texture != null,
+				" pos=", player.horse_sprite.position, " scale=", player.horse_sprite.scale)
+			_save_shot("_horse.png")
+		347:
+			dismount_horse()
+			print("HORSE_DISMOUNT_OK=", not GameData.riding
+				and objects.has(GameData.horse_tile))
+		349: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
