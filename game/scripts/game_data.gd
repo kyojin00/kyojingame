@@ -888,6 +888,29 @@ const LEGENDS := [
 	["memory_piece", "교류", "마을 사람과 마음이 통하면(호감도 100) 건네받게 될 것."],
 ]
 
+# ---- 광산 깊이 ----
+#
+# 예전에는 나가면 무조건 1층부터 다시였다. 이제 최고 도달 층을 기록해 두고,
+# 5층마다의 「승강기 층」에서 다시 시작할 수 있다.
+# (승강기가 없으면 깊은 층에서만 나오는 재료를 모으는 일이 사실상 불가능하다)
+const MINE_ELEVATOR_STEP := 5
+var mine_deepest := 1
+
+
+# 지금 고를 수 있는 시작 층 목록 (1층 + 5의 배수 층)
+func mine_floors() -> Array:
+	var out: Array = [1]
+	var f := MINE_ELEVATOR_STEP
+	while f <= mine_deepest:
+		out.append(f)
+		f += MINE_ELEVATOR_STEP
+	return out
+
+
+func mine_reach(f: int) -> void:
+	mine_deepest = maxi(mine_deepest, f)
+
+
 # ---- 연구소: 씨앗 개량 ----
 # 단계를 올릴수록 모든 작물이 조금씩 빨리 자라고 조금씩 비싸게 팔린다.
 # (작물마다 따로 관리하면 표가 커지므로 마을 전체에 걸리는 한 줄짜리 강화로 둔다)
@@ -895,6 +918,7 @@ const BREED_MAX := 5
 const BREED_COST := [1500, 3000, 5000, 8000, 12000]   # 단계별 연구비
 const BREED_ORE := [0, 3, 6, 10, 15]                  # 단계별 광석
 var breed_level := 0
+var greenhouse_built := false
 
 
 func breed_grow_mult() -> float:
@@ -1484,6 +1508,8 @@ func reset_all() -> void:
 	grandpa_step = 0
 	grandpa_seen = false
 	breed_level = 0
+	greenhouse_built = false
+	mine_deepest = 1
 	fest_history = []
 	reset_festival_state()
 	owned_gear = []
@@ -1697,6 +1723,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"quest": quest,
 		"tutorial": tutorial,
 		"breed_level": breed_level,
+		"greenhouse_built": greenhouse_built,
+		"mine_deepest": mine_deepest,
 		"fest_history": fest_history,
 		"owned_gear": owned_gear,
 		"equipped": equipped,

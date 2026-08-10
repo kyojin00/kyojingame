@@ -170,6 +170,15 @@ const START_TILE := Vector2i(14, 10)
 const CAVE_POS := Vector2i(50, 1)
 const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
 const BARN_POS := Vector2i(10, 3)        # 축사 (구입 시 농장에 건설)
+# ---- 온실 ----
+# 농장 한켠의 유리집. 이 안에서는 계절을 타지 않는다 —
+# 아무 씨앗이나 심을 수 있고, 계절이 바뀌어도 시들지 않는다.
+# (겨울 작물이 하나뿐이라 겨울이 통째로 비는 문제를 메운다)
+const GREENHOUSE := Rect2i(4, 13, 9, 7)
+const GREENHOUSE_SIGN := Vector2i(4, 20)
+const GREENHOUSE_COST_WOOD := 150
+const GREENHOUSE_COST_STONE := 80
+const GREENHOUSE_COST_MONEY := 5000
 # ---- 교진 마을 ----
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
@@ -578,6 +587,15 @@ func _build_map() -> void:
 		if FISH_CLEAR.has_point(p):
 			objects.erase(p)
 	objects[FISH_SIGN] = {"kind": "sign", "hp": 0}
+	# 온실 터 표지판 (농장 한켠) — 온실 자리는 자연물을 비워 둔다
+	for gy in range(GREENHOUSE.position.y, GREENHOUSE.end.y):
+		for gx in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
+			objects.erase(Vector2i(gx, gy))
+	objects[GREENHOUSE_SIGN] = {"kind": "sign", "hp": 0}
+	if GameData.greenhouse_built:
+		for gy2 in range(GREENHOUSE.position.y, GREENHOUSE.end.y):
+			for gx2 in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
+				grid[gy2][gx2].ground = "soil"
 	for p: Vector2i in FISH_LAMPS:
 		objects[p] = {"kind": "deco_lamp", "hp": 0}
 	for p: Vector2i in FISH_BENCHES:
@@ -1571,8 +1589,9 @@ func use_tool() -> void:
 				hud.show_message("이미 작물이 자라고 있다.")
 				return
 			var def: Dictionary = GameData.CROPS[id]
-			if GameData.season() not in def.seasons:
-				hud.show_message("%s은(는) 지금 계절에 자라지 않는다." % def.name)
+			if GameData.season() not in def.seasons and not in_greenhouse(t):
+				hud.show_message("%s은(는) 지금 계절에 자라지 않는다. (온실에서는 된다)"
+					% def.name)
 				return
 			GameData.seeds[id] -= 1
 			cell.crop_id = id
@@ -1960,13 +1979,16 @@ func interact() -> void:
 		if obj.kind == "board":
 			_open_quest_board()
 			return
+		if obj.kind == "sign" and t == GREENHOUSE_SIGN:
+			_open_greenhouse_dialog()
+			return
 		if obj.kind == "sign" and t == FISH_SIGN:
 			dialog.open("낚시터", "교진 마을 낚시터.\n\n부두 끝에 서서 강을 보고 낚싯대(E)를 던지면 된다.\n"
 				+ "입질(!)이 오면 다시 E!\n\n붕어 · 잉어 · 메기... 그리고 아주 드물게\n황금잉어가 올라온다고 한다.",
 				[["알겠다", null]])
 			return
 		if obj.kind == "cave":
-			cave.open()
+			_open_mine_dialog()
 			return
 		if obj.kind == "house":
 			_enter_building(_building_kind_at(t))
@@ -3363,6 +3385,104 @@ func _talk_to(npc: Node2D) -> void:
 	])
 
 
+# ---- 온실 ----
+
+func in_greenhouse(t: Vector2i) -> bool:
+	return GameData.greenhouse_built and GREENHOUSE.has_point(t)
+
+
+func _open_greenhouse_dialog() -> void:
+	if GameData.greenhouse_built:
+		dialog.open("온실", "유리 너머로 늘 봄이다.\n\n이 안에서는 계절을 타지 않는다 —\n"
+			+ "아무 씨앗이나 심을 수 있고,\n계절이 바뀌어도 시들지 않는다.",
+			[["좋다", null]])
+		return
+	var ok: bool = GameData.wood >= GREENHOUSE_COST_WOOD \
+		and GameData.stone >= GREENHOUSE_COST_STONE \
+		and GameData.money >= GREENHOUSE_COST_MONEY
+	var body := "여기에 온실을 세울 수 있다.\n\n온실 안에서는 계절을 타지 않는다.\n"
+	body += "겨울에도 원하는 작물을 키울 수 있다.\n\n"
+	body += "필요: 목재 %d/%d · 석재 %d/%d · %dG/%dG" % [
+		GameData.wood, GREENHOUSE_COST_WOOD, GameData.stone, GREENHOUSE_COST_STONE,
+		GameData.money, GREENHOUSE_COST_MONEY]
+	dialog.open("온실 터", body,
+		[["짓기", _build_greenhouse], ["나중에", null]] if ok else [["다음에", null]])
+
+
+func _build_greenhouse() -> void:
+	if GameData.greenhouse_built:
+		return
+	if GameData.wood < GREENHOUSE_COST_WOOD or GameData.stone < GREENHOUSE_COST_STONE \
+			or GameData.money < GREENHOUSE_COST_MONEY:
+		return
+	GameData.wood -= GREENHOUSE_COST_WOOD
+	GameData.stone -= GREENHOUSE_COST_STONE
+	GameData.money -= GREENHOUSE_COST_MONEY
+	GameData.greenhouse_built = true
+	# 온실 안은 처음부터 갈아 둔 밭으로 만든다 (자연물은 치운다)
+	for y in range(GREENHOUSE.position.y, GREENHOUSE.end.y):
+		for x in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
+			var t := Vector2i(x, y)
+			if objects.has(t) and objects[t].kind != "sign":
+				_remove_object(t)
+			grid[y][x].ground = "soil"
+	Sound.play_sfx("sfx_place")
+	hud.quest_toast("온실 완공!")
+	save_now()
+	queue_redraw()
+	dialog.open("온실", "온실이 완성됐다!\n\n이 안에서는 계절을 타지 않는다.\n"
+		+ "겨울에도 원하는 작물을 키울 수 있다.", [["고맙습니다", null]])
+
+
+# 온실 유리집을 밭 위에 겹쳐 그린다 (지붕 뼈대 + 유리 반사)
+func _draw_greenhouse() -> void:
+	if not GameData.greenhouse_built:
+		return
+	var r := Rect2(GREENHOUSE.position.x * TILE, GREENHOUSE.position.y * TILE,
+		GREENHOUSE.size.x * TILE, GREENHOUSE.size.y * TILE)
+	overlay.draw_rect(r, Color(0.72, 0.9, 0.95, 0.22))              # 유리
+	# 지붕 띠 (위쪽을 조금 더 밝게 — 유리집처럼 보이게)
+	overlay.draw_rect(Rect2(r.position, Vector2(r.size.x, TILE * 0.7)),
+		Color(0.85, 0.95, 1.0, 0.3))
+	overlay.draw_rect(r, Color(0.9, 0.96, 1.0, 0.75), false, 4.0)   # 테두리
+	for i in range(1, GREENHOUSE.size.x):                          # 세로 뼈대
+		var x := r.position.x + i * TILE
+		overlay.draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y),
+			Color(0.85, 0.93, 0.96, 0.28), 1.0)
+	for i in range(1, GREENHOUSE.size.y):                          # 가로 뼈대
+		var y := r.position.y + i * TILE
+		overlay.draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y),
+			Color(0.85, 0.93, 0.96, 0.28), 1.0)
+	# 유리에 비치는 빛 한 줄
+	overlay.draw_line(r.position + Vector2(8, 8),
+		r.position + Vector2(r.size.x * 0.45, r.size.y * 0.45),
+		Color(1, 1, 1, 0.22), 4.0)
+
+
+# 동굴 입구: 1층부터 갈지, 이미 내려가 본 승강기 층으로 갈지 고른다.
+# (한 번도 안 내려가 봤으면 묻지 않고 바로 1층)
+func _open_mine_dialog() -> void:
+	var floors: Array = GameData.mine_floors()
+	if floors.size() <= 1:
+		cave.open(false, 1)
+		return
+	var btns: Array = []
+	for f: int in floors:
+		btns.append(["%d층" % f, _enter_mine.bind(f)])
+	btns.append(["그만두기", null])
+	dialog.open("동굴 승강기",
+		"가장 깊이 내려가 본 곳: %d층
+
+어디서 시작할까?
+(5층마다 승강기가 있다)"
+		% GameData.mine_deepest, btns)
+
+
+func _enter_mine(f: int) -> void:
+	dialog.close()
+	cave.open(false, f)
+
+
 # ---- 여관 · 연구소 · 도서관 ----
 #
 # 거래 창이 없는 방들. 계산대 앞에서 E를 누르면 각자의 일을 한다.
@@ -3803,7 +3923,8 @@ func _next_day(passed_out: bool) -> void:
 			for x in MAP_W:
 				var cell: Dictionary = grid[y][x]
 				if cell.crop_id != "" and not cell.dead \
-						and GameData.season() not in GameData.CROPS[cell.crop_id].seasons:
+						and GameData.season() not in GameData.CROPS[cell.crop_id].seasons \
+						and not in_greenhouse(Vector2i(x, y)):
 					cell.dead = true
 					wilted += 1
 		_apply_season_visuals()
@@ -4033,6 +4154,8 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
 	GameData.breed_level = int(d.get("breed_level", 0))
+	GameData.greenhouse_built = bool(d.get("greenhouse_built", false))
+	GameData.mine_deepest = maxi(1, int(d.get("mine_deepest", 1)))
 	GameData.fest_history = d.get("fest_history", []).duplicate()
 	GameData.owned_gear = d.get("owned_gear", []).duplicate()
 	for slot: String in GameData.GEAR_SLOTS:
@@ -4498,6 +4621,7 @@ func _draw() -> void:
 func _draw_overlay() -> void:
 	_draw_nav_arrow()
 	_draw_festival()
+	_draw_greenhouse()
 
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if player != null:
@@ -4581,6 +4705,9 @@ func _context_hint() -> Array:
 			"sign":
 				if t == FISH_SIGN:
 					return ["E: 낚시터 안내", above_tile]
+				if t == GREENHOUSE_SIGN:
+					return ["E: 온실 짓기" if not GameData.greenhouse_built
+						else "E: 온실", above_tile]
 			"cave":
 				return ["E: 동굴 탐험", above_tile]
 			"worldtree":
@@ -5009,6 +5136,23 @@ func _debug_tick() -> void:
 			print("INN_REST_OK=", GameData.energy >= GameData.ENERGY_MAX)
 			dialog.close()
 			shop_room.close()
+		328:
+			# 광산 승강기: 깊이 기록 -> 시작 층 고르기
+			GameData.mine_deepest = 12
+			print("MINE_FLOORS=", GameData.mine_floors())
+			# 온실: 짓고 나면 겨울에도 심을 수 있어야 한다
+			GameData.wood = 999
+			GameData.stone = 999
+			GameData.money = 99999
+			_build_greenhouse()
+			dialog.close()
+			GameData.day = GameData.DAYS_PER_SEASON * 3 + 1   # 겨울
+			_apply_season_visuals()
+			player.position = Vector2((GREENHOUSE.position.x + 4) * TILE + 16,
+				(GREENHOUSE.end.y + 1) * TILE + 16)
+			print("GREENHOUSE_OK=", GameData.greenhouse_built,
+				" winter_plantable=", in_greenhouse(GREENHOUSE.position))
+		331: _save_shot("_greenhouse.png")
 		330:
 			var where := []
 			for n in npcs:

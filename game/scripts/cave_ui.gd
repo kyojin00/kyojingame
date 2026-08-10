@@ -48,12 +48,14 @@ func _ready() -> void:
 var worldtree := false  # 세계수 동굴 모드 (강화 몬스터 + 3층 보스)
 
 
-func open(wt: bool = false) -> void:
+func open(wt: bool = false, start_floor: int = 1) -> void:
 	if GameData.energy < 15.0:
 		main.hud.show_message("체력이 너무 낮다... 회복하고 오자. (요리를 먹거나 잠시 기다리기)")
 		return
 	worldtree = wt
-	floor_num = 1
+	# 승강기로 내려간 층에서 시작한다 (세계수 동굴은 언제나 1층부터)
+	floor_num = 1 if wt else maxi(1, start_floor)
+	GameData.mine_reach(floor_num)
 	_gen_floor()
 	visible = true
 	Sound.play_sfx("sfx_place")
@@ -332,9 +334,14 @@ func _interact() -> void:
 	# 다음 층 계단
 	if stairs_pos.x >= 0 and pt.distance_to(stairs_pos) < 1.8:
 		floor_num += 1
+		if not worldtree:
+			GameData.mine_reach(floor_num)
 		_gen_floor()
 		Sound.play_sfx("sfx_place")
-		main.hud.show_message("동굴 %d층으로 내려간다... 더 위험해졌다!" % floor_num)
+		var msg2 := "동굴 %d층으로 내려간다... 더 위험해졌다!" % floor_num
+		if not worldtree and floor_num % GameData.MINE_ELEVATOR_STEP == 0:
+			msg2 += "\n승강기 층! 다음부터 여기서 시작할 수 있다."
+		main.hud.show_message(msg2, 4.0)
 
 
 func _dir_vec() -> Vector2:
