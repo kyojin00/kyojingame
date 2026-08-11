@@ -11,6 +11,7 @@
 # 검증: dev_harness.gd의 `_mp_tick` (KYOJIN_MP=host / guest).
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
+class_name KyojinNetSync
 extends Node
 
 var m: KyojinMain    # main.gd
@@ -104,8 +105,8 @@ func _recv_snapshot(json: String) -> void:
 	m.player.position = my_pos
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
-	m._spawn_objects()
-	m._apply_season_visuals()
+	m.objnode._spawn_objects()
+	m.objnode._apply_season_visuals()
 	m._net_ready = true
 	_hide_connecting()
 	m.hud.show_message("농장에 도착했다! 함께 일해보자.")
@@ -193,7 +194,7 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 				continue
 			if m.objects.has(pos) and not present.has(pos):
 				if m.objects[pos].kind != "house":
-					m._remove_object(pos)
+					m.objnode._remove_object(pos)
 			elif present.has(pos):
 				var o: Array = present[pos]
 				if o[2] == "house":
@@ -201,7 +202,7 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 				if m.objects.has(pos):
 					m.objects[pos].hp = int(o[3])
 				else:
-					m._place_object(pos, o[2], int(o[3]))
+					m.objnode._place_object(pos, o[2], int(o[3]))
 	m.queue_redraw()
 
 
@@ -364,7 +365,7 @@ func _net_new_day(json: String, title_text: String, body: String) -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
 	GameData.energy = GameData.ENERGY_MAX
-	m._spawn_objects()
-	m._apply_season_visuals()
+	m.objnode._spawn_objects()
+	m.objnode._apply_season_visuals()
 	m.summary.open(title_text, body)
 	m.queue_redraw()

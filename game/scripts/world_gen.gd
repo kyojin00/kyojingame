@@ -7,6 +7,7 @@
 # 가려 지나갈 수 없게 된 칸은 길로 두지 않는다 (_trim_paths_under_building).
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
+class_name KyojinWorldGen
 extends Node
 
 var m: KyojinMain    # main.gd
@@ -342,7 +343,7 @@ func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
 		tname = "house"
 	# 그림은 512x410이고 0.5배로 그려 화면에서는 256 x 205(8 x 6.4칸)를 덮는다.
 	# 다른 오브젝트와 같은 2:1 축소라 점이 흔들리지 않는다.
-	var hn := m._make_object(m.tex[tname],
+	var hn: Node2D = m.objnode._make_object(m.tex[tname],
 		Vector2(anchor.x * m.TILE, (anchor.y + 4) * m.TILE), Vector2(0, -410))
 	var hspr: Sprite2D = hn.get_child(0)
 	hspr.scale = Vector2(0.5, 0.5)
@@ -385,7 +386,7 @@ func _advance_tree_growth() -> void:
 			if int(o.grow) <= 0:
 				o.erase("young")
 				o.erase("grow")
-			m._refresh_tree_sprite(pos)
+			m.objnode._refresh_tree_sprite(pos)
 	var keep := []
 	for e in GameData.tree_regrow:
 		var pos := Vector2i(int(e[0]), int(e[1]))
@@ -397,8 +398,8 @@ func _advance_tree_growth() -> void:
 		if not m.objects.has(pos) and m.grid[pos.y][pos.x].ground == "grass" \
 				and m.grid[pos.y][pos.x].crop_id == "":
 			m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP, "young": true, "grow": 2}
-			m._spawn_object_node(pos, "tree")
-			m._refresh_tree_sprite(pos)
+			m.objnode._spawn_object_node(pos, "tree")
+			m.objnode._refresh_tree_sprite(pos)
 	GameData.tree_regrow = keep
 
 
@@ -416,7 +417,7 @@ func _respawn_resources() -> void:
 			continue  # 마을/길에는 리스폰하지 않는다
 		if (pos - m.player_tile()).length() < 4.0:
 			continue
-		m._place_object(pos, kind, m.TREE_HP if kind == "tree" else m.ROCK_HP)
+		m.objnode._place_object(pos, kind, m.TREE_HP if kind == "tree" else m.ROCK_HP)
 		break
 
 
@@ -440,7 +441,7 @@ func _respawn_forage() -> void:
 		if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
 			continue
 		var kind := "forage_berry" if randf() < 0.6 else "forage_herb"
-		m._place_object(pos, kind, 0)
+		m.objnode._place_object(pos, kind, 0)
 		count += 1
 
 
@@ -483,5 +484,5 @@ func _migrate_farm_layout() -> void:
 		_block_barn_art()
 		# 새 축사 그림 자리에 서 있던 세이브라면 밖으로 꺼내 준다 (갇히지 않게)
 		if not m.is_passable(m.player_tile()):
-			var out := m._free_spot_near(m.BARN_POS + Vector2i(0, 2))
+			var out: Vector2i = m.riding._free_spot_near(m.BARN_POS + Vector2i(0, 2))
 			m.player.position = Vector2(out.x * m.TILE + 16, out.y * m.TILE + 16)

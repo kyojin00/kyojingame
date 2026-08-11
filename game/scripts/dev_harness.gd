@@ -14,6 +14,7 @@
 #     | sed 's/:\t\t/ /' | awk '{print $2}' | tr -d ':' | sort -n | uniq -d
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
+class_name KyojinHarness
 extends Node
 
 var m: KyojinMain    # main.gd
@@ -187,9 +188,9 @@ func _debug_tick() -> void:
 			m.objects.erase(wt)
 			wc.ground = "soil"
 			wc.crop_id = "potato"
-			wc.crop_day = m._grow_total(GameData.CROPS["potato"]) * 0.7
+			wc.crop_day = m.farming._grow_total(GameData.CROPS["potato"]) * 0.7
 			wc.dead = false
-			m._wet(wc, m.WET_ALL_DAY)      # 비로 이미 젖은 상태
+			m.farming._wet(wc, m.WET_ALL_DAY)      # 비로 이미 젖은 상태
 			wc.half_fed = false        # 아직 체크포인트 물은 안 줬다
 			m.set_tool("water")
 			m._sel_target = wt
@@ -266,7 +267,7 @@ func _debug_tick() -> void:
 				" open=", GameData.festival_open(),
 				" npc_place=", m.npc_place_now("merchant"))
 			m.player.position = Vector2(74 * m.TILE + 16, 14 * m.TILE + 16)
-			m._apply_season_visuals()
+			m.objnode._apply_season_visuals()
 		313: _save_shot("_festival.png")
 		314:
 			# 인사를 다 채우면 축제가 끝나고 상금이 나온다
@@ -318,7 +319,7 @@ func _debug_tick() -> void:
 			m.village._build_greenhouse()
 			m.dialog.close()
 			GameData.day = GameData.DAYS_PER_SEASON * 3 + 1   # 겨울
-			m._apply_season_visuals()
+			m.objnode._apply_season_visuals()
 			m.player.position = Vector2((m.GREENHOUSE.position.x + 4) * m.TILE + 16,
 				(m.GREENHOUSE.end.y + 1) * m.TILE + 16)
 			print("GREENHOUSE_OK=", GameData.greenhouse_built,
@@ -386,7 +387,7 @@ func _debug_tick() -> void:
 			for yy in range(ry - 2, ry + 3):
 				var rp := Vector2i(rx, yy)
 				m.objects[rp] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
-				m._spawn_object_node(rp, "bigrock")
+				m.objnode._spawn_object_node(rp, "bigrock")
 			m._sel_target = Vector2i(-999, -999)
 			m._mouse_target = Vector2i(-999, -999)
 			m.set_tool("pickaxe")
@@ -427,7 +428,7 @@ func _debug_tick() -> void:
 			m.shop.main = m
 			m.shop._on_buy_horse()
 			var parked: bool = m.objects.has(GameData.horse_tile)
-			m._mount_horse(GameData.horse_tile)
+			m.riding._mount_horse(GameData.horse_tile)
 			print("HORSE: parked=", parked, " riding=", GameData.riding)
 		346:
 			print("HORSE_DRAW: vis=", m.player.horse_sprite.visible,
@@ -435,7 +436,7 @@ func _debug_tick() -> void:
 				" pos=", m.player.horse_sprite.position, " scale=", m.player.horse_sprite.scale)
 			_save_shot("_horse.png")
 		347:
-			m.dismount_horse()
+			m.riding.dismount_horse()
 			print("HORSE_DISMOUNT_OK=", not GameData.riding
 				and m.objects.has(GameData.horse_tile))
 		349:
@@ -453,11 +454,11 @@ func _debug_tick() -> void:
 				" plaza_overlap=", home_yard.intersects(m.PLAZA))
 			# 지어 놓고 바깥 모습도 남긴다 (이름표 확인)
 			GameData.house_lv = maxi(GameData.house_lv, 1)
-			m._remove_object(m.HOME_SITE)
+			m.objnode._remove_object(m.HOME_SITE)
 			m.worldgen._fill_building(m.HOME_ANCHOR)
 			m.worldgen._spawn_house_node(m.HOME_ANCHOR)
 			GameData.day = 1                 # 봄으로 되돌려 눈 없이 찍는다
-			m._apply_season_visuals()
+			m.objnode._apply_season_visuals()
 			m.player.position = Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16,
 				(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
 			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
@@ -470,7 +471,7 @@ func _debug_tick() -> void:
 			GameData.has_horse = false
 			GameData.riding = false
 			m.build_barn()
-			m.place_horse()
+			m.riding.place_horse()
 			GameData.has_horse = true
 			# 그림이 덮는 칸이 모두 막혀 있는가 (안으로 걸어 들어가면 안 된다)
 			var art_ok := true
@@ -543,7 +544,7 @@ func _debug_tick() -> void:
 			var mt := Vector2i(30, 40)
 			m.objects[mt] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			if not m.obj_nodes.has(mt):
-				m._spawn_object_node(mt, "bigrock")
+				m.objnode._spawn_object_node(mt, "bigrock")
 			m._pending_hits.clear()
 			m._obj_shakes.clear()
 			m.set_tool("pickaxe")
@@ -560,14 +561,14 @@ func _debug_tick() -> void:
 			# ---- 화면용 ----
 			# 앞선 검사에서 세워 둔 커다란 바위 벽이 캐릭터를 덮으므로
 			# 깨끗한 자리로 옮겨 작은 돌 하나만 놓고 찍는다.
-			m._remove_object(mt)
+			m.objnode._remove_object(mt)
 			var demo := Vector2i(24, 20)
 			for cy in range(demo.y - 3, demo.y + 4):
 				for cx in range(demo.x - 3, demo.x + 4):
-					m._remove_object(Vector2i(cx, cy))
+					m.objnode._remove_object(Vector2i(cx, cy))
 			var rt2 := demo + Vector2i(1, 0)
 			m.objects[rt2] = {"kind": "rock", "hp": m.ROCK_HP}
-			m._spawn_object_node(rt2, "rock")
+			m.objnode._spawn_object_node(rt2, "rock")
 			m.player.position = Vector2(demo.x * m.TILE + 16, demo.y * m.TILE + 16)
 			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
 			m.player.dir = "right"
@@ -612,16 +613,16 @@ func _debug_tick() -> void:
 			var ft := Vector2i(24, 22)
 			for cy in range(ft.y - 2, ft.y + 3):
 				for cx in range(ft.x - 2, ft.x + 3):
-					m._remove_object(Vector2i(cx, cy))
+					m.objnode._remove_object(Vector2i(cx, cy))
 			m.objects[ft] = {"kind": "tree", "hp": m.TREE_HP}
-			m._spawn_object_node(ft, "tree")
+			m.objnode._spawn_object_node(ft, "tree")
 			# 나무 그림이 덮는 자리(바로 위 칸)에 선다
 			m.player.position = Vector2(ft.x * m.TILE + 16, (ft.y - 1) * m.TILE + 24)
 			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
 			m._fade_a.clear()
-			var covered: bool = m._covers_player(ft, m.obj_nodes[ft])
+			var covered: bool = m.objnode._covers_player(ft, m.obj_nodes[ft])
 			for i in 30:
-				m._update_object_fade(0.02)
+				m.objnode._update_object_fade(0.02)
 			var alpha: float = m.obj_nodes[ft].get_child(0).modulate.a
 			print("FADE_OK=", covered and alpha < 0.5,
 				" 가리는가=", covered, " 알파=", "%.2f" % alpha)
@@ -759,22 +760,22 @@ func _debug_tick() -> void:
 			for yy in range(p0.y - 1, p0.y + 4):
 				for xx in range(p0.x - 1, p0.x + 4):
 					m.objects.erase(Vector2i(xx, yy))
-			m._recount_pasture()
+			m.farming._recount_pasture()
 			var before_pen: int = m.pasture.size()
 			for i in 5:
 				m.objects[Vector2i(p0.x - 1 + i, p0.y - 1)] = {"kind": "fence", "hp": 0}
 				m.objects[Vector2i(p0.x - 1 + i, p0.y + 3)] = {"kind": "fence", "hp": 0}
 				m.objects[Vector2i(p0.x - 1, p0.y - 1 + i)] = {"kind": "fence", "hp": 0}
 				m.objects[Vector2i(p0.x + 3, p0.y - 1 + i)] = {"kind": "fence", "hp": 0}
-			m._recount_pasture()
+			m.farming._recount_pasture()
 			var closed: int = m.pasture.size()
-			var inside: bool = m.in_pasture(p0 + Vector2i(1, 1))
+			var inside: bool = m.farming.in_pasture(p0 + Vector2i(1, 1))
 			# 문을 하나 내면 (울타리 한 칸 걷어내면) 목초지가 풀려야 한다
 			m.objects.erase(Vector2i(p0.x + 1, p0.y - 1))
-			m._recount_pasture()
+			m.farming._recount_pasture()
 			print("PASTURE_OK=", inside and closed > before_pen,
 				" 닫았을 때=", closed - before_pen, "칸  문 내면=",
-				m.pasture.size() - before_pen, "칸  OPEN_OK=", not m.in_pasture(p0 + Vector2i(1, 1)))
+				m.pasture.size() - before_pen, "칸  OPEN_OK=", not m.farming.in_pasture(p0 + Vector2i(1, 1)))
 		357:
 			# 스프링클러: 설치하면 바로, 그리고 계속 물을 준다
 			var sp := Vector2i(20, 20)
@@ -784,14 +785,14 @@ func _debug_tick() -> void:
 				m.grid[sp.y + d2.y][sp.x + d2.x].wet_min = 0.0
 				m.grid[sp.y + d2.y][sp.x + d2.x].watered = false
 			m.objects.erase(sp)
-			m._place_object(sp, "sprinkler", 0)
-			m._sprinkle(sp)
+			m.objnode._place_object(sp, "sprinkler", 0)
+			m.farming._sprinkle(sp)
 			var wet_now: bool = m.grid[sp.y][sp.x + 1].watered
 			# 하루가 지나 마른 뒤에도, 낮에 새로 간 밭까지 다시 적셔야 한다
 			for d3 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 				m.grid[sp.y + d3.y][sp.x + d3.x].wet_min = 0.0
 				m.grid[sp.y + d3.y][sp.x + d3.x].watered = false
-			m._sprinkler_tick()
+			m.farming._sprinkler_tick()
 			print("SPRINKLER_NOW_OK=", wet_now,
 				" SPRINKLER_KEEPS_OK=", m.grid[sp.y][sp.x + 1].watered)
 		358:
@@ -879,7 +880,7 @@ func _debug_tick() -> void:
 			m.note_ui.close()
 			m.dialog.close()
 			GameData.day = 1
-			m._apply_season_visuals()
+			m.objnode._apply_season_visuals()
 			m.player.position = Vector2(16 * m.TILE + 16, 12 * m.TILE + 16)
 			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
 			GameData.minutes = 14.0 * 60.0

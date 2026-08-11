@@ -23,6 +23,10 @@ MODULES = {
     "village_ui.gd": "village",
     "renderer.gd": "renderer",
     "net_sync.gd": "netsync",
+    "object_nodes.gd": "objnode",
+    "farming.gd": "farming",
+    "fishing.gd": "fishing",
+    "riding.gd": "riding",
     "dev_harness.gd": "harness",
 }
 

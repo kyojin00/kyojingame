@@ -8,6 +8,7 @@
 # 유효하다 — 다른 때 부르면 아무 일도 일어나지 않는다.
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
+class_name KyojinRenderer
 extends Node
 
 var m: KyojinMain    # main.gd
@@ -114,7 +115,7 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 	if cell.dead:
 		return m.tex["withered"]
 	var def: Dictionary = GameData.CROPS[cell.crop_id]
-	var t := float(cell.crop_day) / m._grow_total(def)
+	var t := float(cell.crop_day) / m.farming._grow_total(def)
 	if t >= 1.0:
 		return m.tex["mature_" + cell.crop_id]
 	if t < 0.34:
@@ -239,11 +240,11 @@ func _context_hint() -> Array:
 		if cell.dead:
 			return ["시듦 - 호미로 정리", above_tile]
 		var def: Dictionary = GameData.CROPS[cell.crop_id]
-		var pct := float(cell.crop_day) / m._grow_total(def)
+		var pct := float(cell.crop_day) / m.farming._grow_total(def)
 		if pct >= 1.0:
 			return ["수확!", above_tile]
 		var text := "성장 %d%%" % int(pct * 100.0)
-		if m._crop_thirsty(cell):
+		if m.farming._crop_thirsty(cell):
 			text += " · 물을 한 번 더!"
 		elif not cell.watered:
 			text += " · 물주기!"
@@ -282,7 +283,7 @@ func nav_target() -> Variant:
 			var ga: Vector2i = m.VILLAGE_PLOTS["general"].anchor
 			return Vector2((ga.x + 2) * m.TILE + 16, (ga.y + 4) * m.TILE + 16)
 		"fish":
-			return m.fishing_spot_center()   # 마을 남쪽 낚시터 부두
+			return m.fishing.fishing_spot_center()   # 마을 남쪽 낚시터 부두
 		"chop":
 			return _nearest_object_pos("tree")
 		"mine":

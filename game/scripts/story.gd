@@ -7,6 +7,7 @@
 # 그 단계를 보고 무엇을 할지 고른다.
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
+class_name KyojinStory
 extends Node
 
 var m: KyojinMain    # main.gd

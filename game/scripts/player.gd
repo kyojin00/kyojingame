@@ -119,7 +119,7 @@ func _process(delta: float) -> void:
 	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	moving = v != Vector2.ZERO
 	if moving and main.fishing_state != "":
-		main.cancel_fishing()  # 움직이면 낚시 중단
+		main.fishing.cancel_fishing()  # 움직이면 낚시 중단
 	if moving:
 		if v.x != 0.0:
 			# 대각선 포함: 좌우 성분이 있으면 옆모습 걷기

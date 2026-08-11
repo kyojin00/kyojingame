@@ -2,6 +2,10 @@
 #
 # 덩치가 커서 몇 갈래를 따로 뺐다 (전부 자식 노드로 붙고 `m`으로 여기를 부른다):
 #   scripts/world_gen.gd    지형·길·마을 부지·자원 재생
+#   scripts/object_nodes.gd 세계에 서 있는 것들의 노드
+#   scripts/farming.gd      농사·목초지·가축
+#   scripts/fishing.gd      낚시
+#   scripts/riding.gd       탈 것
 #   scripts/net_sync.gd     함께하기 배관 (@rpc는 전부 여기)
 #   scripts/renderer.gd     지형 위에 얹히는 것들 + 화면 안내
 #   scripts/village_ui.gd   마을에서 여는 창들 (상점·여관·축제·의뢰·선물)
@@ -38,9 +42,6 @@ const STAR_FIREFLY_COUNT := 9      # 별밤의 반딧불이 (평소 3)
 
 
 # 작물 성숙에 필요한 누적 성장 시간 (게임 분) — grow_days를 '시간'으로 해석
-func _grow_total(def: Dictionary) -> float:
-	# 연구소에서 개량한 씨앗은 더 빨리 자란다 (최소 40%까지)
-	return float(def.grow_days) * 60.0 * GameData.breed_grow_mult()
 
 
 # 절반까지 자란 작물은 물을 한 번 더 받아야 계속 자란다 (성장 체크포인트)
@@ -48,19 +49,7 @@ const GROW_CHECKPOINT := 0.5
 
 
 # 이 칸의 작물이 체크포인트에서 물을 기다리며 멈춰 있는가
-func _crop_thirsty(cell: Dictionary) -> bool:
-	if cell.crop_id == "" or cell.dead or bool(cell.get("half_fed", false)):
-		return false
-	return float(cell.crop_day) >= _grow_total(GameData.CROPS[cell.crop_id]) * GROW_CHECKPOINT
 
-
-func _wet(cell: Dictionary, minutes: float) -> void:
-	cell.wet_min = maxf(float(cell.wet_min), minutes)
-	cell.watered = true
-	# 절반까지 자란 뒤에 받은 물만 체크포인트를 통과시킨다
-	# (심을 때 내린 비로 미리 통과되지 않도록 성장률을 직접 본다)
-	if _crop_thirsty(cell):
-		cell.half_fed = true
 
 # grid[y][x] = {ground, watered, crop_id, crop_day, dead}
 var grid: Array = []
@@ -121,17 +110,25 @@ var particles: Array = []
 # 검증 시퀀스 본체는 scripts/dev_harness.gd에 있다. KYOJIN_SHOT이 켜졌을 때만
 # 자식으로 붙으므로, 실제 플레이에서는 아예 존재하지 않는다.
 var _shot_path := ""
-var harness: Node = null
+var harness: KyojinHarness = null
 # 메인 스토리 연출 (scripts/story.gd). 규칙이 아니라 각본이라 따로 뺐다.
-var story: Node = null
+var story: KyojinStory = null
 # 지형·길·마을 부지·자원 재생 (scripts/world_gen.gd)
-var worldgen: Node = null
+var worldgen: KyojinWorldGen = null
 # 마을에서 여는 창들 — 상점·여관·축제·의뢰·선물 (scripts/village_ui.gd)
-var village: Node = null
+var village: KyojinVillage = null
 # 지형 위에 얹히는 것들 + 화면 안내 (scripts/renderer.gd)
-var renderer: Node = null
+var renderer: KyojinRenderer = null
 # 함께하기 배관 — @rpc는 전부 여기 있다 (scripts/net_sync.gd)
-var netsync: Node = null
+var netsync: KyojinNetSync = null
+# 세계에 서 있는 것들의 노드 (scripts/object_nodes.gd)
+var objnode: KyojinObjects = null
+# 농사·목초지·가축 (scripts/farming.gd)
+var farming: KyojinFarming = null
+# 낚시 (scripts/fishing.gd)
+var fishing: KyojinFishing = null
+# 탈 것 (scripts/riding.gd)
+var riding: KyojinRiding = null
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
@@ -222,74 +219,14 @@ const HORSE_HOME := Vector2i(10, 9)      # 산 말을 세워 두는 자리 (축�
 #
 # 목장 상회에서 사면 그 자리 근처에 말이 서 있다. **F로 타고 내린다.**
 # 탄 동안에는 도구를 쓸 수 없다.
-func toggle_ride() -> void:
-	if GameData.riding:
-		dismount_horse()
-		return
-	if not GameData.has_horse:
-		hud.show_message("아직 말이 없다. 목장 상회에서 살 수 있다.")
-		return
-	# 가까이 있는 말에 올라탄다 (정확히 그 칸에 서 있지 않아도 된다)
-	var here := player_tile()
-	for r in range(0, 3):
-		for dy in range(-r, r + 1):
-			for dx in range(-r, r + 1):
-				var t: Vector2i = here + Vector2i(dx, dy)
-				var o: Variant = objects.get(t)
-				if o != null and o.kind == "horse":
-					_mount_horse(t)
-					return
-	hud.show_message("말이 근처에 없다. 말을 세워 둔 곳으로 가자.")
-
-func _mount_horse(t: Vector2i) -> void:
-	objects.erase(t)
-	if obj_nodes.has(t):
-		obj_nodes[t].queue_free()
-		obj_nodes.erase(t)
-	GameData.riding = true
-	Sound.play_sfx("sfx_place")
-	hud.show_message("말에 올라탔다! F로 내린다.", 3.0)
-	queue_redraw()
 
 
 # 산 직후: 축사 앞마당(HORSE_HOME)에 말을 세운다.
 # 말은 목장 상회 **실내**에서 사기 때문에 player_tile()을 쓰면 마을 한복판에
 # 서 있게 된다 — 「농장에 세워 뒀다」는 안내와 어긋나 말을 못 찾았다.
-func place_horse() -> void:
-	var spot := HORSE_HOME if not objects.has(HORSE_HOME) and is_passable(HORSE_HOME) \
-		else _free_spot_near(HORSE_HOME)
-	GameData.horse_tile = spot
-	objects[spot] = {"kind": "horse", "hp": 0}
-	_spawn_object_node(spot, "horse")
-	queue_redraw()
 
 
 # 이 칸 둘레에서 오브젝트가 없고 걸어갈 수 있는 자리를 찾는다
-func _free_spot_near(from: Vector2i) -> Vector2i:
-	for r in range(1, 6):
-		for dy in range(-r, r + 1):
-			for dx in range(-r, r + 1):
-				if absi(dx) != r and absi(dy) != r:
-					continue          # 껍질만 훑는다 (가까운 곳부터)
-				var t: Vector2i = from + Vector2i(dx, dy)
-				if not objects.has(t) and is_passable(t):
-					return t
-	return from
-
-
-func dismount_horse() -> void:
-	if not GameData.riding:
-		return
-	GameData.riding = false
-	# 지금 자리 근처의 빈 칸에 말을 세운다
-	var here := player_tile()
-	var spot: Vector2i = here if not objects.has(here) else _free_spot_near(here)
-	GameData.horse_tile = spot
-	objects[spot] = {"kind": "horse", "hp": 0}
-	_spawn_object_node(spot, "horse")
-	Sound.play_sfx("sfx_place")
-	hud.show_message("말에서 내렸다.", 2.0)
-	queue_redraw()
 
 
 # ---- 온실 ----
@@ -413,37 +350,17 @@ var npcs: Array = []
 
 
 func _ready() -> void:
-	# 갈라낸 모듈부터 붙인다 — 바로 아래 _build_map()이 worldgen을 쓴다
-	# 세계를 짓는 쪽 (scripts/world_gen.gd)
-	worldgen = load("res://scripts/world_gen.gd").new()
-	worldgen.name = "WorldGen"
-	worldgen.m = self
-	add_child(worldgen)
-
-	# 함께하기 배관 (scripts/net_sync.gd)
-	# @rpc는 노드 경로로 상대를 찾으므로 **이름을 바꾸면 통신이 죽는다**
-	netsync = load("res://scripts/net_sync.gd").new()
-	netsync.name = "NetSync"
-	netsync.m = self
-	add_child(netsync)
-
-	# 그리는 쪽 (scripts/renderer.gd)
-	renderer = load("res://scripts/renderer.gd").new()
-	renderer.name = "Renderer"
-	renderer.m = self
-	add_child(renderer)
-
-	# 마을 창들 (scripts/village_ui.gd)
-	village = load("res://scripts/village_ui.gd").new()
-	village.name = "VillageUI"
-	village.m = self
-	add_child(village)
-
-	# 스토리 연출은 scripts/story.gd가 맡는다
-	story = load("res://scripts/story.gd").new()
-	story.name = "Story"
-	story.m = self
-	add_child(story)
+	# 갈라낸 모듈부터 붙인다 — 바로 아래 _build_map()이 worldgen을 쓴다.
+	# @rpc는 노드 경로로 상대를 찾으므로 **NetSync는 이름을 바꾸면 통신이 죽는다.**
+	worldgen = _mount("world_gen", "WorldGen")
+	netsync = _mount("net_sync", "NetSync")
+	renderer = _mount("renderer", "Renderer")
+	village = _mount("village_ui", "VillageUI")
+	story = _mount("story", "Story")
+	objnode = _mount("object_nodes", "ObjectNodes")
+	farming = _mount("farming", "Farming")
+	fishing = _mount("fishing", "Fishing")
+	riding = _mount("riding", "Riding")
 
 	_load_textures()
 	worldgen._build_map()
@@ -485,7 +402,7 @@ func _ready() -> void:
 	add_child(summary)
 
 	fishing_ui = preload("res://scripts/fishing_ui.gd").new()
-	fishing_ui.finished.connect(_on_fishing_finished)
+	fishing_ui.finished.connect(fishing._on_fishing_finished)
 	add_child(fishing_ui)
 
 	dialog = preload("res://scripts/dialog_ui.gd").new()
@@ -571,8 +488,8 @@ func _ready() -> void:
 		multiplayer.connected_to_server.connect(func() -> void: netsync._req_snapshot.rpc_id(1))
 		if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
 			netsync._req_snapshot.rpc_id(1)
-		_spawn_objects()
-		_apply_season_visuals()
+		objnode._spawn_objects()
+		objnode._apply_season_visuals()
 		_setup_fade(false)
 		return
 
@@ -622,13 +539,23 @@ func _ready() -> void:
 					objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
 			objects.erase(HOME_SITE)
 	_sync_village_npcs()
-	_spawn_objects()
-	_apply_season_visuals()
+	objnode._spawn_objects()
+	objnode._apply_season_visuals()
 	if GameData.quest.is_empty() and GameData.quest_offers.is_empty():
 		GameData.make_daily_quest()
 
 	_setup_fade(loaded.size() > 0 or _shot_path != "")
 	# 신규 게임은 _show_intro가 스토리 동안 화면을 가렸다가 직접 페이드한다
+
+
+# 갈라낸 모듈 하나를 자식으로 붙인다.
+# preload가 아니라 load인 이유: 모듈이 KyojinMain을 알아서 서로 참조가 된다.
+func _mount(script_name: String, node_name: String) -> Variant:
+	var n: Node = load("res://scripts/%s.gd" % script_name).new()
+	n.name = node_name
+	n.m = self
+	add_child(n)
+	return n
 
 
 func _setup_fade(animate_in: bool) -> void:
@@ -674,29 +601,6 @@ func _setup_camera() -> void:
 # 빽빽한 숲에서는 앞쪽(아래) 나무가 주인공을 가린다.
 # 가리는 나무만 잠깐 비치게 해서 자기 위치를 항상 볼 수 있게 한다.
 var _faded_trees: Array = []
-
-
-func _update_tree_fade() -> void:
-	for spr in _faded_trees:
-		if is_instance_valid(spr):
-			spr.modulate.a = 1.0
-	_faded_trees.clear()
-	if player == null or interior.visible or cave.visible:
-		return
-	var t := player_tile()
-	for dy in range(0, 4):
-		for dx in range(-2, 3):
-			var p := t + Vector2i(dx, dy)
-			if not obj_nodes.has(p) or not objects.has(p):
-				continue
-			if objects[p].kind != "tree":
-				continue
-			var node: Node2D = obj_nodes[p]
-			if node.position.y <= player.position.y:
-				continue  # 뒤쪽 나무는 주인공을 가리지 않는다
-			var spr: Sprite2D = node.get_child(0)
-			spr.modulate.a = 0.45
-			_faded_trees.append(spr)
 
 
 func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
@@ -773,28 +677,6 @@ func _sync_village_npcs() -> void:
 		_spawn_npc(nid, Vector2i(a.x + 2, a.y + 4))  # 자기 건물 문 앞
 
 
-func _spawn_objects() -> void:
-	for n in obj_nodes.values():
-		n.queue_free()
-	obj_nodes.clear()
-	tree_sprites.clear()
-	# 지은 뒤에만 존재한다. 문 칸은 비워 둔다 (구버전 저장도 여기서 열린다)
-	for pid: String in GameData.village_built:
-		if VILLAGE_PLOTS.has(pid):
-			objects.erase(door_tile(VILLAGE_PLOTS[pid].anchor))
-			worldgen._spawn_house_node(VILLAGE_PLOTS[pid].anchor, pid)
-			worldgen._trim_paths_under_building(VILLAGE_PLOTS[pid].anchor)
-	if GameData.house_lv >= 1:
-		objects.erase(door_tile(HOME_ANCHOR))
-		worldgen._spawn_house_node(HOME_ANCHOR)
-		worldgen._trim_paths_under_building(HOME_ANCHOR)
-	for pos: Vector2i in objects:
-		if objects[pos].kind != "house":
-			_spawn_object_node(pos, objects[pos].kind)
-	_recount_pasture()   # 불러온 세이브의 울타리도 목초지로 인정한다
-	story._apply_story_visibility()
-
-
 # 건물 한 채: 5x4칸을 벽으로 채우고 그림을 세운다.
 # 문 칸(아래 가운데)만 비워 둬서 걸어 들어가면 자동으로 안으로 들어간다.
 func door_tile(anchor: Vector2i) -> Vector2i:
@@ -817,7 +699,7 @@ func _door_kind_at(t: Vector2i) -> String:
 
 # 문으로 들어가면 열리는 것 (E로 눌렀을 때와 같다)
 func _enter_building(kind: String) -> void:
-	dismount_horse()   # 말을 타고 실내로 들어갈 수는 없다
+	riding.dismount_horse()   # 말을 타고 실내로 들어갈 수는 없다
 	if kind == "home":
 		interior.open()
 		return
@@ -871,142 +753,8 @@ const OBJECT_PAD := {
 }
 
 
-func _spawn_object_node(pos: Vector2i, kind: String) -> void:
-	var offset := Vector2(0, -64)
-	var texture: Texture2D
-	match kind:
-		"tree":
-			texture = tex["tree_01"]  # 실제 상태별 텍스처는 _refresh_tree_sprite가 결정
-			offset = Vector2(0, -100)
-		"rock":
-			texture = tex["rock"]
-		"bigrock":
-			texture = tex["rock"]  # 같은 바위 그림을 크게 그린다 (퀘스트 5)
-		"housesite":
-			texture = tex["sign"]  # 집터 표지판
-		"board":
-			texture = tex["board"]
-		"sign":
-			texture = tex["sign"]
-		"cave":
-			texture = tex["cave"]
-			offset = Vector2(0, -100)
-		"fence":
-			texture = tex["fence"]
-		"sprinkler":
-			texture = tex["sprinkler"]
-		"forage_berry":
-			texture = tex["forage_berry"]
-		"forage_herb":
-			texture = tex["forage_herb"]
-		"worldtree":
-			texture = tex["cave"]
-			offset = Vector2(0, -100)
-		"barn":
-			texture = tex["barn"]
-			offset = Vector2(0, -texture.get_height())   # 밑변을 문 칸 아래에 맞춘다
-		"barn_block":
-			pass  # 축사 오른쪽 칸 (통행 차단용, 그림 없음)
-		"art_block":
-			pass  # 건물 그림이 덮는 칸 (통행 차단용, 그림 없음)
-		"deco_fountain":
-			texture = tex["deco_fountain"]  # 광장 분수 조형물 (분수 한가운데)
-			offset = Vector2(0, -160)
-		"deco_lamp":
-			texture = tex["deco_lamp"]
-			offset = Vector2(0, -128)
-		"deco_bench":
-			texture = tex["deco_bench"]
-		"horse":
-			texture = tex["horse_side_0"]   # 세워 둔 말
-			offset = Vector2(0, -80)
-	var node := _make_object(texture, Vector2(pos.x * TILE, (pos.y + 1) * TILE), offset)
-	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
-	var sc: float = OBJECT_SCALES.get(kind, 1.0) / OBJECT_TEX_DENSITY
-	if kind == "tree":
-		# 크기 편차는 5칸 간격 안에서 겹치지 않는 범위까지만 (숲에서는 덩어리감을 준다)
-		sc *= 0.82 + _hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.26
-	elif kind == "rock":
-		# 큰 돌과 작은 돌이 섞이도록
-		sc *= 0.65 + _hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
-	if texture != null:
-		var spr: Sprite2D = node.get_child(0)
-		if kind == "tree":
-			spr.flip_h = _hash01(pos.x * 3 + 5, pos.y * 11 + 7) > 0.5  # 좌우 변형
-		spr.scale = Vector2(sc, sc)
-		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
-		if kind == "deco_fountain":
-			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
-	obj_nodes[pos] = node
-	if kind == "tree":
-		tree_sprites.append(node.get_child(0))
-	world.add_child(node)
-
-
 # 나무 상태별 이미지 규칙 (고정 매핑):
 # 어린 나무=tree_15 / 다 자란 나무=tree_01 / 1회 벌목=tree_06 / 2회 벌목=tree_09
-func _refresh_tree_sprite(pos: Vector2i) -> void:
-	if not obj_nodes.has(pos) or not objects.has(pos):
-		return
-	if objects[pos].kind != "tree":
-		return
-	var spr: Sprite2D = obj_nodes[pos].get_child(0)
-	var hp := int(objects[pos].hp)
-	if hp >= TREE_HP:
-		if bool(objects[pos].get("young", false)):
-			spr.texture = tex["tree_15"]  # 아직 덜 자란 어린 나무
-		elif objects[pos].get("apple", false):
-			spr.texture = tex["tree_13"]  # 일부 나무에만 사과 3개
-		else:
-			spr.texture = tex["tree_01"]  # 완전히 자란 기본 나무
-	elif hp == 2:
-		spr.texture = tex["tree_06"]
-	else:
-		spr.texture = tex["tree_09"]
-
-
-func _remove_object(pos: Vector2i, pop: bool = false) -> void:
-	objects.erase(pos)
-	if obj_nodes.has(pos):
-		var node: Node2D = obj_nodes[pos]
-		var sprite := node.get_child(0)
-		tree_sprites.erase(sprite)
-		obj_nodes.erase(pos)
-		if pop and is_instance_valid(sprite):
-			# 바로 지우지 않고 팍 튀었다가 사라진다 (그림만 남는 것이라 판정과 무관)
-			# 노드에 매어 둔다 — 다른 이유로 노드가 먼저 사라져도
-			# 트윈이 유령 객체에 값을 쓰지 않는다
-			var tw := create_tween().bind_node(node).set_parallel(true)
-			tw.tween_property(sprite, "scale", sprite.scale * 1.25, 0.08)
-			tw.chain().tween_property(sprite, "scale", Vector2.ZERO, 0.14)
-			tw.chain().tween_callback(node.queue_free)
-		else:
-			node.queue_free()
-
-
-func _place_object(pos: Vector2i, kind: String, hp: int) -> void:
-	objects[pos] = {"kind": kind, "hp": hp}
-	_spawn_object_node(pos, kind)
-
-
-func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Node2D:
-	# y 정렬 기준점(밑변)에 노드를 두고, 스프라이트는 위로 올려 그린다.
-	var node := Node2D.new()
-	node.position = base_pos
-	var s := Sprite2D.new()
-	s.texture = texture
-	s.centered = false
-	s.offset = offset
-	node.add_child(s)
-	return node
-
-
-func _apply_season_visuals() -> void:
-	for pos: Vector2i in obj_nodes:
-		if objects.has(pos) and objects[pos].kind == "tree":
-			_refresh_tree_sprite(pos)  # 손상 단계(잎 없음/반파)를 유지한 채 계절 반영
-	Sound.play_bgm(GameData.season_key())
-	queue_redraw()
 
 
 func weather_now() -> int:
@@ -1165,57 +913,14 @@ func set_tool(t: String) -> void:
 		hud.show_message("가방(I)에서 빠른 슬롯에 장착해야 쓸 수 있다!")
 		return
 	if t != "rod":
-		cancel_fishing()
+		fishing.cancel_fishing()
 	GameData.tool = t
 
 
 # ---- 낚시 ----
 
-func cancel_fishing() -> void:
-	fishing_state = ""
-
-
-func at_fishing_spot() -> bool:
-	return FISH_SPOT.has_point(player_tile())
-
 
 # 낚시터 안내 지점 — 왼쪽 부두 끝 (길라잡이 화살표가 여기를 가리킨다)
-func fishing_spot_center() -> Vector2:
-	var p: Vector2i = FISH_PIERS[0]
-	return Vector2(p.x * TILE + 16, (VILLAGE_RIVER_Y + RIVER_ROWS - 2) * TILE + 16)
-
-
-func _start_fishing() -> void:
-	var t := target_tile()
-	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H \
-			or grid[t.y][t.x].ground != "water":
-		hud.show_message("물가를 보고 낚싯대를 던지자.")
-		return
-	# 「낚시」 목표를 받은 동안에는 마을 남쪽 낚시터에서 배운다.
-	# (목표를 끝낸 뒤에는 어느 물가에서든 낚을 수 있다)
-	if GameData.tutorial_current_flag() == "fish" and not at_fishing_spot():
-		hud.show_message("마을 남쪽 강가의 낚시터로 가자! 부두에서 낚싯대를 던진다. (지도 M)", 4.0)
-		return
-	if not can_use_tile(t):
-		hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
-		return
-	fishing_state = "waiting"
-	fishing_timer = randf_range(1.5, 4.0) * GameData.fish_wait_mult()
-	Sound.play_sfx("sfx_cast")
-
-
-func _update_fishing(delta: float) -> void:
-	if fishing_state == "waiting":
-		fishing_timer -= delta
-		if fishing_timer <= 0.0:
-			fishing_state = "bite"
-			fishing_timer = 0.9
-			Sound.play_sfx("sfx_bite")
-	elif fishing_state == "bite":
-		fishing_timer -= delta
-		if fishing_timer <= 0.0:
-			fishing_state = ""
-			hud.show_message("물고기가 도망갔다...")
 
 
 # 축사 건설: 농장 고정 위치에 세워진다 (동물 16마리 + 굳은 날씨 자동 배부름)
@@ -1225,7 +930,7 @@ func build_barn() -> void:
 	GameData.barn_built = true
 	GameData.money -= GameData.BARN_COST_MONEY
 	GameData.wood -= GameData.BARN_COST_WOOD
-	_place_object(BARN_POS, "barn", 0)
+	objnode._place_object(BARN_POS, "barn", 0)
 	worldgen._block_barn_art()
 	Sound.play_sfx("sfx_place")
 	hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지.\n"
@@ -1260,38 +965,6 @@ func gain_skill(id: String, amount: float) -> void:
 			[GameData.SKILLS[id].name, lv, GameData.SKILLS[id].effect])
 	if lv > 0 and Net.is_host():
 		netsync._broadcast_stats()
-
-
-func _on_fishing_finished(success: bool) -> void:
-	if pending_fish.is_empty():
-		return          # 무엇이 물었는지 모르는 채로 끝났다 (있어선 안 되는 경우)
-	if success:
-		var id: String = pending_fish[0]
-		var def: Dictionary = GameData.ITEMS[id]
-		GameData.items[id] += 1
-		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
-		GameData.today_harvest += 1
-		Sound.play_sfx("sfx_catch")
-		renderer.spawn_particles(player_tile(), "sparkle")
-		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
-		tutorial_notify("fish")
-		# 여름 낚시대회: 대회 시간 안에 낚시터에서 낚은 것만 센다
-		if GameData.festival_open() and str(GameData.festival_today().id) == "fishing" \
-				and at_fishing_spot():
-			GameData.fest_fish += 1
-			if GameData.fest_fish == 5:
-				hud.show_message("5마리! 이장에게 결과를 알리자.", 4.0)
-		gain_skill("fish", 10.0)
-		if Net.is_guest():
-			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
-			GameData.items[id] -= 1
-			GameData.fish_caught[id] = int(GameData.fish_caught[id]) - 1
-			netsync._req_gain.rpc_id(1, id, 1)
-		elif Net.is_host():
-			netsync._broadcast_stats()
-	else:
-		Sound.play_sfx("sfx_miss")
-		hud.show_message("놓쳤다...")
 
 
 func _affected_tiles(base: Vector2i) -> Array:
@@ -1337,7 +1010,7 @@ func _try_harvest(t: Vector2i) -> bool:
 		return true
 	var cid: String = cell.crop_id
 	var def: Dictionary = GameData.CROPS[cid]
-	if float(cell.crop_day) < _grow_total(def):
+	if float(cell.crop_day) < farming._grow_total(def):
 		hud.show_message("아직 다 자라지 않았다.")
 		return true
 	var quality := GameData.roll_quality(GameData.total_luck())
@@ -1423,7 +1096,7 @@ func use_tool() -> void:
 						continue
 					c.ground = "soil"
 					if GameData.weather_wet(weather_now()):
-						_wet(c, WET_ALL_DAY)
+						farming._wet(c, WET_ALL_DAY)
 					renderer.spawn_particles(pos, "dirt")
 					worked = true
 				if worked:
@@ -1436,10 +1109,10 @@ func use_tool() -> void:
 				if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
 					continue
 				var c: Dictionary = grid[pos.y][pos.x]
-				var was_thirsty := _crop_thirsty(c)
+				var was_thirsty: bool = farming._crop_thirsty(c)
 				if c.ground == "soil" and not objects.has(pos) \
 						and (float(c.wet_min) < WET_MANUAL - 1.0 or was_thirsty):
-					_wet(c, WET_MANUAL)
+					farming._wet(c, WET_MANUAL)
 					renderer.spawn_particles(pos, "water")
 					worked = true
 					revived = revived or was_thirsty
@@ -1472,7 +1145,7 @@ func use_tool() -> void:
 			cell.dead = false
 			cell.half_fed = false
 			if GameData.weather_wet(weather_now()):
-				_wet(cell, WET_ALL_DAY)
+				farming._wet(cell, WET_ALL_DAY)
 			Sound.play_sfx("sfx_seed", 0.1)
 			renderer.spawn_particles(t, "seed")
 			tutorial_notify("plant")
@@ -1488,9 +1161,9 @@ func use_tool() -> void:
 				obj.hp -= int(GameData.tool_stat("axe", "power"))
 				Sound.play_sfx("sfx_chop", 0.15)
 				swing_at(t, "wood")
-				_refresh_tree_sprite(t)
+				objnode._refresh_tree_sprite(t)
 				if obj.hp <= 0:
-					_remove_object(t, true)
+					objnode._remove_object(t, true)
 					# 숲길을 막고 있던 나무는 다시 자라지 않는다 (길이 도로 막히면 안 된다)
 					var story_gate: bool = GameData.story_phase != "done" \
 						and STORY_GATE_XS.has(t.x) \
@@ -1532,9 +1205,9 @@ func use_tool() -> void:
 				if bool(obj.get("fixed", false)):
 					hud.show_message("단단히 박힌 울타리다. 길을 따라 가야 한다.")
 					return
-				_remove_object(t)
+				objnode._remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
-				_recount_pasture()   # 울타리를 걷으면 목초지가 풀린다
+				farming._recount_pasture()   # 울타리를 걷으면 목초지가 풀린다
 				Sound.play_sfx("sfx_place")
 				hud.show_message("울타리를 회수했다.")
 			else:
@@ -1548,7 +1221,7 @@ func use_tool() -> void:
 				Sound.play_sfx("sfx_pick", 0.15)
 				swing_at(t, "stone")
 				if obj.hp <= 0:
-					_remove_object(t, true)
+					objnode._remove_object(t, true)
 					var stone_got := STONE_PER_ROCK
 					if randf() < GameData.bonus_drop_chance("mine"):
 						stone_got += 1
@@ -1565,7 +1238,7 @@ func use_tool() -> void:
 				Sound.play_sfx("sfx_pick", 0.15)
 				swing_at(t, "stone", true)
 				if obj.hp <= 0:
-					_remove_object(t, true)
+					objnode._remove_object(t, true)
 					GameData.stone += BIGROCK_STONE
 					hud.show_message("커다란 바위를 캐냈다! 돌 +%d" % BIGROCK_STONE)
 					_maybe_drop_recipe("bigrock")
@@ -1575,7 +1248,7 @@ func use_tool() -> void:
 					hud.show_message("커다란 바위를 내리쳤다. (%d/%d)" %
 						[BIGROCK_HP - obj.hp, BIGROCK_HP])
 			elif obj.kind == "sprinkler":
-				_remove_object(t)
+				objnode._remove_object(t)
 				GameData.wood += GameData.SPRINKLER_COST_WOOD
 				GameData.stone += GameData.SPRINKLER_COST_STONE
 				Sound.play_sfx("sfx_place")
@@ -1591,10 +1264,10 @@ func use_tool() -> void:
 				hud.show_message("목재가 부족하다. (목재 %d 필요)" % GameData.FENCE_COST_WOOD)
 				return
 			GameData.wood -= GameData.FENCE_COST_WOOD
-			_place_object(t, "fence", 0)
+			objnode._place_object(t, "fence", 0)
 			Sound.play_sfx("sfx_place")
 			var was: int = pasture.size()
-			_recount_pasture()
+			farming._recount_pasture()
 			if pasture.size() > was:
 				hud.quest_toast("목초지 완성!")
 				hud.show_message(
@@ -1612,15 +1285,15 @@ func use_tool() -> void:
 				return
 			GameData.wood -= GameData.SPRINKLER_COST_WOOD
 			GameData.stone -= GameData.SPRINKLER_COST_STONE
-			_place_object(t, "sprinkler", 0)
-			_sprinkle(t)                      # 설치하자마자 바로 적신다
+			objnode._place_object(t, "sprinkler", 0)
+			farming._sprinkle(t)                      # 설치하자마자 바로 적신다
 			Sound.play_sfx("sfx_place")
 			hud.show_message("스프링클러 설치! 주변 4칸에 계속 물을 준다.")
 			tutorial_notify("build")
 		"rod":
 			match fishing_state:
 				"":
-					_start_fishing()
+					fishing._start_fishing()
 				"waiting":
 					fishing_state = ""
 					hud.show_message("아직 입질이 없다...")
@@ -1748,7 +1421,7 @@ func _blocking_object_tile() -> Vector2i:
 func interact() -> void:
 	# 말을 타고 있으면 E도 「내리기」로 친다 (기본은 F)
 	if GameData.riding:
-		dismount_horse()
+		riding.dismount_horse()
 		return
 	# 맞는 도구를 들고 나무/돌을 조준 중이면 채집이 최우선
 	# (근처에 NPC가 있어도 대화가 끼어들지 않는다)
@@ -1836,7 +1509,7 @@ func interact() -> void:
 			continue
 		if String(obj.kind).begins_with("forage_"):
 			var fid: String = obj.kind
-			_remove_object(t)
+			objnode._remove_object(t)
 			GameData.items[fid] += 1
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + 1
 			Sound.play_sfx("sfx_harvest")
@@ -1867,7 +1540,7 @@ func interact() -> void:
 				[["알겠다", null]])
 			return
 		if obj.kind == "horse":
-			_mount_horse(t)   # 말 칸에서 E를 눌러도 탄다 (F가 기본)
+			riding._mount_horse(t)   # 말 칸에서 E를 눌러도 탄다 (F가 기본)
 			return
 		if obj.kind == "cave":
 			village._open_mine_dialog()
@@ -2156,28 +1829,6 @@ const INN_REST_HOURS := 3.0
 
 # ---- 동물 ----
 
-func spawn_animal(type: String, pos: Vector2 = Vector2.ZERO, fed: bool = false) -> void:
-	var a: Node2D = preload("res://scripts/animal.gd").new()
-	a.main = self
-	a.type = type
-	a.fed = fed
-	if pos == Vector2.ZERO:
-		var t := _find_free_tile_near(Vector2i(10, 7))
-		pos = Vector2(t.x * TILE + 16, t.y * TILE + 16)
-	a.position = pos
-	animals.append(a)
-	world.add_child(a)
-
-
-func _find_free_tile_near(center: Vector2i) -> Vector2i:
-	for r in range(0, 8):
-		for dy in range(-r, r + 1):
-			for dx in range(-r, r + 1):
-				var t := center + Vector2i(dx, dy)
-				if is_passable(t):
-					return t
-	return START_TILE
-
 
 # ---- 하루 진행 ----
 
@@ -2222,7 +1873,7 @@ func _next_day(passed_out: bool) -> void:
 						and not village.in_greenhouse(Vector2i(x, y)):
 					cell.dead = true
 					wilted += 1
-		_apply_season_visuals()
+		objnode._apply_season_visuals()
 
 	# 폭풍이 지나간 아침: 자란 작물 일부가 상하고, 대신 목재가 잔뜩 떨어져 있다
 	var storm_hurt := 0
@@ -2242,9 +1893,9 @@ func _next_day(passed_out: bool) -> void:
 		for y in MAP_H:
 			for x in MAP_W:
 				if grid[y][x].ground == "soil":
-					_wet(grid[y][x], WET_ALL_DAY)
+					farming._wet(grid[y][x], WET_ALL_DAY)
 
-	_sprinkler_tick()
+	farming._sprinkler_tick()
 
 	# 축사가 있으면 굳은 날씨에도 동물들이 알아서 배부르다
 	if GameData.barn_built and GameData.weather_harsh(weather_now()):
@@ -2252,10 +1903,10 @@ func _next_day(passed_out: bool) -> void:
 			a2.fed = true
 
 	# 목초지(울타리로 둘러싼 곳)의 동물은 알아서 배부르다
-	_recount_pasture()
+	farming._recount_pasture()
 	var penned := 0
 	for a3 in animals:
-		if in_pasture(Vector2i(int(a3.position.x / TILE), int(a3.position.y / TILE))):
+		if farming.in_pasture(Vector2i(int(a3.position.x / TILE), int(a3.position.y / TILE))):
 			a3.fed = true
 			penned += 1
 
@@ -2263,7 +1914,7 @@ func _next_day(passed_out: bool) -> void:
 	var collected := {}
 	for a in animals:
 		if a.fed:
-			var in_pen: bool = in_pasture(Vector2i(int(a.position.x / TILE),
+			var in_pen: bool = farming.in_pasture(Vector2i(int(a.position.x / TILE),
 				int(a.position.y / TILE)))
 			var product: String = GameData.ANIMALS[a.type].product
 			var n_out := 2 if (in_pen and randf() < PASTURE_BONUS) else 1
@@ -2466,7 +2117,7 @@ func _apply_save(d: Dictionary) -> void:
 		worldgen._block_barn_art()
 	var anim_scale := float(TILE) / float(d.get("tile", 16))
 	for a in d.get("animals", []):
-		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])) * anim_scale, int(a[3]) == 1)
+		farming.spawn_animal(a[0], Vector2(float(a[1]), float(a[2])) * anim_scale, int(a[3]) == 1)
 	# 구버전(16px 타일) 저장 좌표 환산
 	var pos_scale := float(TILE) / float(d.get("tile", 16))
 	player.position = Vector2(float(d.player[0]), float(d.player[1])) * pos_scale
@@ -2518,7 +2169,7 @@ func _process(delta: float) -> void:
 	story._story_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	_update_hit_fx(delta)
-	_update_object_fade(delta)
+	objnode._update_object_fade(delta)
 	if GameData.story_phase == "done":
 		story._grandpa_update(delta)
 	for ft in float_texts:
@@ -2536,10 +2187,10 @@ func _process(delta: float) -> void:
 			water_frame = 1 - water_frame
 		_growth_timer += delta
 		if _growth_timer >= 0.7:
-			_growth_tick(_growth_timer * MIN_PER_SEC)
+			farming._growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
 		_update_mouse_target()
-		_update_fishing(delta)
+		fishing._update_fishing(delta)
 		if player_tile() != _last_explore_tile:
 			_last_explore_tile = player_tile()
 			GameData.mark_explored_at(_last_explore_tile)
@@ -2558,7 +2209,7 @@ func _process(delta: float) -> void:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	renderer._update_particles(delta)
 	_update_night_mobs(delta)
-	_update_tree_fade()
+	objnode._update_tree_fade()
 	story._update_u_intro()
 	netsync._net_process(delta)
 	_update_night()
@@ -2584,110 +2235,9 @@ const PASTURE_BONUS := 0.35            # 생산물이 하나 더 나올 확률
 const PASTURE_GOLDEN_EGG := 0.09       # 목초지 닭의 황금 달걀 확률 (평소 0.03)
 
 
-func _blocks_pasture(t: Vector2i) -> bool:
-	return objects.has(t) or grid[t.y][t.x].ground == "water"
-
-
-func _recount_pasture() -> void:
-	pasture.clear()
-	# ① 가장자리에서 흘려보내 「바깥」을 표시한다
-	var outside := {}
-	var queue: Array[Vector2i] = []
-	for x in MAP_W:
-		for y in [0, MAP_H - 1]:
-			var t := Vector2i(x, y)
-			if not _blocks_pasture(t) and not outside.has(t):
-				outside[t] = true
-				queue.append(t)
-	for y2 in MAP_H:
-		for x2 in [0, MAP_W - 1]:
-			var t2 := Vector2i(x2, y2)
-			if not _blocks_pasture(t2) and not outside.has(t2):
-				outside[t2] = true
-				queue.append(t2)
-	var head := 0
-	while head < queue.size():
-		var cur: Vector2i = queue[head]
-		head += 1
-		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-			var n: Vector2i = cur + d
-			if n.x < 0 or n.y < 0 or n.x >= MAP_W or n.y >= MAP_H:
-				continue
-			if outside.has(n) or _blocks_pasture(n):
-				continue
-			outside[n] = true
-			queue.append(n)
-	# ② 바깥에 닿지 못한 빈 칸 = 갇힌 칸. 덩어리별로 크기를 재서 너무 넓으면 뺀다
-	var seen := {}
-	for y3 in MAP_H:
-		for x3 in MAP_W:
-			var t3 := Vector2i(x3, y3)
-			if seen.has(t3) or outside.has(t3) or _blocks_pasture(t3):
-				continue
-			var blob: Array[Vector2i] = [t3]
-			seen[t3] = true
-			var h2 := 0
-			while h2 < blob.size():
-				var c2: Vector2i = blob[h2]
-				h2 += 1
-				for d2 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-					var n2: Vector2i = c2 + d2
-					if n2.x < 0 or n2.y < 0 or n2.x >= MAP_W or n2.y >= MAP_H:
-						continue
-					if seen.has(n2) or _blocks_pasture(n2):
-						continue
-					seen[n2] = true
-					blob.append(n2)
-			if blob.size() <= PASTURE_MAX:
-				for c3: Vector2i in blob:
-					pasture[c3] = true
-
-
-func in_pasture(t: Vector2i) -> bool:
-	return pasture.has(t)
-
-
 # 스프링클러: 설치해 두면 둘레 네 칸을 **계속** 적신다.
 # 예전에는 아침에 딱 한 번만 뿌렸다 — 그래서 방금 설치한 스프링클러도,
 # 낮에 새로 간 밭도 다음 날이 되어야 물이 갔다.
-func _sprinkle(pos: Vector2i) -> void:
-	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-		var n: Vector2i = pos + d
-		if n.x < 0 or n.y < 0 or n.x >= MAP_W or n.y >= MAP_H:
-			continue
-		if grid[n.y][n.x].ground == "soil":
-			_wet(grid[n.y][n.x], WET_ALL_DAY)
-
-
-func _sprinkler_tick() -> void:
-	for pos: Vector2i in objects:
-		if objects[pos].kind == "sprinkler":
-			_sprinkle(pos)
-
-
-func _growth_tick(game_minutes: float) -> void:
-	_sprinkler_tick()
-	var changed := false
-	for y in MAP_H:
-		for x in MAP_W:
-			var cell: Dictionary = grid[y][x]
-			if float(cell.wet_min) <= 0.0:
-				continue
-			cell.wet_min = float(cell.wet_min) - game_minutes
-			if float(cell.wet_min) <= 0.0:
-				cell.wet_min = 0.0
-				cell.watered = false
-				changed = true
-			if cell.crop_id != "" and not cell.dead and not _crop_thirsty(cell):
-				var before_stage: Texture2D = renderer._crop_texture(cell)
-				cell.crop_day = float(cell.crop_day) + game_minutes * GameData.farm_growth_mult()
-				# 절반을 막 넘겼다면 여기서 멈춘다 — 물을 한 번 더 줘야 한다
-				if _crop_thirsty(cell):
-					changed = true
-				if renderer._crop_texture(cell) != before_stage:
-					changed = true
-	if changed:
-		queue_redraw()
 
 
 # (자동 도구 선택은 제거됨 — 도구는 반드시 슬롯에 장착하고 숫자키/클릭으로
@@ -2795,7 +2345,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("use_tool"):
 		use_tool()
 	elif event.is_action_pressed("mount"):
-		toggle_ride()
+		riding.toggle_ride()
 	elif event.is_action_pressed("interact"):
 		interact()
 	elif event.is_action_pressed("save_game"):
@@ -2919,46 +2469,6 @@ var _fade_a := {}     # Vector2i -> 지금 알파
 
 
 # 이 오브젝트 그림이 플레이어를 덮고 있는가 (그리고 앞에 그려지는가)
-func _covers_player(t: Vector2i, node: Node2D) -> bool:
-	if node.position.y <= player.position.y:
-		return false          # y정렬상 플레이어 뒤 — 가릴 수 없다
-	var spr: Sprite2D = node.get_child(0)
-	if spr == null or spr.texture == null:
-		return false
-	var top_left: Vector2 = node.position + spr.offset * spr.scale
-	var art := Rect2(top_left, spr.texture.get_size() * spr.scale)
-	# 플레이어 몸통 (발끝 위쪽)
-	return art.intersects(Rect2(player.position + Vector2(-9, -74), Vector2(18, 70)))
-
-
-func _update_object_fade(delta: float) -> void:
-	var pt := player_tile()
-	var want := {}
-	# 플레이어보다 아래쪽(앞에 그려지는) 오브젝트만 본다
-	for dy in range(-1, 5):
-		for dx in range(-3, 4):
-			var t: Vector2i = pt + Vector2i(dx, dy)
-			if not obj_nodes.has(t):
-				continue
-			var kind: String = str(objects.get(t, {}).get("kind", ""))
-			if not FADE_KINDS.has(kind):
-				continue
-			if _covers_player(t, obj_nodes[t]):
-				want[t] = true
-				if not _fade_a.has(t):
-					_fade_a[t] = 1.0
-	for t: Vector2i in _fade_a.keys():
-		if not obj_nodes.has(t):
-			_fade_a.erase(t)
-			continue
-		var target: float = FADE_ALPHA if want.has(t) else 1.0
-		var a: float = move_toward(float(_fade_a[t]), target, delta * FADE_SPEED)
-		_fade_a[t] = a
-		var spr2: Sprite2D = obj_nodes[t].get_child(0)
-		if spr2 != null:
-			spr2.modulate.a = a
-		if is_equal_approx(a, 1.0) and not want.has(t):
-			_fade_a.erase(t)
 
 
 func _update_hit_fx(delta: float) -> void:
@@ -3228,7 +2738,7 @@ func do_drink(fid: String) -> void:
 			for x in MAP_W:
 				var cell: Dictionary = grid[y][x]
 				if cell.ground == "soil" and not cell.watered:
-					_wet(cell, WET_ALL_DAY)
+					farming._wet(cell, WET_ALL_DAY)
 					wet += 1
 		hud.show_message("달빛이 밭 %d칸을 적셨다." % wet, 3.0)
 	var key: String = str(def.get("today", ""))

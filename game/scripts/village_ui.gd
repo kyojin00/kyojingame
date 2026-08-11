@@ -5,6 +5,7 @@
 # 세계 상태를 매 프레임 굴리는 쪽(main)과 성격이 달라서 따로 뺐다.
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
+class_name KyojinVillage
 extends Node
 
 var m: KyojinMain    # main.gd
@@ -30,7 +31,7 @@ func _build_house() -> void:
 	GameData.wood -= GameData.HOUSE_BUILD_WOOD
 	GameData.house_lv = 1
 	m.tutorial_notify("home")
-	m._remove_object(m.HOME_SITE)
+	m.objnode._remove_object(m.HOME_SITE)
 	m.worldgen._fill_building(m.HOME_ANCHOR)
 	Sound.play_sfx("sfx_place")
 	m.dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
@@ -170,7 +171,7 @@ func _build_greenhouse() -> void:
 		for x in range(m.GREENHOUSE.position.x, m.GREENHOUSE.end.x):
 			var t := Vector2i(x, y)
 			if m.objects.has(t) and m.objects[t].kind != "sign":
-				m._remove_object(t)
+				m.objnode._remove_object(t)
 			m.grid[y][x].ground = "soil"
 	Sound.play_sfx("sfx_place")
 	m.hud.quest_toast("온실 완공!")
