@@ -20,6 +20,7 @@ MAIN = os.path.join(SCRIPTS, "main.gd")
 MODULES = {
     "story.gd": "story",
     "world_gen.gd": "worldgen",
+    "village_ui.gd": "village",
     "dev_harness.gd": "harness",
 }
 

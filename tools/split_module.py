@@ -117,8 +117,30 @@ def locals_in(text):
 
 
 def prefix(text, names, ref):
-    """온전한 낱말인 main 멤버 앞에 `ref.`를 붙인다."""
+    """온전한 낱말인 main 멤버 앞에 `ref.`를 붙인다 (문자열·주석은 알아서 가린다)."""
     masked, store = mask(text)
+    return unmask(prefix_masked(masked, names, ref), store)
+
+
+# CanvasItem/Node2D의 것 — 옮겨 간 모듈은 그냥 Node라 자기 것이 없다.
+# 그대로 두면 「Function ... not found in base self」로 터진다.
+CANVAS_CALLS = """
+queue_redraw draw_texture_rect draw_rect draw_line draw_circle draw_string
+draw_texture draw_polygon draw_colored_polygon draw_arc draw_set_transform
+draw_multiline draw_dashed_line draw_char draw_string_outline
+get_canvas_transform get_global_mouse_position get_local_mouse_position
+get_viewport_transform to_local to_global make_canvas_position_local
+""".split()
+
+
+def fix_canvas_calls(masked, ref):
+    for name in CANVAS_CALLS:
+        masked = re.sub(r"(?<![\w.])" + name + r"\(", ref + "." + name + "(", masked)
+    return masked
+
+
+def prefix_masked(masked, names, ref):
+    """이미 가려 둔 글에 접두사를 붙인다."""
     skip = locals_in(masked) | KEYWORDS
 
     def sub(m):
@@ -138,15 +160,18 @@ def prefix(text, names, ref):
             return w
         return ref + "." + w
 
-    masked = re.sub(r"\b\w+\b", sub, masked)
-    return unmask(masked, store)
+    return re.sub(r"\b\w+\b", sub, masked)
 
 
 def main():
     cfg = __import__("json").loads(load(sys.argv[1]))
     src_path = cfg["source"]
     src = load(src_path)
-    lines, blocks = split_blocks(src)
+    # 문자열·주석을 **줄로 자르기 전에** 가린다.
+    # GDScript 문자열은 줄바꿈을 품을 수 있어서, 그냥 자르면 여러 줄 대사
+    # 한가운데가 함수 경계로 오인된다 (실제로 광산 대화가 반토막 났다).
+    msrc, store = mask(src)
+    lines, blocks = split_blocks(msrc)
 
     move_funcs = set(cfg["funcs"])
     move_vars = set(cfg.get("vars", []))
@@ -156,7 +181,7 @@ def main():
     if missing:
         sys.exit("!! 없는 함수: %s" % sorted(missing))
 
-    all_members = members_of(src)
+    all_members = members_of(msrc)
     # 함께 옮겨 가는 것들은 같은 파일에 있으니 접두사를 안 붙인다
     keep_names = all_members - move_funcs - move_vars
 
@@ -177,9 +202,8 @@ def main():
             var_decls.append(l)
             drop.add(i)
 
-    body = "\n\n\n".join(taken)
-    body = prefix(body, keep_names, ref)
-    var_text = "\n".join(prefix(v, keep_names, ref) for v in var_decls)
+    body = fix_canvas_calls(prefix_masked("\n\n\n".join(taken), keep_names, ref), ref)
+    var_text = "\n".join(prefix_masked(v, keep_names, ref) for v in var_decls)
 
     module = cfg["header"].rstrip() + "\nextends Node\n\n"
     module += "var %s: KyojinMain    # main.gd\n" % ref
@@ -187,20 +211,41 @@ def main():
         module += var_text + "\n"
     module += "\n\n" + body + "\n"
     with open(cfg["out"], "w", encoding="utf-8") as f:
-        f.write(module)
+        f.write(unmask(module, store))
 
     # ---- main에서 덜어내고, 남은 호출부를 모듈 쪽으로 돌린다 ----
-    rest = "\n".join(l for i, l in enumerate(lines) if i not in drop)
+    masked_rest = "\n".join(l for i, l in enumerate(lines) if i not in drop)
     handle = cfg["handle"]
-    masked, store = mask(rest)
     for name in sorted(move_funcs | move_vars, key=len, reverse=True):
-        masked = re.sub(r"(?<![\w.])" + re.escape(name) + r"\b",
-                        handle + "." + name, masked)
-    rest = unmask(masked, store)
+        masked_rest = re.sub(r"(?<![\w.])" + re.escape(name) + r"\b",
+                             handle + "." + name, masked_rest)
+    rest = unmask(masked_rest, store)
     # 남은 줄바꿈 정리
     rest = re.sub(r"\n{4,}", "\n\n\n", rest)
     with open(src_path, "w", encoding="utf-8") as f:
         f.write(rest)
+
+    # ---- 다른 스크립트가 옛 주소로 부르던 곳도 새 주소로 ----
+    # (main.gd만 고치면, 다른 창이 부르는 자리는 컴파일에 안 걸리고
+    #  그 코드가 실제로 도는 순간에야 터진다)
+    keep = set(cfg.get("keep_wrapper", []))
+    fixed = []
+    for other in __import__("glob").glob("game/scripts/*.gd"):
+        if other in (src_path, cfg["out"]):
+            continue
+        t = load(other)
+        t2, tstore = mask(t)
+        before = t2
+        for name in sorted((move_funcs | move_vars) - keep, key=len, reverse=True):
+            for pre in ("main.", "m."):
+                t2 = re.sub(r"(?<![\w.])" + re.escape(pre + name) + r"\b",
+                            pre + handle + "." + name, t2)
+        if t2 != before:
+            with open(other, "w", encoding="utf-8") as f:
+                f.write(unmask(t2, tstore))
+            fixed.append(other.split("/")[-1])
+    if fixed:
+        print("옛 주소 고침: %s" % ", ".join(sorted(fixed)))
 
     print("옮김: 함수 %d개 · 변수 %d개 -> %s" %
           (len(taken), len(var_decls), cfg["out"]))

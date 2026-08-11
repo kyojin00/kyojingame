@@ -86,10 +86,10 @@ func _debug_tick() -> void:
 		101:
 			GameData.produce["potato"] = 3             # 선물 고르기 확인
 			GameData.items["egg"] = 2
-			m._open_gift_picker("chief")
+			m.village._open_gift_picker("chief")
 		103: _save_shot("_gift.png")
 		104:
-			m._close_gift_picker()
+			m.village._close_gift_picker()
 			m.dialog.close()
 			GameData.money = 200000
 		122: m.interior.open()                           # 집 내부 확인
@@ -138,9 +138,9 @@ func _debug_tick() -> void:
 			m.stats_ui.close()
 			GameData.wood = 999                        # 마을 발전(건설) 확인
 			GameData.stone = 999
-			m._build_village_building("post")
-			m._build_village_building("general")
-			m._build_village_building("smith")
+			m.village._build_village_building("post")
+			m.village._build_village_building("general")
+			m.village._build_village_building("smith")
 			m.dialog.close()
 			m.player.position = Vector2(74 * m.TILE + 16, 11 * m.TILE + 16)
 			m.player.dir = "up"
@@ -270,7 +270,7 @@ func _debug_tick() -> void:
 			for nid: String in GameData.NPCS:
 				if not GameData.fest_greeted.has(nid):
 					GameData.fest_greeted.append(nid)
-			m._finish_festival()
+			m.village._finish_festival()
 			print("FESTIVAL_DONE=", GameData.fest_done,
 				" history=", ", ".join(GameData.fest_history))
 		316: _save_shot("_festival2.png")
@@ -283,7 +283,7 @@ func _debug_tick() -> void:
 		321:
 			GameData.money = 100000
 			GameData.items["ore"] = 100
-			m._do_breed()
+			m.village._do_breed()
 			m.dialog.close()
 			m.shop_room.close()
 			m.shop_room.open("library")
@@ -300,7 +300,7 @@ func _debug_tick() -> void:
 			m.room_action("rest")
 		326: _save_shot("_inn.png")
 		327:
-			m._do_rest()
+			m.village._do_rest()
 			print("INN_REST_OK=", GameData.energy >= GameData.ENERGY_MAX)
 			m.dialog.close()
 			m.shop_room.close()
@@ -312,14 +312,14 @@ func _debug_tick() -> void:
 			GameData.wood = 999
 			GameData.stone = 999
 			GameData.money = 99999
-			m._build_greenhouse()
+			m.village._build_greenhouse()
 			m.dialog.close()
 			GameData.day = GameData.DAYS_PER_SEASON * 3 + 1   # 겨울
 			m._apply_season_visuals()
 			m.player.position = Vector2((m.GREENHOUSE.position.x + 4) * m.TILE + 16,
 				(m.GREENHOUSE.end.y + 1) * m.TILE + 16)
 			print("GREENHOUSE_OK=", GameData.greenhouse_built,
-				" winter_plantable=", m.in_greenhouse(m.GREENHOUSE.position))
+				" winter_plantable=", m.village.in_greenhouse(m.GREENHOUSE.position))
 		331: _save_shot("_greenhouse.png")
 		332:
 			# 지도 휠·끌기: 이벤트가 실제로 map_ui까지 닿는지 확인한다.
@@ -743,7 +743,7 @@ func _debug_tick() -> void:
 				GameData.items[qitem] = qneed
 			var money0: int = GameData.money
 			var left0: int = GameData.ingredient_count(qitem)
-			m._turn_in_quest()
+			m.village._turn_in_quest()
 			print("QUEST_TURNIN_OK=", GameData.quest.is_empty()
 					and GameData.money == money0 + int(off.reward)
 					and GameData.ingredient_count(qitem) == left0 - qneed,
@@ -892,7 +892,7 @@ func _debug_tick() -> void:
 			GameData.quest = {}
 			GameData.make_daily_quest()
 			m._weather_override = -1
-			m._open_quest_board()
+			m.village._open_quest_board()
 		381: _save_shot("_board.png")
 		388: get_tree().quit()
 
