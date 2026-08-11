@@ -134,6 +134,9 @@ const TEXTURE_NAMES := [
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
+	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
+	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
+	"house_library", "house_ranch", "house_fish",
 	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
@@ -1013,7 +1016,7 @@ func _spawn_objects() -> void:
 	for pid: String in GameData.village_built:
 		if VILLAGE_PLOTS.has(pid):
 			objects.erase(door_tile(VILLAGE_PLOTS[pid].anchor))
-			_spawn_house_node(VILLAGE_PLOTS[pid].anchor)
+			_spawn_house_node(VILLAGE_PLOTS[pid].anchor, pid)
 			_trim_paths_under_building(VILLAGE_PLOTS[pid].anchor)
 	if GameData.house_lv >= 1:
 		objects.erase(door_tile(HOME_ANCHOR))
@@ -1043,9 +1046,9 @@ func _place_building_tiles(anchor: Vector2i) -> void:
 	_build_yard(anchor)
 
 
-func _fill_building(anchor: Vector2i) -> void:
+func _fill_building(anchor: Vector2i, kind: String = "") -> void:
 	_place_building_tiles(anchor)
-	_spawn_house_node(anchor)
+	_spawn_house_node(anchor, kind)
 
 
 # 건물이 덮은 자리에는 길을 그리지 않는다 — 길은 걸어 다닐 수 있는 곳에만 있어야 한다
@@ -1086,12 +1089,18 @@ func _enter_building(kind: String) -> void:
 		BUILDING_NAMES.get(kind, "건물"))
 
 
-func _spawn_house_node(anchor: Vector2i) -> void:
-	var hn := _make_object(tex["house"],
-		Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -256))
+# kind: VILLAGE_PLOTS의 열쇠("post"/"smith"...). 빈 값이면 살림집.
+func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
+	var tname := "house_" + kind
+	if kind == "" or not tex.has(tname):
+		tname = "house"
+	# 그림은 640x512지만 화면에서는 256 x 204.8(8 x 6.4칸)을 덮는다.
+	# 예전 320x256 그림을 0.8배로 그리던 것과 자리·크기가 똑같다 — 밀도만 두 배다.
+	var hn := _make_object(tex[tname],
+		Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -512))
 	var hspr: Sprite2D = hn.get_child(0)
-	hspr.scale = Vector2(0.8, 0.8)  # 문이 캐릭터와 1:1이 되는 크기
-	hspr.offset.x = 80.0 / 0.8 - 160.0
+	hspr.scale = Vector2(0.4, 0.4)
+	hspr.offset.x = -120.0
 	obj_nodes[anchor] = hn
 	world.add_child(hn)
 	# 집 그림은 5x4칸보다 크게 그려진다 (양옆 1칸, 위 2칸 더 덮는다).
@@ -3076,7 +3085,7 @@ func _build_village_building(pid: String) -> void:
 	GameData.wood -= int(cost[0])
 	GameData.stone -= int(cost[1])
 	GameData.village_built.append(pid)
-	_fill_building(plot.anchor)
+	_fill_building(plot.anchor, pid)
 	_sync_village_npcs()
 	Sound.play_sfx("sfx_place")
 	hud.quest_toast("%s 완공!" % plot.name)
@@ -6281,6 +6290,20 @@ func _debug_tick() -> void:
 				" legends=", GameData.legends_owned(), "/", GameData.LEGENDS.size())
 			interior.open()
 			alchemy_ui.open()
+			# 조합 결과가 창 안에 뜨는가. 우유 셋은 생명3·물3이라 어느 조합법도
+			# 문턱을 못 넘고, 달걀 셋은 생명6이라 원기 물약이 된다.
+			GameData.items["milk"] = 3
+			GameData.items["egg"] = 3
+			var r_fail: Dictionary = do_brew(["milk", "milk", "milk"])
+			var r_ok: Dictionary = do_brew(["egg", "egg", "egg"])
+			print("BREW_RESULT_OK=", r_fail.get("ok", true) == false
+					and bool(r_ok.get("ok", false)),
+				" 실패안내=\"", r_fail.get("hint", ""), "\"",
+				" 성공=\"", r_ok.get("name", ""), "\"")
+			alchemy_ui.last = r_ok
+			alchemy_ui._rebuild()
+			print("BREW_BANNER_OK=", alchemy_ui.result_panel.visible,
+				" 문구=\"", alchemy_ui.result_head.text, "\"")
 		362: _save_shot("_alchemy.png")
 		363:
 			alchemy_ui.close()
@@ -6660,13 +6683,15 @@ func _req_cook(id: String) -> void:
 # 재료 3가지를 올리고 돌린다. 속성 합계가 어느 조합법의 조건을 넘으면
 # 그 물약이 나오고 조합법을 알아낸다. 아니면 탁한 앙금만 남는다.
 # 재료는 성공하든 실패하든 없어진다 — 실험에는 값이 따른다.
-func do_brew(ids: Array) -> void:
+# 무엇이 나왔는지를 조합대 창이 그대로 띄울 수 있게 결과를 돌려준다.
+# {ok, fid, name, effect, hint, first, ids}
+func do_brew(ids: Array) -> Dictionary:
 	if ids.size() != GameData.ALCHEMY_SLOTS:
-		return
+		return {}
 	for id: String in ids:
 		if GameData.ingredient_count(id) <= 0:
 			hud.show_message("재료가 부족하다.")
-			return
+			return {}
 	for id: String in ids:
 		if GameData.CROPS.has(id):
 			GameData.consume_produce(id, 1)
@@ -6677,12 +6702,15 @@ func do_brew(ids: Array) -> void:
 		GameData.items[GameData.ALCHEMY_FAIL] += 1
 		GameData.alchemy_fails += 1
 		Sound.play_sfx("sfx_ui")
-		hud.show_message("탁한 앙금만 남았다... 속성이 모자란 것 같다.", 3.5)
-		return
+		save_now()
+		return {"ok": false, "fid": GameData.ALCHEMY_FAIL, "ids": ids.duplicate(),
+			"name": "탁한 앙금", "effect": "", "first": false,
+			"hint": GameData.brew_hint(ids)}
 	GameData.items[fid] += 1
 	GameData.alchemy_brews[fid] = int(GameData.alchemy_brews.get(fid, 0)) + 1
 	Sound.play_sfx("sfx_buy")
-	if GameData.learn_formula(fid):
+	var first := GameData.learn_formula(fid)
+	if first:
 		# 처음 맞힌 순간이 이 시스템의 알맹이다 — 크게 알린다
 		hud.quest_toast("새 조합법 발견!")
 		dialog.open("연금술 — 새 조합법",
@@ -6690,10 +6718,11 @@ func do_brew(ids: Array) -> void:
 				% [GameData.FORMULAS[fid].name, GameData.FORMULAS[fid].effect,
 				GameData.formula_need_text(fid)],
 			[["좋아", null]])
-	else:
-		hud.show_message("'%s' 완성!" % GameData.FORMULAS[fid].name)
 	gain_skill("cook", 6.0)
 	save_now()
+	return {"ok": true, "fid": fid, "ids": ids.duplicate(),
+		"name": str(GameData.FORMULAS[fid].name),
+		"effect": str(GameData.FORMULAS[fid].effect), "first": first, "hint": ""}
 
 
 # 물약 마시기: 즉효 + 그날 밤까지 가는 약효

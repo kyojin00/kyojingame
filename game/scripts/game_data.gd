@@ -1077,6 +1077,29 @@ func unknown_formulas() -> Array:
 
 
 # 조합법에 필요한 속성을 사람이 읽는 글로
+# 실패했을 때 무엇이 모자랐는지만 알려준다.
+# 어떤 조합법에 가까웠는지는 말하지 않는다 — 알아내는 재미가 사라지므로,
+# 「가장 적게 모자랐던 배합」의 부족분만 뽑아 준다.
+func brew_hint(ids: Array) -> String:
+	var sum := mix_elements(ids)
+	var best := 999
+	var best_parts: Array[String] = []
+	for fid: String in FORMULA_IDS:
+		var lack_total := 0
+		var parts: Array[String] = []
+		for e: String in FORMULAS[fid].need:
+			var lack := int(FORMULAS[fid].need[e]) - int(sum.get(e, 0))
+			if lack > 0:
+				lack_total += lack
+				parts.append("%s %d" % [ELEMENT_NAMES[e], lack])
+		if lack_total > 0 and lack_total < best:
+			best = lack_total
+			best_parts = parts
+	if best_parts.is_empty():
+		return "속성은 넘쳤는데 어울리지 않았다."
+	return "가장 가까웠던 배합에서 " + " · ".join(best_parts) + " 모자랐다."
+
+
 func formula_need_text(id: String) -> String:
 	var parts: Array[String] = []
 	for e: String in FORMULAS[id].need:

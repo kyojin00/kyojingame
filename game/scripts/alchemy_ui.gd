@@ -24,6 +24,10 @@ var reagent_box: VBoxContainer
 var formula_box: VBoxContainer
 
 var picked: Array = []          # 올려 둔 재료 id (최대 ALCHEMY_SLOTS)
+var result_panel: PanelContainer
+var result_head: Label
+var result_body: Label
+var last: Dictionary = {}       # 마지막 조합 결과 (main.do_brew가 돌려준 것)
 
 
 func _ready() -> void:
@@ -31,8 +35,8 @@ func _ready() -> void:
 	visible = false
 
 	var panel := PanelContainer.new()
-	panel.position = Vector2(48, 40)
-	panel.custom_minimum_size = Vector2(864, 462)
+	panel.position = Vector2(32, 24)
+	panel.custom_minimum_size = Vector2(896, 500)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.13, 0.11, 0.19, 0.97)
 	style.border_color = Color(0.48, 0.4, 0.66)
@@ -46,29 +50,89 @@ func _ready() -> void:
 	v.add_theme_constant_override("separation", 6)
 	panel.add_child(v)
 
+	# ---- 머리줄: 제목 + 속성 범례 ----
+	# 색 점이 무슨 속성인지 모르면 재료 목록이 그냥 알록달록한 점이 된다.
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	v.add_child(head)
 	var title := Label.new()
-	title.text = "- 연금술 조합대 (E/ESC: 닫기) -"
+	title.text = "연금술 조합대"
 	title.add_theme_color_override("font_color", Color("ffd75e"))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(title)
+	head.add_child(title)
+	for e: String in GameData.ELEMENTS:
+		var chip := HBoxContainer.new()
+		chip.add_theme_constant_override("separation", 3)
+		var sw := ColorRect.new()
+		sw.color = EL_COLORS[e]
+		sw.custom_minimum_size = Vector2(9, 9)
+		sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		chip.add_child(sw)
+		var nm2 := Label.new()
+		nm2.text = str(GameData.ELEMENT_NAMES[e])
+		nm2.add_theme_color_override("font_color", EL_COLORS[e])
+		chip.add_child(nm2)
+		head.add_child(chip)
+	var closer := Label.new()
+	closer.text = "  (E/ESC: 닫기)"
+	closer.add_theme_color_override("font_color", Color(0.58, 0.55, 0.7))
+	closer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	closer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	head.add_child(closer)
 
-	# ---- 올린 재료 세 칸 ----
+	# ---- 결과 배너 (조합한 뒤에만 보인다) ----
+	result_panel = PanelContainer.new()
+	result_panel.visible = false
+	var rstyle := StyleBoxFlat.new()
+	rstyle.bg_color = Color(0.10, 0.16, 0.12, 0.95)
+	rstyle.border_color = Color(0.4, 0.8, 0.5)
+	rstyle.set_border_width_all(2)
+	rstyle.set_corner_radius_all(3)
+	rstyle.set_content_margin_all(7)
+	result_panel.add_theme_stylebox_override("panel", rstyle)
+	v.add_child(result_panel)
+	var rv := VBoxContainer.new()
+	rv.add_theme_constant_override("separation", 2)
+	result_panel.add_child(rv)
+	result_head = Label.new()
+	result_head.add_theme_font_size_override("font_size", 15)
+	rv.add_child(result_head)
+	result_body = Label.new()
+	result_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	result_body.custom_minimum_size = Vector2(846, 0)
+	result_body.add_theme_color_override("font_color", Color(0.86, 0.86, 0.9))
+	rv.add_child(result_body)
+
+	# ---- 조합대: 올린 재료 세 칸 + 합계 + 버튼 ----
+	var bench := PanelContainer.new()
+	var bstyle := StyleBoxFlat.new()
+	bstyle.bg_color = Color(0.18, 0.15, 0.26, 0.9)
+	bstyle.border_color = Color(0.40, 0.34, 0.56)
+	bstyle.set_border_width_all(1)
+	bstyle.set_corner_radius_all(3)
+	bstyle.set_content_margin_all(7)
+	bench.add_theme_stylebox_override("panel", bstyle)
+	v.add_child(bench)
+	var bv := VBoxContainer.new()
+	bv.add_theme_constant_override("separation", 5)
+	bench.add_child(bv)
+
 	slot_box = HBoxContainer.new()
 	slot_box.add_theme_constant_override("separation", 6)
-	v.add_child(slot_box)
+	bv.add_child(slot_box)
 
-	sum_label = Label.new()
-	sum_label.add_theme_color_override("font_color", Color(0.8, 0.78, 0.9))
-	v.add_child(sum_label)
-
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 6)
-	v.add_child(actions)
+	var row2 := HBoxContainer.new()
+	row2.add_theme_constant_override("separation", 8)
+	bv.add_child(row2)
 	brew_btn = _mk_button("조합하기", _on_brew)
-	actions.add_child(brew_btn)
-	actions.add_child(_mk_button("비우기", func() -> void:
+	brew_btn.custom_minimum_size = Vector2(110, 0)
+	row2.add_child(brew_btn)
+	row2.add_child(_mk_button("비우기", func() -> void:
 		picked.clear()
 		_rebuild()))
+	sum_label = Label.new()
+	sum_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sum_label.add_theme_color_override("font_color", Color(0.82, 0.8, 0.92))
+	row2.add_child(sum_label)
 
 	# ---- 아래: 재료 목록 | 조합법 ----
 	var cols := HBoxContainer.new()
@@ -76,8 +140,8 @@ func _ready() -> void:
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(cols)
 
-	reagent_box = _mk_column(cols, "[ 재료 ]", 372)
-	formula_box = _mk_column(cols, "[ 조합법 ]", 452)
+	reagent_box = _mk_column(cols, "[ 재료 ]  (올리기 -> 세 칸을 채우고 조합)", 356)
+	formula_box = _mk_column(cols, "[ 알아낸 조합법 ]", 500)
 
 
 func _mk_column(parent: HBoxContainer, head: String, w: float) -> VBoxContainer:
@@ -113,6 +177,7 @@ func _mk_button(text: String, cb: Callable) -> Button:
 func open() -> void:
 	visible = true
 	picked.clear()
+	last.clear()
 	Sound.play_sfx("sfx_ui")
 	_rebuild()
 
@@ -133,12 +198,15 @@ func _unhandled_input(event: InputEvent) -> void:
 func _element_pips(el: Dictionary) -> HBoxContainer:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 2)
+	h.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	for e: String in GameData.ELEMENTS:
 		var n := int(el.get(e, 0))
 		for i in n:
 			var r := ColorRect.new()
 			r.color = EL_COLORS[e]
-			r.custom_minimum_size = Vector2(7, 7)
+			r.custom_minimum_size = Vector2(9, 9)
+			# 이걸 안 걸면 줄 높이만큼 세로로 늘어나 색 막대가 된다
+			r.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			r.tooltip_text = str(GameData.ELEMENT_NAMES[e])
 			h.add_child(r)
 	return h
@@ -170,9 +238,35 @@ func _pick(id: String) -> void:
 func _on_brew() -> void:
 	if picked.size() != GameData.ALCHEMY_SLOTS:
 		return
-	main.do_brew(picked.duplicate())
+	last = main.do_brew(picked.duplicate())
 	picked.clear()
 	_rebuild()
+
+
+# 무엇이 나왔는지 창 안에서 바로 보이게 한다.
+# (예전에는 화면 아래 안내문으로만 스쳐 지나가서, 성공했는지도 몰랐다)
+func _refresh_result() -> void:
+	if last.is_empty():
+		result_panel.visible = false
+		return
+	result_panel.visible = true
+	var ok: bool = bool(last.get("ok", false))
+	var style: StyleBoxFlat = result_panel.get_theme_stylebox("panel")
+	style.bg_color = Color(0.10, 0.17, 0.12, 0.95) if ok else Color(0.19, 0.11, 0.11, 0.95)
+	style.border_color = Color(0.42, 0.82, 0.52) if ok else Color(0.82, 0.44, 0.42)
+	var names: Array[String] = []
+	for id: String in last.get("ids", []):
+		names.append(_name_of(id))
+	if ok:
+		result_head.text = "✔  %s 완성!%s" % [last.get("name", ""),
+			"   ★ 새 조합법" if last.get("first", false) else ""]
+		result_head.add_theme_color_override("font_color", Color(0.62, 0.94, 0.68))
+		result_body.text = "%s  →  %s\n%s" % [" + ".join(names),
+			last.get("name", ""), last.get("effect", "")]
+	else:
+		result_head.text = "✘  실패 — 탁한 앙금만 남았다"
+		result_head.add_theme_color_override("font_color", Color(0.96, 0.62, 0.58))
+		result_body.text = "%s  →  탁한 앙금\n%s" % [" + ".join(names), last.get("hint", "")]
 
 
 # 아는 조합법을 재료 자동 선택으로 만든다.
@@ -197,12 +291,13 @@ func _make(fid: String) -> void:
 	if trio.is_empty():
 		main.hud.show_message("재료가 모자란다. (%s)" % GameData.formula_need_text(fid))
 		return
-	main.do_brew(trio)
+	last = main.do_brew(trio)
 	picked.clear()
 	_rebuild()
 
 
 func _rebuild() -> void:
+	_refresh_result()
 	for c in slot_box.get_children():
 		c.queue_free()
 	for c in reagent_box.get_children():
@@ -210,34 +305,59 @@ func _rebuild() -> void:
 	for c in formula_box.get_children():
 		c.queue_free()
 
-	# ---- 올린 재료 칸 ----
+	# ---- 올린 재료 칸 (이름 + 그 재료가 넣는 속성) ----
 	for i in GameData.ALCHEMY_SLOTS:
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 2)
+		cell.custom_minimum_size = Vector2(176, 0)
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(150, 0)
+		b.custom_minimum_size = Vector2(176, 0)
 		if i < picked.size():
 			var id: String = picked[i]
-			b.text = _name_of(id)
+			b.text = "%s  ✕" % _name_of(id)
+			b.tooltip_text = "누르면 내린다"
 			b.pressed.connect(func() -> void:
 				picked.remove_at(i)
 				_rebuild())
+			cell.add_child(b)
+			var pips := _element_pips(GameData.reagent_elements(id))
+			pips.alignment = BoxContainer.ALIGNMENT_CENTER
+			cell.add_child(pips)
 		else:
-			b.text = "(비어 있음)"
+			b.text = "%d번 칸 (비어 있음)" % (i + 1)
 			b.disabled = true
-		slot_box.add_child(b)
+			cell.add_child(b)
+			var sp := Control.new()
+			sp.custom_minimum_size = Vector2(0, 9)
+			cell.add_child(sp)
+		slot_box.add_child(cell)
 
 	var sum: Dictionary = GameData.mix_elements(picked)
 	var parts: Array[String] = []
 	for e: String in GameData.ELEMENTS:
-		parts.append("%s %d" % [GameData.ELEMENT_NAMES[e], int(sum[e])])
-	sum_label.text = "합계  " + " · ".join(parts)
+		if int(sum[e]) > 0:
+			parts.append("%s %d" % [GameData.ELEMENT_NAMES[e], int(sum[e])])
+	sum_label.text = "합계  " + (" · ".join(parts) if not parts.is_empty() else "-")
 	brew_btn.disabled = picked.size() != GameData.ALCHEMY_SLOTS
+	if brew_btn.disabled:
+		sum_label.text += "     (재료 %d/%d)" % [picked.size(), GameData.ALCHEMY_SLOTS]
 
 	# ---- 재료 목록 (가진 것만) ----
 	var any := false
+	var order: Array = []
 	for id: String in GameData.REAGENTS:
-		if GameData.ingredient_count(id) <= 0:
-			continue
+		if GameData.ingredient_count(id) > 0:
+			order.append(id)
+	# 더 올릴 수 있는 재료를 위로 (칸이 다 차면 전부 아래로 내려간다)
+	var keys: Array = GameData.REAGENTS.keys()
+	order.sort_custom(func(a: String, b: String) -> bool:
+		var la: bool = _left(a) > 0
+		var lb: bool = _left(b) > 0
+		if la != lb:
+			return la
+		return keys.find(a) < keys.find(b))
+	for id: String in order:
 		any = true
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 5)
@@ -269,18 +389,28 @@ func _rebuild() -> void:
 		if not GameData.knows_formula(fid):
 			continue
 		var def: Dictionary = GameData.FORMULAS[fid]
+		var can := not _auto_pick(fid).is_empty()
 		var row2 := HBoxContainer.new()
 		row2.add_theme_constant_override("separation", 5)
-		row2.add_child(_mk_button("만들기", _make.bind(fid)))
+		var mk := _mk_button("만들기", _make.bind(fid))
+		mk.disabled = not can
+		row2.add_child(mk)
 		var drink := _mk_button("마시기", func() -> void:
 			main.do_drink(fid)
 			_rebuild())
 		drink.disabled = int(GameData.items[fid]) <= 0
 		row2.add_child(drink)
 		var l2 := Label.new()
-		l2.text = "%s x%d" % [def.name, int(GameData.items[fid])]
-		l2.add_theme_color_override("font_color", Color(0.95, 0.92, 0.7))
+		l2.text = "%s  x%d" % [def.name, int(GameData.items[fid])]
+		l2.add_theme_color_override("font_color",
+			Color(0.98, 0.94, 0.72) if can else Color(0.64, 0.62, 0.7))
 		row2.add_child(l2)
+		# 지금 만들 수 있는지를 한 글자로 — 목록이 길어져도 눈에 들어온다
+		var chip := Label.new()
+		chip.text = "  ● 가능" if can else "  ○ 부족"
+		chip.add_theme_color_override("font_color",
+			Color(0.5, 0.88, 0.6) if can else Color(0.55, 0.52, 0.62))
+		row2.add_child(chip)
 		formula_box.add_child(row2)
 		var d2 := Label.new()
 		d2.text = "    %s · %s" % [GameData.formula_need_text(fid), def.effect]
