@@ -100,8 +100,8 @@ func _talk_to(npc: Node2D) -> void:
 		if GameData.fest_greeted.size() >= GameData.NPCS.size():
 			_finish_festival()
 			return
-	var lines: Array = def.lines
-	var line: String = lines[randi() % lines.size()]
+	# 계절·날씨·시간대·호감도·연애 단계에 맞는 대사를 고른다 (game_data.npc_line)
+	var line: String = GameData.npc_line(npc.id)
 	var aff := mini(int(GameData.affinity[npc.id]), 100)
 	# 호감도가 오르면 비밀 이야기(할아버지의 과거)가 섞여 나온다
 	if aff >= 100 and def.has("secret100") and randf() < 0.4:
@@ -109,7 +109,14 @@ func _talk_to(npc: Node2D) -> void:
 	elif aff >= 50 and def.has("secret50") and randf() < 0.4:
 		line = def.secret50
 	var hearts := int(aff / 10.0)
-	var title := "%s %s (%d/100)" % [def.name, "♥".repeat(maxi(hearts, 0)), aff]
+	var mark := ""
+	if GameData.spouse == npc.id:
+		mark = " [배우자]"
+	elif GameData.dating == npc.id:
+		mark = " [연인]"
+	if GameData.is_birthday(npc.id):
+		mark += " [오늘 생일!]"
+	var title := "%s%s %s (%d/100)" % [def.name, mark, "♥".repeat(maxi(hearts, 0)), aff]
 	if aff >= 50:
 		line += "\n(친밀한 사이다! 특전 발동 중)"
 	# 호감도 100: 할아버지의 기억 조각을 건네받는다 (1회)
@@ -472,18 +479,90 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 	var before := int(GameData.affinity[npc_id])
 	if Net.is_guest():
 		m.netsync._req_gift.rpc_id(1, npc_id, kind, item_id)  # 호스트가 차감/가산 후 전파
-	GameData.affinity[npc_id] = before + 10
+
+	# 꽃다발과 반지는 호감도가 아니라 사이를 바꾼다
+	if item_id == "bouquet" or item_id == "wedding_ring":
+		_romance_gift(npc_id, item_id, before)
+		return
+
+	var gain := GameData.gift_value(npc_id, item_id)
+	GameData.affinity[npc_id] = clampi(before + gain, 0, 100)
+	GameData.gifted_today.append(npc_id)
 	Sound.play_sfx("sfx_heart")
 	if Net.is_host():
 		m.netsync._broadcast_stats()
-	m.dialog.set_portrait(_npc_portrait(npc_id, true))
-	var body := "%s을(를) 선물했다! 정말 좋아한다. ♥" % gift_name
-	if before < 50 and before + 10 >= 50:
+	m.dialog.set_portrait(_npc_portrait(npc_id, gain > 8))
+	var body := ""
+	if gain < 0:
+		body = "%s을(를) 선물했다... 별로 안 좋아하는 눈치다." % gift_name
+	elif gain >= 30:
+		body = "%s을(를) 선물했다! 정말 좋아한다!! ♥♥♥" % gift_name
+	elif gain >= 18:
+		body = "%s을(를) 선물했다! 좋아한다. ♥♥" % gift_name
+	else:
+		body = "%s을(를) 선물했다. 고맙다고 한다. ♥" % gift_name
+	if GameData.is_birthday(npc_id):
+		body = "오늘은 %s의 생일이다!\n" % str(GameData.NPCS[npc_id].name) + body + "  (생일 3배!)"
+	var after := int(GameData.affinity[npc_id])
+	if before < 50 and after >= 50:
 		if npc_id == "merchant":
 			body += "\n\n[특전 해금] 민지의 씨앗 10% 할인!"
-		else:
+		elif npc_id == "fisher":
 			body += "\n\n[특전 해금] 철수의 낚시 비법! 판정 구간 확대!"
+		else:
+			body += "\n\n[친밀] 이제 속 이야기를 들려준다."
+	if bool(GameData.NPCS[npc_id].get("romance", false)):
+		if before < 60 and after >= 60:
+			body += "\n\n(꽃다발을 건네면 마음을 물어볼 수 있을 것 같다.)"
+		elif GameData.dating == npc_id and after >= 100 and GameData.spouse == "":
+			body += "\n\n(청혼 반지를 건넬 수 있을 것 같다.)"
 	m.dialog.set_body(body)
+
+
+# 꽃다발 -> 연인, 청혼 반지 -> 배우자. 각각 한 사람뿐이고 되돌릴 수 없다.
+func _romance_gift(npc_id: String, item_id: String, aff: int) -> void:
+	var def: Dictionary = GameData.NPCS[npc_id]
+	var name := str(def.name)
+	m.dialog.set_portrait(_npc_portrait(npc_id, true))
+	if not bool(def.get("romance", false)):
+		GameData.items[item_id] += 1        # 돌려받는다
+		m.dialog.set_body("%s은(는) 웃으며 돌려주었다.\n\"마음은 고맙네. 나한테 쓸 건 아니지.\"" % name)
+		return
+	if item_id == "bouquet":
+		if GameData.spouse != "":
+			GameData.items[item_id] += 1
+			m.dialog.set_body("이미 함께하는 사람이 있다.")
+			return
+		if aff < 60:
+			GameData.items[item_id] += 1
+			m.dialog.set_body("%s은(는) 꽃다발을 보고 당황했다.\n\"...아직은, 조금 이른 것 같아.\"\n(호감도 60 이상이어야 한다. 지금 %d)" % [name, aff])
+			return
+		if GameData.dating != "" and GameData.dating != npc_id:
+			GameData.items[item_id] += 1
+			m.dialog.set_body("%s은(는) 고개를 저었다.\n\"...너, 다른 사람이 있잖아.\"" % name)
+			return
+		GameData.dating = npc_id
+		GameData.affinity[npc_id] = mini(aff + 10, 100)
+		Sound.play_sfx("sfx_heart")
+		m.dialog.set_body("%s에게 꽃다발을 건넸다.\n\n\"...받을게. 오래 기다렸어.\"\n\n[연인이 되었다]" % name)
+	else:
+		if GameData.spouse != "":
+			GameData.items[item_id] += 1
+			m.dialog.set_body("이미 함께하는 사람이 있다.")
+			return
+		if GameData.dating != npc_id:
+			GameData.items[item_id] += 1
+			m.dialog.set_body("%s은(는) 반지를 보고 얼어붙었다.\n\"...우리, 아직 그런 사이는 아니잖아.\"\n(먼저 꽃다발로 연인이 되어야 한다.)" % name)
+			return
+		if aff < 100:
+			GameData.items[item_id] += 1
+			m.dialog.set_body("%s은(는) 반지를 보고 망설였다.\n\"조금만... 조금만 더 알고 싶어.\"\n(호감도 100이어야 한다. 지금 %d)" % [name, aff])
+			return
+		GameData.spouse = npc_id
+		Sound.play_sfx("sfx_heart")
+		m.dialog.set_body("%s에게 반지를 건넸다.\n\n\"...응. 같이 살자.\"\n\n[결혼했다! 이제 아침마다 같이 눈을 뜬다]" % name)
+	if Net.is_host():
+		m.netsync._broadcast_stats()
 
 
 func _open_quest_board() -> void:

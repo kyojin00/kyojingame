@@ -292,6 +292,29 @@ const ICONS = {
     px(c, 12, 3, C.white); px(c, 13, 4, C.white); return c; },
   dish_moon_tea:      () => cup(C.purple, C.ice),
   dish_feast:         () => tray(),
+  bouquet: () => {
+    const c = newCanvas();
+    for (let i = 0; i < 6; i++) px(c, 8, 9 + i, C.green2);       // 줄기
+    px(c, 6, 12, C.green); px(c, 10, 11, C.green);
+    for (const [x, y, col] of [[5, 6, C.pink], [8, 4, C.red], [11, 6, C.gold],
+        [6, 9, C.purple], [10, 8, C.white]]) {
+      ellipse(c, x, y, 2, 2, col);
+      px(c, x, y, C.cream);
+    }
+    rect(c, 6, 13, 5, 1, C.crust);                                // 리본
+    return c;
+  },
+  wedding_ring: () => {
+    const c = newCanvas();
+    for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) {
+      const d = x * x + y * y;
+      if (d <= 20 && d >= 8) px(c, 8 + x, 10 + y, C.gold);
+    }
+    ellipse(c, 8, 5, 2, 2, C.ice);                                // 보석
+    px(c, 7, 4, C.white); px(c, 8, 3, C.white);
+    px(c, 12, 3, C.white); px(c, 13, 4, C.white);
+    return c;
+  },
   gold_crop: () => {
     const c = newCanvas();
     rect(c, 7, 8, 2, 6, C.green2);            // 줄기

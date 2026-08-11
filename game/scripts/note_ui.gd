@@ -177,6 +177,25 @@ func _rebuild() -> void:
 	for npc_id in GameData.NPCS:
 		var def: Dictionary = GameData.NPCS[npc_id]
 		var aff := int(GameData.affinity[npc_id])
+		# 생일과 취향 — 취향은 좀 친해져야 알게 된다
+		var head_bits: Array[String] = []
+		var b: Array = def.get("birthday", [])
+		if b.size() == 2:
+			head_bits.append("생일 %s %d일" % [GameData.SEASON_NAMES[int(b[0])], int(b[1])])
+		if GameData.spouse == npc_id:
+			head_bits.append("배우자")
+		elif GameData.dating == npc_id:
+			head_bits.append("연인")
+		if not head_bits.is_empty():
+			_line("  %s — %s" % [def.name, " · ".join(head_bits)], GOLD)
+		if aff >= 30:
+			var loves: Array = def.get("loves", [])
+			var names: Array[String] = []
+			for lid: String in loves:
+				names.append(_item_name(lid))
+			_line("   아주 좋아하는 것: %s" % ", ".join(names), DIM)
+		else:
+			_line("   좋아하는 것은 아직 모른다 (호감도 30부터)", DIM)
 		if aff >= 50:
 			_line("  %s의 기억:" % def.name)
 			_line("   \"%s\"" % String(def.secret50).replace("\n", " "), Color(0.35, 0.27, 0.16))
@@ -223,3 +242,12 @@ func _rebuild() -> void:
 		_head("[유니콘의 뿔]")
 		_line("  세상에 단 하나뿐인 뿔이 집 조합대 위에서 빛나고 있다.", GOLD)
 		_line("  할아버지의 꿈은 완성되었다. 이야기는 계속된다.", DIM)
+
+
+# 작물이든 아이템이든 이름을 찾아 준다
+func _item_name(id: String) -> String:
+	if GameData.CROPS.has(id):
+		return str(GameData.CROPS[id].name)
+	if GameData.ITEMS.has(id):
+		return str(GameData.ITEMS[id].name)
+	return id

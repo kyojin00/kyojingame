@@ -172,6 +172,8 @@ func _next_day(passed_out: bool) -> void:
 	# NPC 일일 상태 리셋 + 새 의뢰
 	for n in m.npcs:
 		n.talked_today = false
+	GameData.gifted_today.clear()
+	var spouse_note := _spouse_morning()
 	# 수락해 둔 의뢰는 다음 날까지 이어진다. 안 골랐으면 새로 세 건이 붙는다
 	if GameData.quest.is_empty():
 		GameData.make_daily_quest()
@@ -202,6 +204,8 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n%s %s" % [GameData.weather_icon(m.weather_now()), wnote]
 	if passed_out:
 		note += "\n쓰러져서 기력이 절반만 회복됐다..."
+	if spouse_note != "":
+		note += "\n\n" + spouse_note
 
 	var s_title := "- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()]
 	var s_body := "어제 수확: %d개\n판매 수입: +%dG\n지출: -%dG\n소지금: %dG\n%s" \
@@ -223,3 +227,33 @@ func _update_night() -> void:
 	elif m.weather_now() == GameData.WEATHER_FOG:
 		c *= Color(0.86, 0.88, 0.9)  # 안개 낀 날은 색이 옅다
 	m.night.color = c
+
+
+# 배우자의 아침 — 함께 눈을 뜬다.
+#
+# 마을을 걸어다니는 NPC를 집 안으로 옮기려면 실내 장면과 길찾기를 새로
+# 짜야 한다. 그래서 「집에 사는 사람」을 따로 세우는 대신, 아침 결산에
+# 한마디를 얹고 이틀에 한 번 뭔가를 남겨 두는 것으로 했다.
+func _spouse_morning() -> String:
+	var sid := GameData.spouse
+	if sid == "" or not GameData.NPCS.has(sid):
+		return ""
+	var def: Dictionary = GameData.NPCS[sid]
+	var lines: Array = def.get("married", [])
+	var line: String = str(lines[randi() % lines.size()]) if not lines.is_empty() else "잘 잤어?"
+	var out := "%s: \"%s\"" % [def.name, line]
+	if GameData.is_birthday(sid):
+		return out + "\n(오늘은 %s의 생일이다. 선물을 준비하자.)" % def.name
+	# 이틀에 한 번, 자기 일에서 나온 것을 남겨 둔다
+	if GameData.day - GameData.spouse_gift_day >= 2:
+		GameData.spouse_gift_day = GameData.day
+		var give := str(SPOUSE_GIFTS.get(sid, "egg"))
+		GameData.items[give] = int(GameData.items[give]) + 1
+		out += "\n머리맡에 %s을(를) 두고 갔다." % GameData.ITEMS[give].name
+	return out
+
+
+# 배우자가 아침에 두고 가는 것 — 각자 자기 일에서 나오는 것이라야 말이 된다
+const SPOUSE_GIFTS := {
+	"merchant": "dish_jam", "fisher": "fish_carp", "rancher": "milk",
+}

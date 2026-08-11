@@ -957,6 +957,57 @@ func _debug_tick() -> void:
 			print("PERF_BREAKDOWN: ", line)
 			print("PERF_DRAWCALLS_OK=", calls < 2500, " 콜=", int(calls))
 			print("PERF_PROCESS_OK=", proc_us < 8000.0, " us=", "%.0f" % proc_us)
+		390:
+			# 선물 취향 · 생일 · 연애 단계
+			GameData.dating = ""
+			GameData.spouse = ""
+			GameData.affinity["merchant"] = 0
+			var loved := GameData.gift_value("merchant", "strawberry")     # loves
+			var liked := GameData.gift_value("merchant", "potato")         # likes
+			var plain := GameData.gift_value("merchant", "ore")            # 표에 없음
+			var hated := GameData.gift_value("merchant", "sludge")         # hates
+			print("GIFT_TASTE_OK=", loved > liked and liked > plain and hated < 0,
+				" 아주좋아함=", loved, " 좋아함=", liked, " 보통=", plain, " 싫어함=", hated)
+
+			# 꽃다발은 호감도 60부터, 반지는 연인 + 100부터. 순서를 건너뛸 수 없어야 한다.
+			# _give_gift가 먼저 하나 빼고 부르므로 여기서도 0으로 두고 부른다
+			GameData.items["bouquet"] = 0
+			GameData.items["wedding_ring"] = 0
+			m.village._romance_gift("merchant", "bouquet", 20)
+			var too_early: bool = GameData.dating == "" and int(GameData.items["bouquet"]) == 1
+			GameData.items["bouquet"] = 0
+			m.village._romance_gift("merchant", "wedding_ring", 100)
+			var ring_first: bool = GameData.spouse == "" and int(GameData.items["wedding_ring"]) == 1
+			GameData.items["wedding_ring"] = 0
+			m.village._romance_gift("merchant", "bouquet", 70)
+			var now_dating := GameData.dating == "merchant"
+			m.village._romance_gift("merchant", "wedding_ring", 100)
+			var now_married := GameData.spouse == "merchant"
+			# 연애 대상이 아닌 사람에게는 되돌려 준다
+			GameData.spouse = ""
+			GameData.dating = ""
+			GameData.items["bouquet"] = 0
+			m.village._romance_gift("chief", "bouquet", 100)
+			var refused: bool = GameData.dating == "" and int(GameData.items["bouquet"]) == 1
+			print("ROMANCE_OK=", too_early and ring_first and now_dating
+				and now_married and refused,
+				" 이른꽃다발거절=", too_early, " 반지먼저거절=", ring_first,
+				" 연인=", now_dating, " 결혼=", now_married, " 어른거절=", refused)
+
+			# 대사가 갈래대로 늘었는가 (넉 줄 돌려막기로 되돌아가면 잡힌다)
+			var line_total := 0
+			for nid: String in GameData.NPCS:
+				var d: Dictionary = GameData.NPCS[nid]
+				line_total += (d.lines as Array).size()
+				for k in ["season", "weather"]:
+					for kk in d.get(k, {}):
+						line_total += (d[k][kk] as Array).size()
+				for k2 in ["morning", "night", "aff30", "aff70", "dating", "married"]:
+					line_total += (d.get(k2, []) as Array).size()
+			print("NPC_LINES_OK=", line_total >= 100, " 대사줄=", line_total,
+				" 사람=", GameData.NPCS.size())
+			GameData.dating = ""
+			GameData.spouse = ""
 		391:
 			# 표에 한 줄 넣고 아이콘이나 아이템 정의를 빠뜨리면 조용히 사라진다.
 			# (그림이 없으면 칸이 그냥 비고, 어서션이 없으면 한참 뒤에야 안다)

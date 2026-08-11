@@ -269,6 +269,13 @@ func _rebuild() -> void:
 				[["coin", price]]))
 		if GameData.merchant_discount():
 			_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
+		# 마음을 전하는 것들 — 씨앗과 같은 칸에 두면 눈에 띈다
+		_note("— 마음을 전하는 것 —")
+		var fb := _mk_button("구매", _on_buy_gift.bind("bouquet", GameData.BOUQUET_PRICE))
+		fb.disabled = GameData.money < GameData.BOUQUET_PRICE
+		items_box.add_child(_mk_row("bouquet", "꽃다발",
+			"보유 %d개 · 마음이 있는 사람에게 (호감도 60 이상)" % GameData.items["bouquet"],
+			fb, [["coin", GameData.BOUQUET_PRICE]]))
 	elif tab == "sell":
 		var any := false
 		for id in GameData.CROP_IDS:
@@ -384,6 +391,13 @@ func _rebuild() -> void:
 		_note("낚싯대를 들고 물가에서 E! 입질(!)이 오면 다시 E!\n"
 			+ "철수와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
 	elif tab == "craft":
+		# 청혼 반지 — 대장간에서만 벼릴 수 있다
+		_note("— 특별 주문 —")
+		var rb := _mk_button("주문", _on_buy_gift.bind("wedding_ring", GameData.RING_PRICE))
+		rb.disabled = GameData.money < GameData.RING_PRICE
+		items_box.add_child(_mk_row("wedding_ring", "청혼 반지",
+			"보유 %d개 · 연인에게 (호감도 100)" % GameData.items["wedding_ring"],
+			rb, [["coin", GameData.RING_PRICE]]))
 		# 대장간 제작: 부위별로 묶어 보여 준다
 		for slot: String in GameData.GEAR_SLOTS:
 			var eq: String = str(GameData.equipped.get(slot, ""))
@@ -518,6 +532,17 @@ func _on_buy_animal(id: String) -> void:
 		% def.name, 5.0)
 	if main != null and not main._remote_acting:
 		main.doing.net_shop("buy_animal", id)
+	_rebuild()
+
+
+# 꽃다발·반지는 개수만 늘려 주면 된다 (쓰는 곳은 선물하기 쪽이다)
+func _on_buy_gift(item_id: String, price: int) -> void:
+	if GameData.money < price:
+		return
+	GameData.money -= price
+	GameData.today_spent += price
+	GameData.items[item_id] += 1
+	Sound.play_sfx("sfx_coin")
 	_rebuild()
 
 

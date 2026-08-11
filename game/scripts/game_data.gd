@@ -883,6 +883,8 @@ const ITEMS := {
 	"ore": {"name": "광석", "sell": 50},
 	"gem": {"name": "보석", "sell": 220},
 	"star_shard": {"name": "별빛 조각", "sell": 300},
+	"bouquet": {"name": "꽃다발", "sell": 0},
+	"wedding_ring": {"name": "청혼 반지", "sell": 0},
 	"dish_baked_potato": {"name": "구운 감자", "sell": 70},
 	"dish_soup": {"name": "야채 수프", "sell": 110},
 	"dish_jam": {"name": "딸기잼", "sell": 150},
@@ -947,7 +949,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_rainbow", "fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish",
 	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
 	"fish_king", "fish_dragon",
-	"ore", "gem", "star_shard", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"ore", "gem", "star_shard", "bouquet", "wedding_ring", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
 	"dish_pickle", "dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad",
 	"dish_sweet_potato", "dish_bean_rice", "dish_rice_cake", "dish_melon_ice",
@@ -1587,54 +1589,280 @@ func is_tile_owned(_x: int, _y: int) -> bool:
 
 # ---- NPC / 퀘스트 ----
 # 호감도가 오르면 secret50/secret100 대사가 풀리며 할아버지의 과거가 드러난다
+# ---- 마을 사람 ----
+#
+# 대사가 넉 줄뿐이면 세 번째 대화에서 이미 다 본 게 된다. 그래서 갈래를
+# 나눴다 — 계절 · 날씨 · 시간대 · 호감도 · 연애 단계. `npc_line()`이
+# 지금 맞는 갈래를 모아 그 안에서 하나를 뽑는다.
+#
+#   birthday  [계절, 날] — 그날 선물은 세 배로 오른다
+#   romance   연애할 수 있는가 (마을 어른 둘은 아니다)
+#   loves     아주 좋아함 +30 · likes 좋아함 +18 · hates 싫어함 -6
+#             (표에 없는 것은 +8)
 const NPCS := {
-	"merchant": {"name": "민지", "lines": [
+	"merchant": {"name": "민지", "birthday": [SPRING, 12], "romance": true,
+	"lines": [
 		"어서 와! 오늘도 농사는 잘 되고 있어?",
 		"제철 씨앗이 제일 잘 자라. 가게 안으로 들어와!",
 		"거둔 작물은 우리 가게로 가져와. 내가 좋은 값에 사줄게.",
 		"스프링클러를 세워 두면 그 둘레는 물주기가 아예 필요 없어.",
+		"장부 정리가 제일 싫어. 숫자만 보면 졸려...",
 	],
+	"season": {
+		SPRING: ["봄 씨앗이 들어왔어! 딸기가 인기야.",
+			"봄이 되면 가게에 사람이 북적여서 좋아."],
+		SUMMER: ["여름엔 수박이 제일 잘 팔려. 너도 심어 봐!",
+			"더워... 가게 안이 그나마 시원해."],
+		FALL: ["가을엔 다들 창고를 채우느라 바빠. 나도 그렇고.",
+			"호박 값이 좋을 때야. 지금이 기회라고!"],
+		WINTER: ["겨울엔 밭이 쉬니까 나도 좀 쉬어.",
+			"난롯가에서 장부 보는 거, 이건 좀 좋아."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오는 날엔 손님이 없어. 너라도 와줘서 다행이야."],
+		WEATHER_SNOW: ["눈 오는 날 가게 앞 쓸기가 제일 힘들어..."],
+		WEATHER_STORM: ["폭풍이야! 가게 덧문 닫는 거 도와줄래?"],
+		WEATHER_FOG: ["안개 낀 날은 간판이 안 보여서 손님이 길을 잃어."],
+		WEATHER_STAR: ["오늘 별 봤어? 이런 밤엔 이상한 물건이 잘 팔려."],
+	},
+	"morning": ["아침 일찍부터 부지런하네! 나도 방금 문 열었어."],
+	"night": ["이 시간까지 안 자고? 무리하지 마."],
+	"aff30": ["요즘 네 얼굴 보는 게 하루 낙이야.",
+		"너한테는 특별히 싸게 줄게. 비밀이야!"],
+	"aff70": ["...가끔은 장사 얘기 말고 다른 얘기도 하고 싶어.",
+		"네가 오는 시간쯤 되면 나도 모르게 문 쪽을 봐."],
+	"dating": ["오늘 장사 접고 같이 걸을까?",
+		"네 밭에서 난 거라면 뭐든 맛있어.",
+		"가게 문에 「잠시 자리 비움」 걸어 둘게. 잠깐만 있다 가."],
+	"married": ["다녀왔어? 밥은?",
+		"오늘 장부에 네 이름을 세 번이나 썼어. 실수로.",
+		"가게보다 집이 좋아진 건 네 탓이야."],
+	"loves": ["strawberry", "dish_jam", "dish_rice_cake", "gem"],
+	"likes": ["potato", "carrot", "melon", "dish_punch", "forage_berry"],
+	"hates": ["sludge", "fish_loach"],
 	"secret50": "너희 할아버지... 우리 가게 단골이었어. 늘 이상한 걸 찾으셨지.\n'달빛을 먹고 자란 작물'이라던가... 밭에서도 기적이 자란다고 하셨어.",
 	"secret100": "떠나시기 전에 그러셨어. '내 연구는 이 마을 전부에 흩어져 있다'고.\n밭, 호수, 숲, 동굴... 그리고 사람들 속에도. 이제 그 말뜻을 알겠니?",
 	},
-	"fisher": {"name": "철수", "lines": [
+	"fisher": {"name": "철수", "birthday": [SUMMER, 3], "romance": true,
+	"lines": [
 		"입질이 오면 초록 구간에서 낚아채는 거야.",
 		"황금잉어는 정말 귀하지... 나도 두 번밖에 못 봤어.",
 		"비 오는 날엔 왠지 물고기가 더 잘 잡히는 기분이야.",
 		"겨울엔 농사가 안 되니 낚시가 최고야.",
+		"물고기는 시간을 알아. 아침 놈과 밤 놈이 따로 있어.",
 	],
+	"season": {
+		SPRING: ["봄엔 은어가 올라와. 아침 일찍 나와야 해.",
+			"물이 풀리는 소리, 저게 봄이 왔다는 신호야."],
+		SUMMER: ["여름 밤엔 메기가 물어. 등불 하나 챙겨 가.",
+			"장어는 비 오는 여름 밤에만 나와. 진짜야."],
+		FALL: ["가을엔 연어가 거슬러 올라. 아침에 가 봐.",
+			"참게 철이다. 국 끓이면 그렇게 시원할 수가 없어."],
+		WINTER: ["얼음 위에서 빙어를 낚는 맛, 알아?",
+			"열목어는 눈 오는 날에만 나와. 손 시려도 참을 만해."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오는 날이야말로 낚시하기 좋은 날이지."],
+		WEATHER_SNOW: ["눈 오는 날 낚시? 나 같은 놈이나 하는 거지."],
+		WEATHER_STORM: ["오늘은 물가에 가지 마. 물이 사람을 삼켜."],
+		WEATHER_FOG: ["안개 낀 물가에선... 가끔 없는 게 물어."],
+		WEATHER_STAR: ["별 뜬 밤 물속을 봐. 별이 하나 더 헤엄쳐."],
+	},
+	"morning": ["새벽 물이 제일 맑아. 좋은 시간에 나왔네."],
+	"night": ["밤낚시 하러 왔어? 조용히 해, 놈들이 눈치채."],
+	"aff30": ["내 자리 하나 비워 뒀어. 옆에 앉아.",
+		"너랑 있으면 입질이 잘 오는 것 같단 말이지."],
+	"aff70": ["...혼자 낚는 게 편했는데, 요즘은 아니야.",
+		"오늘 잡은 거 반은 네 몫이야. 그냥 그러고 싶어서."],
+	"dating": ["오늘은 물고기 말고 네 얼굴만 봤어.",
+		"낚싯대 두 개 챙겨 왔어. 하나는 네 거."],
+	"married": ["아침에 국 끓여 놨어. 식기 전에 먹어.",
+		"오늘은 일찍 접고 왔어. 집에 오고 싶어서."],
+	"loves": ["fish_golden", "dish_sashimi", "dish_grilled_fish", "fish_king"],
+	"likes": ["fish_carp", "fish_catfish", "dish_stew", "forage_herb"],
+	"hates": ["sludge", "dish_jam"],
 	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
 	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
 	},
-	"blacksmith": {"name": "무쇠", "lines": [
-		"광석을 가져오면 도구를 벼려주지. 대장간으로 와.",
-		"동굴 깊은 곳 광석일수록 좋은 쇠가 된다.",
-		"쇠는 정직해. 두드린 만큼만 단단해지지.",
-		"요즘 젊은것들은 도끼 가는 법도 몰라... 자네는 다르군.",
-	],
-	"secret50": "자네 할아버지? 별난 양반이었지. 광석을 사 가면서\n'이건 녹이려는 게 아니라 별을 담으려는 거야'라고 하더군.",
-	"secret100": "떠나기 전에 화로를 빌려 갔어. 뭘 만들었는지는 끝내 안 보여줬지만...\n그날 밤 대장간 굴뚝에서 무지개색 연기가 올라왔다네.",
-	},
-	"rancher": {"name": "보라", "lines": [
+	"rancher": {"name": "보라", "birthday": [FALL, 20], "romance": true,
+	"lines": [
 		"동물은 사랑을 먹고 자라. 매일 쓰다듬어 줘!",
 		"닭이 낳은 달걀은 아침에 거둬야 신선해.",
 		"우리 목장 상회에서 귀여운 펫도 분양하고 있어~",
 		"축사가 있으면 비 오는 날에도 동물들이 편하지.",
+		"소가 나를 보고 우는 소리, 그게 인사인 거 알아?",
 	],
+	"season": {
+		SPRING: ["봄엔 새끼들이 태어나. 눈코 뜰 새가 없어!",
+			"목초가 파래지면 우유 맛이 달라져. 진짜야."],
+		SUMMER: ["더울 땐 동물들도 지쳐. 물을 자주 갈아 줘.",
+			"여름 저녁에 목장 바람 쐬러 와. 시원해."],
+		FALL: ["가을 털이 제일 좋아. 이때 깎아야 해.",
+			"겨울나기 준비로 건초를 쌓는 철이야."],
+		WINTER: ["눈 오면 다 안으로 들여야 해서 바빠.",
+			"겨울엔 축사 안이 제일 따뜻해. 놀러 와."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오면 애들을 다 안에 들여야 해. 도와줄래?"],
+		WEATHER_SNOW: ["눈 오는 날 축사는 김이 모락모락 나."],
+		WEATHER_STORM: ["폭풍이야! 울타리 무너지지 않게 봐 둬야 해."],
+		WEATHER_FOG: ["안개 끼면 애들이 길을 잃어. 종을 달아 놨어."],
+		WEATHER_STAR: ["별 뜬 밤엔 닭들도 안 자고 하늘을 봐. 신기하지?"],
+	},
+	"morning": ["아침 젖 짜는 거 도와줄래? 손이 모자라!"],
+	"night": ["이 시간엔 애들 다 자. 조용히 와."],
+	"aff30": ["우리 애들이 너를 알아봐. 좋은 사람이란 뜻이야.",
+		"네가 오는 날은 우유가 더 잘 나와. 우연 아니야."],
+	"aff70": ["동물한테만 마음을 주고 살았는데... 요즘은 좀 달라.",
+		"오늘은 일 얘기 말고 그냥 앉아 있자."],
+	"dating": ["송아지 이름을 네 이름으로 지었어. 싫어?",
+		"목장 노을 보러 갈래? 오늘 좋을 것 같아."],
+	"married": ["오늘 짠 우유 제일 좋은 걸로 남겨 뒀어.",
+		"집에 오니까 좋다. 그 말이 이런 거구나."],
+	"loves": ["milk", "golden_egg", "dish_melon_ice", "dish_salad"],
+	"likes": ["egg", "cabbage", "bean", "dish_pumpkin_soup"],
+	"hates": ["sludge", "fish_snakehead"],
 	"secret50": "너희 할아버지, 동물들이 유난히 따랐어.\n'동물이 주는 건 생산물이 아니라 마음'이라고 입버릇처럼 말씀하셨지.",
 	"secret100": "언젠가 금빛으로 빛나는 달걀을 보여주신 적이 있어.\n'사랑받은 닭만이 낳을 수 있다'며... 나는 아직도 그게 꿈같아.",
 	},
-	"chief": {"name": "덕수", "lines": [
+	"blacksmith": {"name": "무쇠", "birthday": [WINTER, 8], "romance": false,
+	"lines": [
+		"광석을 가져오면 도구를 벼려주지. 대장간으로 와.",
+		"동굴 깊은 곳 광석일수록 좋은 쇠가 된다.",
+		"쇠는 정직해. 두드린 만큼만 단단해지지.",
+		"요즘 젊은것들은 도끼 가는 법도 몰라... 자네는 다르군.",
+		"불은 거짓말을 안 해. 뜨거우면 뜨겁다고 말하지.",
+	],
+	"season": {
+		SPRING: ["봄엔 연장 손보러 오는 사람이 줄을 서지."],
+		SUMMER: ["여름 화덕 앞은 지옥이야. 그래도 불은 꺼뜨릴 수 없지."],
+		FALL: ["가을엔 겨울 연장을 미리 벼려 둬야 해."],
+		WINTER: ["겨울엔 화덕 앞이 제일 좋은 자리지. 앉게."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["빗소리에 망치 소리가 묻히는군. 나쁘지 않아."],
+		WEATHER_SNOW: ["눈 오는 날의 쇠는 더 잘 식어. 담금질하기 좋지."],
+		WEATHER_STORM: ["번개 치는 날 벼린 쇠가 제일 좋다는 말이 있어."],
+		WEATHER_FOG: ["안개 낀 날은 불빛이 멀리 안 가. 조심히 다니게."],
+		WEATHER_STAR: ["별빛 조각... 저런 게 하늘에서 떨어진다니 믿기나?"],
+	},
+	"morning": ["일찍 왔군. 화덕이 아직 덜 달았네."],
+	"night": ["이 시간에? 대장간 불은 벌써 껐네."],
+	"aff30": ["자네 손을 보니 일하는 손이야. 마음에 들어.",
+		"자네가 가져오는 광석은 늘 깨끗해. 고르는 눈이 있어."],
+	"aff70": ["내 연장 중 하나를 자네한테 물려줄 생각을 하고 있네.",
+		"손주가 있었으면 자네 같았을 텐데 말이야."],
+	"loves": ["star_ore", "ore", "gem", "star_shard"],
+	"likes": ["dish_baked_potato", "dish_stew", "sweet_potato"],
+	"hates": ["sludge", "dish_punch"],
+	"secret50": "자네 할아버지? 별난 양반이었지. 광석을 사 가면서\n'이건 녹이려는 게 아니라 별을 담으려는 거야'라고 하더군.",
+	"secret100": "떠나기 전에 화로를 빌려 갔어. 뭘 만들었는지는 끝내 안 보여줬지만...\n그날 밤 대장간 굴뚝에서 무지개색 연기가 올라왔다네.",
+	},
+	"chief": {"name": "덕수", "birthday": [FALL, 5], "romance": false,
+	"lines": [
 		"우리 마을에 젊은 사람이 오니 좋구먼.",
 		"부지 문서는 내가 관리하고 있네. 표지판에서 사면 돼.",
 		"광장 게시판에 마을 사람들 부탁이 올라온다네.",
 		"자네 할아버지와는... 오랜 친구였지.",
+		"마을이 커지는 걸 보는 게 늙은이의 낙이야.",
 	],
+	"season": {
+		SPRING: ["봄 꽃놀이 준비는 잘 되어 가나? 광장에서 보세."],
+		SUMMER: ["여름 낚시대회가 곧이야. 자네도 나가 보게."],
+		FALL: ["가을엔 추수 감사 잔치가 있지. 기대하게."],
+		WINTER: ["겨울 등불 축제는 내가 제일 좋아하는 날이야."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오는 날엔 늙은 무릎이 먼저 알아채."],
+		WEATHER_SNOW: ["눈이 오면 마을이 조용해져서 좋아."],
+		WEATHER_STORM: ["다들 집에 있으라고 일러뒀네. 자네도 조심하게."],
+		WEATHER_FOG: ["안개 낀 날엔 옛날 일이 자꾸 떠올라."],
+		WEATHER_STAR: ["이런 밤이면 자네 할아버지 생각이 나는군."],
+	},
+	"morning": ["부지런하구먼. 젊을 땐 나도 그랬지."],
+	"night": ["늦었네. 젊다고 몸을 함부로 쓰면 안 돼."],
+	"aff30": ["자네가 오고 나서 마을이 밝아졌어.",
+		"이 마을을 자네에게 맡겨도 되겠다는 생각을 해."],
+	"aff70": ["언젠가 이 마을을 자네가 이끌었으면 하네.",
+		"내 친구의 손주가 이렇게 자랐구먼... 고맙네."],
+	"loves": ["dish_feast", "dish_bean_rice", "memory_piece", "dish_rice_cake"],
+	"likes": ["rice", "pumpkin", "dish_pie", "leek"],
+	"hates": ["sludge"],
 	"secret50": "자네 할아버지가 이 마을에 처음 왔을 때, 다들 미친 사람 취급했어.\n나만 빼고. 그 눈빛은... 미친 게 아니라 믿는 사람의 눈이었거든.",
 	"secret100": "그 양반이 마지막으로 한 말을 전해주지. '덕수, 내 손주가 오면\n일곱 가지를 모을 걸세. 그때 이 마을은 기적을 보게 될 거야.'",
 	},
 }
 var affinity := {"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0}
+# 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
+const BOUQUET_PRICE := 800
+const RING_PRICE := 12000
+var dating := ""                # NPC id, 없으면 ""
+var spouse := ""                # NPC id, 없으면 ""
+var spouse_gift_day := 0        # 배우자가 마지막으로 아침 선물을 준 날
+var gifted_today: Array[String] = []   # 오늘 선물한 상대 (하루 한 번)
+
+
+# 오늘이 이 사람 생일인가
+func is_birthday(npc_id: String) -> bool:
+	var b: Array = NPCS[npc_id].get("birthday", [])
+	return b.size() == 2 and int(b[0]) == season() and int(b[1]) == day_in_season()
+
+
+# 며칠 뒤가 생일인가 (-1이면 이번 계절에 없다)
+func days_to_birthday(npc_id: String) -> int:
+	var b: Array = NPCS[npc_id].get("birthday", [])
+	if b.size() != 2 or int(b[0]) != season():
+		return -1
+	return int(b[1]) - day_in_season()
+
+
+# 선물이 얼마나 오르는가. 표에 없으면 그냥 반갑다.
+func gift_value(npc_id: String, item_id: String) -> int:
+	var def: Dictionary = NPCS[npc_id]
+	var base := 8
+	if item_id in def.get("loves", []):
+		base = 30
+	elif item_id in def.get("likes", []):
+		base = 18
+	elif item_id in def.get("hates", []):
+		base = -6
+	if base > 0 and is_birthday(npc_id):
+		base *= 3          # 생일에는 세 배
+	return base
+
+
+# 지금 상황에 맞는 대사를 하나 고른다.
+#
+# 좁은 갈래(연애 > 호감도 > 생일 > 날씨 > 시간대 > 계절)일수록 먼저 보고,
+# 거기 있는 것과 기본 대사를 **함께** 후보에 넣는다. 좁은 것만 쓰면
+# 같은 계절 내내 같은 말을 하고, 기본만 쓰면 갈래를 나눈 뜻이 없어진다.
+func npc_line(npc_id: String) -> String:
+	var def: Dictionary = NPCS[npc_id]
+	var pool: Array = []
+	if spouse == npc_id:
+		pool += def.get("married", [])
+	elif dating == npc_id:
+		pool += def.get("dating", [])
+	var aff := int(affinity[npc_id])
+	if aff >= 70:
+		pool += def.get("aff70", [])
+	if aff >= 30:
+		pool += def.get("aff30", [])
+	if is_birthday(npc_id):
+		pool.append("오늘 내 생일인 거... 알고 있었어?")
+	var w: Dictionary = def.get("weather", {})
+	if w.has(weather_today()):
+		pool += w[weather_today()]
+	var h := minutes / 60.0
+	if h < 9.0:
+		pool += def.get("morning", [])
+	elif h >= 19.0:
+		pool += def.get("night", [])
+	var sn: Dictionary = def.get("season", {})
+	if sn.has(season()):
+		pool += sn[season()]
+	pool += def.lines
+	return str(pool[randi() % pool.size()])
 # {crop, qty, reward, accepted}
 var quest := {}
 
@@ -2086,6 +2314,10 @@ func reset_all() -> void:
 		items[id] = 0
 	for k in affinity:
 		affinity[k] = 0
+	dating = ""
+	spouse = ""
+	spouse_gift_day = 0
+	gifted_today.clear()
 	if DEV_MODE:
 		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
 		wood = DEV_STOCK
@@ -2371,6 +2603,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"fish_caught": fish_caught,
 		"mob_kills": mob_kills,
 		"affinity": affinity,
+		"dating": dating, "spouse": spouse, "spouse_gift_day": spouse_gift_day,
 		"quest": quest,
 		"quest_offers": quest_offers,
 		"tutorial": tutorial,
@@ -2467,6 +2700,9 @@ func apply_stats(d: Dictionary) -> void:
 		mob_kills[k] = int(d.mob_kills[k])
 	for k in d.get("affinity", {}):
 		affinity[k] = int(d.affinity[k])
+	dating = str(d.get("dating", ""))
+	spouse = str(d.get("spouse", ""))
+	spouse_gift_day = int(d.get("spouse_gift_day", 0))
 	for k in d.get("tool_level", {}):
 		tool_level[k] = int(d.tool_level[k])
 	apply_skills_data(d.get("skills", {}))
