@@ -13,54 +13,74 @@ var _key_buttons := {}
 
 
 func _ready() -> void:
-	# 배경
-	var bg := ColorRect.new()
-	bg.color = Color(0.16, 0.23, 0.14)
+	# 배경: 참고 도트 풍경화 한 장 (960x540 그대로 화면을 채운다)
+	var bg := TextureRect.new()
+	bg.texture = load("res://assets/sprites/title_bg.png")
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
-	# 배경 장식: 도트 스프라이트 몇 개
-	var deco := Node2D.new()
-	deco.position = Vector2(0, 0)
-	add_child(deco)
-	var deco_items := [
-		["tree_spring", Vector2(75, 375), 2.5], ["tree_spring", Vector2(810, 360), 2.5],
-		["house", Vector2(60, 60), 1.6], ["mature_pumpkin", Vector2(210, 459), 2.0],
-		["mature_strawberry", Vector2(300, 465), 2.0], ["chicken_0", Vector2(585, 468), 2.0],
-		["cow_0", Vector2(690, 459), 2.0],
-	]
-	for item in deco_items:
-		var s := Sprite2D.new()
-		s.texture = load("res://assets/sprites/%s.png" % item[0])
-		s.centered = false
-		s.position = item[1]
-		s.scale = Vector2(item[2], item[2])
-		s.modulate = Color(1, 1, 1, 0.85)
-		deco.add_child(s)
+	# 글자가 하늘 위에 얹히므로 위쪽을 살짝 어둡게 깐다.
+	# 단색 판을 얹으면 경계가 자로 그은 듯 보이므로 아래로 갈수록 옅어지게 한다.
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0.03, 0.05, 0.11, 0.44))
+	grad.set_color(1, Color(0.03, 0.05, 0.11, 0.0))
+	var gtex := GradientTexture2D.new()
+	gtex.gradient = grad
+	gtex.width = 8
+	gtex.height = 64
+	gtex.fill_from = Vector2(0, 0)
+	gtex.fill_to = Vector2(0, 1)
+	var veil := TextureRect.new()
+	veil.texture = gtex
+	veil.position = Vector2(0, 0)
+	veil.size = Vector2(960, 230)
+	veil.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	veil.stretch_mode = TextureRect.STRETCH_SCALE
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(veil)
 
 	# 타이틀
 	var title := Label.new()
 	title.text = "교 진 팜"
-	title.add_theme_font_size_override("font_size", 44)
-	title.add_theme_color_override("font_color", Color("ffd75e"))
-	title.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
-	title.add_theme_constant_override("outline_size", 3)
-	title.position = Vector2(285, 72)
-	title.size = Vector2(390, 60)
+	title.add_theme_font_size_override("font_size", 52)
+	title.add_theme_color_override("font_color", Color("ffe08a"))
+	title.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.04))
+	title.add_theme_constant_override("outline_size", 6)
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
+	title.add_theme_constant_override("shadow_offset_y", 3)
+	title.position = Vector2(285, 48)
+	title.size = Vector2(390, 66)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "- 도트 농장 시뮬레이션 -"
-	subtitle.add_theme_color_override("font_color", Color(0.8, 0.85, 0.7))
-	subtitle.add_theme_color_override("font_outline_color", Color(0.1, 0.07, 0.05))
-	subtitle.add_theme_constant_override("outline_size", 2)
-	subtitle.position = Vector2(300, 148)
+	subtitle.add_theme_color_override("font_color", Color(0.94, 0.96, 0.9))
+	subtitle.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.04))
+	subtitle.add_theme_constant_override("outline_size", 4)
+	subtitle.position = Vector2(300, 126)
 	subtitle.size = Vector2(360, 30)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(subtitle)
 
-	# 메뉴 버튼
+	# 메뉴 버튼 (풍경 위라 뒤에 어두운 판을 깐다)
+	var menu_bg := PanelContainer.new()
+	menu_bg.position = Vector2(363, 190)
+	menu_bg.custom_minimum_size = Vector2(234, 180)
+	menu_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mstyle := StyleBoxFlat.new()
+	mstyle.bg_color = Color(0.06, 0.08, 0.12, 0.58)
+	mstyle.border_color = Color(0.72, 0.62, 0.38, 0.7)
+	mstyle.set_border_width_all(2)
+	mstyle.set_corner_radius_all(4)
+	mstyle.set_content_margin_all(10)
+	menu_bg.add_theme_stylebox_override("panel", mstyle)
+	add_child(menu_bg)
+
 	var v := VBoxContainer.new()
 	v.position = Vector2(375, 200)
 	v.custom_minimum_size = Vector2(210, 0)
