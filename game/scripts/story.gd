@@ -966,7 +966,7 @@ func tutorial_notify(flag: String) -> void:
 		msg += " 보상: " + ", ".join(parts)
 		m.hud.reward_toast(", ".join(parts), m.tex["icon_coin"])
 	if Net.is_host():
-		m._broadcast_stats()
+		m.netsync._broadcast_stats()
 
 	# 새 도구 해금
 	var unlocked: Array = GameData.TUTORIAL_UNLOCKS.get(flag, [])
@@ -1041,7 +1041,7 @@ func _finish_grandpa() -> void:
 		m.hud.reward_toast(", ".join(parts), m.tex["icon_coin"])
 	m.hud.quest_toast("할아버지의 부탁 — %s" % q.name)
 	if Net.is_host():
-		m._broadcast_stats()
+		m.netsync._broadcast_stats()
 	m.save_now()
 
 	# 다음 부탁 편지를 바로 이어서 보여 준다

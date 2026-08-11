@@ -46,11 +46,13 @@ def split_blocks(src):
     starts = [i for i, l in enumerate(lines) if l.startswith("func ")]
     blocks = []
     for idx, s in enumerate(starts):
-        # 바로 위에 붙은 주석줄까지 함께 가져간다
+        # 바로 위에 붙은 주석줄과 **어노테이션**(@rpc 등)까지 함께 가져간다.
+        # @rpc를 두고 오면 함수만 옮겨져 통신이 통째로 죽는다.
         head = s
-        while head > 0 and (lines[head - 1].startswith("#") or
-                            (lines[head - 1].strip() == "" and head - 2 >= 0
-                             and lines[head - 2].startswith("#"))):
+        while head > 0 and (lines[head - 1].startswith("#")
+                            or lines[head - 1].startswith("@")
+                            or (lines[head - 1].strip() == "" and head - 2 >= 0
+                                and lines[head - 2].startswith("#"))):
             head -= 1
         # 함수 본문은 반드시 들여쓰기되어 있다. 들여쓰지 않은 줄이 나오면
         # 거기서 끝이다 — 함수 사이에 낀 `var` 선언까지 끌고 가면 안 된다.

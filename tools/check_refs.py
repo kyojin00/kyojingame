@@ -22,6 +22,7 @@ MODULES = {
     "world_gen.gd": "worldgen",
     "village_ui.gd": "village",
     "renderer.gd": "renderer",
+    "net_sync.gd": "netsync",
     "dev_harness.gd": "harness",
 }
 
@@ -52,6 +53,16 @@ def main():
                     if re.search(r"(?<![\w.])" + re.escape(pref + name) + r"\b", src):
                         bad.append("%s: %s%s  ->  %s.%s.%s"
                                    % (other, pref, name, pref.rstrip("."), handle, name))
+    # `self`는 옮겨 오기 전에는 main이었다. 이제는 모듈 노드라 뜻이 바뀐다.
+    # 컴파일에 안 걸리고 그 코드가 도는 순간에야 터지므로 여기서 잡는다.
+    for fname in MODULES:
+        path = os.path.join(SCRIPTS, fname)
+        if not os.path.exists(path):
+            continue
+        for i, line in enumerate(open(path, encoding="utf-8"), 1):
+            if re.search(r"(?<![\w.])self\b", line.split("#")[0]):
+                bad.append("%s:%d: self — main을 뜻하던 자리인지 확인 (아마 `m`)"
+                           % (path, i))
     if bad:
         print("옛 주소로 부르는 곳 %d군데:" % len(bad))
         for b in sorted(bad):

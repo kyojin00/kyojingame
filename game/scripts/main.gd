@@ -2,6 +2,7 @@
 #
 # 덩치가 커서 몇 갈래를 따로 뺐다 (전부 자식 노드로 붙고 `m`으로 여기를 부른다):
 #   scripts/world_gen.gd    지형·길·마을 부지·자원 재생
+#   scripts/net_sync.gd     함께하기 배관 (@rpc는 전부 여기)
 #   scripts/renderer.gd     지형 위에 얹히는 것들 + 화면 안내
 #   scripts/village_ui.gd   마을에서 여는 창들 (상점·여관·축제·의뢰·선물)
 #   scripts/story.gd        메인 스토리 연출 (각본)
@@ -129,6 +130,8 @@ var worldgen: Node = null
 var village: Node = null
 # 지형 위에 얹히는 것들 + 화면 안내 (scripts/renderer.gd)
 var renderer: Node = null
+# 함께하기 배관 — @rpc는 전부 여기 있다 (scripts/net_sync.gd)
+var netsync: Node = null
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
@@ -417,6 +420,13 @@ func _ready() -> void:
 	worldgen.m = self
 	add_child(worldgen)
 
+	# 함께하기 배관 (scripts/net_sync.gd)
+	# @rpc는 노드 경로로 상대를 찾으므로 **이름을 바꾸면 통신이 죽는다**
+	netsync = load("res://scripts/net_sync.gd").new()
+	netsync.name = "NetSync"
+	netsync.m = self
+	add_child(netsync)
+
 	# 그리는 쪽 (scripts/renderer.gd)
 	renderer = load("res://scripts/renderer.gd").new()
 	renderer.name = "Renderer"
@@ -545,10 +555,10 @@ func _ready() -> void:
 		_weather_override = int(OS.get_environment("KYOJIN_WEATHER"))
 
 	if Net.active():
-		multiplayer.peer_connected.connect(_on_peer_connected)
-		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
+		multiplayer.peer_connected.connect(netsync._on_peer_connected)
+		multiplayer.peer_disconnected.connect(netsync._on_peer_disconnected)
 	if Net.is_guest():
-		multiplayer.server_disconnected.connect(_on_server_disconnected)
+		multiplayer.server_disconnected.connect(netsync._on_server_disconnected)
 		# 게스트: 로컬 저장 대신 호스트 스냅샷을 기다린다
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
@@ -556,11 +566,11 @@ func _ready() -> void:
 		GameData.unlock_all_tools()
 		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 16,
 			START_TILE.y * TILE + 16)
-		_show_connecting()
+		netsync._show_connecting()
 		# 연결이 완료된 뒤에 스냅샷을 요청한다 (그 전 RPC는 유실됨)
-		multiplayer.connected_to_server.connect(func() -> void: _req_snapshot.rpc_id(1))
+		multiplayer.connected_to_server.connect(func() -> void: netsync._req_snapshot.rpc_id(1))
 		if multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
-			_req_snapshot.rpc_id(1)
+			netsync._req_snapshot.rpc_id(1)
 		_spawn_objects()
 		_apply_season_visuals()
 		_setup_fade(false)
@@ -1222,7 +1232,7 @@ func build_barn() -> void:
 		% GameData.BARN_MAX_ANIMALS
 		+ "울타리로 빈틈없이 둘러싸 **목초지**를 만들면 알아서 배부르다.", 6.0)
 	if Net.is_host():
-		_broadcast_stats()
+		netsync._broadcast_stats()
 
 
 # 전설 재료 획득 (판매 불가, 최후의 연금술 재료 — 연구 노트에 기록)
@@ -1249,7 +1259,7 @@ func gain_skill(id: String, amount: float) -> void:
 		hud.show_message("[능력치] %s Lv.%d 달성! (%s)" %
 			[GameData.SKILLS[id].name, lv, GameData.SKILLS[id].effect])
 	if lv > 0 and Net.is_host():
-		_broadcast_stats()
+		netsync._broadcast_stats()
 
 
 func _on_fishing_finished(success: bool) -> void:
@@ -1276,9 +1286,9 @@ func _on_fishing_finished(success: bool) -> void:
 			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
 			GameData.items[id] -= 1
 			GameData.fish_caught[id] = int(GameData.fish_caught[id]) - 1
-			_req_gain.rpc_id(1, id, 1)
+			netsync._req_gain.rpc_id(1, id, 1)
 		elif Net.is_host():
-			_broadcast_stats()
+			netsync._broadcast_stats()
 	else:
 		Sound.play_sfx("sfx_miss")
 		hud.show_message("놓쳤다...")
@@ -1627,11 +1637,11 @@ func use_tool() -> void:
 	# 멀티: 내 행동을 다른 플레이어에게 반영 (낚싯대는 로컬 진행)
 	if not _remote_acting:
 		if Net.is_guest() and GameData.tool != "rod":
-			_req_tool.rpc_id(1, t.x, t.y, GameData.tool, seed_now,
+			netsync._req_tool.rpc_id(1, t.x, t.y, GameData.tool, seed_now,
 				_current_perp().x, _current_perp().y)
 		elif Net.is_host():
-			_broadcast_area(t)
-			_broadcast_stats()
+			netsync._broadcast_area(t)
+			netsync._broadcast_stats()
 	queue_redraw()
 
 
@@ -1803,7 +1813,7 @@ func interact() -> void:
 			animal.fed = true
 			Sound.play_sfx("sfx_heart")
 			if Net.is_guest():
-				_req_feed.rpc_id(1, animals.find(animal))
+				netsync._req_feed.rpc_id(1, animals.find(animal))
 			hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
 				[def.name, GameData.ITEMS[def.product].name])
 		return
@@ -1818,7 +1828,7 @@ func interact() -> void:
 		hud.show_message("%s를 잡았다! 연구 노트에 기록됐다." % GameData.ITEMS[bid].name)
 		bug.respawn()
 		if Net.is_host():
-			_broadcast_stats()
+			netsync._broadcast_stats()
 		return
 	for t in [target_tile(), player_tile()]:
 		var obj: Variant = objects.get(t)
@@ -1834,10 +1844,10 @@ func interact() -> void:
 			hud.show_message("%s 채집! 연구 노트에 기록됐다." % GameData.ITEMS[fid].name)
 			gain_skill("forest", 3.0)
 			if Net.is_host():
-				_broadcast_area(t)
-				_broadcast_stats()
+				netsync._broadcast_area(t)
+				netsync._broadcast_stats()
 			elif Net.is_guest():
-				_req_gain.rpc_id(1, fid, 1)
+				netsync._req_gain.rpc_id(1, fid, 1)
 			return
 		if obj.kind == "worldtree":
 			cave.open(true)
@@ -2312,7 +2322,7 @@ func _next_day(passed_out: bool) -> void:
 		% [stats[0], stats[1], stats[2], GameData.money, note]
 	summary.open(s_title, s_body)
 	if Net.is_host():
-		_net_new_day.rpc(_make_snapshot_json(), s_title, s_body)
+		netsync._net_new_day.rpc(netsync._make_snapshot_json(), s_title, s_body)
 	queue_redraw()
 
 
@@ -2550,7 +2560,7 @@ func _process(delta: float) -> void:
 	_update_night_mobs(delta)
 	_update_tree_fade()
 	story._update_u_intro()
-	_net_process(delta)
+	netsync._net_process(delta)
 	_update_night()
 	hud.refresh()
 	queue_redraw()
@@ -3093,210 +3103,14 @@ func _draw() -> void:
 
 # ==== 멀티플레이 ====
 
-func _show_connecting() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = 55
-	layer.name = "Connecting"
-	add_child(layer)
-	var bg := ColorRect.new()
-	bg.color = Color(0.05, 0.04, 0.09, 1)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	layer.add_child(bg)
-	_connect_label = Label.new()
-	_connect_label.text = "호스트에 접속하는 중..."
-	_connect_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_connect_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_connect_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	layer.add_child(_connect_label)
-	# 12초 안에 스냅샷을 못 받으면 타이틀로
-	get_tree().create_timer(12.0).timeout.connect(func() -> void:
-		if not _net_ready and Net.is_guest():
-			_back_to_title())
-
-
-func _hide_connecting() -> void:
-	var layer := get_node_or_null("Connecting")
-	if layer != null:
-		layer.queue_free()
-
-
-func _on_peer_connected(_id: int) -> void:
-	if Net.is_host():
-		hud.show_message("새 일꾼이 농장에 도착했다!")
-
-
-func _on_peer_disconnected(id: int) -> void:
-	if remote_players.has(id):
-		remote_players[id].queue_free()
-		remote_players.erase(id)
-	if Net.is_host():
-		hud.show_message("일꾼이 농장을 떠났다.")
-
-
-func _on_server_disconnected() -> void:
-	Net.reset()
-	get_tree().change_scene_to_file("res://scenes/title.tscn")
-
-
-func _make_snapshot_json() -> String:
-	var g := []
-	for y in MAP_H:
-		var row := []
-		for x in MAP_W:
-			var c: Dictionary = grid[y][x]
-			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day),
-				1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
-		g.append(row)
-	var objs := []
-	for pos: Vector2i in objects:
-		objs.append([pos.x, pos.y, objects[pos].kind, objects[pos].hp,
-			1 if objects[pos].get("apple", false) else 0,
-			1 if objects[pos].get("young", false) else 0,
-			int(objects[pos].get("grow", 0)),
-			1 if objects[pos].get("fixed", false) else 0])
-	var anims := []
-	for a in animals:
-		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
-	return JSON.stringify(GameData.build_save(g, player.position, objs, anims))
-
-
-@rpc("any_peer", "reliable")
-func _req_snapshot() -> void:
-	if not Net.is_host():
-		return
-	_recv_snapshot.rpc_id(multiplayer.get_remote_sender_id(), _make_snapshot_json())
-
-
-@rpc("authority", "reliable")
-func _recv_snapshot(json: String) -> void:
-	var d: Variant = JSON.parse_string(json)
-	if typeof(d) != TYPE_DICTIONARY:
-		return
-	# 스냅샷의 플레이어 위치는 호스트 것이므로 내 위치는 유지한다
-	var my_pos := player.position
-	for a in animals:
-		a.queue_free()
-	animals.clear()
-	_apply_save(d)
-	player.position = my_pos
-	GameData.tutorial = {"active": false}
-	GameData.unlock_all_tools()
-	_spawn_objects()
-	_apply_season_visuals()
-	_net_ready = true
-	_hide_connecting()
-	hud.show_message("농장에 도착했다! 함께 일해보자.")
-	queue_redraw()
-
 
 # 위치 동기화 (15Hz, 비신뢰)
-@rpc("any_peer", "unreliable_ordered")
-func _sync_pos(x: float, y: float, dir: String, moving: bool) -> void:
-	var pid := multiplayer.get_remote_sender_id()
-	if not remote_players.has(pid):
-		var rp: Node2D = preload("res://scripts/remote_player.gd").new()
-		rp.main = self
-		rp.tint = PLAYER_TINTS[(pid % 3) + 1]
-		rp.position = Vector2(x, y)
-		remote_players[pid] = rp
-		world.add_child(rp)
-	remote_players[pid].set_state(Vector2(x, y), dir, moving)
 
 
 var _snapshot_retry := 0.0
 
 
-func _net_process(delta: float) -> void:
-	if not Net.active():
-		return
-	if Net.is_guest() and not _net_ready:
-		# 스냅샷 재요청 (유실 대비)
-		_snapshot_retry -= delta
-		if _snapshot_retry <= 0.0 and multiplayer.multiplayer_peer != null \
-				and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
-			_snapshot_retry = 2.0
-			_req_snapshot.rpc_id(1)
-	_pos_sync_timer -= delta
-	if _pos_sync_timer <= 0.0:
-		_pos_sync_timer = 1.0 / 15.0
-		_sync_pos.rpc(player.position.x, player.position.y, player.dir, player.moving)
-	if Net.is_host():
-		_time_sync_timer -= delta
-		if _time_sync_timer <= 0.0:
-			_time_sync_timer = 3.0
-			_net_time.rpc(GameData.day, GameData.minutes, GameData.energy)
-
-
-@rpc("authority", "unreliable_ordered")
-func _net_time(day: int, minutes: float, _host_energy: float) -> void:
-	GameData.day = day
-	GameData.minutes = minutes
-
-
 # 도구 사용 결과 영역 동기화 (호스트 -> 전체)
-func _broadcast_area(center: Vector2i) -> void:
-	if not Net.is_host():
-		return
-	var cells := []
-	var objs := []
-	for dy in range(-2, 3):
-		for dx in range(-2, 3):
-			var pos := center + Vector2i(dx, dy)
-			if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
-				continue
-			var c: Dictionary = grid[pos.y][pos.x]
-			cells.append([pos.x, pos.y, c.ground, int(c.wet_min), c.crop_id,
-				int(c.crop_day), 1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
-			if objects.has(pos):
-				var o: Dictionary = objects[pos]
-				objs.append([pos.x, pos.y, o.kind, o.hp])
-	_net_area.rpc(center.x, center.y, cells, objs)
-
-
-@rpc("authority", "reliable")
-func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
-	for entry in cells:
-		var c: Dictionary = grid[entry[1]][entry[0]]
-		c.ground = entry[2]
-		c.wet_min = float(entry[3])
-		c.watered = float(entry[3]) > 0.0
-		c.crop_id = entry[4]
-		c.crop_day = float(entry[5])
-		c.dead = int(entry[6]) == 1
-		c.half_fed = entry.size() > 7 and int(entry[7]) == 1
-	# 영역 내 오브젝트: 목록에 없는 건 제거, 있는 건 갱신/추가
-	var present := {}
-	for o in objs:
-		present[Vector2i(int(o[0]), int(o[1]))] = o
-	for dy in range(-2, 3):
-		for dx in range(-2, 3):
-			var pos := Vector2i(cx + dx, cy + dy)
-			if pos.x < 0 or pos.y < 0 or pos.x >= MAP_W or pos.y >= MAP_H:
-				continue
-			if objects.has(pos) and not present.has(pos):
-				if objects[pos].kind != "house":
-					_remove_object(pos)
-			elif present.has(pos):
-				var o: Array = present[pos]
-				if o[2] == "house":
-					continue
-				if objects.has(pos):
-					objects[pos].hp = int(o[3])
-				else:
-					_place_object(pos, o[2], int(o[3]))
-	queue_redraw()
-
-
-func _broadcast_stats() -> void:
-	if Net.is_host():
-		_net_stats.rpc(JSON.stringify(GameData.build_stats()))
-
-
-@rpc("authority", "reliable")
-func _net_stats(json: String) -> void:
-	var d: Variant = JSON.parse_string(json)
-	if typeof(d) == TYPE_DICTIONARY:
-		GameData.apply_stats(d)
 
 
 # 게스트 행동 요청: 호스트가 같은 로직을 실행하고 결과를 전파한다
@@ -3306,64 +3120,12 @@ var _forced_seed := ""
 var _remote_acting := false
 
 
-@rpc("any_peer", "reliable")
-func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int) -> void:
-	if not Net.is_host():
-		return
-	var saved_tool: String = GameData.tool
-	var saved_energy: float = GameData.energy
-	_target_override = Vector2i(tx, ty)
-	_perp_override = Vector2i(px, py)
-	_forced_seed = seed_id
-	_remote_acting = true
-	GameData.tool = tool
-	use_tool()
-	GameData.tool = saved_tool
-	GameData.energy = saved_energy  # 게스트 기력은 게스트 로컬 관리
-	_remote_acting = false
-	_target_override = Vector2i(-999, -999)
-	_perp_override = Vector2i.ZERO
-	_forced_seed = ""
-	_broadcast_area(Vector2i(tx, ty))
-	_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_shop(op: String, id: String) -> void:
-	if not Net.is_host():
-		return
-	match op:
-		"buy_seed":
-			shop._on_buy(id)
-		"sell_crop":
-			shop._on_sell(id)
-		"sell_item":
-			shop._on_sell_item(id)
-		"buy_animal":
-			shop._on_buy_animal(id)
-		"buy_pet":
-			shop._on_buy_pet(id)
-		"select_pet":
-			shop._on_select_pet(id)
-		"upgrade":
-			shop._on_upgrade(id)
-	_broadcast_stats()
-
-
 # 게스트가 상점 조작 후 호출 (호스트면 즉시 전파)
 func net_shop(op: String, id: String) -> void:
 	if Net.is_host():
-		_broadcast_stats()
+		netsync._broadcast_stats()
 	elif Net.is_guest():
-		_req_shop.rpc_id(1, op, id)
-
-
-@rpc("any_peer", "reliable")
-func _req_feed(index: int) -> void:
-	if not Net.is_host():
-		return
-	if index >= 0 and index < animals.size():
-		animals[index].fed = true
+		netsync._req_shop.rpc_id(1, op, id)
 
 
 # 몬스터 처치 기록 (도감용)
@@ -3371,18 +3133,9 @@ func record_kill(mob: String) -> void:
 	GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
 	_maybe_drop_recipe("mob")
 	if Net.is_guest():
-		_req_kill.rpc_id(1, mob)
+		netsync._req_kill.rpc_id(1, mob)
 	elif Net.is_host():
-		_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_kill(mob: String) -> void:
-	if not Net.is_host():
-		return
-	if GameData.MOBS.has(mob):
-		GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
-		_broadcast_stats()
+		netsync._broadcast_stats()
 
 
 # 아이템 획득 (동굴 보상/낚시 등) — 멀티에서는 호스트가 확정한다
@@ -3391,22 +3144,11 @@ func gain_item(id: String, count: int) -> void:
 		GameData.minerals_found[id] = true
 	if Net.is_guest():
 		GameData.items[id] += count  # 낙관적 반영, 통계 브로드캐스트로 수렴
-		_req_gain.rpc_id(1, id, count)
+		netsync._req_gain.rpc_id(1, id, count)
 		return
 	GameData.items[id] += count
 	if Net.is_host():
-		_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_gain(id: String, count: int) -> void:
-	if not Net.is_host():
-		return
-	if GameData.items.has(id) and count > 0 and count <= 50:
-		GameData.items[id] += count
-		if id.begins_with("fish_"):
-			GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + count
-		_broadcast_stats()
+		netsync._broadcast_stats()
 
 
 # 요리/먹기 — 멀티에서는 호스트가 재고를 확정한다 (에너지는 각자)
@@ -3418,17 +3160,9 @@ func do_cook(id: String) -> void:
 	hud.show_message("'%s' 완성!" % GameData.ITEMS[id].name)
 	gain_skill("cook", 8.0)
 	if Net.is_guest():
-		_req_cook.rpc_id(1, id)
+		netsync._req_cook.rpc_id(1, id)
 	elif Net.is_host():
-		_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_cook(id: String) -> void:
-	if not Net.is_host():
-		return
-	if GameData.RECIPES.has(id) and GameData.cook(id):
-		_broadcast_stats()
+		netsync._broadcast_stats()
 
 
 # ---- 연금술 (집 안 조합대) ----
@@ -3529,90 +3263,17 @@ func do_eat(id: String) -> void:
 	Sound.play_sfx("sfx_harvest")
 	hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
 	if Net.is_guest():
-		_req_eat.rpc_id(1, id)
+		netsync._req_eat.rpc_id(1, id)
 	elif Net.is_host():
-		_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_eat(id: String) -> void:
-	if not Net.is_host():
-		return
-	if GameData.RECIPES.has(id) and int(GameData.items[id]) > 0:
-		GameData.items[id] -= 1
-		_broadcast_stats()
+		netsync._broadcast_stats()
 
 
 # 집 꾸미기 변경 동기화: 가구 배치 목록 + 돈 변화(구입/판매)를 호스트가 확정한다
 func sync_furniture(money_delta: int) -> void:
 	if Net.is_guest():
-		_req_furniture.rpc_id(1, JSON.stringify(GameData.furniture), money_delta)
+		netsync._req_furniture.rpc_id(1, JSON.stringify(GameData.furniture), money_delta)
 	elif Net.is_host():
-		_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_furniture(furn_json: String, money_delta: int) -> void:
-	if not Net.is_host():
-		return
-	var arr: Variant = JSON.parse_string(furn_json)
-	if typeof(arr) != TYPE_ARRAY or absi(money_delta) > 1000:
-		return
-	GameData.apply_furniture_data(arr)
-	GameData.money += money_delta
-	_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_gift(npc_id: String, kind: String, item_id: String) -> void:
-	if not Net.is_host():
-		return
-	# 게스트가 직접 고른 품목을 차감한다
-	if kind == "produce" and int(GameData.produce.get(item_id, 0)) > 0:
-		GameData.produce[item_id] -= 1
-	elif kind == "item" and int(GameData.items.get(item_id, 0)) > 0:
-		GameData.items[item_id] -= 1
-	else:
-		return
-	GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
-	_broadcast_stats()
-
-
-@rpc("any_peer", "reliable")
-func _req_quest(op: String) -> void:
-	if not Net.is_host():
-		return
-	if op == "accept" and not GameData.quest.is_empty():
-		GameData.quest.accepted = true
-	elif op == "turnin" and not GameData.quest.is_empty():
-		var q: Dictionary = GameData.quest
-		var iid: String = str(q.item)
-		if GameData.ingredient_count(iid) >= int(q.qty):
-			GameData.consume_ingredient(iid, int(q.qty))
-			GameData.money += int(q.reward)
-			GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
-			GameData.quest = {}
-	_broadcast_stats()
-
-
-@rpc("authority", "reliable")
-func _net_new_day(json: String, title_text: String, body: String) -> void:
-	var d: Variant = JSON.parse_string(json)
-	if typeof(d) != TYPE_DICTIONARY:
-		return
-	var my_pos := player.position
-	for a in animals:
-		a.queue_free()
-	animals.clear()
-	_apply_save(d)
-	player.position = my_pos
-	GameData.tutorial = {"active": false}
-	GameData.unlock_all_tools()
-	GameData.energy = GameData.ENERGY_MAX
-	_spawn_objects()
-	_apply_season_visuals()
-	summary.open(title_text, body)
-	queue_redraw()
+		netsync._broadcast_stats()
 
 
 # ---- 다른 창에서 부르는 스토리 창구 ----

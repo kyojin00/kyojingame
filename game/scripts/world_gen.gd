@@ -457,7 +457,7 @@ func _spawn_bugs() -> void:
 			continue
 		for i in (m.STAR_FIREFLY_COUNT if (starry and light_bug) else 3):
 			var bnode: Node2D = preload("res://scripts/bug.gd").new()
-			bnode.main = self
+			bnode.main = m
 			bnode.bug_id = bid
 			bnode.night_only = bool(cond.night)
 			bnode.position = Vector2(randi_range(2, m.MAP_W - 2) * m.TILE,

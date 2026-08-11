@@ -117,7 +117,7 @@ func _talk_to(npc: Node2D) -> void:
 		line = def.get("secret100", line)
 		m.gain_legend("memory_piece")
 		if Net.is_host():
-			m._broadcast_stats()
+			m.netsync._broadcast_stats()
 	var choices := [
 		["선물하기", _open_gift_picker.bind(npc.id)],
 		["대화 끝", null],
@@ -378,7 +378,7 @@ func _finish_festival(bonus := 1.0, extra := "") -> void:
 	m.hud.quest_toast(str(f.name))
 	m.hud.reward_toast("%dG" % money, m.tex["icon_coin"])
 	if Net.is_host():
-		m._broadcast_stats()
+		m.netsync._broadcast_stats()
 	m.save_now()
 	m.dialog.open(str(f.name), "%s%s\n\n상금 %dG를 받았다.\n\n내년에도 또 만나자!"
 		% [extra, "\n" if extra != "" else "", money], [["좋았어!", null]],
@@ -470,11 +470,11 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 		return
 	var before := int(GameData.affinity[npc_id])
 	if Net.is_guest():
-		m._req_gift.rpc_id(1, npc_id, kind, item_id)  # 호스트가 차감/가산 후 전파
+		m.netsync._req_gift.rpc_id(1, npc_id, kind, item_id)  # 호스트가 차감/가산 후 전파
 	GameData.affinity[npc_id] = before + 10
 	Sound.play_sfx("sfx_heart")
 	if Net.is_host():
-		m._broadcast_stats()
+		m.netsync._broadcast_stats()
 	m.dialog.set_portrait(_npc_portrait(npc_id, true))
 	var body := "%s을(를) 선물했다! 정말 좋아한다. ♥" % gift_name
 	if before < 50 and before + 10 >= 50:
@@ -519,9 +519,9 @@ func _open_quest_board() -> void:
 func _accept_quest(i: int) -> void:
 	GameData.accept_offer(i)
 	if Net.is_guest():
-		m._req_quest.rpc_id(1, "accept")
+		m.netsync._req_quest.rpc_id(1, "accept")
 	elif Net.is_host():
-		m._broadcast_stats()
+		m.netsync._broadcast_stats()
 	m.save_now()
 	m.dialog.set_body("의뢰를 수락했다!\n%s %d개를 모아서 다시 오자." % [
 		GameData.item_display_name(str(GameData.quest.item)), int(GameData.quest.qty)])
@@ -542,6 +542,6 @@ func _turn_in_quest() -> void:
 	GameData.quest = {}
 	m.save_now()
 	if Net.is_guest():
-		m._req_quest.rpc_id(1, "turnin")
+		m.netsync._req_quest.rpc_id(1, "turnin")
 	elif Net.is_host():
-		m._broadcast_stats()
+		m.netsync._broadcast_stats()

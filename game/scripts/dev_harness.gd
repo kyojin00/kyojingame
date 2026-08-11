@@ -979,7 +979,7 @@ func _mp_tick() -> void:
 			# 게스트가 민 변경이 호스트를 거쳐 되돌아오는가
 			m.player.position = Vector2(MP_TILE.x * m.TILE + 16, (MP_TILE.y + 1) * m.TILE + 16)
 			GameData.tool = "hoe"
-			m._req_tool.rpc_id(1, MP_TILE.x, MP_TILE.y, "hoe", "",
+			m.netsync._req_tool.rpc_id(1, MP_TILE.x, MP_TILE.y, "hoe", "",
 				int(m.player.position.x), int(m.player.position.y))
 		330:
 			var g: Dictionary = m.grid[MP_TILE.y][MP_TILE.x]
