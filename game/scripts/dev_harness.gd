@@ -684,14 +684,14 @@ func _debug_tick() -> void:
 				" (한 번 놓쳐도 계속=", alive_after_1, ")")
 			m.fishing_ui.finished.disconnect(fin)
 			# 화면용: 황금잉어 판정을 한 번 맞힌 상태로 띄워 둔다
-			m.fishing_ui.start(34.0, 3, 1.5, str(GameData.FISH_HINT["fish_golden"]))
+			m.fishing_ui.start(34.0, 3, 1.5, "낚싯대가 휜다!!!")
 			m.fishing_ui.zone_x = 0.0
 			m.fishing_ui.zone_w = m.fishing_ui.BAR_W
 			m.fishing_ui._input(ev_hook)
 		368:
 			_save_shot("_fishing.png")
 			m.fishing_ui.visible = false
-			m.pending_fish = []
+			m.pending_fish = {}
 		364:
 			# 동굴 층: 유형이 실제로 섞여 나오고, 계단/상자가 늘 걸어 닿는 곳에 있는가
 			m.cave.main = m
@@ -957,6 +957,47 @@ func _debug_tick() -> void:
 			print("PERF_BREAKDOWN: ", line)
 			print("PERF_DRAWCALLS_OK=", calls < 2500, " 콜=", int(calls))
 			print("PERF_PROCESS_OK=", proc_us < 8000.0, " us=", "%.0f" % proc_us)
+		391:
+			# 표에 한 줄 넣고 아이콘이나 아이템 정의를 빠뜨리면 조용히 사라진다.
+			# (그림이 없으면 칸이 그냥 비고, 어서션이 없으면 한참 뒤에야 안다)
+			var missing: Array[String] = []
+			for fid: String in GameData.FISH_IDS:
+				if not GameData.ITEMS.has(fid):
+					missing.append("ITEMS:" + fid)
+				if not m.tex.has(fid) or m.tex[fid] == null:
+					missing.append("그림:" + fid)
+			for rid: String in GameData.RECIPE_IDS:
+				if not GameData.ITEMS.has(rid):
+					missing.append("ITEMS:" + rid)
+				if not m.tex.has(rid) or m.tex[rid] == null:
+					missing.append("그림:" + rid)
+				for need: String in GameData.RECIPES[rid].needs:
+					if not (GameData.CROPS.has(need) or GameData.ITEMS.has(need)):
+						missing.append("재료:%s<-%s" % [rid, need])
+			for cid: String in GameData.CROP_IDS:
+				if not m.tex.has("mature_" + cid) or m.tex["mature_" + cid] == null:
+					missing.append("그림:mature_" + cid)
+			print("CONTENT_OK=", missing.is_empty(),
+				" 물고기=", GameData.FISH_IDS.size(),
+				" 요리=", GameData.RECIPE_IDS.size(),
+				" 작물=", GameData.CROP_IDS.size(), " 빠진것=", missing)
+			# 계절마다 낚을 것과 심을 것이 실제로 있는가 (한 계절이 비면 그 달이 죽는다)
+			var per_season: Array[String] = []
+			var thin := false
+			for s in range(4):
+				var crops := 0
+				for cid: String in GameData.CROP_IDS:
+					if s in GameData.CROPS[cid].seasons:
+						crops += 1
+				var fishes := 0
+				for f: Dictionary in GameData.FISH:
+					var ss: Array = f.seasons
+					if ss.is_empty() or s in ss:
+						fishes += 1
+				per_season.append("%s 작물%d 물고기%d" % [GameData.SEASON_NAMES[s], crops, fishes])
+				if crops < 5 or fishes < 6:
+					thin = true
+			print("SEASON_CONTENT_OK=", not thin, " ", per_season)
 		392: get_tree().quit()
 
 

@@ -32,12 +32,31 @@ const CROPS := {
 	"eggplant": {"name": "가지", "seed_price": 45, "sell_price": 120, "grow_days": 3, "seasons": [FALL]},
 	"cabbage": {"name": "배추", "seed_price": 70, "sell_price": 200, "grow_days": 5, "seasons": [FALL]},
 	"winter_radish": {"name": "겨울무", "seed_price": 60, "sell_price": 180, "grow_days": 4, "seasons": [WINTER]},
+	# 봄
+	"spinach": {"name": "시금치", "seed_price": 35, "sell_price": 95, "grow_days": 2, "seasons": [SPRING]},
+	"onion": {"name": "양파", "seed_price": 55, "sell_price": 150, "grow_days": 4, "seasons": [SPRING]},
+	"pea": {"name": "완두", "seed_price": 45, "sell_price": 130, "grow_days": 3, "seasons": [SPRING, SUMMER]},
+	# 여름
+	"pepper": {"name": "고추", "seed_price": 65, "sell_price": 175, "grow_days": 4, "seasons": [SUMMER]},
+	"melon": {"name": "참외", "seed_price": 110, "sell_price": 330, "grow_days": 6, "seasons": [SUMMER]},
+	"garlic": {"name": "마늘", "seed_price": 50, "sell_price": 140, "grow_days": 3, "seasons": [SUMMER]},
+	# 가을
+	"sweet_potato": {"name": "고구마", "seed_price": 80, "sell_price": 230, "grow_days": 5, "seasons": [FALL]},
+	"bean": {"name": "콩", "seed_price": 55, "sell_price": 155, "grow_days": 4, "seasons": [FALL]},
+	"rice": {"name": "벼", "seed_price": 90, "sell_price": 260, "grow_days": 6, "seasons": [FALL]},
+	# 겨울 — 추운 계절은 종류가 적은 대신 값이 좋다
+	"leek": {"name": "대파", "seed_price": 55, "sell_price": 165, "grow_days": 3, "seasons": [WINTER]},
+	"beet": {"name": "비트", "seed_price": 85, "sell_price": 250, "grow_days": 5, "seasons": [WINTER]},
+	"snow_cabbage": {"name": "눈배추", "seed_price": 130, "sell_price": 400, "grow_days": 7, "seasons": [WINTER]},
+	# 사계절 — 값은 싸지만 언제든 심을 수 있다
+	"herb_leaf": {"name": "약초잎", "seed_price": 40, "sell_price": 105, "grow_days": 3, "seasons": [SPRING, SUMMER, FALL, WINTER]},
 }
 const CROP_IDS := [
-	"potato", "carrot", "strawberry",
-	"tomato", "corn", "watermelon",
-	"pumpkin", "eggplant", "cabbage",
-	"winter_radish",
+	"potato", "carrot", "strawberry", "spinach", "onion", "pea",
+	"tomato", "corn", "watermelon", "pepper", "melon", "garlic",
+	"pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice",
+	"winter_radish", "leek", "beet", "snow_cabbage",
+	"herb_leaf",
 ]
 
 const ENERGY_MAX := 100.0  # 체력 (동굴 전투용. 밖에서는 천천히 자연 회복)
@@ -837,9 +856,30 @@ const ITEMS := {
 	"egg": {"name": "달걀", "sell": 60},
 	"milk": {"name": "우유", "sell": 120},
 	"fish_crucian": {"name": "붕어", "sell": 40},
+	"fish_minnow": {"name": "피라미", "sell": 30},
+	"fish_loach": {"name": "미꾸라지", "sell": 55},
+	"fish_bitterling": {"name": "납자루", "sell": 45},
 	"fish_carp": {"name": "잉어", "sell": 60},
+	"fish_sweetfish": {"name": "은어", "sell": 110},
+	"fish_trout": {"name": "산천어", "sell": 140},
+	"fish_mandarin": {"name": "쏘가리", "sell": 160},
 	"fish_catfish": {"name": "메기", "sell": 90},
+	"fish_eel": {"name": "뱀장어", "sell": 180},
+	"fish_snakehead": {"name": "가물치", "sell": 200},
+	"fish_crab": {"name": "참게", "sell": 130},
+	"fish_salmon": {"name": "연어", "sell": 220},
+	"fish_rainbow": {"name": "무지개송어", "sell": 190},
+	"fish_smelt": {"name": "빙어", "sell": 70},
+	"fish_icecarp": {"name": "얼음잉어", "sell": 150},
+	"fish_lenok": {"name": "열목어", "sell": 240},
+	"fish_mistfish": {"name": "안개무늬", "sell": 170},
+	"fish_stormjack": {"name": "폭풍전갱이", "sell": 260},
+	"fish_moonfish": {"name": "달빛어", "sell": 320},
+	"fish_starcarp": {"name": "별잉어", "sell": 380},
+	"fish_ghost": {"name": "유령물고기", "sell": 420},
 	"fish_golden": {"name": "황금잉어", "sell": 300},
+	"fish_king": {"name": "무지개 왕송어", "sell": 500},
+	"fish_dragon": {"name": "이무기", "sell": 800},
 	"ore": {"name": "광석", "sell": 50},
 	"gem": {"name": "보석", "sell": 220},
 	"star_shard": {"name": "별빛 조각", "sell": 300},
@@ -853,6 +893,26 @@ const ITEMS := {
 	"dish_salad": {"name": "치즈 샐러드", "sell": 170},
 	"dish_punch": {"name": "수박화채", "sell": 240},
 	"dish_eggplant": {"name": "가지볶음", "sell": 120},
+	"dish_pickle": {"name": "무김치", "sell": 140},
+	"dish_ratatouille": {"name": "야채볶음", "sell": 260},
+	"dish_pumpkin_soup": {"name": "호박죽", "sell": 230},
+	"dish_corn_salad": {"name": "옥수수 샐러드", "sell": 210},
+	"dish_sweet_potato": {"name": "군고구마", "sell": 160},
+	"dish_bean_rice": {"name": "콩밥", "sell": 200},
+	"dish_rice_cake": {"name": "인절미", "sell": 290},
+	"dish_melon_ice": {"name": "참외 빙수", "sell": 270},
+	"dish_onion_soup": {"name": "양파 수프", "sell": 190},
+	"dish_garlic_bread": {"name": "마늘빵", "sell": 150},
+	"dish_spinach_saute": {"name": "시금치 볶음", "sell": 155},
+	"dish_sashimi": {"name": "회", "sell": 300},
+	"dish_eel_rice": {"name": "장어덮밥", "sell": 420},
+	"dish_crab_soup": {"name": "게탕", "sell": 340},
+	"dish_salmon_steak": {"name": "연어 스테이크", "sell": 460},
+	"dish_smelt_fry": {"name": "빙어 튀김", "sell": 240},
+	"dish_fish_soup": {"name": "생선 맑은국", "sell": 180},
+	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 700},
+	"dish_moon_tea": {"name": "달빛차", "sell": 640},
+	"dish_feast": {"name": "한상차림", "sell": 1100},
 	# 채집물/곤충
 	"forage_berry": {"name": "산딸기", "sell": 40},
 	"forage_herb": {"name": "약초", "sell": 60},
@@ -876,9 +936,24 @@ const ITEMS := {
 	"potion_moon": {"name": "달빛의 물", "sell": 400},
 	"sludge": {"name": "탁한 앙금", "sell": 5},
 }
-const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
+const FISH_IDS := ["fish_crucian", "fish_minnow", "fish_loach", "fish_bitterling",
+	"fish_carp", "fish_sweetfish", "fish_trout", "fish_mandarin", "fish_catfish",
+	"fish_eel", "fish_snakehead", "fish_crab", "fish_salmon", "fish_rainbow",
+	"fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish", "fish_stormjack",
+	"fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden", "fish_king", "fish_dragon"]
+const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
+	"fish_bitterling", "fish_carp", "fish_sweetfish", "fish_trout", "fish_mandarin",
+	"fish_catfish", "fish_eel", "fish_snakehead", "fish_crab", "fish_salmon",
+	"fish_rainbow", "fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish",
+	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
+	"fish_king", "fish_dragon",
 	"ore", "gem", "star_shard", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
+	"dish_pickle", "dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad",
+	"dish_sweet_potato", "dish_bean_rice", "dish_rice_cake", "dish_melon_ice",
+	"dish_onion_soup", "dish_garlic_bread", "dish_spinach_saute", "dish_sashimi",
+	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
+	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -938,12 +1013,46 @@ const REAGENTS := {
 	"eggplant": {"earth": 1, "water": 1},
 	"cabbage": {"life": 2},
 	"winter_radish": {"earth": 2, "water": 1},
+	"spinach": {"life": 1, "water": 1},
+	"onion": {"earth": 1, "fire": 1},
+	"pea": {"life": 2, "earth": 1},
+	"pepper": {"fire": 3},
+	"melon": {"water": 2, "life": 1},
+	"garlic": {"fire": 2, "earth": 1},
+	"sweet_potato": {"earth": 3},
+	"bean": {"life": 2, "earth": 1},
+	"rice": {"life": 3, "water": 1},
+	"leek": {"life": 1, "earth": 2},
+	"beet": {"earth": 2, "fire": 1},
+	"snow_cabbage": {"life": 3, "water": 2},
+	"herb_leaf": {"life": 2, "light": 1},
 	# 축산물 · 물고기
 	"egg": {"life": 2},
 	"milk": {"life": 1, "water": 1},
 	"fish_crucian": {"water": 2},
+	"fish_minnow": {"water": 1},
+	"fish_loach": {"water": 2, "earth": 1},
+	"fish_bitterling": {"water": 1, "life": 1},
 	"fish_carp": {"water": 2, "life": 1},
+	"fish_sweetfish": {"water": 2, "light": 1},
+	"fish_trout": {"water": 2, "life": 2},
+	"fish_mandarin": {"water": 2, "fire": 1},
 	"fish_catfish": {"water": 3, "earth": 1},
+	"fish_eel": {"water": 3, "life": 1},
+	"fish_snakehead": {"water": 3, "earth": 2},
+	"fish_crab": {"water": 1, "earth": 3},
+	"fish_salmon": {"water": 3, "life": 2},
+	"fish_rainbow": {"water": 2, "light": 2},
+	"fish_smelt": {"water": 2, "earth": 1},
+	"fish_icecarp": {"water": 3, "earth": 1},
+	"fish_lenok": {"water": 3, "life": 1, "earth": 1},
+	"fish_mistfish": {"water": 2, "light": 1, "earth": 1},
+	"fish_stormjack": {"water": 3, "fire": 2},
+	"fish_moonfish": {"water": 2, "light": 3},
+	"fish_starcarp": {"water": 2, "light": 4},
+	"fish_ghost": {"water": 2, "light": 2, "life": 2},
+	"fish_king": {"water": 4, "light": 2, "life": 2},
+	"fish_dragon": {"water": 4, "fire": 2, "light": 2},
 	# 광물
 	"ore": {"earth": 2, "fire": 2},
 	"gem": {"light": 2, "fire": 1},
@@ -1181,19 +1290,48 @@ func breed_next_cost() -> Array:
 
 # ---- 요리: 재료(작물/아이템) -> 요리 아이템. energy = 먹었을 때 회복량 ----
 const RECIPES := {
+	# ---- 밭에서 나오는 것 ----
 	"dish_baked_potato": {"needs": {"potato": 2}, "energy": 30},
 	"dish_soup": {"needs": {"potato": 1, "carrot": 2}, "energy": 45},
 	"dish_jam": {"needs": {"strawberry": 3}, "energy": 35},
 	"dish_cornbread": {"needs": {"corn": 2}, "energy": 50},
-	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40},
-	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65},
-	"dish_pie": {"needs": {"pumpkin": 1, "egg": 1}, "energy": 80},
+	"dish_eggplant": {"needs": {"eggplant": 2}, "energy": 40},
 	"dish_salad": {"needs": {"cabbage": 1, "milk": 1}, "energy": 55},
 	"dish_punch": {"needs": {"watermelon": 1, "strawberry": 1}, "energy": 60},
-	"dish_eggplant": {"needs": {"eggplant": 2}, "energy": 40},
+	"dish_pie": {"needs": {"pumpkin": 1, "egg": 1}, "energy": 80},
+	"dish_pickle": {"needs": {"winter_radish": 2, "carrot": 1}, "energy": 45},
+	"dish_ratatouille": {"needs": {"eggplant": 1, "tomato": 1, "pepper": 1}, "energy": 90},
+	"dish_pumpkin_soup": {"needs": {"pumpkin": 1, "milk": 1}, "energy": 75},
+	"dish_corn_salad": {"needs": {"corn": 1, "cabbage": 1, "tomato": 1}, "energy": 70},
+	"dish_sweet_potato": {"needs": {"sweet_potato": 2}, "energy": 55},
+	"dish_bean_rice": {"needs": {"bean": 2, "rice": 1}, "energy": 65},
+	"dish_rice_cake": {"needs": {"rice": 2, "bean": 1}, "energy": 85},
+	"dish_melon_ice": {"needs": {"melon": 1, "milk": 1}, "energy": 80},
+	"dish_onion_soup": {"needs": {"onion": 2, "milk": 1}, "energy": 60},
+	"dish_garlic_bread": {"needs": {"garlic": 1, "corn": 1}, "energy": 50},
+	"dish_spinach_saute": {"needs": {"spinach": 2, "garlic": 1}, "energy": 55},
+	# ---- 물에서 나오는 것 ----
+	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40},
+	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65},
+	"dish_sashimi": {"needs": {"fish_trout": 1, "winter_radish": 1}, "energy": 85},
+	"dish_eel_rice": {"needs": {"fish_eel": 1, "rice": 1}, "energy": 110},
+	"dish_crab_soup": {"needs": {"fish_crab": 1, "onion": 1}, "energy": 95},
+	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120},
+	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70},
+	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60},
+	# ---- 귀한 것 ----
+	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160},
+	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150},
+	"dish_feast": {"needs": {"fish_king": 1, "pumpkin": 1, "rice": 2}, "energy": 220},
 }
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
-	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant"]
+	"dish_eggplant", "dish_salad", "dish_punch", "dish_pie", "dish_pickle",
+	"dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad", "dish_sweet_potato",
+	"dish_bean_rice", "dish_rice_cake", "dish_melon_ice", "dish_onion_soup",
+	"dish_garlic_bread", "dish_spinach_saute",
+	"dish_grilled_fish", "dish_stew", "dish_sashimi", "dish_eel_rice", "dish_crab_soup",
+	"dish_salmon_steak", "dish_smelt_fry", "dish_fish_soup",
+	"dish_golden_roast", "dish_moon_tea", "dish_feast"]
 var recipes_cooked := {}  # 도감: id -> 만든 횟수
 # 최후의 연금술(유니콘의 뿔)을 완성했는가 — 엔딩 후에도 자유 플레이 계속
 var ending_seen := false
@@ -1222,9 +1360,9 @@ func note_progress() -> Dictionary:
 		total += 1
 		if int(crops_harvested.get(id, 0)) > 0:
 			filled += 1
-	for f in FISH:
+	for fid in FISH_IDS:
 		total += 1
-		if int(fish_caught.get(f[0], 0)) > 0:
+		if int(fish_caught.get(fid, 0)) > 0:
 			filled += 1
 	for mid in MOBS:
 		total += 1
@@ -1337,17 +1475,104 @@ func cook(id: String) -> bool:
 # [id, 나올 확률(무게), 판정 구간 너비, 성공 횟수, 커서 속도 배율]
 # 귀한 물고기일수록 구간이 좁고 · 여러 번 맞혀야 하고 · 커서가 빠르다.
 # 황금잉어는 세 번을 이어서 맞혀야 올라온다.
+# ---- 물고기 ----
+#
+# 언제 무는지가 물고기마다 다르다. 그래야 「오늘은 뭐가 물까」가 생긴다.
+#   seasons  빈 배열이면 사계절
+#   time     "" 아무 때 / "morning" 6~11시 / "day" 11~18시 / "night" 18시~새벽
+#   weather  빈 배열이면 날씨 무관
+# 미니게임 쪽 값 —
+#   zone  초록 구간의 폭(작을수록 어렵다) · stages 몇 번 맞춰야 하는가
+#   speed 찌가 움직이는 빠르기 · w 같은 조건 안에서의 흔한 정도
 const FISH := [
-	["fish_crucian", 0.45, 96.0, 1, 1.0],
-	["fish_carp", 0.30, 72.0, 2, 1.12],
-	["fish_catfish", 0.18, 54.0, 2, 1.3],
-	["fish_golden", 0.07, 34.0, 3, 1.5],
+	# 사계절 — 아무 때나 무는 것들
+	{"id": "fish_crucian", "w": 1.00, "zone": 96.0, "stages": 1, "speed": 1.00,
+		"seasons": [], "time": "", "weather": [], "hint": "가볍게 톡 —"},
+	{"id": "fish_minnow", "w": 0.90, "zone": 100.0, "stages": 1, "speed": 0.95,
+		"seasons": [], "time": "", "weather": [], "hint": "톡, 톡 —"},
+	{"id": "fish_loach", "w": 0.70, "zone": 88.0, "stages": 1, "speed": 1.15,
+		"seasons": [SPRING, SUMMER, FALL], "time": "", "weather": [], "hint": "꿈틀거린다"},
+	# 봄
+	{"id": "fish_bitterling", "w": 0.65, "zone": 92.0, "stages": 1, "speed": 1.00,
+		"seasons": [SPRING], "time": "", "weather": [], "hint": "가볍게 톡 —"},
+	{"id": "fish_carp", "w": 0.55, "zone": 84.0, "stages": 2, "speed": 1.12,
+		"seasons": [SPRING, SUMMER], "time": "", "weather": [], "hint": "제법 당긴다!"},
+	{"id": "fish_sweetfish", "w": 0.40, "zone": 70.0, "stages": 2, "speed": 1.30,
+		"seasons": [SPRING], "time": "morning", "weather": [], "hint": "빠르다!"},
+	{"id": "fish_trout", "w": 0.35, "zone": 66.0, "stages": 2, "speed": 1.35,
+		"seasons": [SPRING, WINTER], "time": "morning", "weather": [], "hint": "빠르다!"},
+	# 여름
+	{"id": "fish_mandarin", "w": 0.32, "zone": 58.0, "stages": 2, "speed": 1.45,
+		"seasons": [SUMMER], "time": "day", "weather": [], "hint": "홱 채간다!"},
+	{"id": "fish_catfish", "w": 0.45, "zone": 54.0, "stages": 2, "speed": 1.30,
+		"seasons": [SUMMER, FALL], "time": "night", "weather": [], "hint": "묵직하다!!"},
+	{"id": "fish_eel", "w": 0.30, "zone": 50.0, "stages": 3, "speed": 1.40,
+		"seasons": [SUMMER], "time": "night", "weather": [WEATHER_RAIN], "hint": "미끄럽게 빠져나간다!!"},
+	{"id": "fish_snakehead", "w": 0.25, "zone": 48.0, "stages": 3, "speed": 1.50,
+		"seasons": [SUMMER, FALL], "time": "night", "weather": [], "hint": "낚싯대가 휜다!!!"},
+	# 가을
+	{"id": "fish_crab", "w": 0.45, "zone": 78.0, "stages": 1, "speed": 0.85,
+		"seasons": [FALL], "time": "", "weather": [], "hint": "게걸음처럼 옆으로 —"},
+	{"id": "fish_salmon", "w": 0.30, "zone": 52.0, "stages": 3, "speed": 1.50,
+		"seasons": [FALL], "time": "morning", "weather": [], "hint": "거슬러 오른다!!"},
+	{"id": "fish_rainbow", "w": 0.30, "zone": 56.0, "stages": 2, "speed": 1.40,
+		"seasons": [SPRING, FALL], "time": "", "weather": [WEATHER_RAIN], "hint": "무지개빛이 스친다!"},
+	# 겨울
+	{"id": "fish_smelt", "w": 0.75, "zone": 90.0, "stages": 1, "speed": 1.05,
+		"seasons": [WINTER], "time": "", "weather": [], "hint": "가볍게 톡 —"},
+	{"id": "fish_icecarp", "w": 0.40, "zone": 68.0, "stages": 2, "speed": 1.25,
+		"seasons": [WINTER], "time": "", "weather": [], "hint": "차갑게 당긴다"},
+	{"id": "fish_lenok", "w": 0.25, "zone": 46.0, "stages": 3, "speed": 1.55,
+		"seasons": [WINTER], "time": "", "weather": [WEATHER_SNOW], "hint": "낚싯대가 휜다!!!"},
+	# 날씨가 만드는 것들
+	{"id": "fish_mistfish", "w": 0.50, "zone": 60.0, "stages": 2, "speed": 1.35,
+		"seasons": [], "time": "", "weather": [WEATHER_FOG], "hint": "안개 속에서 뭔가가 —"},
+	{"id": "fish_stormjack", "w": 0.50, "zone": 44.0, "stages": 3, "speed": 1.60,
+		"seasons": [], "time": "", "weather": [WEATHER_STORM], "hint": "물살을 가른다!!!"},
+	{"id": "fish_moonfish", "w": 0.40, "zone": 42.0, "stages": 3, "speed": 1.60,
+		"seasons": [], "time": "night", "weather": [WEATHER_STAR], "hint": "달빛이 흔들린다!!"},
+	{"id": "fish_starcarp", "w": 0.30, "zone": 40.0, "stages": 3, "speed": 1.65,
+		"seasons": [], "time": "", "weather": [WEATHER_STAR], "hint": "별이 물속에서 —!!!"},
+	{"id": "fish_ghost", "w": 0.20, "zone": 36.0, "stages": 3, "speed": 1.70,
+		"seasons": [], "time": "night", "weather": [WEATHER_FOG], "hint": "아무 무게도 느껴지지 않는다..."},
+	# 어디서나 아주 드물게
+	{"id": "fish_golden", "w": 0.07, "zone": 34.0, "stages": 3, "speed": 1.50,
+		"seasons": [], "time": "", "weather": [], "hint": "낚싯대가 휜다!!!"},
+	{"id": "fish_king", "w": 0.04, "zone": 30.0, "stages": 4, "speed": 1.75,
+		"seasons": [], "time": "", "weather": [], "hint": "이건... 뭔가 다르다!!!"},
+	{"id": "fish_dragon", "w": 0.03, "zone": 26.0, "stages": 4, "speed": 1.90,
+		"seasons": [], "time": "night", "weather": [WEATHER_STORM], "hint": "물이 통째로 솟구친다!!!!"},
 ]
-# 물고기가 얼마나 세게 무는지 (판정 전 귀띔)
-const FISH_HINT := {
-	"fish_crucian": "가볍게 톡 —", "fish_carp": "제법 당긴다!",
-	"fish_catfish": "묵직하다!!", "fish_golden": "낚싯대가 휜다!!!",
-}
+
+
+# 지금이 어느 때인가 — 물고기 조건에 쓴다.
+func fish_time_key() -> String:
+	var h := minutes / 60.0
+	if h < 11.0:
+		return "morning"
+	if h < 18.0:
+		return "day"
+	return "night"
+
+
+# 지금 물 수 있는 물고기만 추린다 (흔한 것 → 드문 것 순).
+func fish_now() -> Array:
+	var s := season()
+	var w := weather_today()
+	var t := fish_time_key()
+	var out: Array = []
+	for f: Dictionary in FISH:
+		var seasons: Array = f.seasons
+		if not seasons.is_empty() and s not in seasons:
+			continue
+		var weathers: Array = f.weather
+		if not weathers.is_empty() and w not in weathers:
+			continue
+		if str(f.time) != "" and str(f.time) != t:
+			continue
+		out.append(f)
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.w) > float(b.w))
+	return out
 
 var items := {}
 var fish_caught := {}  # 도감용 누적 기록
@@ -1712,9 +1937,13 @@ func quest_pool(kind: String) -> Array:
 				if season() in CROPS[id].seasons:
 					out.append(id)
 		"fish":
-			for f in FISH:
-				if str(f[0]) != "fish_golden":   # 전설급은 의뢰로 내지 않는다
-					out.append(str(f[0]))
+			# 전설급은 의뢰로 내지 않는다 — 못 잡아서 표가 막힌다
+			var legendary := ["fish_golden", "fish_king", "fish_dragon",
+				"fish_ghost", "fish_starcarp", "fish_moonfish"]
+			for f: Dictionary in FISH:
+				var fid := str(f.id)
+				if fid not in legendary:
+					out.append(fid)
 		"forage":
 			out = FORAGE_IDS + BUG_IDS
 		"mineral":
@@ -1779,15 +2008,22 @@ func quest_line() -> String:
 		mini(ingredient_count(id), int(quest.qty)), int(quest.qty)]
 
 
-func pick_fish() -> Array:
-	# 장비 행운이 높을수록 흔한 물고기 쪽 확률을 덜어 뒤쪽(희귀)으로 넘긴다
-	var r := randf() * (1.0 + total_luck() * 0.06)
+func pick_fish() -> Dictionary:
+	# 지금 조건에 맞는 것 중에서 고른다 (fish_now가 흔한 것부터 정렬해 준다).
+	var pool := fish_now()
+	if pool.is_empty():
+		return FISH[0]          # 조건이 다 어긋나는 일은 없지만, 붕어로 떨어뜨린다
+	var total := 0.0
+	for f: Dictionary in pool:
+		total += float(f.w)
+	# 행운이 높을수록 뽑기 값을 뒤(희귀)로 밀어 준다
+	var r: float = pow(randf(), 1.0 / (1.0 + total_luck() * 0.08)) * total
 	var acc := 0.0
-	for f in FISH:
-		acc += f[1]
+	for f: Dictionary in pool:
+		acc += float(f.w)
 		if r <= acc:
 			return f
-	return FISH[FISH.size() - 1]
+	return pool[pool.size() - 1]
 
 # 일별 통계 (결산 화면용, 매일 아침 리셋)
 var today_harvest := 0

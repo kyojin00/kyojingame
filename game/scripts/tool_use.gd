@@ -396,12 +396,12 @@ func use_tool() -> void:
 					m.fishing_state = ""
 					m.pending_fish = GameData.pick_fish()
 					# 철수 호감도 50+ 특전: 판정 구간 25% 확대
-					var zone: float = m.pending_fish[2]
+					var zone: float = float(m.pending_fish.zone)
 					if int(GameData.affinity["fisher"]) >= 50:
 						zone *= 1.25
 					# 귀한 물고기일수록 여러 번 · 좁게 · 빠르게 (game_data.FISH)
-					m.fishing_ui.start(zone, int(m.pending_fish[3]), float(m.pending_fish[4]),
-						str(GameData.FISH_HINT.get(str(m.pending_fish[0]), "")))
+					m.fishing_ui.start(zone, int(m.pending_fish.stages),
+						float(m.pending_fish.speed), str(m.pending_fish.hint))
 	# 멀티: 내 행동을 다른 플레이어에게 반영 (낚싯대는 로컬 진행)
 	if not m._remote_acting:
 		if Net.is_guest() and GameData.tool != "rod":

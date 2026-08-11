@@ -82,13 +82,25 @@ func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
 
+	# 지금 만들 수 있는 것을 위로 올린다. 요리가 서른 가지라 순서대로 두면
+	# 재료가 있는 것을 찾으려고 매번 끝까지 굴려야 한다.
+	var ready_ids: Array[String] = []
+	var rest_ids: Array[String] = []
+	for id: String in GameData.RECIPE_IDS:
+		if GameData.can_cook(id):
+			ready_ids.append(id)
+		else:
+			rest_ids.append(id)
+
 	var head := Label.new()
-	head.text = "요리 숙련 Lv.%d · 회복 +%d%%" % [GameData.skill_lv("cook"),
-		int(round((GameData.cook_energy_mult() - 1.0) * 100.0))]
+	head.text = "요리 숙련 Lv.%d · 회복 +%d%% · 지금 만들 수 있는 것 %d / %d" % [
+		GameData.skill_lv("cook"),
+		int(round((GameData.cook_energy_mult() - 1.0) * 100.0)),
+		ready_ids.size(), GameData.RECIPE_IDS.size()]
 	head.add_theme_color_override("font_color", Color(0.65, 0.85, 0.6))
 	items_box.add_child(head)
 
-	for id in GameData.RECIPE_IDS:
+	for id: String in ready_ids + rest_ids:
 		var def: Dictionary = GameData.ITEMS[id]
 		var rec: Dictionary = GameData.RECIPES[id]
 		var made := int(GameData.recipes_cooked.get(id, 0))

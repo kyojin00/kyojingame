@@ -56,6 +56,50 @@ function fish(body, belly, spark) {
   if (spark) { px(c, 11, 4, C.white); px(c, 12, 3, C.white); }
   return c;
 }
+// 물고기 25종을 한 함수로 찍는다. 모양 넷 x 색 x 무늬.
+//   kind  round 붕어형 · slim 송어형 · long 장어형 · flat 게
+//   mark  null · spots 점 · stripes 줄 · glow 빛나는 점
+function fishOf(kind, body, belly, mark, markCol) {
+  const c = newCanvas();
+  if (kind === 'long') {
+    // 뱀처럼 굽이치는 몸 — 두께는 얇게 두어야 장어로 보인다
+    for (let x = 2; x <= 13; x++) {
+      const cy = 8 + Math.round(Math.sin((x - 2) * 0.55) * 2.2);
+      px(c, x, cy - 1, body); px(c, x, cy, body); px(c, x, cy + 1, belly);
+    }
+    const hy = 8 + Math.round(Math.sin(0) * 2.2);
+    px(c, 2, hy - 2, body); px(c, 3, hy - 2, body);      // 머리
+    px(c, 3, hy - 1, C.line);                            // 눈
+    const ty = 8 + Math.round(Math.sin(11 * 0.55) * 2.2);
+    px(c, 14, ty - 2, body); px(c, 14, ty + 1, body);    // 꼬리지느러미
+  } else if (kind === 'flat') {
+    // 게 — 둥근 등딱지에 집게와 다리
+    ellipse(c, 8, 9, 5, 3, body);
+    rect(c, 2, 6, 2, 2, body); rect(c, 12, 6, 2, 2, body);   // 집게
+    px(c, 3, 5, body); px(c, 13, 5, body);
+    for (const x of [4, 6, 10, 12]) { px(c, x, 12, body); px(c, x, 13, belly); }
+    px(c, 6, 7, C.line); px(c, 10, 7, C.line);               // 눈
+    ellipse(c, 8, 10, 3, 1, belly);
+  } else {
+    const rx = kind === 'slim' ? 6 : 5, ry = kind === 'slim' ? 2 : 3;
+    ellipse(c, 8, 8, rx, ry, body);
+    rect(c, 8 + rx - 1, 6, 3, 1, body); rect(c, 8 + rx, 7, 2, 3, body);
+    rect(c, 8 + rx - 1, 10, 3, 1, body);                     // 꼬리
+    ellipse(c, 8, 10, rx - 1, ry - 1, belly);
+    rect(c, 7, 5, 3, 1, belly);                              // 등지느러미
+    px(c, 8 - rx + 1, 7, C.line);                            // 눈
+  }
+  if (mark === 'spots') {
+    for (const [x, y] of [[6, 7], [9, 9], [11, 7], [7, 10]]) px(c, x, y, markCol);
+  } else if (mark === 'stripes') {
+    // 줄은 둘만. 넷을 그으면 16px에서는 창살처럼 보인다
+    for (const x of [6, 9]) for (let y = 6; y <= 9; y++) if (c[y][x]) px(c, x, y, markCol);
+  } else if (mark === 'glow') {
+    for (const [x, y] of [[6, 7], [10, 8], [8, 6]]) px(c, x, y, markCol);
+    px(c, 12, 3, C.white); px(c, 13, 4, C.white);
+  }
+  return c;
+}
 function bowl(soup, rim) {
   const c = newCanvas();
   ellipse(c, 8, 8, 6, 2, soup);              // 국물
@@ -76,6 +120,36 @@ function jar(content) {
   rect(c, 4, 6, 8, 8, C.ice);                // 유리
   rect(c, 5, 8, 6, 5, content);              // 내용물
   px(c, 5, 7, C.white); px(c, 6, 7, C.white);
+  return c;
+}
+// 밥공기 — 소복이 담긴 밥에 고명 하나
+function riceBowl(rice, topping) {
+  const c = newCanvas();
+  ellipse(c, 8, 7, 5, 3, rice);
+  rect(c, 3, 8, 11, 4, C.blue2); rect(c, 4, 12, 9, 1, C.blue2); rect(c, 6, 13, 5, 1, C.blue2);
+  rect(c, 4, 8, 9, 1, C.ice);                // 그릇 테두리
+  ellipse(c, 8, 6, 3, 1, topping);
+  return c;
+}
+// 손잡이 달린 컵 — 차 · 빙수
+function cup(content, foam) {
+  const c = newCanvas();
+  rect(c, 4, 5, 8, 8, C.white);
+  rect(c, 5, 6, 6, 6, content);
+  rect(c, 5, 5, 6, 1, foam);
+  rect(c, 12, 7, 2, 1, C.white); px(c, 13, 8, C.white); rect(c, 12, 9, 2, 1, C.white);
+  rect(c, 4, 13, 8, 1, C.shadow);
+  return c;
+}
+// 여러 가지가 올라간 쟁반 — 한상차림
+function tray() {
+  const c = newCanvas();
+  rect(c, 1, 9, 14, 4, C.brown2); rect(c, 2, 13, 12, 1, C.brown);
+  ellipse(c, 4, 8, 2, 2, C.white); px(c, 4, 7, C.red);      // 밥
+  ellipse(c, 8, 8, 2, 2, C.green);                          // 나물
+  ellipse(c, 12, 8, 2, 2, C.gold);                          // 전
+  rect(c, 6, 5, 4, 1, C.orange);                            // 생선
+  px(c, 3, 4, C.white); px(c, 13, 4, C.white);
   return c;
 }
 function gemShape(col, col2) {
@@ -116,10 +190,34 @@ const ICONS = {
     rect(c, 5, 4, 1, 10, C.shadow);
     return c;
   },
-  fish_crucian: () => fish(C.grey, C.cream, false),
-  fish_carp:    () => fish(C.orange, C.cream, false),
-  fish_catfish: () => { const c = fish(C.brown2, C.brown, false); px(c, 3, 8, C.brown); px(c, 2, 9, C.brown); return c; },
-  fish_golden:  () => fish(C.gold, C.cream, true),
+  // ---- 물고기 25종 ----
+  fish_crucian:   () => fishOf('round', C.grey, C.cream, null, null),
+  fish_minnow:    () => fishOf('slim', C.ice, C.white, null, null),
+  fish_loach:     () => fishOf('long', C.brown2, C.brown, 'spots', C.line),
+  fish_bitterling:() => fishOf('round', C.pink, C.cream, 'stripes', C.blue2),
+  fish_carp:      () => fishOf('round', C.orange, C.cream, null, null),
+  fish_sweetfish: () => fishOf('slim', C.cyan, C.white, null, null),
+  fish_trout:     () => fishOf('slim', C.green2, C.cream, 'spots', C.red2),
+  fish_mandarin:  () => fishOf('round', C.gold2, C.cream, 'spots', C.brown2),
+  fish_catfish:   () => { const c = fishOf('round', C.brown2, C.brown, null, null);
+    px(c, 3, 8, C.brown); px(c, 2, 9, C.brown); return c; },   // 수염
+  fish_eel:       () => fishOf('long', C.green2, C.gold2, null, null),
+  fish_snakehead: () => fishOf('long', C.grey2, C.green, 'spots', C.line),
+  fish_crab:      () => fishOf('flat', C.red, C.orange, null, null),
+  fish_salmon:    () => fishOf('slim', C.orange2, C.pink, 'stripes', C.red2),
+  fish_rainbow:   () => fishOf('slim', C.green, C.pink, 'stripes', C.purple),
+  fish_smelt:     () => fishOf('slim', C.white, C.ice, null, null),
+  fish_icecarp:   () => fishOf('round', C.ice, C.white, 'stripes', C.blue),
+  fish_lenok:     () => fishOf('slim', C.blue2, C.cream, 'spots', C.line),
+  fish_mistfish:  () => fishOf('round', C.grey, C.white, 'stripes', C.grey2),
+  fish_stormjack: () => fishOf('slim', C.blue, C.ice, 'glow', C.gold),
+  fish_moonfish:  () => fishOf('round', C.purple, C.ice, 'glow', C.white),
+  fish_starcarp:  () => fishOf('round', C.blue2, C.ice, 'glow', C.gold),
+  fish_ghost:     () => fishOf('slim', C.ice, C.white, 'glow', C.cyan),
+  fish_golden:    () => fishOf('round', C.gold, C.cream, 'glow', C.white),
+  fish_king:      () => fishOf('slim', C.purple2, C.gold, 'stripes', C.gold),
+  fish_dragon:    () => { const c = fishOf('long', C.green2, C.gold, 'glow', C.red);
+    px(c, 1, 6, C.gold); px(c, 2, 5, C.gold); return c; },     // 뿔
   ore:      () => rockShape(C.grey, C.brown, null),
   star_ore: () => rockShape(C.grey2, C.blue, C.ice),
   star_shard: () => {   // 별빛 조각 — 대장간 재료 (전설 별빛 광석과 다르다)
@@ -172,6 +270,28 @@ const ICONS = {
     px(c, 6, 7, C.purple2); px(c, 9, 7, C.purple2); px(c, 8, 6, C.green);
     return c;
   },
+  // ---- 요리 20종 (밥공기 · 접시 · 컵 · 쟁반을 색만 바꿔 쓴다) ----
+  dish_pickle:        () => jar(C.white),
+  dish_ratatouille:   () => bowl(C.purple, C.white),
+  dish_pumpkin_soup:  () => bowl(C.orange, C.cream),
+  dish_corn_salad:    () => bowl(C.gold, C.white),
+  dish_sweet_potato:  () => plate(C.purple2, C.orange),
+  dish_bean_rice:     () => riceBowl(C.white, C.brown2),
+  dish_rice_cake:     () => plate(C.cream, C.green),
+  dish_melon_ice:     () => cup(C.ice, C.gold),
+  dish_onion_soup:    () => bowl(C.cream, C.white),
+  dish_garlic_bread:  () => plate(C.crust, C.white),
+  dish_spinach_saute: () => bowl(C.green2, C.white),
+  dish_sashimi:       () => plate(C.pink, C.white),
+  dish_eel_rice:      () => riceBowl(C.white, C.brown),
+  dish_crab_soup:     () => bowl(C.red, C.orange),
+  dish_salmon_steak:  () => plate(C.orange2, C.pink),
+  dish_smelt_fry:     () => plate(C.crust, C.gold),
+  dish_fish_soup:     () => bowl(C.ice, C.white),
+  dish_golden_roast:  () => { const c = plate(C.gold, C.gold2);
+    px(c, 12, 3, C.white); px(c, 13, 4, C.white); return c; },
+  dish_moon_tea:      () => cup(C.purple, C.ice),
+  dish_feast:         () => tray(),
   gold_crop: () => {
     const c = newCanvas();
     rect(c, 7, 8, 2, 6, C.green2);            // 줄기

@@ -83,7 +83,7 @@ var animals: Array = []
 var fishing_state := ""
 var fishing_timer := 0.0
 var fishing_ui: CanvasLayer
-var pending_fish: Array = []
+var pending_fish: Dictionary = {}
 var dialog: CanvasLayer
 var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
@@ -162,14 +162,9 @@ const TEXTURE_NAMES := [
 	"new_boy_up_walk_2", "new_boy_up_walk_3",
 	"egg", "golden_egg", "milk", "ore", "star_ore", "gem", "memory_piece",
 	"ghost_essence", "gold_crop", "world_branch",
-	"fish_crucian", "fish_carp", "fish_catfish", "fish_golden",
-	"dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
-	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad",
-	"dish_punch", "dish_eggplant",
+	# 물고기 · 요리 · 다 자란 작물은 _load_textures가 GameData의 표를 보고
+	# 알아서 불러온다 (FISH_IDS · RECIPE_IDS · CROP_IDS).
 	"crop_sprout", "crop_small", "crop_medium", "withered",
-	"mature_potato", "mature_carrot", "mature_strawberry", "mature_pumpkin",
-	"mature_tomato", "mature_corn", "mature_watermelon",
-	"mature_eggplant", "mature_cabbage", "mature_winter_radish",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
@@ -600,6 +595,15 @@ func _setup_fade(animate_in: bool) -> void:
 func _load_textures() -> void:
 	for n in TEXTURE_NAMES:
 		tex[n] = load("res://assets/sprites/%s.png" % n)
+	# 물고기·요리·작물은 표가 곧 그림 목록이다. 여기서 따라가면 표에 한 줄
+	# 넣을 때마다 TEXTURE_NAMES도 고쳐야 하는 일이 없다 (빠뜨리면 아이콘이
+	# 통째로 사라지는데, 어서션에 안 걸려 한참 뒤에야 눈에 띈다).
+	for id: String in GameData.FISH_IDS:
+		tex[id] = load("res://assets/sprites/%s.png" % id)
+	for id: String in GameData.RECIPE_IDS:
+		tex[id] = load("res://assets/sprites/%s.png" % id)
+	for id: String in GameData.CROP_IDS:
+		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
 
 
 # 맵 밖 배경 색조 (어두운 숲처럼 보이게)

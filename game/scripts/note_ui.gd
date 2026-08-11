@@ -102,10 +102,10 @@ func _rebuild() -> void:
 	# 물고기 생태
 	_line("")
 	_head("[물고기 생태]")
-	for f in GameData.FISH:
-		var caught := int(GameData.fish_caught.get(f[0], 0))
+	for fid in GameData.FISH_IDS:
+		var caught := int(GameData.fish_caught.get(fid, 0))
 		if caught > 0:
-			_line("  %s — %d마리 관찰" % [GameData.ITEMS[f[0]].name, caught])
+			_line("  %s — %d마리 관찰" % [GameData.ITEMS[fid].name, caught])
 		else:
 			_line("  ??? — 물가에서 만나지 못했다", DIM)
 

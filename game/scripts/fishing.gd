@@ -60,7 +60,7 @@ func _on_fishing_finished(success: bool) -> void:
 	if m.pending_fish.is_empty():
 		return          # 무엇이 물었는지 모르는 채로 끝났다 (있어선 안 되는 경우)
 	if success:
-		var id: String = m.pending_fish[0]
+		var id: String = str(m.pending_fish.id)
 		var def: Dictionary = GameData.ITEMS[id]
 		GameData.items[id] += 1
 		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
