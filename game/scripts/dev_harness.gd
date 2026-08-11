@@ -957,6 +957,32 @@ func _debug_tick() -> void:
 			print("PERF_BREAKDOWN: ", line)
 			print("PERF_DRAWCALLS_OK=", calls < 2500, " 콜=", int(calls))
 			print("PERF_PROCESS_OK=", proc_us < 8000.0, " us=", "%.0f" % proc_us)
+		388:
+			# 배경음: 상황마다 다른 곡이 나오는가 + 열 곡이 다 실렸는가
+			var loaded := 0
+			for bn: String in Sound.BGM_NAMES:
+				if Sound.streams.has(bn) and Sound.streams[bn] != null:
+					loaded += 1
+			var save_pos := m.player.position
+			var save_min := GameData.minutes
+			m.player.position = Vector2(74 * m.TILE + 16, 20 * m.TILE + 16)   # 광장
+			GameData.minutes = 12.0 * 60.0
+			var in_village := m._want_bgm()
+			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16, m.START_TILE.y * m.TILE + 16)
+			var at_farm := m._want_bgm()
+			GameData.minutes = 21.0 * 60.0
+			var at_night := m._want_bgm()
+			GameData.minutes = save_min
+			m.cave.visible = true
+			var in_cave := m._want_bgm()
+			m.cave.visible = false
+			m.player.position = save_pos
+			var picks := [in_village, at_farm, at_night, in_cave]
+			print("BGM_OK=", loaded == Sound.BGM_NAMES.size()
+				and in_village == "bgm_village" and in_cave == "bgm_cave"
+				and at_night == "bgm_night" and at_farm.begins_with("bgm_")
+				and picks.size() == 4,
+				" 실린곡=", loaded, "/", Sound.BGM_NAMES.size(), " 고른것=", picks)
 		390:
 			# 선물 취향 · 생일 · 연애 단계
 			GameData.dating = ""

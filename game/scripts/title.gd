@@ -100,7 +100,7 @@ func _ready() -> void:
 	_build_keys_panel()
 	_build_mp_panel()
 	Net.reset()
-	Sound.play_bgm("spring")
+	Sound.play_track("bgm_title")
 
 	# 개발/CI용: KYOJIN_MP=host|guest 로 자동 접속
 	var mp := OS.get_environment("KYOJIN_MP")

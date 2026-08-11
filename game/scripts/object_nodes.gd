@@ -190,7 +190,7 @@ func _apply_season_visuals() -> void:
 	for pos: Vector2i in m.obj_nodes:
 		if m.objects.has(pos) and m.objects[pos].kind == "tree":
 			_refresh_tree_sprite(pos)  # 손상 단계(잎 없음/반파)를 유지한 채 계절 반영
-	Sound.play_bgm(GameData.season_key())
+	# 배경음은 main._bgm_tick이 상황을 보고 고른다 (계절만으로는 못 정한다)
 	m.queue_redraw()
 
 

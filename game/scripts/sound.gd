@@ -7,13 +7,16 @@ const SFX_NAMES := [
 	"sfx_place", "sfx_cast", "sfx_bite", "sfx_catch", "sfx_miss", "sfx_ui",
 	"sfx_coin", "sfx_heart", "sfx_sleep", "sfx_step0", "sfx_step1",
 ]
-const BGM_NAMES := ["bgm_spring", "bgm_summer", "bgm_fall", "bgm_winter"]
+# 계절 넷 + 장소·상황 여섯. 예전에는 계절 넷뿐이었고 각 20초였다.
+const BGM_NAMES := ["bgm_spring", "bgm_summer", "bgm_fall", "bgm_winter",
+	"bgm_village", "bgm_cave", "bgm_shop", "bgm_night", "bgm_festival", "bgm_title"]
 
 var streams := {}
 var bgm_player: AudioStreamPlayer
 var sfx_pool: Array = []
 var sfx_index := 0
 var current_bgm := ""
+var _fade: Tween = null
 
 # 설정 (0~100)
 var master_volume := 80.0
@@ -61,12 +64,27 @@ func play_sfx(name: String, pitch_jitter := 0.0) -> void:
 
 
 func play_bgm(season_key: String) -> void:
-	var name := "bgm_" + season_key
+	play_track("bgm_" + season_key)
+
+
+# 곡을 바꾼다. 뚝 끊으면 귀에 거슬려서 0.6초에 걸쳐 갈아 끼운다.
+func play_track(name: String) -> void:
 	if name == current_bgm or not streams.has(name):
 		return
 	current_bgm = name
-	bgm_player.stream = streams[name]
-	bgm_player.play()
+	if _fade != null and _fade.is_valid():
+		_fade.kill()
+	if not bgm_player.playing:
+		bgm_player.stream = streams[name]
+		bgm_player.volume_db = 0.0
+		bgm_player.play()
+		return
+	_fade = create_tween()
+	_fade.tween_property(bgm_player, "volume_db", -40.0, 0.3)
+	_fade.tween_callback(func() -> void:
+		bgm_player.stream = streams[name]
+		bgm_player.play())
+	_fade.tween_property(bgm_player, "volume_db", 0.0, 0.3)
 
 
 func stop_bgm() -> void:

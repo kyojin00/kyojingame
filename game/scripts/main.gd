@@ -1005,6 +1005,7 @@ var bugs: Array = []
 # ---- 루프 ----
 
 func _process(delta: float) -> void:
+	_bgm_tick(delta)
 	story._story_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
@@ -1460,3 +1461,35 @@ func show_ending() -> void:
 # 상점 안(shop_room.gd)에서 부르는 창구 — 본체는 scripts/village_ui.gd
 func room_action(kind: String) -> void:
 	village.room_action(kind)
+
+
+# ---- 배경음 고르기 ----
+#
+# 계절 곡만 틀면 어디를 가나 같은 소리가 난다. 지금 어디에 있고 무슨
+# 때인지를 보고 골라 준다. 0.4초에 한 번만 본다 — 매 프레임 볼 이유가 없고,
+# 경계에서 곡이 왔다 갔다 하면 그게 더 거슬린다.
+const VILLAGE_AREA := Rect2i(60, 6, 40, 36)   # 마을 전체 (큰길~강가)
+var _bgm_t := 0.0
+
+
+func _bgm_tick(delta: float) -> void:
+	_bgm_t -= delta
+	if _bgm_t > 0.0:
+		return
+	_bgm_t = 0.4
+	Sound.play_track(_want_bgm())
+
+
+func _want_bgm() -> String:
+	if cave.visible:
+		return "bgm_cave"
+	if shop_room.visible or shop.visible:
+		return "bgm_shop"
+	if GameData.festival_open():
+		return "bgm_festival"
+	var h := GameData.minutes / 60.0
+	if h >= 19.0 or h < 5.0:
+		return "bgm_night"
+	if VILLAGE_AREA.has_point(player_tile()):
+		return "bgm_village"
+	return "bgm_" + GameData.season_key()
