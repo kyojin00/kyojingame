@@ -590,7 +590,7 @@ func _rock_demo() -> void:
 		get_tree().create_timer(0.35 + 0.5 * i).timeout.connect(func() -> void:
 			if m.objects.has(m.STORY_ROCK):
 				Sound.play_sfx("sfx_pick", 0.15)
-				m.spawn_particles(m.STORY_ROCK, "stone"))
+				m.renderer.spawn_particles(m.STORY_ROCK, "stone"))
 
 
 func _story_give_pickaxe() -> void:

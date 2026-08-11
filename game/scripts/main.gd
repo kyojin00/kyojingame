@@ -2,6 +2,7 @@
 #
 # 덩치가 커서 몇 갈래를 따로 뺐다 (전부 자식 노드로 붙고 `m`으로 여기를 부른다):
 #   scripts/world_gen.gd    지형·길·마을 부지·자원 재생
+#   scripts/renderer.gd     지형 위에 얹히는 것들 + 화면 안내
 #   scripts/village_ui.gd   마을에서 여는 창들 (상점·여관·축제·의뢰·선물)
 #   scripts/story.gd        메인 스토리 연출 (각본)
 #   scripts/dev_harness.gd  검증 하네스 (KYOJIN_SHOT일 때만)
@@ -126,6 +127,8 @@ var story: Node = null
 var worldgen: Node = null
 # 마을에서 여는 창들 — 상점·여관·축제·의뢰·선물 (scripts/village_ui.gd)
 var village: Node = null
+# 지형 위에 얹히는 것들 + 화면 안내 (scripts/renderer.gd)
+var renderer: Node = null
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
@@ -414,6 +417,12 @@ func _ready() -> void:
 	worldgen.m = self
 	add_child(worldgen)
 
+	# 그리는 쪽 (scripts/renderer.gd)
+	renderer = load("res://scripts/renderer.gd").new()
+	renderer.name = "Renderer"
+	renderer.m = self
+	add_child(renderer)
+
 	# 마을 창들 (scripts/village_ui.gd)
 	village = load("res://scripts/village_ui.gd").new()
 	village.name = "VillageUI"
@@ -440,7 +449,7 @@ func _ready() -> void:
 	overlay = Node2D.new()
 	overlay.name = "Overlay"
 	overlay.z_index = 100
-	overlay.draw.connect(_draw_overlay)
+	overlay.draw.connect(renderer._draw_overlay)
 	add_child(overlay)
 
 	player = preload("res://scenes/player.tscn").instantiate()
@@ -1253,7 +1262,7 @@ func _on_fishing_finished(success: bool) -> void:
 		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
 		GameData.today_harvest += 1
 		Sound.play_sfx("sfx_catch")
-		spawn_particles(player_tile(), "sparkle")
+		renderer.spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
 		tutorial_notify("fish")
 		# 여름 낚시대회: 대회 시간 안에 낚시터에서 낚은 것만 센다
@@ -1335,7 +1344,7 @@ func _try_harvest(t: Vector2i) -> bool:
 	cell.crop_day = 0.0
 	cell.half_fed = false
 	Sound.play_sfx("sfx_harvest")
-	spawn_particles(t, "sparkle")
+	renderer.spawn_particles(t, "sparkle")
 	tutorial_notify("harvest")
 	gain_skill("farm", 8.0)
 	if int(GameData.crops_harvested.get(cid, 0)) == 0:
@@ -1405,7 +1414,7 @@ func use_tool() -> void:
 					c.ground = "soil"
 					if GameData.weather_wet(weather_now()):
 						_wet(c, WET_ALL_DAY)
-					spawn_particles(pos, "dirt")
+					renderer.spawn_particles(pos, "dirt")
 					worked = true
 				if worked:
 					Sound.play_sfx("sfx_hoe", 0.1)
@@ -1421,7 +1430,7 @@ func use_tool() -> void:
 				if c.ground == "soil" and not objects.has(pos) \
 						and (float(c.wet_min) < WET_MANUAL - 1.0 or was_thirsty):
 					_wet(c, WET_MANUAL)
-					spawn_particles(pos, "water")
+					renderer.spawn_particles(pos, "water")
 					worked = true
 					revived = revived or was_thirsty
 			if worked:
@@ -1455,7 +1464,7 @@ func use_tool() -> void:
 			if GameData.weather_wet(weather_now()):
 				_wet(cell, WET_ALL_DAY)
 			Sound.play_sfx("sfx_seed", 0.1)
-			spawn_particles(t, "seed")
+			renderer.spawn_particles(t, "seed")
 			tutorial_notify("plant")
 			gain_skill("farm", 2.0)
 		"axe":
@@ -1677,28 +1686,6 @@ func _tool_target_nearby() -> Vector2i:
 
 # 건물 이름표: 지붕 위에 작은 나무 간판을 걸어 어느 집인지 바로 알게 한다.
 # (가게 그림이 모두 같아서 이름이 없으면 구분이 되지 않는다)
-func _draw_building_signs() -> void:
-	var f: Font = UI_FONT_SMALL
-	for pid: String in GameData.village_built:
-		if not VILLAGE_PLOTS.has(pid):
-			continue
-		var a: Vector2i = VILLAGE_PLOTS[pid].anchor
-		_draw_name_plate(f, str(VILLAGE_PLOTS[pid].name),
-			Vector2((a.x + 2) * TILE + 16, a.y * TILE - 6))
-	if GameData.house_lv >= 1:
-		_draw_name_plate(f, "우리집",
-			Vector2((HOME_ANCHOR.x + 2) * TILE + 16, HOME_ANCHOR.y * TILE - 6))
-
-
-func _draw_name_plate(f: Font, text: String, at: Vector2) -> void:
-	var w: float = f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-	var box := Rect2(at.x - w / 2.0 - 5, at.y - 13, w + 10, 17)
-	overlay.draw_rect(box.grow(1), Color(0.24, 0.15, 0.08, 0.95))
-	overlay.draw_rect(box, Color(0.86, 0.7, 0.44, 0.96))
-	overlay.draw_rect(Rect2(box.position, Vector2(box.size.x, 3)),
-		Color(0.95, 0.82, 0.58, 0.96))
-	overlay.draw_string(f, Vector2(at.x - w / 2.0, at.y), text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.3, 0.18, 0.07))
 
 
 # 축제날 장식: 모이는 자리 위로 삼각 깃발 줄을 걸고 계절 색을 쓴다.
@@ -1709,28 +1696,6 @@ const FEST_COLORS := {
 	"harvest": [Color(1, 0.68, 0.32), Color(0.95, 0.85, 0.4), Color(0.85, 0.45, 0.3)],
 	"star": [Color(0.75, 0.85, 1), Color(1, 1, 0.95), Color(0.6, 0.7, 1)],
 }
-
-
-func _draw_festival() -> void:
-	var f: Dictionary = GameData.festival_today()
-	if f.is_empty() or GameData.minutes >= GameData.FEST_END:
-		return
-	var cols: Array = FEST_COLORS.get(str(f.id), FEST_COLORS.flower)
-	# 깃발 줄을 거는 구간 (모이는 자리 위)
-	var x0: int = FISH_YARD_X0 if str(f.place) == "pier" else PLAZA.position.x
-	var x1: int = FISH_YARD_X1 if str(f.place) == "pier" else PLAZA.end.x - 1
-	var y: int = DOCK_Y - 2 if str(f.place) == "pier" else PLAZA.position.y
-	var top := float(y) * TILE
-	for i in range(x0, x1):
-		var px := float(i) * TILE
-		# 줄은 살짝 늘어지게 (사인 곡선)
-		var sag := sin(float(i - x0) / 3.0) * 4.0 + 6.0
-		overlay.draw_line(Vector2(px, top + sag), Vector2(px + TILE, top + sag + 1.0),
-			Color(0.35, 0.26, 0.18), 2.0)
-		var c: Color = cols[(i - x0) % cols.size()]
-		var a := Vector2(px + 8, top + sag + 2)
-		overlay.draw_colored_polygon(PackedVector2Array([
-			a, a + Vector2(14, 0), a + Vector2(7, 16)]), c)
 
 
 # 그 칸 쪽으로 몸을 돌린다 (우세한 축 기준, 대각선이면 좌우 우선)
@@ -1849,7 +1814,7 @@ func interact() -> void:
 		GameData.items[bid] += 1
 		GameData.forage_caught[bid] = int(GameData.forage_caught.get(bid, 0)) + 1
 		Sound.play_sfx("sfx_catch")
-		spawn_particles(player_tile(), "sparkle")
+		renderer.spawn_particles(player_tile(), "sparkle")
 		hud.show_message("%s를 잡았다! 연구 노트에 기록됐다." % GameData.ITEMS[bid].name)
 		bug.respawn()
 		if Net.is_host():
@@ -1865,7 +1830,7 @@ func interact() -> void:
 			GameData.items[fid] += 1
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + 1
 			Sound.play_sfx("sfx_harvest")
-			spawn_particles(t, "sparkle")
+			renderer.spawn_particles(t, "sparkle")
 			hud.show_message("%s 채집! 연구 노트에 기록됐다." % GameData.ITEMS[fid].name)
 			gain_skill("forest", 3.0)
 			if Net.is_host():
@@ -2064,7 +2029,7 @@ func _update_night_mobs(delta: float) -> void:
 			_mob_hit_cd = 1.2
 			GameData.energy = maxf(0.0, GameData.energy - 10.0)
 			Sound.play_sfx("sfx_chop", 0.2)
-			spawn_particles(player_tile(), "stone")
+			renderer.spawn_particles(player_tile(), "stone")
 			hud.show_message("지네에게 물렸다! 밤의 숲은 위험하다...", 3.0)
 			player.position += (player.position - m.node.position).normalized() * 36.0
 			if GameData.energy <= 0.0 and not day_transitioning:
@@ -2145,28 +2110,6 @@ const ENDING_PAGES := [
 
 
 # 온실 유리집을 밭 위에 겹쳐 그린다 (지붕 뼈대 + 유리 반사)
-func _draw_greenhouse() -> void:
-	if not GameData.greenhouse_built:
-		return
-	var r := Rect2(GREENHOUSE.position.x * TILE, GREENHOUSE.position.y * TILE,
-		GREENHOUSE.size.x * TILE, GREENHOUSE.size.y * TILE)
-	overlay.draw_rect(r, Color(0.72, 0.9, 0.95, 0.22))              # 유리
-	# 지붕 띠 (위쪽을 조금 더 밝게 — 유리집처럼 보이게)
-	overlay.draw_rect(Rect2(r.position, Vector2(r.size.x, TILE * 0.7)),
-		Color(0.85, 0.95, 1.0, 0.3))
-	overlay.draw_rect(r, Color(0.9, 0.96, 1.0, 0.75), false, 4.0)   # 테두리
-	for i in range(1, GREENHOUSE.size.x):                          # 세로 뼈대
-		var x := r.position.x + i * TILE
-		overlay.draw_line(Vector2(x, r.position.y), Vector2(x, r.end.y),
-			Color(0.85, 0.93, 0.96, 0.28), 1.0)
-	for i in range(1, GREENHOUSE.size.y):                          # 가로 뼈대
-		var y := r.position.y + i * TILE
-		overlay.draw_line(Vector2(r.position.x, y), Vector2(r.end.x, y),
-			Color(0.85, 0.93, 0.96, 0.28), 1.0)
-	# 유리에 비치는 빛 한 줄
-	overlay.draw_line(r.position + Vector2(8, 8),
-		r.position + Vector2(r.size.x * 0.45, r.size.y * 0.45),
-		Color(1, 1, 1, 0.22), 4.0)
 
 
 # 동굴 입구: 1층부터 갈지, 이미 내려가 본 승강기 층으로 갈지 고른다.
@@ -2603,7 +2546,7 @@ func _process(delta: float) -> void:
 	# 체력은 동굴 밖에서 천천히 회복된다 (요리를 먹으면 즉시 회복)
 	if not cave.visible:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
-	_update_particles(delta)
+	renderer._update_particles(delta)
 	_update_night_mobs(delta)
 	_update_tree_fade()
 	story._update_u_intro()
@@ -2726,12 +2669,12 @@ func _growth_tick(game_minutes: float) -> void:
 				cell.watered = false
 				changed = true
 			if cell.crop_id != "" and not cell.dead and not _crop_thirsty(cell):
-				var before_stage := _crop_texture(cell)
+				var before_stage: Texture2D = renderer._crop_texture(cell)
 				cell.crop_day = float(cell.crop_day) + game_minutes * GameData.farm_growth_mult()
 				# 절반을 막 넘겼다면 여기서 멈춘다 — 물을 한 번 더 줘야 한다
 				if _crop_thirsty(cell):
 					changed = true
-				if _crop_texture(cell) != before_stage:
+				if renderer._crop_texture(cell) != before_stage:
 					changed = true
 	if changed:
 		queue_redraw()
@@ -2937,7 +2880,7 @@ func _dir_to_vec(d: String) -> Vector2:
 # 맞는 순간: 파편 + 대상 흔들림 + (큰 것이면) 화면 흔들림
 func _land_hit(h: Dictionary) -> void:
 	var t: Vector2i = h.tile
-	spawn_particles(t, str(h.particle))
+	renderer.spawn_particles(t, str(h.particle))
 	if obj_nodes.has(t):
 		var node: Node2D = obj_nodes[t]
 		var here := player_tile()
@@ -3047,47 +2990,7 @@ func _is_path(x: int, y: int) -> bool:
 	return grid[y][x].ground == "path"
 
 
-func spawn_particles(t: Vector2i, kind: String) -> void:
-	var d: Array = PARTICLE_DEFS[kind]
-	var center := Vector2(t.x * TILE + 16, t.y * TILE + 16)
-	for i in d[1]:
-		particles.append({
-			"p": center + Vector2(randf_range(-5, 5), randf_range(-4, 2)),
-			"v": Vector2(randf_range(-14, 14), d[2] + randf_range(-8, 8)),
-			"c": d[0],
-			"life": randf_range(0.3, 0.55),
-			"g": d[3],
-		})
-
-
-func _update_particles(delta: float) -> void:
-	if particles.is_empty():
-		return
-	var alive := []
-	for pt in particles:
-		pt.life -= delta
-		if pt.life <= 0.0:
-			continue
-		pt.v.y += pt.g * delta
-		pt.p += pt.v * delta
-		alive.append(pt)
-	particles = alive
-
-
 # ---- 렌더링 ----
-
-func _crop_texture(cell: Dictionary) -> Texture2D:
-	if cell.dead:
-		return tex["withered"]
-	var def: Dictionary = GameData.CROPS[cell.crop_id]
-	var t := float(cell.crop_day) / _grow_total(def)
-	if t >= 1.0:
-		return tex["mature_" + cell.crop_id]
-	if t < 0.34:
-		return tex["crop_sprout"]
-	if t < 0.67:
-		return tex["crop_small"]
-	return tex["crop_medium"]
 
 
 func _draw() -> void:
@@ -3159,7 +3062,7 @@ func _draw() -> void:
 					if _is_path(x + 1, y):
 						draw_texture_rect(tex["path_edge_e"], tile_rect, false)
 			if cell.crop_id != "":
-				draw_texture_rect(_crop_texture(cell), tile_rect, false)
+				draw_texture_rect(renderer._crop_texture(cell), tile_rect, false)
 
 	# 타겟 타일 하이라이트 (호버: 흰 실선 / 좌클릭 선택: 금색 강조)
 	if player != null:
@@ -3174,290 +3077,18 @@ func _draw() -> void:
 
 
 # 건물/오브젝트 위에 그려야 하는 것들 (안내 텍스트·화살표·파티클·날씨)
-func _draw_overlay() -> void:
-	_draw_nav_arrow()
-	_draw_festival()
-	_draw_greenhouse()
-	_draw_building_signs()
-
-	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
-	if player != null:
-		if fishing_state == "waiting":
-			var base := player.position + Vector2(-8, -96)
-			var dots := int(weather_time * 2.0) % 3 + 1
-			for i in dots:
-				overlay.draw_rect(Rect2(base + Vector2(i * 5, 0), Vector2(2, 2)),
-					Color(1, 1, 1, 0.8))
-		elif fishing_state == "bite":
-			var base := player.position + Vector2(-2, -108)
-			overlay.draw_rect(Rect2(base, Vector2(3, 7)), Color(1, 0.85, 0.2))
-			overlay.draw_rect(Rect2(base + Vector2(0, 9), Vector2(3, 3)), Color(1, 0.85, 0.2))
-
-	# 말을 걸어 달라는 표시: 머리 위에서 통통 튀는 느낌표
-	if story._postman != null and story._postman_state == "wait" and not ui_open():
-		_draw_bang(story._postman.position + Vector2(0, -136))
-
-	for pt in particles:
-		overlay.draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
-
-	# 경험치 획득 플로팅 텍스트
-	for ft in float_texts:
-		var a: float = clampf(1.4 - ft.t, 0.0, 1.0)
-		var p: Vector2 = ft.pos + Vector2(0, -ft.t * 26.0)
-		var tw: float = UI_FONT_SMALL.get_string_size(ft.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-		overlay.draw_string_outline(UI_FONT_SMALL, p + Vector2(-tw / 2.0, 0), ft.text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 3, Color(0.05, 0.04, 0.08, a))
-		overlay.draw_string(UI_FONT_SMALL, p + Vector2(-tw / 2.0, 0), ft.text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.65, 0.95, 0.5, a))
-
-	_draw_context_hint()
-	_draw_weather()
 
 
 # 머리 위 느낌표 (도트 그대로 — 굵은 막대 + 점)
-func _draw_bang(pos: Vector2) -> void:
-	var bob := absf(sin(weather_time * 4.0)) * 6.0
-	var p := pos + Vector2(0, -bob)
-	var body := Rect2(p + Vector2(-3, 0), Vector2(6, 20))
-	var dot := Rect2(p + Vector2(-3, 24), Vector2(6, 7))
-	for r: Rect2 in [body, dot]:
-		overlay.draw_rect(r.grow(2.0), Color(0.12, 0.08, 0.05, 0.92))  # 외곽선
-		overlay.draw_rect(r, Color(1.0, 0.86, 0.25))
 
 
 # 타겟 타일/주변 상황에 맞는 안내 문구를 월드에 띄운다
-func _context_hint() -> Array:
-	# 반환: [문구, 기준 위치(월드)] 또는 []
-	if player == null or ui_open():
-		return []
-	var above_player := player.position + Vector2(0, -100)
-	if fishing_state == "bite":
-		return ["지금이다!", above_player]
-	if fishing_state == "waiting":
-		return []
-	# 첫 만남: 걸어와서 기다리는 우체부 아저씨 머리 위에 안내를 띄운다
-	if story._postman != null and story._postman_state == "wait" \
-			and (player.position - story._postman.position).length() < POSTMAN_TALK_DIST:
-		return ["E: 말 걸기", story._postman.position + Vector2(0, -112)]
-	if nearby_npc() != null:
-		return ["E: 대화", above_player]
-	if nearby_animal() != null:
-		return ["E: 쓰다듬기", above_player]
-	var t := target_tile()
-	if not objects.has(t):
-		# 앞 칸은 비었는데 걸음을 막고 있는 오브젝트가 있으면 그것을 가리킨다
-		var bt := _blocking_object_tile()
-		if bt.x != -999:
-			t = bt
-	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
-		return []
-	var above_tile := Vector2(t.x * TILE + 16, t.y * TILE - 12)
-	var obj: Variant = objects.get(t)
-	if obj != null:
-		match obj.kind:
-			"board":
-				return ["E: 의뢰 게시판", above_tile]
-			"horse":
-				return ["F: 말 타기", above_tile]
-			"sign":
-				if t == FISH_SIGN:
-					return ["E: 낚시터 안내", above_tile]
-				if t == GREENHOUSE_SIGN:
-					return ["E: 온실 짓기" if not GameData.greenhouse_built
-						else "E: 온실", above_tile]
-			"cave":
-				return ["E: 동굴 탐험", above_tile]
-			"worldtree":
-				return ["E: 세계수 동굴 (위험!)", above_tile]
-			"forage_berry", "forage_herb":
-				return ["E: 채집", above_tile]
-			"housesite":
-				return ["E: 집 짓기 (목재 %d)" % GameData.HOUSE_BUILD_WOOD, above_tile]
-			"tree":
-				if bool(obj.get("young", false)):
-					return ["어린 나무 (자라는 중)", above_tile]
-				return ["E: 벌목 (도끼)", above_tile]
-			"rock", "bigrock":
-				return ["E: 채광 (곡괭이)", above_tile]
-			"house":
-				var bk := _building_kind_at(t)
-				if bk == "home":
-					return ["E: 집에 들어가기", above_tile]
-				if bk in ["general", "ranch", "smith", "fish"]:
-					return ["E: " + BUILDING_NAMES[bk], above_tile]
-		return []
-	var cell: Dictionary = grid[t.y][t.x]
-	if cell.crop_id != "":
-		if cell.dead:
-			return ["시듦 - 호미로 정리", above_tile]
-		var def: Dictionary = GameData.CROPS[cell.crop_id]
-		var pct := float(cell.crop_day) / _grow_total(def)
-		if pct >= 1.0:
-			return ["수확!", above_tile]
-		var text := "성장 %d%%" % int(pct * 100.0)
-		if _crop_thirsty(cell):
-			text += " · 물을 한 번 더!"
-		elif not cell.watered:
-			text += " · 물주기!"
-		return [text, above_tile]
-	if cell.ground == "water" and GameData.tool == "rod":
-		return ["E: 낚시", above_tile]
-	return []
 
 
 # 현재 목표에 목적지가 있으면 플레이어 주위에 방향 화살표를 띄운다
-func nav_target() -> Variant:
-	if GameData.story_phase == "approach" and story._postman != null:
-		return story._postman.position          # 첫 만남: 우체부에게 가는 길 안내
-	if GameData.story_phase == "path":
-		# 갈림길까지 숲길 안내
-		return Vector2(STORY_FORK.x * TILE + 16, STORY_FORK.y * TILE + 16)
-	if GameData.story_phase == "rock":
-		# 커다란 바위까지 안내, 바위를 캔 뒤에는 우체부 아저씨에게
-		if GameData.story_rock_state >= 2 and story._postman != null:
-			return story._postman.position
-		return Vector2(STORY_ROCK.x * TILE + 16, STORY_ROCK.y * TILE + 16)
-	if GameData.story_phase == "travel":
-		# 마을 이장에게 가는 길 안내
-		var chief: Node2D = story._story_chief()
-		if chief != null:
-			return chief.position
-	if GameData.story_phase != "done":
-		return null  # 숲 구간에서는 화살표를 띄우지 않는다
-	match GameData.tutorial_current_flag():
-		"home", "bed", "slept":
-			# 우리집(마을 서쪽) 문 앞 — 아직 안 지었으면 집터로 안내한다
-			return Vector2(HOME_ANCHOR.x * TILE + 2 * TILE + 16,
-				(HOME_ANCHOR.y + 4) * TILE + 16)
-		"shop":
-			if not GameData.village_built.has("general"):
-				return null  # 잡화점은 마을 발전으로 지어야 생긴다
-			var ga: Vector2i = VILLAGE_PLOTS["general"].anchor
-			return Vector2((ga.x + 2) * TILE + 16, (ga.y + 4) * TILE + 16)
-		"fish":
-			return fishing_spot_center()   # 마을 남쪽 낚시터 부두
-		"chop":
-			return _nearest_object_pos("tree")
-		"mine":
-			return _nearest_object_pos("rock")
-	return null
-
-
-func _nearest_object_pos(kind: String) -> Variant:
-	var best: Variant = null
-	var best_d := INF
-	for pos: Vector2i in objects:
-		if objects[pos].kind != kind:
-			continue
-		var p := Vector2(pos.x * TILE + 16, pos.y * TILE + 16)
-		var d := p.distance_to(player.position)
-		if d < best_d:
-			best_d = d
-			best = p
-	return best
-
-
-func _draw_nav_arrow() -> void:
-	if player == null or ui_open():
-		return
-	var target: Variant = nav_target()
-	if target == null:
-		return
-	var to: Vector2 = target - player.position
-	if to.length() < 40.0:
-		return  # 목적지 근처에서는 숨긴다
-	# 길라잡이 화살표는 한눈에 들어와야 한다 — 크게 그리고 검은 테두리를 두른다
-	var dirv := to.normalized()
-	var bob := sin(weather_time * 6.0) * 4.0
-	var base := player.position + Vector2(0, -84) + dirv * (44.0 + bob)
-	var tip := base + dirv * 20.0
-	var left := base + dirv.rotated(2.5) * 13.0
-	var right := base + dirv.rotated(-2.5) * 13.0
-	var tail := base - dirv * 3.0
-	var edge := 3.0
-	overlay.draw_colored_polygon(PackedVector2Array([
-		tip + dirv * edge,
-		left + dirv.rotated(2.5) * edge,
-		tail - dirv * edge,
-		right + dirv.rotated(-2.5) * edge]), Color(0.12, 0.08, 0.04, 0.85))
-	overlay.draw_colored_polygon(PackedVector2Array([tip, left, tail, right]),
-		Color(1, 0.85, 0.3, 0.97))
-
-
-func _draw_context_hint() -> void:
-	var hint := _context_hint()
-	if hint.is_empty():
-		return
-	var text: String = hint[0]
-	var base: Vector2 = hint[1]
-	var w := UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-	var pos := Vector2(base.x - w / 2.0, base.y)
-	overlay.draw_string_outline(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 3,
-		Color(0.08, 0.06, 0.12, 0.9))
-	overlay.draw_string(UI_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 1, 0.9))
-
-
-func _draw_weather() -> void:
-	var w := weather_now()
-	var full_w := MAP_W * TILE + 20.0
-	var full_h := MAP_H * TILE + 10.0
-	if w == GameData.WEATHER_RAIN:
-		for i in 360:
-			var sx := _hash01(i, 1) * full_w - 10.0
-			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 280.0, full_h) - 5.0
-			overlay.draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy),
-				Color(0.72, 0.82, 1.0, 0.5), 1.0)
-	elif w == GameData.WEATHER_SNOW:
-		for i in 240:
-			var sx := fposmod(_hash01(i, 1) * full_w + sin(weather_time * 1.5 + i) * 12.0, full_w)
-			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 35.0, full_h) - 5.0
-			overlay.draw_rect(Rect2(Vector2(sx, sy), Vector2(1, 1)), Color(1, 1, 1, 0.85))
-	elif w == GameData.WEATHER_STORM:
-		# 굵고 비스듬한 빗줄기 + 이따금 번쩍
-		for i in 620:
-			var sx := _hash01(i, 1) * full_w - 10.0
-			var sy := fposmod(_hash01(i, 2) * full_h + weather_time * 520.0, full_h) - 5.0
-			overlay.draw_line(Vector2(sx - 9, sy - 20), Vector2(sx, sy),
-				Color(0.78, 0.85, 1.0, 0.85), 2.0)
-		var flash := fposmod(weather_time, 5.2)
-		if flash < 0.18:
-			overlay.draw_rect(_camera_rect(), Color(1, 1, 1, 0.45 * (1.0 - flash / 0.18)))
-	elif w == GameData.WEATHER_FOG:
-		# 가장자리로 갈수록 짙어지는 안개 (가까운 곳만 또렷하다)
-		var view2 := _camera_rect()
-		overlay.draw_rect(view2, Color(0.87, 0.89, 0.93, 0.34))
-		var band: float = view2.size.y * 0.1
-		for i in 5:
-			var inset: float = band * float(i)
-			var r := Rect2(view2.position + Vector2(inset * 1.7, inset),
-				view2.size - Vector2(inset * 3.4, inset * 2.0))
-			if r.size.x <= band or r.size.y <= band:
-				break
-			overlay.draw_rect(r, Color(0.9, 0.92, 0.95, 0.13), false, band)
-		# 흘러가는 안개 띠
-		for i in 16:
-			var by := view2.position.y + fposmod(_hash01(i, 3) * view2.size.y
-				+ weather_time * 7.0, view2.size.y)
-			var bh: float = 12.0 + _hash01(i, 4) * 30.0
-			overlay.draw_rect(Rect2(view2.position.x, by, view2.size.x, bh),
-				Color(0.95, 0.96, 0.98, 0.16))
-	elif w == GameData.WEATHER_STAR and GameData.minutes >= 17.0 * 60.0:
-		# 별밤: 해가 지면 하늘빛 알갱이가 반짝인다
-		var view3 := _camera_rect()
-		for i in 210:
-			var px2 := view3.position.x + _hash01(i, 5) * view3.size.x
-			var py2 := view3.position.y + _hash01(i, 6) * view3.size.y
-			var tw: float = 0.35 + 0.65 * absf(sin(weather_time * 1.8 + float(i) * 1.7))
-			overlay.draw_rect(Rect2(px2, py2, 3, 3), Color(1, 0.99, 0.88, tw))
-			if _hash01(i, 7) > 0.86:   # 몇 개는 십자로 크게 반짝인다
-				overlay.draw_rect(Rect2(px2 - 3, py2 + 1, 9, 1), Color(1, 1, 0.92, tw * 0.8))
-				overlay.draw_rect(Rect2(px2 + 1, py2 - 3, 1, 9), Color(1, 1, 0.92, tw * 0.8))
 
 
 # 지금 화면에 보이는 월드 범위 (화면 전체를 덮는 효과에 쓴다)
-func _camera_rect() -> Rect2:
-	var half := Vector2(960.0, 540.0) / (2.0 * CAMERA_ZOOM)
-	return Rect2(player.position - half, half * 2.0)
 
 
 # ==== 멀티플레이 ====

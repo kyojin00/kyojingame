@@ -95,7 +95,7 @@ func _talk_to(npc: Node2D) -> void:
 	if GameData.festival_open() and str(GameData.festival_today().id) == "flower" \
 			and not GameData.fest_greeted.has(npc.id):
 		GameData.fest_greeted.append(npc.id)
-		m.spawn_particles(m.player_tile(), "sparkle")
+		m.renderer.spawn_particles(m.player_tile(), "sparkle")
 		if GameData.fest_greeted.size() >= GameData.NPCS.size():
 			_finish_festival()
 			return

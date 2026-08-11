@@ -21,6 +21,7 @@ MODULES = {
     "story.gd": "story",
     "world_gen.gd": "worldgen",
     "village_ui.gd": "village",
+    "renderer.gd": "renderer",
     "dev_harness.gd": "harness",
 }
 
