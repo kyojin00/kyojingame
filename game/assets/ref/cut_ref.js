@@ -315,3 +315,123 @@ save('title_bg', punch(big, 1.08, 1.03));
 
 console.log('오려내기 완료 — 지형 %d장 + 타이틀 1장',
   2 + 1 + 4 + Object.keys(SEASON).length * 3 + 2);
+
+// ================= 3. 건물 재질 =================
+//
+// 건물을 손으로 칠하면 넓은 면이 단색이라, 참고 그림에서 오려 온 바닥 타일
+// 옆에 세웠을 때 혼자 매끈해서 튄다. 그래서 **결(grain)** 을 참고 그림의
+// 마을집에서 그대로 떠 온다.
+//
+// 결 = 밝기에서 「넓은 얼룩」을 뺀 나머지. 색은 버리고 요철만 남기므로,
+// 지붕 색을 건물마다 바꿔도 결은 그대로 쓸 수 있다.
+const MAT = __dirname + '/mat/';
+if (!fs.existsSync(MAT)) fs.mkdirSync(MAT);
+const scene2 = load('ref_title.png');
+const MAT_S = 48;   // 결 한 장 크기 (건물 그릴 때 이 크기로 반복해 쓴다)
+
+function lum(c) { return c[0] * 0.299 + c[1] * 0.587 + c[2] * 0.114; }
+
+// 결은 참고 그림에서 **통째로 떠 오지 않는다.**
+// 그렇게 했더니 창틀·기와 줄 같은 큰 무늬까지 딸려 와서, 벽에 벽돌 자국처럼
+// 규칙적으로 반복돼 보였다 (마을집 벽이 작아 깨끗한 조각을 뜰 수가 없다).
+// 대신 그 자리의 **결의 세기만 재고**, 무늬는 이어붙는 잡음으로 직접 만든다.
+
+// 고주파 밝기의 흩어진 정도. 창틀 같은 큰 경계에 휘둘리지 않게 중앙절대편차로 잰다.
+function grainSigma(p, box, R) {
+  const vals = [];
+  for (let y = box[1]; y < box[3]; y += 2)
+    for (let x = box[0]; x < box[2]; x += 2) {
+      let s2 = 0, n = 0;
+      for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) {
+        s2 += lum(at(p, x + i, y + j)); n++;
+      }
+      vals.push(Math.abs(lum(at(p, x, y)) - s2 / n));
+    }
+  vals.sort((a, b) => a - b);
+  return vals[vals.length >> 1] * 1.4826;
+}
+
+// 이어붙는 값잡음 한 겹 (period는 N의 약수여야 감았을 때 안 튄다)
+function valueNoise(N, period, seed) {
+  const cells = N / period;
+  const lat = [];
+  for (let j = 0; j < cells; j++) {
+    const row = [];
+    for (let i = 0; i < cells; i++) {
+      let n = (Math.imul(i + 1, 374761393) ^ Math.imul(j + 1, 668265263)
+        ^ Math.imul(seed, 362437)) >>> 0;
+      n = Math.imul(n ^ (n >>> 13), 1274126177) >>> 0;
+      row.push(((n ^ (n >>> 16)) >>> 0) / 4294967295 - 0.5);
+    }
+    lat.push(row);
+  }
+  const out = [];
+  for (let y = 0; y < N; y++) {
+    const row = [];
+    for (let x = 0; x < N; x++) {
+      const fx = x / period, fy = y / period;
+      const i0 = Math.floor(fx) % cells, j0 = Math.floor(fy) % cells;
+      const i1 = (i0 + 1) % cells, j1 = (j0 + 1) % cells;
+      const tx = fx - Math.floor(fx), ty = fy - Math.floor(fy);
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      const a = lat[j0][i0] * (1 - sx) + lat[j0][i1] * sx;
+      const b = lat[j1][i0] * (1 - sx) + lat[j1][i1] * sx;
+      row.push(a * (1 - sy) + b * sy);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+// 여러 겹을 겹쳐 「굵은 얼룩 + 잔 알갱이」를 만든 뒤, 잰 세기에 맞춰 키운다
+function makeGrain(N, weights, sigma, seed) {
+  const layers = weights.map((w, i) => valueNoise(N, [16, 8, 4, 2][i], seed + i * 17));
+  const raw = [];
+  for (let y = 0; y < N; y++) {
+    const row = [];
+    for (let x = 0; x < N; x++) {
+      let v = 0;
+      layers.forEach((L, i) => { v += L[y][x] * weights[i]; });
+      row.push(v);
+    }
+    raw.push(row);
+  }
+  let m = 0, n = 0;
+  for (const r of raw) for (const v of r) { m += v * v; n++; }
+  const rms = Math.sqrt(m / n) || 1;
+  return raw.map(r => r.map(v => {
+    const q = Math.max(0, Math.min(255, Math.round(128 + v / rms * sigma)));
+    return [q, q, q];
+  }));
+}
+
+function saveMat(name, tile) {
+  const w = tile[0].length, h = tile.length;
+  const png = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, c = tile[y][x];
+    png.data[i] = c[0]; png.data[i + 1] = c[1]; png.data[i + 2] = c[2]; png.data[i + 3] = 255;
+  }
+  fs.writeFileSync(MAT + name + '.png', PNG.sync.write(png));
+}
+
+// 마을집이 실제로 서 있는 자리 (하늘·산이 안 물리게 잡는다)
+const VILLAGE = [1150, 430, 1530, 690];
+// [세기를 잴 자리, 겹 무게(굵은->잔), 대표색]
+const MATS = {
+  plaster: [VILLAGE, [0.55, 0.85, 1.0, 0.75], [226, 226, 214]],
+  roof: [[1368, 428, 1530, 480], [0.30, 0.60, 1.0, 0.9], [206, 112, 46]],
+  wood: [[30, 690, 540, 1000], [0.25, 0.55, 1.0, 1.0], [122, 84, 46]],
+  stone: [[1230, 320, 1420, 560], [0.60, 0.90, 1.0, 0.8], [176, 176, 168]],
+};
+const mats = {};
+let seed0 = 91;
+for (const k in MATS) {
+  const [box, weights, col] = MATS[k];
+  const sigma = grainSigma(scene2, box, 3);
+  saveMat('grain_' + k, makeGrain(MAT_S, weights, sigma, seed0));
+  seed0 += 131;
+  mats[k] = col;
+  console.log('재질 %s  결의 세기=%.1f  색=%j', k, sigma, col);
+}
+fs.writeFileSync(MAT + 'colors.json', JSON.stringify(mats, null, 1));

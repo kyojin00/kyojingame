@@ -82,14 +82,54 @@ function quad(p0, p1, p2, p3, fn) {
 // 세 점 삼각형 (박공용) — 위 두 점을 붙여 사각형으로 쓴다
 function tri(a, b, c, fn) { quad(a, a, b, c, fn); }
 
+// ================= 재질의 결 =================
+//
+// 넓은 면을 단색으로 칠하면, 참고 그림에서 오려 온 바닥 타일 옆에 세웠을 때
+// 혼자 매끈해서 튄다. 그래서 **결**을 참고 그림의 마을집에서 그대로 떠 왔다
+// (assets/ref/cut_ref.js가 mat/grain_*.png로 뽑는다).
+//
+// 결은 색이 없고 밝기의 요철만 담는다(128 = 변화 없음). 그래서 지붕 색을
+// 건물마다 바꿔도 같은 결을 쓸 수 있다.
+const MATDIR = __dirname + '/mat/';
+const GRAIN = {};
+for (const k of ['plaster', 'roof', 'wood', 'stone']) {
+  const g = PNG.sync.read(fs.readFileSync(MATDIR + 'grain_' + k + '.png'));
+  const m = [];
+  for (let y = 0; y < g.height; y++) {
+    const row = [];
+    for (let x = 0; x < g.width; x++) row.push(g.data[(y * g.width + x) * 4] - 128);
+    m.push(row);
+  }
+  GRAIN[k] = m;
+}
+const GRAIN_ZOOM = 1.0;    // 결은 이미 알맞은 굵기로 만들어져 있다
+// 결의 세기 (재질마다 다르다 — 회벽은 거칠고 유리는 매끈하다)
+const GRAIN_K = { plaster: 0.52, roof: 0.80, wood: 0.85, stone: 0.80 };
+
+function grained(kind, x, y, c) {
+  const m = GRAIN[kind];
+  if (!m) return c;
+  const n = m.length;
+  const gx = Math.floor(x / GRAIN_ZOOM) % n, gy = Math.floor(y / GRAIN_ZOOM) % n;
+  const d = m[(gy + n) % n][(gx + n) % n] * GRAIN_K[kind];
+  // 밝은 쪽은 조금 따뜻하게, 그늘은 조금 차갑게 — 밝기만 흔들면 회색빛으로 죽는다
+  const w = d * 0.22;
+  return [Math.max(0, Math.min(255, Math.round(c[0] + d + w))),
+    Math.max(0, Math.min(255, Math.round(c[1] + d))),
+    Math.max(0, Math.min(255, Math.round(c[2] + d - w)))];
+}
+
 // ================= 팔레트 =================
+// 참고 그림의 마을집에서 골랐다. 회벽은 크림색이 아니라 **차가운 흰빛**이고,
+// 볕 안 드는 칸은 푸르스름하게 가라앉는다 — 우리 집이 노랗게 떠 보이던 이유다.
 const P = {
-  plaster: [231, 220, 194], plasterHi: [244, 236, 214], plasterLo: [204, 191, 164],
-  beam: [104, 68, 40], beamHi: [136, 96, 60], beamLo: [72, 46, 26],
-  stone: [156, 148, 136], stoneHi: [188, 182, 170], stoneLo: [108, 102, 94],
-  door: [116, 74, 40], doorHi: [148, 100, 58], doorLo: [72, 44, 22],
-  glass: [126, 176, 206], glassHi: [186, 218, 236], glassLit: [250, 216, 128],
-  brick: [150, 84, 62], brickLo: [110, 58, 42], brickHi: [178, 108, 82],
+  plaster: [226, 226, 214], plasterHi: [242, 242, 232], plasterLo: [196, 200, 198],
+  plasterShade: [138, 158, 172],          // 그늘진 벽 칸 (푸르스름하다)
+  beam: [122, 84, 46], beamHi: [156, 114, 66], beamLo: [80, 52, 28],
+  stone: [176, 176, 168], stoneHi: [208, 208, 200], stoneLo: [122, 122, 116],
+  door: [116, 74, 40], doorHi: [150, 102, 58], doorLo: [70, 44, 22],
+  glass: [70, 112, 140], glassHi: [126, 172, 198], glassLit: [248, 208, 116],
+  brick: [154, 86, 60], brickLo: [108, 56, 40], brickHi: [186, 116, 84],
   shadow: [0, 0, 0],
   leaf: [64, 122, 58], leafHi: [96, 158, 78], flower: [214, 88, 92],
 };
@@ -99,13 +139,16 @@ function roofSet(base) {
   return { mid: base, hi: sh(base, 34), lo: sh(base, -38), edge: sh(base, -62) };
 }
 
-// ---- 회벽 무늬 (거친 미장) ----
+// ---- 회벽 ----
+// 바탕색 + 참고 그림에서 뜬 결. 칸(bay)마다 밝기를 조금씩 달리해야
+// 참고 그림처럼 「볕 든 칸 / 그늘진 칸」이 섞인 벽이 된다.
 function plasterAt(lx, ly, seed, dim) {
-  let c = P.plaster;
-  const r = h2(lx >> 1, ly >> 1, seed);
-  if (r > 0.80) c = P.plasterHi;
-  else if (r > 0.62) c = P.plasterLo;
+  const c = grained('plaster', lx, ly, P.plaster);
   return dim ? mul(c, dim) : c;
+}
+// 칸별 밝기 (같은 벽인데 칸마다 조금씩 다르다)
+function bayTone(bay, seed) {
+  return 0.90 + 0.16 * h2(bay, seed, 401);
 }
 
 // ================= 한 채 그리기 =================
@@ -128,14 +171,17 @@ function build(opt) {
     (u, v, sp, dp) => {
       const lx = Math.round(u * sp), ly = Math.round(v * dp);
       // 뒤로 갈수록 조금 더 어둡게 (공기 원근)
-      let c = plasterAt(lx + 300, ly, 21, 0.74 - u * 0.06);
+      const dim = 0.74 - u * 0.06;
+      let c = mul(P.plaster, dim), mat = 'plaster';
       // 기둥 두 개
-      if (lx < 5 || lx > sp - 6 || Math.abs(lx - sp * 0.5) < 4) c = mul(P.beam, 0.74);
+      if (lx < 5 || lx > sp - 6 || Math.abs(lx - sp * 0.5) < 4) {
+        c = mul(P.beam, 0.74); mat = 'wood';
+      }
       // 1층/2층 띠
       const gy = (MID - FY0) / (FY1 - FY0);
-      if (Math.abs(v - gy) < 0.022) c = mul(P.beam, 0.7);
-      if (v > 0.93) c = mul(P.stone, 0.72);
-      return c;
+      if (Math.abs(v - gy) < 0.022) { c = mul(P.beam, 0.7); mat = 'wood'; }
+      if (v > 0.93) { c = mul(P.stone, 0.72); mat = 'stone'; }
+      return grained(mat, lx + 300, ly, c);
     });
   // 앞면과 옆면이 만나는 모서리
   for (let y = FY0; y <= FY1; y++) px(FX1, y, mul(P.beam, 0.62));
@@ -143,13 +189,15 @@ function build(opt) {
   // ---- 2. 앞면 1층 ----
   quad([FX0, MID], [FX1, MID], [FX1, FY1], [FX0, FY1], (u, v, sp, dp) => {
     const lx = Math.round(u * sp), ly = Math.round(v * dp);
-    let c = plasterAt(lx, ly + 200, 31, 1);
-    if (lx < 7 || lx > sp - 8) c = P.beam;                 // 모서리 기둥
-    if (ly > dp - 7) c = P.beam;                           // 밑보
-    // 2층과 같은 자리에 기둥을 세운다 — 이래야 한 채로 이어져 보인다
     const cell = (sp - 14) / BAYS;
-    for (let i = 1; i < BAYS; i++) if (Math.abs(lx - (7 + cell * i)) < 5) c = P.beam;
-    return c;
+    const bay = Math.max(0, Math.min(BAYS - 1, Math.floor((lx - 7) / cell)));
+    let c = mul(P.plaster, bayTone(bay, 11)), mat = 'plaster';
+    if (lx < 7 || lx > sp - 8) { c = P.beam; mat = 'wood'; }   // 모서리 기둥
+    if (ly > dp - 7) { c = P.beam; mat = 'wood'; }             // 밑보
+    // 2층과 같은 자리에 기둥을 세운다 — 이래야 한 채로 이어져 보인다
+    for (let i = 1; i < BAYS; i++)
+      if (Math.abs(lx - (7 + cell * i)) < 5) { c = P.beam; mat = 'wood'; }
+    return grained(mat, lx, ly + 200, c);
   });
   // 층 사이 보: 두 층을 갈라 놓는 게 아니라 「묶어 주는」 띠다.
   // 위에 볕, 아래에 얕은 그늘만 넣어 한 벽에 가로대를 지른 것처럼 보이게 한다.
@@ -166,19 +214,20 @@ function build(opt) {
   quad([FX0, FY0], [FX1, FY0], [FX1, MID], [FX0, MID],
     (u, v, sp, dp) => {
       const lx = Math.round(u * sp), ly = Math.round(v * dp);
-      let c = plasterAt(lx, ly, 41, 1);
-      if (lx < 7 || lx > sp - 8) c = P.beam;
-      if (ly < 6 || ly > dp - 7) c = P.beam;
       // 기둥 + 빗댄 가새 (반목조의 얼굴). 칸 수를 1층과 맞춰 기둥이 이어진다.
       const cell = (sp - 14) / BAYS;
-      for (let i = 1; i < BAYS; i++) if (Math.abs(lx - (7 + cell * i)) < 5) c = P.beam;
-      const seg = Math.floor((lx - 7) / cell);
+      const seg = Math.max(0, Math.min(BAYS - 1, Math.floor((lx - 7) / cell)));
+      let c = mul(P.plaster, bayTone(seg, 12)), mat = 'plaster';
+      if (lx < 7 || lx > sp - 8) { c = P.beam; mat = 'wood'; }
+      if (ly < 6 || ly > dp - 7) { c = P.beam; mat = 'wood'; }
+      for (let i = 1; i < BAYS; i++)
+        if (Math.abs(lx - (7 + cell * i)) < 5) { c = P.beam; mat = 'wood'; }
       const t = ((lx - 7) - seg * cell) / cell, tv = (ly - 6) / (dp - 13);
       if (seg === 0 || seg === BAYS - 1) {
         const want = seg === 0 ? tv : 1 - tv;
-        if (Math.abs(t - want) < 0.055) c = P.beam;
+        if (Math.abs(t - want) < 0.055) { c = P.beam; mat = 'wood'; }
       }
-      return c;
+      return grained(mat, lx, ly, c);
     });
   // 2층 아래·위 테두리 밝게 (나무결)
   for (let x = FX0; x <= FX1; x++) px(x, FY0 + 1, P.beamHi);
@@ -192,11 +241,11 @@ function build(opt) {
     const ox = (h2(gx, gy, 51) - 0.5) * 10, oy = (h2(gx, gy, 52) - 0.5) * 4;
     const cx = gx * cw + cw / 2 + ox, cy = gy * ch + ch / 2 + oy;
     const d = Math.hypot((lx - cx) / (cw * 0.46), (ly - cy) / (ch * 0.46));
-    if (d > 1) return P.stoneLo;
+    if (d > 1) return grained('stone', lx, ly, P.stoneLo);
     const tone = h2(gx, gy, 53) > 0.5 ? P.stone : sh(P.stone, -14);
-    if (ly - cy < -ch * 0.16) return sh(tone, 26);
-    if (ly - cy > ch * 0.18) return sh(tone, -22);
-    return tone;
+    if (ly - cy < -ch * 0.16) return grained('stone', lx, ly, sh(tone, 26));
+    if (ly - cy > ch * 0.18) return grained('stone', lx, ly, sh(tone, -22));
+    return grained('stone', lx, ly, tone);
   });
 
   // ---- 5. 지붕 ----
@@ -216,17 +265,17 @@ function build(opt) {
     if (rib < 0.10) c = sh(c, -22);
     else if (rib > 0.88) c = sh(c, 12);
     if (h2(u * 900, v * 900, 61) > 0.90) c = sh(c, -12);
-    return mul(c, 0.90 + v * 0.10);
+    return grained('roof', u * 260, v * 190, mul(c, 0.90 + v * 0.10));
   });
   // 5-2. 앞 박공 벽 (삼각형) — 회벽 + 기둥 + 다락창
   tri(A, [FX1, FY0], [FX0, FY0], (u, v, sp, dp) => {
     const lx = Math.round(u * sp), ly = Math.round(v * dp);
-    let c = plasterAt(lx + 90, ly + 60, 71, 1);
-    if (Math.abs(lx - sp * 0.5) < 5) c = P.beam;     // 가운데 기둥
-    if (ly > dp - 7) c = P.beam;                     // 밑변 보
+    let c = mul(P.plaster, bayTone(1, 13)), mat = 'plaster';
+    if (Math.abs(lx - sp * 0.5) < 5) { c = P.beam; mat = 'wood'; }   // 가운데 기둥
+    if (ly > dp - 7) { c = P.beam; mat = 'wood'; }                   // 밑변 보
     // 양쪽 빗기둥
-    if (Math.abs(u - 0.28) < 0.028 || Math.abs(u - 0.72) < 0.028) c = P.beam;
-    return c;
+    if (Math.abs(u - 0.28) < 0.028 || Math.abs(u - 0.72) < 0.028) { c = P.beam; mat = 'wood'; }
+    return grained(mat, lx + 90, ly + 60, c);
   });
   // 다락창
   const atticY = FY0 - 66;
@@ -444,7 +493,8 @@ function soften() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const c = src[y][x];
     if (!c) continue;
-    let r = c[0] * 4, g = c[1] * 4, b = c[2] * 4, n = 4;
+    // 가운데를 무겁게 잡는다 — 세게 흐리면 참고 그림에서 떠 온 결까지 지워진다
+    let r = c[0] * 7, g = c[1] * 7, b = c[2] * 7, n = 7;
     for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
       const q = inb(x + dx, y + dy) ? src[y + dy][x + dx] : null;
       // 투명한 이웃과 섞으면 테두리가 뜨므로 자기 색을 대신 쓴다
@@ -480,7 +530,7 @@ function save(name) {
 
 // ================= 건물 종류 =================
 // 지붕색 · 덧문색 · 차양 · 간판 문양으로 구분한다.
-const RED = [190, 84, 48], BLUE = [78, 108, 168], SLATE = [96, 106, 126];
+const RED = [206, 112, 46], BLUE = [78, 108, 168], SLATE = [96, 106, 126];
 const GREEN = [86, 132, 76], PLUM = [126, 84, 148], TEAL = [64, 138, 148];
 const BROWN = [150, 100, 58], NAVY = [64, 82, 132];
 const KINDS = {

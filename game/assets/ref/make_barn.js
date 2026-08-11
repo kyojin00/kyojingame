@@ -158,11 +158,30 @@ for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
   k *= 0.985 + 0.03 * hash01(x >> 2, y >> 2, 301);
   big[y][x] = col.map(v => Math.max(0, Math.min(255, Math.round(v * k))));
 }
+// 집과 같은 결을 얹는다 — 건물끼리 질감이 따로 놀면 그게 제일 눈에 띈다
+const GR = (() => {
+  const g = PNG.sync.read(fs.readFileSync(__dirname + '/mat/grain_wood.png'));
+  const m = [];
+  for (let y = 0; y < g.height; y++) {
+    const row = [];
+    for (let x = 0; x < g.width; x++) row.push(g.data[(y * g.width + x) * 4] - 128);
+    m.push(row);
+  }
+  return m;
+})();
+for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+  const col = big[y][x];
+  if (!col) continue;
+  const n = GR.length, d = GR[y % n][x % n] * 0.8, w = d * 0.22;
+  big[y][x] = [Math.max(0, Math.min(255, Math.round(col[0] + d + w))),
+    Math.max(0, Math.min(255, Math.round(col[1] + d))),
+    Math.max(0, Math.min(255, Math.round(col[2] + d - w)))];
+}
 const src = big.map(r => r.slice());
 for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
   const col = src[y][x];
   if (!col) continue;
-  let r = col[0] * 4, g = col[1] * 4, b = col[2] * 4, n = 4;
+  let r = col[0] * 7, g = col[1] * 7, b = col[2] * 7, n = 7;
   for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
     const q = (x + dx >= 0 && x + dx < BW && y + dy >= 0 && y + dy < BH)
       ? src[y + dy][x + dx] : null;
