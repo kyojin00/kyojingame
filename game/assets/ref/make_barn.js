@@ -133,14 +133,52 @@ function outline(c) {
   return out;
 }
 
+// ---- 마무리 ----
+// 집(make_house.js)과 같은 손질을 한다. 널판마다 단색이면 종이를 오려 붙인
+// 것처럼 각이 지므로, 왼쪽 위에서 빛이 든 것처럼 명암을 흘리고 살짝 흐린 뒤
+// 색을 다시 계단으로 끊는다. (2배로 키운 뒤에 해야 결이 남는다)
+const BW = W * Z, BH = H * Z;
+function hash01(x, y, seed) {
+  let n = (Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)
+    ^ Math.imul(seed | 0, 362437)) >>> 0;
+  n = Math.imul(n ^ (n >>> 13), 1274126177) >>> 0;
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
 const c = outline(barn());
-const p = new PNG({ width: W * Z, height: H * Z });
-p.data.fill(0);
-for (let y = 0; y < H * Z; y++) for (let x = 0; x < W * Z; x++) {
-  const col = c[Math.floor(y / Z)][Math.floor(x / Z)];
+const big = [];
+for (let y = 0; y < BH; y++) {
+  const row = [];
+  for (let x = 0; x < BW; x++) row.push(c[Math.floor(y / Z)][Math.floor(x / Z)] || null);
+  big.push(row);
+}
+for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+  const col = big[y][x];
   if (!col) continue;
-  const i = (y * W * Z + x) * 4;
+  let k = 1.07 - 0.17 * ((x / BW) * 0.42 + (y / BH) * 0.58);
+  k *= 0.985 + 0.03 * hash01(x >> 2, y >> 2, 301);
+  big[y][x] = col.map(v => Math.max(0, Math.min(255, Math.round(v * k))));
+}
+const src = big.map(r => r.slice());
+for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+  const col = src[y][x];
+  if (!col) continue;
+  let r = col[0] * 4, g = col[1] * 4, b = col[2] * 4, n = 4;
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    const q = (x + dx >= 0 && x + dx < BW && y + dy >= 0 && y + dy < BH)
+      ? src[y + dy][x + dx] : null;
+    const u = q || col;               // 투명한 이웃과 섞으면 테두리가 뜬다
+    r += u[0]; g += u[1]; b += u[2]; n += 1;
+  }
+  const q6 = (v) => Math.max(0, Math.min(255, Math.round(v / n / 6) * 6));
+  big[y][x] = [q6(r), q6(g), q6(b)];
+}
+const p = new PNG({ width: BW, height: BH });
+p.data.fill(0);
+for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
+  const col = big[y][x];
+  if (!col) continue;
+  const i = (y * BW + x) * 4;
   p.data[i] = col[0]; p.data[i + 1] = col[1]; p.data[i + 2] = col[2]; p.data[i + 3] = 255;
 }
 fs.writeFileSync(OUT + 'barn.png', PNG.sync.write(p));
-console.log('축사 스프라이트 생성:', W * Z, 'x', H * Z);
+console.log('축사 스프라이트 생성:', BW, 'x', BH);

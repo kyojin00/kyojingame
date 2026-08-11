@@ -1094,13 +1094,13 @@ func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
 	var tname := "house_" + kind
 	if kind == "" or not tex.has(tname):
 		tname = "house"
-	# 그림은 640x512지만 화면에서는 256 x 204.8(8 x 6.4칸)을 덮는다.
-	# 예전 320x256 그림을 0.8배로 그리던 것과 자리·크기가 똑같다 — 밀도만 두 배다.
+	# 그림은 512x410이고 0.5배로 그려 화면에서는 256 x 205(8 x 6.4칸)를 덮는다.
+	# 다른 오브젝트와 같은 2:1 축소라 점이 흔들리지 않는다.
 	var hn := _make_object(tex[tname],
-		Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -512))
+		Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -410))
 	var hspr: Sprite2D = hn.get_child(0)
-	hspr.scale = Vector2(0.4, 0.4)
-	hspr.offset.x = -120.0
+	hspr.scale = Vector2(0.5, 0.5)
+	hspr.offset.x = -96.0
 	obj_nodes[anchor] = hn
 	world.add_child(hn)
 	# 집 그림은 5x4칸보다 크게 그려진다 (양옆 1칸, 위 2칸 더 덮는다).

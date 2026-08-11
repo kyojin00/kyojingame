@@ -414,12 +414,66 @@ function build(opt) {
   return img;
 }
 
-function save(name) {
-  const p = new PNG({ width: W, height: H });
+// ================= 마무리: 각을 눕힌다 =================
+//
+// 면마다 단색으로 칠하면 종이를 오려 붙인 것처럼 각이 진다.
+// 시작화면 그림처럼 보이게 네 단계를 거친다.
+//   1) 빛 방향(왼쪽 위)으로 은은한 명암을 깔아 면 안에서도 밝기가 흐른다
+//   2) 살짝 흐려 경계의 계단을 녹인다 (투명한 곳과는 섞지 않는다 — 테두리가 뜬다)
+//   3) 640x512로 그린 것을 512x410으로 줄인다. 게임에서 0.5배로 그리므로
+//      2:1 정수 축소가 되어 점이 흔들리지 않고, 줄이면서 가장자리가 다듬어진다
+//   4) 색을 다시 계단으로 끊어 도트다운 색 수로 되돌린다
+
+const OW = 512, OH = 410;   // 내보내는 크기 (게임에서 0.5배 = 256 x 205)
+
+function softLight() {
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = (y * W + x) * 4, c = img[y][x];
-    if (!c) { p.data[i + 3] = 0; continue; }
-    p.data[i] = c[0]; p.data[i + 1] = c[1]; p.data[i + 2] = c[2]; p.data[i + 3] = 255;
+    const c = img[y][x];
+    if (!c) continue;
+    // 왼쪽 위가 밝고 오른쪽 아래로 갈수록 가라앉는다
+    const t = (x / W) * 0.42 + (y / H) * 0.58;
+    let k = 1.07 - 0.17 * t;
+    // 아주 얕은 얼룩 — 완전히 매끈한 면은 오히려 플라스틱처럼 보인다
+    k *= 0.985 + 0.03 * h2(x >> 2, y >> 2, 301);
+    img[y][x] = mul(c, k);
+  }
+}
+
+function soften() {
+  const src = img.map(r => r.slice());
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = src[y][x];
+    if (!c) continue;
+    let r = c[0] * 4, g = c[1] * 4, b = c[2] * 4, n = 4;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const q = inb(x + dx, y + dy) ? src[y + dy][x + dx] : null;
+      // 투명한 이웃과 섞으면 테두리가 뜨므로 자기 색을 대신 쓴다
+      const u = q || c;
+      r += u[0]; g += u[1]; b += u[2]; n += 1;
+    }
+    img[y][x] = [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+  }
+}
+
+function save(name) {
+  const p = new PNG({ width: OW, height: OH });
+  const sx = W / OW, sy = H / OH;
+  for (let y = 0; y < OH; y++) for (let x = 0; x < OW; x++) {
+    let r = 0, g = 0, b = 0, on = 0, all = 0;
+    for (let j = Math.floor(y * sy); j < Math.ceil((y + 1) * sy); j++)
+      for (let i = Math.floor(x * sx); i < Math.ceil((x + 1) * sx); i++) {
+        if (!inb(i, j)) continue;
+        all++;
+        const c = img[j][i];
+        if (!c) continue;
+        r += c[0]; g += c[1]; b += c[2]; on++;
+      }
+    const idx = (y * OW + x) * 4;
+    if (!on || on / Math.max(1, all) < 0.42) { p.data[idx + 3] = 0; continue; }
+    // 색 계단 6 — 너무 곱게 두면 그러데이션이 되어 도트로 안 보인다
+    const q = (v) => Math.max(0, Math.min(255, Math.round(v / on / 6) * 6));
+    p.data[idx] = q(r); p.data[idx + 1] = q(g); p.data[idx + 2] = q(b);
+    p.data[idx + 3] = 255;
   }
   fs.writeFileSync(OUT + name + '.png', PNG.sync.write(p));
 }
@@ -451,6 +505,8 @@ const KINDS = {
 
 for (const k in KINDS) {
   build(KINDS[k]);
+  softLight();
+  soften();
   save(k === 'house' ? 'house' : 'house_' + k);
 }
-console.log('건물 %d채 생성 완료 (640x512)', Object.keys(KINDS).length);
+console.log('건물 %d채 생성 완료 (%dx%d)', Object.keys(KINDS).length, OW, OH);
