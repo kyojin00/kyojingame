@@ -37,67 +37,173 @@ function blockNoise(c, tones, seed, chance) {
   }
 }
 
-// ---- 흙길 ----
-// 다져진 흙 + 잔자갈 + 희미한 바퀴 자국
+// ---- 돌길 (자갈 포석) ----
+//
+// 참고 도트의 마을 길은 「흙」이 아니라 둥글둥글한 포석을 깐 길이다.
+// 돌 하나하나를 손으로 찍으면 이어붙일 때 티가 나므로, 씨앗점을 격자에
+// 흔들어 뿌리고 보로노이로 나눠 돌을 만든다. 씨앗을 S로 감아 쓰기 때문에
+// 타일 경계에서도 돌이 자연스럽게 이어진다.
+const STONE_CELL = 16;                    // 씨앗 격자 (64 / 16 = 4 x 4 = 16개)
+const STONE_TONES = [
+  [168, 152, 124], [150, 136, 112], [180, 166, 138],
+  [142, 132, 114], [160, 146, 118], [172, 158, 130],
+];
+const MORTAR = [118, 100, 76];            // 돌 사이 흙
+const MORTAR_DARK = [98, 82, 62];
+
+function stoneSeeds() {
+  const seeds = [];
+  const n = S / STONE_CELL;
+  for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) {
+    seeds.push({
+      x: gx * STONE_CELL + 3 + h2(gx * 13, gy * 7, 201) * (STONE_CELL - 6),
+      y: gy * STONE_CELL + 3 + h2(gx * 17, gy * 11, 202) * (STONE_CELL - 6),
+      tone: Math.floor(h2(gx, gy, 203) * STONE_TONES.length),
+    });
+  }
+  return seeds;
+}
+
+// 감긴 거리 (타일 경계를 넘어가도 이어지게)
+function wrapd(a, b) {
+  let d = Math.abs(a - b);
+  return d > S / 2 ? S - d : d;
+}
+
 function pathTile() {
-  const base = [150, 126, 96];
-  const c = canvas(base);
-  blockNoise(c, [[158, 134, 103], [142, 118, 88], [163, 139, 108]], 11, 0.72);
-  // 다져진 결 (가로로 길게, 아주 옅게)
-  for (let i = 0; i < 5; i++) {
-    const y = Math.floor(h2(i * 7, 3, 21) * S);
-    const len = 14 + Math.floor(h2(i, 9, 22) * 30);
-    const x0 = Math.floor(h2(i, 5, 23) * S);
-    for (let k = 0; k < len; k++) {
-      const x = (x0 + k) % S;
-      px(c, x, y, [138, 114, 85]);
-      px(c, x, y + 1, [146, 122, 92]);
+  const c = canvas(MORTAR);
+  blockNoise(c, [[126, 108, 82], [110, 94, 70], [134, 116, 88]], 11, 0.7);
+  const seeds = stoneSeeds();
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    // 가장 가까운 씨앗 두 개 — 두 거리가 비슷하면 돌 사이 틈이다
+    let b1 = 1e9, b2 = 1e9, best = null;
+    for (const s of seeds) {
+      const dx = wrapd(x + 0.5, s.x), dy = wrapd(y + 0.5, s.y);
+      // 세로를 살짝 눌러 납작한 돌로 (위에서 비스듬히 본 느낌)
+      const d = Math.sqrt(dx * dx + dy * dy * 1.35);
+      if (d < b1) { b2 = b1; b1 = d; best = s; }
+      else if (d < b2) b2 = d;
     }
+    if (b2 - b1 < 2.2) continue;                       // 틈 = 흙 그대로
+    const tone = STONE_TONES[best.tone];
+    // 돌 하나 안에서 위는 밝게, 아래는 그늘 (둥글게 보이게)
+    let dy = y + 0.5 - best.y;
+    if (dy > S / 2) dy -= S; else if (dy < -S / 2) dy += S;
+    let k = 0;
+    if (dy < -2.5) k = 22;
+    else if (dy > 3.0) k = -30;
+    else if (dy > 1.5) k = -14;
+    // 잔결
+    const g = h2(x, y, 204) > 0.72 ? 8 : 0;
+    px(c, x, y, [
+      Math.max(0, Math.min(255, tone[0] + k + g)),
+      Math.max(0, Math.min(255, tone[1] + k + g)),
+      Math.max(0, Math.min(255, tone[2] + k + g)),
+    ]);
+    // 돌 테두리 바로 안쪽은 한 톤 어둡게 (돌끼리 붙어 보이지 않게)
+    if (b2 - b1 < 3.1) px(c, x, y, [tone[0] - 34, tone[1] - 32, tone[2] - 28]);
   }
-  // 잔자갈 (밝은 윗면 + 그림자)
-  for (let i = 0; i < 16; i++) {
-    const x = Math.floor(h2(i * 13, 1, 31) * S);
-    const y = Math.floor(h2(i * 17, 2, 32) * S);
-    const big = h2(i, 4, 33) > 0.65;
-    const w = big ? 4 : 2, hh = big ? 3 : 2;
-    rect(c, x, y, w, hh, [122, 116, 108]);
-    rect(c, x, y, w, 1, [166, 160, 150]);
-    rect(c, x, y + hh, w, 1, [110, 92, 70]);
-  }
-  // 흙 부스러기
-  for (let i = 0; i < 26; i++) {
+  // 틈에 낀 잔풀
+  for (let i = 0; i < 10; i++) {
     const x = Math.floor(h2(i * 29, 6, 41) * S);
     const y = Math.floor(h2(i * 31, 7, 42) * S);
-    rect(c, x, y, 2, 1, [134, 110, 82]);
+    if (c[y][x][0] > 150) continue;                    // 돌 위에는 안 난다
+    px(c, x, y, [86, 128, 62]);
+    px(c, x, y - 1, [104, 148, 74]);
   }
   return c;
 }
 
-// ---- 흙길 가장자리 ----
-// 길과 풀이 만나는 자리에 덧그린다. 직선 경계를 톱니처럼 흐트러뜨린다.
+// ---- 돌길 가장자리 ----
+// 길과 풀이 만나는 자리에 덧그린다. 직선 경계를 톱니처럼 흐트러뜨리고,
+// 끝자락에는 반쯤 묻힌 돌을 몇 개 흘려 놓는다.
 function pathEdge(dir) {
   const c = Array.from({ length: S }, () => new Array(S).fill(null));
+  const put = (i, d, col) => {
+    if (dir === 0) px(c, i, d, col);                   // 위
+    else if (dir === 1) px(c, i, S - 1 - d, col);      // 아래
+    else if (dir === 2) px(c, d, i, col);              // 왼쪽
+    else px(c, S - 1 - d, i, col);                     // 오른쪽
+  };
   for (let i = 0; i < S; i++) {
     const depth = Math.floor(2 + h2(i, dir * 3, 51) * 9);   // 들쭉날쭉한 깊이
     for (let d = 0; d < depth; d++) {
-      const fade = d < depth - 3;                            // 끝자락은 성기게
+      const fade = d < depth - 3;                           // 끝자락은 성기게
       if (!fade && h2(i, d, 52) > 0.5) continue;
-      const tone = h2(i, d, 53) > 0.5 ? [150, 126, 96] : [142, 118, 88];
-      if (dir === 0) px(c, i, d, tone);                      // 위
-      else if (dir === 1) px(c, i, S - 1 - d, tone);         // 아래
-      else if (dir === 2) px(c, d, i, tone);                 // 왼쪽
-      else px(c, S - 1 - d, i, tone);                        // 오른쪽
+      put(i, d, h2(i, d, 53) > 0.5 ? MORTAR : MORTAR_DARK);
     }
+  }
+  // 흩어진 포석 조각
+  for (let k = 0; k < 5; k++) {
+    const i = Math.floor(h2(k * 11, dir, 54) * S);
+    const d = 2 + Math.floor(h2(k * 7, dir, 55) * 5);
+    const tone = STONE_TONES[Math.floor(h2(k, dir, 56) * STONE_TONES.length)];
+    for (let a = 0; a < 4; a++) for (let b = 0; b < 3; b++) {
+      if (a === 0 && b === 0) continue;
+      put((i + a) % S, d + b, b === 0
+        ? [tone[0] + 16, tone[1] + 16, tone[2] + 16]
+        : (b === 2 ? [tone[0] - 32, tone[1] - 30, tone[2] - 26] : tone));
+    }
+  }
+  return c;
+}
+
+// ---- 물 ----
+//
+// 참고 도트의 호수는 「파란 판」이 아니라 잔물결이 층층이 겹친 면이다.
+// 낮은 주파수 사인으로 깊이를 흔들어 바탕을 만들고, 그 위에 잔물결 선과
+// 반짝임을 얹는다. 사인 주기를 64의 약수로 잡아야 이어붙여도 안 튄다.
+const W_DEEP = [26, 84, 152], W_MID = [42, 112, 190], W_SHALLOW = [64, 146, 216];
+const W_FOAM = [150, 208, 244], W_SPARK = [226, 244, 255];
+
+function mix(a, b, t) {
+  return [Math.round(a[0] + (b[0] - a[0]) * t),
+    Math.round(a[1] + (b[1] - a[1]) * t),
+    Math.round(a[2] + (b[2] - a[2]) * t)];
+}
+
+function waterTile(frame) {
+  const ph = frame * Math.PI;                       // 프레임마다 물결을 반 주기 민다
+  const c = canvas(W_MID);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S * Math.PI * 2, v = y / S * Math.PI * 2;
+    // 깊이 얼룩 (저주파 2개를 겹쳐 규칙적으로 안 보이게)
+    const d = 0.5 + 0.28 * Math.sin(u + 0.7 * Math.sin(v))
+      + 0.22 * Math.sin(2 * v + 1.9 + 0.6 * Math.sin(2 * u));
+    c[y][x] = d < 0.42 ? mix(W_DEEP, W_MID, d / 0.42)
+      : mix(W_MID, W_SHALLOW, Math.min(1, (d - 0.42) / 0.62));
+  }
+  blockNoise(c, [W_MID, mix(W_MID, W_DEEP, 0.35), mix(W_MID, W_SHALLOW, 0.35)], 141, 0.28);
+  // 잔물결: 가로로 길고 얕은 호. 밑에 그림자를 깔아야 「면」으로 보인다.
+  for (let i = 0; i < 15; i++) {
+    const y0 = Math.floor(h2(i * 13, 1, 151) * S);
+    const x0 = Math.floor((h2(i * 17, 2, 152) * S + frame * 5) % S);
+    const len = 13 + Math.floor(h2(i, 3, 153) * 20);
+    const bright = h2(i, 4, 154) > 0.55;
+    for (let k = 0; k < len; k++) {
+      const x = (x0 + k) % S;
+      const bend = Math.round(1.2 * Math.sin(k / len * Math.PI + ph));
+      const y = ((y0 + bend) % S + S) % S;
+      px(c, x, y, bright ? W_FOAM : mix(W_SHALLOW, W_FOAM, 0.35));
+      px(c, x, (y + 1) % S, mix(W_MID, W_DEEP, 0.55));
+    }
+  }
+  // 반짝임
+  for (let i = 0; i < 9; i++) {
+    const x = Math.floor((h2(i * 23, 5, 161) * S + frame * 11) % S);
+    const y = Math.floor((h2(i * 29, 6, 162) * S + frame * 7) % S);
+    px(c, x, y, W_SPARK);
+    if (h2(i, 7, 163) > 0.5) px(c, (x + 1) % S, y, W_FOAM);
   }
   return c;
 }
 
 // ---- 풀 ----
 const SEASONS = {
-  spring: { base: [86, 148, 76], tones: [[92, 156, 82], [80, 140, 70], [98, 162, 88]],
-    blade: [64, 118, 56], tip: [124, 186, 104], flower: [[236, 232, 240], [244, 200, 216]] },
-  summer: { base: [72, 140, 64], tones: [[78, 148, 70], [66, 130, 58], [86, 158, 76]],
-    blade: [52, 106, 46], tip: [110, 178, 92], flower: [[248, 226, 120], [240, 168, 96]] },
+  spring: { base: [96, 160, 72], tones: [[104, 170, 80], [86, 146, 64], [114, 182, 90]],
+    blade: [64, 120, 50], tip: [146, 204, 110], flower: [[240, 240, 244], [244, 200, 216]] },
+  summer: { base: [78, 146, 60], tones: [[86, 156, 68], [68, 132, 52], [96, 168, 78]],
+    blade: [50, 108, 40], tip: [126, 192, 96], flower: [[248, 226, 120], [240, 168, 96]] },
   fall: { base: [140, 122, 66], tones: [[148, 130, 72], [130, 112, 60], [158, 138, 80]],
     blade: [112, 94, 50], tip: [176, 152, 92], flower: [[196, 104, 60], [212, 148, 66]] },
   winter: { base: [206, 214, 224], tones: [[214, 222, 232], [196, 205, 216], [224, 230, 238]],
@@ -193,4 +299,6 @@ for (const season of Object.keys(SEASONS))
   for (let v = 0; v < 3; v++) save(`grass_${season}_${v}`, grassTile(season, v));
 save('soil_dry', soilTile(false));
 save('soil_wet', soilTile(true));
-console.log('지형 타일 생성 완료 (흙길 1 + 가장자리 4 + 풀 12 + 밭 2)');
+save('water_0', waterTile(0));
+save('water_1', waterTile(1));
+console.log('지형 타일 생성 완료 (돌길 1 + 가장자리 4 + 풀 12 + 밭 2 + 물 2)');
