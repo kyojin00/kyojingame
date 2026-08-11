@@ -26,6 +26,12 @@ const JOBS = [
   { src: 'ref_house.png', out: 'house', door: 758 },
   { src: 'ref_shop.png', out: 'house_general', door: 768, sky: { x0: 1000, y1: 185 } },
   { src: 'ref_post.png', out: 'house_post', door: 767 },
+  { src: 'ref_lab.png', out: 'house_lab', door: 514 },
+  { src: 'ref_smith.png', out: 'house_smith', door: 506 },
+  { src: 'ref_ranch.png', out: 'house_ranch', door: 509 },
+  { src: 'ref_inn.png', out: 'house_inn', door: 628 },
+  { src: 'ref_library.png', out: 'house_library', door: 636 },
+  { src: 'ref_fish.png', out: 'house_fish', door: 508 },
 ];
 
 for (const job of JOBS) cut(job);
