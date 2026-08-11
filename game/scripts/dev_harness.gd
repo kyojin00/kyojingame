@@ -430,15 +430,32 @@ func _debug_tick() -> void:
 			var parked: bool = m.objects.has(GameData.horse_tile)
 			m.riding._mount_horse(GameData.horse_tile)
 			print("HORSE: parked=", parked, " riding=", GameData.riding)
-		346:
+			# 앉은 자세는 방향마다 따로 맞춰야 해서 셋 다 찍는다.
+			# 화면은 한 프레임 늦게 찍히므로 「자세 -> 다음 단계에서 촬영」으로 민다.
+			_ride_pose("down")
+		345:
 			print("HORSE_DRAW: vis=", m.player.horse_sprite.visible,
 				" tex=", m.player.horse_sprite.texture != null,
-				" pos=", m.player.horse_sprite.position, " scale=", m.player.horse_sprite.scale)
+				" 말offset=", m.player.horse_sprite.offset,
+				" 배율=", m.player.horse_sprite.scale,
+				" 사람y=", m.player.sprite.position.y,
+				" 자른행=", m.player.sprite.region_rect.size.y)
+			print("HORSE_SEAT_OK=", m.player.sprite.region_enabled
+				and m.player.sprite.texture == m.tex[
+					GameData.player_down_tex(false, "idle", 0.0)])
 			_save_shot("_horse.png")
+			_ride_pose("right")
+		346:
+			_save_shot("_horse_side.png")
+			_ride_pose("up")
 		347:
+			_save_shot("_horse_up.png")
+		348:
 			m.riding.dismount_horse()
+			m.player._update_sprite()   # 자른 상체를 되돌리는 건 그릴 때다
 			print("HORSE_DISMOUNT_OK=", not GameData.riding
-				and m.objects.has(GameData.horse_tile))
+				and m.objects.has(GameData.horse_tile)
+				and not m.player.sprite.region_enabled)
 		349:
 			# 우리집 자리: 마을 건물 마당과 한 칸도 겹치면 안 된다
 			var home_yard := Rect2i(m.HOME_ANCHOR - Vector2i(m.YARD_PAD, m.YARD_PAD),
@@ -985,6 +1002,15 @@ func _send_click(world_pos: Vector2) -> void:
 func _save_shot(suffix: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(m._shot_path + suffix)
+
+
+# 말 탄 자세를 한 방향으로 고정한다 (걷는 도중 한 컷).
+# 하네스는 키를 누르지 않으므로 moving을 직접 세운다.
+func _ride_pose(face: String) -> void:
+	m.player.dir = face
+	m.player.moving = true
+	m.player.anim_time = 0.21
+	m.player._update_sprite()
 
 
 # ---- 함께하기 검증 ----
