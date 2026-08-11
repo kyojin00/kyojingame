@@ -179,6 +179,7 @@ const TEXTURE_NAMES := [
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
 	"soil_dry", "soil_wet", "water_0", "water_1", "path",
+	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
 const START_TILE := Vector2i(14, 10)
@@ -1143,7 +1144,11 @@ const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 
 # 위아래 오브젝트의 여백이 32px 틈을 다 먹지 않도록 pad.y는 12 이하로 잡는다.
 const OBJECT_PAD := {
 	# 커다란 바위는 그림이 3칸 폭이라 여백도 그만큼 넓다 (안으로 걸어 들어가지 않게)
-	"tree": Vector2(6, 6), "bigrock": Vector2(26, 8), "rock": Vector2(9, 6),
+	# 나무·돌은 서로 4칸(TREE_DX)·2칸 넘게 떨어뜨려 놓으므로,
+	# 여백을 넓혀도 한 칸짜리 통로가 막히지 않는다. 그림 밑동에 맞춰 넓혔다.
+	# 세로 여백(pad.y)은 12를 넘기면 안 된다 — 같은 줄로 늘어선 것들 사이의
+	# 한 칸 틈이 막힌다 (퀘스트 5의 바위벽. BIGROCK_GAP_OK가 잡아낸다)
+	"tree": Vector2(13, 9), "bigrock": Vector2(26, 8), "rock": Vector2(13, 9),
 	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
@@ -2303,7 +2308,10 @@ const STORY_ROAD_X1 := 47
 const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
-const STORY_GATE_XS := [25, 30, 36, 42]
+# 길을 막은 길목. 예전에는 네 곳 x 네 줄 = 나무 16그루라 초반이 지루했다.
+# 지금은 두 곳이고, 길목마다 길이 두 줄로 좁아진다 → 나무 4그루.
+const STORY_GATE_XS := [27, 38]
+const STORY_GATE_ROWS := [16, 17]   # 막히는 줄 (나머지 줄은 울타리로 좁힌다)
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
@@ -2394,14 +2402,13 @@ func _plant_story_forest() -> void:
 		_story_fence(Vector2i(STORY_ROAD_X1 + 1, y))
 		_story_fence(Vector2i(STORY_ROAD_X0 - 1, y))
 
-	# ③ 길을 가로막고 선 나무 줄 — 베어야만 지나갈 수 있다
+	# ③ 길을 가로막고 선 나무 — 베어야만 지나갈 수 있다.
+	#    길목에서는 길이 두 줄로 좁아지므로 나무 두 그루면 막힌다.
 	for gx: int in STORY_GATE_XS:
-		for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):
-			objects[Vector2i(gx, y)] = {"kind": "tree", "hp": TREE_HP}
+		_story_narrow(gx, "tree", TREE_HP)
 
-	# ④ 퀘스트 5: 커다란 바위가 길 4줄을 통째로 가로막는다
-	for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):
-		objects[Vector2i(STORY_ROCK.x, y)] = {"kind": "bigrock", "hp": BIGROCK_HP}
+	# ④ 퀘스트 5: 커다란 바위 두 개가 좁아진 길을 막는다
+	_story_narrow(STORY_ROCK.x, "bigrock", BIGROCK_HP)
 
 	# ⑤ 길 바깥의 숲: 서로 겹치지 않게 간격을 지켜 세운다 (울타리 너머 풍경)
 	for y in range(1, 23):
@@ -2442,6 +2449,17 @@ func _story_fence(pos: Vector2i) -> void:
 
 
 # 아직 뚫지 못한 길목(나무 줄) 수를 센다 — 한 칸만 베어도 그 줄은 열린 것으로 본다
+# 그 자리에서 길을 두 줄로 좁히고, 남은 두 줄을 막을 것으로 채운다.
+# (길이 네 줄이면 네 개를 다 캐야 하는데 초반부터 그건 지루하다)
+func _story_narrow(gx: int, kind: String, hp: int) -> void:
+	for y in range(STORY_ROAD_Y0, STORY_ROAD_Y1 + 1):
+		var p := Vector2i(gx, y)
+		if STORY_GATE_ROWS.has(y):
+			objects[p] = {"kind": kind, "hp": hp}
+		else:
+			_story_fence(p)
+
+
 func _refresh_story_gates() -> void:
 	var left := 0
 	for gx: int in STORY_GATE_XS:
@@ -5014,6 +5032,12 @@ func _update_hit_fx(delta: float) -> void:
 			cam.offset = Vector2.ZERO
 
 
+func _is_path(x: int, y: int) -> bool:
+	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+		return false
+	return grid[y][x].ground == "path"
+
+
 func spawn_particles(t: Vector2i, kind: String) -> void:
 	var d: Array = PARTICLE_DEFS[kind]
 	var center := Vector2(t.x * TILE + 16, t.y * TILE + 16)
@@ -5114,6 +5138,17 @@ func _draw() -> void:
 					Color(0.68, 0.5, 0.3))
 			else:
 				draw_texture_rect(t, tile_rect, false)
+				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
+				# 길 쪽에서 흙이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다.
+				if cell.ground == "grass":
+					if _is_path(x, y - 1):
+						draw_texture_rect(tex["path_edge_n"], tile_rect, false)
+					if _is_path(x, y + 1):
+						draw_texture_rect(tex["path_edge_s"], tile_rect, false)
+					if _is_path(x - 1, y):
+						draw_texture_rect(tex["path_edge_w"], tile_rect, false)
+					if _is_path(x + 1, y):
+						draw_texture_rect(tex["path_edge_e"], tile_rect, false)
 			if cell.crop_id != "":
 				draw_texture_rect(_crop_texture(cell), tile_rect, false)
 
@@ -5971,6 +6006,36 @@ func _debug_tick() -> void:
 			player.start_swing("pickaxe", Vector2.RIGHT, 4.0)
 			player.swing_t = 4.0 * 0.45
 
+		380:
+			# 충돌 범위를 넓혔으니 길이 막히지 않았는지 확인한다.
+			# 농장 시작 자리에서 마을 광장까지 실제로 걸어갈 수 있어야 한다.
+			var seen_w := {START_TILE: true}
+			var q: Array[Vector2i] = [START_TILE]
+			var head2 := 0
+			while head2 < q.size():
+				var cur: Vector2i = q[head2]
+				head2 += 1
+				for d5 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n5: Vector2i = cur + d5
+					if seen_w.has(n5) or not is_passable(n5):
+						continue
+					seen_w[n5] = true
+					q.append(n5)
+			var plaza := Vector2i(PLAZA.position.x + 3, PLAZA.position.y + 3)
+			var pier := Vector2i(NS_LANE_X + 1, DOCK_Y - 1)
+			print("WORLD_PATH_OK=", seen_w.has(plaza) and seen_w.has(pier),
+				" 광장=", seen_w.has(plaza), " 낚시터=", seen_w.has(pier),
+				" 걸어갈 수 있는 칸=", seen_w.size())
+			# 나무·돌 여백을 넓혀도 한 칸 통로는 살아 있어야 한다
+			print("PAD_INFO=", OBJECT_PAD["tree"], OBJECT_PAD["rock"])
+			# 스토리 길목: 두 곳 · 각 두 그루(개), 막는 줄은 길 안에서 이어져 있어야
+			# 한다 (떨어져 있으면 사이로 그냥 지나가 버린다)
+			print("STORY_GATE_OK=", STORY_GATE_XS.size() == 2
+					and STORY_GATE_ROWS.size() == 2
+					and int(STORY_GATE_ROWS[1]) == int(STORY_GATE_ROWS[0]) + 1
+					and int(STORY_GATE_ROWS[0]) >= STORY_ROAD_Y0
+					and int(STORY_GATE_ROWS[1]) <= STORY_ROAD_Y1,
+				" 길목=", STORY_GATE_XS.size(), "곳 · 막는 줄=", STORY_GATE_ROWS)
 		384:
 			# 나무 뒤에 서면 나무가 비쳐 보여야 한다 (플레이어가 안 가려지게)
 			var ft := Vector2i(24, 22)
