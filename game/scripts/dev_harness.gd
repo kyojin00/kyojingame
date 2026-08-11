@@ -16,7 +16,7 @@
 # main의 것은 `m.`으로 부른다 (m = main.gd).
 extends Node
 
-var m: Node2D    # main.gd
+var m: KyojinMain    # main.gd
 var _shot_frames := 0
 
 
@@ -36,10 +36,10 @@ func _debug_tick() -> void:
 	if OS.get_environment("KYOJIN_STORY") != "":
 		# 스토리 화면만 캡처하고 종료 (프레임 수가 아니라 스토리 진행 시간 기준 —
 		# 헤드리스 환경은 프레임 속도가 들쭉날쭉하다)
-		if not m._story_snapped and m._story_t >= 3.2:
-			m._story_snapped = true
+		if not m.story._story_snapped and m.story._story_t >= 3.2:
+			m.story._story_snapped = true
 			_save_shot("_story.png")
-		elif m._story_snapped and m._story_t >= 3.8:
+		elif m.story._story_snapped and m.story._story_t >= 3.8:
 			get_tree().quit()
 		return
 	match _shot_frames:
