@@ -5845,6 +5845,22 @@ func _debug_tick() -> void:
 				if str(m.type) == "treant":
 					boss += 1
 			print("CAVE_MINIBOSS_OK=", boss >= 1, " 10층 보스=", boss)
+			# 한 화면(ZOOM 배)보다 넓어야 「탐험」이 된다
+			var view_w: float = 960.0 / cave.ZOOM / cave.TS
+			var view_h: float = 540.0 / cave.ZOOM / cave.TS
+			cave.floor_num = 1
+			cave._gen_floor()
+			var w1: int = cave.GW
+			var h1: int = cave.GH
+			cave.floor_num = 12
+			cave._gen_floor()
+			print("CAVE_SIZE_OK=", float(w1) > view_w * 1.8 and float(h1) > view_h * 1.8,
+				" 1층=", w1, "x", h1, " 12층=", cave.GW, "x", cave.GH,
+				" 한 화면=", "%.0f x %.0f" % [view_w, view_h])
+			# 계단이 처음부터 있어야 몬스터를 다 잡지 않고도 내려갈 수 있다
+			print("CAVE_STAIRS_OK=", cave.stairs_pos.x >= 0
+					and cave.reachable.has(cave.stairs_pos),
+				" 계단=", cave.stairs_pos, " 입구=", cave.entry_pos)
 		361:
 			# 의뢰: 종류가 여러 가지로 붙고, 골라서 수락 -> 납품까지 되는가
 			GameData.quest = {}

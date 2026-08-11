@@ -1,11 +1,28 @@
 # 동굴 탐험: 층별 생성 던전. 슬라임을 모두 잡으면 보상 상자 + 다음 층.
 extends CanvasLayer
 
-const GW := 26          # 동굴 그리드 (타일)
-const GH := 13
-const TS := 32.0        # 타일 픽셀
-const OX := 64.0         # 화면 오프셋
-const OY := 62.0
+# 동굴은 **한 화면에 다 들어오지 않는다.** 층이 깊어질수록 넓어지고,
+# 화면은 주인공을 따라 움직인다 (ZOOM 배로 확대해 그린다).
+#
+# 좌표계는 예전 그대로 「타일 x TS 픽셀」이다 (OX/OY = 0).
+# 이동 속도·판정 거리 같은 값을 건드리지 않으려고 논리 좌표는 그대로 두고,
+# **그리기만** 확대·이동한다 (_draw_cave의 draw_set_transform).
+const TS := 32.0         # 타일 (논리 픽셀)
+const OX := 0.0
+const OY := 0.0
+const ZOOM := 1.5        # 화면에 그릴 때의 배율 — 타일 한 칸이 48px로 보인다
+const VIEW := Vector2(960.0, 540.0)
+
+const CAVE_W_BASE := 42  # 1층 크기
+const CAVE_H_BASE := 28
+const CAVE_GROW := 2     # 한 층 내려갈 때마다 (가로/세로)
+const CAVE_W_MAX := 76
+const CAVE_H_MAX := 52
+
+var GW := CAVE_W_BASE
+var GH := CAVE_H_BASE
+var cam := Vector2.ZERO
+var seen := {}           # 미니맵에 드러난 칸
 
 var main: Node2D
 var canvas: Control
@@ -127,8 +144,13 @@ func _gen_floor() -> void:
 	walls.clear()
 	ores.clear()
 	monsters.clear()
+	seen.clear()
 	chest_pos = Vector2i(-1, -1)
 	stairs_pos = Vector2i(-1, -1)
+	# 층이 깊어질수록 넓어진다
+	GW = mini(CAVE_W_MAX, CAVE_W_BASE + (floor_num - 1) * CAVE_GROW)
+	GH = mini(CAVE_H_MAX, CAVE_H_BASE + (floor_num - 1) * CAVE_GROW)
+	entry_pos = Vector2i(2, GH - 3)
 
 	# 층마다 모양을 바꾼다 (세계수 동굴은 언제나 너른 굴)
 	layout = "open" if worldtree else LAYOUTS[randi() % LAYOUTS.size()]
@@ -215,8 +237,15 @@ func _gen_floor() -> void:
 		if not worldtree and floor_num % 5 == 0:
 			_spawn_mob("treant", 12 + floor_num * 2)
 
+	# 계단은 처음부터 어딘가에 있다 — 넓어진 동굴에서 몬스터를 한 마리씩
+	# 찾아다니지 않고도 내려갈 수 있어야 「탐험」이 된다.
+	# (상자는 여전히 전멸 보상이다)
+	var st := _free_tile(minf(GW, GH) * 0.55)
+	stairs_pos = st if st.x >= 0 else Vector2i(GW - 3, 2)
 	ppos = Vector2(OX + (entry_pos.x + 0.5) * TS, OY + (entry_pos.y + 0.5) * TS)
 	pdir = "right"
+	cam = ppos
+	_mark_seen()
 
 
 func _spawn_mob(type: String, hp: int) -> void:
@@ -264,6 +293,8 @@ func _process(delta: float) -> void:
 	attack_cd -= delta
 	hurt_cd -= delta
 	swing_t -= delta
+	_update_cam(delta)
+	_mark_seen()
 
 	# 이동 (이미 끼어 있으면 충돌 무시하고 빠져나올 수 있게)
 	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -456,8 +487,6 @@ func _interact() -> void:
 			main.gain_item("star_shard", shards)
 			main.hud.show_message("별빛 조각 %d개! 대장간에서 쓸 수 있다." % shards, 4.0)
 		chest_pos = Vector2i(-1, -1)
-		var sp := _free_tile(0.0)
-		stairs_pos = sp if sp.x >= 0 else Vector2i(GW / 2, GH / 2)
 		return
 	# 다음 층 계단
 	if stairs_pos.x >= 0 and pt.distance_to(stairs_pos) < 1.8:
@@ -508,11 +537,78 @@ func _update_sprite() -> void:
 			player_sprite.flip_h = pdir == "left"
 	player_sprite.texture = main.tex[tex_name]
 	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
-	player_sprite.position = ppos + Vector2(-32, -95)
+	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
+	player_sprite.position = _to_screen(ppos) + Vector2(-32, -95) * ZOOM
 	player_sprite.modulate = Color(1, 0.55, 0.55) if hurt_cd > 0.6 else Color(1, 1, 1)
 
 
+# 주인공 둘레를 미니맵에 드러낸다 (한 화면에 안 들어오니 길잡이가 필요하다)
+func _mark_seen() -> void:
+	var pt := Vector2i(int(ppos.x / TS), int(ppos.y / TS))
+	for dy in range(-5, 6):
+		for dx in range(-7, 8):
+			var t := pt + Vector2i(dx, dy)
+			if t.x >= 0 and t.y >= 0 and t.x < GW and t.y < GH:
+				seen[t] = true
+
+
+# 화면은 주인공을 따라간다. 동굴이 화면보다 작은 쪽(좁은 층)은 가운데 맞춘다.
+func _update_cam(delta: float) -> void:
+	var half := VIEW / (2.0 * ZOOM)
+	var target := ppos
+	var w: float = GW * TS
+	var h: float = GH * TS
+	if w > half.x * 2.0:
+		target.x = clampf(target.x, half.x, w - half.x)
+	else:
+		target.x = w / 2.0
+	if h > half.y * 2.0:
+		target.y = clampf(target.y, half.y, h - half.y)
+	else:
+		target.y = h / 2.0
+	cam = cam.lerp(target, clampf(delta * 9.0, 0.0, 1.0))
+
+
+func _to_screen(p: Vector2) -> Vector2:
+	return (p - cam) * ZOOM + VIEW / 2.0
+
+
+# 미니맵 (오른쪽 아래) — 가 본 곳만 보여 준다.
+# 오른쪽 위는 바깥 HUD(시계·의뢰 두루마리)가 덮으므로 피한다.
+func _draw_minimap() -> void:
+	var cell := 3.0
+	var w: float = GW * cell
+	var h: float = GH * cell
+	var ox: float = VIEW.x - w - 14.0
+	var oy: float = VIEW.y - h - 14.0
+	# 판 + 테두리 (아직 안 가 본 곳은 옅은 회색으로 남겨 둬서 「지도」로 읽히게)
+	canvas.draw_rect(Rect2(ox - 4, oy - 4, w + 8, h + 8), Color(0.08, 0.07, 0.12, 0.92))
+	canvas.draw_rect(Rect2(ox - 4, oy - 4, w + 8, h + 8), Color(0.45, 0.4, 0.55, 0.9),
+		false, 1.0)
+	canvas.draw_rect(Rect2(ox, oy, w, h), Color(0.13, 0.12, 0.17, 0.95))
+	for t: Vector2i in seen:
+		var c := Color(0.42, 0.38, 0.45) if walls.has(t) else Color(0.2, 0.26, 0.22)
+		canvas.draw_rect(Rect2(ox + t.x * cell, oy + t.y * cell, cell, cell), c)
+	for t2: Vector2i in ores:
+		if seen.has(t2):
+			canvas.draw_rect(Rect2(ox + t2.x * cell, oy + t2.y * cell, cell, cell),
+				Color(0.85, 0.72, 0.35))
+	if stairs_pos.x >= 0 and seen.has(stairs_pos):
+		canvas.draw_rect(Rect2(ox + stairs_pos.x * cell - 1, oy + stairs_pos.y * cell - 1,
+			cell + 2, cell + 2), Color(0.5, 0.9, 1.0))
+	if chest_pos.x >= 0 and seen.has(chest_pos):
+		canvas.draw_rect(Rect2(ox + chest_pos.x * cell - 1, oy + chest_pos.y * cell - 1,
+			cell + 2, cell + 2), Color(1.0, 0.85, 0.35))
+	canvas.draw_rect(Rect2(ox + entry_pos.x * cell - 1, oy + entry_pos.y * cell - 1,
+		cell + 2, cell + 2), Color(0.6, 0.8, 0.6))
+	var pt := Vector2(ox + ppos.x / TS * cell, oy + ppos.y / TS * cell)
+	canvas.draw_rect(Rect2(pt.x - 2, pt.y - 2, 5, 5), Color(1, 1, 1))
+	canvas.draw_rect(Rect2(pt.x - 1, pt.y - 1, 3, 3), Color(0.95, 0.3, 0.25))
+
+
 func _draw_cave() -> void:
+	# 여기서부터 그리는 것은 모두 카메라 기준 + ZOOM 배
+	canvas.draw_set_transform(VIEW / 2.0 - cam * ZOOM, 0.0, Vector2(ZOOM, ZOOM))
 	# 바닥
 	canvas.draw_rect(Rect2(OX, OY, GW * TS, GH * TS),
 		Color(0.16, 0.24, 0.18) if worldtree else Color(0.22, 0.19, 0.24))
@@ -550,14 +646,19 @@ func _draw_cave() -> void:
 		var reach := ppos + _dir_vec() * 28.0
 		canvas.draw_rect(Rect2(reach.x - 12, reach.y - 12, 24, 24), Color(1, 0.9, 0.5, 0.5))
 
+	# ---- 여기부터는 화면 고정 (카메라를 따라가지 않는다) ----
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_draw_minimap()
+
 	# 상단 정보
 	var cave_name := "세계수 동굴" if worldtree else "동굴"
 	var info := "%s %d층 · 몬스터 %d마리 · 체력 %d" % [cave_name, floor_num, monsters.size(), int(GameData.energy)]
 	if chest_pos.x >= 0:
 		info += " · 상자를 열자(E)!"
 	elif stairs_pos.x >= 0:
-		info += " · 계단(E)으로 다음 층!"
-	_cave_label(Vector2(480, 52), info)
+		info += " · 계단을 찾아 내려가자(E)"
+	_cave_label(Vector2(480, 30), info)
+	_cave_label(Vector2(480, 54), "%s · %d x %d칸" % [floor_title(), GW, GH])
 
 
 func _cave_label(center: Vector2, text: String) -> void:
