@@ -25,6 +25,7 @@ const BASE_Y = 404;              // 그림 밑동이 앉는 줄 (아래는 그�
 const JOBS = [
   { src: 'ref_house.png', out: 'house', door: 758 },
   { src: 'ref_shop.png', out: 'house_general', door: 768, sky: { x0: 1000, y1: 185 } },
+  { src: 'ref_post.png', out: 'house_post', door: 767 },
 ];
 
 for (const job of JOBS) cut(job);
