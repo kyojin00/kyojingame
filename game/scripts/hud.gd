@@ -353,7 +353,18 @@ func _build_hotbar() -> void:
 		slot_buttons.append(b)
 
 
+# 핫바는 **바뀌었을 때만** 다시 그린다.
+# 매 프레임 12칸에 스타일박스를 새로 씌우면 그때마다 Control이 다시 배치된다 —
+# 이것만으로 프레임당 0.7ms를 먹고 있었다.
+var _hotbar_sig := ""
+
 func _refresh_hotbar() -> void:
+	var sig := GameData.tool + "|" + "|".join(GameData.tool_slots)
+	for t2: String in GameData.tool_slots:
+		sig += "1" if (t2 != "" and GameData.is_tool_unlocked(t2)) else "0"
+	if sig == _hotbar_sig:
+		return
+	_hotbar_sig = sig
 	for i in slot_buttons.size():
 		var b: Button = slot_buttons[i]
 		var t: String = GameData.tool_slots[i] if i < GameData.tool_slots.size() else ""
@@ -365,14 +376,32 @@ func _refresh_hotbar() -> void:
 		b.add_theme_stylebox_override("pressed", _slot_selected)
 
 
-func refresh() -> void:
+# 같은 글을 다시 넣지 않는다. Label.text에 대입하면 글자 배치를 새로 계산하는데,
+# 한글은 그 비용이 특히 크다. 매 프레임 여섯 줄을 다시 계산하고 있었다.
+func _put(l: Label, s2: String) -> void:
+	if l.text != s2:
+		l.text = s2
+
+
+# HUD는 **초당 열 번**만 다시 짠다.
+# 글자를 바꾸지 않아도 「무슨 글을 넣을지」 만드는 데만 프레임당 0.12ms가 든다
+# (목표·의뢰·축제 줄을 매번 새로 이어 붙인다). 시계는 게임 분 단위라
+# 0.1초 늦어도 눈에 안 보인다. 체력 막대만 매 프레임 따라간다.
+var _refresh_t := 0.0
+
+func refresh(force := false) -> void:
+	energy_bar.value = GameData.energy
+	_refresh_t -= get_process_delta_time()
+	if _refresh_t > 0.0 and not force:
+		return
+	_refresh_t = 0.1
+
 	# 컴팩트 날씨/날짜/시간: "☀ 맑음" / "봄 1일 · 오전 8:30"
 	var w: int = main.weather_now()
-	day_label.text = "%s %s" % [GameData.weather_icon(w), GameData.weather_name(w)]
-	clock_label.text = "%s %d일 · %s" % [GameData.season_name(),
-		GameData.day_in_season(), GameData.clock_text()]
-	money_label.text = "%dG" % GameData.money
-	energy_bar.value = GameData.energy
+	_put(day_label, "%s %s" % [GameData.weather_icon(w), GameData.weather_name(w)])
+	_put(clock_label, "%s %d일 · %s" % [GameData.season_name(),
+		GameData.day_in_season(), GameData.clock_text()])
+	_put(money_label, "%dG" % GameData.money)
 
 	# 두루마리 퀘스트 트래커 (최소 문구)
 	var track := []
@@ -397,23 +426,23 @@ func refresh() -> void:
 	if qline != "":
 		track.append("의뢰: " + qline)
 	track.append("%s: 퀘스트 창" % GameData.key_label("open_quest"))
-	objective_label.text = "\n".join(track)
+	_put(objective_label, "\n".join(track))
 
 	_refresh_hotbar()
 
 	if GameData.tool == "seed":
 		var id := GameData.current_seed_id()
 		if id == "":
-			tool_name.text = "씨앗 없음 - 마을 잡화점에서 사자"
+			_put(tool_name, "씨앗 없음 - 마을 잡화점에서 사자")
 		else:
-			tool_name.text = "%s 씨앗 x%d (%s: 바꾸기)" % [GameData.CROPS[id].name,
-				GameData.seeds[id], GameData.key_label("cycle_seed")]
+			_put(tool_name, "%s 씨앗 x%d (%s: 바꾸기)" % [GameData.CROPS[id].name,
+				GameData.seeds[id], GameData.key_label("cycle_seed")])
 	else:
-		tool_name.text = TOOL_LABELS[GameData.tool]
+		var label: String = TOOL_LABELS[GameData.tool]
 		var sk: String = TOOL_SKILL.get(GameData.tool, "")
 		if sk != "":
-			tool_name.text += "  ·  %s Lv.%d" % [GameData.SKILLS[sk].name,
-				GameData.skill_lv(sk)]
+			label += "  ·  %s Lv.%d" % [GameData.SKILLS[sk].name, GameData.skill_lv(sk)]
+		_put(tool_name, label)
 
 
 func show_message(text: String, dur := 2.5) -> void:

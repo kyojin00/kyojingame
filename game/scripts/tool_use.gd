@@ -235,6 +235,7 @@ func use_tool() -> void:
 				return
 			GameData.seeds[id] -= 1
 			cell.crop_id = id
+			m.farming.touch(cell)
 			cell.crop_day = 0.0
 			cell.dead = false
 			cell.half_fed = false

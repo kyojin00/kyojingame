@@ -182,3 +182,5 @@ func _apply_save(d: Dictionary) -> void:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
 			m.objects[Vector2i(int(o[0]), int(o[1]))] = od
 		m.worldgen._migrate_farm_layout()
+	# 격자가 통째로 바뀌었다 — 「돌아가는 칸」 목록을 다시 만든다
+	m.farming.rebuild()

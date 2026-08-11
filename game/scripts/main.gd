@@ -388,6 +388,7 @@ func _ready() -> void:
 
 	_load_textures()
 	worldgen._build_map()
+	farming.rebuild()
 
 	night = CanvasModulate.new()
 	add_child(night)
@@ -1174,8 +1175,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("save_game"):
 		saveio.save_now()
 		hud.show_message("저장했다!")
+	elif event is InputEventMouseMotion:
+		# 마우스 화면 좌표는 **움직일 때만** 적어 둔다.
+		# get_global_mouse_position()은 매번 창 시스템에 물어보기 때문에 비싸다
+		# (프레임당 0.13ms — 매 프레임 도는 것 중 제일 컸다).
+		actions.mouse_screen = event.position
 	elif event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
+		actions.mouse_screen = event.position
 		actions._click_at(get_canvas_transform().affine_inverse() * event.position,
 			event.double_click)
 
@@ -1249,7 +1256,7 @@ func _is_path(x: int, y: int) -> bool:
 
 
 func _draw() -> void:
-	# 카메라에 보이는 타일만 그린다 (90x60 맵 컬링)
+	# 카메라에 보이는 타일만 그린다 (120x90 맵 컬링)
 	var vis: Rect2 = get_canvas_transform().affine_inverse() * get_viewport_rect()
 	var vx0 := int(floor(vis.position.x / TILE)) - 1
 	var vy0 := int(floor(vis.position.y / TILE)) - 1
@@ -1261,63 +1268,103 @@ func _draw() -> void:
 	var y1 := mini(MAP_H, vy1)
 
 	var grass_prefix := "grass_" + GameData.season_key() + "_"
+	var tile_size := Vector2(TILE, TILE)
+
+	# ---- 텍스처별로 모았다가 한 번에 그린다 ----
+	#
+	# 칸 순서대로 그리면 잔디->물->길->잔디로 텍스처가 계속 바뀌어 배치(batch)가
+	# 매번 끊긴다. 그래서 보이는 칸 수만큼(800여 번) 드로우콜이 났다.
+	# 같은 텍스처끼리 붙여 그리면 스무 번 안쪽으로 줄어든다.
+	#
+	# 겹치는 순서는 지켜야 한다: 바탕 -> 길 가장자리 -> 작물.
+	# 바탕끼리는 한 칸에 하나뿐이라 서로 안 겹친다 — 순서를 바꿔도 안전하다.
+	var base := {}      # Texture2D -> Array[Vector2]
+	var edges := {}
+	var crops := {}
+	var docks: Array[Vector2] = []
+
+	var put := func(bin: Dictionary, t: Texture2D, at: Vector2) -> void:
+		if not bin.has(t):
+			bin[t] = [] as Array[Vector2]
+		bin[t].append(at)
 
 	# 맵 바깥: 화면 가장자리가 비지 않도록 어두운 숲을 깔아 둔다.
 	# (카메라 제한을 풀어 주인공을 항상 화면 가운데 두기 위한 배경)
+	var out_grass := {}
+	var out_trees: Array[Vector2] = []
 	for y in range(vy0, vy1):
 		for x in range(vx0, vx1):
 			if x >= 0 and y >= 0 and x < MAP_W and y < MAP_H:
 				continue
-			var gt: Texture2D = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
-			draw_texture_rect(gt, Rect2(Vector2(x * TILE, y * TILE), Vector2(TILE, TILE)),
-				false, OUT_TINT)
+			put.call(out_grass, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)],
+				Vector2(x * TILE, y * TILE))
 			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다
 			if x % 3 == 0 and y % 2 == 0 and _hash01(x * 5 + 1, y * 7 + 3) < 0.55:
-				var ot: Texture2D = tex["tree_01"]
-				var osc := 1.5
-				draw_texture_rect(ot, Rect2(
-					Vector2(x * TILE + 16 - ot.get_width() * osc / 2.0,
-						(y + 1) * TILE - ot.get_height() * osc),
-					ot.get_size() * osc), false, OUT_TREE_TINT)
+				out_trees.append(Vector2(x * TILE, y * TILE))
+
 	for y in range(y0, y1):
+		var row: Array = grid[y]
 		for x in range(x0, x1):
-			var cell: Dictionary = grid[y][x]
-			var t: Texture2D
-			if cell.ground == "water":
-				t = tex["water_%d" % water_frame]
-			elif cell.ground == "soil":
-				t = tex["soil_wet"] if cell.watered else tex["soil_dry"]
-			elif cell.ground == "path" or cell.ground == "dock":
-				t = tex["path"]
+			var cell: Dictionary = row[x]
+			var at := Vector2(x * TILE, y * TILE)
+			var ground: String = cell.ground
+			if ground == "dock":
+				docks.append(at)
+			elif ground == "water":
+				put.call(base, tex["water_%d" % water_frame], at)
+			elif ground == "soil":
+				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
+			elif ground == "path":
+				put.call(base, tex["path"], at)
 			else:
-				t = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
-			# 텍스처 해상도와 무관하게 타일 칸에 맞춰 그린다 (64px 아트 → 1080p에서 1:1)
-			var tile_rect := Rect2(Vector2(x * TILE, y * TILE), Vector2(TILE, TILE))
-			if cell.ground == "dock":
-				# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
-				draw_texture_rect(tex["water_%d" % water_frame], tile_rect, false)
-				draw_rect(Rect2(tile_rect.position + Vector2(0, 2),
-					Vector2(TILE, TILE - 4)), Color(0.55, 0.38, 0.22))
-				for i in 3:
-					draw_rect(Rect2(tile_rect.position + Vector2(0, 2 + i * 9),
-						Vector2(TILE, 1)), Color(0.38, 0.25, 0.14))
-				draw_rect(Rect2(tile_rect.position + Vector2(0, 2), Vector2(TILE, 2)),
-					Color(0.68, 0.5, 0.3))
-			else:
-				draw_texture_rect(t, tile_rect, false)
+				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
 				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
 				# 길 쪽에서 흙이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다.
-				if cell.ground == "grass":
-					if _is_path(x, y - 1):
-						draw_texture_rect(tex["path_edge_n"], tile_rect, false)
-					if _is_path(x, y + 1):
-						draw_texture_rect(tex["path_edge_s"], tile_rect, false)
-					if _is_path(x - 1, y):
-						draw_texture_rect(tex["path_edge_w"], tile_rect, false)
-					if _is_path(x + 1, y):
-						draw_texture_rect(tex["path_edge_e"], tile_rect, false)
+				if _is_path(x, y - 1):
+					put.call(edges, tex["path_edge_n"], at)
+				if _is_path(x, y + 1):
+					put.call(edges, tex["path_edge_s"], at)
+				if _is_path(x - 1, y):
+					put.call(edges, tex["path_edge_w"], at)
+				if _is_path(x + 1, y):
+					put.call(edges, tex["path_edge_e"], at)
 			if cell.crop_id != "":
-				draw_texture_rect(renderer._crop_texture(cell), tile_rect, false)
+				put.call(crops, renderer._crop_texture(cell), at)
+
+	# 맵 바깥 (어둡게)
+	for t: Texture2D in out_grass:
+		for at: Vector2 in out_grass[t]:
+			draw_texture_rect(t, Rect2(at, tile_size), false, OUT_TINT)
+	if not out_trees.is_empty():
+		var ot: Texture2D = tex["tree_01"]
+		var osc := 1.5
+		var osize: Vector2 = ot.get_size() * osc
+		for at: Vector2 in out_trees:
+			draw_texture_rect(ot, Rect2(
+				Vector2(at.x + 16 - osize.x / 2.0, at.y + TILE - osize.y), osize),
+				false, OUT_TREE_TINT)
+	# 바탕 -> 길 가장자리 -> 작물
+	for t: Texture2D in base:
+		for at: Vector2 in base[t]:
+			draw_texture_rect(t, Rect2(at, tile_size), false)
+	# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
+	if not docks.is_empty():
+		var wt: Texture2D = tex["water_%d" % water_frame]
+		for at: Vector2 in docks:
+			draw_texture_rect(wt, Rect2(at, tile_size), false)
+		for at: Vector2 in docks:
+			draw_rect(Rect2(at + Vector2(0, 2), Vector2(TILE, TILE - 4)),
+				Color(0.55, 0.38, 0.22))
+			for i in 3:
+				draw_rect(Rect2(at + Vector2(0, 2 + i * 9), Vector2(TILE, 1)),
+					Color(0.38, 0.25, 0.14))
+			draw_rect(Rect2(at + Vector2(0, 2), Vector2(TILE, 2)), Color(0.68, 0.5, 0.3))
+	for t: Texture2D in edges:
+		for at: Vector2 in edges[t]:
+			draw_texture_rect(t, Rect2(at, tile_size), false)
+	for t: Texture2D in crops:
+		for at: Vector2 in crops[t]:
+			draw_texture_rect(t, Rect2(at, tile_size), false)
 
 	# 타겟 타일 하이라이트 (호버: 흰 실선 / 좌클릭 선택: 금색 강조)
 	if player != null:

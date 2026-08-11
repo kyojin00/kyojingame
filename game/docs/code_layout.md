@@ -131,7 +131,9 @@ python3 tools/split_module.py <설정.json>
 - **`@rpc` 어노테이션.** 함수 위에 따로 있어서 두고 올 뻔했다. 그러면 함수만
   옮겨져 통신이 통째로 죽는다.
 
-`python3 tools/check_refs.py`가 옛 주소와 `self`를 훑는다.
+`python3 tools/check_refs.py`가 옛 주소·`self`·지역 `m`을 훑는다.
+`python3 tools/check_steps.py`는 하네스 단계 번호가 겹치는지 본다 —
+겹치면 뒤에 온 갈래가 죽은 코드가 되고 검사가 조용히 사라진다 (다섯 번 당했다).
 
 ## 옮긴 뒤 반드시 하는 검증
 

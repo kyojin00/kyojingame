@@ -898,7 +898,49 @@ func _debug_tick() -> void:
 			m._weather_override = -1
 			m.village._open_quest_board()
 		381: _save_shot("_board.png")
-		388: get_tree().quit()
+		387:
+			# ---- 성능 재기 ----
+			# 소프트웨어 렌더러라 FPS는 뜻이 없다. **개수**를 본다 —
+			# 드로우콜과 노드 수는 실기에서도 그대로다.
+			m.interior.close()
+			m.cave.close()
+			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16,
+				m.START_TILE.y * m.TILE + 16)
+		389:
+			var calls := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+			var nodes := Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+			var t0 := Time.get_ticks_usec()
+			for i in 20:
+				m._process(0.016)
+			var proc_us := (Time.get_ticks_usec() - t0) / 20.0
+			print("PERF: 드로우콜=", int(calls), " 노드=", int(nodes),
+				" world자식=", m.world.get_child_count(),
+				" 오브젝트=", m.objects.size(),
+				" _process=", "%.0f" % proc_us, "us")
+			# 한 프레임 드로우콜이 이 선을 넘으면 무언가 잘못된 것이다.
+			# (화면에 보이는 칸이 38 x 22쯤이므로 타일만으로 900을 넘지 않아야 한다)
+			# 어디에 시간이 드는지 쪼개 본다
+			var parts := {
+				"story": func() -> void: m.story._story_update(0.016),
+				"fade": func() -> void: m.objnode._update_object_fade(0.016),
+				"treefade": func() -> void: m.objnode._update_tree_fade(),
+				"mouse": func() -> void: m.actions._update_mouse_target(),
+				"particles": func() -> void: m.renderer._update_particles(0.016),
+				"nightmobs": func() -> void: m.daycycle._update_night_mobs(0.016),
+				"hud": func() -> void: m.hud.refresh(true),
+				"growth": func() -> void: m.farming._growth_tick(1.0),
+				"hitfx": func() -> void: m.toolwork._update_hit_fx(0.016),
+			}
+			var line := ""
+			for k: String in parts:
+				var t1 := Time.get_ticks_usec()
+				for i2 in 20:
+					parts[k].call()
+				line += "%s=%.0f " % [k, (Time.get_ticks_usec() - t1) / 20.0]
+			print("PERF_BREAKDOWN: ", line)
+			print("PERF_DRAWCALLS_OK=", calls < 2500, " 콜=", int(calls))
+			print("PERF_PROCESS_OK=", proc_us < 8000.0, " us=", "%.0f" % proc_us)
+		392: get_tree().quit()
 
 
 # ==== 검증 시퀀스 ====

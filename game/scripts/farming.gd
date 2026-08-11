@@ -24,6 +24,7 @@ func _crop_thirsty(cell: Dictionary) -> bool:
 
 
 func _wet(cell: Dictionary, minutes: float) -> void:
+	touch(cell)
 	cell.wet_min = maxf(float(cell.wet_min), minutes)
 	cell.watered = true
 	# 절반까지 자란 뒤에 받은 물만 체크포인트를 통과시킨다
@@ -133,14 +134,42 @@ func _sprinkler_tick() -> void:
 			_sprinkle(pos)
 
 
+# ---- 「지금 돌아가고 있는 칸」만 돈다 ----
+#
+# 자라거나 마르는 중인 칸은 늘 몇십 개뿐인데, 예전에는 0.7초마다 지도 전체
+# 10,800칸을 훑었다. 그게 4ms짜리 끊김이 되어 0.7초마다 한 번씩 걸렸다.
+#
+# 젖거나 심긴 순간에 이 목록에 들어오고(`touch`), 마르고 작물도 없으면 빠진다.
+# 칸 Dictionary를 그대로 담는다 — 성장 계산에 좌표가 필요 없기 때문이다.
+# 세이브를 펴거나 하루가 넘어갈 때는 통째로 다시 만든다 (`rebuild`) —
+# 어딘가에서 touch를 빠뜨려도 하루 안에 저절로 맞춰진다.
+var _ticking: Array[Dictionary] = []
+
+
+func touch(cell: Dictionary) -> void:
+	if cell.get("ticking", false):
+		return
+	cell["ticking"] = true
+	_ticking.append(cell)
+
+
+func rebuild() -> void:
+	_ticking.clear()
+	for y in m.MAP_H:
+		var row: Array = m.grid[y]
+		for x in m.MAP_W:
+			var c: Dictionary = row[x]
+			c["ticking"] = false
+			if float(c.wet_min) > 0.0 or str(c.crop_id) != "":
+				touch(c)
+
+
 func _growth_tick(game_minutes: float) -> void:
 	_sprinkler_tick()
 	var changed := false
-	for y in m.MAP_H:
-		for x in m.MAP_W:
-			var cell: Dictionary = m.grid[y][x]
-			if float(cell.wet_min) <= 0.0:
-				continue
+	var keep: Array[Dictionary] = []
+	for cell in _ticking:
+		if float(cell.wet_min) > 0.0:
 			cell.wet_min = float(cell.wet_min) - game_minutes
 			if float(cell.wet_min) <= 0.0:
 				cell.wet_min = 0.0
@@ -154,5 +183,11 @@ func _growth_tick(game_minutes: float) -> void:
 					changed = true
 				if m.renderer._crop_texture(cell) != before_stage:
 					changed = true
+		# 마르고 작물도 없으면 더 볼 일이 없다
+		if float(cell.wet_min) > 0.0 or str(cell.crop_id) != "":
+			keep.append(cell)
+		else:
+			cell["ticking"] = false
+	_ticking = keep
 	if changed:
 		m.queue_redraw()

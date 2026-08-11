@@ -33,11 +33,17 @@ func _enter_building(kind: String) -> void:
 		m.BUILDING_NAMES.get(kind, "건물"))
 
 
+# 마우스가 움직일 때 main이 여기에 화면 좌표를 적어 둔다 (main._unhandled_input).
+# 창 시스템에 매 프레임 묻지 않기 위해서다.
+var mouse_screen := Vector2(-9999, -9999)
+
+
 func _update_mouse_target() -> void:
 	if m.player == null:
 		m._mouse_target = Vector2i(-999, -999)
 		return
-	var mp := m.get_global_mouse_position()
+	# 화면 -> 월드 변환만 매 프레임 한다 (이건 싸다)
+	var mp: Vector2 = m.get_canvas_transform().affine_inverse() * mouse_screen
 	var t := Vector2i(int(floor(mp.x / m.TILE)), int(floor(mp.y / m.TILE)))
 	var d := t - m.player_tile()
 	if d != Vector2i.ZERO and absi(d.x) <= 1 and absi(d.y) <= 1:

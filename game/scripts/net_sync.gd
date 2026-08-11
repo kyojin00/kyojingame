@@ -204,7 +204,7 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 				else:
 					m.objnode._place_object(pos, o[2], int(o[3]))
 	m.queue_redraw()
-
+	m.farming.rebuild()
 
 func _broadcast_stats() -> void:
 	if Net.is_host():
