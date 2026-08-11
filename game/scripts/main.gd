@@ -1,6 +1,7 @@
 # 메인 월드: 맵, 경작, 도구, 자원, 시간, 낮/밤을 관리한다.
 #
 # 덩치가 커서 몇 갈래를 따로 뺐다 (전부 자식 노드로 붙고 `m`으로 여기를 부른다):
+#   scripts/world_gen.gd    지형·길·마을 부지·자원 재생
 #   scripts/story.gd        메인 스토리 연출 (각본)
 #   scripts/dev_harness.gd  검증 하네스 (KYOJIN_SHOT일 때만)
 #
@@ -120,6 +121,8 @@ var _shot_path := ""
 var harness: Node = null
 # 메인 스토리 연출 (scripts/story.gd). 규칙이 아니라 각본이라 따로 뺐다.
 var story: Node = null
+# 지형·길·마을 부지·자원 재생 (scripts/world_gen.gd)
+var worldgen: Node = null
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
@@ -401,8 +404,21 @@ var npcs: Array = []
 
 
 func _ready() -> void:
+	# 갈라낸 모듈부터 붙인다 — 바로 아래 _build_map()이 worldgen을 쓴다
+	# 세계를 짓는 쪽 (scripts/world_gen.gd)
+	worldgen = load("res://scripts/world_gen.gd").new()
+	worldgen.name = "WorldGen"
+	worldgen.m = self
+	add_child(worldgen)
+
+	# 스토리 연출은 scripts/story.gd가 맡는다
+	story = load("res://scripts/story.gd").new()
+	story.name = "Story"
+	story.m = self
+	add_child(story)
+
 	_load_textures()
-	_build_map()
+	worldgen._build_map()
 
 	night = CanvasModulate.new()
 	add_child(night)
@@ -498,12 +514,6 @@ func _ready() -> void:
 		Sound.play_sfx("sfx_sleep")
 		_fade_next_day(false))
 	add_child(sleep_dialog)
-
-	# 스토리 연출은 scripts/story.gd가 맡는다
-	story = load("res://scripts/story.gd").new()
-	story.name = "Story"
-	story.m = self
-	add_child(story)
 
 	_shot_path = OS.get_environment("KYOJIN_SHOT")
 	if _shot_path != "":
@@ -633,302 +643,6 @@ func _setup_camera() -> void:
 	_free_camera_limits(cam)
 
 
-# ---- 맵 ----
-
-func _build_map() -> void:
-	grid = []
-	objects = {}
-	for y in MAP_H:
-		var row := []
-		for x in MAP_W:
-			# crop_day = 누적 성장 시간(게임 분), wet_min = 남은 젖음 시간(게임 분)
-			row.append({"ground": "grass", "watered": false, "wet_min": 0.0,
-				"crop_id": "", "crop_day": 0.0, "dead": false, "half_fed": false})
-		grid.append(row)
-
-	# 연못들 (숲/깊은 숲) — 시작 부지의 연못은 없앴다
-	for y in range(28, 35):
-		for x in range(45, 53):
-			grid[y][x].ground = "water"
-	# (y 34~35의 옛 개천은 없앴다 — 마을이 넓어지면서 광장 남쪽을 갈라 놓았다.
-	#  마을 강은 남쪽 외곽 VILLAGE_RIVER_Y 하나뿐이다)
-	for y in range(48, 54):          # 깊은 숲 연못
-		for x in range(70, 79):
-			grid[y][x].ground = "water"
-
-	_build_village()
-
-	# 농장 -> 마을 공용 길
-	for y in range(ROAD.position.y, ROAD.end.y):
-		for x in range(ROAD.position.x, ROAD.end.x):
-			grid[y][x].ground = "path"
-
-	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
-	objects[CAVE_POS] = {"kind": "cave", "hp": 0}
-	objects[WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
-
-	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
-	for x in MAP_W:
-		if x % 4 == 0 and not objects.has(Vector2i(x, 0)):
-			objects[Vector2i(x, 0)] = {"kind": "tree", "hp": TREE_HP}
-		if x % 4 == 0:
-			objects[Vector2i(x, MAP_H - 1)] = {"kind": "tree", "hp": TREE_HP}
-	for y in MAP_H:
-		if y % 4 == 0 and not objects.has(Vector2i(0, y)):
-			objects[Vector2i(0, y)] = {"kind": "tree", "hp": TREE_HP}
-		if y % 4 == 0 and not objects.has(Vector2i(MAP_W - 1, y)):
-			objects[Vector2i(MAP_W - 1, y)] = {"kind": "tree", "hp": TREE_HP}
-
-	# 흩어진 나무/돌 (결정적 해시 배치, 남동쪽 깊은 숲은 더 빽빽하게)
-	var deep_rect := Rect2i(45, 40, 45, 20)
-	for y in range(1, MAP_H - 1):
-		for x in range(1, MAP_W - 1):
-			var pos := Vector2i(x, y)
-			if objects.has(pos) or grid[y][x].ground != "grass":
-				continue
-			if x >= 1 and x <= 10 and y >= 0 and y <= 6:
-				continue  # 축사 주변은 비워둔다
-			if abs(x - START_TILE.x) <= 3 and abs(y - START_TILE.y) <= 3:
-				continue  # 시작 지점 주변도 비워둔다
-			if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
-				continue  # 마을/길은 비워둔다
-			var h := _hash01(x * 3 + 7, y * 5 + 11)
-			if deep_rect.has_point(pos):
-				# 깊은 숲은 나무를 많이 두되, 그림이 겹치지 않는 선까지만 채운다
-				if h < 0.30:
-					if _nature_clear(pos, "tree"):
-						objects[pos] = {"kind": "tree", "hp": TREE_HP}
-				elif h < 0.40:
-					if _nature_clear(pos, "rock"):
-						objects[pos] = {"kind": "rock", "hp": ROCK_HP}
-			elif h < 0.06:
-				if _nature_clear(pos, "tree"):
-					objects[pos] = {"kind": "tree", "hp": TREE_HP}
-			elif h < 0.12:
-				if _nature_clear(pos, "rock"):
-					objects[pos] = {"kind": "rock", "hp": ROCK_HP}
-
-	# 낚시터 둘레는 마지막에 비운다 — 나무/돌 그림이 부두와 강을 덮으면 안 된다.
-	# (자연물 배치가 모두 끝난 뒤라야 확실히 비워진다)
-	for p: Vector2i in objects.keys():
-		if FISH_CLEAR.has_point(p):
-			objects.erase(p)
-	objects[FISH_SIGN] = {"kind": "sign", "hp": 0}
-	# 온실 터 표지판 (농장 한켠) — 온실 자리는 자연물을 비워 둔다
-	for gy in range(GREENHOUSE.position.y, GREENHOUSE.end.y):
-		for gx in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
-			objects.erase(Vector2i(gx, gy))
-	objects[GREENHOUSE_SIGN] = {"kind": "sign", "hp": 0}
-	if GameData.has_horse and not GameData.riding:
-		objects[GameData.horse_tile] = {"kind": "horse", "hp": 0}
-	if GameData.greenhouse_built:
-		for gy2 in range(GREENHOUSE.position.y, GREENHOUSE.end.y):
-			for gx2 in range(GREENHOUSE.position.x, GREENHOUSE.end.x):
-				grid[gy2][gx2].ground = "soil"
-	for p: Vector2i in FISH_LAMPS:
-		objects[p] = {"kind": "deco_lamp", "hp": 0}
-	for p: Vector2i in FISH_BENCHES:
-		objects[p] = {"kind": "deco_bench", "hp": 0}
-
-
-# 교진 마을: 건물은 하나도 짓지 않는다.
-# 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
-func _build_village() -> void:
-	# 마을을 가로지르는 큰길 (서쪽 입구 -> 동쪽) — 인도는 모두 3줄이다
-	for y in range(MAIN_STREET_Y, MAIN_STREET_Y + ROAD_W):
-		for x in range(60, 99):
-			grid[y][x].ground = "path"
-	# 중앙 광장 (아주 넓은 평지)
-	for y in range(PLAZA.position.y, PLAZA.end.y):
-		for x in range(PLAZA.position.x, PLAZA.end.x):
-			grid[y][x].ground = "path"
-	# 남북 인도: 큰길 <-> 광장 <-> 낚시터 (3줄)
-	for i in ROAD_W:
-		var nx: int = NS_LANE_X + i
-		for y in range(MAIN_STREET_Y, PLAZA.position.y):
-			grid[y][nx].ground = "path"
-		for y in range(PLAZA.end.y, DOCK_Y + 1):
-			grid[y][nx].ground = "path"
-	# 서쪽·동쪽 건물 줄 앞을 지나는 세로 인도 (마당 문이 여기로 붙는다, 3줄)
-	for i in ROAD_W:
-		for y in range(MAIN_STREET_Y, DOCK_Y):
-			grid[y][WEST_LANE_X + i].ground = "path"
-			grid[y][EAST_LANE_X + i].ground = "path"
-	# 광장 한가운데 분수
-	for y in range(FOUNTAIN.position.y, FOUNTAIN.end.y):
-		for x in range(FOUNTAIN.position.x, FOUNTAIN.end.x):
-			grid[y][x].ground = "water"
-
-	# 마을 바깥쪽을 따라 흐르는 강 (광장을 가로막지 않는다)
-	for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + RIVER_ROWS):
-		for x in range(46, 89):
-			grid[y][x].ground = "water"
-	for x in [EAST_RIVER_X, EAST_RIVER_X + 1]:
-		for y in range(1, VILLAGE_RIVER_Y):
-			grid[y][x].ground = "water"
-	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 나무 부두.
-	# 「낚시」 목표는 여기서 진행한다 (물가는 여러 곳이지만 낚시터는 여기 하나뿐).
-	for x in range(FISH_YARD_X0, FISH_YARD_X1 + 1):
-		for y in [DOCK_Y - 3, DOCK_Y - 2, DOCK_Y - 1, DOCK_Y]:
-			grid[y][x].ground = "path"
-	# 강 첫 줄에 데크를 길게 깔고, 거기서 부두 두 개를 물 쪽으로 내민다.
-	# 데크에서 아래를 보거나 부두 끝에서 좌우를 보고 낚싯대를 던진다.
-	for x in range(FISH_DECK_X0, FISH_DECK_X1 + 1):
-		grid[VILLAGE_RIVER_Y][x].ground = "dock"
-	for p: Vector2i in FISH_PIERS:
-		for x in range(p.x, p.y + 1):
-			for dy in range(1, RIVER_ROWS - 1):
-				grid[VILLAGE_RIVER_Y + dy][x].ground = "dock"
-	# 강 건너 남쪽 부지로 이어지는 작은 다리
-	for x in [63, 64]:
-		for y in range(VILLAGE_RIVER_Y, VILLAGE_RIVER_Y + RIVER_ROWS):
-			grid[y][x].ground = "path"
-
-	# 길이 물 위를 지나야 하면 다리를 놓는다.
-	# (강을 옮기거나 길을 늘릴 때 길이 끊기는 일을 없앤다)
-	_bridge_roads()
-
-	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
-	for pid: String in GameData.village_built:
-		if VILLAGE_PLOTS.has(pid):
-			_place_building_tiles(VILLAGE_PLOTS[pid].anchor)
-
-	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
-	objects[HOME_SITE] = {"kind": "housesite", "hp": 0}
-	objects[BOARD_POS] = {"kind": "board", "hp": 0}
-	objects[FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
-	for p: Vector2i in PLAZA_LAMPS:
-		objects[p] = {"kind": "deco_lamp", "hp": 0}
-	for p: Vector2i in PLAZA_BENCHES:
-		objects[p] = {"kind": "deco_bench", "hp": 0}
-	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
-	for x in range(60, 99):
-		for y in [1, 43]:
-			var rim := Vector2i(x, y)
-			if grid[y][x].ground == "grass" and not objects.has(rim) \
-					and _hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
-				objects[rim] = {"kind": "tree", "hp": TREE_HP}
-
-
-# 인도가 지나야 할 자리가 물이면 나무 다리를 놓는다.
-# 길을 먼저 깔고 강을 나중에 그리므로, 강이 덮어 버린 자리를 여기서 되살린다.
-func _bridge_roads() -> void:
-	var lines: Array = []
-	# 큰길 (가로 3줄)
-	for i in ROAD_W:
-		lines.append([Vector2i(60, MAIN_STREET_Y + i), Vector2i(98, MAIN_STREET_Y + i)])
-	# 세로 인도 3종 (각 3줄). 구간은 길을 깔 때와 똑같이 잡는다 —
-	# 광장 안은 이미 평지이므로 지나가지 않는다 (분수 위에 다리가 놓이면 안 된다).
-	for i in ROAD_W:
-		lines.append([Vector2i(NS_LANE_X + i, MAIN_STREET_Y),
-			Vector2i(NS_LANE_X + i, PLAZA.position.y - 1)])
-		lines.append([Vector2i(NS_LANE_X + i, PLAZA.end.y),
-			Vector2i(NS_LANE_X + i, DOCK_Y)])
-		lines.append([Vector2i(WEST_LANE_X + i, MAIN_STREET_Y),
-			Vector2i(WEST_LANE_X + i, DOCK_Y - 1)])
-		lines.append([Vector2i(EAST_LANE_X + i, MAIN_STREET_Y),
-			Vector2i(EAST_LANE_X + i, DOCK_Y - 1)])
-	for line: Array in lines:
-		var a: Vector2i = line[0]
-		var b: Vector2i = line[1]
-		var step := Vector2i(signi(b.x - a.x), signi(b.y - a.y))
-		var at := a
-		while true:
-			if at.x >= 0 and at.y >= 0 and at.x < MAP_W and at.y < MAP_H \
-					and grid[at.y][at.x].ground == "water":
-				grid[at.y][at.x].ground = "dock"   # 나무 다리
-			if at == b:
-				break
-			at += step
-
-
-# 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
-# 문 앞 한 줄만 터 두고, 거기서 가장 가까운 길까지 흙길을 잇는다.
-func _build_yard(anchor: Vector2i) -> void:
-	var door := door_tile(anchor)
-	var yard := Rect2i(anchor.x - YARD_PAD, anchor.y - YARD_PAD,
-		5 + YARD_PAD * 2, 4 + YARD_PAD * 2)
-	# 마당 안은 잔디 (길이 건물 밑으로 지나가지 않게)
-	for y in range(yard.position.y, yard.end.y):
-		for x in range(yard.position.x, yard.end.x):
-			if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-				continue
-			grid[y][x].ground = "grass"
-	# 울타리: 마당 테두리. 문 앞 칸만 비운다
-	for y in range(yard.position.y, yard.end.y):
-		for x in range(yard.position.x, yard.end.x):
-			var edge: bool = x == yard.position.x or x == yard.end.x - 1 \
-				or y == yard.position.y or y == yard.end.y - 1
-			if not edge or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-				continue
-			if x == door.x:
-				continue  # 드나드는 통로
-			if objects.has(Vector2i(x, y)):
-				continue
-			objects[Vector2i(x, y)] = {"kind": "fence", "hp": 0, "fixed": true}
-	# 문 앞에서 가장 가까운 길까지 흙길을 낸다
-	_connect_to_road(Vector2i(door.x, yard.end.y - 1))
-
-
-# 이 칸에서 가장 가까운 길까지 흙길을 깐다 (오브젝트가 없는 칸만 지난다)
-func _connect_to_road(from: Vector2i) -> void:
-	if from.x < 0 or from.y < 0 or from.x >= MAP_W or from.y >= MAP_H:
-		return
-	if grid[from.y][from.x].ground == "path":
-		return
-	var prev := {from: from}
-	var queue: Array[Vector2i] = [from]
-	var head := 0
-	var goal := Vector2i(-999, -999)
-	while head < queue.size():
-		var cur: Vector2i = queue[head]
-		head += 1
-		if grid[cur.y][cur.x].ground == "path" and cur != from:
-			goal = cur
-			break
-		for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
-			var n: Vector2i = cur + d
-			if prev.has(n) or not VILLAGE_REGION.has_point(n):
-				continue
-			if objects.has(n) or grid[n.y][n.x].ground == "water":
-				continue
-			prev[n] = cur
-			queue.append(n)
-	if goal.x == -999:
-		return
-	var at := goal
-	while at != from:
-		grid[at.y][at.x].ground = "path"
-		at = prev[at]
-	grid[from.y][from.x].ground = "path"
-
-
-# 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,
-# 두 오브젝트가 요구하는 간격 중 더 큰 값을 적용해 배치 가능 여부를 판단한다.
-func _nature_clear(pos: Vector2i, kind: String, override_dist := -1) -> bool:
-	var need_self: int = override_dist if override_dist >= 0 \
-		else int(NATURE_CLEAR.get(kind, 1))
-	for dy in range(-NATURE_CLEAR_MAX, NATURE_CLEAR_MAX + 1):
-		for dx in range(-NATURE_CLEAR_MAX, NATURE_CLEAR_MAX + 1):
-			var p := pos + Vector2i(dx, dy)
-			if p == pos or not objects.has(p):
-				continue
-			var k: String = objects[p].kind
-			if not NATURE_CLEAR.has(k):
-				continue
-			if override_dist < 0 and (kind == "tree" or k == "tree"):
-				# 나무는 "옆으로 나란히" 놓일 때만 지저분하게 겹친다.
-				# 앞뒤로 겹치는 건 앞 나무가 뒤를 가려 주므로 깊은 숲처럼 보인다.
-				if absi(dx) <= TREE_DX and absi(dy) <= TREE_DY:
-					return false
-				continue
-			var need: int = need_self if override_dist >= 0 \
-				else maxi(need_self, int(NATURE_CLEAR[k]))
-			if maxi(absi(dx), absi(dy)) <= need:
-				return false
-	return true
-
-
 # 빽빽한 숲에서는 앞쪽(아래) 나무가 주인공을 가린다.
 # 가리는 나무만 잠깐 비치게 해서 자기 위치를 항상 볼 수 있게 한다.
 var _faded_trees: Array = []
@@ -1040,12 +754,12 @@ func _spawn_objects() -> void:
 	for pid: String in GameData.village_built:
 		if VILLAGE_PLOTS.has(pid):
 			objects.erase(door_tile(VILLAGE_PLOTS[pid].anchor))
-			_spawn_house_node(VILLAGE_PLOTS[pid].anchor, pid)
-			_trim_paths_under_building(VILLAGE_PLOTS[pid].anchor)
+			worldgen._spawn_house_node(VILLAGE_PLOTS[pid].anchor, pid)
+			worldgen._trim_paths_under_building(VILLAGE_PLOTS[pid].anchor)
 	if GameData.house_lv >= 1:
 		objects.erase(door_tile(HOME_ANCHOR))
-		_spawn_house_node(HOME_ANCHOR)
-		_trim_paths_under_building(HOME_ANCHOR)
+		worldgen._spawn_house_node(HOME_ANCHOR)
+		worldgen._trim_paths_under_building(HOME_ANCHOR)
 	for pos: Vector2i in objects:
 		if objects[pos].kind != "house":
 			_spawn_object_node(pos, objects[pos].kind)
@@ -1059,35 +773,8 @@ func door_tile(anchor: Vector2i) -> Vector2i:
 	return anchor + Vector2i(2, 3)
 
 
-# 건물이 차지하는 칸과 마당만 만든다 (그림 노드는 _spawn_objects가 세운다).
-# 맵을 만드는 단계에서는 아직 world 노드가 없으므로 이쪽만 부른다.
-func _place_building_tiles(anchor: Vector2i) -> void:
-	for y in range(anchor.y, anchor.y + 4):
-		for x in range(anchor.x, anchor.x + 5):
-			objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
-	objects.erase(door_tile(anchor))
-	_trim_paths_under_building(anchor)
-	_build_yard(anchor)
-
-
-func _fill_building(anchor: Vector2i, kind: String = "") -> void:
-	_place_building_tiles(anchor)
-	_spawn_house_node(anchor, kind)
-
-
 # 건물이 덮은 자리에는 길을 그리지 않는다 — 길은 걸어 다닐 수 있는 곳에만 있어야 한다
 const BUILDING_KINDS := ["house", "art_block", "barn", "barn_block"]
-
-
-func _trim_paths_under_building(anchor: Vector2i) -> void:
-	var door := door_tile(anchor)
-	for y in range(anchor.y - 2, anchor.y + 4):
-		for x in range(anchor.x - 1, anchor.x + 6):
-			var pos := Vector2i(x, y)
-			if pos == door or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-				continue
-			if objects.has(pos) and BUILDING_KINDS.has(objects[pos].kind):
-				grid[y][x].ground = "grass"
 
 
 # 이 칸이 다 지어진 건물의 문이면 그 건물 종류를 돌려준다
@@ -1111,39 +798,6 @@ func _enter_building(kind: String) -> void:
 		return
 	hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %
 		BUILDING_NAMES.get(kind, "건물"))
-
-
-# kind: VILLAGE_PLOTS의 열쇠("post"/"smith"...). 빈 값이면 살림집.
-func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
-	var tname := "house_" + kind
-	if kind == "" or not tex.has(tname):
-		tname = "house"
-	# 그림은 512x410이고 0.5배로 그려 화면에서는 256 x 205(8 x 6.4칸)를 덮는다.
-	# 다른 오브젝트와 같은 2:1 축소라 점이 흔들리지 않는다.
-	var hn := _make_object(tex[tname],
-		Vector2(anchor.x * TILE, (anchor.y + 4) * TILE), Vector2(0, -410))
-	var hspr: Sprite2D = hn.get_child(0)
-	hspr.scale = Vector2(0.5, 0.5)
-	hspr.offset.x = -96.0
-	obj_nodes[anchor] = hn
-	world.add_child(hn)
-	# 집 그림은 5x4칸보다 크게 그려진다 (양옆 1칸, 위 2칸 더 덮는다).
-	# 그 칸도 막아 두지 않으면 벽 안쪽으로 걸어 들어가진다.
-	_block_under_art(Rect2i(anchor.x - 1, anchor.y - 2, 7, 6),
-		Rect2i(anchor.x, anchor.y, 5, 4))
-
-
-# 그림이 덮는 칸(area) 중 건물 본체(core)가 아닌 칸을 보이지 않는 벽으로 막는다.
-# 이미 다른 것이 놓인 칸은 건드리지 않는다.
-func _block_under_art(area: Rect2i, core: Rect2i) -> void:
-	for y in range(area.position.y, area.end.y):
-		for x in range(area.position.x, area.end.x):
-			var pos := Vector2i(x, y)
-			if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-				continue
-			if core.has_point(pos) or objects.has(pos):
-				continue
-			objects[pos] = {"kind": "art_block", "hp": 0, "fixed": true}
 
 
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
@@ -1536,13 +1190,6 @@ func _update_fishing(delta: float) -> void:
 			hud.show_message("물고기가 도망갔다...")
 
 
-# 축사 그림이 덮는 칸을 막는다 (그림 안으로 걸어 들어가지 않게).
-# 그림 크기가 바뀌면 BARN_ART만 고치면 된다.
-func _block_barn_art() -> void:
-	_block_under_art(Rect2i(BARN_POS + BARN_ART.position, BARN_ART.size),
-		Rect2i(BARN_POS, Vector2i.ONE))
-
-
 # 축사 건설: 농장 고정 위치에 세워진다 (동물 16마리 + 굳은 날씨 자동 배부름)
 func build_barn() -> void:
 	if GameData.barn_built:
@@ -1551,7 +1198,7 @@ func build_barn() -> void:
 	GameData.money -= GameData.BARN_COST_MONEY
 	GameData.wood -= GameData.BARN_COST_WOOD
 	_place_object(BARN_POS, "barn", 0)
-	_block_barn_art()
+	worldgen._block_barn_art()
 	Sound.play_sfx("sfx_place")
 	hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지.\n"
 		% GameData.BARN_MAX_ANIMALS
@@ -2438,7 +2085,7 @@ func _build_house() -> void:
 	GameData.house_lv = 1
 	tutorial_notify("home")
 	_remove_object(HOME_SITE)
-	_fill_building(HOME_ANCHOR)
+	worldgen._fill_building(HOME_ANCHOR)
 	Sound.play_sfx("sfx_place")
 	dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
 		GameData.BED_WOOD)
@@ -2487,7 +2134,7 @@ func _build_village_building(pid: String) -> void:
 	GameData.wood -= int(cost[0])
 	GameData.stone -= int(cost[1])
 	GameData.village_built.append(pid)
-	_fill_building(plot.anchor, pid)
+	worldgen._fill_building(plot.anchor, pid)
 	_sync_village_npcs()
 	Sound.play_sfx("sfx_place")
 	hud.quest_toast("%s 완공!" % plot.name)
@@ -3106,33 +2753,6 @@ func _fade_next_day(passed_out: bool) -> void:
 	tw.tween_callback(func() -> void: day_transitioning = false)
 
 
-# 나무 성장: 어린 나무(tree_15)는 며칠 지나면 다 자란 나무(tree_01)가 되고,
-# 벤 자리에는 다음 날 어린 나무가 돋아 다시 자란다.
-func _advance_tree_growth() -> void:
-	for pos: Vector2i in objects:
-		var o: Dictionary = objects[pos]
-		if o.kind == "tree" and bool(o.get("young", false)):
-			o["grow"] = int(o.get("grow", 2)) - 1
-			if int(o.grow) <= 0:
-				o.erase("young")
-				o.erase("grow")
-			_refresh_tree_sprite(pos)
-	var keep := []
-	for e in GameData.tree_regrow:
-		var pos := Vector2i(int(e[0]), int(e[1]))
-		var days := int(e[2]) - 1
-		if days > 0:
-			keep.append([pos.x, pos.y, days])
-			continue
-		# 자리가 비어 있고 밭/작물이 아니면 어린 나무가 돋는다 (차 있으면 소멸)
-		if not objects.has(pos) and grid[pos.y][pos.x].ground == "grass" \
-				and grid[pos.y][pos.x].crop_id == "":
-			objects[pos] = {"kind": "tree", "hp": TREE_HP, "young": true, "grow": 2}
-			_spawn_object_node(pos, "tree")
-			_refresh_tree_sprite(pos)
-	GameData.tree_regrow = keep
-
-
 func _next_day(passed_out: bool) -> void:
 	# 밤사이 밭은 마른다 (성장은 실시간 _growth_tick에서)
 	for y in MAP_H:
@@ -3149,7 +2769,7 @@ func _next_day(passed_out: bool) -> void:
 	GameData.minutes = GameData.DAY_START
 	GameData.energy = GameData.ENERGY_MAX * 0.5 if passed_out else GameData.ENERGY_MAX
 	GameData.reset_daily()
-	_advance_tree_growth()
+	worldgen._advance_tree_growth()
 
 	# 계절이 바뀌면 제철 아닌 작물은 시든다
 	var season_changed := GameData.season() != prev_season
@@ -3218,9 +2838,9 @@ func _next_day(passed_out: bool) -> void:
 		a.fed = false
 
 	# 나무/돌이 조금씩 다시 자란다
-	_respawn_resources()
-	_respawn_forage()
-	_spawn_bugs()
+	worldgen._respawn_resources()
+	worldgen._respawn_forage()
+	worldgen._spawn_bugs()
 
 	tutorial_notify("slept")
 
@@ -3267,72 +2887,8 @@ func _next_day(passed_out: bool) -> void:
 	queue_redraw()
 
 
-func _respawn_resources() -> void:
-	for attempt in 6:
-		var kind := "tree" if randf() < 0.5 else "rock"
-		var chance := 0.4 if kind == "tree" else 0.3
-		if randf() > chance:
-			continue
-		var pos := Vector2i(randi_range(1, MAP_W - 2), randi_range(1, MAP_H - 2))
-		var cell: Dictionary = grid[pos.y][pos.x]
-		if objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
-			continue
-		if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
-			continue  # 마을/길에는 리스폰하지 않는다
-		if (pos - player_tile()).length() < 4.0:
-			continue
-		_place_object(pos, kind, TREE_HP if kind == "tree" else ROCK_HP)
-		break
-
-
-# 아침마다 열매/약초가 풀밭에 돋아난다 (최대 12개 유지)
-func _respawn_forage() -> void:
-	# 안개 낀 날은 발밑이 잘 보인다 — 채집물이 훨씬 많이 돋는다
-	var fog: bool = weather_now() == GameData.WEATHER_FOG
-	var cap := FORAGE_CAP_FOG if fog else FORAGE_CAP
-	var tries := 20 if fog else 8
-	var count := 0
-	for pos in objects:
-		if String(objects[pos].kind).begins_with("forage_"):
-			count += 1
-	for attempt in tries:
-		if count >= cap:
-			break
-		var pos := Vector2i(randi_range(1, MAP_W - 2), randi_range(1, MAP_H - 2))
-		var cell: Dictionary = grid[pos.y][pos.x]
-		if objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
-			continue
-		if VILLAGE_REGION.has_point(pos) or ROAD.has_point(pos):
-			continue
-		var kind := "forage_berry" if randf() < 0.6 else "forage_herb"
-		_place_object(pos, kind, 0)
-		count += 1
-
-
 # 곤충: 계절/시간대에 맞는 곤충들이 들판을 날아다닌다
 var bugs: Array = []
-
-
-func _spawn_bugs() -> void:
-	for bnode in bugs:
-		bnode.queue_free()
-	bugs.clear()
-	# 별밤에는 「빛을 품은 것」이 계절을 가리지 않고 잔뜩 나온다 (연금술 빛 재료)
-	var starry: bool = weather_now() == GameData.WEATHER_STAR
-	for bid in GameData.BUGS:
-		var cond: Dictionary = GameData.BUGS[bid]
-		var light_bug: bool = bid == "bug_firefly"
-		if GameData.season() not in cond.seasons and not (starry and light_bug):
-			continue
-		for i in (STAR_FIREFLY_COUNT if (starry and light_bug) else 3):
-			var bnode: Node2D = preload("res://scripts/bug.gd").new()
-			bnode.main = self
-			bnode.bug_id = bid
-			bnode.night_only = bool(cond.night)
-			bnode.position = Vector2(randi_range(2, MAP_W - 2) * TILE,
-				randi_range(2, MAP_H - 2) * TILE)
-			bugs.append(bnode)
-			world.add_child(bnode)
 
 
 func nearby_bug() -> Node2D:
@@ -3468,7 +3024,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.barn_built = bool(d.get("barn_built", false))
 	if GameData.barn_built and not objects.has(BARN_POS):
 		objects[BARN_POS] = {"kind": "barn", "hp": 0}
-		_block_barn_art()
+		worldgen._block_barn_art()
 	var anim_scale := float(TILE) / float(d.get("tile", 16))
 	for a in d.get("animals", []):
 		spawn_animal(a[0], Vector2(float(a[1]), float(a[2])) * anim_scale, int(a[3]) == 1)
@@ -3514,28 +3070,7 @@ func _apply_save(d: Dictionary) -> void:
 			if o.size() > 7 and int(o[7]) == 1:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
 			objects[Vector2i(int(o[0]), int(o[1]))] = od
-		_migrate_farm_layout()
-
-
-# 옛 저장 정리: 축사를 크게 다시 그리면서 자리를 옮겼고,
-# 농장의 출하 상자는 아예 없앴다 (판매는 마을 잡화점에서 한다).
-# 오브젝트는 통째로 저장되므로, 불러올 때 한 번 자리를 맞춰 준다.
-func _migrate_farm_layout() -> void:
-	const OLD_BARN := Vector2i(10, 3)
-	const OLD_BARN_ART := Rect2i(9, 2, 4, 2)
-	for p: Vector2i in objects.keys():
-		var kind: String = objects[p].kind
-		if kind == "bin" or kind == "barn" or kind == "barn_block":
-			objects.erase(p)
-		elif kind == "art_block" and OLD_BARN_ART.has_point(p) and p != OLD_BARN:
-			objects.erase(p)
-	if GameData.barn_built:
-		objects[BARN_POS] = {"kind": "barn", "hp": 0}
-		_block_barn_art()
-		# 새 축사 그림 자리에 서 있던 세이브라면 밖으로 꺼내 준다 (갇히지 않게)
-		if not is_passable(player_tile()):
-			var out := _free_spot_near(BARN_POS + Vector2i(0, 2))
-			player.position = Vector2(out.x * TILE + 16, out.y * TILE + 16)
+		worldgen._migrate_farm_layout()
 
 
 # ---- 루프 ----

@@ -451,8 +451,8 @@ func _debug_tick() -> void:
 			# 지어 놓고 바깥 모습도 남긴다 (이름표 확인)
 			GameData.house_lv = maxi(GameData.house_lv, 1)
 			m._remove_object(m.HOME_SITE)
-			m._fill_building(m.HOME_ANCHOR)
-			m._spawn_house_node(m.HOME_ANCHOR)
+			m.worldgen._fill_building(m.HOME_ANCHOR)
+			m.worldgen._spawn_house_node(m.HOME_ANCHOR)
 			GameData.day = 1                 # 봄으로 되돌려 눈 없이 찍는다
 			m._apply_season_visuals()
 			m.player.position = Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16,
@@ -499,7 +499,7 @@ func _debug_tick() -> void:
 			m.objects[stale[3]] = {"kind": "art_block", "hp": 0}
 			m.objects[stale[4]] = {"kind": "art_block", "hp": 0}
 			m.player.position = Vector2(m.BARN_POS.x * m.TILE + 16, m.BARN_POS.y * m.TILE + 16)
-			m._migrate_farm_layout()
+			m.worldgen._migrate_farm_layout()
 			# 옛 자리의 상자/축사는 사라지고, 새 축사 그림 칸은 art_block이어야 한다
 			var art := Rect2i(m.BARN_POS + m.BARN_ART.position, m.BARN_ART.size)
 			var left := []

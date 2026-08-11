@@ -120,16 +120,16 @@ func _plant_story_forest() -> void:
 				continue
 			var h := m._hash01(x, y)
 			if h < 0.55:
-				if m._nature_clear(pos, "tree"):
+				if m.worldgen._nature_clear(pos, "tree"):
 					var tr := {"kind": "tree", "hp": m.TREE_HP}
 					if m._hash01(x * 17 + 2, y * 23 + 5) < 0.12:
 						tr["apple"] = true  # 일부 나무에만 사과 3개가 열린다
 					m.objects[pos] = tr
 			elif h > 0.93:
-				if m._nature_clear(pos, "rock"):
+				if m.worldgen._nature_clear(pos, "rock"):
 					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
 			elif h > 0.86:
-				if m._nature_clear(pos, "forage_berry"):
+				if m.worldgen._nature_clear(pos, "forage_berry"):
 					m.objects[pos] = {"kind": "forage_herb" if h < 0.895 else "forage_berry",
 						"hp": 0}
 	_refresh_story_gates()
