@@ -18,6 +18,24 @@ var bumped := false  # 이동하려 했지만 완전히 막혔는가 (스토리 
 # 탈 것: 캐릭터 밑에 깔리는 말 그림 (탔을 때만 보인다)
 var horse_sprite: Sprite2D
 
+# ---- 도구 휘두르기 ----
+#
+# 캐릭터 도트에는 「휘두르는」 프레임이 없다 (서기 + 걷기 4프레임뿐).
+# 그래서 몸을 발끝을 축으로 젖혔다 내리치고, 손에 도구 아이콘을 띄워
+# 호를 그리게 해서 동작을 만든다. 나중에 휘두르기 도트가 생기면
+# _swing_visual만 갈아끼우면 된다.
+const SWING_LEAN := 0.22        # 몸이 젖혀지는 최대 각(라디안)
+const SWING_ARC := 1.9          # 도구가 그리는 호(라디안)
+const TOOL_ICONS := {
+	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
+	"hoe": "icon_hoe", "water": "icon_water",
+}
+
+var swing_t := 0.0              # 남은 시간
+var swing_len := 0.0
+var swing_face := Vector2.DOWN  # 내리치는 방향
+var tool_sprite: Sprite2D
+
 
 func _ready() -> void:
 	horse_sprite = Sprite2D.new()
@@ -29,7 +47,60 @@ func _ready() -> void:
 	# 캐릭터보다 먼저 그린다 (자식 순서로 앞뒤를 정한다).
 	# z_index를 -1로 두면 지형(z=0)보다 먼저 그려져 땅 밑에 깔린다.
 	move_child(horse_sprite, 0)
+
+	# 손에 들리는 도구 (휘두를 때만 보인다). 손잡이 끝을 축으로 돈다.
+	tool_sprite = Sprite2D.new()
+	tool_sprite.centered = false
+	tool_sprite.offset = Vector2(-16, -30)
+	tool_sprite.scale = Vector2(1.15, 1.15)   # 한눈에 보이게 조금 크게
+	tool_sprite.visible = false
+	add_child(tool_sprite)
 	_update_sprite()
+
+
+# 휘두르기 시작. face = 내리치는 방향, length = 동작 길이(초)
+func start_swing(tool_id: String, face: Vector2, length: float) -> void:
+	if not TOOL_ICONS.has(tool_id):
+		return
+	var icon: String = TOOL_ICONS[tool_id]
+	if tool_id == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
+		icon = "icon_axe_stone"
+	if not main.tex.has(icon):
+		return
+	tool_sprite.texture = main.tex[icon]
+	swing_face = face if face != Vector2.ZERO else Vector2.DOWN
+	swing_len = maxf(0.14, length)
+	swing_t = swing_len
+
+
+# 0(시작) ~ 1(끝)을 -1(뒤로 젖힘) ~ +1(앞으로 내리침)로 바꾼다.
+# 감아올리기는 느리게, 내리치기는 빠르게 — 그래야 「친다」로 보인다.
+func _swing_curve(p: float) -> float:
+	if p < 0.32:
+		return -p / 0.32
+	if p < 0.5:
+		return -1.0 + (p - 0.32) / 0.18 * 2.0
+	return 1.0 - (p - 0.5) / 0.5
+
+
+func _swing_visual() -> void:
+	if swing_t <= 0.0:
+		tool_sprite.visible = false
+		sprite.rotation = 0.0
+		return
+	var p: float = 1.0 - swing_t / swing_len
+	var c := _swing_curve(p)
+	var sign_x := -1.0 if swing_face.x < -0.3 else 1.0
+	# 몸: 발끝을 축으로 젖혔다 내리친다 (스프라이트 원점이 발이다)
+	sprite.rotation = c * SWING_LEAN * sign_x
+	# 도구: 손 높이에서 호를 그린다
+	tool_sprite.visible = true
+	tool_sprite.flip_h = sign_x < 0.0
+	tool_sprite.rotation = (-1.1 + c * SWING_ARC) * sign_x
+	tool_sprite.position = Vector2(sign_x * 9.0 + swing_face.x * 6.0,
+		-30.0 + swing_face.y * 5.0 + c * 4.0)
+	# 위를 향해 칠 때는 캐릭터 뒤로 (아래/옆이면 앞으로)
+	move_child(tool_sprite, 0 if swing_face.y < -0.3 else get_child_count() - 1)
 
 
 func _draw() -> void:
@@ -40,9 +111,11 @@ func _draw() -> void:
 func _process(delta: float) -> void:
 	if main == null or main.ui_open():
 		moving = false
+		swing_t = maxf(0.0, swing_t - delta)
 		_update_sprite()
 		return
 
+	swing_t = maxf(0.0, swing_t - delta)
 	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	moving = v != Vector2.ZERO
 	if moving and main.fishing_state != "":
@@ -142,3 +215,4 @@ func _update_sprite() -> void:
 		sprite.position.y = -34.0     # 안장 위
 	else:
 		sprite.position.y = 0.0
+	_swing_visual()

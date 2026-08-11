@@ -1245,14 +1245,23 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 		spr.texture = tex["tree_09"]
 
 
-func _remove_object(pos: Vector2i) -> void:
+func _remove_object(pos: Vector2i, pop: bool = false) -> void:
 	objects.erase(pos)
 	if obj_nodes.has(pos):
 		var node: Node2D = obj_nodes[pos]
 		var sprite := node.get_child(0)
 		tree_sprites.erase(sprite)
-		node.queue_free()
 		obj_nodes.erase(pos)
+		if pop and is_instance_valid(sprite):
+			# 바로 지우지 않고 팍 튀었다가 사라진다 (그림만 남는 것이라 판정과 무관)
+			# 노드에 매어 둔다 — 다른 이유로 노드가 먼저 사라져도
+			# 트윈이 유령 객체에 값을 쓰지 않는다
+			var tw := create_tween().bind_node(node).set_parallel(true)
+			tw.tween_property(sprite, "scale", sprite.scale * 1.25, 0.08)
+			tw.chain().tween_property(sprite, "scale", Vector2.ZERO, 0.14)
+			tw.chain().tween_callback(node.queue_free)
+		else:
+			node.queue_free()
 
 
 func _place_object(pos: Vector2i, kind: String, hp: int) -> void:
@@ -1765,10 +1774,10 @@ func use_tool() -> void:
 					return
 				obj.hp -= int(GameData.tool_stat("axe", "power"))
 				Sound.play_sfx("sfx_chop", 0.15)
-				spawn_particles(t, "wood")
+				swing_at(t, "wood")
 				_refresh_tree_sprite(t)
 				if obj.hp <= 0:
-					_remove_object(t)
+					_remove_object(t, true)
 					# 숲길을 막고 있던 나무는 다시 자라지 않는다 (길이 도로 막히면 안 된다)
 					var story_gate: bool = GameData.story_phase != "done" \
 						and STORY_GATE_XS.has(t.x) \
@@ -1824,9 +1833,9 @@ func use_tool() -> void:
 			if obj.kind == "rock":
 				obj.hp -= int(GameData.tool_stat("pickaxe", "power"))
 				Sound.play_sfx("sfx_pick", 0.15)
-				spawn_particles(t, "stone")
+				swing_at(t, "stone")
 				if obj.hp <= 0:
-					_remove_object(t)
+					_remove_object(t, true)
 					var stone_got := STONE_PER_ROCK
 					if randf() < GameData.bonus_drop_chance("mine"):
 						stone_got += 1
@@ -1841,9 +1850,9 @@ func use_tool() -> void:
 				# 퀘스트 5: 길을 막은 커다란 바위 (여러 번 캐야 부서진다)
 				obj.hp -= 1
 				Sound.play_sfx("sfx_pick", 0.15)
-				spawn_particles(t, "stone")
+				swing_at(t, "stone", true)
 				if obj.hp <= 0:
-					_remove_object(t)
+					_remove_object(t, true)
 					GameData.stone += BIGROCK_STONE
 					hud.show_message("커다란 바위를 캐냈다! 돌 +%d" % BIGROCK_STONE)
 					_maybe_drop_recipe("bigrock")
@@ -4528,6 +4537,8 @@ func _migrate_farm_layout() -> void:
 func _process(delta: float) -> void:
 	_story_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
+	_update_hit_fx(delta)
+	_update_object_fade(delta)
 	if GameData.story_phase == "done":
 		_grandpa_update(delta)
 	for ft in float_texts:
@@ -4857,6 +4868,150 @@ const PARTICLE_DEFS := {
 	"seed": [Color(0.4, 0.75, 0.35), 6, -28.0, 50.0],
 	"dirt": [Color(0.52, 0.4, 0.26), 6, -25.0, 60.0],
 }
+
+
+# ---- 캐기 모션 ----
+#
+# 판정은 예전 그대로 **즉시** 일어난다 (조작감을 건드리지 않는다).
+# 눈에 보이는 것만 뒤로 미룬다: 휘두르는 동작이 내려찍히는 순간(_HIT_AT)에
+# 파편이 튀고 대상이 흔들리도록 맞춰 둔 것이다.
+const SWING_TIME := 0.34        # 휘두르는 동작 길이
+const HIT_AT := 0.15            # 내려찍히는 순간 (동작 시작부터)
+const SHAKE_TIME := 0.22        # 맞은 오브젝트가 흔들리는 시간
+
+var _pending_hits: Array = []   # {t, tile, particle, heavy}
+var _obj_shakes: Array = []     # {node, base, t, dir}
+var _cam_shake := 0.0
+var _cam_shake_amp := 0.0
+
+
+# 도구를 휘두른다 — 대상이 있든 없든 동작은 나간다
+func swing_at(t: Vector2i, particle: String, heavy: bool = false) -> void:
+	var here := player_tile()
+	var face := Vector2(t.x - here.x, t.y - here.y)
+	if face == Vector2.ZERO:
+		face = _dir_to_vec(player.dir)
+	player.start_swing(GameData.tool, face.normalized(), SWING_TIME)
+	_pending_hits.append({"t": HIT_AT, "tile": t, "particle": particle, "heavy": heavy})
+
+
+func _dir_to_vec(d: String) -> Vector2:
+	match d:
+		"up":
+			return Vector2.UP
+		"left":
+			return Vector2.LEFT
+		"right":
+			return Vector2.RIGHT
+		_:
+			return Vector2.DOWN
+
+
+# 맞는 순간: 파편 + 대상 흔들림 + (큰 것이면) 화면 흔들림
+func _land_hit(h: Dictionary) -> void:
+	var t: Vector2i = h.tile
+	spawn_particles(t, str(h.particle))
+	if obj_nodes.has(t):
+		var node: Node2D = obj_nodes[t]
+		var here := player_tile()
+		var dir := Vector2(t.x - here.x, t.y - here.y)
+		_obj_shakes.append({"node": node, "base": node.position,
+			"t": SHAKE_TIME, "dir": (dir.normalized() if dir != Vector2.ZERO else Vector2.DOWN)})
+	if bool(h.heavy):
+		_cam_shake = 0.18
+		_cam_shake_amp = 3.0
+
+
+# ---- 앞에 선 오브젝트 비쳐 보이기 ----
+#
+# 나무·커다란 바위는 그림이 여러 칸을 덮는다. 플레이어가 그 뒤에 서면
+# 통째로 가려져 어디 있는지 안 보인다.
+#
+# 충돌 범위를 그림만큼 넓히면 그림 뒤에 설 수는 없지만, 숲과 바위밭을
+# 지나갈 수 없게 된다 (한 칸짜리 통로가 다 막힌다). 그래서 범위는 그대로 두고,
+# **가리는 동안만 반투명**하게 해서 플레이어가 언제나 보이게 한다.
+const FADE_KINDS := ["tree", "bigrock", "cave", "worldtree", "barn",
+	"deco_fountain", "deco_lamp", "house", "art_block"]
+const FADE_ALPHA := 0.35
+const FADE_SPEED := 6.0
+
+var _fade_a := {}     # Vector2i -> 지금 알파
+
+
+# 이 오브젝트 그림이 플레이어를 덮고 있는가 (그리고 앞에 그려지는가)
+func _covers_player(t: Vector2i, node: Node2D) -> bool:
+	if node.position.y <= player.position.y:
+		return false          # y정렬상 플레이어 뒤 — 가릴 수 없다
+	var spr: Sprite2D = node.get_child(0)
+	if spr == null or spr.texture == null:
+		return false
+	var top_left: Vector2 = node.position + spr.offset * spr.scale
+	var art := Rect2(top_left, spr.texture.get_size() * spr.scale)
+	# 플레이어 몸통 (발끝 위쪽)
+	return art.intersects(Rect2(player.position + Vector2(-9, -74), Vector2(18, 70)))
+
+
+func _update_object_fade(delta: float) -> void:
+	var pt := player_tile()
+	var want := {}
+	# 플레이어보다 아래쪽(앞에 그려지는) 오브젝트만 본다
+	for dy in range(-1, 5):
+		for dx in range(-3, 4):
+			var t: Vector2i = pt + Vector2i(dx, dy)
+			if not obj_nodes.has(t):
+				continue
+			var kind: String = str(objects.get(t, {}).get("kind", ""))
+			if not FADE_KINDS.has(kind):
+				continue
+			if _covers_player(t, obj_nodes[t]):
+				want[t] = true
+				if not _fade_a.has(t):
+					_fade_a[t] = 1.0
+	for t: Vector2i in _fade_a.keys():
+		if not obj_nodes.has(t):
+			_fade_a.erase(t)
+			continue
+		var target: float = FADE_ALPHA if want.has(t) else 1.0
+		var a: float = move_toward(float(_fade_a[t]), target, delta * FADE_SPEED)
+		_fade_a[t] = a
+		var spr2: Sprite2D = obj_nodes[t].get_child(0)
+		if spr2 != null:
+			spr2.modulate.a = a
+		if is_equal_approx(a, 1.0) and not want.has(t):
+			_fade_a.erase(t)
+
+
+func _update_hit_fx(delta: float) -> void:
+	for h in _pending_hits:
+		h.t -= delta
+	for h in _pending_hits.duplicate():
+		if h.t <= 0.0:
+			_pending_hits.erase(h)
+			_land_hit(h)
+	for sh in _obj_shakes.duplicate():
+		sh.t -= delta
+		# 흔들리는 도중에 다 캐서 노드가 사라질 수 있다.
+		# 형을 붙여 받으면 **대입하는 순간** 오류가 나므로 Variant로 먼저 받는다.
+		var nv: Variant = sh.node
+		if not is_instance_valid(nv):
+			_obj_shakes.erase(sh)
+			continue
+		var node: Node2D = nv
+		if sh.t <= 0.0:
+			node.position = sh.base
+			_obj_shakes.erase(sh)
+			continue
+		var p: float = sh.t / SHAKE_TIME
+		node.position = sh.base + sh.dir * sin(p * PI * 5.0) * 3.5 * p
+	# 화면 흔들림 (커다란 바위처럼 묵직한 것만)
+	var cam := player.get_node_or_null("Camera") as Camera2D
+	if cam != null:
+		if _cam_shake > 0.0:
+			_cam_shake = maxf(0.0, _cam_shake - delta)
+			var k: float = _cam_shake_amp * (_cam_shake / 0.18)
+			cam.offset = Vector2(randf_range(-k, k), randf_range(-k, k))
+		elif cam.offset != Vector2.ZERO:
+			cam.offset = Vector2.ZERO
 
 
 func spawn_particles(t: Vector2i, kind: String) -> void:
@@ -5774,6 +5929,73 @@ func _debug_tick() -> void:
 					and not GameData.weather_wet(GameData.WEATHER_FOG)
 					and not GameData.weather_wet(GameData.WEATHER_STAR),
 				" harsh(안개)=", GameData.weather_harsh(GameData.WEATHER_FOG))
+		370:
+			# 캐기 모션: 휘두르기 -> (0.15초 뒤) 파편 + 대상 흔들림
+			player.position = Vector2(29 * TILE + 16, 40 * TILE + 16)
+			(player.get_node("Camera") as Camera2D).reset_smoothing()
+			player.dir = "right"
+			var mt := Vector2i(30, 40)
+			objects[mt] = {"kind": "bigrock", "hp": BIGROCK_HP}
+			if not obj_nodes.has(mt):
+				_spawn_object_node(mt, "bigrock")
+			_pending_hits.clear()
+			_obj_shakes.clear()
+			set_tool("pickaxe")
+			swing_at(mt, "stone", true)
+			var swung: bool = player.swing_t > 0.0 and player.tool_sprite.texture != null
+			var queued: int = _pending_hits.size()
+			# 맞는 순간까지 시간을 흘려 본다
+			for i in 20:
+				_update_hit_fx(0.01)
+			print("SWING_OK=", swung, " 예약된 타격=", queued,
+				" 터진 뒤 남은 예약=", _pending_hits.size(),
+				" 흔들리는 오브젝트=", _obj_shakes.size(),
+				" 화면흔들림=", _cam_shake > 0.0)
+			# ---- 화면용 ----
+			# 앞선 검사에서 세워 둔 커다란 바위 벽이 캐릭터를 덮으므로
+			# 깨끗한 자리로 옮겨 작은 돌 하나만 놓고 찍는다.
+			_remove_object(mt)
+			var demo := Vector2i(24, 20)
+			for cy in range(demo.y - 3, demo.y + 4):
+				for cx in range(demo.x - 3, demo.x + 4):
+					_remove_object(Vector2i(cx, cy))
+			var rt2 := demo + Vector2i(1, 0)
+			objects[rt2] = {"kind": "rock", "hp": ROCK_HP}
+			_spawn_object_node(rt2, "rock")
+			player.position = Vector2(demo.x * TILE + 16, demo.y * TILE + 16)
+			(player.get_node("Camera") as Camera2D).reset_smoothing()
+			player.dir = "right"
+			swing_at(rt2, "stone")
+			# 헤드리스는 프레임이 들쭉날쭉해서 짧은 동작이 그냥 지나간다.
+			# 길게 잡고 「내리친 직후」 위상에 고정해 둔다.
+			player.start_swing("pickaxe", Vector2.RIGHT, 4.0)
+			player.swing_t = 4.0 * 0.45
+
+		384:
+			# 나무 뒤에 서면 나무가 비쳐 보여야 한다 (플레이어가 안 가려지게)
+			var ft := Vector2i(24, 22)
+			for cy in range(ft.y - 2, ft.y + 3):
+				for cx in range(ft.x - 2, ft.x + 3):
+					_remove_object(Vector2i(cx, cy))
+			objects[ft] = {"kind": "tree", "hp": TREE_HP}
+			_spawn_object_node(ft, "tree")
+			# 나무 그림이 덮는 자리(바로 위 칸)에 선다
+			player.position = Vector2(ft.x * TILE + 16, (ft.y - 1) * TILE + 24)
+			(player.get_node("Camera") as Camera2D).reset_smoothing()
+			_fade_a.clear()
+			var covered: bool = _covers_player(ft, obj_nodes[ft])
+			for i in 30:
+				_update_object_fade(0.02)
+			var alpha: float = obj_nodes[ft].get_child(0).modulate.a
+			print("FADE_OK=", covered and alpha < 0.5,
+				" 가리는가=", covered, " 알파=", "%.2f" % alpha)
+		386: _save_shot("_fade.png")
+		373:
+			print("SWING_DRAW: 도구 보임=", player.tool_sprite.visible,
+				" 그림=", player.tool_sprite.texture != null,
+				" 위치=", player.tool_sprite.position.round(),
+				" 몸 기울기=", "%.2f" % player.sprite.rotation)
+			_save_shot("_swing.png")
 		367:
 			# 낚시: 귀한 물고기는 여러 번 맞혀야 하고, 두 번 놓치면 도망간다
 			var hooked := [0]
@@ -6025,7 +6247,7 @@ func _debug_tick() -> void:
 			_weather_override = -1
 			_open_quest_board()
 		381: _save_shot("_board.png")
-		383: get_tree().quit()
+		388: get_tree().quit()
 
 
 # ==== 멀티플레이 ====
