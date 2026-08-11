@@ -23,7 +23,9 @@ const W = 640, H = 512;
 const FX0 = 145, FX1 = 495;      // 앞면 좌우
 const FY0 = 250, FY1 = 494;      // 앞면 위(=박공 밑변) / 땅
 const MID = 352;                 // 1층과 2층 경계
-const JUT = 13;                  // 2층이 앞으로 나온 폭
+// 두 층은 같은 폭이다. 예전에는 2층을 13px 내밀었는데(제티), 게임 크기로
+// 줄이면 위아래 벽이 어긋난 것처럼 보여서 없앴다. 대신 층 사이에 보를 지른다.
+const BAYS = 3;                  // 두 층이 공유하는 기둥 칸 수 (기둥이 위아래로 이어진다)
 const DX = 86, DY = -34;         // 깊이 벡터 (뒤로 갈수록 오른쪽 위)
 const AX = 320, AY = 88;         // 용마루 앞끝
 const EAVE = 34;                 // 처마가 벽 밖으로 나온 길이
@@ -142,59 +144,44 @@ function build(opt) {
   quad([FX0, MID], [FX1, MID], [FX1, FY1], [FX0, FY1], (u, v, sp, dp) => {
     const lx = Math.round(u * sp), ly = Math.round(v * dp);
     let c = plasterAt(lx, ly + 200, 31, 1);
-    if (lx < 6 || lx > sp - 7) c = P.beam;                 // 모서리 기둥
-    if (ly < 5) c = P.beamLo;                              // 2층 밑 그늘
-    else if (ly < 9) c = P.beam;
-    // 가운데 기둥 두 개 (문 양옆)
-    if (Math.abs(lx - 108) < 5 || Math.abs(lx - (sp - 108)) < 5) c = P.beam;
+    if (lx < 7 || lx > sp - 8) c = P.beam;                 // 모서리 기둥
+    if (ly > dp - 7) c = P.beam;                           // 밑보
+    // 2층과 같은 자리에 기둥을 세운다 — 이래야 한 채로 이어져 보인다
+    const cell = (sp - 14) / BAYS;
+    for (let i = 1; i < BAYS; i++) if (Math.abs(lx - (7 + cell * i)) < 5) c = P.beam;
     return c;
   });
-  // 2층이 앞으로 나온 턱: 그 밑에 그늘이 져야 「나왔다」로 보인다.
-  // 이미 그려 둔 벽을 어둡게 눌러야 한다 — 검게 덮으면 벽 밖으로 검은 조각이 삐져나온다.
-  for (let x = FX0; x <= FX1; x++)
-    for (let k = 2; k < 12; k++) {
-      const t = (k - 2) / 10;
-      if (img[MID + k][x]) px(x, MID + k, mul(img[MID + k][x], 0.26 + t * 0.70));
-    }
-  // 턱 밑판 (여기가 곧 「나온 두께」다)
-  for (let x = FX0 - JUT; x <= FX1 + JUT; x++) {
-    px(x, MID, sh(P.beamLo, -12));
+  // 층 사이 보: 두 층을 갈라 놓는 게 아니라 「묶어 주는」 띠다.
+  // 위에 볕, 아래에 얕은 그늘만 넣어 한 벽에 가로대를 지른 것처럼 보이게 한다.
+  for (let x = FX0; x <= FX1; x++) {
+    px(x, MID - 2, P.beamHi);
+    px(x, MID - 1, P.beam);
+    px(x, MID, P.beam);
     px(x, MID + 1, P.beamLo);
-  }
-  for (const side of [-1, 1]) {
-    const x0 = side < 0 ? FX0 - JUT : FX1 + 1;
-    for (let i = 0; i < JUT; i++)
-      for (let k = 2; k < 12 - Math.floor(i * 0.5); k++)
-        px(x0 + i, MID + k, mul(P.beamLo, 0.72));
-  }
-  // 턱 받침 (까치발)
-  for (let bx = FX0 + 12; bx < FX1; bx += 74) {
-    for (let k = 0; k < 12; k++) {
-      const w = 11 - k;
-      rect(bx, MID + 1 + k, w, 1, k < 3 ? P.beamHi : P.beam);
-    }
+    for (let k = 2; k < 7; k++)
+      if (img[MID + k][x]) px(x, MID + k, mul(img[MID + k][x], 0.62 + (k - 2) * 0.076));
   }
 
   // ---- 3. 앞면 2층 (앞으로 JUT만큼 나와 있다) ----
-  quad([FX0 - JUT, FY0], [FX1 + JUT, FY0], [FX1 + JUT, MID], [FX0 - JUT, MID],
+  quad([FX0, FY0], [FX1, FY0], [FX1, MID], [FX0, MID],
     (u, v, sp, dp) => {
       const lx = Math.round(u * sp), ly = Math.round(v * dp);
       let c = plasterAt(lx, ly, 41, 1);
       if (lx < 7 || lx > sp - 8) c = P.beam;
       if (ly < 6 || ly > dp - 7) c = P.beam;
-      // 기둥 + 빗댄 가새 (반목조의 얼굴)
-      const cell = (sp - 14) / 4;
-      for (let i = 1; i < 4; i++) if (Math.abs(lx - (7 + cell * i)) < 5) c = P.beam;
+      // 기둥 + 빗댄 가새 (반목조의 얼굴). 칸 수를 1층과 맞춰 기둥이 이어진다.
+      const cell = (sp - 14) / BAYS;
+      for (let i = 1; i < BAYS; i++) if (Math.abs(lx - (7 + cell * i)) < 5) c = P.beam;
       const seg = Math.floor((lx - 7) / cell);
       const t = ((lx - 7) - seg * cell) / cell, tv = (ly - 6) / (dp - 13);
-      if (seg === 0 || seg === 3) {
+      if (seg === 0 || seg === BAYS - 1) {
         const want = seg === 0 ? tv : 1 - tv;
         if (Math.abs(t - want) < 0.055) c = P.beam;
       }
       return c;
     });
   // 2층 아래·위 테두리 밝게 (나무결)
-  for (let x = FX0 - JUT; x <= FX1 + JUT; x++) px(x, FY0 + 1, P.beamHi);
+  for (let x = FX0; x <= FX1; x++) px(x, FY0 + 1, P.beamHi);
 
   // ---- 4. 주춧돌 ----
   quad([FX0, FY1 - 26], [FX1, FY1 - 26], [FX1, FY1], [FX0, FY1], (u, v, sp, dp) => {
@@ -232,7 +219,7 @@ function build(opt) {
     return mul(c, 0.90 + v * 0.10);
   });
   // 5-2. 앞 박공 벽 (삼각형) — 회벽 + 기둥 + 다락창
-  tri(A, [FX1 + JUT, FY0], [FX0 - JUT, FY0], (u, v, sp, dp) => {
+  tri(A, [FX1, FY0], [FX0, FY0], (u, v, sp, dp) => {
     const lx = Math.round(u * sp), ly = Math.round(v * dp);
     let c = plasterAt(lx + 90, ly + 60, 71, 1);
     if (Math.abs(lx - sp * 0.5) < 5) c = P.beam;     // 가운데 기둥
@@ -280,7 +267,7 @@ function build(opt) {
     }
   }
   // 처마 밑 그늘 (앞면 벽 위쪽) — 지붕이 「덮고 있다」로 읽힌다
-  for (let x = FX0 - JUT; x <= FX1 + JUT; x++)
+  for (let x = FX0; x <= FX1; x++)
     for (let k = 0; k < 9; k++)
       px(x, FY0 + 2 + k, mul(img[FY0 + 2 + k][x] || P.plaster, 0.55 + k * 0.05));
 
@@ -340,10 +327,12 @@ function build(opt) {
       }
     }
   }
-  window_(FX0 + 62, FY0 + 44, 46, 46, opt.lit, true);
-  window_(FX1 - 62, FY0 + 44, 46, 46, opt.lit, true);
-  window_(FX0 + 54, MID + 40, 42, 52, opt.lit, false);
-  window_(FX1 - 54, MID + 40, 42, 52, opt.lit, false);
+  // 위아래 창의 x를 기둥 칸 가운데로 맞춘다 (어긋나면 두 층이 딴 집처럼 보인다)
+  const bayC = (FX1 - FX0 - 14) / BAYS / 2 + 7;
+  window_(FX0 + bayC, FY0 + 44, 46, 46, opt.lit, true);
+  window_(FX1 - bayC, FY0 + 44, 46, 46, opt.lit, true);
+  window_(FX0 + bayC, MID + 44, 44, 52, opt.lit, false);
+  window_(FX1 - bayC, MID + 44, 44, 52, opt.lit, false);
 
   // ---- 8. 문 (안으로 들어가 있다) ----
   {
