@@ -639,7 +639,7 @@ func _end_rock_quest() -> void:
 	_apply_story_camera()
 	_apply_story_visibility()
 	m.hud.show_message("우체부 아저씨와 함께 마을로 가자! (화살표 방향)", 6.0)
-	m.save_now()
+	m.saveio.save_now()
 
 
 # 동행 중 우체부에게 말을 걸면 지금 단계에 맞는 짧은 안내를 해 준다.
@@ -750,12 +750,12 @@ func _end_delivery() -> void:
 		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
 	m.hud.show_message("메인 스토리 1 완료! 호미로 밭을 갈고, 집터(E)에 집을 지어 정착하자.", 6.0)
 	if _postman != null:
-		_postman_path = m._tile_path(
+		_postman_path = m.npcmgr._tile_path(
 			Vector2i(int(_postman.position.x / m.TILE), int(_postman.position.y / m.TILE)),
 			Vector2i(m.VILLAGE_EXIT_X, 1))
 		_postman_fade = 1.0
 		_postman_state = "leave"
-	m.save_now()
+	m.saveio.save_now()
 
 
 func _snap_story(name: String) -> void:
@@ -864,7 +864,7 @@ func _close_story() -> void:
 # 최후의 연금술 (연구 노트에서 재료 7종을 모두 모으면 실행 가능)
 func show_ending() -> void:
 	GameData.ending_seen = true
-	m.save_now()
+	m.saveio.save_now()
 	m.hud.visible = false
 	_story_mode = "ending"
 	var kills := 0
@@ -1043,7 +1043,7 @@ func _finish_grandpa() -> void:
 	m.hud.quest_toast("할아버지의 부탁 — %s" % q.name)
 	if Net.is_host():
 		m.netsync._broadcast_stats()
-	m.save_now()
+	m.saveio.save_now()
 
 	# 다음 부탁 편지를 바로 이어서 보여 준다
 	if GameData.grandpa_all_done():

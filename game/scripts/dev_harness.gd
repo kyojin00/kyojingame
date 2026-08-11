@@ -179,7 +179,7 @@ func _debug_tick() -> void:
 			# 낚시터 (마을 남쪽 강가 부두)
 			m.player.position = Vector2(74 * m.TILE + 16, m.DOCK_Y * m.TILE + 16)
 			m.player.dir = "down"
-			m.set_tool("rod")
+			m.toolwork.set_tool("rod")
 		217: _save_shot("_pier.png")
 		218:
 			# 회귀 검사: 비가 와서 이미 젖은 밭에서도 「50% 물주기」가 되어야 한다
@@ -192,10 +192,10 @@ func _debug_tick() -> void:
 			wc.dead = false
 			m.farming._wet(wc, m.WET_ALL_DAY)      # 비로 이미 젖은 상태
 			wc.half_fed = false        # 아직 체크포인트 물은 안 줬다
-			m.set_tool("water")
+			m.toolwork.set_tool("water")
 			m._sel_target = wt
 			m.player.dir = "down"
-			m.interact()
+			m.actions.interact()
 			print("WATER_CHECKPOINT_OK=", wc.half_fed)
 			m._sel_target = Vector2i(-999, -999)
 
@@ -209,8 +209,8 @@ func _debug_tick() -> void:
 			# 회귀 검사: 바위 옆에 서서 다른 쪽을 보고 있어도 E로 캘 수 있어야 한다
 			m.player.position = Vector2(gap.x * m.TILE + 16, gap.y * m.TILE + 16)
 			m.player.dir = "left"
-			m.set_tool("pickaxe")
-			print("ROCK_SIDE_TARGET_OK=", m._tool_target_nearby().x != -999)
+			m.toolwork.set_tool("pickaxe")
+			print("ROCK_SIDE_TARGET_OK=", m.toolwork._tool_target_nearby().x != -999)
 			m.objects.erase(gap + Vector2i(0, -1))
 			m.objects.erase(gap + Vector2i(0, 1))
 		220:
@@ -231,7 +231,7 @@ func _debug_tick() -> void:
 			var sched := []
 			for h in [7, 10, 13, 17]:
 				GameData.minutes = h * 60.0
-				sched.append("%d시=%s" % [h, m.npc_place_now("merchant")])
+				sched.append("%d시=%s" % [h, m.npcmgr.npc_place_now("merchant")])
 			print("NPC_SCHEDULE=", ", ".join(sched))
 			GameData.minutes = 13.0 * 60.0       # 낮: 다들 광장으로 모인다
 			m.dialog.close()
@@ -265,7 +265,7 @@ func _debug_tick() -> void:
 			var ft: Dictionary = GameData.festival_today()
 			print("FESTIVAL_TODAY=", ft.get("name", "없음"),
 				" open=", GameData.festival_open(),
-				" npc_place=", m.npc_place_now("merchant"))
+				" npc_place=", m.npcmgr.npc_place_now("merchant"))
 			m.player.position = Vector2(74 * m.TILE + 16, 14 * m.TILE + 16)
 			m.objnode._apply_season_visuals()
 		313: _save_shot("_festival.png")
@@ -390,7 +390,7 @@ func _debug_tick() -> void:
 				m.objnode._spawn_object_node(rp, "bigrock")
 			m._sel_target = Vector2i(-999, -999)
 			m._mouse_target = Vector2i(-999, -999)
-			m.set_tool("pickaxe")
+			m.toolwork.set_tool("pickaxe")
 			var py: float = ry * m.TILE + 16.0
 			var px: float = (rx - 3) * m.TILE + 16.0
 			while m.is_passable_px(Vector2(px + 1.0, py)):
@@ -398,10 +398,10 @@ func _debug_tick() -> void:
 			m.player.position = Vector2(px, py)
 			m.player.dir = "right"
 			var before: int = int(m.objects[Vector2i(rx, ry)].hp)
-			m.interact()
+			m.actions.interact()
 			var after: int = int(m.objects.get(Vector2i(rx, ry), {"hp": -1}).hp)
 			print("ROCK_WALL: player_tile=", m.player_tile(), " rock_x=", rx,
-				" target=", m.target_tile(), " hp ", before, "->", after,
+				" target=", m.actions.target_tile(), " hp ", before, "->", after,
 				" MINED_OK=", after != before)
 			# 더 나쁜 상황: 두 칸 떨어져 반대쪽을 보고 있어도 캘 수 있어야 한다
 			m._work_lock = 0.0
@@ -409,7 +409,7 @@ func _debug_tick() -> void:
 			m.player.position = Vector2((rx - 2) * m.TILE + 16, py)
 			m.player.dir = "left"
 			var b2: int = int(m.objects[Vector2i(rx, ry)].hp)
-			m.interact()
+			m.actions.interact()
 			var a2: int = int(m.objects.get(Vector2i(rx, ry), {"hp": -1}).hp)
 			print("ROCK_FAR: player_tile=", m.player_tile(), " (두 칸 떨어져 반대쪽 보기) hp ",
 				b2, "->", a2, " MINED_OK=", a2 != b2)
@@ -470,7 +470,7 @@ func _debug_tick() -> void:
 			GameData.barn_built = false
 			GameData.has_horse = false
 			GameData.riding = false
-			m.build_barn()
+			m.toolwork.build_barn()
 			m.riding.place_horse()
 			GameData.has_horse = true
 			# 그림이 덮는 칸이 모두 막혀 있는가 (안으로 걸어 들어가면 안 된다)
@@ -547,13 +547,13 @@ func _debug_tick() -> void:
 				m.objnode._spawn_object_node(mt, "bigrock")
 			m._pending_hits.clear()
 			m._obj_shakes.clear()
-			m.set_tool("pickaxe")
-			m.swing_at(mt, "stone", true)
+			m.toolwork.set_tool("pickaxe")
+			m.toolwork.swing_at(mt, "stone", true)
 			var swung: bool = m.player.swing_t > 0.0 and m.player.tool_sprite.texture != null
 			var queued: int = m._pending_hits.size()
 			# 맞는 순간까지 시간을 흘려 본다
 			for i in 20:
-				m._update_hit_fx(0.01)
+				m.toolwork._update_hit_fx(0.01)
 			print("SWING_OK=", swung, " 예약된 타격=", queued,
 				" 터진 뒤 남은 예약=", m._pending_hits.size(),
 				" 흔들리는 오브젝트=", m._obj_shakes.size(),
@@ -572,7 +572,7 @@ func _debug_tick() -> void:
 			m.player.position = Vector2(demo.x * m.TILE + 16, demo.y * m.TILE + 16)
 			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
 			m.player.dir = "right"
-			m.swing_at(rt2, "stone")
+			m.toolwork.swing_at(rt2, "stone")
 			# 헤드리스는 프레임이 들쭉날쭉해서 짧은 동작이 그냥 지나간다.
 			# 길게 잡고 「내리친 직후」 위상에 고정해 둔다.
 			m.player.start_swing("pickaxe", Vector2.RIGHT, 4.0)
@@ -700,8 +700,8 @@ func _debug_tick() -> void:
 			m.cave.floor_num = 10
 			m.cave._gen_floor()
 			var boss := 0
-			for m in m.cave.monsters:
-				if str(m.type) == "treant":
+			for mob in m.cave.monsters:
+				if str(mob.type) == "treant":
 					boss += 1
 			print("CAVE_MINIBOSS_OK=", boss >= 1, " 10층 보스=", boss)
 			# 한 화면(ZOOM 배)보다 넓어야 「탐험」이 된다
@@ -821,7 +821,7 @@ func _debug_tick() -> void:
 			# 발견: 원기 물약 (생명 4 이상)
 			var trio := ["egg", "egg", "cabbage"]
 			var got := GameData.match_formula(trio)
-			m.do_brew(trio)
+			m.doing.do_brew(trio)
 			print("ALCHEMY_BREW: dud=\"", dud, "\" got=", got,
 				" learned=", GameData.knows_formula("potion_energy"),
 				" bottles=", int(GameData.items["potion_energy"]))
@@ -831,7 +831,7 @@ func _debug_tick() -> void:
 			var spd0: float = GameData.pet_speed_mult()
 			GameData.learn_formula("potion_swift")
 			GameData.items["potion_swift"] = 1
-			m.do_drink("potion_swift")
+			m.doing.do_drink("potion_swift")
 			print("POTION_BUFF: speed ", spd0, " -> ", GameData.pet_speed_mult(),
 				" luck=", GameData.bonus_drop_chance("mine"))
 			GameData.reset_daily()
@@ -840,7 +840,7 @@ func _debug_tick() -> void:
 			GameData.alchemy_known = ["potion_energy"]
 			var before_n: int = GameData.alchemy_known.size()
 			for i in 40:
-				m._maybe_drop_recipe("bigrock")
+				m.doing._maybe_drop_recipe("bigrock")
 			print("RECIPE_DROP_OK=", GameData.alchemy_known.size() > before_n,
 				" known=", GameData.alchemy_known.size(), "/", GameData.FORMULA_IDS.size())
 			for fid2: String in GameData.FORMULA_IDS:
@@ -857,8 +857,8 @@ func _debug_tick() -> void:
 			# 문턱을 못 넘고, 달걀 셋은 생명6이라 원기 물약이 된다.
 			GameData.items["milk"] = 3
 			GameData.items["egg"] = 3
-			var r_fail: Dictionary = m.do_brew(["milk", "milk", "milk"])
-			var r_ok: Dictionary = m.do_brew(["egg", "egg", "egg"])
+			var r_fail: Dictionary = m.doing.do_brew(["milk", "milk", "milk"])
+			var r_ok: Dictionary = m.doing.do_brew(["egg", "egg", "egg"])
 			print("BREW_RESULT_OK=", r_fail.get("ok", true) == false
 					and bool(r_ok.get("ok", false)),
 				" 실패안내=\"", r_fail.get("hint", ""), "\"",

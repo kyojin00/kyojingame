@@ -27,6 +27,12 @@ MODULES = {
     "farming.gd": "farming",
     "fishing.gd": "fishing",
     "riding.gd": "riding",
+    "tool_use.gd": "toolwork",
+    "interact.gd": "actions",
+    "day_cycle.gd": "daycycle",
+    "npcs.gd": "npcmgr",
+    "save_load.gd": "saveio",
+    "player_actions.gd": "doing",
     "dev_harness.gd": "harness",
 }
 
@@ -64,9 +70,13 @@ def main():
         if not os.path.exists(path):
             continue
         for i, line in enumerate(open(path, encoding="utf-8"), 1):
-            if re.search(r"(?<![\w.])self\b", line.split("#")[0]):
+            code = line.split("#")[0]
+            if re.search(r"(?<![\w.])self\b", code):
                 bad.append("%s:%d: self — main을 뜻하던 자리인지 확인 (아마 `m`)"
                            % (path, i))
+            # 지역 이름 `m`은 모듈의 main 참조를 통째로 가린다
+            if re.search(r"\b(?:for|var)\s+m\b", code) and "var m: Kyojin" not in code:
+                bad.append("%s:%d: 지역 이름 `m` — main 참조를 가린다" % (path, i))
     if bad:
         print("옛 주소로 부르는 곳 %d군데:" % len(bad))
         for b in sorted(bad):

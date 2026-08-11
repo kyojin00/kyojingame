@@ -38,7 +38,7 @@ func _build_house() -> void:
 		GameData.BED_WOOD)
 	m.dialog.set_buttons([["좋아!", null]])
 	m.hud.quest_toast("집 짓기")
-	m.save_now()
+	m.saveio.save_now()
 
 
 func _next_village_build() -> String:
@@ -78,13 +78,13 @@ func _build_village_building(pid: String) -> void:
 	GameData.stone -= int(cost[1])
 	GameData.village_built.append(pid)
 	m.worldgen._fill_building(plot.anchor, pid)
-	m._sync_village_npcs()
+	m.npcmgr._sync_village_npcs()
 	Sound.play_sfx("sfx_place")
 	m.hud.quest_toast("%s 완공!" % plot.name)
 	m.dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼." % plot.name)
 	m.dialog.set_buttons([["좋군요!", null]])
 	m.queue_redraw()
-	m.save_now()
+	m.saveio.save_now()
 
 
 func _talk_to(npc: Node2D) -> void:
@@ -116,7 +116,7 @@ func _talk_to(npc: Node2D) -> void:
 	if aff >= 100 and not GameData.memory_given:
 		GameData.memory_given = true
 		line = def.get("secret100", line)
-		m.gain_legend("memory_piece")
+		m.toolwork.gain_legend("memory_piece")
 		if Net.is_host():
 			m.netsync._broadcast_stats()
 	var choices := [
@@ -175,7 +175,7 @@ func _build_greenhouse() -> void:
 			m.grid[y][x].ground = "soil"
 	Sound.play_sfx("sfx_place")
 	m.hud.quest_toast("온실 완공!")
-	m.save_now()
+	m.saveio.save_now()
 	m.queue_redraw()
 	m.dialog.open("온실", "온실이 완성됐다!\n\n이 안에서는 계절을 타지 않는다.\n"
 		+ "겨울에도 원하는 작물을 키울 수 있다.", [["고맙습니다", null]])
@@ -233,7 +233,7 @@ func _do_rest() -> void:
 	GameData.minutes = minf(GameData.minutes + m.INN_REST_HOURS * 60.0,
 		GameData.DAY_END - 60.0)
 	Sound.play_sfx("sfx_sleep")
-	m.save_now()
+	m.saveio.save_now()
 	m.dialog.open("여관", "푹 쉬었다!\n체력이 가득 찼다.", [["고맙습니다", null]])
 
 
@@ -266,7 +266,7 @@ func _do_breed() -> void:
 	GameData.items["ore"] = int(GameData.items["ore"]) - int(cost[1])
 	GameData.breed_level += 1
 	Sound.play_sfx("sfx_catch")
-	m.save_now()
+	m.saveio.save_now()
 	m.hud.quest_toast("씨앗 개량 %d단계!" % GameData.breed_level)
 	_open_lab_dialog()
 
@@ -380,7 +380,7 @@ func _finish_festival(bonus := 1.0, extra := "") -> void:
 	m.hud.reward_toast("%dG" % money, m.tex["icon_coin"])
 	if Net.is_host():
 		m.netsync._broadcast_stats()
-	m.save_now()
+	m.saveio.save_now()
 	m.dialog.open(str(f.name), "%s%s\n\n상금 %dG를 받았다.\n\n내년에도 또 만나자!"
 		% [extra, "\n" if extra != "" else "", money], [["좋았어!", null]],
 		_npc_portrait("chief", true))
@@ -523,7 +523,7 @@ func _accept_quest(i: int) -> void:
 		m.netsync._req_quest.rpc_id(1, "accept")
 	elif Net.is_host():
 		m.netsync._broadcast_stats()
-	m.save_now()
+	m.saveio.save_now()
 	m.dialog.set_body("의뢰를 수락했다!\n%s %d개를 모아서 다시 오자." % [
 		GameData.item_display_name(str(GameData.quest.item)), int(GameData.quest.qty)])
 
@@ -541,7 +541,7 @@ func _turn_in_quest() -> void:
 	m.hud.reward_toast("%dG" % int(q.reward), m.tex["icon_coin"])
 	m.dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % int(q.reward))
 	GameData.quest = {}
-	m.save_now()
+	m.saveio.save_now()
 	if Net.is_guest():
 		m.netsync._req_quest.rpc_id(1, "turnin")
 	elif Net.is_host():

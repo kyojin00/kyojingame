@@ -468,7 +468,7 @@ func _mk_tool_row(t: String) -> Button:
 	var tip := _tool_tip(t)
 	_hover_slots.append({"b": b, "tool": t, "title": tip.title, "body": tip.body})
 	b.pressed.connect(func() -> void:
-		main.set_tool(t)
+		main.toolwork.set_tool(t)
 		_rebuild())
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
@@ -519,7 +519,7 @@ func _mk_tool_slot(slot_i: int) -> Button:
 	b.add_child(num)
 	b.pressed.connect(func() -> void:
 		if unlocked:
-			main.set_tool(t)
+			main.toolwork.set_tool(t)
 			_rebuild())
 	b.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and ev.pressed \

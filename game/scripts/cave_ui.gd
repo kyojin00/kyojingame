@@ -407,27 +407,27 @@ func _attack() -> void:
 			if m.hp <= 0:
 				monsters.erase(m)
 				Sound.play_sfx("sfx_pick", 0.2)
-				main.record_kill(m.type)
-				main.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0, "treant": 40.0}[m.type])
+				main.doing.record_kill(m.type)
+				main.toolwork.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0, "treant": 40.0}[m.type])
 				match m.type:
 					"slime":
 						if randf() < 0.35:
-							main.gain_item("ore", 1)
+							main.doing.gain_item("ore", 1)
 							main.hud.show_message("슬라임이 광석을 떨어뜨렸다!")
 					"bat":
 						if randf() < 0.2:
-							main.gain_item("ore", 1)
+							main.doing.gain_item("ore", 1)
 							main.hud.show_message("박쥐가 광석을 떨어뜨렸다!")
 					"ghost":
-						main.gain_item("ore", 1)
+						main.doing.gain_item("ore", 1)
 						if randf() < 0.15:
-							main.gain_item("gem", 1)
+							main.doing.gain_item("gem", 1)
 							main.hud.show_message("유령이 보석을 떨어뜨렸다!")
 						if randf() < 0.1:
-							main.gain_legend("ghost_essence")
+							main.toolwork.gain_legend("ghost_essence")
 					"treant":
-						main.gain_item("gem", 3)
-						main.gain_legend("world_branch")
+						main.doing.gain_item("gem", 3)
+						main.toolwork.gain_legend("world_branch")
 						main.hud.show_message("숲의 수호자를 쓰러뜨렸다! 세계수 가지를 얻었다!")
 				if monsters.is_empty():
 					_floor_clear()
@@ -438,9 +438,9 @@ func _attack() -> void:
 		ores.erase(rt)
 		Sound.play_sfx("sfx_pick", 0.1)
 		var n := 2 if randf() < GameData.bonus_drop_chance("mine") else 1
-		main.gain_item("ore", n)
+		main.doing.gain_item("ore", n)
 		main.hud.show_message("광석 %d개 획득!" % n if n > 1 else "광석 획득!")
-		main.gain_skill("mine", 8.0)
+		main.toolwork.gain_skill("mine", 8.0)
 
 
 func _floor_clear() -> void:
@@ -464,9 +464,9 @@ func _interact() -> void:
 			ore_n *= 2
 		elif special == "treasure":
 			gem_n += 2 + floor_num / 3
-		main.gain_item("ore", ore_n)
+		main.doing.gain_item("ore", ore_n)
 		if gem_n > 0:
-			main.gain_item("gem", gem_n)
+			main.doing.gain_item("gem", gem_n)
 		Sound.play_sfx("sfx_coin")
 		var msg := "상자에서 광석 %d개" % ore_n
 		if gem_n > 0:
@@ -474,7 +474,7 @@ func _interact() -> void:
 		# 이끼방에서는 약초가 함께 나온다 (연금술 생명 재료)
 		if special == "grove":
 			var herb := 3 + floor_num / 2
-			main.gain_item("forage_herb", herb)
+			main.doing.gain_item("forage_herb", herb)
 			GameData.forage_caught["forage_herb"] = \
 				int(GameData.forage_caught.get("forage_herb", 0)) + herb
 			msg += ", 약초 %d개" % herb
@@ -482,9 +482,9 @@ func _interact() -> void:
 		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
 		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
 		if floor_num >= 5:
-			main.gain_legend("star_ore")
+			main.toolwork.gain_legend("star_ore")
 			var shards: int = 1 + int((floor_num - 5) / 3.0)
-			main.gain_item("star_shard", shards)
+			main.doing.gain_item("star_shard", shards)
 			main.hud.show_message("별빛 조각 %d개! 대장간에서 쓸 수 있다." % shards, 4.0)
 		chest_pos = Vector2i(-1, -1)
 		return

@@ -78,12 +78,12 @@ func _process(delta: float) -> void:
 
 # 시간대가 바뀌면 새 목적지로 길을 잡는다
 func _update_schedule() -> void:
-	var want: String = main.npc_place_now(id)
+	var want: String = main.npcmgr.npc_place_now(id)
 	if want == "":
 		return
 	if want != place:
 		place = want
-		dest = main.npc_place_tile(id, place)
+		dest = main.npcmgr.npc_place_tile(id, place)
 		_route_cd = 0.0
 	if dest.x == -999 or not route.is_empty():
 		return
@@ -95,7 +95,7 @@ func _update_schedule() -> void:
 	if _route_cd > 0.0:
 		return
 	_route_cd = 2.0   # 길이 막혀 있으면 잠시 뒤 다시 시도한다
-	var p: Array = main._tile_path(t, dest)
+	var p: Array = main.npcmgr._tile_path(t, dest)
 	if p.is_empty():
 		return
 	route = p

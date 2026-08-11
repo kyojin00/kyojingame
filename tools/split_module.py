@@ -204,7 +204,13 @@ def main():
             var_decls.append(l)
             drop.add(i)
 
-    body = fix_canvas_calls(prefix_masked("\n\n\n".join(taken), keep_names, ref), ref)
+    # 옮길 코드가 `m`이라는 지역 이름을 만들면, 그 안쪽에서 main 참조가
+    # 통째로 가려진다 (밤 몹 루프가 `for m in night_mobs`였다).
+    joined = "\n\n\n".join(taken)
+    for mo in re.finditer(r"\b(?:for|var)\s+(" + re.escape(ref) + r")\b", joined):
+        sys.exit("!! 옮길 코드가 `%s`라는 지역 이름을 쓴다 — 먼저 이름을 바꿀 것: %s"
+                 % (ref, joined[max(0, mo.start() - 60):mo.end() + 20]))
+    body = fix_canvas_calls(prefix_masked(joined, keep_names, ref), ref)
     var_text = "\n".join(prefix_masked(v, keep_names, ref) for v in var_decls)
 
     module = cfg["header"].rstrip() + "\nextends Node\n\n"

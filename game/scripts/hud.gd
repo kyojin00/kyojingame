@@ -309,7 +309,7 @@ func _build_hotbar() -> void:
 		b.pressed.connect(func() -> void:
 			var t: String = GameData.tool_slots[slot_i]
 			if t != "" and GameData.is_tool_unlocked(t):
-				main.set_tool(t))
+				main.toolwork.set_tool(t))
 		b.gui_input.connect(func(ev: InputEvent) -> void:
 			if ev is InputEventMouseButton and ev.pressed \
 					and ev.button_index == MOUSE_BUTTON_RIGHT \

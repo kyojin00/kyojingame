@@ -101,7 +101,7 @@ func _recv_snapshot(json: String) -> void:
 	for a in m.animals:
 		a.queue_free()
 	m.animals.clear()
-	m._apply_save(d)
+	m.saveio._apply_save(d)
 	m.player.position = my_pos
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
@@ -229,7 +229,7 @@ func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int
 	m._forced_seed = seed_id
 	m._remote_acting = true
 	GameData.tool = tool
-	m.use_tool()
+	m.toolwork.use_tool()
 	GameData.tool = saved_tool
 	GameData.energy = saved_energy  # 게스트 기력은 게스트 로컬 관리
 	m._remote_acting = false
@@ -360,7 +360,7 @@ func _net_new_day(json: String, title_text: String, body: String) -> void:
 	for a in m.animals:
 		a.queue_free()
 	m.animals.clear()
-	m._apply_save(d)
+	m.saveio._apply_save(d)
 	m.player.position = my_pos
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()

@@ -7,39 +7,70 @@
 
 | 파일 | 줄수 | 맡은 일 |
 | --- | ---: | --- |
-| `main.gd` | ~3290 | 세계 상태(grid·objects·player), 도구, 시간, 낮/밤, 입력 |
+| `main.gd` | ~1410 | 세계 상태(grid·objects·player), 매 프레임 흐름, 입력, 그리기 뼈대, 모듈 붙이기 |
 | `story.gd` | ~1060 | 메인 스토리 연출 — 각본 |
 | `dev_harness.gd` | ~990 | 검증 하네스 (KYOJIN_SHOT일 때만 붙는다) |
 | `village_ui.gd` | ~550 | 마을에서 여는 창들 (상점·여관·축제·의뢰·선물) |
+| `tool_use.gd` | ~510 | 도구 쓰기 — 갈기·물주기·심기·베기·캐기 |
 | `world_gen.gd` | ~490 | 지형·길·마을 부지·자원 재생 |
 | `renderer.gd` | ~410 | 지형 위에 얹히는 것들 + 화면 안내 |
 | `net_sync.gd` | ~370 | 함께하기 배관 (@rpc는 전부 여기) |
-| `game_data.gd` | ~2300 | 순수 데이터 + 세이브 (autoload) |
+| `interact.gd` | ~350 | 상호작용·조준·클릭 |
+| `object_nodes.gd` | ~240 | 세계에 서 있는 것들의 노드 |
+| `day_cycle.gd` | ~220 | 하루가 넘어가는 흐름과 밤 |
+| `save_load.gd` | ~190 | 세이브 담기/펴기 |
+| `farming.gd` | ~170 | 농사·물기·스프링클러·목초지·가축 |
+| `player_actions.gd` | ~140 | 먹기·요리·조합·아이템 얻기 |
+| `npcs.gd` | ~110 | NPC 배치·길찾기 |
+| `fishing.gd` | ~90 | 낚시 (미니게임은 fishing_ui.gd) |
+| `riding.gd` | ~70 | 탈 것 |
+| `game_data.gd` | ~2290 | 순수 데이터 + 세이브 (autoload) |
 
-6900줄짜리 한 파일이 3290줄 + 여섯 갈래가 됐다.
-
+6900줄짜리 한 파일이 **1410줄 + 열여섯 갈래**가 됐다.
 `cave_ui` · `shop_ui` · `inventory_ui` 같은 창들은 원래부터 따로 있다.
+
+### main.gd에 남은 것
+
+세계의 **상태**와 **매 프레임 흐름**만 남겼다.
+
+- 상태 선언 (`grid` · `objects` · `player` · `tex` · 상수표) — 200줄
+- `_ready` (모듈 붙이기 + 장면 세우기) · `_process` · `_draw` · `_unhandled_input`
+- 아무 데서나 묻는 질문들 — `is_passable*` · `player_tile` · `ui_open` · `_is_path`
+- 다른 창이 부르는 얇은 창구 (`tutorial_notify` · `show_ending` · `room_action`)
 
 ## 갈라낸 모듈의 모양
 
 전부 **main의 자식 노드**로 붙고, `m`으로 main을 부른다.
 
 ```gdscript
+class_name KyojinFarming
 extends Node
 var m: KyojinMain    # main.gd
+```
+
+main은 `_mount()` 한 줄로 붙인다:
+
+```gdscript
+	farming = _mount("farming", "Farming")
 ```
 
 main은 `_ready()` **맨 앞에서** 이들을 붙인다. 바로 아래 `_build_map()`이
 `worldgen`을 쓰기 때문이다 — 순서가 뒤집히면 `Nil` 호출로 `_ready`가 통째로
 중단되고, 그 뒤로 매 프레임 에러가 쏟아진다.
 
-### 왜 main에 `class_name KyojinMain`을 붙였나
+### 이름(class_name)은 **양쪽 다** 붙여야 한다
 
-모듈에서 `var m: Node2D`로 받으면 `m.player`, `m.TILE`이 전부 Variant가 된다.
-그러면 `var x := m.player_tile()` 같은 줄이 **전부** 「타입을 알 수 없다」로
-막힌다. 이름을 붙이니 한 번에 사라졌다.
+모듈에서 `var m: Node2D`로 받으면 `m.player`, `m.TILE`이 전부 Variant가 되어
+`var x := m.player_tile()` 같은 줄이 전부 「타입을 알 수 없다」로 막힌다.
 
-대신 순환 참조가 되므로 main은 `preload`가 아니라 **`load`** 로 자식을 만든다.
+반대쪽도 똑같다. main이 `var farming: Node`로 들고 있으면
+`farming._grow_total(def)`가 Variant가 되어 같은 일이 벌어진다. 그래서
+main은 `KyojinMain`, 모듈은 `KyojinFarming`처럼 **양쪽 다** 이름을 붙였다.
+
+서로 참조하지만 순환 오류는 나지 않는다 — main이 `preload`가 아니라
+**`load`** 로 자식을 만들기 때문이다.
+
+`tools/fix_infer.py`가 남은 `:=` 자리를 모듈 쪽 `-> 타입`을 읽어 고쳐 준다.
 
 ### @rpc는 노드 경로로 찾아간다
 
@@ -85,6 +116,11 @@ python3 tools/split_module.py <설정.json>
 ### 도구가 못 잡는 것 (전부 실제로 당했다)
 
 - **`self`가 더 이상 main이 아니다.** `shop.main = self`가 하네스를 넘겼다.
+  같은 실수를 `net_sync`(원격 플레이어) · `world_gen`(건물) · `farming`(가축) ·
+  `npcs`(NPC)에서 네 번 더 했다.
+- **지역 이름 `m`.** 밤 몹 루프가 `for m in night_mobs`였다. 모듈에서 `m`은
+  main이라, 루프 안에서 main이 통째로 가려졌다 (`m.player`가 몹을 가리켰다).
+  도구가 이제 이런 코드를 만나면 **옮기지 않고 멈춘다.**
 - **CanvasItem 메서드.** `get_canvas_transform()`은 Node에는 없다 → `m.` 필요.
 - **다른 스크립트의 옛 주소.** `dev_harness.gd`가 `m._story_t`를 계속 보고
   있어서, 스토리 하네스가 종료 조건을 못 만나고 90초를 돌다 죽었다.
@@ -139,8 +175,9 @@ KYOJIN_SHOT=/tmp/x/ KYOJIN_MP=guest godot --path game
 프레임 간격이 들쭉날쭉해 캐릭터·NPC 위치가 매번 조금씩 달라지기 때문이다.
 믿을 수 있는 그물은 `*_OK=` 어서션뿐이고, 그림은 눈으로 확인한다.
 
-## 남은 것
+## 더 쪼갤까
 
-main.gd에 남은 3290줄은 서로 얽혀 있는 알맹이다 — 세계 상태(grid·objects),
-도구 쓰기, 시간, 낮/밤, 입력. 더 쪼개려면 상태 소유를 옮겨야 해서, 지금까지처럼
-「함수만 들어내기」로는 안 된다.
+여기서 멈추는 게 맞다. 남은 1410줄은 **상태와 흐름**이라, 더 나누려면
+`grid`·`objects` 같은 세계 상태의 주인을 옮겨야 한다. 그러면 모듈끼리
+서로를 부르기 시작하고, 지금의 「main이 가운데, 모듈은 바깥」이라는 단순한
+모양이 깨진다. 파일 수가 는다고 깨끗해지지는 않는다.

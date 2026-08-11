@@ -101,7 +101,7 @@ func _rebuild() -> void:
 		cook_btn.focus_mode = Control.FOCUS_NONE
 		cook_btn.disabled = not GameData.can_cook(id)
 		cook_btn.pressed.connect(func() -> void:
-			main.do_cook(id)
+			main.doing.do_cook(id)
 			_rebuild())
 		row.add_child(cook_btn)
 
@@ -110,7 +110,7 @@ func _rebuild() -> void:
 		eat_btn.focus_mode = Control.FOCUS_NONE
 		eat_btn.disabled = int(GameData.items[id]) <= 0
 		eat_btn.pressed.connect(func() -> void:
-			main.do_eat(id)
+			main.doing.do_eat(id)
 			_rebuild())
 		row.add_child(eat_btn)
 

@@ -188,14 +188,14 @@ func _context_hint() -> Array:
 	if m.story._postman != null and m.story._postman_state == "wait" \
 			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
 		return ["E: 말 걸기", m.story._postman.position + Vector2(0, -112)]
-	if m.nearby_npc() != null:
+	if m.actions.nearby_npc() != null:
 		return ["E: 대화", above_player]
-	if m.nearby_animal() != null:
+	if m.actions.nearby_animal() != null:
 		return ["E: 쓰다듬기", above_player]
-	var t := m.target_tile()
+	var t: Vector2i = m.actions.target_tile()
 	if not m.objects.has(t):
 		# 앞 칸은 비었는데 걸음을 막고 있는 오브젝트가 있으면 그것을 가리킨다
-		var bt := m._blocking_object_tile()
+		var bt: Vector2i = m.actions._blocking_object_tile()
 		if bt.x != -999:
 			t = bt
 	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
@@ -229,7 +229,7 @@ func _context_hint() -> Array:
 			"rock", "bigrock":
 				return ["E: 채광 (곡괭이)", above_tile]
 			"house":
-				var bk := m._building_kind_at(t)
+				var bk: String = m.actions._building_kind_at(t)
 				if bk == "home":
 					return ["E: 집에 들어가기", above_tile]
 				if bk in ["general", "ranch", "smith", "fish"]:

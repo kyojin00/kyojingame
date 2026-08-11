@@ -24,7 +24,7 @@ func fishing_spot_center() -> Vector2:
 
 
 func _start_fishing() -> void:
-	var t := m.target_tile()
+	var t: Vector2i = m.actions.target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H \
 			or m.grid[t.y][t.x].ground != "water":
 		m.hud.show_message("물가를 보고 낚싯대를 던지자.")
@@ -34,7 +34,7 @@ func _start_fishing() -> void:
 	if GameData.tutorial_current_flag() == "fish" and not at_fishing_spot():
 		m.hud.show_message("마을 남쪽 강가의 낚시터로 가자! 부두에서 낚싯대를 던진다. (지도 M)", 4.0)
 		return
-	if not m.can_use_tile(t):
+	if not m.actions.can_use_tile(t):
 		m.hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
 		return
 	m.fishing_state = "waiting"
@@ -75,7 +75,7 @@ func _on_fishing_finished(success: bool) -> void:
 			GameData.fest_fish += 1
 			if GameData.fest_fish == 5:
 				m.hud.show_message("5마리! 이장에게 결과를 알리자.", 4.0)
-		m.gain_skill("fish", 10.0)
+		m.toolwork.gain_skill("fish", 10.0)
 		if Net.is_guest():
 			# 로컬 반영분은 호스트 통계 브로드캐스트로 덮어써 수렴한다
 			GameData.items[id] -= 1

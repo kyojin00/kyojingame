@@ -332,7 +332,7 @@ func _rebuild() -> void:
 				"동물 %d마리 · 굳은 날 자동 배부름" % GameData.BARN_MAX_ANIMALS))
 		else:
 			var bb := _mk_button("건설", func() -> void:
-					main.build_barn()
+					main.toolwork.build_barn()
 					_rebuild())
 			bb.disabled = GameData.money < GameData.BARN_COST_MONEY \
 				or GameData.wood < GameData.BARN_COST_WOOD
@@ -476,7 +476,7 @@ func _on_buy(id: String) -> void:
 	GameData.seeds[id] += 1
 	GameData.today_spent += price
 	if main != null and not main._remote_acting:
-		main.net_shop("buy_seed", id)
+		main.doing.net_shop("buy_seed", id)
 	_rebuild()
 
 
@@ -489,7 +489,7 @@ func _on_sell(id: String) -> void:
 	GameData.produce_silver[id] = 0
 	GameData.produce_gold[id] = 0
 	if main != null and not main._remote_acting:
-		main.net_shop("sell_crop", id)
+		main.doing.net_shop("sell_crop", id)
 	_rebuild()
 
 
@@ -501,7 +501,7 @@ func _on_sell_item(id: String) -> void:
 	GameData.today_earned += amount
 	GameData.items[id] = 0
 	if main != null and not main._remote_acting:
-		main.net_shop("sell_item", id)
+		main.doing.net_shop("sell_item", id)
 	_rebuild()
 
 
@@ -517,7 +517,7 @@ func _on_buy_animal(id: String) -> void:
 	main.hud.show_message("%s를 들였다! **농장(맵 서쪽)** 에서 기다린다. (지도 M)"
 		% def.name, 5.0)
 	if main != null and not main._remote_acting:
-		main.net_shop("buy_animal", id)
+		main.doing.net_shop("buy_animal", id)
 	_rebuild()
 
 
@@ -546,7 +546,7 @@ func _on_buy_pet(id: String) -> void:
 	GameData.owned_pets.append(id)
 	GameData.active_pet = id
 	if main != null and not main._remote_acting:
-		main.net_shop("buy_pet", id)
+		main.doing.net_shop("buy_pet", id)
 	_rebuild()
 
 
@@ -554,7 +554,7 @@ func _on_select_pet(id: String) -> void:
 	GameData.active_pet = id
 	Sound.play_sfx("sfx_ui")
 	if main != null and not main._remote_acting:
-		main.net_shop("select_pet", id)
+		main.doing.net_shop("select_pet", id)
 	_rebuild()
 
 
@@ -573,5 +573,5 @@ func _on_upgrade(id: String) -> void:
 	GameData.items["ore"] -= int(next.ore)
 	GameData.tool_level[id] = level + 1
 	if main != null and not main._remote_acting:
-		main.net_shop("upgrade", id)
+		main.doing.net_shop("upgrade", id)
 	_rebuild()

@@ -169,7 +169,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif (ppos - BED.get_center()).length() < 82.0:
 			if GameData.has_bed:
-				main.request_sleep()
+				main.daycycle.request_sleep()
 			else:
 				# 침대는 직접 만들어야 한다
 				main.dialog.open("침대 제작",
@@ -206,7 +206,7 @@ func _craft_bed() -> void:
 	main.dialog.set_body("포근한 침대 완성!\n이제 밤이 되면 여기서 잘 수 있다.")
 	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("침대 만들기")
-	main.save_now()
+	main.saveio.save_now()
 
 
 func _upgrade_house() -> void:
@@ -225,7 +225,7 @@ func _upgrade_house() -> void:
 	main.dialog.set_body("집 확장 완료!\n부엌(요리)과 꾸미기(F)를 쓸 수 있다.")
 	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("집 확장")
-	main.save_now()
+	main.saveio.save_now()
 
 
 # 실제 키보드는 keycode, 테스트 하네스는 physical_keycode만 채워서 보낸다
@@ -276,7 +276,7 @@ func _place_held() -> void:
 			held.erase("new_cost")
 		held = {}
 		Sound.play_sfx("sfx_place")
-		main.sync_furniture(delta)
+		main.doing.sync_furniture(delta)
 	else:
 		main.hud.show_message("여기에는 놓을 수 없다.")
 
@@ -312,7 +312,7 @@ func _sell_held() -> void:
 		main.hud.show_message("%s 판매 (+%dG)" % [def.name, refund])
 	held = {}
 	Sound.play_sfx("sfx_sell")
-	main.sync_furniture(delta)
+	main.doing.sync_furniture(delta)
 
 
 func _exit_deco() -> void:
@@ -329,7 +329,7 @@ func _exit_deco() -> void:
 		held = {}
 	deco_mode = false
 	Sound.play_sfx("sfx_ui")
-	main.sync_furniture(0)
+	main.doing.sync_furniture(0)
 
 
 func _update_sprite() -> void:

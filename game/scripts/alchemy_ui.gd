@@ -238,7 +238,7 @@ func _pick(id: String) -> void:
 func _on_brew() -> void:
 	if picked.size() != GameData.ALCHEMY_SLOTS:
 		return
-	last = main.do_brew(picked.duplicate())
+	last = main.doing.do_brew(picked.duplicate())
 	picked.clear()
 	_rebuild()
 
@@ -291,7 +291,7 @@ func _make(fid: String) -> void:
 	if trio.is_empty():
 		main.hud.show_message("재료가 모자란다. (%s)" % GameData.formula_need_text(fid))
 		return
-	last = main.do_brew(trio)
+	last = main.doing.do_brew(trio)
 	picked.clear()
 	_rebuild()
 
@@ -396,7 +396,7 @@ func _rebuild() -> void:
 		mk.disabled = not can
 		row2.add_child(mk)
 		var drink := _mk_button("마시기", func() -> void:
-			main.do_drink(fid)
+			main.doing.do_drink(fid)
 			_rebuild())
 		drink.disabled = int(GameData.items[fid]) <= 0
 		row2.add_child(drink)
