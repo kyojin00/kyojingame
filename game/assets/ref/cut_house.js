@@ -23,8 +23,8 @@ const BASE_Y = 404;              // 그림 밑동이 앉는 줄 (아래는 그�
 //       현관 기둥이나 덧창의 나무색을 문으로 착각한다.
 // sky:  이 y 위쪽을 지운다. 굴뚝 연기가 남으면 그만큼 집이 작아진다.
 const JOBS = [
-  { src: 'ref_house.png', out: 'house', door: 758 },
-  { src: 'ref_shop.png', out: 'house_general', door: 768, sky: { x0: 1000, y1: 185 } },
+  { src: 'ref_house.png', out: 'house', door: 496 },
+  { src: 'ref_shop.png', out: 'house_general', door: 512 },
   { src: 'ref_post.png', out: 'house_post', door: 767 },
   { src: 'ref_lab.png', out: 'house_lab', door: 514 },
   { src: 'ref_smith.png', out: 'house_smith', door: 506 },
