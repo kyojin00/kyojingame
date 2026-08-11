@@ -30,6 +30,9 @@ var _shot_frames := 0
 #    새 단계를 넣기 전에: grep -n "^\t\t[0-9]\+:" 로 빈 번호를 확인할 것.
 
 func _debug_tick() -> void:
+	if OS.get_environment("KYOJIN_MP") != "":
+		_mp_tick()
+		return
 	if Net.is_guest() and not m._net_ready:
 		return  # 접속 완료 후부터 시퀀스 시작
 	_shot_frames += 1
@@ -939,3 +942,49 @@ func _send_click(world_pos: Vector2) -> void:
 func _save_shot(suffix: String) -> void:
 	var img := get_viewport().get_texture().get_image()
 	img.save_png(m._shot_path + suffix)
+
+
+# ---- 함께하기 검증 ----
+#
+# 통신은 헤드리스 한 판으로는 확인할 수가 없다. 호스트와 게스트를 따로
+# 띄워서 서로 붙는지, 세계가 넘어오는지, 게스트가 민 변경이 호스트에
+# 반영되는지를 본다.
+#
+#   KYOJIN_SHOT=/tmp/x/ KYOJIN_MP=host  godot --path game &
+#   KYOJIN_SHOT=/tmp/x/ KYOJIN_MP=guest godot --path game
+#
+# 게스트가 MP_*_OK= 줄을 뱉고, 양쪽 다 스스로 끝낸다.
+const MP_TILE := Vector2i(20, 20)   # 게스트가 갈아 볼 칸 (농장 빈 자리)
+
+func _mp_tick() -> void:
+	_shot_frames += 1
+	var guest := Net.is_guest()
+	if not guest:
+		# 호스트: 게스트가 끝낼 시간을 주고 스스로 나간다
+		if _shot_frames == 1:
+			m.grid[MP_TILE.y][MP_TILE.x].ground = "grass"
+		if _shot_frames == 900:
+			get_tree().quit()
+		return
+	match _shot_frames:
+		1:
+			print("MP_START: 게스트 시작")
+		240:
+			# 스냅샷을 받아 세계가 넘어왔는가
+			print("MP_CONNECT_OK=", m._net_ready,
+				" 접속=", multiplayer.multiplayer_peer != null,
+				" 오브젝트=", m.objects.size() > 0)
+			print("MP_SNAPSHOT_OK=", m.objects.size() > 0 and m.grid.size() == m.MAP_H)
+		250:
+			# 게스트가 민 변경이 호스트를 거쳐 되돌아오는가
+			m.player.position = Vector2(MP_TILE.x * m.TILE + 16, (MP_TILE.y + 1) * m.TILE + 16)
+			GameData.tool = "hoe"
+			m._req_tool.rpc_id(1, MP_TILE.x, MP_TILE.y, "hoe", "",
+				int(m.player.position.x), int(m.player.position.y))
+		330:
+			var g: Dictionary = m.grid[MP_TILE.y][MP_TILE.x]
+			print("MP_TOOL_OK=", g.ground == "soil", " 땅=", g.ground)
+		340:
+			_save_shot("_mp_guest.png")
+		360:
+			get_tree().quit()
