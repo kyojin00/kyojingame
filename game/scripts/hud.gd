@@ -407,9 +407,12 @@ func refresh(force := false) -> void:
 	var track := []
 	var story_obj := GameData.story_objective_short()
 	var obj := GameData.tutorial_objective_short()
+	var story2_obj := GameData.story2_objective_short()
 	var fisher_obj := GameData.fisher_objective_short()
 	if story_obj != "":
 		track.append("목표: " + story_obj)
+	elif story2_obj != "":
+		track.append("목표: " + story2_obj)
 	elif fisher_obj != "":
 		track.append("목표: " + fisher_obj)
 	elif obj != "":

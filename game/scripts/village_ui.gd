@@ -41,6 +41,50 @@ func _build_house() -> void:
 	m.saveio.save_now()
 
 
+# ---- 상점 터 (메인 스토리 2 첫 퀘스트: 재료를 모아 마을의 첫 상점을 짓는다) ----
+func _open_shop_site_dialog() -> void:
+	if GameData.village_built.has("general"):
+		return
+	if GameData.story2_phase == "":
+		# 아직 이장의 부탁을 받기 전이다 (스토리 1 진행 중)
+		m.dialog.open("상점 터", "낡은 게시판이 서 있다.\n「상점이 들어설 자리」라고 적혀 있다.",
+			[["닫기", null]])
+		return
+	m.dialog.open("상점 터",
+		"이장이 말한 상점 자리다.\n재료를 모아 마을의 첫 상점을 세우자.\n\n필요 재료: 목재 %d (보유 %d) · 돌 %d (보유 %d)" %
+			[GameData.SHOP_BUILD_WOOD, GameData.wood,
+			GameData.SHOP_BUILD_STONE, GameData.stone], [
+		["상점 짓기", _build_shop],
+		["닫기", null],
+	])
+
+
+func _build_shop() -> void:
+	if GameData.village_built.has("general"):
+		return
+	if GameData.wood < GameData.SHOP_BUILD_WOOD \
+			or GameData.stone < GameData.SHOP_BUILD_STONE:
+		m.dialog.set_body("재료가 부족하다...\n(보유: 목재 %d/%d · 돌 %d/%d)\n나무를 베고 바위를 캐서 모으자." %
+			[GameData.wood, GameData.SHOP_BUILD_WOOD,
+			GameData.stone, GameData.SHOP_BUILD_STONE])
+		return
+	GameData.wood -= GameData.SHOP_BUILD_WOOD
+	GameData.stone -= GameData.SHOP_BUILD_STONE
+	GameData.village_built.append("general")
+	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
+	m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
+	m.npcmgr._sync_village_npcs()   # 상점 주인 민지가 마을에 온다
+	Sound.play_sfx("sfx_place")
+	m.hud.quest_toast("상점 완성!")
+	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n민지가 씨앗과 생필품을 팔기 시작했다.")
+	m.dialog.set_buttons([["좋아!", null]])
+	if GameData.story2_phase == "shop":
+		GameData.story2_phase = "fisher"
+		m.hud.show_message("상점이 생겼다! ...그런데 낯선 낚시꾼이 마을에 온다는 소문이 돈다.", 6.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
 func _next_village_build() -> String:
 	for pid in m.VILLAGE_BUILD_ORDER:
 		if not GameData.village_built.has(pid):
@@ -77,6 +121,10 @@ func _build_village_building(pid: String) -> void:
 	GameData.wood -= int(cost[0])
 	GameData.stone -= int(cost[1])
 	GameData.village_built.append(pid)
+	if pid == "general":
+		m.objnode._remove_object(m.door_tile(plot.anchor))  # 상점 터 게시판 철거
+		if GameData.story2_phase == "shop":
+			GameData.story2_phase = "fisher"   # 이장 경로로 지어도 이야기는 이어진다
 	m.worldgen._fill_building(plot.anchor, pid)
 	m.npcmgr._sync_village_npcs()
 	Sound.play_sfx("sfx_place")
@@ -88,7 +136,13 @@ func _build_village_building(pid: String) -> void:
 
 
 func _talk_to(npc: Node2D) -> void:
-	# 낚시꾼 퀘스트: 처음 만나는 낚시꾼은 스토리 대화로 이어진다
+	# 스토리 대화가 먼저다 — 편지 전달 / 낚시꾼 첫 만남 / 호미 받기
+	if npc.id == "chief" and GameData.story_phase == "deliver":
+		m.story._start_delivery_dialog()
+		return
+	if npc.id == "chief" and GameData.story2_phase == "farm_talk":
+		m.story._start_farm_dialog()
+		return
 	if npc.id == "fisher" and GameData.fisher_quest == "meet":
 		m.story._start_fisher_dialog()
 		return

@@ -24,7 +24,8 @@ while (q.length) {
 let x0 = W, x1 = -1, y0 = H, y1 = -1;
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
   const i = y * W + x;
-  if (out[i]) { d[i * 4 + 3] = 0; continue; }
+  // 흰 배경(flood)도, 애초에 투명한 칸도 배경이다
+  if (out[i] || d[i * 4 + 3] < 60) { d[i * 4 + 3] = 0; continue; }
   if (x < x0) x0 = x; if (x > x1) x1 = x;
   if (y < y0) y0 = y; if (y > y1) y1 = y;
 }

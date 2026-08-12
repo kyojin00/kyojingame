@@ -666,13 +666,31 @@ var tree_regrow: Array = []
 # 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
 var player_name := ""
 
-# 마을 발전: 처음 마을에는 건물이 하나도 없다.
-# 이장에게 이야기해 재료를 모으면 빈 부지에 건물이 하나씩 세워진다.
-# (건물 id는 main.gd의 VILLAGE_PLOTS 키)
-# 마을은 처음부터 다 세워져 있다. (건물 목록은 main.VILLAGE_PLOTS와 같아야 한다)
+# 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
+# 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
+# 재료를 모아 하나씩 세운다. (건물 id는 main.gd의 VILLAGE_PLOTS 키)
 const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
 	"library", "fish"]
-var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
+var village_built: Array = []
+
+# 메인 스토리 2에서 짓는 첫 상점의 재료 (main.VILLAGE_BUILD_COST.general과 같게)
+const SHOP_BUILD_WOOD := 30
+const SHOP_BUILD_STONE := 20
+
+# 메인 스토리 2 진행 — 집 인사 후 이 순서로 이어진다:
+#   shop: 재료를 모아 상점 짓기 / fisher: 낚시꾼 퀘스트(fisher_quest가 세부) /
+#   farm_talk: 이장에게 가 호미 받기 / farm: 밭 갈기(STORY2_FLAGS) / done: 완료
+var story2_phase := ""
+
+
+func story2_objective_short() -> String:
+	match story2_phase:
+		"shop":
+			return "재료를 모아 상점을 짓자 (목재 %d·돌 %d) — 광장 북쪽 상점 터 게시판 E" \
+				% [SHOP_BUILD_WOOD, SHOP_BUILD_STONE]
+		"farm_talk":
+			return "이장에게 가 보자 (E)"
+	return ""
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
 # 남쪽 바위 능선을 뚫어 바다·해변을 열고, 간이낚싯대(낚시)를 얻는다.
@@ -907,8 +925,8 @@ const STORY1_QUESTS := [
 		"task": "우체부 아저씨와 함께 마을 방향으로 가자 (화살표 방향)",
 		"story": "바위를 치워 마침내 길이 열렸다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
-		"task": "마을 이장을 찾아가자",
-		"story": "드디어 마을이 보인다. 우체부 아저씨가 이장님께 편지를 전하면 긴 여정이 끝난다."},
+		"task": "마을 이장을 찾아가 편지를 전하자 (E)",
+		"story": "마을 어귀에서 우체부 아저씨가 작별 인사를 하며 편지를 맡겼다. 이장님을 찾아 편지를 전하면 긴 여정이 끝난다."},
 	{"name": "새 보금자리",
 		"task": "이장님이 내어 준 집(마을 서쪽)에 들어가 보자 (문 앞 E)",
 		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
@@ -916,7 +934,7 @@ const STORY1_QUESTS := [
 # 단계 -> 지금 진행 중인 퀘스트 번호. home_open: 편지는 전했고, 집에 들어가면
 # 메인 스토리 1이 끝난다. greet(집 안, 표에 없음)는 전부 완료로 본다.
 const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3,
-	"path": 4, "map": 5, "rock": 6, "travel": 7, "home_open": 9}
+	"path": 4, "map": 5, "rock": 6, "travel": 7, "deliver": 8, "home_open": 9}
 
 
 func story_current_quest() -> Dictionary:
@@ -951,6 +969,8 @@ func story_objective_short() -> String:
 					return "우체부 아저씨에게 말을 걸어보자"
 		"travel":
 			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
+		"deliver":
+			return "이장님을 찾아가 편지를 전하자 (화살표 방향, E)"
 		"home_open":
 			return "이장님이 내어 준 집에 들어가 보자 (마을 서쪽, 화살표 방향)"
 		"greet":
@@ -2643,6 +2663,8 @@ func reset_all() -> void:
 	fisher_quest = ""
 	fisher_choice = 0
 	sea_open = false
+	story2_phase = ""
+	village_built = []
 	if DEV_MODE:
 		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
 		wood = DEV_STOCK
@@ -2961,7 +2983,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
-		"sea_open": sea_open,
+		"sea_open": sea_open, "story2_phase": story2_phase,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

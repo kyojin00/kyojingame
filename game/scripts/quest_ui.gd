@@ -141,20 +141,20 @@ func _rebuild() -> void:
 	if ph != "done":
 		return
 
-	# 메인 스토리 2 (밭 일구기) + 마을 생활 안내 (선택 서브퀘스트)
-	if GameData.tutorial.get("active", false):
-		_line("[메인 스토리 2 — 밭을 일구다]", COL_HEAD)
-		_tut_section(true)
-		_line("")
-		_line("[마을 생활 안내]  선택 — 안 해도 이야기는 진행된다", COL_HEAD)
-		_tut_section(false)
-		_line("")
-
-	# 메인 스토리 3 — 낚시꾼과 바다 (첫 수확 뒤 시작)
-	_line("[메인 스토리 3 — 낚시꾼과 바다]", COL_HEAD)
+	# 메인 스토리 2 — 상점 짓기 -> 낚시꾼과 바다 -> 밭 일구기 (이 순서)
+	_line("[메인 스토리 2 — 마을을 깨우다]", COL_HEAD)
+	var s2: String = GameData.story2_phase
+	var shop_txt := "재료를 모아 상점을 짓자 (목재 %d·돌 %d)" \
+		% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]
+	if GameData.village_built.has("general"):
+		_line("  V " + shop_txt, COL_DONE)
+	elif s2 == "shop":
+		_line("  > " + shop_txt, COL_NOW)
+	else:
+		_line("  - ???", COL_DIM)
 	var fq: String = GameData.fisher_quest
 	if fq == "":
-		_line("  - ??? (밭이 자리를 잡으면 이어진다)", COL_DIM)
+		_line("  - ??? (상점이 서면 이어진다)", COL_DIM)
 	else:
 		var order := ["meet", "follow", "open", "done"]
 		var steps := ["낯선 낚시꾼에게 말을 걸어 보자",
@@ -169,7 +169,20 @@ func _rebuild() -> void:
 				_line("  > " + steps[i], COL_NOW)
 			else:
 				_line("  - " + steps[i], COL_DIM)
+	if s2 == "farm_talk":
+		_line("  > 이장에게 가 보자 — 마을의 선물이 기다린다", COL_NOW)
+	elif s2 in ["farm", "done"]:
+		_line("  V 이장에게 호미와 씨앗을 받았다", COL_DONE)
+		_tut_section(true)   # 밭 갈기 -> 씨앗 -> 물 -> 첫 수확
+	else:
+		_line("  - ??? (바닷길이 열리면 이어진다)", COL_DIM)
 	_line("")
+
+	# 마을 생활 안내 (선택 서브퀘스트)
+	if GameData.tutorial.get("active", false):
+		_line("[마을 생활 안내]  선택 — 안 해도 이야기는 진행된다", COL_HEAD)
+		_tut_section(false)
+		_line("")
 
 	# 계절 축제 (계절마다 하루)
 	_line("[계절 축제]", COL_HEAD)

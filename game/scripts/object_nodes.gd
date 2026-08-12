@@ -75,6 +75,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 집터·구역 해금 게시판 — 지붕 얹은 파란 현판 (의뢰 게시판과 다르다)
 			texture = m.tex["board_unlock"]
 			offset = Vector2(0, -texture.get_height())
+		"plotsite":
+			# 상점 터 게시판 — 구역 해금 게시판과 같은 모습
+			texture = m.tex["board_unlock"]
+			offset = Vector2(0, -texture.get_height())
 		"board":
 			# 의뢰 게시판 — 다리 둘 달린 큰 코르크 게시판
 			texture = m.tex["board_quest"]

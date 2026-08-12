@@ -113,17 +113,28 @@ func _build_map() -> void:
 	_build_sea()
 
 
-# 남쪽 끝 바다 + 해변 모래밭. 뭍과는 바위 능선으로 갈라져 있고,
-# 길목(SEA_GATE)의 커다란 바위는 낚시꾼 퀘스트에서 캐서 연다.
+# 남쪽 끝: 바위 능선 너머의 땅. 바다를 열기 전에는 울창한 숲처럼 보이고,
+# 낚시꾼 퀘스트에서 길목(SEA_GATE) 바위를 캐는 순간 바다·해변이 드러난다.
+# 로드 후에도 다시 불러 남쪽 지형을 결정적으로 맞춘다 (구세이브 보정).
 func _build_sea() -> void:
-	for y in range(m.SEA_Y0, m.MAP_H):
-		for x in m.MAP_W:
-			m.grid[y][x].ground = "water"
-			m.objects.erase(Vector2i(x, y))
-	for y in range(m.BEACH_Y0, m.SEA_Y0):
-		for x in m.MAP_W:
-			m.grid[y][x].ground = "sand"
-			m.objects.erase(Vector2i(x, y))
+	if GameData.sea_open:
+		for y in range(m.SEA_Y0, m.MAP_H):
+			for x in m.MAP_W:
+				m.grid[y][x].ground = "water"
+				m.objects.erase(Vector2i(x, y))
+		for y in range(m.BEACH_Y0, m.SEA_Y0):
+			for x in m.MAP_W:
+				m.grid[y][x].ground = "sand"
+				m.objects.erase(Vector2i(x, y))
+	else:
+		# 아직 바다를 모른다 — 능선 너머는 빽빽한 숲으로 가려 둔다
+		for y in range(m.BEACH_Y0, m.MAP_H):
+			for x in range(1, m.MAP_W - 1):
+				var pos := Vector2i(x, y)
+				if m.objects.has(pos) or m.grid[y][x].ground != "grass":
+					continue
+				if m._hash01(x * 11 + 1, y * 7 + 5) < 0.5 and _nature_clear(pos, "tree"):
+					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
 	for x in m.MAP_W:
 		var p := Vector2i(x, m.SEA_RIDGE_Y)
 		m.objects.erase(p)
@@ -131,10 +142,28 @@ func _build_sea() -> void:
 			continue
 		m.objects[p] = {"kind": "searock", "hp": 0}
 	for p: Vector2i in m.SEA_GATE:
-		if not GameData.sea_open:
+		if not GameData.sea_open and not m.objects.has(p):
 			m.objects[p] = {"kind": "bigrock", "hp": m.BIGROCK_HP, "fixed": true}
 	if GameData.sea_open:
-		_seed_beach_forage(false)   # 노드는 뒤이어 _spawn_objects가 만든다
+		var have := false
+		for pos in m.objects:
+			if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+				have = true
+				break
+		if not have:
+			_seed_beach_forage(false)   # 노드는 뒤이어 _spawn_objects가 만든다
+
+
+# 길이 열리는 순간 능선 너머가 드러난다 — 숲을 걷어내고 바다와 모래사장을 깐다
+func _reveal_sea() -> void:
+	GameData.sea_open = true
+	for y in range(m.BEACH_Y0, m.MAP_H):
+		for x in m.MAP_W:
+			var pos := Vector2i(x, y)
+			m.objnode._remove_object(pos)
+			m.grid[y][x].ground = "water" if y >= m.SEA_Y0 else "sand"
+	_seed_beach_forage()
+	m.queue_redraw()
 
 
 # 바다를 연 직후/불러온 직후 해변에 조개를 몇 개 깔아 둔다
@@ -219,6 +248,9 @@ func _build_village() -> void:
 
 	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
 	m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
+	# 상점 터 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 여기서 짓는다)
+	if not GameData.village_built.has("general"):
+		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
 	for p: Vector2i in m.PLAZA_LAMPS:

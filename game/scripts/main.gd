@@ -329,7 +329,8 @@ const YARD_PAD := 1
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
-	"post": [30, 10], "general": [50, 20], "smith": [60, 50],
+	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
+	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
 	"ranch": [80, 40], "fish": [100, 60],
 }
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
@@ -515,6 +516,8 @@ func _ready() -> void:
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
 		GameData.story_phase = "done"
+		GameData.story2_phase = "done"
+		GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 		GameData.unlock_all_tools()
 		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 16,
 			START_TILE.y * TILE + 16)
@@ -568,6 +571,8 @@ func _ready() -> void:
 			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
+			GameData.story2_phase = "done"
+			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용
 			GameData.has_bed = true
