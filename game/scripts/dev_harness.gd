@@ -118,6 +118,7 @@ func _debug_tick() -> void:
 			m.interior.ppos = Vector2(645, 174)         # 조리대 앞으로
 			GameData.kitchen_found = true               # 주방 격자 캡처용 (청소는 382가 검사)
 			GameData.recipes_cooked["dish_soup"] = 1    # 컬러/회색 셀이 섞여 보이게
+		137: _save_shot("_kitchen.png")                # 조리대 그림 확인
 		138: _send_key(KEY_E)                          # 주방 열기
 		142: _save_shot("_cook.png")
 		144:
