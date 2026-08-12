@@ -38,8 +38,11 @@ const POSE = {
   down: { file: 'new_boy_down_idle', hand: [10, -36], mid: 0.85, arc: 2.6, shift: [1, 3] },
   up:   { file: 'new_boy_up_idle',   hand: [-9, -40], mid: 0.80, arc: 2.4, shift: [1, -3] },
 };
-// 위상마다 대표로 삼는 휘두르기 값 (player.gd `_swing_frame`의 갈림값 한가운데)
+// 위상마다 대표로 삼는 휘두르기 값 (player.gd `swing_phase`의 갈림값 한가운데)
 const PHASE_C = [-1.0, 0.1, 1.0];
+// 도트가 이미 있는 방향은 **그 도트의 주먹 자리**를 찍는다 (player.gd SWING_HAND_DOT).
+// make_swing_src.js가 팔을 돌린 각도에서 계산해 준 값이다.
+const HAND_DOT = { side: [[-21, -52], [14, -47], [13, -39]] };
 const TOOL_LEN = 34;             // 손잡이 끝 ~ 날 끝 (node px)
 
 const DIRS = ['side', 'down', 'up'];
@@ -90,8 +93,13 @@ DIRS.forEach((dir, row) => {
     line(ox + HIP_X, oy, ox + HIP_X, oy + FH - 1, C.hip, 3, 6);
 
     // 손잡이 끝이 와야 할 자리 — player.gd `_swing_visual`의 tool_sprite.position
-    const hx = pose.hand[0] + c * 7.0 + pose.shift[0] * c * (SWING_SHIFT / 5.0);
-    const hy = pose.hand[1] + c * 9.0 + pose.shift[1] * c * (SWING_SHIFT / 5.0);
+    let hx, hy;
+    if (HAND_DOT[dir]) {
+      [hx, hy] = HAND_DOT[dir][col];            // 도트가 있는 방향
+    } else {
+      hx = pose.hand[0] + c * 7.0 + pose.shift[0] * c * (SWING_SHIFT / 5.0);
+      hy = pose.hand[1] + c * 9.0 + pose.shift[1] * c * (SWING_SHIFT / 5.0);
+    }
     const tx = ox + HIP_X + hx / ART, ty = oy + FOOT + hy / ART;
     // 도구가 뻗는 방향 (회전 0 = 위로 곧게 선 도구)
     const rot = pose.mid + c * pose.arc * 0.5;

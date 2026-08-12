@@ -94,6 +94,13 @@ const SWING_POSE := {
 	"side": {"hand": Vector2(12, -38), "mid": 0.95, "arc": 2.9, "tilt": 1.0,
 		"shift": Vector2(5, 1)},
 }
+# 휘두르기 도트가 있을 때, 위상마다 **주먹이 실제로 가 있는 자리**.
+# 도구 손잡이 끝을 여기 얹는다. 값은 make_swing_src.js가 찍어 준다 —
+# 팔을 돌린 각도에서 주먹 중심을 계산한 것이라 그림과 어긋나지 않는다.
+# 도트가 없는 방향은 여기에도 없고, SWING_POSE의 이어지는 식을 쓴다.
+const SWING_HAND_DOT := {
+	"side": [Vector2(-21, -52), Vector2(14, -47), Vector2(13, -39)],
+}
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
 	"hoe": "icon_hoe", "water": "icon_water",
@@ -203,14 +210,15 @@ func _swing_frame(key: String) -> String:
 	for i in 3:
 		if not main.tex.has("%s_%d" % [base, i]):
 			return ""
+	return "%s_%d" % [base, swing_phase()]
+
+
+# 지금 위상 (0=다 감음 / 1=내리치는 중 / 2=다 내리침)
+func swing_phase() -> int:
 	var c := swing_c()
-	var idx := 0                 # 다 감은 자세
 	if c > 0.55:
-		idx = 2                  # 다 내리친 자세
-	elif c > -0.4:
-		idx = 1                  # 내리치는 중간
-	var n := "%s_%d" % [base, idx]
-	return n if main.tex.has(n) else ""
+		return 2
+	return 1 if c > -0.4 else 0
 
 
 # 휘두르는 동안 쓰는 방향 딱지 ("down"/"up"/"side")
@@ -247,8 +255,8 @@ func _swing_visual() -> void:
 	var pose: Dictionary = SWING_POSE[key]
 	var sign_x := -1.0 if swing_face.x < -0.3 else 1.0
 	# 도트가 이미 자세를 가지고 있으면 몸은 살짝만 거든다
-	var lean: float = (SWING_LEAN_DOT if _swing_frame(key) != "" else SWING_LEAN) \
-		* float(pose.tilt)
+	var dot := _swing_frame(key)
+	var lean: float = (SWING_LEAN_DOT if dot != "" else SWING_LEAN) * float(pose.tilt)
 
 	# 눌림: 감을 때 늘어났다가 닿는 순간 주저앉는다
 	var sq := 1.0 - SWING_SQUASH * maxf(0.0, c) + 0.03 * maxf(0.0, -c)
@@ -303,8 +311,13 @@ func _swing_visual() -> void:
 	tool_sprite.flip_h = sign_x < 0.0
 	# 감을 때는 어깨 뒤로 세우고(c=-1), 내리칠 때는 발치까지 넘긴다(c=+1)
 	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * sign_x
-	tool_sprite.position = Vector2(hand.x * sign_x + c * 7.0 * sign_x,
-		hand.y + c * 9.0) + shift
+	if dot != "" and SWING_HAND_DOT.has(key):
+		# 도트가 자세를 쥐고 있다 — 도구는 그 프레임의 주먹 자리에 얹는다
+		hand = SWING_HAND_DOT[key][swing_phase()]
+		tool_sprite.position = Vector2(hand.x * sign_x, hand.y) + shift
+	else:
+		tool_sprite.position = Vector2(hand.x * sign_x + c * 7.0 * sign_x,
+			hand.y + c * 9.0) + shift
 	# 감아올리는 동안은 도구가 몸 **뒤로** 간다 (어깨 너머로 넘긴 것이니까).
 	# 내리치기 시작하면 앞으로 나온다. 뒤를 보고 칠 때는 내내 뒤다.
 	var behind: bool = key == "up" or c < 0.0
