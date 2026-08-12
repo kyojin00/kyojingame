@@ -9,7 +9,8 @@ const SFX_NAMES := [
 ]
 # 계절 넷 + 장소·상황 여섯. 예전에는 계절 넷뿐이었고 각 20초였다.
 const BGM_NAMES := ["bgm_spring", "bgm_summer", "bgm_fall", "bgm_winter",
-	"bgm_village", "bgm_cave", "bgm_shop", "bgm_night", "bgm_festival", "bgm_title"]
+	"bgm_village", "bgm_cave", "bgm_shop", "bgm_night", "bgm_festival", "bgm_title",
+	"bgm_main"]      # bgm_main은 받은 곡(mp3) — 낮의 바깥 기본 배경음
 
 var streams := {}
 var bgm_player: AudioStreamPlayer
@@ -32,13 +33,17 @@ func _ready() -> void:
 	AudioServer.set_bus_name(2, "SFX")
 
 	for n in SFX_NAMES + BGM_NAMES:
-		streams[n] = load("res://assets/audio/%s.wav" % n)
-	# BGM 루프 설정
+		var ext := "mp3" if n == "bgm_main" else "wav"
+		streams[n] = load("res://assets/audio/%s.%s" % [n, ext])
+	# BGM 루프 설정 (형마다 다르다)
 	for n in BGM_NAMES:
-		var s: AudioStreamWAV = streams[n]
-		s.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		s.loop_begin = 0
-		s.loop_end = s.data.size() / 2  # 16bit mono
+		var st: AudioStream = streams[n]
+		if st is AudioStreamWAV:
+			st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			st.loop_begin = 0
+			st.loop_end = st.data.size() / 2  # 16bit mono
+		elif st is AudioStreamMP3:
+			st.loop = true
 
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.bus = "BGM"

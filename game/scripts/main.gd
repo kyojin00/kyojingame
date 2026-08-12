@@ -256,7 +256,7 @@ const GREENHOUSE_COST_MONEY := 5000
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
 # 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
-const VILLAGE_REGION := Rect2i(60, 0, 40, 44)
+const VILLAGE_REGION := Rect2i(54, 0, 46, 44)   # 부지를 벌리면서 서쪽으로 넓혔다
 # 인도는 모두 3줄. 길 폭을 한 곳에서 정하고 건물은 이 선에 맞춰 놓는다.
 const ROAD_W := 3
 const WEST_LANE_X := 67                    # 서쪽 세로 인도 (x 67~69)
@@ -292,25 +292,27 @@ const PLAZA_BENCHES := [Vector2i(73, 19), Vector2i(73, 21),
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
-const HOME_ANCHOR := Vector2i(71, 28)
+const HOME_ANCHOR := Vector2i(71, 30)   # 광장에서 두 칸 떨어뜨렸다
 const HOME_SITE := Vector2i(73, 30)  # 집터 표지판 (건물 그림 한가운데)
 
 # 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
 # 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.
 # 건물은 5x4칸 그림에 둘레 마당까지 합쳐 한 채가 7x6칸을 차지한다.
 # 북쪽 한 줄 + 서/동 두 줄로 벌려 놓아 서로 붙어 보이지 않는다.
+# 부지 사이는 일부러 넓게 둔다 — 다닥다닥 붙으면 벽처럼 보인다.
+# 북쪽 줄은 18칸 간격(그림 8칸 + 마당 사이 풀 10칸), 옆줄은 바깥으로 뺐다.
 const VILLAGE_PLOTS := {
 	# 북쪽 줄 (큰길 위쪽)
-	"post":    {"anchor": Vector2i(62, 3),  "name": "우체국"},
+	"post":    {"anchor": Vector2i(56, 3),  "name": "우체국"},
 	"general": {"anchor": Vector2i(74, 3),  "name": "잡화점"},
-	"lab":     {"anchor": Vector2i(86, 3),  "name": "연구소"},
+	"lab":     {"anchor": Vector2i(92, 3),  "name": "연구소"},
 	# 서쪽 줄 (서쪽 세로 길가)
-	"smith":   {"anchor": Vector2i(61, 13), "name": "대장간"},
-	"ranch":   {"anchor": Vector2i(61, 23), "name": "목장 상회"},
-	"inn":     {"anchor": Vector2i(61, 33), "name": "여관"},
+	"smith":   {"anchor": Vector2i(60, 12), "name": "대장간"},
+	"ranch":   {"anchor": Vector2i(60, 22), "name": "목장 상회"},
+	"inn":     {"anchor": Vector2i(60, 32), "name": "여관"},
 	# 동쪽 줄 (동쪽 세로 길가)
-	"library": {"anchor": Vector2i(90, 14), "name": "도서관"},
-	"fish":    {"anchor": Vector2i(90, 25), "name": "수산시장"},
+	"library": {"anchor": Vector2i(91, 12), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(91, 26), "name": "수산시장"},
 }
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
@@ -1494,6 +1496,5 @@ func _want_bgm() -> String:
 	var h := GameData.minutes / 60.0
 	if h >= 19.0 or h < 5.0:
 		return "bgm_night"
-	if VILLAGE_AREA.has_point(player_tile()):
-		return "bgm_village"
-	return "bgm_" + GameData.season_key()
+	# 낮의 바깥(밭·마을)은 올려 준 곡 하나로 간다 — 제일 오래 듣는 자리다
+	return "bgm_main"

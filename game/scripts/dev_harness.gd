@@ -985,8 +985,8 @@ func _debug_tick() -> void:
 			m.player.position = save_pos
 			var picks := [in_village, at_farm, at_night, in_cave]
 			print("BGM_OK=", loaded == Sound.BGM_NAMES.size()
-				and in_village == "bgm_village" and in_cave == "bgm_cave"
-				and at_night == "bgm_night" and at_farm.begins_with("bgm_")
+				and in_village == "bgm_main" and in_cave == "bgm_cave"
+				and at_night == "bgm_night" and at_farm == "bgm_main"
 				and picks.size() == 4,
 				" 실린곡=", loaded, "/", Sound.BGM_NAMES.size(), " 고른것=", picks)
 		390:
