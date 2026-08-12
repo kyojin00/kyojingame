@@ -197,6 +197,12 @@ func _swing_frame(key: String) -> String:
 	var base := GameData.swing_tex_base(key)
 	if base == "":
 		return ""
+	# **세 장이 다 있어야 켠다.** 한 장만 넣으면 그 위상에서만 도트가 되고
+	# 나머지 위상은 서기 자세로 튀어, 휘두르다 말고 깜빡인다.
+	# (손으로 한 장씩 그려 넣을 때 실제로 겪는다)
+	for i in 3:
+		if not main.tex.has("%s_%d" % [base, i]):
+			return ""
 	var c := swing_c()
 	var idx := 0                 # 다 감은 자세
 	if c > 0.55:
