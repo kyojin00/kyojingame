@@ -253,6 +253,29 @@ function dropOrphanOutline(p, mask, near) {
 }
 
 
+// 팔은 몸통 **앞을** 덮고 있다. 그냥 지우면 그 뒤에 있던 몸통까지 없어져
+// 상체가 반쪽이 된다 (옆모습에서 셔츠 폭이 31px -> 15px로 줄었다).
+// 지운 자리를 옆에 남은 몸 색으로 메워, 팔이 가리고 있던 몸통을 되살린다.
+function fillBehind(p, mask) {
+  const W = p.width, H = p.height;
+  for (let pass = 0; pass < 60; pass++) {
+    const add = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!mask[y * W + x] || solid(p, x, y)) continue;
+      // 옆(가로)에 붙은 몸 색을 가져온다. 세로로 번지면 셔츠가 반바지로 샌다
+      for (const dx of [1, -1]) {
+        const nx = x + dx;
+        if (nx < 0 || nx >= W || !solid(p, nx, y) || dark(p, nx, y)) continue;
+        add.push([idx(p, x, y), idx(p, nx, y)]);
+        break;
+      }
+    }
+    if (!add.length) break;
+    for (const [di, si] of add) copyPx(p, si, p, di);
+  }
+}
+
+
 function build(dir, phase) {
   const cfg = ARM[dir];
   const base = load(cfg.src);
@@ -266,6 +289,7 @@ function build(dir, phase) {
   // 지우고 남은 몸을 정리한다: 떨어진 외곽선 조각을 걷어내고,
   // 그러고 나서 몸 색이 드러난 자리에 외곽선을 새로 두른다
   dropOrphanOutline(out, mask, OUTLINE_W + 2);
+  fillBehind(out, mask);          // 팔이 가리고 있던 몸통을 되살린다
   reOutline(out);
 
   // 2) 새 팔을 그린다
