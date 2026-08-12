@@ -92,7 +92,8 @@ func _next_day(passed_out: bool) -> void:
 	var prev_season := GameData.season()
 	GameData.day += 1
 	GameData.minutes = GameData.DAY_START
-	GameData.energy = GameData.ENERGY_MAX * 0.5 if passed_out else GameData.ENERGY_MAX
+	# 침대가 좋을수록 잘 잔다 — 낡은 침대 70% · 나무 100% · 푹신 100%(+쓰러짐 완화)
+	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out)
 	GameData.reset_daily()
 	m.worldgen._advance_tree_growth()
 

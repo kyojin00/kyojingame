@@ -89,6 +89,7 @@ var map_ui: CanvasLayer
 var inventory_ui: CanvasLayer
 var interior: CanvasLayer
 var cooking_ui: CanvasLayer
+var desk_ui: CanvasLayer
 var alchemy_ui: CanvasLayer
 var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
@@ -443,6 +444,9 @@ func _ready() -> void:
 	cooking_ui = preload("res://scripts/cooking_ui.gd").new()
 	cooking_ui.main = self
 	add_child(cooking_ui)
+	desk_ui = preload("res://scripts/desk_ui.gd").new()
+	desk_ui.main = self
+	add_child(desk_ui)
 	alchemy_ui = preload("res://scripts/alchemy_ui.gd").new()
 	alchemy_ui.main = self
 	add_child(alchemy_ui)

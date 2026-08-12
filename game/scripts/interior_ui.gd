@@ -4,6 +4,7 @@ extends CanvasLayer
 const ROOM := Rect2(120, 75, 720, 390)  # 방 전체 (벽 포함)
 const FLOOR_TOP := 156.0                # 벽 아래부터 바닥
 const BED := Rect2(156, 162, 69, 99)
+const DESK := Rect2(597, 288, 105, 48)   # 제작대 — 오른쪽 아랫벽 쪽
 const KITCHEN := Rect2(600, 117, 93, 39)  # 조리대 (윗벽에 붙박이)
 # 연금술 조합대 (윗벽, 조리대 반대편). 왼쪽 창문(x 270~330)을 가리지 않는 자리다.
 const ALCHEMY := Rect2(345, 117, 108, 39)
@@ -64,7 +65,7 @@ func close() -> void:
 
 func _process(delta: float) -> void:
 	if not visible or main.dialog.visible or main.sleep_dialog.visible \
-			or main.summary.visible or main.cooking_ui.visible:
+			or main.summary.visible or main.cooking_ui.visible or main.desk_ui.visible:
 		moving = false
 		_update_sprite()
 		return
@@ -145,7 +146,8 @@ func _can_place(f: Dictionary) -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or main.dialog.visible or main.sleep_dialog.visible \
-			or main.cooking_ui.visible or main.alchemy_ui.visible:
+			or main.cooking_ui.visible or main.alchemy_ui.visible \
+			or main.desk_ui.visible:
 		return
 	if deco_mode:
 		_deco_input(event)
@@ -167,6 +169,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					["닫기", null],
 				])
 			get_viewport().set_input_as_handled()
+		elif (ppos - DESK.get_center()).length() < 78.0:
+			main.desk_ui.open()
+			get_viewport().set_input_as_handled()
 		elif (ppos - BED.get_center()).length() < 82.0:
 			if GameData.has_bed:
 				main.daycycle.request_sleep()
@@ -179,7 +184,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					["닫기", null],
 				])
 		else:
-			main.hud.show_message("침대 E: 잠자기 · 조리대 E: 요리 · 조합대 E: 연금술 · F: 꾸미기")
+			main.hud.show_message("침대 E: 잠자기 · 책상 E: 제작 · 조리대 E: 요리 · 조합대 E: 연금술 · F: 꾸미기")
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and _key_of(event) == KEY_F:
 		if GameData.house_lv < 2:
@@ -203,7 +208,7 @@ func _craft_bed() -> void:
 	GameData.has_bed = true
 	main.tutorial_notify("bed")
 	Sound.play_sfx("sfx_place")
-	main.dialog.set_body("포근한 침대 완성!\n이제 밤이 되면 여기서 잘 수 있다.")
+	main.dialog.set_body("낡은 침대나마 완성!\n이제 밤이 되면 잘 수 있다.\n책상(제작대)에서 더 좋은 침대를 만들 수 있다.")
 	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("침대 만들기")
 	main.saveio.save_now()
@@ -385,6 +390,33 @@ func _draw_room() -> void:
 			seam += 48
 		y += h
 		row += 1
+
+	# 제작대 — 단계가 오를수록 결이 곱고 공구가 는다
+	var desk_top := Color(0.52, 0.36, 0.2) if GameData.desk_lv == 0 \
+		else (Color(0.6, 0.43, 0.24) if GameData.desk_lv == 1 else Color(0.66, 0.5, 0.3))
+	canvas.draw_rect(Rect2(DESK.position.x + 6, DESK.position.y + 30, 8, DESK.size.y - 30),
+		Color(0.4, 0.27, 0.15))
+	canvas.draw_rect(Rect2(DESK.end.x - 14, DESK.position.y + 30, 8, DESK.size.y - 30),
+		Color(0.4, 0.27, 0.15))
+	canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y + 18, DESK.size.x, 14), desk_top)
+	canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y + 18, DESK.size.x, 3),
+		desk_top.lightened(0.25))
+	# 위에 놓인 것들: 망치는 늘, 톱은 1단계부터, 등불은 2단계부터
+	canvas.draw_rect(Rect2(DESK.position.x + 14, DESK.position.y + 6, 6, 14), Color(0.35, 0.35, 0.4))
+	canvas.draw_rect(Rect2(DESK.position.x + 10, DESK.position.y + 4, 14, 6), Color(0.5, 0.5, 0.56))
+	if GameData.desk_lv >= 1:
+		canvas.draw_rect(Rect2(DESK.position.x + 44, DESK.position.y + 8, 26, 4), Color(0.72, 0.72, 0.78))
+		canvas.draw_rect(Rect2(DESK.position.x + 40, DESK.position.y + 6, 6, 10), Color(0.45, 0.3, 0.18))
+	if GameData.desk_lv >= 2:
+		canvas.draw_rect(Rect2(DESK.end.x - 26, DESK.position.y + 2, 10, 16), Color(0.9, 0.75, 0.4))
+	# 만드는 중이면 위에 진행 막대가 뜬다
+	if not GameData.desk_queue.is_empty():
+		var j: Dictionary = GameData.desk_queue[0]
+		var frac := 1.0 - float(j.left) / GameData.desk_time()
+		canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y - 10, DESK.size.x, 6),
+			Color(0.2, 0.16, 0.1))
+		canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y - 10, DESK.size.x * clampf(frac, 0.0, 1.0), 6),
+			Color(0.55, 0.85, 0.45))
 
 	# 연금술 조합대 (고정) — 할아버지가 쓰던 자리
 	canvas.draw_rect(ALCHEMY, Color(0.34, 0.28, 0.42))

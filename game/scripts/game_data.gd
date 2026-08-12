@@ -676,6 +676,127 @@ var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
 # 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
 var house_lv := 0
 var has_bed := false  # 침대는 직접 제작해야 잠을 잘 수 있다
+
+# ---- 제작대 (책상) ----
+#
+# 집에 있는 작업대. 여기서 가구를 만들면 시간이 지나 완성되고,
+# 완성된 가구는 낡은 것과 저절로 바뀐다 (동물의 숲 제작대 느낌).
+# 업글하면 빨라지고 여러 개를 동시에 걸 수 있다.
+const DESK_NAMES := ["낡은 책상", "튼튼한 작업대", "장인의 작업대"]
+const DESK_TIME := [5.0, 3.5, 2.0]       # 하나 만드는 데 걸리는 시간(초)
+const DESK_SLOTS := [1, 2, 3]            # 동시에 걸 수 있는 개수
+# 제작대 자신은 자기로 못 만드니 「손보기」로 즉시 바꾼다 (여기만 예외)
+const DESK_UPGRADES := [
+	{"cost": {"wood": 20, "stone": 10, "nail": 2}},
+	{"cost": {"wood": 40, "ore": 8, "hinge": 3}},
+]
+# 만들 수 있는 것 — kind "bed"는 완성되는 순간 침대가 바뀐다
+const DESK_RECIPES := {
+	"bed_wood": {"name": "나무 침대", "cost": {"wood": 25, "nail": 2},
+		"kind": "bed", "lv": 1, "desc": "아침 기력이 가득 찬다"},
+	"bed_soft": {"name": "푹신한 침대", "cost": {"wood": 30, "cloth": 5, "milk": 3},
+		"kind": "bed", "lv": 2, "desc": "쓰러진 다음 날도 덜 힘들다"},
+}
+const BED_NAMES := ["낡은 침대", "나무 침대", "푹신한 침대"]
+var desk_lv := 0
+var bed_lv := 0
+var desk_queue: Array = []        # [{id, left(초)}]
+var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
+
+
+func desk_time() -> float:
+	return DESK_TIME[desk_lv]
+
+
+func desk_slots() -> int:
+	return DESK_SLOTS[desk_lv]
+
+
+# 목재·돌은 자원 변수에, 나머지는 items에 있다
+func mat_count(k: String) -> int:
+	match k:
+		"wood":
+			return wood
+		"stone":
+			return stone
+		_:
+			return int(items.get(k, 0))
+
+
+func mats_ok(cost: Dictionary) -> bool:
+	for k: String in cost:
+		if mat_count(k) < int(cost[k]):
+			return false
+	return true
+
+
+func pay_mats(cost: Dictionary) -> bool:
+	if not mats_ok(cost):
+		return false
+	for k: String in cost:
+		match k:
+			"wood":
+				wood -= int(cost[k])
+			"stone":
+				stone -= int(cost[k])
+			_:
+				items[k] = int(items[k]) - int(cost[k])
+	return true
+
+
+# 제작을 건다. 자리가 없거나 재료가 모자라면 안 건다.
+func desk_start(id: String) -> bool:
+	if not DESK_RECIPES.has(id) or desk_queue.size() >= desk_slots():
+		return false
+	var def: Dictionary = DESK_RECIPES[id]
+	# 침대는 순서대로만 — 낡은 것에서 푹신한 것으로 건너뛸 수 없다
+	if str(def.kind) == "bed" and int(def.lv) != bed_lv + 1:
+		return false
+	if not pay_mats(def.cost):
+		return false
+	desk_queue.append({"id": id, "left": desk_time()})
+	return true
+
+
+# 시간이 흐른다 — 매 프레임 _process가 부른다 (하네스는 크게 한 번 부른다)
+func desk_tick(delta: float) -> void:
+	if desk_queue.is_empty():
+		return
+	for job: Dictionary in desk_queue:
+		job.left = float(job.left) - delta
+	var still: Array = []
+	for job: Dictionary in desk_queue:
+		if float(job.left) > 0.0:
+			still.append(job)
+			continue
+		var def: Dictionary = DESK_RECIPES[job.id]
+		if str(def.kind) == "bed":
+			bed_lv = maxi(bed_lv, int(def.lv))
+			has_bed = true
+		discover(str(job.id))
+		desk_done_pending.append(str(def.name))
+	desk_queue = still
+
+
+func _process(delta: float) -> void:
+	desk_tick(delta)
+
+
+# 손보기 — 제작대 자신을 다음 단계로 (즉시)
+func desk_upgrade() -> bool:
+	if desk_lv >= DESK_UPGRADES.size():
+		return false
+	if not pay_mats(DESK_UPGRADES[desk_lv].cost):
+		return false
+	desk_lv += 1
+	return true
+
+
+# 아침에 기력이 얼마나 차는가 — 침대가 좋을수록 잘 잔다
+func bed_wake_mult(passed_out: bool) -> float:
+	if passed_out:
+		return [0.4, 0.5, 0.75][bed_lv]
+	return [0.7, 1.0, 1.0][bed_lv]
 const HOUSE_BUILD_WOOD := 20
 const HOUSE_UPGRADE_WOOD := 60
 const HOUSE_UPGRADE_STONE := 40
@@ -899,6 +1020,11 @@ const ITEMS := {
 	"gem": {"name": "보석", "sell": 220},
 	"star_shard": {"name": "별빛 조각", "sell": 300},
 	"bouquet": {"name": "꽃다발", "sell": 0},
+	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
+	"nail": {"name": "못", "sell": 15},
+	"cloth": {"name": "천", "sell": 45},
+	"rope": {"name": "밧줄", "sell": 25},
+	"hinge": {"name": "경첩", "sell": 110},
 	"wedding_ring": {"name": "청혼 반지", "sell": 0},
 	"dish_baked_potato": {"name": "구운 감자", "sell": 70},
 	"dish_soup": {"name": "야채 수프", "sell": 110},
@@ -970,7 +1096,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_rainbow", "fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish",
 	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
 	"fish_king", "fish_dragon",
-	"ore", "gem", "star_shard", "bouquet", "wedding_ring", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"ore", "gem", "star_shard", "bouquet", "wedding_ring",
+	"nail", "cloth", "rope", "hinge", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
 	"dish_pickle", "dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad",
 	"dish_sweet_potato", "dish_bean_rice", "dish_rice_cake", "dish_melon_ice",
@@ -2442,6 +2569,10 @@ func reset_all() -> void:
 	recipes_unlocked.clear()
 	collections_done.clear()
 	collection_pending.clear()
+	desk_lv = 0
+	bed_lv = 0
+	desk_queue.clear()
+	desk_done_pending.clear()
 	if DEV_MODE:
 		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
 		wood = DEV_STOCK
@@ -2757,6 +2888,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"village_built": village_built,
 		"house_lv": house_lv,
 		"has_bed": has_bed,
+		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

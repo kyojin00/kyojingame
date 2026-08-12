@@ -292,6 +292,40 @@ const ICONS = {
     px(c, 12, 3, C.white); px(c, 13, 4, C.white); return c; },
   dish_moon_tea:      () => cup(C.purple, C.ice),
   dish_feast:         () => tray(),
+  nail: () => {
+    const c = newCanvas();
+    rect(c, 7, 3, 3, 2, C.grey);               // 머리
+    rect(c, 8, 5, 1, 8, C.grey2);              // 몸
+    px(c, 8, 13, C.grey2);
+    px(c, 7, 4, C.white);
+    return c;
+  },
+  cloth: () => {
+    const c = newCanvas();
+    for (let i = 0; i < 4; i++) rect(c, 3, 4 + i * 3, 10, 2, i % 2 ? C.red : C.white);
+    rect(c, 3, 4, 2, 11, C.red2);              // 말린 끝
+    return c;
+  },
+  rope: () => {
+    const c = newCanvas();
+    for (let a = 0; a < 14; a++) {
+      const x = 8 + Math.round(Math.cos(a * 0.48) * 4);
+      const y = 8 + Math.round(Math.sin(a * 0.48) * 3.4);
+      px(c, x, y, C.crust); px(c, x + 1, y, C.brown);
+    }
+    rect(c, 10, 10, 2, 4, C.crust);            // 늘어진 끝
+    return c;
+  },
+  hinge: () => {
+    const c = newCanvas();
+    rect(c, 3, 5, 4, 7, C.grey);
+    rect(c, 9, 5, 4, 7, C.grey);
+    rect(c, 7, 4, 2, 9, C.grey2);              // 축
+    px(c, 4, 7, C.line); px(c, 11, 7, C.line); // 나사 구멍
+    px(c, 4, 10, C.line); px(c, 11, 10, C.line);
+    px(c, 7, 4, C.white);
+    return c;
+  },
   butter: () => {
     const c = newCanvas();
     rect(c, 3, 7, 10, 5, C.gold);              // 버터 덩이

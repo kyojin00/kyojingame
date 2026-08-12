@@ -47,6 +47,13 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.village_built = d.get("village_built", [])
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))
+	GameData.desk_lv = int(d.get("desk_lv", 0))
+	# 침대 등급이 생기기 전 세이브: 만들어 둔 침대는 나무 침대(100%)로 쳐 준다
+	GameData.bed_lv = int(d.get("bed_lv", 1 if GameData.has_bed else 0))
+	GameData.desk_queue = []
+	for job in d.get("desk_queue", []):
+		if GameData.DESK_RECIPES.has(str(job.get("id", ""))):
+			GameData.desk_queue.append({"id": str(job.id), "left": float(job.get("left", 1.0))})
 	GameData.explored = {}
 	for c in d.get("explored", []):
 		GameData.explored[Vector2i(int(c[0]), int(c[1]))] = true

@@ -1040,6 +1040,39 @@ func _debug_tick() -> void:
 				" 사람=", GameData.NPCS.size())
 			GameData.dating = ""
 			GameData.spouse = ""
+		383:
+			# 제작대: 재료 지불 -> 시간 -> 완성되면 침대가 바뀐다
+			GameData.desk_lv = 0
+			GameData.bed_lv = 0
+			GameData.desk_queue.clear()
+			GameData.wood = 500
+			GameData.stone = 500
+			GameData.items["nail"] = 10
+			GameData.items["cloth"] = 10
+			GameData.items["hinge"] = 10
+			GameData.items["ore"] = 100
+			GameData.items["milk"] = 10
+			var slow := GameData.desk_time() == 5.0 and GameData.desk_slots() == 1
+			var skip_soft := not GameData.desk_start("bed_soft")   # 순서 건너뛰기 금지
+			var q1 := GameData.desk_start("bed_wood")
+			var full := not GameData.desk_start("bed_wood")        # 1칸이라 둘째는 거절
+			GameData.desk_tick(6.0)
+			var made_bed := GameData.bed_lv == 1 and GameData.desk_queue.is_empty()
+			var up1 := GameData.desk_upgrade()
+			var faster := GameData.desk_time() == 3.5 and GameData.desk_slots() == 2
+			var q2 := GameData.desk_start("bed_soft")
+			GameData.desk_tick(4.0)
+			var made_soft := GameData.bed_lv == 2
+			print("DESK_OK=", slow and skip_soft and q1 and full and made_bed
+				and up1 and faster and q2 and made_soft,
+				" 느림=", slow, " 건너뛰기거절=", skip_soft, " 걸림=", q1,
+				" 칸참=", full, " 나무침대=", made_bed, " 손보기=", up1,
+				" 빨라짐=", faster, " 푹신침대=", made_soft)
+			print("BED_WAKE_OK=", is_equal_approx(GameData.bed_wake_mult(false), 1.0)
+				and is_equal_approx(GameData.bed_wake_mult(true), 0.75),
+				" 아침=", GameData.bed_wake_mult(false),
+				" 쓰러짐=", GameData.bed_wake_mult(true))
+			GameData.desk_done_pending.clear()
 		385:
 			# 발견 기록 + 컬렉션 보상
 			GameData.discovered.clear()
