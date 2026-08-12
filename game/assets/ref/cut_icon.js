@@ -16,6 +16,7 @@ const JOBS = [
   ['ref_icon_fried_egg.png', 'dish_fried_egg', 32],
   ['ref_icon_weed.png', 'weed', 64],           // 잡초 — 주웠을 때(묶음)
   ['ref_icon_weed_plant.png', 'weed_plant', 64], // 잡초 — 자연에 서 있는 풀숲
+  ['ref_icon_pickaxe.png', 'icon_pickaxe', 32],  // 첫(나무) 곡괭이
 ];
 
 for (const [src, out, size] of JOBS) {

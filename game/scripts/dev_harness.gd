@@ -1073,6 +1073,29 @@ func _debug_tick() -> void:
 				" 아침=", GameData.bed_wake_mult(false),
 				" 쓰러짐=", GameData.bed_wake_mult(true))
 			GameData.desk_done_pending.clear()
+		382:
+			# 빗자루 -> 청소 -> 조리대 발견 -> 요리 해금
+			GameData.kitchen_found = false
+			GameData.dust_swept = 0
+			GameData.recipes_unlocked.erase("broom")
+			GameData.items["broom"] = 0
+			GameData.items["weed"] = 10
+			GameData.wood = 100
+			var locked_first := not GameData.desk_start("broom")   # 레시피를 모른다
+			GameData.recipes_unlocked.append("broom")
+			var q_ok := GameData.desk_start("broom")
+			GameData.desk_tick(10.0)
+			var got_broom := int(GameData.items["broom"]) == 1
+			m.interior._sweep_kitchen()
+			m.interior._sweep_kitchen()
+			var not_yet := not GameData.kitchen_found
+			m.interior._sweep_kitchen()
+			var found := GameData.kitchen_found
+			m.dialog.close()
+			print("CLEAN_OK=", locked_first and q_ok and got_broom and not_yet and found,
+				" 레시피잠김=", locked_first, " 제작=", got_broom,
+				" 두번으로는안됨=", not_yet, " 세번에발견=", found)
+			GameData.desk_done_pending.clear()
 		385:
 			# 발견 기록 + 컬렉션 보상
 			GameData.discovered.clear()

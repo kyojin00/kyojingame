@@ -157,17 +157,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			main.alchemy_ui.open()
 			get_viewport().set_input_as_handled()
 		elif (ppos - KITCHEN.get_center()).length() < 69.0:
-			if GameData.house_lv >= 2:
+			# 조리대는 먼지와 잡동사니에 묻혀 있다 — 빗자루로 쓸어야 나타난다
+			if GameData.kitchen_found:
 				main.cooking_ui.open()
+			elif int(GameData.items.get("broom", 0)) > 0:
+				_sweep_kitchen()
 			else:
-				# 부엌은 집 확장으로 얻는다
-				main.dialog.open("집 확장",
-					"부엌을 만들려면 집을 확장해야 한다.\n\n필요 재료: 목재 %d · 석재 %d\n(보유: 목재 %d · 석재 %d)" %
-						[GameData.HOUSE_UPGRADE_WOOD, GameData.HOUSE_UPGRADE_STONE,
-						GameData.wood, GameData.stone], [
-					["확장하기", _upgrade_house],
-					["닫기", null],
-				])
+				main.hud.show_message(
+					"먼지와 잡동사니에 뭔가 묻혀 있다... 빗자루가 있으면 치울 수 있을 텐데. (잡화점에 레시피)", 4.0)
 			get_viewport().set_input_as_handled()
 		elif (ppos - DESK.get_center()).length() < 78.0:
 			main.desk_ui.open()
@@ -188,7 +185,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and _key_of(event) == KEY_F:
 		if GameData.house_lv < 2:
-			main.hud.show_message("집을 확장하면 가구로 꾸밀 수 있다 (조리대 자리 E).")
+			main.dialog.open("집 확장",
+				"집을 확장하면 가구로 꾸밀 수 있다.\n\n필요 재료: 목재 %d · 석재 %d\n(보유: 목재 %d · 석재 %d)" %
+					[GameData.HOUSE_UPGRADE_WOOD, GameData.HOUSE_UPGRADE_STONE,
+					GameData.wood, GameData.stone], [
+				["확장하기", _upgrade_house],
+				["닫기", null],
+			])
 			return
 		deco_mode = true
 		cursor = (ppos / GRID).floor() * GRID
@@ -211,6 +214,25 @@ func _craft_bed() -> void:
 	main.dialog.set_body("낡은 침대나마 완성!\n이제 밤이 되면 잘 수 있다.\n책상(제작대)에서 더 좋은 침대를 만들 수 있다.")
 	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("침대 만들기")
+	main.saveio.save_now()
+
+
+# 빗자루질 — 세 번 쓸면 먼지 밑에서 낡은 조리대가 나온다 (요리 해금)
+func _sweep_kitchen() -> void:
+	GameData.dust_swept += 1
+	Sound.play_sfx("sfx_hoe")
+	canvas.queue_redraw()
+	if GameData.dust_swept < GameData.DUST_TOTAL:
+		main.hud.show_message("빗자루로 먼지를 쓸어 냈다... (%d/%d)"
+			% [GameData.dust_swept, GameData.DUST_TOTAL])
+		return
+	GameData.kitchen_found = true
+	main.dialog.open("낡은 조리대 발견!",
+		"먼지 밑에서 할아버지가 쓰시던 낡은 조리대가 나왔다!\n"
+		+ "화구도 냄비도 그대로다... 닦으면 쓸 수 있겠다.\n\n[요리 해금] 조리대 앞에서 E", [
+		["좋아!", null],
+	])
+	main.hud.quest_toast("낡은 조리대 발견")
 	main.saveio.save_now()
 
 
@@ -440,21 +462,45 @@ func _draw_room() -> void:
 	canvas.draw_rect(Rect2(ALCHEMY.end.x - 17, ALCHEMY.position.y + 1, 1, 5),
 		Color(0.6, 0.5, 0.36))
 
-	# 주방 조리대 (고정)
-	canvas.draw_rect(KITCHEN, Color(0.52, 0.36, 0.22))
-	canvas.draw_rect(Rect2(KITCHEN.position, Vector2(KITCHEN.size.x, 6)), Color(0.72, 0.7, 0.68))
-	# 화구 + 냄비
-	canvas.draw_rect(Rect2(KITCHEN.position.x + 8, KITCHEN.position.y + 1, 14, 4),
-		Color(0.2, 0.18, 0.2))
-	canvas.draw_rect(Rect2(KITCHEN.position.x + 10, KITCHEN.position.y - 6, 10, 7),
-		Color(0.35, 0.35, 0.4))
-	canvas.draw_rect(Rect2(KITCHEN.position.x + 8, KITCHEN.position.y - 7, 14, 2),
-		Color(0.45, 0.45, 0.5))
-	# 도마 + 접시
-	canvas.draw_rect(Rect2(KITCHEN.position.x + 34, KITCHEN.position.y + 1, 16, 4),
-		Color(0.78, 0.62, 0.4))
-	canvas.draw_rect(Rect2(KITCHEN.end.x - 10, KITCHEN.position.y + 1, 6, 4),
-		Color(0.9, 0.9, 0.92))
+	# 주방 조리대 (고정). 발견 전에는 먼지와 잡동사니 더미로 덮여 있다 —
+	# 빗자루로 쓸 때마다(dust_swept) 한 겹씩 걷힌다.
+	if not GameData.kitchen_found:
+		var left := GameData.DUST_TOTAL - GameData.dust_swept
+		# 바탕: 뭔가 있긴 한 실루엣
+		canvas.draw_rect(KITCHEN, Color(0.4, 0.33, 0.26))
+		# 잡동사니 (남은 만큼): 상자·항아리·천 덮개
+		if left >= 3:
+			canvas.draw_rect(Rect2(KITCHEN.position.x + 6, KITCHEN.position.y - 10,
+				26, 28), Color(0.5, 0.4, 0.28))
+			canvas.draw_rect(Rect2(KITCHEN.position.x + 10, KITCHEN.position.y - 6,
+				18, 3), Color(0.38, 0.3, 0.2))
+		if left >= 2:
+			canvas.draw_rect(Rect2(KITCHEN.position.x + 40, KITCHEN.position.y - 4,
+				22, 22), Color(0.62, 0.58, 0.5))
+			canvas.draw_rect(Rect2(KITCHEN.position.x + 44, KITCHEN.position.y - 8,
+				14, 6), Color(0.55, 0.5, 0.42))
+		if left >= 1:
+			canvas.draw_rect(Rect2(KITCHEN.end.x - 26, KITCHEN.position.y + 2,
+				20, 16), Color(0.58, 0.52, 0.44))
+		# 먼지 얼룩
+		for i in range(maxi(left * 2, 1)):
+			canvas.draw_rect(Rect2(KITCHEN.position.x + 4 + i * 17,
+				KITCHEN.end.y - 6 + (i % 2) * 3, 12, 4), Color(0.55, 0.5, 0.44, 0.5))
+	else:
+		canvas.draw_rect(KITCHEN, Color(0.52, 0.36, 0.22))
+		canvas.draw_rect(Rect2(KITCHEN.position, Vector2(KITCHEN.size.x, 6)), Color(0.72, 0.7, 0.68))
+		# 화구 + 냄비
+		canvas.draw_rect(Rect2(KITCHEN.position.x + 8, KITCHEN.position.y + 1, 14, 4),
+			Color(0.2, 0.18, 0.2))
+		canvas.draw_rect(Rect2(KITCHEN.position.x + 10, KITCHEN.position.y - 6, 10, 7),
+			Color(0.35, 0.35, 0.4))
+		canvas.draw_rect(Rect2(KITCHEN.position.x + 8, KITCHEN.position.y - 7, 14, 2),
+			Color(0.45, 0.45, 0.5))
+		# 도마 + 접시
+		canvas.draw_rect(Rect2(KITCHEN.position.x + 34, KITCHEN.position.y + 1, 16, 4),
+			Color(0.78, 0.62, 0.4))
+		canvas.draw_rect(Rect2(KITCHEN.end.x - 10, KITCHEN.position.y + 1, 6, 4),
+			Color(0.9, 0.9, 0.92))
 
 	# 침대 (직접 만들어야 생긴다 — 만들기 전에는 빈 자리 표시)
 	if GameData.has_bed:

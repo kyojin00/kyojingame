@@ -278,6 +278,16 @@ func _rebuild() -> void:
 			pb2.disabled = GameData.money < pprice
 			items_box.add_child(_mk_row(pid, str(pdef.name),
 				"보유 %d개" % GameData.items[pid], pb2, [["coin", pprice]]))
+		# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다
+		_note("— 레시피 —")
+		if "broom" in GameData.recipes_unlocked:
+			items_box.add_child(_mk_row("broom", "빗자루 레시피 (배움)",
+				"집 책상에서 만든다 — 잡초 5 · 목재 3"))
+		else:
+			var rcp := _mk_button("구매", _on_buy_recipe.bind("broom", 300))
+			rcp.disabled = GameData.money < 300
+			items_box.add_child(_mk_row("broom", "빗자루 레시피",
+				"집 안의 먼지를 쓸어 낸다 · 재료: 잡초 5 · 목재 3", rcp, [["coin", 300]]))
 		# 마음을 전하는 것들 — 씨앗과 같은 칸에 두면 눈에 띈다
 		_note("— 마음을 전하는 것 —")
 		var fb := _mk_button("구매", _on_buy_gift.bind("bouquet", GameData.BOUQUET_PRICE))
@@ -578,6 +588,18 @@ func _on_buy_part(item_id: String, price: int) -> void:
 	GameData.items[item_id] += 1
 	GameData.discover(item_id)
 	Sound.play_sfx("sfx_coin")
+	_rebuild()
+
+
+# 레시피 구매 — 집 책상의 잠긴 칸이 열린다
+func _on_buy_recipe(id: String, price: int) -> void:
+	if GameData.money < price or id in GameData.recipes_unlocked:
+		return
+	GameData.money -= price
+	GameData.today_spent += price
+	GameData.recipes_unlocked.append(id)
+	Sound.play_sfx("sfx_coin")
+	main.hud.quest_toast("%s 레시피를 배웠다" % GameData.DESK_RECIPES[id].name)
 	_rebuild()
 
 
