@@ -50,6 +50,18 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.desk_lv = int(d.get("desk_lv", 0))
 	# 침대 등급이 생기기 전 세이브: 만들어 둔 침대는 나무 침대(100%)로 쳐 준다
 	GameData.bed_lv = int(d.get("bed_lv", 1 if GameData.has_bed else 0))
+	GameData.dust_swept = int(d.get("dust_swept", 0))
+	GameData.fisher_quest = str(d.get("fisher_quest", ""))
+	GameData.fisher_choice = int(d.get("fisher_choice", 0))
+	GameData.sea_open = bool(d.get("sea_open", false))
+	# 스토리 2 재배열 전 세이브: 낚시꾼을 끝냈으면 완료로, 아니면 낚시꾼
+	# 대기로 이어 준다 (옛 세이브는 마을이 이미 다 서 있다)
+	GameData.story2_phase = str(d.get("story2_phase",
+		"done" if str(d.get("fisher_quest", "")) == "done" else "fisher"))
+	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
+	# 발견한 것으로 친다 — 쓰던 부엌이 갑자기 먼지에 묻히면 안 된다
+	GameData.kitchen_found = bool(d.get("kitchen_found",
+		int(d.get("house_lv", 0)) >= 2 or not d.get("recipes_cooked", {}).is_empty()))
 	GameData.desk_queue = []
 	for job in d.get("desk_queue", []):
 		if GameData.DESK_RECIPES.has(str(job.get("id", ""))):
@@ -190,6 +202,9 @@ func _apply_save(d: Dictionary) -> void:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
 			m.objects[Vector2i(int(o[0]), int(o[1]))] = od
 		m.worldgen._migrate_farm_layout()
+	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
+	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
+	m.worldgen._build_sea()
 	# 격자가 통째로 바뀌었다 — 「돌아가는 칸」 목록을 다시 만든다
 	m.farming.rebuild()
 

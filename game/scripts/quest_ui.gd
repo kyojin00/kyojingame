@@ -141,18 +141,47 @@ func _rebuild() -> void:
 	if ph != "done":
 		return
 
-	# 생활 안내 (스토리 완료 후, 필요한 순간마다 하나씩)
-	if GameData.tutorial.get("active", false):
-		_line("[마을 생활 안내]", COL_HEAD)
-		var current_found := false
-		for pair in GameData.TUTORIAL_ORDER:
-			if GameData.tutorial.get(pair[0], false):
-				_line("  V " + pair[1], COL_DONE)
-			elif not current_found:
-				current_found = true
-				_line("  > " + pair[1], COL_NOW)
+	# 메인 스토리 2 — 상점 짓기 -> 낚시꾼과 바다 -> 밭 일구기 (이 순서)
+	_line("[메인 스토리 2 — 마을을 깨우다]", COL_HEAD)
+	var s2: String = GameData.story2_phase
+	var shop_txt := "재료를 모아 상점을 짓자 (목재 %d·돌 %d)" \
+		% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]
+	if GameData.village_built.has("general"):
+		_line("  V " + shop_txt, COL_DONE)
+	elif s2 == "shop":
+		_line("  > " + shop_txt, COL_NOW)
+	else:
+		_line("  - ???", COL_DIM)
+	var fq: String = GameData.fisher_quest
+	if fq == "":
+		_line("  - ??? (상점이 서면 이어진다)", COL_DIM)
+	else:
+		var order := ["meet", "follow", "open", "done"]
+		var steps := ["낯선 낚시꾼에게 말을 걸어 보자",
+			"낚시꾼과 함께 남쪽 바위 능선으로 가자",
+			"길목의 커다란 바위를 캐서 바닷길을 열자",
+			"바다·해변 해금 + 간이낚싯대 (낚시 해금)"]
+		var idx := order.find(fq)
+		for i in steps.size():
+			if i < idx or fq == "done":
+				_line("  V " + steps[i], COL_DONE)
+			elif i == idx:
+				_line("  > " + steps[i], COL_NOW)
 			else:
-				_line("  - " + pair[1], COL_DIM)
+				_line("  - " + steps[i], COL_DIM)
+	if s2 == "farm_talk":
+		_line("  > 이장에게 가 보자 — 마을의 선물이 기다린다", COL_NOW)
+	elif s2 in ["farm", "done"]:
+		_line("  V 이장에게 호미와 씨앗을 받았다", COL_DONE)
+		_tut_section(true)   # 밭 갈기 -> 씨앗 -> 물 -> 첫 수확
+	else:
+		_line("  - ??? (바닷길이 열리면 이어진다)", COL_DIM)
+	_line("")
+
+	# 마을 생활 안내 (선택 서브퀘스트)
+	if GameData.tutorial.get("active", false):
+		_line("[마을 생활 안내]  선택 — 안 해도 이야기는 진행된다", COL_HEAD)
+		_tut_section(false)
 		_line("")
 
 	# 계절 축제 (계절마다 하루)
@@ -243,3 +272,19 @@ func _rebuild() -> void:
 		_line("    기록 %d/%d (%d%%)" % [int(prog.filled), int(prog.total),
 			int(prog.ratio * 100.0)], COL_SUB)
 
+
+
+# 튜토리얼 목록의 반쪽을 그린다 — story2=true면 메인 스토리 2(밭 갈기),
+# false면 선택 서브퀘스트(마을 생활 안내)
+func _tut_section(story2: bool) -> void:
+	var current_found := false
+	for pair in GameData.TUTORIAL_ORDER:
+		if (pair[0] in GameData.STORY2_FLAGS) != story2:
+			continue
+		if GameData.tutorial.get(pair[0], false):
+			_line("  V " + pair[1], COL_DONE)
+		elif not current_found:
+			current_found = true
+			_line("  > " + pair[1], COL_NOW)
+		else:
+			_line("  - " + pair[1], COL_DIM)

@@ -71,6 +71,8 @@ func _sync_village_npcs() -> void:
 		if not GameData.village_built.has(pid):
 			continue
 		var nid: String = m.VILLAGE_NPC[pid]
+		if nid == "fisher" and GameData.fisher_quest == "":
+			continue  # 낚시꾼은 황금잉어 소문을 듣고 뒤늦게 온다 (상점 완공 뒤 퀘스트)
 		var found := false
 		for n in m.npcs:
 			if n.id == nid:
@@ -80,6 +82,16 @@ func _sync_village_npcs() -> void:
 			continue
 		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
 		_spawn_npc(nid, Vector2i(a.x + 2, a.y + 4))  # 자기 건물 문 앞
+
+	# 낚시꾼은 자기 건물(수산시장)이 없어도 퀘스트로 마을에 온다
+	if GameData.fisher_quest != "":
+		var have_fisher := false
+		for n in m.npcs:
+			if n.id == "fisher":
+				have_fisher = true
+				break
+		if not have_fisher:
+			_spawn_npc("fisher", m.FISHER_ARRIVE)
 
 
 func _tile_path(start: Vector2i, goal: Vector2i) -> Array:

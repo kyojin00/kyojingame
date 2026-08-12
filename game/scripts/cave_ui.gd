@@ -288,7 +288,8 @@ func _blocked_at(p: Vector2) -> bool:
 
 
 func _process(delta: float) -> void:
-	if not visible or main.dialog.visible or main.summary.visible:
+	if not visible or main.dialog.visible or main.summary.visible \
+			or main.inventory_ui.visible:
 		return
 	attack_cd -= delta
 	hurt_cd -= delta
@@ -374,7 +375,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or main.dialog.visible or main.summary.visible:
+	if not visible or main.dialog.visible or main.summary.visible \
+			or main.inventory_ui.visible:
 		return
 	if event.is_action_pressed("use_tool"):
 		_attack()

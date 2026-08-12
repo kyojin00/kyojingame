@@ -20,6 +20,7 @@ var place := ""              # 지금 향하는(또는 머무는) 장소 이름
 var dest := Vector2i(-999, -999)   # 그 장소의 타일
 var route: Array = []        # 남은 길 (월드 좌표)
 var _route_cd := 0.0         # 길찾기 재시도 간격
+var scripted := false        # 스토리 연출이 직접 움직인다 — 일과·배회 정지
 
 
 func _ready() -> void:
@@ -40,13 +41,19 @@ func _draw() -> void:
 
 func _process(delta: float) -> void:
 	# NPC 일정: 저녁(19시)이 되면 집으로 돌아가 아침까지 만날 수 없다.
-	# (이장은 스토리 1 편지 전달 중에는 남아 있는다)
+	# (이장은 스토리 편지 전달~집 인사 동안에는 남아 있는다)
 	var home_time: bool = GameData.is_evening() \
-		and not (id == "chief" and GameData.story_phase == "travel")
+		and not (id == "chief" and (scripted
+			or GameData.story2_phase == "farm_talk"
+			or GameData.story_phase in ["travel", "deliver", "home_open", "greet"])) \
+		and not (id == "fisher"
+			and GameData.fisher_quest in ["meet", "follow", "open"])
 	if visible == home_time:
 		visible = not home_time
 	if home_time:
 		return
+	if scripted:
+		return   # 위치·방향·걸음은 스토리 연출(story.gd)이 직접 움직인다
 	if main.ui_open():
 		return
 	anim_time += delta

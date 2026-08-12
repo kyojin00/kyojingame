@@ -44,6 +44,14 @@ func _apply_story_camera() -> void:
 		cam.limit_right = m.STORY_FOREST_W * m.TILE
 		cam.limit_bottom = 23 * m.TILE
 		cam.position_smoothing_enabled = true
+	elif GameData.story_phase == "travel":
+		# 가리개 숲의 좁은 길을 지나는 동안 — 마을 전경은 아직 보여 주지 않는다.
+		# 마을 어귀(작별 인사)에서 제한이 풀리며 시야가 극적으로 넓어진다.
+		cam.limit_left = 0
+		cam.limit_top = 0
+		cam.limit_right = 60 * m.TILE
+		cam.limit_bottom = 23 * m.TILE
+		cam.position_smoothing_enabled = true
 	else:
 		m._free_camera_limits(cam)
 		cam.position_smoothing_enabled = true
@@ -98,12 +106,26 @@ func _plant_story_forest() -> void:
 		_story_fence(Vector2i(m.STORY_FORK.x + 3, y))
 	for x in range(m.STORY_FORK.x - 2, m.STORY_FORK.x + 4):
 		_story_fence(Vector2i(x, 22))
-	for y in range(9, m.STORY_ROAD_Y0):               # 연결로 양옆
-		_story_fence(Vector2i(m.STORY_LINK_X - 1, y))
-		_story_fence(Vector2i(m.STORY_LINK_X + 4, y))
+	for y in range(9, m.STORY_ROAD_Y0):               # 연결로 양옆 — 우거진 나무 벽
+		_story_tree_wall(Vector2i(m.STORY_LINK_X - 1, y))
+		_story_tree_wall(Vector2i(m.STORY_LINK_X + 4, y))
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):   # 본길 양 끝
 		_story_fence(Vector2i(m.STORY_ROAD_X1 + 1, y))
 		_story_fence(Vector2i(m.STORY_ROAD_X0 - 1, y))
+
+	# ⑥ 마을 초입 가리개 숲: 큰길(y8~10) 양옆을 벨 수 없는 나무로 빽빽하게
+	#    채워, 이 좁은 길을 다 지나기 전에는 마을 전경이 보이지 않는다.
+	#    마을로 드는 길은 이 큰길 하나뿐이다.
+	for x in range(40, 60):
+		_story_tree_wall(Vector2i(x, 7))
+		_story_tree_wall(Vector2i(x, 11))
+	for y in range(1, 15):
+		for x in range(40, 60):
+			var pos6 := Vector2i(x, y)
+			if m.grid[y][x].ground != "grass" or m.objects.has(pos6):
+				continue
+			if m._hash01(x * 13 + 3, y * 17 + 9) < 0.85 and m.worldgen._nature_clear(pos6, "tree"):
+				m.objects[pos6] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
 
 	# ③ 길을 가로막고 선 나무 — 베어야만 지나갈 수 있다.
 	#    길목에서는 길이 두 줄로 좁아지므로 나무 두 그루면 막힌다.
@@ -151,6 +173,15 @@ func _story_fence(pos: Vector2i) -> void:
 	m.objects[pos] = {"kind": "fence", "hp": 0, "fixed": true}
 
 
+# 가리개 숲의 나무 벽: 벨 수 없는 나무 한 그루 (풀밭에만 세운다)
+func _story_tree_wall(pos: Vector2i) -> void:
+	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
+		return
+	if m.grid[pos.y][pos.x].ground != "grass":
+		return
+	m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
+
+
 # 아직 뚫지 못한 길목(나무 줄) 수를 센다 — 한 칸만 베어도 그 줄은 열린 것으로 본다
 # 그 자리에서 길을 두 줄로 좁히고, 남은 두 줄을 막을 것으로 채운다.
 # (길이 네 줄이면 네 개를 다 캐야 하는데 초반부터 그건 지루하다)
@@ -188,7 +219,7 @@ func _story_update(delta: float) -> void:
 	# 안전장치: 어떤 이유로든 연출이 끊겨 조작이 잠긴 채 남으면 풀어 준다.
 	# (편지 전달 중에는 원래 잠겨 있어야 한다)
 	if m.story_cutscene and not m.dialog.visible and m._name_layer == null \
-			and _postman_state != "deliver":
+			and _postman_state != "deliver" and not _chief_greet:
 		m._cutscene_idle += delta
 		if m._cutscene_idle > 1.5:
 			m._cutscene_idle = 0.0
@@ -276,12 +307,19 @@ func _story_update(delta: float) -> void:
 				_start_rock_dialog()
 		"travel":
 			_update_postman(delta, story_shot)
-			# 마을 이장 근처에 도착하면 편지 전달 컷신
-			if _postman_state == "follow":
-				var chief := _story_chief()
-				if chief != null and m.player.position.distance_to(chief.position) < 150.0:
-					m.story_cutscene = true
-					_postman_state = "deliver"
+			# 마을 어귀에 다다르면 우체부가 작별 인사를 하며 편지를 맡긴다
+			if _postman_state == "follow" and not m.dialog.visible \
+					and m.player_tile().x >= 58:
+				m.story_cutscene = true
+				_postman_state = "talk"
+				_start_farewell_dialog()
+		"deliver":
+			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
+		"home_open":
+			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
+		"greet":
+			_update_postman(delta, false)
+			_update_home_greet(delta)       # 이장이 문 앞으로 걸어온다
 
 
 func _spawn_postman() -> void:
@@ -712,49 +750,400 @@ func _story_chief() -> Node2D:
 	return null
 
 
-func _start_delivery_dialog() -> void:
-	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
-	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+# 마을 어귀: 우체부가 작별 인사를 하고 편지를 플레이어에게 맡긴다
+func _start_farewell_dialog() -> void:
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
-		{"text": "「이장님! 편지를 가지고 왔습니다.」"},
-		{"text": "「오, 우체부 양반. 그 험한 숲길을 뚫고 왔는가!」",
-			"name": "이장 덕수", "portrait": chief_normal},
-		{"text": "「여기 %s(이)가 길을 열어 준 덕분입니다.」" % nm},
-		{"text": "「%s(이)라고 했나. 교진 마을에 온 것을 환영하네!」" % nm,
-			"name": "이장 덕수", "portrait": chief_happy},
-		{"text": "「마을 서쪽 큰길가에 빈 집터가 하나 있네. 자네가 쓰게.」",
-			"name": "이장 덕수", "portrait": chief_happy},
-		{"text": "「그리고 이건 새로 온 사람에게 주는 우리 마을의 선물일세.」",
-			"name": "이장 덕수", "portrait": chief_normal, "event": _story_give_hoe},
-		{"text": "「호미로 땅을 갈아 밭을 만들면, 이 마을에서 살아갈 수 있을 걸세.」",
-			"name": "이장 덕수", "portrait": chief_happy},
-	], _end_delivery)
+		{"text": "「다 왔군! 여기가 교진 마을일세.」"},
+		{"text": "「그런데 미안하네만... 나는 이 길로 다음 배달을 가야 해서 말이야.」",
+			"portrait": m.tex["npc_postman_portrait_normal"]},
+		{"text": "「이 편지를 자네가 이장님께 전해 주겠나? 광장 근처에 계실 걸세.」"},
+		{"text": "「자네와의 숲길, 즐거웠네. 잘 지내게, %s!」" % nm,
+			"portrait": m.tex["npc_postman_portrait_happy"]},
+	], _end_farewell)
 
 
-func _story_give_hoe() -> void:
-	# 정착 준비: 이장이 환영 선물로 호미를 건넨다 (밭갈기 목표의 시작)
-	if not GameData.is_tool_unlocked("hoe"):
-		GameData.unlocked_tools.append("hoe")
-	m.hud.reward_toast("호미 × 1", m.tex["icon_hoe"])
-	m.hud.show_message("호미는 가방(I)에서 슬롯에 넣어야 쓸 수 있다.", 5.0)
-
-
-func _end_delivery() -> void:
+func _end_farewell() -> void:
 	m.story_cutscene = false
-	GameData.story_phase = "done"
+	GameData.story_phase = "deliver"
 	_apply_story_camera()
 	_apply_story_visibility()
-	m.hud.quest_toast("이장에게 편지 전달")
-	if not GameData.is_tool_unlocked("hoe"):
-		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
-	m.hud.show_message("메인 스토리 1 완료! 호미로 밭을 갈고, 집터(E)에 집을 지어 정착하자.", 6.0)
-	if _postman != null:
+	m.hud.quest_toast("마을로 이동")
+	m.hud.show_message("우체부 아저씨의 편지를 이장님께 전하자. (화살표 방향)", 6.0)
+	if _postman != null:   # 우체부는 마을 북쪽 길로 떠난다
 		_postman_path = m.npcmgr._tile_path(
 			Vector2i(int(_postman.position.x / m.TILE), int(_postman.position.y / m.TILE)),
 			Vector2i(m.VILLAGE_EXIT_X, 1))
 		_postman_fade = 1.0
 		_postman_state = "leave"
+	m.saveio.save_now()
+
+
+# 이장에게 말을 걸면(E) 편지를 전한다 — village_ui._talk_to가 부른다
+func _start_delivery_dialog() -> void:
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.story_cutscene = true
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "(우체부 아저씨가 맡긴 편지를 건넸다...)", "name": "나", "portrait": null},
+		{"text": "「오, 우체부 양반의 편지로군. 고맙네!」", "portrait": chief_happy},
+		{"text": "「...편지에 자네 얘기도 적혀 있구먼. 험한 숲길을 자네가 열었다고?」"},
+		{"text": "「%s(이)라고 했나. 교진 마을에 온 것을 환영하네!」" % nm,
+			"portrait": chief_happy},
+		{"text": "「자네 할아버지가 지내던 집이 마을 서쪽에 그대로 있네.」"},
+		{"text": "「오래 비워 둬서 낡았네만... 오늘부터 자네 집일세.」",
+			"portrait": chief_happy, "event": _story_open_home},
+		{"text": "「먼저 들어가서 짐을 풀게. 나도 곧 따라감세.」"},
+	], _end_delivery)
+
+
+# 이장이 할아버지의 집을 내어 준다 — 낡은 침대와 책상이 남아 있다
+func _story_open_home() -> void:
+	if GameData.house_lv >= 1:
+		return
+	GameData.house_lv = 1
+	GameData.has_bed = true    # 할아버지가 쓰던 낡은 침대
+	GameData.bed_lv = 0
+	m.objnode._remove_object(m.HOME_SITE)
+	m.worldgen._fill_building(m.HOME_ANCHOR)
+	Sound.play_sfx("sfx_place")
+	m.hud.quest_toast("할아버지의 집을 물려받았다")
+
+
+func _story_give_hoe() -> void:
+	# 정착 준비: 이장이 환영 선물로 호미와 씨앗을 건넨다 (밭갈기 목표의 시작)
+	if not GameData.is_tool_unlocked("hoe"):
+		GameData.unlocked_tools.append("hoe")
+	GameData.seeds["potato"] += 3
+	m.hud.reward_toast("호미 × 1 · 감자 씨앗 × 3", m.tex["icon_hoe"])
+	m.hud.show_message("호미는 가방(I)에서 슬롯에 넣어야 쓸 수 있다.", 5.0)
+
+
+func _end_delivery() -> void:
+	m.story_cutscene = false
+	GameData.story_phase = "home_open"
+	_story_open_home()   # 대화를 스킵해도 집은 열린다
+	_apply_story_camera()
+	_apply_story_visibility()
+	m.hud.quest_toast("이장에게 편지 전달")
+	m.hud.show_message("마을 서쪽, 이장님이 내어 준 집에 들어가 보자. (문 앞에서 E)", 6.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 1 끝 / 2 시작 ----
+#
+# 집에 처음 들어가면 스토리 1이 끝난다 (interior.open이 부른다).
+# 집에서 나오면 이장이 문 앞으로 걸어와 말을 걸고, 그 대화가 스토리 2
+# (밭 일구기)의 시작이다.
+var _chief_greet := false     # 이장이 걸어오는 연출 중
+
+
+func home_entered() -> void:
+	if GameData.story_phase != "home_open":
+		return
+	GameData.story_phase = "greet"
+	m.hud.quest_toast("새 보금자리")
+	m.hud.show_message("메인 스토리 1 완료! 집을 둘러보고 밖으로 나가 보자.", 6.0)
+	m.saveio.save_now()
+
+
+func start_home_greet() -> void:
+	if GameData.story_phase != "greet":
+		return
+	var chief: Variant = _story_chief()
+	if chief == null:
+		_start_story2_dialog()
+		return
+	m.story_cutscene = true
+	chief.scripted = true      # 일과·배회를 멈추고 연출이 직접 움직인다
+	chief.visible = true
+	# 문 앞 큰길 쪽에서 걸어온다
+	chief.position = m.player.position + Vector2(-24.0, 150.0)
+	_chief_greet = true
+
+
+func _update_home_greet(delta: float) -> void:
+	if not _chief_greet:
+		return
+	var chief: Variant = _story_chief()
+	if chief == null:
+		_chief_greet = false
+		_start_story2_dialog()
+		return
+	var to: Vector2 = m.player.position + Vector2(0.0, 30.0) - chief.position
+	if to.length() > 8.0:
+		chief.position += to.normalized() * minf(to.length() * 2.5, 130.0) * delta
+		chief.moving = true
+		chief.anim_time += delta
+		if absf(to.x) > absf(to.y):
+			chief.dir = "right" if to.x > 0 else "left"
+		else:
+			chief.dir = "down" if to.y > 0 else "up"
+		chief._update_sprite()
+	else:
+		chief.moving = false
+		chief.dir = "up"          # 플레이어를 올려다본다
+		chief._update_sprite()
+		_chief_greet = false
+		_start_story2_dialog()
+
+
+func _start_story2_dialog() -> void:
+	m.story_cutscene = true
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "「%s! 집은 좀 둘러봤는가?」" % nm, "portrait": chief_happy},
+		{"text": "「할아버지가 쓰시던 침대와 책상이 그대로 남아 있을 걸세.」"},
+		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
+		{"text": "「책상은 제작대일세. 재료만 있으면 가구도 손수 만들 수 있지.」"},
+		{"text": "「그나저나... 보다시피 마을이 텅 비었네. 젊은 사람들이 다 떠났거든.」"},
+		{"text": "「자네가 와 준 김에 부탁 하나 함세. 우선 **상점**부터 세워 보지 않겠나?」",
+			"portrait": chief_happy},
+		{"text": "「목재 %d에 돌 %d... 나무를 베고 바위를 캐면 모일 걸세.」"
+			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]},
+		{"text": "「재료가 모이면 광장 북쪽 상점 터의 게시판에서 짓게. 상점이 서면 민지가 와서 씨앗이며 생필품을 팔 거야.」"},
+	], _end_home_greet)
+
+
+func _end_home_greet() -> void:
+	m.story_cutscene = false
+	_chief_greet = false
+	GameData.story_phase = "done"
+	GameData.story2_phase = "shop"
+	var chief: Variant = _story_chief()
+	if chief != null:
+		chief.scripted = false
+	m.hud.quest_toast("메인 스토리 2 — 상점을 짓자")
+	m.hud.show_message("메인 스토리 2 시작! 목재 %d·돌 %d을 모아 상점 터 게시판(광장 북쪽)에서 상점을 짓자."
+		% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE], 7.0)
+	m.saveio.save_now()
+
+
+# 상점이 서고 바닷길까지 열리면, 이장이 호미를 주며 밭 갈기를 권한다
+func _start_farm_dialog() -> void:
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "「%s! 상점도 서고, 바닷길도 열리고... 자네 덕에 마을이 살아나는구먼!」" % nm,
+			"portrait": chief_happy},
+		{"text": "「이제 자네도 여기 뿌리를 내릴 차례지. 이건 우리 마을의 선물일세.」",
+			"event": _story_give_hoe},
+		{"text": "「호미로 집 앞 풀밭을 갈아 밭을 만들어 보게. 농사가 이 마을의 근본일세.」",
+			"portrait": chief_happy},
+		{"text": "「씨앗이 모자라면 상점에서 사면 되네. 급할 것 없으니 천천히 하게나.」"},
+	], _end_farm_intro)
+
+
+func _end_farm_intro() -> void:
+	GameData.story2_phase = "farm"
+	if not GameData.is_tool_unlocked("hoe"):
+		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
+	m.hud.quest_toast("밭을 일구자")
+	m.hud.show_message("호미로 밭을 갈아 농사를 시작하자! (밭 갈기 → 씨앗 → 물 → 수확)", 6.0)
+	m.saveio.save_now()
+
+
+# ---- 낚시꾼 퀘스트 (메인 스토리 3): 바다 · 해변 · 낚시 해금 ----
+#
+# 첫 수확을 마치면(마을 생활이 자리 잡으면) 전설의 황금잉어를 쫓는
+# 낚시꾼이 마을 광장에 나타난다. 함께 남쪽 바위 능선으로 내려가
+# 길목의 바위를 캐면 바다와 해변이 열리고, 보답으로 간이낚싯대를
+# 받아 낚시가 해금된다. 황금잉어 선택지는 대사만 가른다.
+var _fisher_gate_talked := false
+
+
+func _fisher_node() -> Variant:
+	for n in m.npcs:
+		if n.id == "fisher":
+			return n
+	return null
+
+
+func _sea_gate_center() -> Vector2:
+	return Vector2(m.SEA_GATE[0].x * m.TILE + 32.0, m.SEA_GATE[0].y * m.TILE - 16.0)
+
+
+func _fisher_update(delta: float) -> void:
+	if Net.is_guest():
+		return
+	match GameData.fisher_quest:
+		"":
+			# 상점이 서면(메인 스토리 2의 다음 마디) 낚시꾼이 온다
+			if GameData.story_phase == "done" and not m.ui_open() \
+					and GameData.story2_phase == "fisher":
+				_fisher_arrive()
+		"open":
+			# 길을 연 채로 저장했다가 불러온 경우: 보상 대화를 다시 잇는다
+			if GameData.sea_open and not m.ui_open():
+				_start_fisher_reward_dialog()
+		"follow":
+			if m.ui_open():
+				return
+			var fisher: Variant = _fisher_node()
+			if fisher == null:
+				return
+			# 주인공을 따라 걷는다 (우체부 동행과 같은 느낌)
+			var to: Vector2 = m.player.position + Vector2(44.0, -4.0) - fisher.position
+			if to.length() > 16.0:
+				fisher.position += to.normalized() * minf(to.length() * 2.2, 150.0) * delta
+				fisher.moving = true
+				fisher.anim_time += delta
+				if absf(to.x) > absf(to.y):
+					fisher.dir = "right" if to.x > 0 else "left"
+				else:
+					fisher.dir = "down" if to.y > 0 else "up"
+				fisher._update_sprite()
+			else:
+				fisher.moving = false
+				fisher._update_sprite()
+			# 능선 길목에 다다르면 바위 앞 대화
+			if not _fisher_gate_talked \
+					and m.player.position.distance_to(_sea_gate_center()) < 150.0:
+				_fisher_gate_talked = true
+				_start_fisher_gate_dialog()
+
+
+# 퀘스트 도중 저장한 게임을 불러오면 낚시꾼을 제자리에 되돌린다
+func _restore_fisher() -> void:
+	var fisher: Variant = _fisher_node()
+	if fisher == null:
+		return
+	fisher.scripted = true
+	match GameData.fisher_quest:
+		"meet":
+			fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
+				m.FISHER_ARRIVE.y * m.TILE + 16)
+		"follow":
+			fisher.position = m.player.position + Vector2(44.0, -4.0)
+		"open":
+			fisher.position = Vector2((m.SEA_GATE[0].x - 2) * m.TILE + 16,
+				(m.SEA_GATE[0].y - 1) * m.TILE + 16)
+
+
+func _fisher_arrive() -> void:
+	GameData.fisher_quest = "meet"
+	m.npcmgr._sync_village_npcs()   # 낚시꾼은 이 퀘스트로 처음 마을에 온다
+	var fisher: Variant = _fisher_node()
+	if fisher != null:
+		fisher.scripted = true
+		fisher.visible = true
+		fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
+			m.FISHER_ARRIVE.y * m.TILE + 16)
+	m.hud.quest_toast("낯선 낚시꾼이 마을에 왔다")
+	m.hud.show_message("항구 차림의 낯선 사람이 마을 광장에 서 있다. 말을 걸어 보자. (E)", 6.0)
+	m.saveio.save_now()
+
+
+func _start_fisher_dialog() -> void:
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_normal"], [
+		{"text": "「오, 처음 보는 얼굴이군! 나는 낚시꾼 철수라고 하네.」",
+			"portrait": m.tex["npc_fisher_portrait_happy"]},
+		{"text": "「이 마을 물줄기에 **전설의 황금잉어**가 산다는 소문을 듣고 왔지.」"},
+		{"text": "「그놈을 낚을 때까지 이 마을에 눌러앉을 작정이야.」"},
+		{"text": "「그런데 말이지... 큰 놈은 바다를 오간다네. 남쪽 능선 너머가 바다인데, 바위가 길을 막고 있더군.」"},
+		{"text": "「%s, 자네도 황금잉어에 관심이 있나?」" % nm,
+			"choices": [
+				["당연하다. 꼭 잡고 말 거다.", _fisher_choose.bind(1)],
+				["잘 모르겠다. 아직까진 욕심이 없다.", _fisher_choose.bind(2)],
+			]},
+	])
+
+
+func _fisher_choose(pick: int) -> void:
+	GameData.fisher_choice = pick
+	var first := "「하하, 좋은 눈빛이야! 그럼 우리는 경쟁자로군. 정정당당하게 겨뤄 보세!」" \
+		if pick == 1 else "「욕심이 없는 것도 낚시꾼의 덕목이지. 물은 조용한 사람을 좋아하거든.」"
+	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_happy"], [
+		{"text": first},
+		{"text": "「마침 잘됐군. 같이 남쪽으로 내려가 주지 않겠나?」",
+			"portrait": m.tex["npc_fisher_portrait_normal"]},
+		{"text": "「듣자 하니 자네, 곡괭이 솜씨가 보통이 아니라던데.」"},
+	], _end_fisher_meet)
+
+
+func _end_fisher_meet() -> void:
+	GameData.fisher_quest = "follow"
+	_fisher_gate_talked = false
+	m.hud.quest_toast("낚시꾼과 함께 바다로")
+	m.hud.show_message("낚시꾼과 함께 남쪽 바위 능선으로 가자. (화살표 방향)", 6.0)
+	m.saveio.save_now()
+
+
+func _start_fisher_gate_dialog() -> void:
+	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_normal"], [
+		{"text": "「여기군! 능선 너머에서 파도 소리가 들려.」"},
+		{"text": "「길목의 저 커다란 바위 두 개... 자네 곡괭이라면 캐낼 수 있겠지?」"},
+		{"text": "「부탁하네. 길이 열리면 보답은 톡톡히 하지!」",
+			"portrait": m.tex["npc_fisher_portrait_happy"]},
+	], func() -> void:
+		GameData.fisher_quest = "open"
+		var fisher: Variant = _fisher_node()
+		if fisher != null:   # 낚시꾼은 길목 옆에서 기다린다
+			fisher.position = Vector2((m.SEA_GATE[0].x - 2) * m.TILE + 16,
+				(m.SEA_GATE[0].y - 1) * m.TILE + 16)
+			fisher.moving = false
+			fisher.dir = "right"
+			fisher._update_sprite()
+		m.hud.quest_toast("바닷길을 열자")
+		m.hud.show_message("곡괭이로 길목의 커다란 바위를 캐자!", 5.0)
+		m.saveio.save_now())
+
+
+# 길목의 바위가 부서질 때마다 불린다 (tool_use) — 둘 다 캐면 보상 대화
+func _sea_gate_mined() -> void:
+	if GameData.fisher_quest != "open":
+		return
+	for p: Vector2i in m.SEA_GATE:
+		if m.objects.has(p):
+			m.hud.show_message("하나 더! 남은 바위를 캐자.")
+			return
+	# 길이 열리는 순간 능선 너머의 숲이 걷히고 바다가 드러난다
+	m.worldgen._reveal_sea()
+	_start_fisher_reward_dialog()
+
+
+func _start_fisher_reward_dialog() -> void:
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	var brag := "「황금잉어는 강에도 바다에도 나온다더군. 먼저 낚는 쪽이 임자야!」" \
+		if GameData.fisher_choice == 1 \
+		else "「서두를 것 없네. 바다는 어디 안 가니까, 천천히 즐기게.」"
+	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_happy"], [
+		{"text": "「열렸다! 이 바람, 이 냄새... 바다야!」"},
+		{"text": "「고맙네, %s. 자네 덕에 길이 열렸어.」" % nm},
+		{"text": "「약속한 보답일세 — 내가 손수 깎은 **간이낚싯대**야.」",
+			"event": _story_give_rod},
+		{"text": "「물가 어디서든 던져 보게. 입질(!)이 오면 다시 E일세.」",
+			"portrait": m.tex["npc_fisher_portrait_normal"]},
+		{"text": brag, "portrait": m.tex["npc_fisher_portrait_happy"]},
+		{"text": "「참, 해변 모래밭에는 조개가 밀려온다네. 물때마다 주워 가게.」"},
+	], _end_fisher_quest)
+
+
+func _story_give_rod() -> void:
+	if not GameData.is_tool_unlocked("rod"):
+		GameData.unlocked_tools.append("rod")
+	m.hud.reward_toast("간이낚싯대 × 1", m.tex["icon_rod"])
+	m.hud.show_message("낚싯대는 가방(I)에서 슬롯에 장착해 물가에서 쓴다.", 5.0)
+
+
+func _end_fisher_quest() -> void:
+	GameData.fisher_quest = "done"
+	if not GameData.sea_open:
+		m.worldgen._reveal_sea()   # 대화를 스킵해도 바다는 열린다
+	if not GameData.is_tool_unlocked("rod"):
+		GameData.unlocked_tools.append("rod")  # 대화를 스킵해도 지급 보장
+	if GameData.story2_phase == "fisher":
+		GameData.story2_phase = "farm_talk"    # 다음: 이장이 호미를 준다
+	var fisher: Variant = _fisher_node()
+	if fisher != null:
+		fisher.scripted = false   # 이제부터는 마을 일과(부두)대로 산다
+	m.hud.quest_toast("바다 · 해변 해금!")
+	m.hud.show_message("남쪽 바다가 열렸다! 물가 어디서든 낚시할 수 있다. 이장님이 자네를 찾는다더군. (E)", 7.0)
 	m.saveio.save_now()
 
 
@@ -931,6 +1320,18 @@ func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
 	GameData.story_phase = "done"
+	GameData.story2_phase = "done"
+	_story_open_home()   # 이장이 내어 주는 집도 바로 받는다
+	# 이야기를 건너뛰면 마을과 바다도 다 열린 채 시작한다 (샌드박스)
+	GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
+	for pid: String in GameData.village_built:
+		if m.VILLAGE_PLOTS.has(pid):
+			m.worldgen._fill_building(m.VILLAGE_PLOTS[pid].anchor, pid)
+	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
+	m.worldgen._reveal_sea()
+	m.npcmgr._sync_village_npcs()
+	GameData.fisher_quest = "done"
+	GameData.seeds["potato"] += 3
 	_apply_story_camera()
 	if _postman != null:
 		_postman.queue_free()
@@ -940,6 +1341,11 @@ func _skip_tutorial() -> void:
 
 
 func tutorial_notify(flag: String) -> void:
+	# 첫 수확 = 메인 스토리 2의 마지막 목표 (안내 체크리스트와는 무관하다)
+	if flag == "harvest" and GameData.story2_phase == "farm":
+		GameData.story2_phase = "done"
+		m.hud.quest_toast("메인 스토리 2 완료!")
+		m.saveio.save_now()
 	var tut: Dictionary = GameData.tutorial
 	if not tut.get("active", false) or tut.get(flag, true):
 		return

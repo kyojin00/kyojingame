@@ -47,6 +47,15 @@ func _debug_tick() -> void:
 		if not m.story._story_snapped and m.story._story_t >= 3.2:
 			m.story._story_snapped = true
 			_save_shot("_story.png")
+			# 마을 진입로: 큰길(y8~10) 위아래가 벨 수 없는 나무로 막혀 있고,
+			# 마을로 드는 길은 그 길 하나뿐이어야 한다
+			print("ENTRANCE_OK=", not m.is_passable(Vector2i(52, 7))
+				and not m.is_passable(Vector2i(52, 11))
+				and m.is_passable(Vector2i(52, 9))
+				and bool(m.objects.get(Vector2i(52, 7), {}).get("fixed", false)),
+				" 위막힘=", not m.is_passable(Vector2i(52, 7)),
+				" 아래막힘=", not m.is_passable(Vector2i(52, 11)),
+				" 길열림=", m.is_passable(Vector2i(52, 9)))
 		elif m.story._story_snapped and m.story._story_t >= 3.8:
 			get_tree().quit()
 		return
@@ -105,7 +114,10 @@ func _debug_tick() -> void:
 		129: _send_key(KEY_F)                          # 꾸미기 모드
 		133: _save_shot("_deco.png")
 		134: _send_key(KEY_F)                          # 꾸미기 종료
-		136: m.interior.ppos = Vector2(645, 174)         # 조리대 앞으로
+		136:
+			m.interior.ppos = Vector2(645, 174)         # 조리대 앞으로
+			GameData.kitchen_found = true               # 주방 격자 캡처용 (청소는 382가 검사)
+			GameData.recipes_cooked["dish_soup"] = 1    # 컬러/회색 셀이 섞여 보이게
 		138: _send_key(KEY_E)                          # 주방 열기
 		142: _save_shot("_cook.png")
 		144:
@@ -429,6 +441,45 @@ func _debug_tick() -> void:
 				where.append("%s:%s" % [n.id, n.place])
 			print("NPC_PLACES=", ", ".join(where))
 			_save_shot("_npcday.png")
+		341:
+			# 더블 클릭 자동 장착: 빈 앞 번호 슬롯부터 차고, 겹치지 않는다
+			var keep_slots: Array = GameData.tool_slots.duplicate()
+			GameData.tool_slots = []
+			for i in GameData.TOOL_SLOT_COUNT:
+				GameData.tool_slots.append("")
+			m.inventory_ui._auto_equip("axe")
+			m.inventory_ui._auto_equip("hoe")
+			m.inventory_ui._auto_equip("axe")    # 중복 — 새 칸을 먹으면 안 된다
+			print("QUICKSLOT_OK=", GameData.tool_slots[0] == "axe"
+				and GameData.tool_slots[1] == "hoe" and GameData.tool_slots[2] == "",
+				" 슬롯=", GameData.tool_slots.slice(0, 3))
+			GameData.tool_slots = keep_slots
+			# 마트: 선반 4개(카테고리 구매) + 판매는 가방 격자 + 툴팁
+			m.shop_room.open("general")
+			var shelves_ok: bool = m.shop_room.SHELVES.size() == 4 \
+				and m.shop_room._shelf_near() == -1
+			m.shop.open("buy", ["buy"], "잡화점 — 씨앗", "seed")
+			var cat_ok: bool = m.shop.visible and m.shop.buy_cat == "seed"
+			m.shop.close()
+			m.shop.open("sell", ["sell"], "잡화점 — 판매")
+			var grid_ok: bool = m.shop.last_sell_cells > 0
+			m.shop.close()
+			m.shop_room.close()
+			print("MART_OK=", shelves_ok and cat_ok and grid_ok,
+				" 선반=", shelves_ok, " 카테고리=", cat_ok,
+				" 판매격자칸=", m.shop.last_sell_cells)
+		342:
+			# 처음 집(좁은 오두막) 캡처 — 낡은 침대·책상·먼지더미뿐이어야 한다
+			GameData.house_lv = 1
+			GameData.kitchen_found = false
+			GameData.dust_swept = 0
+			m.interior.open()
+		343:
+			_save_shot("_home_small.png")
+			m.interior.close()
+			GameData.house_lv = 2         # 이후 단계는 확장한 집 기준
+			GameData.kitchen_found = true
+			m.interior._layout()
 		344:
 			# 탈 것: 사기 -> 타기 -> 속도 -> 내리기
 			GameData.money = 99999
@@ -1189,6 +1240,29 @@ func _debug_tick() -> void:
 				" 아침=", GameData.bed_wake_mult(false),
 				" 쓰러짐=", GameData.bed_wake_mult(true))
 			GameData.desk_done_pending.clear()
+		382:
+			# 빗자루 -> 청소 -> 조리대 발견 -> 요리 해금
+			GameData.kitchen_found = false
+			GameData.dust_swept = 0
+			GameData.recipes_unlocked.erase("broom")
+			GameData.items["broom"] = 0
+			GameData.items["weed"] = 10
+			GameData.wood = 100
+			var locked_first := not GameData.desk_start("broom")   # 레시피를 모른다
+			GameData.recipes_unlocked.append("broom")
+			var q_ok := GameData.desk_start("broom")
+			GameData.desk_tick(10.0)
+			var got_broom := int(GameData.items["broom"]) == 1
+			m.interior._sweep_kitchen()
+			m.interior._sweep_kitchen()
+			var not_yet := not GameData.kitchen_found
+			m.interior._sweep_kitchen()
+			var found := GameData.kitchen_found
+			m.dialog.close()
+			print("CLEAN_OK=", locked_first and q_ok and got_broom and not_yet and found,
+				" 레시피잠김=", locked_first, " 제작=", got_broom,
+				" 두번으로는안됨=", not_yet, " 세번에발견=", found)
+			GameData.desk_done_pending.clear()
 		385:
 			# 발견 기록 + 컬렉션 보상
 			GameData.discovered.clear()
@@ -1260,6 +1334,149 @@ func _debug_tick() -> void:
 				if crops < 5 or fishes < 6:
 					thin = true
 			print("SEASON_CONTENT_OK=", not thin, " ", per_season)
+		376:
+			# 낚시꾼 퀘스트(메인 스토리 3): 등장 -> 황금잉어 선택지 ->
+			# 길목 바위 -> 바다/해변 해금 + 간이낚싯대(낚시 해금) + 조개
+			GameData.fisher_quest = ""
+			GameData.sea_open = false
+			GameData.unlocked_tools.erase("rod")
+			GameData.story2_phase = "fisher"       # 상점이 서면 낚시꾼이 온다
+			var hidden: bool = m.grid[m.MAP_H - 2][30].ground != "water"
+			m.story._fisher_update(0.016)
+			var met: bool = GameData.fisher_quest == "meet" \
+				and m.story._fisher_node() != null
+			m.story._start_fisher_dialog()
+			var choice_shown := m.dialog.visible
+			m.dialog.close()
+			m.story._fisher_choose(2)              # 선택지 — 대사만 갈린다
+			var picked: bool = GameData.fisher_choice == 2 and m.dialog.visible
+			m.dialog.close()
+			m.story._end_fisher_meet()
+			var follow: bool = GameData.fisher_quest == "follow" \
+				and GameData.fisher_objective_short() != ""
+			GameData.fisher_quest = "open"         # 게이트 앞 대화가 끝난 상태
+			for p: Vector2i in m.SEA_GATE:         # 길목 바위 둘을 캐낸 셈 친다
+				m.objnode._remove_object(p)
+			m.story._sea_gate_mined()              # -> 보상(간이낚싯대) 대화
+			var reward := m.dialog.visible
+			m.dialog.close()
+			m.story._end_fisher_quest()
+			var sea: bool = GameData.sea_open and GameData.fisher_quest == "done" \
+				and GameData.is_tool_unlocked("rod") \
+				and GameData.story2_phase == "farm_talk"
+			var ridge: bool = str(m.objects.get(Vector2i(30, m.SEA_RIDGE_Y),
+				{}).get("kind", "")) == "searock"
+			var sand: bool = m.grid[m.BEACH_Y0][30].ground == "sand"
+			var water: bool = m.grid[m.MAP_H - 2][30].ground == "water"
+			var shells := 0
+			for pos in m.objects:
+				if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+					shells += 1
+			var shell_ok: bool = GameData.ITEMS.has("forage_shell") \
+				and m.tex.has("forage_shell") and m.tex.has("forage_coral") and shells > 0
+			print("SEA_OK=", met and choice_shown and picked and follow and reward
+				and sea and ridge and sand and water and shell_ok and hidden,
+				" 등장=", met, " 선택지=", choice_shown, " 선택반영=", picked,
+				" 동행=", follow, " 보상대화=", reward, " 바다해금=", sea,
+				" 열기전숨김=", hidden, " 능선=", ridge, " 모래=", sand,
+				" 바닷물=", water, " 조개=", shells)
+			GameData.story2_phase = "done"
+			# 해변 채집 능력치: 레벨이 오르면 리젠이 빨라지고 한 번에 더 줍는다.
+			# 그리고 줍지 않은 조개가 상한을 넘겨 쌓이지 않아야 한다.
+			GameData.skills["beach"] = {"lv": 1, "xp": 0.0}
+			var base_n := GameData.beach_pick_count()
+			var t1 := 0.0
+			for i in 40:
+				t1 += GameData.shell_respawn_minutes()
+			GameData.skills["beach"] = {"lv": 10, "xp": 0.0}
+			var lv_n := GameData.beach_pick_count()
+			var t2 := 0.0
+			for i in 40:
+				t2 += GameData.shell_respawn_minutes()
+			for i in 40:                       # 리젠을 거듭하면 상한까지만 쌓인다
+				m.worldgen._tick_beach()
+			var after := 0
+			for pos2 in m.objects:
+				if String(m.objects[pos2].kind) in ["forage_shell", "forage_coral"]:
+					after += 1
+			print("BEACH_OK=", base_n == 1 and lv_n > base_n and t2 < t1 * 0.7
+				and after <= m.SHELL_CAP,
+				" 기본줍기=", base_n, " 10렙줍기=", lv_n,
+				" 평균리젠(분) 1렙=", "%.1f" % (t1 / 40.0), " 10렙=", "%.1f" % (t2 / 40.0),
+				" 상한=", after, "/", m.SHELL_CAP)
+			GameData.skills["beach"] = {"lv": 1, "xp": 0.0}
+		378:
+			# 스토리 1->2: 작별 -> 편지 전달 -> 집 해금 -> 입장(1막 끝) ->
+			# 이장 인사(상점 퀘) -> 상점 건설 -> 호미 -> 밭 -> 첫 수확(2막 끝)
+			var keep_house := GameData.house_lv
+			var keep_bed := GameData.has_bed
+			var keep_bedlv := GameData.bed_lv
+			GameData.story_phase = "travel"
+			GameData.story2_phase = ""
+			GameData.house_lv = 0
+			GameData.has_bed = false
+			m.story._end_farewell()
+			var farewell := GameData.story_phase == "deliver" \
+				and GameData.story_objective_short() != ""
+			m.story._start_delivery_dialog()   # 이장에게 E — 편지 전달
+			var deliver_talk := m.dialog.visible
+			m.dialog.close()
+			m.story._end_delivery()
+			var opened := GameData.house_lv == 1 and GameData.has_bed \
+				and GameData.story_phase == "home_open"
+			m.interior.open()
+			var s1_done := GameData.story_phase == "greet"
+			var small: bool = m.interior.ROOM.size.x < 500.0   # 처음 집은 좁은 오두막
+			m.interior.close()
+			m.story.start_home_greet()
+			m.story._chief_greet = false     # 걸어오는 연출은 생략하고 도착한 셈 친다
+			m.story._start_story2_dialog()
+			var talk := m.dialog.visible
+			m.dialog.close()
+			m.story._end_home_greet()
+			var shop_q: bool = GameData.story2_phase == "shop" \
+				and GameData.story2_objective_short() != ""
+			# 상점 건설 (재료를 채우고 상점 터 게시판 흐름으로)
+			GameData.village_built.erase("general")
+			GameData.wood = 100
+			GameData.stone = 100
+			m.village._open_shop_site_dialog()
+			m.village._build_shop()
+			m.dialog.close()
+			var shop_built: bool = GameData.village_built.has("general") \
+				and GameData.story2_phase == "fisher"
+			# 바닷길이 열린 뒤(SEA_OK에서 검사) 이장이 호미를 준다
+			GameData.story2_phase = "farm_talk"
+			GameData.unlocked_tools.erase("hoe")
+			m.story._start_farm_dialog()
+			var farm_talk := m.dialog.visible
+			m.dialog.close()
+			m.story._end_farm_intro()
+			var farm: bool = GameData.story2_phase == "farm" \
+				and GameData.is_tool_unlocked("hoe")
+			GameData.tutorial["harvest"] = false
+			m.tutorial_notify("harvest")       # 첫 수확 = 2막 끝
+			var s2_done: bool = GameData.story2_phase == "done"
+			# 튜토리얼 분리: 밭 갈기 4개가 맨 앞, 집 짓기/침대 목표는 사라졌어야 한다
+			var order_ok := true
+			for i in 4:
+				order_ok = order_ok \
+					and str(GameData.TUTORIAL_ORDER[i][0]) == str(GameData.STORY2_FLAGS[i])
+			for pair in GameData.TUTORIAL_ORDER:
+				if str(pair[0]) in ["home", "bed"]:
+					order_ok = false
+			print("STORY2_OK=", farewell and deliver_talk and opened and s1_done and small
+				and talk and shop_q and shop_built and farm_talk and farm and s2_done
+				and order_ok,
+				" 작별=", farewell, " 편지=", deliver_talk, " 집해금=", opened,
+				" 입장으로1막끝=", s1_done, " 오두막=", small, " 이장대화=", talk,
+				" 상점퀘=", shop_q, " 상점완성=", shop_built, " 호미대화=", farm_talk,
+				" 밭시작=", farm, " 수확으로2막끝=", s2_done, " 안내분리=", order_ok)
+			GameData.house_lv = keep_house
+			GameData.has_bed = keep_bed
+			GameData.bed_lv = keep_bedlv
+			GameData.story2_phase = "done"
+			m.interior._layout()
 		392: get_tree().quit()
 
 

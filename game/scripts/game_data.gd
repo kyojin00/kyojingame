@@ -558,8 +558,9 @@ const SKILLS := {
 	"mine": {"name": "채광", "effect": "석재·광석 추가 +6%/Lv"},
 	"combat": {"name": "전투", "effect": "동굴 공격력 +0.5/Lv"},
 	"cook": {"name": "요리", "effect": "요리 회복량 +5%/Lv"},
+	"beach": {"name": "해변 채집", "effect": "조개 리젠 +8%/Lv · 3Lv마다 채집량 +1"},
 }
-const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook"]
+const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach"]
 const SKILL_MAX_LV := 10
 var skills := {}
 
@@ -665,13 +666,61 @@ var tree_regrow: Array = []
 # 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
 var player_name := ""
 
-# 마을 발전: 처음 마을에는 건물이 하나도 없다.
-# 이장에게 이야기해 재료를 모으면 빈 부지에 건물이 하나씩 세워진다.
-# (건물 id는 main.gd의 VILLAGE_PLOTS 키)
-# 마을은 처음부터 다 세워져 있다. (건물 목록은 main.VILLAGE_PLOTS와 같아야 한다)
+# 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
+# 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
+# 재료를 모아 하나씩 세운다. (건물 id는 main.gd의 VILLAGE_PLOTS 키)
 const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
 	"library", "fish"]
-var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
+var village_built: Array = []
+
+# 메인 스토리 2에서 짓는 첫 상점의 재료 (main.VILLAGE_BUILD_COST.general과 같게)
+const SHOP_BUILD_WOOD := 30
+const SHOP_BUILD_STONE := 20
+
+# 메인 스토리 2 진행 — 집 인사 후 이 순서로 이어진다:
+#   shop: 재료를 모아 상점 짓기 / fisher: 낚시꾼 퀘스트(fisher_quest가 세부) /
+#   farm_talk: 이장에게 가 호미 받기 / farm: 밭 갈기(STORY2_FLAGS) / done: 완료
+var story2_phase := ""
+
+
+func story2_objective_short() -> String:
+	match story2_phase:
+		"shop":
+			return "재료를 모아 상점을 짓자 (목재 %d·돌 %d) — 광장 북쪽 상점 터 게시판 E" \
+				% [SHOP_BUILD_WOOD, SHOP_BUILD_STONE]
+		"farm_talk":
+			return "이장에게 가 보자 (E)"
+	return ""
+
+# 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
+# 남쪽 바위 능선을 뚫어 바다·해변을 열고, 간이낚싯대(낚시)를 얻는다.
+#   "": 아직 (첫 수확 뒤 시작) / meet: 광장의 낚시꾼에게 말 걸기 /
+#   follow: 함께 능선으로 / open: 길목 바위 캐기 / done: 완료
+var fisher_quest := ""
+var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
+var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
+
+
+# 해변 채집 능력치 — 조개가 다시 밀려오는 간격(게임 분)과 한 번에 줍는 양.
+# 기본은 10~15분에 하나. 레벨이 오르면 리젠이 빨라지고, 3레벨마다 +1개.
+func shell_respawn_minutes() -> float:
+	return randf_range(10.0, 15.0) / (1.0 + 0.08 * (skill_lv("beach") - 1))
+
+
+func beach_pick_count() -> int:
+	return 1 + int((skill_lv("beach") - 1) / 3.0)   # 4 · 7 · 10레벨에 +1
+
+
+func fisher_objective_short() -> String:
+	match fisher_quest:
+		"meet":
+			return "마을 광장의 낚시꾼에게 말을 걸어 보자 (E)"
+		"follow":
+			return "낚시꾼과 함께 남쪽 바위 능선으로 가자 (화살표 방향)"
+		"open":
+			return "곡괭이로 길목의 커다란 바위를 캐서 바닷길을 열자"
+	return ""
+
 
 # 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
 var house_lv := 0
@@ -692,6 +741,9 @@ const DESK_UPGRADES := [
 ]
 # 만들 수 있는 것 — kind "bed"는 완성되는 순간 침대가 바뀐다
 const DESK_RECIPES := {
+	"broom": {"name": "빗자루", "cost": {"weed": 5, "wood": 3},
+		"kind": "item", "give": "broom", "locked": true,
+		"desc": "집 안의 먼지를 쓸어 낸다 (레시피는 잡화점에서)"},
 	"bed_wood": {"name": "나무 침대", "cost": {"wood": 25, "nail": 2},
 		"kind": "bed", "lv": 1, "desc": "아침 기력이 가득 찬다"},
 	"bed_soft": {"name": "푹신한 침대", "cost": {"wood": 30, "cloth": 5, "milk": 3},
@@ -700,6 +752,11 @@ const DESK_RECIPES := {
 const BED_NAMES := ["낡은 침대", "나무 침대", "푹신한 침대"]
 var desk_lv := 0
 var bed_lv := 0
+# 집 청소 — 조리대는 먼지와 잡동사니에 묻혀 있다. 빗자루로 세 번 쓸면
+# 나타나고, 그때부터 요리를 할 수 있다 (요리 해금).
+const DUST_TOTAL := 3
+var dust_swept := 0
+var kitchen_found := false
 var desk_queue: Array = []        # [{id, left(초)}]
 var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
 
@@ -749,6 +806,9 @@ func desk_start(id: String) -> bool:
 	if not DESK_RECIPES.has(id) or desk_queue.size() >= desk_slots():
 		return false
 	var def: Dictionary = DESK_RECIPES[id]
+	# 레시피를 상점에서 사기 전에는 못 만든다 (기본 컨셉 1과 같은 결)
+	if bool(def.get("locked", false)) and id not in recipes_unlocked:
+		return false
 	# 침대는 순서대로만 — 낡은 것에서 푹신한 것으로 건너뛸 수 없다
 	if str(def.kind) == "bed" and int(def.lv) != bed_lv + 1:
 		return false
@@ -773,6 +833,10 @@ func desk_tick(delta: float) -> void:
 		if str(def.kind) == "bed":
 			bed_lv = maxi(bed_lv, int(def.lv))
 			has_bed = true
+		elif str(def.kind) == "item":
+			var give := str(def.give)
+			items[give] = int(items.get(give, 0)) + 1
+			discover(give)
 		discover(str(job.id))
 		desk_done_pending.append(str(def.name))
 	desk_queue = still
@@ -861,11 +925,16 @@ const STORY1_QUESTS := [
 		"task": "우체부 아저씨와 함께 마을 방향으로 가자 (화살표 방향)",
 		"story": "바위를 치워 마침내 길이 열렸다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
-		"task": "마을 이장을 찾아가자",
-		"story": "드디어 마을이 보인다. 우체부 아저씨가 이장님께 편지를 전하면 긴 여정이 끝난다."},
+		"task": "마을 이장을 찾아가 편지를 전하자 (E)",
+		"story": "마을 어귀에서 우체부 아저씨가 작별 인사를 하며 편지를 맡겼다. 이장님을 찾아 편지를 전하면 긴 여정이 끝난다."},
+	{"name": "새 보금자리",
+		"task": "이장님이 내어 준 집(마을 서쪽)에 들어가 보자 (문 앞 E)",
+		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
 ]
+# 단계 -> 지금 진행 중인 퀘스트 번호. home_open: 편지는 전했고, 집에 들어가면
+# 메인 스토리 1이 끝난다. greet(집 안, 표에 없음)는 전부 완료로 본다.
 const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3,
-	"path": 4, "map": 5, "rock": 6, "travel": 7}
+	"path": 4, "map": 5, "rock": 6, "travel": 7, "deliver": 8, "home_open": 9}
 
 
 func story_current_quest() -> Dictionary:
@@ -900,6 +969,12 @@ func story_objective_short() -> String:
 					return "우체부 아저씨에게 말을 걸어보자"
 		"travel":
 			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
+		"deliver":
+			return "이장님을 찾아가 편지를 전하자 (화살표 방향, E)"
+		"home_open":
+			return "이장님이 내어 준 집에 들어가 보자 (마을 서쪽, 화살표 방향)"
+		"greet":
+			return "집을 둘러보고 밖으로 나가 보자 (아랫문)"
 	return ""
 
 
@@ -1076,6 +1151,11 @@ const ITEMS := {
 	"dish_butter_corn": {"name": "버터옥수수", "sell": 260},
 	# 채집물/곤충
 	"forage_berry": {"name": "산딸기", "sell": 40},
+	"weed": {"name": "잡초", "sell": 5},
+	"broom": {"name": "빗자루", "sell": 0},
+	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
+	"forage_shell": {"name": "조개", "sell": 35},
+	"forage_coral": {"name": "산호", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
 	"bug_dragonfly": {"name": "잠자리", "sell": 50},
@@ -1117,13 +1197,15 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
-	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
+	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
+	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
 	"potion_guard", "potion_moon", "sludge"]
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
-const FORAGE_IDS := ["forage_berry", "forage_herb"]
+const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
+	"forage_shell", "forage_coral"]   # 잡초는 화분 재료 · 조개/산호는 해변(바다 해금 후)
 const BUG_IDS := ["bug_butterfly", "bug_dragonfly", "bug_firefly"]
 # 곤충 출현 조건
 const BUGS := {
@@ -1297,6 +1379,8 @@ const REAGENTS := {
 	# 채집물 · 곤충
 	"forage_berry": {"life": 1, "water": 1},
 	"forage_herb": {"life": 2, "earth": 1},
+	"forage_shell": {"water": 2},
+	"forage_coral": {"water": 2, "life": 1},
 	"bug_butterfly": {"light": 1, "life": 1},
 	"bug_dragonfly": {"light": 1, "water": 1},
 	"bug_firefly": {"light": 2, "life": 1},
@@ -1930,7 +2014,7 @@ const NPCS := {
 	"married": ["아침에 국 끓여 놨어. 식기 전에 먹어.",
 		"오늘은 일찍 접고 왔어. 집에 오고 싶어서."],
 	"loves": ["fish_golden", "dish_sashimi", "dish_grilled_fish", "fish_king"],
-	"likes": ["fish_carp", "fish_catfish", "dish_stew", "forage_herb"],
+	"likes": ["fish_carp", "fish_catfish", "dish_stew", "forage_herb", "forage_shell"],
 	"hates": ["sludge", "dish_jam"],
 	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
 	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
@@ -2126,34 +2210,37 @@ func npc_line(npc_id: String) -> String:
 var quest := {}
 
 # ---- 튜토리얼 / 도구 해금 ----
+#
+# 두 갈래로 나뉜다:
+#   · 앞 네 개(till~harvest)는 **메인 스토리 2** — 이장에게 호미를 받고
+#     밭을 일구는 본 줄기다.
+#   · 나머지는 **마을 생활 안내** — 선택 서브퀘스트. 안 해도 메인은
+#     진행되고, 도구도 안내에 묶여 잠기지 않는다.
 # 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
+const STORY2_FLAGS := ["till", "plant", "water", "harvest"]
 const TUTORIAL_ORDER := [
-	["moved", "방향키/WASD로 움직여보자"],
-	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
-	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
-	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
 	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
+	["moved", "방향키/WASD로 움직여보자"],
+	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
+	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
+	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
-	["home", "목재를 모았으니 집터(마을 서쪽)에 집을 짓자"],
-	["bed", "집 안에서 침대를 만들자"],
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
 	["build", "울타리나 스프링클러를 설치해보자"],
 	["fish", "마을 남쪽 낚시터(부두)에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
-# 목표 달성 시 해금되는 도구
-# 목표를 달성하면 다음 단계에서 쓸 도구가 열린다 (순서와 어긋나지 않게)
+# 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
+# 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 전부 열린다
+# (마을 생활 안내는 선택이므로 도구를 잠그지 않는다)
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"harvest": ["axe"],
-	"slept": ["pickaxe"],
-	"mine": ["fence", "sprinkler"],
-	"build": ["rod"],
+	"harvest": ["axe", "pickaxe", "fence", "sprinkler", "rod"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
 const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
@@ -2169,8 +2256,6 @@ const TUTORIAL_REWARDS := {
 	"water": {"money": 100},
 	"harvest": {"money": 100},
 	"chop": {"wood": 5},
-	"home": {"money": 200},
-	"bed": {"seeds": {"carrot": 2}},
 	"slept": {"money": 150},
 	"mine": {"stone": 5},
 	"build": {"money": 150},
@@ -2221,7 +2306,7 @@ const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
 	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
-	"home": "집 짓기 (집터 E)", "bed": "침대 만들기", "slept": "침대에서 자기",
+	"slept": "침대에서 자기",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
 	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
 }
@@ -2526,7 +2611,7 @@ func _init() -> void:
 		items[id] = 0
 	seeds["potato"] = 5
 	_reset_skills()
-	furniture = default_furniture()
+	furniture = []   # 처음 집엔 세간이 없다 — 집을 확장하면 기본 가구가 생긴다
 
 
 func reset_daily() -> void:
@@ -2585,6 +2670,13 @@ func reset_all() -> void:
 	bed_lv = 0
 	desk_queue.clear()
 	desk_done_pending.clear()
+	dust_swept = 0
+	kitchen_found = false
+	fisher_quest = ""
+	fisher_choice = 0
+	sea_open = false
+	story2_phase = ""
+	village_built = []
 	if DEV_MODE:
 		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
 		wood = DEV_STOCK
@@ -2595,7 +2687,7 @@ func reset_all() -> void:
 		for id in ITEM_IDS:
 			items[id] = DEV_STOCK
 	_reset_skills()
-	furniture = default_furniture()
+	furniture = []   # 처음 집엔 세간이 없다 — 집을 확장하면 기본 가구가 생긴다
 	tutorial = fresh_tutorial()
 	grandpa_step = 0
 	grandpa_seen = false
@@ -2901,6 +2993,9 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"house_lv": house_lv,
 		"has_bed": has_bed,
 		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
+		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
+		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
+		"sea_open": sea_open, "story2_phase": story2_phase,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

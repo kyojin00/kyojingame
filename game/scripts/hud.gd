@@ -407,10 +407,19 @@ func refresh(force := false) -> void:
 	var track := []
 	var story_obj := GameData.story_objective_short()
 	var obj := GameData.tutorial_objective_short()
+	var story2_obj := GameData.story2_objective_short()
+	var fisher_obj := GameData.fisher_objective_short()
 	if story_obj != "":
 		track.append("목표: " + story_obj)
+	elif story2_obj != "":
+		track.append("목표: " + story2_obj)
+	elif fisher_obj != "":
+		track.append("목표: " + fisher_obj)
 	elif obj != "":
-		track.append("목표: " + obj)
+		# 밭 갈기(메인 스토리 2)는 「목표」, 마을 생활 안내는 「안내(선택)」
+		var flag := GameData.tutorial_current_flag()
+		track.append(("목표: " if flag in GameData.STORY2_FLAGS
+			else "안내(선택): ") + obj)
 	else:
 		# 기본 안내가 끝나면 할아버지의 부탁이 그 자리를 잇는다
 		var gl := GameData.grandpa_line()

@@ -253,6 +253,10 @@ func use_tool() -> void:
 				if bool(obj.get("young", false)):
 					m.hud.show_message("아직 어린 나무다. 다 자라면 벨 수 있다.")
 					return
+				if bool(obj.get("fixed", false)):
+					# 마을 초입 가리개 숲 — 베어서 뚫을 수 없다 (길은 하나뿐)
+					m.hud.show_message("나무가 너무 우거져 벨 엄두가 나지 않는다.")
+					return
 				obj.hp -= int(GameData.tool_stat("axe", "power"))
 				Sound.play_sfx("sfx_chop", 0.15)
 				var felled: bool = obj.hp <= 0
@@ -335,7 +339,10 @@ func use_tool() -> void:
 				else:
 					m.hud.show_message("돌을 내리쳤다. (%d/%d)" % [m.ROCK_HP - obj.hp, m.ROCK_HP])
 			elif obj.kind == "bigrock":
-				# 퀘스트 5: 길을 막은 커다란 바위 (여러 번 캐야 부서진다)
+				# 길목의 바위 (스토리 1 바위 / 바닷길 바위 — 여러 번 캐야 부서진다)
+				if bool(obj.get("fixed", false)) and GameData.fisher_quest != "open":
+					m.hud.show_message("바위가 어찌나 단단한지 곡괭이가 튕겨 나온다. 지금은 캘 도리가 없다.")
+					return
 				obj.hp -= 1
 				Sound.play_sfx("sfx_pick", 0.15)
 				swing_at(t, "stone", true)
@@ -347,6 +354,7 @@ func use_tool() -> void:
 					m.doing._maybe_drop_recipe("bigrock")
 					gain_skill("mine", 4.0)
 					m.story._story_rock_mined()
+					m.story._sea_gate_mined()
 				else:
 					m.hud.show_message("커다란 바위를 내리쳤다. (%d/%d)" %
 						[m.BIGROCK_HP - obj.hp, m.BIGROCK_HP])

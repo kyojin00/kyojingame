@@ -166,6 +166,10 @@ func _draw_overlay() -> void:
 	# 말을 걸어 달라는 표시: 머리 위에서 통통 튀는 느낌표
 	if m.story._postman != null and m.story._postman_state == "wait" and not m.ui_open():
 		_draw_bang(m.story._postman.position + Vector2(0, -136))
+	if GameData.fisher_quest == "meet" and not m.ui_open():
+		var fn: Variant = m.story._fisher_node()
+		if fn != null and fn.visible:
+			_draw_bang(fn.position + Vector2(0, -124))
 
 	for pt in m.particles:
 		var s: float = float(pt.size)
@@ -290,11 +294,37 @@ func nav_target() -> Variant:
 		var chief: Node2D = m.story._story_chief()
 		if chief != null:
 			return chief.position
+	if GameData.story_phase == "deliver":
+		# 이장을 찾아가 편지를 전하자
+		var chief2: Node2D = m.story._story_chief()
+		if chief2 != null:
+			return chief2.position
+	if GameData.story_phase == "home_open":
+		# 이장이 내어 준 집 문 앞으로 안내
+		return Vector2(m.HOME_ANCHOR.x * m.TILE + 2 * m.TILE + 16,
+			(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
 	if GameData.story_phase != "done":
 		return null  # 숲 구간에서는 화살표를 띄우지 않는다
+	# 낚시꾼 퀘스트: 낚시꾼 -> 남쪽 능선 길목
+	match GameData.fisher_quest:
+		"meet":
+			var fn: Variant = m.story._fisher_node()
+			if fn != null:
+				return fn.position
+		"follow", "open":
+			return Vector2(m.SEA_GATE[0].x * m.TILE + 32.0,
+				m.SEA_GATE[0].y * m.TILE - 16.0)
+	# 메인 스토리 2: 상점 터 / 호미를 주려는 이장
+	if GameData.story2_phase == "shop":
+		var gd: Vector2i = m.door_tile(m.VILLAGE_PLOTS["general"].anchor)
+		return Vector2(gd.x * m.TILE + 16, gd.y * m.TILE + 16)
+	if GameData.story2_phase == "farm_talk":
+		var chief3: Node2D = m.story._story_chief()
+		if chief3 != null:
+			return chief3.position
 	match GameData.tutorial_current_flag():
-		"home", "bed", "slept":
-			# 우리집(마을 서쪽) 문 앞 — 아직 안 지었으면 집터로 안내한다
+		"slept":
+			# 우리집(마을 서쪽) 문 앞
 			return Vector2(m.HOME_ANCHOR.x * m.TILE + 2 * m.TILE + 16,
 				(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
 		"shop":

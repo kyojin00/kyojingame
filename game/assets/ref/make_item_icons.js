@@ -292,6 +292,16 @@ const ICONS = {
     px(c, 12, 3, C.white); px(c, 13, 4, C.white); return c; },
   dish_moon_tea:      () => cup(C.purple, C.ice),
   dish_feast:         () => tray(),
+  broom: () => {
+    const c = newCanvas();
+    for (let i = 0; i < 9; i++) px(c, 4 + i, 12 - i, C.brown);   // 자루
+    for (let i = 0; i < 9; i++) px(c, 5 + i, 12 - i, C.crust);
+    // 빗자루 머리 (잡초 다발)
+    for (let j = 0; j < 5; j++) for (let i = 0; i < 4 - (j > 2 ? 1 : 0); i++)
+      px(c, 2 + i + (j >> 1), 10 + j, j < 2 ? C.gold : C.gold2);
+    rect(c, 3, 10, 4, 1, C.brown2);                              // 묶은 끈
+    return c;
+  },
   nail: () => {
     const c = newCanvas();
     rect(c, 7, 3, 3, 2, C.grey);               // 머리

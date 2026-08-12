@@ -170,6 +170,7 @@ const TEXTURE_NAMES := [
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
+	"board_quest", "board_unlock", "bed_old",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
 	"house_library", "house_ranch", "house_fish",
@@ -201,7 +202,8 @@ const TEXTURE_NAMES := [
 	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
 	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
 	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
-	"forage_berry", "forage_herb", "bug_butterfly_0", "bug_butterfly_1",
+	"weed_plant",
+	"bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
@@ -280,6 +282,13 @@ const FISH_DECK_X0 := 71                   # 강 첫 줄(y=27)에 깔리는 데�
 const FISH_DECK_X1 := 94
 const FISH_PIERS := [Vector2i(72, 73), Vector2i(80, 81), Vector2i(88, 89)]  # 물로 내민 부두 (x 구간)
 const FISH_SIGN := Vector2i(70, 38)
+# 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
+const SEA_RIDGE_Y := 77            # 바위 능선 줄 — 바다로 가는 길을 막는다
+const BEACH_Y0 := 78               # 모래사장 (능선 아래 ~ 바다 위)
+const SEA_Y0 := 83                 # 여기부터 남쪽 끝까지 바다
+const SEA_GATE := [Vector2i(63, 77), Vector2i(64, 77)]  # 곡괭이로 캐서 여는 길목
+const FISHER_ARRIVE := Vector2i(78, 23)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
+const SHELL_CAP := 8               # 해변 채집물(조개/산호) 최대 수
 const FISH_LAMPS := [Vector2i(72, 37), Vector2i(79, 37), Vector2i(86, 37), Vector2i(93, 37)]
 const FISH_BENCHES := [Vector2i(75, 38), Vector2i(83, 38), Vector2i(91, 38)]
 const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있다」
@@ -320,7 +329,8 @@ const YARD_PAD := 1
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
-	"post": [30, 10], "general": [50, 20], "smith": [60, 50],
+	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
+	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
 	"ranch": [80, 40], "fish": [100, 60],
 }
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
@@ -506,6 +516,8 @@ func _ready() -> void:
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
 		GameData.story_phase = "done"
+		GameData.story2_phase = "done"
+		GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 		GameData.unlock_all_tools()
 		player.position = Vector2((START_TILE.x + multiplayer.get_unique_id() % 3 + 1) * TILE + 16,
 			START_TILE.y * TILE + 16)
@@ -531,6 +543,11 @@ func _ready() -> void:
 			story_cutscene = false
 			story._postman_state = "follow"
 			story._postman.position = player.position + Vector2(-42, 6)
+		elif GameData.story_phase == "greet":
+			# 집에 들어간 직후 저장했다면, 나온 셈 치고 이장이 다가온다
+			story.start_home_greet.call_deferred()
+		if GameData.fisher_quest in ["meet", "follow", "open"]:
+			story._restore_fisher.call_deferred()   # 낚시꾼 연출 자리 복구
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		GameData.reset_all()
@@ -554,9 +571,12 @@ func _ready() -> void:
 			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
+			GameData.story2_phase = "done"
+			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용
 			GameData.has_bed = true
+			GameData.furniture = GameData.default_furniture()  # 넓은 방 캡처용 세간
 			for cy in range(0, MAP_H / GameData.EXPLORE_CHUNK + 1):
 				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
 					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
@@ -610,19 +630,6 @@ func _load_textures() -> void:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
 	for id: String in GameData.CROP_IDS:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
-	# 휘두르기 도트는 **있으면 쓴다**. 아직 안 뽑았으면 없는 채로 둔다 —
-	# player.gd가 몸통을 굽혀 대신한다. TEXTURE_NAMES에 넣으면 없을 때 터지므로
-	# 여기서만 따로 챙긴다. 그림을 sprites/에 떨어뜨리면 그날부터 켜진다.
-	# (뽑는 법은 assets/ref/new_boy/make_sprites.js 위쪽 주석)
-	for g: String in ["new_boy", "player_f"]:
-		for d: String in ["down", "up", "side"]:
-			for i in 3:
-				var sn := "%s_%s_swing_%d" % [g, d, i]
-				var sp := "res://assets/sprites/%s.png" % sn
-				if ResourceLoader.exists(sp):
-					tex[sn] = load(sp)
-
-
 # 맵 밖 배경 색조 (어두운 숲처럼 보이게)
 const OUT_TINT := Color(0.42, 0.47, 0.42)
 const OUT_TREE_TINT := Color(0.34, 0.4, 0.35)
@@ -675,7 +682,8 @@ const BUILDING_KINDS := ["house", "art_block", "barn", "barn_block"]
 const OBJECT_SCALES := {
 	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
 	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
-	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5,
+	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
+	"forage_shell": 1.2, "forage_coral": 1.3,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
@@ -707,6 +715,7 @@ const OBJECT_PAD := {
 	# 세로 여백(pad.y)은 12를 넘기면 안 된다 — 같은 줄로 늘어선 것들 사이의
 	# 한 칸 틈이 막힌다 (퀘스트 5의 바위벽. BIGROCK_GAP_OK가 잡아낸다)
 	"tree": Vector2(13, 9), "bigrock": Vector2(26, 8), "rock": Vector2(13, 9),
+	"searock": Vector2(10, 8),
 	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
@@ -835,7 +844,8 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 
 # 채집·벌목·채광 대상이 되는 것들
-const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
+const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
+	"forage_shell", "forage_coral"]
 
 # E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
 const WORK_LOCK_TIME := 0.9
@@ -921,6 +931,7 @@ var _last_explore_tile := Vector2i(-999, -999)
 # ---- 밤 몬스터: 지네 (21시 이후 야외에서 등장, 아침에 사라진다) ----
 # 밤늦게까지 밖에서 채집하는 것이 위험해지도록 만드는 요소.
 
+var _shell_cd := 0.0        # 다음 조개가 밀려올 때까지 남은 게임 분
 var night_mobs: Array = []  # [{node, spr, anim}]
 var _mob_hit_cd := 0.0
 var _mob_spawn_cd := 0.0
@@ -1024,6 +1035,7 @@ var bugs: Array = []
 func _process(delta: float) -> void:
 	_bgm_tick(delta)
 	story._story_update(delta)
+	story._fisher_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_tree_fall(delta)
@@ -1047,6 +1059,12 @@ func _process(delta: float) -> void:
 		if _growth_timer >= 0.7:
 			farming._growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
+		# 해변: 게임 시간 10~15분마다 조개가 하나씩 밀려온다 (상한에서 멈춘다)
+		if GameData.sea_open and not Net.is_guest():
+			_shell_cd -= delta * MIN_PER_SEC
+			if _shell_cd <= 0.0:
+				_shell_cd = GameData.shell_respawn_minutes()
+				worldgen._tick_beach()
 		actions._update_mouse_target()
 		fishing._update_fishing(delta)
 		if player_tile() != _last_explore_tile:
@@ -1143,6 +1161,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			map_ui.close()
 		elif event.is_action_pressed("open_inventory") and inventory_ui.visible:
 			inventory_ui.close()
+		elif (event.is_action_pressed("open_inventory")
+				or event.is_action_pressed("open_quest")
+				or event.is_action_pressed("open_note")) \
+				and (interior.visible or cave.visible
+				or (shop_room != null and shop_room.visible)) and not (dialog.visible
+				or shop.visible or cooking_ui.visible or alchemy_ui.visible or desk_ui.visible
+				or quest_ui.visible or note_ui.visible or stats_ui.visible or map_ui.visible
+				or sleep_dialog.visible or summary.visible or story_cutscene):
+			# 집/동굴/가게 안에서도 가방·퀘스트·연구노트는 열려야 한다
+			Sound.play_sfx("sfx_ui")
+			if event.is_action_pressed("open_inventory"):
+				inventory_ui.toggle()
+			elif event.is_action_pressed("open_quest"):
+				quest_ui.toggle()
+			else:
+				note_ui.toggle()
 		elif event.is_action_pressed("open_quest") and quest_ui.visible:
 			quest_ui.close()
 		elif event.is_action_pressed("open_note") and note_ui.visible:
@@ -1321,6 +1355,7 @@ func _draw() -> void:
 	var edges := {}
 	var crops := {}
 	var docks: Array[Vector2] = []
+	var sands: Array[Vector2] = []
 
 	var put := func(bin: Dictionary, t: Texture2D, at: Vector2) -> void:
 		if not bin.has(t):
@@ -1349,6 +1384,8 @@ func _draw() -> void:
 			var ground: String = cell.ground
 			if ground == "dock":
 				docks.append(at)
+			elif ground == "sand":
+				sands.append(at)
 			elif ground == "water":
 				put.call(base, tex["water_%d" % water_frame], at)
 			elif ground == "soil":
@@ -1386,6 +1423,22 @@ func _draw() -> void:
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)
+	# 해변 모래밭 — 옅은 모래 바탕에 알갱이를 점점이 뿌린다
+	if not sands.is_empty():
+		for at: Vector2 in sands:
+			draw_rect(Rect2(at, tile_size), Color(0.87, 0.79, 0.57))
+		for at: Vector2 in sands:
+			var gx := int(at.x / TILE)
+			var gy := int(at.y / TILE)
+			for i in 3:
+				var hx := _hash01(gx * 7 + i * 13, gy * 11 + i * 5)
+				var hy := _hash01(gx * 5 + i * 3, gy * 13 + i * 7)
+				draw_rect(Rect2(at + Vector2(hx * 28.0 + 2.0, hy * 28.0 + 2.0),
+					Vector2(2, 2)), Color(0.76, 0.66, 0.44, 0.85))
+			# 바다와 닿는 줄에는 물거품 띠
+			if gy + 1 < MAP_H and grid[gy + 1][gx].ground == "water":
+				draw_rect(Rect2(at + Vector2(0, TILE - 3), Vector2(TILE, 3)),
+					Color(0.95, 0.97, 0.98, 0.75))
 	# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
 	if not docks.is_empty():
 		var wt: Texture2D = tex["water_%d" % water_frame]

@@ -207,6 +207,8 @@ func _draw_map() -> void:
 			var c: Color
 			if cell.ground == "water":
 				c = Color(0.26, 0.45, 0.68)
+			elif cell.ground == "sand":
+				c = Color(0.85, 0.77, 0.55)
 			elif cell.ground == "dock":
 				c = Color(0.55, 0.38, 0.22)
 			elif cell.ground == "path":

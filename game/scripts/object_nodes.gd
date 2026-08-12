@@ -70,12 +70,26 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["rock"]
 		"bigrock":
 			texture = m.tex["rock"]  # 같은 바위 그림을 크게 그린다 (퀘스트 5)
+		"searock":
+			texture = m.tex["rock"]  # 남쪽 바위 능선 — 캘 수 없는 바위 벽
 		"housesite":
-			texture = m.tex["sign"]  # 집터 표지판
+			# 집터·구역 해금 게시판 — 지붕 얹은 파란 현판 (의뢰 게시판과 다르다)
+			texture = m.tex["board_unlock"]
+			offset = Vector2(0, -texture.get_height())
+		"plotsite":
+			# 상점 터 게시판 — 구역 해금 게시판과 같은 모습
+			texture = m.tex["board_unlock"]
+			offset = Vector2(0, -texture.get_height())
 		"board":
-			texture = m.tex["board"]
+			# 의뢰 게시판 — 다리 둘 달린 큰 코르크 게시판
+			texture = m.tex["board_quest"]
+			offset = Vector2(0, -texture.get_height())
 		"sign":
-			texture = m.tex["sign"]
+			if pos == m.GREENHOUSE_SIGN:
+				texture = m.tex["board_unlock"]  # 온실 터도 「구역 해금」 게시판
+				offset = Vector2(0, -texture.get_height())
+			else:
+				texture = m.tex["sign"]
 		"cave":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
@@ -87,6 +101,13 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["forage_berry"]
 		"forage_herb":
 			texture = m.tex["forage_herb"]
+		"forage_shell":
+			texture = m.tex["forage_shell"]
+		"forage_coral":
+			texture = m.tex["forage_coral"]
+		"weed":
+			# 서 있을 때는 풀숲, 주우면 묶음(weed)이 인벤토리에 들어간다
+			texture = m.tex["weed_plant"]
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
@@ -117,6 +138,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	elif kind == "rock":
 		# 큰 돌과 작은 돌이 섞이도록
 		sc *= 0.65 + m._hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
+	elif kind == "searock":
+		# 능선 바위도 크기를 조금씩 다르게 — 벽이 자로 잰 듯 보이지 않게
+		sc *= 0.85 + m._hash01(pos.x * 7 + 2, pos.y * 3 + 8) * 0.3
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
 		if kind == "tree":
