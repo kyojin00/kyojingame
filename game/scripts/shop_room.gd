@@ -130,7 +130,10 @@ func open(id: String) -> void:
 	pdir = "up"
 	moving = false
 	Sound.play_sfx("sfx_place")
-	main.hud.show_message("%s — 계산대 앞에서 E" % ROOMS[id].name, 3.0)
+	if id == "general":
+		main.hud.show_message("선반 앞에서 E: 구매 · 계산대(민지)에서 E: 판매", 4.0)
+	else:
+		main.hud.show_message("%s — 계산대 앞에서 E" % ROOMS[id].name, 3.0)
 	canvas.queue_redraw()
 
 
@@ -284,13 +287,15 @@ func _draw_room() -> void:
 			wall.darkened(0.4))
 
 	# 가운데 간판 (주인은 그 아래 계산대 뒤에 선다)
-	var sign_rect := Rect2(360, 88, 240, 48)
-	canvas.draw_rect(sign_rect.grow(3), Color(0.16, 0.11, 0.07))
-	canvas.draw_rect(sign_rect, wall.darkened(0.42))
-	canvas.draw_rect(sign_rect.grow(-5), wall.lightened(0.22))
-	var tw: float = f.get_string_size(str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-	canvas.draw_string(f, Vector2(sign_rect.get_center().x - tw / 2.0, 122),
-		str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
+	# 잡화점(마트)은 간판을 뗐다 — 선반 팻말이 그 역할을 한다
+	if room_id != "general":
+		var sign_rect := Rect2(360, 88, 240, 48)
+		canvas.draw_rect(sign_rect.grow(3), Color(0.16, 0.11, 0.07))
+		canvas.draw_rect(sign_rect, wall.darkened(0.42))
+		canvas.draw_rect(sign_rect.grow(-5), wall.lightened(0.22))
+		var tw: float = f.get_string_size(str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+		canvas.draw_string(f, Vector2(sign_rect.get_center().x - tw / 2.0, 122),
+			str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
 
 	# ---- 바닥 ----
 	var floor_c: Color = d.floor
