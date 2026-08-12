@@ -101,7 +101,10 @@ func _debug_tick() -> void:
 		129: _send_key(KEY_F)                          # 꾸미기 모드
 		133: _save_shot("_deco.png")
 		134: _send_key(KEY_F)                          # 꾸미기 종료
-		136: m.interior.ppos = Vector2(645, 174)         # 조리대 앞으로
+		136:
+			m.interior.ppos = Vector2(645, 174)         # 조리대 앞으로
+			GameData.kitchen_found = true               # 주방 격자 캡처용 (청소는 382가 검사)
+			GameData.recipes_cooked["dish_soup"] = 1    # 컬러/회색 셀이 섞여 보이게
 		138: _send_key(KEY_E)                          # 주방 열기
 		142: _save_shot("_cook.png")
 		144:

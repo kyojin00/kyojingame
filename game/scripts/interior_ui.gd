@@ -73,6 +73,36 @@ func _ready() -> void:
 	player_sprite.scale = Vector2(0.5, 0.5)
 	add_child(player_sprite)
 
+	# 집 안에서 바로 여는 창 버튼 — 연구노트(N) · 퀘스트(Q)
+	var dock := HBoxContainer.new()
+	dock.position = Vector2(24, 14)
+	dock.add_theme_constant_override("separation", 8)
+	add_child(dock)
+	for pair in [["연구노트 (%s)" % GameData.key_label("open_note"),
+			func() -> void: main.note_ui.toggle()],
+			["퀘스트 (%s)" % GameData.key_label("open_quest"),
+			func() -> void: main.quest_ui.toggle()]]:
+		var b := Button.new()
+		b.text = str(pair[0])
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(0, 32)
+		var bs := StyleBoxFlat.new()
+		bs.bg_color = Color(0.24, 0.18, 0.12, 0.95)
+		bs.border_color = Color(0.62, 0.48, 0.28)
+		bs.set_border_width_all(2)
+		bs.set_corner_radius_all(4)
+		bs.set_content_margin_all(7)
+		var bs2: StyleBoxFlat = bs.duplicate()
+		bs2.border_color = Color(1, 0.84, 0.37)
+		b.add_theme_stylebox_override("normal", bs)
+		b.add_theme_stylebox_override("hover", bs2)
+		b.add_theme_stylebox_override("pressed", bs2)
+		b.add_theme_color_override("font_color", Color(0.95, 0.9, 0.78))
+		b.pressed.connect(func() -> void:
+			Sound.play_sfx("sfx_ui")
+			(pair[1] as Callable).call())
+		dock.add_child(b)
+
 
 func open() -> void:
 	visible = true
@@ -99,7 +129,7 @@ func close() -> void:
 func _process(delta: float) -> void:
 	if not visible or main.dialog.visible or main.sleep_dialog.visible \
 			or main.summary.visible or main.cooking_ui.visible or main.desk_ui.visible \
-			or main.inventory_ui.visible:
+			or main.inventory_ui.visible or main.quest_ui.visible or main.note_ui.visible:
 		moving = false
 		_update_sprite()
 		return

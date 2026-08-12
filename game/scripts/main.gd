@@ -1164,14 +1164,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			map_ui.close()
 		elif event.is_action_pressed("open_inventory") and inventory_ui.visible:
 			inventory_ui.close()
-		elif event.is_action_pressed("open_inventory") and (interior.visible or cave.visible
+		elif (event.is_action_pressed("open_inventory")
+				or event.is_action_pressed("open_quest")
+				or event.is_action_pressed("open_note")) \
+				and (interior.visible or cave.visible
 				or (shop_room != null and shop_room.visible)) and not (dialog.visible
 				or shop.visible or cooking_ui.visible or alchemy_ui.visible or desk_ui.visible
 				or quest_ui.visible or note_ui.visible or stats_ui.visible or map_ui.visible
 				or sleep_dialog.visible or summary.visible or story_cutscene):
-			# 집/동굴/가게 안에서도 가방은 열려야 한다 (다른 창이 겹칠 때만 막는다)
+			# 집/동굴/가게 안에서도 가방·퀘스트·연구노트는 열려야 한다
 			Sound.play_sfx("sfx_ui")
-			inventory_ui.toggle()
+			if event.is_action_pressed("open_inventory"):
+				inventory_ui.toggle()
+			elif event.is_action_pressed("open_quest"):
+				quest_ui.toggle()
+			else:
+				note_ui.toggle()
 		elif event.is_action_pressed("open_quest") and quest_ui.visible:
 			quest_ui.close()
 		elif event.is_action_pressed("open_note") and note_ui.visible:
