@@ -58,13 +58,15 @@ func _ready() -> void:
 	apply_settings()
 
 
-func play_sfx(name: String, pitch_jitter := 0.0) -> void:
+# pitch_base로 같은 소리를 굵게/가늘게 쓴다 — 도끼질(1.0)과 나무가 쓰러지며
+# 나는 「쿵」(0.55)은 같은 sfx_chop이지만 음높이만 다르다.
+func play_sfx(name: String, pitch_jitter := 0.0, pitch_base := 1.0) -> void:
 	if not streams.has(name):
 		return
 	var p: AudioStreamPlayer = sfx_pool[sfx_index]
 	sfx_index = (sfx_index + 1) % sfx_pool.size()
 	p.stream = streams[name]
-	p.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+	p.pitch_scale = maxf(0.05, pitch_base + randf_range(-pitch_jitter, pitch_jitter))
 	p.play()
 
 

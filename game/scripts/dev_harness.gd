@@ -4,14 +4,17 @@
 # 결과를 print로 뱉고, 스크린샷을 남긴다. 여기서 나오는 `*_OK=...` 줄이
 # 곧 이 게임의 회귀 테스트다.
 #
-#   KYOJIN_SHOT=<디렉터리>/ godot --path game        -> 51장 + 어서션
+#   KYOJIN_SHOT=<디렉터리>/ godot --path game        -> 54장 + 어서션
 #   KYOJIN_SHOT=<디렉터리>/ KYOJIN_STORY=1 godot ...  -> 스토리 9장
 #
 # **단계 번호는 match의 갈래다. 번호가 겹치면 뒤에 온 갈래는 죽은 코드가 된다.**
-# 새 단계를 넣기 전에 반드시 확인할 것:
+# 새 단계를 넣기 전에 반드시 확인할 것 (340·360은 _mp_tick과 겹치는 것이라 정상):
 #
-#   grep -n "^\t\t[0-9]\+:" scripts/dev_harness.gd \
-#     | sed 's/:\t\t/ /' | awk '{print $2}' | tr -d ':' | sort -n | uniq -d
+#   grep -oP "^\t\t\K[0-9]+(?=:)" scripts/dev_harness.gd | sort -n | uniq -d
+#
+# **화면을 찍는 단계는 389보다 앞 번호를 쓸 것.** 389의 성능 측정이
+# `m._process`를 스무 번 돌려 _shot_frames를 그만큼 미는데, 그 사이에는
+# 프레임이 그려지지 않아 390~409는 같은 화면만 찍는다.
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
 class_name KyojinHarness
@@ -19,6 +22,7 @@ extends Node
 
 var m: KyojinMain    # main.gd
 var _shot_frames := 0
+var _saved_pos := Vector2.ZERO   # 화면용으로 잠깐 옮겨 둔 플레이어 자리
 
 
 # ---- 검증 시퀀스 ----
@@ -656,6 +660,99 @@ func _debug_tick() -> void:
 				" 위치=", m.player.tool_sprite.position.round(),
 				" 몸 기울기=", "%.2f" % m.player.sprite.rotation)
 			_save_shot("_swing.png")
+		341:
+			# 나무 쓰러지는 모션.
+			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
+			# 순간(HIT_AT)부터 움직인다. 밑동을 축으로 반동 -> 가속 -> 착지.
+			var fd := Vector2i(24, 34)
+			for cy in range(fd.y - 4, fd.y + 5):
+				for cx in range(fd.x - 4, fd.x + 5):
+					m.objnode._remove_object(Vector2i(cx, cy))
+			m.objnode._clear_tree_falls()
+			_saved_pos = m.player.position
+			m.player.position = Vector2(fd.x * m.TILE + 16, fd.y * m.TILE + 16)
+			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
+			m.player.dir = "right"
+			m.toolwork.set_tool("axe")
+			var ft2 := fd + Vector2i(1, 0)
+			m.objects[ft2] = {"kind": "tree", "hp": 1}
+			m.objnode._spawn_object_node(ft2, "tree")
+			m.objnode._refresh_tree_sprite(ft2)
+			var fspr: Sprite2D = m.obj_nodes[ft2].get_child(0)
+			var wood0: int = GameData.wood
+			var parts0: int = m.particles.size()
+			m._pending_hits.clear()
+			m._target_override = ft2
+			m.toolwork.use_tool()                        # 마지막 한 방
+			m._target_override = Vector2i(-999, -999)
+			# 판정은 벌써 끝났는데 그림은 아직 서 있어야 한다
+			var fell_now: bool = not m.objects.has(ft2) \
+				and GameData.wood > wood0 and m._tree_falls.size() == 1
+			m.objnode._update_tree_fall(m.HIT_AT * 0.5)
+			print("FELL_START_OK=", fell_now and is_equal_approx(fspr.rotation, 0.0),
+				" 목재+", GameData.wood - wood0,
+				" 날 닿기 전 각=", "%.2f" % fspr.rotation)
+			# 날이 닿은 뒤: 반동으로 되젖혔다가 반대쪽으로 넘어간다
+			var lean := 0.0
+			for i in 50:
+				m.objnode._update_tree_fall(0.02)
+				lean = minf(lean, fspr.rotation)
+			var fall: Dictionary = m._tree_falls[0]
+			var pv: Vector2 = fall.pivot
+			var top0 := Vector2(m.TILE / 2.0, fspr.offset.y * fspr.scale.y)
+			var top_now: Vector2 = fspr.position + top0.rotated(fspr.rotation)
+			# 도끼질한 사람 반대쪽(오른쪽)으로 넘어간다 = 각도도 우듬지도 +쪽
+			print("FELL_DOWN_OK=", fspr.rotation > 1.4 and lean < -0.05
+					and top_now.x - top0.x > 100.0,
+				" 각=", "%.2f" % fspr.rotation, " 반동=", "%.2f" % lean,
+				" 우듬지 x이동=", int(top_now.x - top0.x))
+			# 밑동은 제자리에 붙어 있고, 착지에 흙먼지·잎이 인다
+			var pv_now: Vector2 = fspr.position + pv.rotated(fspr.rotation)
+			print("FELL_PIVOT_OK=", pv_now.distance_to(pv) < 0.5
+					and is_instance_valid(fall.stump) and m.particles.size() > parts0,
+				" 밑동 어긋남=", "%.2f" % pv_now.distance_to(pv),
+				" 그루터기=", is_instance_valid(fall.stump),
+				" 파편=", m.particles.size() - parts0)
+		342:
+			# 화면용: 세 그루를 각각 다른 박자로 세워 반동·기울기·착지를 한 컷에 담는다.
+			# 자세를 잡은 뒤 `wait`을 크게 줘서 그대로 얼려 둔다 — 안 그러면
+			# 찍을 때까지 흐른 프레임만큼 자세가 밀린다.
+			#
+			# ※ 389 이후 번호로는 화면을 찍을 수 없다. 389의 성능 측정 루프가
+			#    `m._process`를 스무 번 돌려 하네스를 그만큼 밀어 버리는데,
+			#    그 사이에는 프레임이 그려지지 않아 화면이 안 바뀐다.
+			m.dialog.close()
+			m.objnode._clear_tree_falls()
+			m.float_texts.clear()
+			m.particles.clear()
+			var fx := 21
+			var poses := [0.26, 0.48, 0.72]     # 반동 / 넘어가는 중 / 착지 직후
+			for i in poses.size():
+				var pt := Vector2i(fx + i * 4, 34)
+				for cy in range(pt.y - 4, pt.y + 4):
+					for cx in range(pt.x - 2, pt.x + 3):
+						m.objnode._remove_object(Vector2i(cx, cy))
+				# 잎이 붙은 채로 넘어가는 쪽을 찍는다 (도끼를 올리면 한 방에 이렇게 된다)
+				m.objects[pt] = {"kind": "tree", "hp": m.TREE_HP}
+				m.objnode._spawn_object_node(pt, "tree")
+				m.objnode._refresh_tree_sprite(pt)
+				m.objnode._fell_tree(pt, 1.0)
+				var f2: Dictionary = m._tree_falls[i]
+				f2.wait = 0.0
+				f2.t = float(poses[i])
+			m.player.position = Vector2((fx + 4) * m.TILE + 16, 37 * m.TILE + 16)
+			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
+			m.player.dir = "up"
+			m.objnode._update_tree_fall(0.0)   # 잡은 자세를 한 번 그린 뒤
+			for f3 in m._tree_falls:
+				f3.wait = 999.0                # 그대로 얼린다
+			m._cam_shake = 0.0                 # 착지 흔들림에 화면이 밀리지 않게
+		343:
+			_save_shot("_fell.png")
+			m.objnode._clear_tree_falls()
+			# 뒤 단계(말 사기)는 지금 서 있는 칸을 기준으로 삼는다 — 자리를 돌려준다
+			m.player.position = _saved_pos
+			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
 		367:
 			# 낚시: 귀한 물고기는 여러 번 맞혀야 하고, 두 번 놓치면 도망간다
 			var hooked := [0]

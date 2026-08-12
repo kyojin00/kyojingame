@@ -1015,6 +1015,7 @@ func _process(delta: float) -> void:
 	story._story_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
+	objnode._update_tree_fall(delta)
 	objnode._update_object_fade(delta)
 	if GameData.story_phase == "done":
 		story._grandpa_update(delta)
@@ -1207,27 +1208,43 @@ func _back_to_title() -> void:
 
 # ---- 파티클 ----
 
+# c=색 / n=개수 / up=처음 솟는 속도 / g=중력 / drift=좌우로 흩어지는 폭
+# size=한 알 크기(px) / life=수명 배수 / sway=팔랑거리는 폭 (0이면 안 흔들린다)
+# 뒤 넷은 없으면 기본값이다 (renderer.spawn_burst 참고).
 const PARTICLE_DEFS := {
-	"water": [Color(0.45, 0.65, 1.0), 8, -18.0, 40.0],
-	"sparkle": [Color(1.0, 0.85, 0.3), 10, -45.0, 25.0],
-	"wood": [Color(0.55, 0.38, 0.2), 7, -35.0, 70.0],
-	"stone": [Color(0.62, 0.62, 0.68), 7, -35.0, 70.0],
-	"seed": [Color(0.4, 0.75, 0.35), 6, -28.0, 50.0],
-	"dirt": [Color(0.52, 0.4, 0.26), 6, -25.0, 60.0],
+	"water": {"c": Color(0.45, 0.65, 1.0), "n": 8, "up": -18.0, "g": 40.0},
+	"sparkle": {"c": Color(1.0, 0.85, 0.3), "n": 10, "up": -45.0, "g": 25.0},
+	"wood": {"c": Color(0.55, 0.38, 0.2), "n": 7, "up": -35.0, "g": 70.0},
+	"stone": {"c": Color(0.62, 0.62, 0.68), "n": 7, "up": -35.0, "g": 70.0},
+	"seed": {"c": Color(0.4, 0.75, 0.35), "n": 6, "up": -28.0, "g": 50.0},
+	"dirt": {"c": Color(0.52, 0.4, 0.26), "n": 6, "up": -25.0, "g": 60.0},
+	# 나뭇잎: 도끼질마다 우듬지에서 떨어진다. 중력을 아주 낮게 주고 좌우로
+	# 팔랑거리게 해서, 흙먼지가 아니라 **잎**으로 읽히게 했다.
+	"leaf": {"c": Color(0.35, 0.6, 0.28), "n": 9, "up": -10.0, "g": 14.0,
+		"drift": 22.0, "size": 2.0, "life": 2.6, "sway": 26.0},
+	# 쓰러진 나무가 땅에 닿을 때 이는 흙먼지 (옆으로 낮게 퍼진다)
+	"dust": {"c": Color(0.74, 0.68, 0.54), "n": 14, "up": -12.0, "g": 18.0,
+		"drift": 34.0, "size": 2.0, "life": 1.6},
 }
 
 
 # ---- 캐기 모션 ----
 #
 # 판정은 예전 그대로 **즉시** 일어난다 (조작감을 건드리지 않는다).
-# 눈에 보이는 것만 뒤로 미룬다: 휘두르는 동작이 내려찍히는 순간(_HIT_AT)에
-# 파편이 튀고 대상이 흔들리도록 맞춰 둔 것이다.
+# 눈에 보이는 것만 뒤로 미룬다: 휘두르는 동작이 내려찍히는 순간(HIT_AT)에
+# 파편이 튀고, 그림이 손상 단계로 바뀌고, 나무가 쓰러지기 시작한다.
+#
+# 여기가 어긋나면 눈에 바로 띈다 — 예전에는 도끼가 아직 머리 위에 있는데
+# 나무가 먼저 사라졌다. 지금은 그림 쪽 일을 전부 `_pending_hits`에 실어
+# 보내서, 날이 나무에 박히는 그 프레임에 한꺼번에 터지게 했다.
 const SWING_TIME := 0.34        # 휘두르는 동작 길이
 const HIT_AT := 0.15            # 내려찍히는 순간 (동작 시작부터)
 const SHAKE_TIME := 0.22        # 맞은 오브젝트가 흔들리는 시간
+const HIT_SQUASH := 0.09        # 맞는 순간 그림이 눌리는 정도 (0.09 = 9%)
 
-var _pending_hits: Array = []   # {t, tile, particle, heavy}
-var _obj_shakes: Array = []     # {node, base, t, dir}
+var _pending_hits: Array = []   # {t, tile, particle, heavy, after}
+var _obj_shakes: Array = []     # {node, base, t, dir, spr, sc}
+var _tree_falls: Array = []     # 쓰러지는 중인 나무 (object_nodes.gd가 굴린다)
 var _cam_shake := 0.0
 var _cam_shake_amp := 0.0
 
