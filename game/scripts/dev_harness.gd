@@ -247,6 +247,7 @@ func _debug_tick() -> void:
 			GameData.wood = 500
 			GameData.stone = 500
 			GameData.items["ore"] = 100
+			GameData.discover("ore")   # 겪어 본 재료만 벼려 준다 (SHOP_GATE)
 			var made: bool = GameData.craft_gear("gear_sword_iron")
 			GameData.craft_gear("gear_vest_leather")
 			GameData.craft_gear("gear_charm_ember")
@@ -1060,9 +1061,14 @@ func _debug_tick() -> void:
 				" 잠겨있었다=", was_locked, " 5개로는안열림=", not before_full,
 				" 6개로열림=", unlocked, " 배너대기=", pending,
 				" 날짜=", GameData.discovered_on("pea"), " 중복차단=", again)
-			# ♥ 요리는 누구에게나 잘 통한다
-			print("HEART_GIFT_OK=", GameData.gift_value("blacksmith", "dish_omurice") == 22,
-				" 값=", GameData.gift_value("blacksmith", "dish_omurice"))
+			# 상점 해금: 재료를 겪기 전에는 대장간이 안 벼려 준다
+			GameData.owned_gear.erase("gear_sword_iron")
+			var gate_before := GameData.gear_known("gear_sword_iron")   # ore 미발견
+			var wood_open := GameData.gear_known("gear_sword_wood")     # tier1은 늘 열림
+			GameData.discover("ore")
+			var gate_after := GameData.gear_known("gear_sword_iron")
+			print("SHOP_GATE_OK=", not gate_before and wood_open and gate_after,
+				" 광석전=", gate_before, " 나무장비=", wood_open, " 광석후=", gate_after)
 			GameData.collection_pending.clear()
 		391:
 			# 표에 한 줄 넣고 아이콘이나 아이템 정의를 빠뜨리면 조용히 사라진다.

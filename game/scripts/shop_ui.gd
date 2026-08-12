@@ -364,12 +364,13 @@ func _rebuild() -> void:
 				str(pdef.passive), pb, pcost))
 	elif tab == "codex":
 		_note("— 물고기 도감 —")
-		for f in GameData.FISH:
-			var id: String = f[0]
+		for id: String in GameData.FISH_IDS:
 			var caught := int(GameData.fish_caught.get(id, 0))
 			if caught > 0:
+				var when := GameData.discovered_on(id)
 				items_box.add_child(_mk_row(id, str(GameData.ITEMS[id].name),
-					"%d마리 낚음 · %dG" % [caught, GameData.ITEMS[id].sell]))
+					"%d마리 낚음 · %dG%s" % [caught, GameData.ITEMS[id].sell,
+						("" if when == "" else " · 처음: " + when)]))
 			else:
 				items_box.add_child(_mk_row("", "???", "아직 낚지 못했다"))
 		_note("— 몬스터 도감 —")
@@ -406,6 +407,11 @@ func _rebuild() -> void:
 			for gid: String in GameData.GEAR_IDS:
 				var g: Dictionary = GameData.GEAR[gid]
 				if str(g.slot) != slot:
+					continue
+				# 재료를 겪어 보기 전에는 무쇠가 그림만 보여 준다 (기본 컨셉 1)
+				if not GameData.gear_known(gid):
+					items_box.add_child(_mk_row("", "???",
+						"「가져와 본 적 없는 재료는 벼릴 수 없네.」 — 새 재료를 구해 오자"))
 					continue
 				var sub: String = "%s · %s" % [GameData.gear_stat_text(gid), g.desc]
 				if GameData.owned_gear.has(gid):

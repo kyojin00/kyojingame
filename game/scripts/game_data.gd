@@ -453,8 +453,23 @@ func gear_cost_text(gid: String) -> String:
 	return " · ".join(parts)
 
 
+# 이 장비의 재료를 전부 겪어 봤는가 — 대장간은 「아는 재료」로만 벼려 준다.
+# 처음 보는 물건이 진열대에 있으면 발견의 재미가 사라진다 (기본 컨셉 1).
+# 목재·돌·돈은 늘 아는 것으로 친다. tier 1(나무 장비)은 언제나 열려 있다 —
+# 첫 장비까지 잠그면 동굴 첫 걸음이 막힌다.
+func gear_known(gid: String) -> bool:
+	if int(GEAR[gid].get("tier", 1)) <= 1:
+		return true
+	for k: String in GEAR[gid].cost:
+		if k in ["money", "wood", "stone"]:
+			continue
+		if not discovered.has(k):
+			return false
+	return true
+
+
 func can_craft_gear(gid: String) -> bool:
-	if not GEAR.has(gid) or owned_gear.has(gid):
+	if not GEAR.has(gid) or owned_gear.has(gid) or not gear_known(gid):
 		return false
 	var cost: Dictionary = GEAR[gid].cost
 	if money < int(cost.get("money", 0)):
@@ -915,13 +930,12 @@ const ITEMS := {
 	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 700},
 	"dish_moon_tea": {"name": "달빛차", "sell": 640},
 	"dish_feast": {"name": "한상차림", "sell": 1100},
-	# 컬렉션 보상으로 열리는 요리 — 전부 「마음이 담긴」 요리(♥)라
-	# 누구에게 선물해도 잘 통한다 (gift_value가 heart를 본다)
-	"butter": {"name": "버터", "sell": 180, "heart": true},
-	"dish_fried_egg": {"name": "계란후라이", "sell": 90, "heart": true},
-	"dish_egg_roll": {"name": "계란말이", "sell": 200, "heart": true},
-	"dish_omurice": {"name": "오므라이스", "sell": 380, "heart": true},
-	"dish_butter_corn": {"name": "버터옥수수", "sell": 260, "heart": true},
+	# 컬렉션 보상으로 열리는 요리 레시피
+	"butter": {"name": "버터", "sell": 180},
+	"dish_fried_egg": {"name": "계란후라이", "sell": 90},
+	"dish_egg_roll": {"name": "계란말이", "sell": 200},
+	"dish_omurice": {"name": "오므라이스", "sell": 380},
+	"dish_butter_corn": {"name": "버터옥수수", "sell": 260},
 	# 채집물/곤충
 	"forage_berry": {"name": "산딸기", "sell": 40},
 	"forage_herb": {"name": "약초", "sell": 60},
@@ -1001,7 +1015,7 @@ func discover(id: String) -> bool:
 # ---- 컬렉션 ----
 #
 # 묶음을 다 모으면 잠긴 레시피가 열린다 (메이플 몬스터컬렉션식).
-# 앞은 쉽고 갈수록 귀해진다. ♥ = 누구에게 선물해도 잘 통하는 요리.
+# 앞은 쉽고 갈수록 귀해진다. 보상은 전부 요리 레시피다.
 const COLLECTIONS := [
 	{"id": "spring_field", "name": "봄의 밭", "reward": "dish_fried_egg",
 		"ids": ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]},
@@ -1932,9 +1946,6 @@ func gift_value(npc_id: String, item_id: String) -> int:
 		base = 18
 	elif item_id in def.get("hates", []):
 		base = -6
-	# 마음이 담긴 요리(♥)는 누구에게나 잘 통한다 (아주 좋아하는 것 다음)
-	if base < 22 and ITEMS.has(item_id) and bool(ITEMS[item_id].get("heart", false)):
-		base = 22
 	if base > 0 and is_birthday(npc_id):
 		base *= 3          # 생일에는 세 배
 	return base
