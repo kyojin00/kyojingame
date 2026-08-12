@@ -105,6 +105,11 @@ const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
 	"hoe": "icon_hoe", "water": "icon_water",
 }
+# 도구 그림마다 자루가 놓인 방향이 다르다. 곡괭이·호미·물뿌리개는 자루가
+# **왼쪽 아래**에서 머리가 오른쪽 위로 가는데 **도끼만 반대**다
+# (자루 오른쪽 아래 - 날 왼쪽 위). 그대로 쓰면 오른쪽을 보고 휘두를 때
+# 날이 등 뒤를 향한다. 가방 아이콘은 그대로 두고 **휘두를 때만** 뒤집는다.
+const TOOL_MIRROR := ["axe"]
 
 var _was_riding := false        # 그림자 크기를 다시 그릴 때만 쓴다
 var swing_t := 0.0              # 남은 시간
@@ -115,6 +120,7 @@ var upper_sprite: Sprite2D      # 휘두를 때만 보인다 (상체 — 허리 
 var _base_offset := Vector2.ZERO # scenes/player.tscn이 정한 스프라이트 자리
 var _split := false             # 지금 상·하체를 갈라 그리는 중인가
 var _trail: Array = []          # 도구 끝이 지나간 자취 (node 좌표)
+var _tool_mirror := false       # 지금 든 도구 그림을 좌우로 뒤집어야 하는가
 
 
 func _ready() -> void:
@@ -155,6 +161,7 @@ func start_swing(tool_id: String, face: Vector2, length: float) -> void:
 	if not main.tex.has(icon):
 		return
 	tool_sprite.texture = main.tex[icon]
+	_tool_mirror = TOOL_MIRROR.has(tool_id)
 	swing_face = face if face != Vector2.ZERO else Vector2.DOWN
 	swing_len = maxf(0.14, length)
 	swing_t = swing_len
@@ -308,7 +315,7 @@ func _swing_visual() -> void:
 	# 도구: 손 높이에서 호를 그린다
 	var hand: Vector2 = pose.hand
 	tool_sprite.visible = true
-	tool_sprite.flip_h = sign_x < 0.0
+	tool_sprite.flip_h = (sign_x < 0.0) != _tool_mirror
 	# 감을 때는 어깨 뒤로 세우고(c=-1), 내리칠 때는 발치까지 넘긴다(c=+1)
 	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * sign_x
 	if dot != "" and SWING_HAND_DOT.has(key):
