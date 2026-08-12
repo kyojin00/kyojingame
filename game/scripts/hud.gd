@@ -456,6 +456,15 @@ func show_message(text: String, dur := 2.5) -> void:
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	# 컬렉션이 방금 찼으면 배너로 알린다 (game_data는 UI를 못 부른다)
+	while not GameData.collection_pending.is_empty():
+		var col: Dictionary = GameData.collection_pending.pop_front()
+		var rname: String = GameData.ITEMS[col.reward].name
+		_toast_queue.append({"head": "★ 도감 완성 — %s!" % col.name,
+			"body": "%s 레시피가 열렸다!" % rname,
+			"icon": main.tex.get(col.reward) if main != null else null,
+			"head_col": Color(0.85, 0.6, 0.15)})
+		Sound.play_sfx("sfx_catch")
 	if minimap_panel != null and main != null:
 		# 실내(집·동굴·가게 방)에서는 바깥 지도를 띄우지 않는다
 		minimap_panel.visible = not (main.interior.visible or main.cave.visible

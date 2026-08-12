@@ -285,6 +285,7 @@ func _req_gain(id: String, count: int) -> void:
 		return
 	if GameData.items.has(id) and count > 0 and count <= 50:
 		GameData.items[id] += count
+		GameData.discover(id)
 		if id.begins_with("fish_"):
 			GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + count
 		_broadcast_stats()

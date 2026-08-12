@@ -155,11 +155,13 @@ func _next_day(passed_out: bool) -> void:
 			var n_out := 2 if (in_pen and randf() < m.PASTURE_BONUS) else 1
 			GameData.items[product] += n_out
 			collected[product] = int(collected.get(product, 0)) + n_out
+			GameData.discover(product)
 			var egg_chance: float = m.PASTURE_GOLDEN_EGG if in_pen else 0.03
 			if a.type == "chicken" and randf() < egg_chance \
 					and int(GameData.items["golden_egg"]) == 0:
 				GameData.items["golden_egg"] += 1
 				collected["golden_egg"] = 1
+				GameData.discover("golden_egg")
 		a.fed = false
 
 	# 나무/돌이 조금씩 다시 자란다
@@ -249,6 +251,7 @@ func _spouse_morning() -> String:
 		GameData.spouse_gift_day = GameData.day
 		var give := str(SPOUSE_GIFTS.get(sid, "egg"))
 		GameData.items[give] = int(GameData.items[give]) + 1
+		GameData.discover(give)
 		out += "\n머리맡에 %s을(를) 두고 갔다." % GameData.ITEMS[give].name
 	return out
 

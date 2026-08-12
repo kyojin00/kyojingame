@@ -1,11 +1,20 @@
 # 연구 노트 (N): 할아버지가 남긴 노트. 발견할 때마다 빈 페이지가 채워지고,
 # 절반 이상 채워지면 숨겨진 메모가 하나씩 해금된다. (게임의 핵심 시스템)
+#
+# 두 장으로 나뉜다 —
+#   도감: 모으는 것들. 네모칸 격자. 못 얻은 것은 어두운 칸에 물음표,
+#         칸에 마우스를 올리면 설명과 「처음 얻은 날」이 뜬다.
+#   이야기: 연금술 조합법 · 주민 · 숨겨진 메모. 읽는 것이라 줄글 그대로.
 extends CanvasLayer
 
 var main: Node2D
 var items_box: VBoxContainer
 var scroll: ScrollContainer
 var _refresh_timer := 0.0
+var tab := "collect"          # "collect" | "story"
+var _tab_buttons := {}
+var _tip: PanelContainer
+var _tip_label: Label
 
 
 func _ready() -> void:
@@ -35,14 +44,124 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(title)
 
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	tabs.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(tabs)
+	for t: Array in [["collect", "도감"], ["story", "이야기"]]:
+		var b := Button.new()
+		b.text = str(t[1])
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(90, 24)
+		b.pressed.connect(_show_tab.bind(str(t[0])))
+		tabs.add_child(b)
+		_tab_buttons[t[0]] = b
+
 	scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(510, 306)
+	scroll.custom_minimum_size = Vector2(510, 280)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
 	items_box = VBoxContainer.new()
 	items_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	items_box.add_theme_constant_override("separation", 2)
 	scroll.add_child(items_box)
+
+	# 칸에 마우스를 올리면 뜨는 설명 (다른 무엇보다 위에)
+	_tip = PanelContainer.new()
+	var ts := StyleBoxFlat.new()
+	ts.bg_color = Color(0.16, 0.13, 0.09, 0.97)
+	ts.border_color = Color(0.62, 0.48, 0.28)
+	ts.set_border_width_all(2)
+	ts.set_content_margin_all(7)
+	_tip.add_theme_stylebox_override("panel", ts)
+	_tip.visible = false
+	_tip.z_index = 50
+	add_child(_tip)
+	_tip_label = Label.new()
+	_tip_label.add_theme_color_override("font_color", Color(0.93, 0.88, 0.74))
+	_tip_label.custom_minimum_size = Vector2(0, 0)
+	_tip.add_child(_tip_label)
+
+
+func _show_tab(t: String) -> void:
+	tab = t
+	_rebuild()
+
+
+func _tab_style() -> void:
+	for k in _tab_buttons:
+		_tab_buttons[k].disabled = (k == tab)
+
+
+# ---- 격자 ----
+#
+# 갈래마다 아이콘 한 줄짜리 표. 얻은 것은 아이콘, 못 얻은 것은 어두운
+# 칸에 물음표. 마우스를 올리면 설명 + 처음 얻은 날.
+const CELL := 40
+const COLS := 11
+
+
+func _grid(entries: Array) -> void:
+	# entries: [{icon, name, found, count_text, desc, date}]
+	var grid := GridContainer.new()
+	grid.columns = COLS
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	items_box.add_child(grid)
+	for e: Dictionary in entries:
+		var cell := Panel.new()
+		cell.custom_minimum_size = Vector2(CELL, CELL)
+		var st := StyleBoxFlat.new()
+		var found: bool = e.found
+		st.bg_color = Color(0.85, 0.79, 0.62) if found else Color(0.32, 0.29, 0.24)
+		st.border_color = Color(0.6, 0.47, 0.28) if found else Color(0.42, 0.38, 0.32)
+		st.set_border_width_all(2)
+		st.set_corner_radius_all(4)
+		cell.add_theme_stylebox_override("panel", st)
+		if found and main.tex.has(str(e.icon)) and main.tex[str(e.icon)] != null:
+			var icon := TextureRect.new()
+			icon.texture = main.tex[str(e.icon)]
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+			icon.offset_left = 4
+			icon.offset_top = 4
+			icon.offset_right = -4
+			icon.offset_bottom = -4
+			cell.add_child(icon)
+		else:
+			var q := Label.new()
+			q.text = "?"
+			q.add_theme_color_override("font_color", Color(0.55, 0.5, 0.42))
+			q.set_anchors_preset(Control.PRESET_FULL_RECT)
+			q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			q.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			cell.add_child(q)
+		cell.mouse_entered.connect(_cell_tip.bind(cell, e))
+		cell.mouse_exited.connect(func() -> void: _tip.visible = false)
+		grid.add_child(cell)
+
+
+func _cell_tip(cell: Panel, e: Dictionary) -> void:
+	var text := ""
+	if e.found:
+		text = str(e.name)
+		if str(e.get("count_text", "")) != "":
+			text += "\n" + str(e.count_text)
+		if str(e.get("desc", "")) != "":
+			text += "\n" + str(e.desc)
+		if str(e.get("date", "")) != "":
+			text += "\n처음 얻은 날: " + str(e.date)
+	else:
+		text = "???\n" + str(e.get("hint", "아직 만나지 못했다"))
+	_tip_label.text = text
+	_tip.visible = true
+	# 칸 오른쪽 아래. 화면 밖으로 나가면 왼쪽으로 뒤집는다
+	var pos := cell.get_screen_position() + Vector2(CELL + 4, 0)
+	_tip.reset_size()
+	if pos.x + 240 > 960:
+		pos.x = cell.get_screen_position().x - _tip.size.x - 4
+	_tip.position = pos
 
 
 func toggle() -> void:
@@ -81,81 +200,161 @@ const GOLD := Color(0.62, 0.42, 0.05)
 
 
 func _rebuild() -> void:
+	_tab_style()
 	for c in items_box.get_children():
 		c.queue_free()
+	_tip.visible = false
 
 	var prog: Dictionary = GameData.note_progress()
 	var pct := int(prog.ratio * 100.0)
 	_head("기록된 페이지: %d / %d (%d%%)" % [int(prog.filled), int(prog.total), pct])
-	_line("새로운 것을 발견하면 빈 페이지가 채워진다.", DIM)
+	if tab == "collect":
+		_rebuild_collect()
+	else:
+		_rebuild_story()
 
-	# 작물 기록
+
+# ---- 도감 (격자) ----
+func _rebuild_collect() -> void:
+	_line("새로운 것을 발견하면 빈 페이지가 채워진다. 칸에 마우스를 올려 보자.", DIM)
+
+	# 컬렉션 — 묶음을 다 모으면 레시피가 열린다
 	_line("")
-	_head("[작물 기록]")
+	_head("[컬렉션]")
+	for col: Dictionary in GameData.COLLECTIONS:
+		var have := GameData.collection_have(col)
+		var total := (col.ids as Array).size()
+		var done: bool = str(col.id) in GameData.collections_done
+		if done:
+			_line("  ★ %s %d/%d — %s 레시피!" % [col.name, have, total,
+				GameData.ITEMS[col.reward].name], GOLD)
+		else:
+			var reward_hint := "???" if have < total - 1 else str(GameData.ITEMS[col.reward].name)
+			_line("  %s %d/%d — 보상: %s" % [col.name, have, total, reward_hint], DIM)
+
+	_line("")
+	_head("[작물]  %s" % _count(GameData.CROP_IDS, GameData.crops_harvested))
+	var rows: Array = []
 	for id in GameData.CROP_IDS:
 		var n := int(GameData.crops_harvested.get(id, 0))
-		if n > 0:
-			_line("  %s — 수확 %d회" % [GameData.CROPS[id].name, n])
-		else:
-			_line("  ??? — 아직 수확하지 못했다", DIM)
+		rows.append({"icon": "mature_" + id, "name": GameData.CROPS[id].name,
+			"found": n > 0, "count_text": "수확 %d회" % n,
+			"desc": "%s 씨앗 %dG" % [GameData.season_list(id), GameData.CROPS[id].seed_price],
+			"date": GameData.discovered_on(id), "hint": "밭에 심어 거둬 보자"})
+	_grid(rows)
 
-	# 물고기 생태
 	_line("")
-	_head("[물고기 생태]")
+	_head("[물고기]  %s" % _count(GameData.FISH_IDS, GameData.fish_caught))
+	rows = []
 	for fid in GameData.FISH_IDS:
 		var caught := int(GameData.fish_caught.get(fid, 0))
-		if caught > 0:
-			_line("  %s — %d마리 관찰" % [GameData.ITEMS[fid].name, caught])
-		else:
-			_line("  ??? — 물가에서 만나지 못했다", DIM)
+		rows.append({"icon": fid, "name": GameData.ITEMS[fid].name,
+			"found": caught > 0, "count_text": "%d마리 · %dG" % [caught, GameData.ITEMS[fid].sell],
+			"desc": _fish_desc(fid),
+			"date": GameData.discovered_on(fid), "hint": _fish_desc(fid)})
+	_grid(rows)
 
-	# 광물 연구
 	_line("")
-	_head("[광물 연구]")
-	for mid in ["ore", "gem"]:
-		if GameData.minerals_found.get(mid, false):
-			_line("  %s — 동굴에서 발견" % GameData.ITEMS[mid].name)
-		else:
-			_line("  ??? — 동굴 어딘가에", DIM)
-
-	# 채집/곤충
-	_line("")
-	_head("[채집 기록]")
-	for fid in GameData.FORAGE_IDS:
-		var got := int(GameData.forage_caught.get(fid, 0))
-		if got > 0:
-			_line("  %s — %d개 채집" % [GameData.ITEMS[fid].name, got])
-		else:
-			_line("  ??? — 들판 어딘가에 돋아난다", DIM)
-	_line("")
-	_head("[곤충 기록]")
-	for bid in GameData.BUG_IDS:
-		var caught_b := int(GameData.forage_caught.get(bid, 0))
-		if caught_b > 0:
-			_line("  %s — %d마리 관찰" % [GameData.ITEMS[bid].name, caught_b])
-		else:
-			_line("  ??? — 계절과 시간을 살펴보자", DIM)
-
-	# 몬스터 관찰
-	_line("")
-	_head("[몬스터 관찰]")
-	for mid in GameData.MOBS:
-		var kills := int(GameData.mob_kills.get(mid, 0))
-		if kills > 0:
-			_line("  %s — %s" % [GameData.MOBS[mid].name, GameData.MOBS[mid].desc])
-		else:
-			_line("  ??? — 동굴에서 만나보자", DIM)
-
-	# 요리 기록
-	_line("")
-	_head("[요리 기록]")
+	_head("[요리]  %s" % _count(GameData.RECIPE_IDS, GameData.recipes_cooked))
+	rows = []
 	for rid in GameData.RECIPE_IDS:
 		var made := int(GameData.recipes_cooked.get(rid, 0))
-		if made > 0:
-			_line("  %s — %d번 만들었다" % [GameData.ITEMS[rid].name, made])
-		else:
-			_line("  ??? — 조리대에서 실험해 보자", DIM)
+		rows.append({"icon": rid, "name": GameData.ITEMS[rid].name,
+			"found": made > 0, "count_text": "%d번 만들었다" % made,
+			"desc": "회복 %d · %dG" % [int(GameData.RECIPES[rid].energy), GameData.ITEMS[rid].sell],
+			"date": GameData.discovered_on(rid), "hint": "조리대에서 실험해 보자"})
+	_grid(rows)
 
+	_line("")
+	var got_m := 0
+	for mid in ["ore", "gem", "star_shard"]:
+		if GameData.minerals_found.get(mid, false) or GameData.discovered.has(mid):
+			got_m += 1
+	_head("[광물]  %d / 3" % got_m)
+	rows = []
+	for mid in ["ore", "gem", "star_shard"]:
+		var found: bool = GameData.minerals_found.get(mid, false) or GameData.discovered.has(mid)
+		rows.append({"icon": mid, "name": GameData.ITEMS[mid].name,
+			"found": found, "count_text": "%dG" % GameData.ITEMS[mid].sell,
+			"desc": "동굴에서 캔다", "date": GameData.discovered_on(mid),
+			"hint": "동굴 어딘가에"})
+	_grid(rows)
+
+	_line("")
+	_head("[채집 · 곤충]  %s" % _count(GameData.FORAGE_IDS + GameData.BUG_IDS, GameData.forage_caught))
+	rows = []
+	for fid2 in GameData.FORAGE_IDS + GameData.BUG_IDS:
+		var got := int(GameData.forage_caught.get(fid2, 0))
+		rows.append({"icon": fid2, "name": GameData.ITEMS[fid2].name,
+			"found": got > 0, "count_text": "%d개" % got,
+			"desc": "들과 숲에서", "date": GameData.discovered_on(fid2),
+			"hint": "들판과 계절을 살펴보자"})
+	_grid(rows)
+
+	_line("")
+	_head("[몬스터]  %s" % _count(GameData.MOBS.keys(), GameData.mob_kills))
+	rows = []
+	for mid2 in GameData.MOBS:
+		var kills := int(GameData.mob_kills.get(mid2, 0))
+		rows.append({"icon": mid2 + "_0", "name": GameData.MOBS[mid2].name,
+			"found": kills > 0, "count_text": "%d마리 처치" % kills,
+			"desc": GameData.MOBS[mid2].desc, "date": "",
+			"hint": "동굴에서 만나보자"})
+	_grid(rows)
+
+	_line("")
+	var known_f := 0
+	for fo in GameData.FORMULA_IDS:
+		if GameData.knows_formula(fo):
+			known_f += 1
+	_head("[물약]  %d / %d" % [known_f, GameData.FORMULA_IDS.size()])
+	rows = []
+	for fo2 in GameData.FORMULA_IDS:
+		var knows := GameData.knows_formula(fo2)
+		var def: Dictionary = GameData.FORMULAS[fo2]
+		rows.append({"icon": fo2, "name": def.name,
+			"found": knows, "count_text": "%d병" % int(GameData.alchemy_brews.get(fo2, 0)),
+			"desc": str(def.effect), "date": GameData.discovered_on(fo2),
+			"hint": "재료 셋을 조합대에 올려 보자"})
+	_grid(rows)
+	_line("")
+
+
+func _count(ids: Array, tally: Dictionary) -> String:
+	var got := 0
+	for id in ids:
+		if int(tally.get(id, 0)) > 0:
+			got += 1
+	return "%d / %d" % [got, ids.size()]
+
+
+# 물고기가 언제 무는지 — 표에서 만들어 준다 (도감 힌트)
+func _fish_desc(fid: String) -> String:
+	for f: Dictionary in GameData.FISH:
+		if str(f.id) != fid:
+			continue
+		var bits: Array[String] = []
+		var seasons: Array = f.seasons
+		if not seasons.is_empty():
+			var names: Array[String] = []
+			for sn in seasons:
+				names.append(GameData.SEASON_NAMES[int(sn)])
+			bits.append("/".join(names))
+		match str(f.time):
+			"morning": bits.append("아침")
+			"day": bits.append("낮")
+			"night": bits.append("밤")
+		var weathers: Array = f.weather
+		for w in weathers:
+			bits.append(str(GameData.WEATHERS[int(w)].name) + " 날")
+		if bits.is_empty():
+			return "어디서나 문다"
+		return " · ".join(bits) + "에 문다"
+	return ""
+
+
+# ---- 이야기 (줄글) ----
+func _rebuild_story() -> void:
 	# 연금술 (조합대에서 알아낸 것)
 	_line("")
 	_head("[연금술 조합법]")
@@ -175,11 +374,11 @@ func _rebuild() -> void:
 	_line("")
 	_head("[주민 이야기]")
 	for npc_id in GameData.NPCS:
-		var def: Dictionary = GameData.NPCS[npc_id]
+		var def2: Dictionary = GameData.NPCS[npc_id]
 		var aff := int(GameData.affinity[npc_id])
 		# 생일과 취향 — 취향은 좀 친해져야 알게 된다
 		var head_bits: Array[String] = []
-		var b: Array = def.get("birthday", [])
+		var b: Array = def2.get("birthday", [])
 		if b.size() == 2:
 			head_bits.append("생일 %s %d일" % [GameData.SEASON_NAMES[int(b[0])], int(b[1])])
 		if GameData.spouse == npc_id:
@@ -187,9 +386,9 @@ func _rebuild() -> void:
 		elif GameData.dating == npc_id:
 			head_bits.append("연인")
 		if not head_bits.is_empty():
-			_line("  %s — %s" % [def.name, " · ".join(head_bits)], GOLD)
+			_line("  %s — %s" % [def2.name, " · ".join(head_bits)], GOLD)
 		if aff >= 30:
-			var loves: Array = def.get("loves", [])
+			var loves: Array = def2.get("loves", [])
 			var names: Array[String] = []
 			for lid: String in loves:
 				names.append(_item_name(lid))
@@ -197,54 +396,27 @@ func _rebuild() -> void:
 		else:
 			_line("   좋아하는 것은 아직 모른다 (호감도 30부터)", DIM)
 		if aff >= 50:
-			_line("  %s의 기억:" % def.name)
-			_line("   \"%s\"" % String(def.secret50).replace("\n", " "), Color(0.35, 0.27, 0.16))
+			_line("  %s의 기억:" % def2.name)
+			_line("   \"%s\"" % String(def2.secret50).replace("\n", " "), Color(0.35, 0.27, 0.16))
 		else:
-			_line("  %s — 더 친해지면 이야기해 줄 것 같다 (%d/50)" % [def.name, aff], DIM)
+			_line("  %s — 더 친해지면 이야기해 줄 것 같다 (%d/50)" % [def2.name, aff], DIM)
 		if aff >= 100:
-			_line("   \"%s\"" % String(def.secret100).replace("\n", " "), Color(0.35, 0.27, 0.16))
+			_line("   \"%s\"" % String(def2.secret100).replace("\n", " "), Color(0.35, 0.27, 0.16))
 		elif aff >= 50:
 			_line("   ...아직 못다 한 이야기가 있는 듯하다 (%d/100)" % aff, DIM)
 
 	# 할아버지의 숨겨진 메모 (진행도 해금)
+	var prog: Dictionary = GameData.note_progress()
 	_line("")
 	_head("[할아버지의 숨겨진 메모]")
 	for memo in GameData.NOTE_MEMOS:
 		if prog.ratio >= float(memo[0]):
 			_line("  · %s" % memo[1], GOLD)
-			_line("    %s" % String(memo[2]).replace("\n", " "))
 		else:
-			_line("  · ??? (기록 %d%% 필요)" % int(float(memo[0]) * 100.0), DIM)
-
-	# 전설의 재료 (메모 II부터 존재가 드러난다)
-	if prog.ratio >= 0.6 or GameData.legends_owned() > 0:
-		_line("")
-		_head("[일곱 개의 전설 재료]")
-		for leg in GameData.LEGENDS:
-			if int(GameData.items[leg[0]]) > 0:
-				_line("  V %s (%s)" % [GameData.ITEMS[leg[0]].name, leg[1]], GOLD)
-			elif prog.ratio >= 0.7:
-				_line("  - ??? (%s) 힌트: %s" % [leg[1], leg[2]], DIM)
-			else:
-				_line("  - ??? (%s)" % leg[1], DIM)
-
-	# 마지막 연금술 (메모 IV 해금 후)
-	if prog.ratio >= 0.8 and not GameData.ending_seen:
-		_line("")
-		_head("[마지막 연금술]")
-		_line("  일곱 재료: %d / %d" % [GameData.legends_owned(), GameData.LEGENDS.size()])
-		if GameData.can_final_alchemy():
-			_line("  모두 모았다. **집 조합대**에서 마지막 연금술을 시작할 수 있다.", GOLD)
-		else:
-			_line("  일곱이 다 모이면 집 조합대에서 마지막 연금술을 시작할 수 있다.", DIM)
-	elif GameData.ending_seen:
-		_line("")
-		_head("[유니콘의 뿔]")
-		_line("  세상에 단 하나뿐인 뿔이 집 조합대 위에서 빛나고 있다.", GOLD)
-		_line("  할아버지의 꿈은 완성되었다. 이야기는 계속된다.", DIM)
+			_line("  · (%d%%를 채우면 열린다)" % int(float(memo[0]) * 100.0), DIM)
+	_line("")
 
 
-# 작물이든 아이템이든 이름을 찾아 준다
 func _item_name(id: String) -> String:
 	if GameData.CROPS.has(id):
 		return str(GameData.CROPS[id].name)

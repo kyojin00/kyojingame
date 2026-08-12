@@ -194,6 +194,7 @@ func interact() -> void:
 		var bid: String = bug.bug_id
 		GameData.items[bid] += 1
 		GameData.forage_caught[bid] = int(GameData.forage_caught.get(bid, 0)) + 1
+		GameData.discover(bid)
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
 		m.hud.show_message("%s를 잡았다! 연구 노트에 기록됐다." % GameData.ITEMS[bid].name)
@@ -210,6 +211,7 @@ func interact() -> void:
 			m.objnode._remove_object(t)
 			GameData.items[fid] += 1
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + 1
+			GameData.discover(fid)
 			Sound.play_sfx("sfx_harvest")
 			m.renderer.spawn_particles(t, "sparkle")
 			m.hud.show_message("%s 채집! 연구 노트에 기록됐다." % GameData.ITEMS[fid].name)

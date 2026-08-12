@@ -292,6 +292,43 @@ const ICONS = {
     px(c, 12, 3, C.white); px(c, 13, 4, C.white); return c; },
   dish_moon_tea:      () => cup(C.purple, C.ice),
   dish_feast:         () => tray(),
+  butter: () => {
+    const c = newCanvas();
+    rect(c, 3, 7, 10, 5, C.gold);              // 버터 덩이
+    rect(c, 3, 7, 10, 1, C.cream);
+    rect(c, 2, 12, 12, 2, C.ice);              // 접시
+    px(c, 5, 9, C.cream); px(c, 9, 8, C.cream);
+    return c;
+  },
+  dish_fried_egg: () => {
+    const c = newCanvas();
+    ellipse(c, 8, 9, 6, 4, C.white);           // 흰자
+    ellipse(c, 7, 9, 2, 2, C.gold);            // 노른자
+    px(c, 6, 8, C.cream);
+    rect(c, 2, 13, 12, 1, C.shadow);
+    return c;
+  },
+  dish_egg_roll: () => {
+    const c = newCanvas();
+    for (const x of [3, 7, 11]) { rect(c, x, 7, 3, 4, C.gold); rect(c, x, 7, 3, 1, C.cream); }
+    rect(c, 2, 11, 13, 2, C.white); rect(c, 4, 13, 9, 1, C.shadow);
+    return c;
+  },
+  dish_omurice: () => {
+    const c = newCanvas();
+    ellipse(c, 8, 9, 6, 3, C.gold);            // 오믈렛
+    for (let i = 0; i < 4; i++) px(c, 5 + i * 2, 7, C.red);   // 케첩
+    rect(c, 2, 12, 12, 2, C.white);
+    return c;
+  },
+  dish_butter_corn: () => {
+    const c = newCanvas();
+    ellipse(c, 8, 9, 6, 3, C.gold);            // 옥수수
+    for (const [x, y] of [[5, 8], [8, 8], [11, 8], [6, 10], [9, 10]]) px(c, x, y, C.gold2);
+    rect(c, 6, 5, 4, 2, C.cream);              // 버터 조각
+    rect(c, 2, 12, 12, 2, C.ice);
+    return c;
+  },
   bouquet: () => {
     const c = newCanvas();
     for (let i = 0; i < 6; i++) px(c, 8, 9 + i, C.green2);       // 줄기

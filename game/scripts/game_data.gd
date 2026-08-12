@@ -915,6 +915,13 @@ const ITEMS := {
 	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 700},
 	"dish_moon_tea": {"name": "달빛차", "sell": 640},
 	"dish_feast": {"name": "한상차림", "sell": 1100},
+	# 컬렉션 보상으로 열리는 요리 — 전부 「마음이 담긴」 요리(♥)라
+	# 누구에게 선물해도 잘 통한다 (gift_value가 heart를 본다)
+	"butter": {"name": "버터", "sell": 180, "heart": true},
+	"dish_fried_egg": {"name": "계란후라이", "sell": 90, "heart": true},
+	"dish_egg_roll": {"name": "계란말이", "sell": 200, "heart": true},
+	"dish_omurice": {"name": "오므라이스", "sell": 380, "heart": true},
+	"dish_butter_corn": {"name": "버터옥수수", "sell": 260, "heart": true},
 	# 채집물/곤충
 	"forage_berry": {"name": "산딸기", "sell": 40},
 	"forage_herb": {"name": "약초", "sell": 60},
@@ -956,6 +963,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_onion_soup", "dish_garlic_bread", "dish_spinach_saute", "dish_sashimi",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
+	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -971,6 +979,80 @@ const BUGS := {
 	"bug_firefly": {"seasons": [SUMMER], "night": true},
 }
 var forage_caught := {}  # id -> 누적 획득 수
+
+# ---- 발견 기록 ----
+#
+# 「무엇을 언제 처음 얻었는가」. 도감의 물음표를 여는 열쇠이고,
+# 상점이 무엇을 진열할지도 여기서 갈린다 (겪지 않은 물건은 안 판다).
+# 값은 처음 얻은 날(day). 1일에 얻은 것과 「아직 못 얻음」을 구별해야 해서
+# 있는지 없는지(has)로 보고, 날짜는 보여 줄 때만 쓴다.
+var discovered := {}
+
+
+# 처음이면 true를 돌려준다 (연출을 띄울지 부르는 쪽이 정한다)
+func discover(id: String) -> bool:
+	if id == "" or discovered.has(id):
+		return false
+	discovered[id] = day
+	_check_collections()
+	return true
+
+
+# ---- 컬렉션 ----
+#
+# 묶음을 다 모으면 잠긴 레시피가 열린다 (메이플 몬스터컬렉션식).
+# 앞은 쉽고 갈수록 귀해진다. ♥ = 누구에게 선물해도 잘 통하는 요리.
+const COLLECTIONS := [
+	{"id": "spring_field", "name": "봄의 밭", "reward": "dish_fried_egg",
+		"ids": ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]},
+	{"id": "summer_field", "name": "여름의 밭", "reward": "butter",
+		"ids": ["tomato", "corn", "watermelon", "pepper", "melon", "garlic"]},
+	{"id": "fall_field", "name": "가을의 밭", "reward": "dish_egg_roll",
+		"ids": ["pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice"]},
+	{"id": "winter_field", "name": "겨울의 밭", "reward": "dish_omurice",
+		"ids": ["winter_radish", "leek", "beet", "snow_cabbage"]},
+	{"id": "everyday_fish", "name": "흔한 물고기", "reward": "dish_butter_corn",
+		"ids": ["fish_crucian", "fish_minnow", "fish_loach", "fish_carp", "fish_smelt"]},
+	{"id": "weather_fish", "name": "궂은 날의 물고기", "reward": "dish_moon_tea",
+		"ids": ["fish_eel", "fish_rainbow", "fish_lenok", "fish_mistfish", "fish_stormjack"]},
+	{"id": "night_legends", "name": "밤의 전설", "reward": "dish_golden_roast",
+		"ids": ["fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden"]},
+	{"id": "cave_watch", "name": "동굴 관찰자", "reward": "dish_feast",
+		"ids": ["slime", "bat", "ghost", "treant"]},
+]
+var recipes_unlocked: Array = []
+var collections_done: Array = []
+# 방금 열린 것 — hud가 꺼내 배너를 띄운다 (여기서는 UI를 못 부른다)
+var collection_pending: Array = []
+
+
+# 이 묶음에서 몇 개를 모았나 (몬스터는 처치 기록을 본다)
+func collection_have(col: Dictionary) -> int:
+	var n := 0
+	for id: String in col.ids:
+		if discovered.has(id) or int(mob_kills.get(id, 0)) > 0:
+			n += 1
+	return n
+
+
+func _check_collections() -> void:
+	for col: Dictionary in COLLECTIONS:
+		if col.id in collections_done:
+			continue
+		if collection_have(col) < (col.ids as Array).size():
+			continue
+		collections_done.append(col.id)
+		if not (col.reward in recipes_unlocked):
+			recipes_unlocked.append(col.reward)
+		collection_pending.append(col)
+
+
+func discovered_on(id: String) -> String:
+	if not discovered.has(id):
+		return ""
+	var d := int(discovered[id])
+	return "%d년 %s %d일" % [(d - 1) / (DAYS_PER_SEASON * 4) + 1,
+		SEASON_NAMES[season_of_day(d)], (d - 1) % DAYS_PER_SEASON + 1]
 
 # 최후의 연금술에 필요한 전설 재료 7종 (콘텐츠마다 하나씩)
 # [아이템 id, 어느 콘텐츠에서, 힌트]
@@ -1321,10 +1403,16 @@ const RECIPES := {
 	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120},
 	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70},
 	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60},
-	# ---- 귀한 것 ----
-	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160},
-	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150},
-	"dish_feast": {"needs": {"fish_king": 1, "pumpkin": 1, "rice": 2}, "energy": 220},
+	# ---- 귀한 것 (컬렉션 보상으로 열린다) ----
+	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160, "locked": true},
+	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150, "locked": true},
+	"dish_feast": {"needs": {"fish_king": 1, "pumpkin": 1, "rice": 2}, "energy": 220, "locked": true},
+	# ---- 마음이 담긴 요리 (♥ 컬렉션 보상) ----
+	"butter": {"needs": {"milk": 1}, "energy": 20, "locked": true},
+	"dish_fried_egg": {"needs": {"egg": 1}, "energy": 25, "locked": true},
+	"dish_egg_roll": {"needs": {"egg": 1, "milk": 1}, "energy": 45, "locked": true},
+	"dish_omurice": {"needs": {"egg": 1, "rice": 2}, "energy": 90, "locked": true},
+	"dish_butter_corn": {"needs": {"butter": 1, "corn": 1}, "energy": 60, "locked": true},
 }
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_eggplant", "dish_salad", "dish_punch", "dish_pie", "dish_pickle",
@@ -1333,7 +1421,8 @@ const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbre
 	"dish_garlic_bread", "dish_spinach_saute",
 	"dish_grilled_fish", "dish_stew", "dish_sashimi", "dish_eel_rice", "dish_crab_soup",
 	"dish_salmon_steak", "dish_smelt_fry", "dish_fish_soup",
-	"dish_golden_roast", "dish_moon_tea", "dish_feast"]
+	"dish_golden_roast", "dish_moon_tea", "dish_feast",
+	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn"]
 var recipes_cooked := {}  # 도감: id -> 만든 횟수
 # 최후의 연금술(유니콘의 뿔)을 완성했는가 — 엔딩 후에도 자유 플레이 계속
 var ending_seen := false
@@ -1420,6 +1509,7 @@ func roll_quality(luck := 0.0) -> int:
 
 func add_produce(id: String, quality: int) -> void:
 	produce[id] += 1
+	discover(id)
 	if quality == 2:
 		produce_gold[id] = int(produce_gold.get(id, 0)) + 1
 	elif quality == 1:
@@ -1454,7 +1544,14 @@ func ingredient_count(id: String) -> int:
 	return int(produce[id]) if CROPS.has(id) else int(items[id])
 
 
+# 잠긴 레시피인가 (컬렉션 보상으로 열린다)
+func recipe_locked(id: String) -> bool:
+	return bool(RECIPES[id].get("locked", false)) and id not in recipes_unlocked
+
+
 func can_cook(id: String) -> bool:
+	if recipe_locked(id):
+		return false
 	for k in RECIPES[id].needs:
 		if ingredient_count(k) < int(RECIPES[id].needs[k]):
 			return false
@@ -1470,6 +1567,7 @@ func cook(id: String) -> bool:
 		else:
 			items[k] -= int(RECIPES[id].needs[k])
 	items[id] += 1
+	discover(id)
 	recipes_cooked[id] = int(recipes_cooked.get(id, 0)) + 1
 	return true
 
@@ -1809,6 +1907,14 @@ func is_birthday(npc_id: String) -> bool:
 
 
 # 며칠 뒤가 생일인가 (-1이면 이번 계절에 없다)
+# "봄/여름"처럼 심을 수 있는 계절을 글로 (도감 설명용)
+func season_list(crop_id: String) -> String:
+	var names: Array[String] = []
+	for sn in CROPS[crop_id].seasons:
+		names.append(SEASON_NAMES[int(sn)])
+	return "/".join(names)
+
+
 func days_to_birthday(npc_id: String) -> int:
 	var b: Array = NPCS[npc_id].get("birthday", [])
 	if b.size() != 2 or int(b[0]) != season():
@@ -1826,6 +1932,9 @@ func gift_value(npc_id: String, item_id: String) -> int:
 		base = 18
 	elif item_id in def.get("hates", []):
 		base = -6
+	# 마음이 담긴 요리(♥)는 누구에게나 잘 통한다 (아주 좋아하는 것 다음)
+	if base < 22 and ITEMS.has(item_id) and bool(ITEMS[item_id].get("heart", false)):
+		base = 22
 	if base > 0 and is_birthday(npc_id):
 		base *= 3          # 생일에는 세 배
 	return base
@@ -2318,6 +2427,10 @@ func reset_all() -> void:
 	spouse = ""
 	spouse_gift_day = 0
 	gifted_today.clear()
+	discovered.clear()
+	recipes_unlocked.clear()
+	collections_done.clear()
+	collection_pending.clear()
 	if DEV_MODE:
 		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
 		wood = DEV_STOCK
@@ -2604,6 +2717,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"mob_kills": mob_kills,
 		"affinity": affinity,
 		"dating": dating, "spouse": spouse, "spouse_gift_day": spouse_gift_day,
+		"discovered": discovered,
+		"recipes_unlocked": recipes_unlocked, "collections_done": collections_done,
 		"quest": quest,
 		"quest_offers": quest_offers,
 		"tutorial": tutorial,
@@ -2681,6 +2796,8 @@ func build_stats() -> Dictionary:
 		"produce_silver": produce_silver, "produce_gold": produce_gold,
 		"barn_built": barn_built,
 		"owned_pets": owned_pets, "active_pet": active_pet,
+		"discovered": discovered, "recipes_unlocked": recipes_unlocked,
+		"collections_done": collections_done,
 	}
 
 
@@ -2700,6 +2817,10 @@ func apply_stats(d: Dictionary) -> void:
 		mob_kills[k] = int(d.mob_kills[k])
 	for k in d.get("affinity", {}):
 		affinity[k] = int(d.affinity[k])
+	discovered = d.get("discovered", {})
+	recipes_unlocked = d.get("recipes_unlocked", [])
+	collections_done = d.get("collections_done", [])
+	_check_collections()   # 예전 세이브: 이미 채운 묶음이 있으면 지금 열어 준다
 	dating = str(d.get("dating", ""))
 	spouse = str(d.get("spouse", ""))
 	spouse_gift_day = int(d.get("spouse_gift_day", 0))

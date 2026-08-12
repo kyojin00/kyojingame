@@ -19,6 +19,7 @@ func net_shop(op: String, id: String) -> void:
 
 func record_kill(mob: String) -> void:
 	GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
+	GameData._check_collections()   # 「동굴 관찰자」는 처치 기록으로 찬다
 	_maybe_drop_recipe("mob")
 	if Net.is_guest():
 		m.netsync._req_kill.rpc_id(1, mob)
@@ -29,6 +30,9 @@ func record_kill(mob: String) -> void:
 func gain_item(id: String, count: int) -> void:
 	if id in ["ore", "gem"]:
 		GameData.minerals_found[id] = true
+	# 처음 얻은 것이면 도감에 자리가 열린다 (상점 진열도 여기서 갈린다)
+	if GameData.discover(id) and GameData.ITEMS.has(id):
+		m.hud.show_message("★ %s — 도감에 기록했다! (N)" % GameData.ITEMS[id].name, 2.6)
 	if Net.is_guest():
 		GameData.items[id] += count  # 낙관적 반영, 통계 브로드캐스트로 수렴
 		m.netsync._req_gain.rpc_id(1, id, count)

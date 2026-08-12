@@ -129,6 +129,11 @@ func _debug_tick() -> void:
 			m.quest_ui.close()
 			GameData.crops_harvested = {"potato": 3, "carrot": 1}
 			GameData.affinity["merchant"] = 60
+			# 도감 격자가 「얻은 것/못 얻은 것」을 갈라 그리는지 보이게 몇 개 심는다
+			GameData.discover("potato")
+			GameData.discover("carrot")
+			GameData.discover("fish_crucian")
+			GameData.fish_caught["fish_crucian"] = 2
 			m.note_ui.toggle()                           # 연구 노트(N) 확인
 		176: _save_shot("_note.png")
 		177:
@@ -1034,6 +1039,31 @@ func _debug_tick() -> void:
 				" 사람=", GameData.NPCS.size())
 			GameData.dating = ""
 			GameData.spouse = ""
+		385:
+			# 발견 기록 + 컬렉션 보상
+			GameData.discovered.clear()
+			GameData.collections_done.clear()
+			GameData.recipes_unlocked.clear()
+			GameData.collection_pending.clear()
+			var was_locked := GameData.recipe_locked("dish_fried_egg")
+			# 봄의 밭 여섯을 채우면 계란후라이 레시피가 열려야 한다
+			for cid2: String in ["potato", "carrot", "strawberry", "spinach", "onion"]:
+				GameData.discover(cid2)
+			var before_full := not GameData.recipe_locked("dish_fried_egg")
+			GameData.discover("pea")
+			var unlocked := not GameData.recipe_locked("dish_fried_egg")
+			var pending := GameData.collection_pending.size() == 1
+			var dated := GameData.discovered_on("pea") != ""
+			var again := not GameData.discover("pea")   # 두 번째는 기록하지 않는다
+			print("COLLECT_OK=", was_locked and not before_full and unlocked
+				and pending and dated and again,
+				" 잠겨있었다=", was_locked, " 5개로는안열림=", not before_full,
+				" 6개로열림=", unlocked, " 배너대기=", pending,
+				" 날짜=", GameData.discovered_on("pea"), " 중복차단=", again)
+			# ♥ 요리는 누구에게나 잘 통한다
+			print("HEART_GIFT_OK=", GameData.gift_value("blacksmith", "dish_omurice") == 22,
+				" 값=", GameData.gift_value("blacksmith", "dish_omurice"))
+			GameData.collection_pending.clear()
 		391:
 			# 표에 한 줄 넣고 아이콘이나 아이템 정의를 빠뜨리면 조용히 사라진다.
 			# (그림이 없으면 칸이 그냥 비고, 어서션이 없으면 한참 뒤에야 안다)

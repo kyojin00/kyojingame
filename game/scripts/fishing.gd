@@ -63,6 +63,7 @@ func _on_fishing_finished(success: bool) -> void:
 		var id: String = str(m.pending_fish.id)
 		var def: Dictionary = GameData.ITEMS[id]
 		GameData.items[id] += 1
+		GameData.discover(id)
 		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
 		GameData.today_harvest += 1
 		Sound.play_sfx("sfx_catch")

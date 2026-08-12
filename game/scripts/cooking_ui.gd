@@ -86,8 +86,11 @@ func _rebuild() -> void:
 	# 재료가 있는 것을 찾으려고 매번 끝까지 굴려야 한다.
 	var ready_ids: Array[String] = []
 	var rest_ids: Array[String] = []
+	var locked_n := 0
 	for id: String in GameData.RECIPE_IDS:
-		if GameData.can_cook(id):
+		if GameData.recipe_locked(id):
+			locked_n += 1        # 잠긴 것은 목록에 안 보인다 — 도감 컬렉션이 연다
+		elif GameData.can_cook(id):
 			ready_ids.append(id)
 		else:
 			rest_ids.append(id)
@@ -96,7 +99,9 @@ func _rebuild() -> void:
 	head.text = "요리 숙련 Lv.%d · 회복 +%d%% · 지금 만들 수 있는 것 %d / %d" % [
 		GameData.skill_lv("cook"),
 		int(round((GameData.cook_energy_mult() - 1.0) * 100.0)),
-		ready_ids.size(), GameData.RECIPE_IDS.size()]
+		ready_ids.size(), ready_ids.size() + rest_ids.size()]
+	if locked_n > 0:
+		head.text += "  ·  잠긴 레시피 %d (도감 컬렉션으로 연다)" % locked_n
 	head.add_theme_color_override("font_color", Color(0.65, 0.85, 0.6))
 	items_box.add_child(head)
 

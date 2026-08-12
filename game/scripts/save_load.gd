@@ -128,6 +128,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.active_pet = str(d.get("active_pet", ""))
 	for k in d.get("forage_caught", {}):
 		GameData.forage_caught[k] = int(d.forage_caught[k])
+	_backfill_discovered()
 	for k in d.get("produce_silver", {}):
 		GameData.produce_silver[k] = int(d.produce_silver[k])
 	for k in d.get("produce_gold", {}):
@@ -184,3 +185,23 @@ func _apply_save(d: Dictionary) -> void:
 		m.worldgen._migrate_farm_layout()
 	# 격자가 통째로 바뀌었다 — 「돌아가는 칸」 목록을 다시 만든다
 	m.farming.rebuild()
+
+
+# 발견 기록은 나중에 붙은 것이라, 예전 세이브에는 없다. 이미 겪은 흔적
+# (잡은 물고기 · 수확 · 만든 요리 · 들고 있는 것)을 보고 메워 준다.
+# 날짜를 알 수 없으니 1일로 적는다 — 「언제인지 모르지만 겪었다」.
+func _backfill_discovered() -> void:
+	var seen: Array = []
+	seen += GameData.fish_caught.keys()
+	seen += GameData.crops_harvested.keys()
+	seen += GameData.recipes_cooked.keys()
+	seen += GameData.forage_caught.keys()
+	for id: String in GameData.ITEM_IDS:
+		if int(GameData.items.get(id, 0)) > 0:
+			seen.append(id)
+	for id: String in GameData.CROP_IDS:
+		if int(GameData.produce.get(id, 0)) > 0:
+			seen.append(id)
+	for id in seen:
+		if not GameData.discovered.has(id):
+			GameData.discovered[id] = 1
