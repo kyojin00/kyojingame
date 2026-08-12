@@ -44,6 +44,14 @@ func _apply_story_camera() -> void:
 		cam.limit_right = m.STORY_FOREST_W * m.TILE
 		cam.limit_bottom = 23 * m.TILE
 		cam.position_smoothing_enabled = true
+	elif GameData.story_phase == "travel":
+		# 가리개 숲의 좁은 길을 지나는 동안 — 마을 전경은 아직 보여 주지 않는다.
+		# 마을 어귀(작별 인사)에서 제한이 풀리며 시야가 극적으로 넓어진다.
+		cam.limit_left = 0
+		cam.limit_top = 0
+		cam.limit_right = 60 * m.TILE
+		cam.limit_bottom = 23 * m.TILE
+		cam.position_smoothing_enabled = true
 	else:
 		m._free_camera_limits(cam)
 		cam.position_smoothing_enabled = true
@@ -98,12 +106,26 @@ func _plant_story_forest() -> void:
 		_story_fence(Vector2i(m.STORY_FORK.x + 3, y))
 	for x in range(m.STORY_FORK.x - 2, m.STORY_FORK.x + 4):
 		_story_fence(Vector2i(x, 22))
-	for y in range(9, m.STORY_ROAD_Y0):               # 연결로 양옆
-		_story_fence(Vector2i(m.STORY_LINK_X - 1, y))
-		_story_fence(Vector2i(m.STORY_LINK_X + 4, y))
+	for y in range(9, m.STORY_ROAD_Y0):               # 연결로 양옆 — 우거진 나무 벽
+		_story_tree_wall(Vector2i(m.STORY_LINK_X - 1, y))
+		_story_tree_wall(Vector2i(m.STORY_LINK_X + 4, y))
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):   # 본길 양 끝
 		_story_fence(Vector2i(m.STORY_ROAD_X1 + 1, y))
 		_story_fence(Vector2i(m.STORY_ROAD_X0 - 1, y))
+
+	# ⑥ 마을 초입 가리개 숲: 큰길(y8~10) 양옆을 벨 수 없는 나무로 빽빽하게
+	#    채워, 이 좁은 길을 다 지나기 전에는 마을 전경이 보이지 않는다.
+	#    마을로 드는 길은 이 큰길 하나뿐이다.
+	for x in range(40, 60):
+		_story_tree_wall(Vector2i(x, 7))
+		_story_tree_wall(Vector2i(x, 11))
+	for y in range(1, 15):
+		for x in range(40, 60):
+			var pos6 := Vector2i(x, y)
+			if m.grid[y][x].ground != "grass" or m.objects.has(pos6):
+				continue
+			if m._hash01(x * 13 + 3, y * 17 + 9) < 0.85 and m.worldgen._nature_clear(pos6, "tree"):
+				m.objects[pos6] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
 
 	# ③ 길을 가로막고 선 나무 — 베어야만 지나갈 수 있다.
 	#    길목에서는 길이 두 줄로 좁아지므로 나무 두 그루면 막힌다.
@@ -149,6 +171,15 @@ func _story_fence(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
 		return
 	m.objects[pos] = {"kind": "fence", "hp": 0, "fixed": true}
+
+
+# 가리개 숲의 나무 벽: 벨 수 없는 나무 한 그루 (풀밭에만 세운다)
+func _story_tree_wall(pos: Vector2i) -> void:
+	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
+		return
+	if m.grid[pos.y][pos.x].ground != "grass":
+		return
+	m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
 
 
 # 아직 뚫지 못한 길목(나무 줄) 수를 센다 — 한 칸만 베어도 그 줄은 열린 것으로 본다

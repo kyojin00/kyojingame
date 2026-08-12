@@ -486,6 +486,11 @@ func _mk_tool_row(t: String) -> Button:
 	b.pressed.connect(func() -> void:
 		main.toolwork.set_tool(t)
 		_rebuild())
+	# 더블 클릭: 비어 있는 가장 앞 번호 슬롯에 자동 장착
+	b.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed and ev.double_click \
+				and ev.button_index == MOUSE_BUTTON_LEFT:
+			_auto_equip(t))
 	b.set_drag_forwarding(
 		func(_pos: Vector2) -> Variant:
 			var pv := TextureRect.new()
@@ -608,6 +613,26 @@ func _mk_tool_slot(slot_i: int) -> Button:
 			else:
 				_swap_slots(int(data.from), slot_i))
 	return b
+
+
+# 더블 클릭 자동 장착: 이미 걸려 있으면 그 칸을 알려 주고,
+# 아니면 비어 있는 가장 앞 번호 슬롯에 넣는다
+func _auto_equip(t: String) -> void:
+	for i in GameData.tool_slots.size():
+		if GameData.tool_slots[i] == t:
+			main.toolwork.set_tool(t)
+			main.hud.show_message("%s은(는) 이미 %d번 슬롯에 있다." % [GameData.TOOL_KOR.get(t, t), i + 1])
+			_rebuild()
+			return
+	for i in GameData.tool_slots.size():
+		if GameData.tool_slots[i] == "":
+			GameData.tool_slots[i] = t
+			Sound.play_sfx("sfx_place")
+			main.hud.show_message("%s을(를) %d번 슬롯에 장착했다. (숫자키 %d)" %
+				[GameData.TOOL_KOR.get(t, t), i + 1, i + 1])
+			_rebuild()
+			return
+	main.hud.show_message("빈 슬롯이 없다. 우클릭으로 칸을 비우거나 드래그로 바꾸자.")
 
 
 func _place_tool(t: String, slot_i: int) -> void:

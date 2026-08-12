@@ -43,6 +43,15 @@ func _debug_tick() -> void:
 		if not m.story._story_snapped and m.story._story_t >= 3.2:
 			m.story._story_snapped = true
 			_save_shot("_story.png")
+			# 마을 진입로: 큰길(y8~10) 위아래가 벨 수 없는 나무로 막혀 있고,
+			# 마을로 드는 길은 그 길 하나뿐이어야 한다
+			print("ENTRANCE_OK=", not m.is_passable(Vector2i(52, 7))
+				and not m.is_passable(Vector2i(52, 11))
+				and m.is_passable(Vector2i(52, 9))
+				and bool(m.objects.get(Vector2i(52, 7), {}).get("fixed", false)),
+				" 위막힘=", not m.is_passable(Vector2i(52, 7)),
+				" 아래막힘=", not m.is_passable(Vector2i(52, 11)),
+				" 길열림=", m.is_passable(Vector2i(52, 9)))
 		elif m.story._story_snapped and m.story._story_t >= 3.8:
 			get_tree().quit()
 		return
@@ -428,6 +437,33 @@ func _debug_tick() -> void:
 				where.append("%s:%s" % [n.id, n.place])
 			print("NPC_PLACES=", ", ".join(where))
 			_save_shot("_npcday.png")
+		341:
+			# 더블 클릭 자동 장착: 빈 앞 번호 슬롯부터 차고, 겹치지 않는다
+			var keep_slots: Array = GameData.tool_slots.duplicate()
+			GameData.tool_slots = []
+			for i in GameData.TOOL_SLOT_COUNT:
+				GameData.tool_slots.append("")
+			m.inventory_ui._auto_equip("axe")
+			m.inventory_ui._auto_equip("hoe")
+			m.inventory_ui._auto_equip("axe")    # 중복 — 새 칸을 먹으면 안 된다
+			print("QUICKSLOT_OK=", GameData.tool_slots[0] == "axe"
+				and GameData.tool_slots[1] == "hoe" and GameData.tool_slots[2] == "",
+				" 슬롯=", GameData.tool_slots.slice(0, 3))
+			GameData.tool_slots = keep_slots
+			# 마트: 선반 4개(카테고리 구매) + 판매는 가방 격자 + 툴팁
+			m.shop_room.open("general")
+			var shelves_ok: bool = m.shop_room.SHELVES.size() == 4 \
+				and m.shop_room._shelf_near() == -1
+			m.shop.open("buy", ["buy"], "잡화점 — 씨앗", "seed")
+			var cat_ok: bool = m.shop.visible and m.shop.buy_cat == "seed"
+			m.shop.close()
+			m.shop.open("sell", ["sell"], "잡화점 — 판매")
+			var grid_ok: bool = m.shop.last_sell_cells > 0
+			m.shop.close()
+			m.shop_room.close()
+			print("MART_OK=", shelves_ok and cat_ok and grid_ok,
+				" 선반=", shelves_ok, " 카테고리=", cat_ok,
+				" 판매격자칸=", m.shop.last_sell_cells)
 		342:
 			# 처음 집(좁은 오두막) 캡처 — 낡은 침대·책상·먼지더미뿐이어야 한다
 			GameData.house_lv = 1

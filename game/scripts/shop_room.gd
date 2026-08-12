@@ -13,6 +13,20 @@ const FLOOR_TOP := 156.0                 # 벽 아래부터 바닥
 const COUNTER := Rect2(276, 252, 408, 54)  # 주인이 뒤에 설 자리를 벽 아래에 남긴다
 const EXIT_X := Vector2(432, 528)        # 아랫벽 문 구간
 
+# 잡화점(마트)만의 배치: 물건은 한가운데 네 선반에서 산다.
+# 계산대는 오른쪽으로 밀려나고, 민지에게는 「판매」만 한다.
+# [카테고리, 표시 이름, 선반 왼쪽 x]
+const SHELVES := [
+	["seed", "씨앗", 168.0],
+	["life", "생활용품", 300.0],
+	["tool", "도구", 432.0],
+	["misc", "기타", 564.0],
+]
+const SHELF_Y := 208.0                   # 선반 윗변
+const SHELF_W := 104.0
+const SHELF_H := 58.0
+const GENERAL_COUNTER := Rect2(688, 336, 124, 50)
+
 const ROOMS := {
 	"general": {
 		"name": "잡화점", "keeper": "merchant",
@@ -130,6 +144,27 @@ func _def() -> Dictionary:
 	return ROOMS.get(room_id, ROOMS.general)
 
 
+# 잡화점은 계산대가 오른쪽 아래로 밀려나 있다 (가운데는 선반 차지)
+func _counter() -> Rect2:
+	return GENERAL_COUNTER if room_id == "general" else COUNTER
+
+
+func _shelf_rect(i: int) -> Rect2:
+	return Rect2(float(SHELVES[i][2]), SHELF_Y, SHELF_W, SHELF_H)
+
+
+# 플레이어가 어느 선반 앞에 서 있는가 (-1 = 없음)
+func _shelf_near() -> int:
+	if room_id != "general":
+		return -1
+	for i in SHELVES.size():
+		var r := _shelf_rect(i)
+		if ppos.y > r.end.y - 6.0 and ppos.y < r.end.y + 52.0 \
+				and ppos.x > r.position.x - 14.0 and ppos.x < r.end.x + 14.0:
+			return i
+	return -1
+
+
 func _process(delta: float) -> void:
 	if not visible or main.dialog.visible or main.shop.visible \
 			or main.inventory_ui.visible:
@@ -146,7 +181,14 @@ func _process(delta: float) -> void:
 		var np := ppos + v * 150.0 * delta
 		np.x = clampf(np.x, ROOM.position.x + 18, ROOM.end.x - 18)
 		np.y = clampf(np.y, FLOOR_TOP + 9, ROOM.end.y - 6)
-		if not Rect2(np.x - 8, np.y - 6, 16, 8).intersects(COUNTER):
+		var feet := Rect2(np.x - 8, np.y - 6, 16, 8)
+		var blocked := feet.intersects(_counter())
+		if room_id == "general":
+			for i in SHELVES.size():
+				if feet.intersects(_shelf_rect(i)):
+					blocked = true
+					break
+		if not blocked:
 			ppos = np
 		anim_time += delta
 		# 아랫문으로 나가기
@@ -157,8 +199,9 @@ func _process(delta: float) -> void:
 
 
 func _at_counter() -> bool:
-	return absf(ppos.y - COUNTER.end.y) < 46.0 \
-		and ppos.x > COUNTER.position.x - 20.0 and ppos.x < COUNTER.end.x + 20.0
+	var c := _counter()
+	return absf(ppos.y - c.end.y) < 46.0 \
+		and ppos.x > c.position.x - 20.0 and ppos.x < c.end.x + 20.0
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -166,10 +209,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			or main.inventory_ui.visible:
 		return
 	if event.is_action_pressed("interact"):
-		if _at_counter():
+		var si := _shelf_near()
+		if si >= 0:
+			# 선반에서 산다 — 그 카테고리의 물건만 진열된다
+			main.shop.open("buy", ["buy"],
+				"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
+		elif _at_counter():
 			var d := _def()
 			if str(d.get("action", "")) != "":
 				main.room_action(str(d.action))   # 여관·연구소·도서관
+			elif room_id == "general":
+				# 민지에게는 판매만 — 구매는 선반에서
+				main.shop.open("sell", ["sell"], "잡화점 — 판매")
 			elif str(d.tab) == "":
 				main.hud.show_message(str(d.hint), 4.0)
 			else:
@@ -261,32 +312,38 @@ func _draw_room() -> void:
 	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP, ROOM.size.x, 14),
 		Color(0, 0, 0, 0.16))
 
+	var C := _counter()
 	# 계산대 앞 깔개 — 손님이 서는 자리를 알려 준다
-	var rug := Rect2(348, 320, 264, 96)
+	var rug := Rect2(348, 320, 264, 96) if room_id != "general" \
+		else Rect2(C.position.x - 16, C.end.y + 10, C.size.x + 32, 52)
 	canvas.draw_rect(rug, Color(0.62, 0.26, 0.24, 0.55))
 	canvas.draw_rect(rug.grow(-8), Color(0.75, 0.38, 0.32, 0.5))
 	canvas.draw_rect(rug, Color(0.35, 0.16, 0.14, 0.5), false, 2.0)
 
 	_draw_deco(str(d.deco), wall)
+	if room_id == "general":
+		_draw_shelves()
 
 	# ---- 계산대 ----
-	canvas.draw_rect(Rect2(COUNTER.position.x, COUNTER.end.y, COUNTER.size.x, 10),
+	canvas.draw_rect(Rect2(C.position.x, C.end.y, C.size.x, 10),
 		Color(0, 0, 0, 0.22))                                   # 바닥 그림자
-	canvas.draw_rect(COUNTER.grow(2), Color(0.2, 0.14, 0.1))
-	canvas.draw_rect(COUNTER, d.counter)
-	canvas.draw_rect(Rect2(COUNTER.position, Vector2(COUNTER.size.x, 9)),
+	canvas.draw_rect(C.grow(2), Color(0.2, 0.14, 0.1))
+	canvas.draw_rect(C, d.counter)
+	canvas.draw_rect(Rect2(C.position, Vector2(C.size.x, 9)),
 		Color(d.counter).lightened(0.32))                       # 상판 하이라이트
 	for i in 6:                                                 # 앞면 판자 이음매
-		canvas.draw_rect(Rect2(COUNTER.position.x + 24 + i * 64, COUNTER.position.y + 12,
-			2, COUNTER.size.y - 14), Color(d.counter).darkened(0.28))
+		var seam_x := C.position.x + 24 + i * 64
+		if seam_x < C.end.x - 6:
+			canvas.draw_rect(Rect2(seam_x, C.position.y + 12,
+				2, C.size.y - 14), Color(d.counter).darkened(0.28))
 
 	# ---- 주인 (계산대 뒤) ----
 	var kt := "npc_%s_down_0" % str(d.keeper)
 	if main.tex.has(kt):
-		canvas.draw_rect(Rect2(COUNTER.get_center().x - 26, COUNTER.position.y - 8, 52, 10),
+		canvas.draw_rect(Rect2(C.get_center().x - 26, C.position.y - 8, 52, 10),
 			Color(0, 0, 0, 0.2))                                # 발밑 그림자
 		canvas.draw_texture_rect(main.tex[kt],
-			Rect2(COUNTER.get_center().x - 32, COUNTER.position.y - 100, 64, 96), false)
+			Rect2(C.get_center().x - 32, C.position.y - 100, 64, 96), false)
 
 	# ---- 아랫문 (문틀 + 매트) ----
 	var dw: float = EXIT_X.y - EXIT_X.x
@@ -299,11 +356,61 @@ func _draw_room() -> void:
 	canvas.draw_string(f, Vector2((EXIT_X.x + EXIT_X.y) / 2.0 - ew / 2.0, ROOM.end.y + 20),
 		"나가기 ▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.8, 0.74))
 
-	if _at_counter():
-		var ht := "E: %s" % str(d.hint)
+	var si := _shelf_near()
+	if si >= 0:
+		var sht := "E: [%s] 선반 — 물건 보기" % str(SHELVES[si][1])
+		var shw: float = f.get_string_size(sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		canvas.draw_string(f, Vector2(480 - shw / 2.0, SHELF_Y + SHELF_H + 66),
+			sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
+	elif _at_counter():
+		var ht := "E: %s" % ("판매 — 민지에게 판다" if room_id == "general" else str(d.hint))
 		var hw: float = f.get_string_size(ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		canvas.draw_string(f, Vector2(480 - hw / 2.0, COUNTER.end.y + 40),
+		canvas.draw_string(f, Vector2(480 - hw / 2.0, C.end.y + 40),
 			ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
+
+
+# 잡화점 한가운데 네 선반 — 카테고리마다 다른 물건이 얹혀 있고,
+# 아래에 팻말이 붙어 있다. 선반 앞에서 E를 누르면 그 칸의 진열대가 열린다.
+func _draw_shelves() -> void:
+	var f: Font = main.UI_FONT
+	for i in SHELVES.size():
+		var r := _shelf_rect(i)
+		var cat: String = SHELVES[i][0]
+		# 바닥 그림자 + 나무 몸통
+		canvas.draw_rect(Rect2(r.position.x + 2, r.end.y, r.size.x - 4, 8),
+			Color(0, 0, 0, 0.2))
+		canvas.draw_rect(r.grow(2), Color(0.24, 0.16, 0.1))
+		canvas.draw_rect(r, Color(0.55, 0.4, 0.24))
+		canvas.draw_rect(Rect2(r.position, Vector2(r.size.x, 7)), Color(0.68, 0.52, 0.32))
+		canvas.draw_rect(Rect2(r.position.x, r.position.y + 30, r.size.x, 5),
+			Color(0.4, 0.29, 0.17))
+		# 얹힌 물건 — 카테고리마다 다르게
+		match cat:
+			"seed":
+				for j in 3:
+					var sx := r.position.x + 12 + j * 30.0
+					canvas.draw_rect(Rect2(sx, r.position.y + 12, 18, 14), Color(0.82, 0.68, 0.4))
+					canvas.draw_rect(Rect2(sx + 5, r.position.y + 8, 8, 5), Color(0.4, 0.7, 0.35))
+			"life":
+				canvas.draw_rect(Rect2(r.position.x + 12, r.position.y + 9, 6, 18), Color(0.6, 0.44, 0.24))
+				canvas.draw_rect(Rect2(r.position.x + 9, r.position.y + 22, 12, 6), Color(0.85, 0.75, 0.5))
+				canvas.draw_rect(Rect2(r.position.x + 40, r.position.y + 12, 16, 14), Color(0.7, 0.82, 0.9))
+				canvas.draw_rect(Rect2(r.position.x + 70, r.position.y + 10, 14, 16), Color(0.85, 0.6, 0.5))
+			"tool":
+				canvas.draw_rect(Rect2(r.position.x + 12, r.position.y + 16, 22, 10), Color(0.55, 0.55, 0.6))
+				canvas.draw_rect(Rect2(r.position.x + 46, r.position.y + 10, 8, 16), Color(0.72, 0.72, 0.78))
+				canvas.draw_rect(Rect2(r.position.x + 68, r.position.y + 12, 20, 12), Color(0.75, 0.65, 0.45))
+			_:
+				canvas.draw_rect(Rect2(r.position.x + 14, r.position.y + 10, 12, 16), Color(0.9, 0.55, 0.6))
+				canvas.draw_rect(Rect2(r.position.x + 44, r.position.y + 14, 18, 12), Color(0.6, 0.7, 0.85))
+		# 팻말 (카테고리 이름)
+		var label: String = "[%s]" % SHELVES[i][1]
+		var lw: float = f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		var plate := Rect2(r.get_center().x - lw / 2.0 - 6, r.end.y + 10, lw + 12, 22)
+		canvas.draw_rect(plate, Color(0.28, 0.19, 0.11))
+		canvas.draw_rect(plate.grow(-2), Color(0.8, 0.68, 0.45))
+		canvas.draw_string(f, Vector2(plate.position.x + 6, plate.end.y - 6),
+			label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.25, 0.15, 0.06))
 
 
 # 가게마다 다른 소품

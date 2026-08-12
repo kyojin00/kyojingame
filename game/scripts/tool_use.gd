@@ -253,6 +253,10 @@ func use_tool() -> void:
 				if bool(obj.get("young", false)):
 					m.hud.show_message("아직 어린 나무다. 다 자라면 벨 수 있다.")
 					return
+				if bool(obj.get("fixed", false)):
+					# 마을 초입 가리개 숲 — 베어서 뚫을 수 없다 (길은 하나뿐)
+					m.hud.show_message("나무가 너무 우거져 벨 엄두가 나지 않는다.")
+					return
 				obj.hp -= int(GameData.tool_stat("axe", "power"))
 				Sound.play_sfx("sfx_chop", 0.15)
 				swing_at(t, "wood")
