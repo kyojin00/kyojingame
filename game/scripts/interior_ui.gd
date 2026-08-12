@@ -580,7 +580,14 @@ func _draw_kitchen() -> void:
 
 # 침대 (직접 만들어야 생긴다 — 만들기 전에는 빈 자리 표시)
 func _draw_bed() -> void:
-	if GameData.has_bed:
+	if GameData.has_bed and GameData.bed_lv == 0 and main.tex.has("bed_old"):
+		# 할아버지가 쓰던 낡은 침대 — 올려 준 손그림 (비율 유지, 칸 중심에)
+		var t: Texture2D = main.tex["bed_old"]
+		var r := BED.grow(10)
+		var s := minf(r.size.x / t.get_width(), r.size.y / t.get_height())
+		var sz := Vector2(t.get_width(), t.get_height()) * s
+		canvas.draw_texture_rect(t, Rect2(r.get_center() - sz / 2.0, sz), false)
+	elif GameData.has_bed:
 		canvas.draw_rect(BED.grow(2), Color(0.35, 0.23, 0.14))
 		canvas.draw_rect(BED, Color(0.75, 0.3, 0.28))
 		canvas.draw_rect(Rect2(BED.position.x + 3, BED.position.y + 3, BED.size.x - 6, 16),

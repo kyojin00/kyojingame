@@ -170,6 +170,7 @@ const TEXTURE_NAMES := [
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
+	"board_quest", "board_unlock", "bed_old",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
 	"house_library", "house_ranch", "house_fish",
@@ -281,6 +282,13 @@ const FISH_DECK_X0 := 71                   # 강 첫 줄(y=27)에 깔리는 데�
 const FISH_DECK_X1 := 94
 const FISH_PIERS := [Vector2i(72, 73), Vector2i(80, 81), Vector2i(88, 89)]  # 물로 내민 부두 (x 구간)
 const FISH_SIGN := Vector2i(70, 38)
+# 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
+const SEA_RIDGE_Y := 77            # 바위 능선 줄 — 바다로 가는 길을 막는다
+const BEACH_Y0 := 78               # 모래사장 (능선 아래 ~ 바다 위)
+const SEA_Y0 := 83                 # 여기부터 남쪽 끝까지 바다
+const SEA_GATE := [Vector2i(63, 77), Vector2i(64, 77)]  # 곡괭이로 캐서 여는 길목
+const FISHER_ARRIVE := Vector2i(78, 23)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
+const SHELL_CAP := 8               # 해변 채집물(조개/산호) 최대 수
 const FISH_LAMPS := [Vector2i(72, 37), Vector2i(79, 37), Vector2i(86, 37), Vector2i(93, 37)]
 const FISH_BENCHES := [Vector2i(75, 38), Vector2i(83, 38), Vector2i(91, 38)]
 const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있다」
@@ -535,6 +543,8 @@ func _ready() -> void:
 		elif GameData.story_phase == "greet":
 			# 집에 들어간 직후 저장했다면, 나온 셈 치고 이장이 다가온다
 			story.start_home_greet.call_deferred()
+		if GameData.fisher_quest in ["meet", "follow", "open"]:
+			story._restore_fisher.call_deferred()   # 낚시꾼 연출 자리 복구
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		GameData.reset_all()
@@ -671,7 +681,8 @@ const BUILDING_KINDS := ["house", "art_block", "barn", "barn_block"]
 const OBJECT_SCALES := {
 	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
 	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
-	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5,
+	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
+	"forage_shell": 1.2, "forage_coral": 1.3,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
@@ -703,6 +714,7 @@ const OBJECT_PAD := {
 	# 세로 여백(pad.y)은 12를 넘기면 안 된다 — 같은 줄로 늘어선 것들 사이의
 	# 한 칸 틈이 막힌다 (퀘스트 5의 바위벽. BIGROCK_GAP_OK가 잡아낸다)
 	"tree": Vector2(13, 9), "bigrock": Vector2(26, 8), "rock": Vector2(13, 9),
+	"searock": Vector2(10, 8),
 	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
@@ -831,7 +843,8 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 
 # 채집·벌목·채광 대상이 되는 것들
-const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed"]
+const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
+	"forage_shell", "forage_coral"]
 
 # E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
 const WORK_LOCK_TIME := 0.9
@@ -1020,6 +1033,7 @@ var bugs: Array = []
 func _process(delta: float) -> void:
 	_bgm_tick(delta)
 	story._story_update(delta)
+	story._fisher_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_object_fade(delta)
@@ -1308,6 +1322,7 @@ func _draw() -> void:
 	var edges := {}
 	var crops := {}
 	var docks: Array[Vector2] = []
+	var sands: Array[Vector2] = []
 
 	var put := func(bin: Dictionary, t: Texture2D, at: Vector2) -> void:
 		if not bin.has(t):
@@ -1336,6 +1351,8 @@ func _draw() -> void:
 			var ground: String = cell.ground
 			if ground == "dock":
 				docks.append(at)
+			elif ground == "sand":
+				sands.append(at)
 			elif ground == "water":
 				put.call(base, tex["water_%d" % water_frame], at)
 			elif ground == "soil":
@@ -1373,6 +1390,22 @@ func _draw() -> void:
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)
+	# 해변 모래밭 — 옅은 모래 바탕에 알갱이를 점점이 뿌린다
+	if not sands.is_empty():
+		for at: Vector2 in sands:
+			draw_rect(Rect2(at, tile_size), Color(0.87, 0.79, 0.57))
+		for at: Vector2 in sands:
+			var gx := int(at.x / TILE)
+			var gy := int(at.y / TILE)
+			for i in 3:
+				var hx := _hash01(gx * 7 + i * 13, gy * 11 + i * 5)
+				var hy := _hash01(gx * 5 + i * 3, gy * 13 + i * 7)
+				draw_rect(Rect2(at + Vector2(hx * 28.0 + 2.0, hy * 28.0 + 2.0),
+					Vector2(2, 2)), Color(0.76, 0.66, 0.44, 0.85))
+			# 바다와 닿는 줄에는 물거품 띠
+			if gy + 1 < MAP_H and grid[gy + 1][gx].ground == "water":
+				draw_rect(Rect2(at + Vector2(0, TILE - 3), Vector2(TILE, 3)),
+					Color(0.95, 0.97, 0.98, 0.75))
 	# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
 	if not docks.is_empty():
 		var wt: Texture2D = tex["water_%d" % water_frame]

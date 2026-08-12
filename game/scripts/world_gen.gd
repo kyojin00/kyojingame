@@ -110,6 +110,50 @@ func _build_map() -> void:
 	for p: Vector2i in m.FISH_BENCHES:
 		m.objects[p] = {"kind": "deco_bench", "hp": 0}
 
+	_build_sea()
+
+
+# 남쪽 끝 바다 + 해변 모래밭. 뭍과는 바위 능선으로 갈라져 있고,
+# 길목(SEA_GATE)의 커다란 바위는 낚시꾼 퀘스트에서 캐서 연다.
+func _build_sea() -> void:
+	for y in range(m.SEA_Y0, m.MAP_H):
+		for x in m.MAP_W:
+			m.grid[y][x].ground = "water"
+			m.objects.erase(Vector2i(x, y))
+	for y in range(m.BEACH_Y0, m.SEA_Y0):
+		for x in m.MAP_W:
+			m.grid[y][x].ground = "sand"
+			m.objects.erase(Vector2i(x, y))
+	for x in m.MAP_W:
+		var p := Vector2i(x, m.SEA_RIDGE_Y)
+		m.objects.erase(p)
+		if p in m.SEA_GATE:
+			continue
+		m.objects[p] = {"kind": "searock", "hp": 0}
+	for p: Vector2i in m.SEA_GATE:
+		if not GameData.sea_open:
+			m.objects[p] = {"kind": "bigrock", "hp": m.BIGROCK_HP, "fixed": true}
+	if GameData.sea_open:
+		_seed_beach_forage(false)   # 노드는 뒤이어 _spawn_objects가 만든다
+
+
+# 바다를 연 직후/불러온 직후 해변에 조개를 몇 개 깔아 둔다
+func _seed_beach_forage(with_node := true) -> void:
+	for i in 4:
+		_try_spawn_shell(with_node)
+
+
+func _try_spawn_shell(with_node := true) -> bool:
+	var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(m.BEACH_Y0, m.SEA_Y0 - 1))
+	if m.objects.has(pos) or m.grid[pos.y][pos.x].ground != "sand":
+		return false
+	var kind := "forage_shell" if randf() < 0.88 else "forage_coral"
+	if with_node:
+		m.objnode._place_object(pos, kind, 0)
+	else:
+		m.objects[pos] = {"kind": kind, "hp": 0}
+	return true
+
 
 # 교진 마을: 건물은 하나도 짓지 않는다.
 # 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
@@ -448,6 +492,18 @@ func _respawn_forage() -> void:
 			else ("forage_herb" if roll < 0.8 else "weed")
 		m.objnode._place_object(pos, kind, 0)
 		count += 1
+
+	# 해변: 바다를 열었으면 아침마다 조개(흔함)·산호(드묾)가 밀려온다
+	if GameData.sea_open:
+		var shells := 0
+		for pos in m.objects:
+			if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+				shells += 1
+		for attempt in 10:
+			if shells >= m.SHELL_CAP:
+				break
+			if _try_spawn_shell():
+				shells += 1
 
 
 func _spawn_bugs() -> void:

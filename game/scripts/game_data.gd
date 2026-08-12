@@ -673,6 +673,26 @@ const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
 	"library", "fish"]
 var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
 
+# 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
+# 남쪽 바위 능선을 뚫어 바다·해변을 열고, 간이낚싯대(낚시)를 얻는다.
+#   "": 아직 (첫 수확 뒤 시작) / meet: 광장의 낚시꾼에게 말 걸기 /
+#   follow: 함께 능선으로 / open: 길목 바위 캐기 / done: 완료
+var fisher_quest := ""
+var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
+var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
+
+
+func fisher_objective_short() -> String:
+	match fisher_quest:
+		"meet":
+			return "마을 광장의 낚시꾼에게 말을 걸어 보자 (E)"
+		"follow":
+			return "낚시꾼과 함께 남쪽 바위 능선으로 가자 (화살표 방향)"
+		"open":
+			return "곡괭이로 길목의 커다란 바위를 캐서 바닷길을 열자"
+	return ""
+
+
 # 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
 var house_lv := 0
 var has_bed := false  # 침대는 직접 제작해야 잠을 잘 수 있다
@@ -1090,6 +1110,9 @@ const ITEMS := {
 	"forage_berry": {"name": "산딸기", "sell": 40},
 	"weed": {"name": "잡초", "sell": 5},
 	"broom": {"name": "빗자루", "sell": 0},
+	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
+	"forage_shell": {"name": "조개", "sell": 35},
+	"forage_coral": {"name": "산호", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
 	"bug_dragonfly": {"name": "잠자리", "sell": 50},
@@ -1131,13 +1154,15 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
-	"forage_berry", "forage_herb", "weed", "broom", "bug_butterfly", "bug_dragonfly", "bug_firefly",
+	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
+	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
 	"potion_guard", "potion_moon", "sludge"]
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
-const FORAGE_IDS := ["forage_berry", "forage_herb", "weed"]   # 잡초는 화분 재료 (노점 계획)
+const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
+	"forage_shell", "forage_coral"]   # 잡초는 화분 재료 · 조개/산호는 해변(바다 해금 후)
 const BUG_IDS := ["bug_butterfly", "bug_dragonfly", "bug_firefly"]
 # 곤충 출현 조건
 const BUGS := {
@@ -1311,6 +1336,8 @@ const REAGENTS := {
 	# 채집물 · 곤충
 	"forage_berry": {"life": 1, "water": 1},
 	"forage_herb": {"life": 2, "earth": 1},
+	"forage_shell": {"water": 2},
+	"forage_coral": {"water": 2, "life": 1},
 	"bug_butterfly": {"light": 1, "life": 1},
 	"bug_dragonfly": {"light": 1, "water": 1},
 	"bug_firefly": {"light": 2, "life": 1},
@@ -1944,7 +1971,7 @@ const NPCS := {
 	"married": ["아침에 국 끓여 놨어. 식기 전에 먹어.",
 		"오늘은 일찍 접고 왔어. 집에 오고 싶어서."],
 	"loves": ["fish_golden", "dish_sashimi", "dish_grilled_fish", "fish_king"],
-	"likes": ["fish_carp", "fish_catfish", "dish_stew", "forage_herb"],
+	"likes": ["fish_carp", "fish_catfish", "dish_stew", "forage_herb", "forage_shell"],
 	"hates": ["sludge", "dish_jam"],
 	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
 	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
@@ -2602,6 +2629,9 @@ func reset_all() -> void:
 	desk_done_pending.clear()
 	dust_swept = 0
 	kitchen_found = false
+	fisher_quest = ""
+	fisher_choice = 0
+	sea_open = false
 	if DEV_MODE:
 		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
 		wood = DEV_STOCK
@@ -2919,6 +2949,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"has_bed": has_bed,
 		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
+		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
+		"sea_open": sea_open,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

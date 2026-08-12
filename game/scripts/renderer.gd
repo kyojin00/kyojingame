@@ -147,6 +147,10 @@ func _draw_overlay() -> void:
 	# 말을 걸어 달라는 표시: 머리 위에서 통통 튀는 느낌표
 	if m.story._postman != null and m.story._postman_state == "wait" and not m.ui_open():
 		_draw_bang(m.story._postman.position + Vector2(0, -136))
+	if GameData.fisher_quest == "meet" and not m.ui_open():
+		var fn: Variant = m.story._fisher_node()
+		if fn != null and fn.visible:
+			_draw_bang(fn.position + Vector2(0, -124))
 
 	for pt in m.particles:
 		m.overlay.draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
@@ -276,6 +280,15 @@ func nav_target() -> Variant:
 			(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
 	if GameData.story_phase != "done":
 		return null  # 숲 구간에서는 화살표를 띄우지 않는다
+	# 낚시꾼 퀘스트 (메인 스토리 3): 낚시꾼 -> 남쪽 능선 길목
+	match GameData.fisher_quest:
+		"meet":
+			var fn: Variant = m.story._fisher_node()
+			if fn != null:
+				return fn.position
+		"follow", "open":
+			return Vector2(m.SEA_GATE[0].x * m.TILE + 32.0,
+				m.SEA_GATE[0].y * m.TILE - 16.0)
 	match GameData.tutorial_current_flag():
 		"slept":
 			# 우리집(마을 서쪽) 문 앞

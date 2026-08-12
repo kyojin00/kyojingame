@@ -150,6 +150,27 @@ func _rebuild() -> void:
 		_tut_section(false)
 		_line("")
 
+	# 메인 스토리 3 — 낚시꾼과 바다 (첫 수확 뒤 시작)
+	_line("[메인 스토리 3 — 낚시꾼과 바다]", COL_HEAD)
+	var fq: String = GameData.fisher_quest
+	if fq == "":
+		_line("  - ??? (밭이 자리를 잡으면 이어진다)", COL_DIM)
+	else:
+		var order := ["meet", "follow", "open", "done"]
+		var steps := ["낯선 낚시꾼에게 말을 걸어 보자",
+			"낚시꾼과 함께 남쪽 바위 능선으로 가자",
+			"길목의 커다란 바위를 캐서 바닷길을 열자",
+			"바다·해변 해금 + 간이낚싯대 (낚시 해금)"]
+		var idx := order.find(fq)
+		for i in steps.size():
+			if i < idx or fq == "done":
+				_line("  V " + steps[i], COL_DONE)
+			elif i == idx:
+				_line("  > " + steps[i], COL_NOW)
+			else:
+				_line("  - " + steps[i], COL_DIM)
+	_line("")
+
 	# 계절 축제 (계절마다 하루)
 	_line("[계절 축제]", COL_HEAD)
 	var ft: Dictionary = GameData.festival_today()

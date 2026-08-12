@@ -1179,6 +1179,49 @@ func _debug_tick() -> void:
 				if crops < 5 or fishes < 6:
 					thin = true
 			print("SEASON_CONTENT_OK=", not thin, " ", per_season)
+		376:
+			# 낚시꾼 퀘스트(메인 스토리 3): 등장 -> 황금잉어 선택지 ->
+			# 길목 바위 -> 바다/해변 해금 + 간이낚싯대(낚시 해금) + 조개
+			GameData.fisher_quest = ""
+			GameData.sea_open = false
+			GameData.unlocked_tools.erase("rod")
+			GameData.tutorial["harvest"] = true
+			m.story._fisher_update(0.016)          # 첫 수확 뒤 낚시꾼이 온다
+			var met: bool = GameData.fisher_quest == "meet" \
+				and m.story._fisher_node() != null
+			m.story._start_fisher_dialog()
+			var choice_shown := m.dialog.visible
+			m.dialog.close()
+			m.story._fisher_choose(2)              # 선택지 — 대사만 갈린다
+			var picked: bool = GameData.fisher_choice == 2 and m.dialog.visible
+			m.dialog.close()
+			m.story._end_fisher_meet()
+			var follow: bool = GameData.fisher_quest == "follow" \
+				and GameData.fisher_objective_short() != ""
+			GameData.fisher_quest = "open"         # 게이트 앞 대화가 끝난 상태
+			for p: Vector2i in m.SEA_GATE:         # 길목 바위 둘을 캐낸 셈 친다
+				m.objnode._remove_object(p)
+			m.story._sea_gate_mined()              # -> 보상(간이낚싯대) 대화
+			var reward := m.dialog.visible
+			m.dialog.close()
+			m.story._end_fisher_quest()
+			var sea: bool = GameData.sea_open and GameData.fisher_quest == "done" \
+				and GameData.is_tool_unlocked("rod")
+			var ridge: bool = str(m.objects.get(Vector2i(30, m.SEA_RIDGE_Y),
+				{}).get("kind", "")) == "searock"
+			var sand: bool = m.grid[m.BEACH_Y0][30].ground == "sand"
+			var water: bool = m.grid[m.MAP_H - 2][30].ground == "water"
+			var shells := 0
+			for pos in m.objects:
+				if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+					shells += 1
+			var shell_ok: bool = GameData.ITEMS.has("forage_shell") \
+				and m.tex.has("forage_shell") and m.tex.has("forage_coral") and shells > 0
+			print("SEA_OK=", met and choice_shown and picked and follow and reward
+				and sea and ridge and sand and water and shell_ok,
+				" 등장=", met, " 선택지=", choice_shown, " 선택반영=", picked,
+				" 동행=", follow, " 보상대화=", reward, " 바다해금=", sea,
+				" 능선=", ridge, " 모래=", sand, " 바닷물=", water, " 조개=", shells)
 		378:
 			# 스토리 1->2 연결: 편지 전달 -> 집 해금 -> 입장(1막 끝) ->
 			# 나오면 이장이 다가와 대화(2막 시작). 안내는 선택 서브퀘로 분리.

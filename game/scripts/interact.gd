@@ -222,6 +222,9 @@ func interact() -> void:
 			elif Net.is_guest():
 				m.netsync._req_gain.rpc_id(1, fid, 1)
 			return
+		if obj.kind == "searock":
+			m.hud.show_message("울퉁불퉁한 바위 능선이다. 이 너머가 바다인 모양이다.")
+			return
 		if obj.kind == "worldtree":
 			m.cave.open(true)
 			return

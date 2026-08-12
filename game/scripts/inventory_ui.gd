@@ -713,6 +713,10 @@ func _item_entries() -> Array:
 			e["desc"] = "축사 동물이 준 선물. 요리 재료로도 쓴다"
 		elif id == "weed":
 			e["desc"] = "숲에서 채집할 수 있는 풀. 빗자루 재료 (제작대)"
+		elif id == "forage_shell":
+			e["desc"] = "해변 모래밭에 밀려온 조개. 아침마다 새로 밀려온다"
+		elif id == "forage_coral":
+			e["desc"] = "파도가 실어 온 산호 가지 — 해변에서 드물게 보인다"
 		elif id == "broom":
 			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
 		elif id in ["nail", "cloth", "rope", "hinge"]:

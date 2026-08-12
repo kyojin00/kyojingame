@@ -88,6 +88,10 @@ func _build_village_building(pid: String) -> void:
 
 
 func _talk_to(npc: Node2D) -> void:
+	# 낚시꾼 퀘스트: 처음 만나는 낚시꾼은 스토리 대화로 이어진다
+	if npc.id == "fisher" and GameData.fisher_quest == "meet":
+		m.story._start_fisher_dialog()
+		return
 	var def: Dictionary = GameData.NPCS[npc.id]
 	if not npc.talked_today:
 		npc.talked_today = true

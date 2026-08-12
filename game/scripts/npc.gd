@@ -44,7 +44,9 @@ func _process(delta: float) -> void:
 	# (이장은 스토리 편지 전달~집 인사 동안에는 남아 있는다)
 	var home_time: bool = GameData.is_evening() \
 		and not (id == "chief" and (scripted
-			or GameData.story_phase in ["travel", "home_open", "greet"]))
+			or GameData.story_phase in ["travel", "home_open", "greet"])) \
+		and not (id == "fisher"
+			and GameData.fisher_quest in ["meet", "follow", "open"])
 	if visible == home_time:
 		visible = not home_time
 	if home_time:

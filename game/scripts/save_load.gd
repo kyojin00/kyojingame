@@ -51,6 +51,9 @@ func _apply_save(d: Dictionary) -> void:
 	# 침대 등급이 생기기 전 세이브: 만들어 둔 침대는 나무 침대(100%)로 쳐 준다
 	GameData.bed_lv = int(d.get("bed_lv", 1 if GameData.has_bed else 0))
 	GameData.dust_swept = int(d.get("dust_swept", 0))
+	GameData.fisher_quest = str(d.get("fisher_quest", ""))
+	GameData.fisher_choice = int(d.get("fisher_choice", 0))
+	GameData.sea_open = bool(d.get("sea_open", false))
 	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
 	# 발견한 것으로 친다 — 쓰던 부엌이 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",
