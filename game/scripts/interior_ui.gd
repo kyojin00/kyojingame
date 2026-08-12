@@ -1,15 +1,43 @@
 # 집 내부: 문에서 E로 입장, 침대에서 잠자기, F로 꾸미기 모드, 아래 문으로 나가기.
+#
+# 방 배치는 집 단계를 따라간다. 처음 집(1단계)은 할아버지가 살던 좁은
+# 오두막 — 낡은 침대·낡은 책상·먼지더미(조리대가 묻혀 있다)뿐이다.
+# 확장(2단계)하면 방이 넓어지고 조합대·가구 꾸미기가 생긴다.
 extends CanvasLayer
 
-const ROOM := Rect2(120, 75, 720, 390)  # 방 전체 (벽 포함)
-const FLOOR_TOP := 156.0                # 벽 아래부터 바닥
-const BED := Rect2(156, 162, 69, 99)
-const DESK := Rect2(597, 288, 105, 48)   # 제작대 — 오른쪽 아랫벽 쪽
-const KITCHEN := Rect2(600, 117, 93, 39)  # 조리대 (윗벽에 붙박이)
-# 연금술 조합대 (윗벽, 조리대 반대편). 왼쪽 창문(x 270~330)을 가리지 않는 자리다.
-const ALCHEMY := Rect2(345, 117, 108, 39)
-const EXIT_X := Vector2(408, 552)       # 아랫벽 문 구간
+var ROOM := Rect2(120, 75, 720, 390)  # 방 전체 (벽 포함)
+var FLOOR_TOP := 156.0                # 벽 아래부터 바닥
+var BED := Rect2(156, 162, 69, 99)
+var DESK := Rect2(597, 288, 105, 48)   # 제작대 — 오른쪽 아랫벽 쪽
+var KITCHEN := Rect2(600, 117, 93, 39)  # 조리대 (윗벽에 붙박이)
+# 연금술 조합대 (윗벽, 조리대 반대편). 확장 전에는 없다.
+var ALCHEMY := Rect2(345, 117, 108, 39)
+var EXIT_X := Vector2(408, 552)       # 아랫벽 문 구간
+var WINDOWS: Array = [270.0, 690.0]   # 창문 x 자리
 const GRID := 12.0                      # 꾸미기 배치 격자
+
+
+# 집 단계에 맞춰 방 크기와 붙박이 자리를 정한다
+func _layout() -> void:
+	if GameData.house_lv >= 2:
+		ROOM = Rect2(120, 75, 720, 390)
+		FLOOR_TOP = 156.0
+		BED = Rect2(156, 162, 69, 99)
+		DESK = Rect2(597, 288, 105, 48)
+		KITCHEN = Rect2(600, 117, 93, 39)
+		ALCHEMY = Rect2(345, 117, 108, 39)
+		EXIT_X = Vector2(408, 552)
+		WINDOWS = [270.0, 690.0]
+	else:
+		# 좁은 오두막 — 큰 방의 6할쯤. 세간이라곤 침대·책상·먼지더미뿐
+		ROOM = Rect2(255, 135, 450, 300)
+		FLOOR_TOP = 216.0
+		BED = Rect2(285, 231, 69, 99)
+		DESK = Rect2(576, 348, 105, 48)
+		KITCHEN = Rect2(576, 177, 93, 39)
+		ALCHEMY = Rect2(-900, -900, 108, 39)   # 화면 밖 = 없음
+		EXIT_X = Vector2(432, 528)
+		WINDOWS = [345.0]
 
 var main: Node2D
 var canvas: Control
@@ -48,11 +76,13 @@ func _ready() -> void:
 
 func open() -> void:
 	visible = true
-	ppos = Vector2(480, 444)
+	_layout()
+	ppos = Vector2((EXIT_X.x + EXIT_X.y) / 2.0, ROOM.end.y - 12)
 	pdir = "up"
 	deco_mode = false
 	held = {}
 	Sound.play_sfx("sfx_place")
+	main.story.home_entered()   # 처음 들어온 순간 메인 스토리 1이 끝난다
 	canvas.queue_redraw()
 
 
@@ -61,11 +91,15 @@ func close() -> void:
 		_exit_deco()
 	visible = false
 	Sound.play_sfx("sfx_place")
+	# 스토리: 첫 집 구경을 마치고 나오면 이장이 문 앞으로 걸어온다
+	if GameData.story_phase == "greet":
+		main.story.start_home_greet.call_deferred()
 
 
 func _process(delta: float) -> void:
 	if not visible or main.dialog.visible or main.sleep_dialog.visible \
-			or main.summary.visible or main.cooking_ui.visible or main.desk_ui.visible:
+			or main.summary.visible or main.cooking_ui.visible or main.desk_ui.visible \
+			or main.inventory_ui.visible:
 		moving = false
 		_update_sprite()
 		return
@@ -117,9 +151,10 @@ func _blocked(p: Vector2) -> bool:
 	var feet := Rect2(p.x - 8, p.y - 6, 16, 8)
 	if feet.intersects(BED):
 		return true
-	for f in GameData.furniture:
-		if GameData.FURNITURE[f.id].solid and feet.intersects(_furn_rect(f)):
-			return true
+	if GameData.house_lv >= 2:   # 가구는 확장한 집에만 있다
+		for f in GameData.furniture:
+			if GameData.FURNITURE[f.id].solid and feet.intersects(_furn_rect(f)):
+				return true
 	return false
 
 
@@ -248,8 +283,12 @@ func _upgrade_house() -> void:
 	GameData.wood -= GameData.HOUSE_UPGRADE_WOOD
 	GameData.stone -= GameData.HOUSE_UPGRADE_STONE
 	GameData.house_lv = 2
+	if GameData.furniture.is_empty():
+		GameData.furniture = GameData.default_furniture()  # 확장 기념 기본 세간
+	_layout()
+	canvas.queue_redraw()
 	Sound.play_sfx("sfx_place")
-	main.dialog.set_body("집 확장 완료!\n부엌(요리)과 꾸미기(F)를 쓸 수 있다.")
+	main.dialog.set_body("집 확장 완료!\n방이 넓어지고, 연금술 조합대와 가구 꾸미기(F)가 생겼다.")
 	main.dialog.set_buttons([["좋아!", null]])
 	main.hud.quest_toast("집 확장")
 	main.saveio.save_now()
@@ -392,12 +431,13 @@ func _draw_room() -> void:
 	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, FLOOR_TOP - ROOM.position.y)),
 		Color(0.42, 0.29, 0.19))
 	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, 8)), Color(0.3, 0.2, 0.13))
-	# 창문 2개 (밖의 하늘)
-	for wx in [270.0, 690.0]:
-		canvas.draw_rect(Rect2(wx, 99, 60, 39), Color(0.25, 0.17, 0.11))
-		canvas.draw_rect(Rect2(wx + 3, 102, 54, 33),
+	# 창문 (밖의 하늘) — 좁은 집은 하나뿐이다
+	var wy := ROOM.position.y + 24.0
+	for wx: float in WINDOWS:
+		canvas.draw_rect(Rect2(wx, wy, 60, 39), Color(0.25, 0.17, 0.11))
+		canvas.draw_rect(Rect2(wx + 3, wy + 3, 54, 33),
 			Color(0.55, 0.75, 0.95) if GameData.minutes < 18 * 60 else Color(0.13, 0.12, 0.3))
-		canvas.draw_rect(Rect2(wx + 28, 102, 3, 33), Color(0.25, 0.17, 0.11))
+		canvas.draw_rect(Rect2(wx + 28, wy + 3, 3, 33), Color(0.25, 0.17, 0.11))
 
 	# 바닥 (나무 판자)
 	var y := FLOOR_TOP
@@ -440,7 +480,40 @@ func _draw_room() -> void:
 		canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y - 10, DESK.size.x * clampf(frac, 0.0, 1.0), 6),
 			Color(0.55, 0.85, 0.45))
 
-	# 연금술 조합대 (고정) — 할아버지가 쓰던 자리
+	# 연금술 조합대 — 확장한 집에만 있다
+	if GameData.house_lv >= 2:
+		_draw_alchemy()
+
+	_draw_kitchen()
+	_draw_bed()
+
+	# 배치된 가구 (확장한 집에만 — 러그 같은 비충돌 가구 먼저, 그 위에 솔리드)
+	if GameData.house_lv >= 2:
+		for f in GameData.furniture:
+			if not GameData.FURNITURE[f.id].solid:
+				_draw_furniture(f)
+		for f in GameData.furniture:
+			if GameData.FURNITURE[f.id].solid:
+				_draw_furniture(f)
+
+	# 아랫문 (매트)
+	canvas.draw_rect(Rect2(EXIT_X.x, ROOM.end.y - 8, EXIT_X.y - EXIT_X.x, 8), Color(0.35, 0.25, 0.15))
+	canvas.draw_rect(Rect2(EXIT_X.x + 6, ROOM.end.y - 6, EXIT_X.y - EXIT_X.x - 12, 4), Color(0.7, 0.6, 0.4))
+
+	# 그림자 + 안내
+	canvas.draw_rect(Rect2(ppos.x - 4, ppos.y - 2, 8, 3), Color(0, 0, 0, 0.22))
+	if deco_mode:
+		_draw_deco_ui()
+	else:
+		var guide := "E: 잠자기/요리/연금술 · F: 꾸미기 · 아랫문: 나가기"
+		if not GameData.has_bed:
+			guide = "침대 자리 E: 침대 만들기 · 아랫문: 나가기"
+		elif GameData.house_lv < 2:
+			guide = "침대 E: 잠자기 · 책상 E: 제작 · F: 집 확장 · 아랫문: 나가기"
+		_draw_center_text(guide, 72)
+
+
+func _draw_alchemy() -> void:
 	canvas.draw_rect(ALCHEMY, Color(0.34, 0.28, 0.42))
 	canvas.draw_rect(Rect2(ALCHEMY.position, Vector2(ALCHEMY.size.x, 6)),
 		Color(0.5, 0.44, 0.62))
@@ -462,8 +535,10 @@ func _draw_room() -> void:
 	canvas.draw_rect(Rect2(ALCHEMY.end.x - 17, ALCHEMY.position.y + 1, 1, 5),
 		Color(0.6, 0.5, 0.36))
 
-	# 주방 조리대 (고정). 발견 전에는 먼지와 잡동사니 더미로 덮여 있다 —
-	# 빗자루로 쓸 때마다(dust_swept) 한 겹씩 걷힌다.
+
+# 주방 조리대 (고정). 발견 전에는 먼지와 잡동사니 더미로 덮여 있다 —
+# 빗자루로 쓸 때마다(dust_swept) 한 겹씩 걷힌다.
+func _draw_kitchen() -> void:
 	if not GameData.kitchen_found:
 		var left := GameData.DUST_TOTAL - GameData.dust_swept
 		# 바탕: 뭔가 있긴 한 실루엣
@@ -502,7 +577,9 @@ func _draw_room() -> void:
 		canvas.draw_rect(Rect2(KITCHEN.end.x - 10, KITCHEN.position.y + 1, 6, 4),
 			Color(0.9, 0.9, 0.92))
 
-	# 침대 (직접 만들어야 생긴다 — 만들기 전에는 빈 자리 표시)
+
+# 침대 (직접 만들어야 생긴다 — 만들기 전에는 빈 자리 표시)
+func _draw_bed() -> void:
 	if GameData.has_bed:
 		canvas.draw_rect(BED.grow(2), Color(0.35, 0.23, 0.14))
 		canvas.draw_rect(BED, Color(0.75, 0.3, 0.28))
@@ -513,30 +590,6 @@ func _draw_room() -> void:
 	else:
 		canvas.draw_rect(BED, Color(0.5, 0.42, 0.3, 0.35))
 		canvas.draw_rect(BED, Color(0.45, 0.35, 0.22, 0.8), false, 2.0)
-
-	# 배치된 가구 (러그 같은 비충돌 가구 먼저 → 그 위에 솔리드)
-	for f in GameData.furniture:
-		if not GameData.FURNITURE[f.id].solid:
-			_draw_furniture(f)
-	for f in GameData.furniture:
-		if GameData.FURNITURE[f.id].solid:
-			_draw_furniture(f)
-
-	# 아랫문 (매트)
-	canvas.draw_rect(Rect2(EXIT_X.x, ROOM.end.y - 8, EXIT_X.y - EXIT_X.x, 8), Color(0.35, 0.25, 0.15))
-	canvas.draw_rect(Rect2(EXIT_X.x + 6, ROOM.end.y - 6, EXIT_X.y - EXIT_X.x - 12, 4), Color(0.7, 0.6, 0.4))
-
-	# 그림자 + 안내
-	canvas.draw_rect(Rect2(ppos.x - 4, ppos.y - 2, 8, 3), Color(0, 0, 0, 0.22))
-	if deco_mode:
-		_draw_deco_ui()
-	else:
-		var guide := "E: 잠자기/요리/연금술 · F: 꾸미기 · 아랫문: 나가기"
-		if not GameData.has_bed:
-			guide = "침대 자리 E: 침대 만들기 · 아랫문: 나가기"
-		elif GameData.house_lv < 2:
-			guide = "침대 E: 잠자기 · 조리대 자리 E: 집 확장 · 아랫문: 나가기"
-		_draw_center_text(guide, 72)
 
 
 func _draw_center_text(text: String, ty: float) -> void:

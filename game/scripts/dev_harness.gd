@@ -425,6 +425,18 @@ func _debug_tick() -> void:
 				where.append("%s:%s" % [n.id, n.place])
 			print("NPC_PLACES=", ", ".join(where))
 			_save_shot("_npcday.png")
+		342:
+			# 처음 집(좁은 오두막) 캡처 — 낡은 침대·책상·먼지더미뿐이어야 한다
+			GameData.house_lv = 1
+			GameData.kitchen_found = false
+			GameData.dust_swept = 0
+			m.interior.open()
+		343:
+			_save_shot("_home_small.png")
+			m.interior.close()
+			GameData.house_lv = 2         # 이후 단계는 확장한 집 기준
+			GameData.kitchen_found = true
+			m.interior._layout()
 		344:
 			# 탈 것: 사기 -> 타기 -> 속도 -> 내리기
 			GameData.money = 99999
@@ -1167,6 +1179,45 @@ func _debug_tick() -> void:
 				if crops < 5 or fishes < 6:
 					thin = true
 			print("SEASON_CONTENT_OK=", not thin, " ", per_season)
+		378:
+			# 스토리 1->2 연결: 편지 전달 -> 집 해금 -> 입장(1막 끝) ->
+			# 나오면 이장이 다가와 대화(2막 시작). 안내는 선택 서브퀘로 분리.
+			var keep_house := GameData.house_lv
+			var keep_bed := GameData.has_bed
+			var keep_bedlv := GameData.bed_lv
+			GameData.story_phase = "travel"
+			GameData.house_lv = 0
+			GameData.has_bed = false
+			m.story._end_delivery()
+			var opened := GameData.house_lv == 1 and GameData.has_bed \
+				and GameData.story_phase == "home_open" \
+				and GameData.story_objective_short() != ""
+			m.interior.open()
+			var s1_done := GameData.story_phase == "greet"
+			var small: bool = m.interior.ROOM.size.x < 500.0   # 처음 집은 좁은 오두막
+			m.interior.close()
+			m.story.start_home_greet()
+			m.story._chief_greet = false     # 걸어오는 연출은 생략하고 도착한 셈 친다
+			m.story._start_story2_dialog()
+			var talk := m.dialog.visible
+			m.dialog.close()
+			m.story._end_story2_intro()
+			var s2 := GameData.story_phase == "done" and GameData.is_tool_unlocked("hoe")
+			# 튜토리얼 분리: 밭 갈기 4개가 맨 앞, 집 짓기/침대 목표는 사라졌어야 한다
+			var order_ok := true
+			for i in 4:
+				order_ok = order_ok \
+					and str(GameData.TUTORIAL_ORDER[i][0]) == str(GameData.STORY2_FLAGS[i])
+			for pair in GameData.TUTORIAL_ORDER:
+				if str(pair[0]) in ["home", "bed"]:
+					order_ok = false
+			print("STORY2_OK=", opened and s1_done and small and talk and s2 and order_ok,
+				" 집해금=", opened, " 입장으로1막끝=", s1_done, " 오두막=", small,
+				" 이장대화=", talk, " 2막시작=", s2, " 안내분리=", order_ok)
+			GameData.house_lv = keep_house
+			GameData.has_bed = keep_bed
+			GameData.bed_lv = keep_bedlv
+			m.interior._layout()
 		392: get_tree().quit()
 
 

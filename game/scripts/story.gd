@@ -188,7 +188,7 @@ func _story_update(delta: float) -> void:
 	# 안전장치: 어떤 이유로든 연출이 끊겨 조작이 잠긴 채 남으면 풀어 준다.
 	# (편지 전달 중에는 원래 잠겨 있어야 한다)
 	if m.story_cutscene and not m.dialog.visible and m._name_layer == null \
-			and _postman_state != "deliver":
+			and _postman_state != "deliver" and not _chief_greet:
 		m._cutscene_idle += delta
 		if m._cutscene_idle > 1.5:
 			m._cutscene_idle = 0.0
@@ -282,6 +282,11 @@ func _story_update(delta: float) -> void:
 				if chief != null and m.player.position.distance_to(chief.position) < 150.0:
 					m.story_cutscene = true
 					_postman_state = "deliver"
+		"home_open":
+			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
+		"greet":
+			_update_postman(delta, false)
+			_update_home_greet(delta)       # 이장이 문 앞으로 걸어온다
 
 
 func _spawn_postman() -> void:
@@ -723,38 +728,141 @@ func _start_delivery_dialog() -> void:
 		{"text": "「여기 %s(이)가 길을 열어 준 덕분입니다.」" % nm},
 		{"text": "「%s(이)라고 했나. 교진 마을에 온 것을 환영하네!」" % nm,
 			"name": "이장 덕수", "portrait": chief_happy},
-		{"text": "「마을 서쪽 큰길가에 빈 집터가 하나 있네. 자네가 쓰게.」",
-			"name": "이장 덕수", "portrait": chief_happy},
-		{"text": "「그리고 이건 새로 온 사람에게 주는 우리 마을의 선물일세.」",
-			"name": "이장 덕수", "portrait": chief_normal, "event": _story_give_hoe},
-		{"text": "「호미로 땅을 갈아 밭을 만들면, 이 마을에서 살아갈 수 있을 걸세.」",
-			"name": "이장 덕수", "portrait": chief_happy},
+		{"text": "「자네 할아버지가 지내던 집이 마을 서쪽에 그대로 있네.」",
+			"name": "이장 덕수", "portrait": chief_normal},
+		{"text": "「오래 비워 둬서 낡았네만... 오늘부터 자네 집일세.」",
+			"name": "이장 덕수", "portrait": chief_happy, "event": _story_open_home},
+		{"text": "「먼저 들어가서 짐을 풀게. 나도 곧 따라감세.」",
+			"name": "이장 덕수", "portrait": chief_normal},
 	], _end_delivery)
 
 
+# 이장이 할아버지의 집을 내어 준다 — 낡은 침대와 책상이 남아 있다
+func _story_open_home() -> void:
+	if GameData.house_lv >= 1:
+		return
+	GameData.house_lv = 1
+	GameData.has_bed = true    # 할아버지가 쓰던 낡은 침대
+	GameData.bed_lv = 0
+	m.objnode._remove_object(m.HOME_SITE)
+	m.worldgen._fill_building(m.HOME_ANCHOR)
+	Sound.play_sfx("sfx_place")
+	m.hud.quest_toast("할아버지의 집을 물려받았다")
+
+
 func _story_give_hoe() -> void:
-	# 정착 준비: 이장이 환영 선물로 호미를 건넨다 (밭갈기 목표의 시작)
+	# 정착 준비: 이장이 환영 선물로 호미와 씨앗을 건넨다 (밭갈기 목표의 시작)
 	if not GameData.is_tool_unlocked("hoe"):
 		GameData.unlocked_tools.append("hoe")
-	m.hud.reward_toast("호미 × 1", m.tex["icon_hoe"])
+	GameData.seeds["potato"] += 3
+	m.hud.reward_toast("호미 × 1 · 감자 씨앗 × 3", m.tex["icon_hoe"])
 	m.hud.show_message("호미는 가방(I)에서 슬롯에 넣어야 쓸 수 있다.", 5.0)
 
 
 func _end_delivery() -> void:
 	m.story_cutscene = false
-	GameData.story_phase = "done"
+	GameData.story_phase = "home_open"
+	_story_open_home()   # 대화를 스킵해도 집은 열린다
 	_apply_story_camera()
 	_apply_story_visibility()
 	m.hud.quest_toast("이장에게 편지 전달")
-	if not GameData.is_tool_unlocked("hoe"):
-		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
-	m.hud.show_message("메인 스토리 1 완료! 호미로 밭을 갈고, 집터(E)에 집을 지어 정착하자.", 6.0)
+	m.hud.show_message("마을 서쪽, 이장님이 내어 준 집에 들어가 보자. (문 앞에서 E)", 6.0)
 	if _postman != null:
 		_postman_path = m.npcmgr._tile_path(
 			Vector2i(int(_postman.position.x / m.TILE), int(_postman.position.y / m.TILE)),
 			Vector2i(m.VILLAGE_EXIT_X, 1))
 		_postman_fade = 1.0
 		_postman_state = "leave"
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 1 끝 / 2 시작 ----
+#
+# 집에 처음 들어가면 스토리 1이 끝난다 (interior.open이 부른다).
+# 집에서 나오면 이장이 문 앞으로 걸어와 말을 걸고, 그 대화가 스토리 2
+# (밭 일구기)의 시작이다.
+var _chief_greet := false     # 이장이 걸어오는 연출 중
+
+
+func home_entered() -> void:
+	if GameData.story_phase != "home_open":
+		return
+	GameData.story_phase = "greet"
+	m.hud.quest_toast("새 보금자리")
+	m.hud.show_message("메인 스토리 1 완료! 집을 둘러보고 밖으로 나가 보자.", 6.0)
+	m.saveio.save_now()
+
+
+func start_home_greet() -> void:
+	if GameData.story_phase != "greet":
+		return
+	var chief: Variant = _story_chief()
+	if chief == null:
+		_start_story2_dialog()
+		return
+	m.story_cutscene = true
+	chief.scripted = true      # 일과·배회를 멈추고 연출이 직접 움직인다
+	chief.visible = true
+	# 문 앞 큰길 쪽에서 걸어온다
+	chief.position = m.player.position + Vector2(-24.0, 150.0)
+	_chief_greet = true
+
+
+func _update_home_greet(delta: float) -> void:
+	if not _chief_greet:
+		return
+	var chief: Variant = _story_chief()
+	if chief == null:
+		_chief_greet = false
+		_start_story2_dialog()
+		return
+	var to: Vector2 = m.player.position + Vector2(0.0, 30.0) - chief.position
+	if to.length() > 8.0:
+		chief.position += to.normalized() * minf(to.length() * 2.5, 130.0) * delta
+		chief.moving = true
+		chief.anim_time += delta
+		if absf(to.x) > absf(to.y):
+			chief.dir = "right" if to.x > 0 else "left"
+		else:
+			chief.dir = "down" if to.y > 0 else "up"
+		chief._update_sprite()
+	else:
+		chief.moving = false
+		chief.dir = "up"          # 플레이어를 올려다본다
+		chief._update_sprite()
+		_chief_greet = false
+		_start_story2_dialog()
+
+
+func _start_story2_dialog() -> void:
+	m.story_cutscene = true
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "「%s! 집은 좀 둘러봤는가?」" % nm, "portrait": chief_happy},
+		{"text": "「할아버지가 쓰시던 침대와 책상이 그대로 남아 있을 걸세.」"},
+		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
+		{"text": "「책상은 제작대일세. 재료만 있으면 가구도 손수 만들 수 있지.」"},
+		{"text": "「그리고... 이건 새로 온 사람에게 주는 우리 마을의 선물일세.」",
+			"event": _story_give_hoe},
+		{"text": "「호미로 땅을 갈아 밭을 만들어 보게. 이 마을에서 살아가는 첫걸음일세.」",
+			"portrait": chief_happy},
+		{"text": "「급할 것 없네. 마을 생활이 궁금하면 퀘스트 창(Q)의 안내를 틈틈이 보게나.」"},
+	], _end_story2_intro)
+
+
+func _end_story2_intro() -> void:
+	m.story_cutscene = false
+	_chief_greet = false
+	GameData.story_phase = "done"
+	var chief: Variant = _story_chief()
+	if chief != null:
+		chief.scripted = false
+	if not GameData.is_tool_unlocked("hoe"):
+		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
+	m.hud.quest_toast("메인 스토리 2 — 밭을 일구자")
+	m.hud.show_message("메인 스토리 2 시작! 호미로 밭을 갈아 농사를 시작하자.", 6.0)
 	m.saveio.save_now()
 
 
@@ -931,6 +1039,8 @@ func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
 	GameData.story_phase = "done"
+	_story_open_home()   # 이장이 내어 주는 집도 바로 받는다
+	GameData.seeds["potato"] += 3
 	_apply_story_camera()
 	if _postman != null:
 		_postman.queue_free()

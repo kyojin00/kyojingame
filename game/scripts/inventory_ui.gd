@@ -24,6 +24,7 @@ var items_box: VBoxContainer
 var tip_panel: PanelContainer
 var tip_title: Label
 var tip_body: Label
+var tip_count: Label
 var _refresh_timer := 0.0
 var _slot_normal: StyleBoxFlat
 var _slot_selected: StyleBoxFlat
@@ -135,6 +136,11 @@ func _ready() -> void:
 	tip_body.custom_minimum_size = Vector2(292, 0)
 	tip_body.add_theme_color_override("font_color", Color(0.88, 0.85, 0.95))
 	tv.add_child(tip_body)
+	tip_count = Label.new()          # 보유 수량 — 작게, 흐리게
+	tip_count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_count.add_theme_font_size_override("font_size", 12)
+	tip_count.add_theme_color_override("font_color", Color(0.68, 0.65, 0.75))
+	tv.add_child(tip_count)
 	add_child(tip_panel)
 
 
@@ -160,10 +166,12 @@ func _tool_tip(t: String) -> Dictionary:
 	return {"title": title, "body": body}
 
 
-func _show_tip(title: String, body: String) -> void:
+func _show_tip(title: String, body: String, count := "") -> void:
 	tip_title.text = title
 	tip_body.text = body
 	tip_body.visible = body != ""
+	tip_count.text = count
+	tip_count.visible = count != ""
 	tip_panel.reset_size()
 	tip_panel.visible = true
 
@@ -234,7 +242,7 @@ func _update_hover_tip() -> void:
 	for h in _hover_slots:
 		var b: Button = h.b
 		if is_instance_valid(b) and b.get_global_rect().has_point(mp):
-			_show_tip(str(h.title), str(h.body))
+			_show_tip(str(h.title), str(h.body), str(h.get("count", "")))
 			return
 	_hide_tip()
 
@@ -306,12 +314,20 @@ func _rebuild() -> void:
 		_build_gear_tab()
 		return
 
+	# 아이템 탭: 네모 슬롯 격자 — 같은 아이템은 한 칸에 모이고, 칸에 아이콘·수량
+	_line("마우스를 올리면 설명이 보인다" +
+		(" · 요리는 클릭해서 바로 먹는다" if _tab == "food" else ""), Color(0.35, 0.22, 0.1))
+	var grid := GridContainer.new()
+	grid.columns = 10
+	grid.add_theme_constant_override("h_separation", 5)
+	grid.add_theme_constant_override("v_separation", 5)
 	var rows := 0
 	for e in _item_entries():
 		if str(e.get("tab", "res")) != _tab:
 			continue
 		rows += 1
-		items_box.add_child(_mk_item_row(e))
+		grid.add_child(_mk_item_slot(e))
+	items_box.add_child(grid)
 	if rows == 0:
 		_line("여기에 담긴 것이 없다.", Color(0.35, 0.22, 0.1))
 
@@ -484,15 +500,55 @@ func _mk_tool_row(t: String) -> Button:
 	return b
 
 
-func _mk_item_row(e: Dictionary) -> Button:
-	var icon: Texture2D = null
+# 네모 아이템 슬롯: 아이콘 + 수량 숫자. 마우스를 올리면 이름/설명/보유 수가 보인다.
+func _mk_item_slot(e: Dictionary) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(46, 46)
+	b.focus_mode = Control.FOCUS_NONE
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var st: StyleBoxFlat = _slot_normal.duplicate()
+	st.set_content_margin_all(5)
+	var st2: StyleBoxFlat = st.duplicate()
+	st2.border_color = Color(1, 0.84, 0.37)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st2)
+	b.add_theme_stylebox_override("pressed", st2)
 	if e.has("icon") and main.tex.has(e.icon):
-		icon = main.tex[e.icon]
-	var right := "x%d" % int(e.count)
+		b.icon = main.tex[e.icon]
+	else:
+		# 아직 그림이 없는 아이템은 이름 첫 글자로 대신한다
+		b.text = str(e.name).left(1)
+		b.add_theme_color_override("font_color", e.get("color", Color(0.96, 0.93, 0.88)))
+
+	var num := Label.new()      # 보유 수량 — 오른쪽 아래 작은 숫자
+	num.text = str(int(e.count))
+	num.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	num.offset_left = -36
+	num.offset_top = -15
+	num.offset_right = -2
+	num.offset_bottom = -1
+	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	num.add_theme_font_override("font", preload("res://assets/fonts/Galmuri9.ttf"))
+	num.add_theme_font_size_override("font_size", 10)
+	num.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
+	num.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.14))
+	num.add_theme_constant_override("outline_size", 3)
+	num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(num)
+
+	var body := str(e.get("desc", ""))
 	if int(e.get("sell", 0)) > 0:
-		right = "x%d   %dG" % [int(e.count), int(e.sell)]
-	var b := _mk_row(icon, str(e.name), right, e.get("color", Color(0.96, 0.93, 0.88)))
-	_hover_slots.append({"b": b, "title": str(e.tip), "body": str(e.get("desc", ""))})
+		body += ("\n" if body != "" else "") + "개당 %dG에 팔린다" % int(e.sell)
+	_hover_slots.append({"b": b, "title": str(e.name), "body": body,
+		"count": "보유 중: %d개" % int(e.count)})
+
+	# 요리는 슬롯을 눌러 그 자리에서 바로 먹는다
+	var eat_id := str(e.get("eat", ""))
+	if eat_id != "":
+		b.pressed.connect(func() -> void:
+			main.doing.do_eat(eat_id)
+			_rebuild())
 	return b
 
 
@@ -634,10 +690,13 @@ func _item_entries() -> Array:
 			e["tab"] = "food"
 			e["color"] = Color(0.5, 0.75, 1.0)
 			e["desc"] = "낚시로 잡은 물고기"
+			if main.note_ui != null:      # 도감과 같은 문구 — 언제 무는지
+				e["desc"] = "낚시로 잡았다 — %s" % main.note_ui._fish_desc(id)
 		elif id.begins_with("dish_"):
 			e["tab"] = "food"
 			e["color"] = Color(1.0, 0.75, 0.4)
-			e["desc"] = "요리 — 먹으면 체력을 회복한다"
+			e["desc"] = "요리 — 먹으면 체력 +%d" % int(GameData.RECIPES[id].energy)
+			e["eat"] = id
 		elif id.begins_with("potion_"):
 			e["tab"] = "food"
 			e["color"] = Color(0.75, 0.7, 1.0)
@@ -651,7 +710,15 @@ func _item_entries() -> Array:
 			e["desc"] = "동굴에서 얻었다"
 		elif id in ["egg", "milk"]:
 			e["color"] = Color(0.95, 0.9, 0.8)
-			e["desc"] = "축사 동물이 준 선물"
+			e["desc"] = "축사 동물이 준 선물. 요리 재료로도 쓴다"
+		elif id == "weed":
+			e["desc"] = "숲에서 채집할 수 있는 풀. 빗자루 재료 (제작대)"
+		elif id == "broom":
+			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
+		elif id in ["nail", "cloth", "rope", "hinge"]:
+			e["desc"] = "가구 부품 — 집 제작대에서 쓴다"
+		elif id in ["bouquet", "wedding_ring"]:
+			e["desc"] = "마음을 전하는 물건 — 아끼는 주민에게 건네자"
 		else:
 			e["color"] = Color(0.85, 0.82, 0.95)
 			e["desc"] = "채집·수집품"

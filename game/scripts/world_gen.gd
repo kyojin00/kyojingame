@@ -338,6 +338,8 @@ func _trim_paths_under_building(anchor: Vector2i) -> void:
 
 # kind: VILLAGE_PLOTS의 열쇠("post"/"smith"...). 빈 값이면 살림집.
 func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
+	if m.obj_nodes.has(anchor):
+		m.obj_nodes[anchor].queue_free()   # 다시 세워도 낡은 그림이 겹치지 않게
 	var tname := "house_" + kind
 	if kind == "" or not m.tex.has(tname):
 		tname = "house"

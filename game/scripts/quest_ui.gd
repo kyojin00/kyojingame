@@ -141,18 +141,13 @@ func _rebuild() -> void:
 	if ph != "done":
 		return
 
-	# 생활 안내 (스토리 완료 후, 필요한 순간마다 하나씩)
+	# 메인 스토리 2 (밭 일구기) + 마을 생활 안내 (선택 서브퀘스트)
 	if GameData.tutorial.get("active", false):
-		_line("[마을 생활 안내]", COL_HEAD)
-		var current_found := false
-		for pair in GameData.TUTORIAL_ORDER:
-			if GameData.tutorial.get(pair[0], false):
-				_line("  V " + pair[1], COL_DONE)
-			elif not current_found:
-				current_found = true
-				_line("  > " + pair[1], COL_NOW)
-			else:
-				_line("  - " + pair[1], COL_DIM)
+		_line("[메인 스토리 2 — 밭을 일구다]", COL_HEAD)
+		_tut_section(true)
+		_line("")
+		_line("[마을 생활 안내]  선택 — 안 해도 이야기는 진행된다", COL_HEAD)
+		_tut_section(false)
 		_line("")
 
 	# 계절 축제 (계절마다 하루)
@@ -243,3 +238,19 @@ func _rebuild() -> void:
 		_line("    기록 %d/%d (%d%%)" % [int(prog.filled), int(prog.total),
 			int(prog.ratio * 100.0)], COL_SUB)
 
+
+
+# 튜토리얼 목록의 반쪽을 그린다 — story2=true면 메인 스토리 2(밭 갈기),
+# false면 선택 서브퀘스트(마을 생활 안내)
+func _tut_section(story2: bool) -> void:
+	var current_found := false
+	for pair in GameData.TUTORIAL_ORDER:
+		if (pair[0] in GameData.STORY2_FLAGS) != story2:
+			continue
+		if GameData.tutorial.get(pair[0], false):
+			_line("  V " + pair[1], COL_DONE)
+		elif not current_found:
+			current_found = true
+			_line("  > " + pair[1], COL_NOW)
+		else:
+			_line("  - " + pair[1], COL_DIM)

@@ -270,11 +270,15 @@ func nav_target() -> Variant:
 		var chief: Node2D = m.story._story_chief()
 		if chief != null:
 			return chief.position
+	if GameData.story_phase == "home_open":
+		# 이장이 내어 준 집 문 앞으로 안내
+		return Vector2(m.HOME_ANCHOR.x * m.TILE + 2 * m.TILE + 16,
+			(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
 	if GameData.story_phase != "done":
 		return null  # 숲 구간에서는 화살표를 띄우지 않는다
 	match GameData.tutorial_current_flag():
-		"home", "bed", "slept":
-			# 우리집(마을 서쪽) 문 앞 — 아직 안 지었으면 집터로 안내한다
+		"slept":
+			# 우리집(마을 서쪽) 문 앞
 			return Vector2(m.HOME_ANCHOR.x * m.TILE + 2 * m.TILE + 16,
 				(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
 		"shop":

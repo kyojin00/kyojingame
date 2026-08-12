@@ -878,9 +878,14 @@ const STORY1_QUESTS := [
 	{"name": "이장에게 편지 전달",
 		"task": "마을 이장을 찾아가자",
 		"story": "드디어 마을이 보인다. 우체부 아저씨가 이장님께 편지를 전하면 긴 여정이 끝난다."},
+	{"name": "새 보금자리",
+		"task": "이장님이 내어 준 집(마을 서쪽)에 들어가 보자 (문 앞 E)",
+		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
 ]
+# 단계 -> 지금 진행 중인 퀘스트 번호. home_open: 편지는 전했고, 집에 들어가면
+# 메인 스토리 1이 끝난다. greet(집 안, 표에 없음)는 전부 완료로 본다.
 const STORY1_PHASE_IDX := {"enter": 0, "approach": 1, "equip": 2, "chop": 3,
-	"path": 4, "map": 5, "rock": 6, "travel": 7}
+	"path": 4, "map": 5, "rock": 6, "travel": 7, "home_open": 9}
 
 
 func story_current_quest() -> Dictionary:
@@ -915,6 +920,10 @@ func story_objective_short() -> String:
 					return "우체부 아저씨에게 말을 걸어보자"
 		"travel":
 			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
+		"home_open":
+			return "이장님이 내어 준 집에 들어가 보자 (마을 서쪽, 화살표 방향)"
+		"greet":
+			return "집을 둘러보고 밖으로 나가 보자 (아랫문)"
 	return ""
 
 
@@ -2131,34 +2140,37 @@ func npc_line(npc_id: String) -> String:
 var quest := {}
 
 # ---- 튜토리얼 / 도구 해금 ----
+#
+# 두 갈래로 나뉜다:
+#   · 앞 네 개(till~harvest)는 **메인 스토리 2** — 이장에게 호미를 받고
+#     밭을 일구는 본 줄기다.
+#   · 나머지는 **마을 생활 안내** — 선택 서브퀘스트. 안 해도 메인은
+#     진행되고, 도구도 안내에 묶여 잠기지 않는다.
 # 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
+const STORY2_FLAGS := ["till", "plant", "water", "harvest"]
 const TUTORIAL_ORDER := [
-	["moved", "방향키/WASD로 움직여보자"],
-	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
-	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
-	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
 	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
+	["moved", "방향키/WASD로 움직여보자"],
+	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
+	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
+	["note", "할아버지의 연구 노트(N)를 펼쳐보자"],
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
-	["home", "목재를 모았으니 집터(마을 서쪽)에 집을 짓자"],
-	["bed", "집 안에서 침대를 만들자"],
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
 	["build", "울타리나 스프링클러를 설치해보자"],
 	["fish", "마을 남쪽 낚시터(부두)에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
-# 목표 달성 시 해금되는 도구
-# 목표를 달성하면 다음 단계에서 쓸 도구가 열린다 (순서와 어긋나지 않게)
+# 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
+# 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 전부 열린다
+# (마을 생활 안내는 선택이므로 도구를 잠그지 않는다)
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"harvest": ["axe"],
-	"slept": ["pickaxe"],
-	"mine": ["fence", "sprinkler"],
-	"build": ["rod"],
+	"harvest": ["axe", "pickaxe", "fence", "sprinkler", "rod"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
 const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
@@ -2174,8 +2186,6 @@ const TUTORIAL_REWARDS := {
 	"water": {"money": 100},
 	"harvest": {"money": 100},
 	"chop": {"wood": 5},
-	"home": {"money": 200},
-	"bed": {"seeds": {"carrot": 2}},
 	"slept": {"money": 150},
 	"mine": {"stone": 5},
 	"build": {"money": 150},
@@ -2226,7 +2236,7 @@ const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
 	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
-	"home": "집 짓기 (집터 E)", "bed": "침대 만들기", "slept": "침대에서 자기",
+	"slept": "침대에서 자기",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
 	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
 }
@@ -2531,7 +2541,7 @@ func _init() -> void:
 		items[id] = 0
 	seeds["potato"] = 5
 	_reset_skills()
-	furniture = default_furniture()
+	furniture = []   # 처음 집엔 세간이 없다 — 집을 확장하면 기본 가구가 생긴다
 
 
 func reset_daily() -> void:
@@ -2602,7 +2612,7 @@ func reset_all() -> void:
 		for id in ITEM_IDS:
 			items[id] = DEV_STOCK
 	_reset_skills()
-	furniture = default_furniture()
+	furniture = []   # 처음 집엔 세간이 없다 — 집을 확장하면 기본 가구가 생긴다
 	tutorial = fresh_tutorial()
 	grandpa_step = 0
 	grandpa_seen = false

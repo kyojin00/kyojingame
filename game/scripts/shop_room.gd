@@ -131,7 +131,8 @@ func _def() -> Dictionary:
 
 
 func _process(delta: float) -> void:
-	if not visible or main.dialog.visible or main.shop.visible:
+	if not visible or main.dialog.visible or main.shop.visible \
+			or main.inventory_ui.visible:
 		moving = false
 		_update_sprite()
 		return
@@ -161,7 +162,8 @@ func _at_counter() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or main.dialog.visible or main.shop.visible:
+	if not visible or main.dialog.visible or main.shop.visible \
+			or main.inventory_ui.visible:
 		return
 	if event.is_action_pressed("interact"):
 		if _at_counter():

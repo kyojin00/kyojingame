@@ -410,7 +410,10 @@ func refresh(force := false) -> void:
 	if story_obj != "":
 		track.append("목표: " + story_obj)
 	elif obj != "":
-		track.append("목표: " + obj)
+		# 밭 갈기(메인 스토리 2)는 「목표」, 마을 생활 안내는 「안내(선택)」
+		var flag := GameData.tutorial_current_flag()
+		track.append(("목표: " if flag in GameData.STORY2_FLAGS
+			else "안내(선택): ") + obj)
 	else:
 		# 기본 안내가 끝나면 할아버지의 부탁이 그 자리를 잇는다
 		var gl := GameData.grandpa_line()

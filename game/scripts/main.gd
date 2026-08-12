@@ -532,6 +532,9 @@ func _ready() -> void:
 			story_cutscene = false
 			story._postman_state = "follow"
 			story._postman.position = player.position + Vector2(-42, 6)
+		elif GameData.story_phase == "greet":
+			# 집에 들어간 직후 저장했다면, 나온 셈 치고 이장이 다가온다
+			story.start_home_greet.call_deferred()
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
 		GameData.reset_all()
@@ -558,6 +561,7 @@ func _ready() -> void:
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용
 			GameData.has_bed = true
+			GameData.furniture = GameData.default_furniture()  # 넓은 방 캡처용 세간
 			for cy in range(0, MAP_H / GameData.EXPLORE_CHUNK + 1):
 				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
 					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
@@ -1134,6 +1138,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			map_ui.close()
 		elif event.is_action_pressed("open_inventory") and inventory_ui.visible:
 			inventory_ui.close()
+		elif event.is_action_pressed("open_inventory") and (interior.visible or cave.visible
+				or (shop_room != null and shop_room.visible)) and not (dialog.visible
+				or shop.visible or cooking_ui.visible or alchemy_ui.visible or desk_ui.visible
+				or quest_ui.visible or note_ui.visible or stats_ui.visible or map_ui.visible
+				or sleep_dialog.visible or summary.visible or story_cutscene):
+			# 집/동굴/가게 안에서도 가방은 열려야 한다 (다른 창이 겹칠 때만 막는다)
+			Sound.play_sfx("sfx_ui")
+			inventory_ui.toggle()
 		elif event.is_action_pressed("open_quest") and quest_ui.visible:
 			quest_ui.close()
 		elif event.is_action_pressed("open_note") and note_ui.visible:
