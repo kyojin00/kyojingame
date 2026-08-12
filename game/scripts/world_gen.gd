@@ -493,17 +493,19 @@ func _respawn_forage() -> void:
 		m.objnode._place_object(pos, kind, 0)
 		count += 1
 
-	# 해변: 바다를 열었으면 아침마다 조개(흔함)·산호(드묾)가 밀려온다
-	if GameData.sea_open:
-		var shells := 0
-		for pos in m.objects:
-			if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
-				shells += 1
-		for attempt in 10:
-			if shells >= m.SHELL_CAP:
-				break
-			if _try_spawn_shell():
-				shells += 1
+
+# 조개 리젠 한 번 (main이 게임 시간 10~15분마다 부른다 — 해변 채집 레벨을
+# 올리면 빨라진다). 줍지 않고 두면 상한에서 멈추고 더 쌓이지 않는다.
+func _tick_beach() -> void:
+	var shells := 0
+	for pos in m.objects:
+		if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+			shells += 1
+	if shells >= m.SHELL_CAP:
+		return
+	for attempt in 10:
+		if _try_spawn_shell():
+			return
 
 
 func _spawn_bugs() -> void:

@@ -714,7 +714,7 @@ func _item_entries() -> Array:
 		elif id == "weed":
 			e["desc"] = "숲에서 채집할 수 있는 풀. 빗자루 재료 (제작대)"
 		elif id == "forage_shell":
-			e["desc"] = "해변 모래밭에 밀려온 조개. 아침마다 새로 밀려온다"
+			e["desc"] = "해변 모래밭에 밀려온 조개. 시간이 지나면 또 밀려온다"
 		elif id == "forage_coral":
 			e["desc"] = "파도가 실어 온 산호 가지 — 해변에서 드물게 보인다"
 		elif id == "broom":

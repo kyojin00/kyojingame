@@ -558,8 +558,9 @@ const SKILLS := {
 	"mine": {"name": "채광", "effect": "석재·광석 추가 +6%/Lv"},
 	"combat": {"name": "전투", "effect": "동굴 공격력 +0.5/Lv"},
 	"cook": {"name": "요리", "effect": "요리 회복량 +5%/Lv"},
+	"beach": {"name": "해변 채집", "effect": "조개 리젠 +8%/Lv · 3Lv마다 채집량 +1"},
 }
-const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook"]
+const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach"]
 const SKILL_MAX_LV := 10
 var skills := {}
 
@@ -680,6 +681,16 @@ var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
 var fisher_quest := ""
 var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
 var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
+
+
+# 해변 채집 능력치 — 조개가 다시 밀려오는 간격(게임 분)과 한 번에 줍는 양.
+# 기본은 10~15분에 하나. 레벨이 오르면 리젠이 빨라지고, 3레벨마다 +1개.
+func shell_respawn_minutes() -> float:
+	return randf_range(10.0, 15.0) / (1.0 + 0.08 * (skill_lv("beach") - 1))
+
+
+func beach_pick_count() -> int:
+	return 1 + int((skill_lv("beach") - 1) / 3.0)   # 4 · 7 · 10레벨에 +1
 
 
 func fisher_objective_short() -> String:

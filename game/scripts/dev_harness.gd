@@ -1222,6 +1222,30 @@ func _debug_tick() -> void:
 				" 등장=", met, " 선택지=", choice_shown, " 선택반영=", picked,
 				" 동행=", follow, " 보상대화=", reward, " 바다해금=", sea,
 				" 능선=", ridge, " 모래=", sand, " 바닷물=", water, " 조개=", shells)
+			# 해변 채집 능력치: 레벨이 오르면 리젠이 빨라지고 한 번에 더 줍는다.
+			# 그리고 줍지 않은 조개가 상한을 넘겨 쌓이지 않아야 한다.
+			GameData.skills["beach"] = {"lv": 1, "xp": 0.0}
+			var base_n := GameData.beach_pick_count()
+			var t1 := 0.0
+			for i in 40:
+				t1 += GameData.shell_respawn_minutes()
+			GameData.skills["beach"] = {"lv": 10, "xp": 0.0}
+			var lv_n := GameData.beach_pick_count()
+			var t2 := 0.0
+			for i in 40:
+				t2 += GameData.shell_respawn_minutes()
+			for i in 40:                       # 리젠을 거듭하면 상한까지만 쌓인다
+				m.worldgen._tick_beach()
+			var after := 0
+			for pos2 in m.objects:
+				if String(m.objects[pos2].kind) in ["forage_shell", "forage_coral"]:
+					after += 1
+			print("BEACH_OK=", base_n == 1 and lv_n > base_n and t2 < t1 * 0.7
+				and after <= m.SHELL_CAP,
+				" 기본줍기=", base_n, " 10렙줍기=", lv_n,
+				" 평균리젠(분) 1렙=", "%.1f" % (t1 / 40.0), " 10렙=", "%.1f" % (t2 / 40.0),
+				" 상한=", after, "/", m.SHELL_CAP)
+			GameData.skills["beach"] = {"lv": 1, "xp": 0.0}
 		378:
 			# 스토리 1->2 연결: 편지 전달 -> 집 해금 -> 입장(1막 끝) ->
 			# 나오면 이장이 다가와 대화(2막 시작). 안내는 선택 서브퀘로 분리.

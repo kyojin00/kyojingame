@@ -209,18 +209,24 @@ func interact() -> void:
 		if String(obj.kind).begins_with("forage_") or String(obj.kind) == "weed":
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
-			GameData.items[fid] += 1
-			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + 1
+			var got := 1
+			if fid in ["forage_shell", "forage_coral"]:
+				got = GameData.beach_pick_count()   # 해변 채집 레벨: 한 번에 더 줍는다
+				m.toolwork.gain_skill("beach", 6.0)
+			else:
+				m.toolwork.gain_skill("forest", 3.0)
+			GameData.items[fid] += got
+			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
 			GameData.discover(fid)
 			Sound.play_sfx("sfx_harvest")
 			m.renderer.spawn_particles(t, "sparkle")
-			m.hud.show_message("%s 채집! 연구 노트에 기록됐다." % GameData.ITEMS[fid].name)
-			m.toolwork.gain_skill("forest", 3.0)
+			m.hud.show_message("%s%s 채집! 연구 노트에 기록됐다."
+				% [GameData.ITEMS[fid].name, " x%d" % got if got > 1 else ""])
 			if Net.is_host():
 				m.netsync._broadcast_area(t)
 				m.netsync._broadcast_stats()
 			elif Net.is_guest():
-				m.netsync._req_gain.rpc_id(1, fid, 1)
+				m.netsync._req_gain.rpc_id(1, fid, got)
 			return
 		if obj.kind == "searock":
 			m.hud.show_message("울퉁불퉁한 바위 능선이다. 이 너머가 바다인 모양이다.")

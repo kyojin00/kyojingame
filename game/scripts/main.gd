@@ -930,6 +930,7 @@ var _last_explore_tile := Vector2i(-999, -999)
 # ---- 밤 몬스터: 지네 (21시 이후 야외에서 등장, 아침에 사라진다) ----
 # 밤늦게까지 밖에서 채집하는 것이 위험해지도록 만드는 요소.
 
+var _shell_cd := 0.0        # 다음 조개가 밀려올 때까지 남은 게임 분
 var night_mobs: Array = []  # [{node, spr, anim}]
 var _mob_hit_cd := 0.0
 var _mob_spawn_cd := 0.0
@@ -1056,6 +1057,12 @@ func _process(delta: float) -> void:
 		if _growth_timer >= 0.7:
 			farming._growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
+		# 해변: 게임 시간 10~15분마다 조개가 하나씩 밀려온다 (상한에서 멈춘다)
+		if GameData.sea_open and not Net.is_guest():
+			_shell_cd -= delta * MIN_PER_SEC
+			if _shell_cd <= 0.0:
+				_shell_cd = GameData.shell_respawn_minutes()
+				worldgen._tick_beach()
 		actions._update_mouse_target()
 		fishing._update_fishing(delta)
 		if player_tile() != _last_explore_tile:
