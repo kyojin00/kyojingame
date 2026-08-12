@@ -188,7 +188,9 @@ func _debug_tick() -> void:
 		203:
 			_send_key_release(KEY_W)
 			_send_key_press(KEY_S)                     # 앞모습 걷기 확인
-		204: _save_shot("_boy_front.png")
+		# 방향이 바뀌는 데 한 프레임이 필요하다. 바로 찍으면 앞모습 대신
+		# 직전 뒷모습이 걸린다 (실제로 그랬다)
+		206: _save_shot("_boy_front.png")
 		205:
 			_send_key_release(KEY_S)
 			_send_key_press(KEY_D)                     # 옆모습 걷기 확인
@@ -731,7 +733,7 @@ func _debug_tick() -> void:
 				" 상체각=", "%.2f" % m.player.upper_sprite.rotation,
 				" 다리각=", "%.2f" % m.player.sprite.rotation)
 			_save_shot("_swing.png")
-		341:
+		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
 			# 순간(HIT_AT)부터 움직인다. 밑동을 축으로 반동 -> 가속 -> 착지.
@@ -784,7 +786,7 @@ func _debug_tick() -> void:
 				" 밑동 어긋남=", "%.2f" % pv_now.distance_to(pv),
 				" 그루터기=", is_instance_valid(fall.stump),
 				" 파편=", m.particles.size() - parts0)
-		342:
+		272:
 			# 화면용: 세 그루를 각각 다른 박자로 세워 반동·기울기·착지를 한 컷에 담는다.
 			# 자세를 잡은 뒤 `wait`을 크게 줘서 그대로 얼려 둔다 — 안 그러면
 			# 찍을 때까지 흐른 프레임만큼 자세가 밀린다.
@@ -818,7 +820,7 @@ func _debug_tick() -> void:
 			for f3 in m._tree_falls:
 				f3.wait = 999.0                # 그대로 얼린다
 			m._cam_shake = 0.0                 # 착지 흔들림에 화면이 밀리지 않게
-		343:
+		274:
 			_save_shot("_fell.png")
 			m.objnode._clear_tree_falls()
 			# 뒤 단계(말 사기)는 지금 서 있는 칸을 기준으로 삼는다 — 자리를 돌려준다

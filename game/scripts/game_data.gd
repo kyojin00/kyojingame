@@ -996,34 +996,34 @@ func swing_tex_base(key: String) -> String:
 
 
 func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 옆모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	# 옆모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
 	if gender == "m":
 		if not is_moving:
 			return "new_boy_side_idle"
-		return "new_boy_side_walk_%d" % (int(t * 8.0) % 4)
+		return "new_boy_side_walk_%d" % (int(t * 8.0) % 5)
 	if suffix == "idle":
 		return player_tex("side_idle")
 	return player_tex("side_" + suffix)
 
 
 func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 앞모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	# 앞모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	if gender == "m":
 		if not is_moving:
 			return "new_boy_down_idle"
-		return "new_boy_down_walk_%d" % (int(t * 8.0) % 4)
+		return "new_boy_down_walk_%d" % (int(t * 8.0) % 5)
 	if suffix == "idle":
 		return player_tex("down_idle")
 	return player_tex("down_" + suffix)
 
 
 func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 뒷모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	# 뒷모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	if gender == "m":
 		if not is_moving:
 			return "new_boy_up_idle"
-		return "new_boy_up_walk_%d" % (int(t * 8.0) % 4)
+		return "new_boy_up_walk_%d" % (int(t * 8.0) % 5)
 	if suffix == "idle":
 		return player_tex("up_idle")
 	return player_tex("up_" + suffix)
