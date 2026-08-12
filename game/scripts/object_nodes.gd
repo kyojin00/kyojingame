@@ -87,7 +87,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"forage_herb":
 			texture = m.tex["forage_herb"]
 		"weed":
-			texture = m.tex["weed"]
+			# 서 있을 때는 풀숲, 주우면 묶음(weed)이 인벤토리에 들어간다
+			texture = m.tex["weed_plant"]
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
