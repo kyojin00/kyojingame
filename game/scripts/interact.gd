@@ -206,7 +206,7 @@ func interact() -> void:
 		var obj: Variant = m.objects.get(t)
 		if obj == null:
 			continue
-		if String(obj.kind).begins_with("forage_"):
+		if String(obj.kind).begins_with("forage_") or String(obj.kind) == "weed":
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
 			GameData.items[fid] += 1

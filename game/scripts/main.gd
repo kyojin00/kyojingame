@@ -201,7 +201,7 @@ const TEXTURE_NAMES := [
 	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
 	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
 	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
-	"forage_berry", "forage_herb", "bug_butterfly_0", "bug_butterfly_1",
+	"bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
@@ -610,6 +610,8 @@ func _load_textures() -> void:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
 	for id: String in GameData.CROP_IDS:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
+	for id: String in GameData.FORAGE_IDS:
+		tex[id] = load("res://assets/sprites/%s.png" % id)
 
 
 # 맵 밖 배경 색조 (어두운 숲처럼 보이게)
@@ -824,7 +826,7 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 
 # 채집·벌목·채광 대상이 되는 것들
-const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb"]
+const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed"]
 
 # E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
 const WORK_LOCK_TIME := 0.9

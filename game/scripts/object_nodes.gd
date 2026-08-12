@@ -86,6 +86,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["forage_berry"]
 		"forage_herb":
 			texture = m.tex["forage_herb"]
+		"weed":
+			texture = m.tex["weed"]
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)

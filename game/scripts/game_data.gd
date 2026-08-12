@@ -1064,6 +1064,7 @@ const ITEMS := {
 	"dish_butter_corn": {"name": "버터옥수수", "sell": 260},
 	# 채집물/곤충
 	"forage_berry": {"name": "산딸기", "sell": 40},
+	"weed": {"name": "잡초", "sell": 5},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
 	"bug_dragonfly": {"name": "잠자리", "sell": 50},
@@ -1105,13 +1106,13 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
-	"forage_berry", "forage_herb", "bug_butterfly", "bug_dragonfly", "bug_firefly",
+	"forage_berry", "forage_herb", "weed", "bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
 	"potion_guard", "potion_moon", "sludge"]
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
-const FORAGE_IDS := ["forage_berry", "forage_herb"]
+const FORAGE_IDS := ["forage_berry", "forage_herb", "weed"]   # 잡초는 화분 재료 (노점 계획)
 const BUG_IDS := ["bug_butterfly", "bug_dragonfly", "bug_firefly"]
 # 곤충 출현 조건
 const BUGS := {
