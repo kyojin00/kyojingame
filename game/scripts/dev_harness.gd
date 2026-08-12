@@ -658,7 +658,26 @@ func _debug_tick() -> void:
 			print("SWING_DRAW: 도구 보임=", m.player.tool_sprite.visible,
 				" 그림=", m.player.tool_sprite.texture != null,
 				" 위치=", m.player.tool_sprite.position.round(),
-				" 몸 기울기=", "%.2f" % m.player.sprite.rotation)
+				" 상체 기울기=", "%.2f" % m.player.upper_sprite.rotation)
+			# 완급: 내리치는 정점이 판정 순간(HIT_AT)에 **정확히** 와야 한다.
+			# 어긋나면 도끼가 아직 내려오는 중인데 나무가 맞는다 (예전이 그랬다).
+			var hp2: float = m.HIT_AT / m.SWING_TIME
+			var sw_start: float = m.player._swing_curve(0.0)
+			var sw_wind: float = m.player._swing_curve(hp2 * 0.62)
+			var sw_hit: float = m.player._swing_curve(hp2)
+			var sw_end: float = m.player._swing_curve(1.0)
+			print("SWING_TIMING_OK=", is_equal_approx(sw_hit, 1.0)
+					and is_equal_approx(sw_wind, -1.0)
+					and absf(sw_start) < 0.01 and absf(sw_end) < 0.01,
+				" 시작=", "%.2f" % sw_start, " 다감음=", "%.2f" % sw_wind,
+				" 타격=", "%.2f" % sw_hit, " 끝=", "%.2f" % sw_end)
+			# 상·하체를 갈라 그린다 — 다리는 붙박이(각 0), 상체만 돈다
+			print("SWING_SPLIT_OK=", m.player.upper_sprite.visible
+					and m.player.sprite.region_enabled
+					and absf(m.player.upper_sprite.rotation) > 0.05
+					and is_equal_approx(m.player.sprite.rotation, 0.0),
+				" 상체각=", "%.2f" % m.player.upper_sprite.rotation,
+				" 다리각=", "%.2f" % m.player.sprite.rotation)
 			_save_shot("_swing.png")
 		341:
 			# 나무 쓰러지는 모션.

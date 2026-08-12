@@ -908,6 +908,18 @@ func player_tex(part: String) -> String:
 	return "player_f_" + part
 
 
+# 휘두르기 도트 이름의 앞부분 (key = "down"/"up"/"side").
+# 실제 그림 이름은 여기에 _0(다 감음) · _1(내리치는 중) · _2(다 내리침)가 붙는다.
+#
+# **아직 그 도트가 없다.** main.TEXTURE_NAMES에 이름을 넣지 않은 동안에는
+# main.tex에도 없어서, player.gd가 알아서 몸통을 굽히는 쪽으로 대신한다.
+# 도트를 뽑아 이름만 넣으면 그날부터 켜진다 (player.gd 위쪽 주석 참고).
+func swing_tex_base(key: String) -> String:
+	if gender == "m":
+		return "new_boy_%s_swing" % key
+	return "player_f_%s_swing" % key
+
+
 func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
 	# 옆모습. 남자: 걷는 중엔 4프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)

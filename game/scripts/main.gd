@@ -610,6 +610,17 @@ func _load_textures() -> void:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
 	for id: String in GameData.CROP_IDS:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
+	# 휘두르기 도트는 **있으면 쓴다**. 아직 안 뽑았으면 없는 채로 둔다 —
+	# player.gd가 몸통을 굽혀 대신한다. TEXTURE_NAMES에 넣으면 없을 때 터지므로
+	# 여기서만 따로 챙긴다. 그림을 sprites/에 떨어뜨리면 그날부터 켜진다.
+	# (뽑는 법은 assets/ref/new_boy/make_sprites.js 위쪽 주석)
+	for g: String in ["new_boy", "player_f"]:
+		for d: String in ["down", "up", "side"]:
+			for i in 3:
+				var sn := "%s_%s_swing_%d" % [g, d, i]
+				var sp := "res://assets/sprites/%s.png" % sn
+				if ResourceLoader.exists(sp):
+					tex[sn] = load(sp)
 
 
 # 맵 밖 배경 색조 (어두운 숲처럼 보이게)

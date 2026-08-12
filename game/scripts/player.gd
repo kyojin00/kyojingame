@@ -49,12 +49,51 @@ var horse_sprite: Sprite2D
 
 # ---- 도구 휘두르기 ----
 #
-# 캐릭터 도트에는 「휘두르는」 프레임이 없다 (서기 + 걷기 4프레임뿐).
-# 그래서 몸을 발끝을 축으로 젖혔다 내리치고, 손에 도구 아이콘을 띄워
-# 호를 그리게 해서 동작을 만든다. 나중에 휘두르기 도트가 생기면
-# _swing_visual만 갈아끼우면 된다.
-const SWING_LEAN := 0.22        # 몸이 젖혀지는 최대 각(라디안)
-const SWING_ARC := 1.9          # 도구가 그리는 호(라디안)
+# 캐릭터 도트에는 아직 「휘두르는」 프레임이 없다 (서기 + 걷기 4프레임뿐).
+# 그래서 네 가지를 겹쳐 동작을 만든다:
+#
+#   1. 몸    허리를 축으로 **상체만** 감았다 내리친다 (다리는 붙박이)
+#   2. 도구  손 높이에서 호를 그리고, 빠른 구간에 잔상을 남긴다
+#   3. 무게  내리치는 쪽으로 몸이 몇 px 쏠렸다 돌아온다
+#   4. 눌림  닿는 순간 몸이 살짝 주저앉는다
+#
+# 자연스러움은 그림보다 **완급**에서 나온다. 감아올리기는 길고 느리게
+# (예비동작), 내리치기는 두세 프레임에 끝내고, 닿는 순간 잠깐 멈췄다가
+# (히트스톱) 천천히 돌아온다. 그 완급은 `_swing_curve` 하나가 쥐고 있다.
+#
+# **내리치는 정점(+1)을 main.HIT_AT에 맞춰 둔다.** 예전에는 정점이 0.17초인데
+# 판정은 0.15초에 나서, 도끼가 아직 내려오는 중에 나무가 맞았다.
+#
+# ---- 휘두르기 도트가 생기면 ----
+#
+# `assets/ref/new_boy/make_sprites.js`의 SETS에 swing 세트를 추가해
+# `new_boy_<방향>_swing_0..2`를 뽑고, main.TEXTURE_NAMES에 이름을 넣으면 끝이다.
+# `_swing_frame`이 그림이 있는지 보고 알아서 갈아끼우고, 몸 회전은
+# SWING_LEAN_DOT까지 줄어든다 (도트가 이미 자세를 가지고 있으니 덜 굽혀야 한다).
+const SWING_WAIST := 136        # 상·하체를 자르는 텍스처 행 (주먹 아래 · 반바지 한가운데)
+const SWING_OVERLAP := 9        # 상체를 이만큼 더 아래까지 그린다 (자른 자국을 덮는다)
+const SWING_LEAN := 0.34        # 상체가 감겼다 펴지는 최대 각(라디안)
+const SWING_LEAN_DOT := 0.14    # 휘두르기 도트가 있을 때 (도트가 자세를 맡는다)
+const SWING_SHIFT := 5.0        # 내리치는 쪽으로 몸이 쏠리는 거리(px)
+const SWING_SQUASH := 0.06      # 닿는 순간 몸이 눌리는 정도
+const SWING_HOLD := 0.10        # 히트스톱: 정점에서 머무는 구간 (진행도 0~1 기준)
+const SWING_TRAIL := 6          # 도구 잔상으로 남기는 자취 수
+
+# 방향마다 손이 있는 자리와 휘두르는 폭이 다르다.
+#   hand   손잡이 끝이 오는 자리 (발밑 기준 node 좌표. x는 sign_x로 뒤집힌다)
+#   mid    호의 한가운데 각. 여기서 arc/2 만큼 위(감음)·아래(내리침)로 벌어진다.
+#          0은 「위로 곧게 선 도구」다 (도구 그림이 손잡이 끝을 축으로 위를 본다)
+#   arc    도구가 그리는 호 전체(라디안)
+#   tilt   상체를 굽히는 정도 (뒷모습은 팔이 안 보여 조금 덜 굽힌다)
+#   shift  무게가 쏠리는 방향
+const SWING_POSE := {
+	"down": {"hand": Vector2(10, -36), "mid": 0.85, "arc": 2.6, "tilt": 1.0,
+		"shift": Vector2(1, 3)},
+	"up": {"hand": Vector2(-9, -40), "mid": 0.80, "arc": 2.4, "tilt": 0.75,
+		"shift": Vector2(1, -3)},
+	"side": {"hand": Vector2(12, -38), "mid": 0.95, "arc": 2.9, "tilt": 1.0,
+		"shift": Vector2(5, 1)},
+}
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
 	"hoe": "icon_hoe", "water": "icon_water",
@@ -65,6 +104,10 @@ var swing_t := 0.0              # 남은 시간
 var swing_len := 0.0
 var swing_face := Vector2.DOWN  # 내리치는 방향
 var tool_sprite: Sprite2D
+var upper_sprite: Sprite2D      # 휘두를 때만 보인다 (상체 — 허리 위)
+var _base_offset := Vector2.ZERO # scenes/player.tscn이 정한 스프라이트 자리
+var _split := false             # 지금 상·하체를 갈라 그리는 중인가
+var _trail: Array = []          # 도구 끝이 지나간 자취 (node 좌표)
 
 
 func _ready() -> void:
@@ -76,6 +119,14 @@ func _ready() -> void:
 	# 캐릭터보다 먼저 그린다 (자식 순서로 앞뒤를 정한다).
 	# z_index를 -1로 두면 지형(z=0)보다 먼저 그려져 땅 밑에 깔린다.
 	move_child(horse_sprite, 0)
+
+	# 상체 (허리 위). 휘두를 때만 보이고, 그동안 sprite는 다리만 그린다.
+	_base_offset = sprite.offset
+	upper_sprite = Sprite2D.new()
+	upper_sprite.centered = false
+	upper_sprite.visible = false
+	add_child(upper_sprite)
+	move_child(upper_sprite, sprite.get_index() + 1)   # 다리 위에 겹친다
 
 	# 손에 들리는 도구 (휘두를 때만 보인다). 손잡이 끝을 축으로 돈다.
 	tool_sprite = Sprite2D.new()
@@ -100,36 +151,166 @@ func start_swing(tool_id: String, face: Vector2, length: float) -> void:
 	swing_face = face if face != Vector2.ZERO else Vector2.DOWN
 	swing_len = maxf(0.14, length)
 	swing_t = swing_len
+	_trail.clear()
 
 
-# 0(시작) ~ 1(끝)을 -1(뒤로 젖힘) ~ +1(앞으로 내리침)로 바꾼다.
-# 감아올리기는 느리게, 내리치기는 빠르게 — 그래야 「친다」로 보인다.
+# 내리치는 정점이 오는 진행도. main의 두 상수에서 그대로 끌어온다 —
+# 여기가 어긋나면 도끼가 아직 내려오는 중에 나무가 맞는다.
+func _hit_p() -> float:
+	if main == null:
+		return 0.44
+	return clampf(main.HIT_AT / maxf(0.01, main.SWING_TIME), 0.15, 0.8)
+
+
+# 0(시작) ~ 1(끝)을 -1(다 감음) ~ +1(다 내리침)로 바꾼다.
+#
+#   감아올리기  길고 느리게 끝난다 (예비동작 — 여기가 있어야 「친다」로 보인다)
+#   내리치기    두세 프레임에 확 (가속)
+#   히트스톱    정점에서 잠깐 박힌 채로 멈춘다
+#   되돌아오기  천천히 제자리로
 func _swing_curve(p: float) -> float:
-	if p < 0.32:
-		return -p / 0.32
-	if p < 0.5:
-		return -1.0 + (p - 0.32) / 0.18 * 2.0
-	return 1.0 - (p - 0.5) / 0.5
+	var hit := _hit_p()
+	var wind := hit * 0.62
+	if p < wind:
+		return -sin(p / wind * PI * 0.5)          # 뒤로 넘어가며 느려진다
+	if p < hit:
+		var q: float = (p - wind) / maxf(0.01, hit - wind)
+		return -1.0 + 2.0 * q * q                 # 내리치기 (가속)
+	if p < hit + SWING_HOLD:
+		return 1.0                                # 히트스톱
+	var r: float = (p - hit - SWING_HOLD) / maxf(0.02, 1.0 - hit - SWING_HOLD)
+	return 1.0 - r * r * (3.0 - 2.0 * r)          # 부드럽게 제자리로
+
+
+# 지금 휘두르기 위상 (-1 ~ +1). 안 휘두르면 0.
+func swing_c() -> float:
+	if swing_t <= 0.0 or swing_len <= 0.0:
+		return 0.0
+	return _swing_curve(1.0 - swing_t / swing_len)
+
+
+# 지금 위상에 맞는 휘두르기 도트 이름. 아직 도트가 없으면 "" —
+# 그러면 아래에서 몸통 회전으로 대신한다.
+func _swing_frame(key: String) -> String:
+	if main == null or swing_t <= 0.0:
+		return ""
+	var base := GameData.swing_tex_base(key)
+	if base == "":
+		return ""
+	var c := swing_c()
+	var idx := 0                 # 다 감은 자세
+	if c > 0.55:
+		idx = 2                  # 다 내리친 자세
+	elif c > -0.4:
+		idx = 1                  # 내리치는 중간
+	var n := "%s_%d" % [base, idx]
+	return n if main.tex.has(n) else ""
+
+
+# 휘두르는 동안 쓰는 방향 딱지 ("down"/"up"/"side")
+func _swing_key() -> String:
+	if absf(swing_face.x) >= 0.4:
+		return "side"
+	return "up" if swing_face.y < 0.0 else "down"
+
+
+# 휘두르기가 끝났다 — 갈라 놓은 몸을 도로 붙인다
+func _swing_off() -> void:
+	tool_sprite.visible = false
+	sprite.rotation = 0.0
+	if _split:
+		_split = false
+		upper_sprite.visible = false
+		sprite.offset = _base_offset
+	# 말에 올라탄 채로 끝났다면 region·자리는 _ride_visual의 것이다 — 건드리지 않는다
+	if not GameData.riding:
+		sprite.region_enabled = false
+		sprite.position = Vector2.ZERO
+	if not _trail.is_empty():
+		_trail.clear()
+		queue_redraw()
 
 
 func _swing_visual() -> void:
 	if swing_t <= 0.0:
-		tool_sprite.visible = false
-		sprite.rotation = 0.0
+		_swing_off()
 		return
 	var p: float = 1.0 - swing_t / swing_len
 	var c := _swing_curve(p)
+	var key := _swing_key()
+	var pose: Dictionary = SWING_POSE[key]
 	var sign_x := -1.0 if swing_face.x < -0.3 else 1.0
-	# 몸: 발끝을 축으로 젖혔다 내리친다 (스프라이트 원점이 발이다)
-	sprite.rotation = c * SWING_LEAN * sign_x
+	# 도트가 이미 자세를 가지고 있으면 몸은 살짝만 거든다
+	var lean: float = (SWING_LEAN_DOT if _swing_frame(key) != "" else SWING_LEAN) \
+		* float(pose.tilt)
+
+	# 눌림: 감을 때 늘어났다가 닿는 순간 주저앉는다
+	var sq := 1.0 - SWING_SQUASH * maxf(0.0, c) + 0.03 * maxf(0.0, -c)
+	var body := Vector2(0.5, 0.5 * sq)
+	# 무게: 내리치는 쪽으로 쏠렸다 돌아온다 (감을 때는 반대로 = 예비동작)
+	var shift: Vector2 = Vector2(float(pose.shift.x) * sign_x, float(pose.shift.y)) \
+		* (c * SWING_SHIFT / 5.0)
+
+	# 몸: 허리를 축으로 상체만 감았다 내리친다. 다리는 그 자리에서 버틴다.
+	# 말 위에서는 가르지 않는다 — 안장에 앉히느라 이미 몸을 잘라 놨다.
+	var can_split: bool = not GameData.riding and sprite.texture != null
+	if can_split:
+		var tw: float = sprite.texture.get_width()
+		var th: float = sprite.texture.get_height()
+		if not _split:
+			_split = true
+			upper_sprite.visible = true
+		upper_sprite.texture = sprite.texture
+		upper_sprite.flip_h = sprite.flip_h
+		upper_sprite.scale = body
+		upper_sprite.region_enabled = true
+		# 상체는 허리보다 조금 더 아래까지 그린다 — 안 그러면 굽힐 때 허리에
+		# 자른 자국(계단)이 보인다. 겹친 만큼 다리를 덮어 준다.
+		upper_sprite.region_rect = Rect2(0.0, 0.0, tw,
+			minf(th, SWING_WAIST + SWING_OVERLAP))
+		upper_sprite.offset = _base_offset
+		sprite.scale = body
+		sprite.region_enabled = true
+		sprite.region_rect = Rect2(0.0, SWING_WAIST, tw, th - SWING_WAIST)
+		sprite.offset = _base_offset + Vector2(0.0, SWING_WAIST)
+		sprite.rotation = 0.0
+		# 허리 — 자른 자리의 한가운데. 여기를 축으로 돌린다.
+		var pivot := Vector2(0.0, (SWING_WAIST + _base_offset.y) * body.y)
+		var a := c * lean * sign_x
+		upper_sprite.rotation = a
+		upper_sprite.position = pivot - pivot.rotated(a) + shift
+		sprite.position = shift
+	else:
+		if _split:
+			_split = false
+			upper_sprite.visible = false
+			sprite.offset = _base_offset
+			if not GameData.riding:
+				sprite.region_enabled = false
+		sprite.rotation = c * lean * 0.55 * sign_x   # 통째로 젖힌다 (예전 방식)
+		if not GameData.riding:
+			sprite.position = shift   # 말 위에서는 _ride_visual이 자리를 쥔다
+
 	# 도구: 손 높이에서 호를 그린다
+	var hand: Vector2 = pose.hand
 	tool_sprite.visible = true
 	tool_sprite.flip_h = sign_x < 0.0
-	tool_sprite.rotation = (-1.1 + c * SWING_ARC) * sign_x
-	tool_sprite.position = Vector2(sign_x * 9.0 + swing_face.x * 6.0,
-		-30.0 + swing_face.y * 5.0 + c * 4.0)
-	# 위를 향해 칠 때는 캐릭터 뒤로 (아래/옆이면 앞으로)
-	move_child(tool_sprite, 0 if swing_face.y < -0.3 else get_child_count() - 1)
+	# 감을 때는 어깨 뒤로 세우고(c=-1), 내리칠 때는 발치까지 넘긴다(c=+1)
+	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * sign_x
+	tool_sprite.position = Vector2(hand.x * sign_x + c * 7.0 * sign_x,
+		hand.y + c * 9.0) + shift
+	# 감아올리는 동안은 도구가 몸 **뒤로** 간다 (어깨 너머로 넘긴 것이니까).
+	# 내리치기 시작하면 앞으로 나온다. 뒤를 보고 칠 때는 내내 뒤다.
+	var behind: bool = key == "up" or c < 0.0
+	move_child(tool_sprite, 0 if behind else get_child_count() - 1)
+
+	# 잔상: 도구 끝이 지나간 자리를 몇 개 남긴다 (빠른 구간에서만 눈에 띈다)
+	var tip: Vector2 = tool_sprite.position \
+		+ Vector2(0.0, -34.0).rotated(tool_sprite.rotation)
+	_trail.push_front(tip)
+	while _trail.size() > SWING_TRAIL:
+		_trail.pop_back()
+	queue_redraw()
 
 
 func _draw() -> void:
@@ -138,6 +319,13 @@ func _draw() -> void:
 		draw_rect(Rect2(-26, -4, 52, 9), Color(0, 0, 0, 0.22))
 	else:
 		draw_rect(Rect2(-10, -3, 20, 6), Color(0, 0, 0, 0.22))
+	# 도구 잔상 — 날 끝이 지나간 자취를 옅게 이어 그린다.
+	# 빠른 구간에서만 자취가 벌어지므로, 내리치는 순간에만 눈에 띈다.
+	if _trail.size() >= 2:
+		for i in range(_trail.size() - 1):
+			var k: float = 1.0 - float(i) / float(_trail.size() - 1)
+			draw_line(_trail[i], _trail[i + 1], Color(1, 1, 1, 0.30 * k * k),
+				maxf(1.0, 3.0 * k))
 
 
 func _process(delta: float) -> void:
@@ -204,7 +392,9 @@ func _blocked(p: Vector2) -> bool:
 func _update_sprite() -> void:
 	# 말 위에서는 걷기 프레임을 쓰지 않는다 — 말 위를 걸어다니는 것처럼 보인다
 	var riding: bool = GameData.riding
-	var walking: bool = moving and not riding
+	# 휘두르는 동안은 걷기 프레임을 쓰지 않는다 — 발을 붙이고 서야 힘이 실린다
+	var swinging: bool = swing_t > 0.0
+	var walking: bool = moving and not riding and not swinging
 	if riding != _was_riding:
 		_was_riding = riding
 		queue_redraw()          # 발밑 그림자 크기가 바뀐다
@@ -228,6 +418,13 @@ func _update_sprite() -> void:
 		_:
 			tex_name = GameData.player_side_tex(walking, suffix, anim_time)
 			sprite.flip_h = dir == "left"
+	# 휘두르기 도트가 있으면 그것으로 갈아끼운다. 없으면 서기 프레임 그대로 두고
+	# _swing_visual이 몸을 굽혀 대신한다 (도트가 생기면 여기부터 켜진다).
+	if swinging:
+		var swing_name := _swing_frame(_swing_key())
+		if swing_name != "":
+			tex_name = swing_name
+			sprite.flip_h = swing_face.x < -0.3
 	sprite.texture = main.tex[tex_name]
 	# 서 있을 때 숨쉬기: 프레임 대신 세로 스케일을 살짝 키웠다 줄인다
 	# (스프라이트 offset이 발 기준이라 발은 그대로, 머리만 오르내린다)
@@ -240,7 +437,7 @@ func _update_sprite() -> void:
 	horse_sprite.visible = riding
 	if riding:
 		_ride_visual()
-	elif sprite.region_enabled:
+	elif sprite.region_enabled and not _split:
 		sprite.region_enabled = false
 		sprite.position.y = 0.0
 	_swing_visual()
