@@ -591,6 +591,14 @@ func _draw_kitchen() -> void:
 		for i in range(maxi(left * 2, 1)):
 			canvas.draw_rect(Rect2(KITCHEN.position.x + 4 + i * 17,
 				KITCHEN.end.y - 6 + (i % 2) * 3, 12, 4), Color(0.55, 0.5, 0.44, 0.5))
+	elif main.tex.has("kitchen_counter"):
+		# 발견한 낡은 조리대 — 올려 준 손그림 (벽 소품까지 한 장이다).
+		# 밑변을 조리대 칸 바닥에 맞추고, 벽 높이에 맞춰 비율대로 줄인다.
+		var t: Texture2D = main.tex["kitchen_counter"]
+		var h := (KITCHEN.end.y + 8.0) - (ROOM.position.y + 10.0)
+		var w := h * float(t.get_width()) / float(t.get_height())
+		canvas.draw_texture_rect(t, Rect2(
+			KITCHEN.get_center().x - w / 2.0, KITCHEN.end.y + 8.0 - h, w, h), false)
 	else:
 		canvas.draw_rect(KITCHEN, Color(0.52, 0.36, 0.22))
 		canvas.draw_rect(Rect2(KITCHEN.position, Vector2(KITCHEN.size.x, 6)), Color(0.72, 0.7, 0.68))

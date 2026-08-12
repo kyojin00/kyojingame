@@ -8,6 +8,8 @@ const SRC = __dirname + '/src/', OUT = __dirname + '/../sprites/';
 const JOBS = [
   ['ref_icon_rod.png', 'icon_rod', 32],        // 간이낚싯대
   ['ref_deco_fountain.png', 'deco_fountain', 128, 160],  // 광장 분수대
+  ['ref_fence.png', 'fence', 64, 64],          // 나무 울타리 (한 칸)
+  ['ref_kitchen.png', 'kitchen_counter', 384, 256],  // 집 안 조리대 (발견 후)
 ];
 
 for (const [src, out, SW, SH0] of JOBS) {
