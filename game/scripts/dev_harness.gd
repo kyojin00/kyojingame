@@ -1059,7 +1059,7 @@ func _debug_tick() -> void:
 			GameData.desk_tick(6.0)
 			var made_bed := GameData.bed_lv == 1 and GameData.desk_queue.is_empty()
 			var up1 := GameData.desk_upgrade()
-			var faster := GameData.desk_time() == 3.5 and GameData.desk_slots() == 2
+			var faster := GameData.desk_time() == 4.0 and GameData.desk_slots() == 2
 			var q2 := GameData.desk_start("bed_soft")
 			GameData.desk_tick(4.0)
 			var made_soft := GameData.bed_lv == 2
