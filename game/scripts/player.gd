@@ -99,7 +99,7 @@ const SWING_POSE := {
 # 팔을 돌린 각도에서 주먹 중심을 계산한 것이라 그림과 어긋나지 않는다.
 # 도트가 없는 방향은 여기에도 없고, SWING_POSE의 이어지는 식을 쓴다.
 const SWING_HAND_DOT := {
-	"side": [Vector2(-21, -52), Vector2(14, -47), Vector2(13, -39)],
+	"side": [Vector2(-19, -57), Vector2(8, -50), Vector2(6, -33)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",

@@ -1,37 +1,30 @@
-// 휘두르기 원본 만들기 — 서기 원본에서 **팔만 떼어 돌린다**.
+// 휘두르기 원본 만들기 — 서기 원본에서 팔을 지우고 **새로 그린다**.
 //
-// 원본(1280x720)은 도트보다 3.5배 커서, 여기서 돌린 뒤 make_sprites.js로
-// 줄이면 회전 자국이 축소에 묻힌다. 128x192에서 바로 돌리면 계단이 남는다.
+// 처음에는 팔을 떼어 회전시켰다. 이음매는 붙었지만 팔이 통짜 막대처럼
+// 보였다 — 매달린 팔을 통째로 돌린 것이라 팔꿈치가 접히지 않고, 소매도
+// 길게 늘어난 채 따라 돌기 때문이다.
 //
-// 어떻게 떼어 내나 —
-//   1. 아래팔·소매 안쪽에 씨앗을 놓고 **외곽선에 막힐 때까지 번진다**.
-//      팔과 몸통은 외곽선으로 갈라져 있어서 여기서 저절로 끊긴다.
-//   2. 번진 자리를 어두운 쪽으로만 몇 px 부풀려 **자기 외곽선을 챙긴다**.
-//   3. 어깨는 **원으로** 함께 떼어 낸다. 축이 그 원의 한가운데라, 아무리
-//      돌려도 원이 제자리를 지켜 판 자국이 안 생긴다 (컷아웃의 정석).
-//      직선으로 자르면 소매가 판자처럼 떨어져 나온다 — 실제로 그랬다.
+// 그래서 **지우고 새로 그린다.** 이 도트는 평면 색 + 외곽선 구조라
+// 「굵기가 변하는 선분 + 둥근 끝」으로 팔을 그리면 원래 그림과 같은 결이 된다.
+// 대신 자세를 마음대로 잡을 수 있다 — 팔꿈치를 접고, 소매는 짧게 두고,
+// 주먹은 제자리에 둥글게 놓는다.
 //
-// 두 마디로 움직인다. 위팔은 어깨를 축으로, 아래팔은 거기에 팔꿈치 회전을
-// 한 번 더 얹는다. 한 마디로 돌리면 장대를 휘두르는 것처럼 보인다.
-// 이음매가 벌어지지 않게 두 마디를 팔꿈치에서 겹쳐 둔다.
+// 원본(1280x720)에서 그린 뒤 make_sprites.js로 줄인다. 도트보다 3.5배 커서
+// 여기서 그리면 계단이 축소에 묻히고 팔레트도 알아서 맞춰진다.
 //
-// 팔을 뗀 자리에는 몸통의 **왼쪽 외곽선이 없다.** 마지막에 「살색이 배경과
-// 맞닿은 곳」에만 외곽선을 새로 둘러 준다. 이미 어두운 곳은 건드리지 않으므로
-// 원래 외곽선이 두꺼워지지 않는다.
+// 팔을 지우는 방법은 그대로다 —
+//   1. 아래팔·소매 안쪽에 씨앗을 놓고 **외곽선에 막힐 때까지 번진다.**
+//      팔과 몸통은 외곽선으로 갈라져 있어 여기서 저절로 끊긴다.
+//   2. 번진 자리를 어두운 쪽으로 3px 부풀려 자기 외곽선을 챙긴다.
+//      5px로 하면 반바지와 **나눠 쓰는** 외곽선까지 떼어 가 허리가 파인다.
+//   3. 지운 자리에 몸통 외곽선이 없어지므로, 「몸 색이 배경과 맞닿은 곳」에만
+//      새로 둘러 준다. 이미 어두운 곳은 안 건드려 원래 선이 안 두꺼워진다.
 //
-// ---- 방향을 늘리려면 ----
+// ---- 자세를 고치려면 ----
 //
-// 지금은 옆모습만 있다. 앞·뒤는 **화면 오른쪽 팔**만 움직이면 되는데,
-// 한 번 해 보니 마스크는 잘 잡히지만 각도 조합에서 팔이 두 동강으로 보였다.
-// 위팔·아래팔 각을 눈으로 맞추는 과정이 한 번 더 필요하다.
-//
-// 새 방향을 넣는 순서 —
-//   1. `--debug`로 돌려 마스크(빨강)가 팔만 덮는지 본다. 씨앗과 bound를 조정
-//   2. shoulder / elbow를 어깨·팔꿈치 한가운데로 옮긴다
-//   3. phases를 바꿔 가며 세 자세를 눈으로 맞춘다. 옆모습은 [142,-48] ->
-//      [-105,20] -> [-76,14]이었다 (감음 -> 앞으로 뻗음 -> 내리침).
-//      **호가 머리 위를 지나게** 해야 한다. 0을 지나가면 서기 자세로 보인다
-//   4. 찍히는 SWING_HAND_DOT 값을 player.gd에 옮긴다
+// POSE의 [위팔 각, 아래팔 각]만 만지면 된다. 0이 아래(차렷), 시계방향이 +.
+// **호가 머리 위를 지나게** 잡을 것 — 0을 지나가면 팔이 몸 옆으로 내려와
+// 그냥 서기 자세로 보인다.
 //
 // 실행:  node make_swing_src.js [--debug]      (pngjs 필요)
 //        그 다음  node make_sprites.js
@@ -41,6 +34,8 @@ const DEBUG = process.argv.includes('--debug');
 
 const OUTLINE = [26, 10, 3];     // 새로 두르는 외곽선 색 (원본 외곽선과 같은 계열)
 const OUTLINE_W = 5;             // 원본 외곽선 두께
+const ARM_OUT = 7;               // 그려 넣는 팔의 외곽선. 원본보다 굵게 잡아야
+                                 // 3.5배 축소 뒤에도 몸통 선과 같은 굵기로 남는다
 const GRAB_W = 3;                // 팔이 챙겨 가는 외곽선 두께.
                                  // 5로 하면 반바지와 **나눠 쓰는** 외곽선까지
                                  // 떼어 가서 허리에 이빨 빠진 자국이 남는다
@@ -56,8 +51,17 @@ const ARM = {
     src: 'side_idle',
     seeds: [[600, 460], [600, 380]],
     bound: [560, 356, 640, 548],
-    shoulder: [603, 360], elbow: [601, 424], cap: 48, fist: 476,
-    phases: [[142, -48], [-105, 20], [-76, 14]],
+    shoulder: [603, 356],
+    // 팔 치수 (원본 px). 서기 그림에서 재 왔다.
+    upper: 62, fore: 46, fistOut: 13,
+    rSleeve: 21, rArm: 17, rWrist: 14, rFist: 18, sleeve: 40,
+    // 위상별 [위팔 각, 아래팔 각]
+    //   감음   팔꿈치를 위-뒤로 들고 아래팔을 접어 주먹이 머리 뒤로
+    //   중간   앞-위로 쭉 뻗는다
+    //   내리침 앞-아래로 곧게
+    pose: [[124, 135], [-142, -69], [-41, -43]],
+    // 빛은 왼쪽 위에서 온다 — 그늘은 오른쪽 아래
+    light: [-0.6, -0.8],
   },
 };
 
@@ -114,6 +118,81 @@ function capDisc(p, m, [cx, cy], r) {
 }
 
 
+// 원본에서 스포이드로 뽑은 색 (side_idle 기준)
+// 도트 팔레트(28색)에 실제로 들어 있는 값을 쓴다. 중간 색을 지어내면
+// k-means가 새 칸을 잡아먹어 다른 색이 밀린다.
+const COL = {
+  sleeve: [253, 243, 217], sleeveDark: [217, 205, 179],
+  skin: [254, 213, 165], skinDark: [246, 162, 113],
+  outline: [30, 12, 4],
+};
+
+// 각(도) -> 방향. 0이 아래(차렷), 시계방향이 +.
+const dirOf = (deg) => {
+  const a = deg * Math.PI / 180;
+  return [-Math.sin(a), Math.cos(a)];
+};
+
+// 점에서 선분까지의 거리와, 선분 위 어디쯤인지(0~1)
+function segDist(px, py, ax, ay, bx, by) {
+  const vx = bx - ax, vy = by - ay;
+  const L2 = vx * vx + vy * vy;
+  let t = L2 ? ((px - ax) * vx + (py - ay) * vy) / L2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const dx = px - (ax + vx * t), dy = py - (ay + vy * t);
+  return [Math.hypot(dx, dy), t];
+}
+
+// 굵기가 변하는 선분 하나. grow만큼 부풀려 외곽선으로도 쓴다.
+function stroke(p, a, b, r0, r1, col, dark, light, grow) {
+  const W = p.width, H = p.height;
+  const rMax = Math.max(r0, r1) + grow + 1;
+  const x0 = Math.max(0, Math.floor(Math.min(a[0], b[0]) - rMax));
+  const x1 = Math.min(W - 1, Math.ceil(Math.max(a[0], b[0]) + rMax));
+  const y0 = Math.max(0, Math.floor(Math.min(a[1], b[1]) - rMax));
+  const y1 = Math.min(H - 1, Math.ceil(Math.max(a[1], b[1]) + rMax));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const [d, t] = segDist(x + 0.5, y + 0.5, a[0], a[1], b[0], b[1]);
+    const r = r0 + (r1 - r0) * t;
+    if (d > r + grow) continue;
+    const i = idx(p, x, y);
+    // 그늘: 빛 반대쪽 바깥 1/3
+    let c = col;
+    if (dark) {
+      const nx = (x + 0.5 - (a[0] + (b[0] - a[0]) * t)) / Math.max(1, r);
+      const ny = (y + 0.5 - (a[1] + (b[1] - a[1]) * t)) / Math.max(1, r);
+      if (nx * light[0] + ny * light[1] < -0.35) c = dark;
+    }
+    if (d > r) c = COL.outline;                 // 부풀린 만큼은 외곽선
+    p.data[i] = c[0]; p.data[i + 1] = c[1]; p.data[i + 2] = c[2]; p.data[i + 3] = 255;
+  }
+}
+
+// 팔 하나를 그린다. 어깨 -> 팔꿈치 -> 손목 -> 주먹.
+function drawArm(p, cfg, phase) {
+  const [sx, sy] = cfg.shoulder;
+  const [a1, a2] = cfg.pose[phase];
+  const d1 = dirOf(a1), d2 = dirOf(a2);
+  const E = [sx + d1[0] * cfg.upper, sy + d1[1] * cfg.upper];
+  const Wr = [E[0] + d2[0] * cfg.fore, E[1] + d2[1] * cfg.fore];
+  const F = [Wr[0] + d2[0] * cfg.fistOut, Wr[1] + d2[1] * cfg.fistOut];
+  const Sl = [sx + d1[0] * cfg.sleeve, sy + d1[1] * cfg.sleeve];
+  const L = cfg.light;
+  // 외곽선을 먼저 통째로 깔고(grow), 그 위에 속을 채운다(grow 0).
+  // 그래야 마디 사이 이음매에 선이 끼어들지 않는다.
+  const parts = [
+    [[sx, sy], Sl, cfg.rSleeve, cfg.rSleeve * 0.94, COL.sleeve, COL.sleeveDark],
+    [Sl, E, cfg.rArm * 1.02, cfg.rArm, COL.skin, COL.skinDark],
+    [E, Wr, cfg.rArm, cfg.rWrist, COL.skin, COL.skinDark],
+    [F, F, cfg.rFist, cfg.rFist, COL.skin, COL.skinDark],
+  ];
+  for (const [a, b, r0, r1] of parts)
+    stroke(p, a, b, r0, r1, COL.outline, null, L, ARM_OUT);
+  for (const [a, b, r0, r1, col, dk] of parts)
+    stroke(p, a, b, r0, r1, col, dk, L, 0);
+}
+
+
 function unrot(x, y, cx, cy, deg) {
   const a = -deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const dx = x - cx, dy = y - cy;
@@ -140,42 +219,57 @@ function reOutline(p) {
   }
 }
 
+// 팔을 지우면, 팔과 몸통이 **나눠 쓰던** 외곽선의 바깥쪽이 몸에서 떨어져
+// 가느다란 검은 선으로 남는다. 몸 색에 붙어 있지 않은 어두운 점을 걷어낸다.
+//
+// **팔이 있던 자리 안에서만** 본다. 온 그림에 대고 돌리면 머리카락과 부츠처럼
+// 원래 어두운 덩어리가 통째로 갉인다 (실제로 그랬다).
+function dropOrphanOutline(p, mask, near) {
+  const W = p.width, H = p.height;
+  const zone = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!mask[y * W + x]) continue;
+    for (let dy = -near; dy <= near; dy++) for (let dx = -near; dx <= near; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < W && ny < H) zone[ny * W + nx] = 1;
+    }
+  }
+  for (let pass = 0; pass < OUTLINE_W + 2; pass++) {
+    const kill = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!zone[y * W + x]) continue;
+      if (!solid(p, x, y) || !dark(p, x, y)) continue;
+      let attached = false;
+      for (let dy = -1; dy <= 1 && !attached; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          if (solid(p, x + dx, y + dy) && !dark(p, x + dx, y + dy)) { attached = true; break; }
+        }
+      if (!attached) kill.push(idx(p, x, y));
+    }
+    if (!kill.length) break;
+    for (const i of kill) p.data[i + 3] = 0;
+  }
+}
+
+
 function build(dir, phase) {
   const cfg = ARM[dir];
   const base = load(cfg.src);
   const W = base.width, H = base.height;
   const mask = grabOutline(base, capDisc(base,
     flood(base, cfg.seeds, cfg.bound), cfg.shoulder, cfg.cap), GRAB_W);
-  const [upDeg, foreDeg] = cfg.phases[phase];
-  const [sx, sy] = cfg.shoulder;
-  const [ex, ey] = cfg.elbow;
-  const ra = upDeg * Math.PI / 180;
-  const ex2 = sx + (ex - sx) * Math.cos(ra) - (ey - sy) * Math.sin(ra);
-  const ey2 = sy + (ex - sx) * Math.sin(ra) + (ey - sy) * Math.cos(ra);
-
   // 1) 팔을 지운 몸
   const out = blank(W, H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
     if (!mask[y * W + x] && solid(base, x, y)) copyPx(base, idx(base, x, y), out, idx(out, x, y));
-  // 지우고 남은 몸에 먼저 외곽선을 둘러 준다 (팔이 덮기 전에)
+  // 지우고 남은 몸을 정리한다: 떨어진 외곽선 조각을 걷어내고,
+  // 그러고 나서 몸 색이 드러난 자리에 외곽선을 새로 두른다
+  dropOrphanOutline(out, mask, OUTLINE_W + 2);
   reOutline(out);
 
-  // 2) 돌린 팔을 얹는다. 위팔 -> 아래팔 순 (아래팔이 이음매를 덮는다)
-  const put = (deg2, lo, hi) => {
-    const px = [];
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      let ux = x, uy = y;
-      if (deg2 !== null) [ux, uy] = unrot(x, y, ex2, ey2, deg2);
-      [ux, uy] = unrot(ux, uy, sx, sy, upDeg);
-      const si = Math.round(ux), sj = Math.round(uy);
-      if (si < 0 || sj < 0 || si >= W || sj >= H) continue;
-      if (!mask[sj * W + si] || sj < lo || sj > hi) continue;
-      px.push([idx(out, x, y), idx(base, si, sj)]);
-    }
-    for (const [di, si] of px) copyPx(base, si, out, di);
-  };
-  put(null, 0, ey + JOINT);                 // 위팔 (어깨 회전만)
-  put(foreDeg, ey - JOINT, H);              // 아래팔 (팔꿈치 회전 추가)
+  // 2) 새 팔을 그린다
+  drawArm(out, cfg, phase);
 
   if (DEBUG) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -193,22 +287,12 @@ function build(dir, phase) {
 //   도트 -> node: nx = (tx - 64) * 0.5,           ny = (ty - 188) * 0.5
 const FIT = { side: { hipX: 638.9, ground: 680, scale: 0.2874 } };
 function fistNode(cfg, dir, phase) {
-  const base = load(cfg.src), W = base.width;
-  const mask = grabOutline(base, capDisc(base,
-    flood(base, cfg.seeds, cfg.bound), cfg.shoulder, cfg.cap), GRAB_W);
-  let sx = 0, sy = 0, n = 0;
-  for (let y = cfg.fist; y < base.height; y++) for (let x = 0; x < W; x++)
-    if (mask[y * W + x]) { sx += x; sy += y; n++; }
-  if (!n) return null;
-  sx /= n; sy /= n;
-  const [ux, uy] = cfg.shoulder, [ex, ey] = cfg.elbow;
-  const [upDeg, foreDeg] = cfg.phases[phase];
-  const rot = (px, py, cx, cy, deg) => {
-    const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
-    return [cx + (px - cx) * c - (py - cy) * s, cy + (px - cx) * s + (py - cy) * c];
-  };
-  let [fx, fy] = rot(sx, sy, ex, ey, foreDeg);
-  [fx, fy] = rot(fx, fy, ux, uy, upDeg);
+  const [sx, sy] = cfg.shoulder;
+  const [a1, a2] = cfg.pose[phase];
+  const d1 = dirOf(a1), d2 = dirOf(a2);
+  const ex = sx + d1[0] * cfg.upper, ey = sy + d1[1] * cfg.upper;
+  const fx = ex + d2[0] * (cfg.fore + cfg.fistOut);
+  const fy = ey + d2[1] * (cfg.fore + cfg.fistOut);
   const f = FIT[dir];
   const tx = 64 + (fx - f.hipX) * f.scale, ty = 190 + (fy - f.ground) * f.scale;
   return [(tx - 64) * 0.5, (ty - 188) * 0.5];

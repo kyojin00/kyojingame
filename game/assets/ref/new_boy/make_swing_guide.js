@@ -42,7 +42,7 @@ const POSE = {
 const PHASE_C = [-1.0, 0.1, 1.0];
 // 도트가 이미 있는 방향은 **그 도트의 주먹 자리**를 찍는다 (player.gd SWING_HAND_DOT).
 // make_swing_src.js가 팔을 돌린 각도에서 계산해 준 값이다.
-const HAND_DOT = { side: [[-21, -52], [14, -47], [13, -39]] };
+const HAND_DOT = { side: [[-19, -57], [8, -50], [6, -33]] };
 const TOOL_LEN = 34;             // 손잡이 끝 ~ 날 끝 (node px)
 
 const DIRS = ['side', 'down', 'up'];
