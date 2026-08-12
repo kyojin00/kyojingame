@@ -210,7 +210,7 @@ func interact() -> void:
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
 			var got := 1
-			if fid in ["forage_shell", "forage_coral"]:
+			if fid in m.BEACH_FORAGE:
 				got = GameData.beach_pick_count()   # 해변 채집 레벨: 한 번에 더 줍는다
 				m.toolwork.gain_skill("beach", 6.0)
 			else:
@@ -239,6 +239,9 @@ func interact() -> void:
 			return
 		if obj.kind == "plotsite":
 			m.village._open_shop_site_dialog()
+			return
+		if obj.kind == "stall":
+			m.village.open_stall()
 			return
 		if obj.kind == "board":
 			m.village._open_quest_board()

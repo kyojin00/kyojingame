@@ -395,6 +395,91 @@ func _debug_tick() -> void:
 			m.map_ui.reset_view()
 		335: _save_shot("_mapdrag.png")
 		336: m.map_ui.close()
+		337:
+			# 상인 대화 메뉴: 계산대 E -> 인사말 + [판매/대화/퀘스트❗/그만두기].
+			# 퀘스트 선택지는 실제 퀘스트 이름으로, 「그만두기」 바로 위에 선다.
+			GameData.merchant_errand = ""
+			GameData.sea_open = true           # 노점 퀘스트는 바다가 열려야 보인다
+			m.village.open_merchant_counter()
+			var labels: Array = []
+			var bang_ok := false
+			for c in m.dialog.buttons_box.get_children():
+				if c.is_queued_for_deletion() or not (c is Button):
+					continue
+				labels.append((c as Button).text.strip_edges())
+				for cc in c.get_children():
+					if cc is Label and (cc as Label).text == "!":
+						bang_ok = true
+			var menu_ok: bool = m.dialog.visible and labels.size() == 4 \
+				and labels[0] == "판매하기" and labels[1] == "대화하기" \
+				and labels[2] == m.village.MERCHANT_QUEST_NAME \
+				and labels[3] == "대화 그만두기"
+			# 바다가 닫혀 있으면 퀘스트 선택지가 아예 안 보인다
+			GameData.sea_open = false
+			m.village.open_merchant_counter()
+			var closed_n := 0
+			for c2 in m.dialog.buttons_box.get_children():
+				if not c2.is_queued_for_deletion() and c2 is Button:
+					closed_n += 1
+			GameData.sea_open = true
+			print("MERCHANT_TALK_OK=", menu_ok and bang_ok and closed_n == 3,
+				" 메뉴=", menu_ok, " 느낌표=", bang_ok, " 바다전=", closed_n, "개(3)")
+			# 퀘스트 수락 -> 재료 전달 -> 노점 설치 + 방문 시각 3개
+			m.village._merchant_errand_start()
+			var doing: bool = GameData.merchant_errand == "doing"
+			GameData.wood += GameData.STALL_WOOD
+			GameData.items["forage_shell"] = int(GameData.items.get("forage_shell", 0)) \
+				+ GameData.STALL_SHELLS
+			var shell_before := int(GameData.items["forage_shell"])
+			m.village._merchant_errand_turnin()
+			var built: bool = GameData.merchant_errand == "done" \
+				and str(m.objects.get(m.STALL_TILE, {}).get("kind", "")) == "stall" \
+				and int(GameData.items["forage_shell"]) \
+					== shell_before - GameData.STALL_SHELLS
+			var sched_ok: bool = GameData.stall_hours.size() == GameData.STALL_VISITS
+			for i in GameData.stall_hours.size():
+				var s := int(GameData.stall_hours[i])
+				if s < 9 * 60 or s > 18 * 60:
+					sched_ok = false
+				if i > 0 and s - int(GameData.stall_hours[i - 1]) < GameData.STALL_VISIT_MIN:
+					sched_ok = false
+			m.dialog.close()
+			print("STALL_QUEST_OK=", doing and built and sched_ok,
+				" 수락=", doing, " 설치=", built, " 시각표=", sched_ok,
+				" ", GameData.stall_hours)
+		339:
+			# 노점 이용: 민지가 있을 때만 구매(미끼·한정 레시피), 판매는 상시
+			var keep_min: float = GameData.minutes
+			GameData.minutes = float(GameData.stall_hours[0]) + 5.0
+			var here: bool = GameData.merchant_at_stall()
+			m.village.open_stall()
+			var open_full: bool = m.shop.visible and m.shop.allowed == ["buy", "sell"] \
+				and m.shop.tab == "buy"
+			var money0: int = GameData.money
+			var bait0 := int(GameData.items.get("bait", 0))
+			m.shop._on_buy_bait()
+			var bait_ok: bool = int(GameData.items["bait"]) == bait0 + 1 \
+				and GameData.money == money0 - GameData.BAIT_PRICE
+			var locked0: bool = GameData.recipe_locked("dish_smelt_fry")
+			m.shop._on_buy_dish_recipe("dish_smelt_fry", GameData.STALL_RECIPES["dish_smelt_fry"])
+			var recipe_ok: bool = locked0 and not GameData.recipe_locked("dish_smelt_fry")
+			m.shop.close()
+			GameData.minutes = 8.0 * 60.0        # 이른 아침 — 민지가 없다
+			var away: bool = not GameData.merchant_at_stall()
+			m.village.open_stall()
+			var sell_only: bool = m.shop.visible and m.shop.allowed == ["sell"]
+			m.shop.close()
+			GameData.minutes = keep_min
+			# 해변 채집물 확장: 쓰레기/유리 그림·아이템 등록 확인
+			var kinds_ok: bool = m.tex.get("forage_trash") != null \
+				and m.tex.get("forage_glass") != null and m.tex.get("stall") != null \
+				and m.tex.get("bait") != null and GameData.ITEMS.has("forage_trash") \
+				and GameData.ITEMS.has("forage_glass")
+			print("STALL_SHOP_OK=", here and open_full and bait_ok and recipe_ok
+				and away and sell_only and kinds_ok,
+				" 방문중=", here, " 구매판매=", open_full, " 미끼=", bait_ok,
+				" 레시피=", recipe_ok, " 부재=", away, " 판매만=", sell_only,
+				" 등록=", kinds_ok)
 		338:
 			# 퀘스트 5 재현: 바위벽 앞까지 실제 이동 판정으로 붙은 뒤 E
 			var rx := 30
@@ -1255,7 +1340,7 @@ func _debug_tick() -> void:
 			var water: bool = m.grid[m.MAP_H - 2][30].ground == "water"
 			var shells := 0
 			for pos in m.objects:
-				if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+				if String(m.objects[pos].kind) in m.BEACH_FORAGE:
 					shells += 1
 			var shell_ok: bool = GameData.ITEMS.has("forage_shell") \
 				and m.tex.has("forage_shell") and m.tex.has("forage_coral") and shells > 0
@@ -1282,7 +1367,7 @@ func _debug_tick() -> void:
 				m.worldgen._tick_beach()
 			var after := 0
 			for pos2 in m.objects:
-				if String(m.objects[pos2].kind) in ["forage_shell", "forage_coral"]:
+				if String(m.objects[pos2].kind) in m.BEACH_FORAGE:
 					after += 1
 			print("BEACH_OK=", base_n == 1 and lv_n > base_n and t2 < t1 * 0.7
 				and after <= m.SHELL_CAP,

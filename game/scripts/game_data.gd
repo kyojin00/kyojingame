@@ -700,6 +700,52 @@ var fisher_quest := ""
 var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
 var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
 
+# 민지(잡화점)의 서브 퀘스트 「해변 노점」 — 바다가 열린 뒤부터 계산대
+# 대화 선택지에 ❗로 뜬다. 재료를 모아다 주면 해변에 노점이 선다.
+#   "": 아직 안 받음 / doing: 재료 모으는 중 / done: 노점 완성
+var merchant_errand := ""
+# 오늘 민지가 노점에 나와 있는 시각들 (분 단위 시작점). 하루 3번, 1시간씩 —
+# 매일 아침 새로 뽑는다. 민지가 있어야 노점에서 「구매」할 수 있다 (판매는 상시).
+var stall_hours: Array = []
+const STALL_WOOD := 15         # 노점 재료: 목재
+const STALL_SHELLS := 5        # 노점 재료: 조개 (장식 겸 진열대)
+const STALL_VISITS := 3        # 하루 방문 횟수
+const STALL_VISIT_MIN := 60    # 1회 방문 시간 (게임 분)
+# 노점 한정 레시피 — 잡화점 선반에는 없는 낚시 요리들. id -> 가격
+const STALL_RECIPES := {
+	"dish_smelt_fry": 800, "dish_eel_rice": 1500, "dish_salmon_steak": 1600,
+}
+const STALL_RECIPE_IDS := ["dish_smelt_fry", "dish_eel_rice", "dish_salmon_steak"]
+const BAIT_PRICE := 8          # 미끼 한 개 값
+
+
+# 오늘 민지가 노점에 나올 시각 세 개를 뽑는다 (9시~19시 사이, 서로 겹치지 않게)
+func roll_stall_hours() -> void:
+	stall_hours = []
+	if merchant_errand != "done":
+		return
+	var tries := 0
+	while stall_hours.size() < STALL_VISITS and tries < 200:
+		tries += 1
+		var start := randi_range(9 * 60, 18 * 60)
+		var ok := true
+		for s in stall_hours:
+			if absi(start - int(s)) < STALL_VISIT_MIN:
+				ok = false
+				break
+		if ok:
+			stall_hours.append(start)
+	stall_hours.sort()
+
+
+func merchant_at_stall() -> bool:
+	if merchant_errand != "done":
+		return false
+	for s in stall_hours:
+		if minutes >= float(s) and minutes < float(s) + STALL_VISIT_MIN:
+			return true
+	return false
+
 
 # 해변 채집 능력치 — 조개가 다시 밀려오는 간격(게임 분)과 한 번에 줍는 양.
 # 기본은 10~15분에 하나. 레벨이 오르면 리젠이 빨라지고, 3레벨마다 +1개.
@@ -1143,6 +1189,9 @@ const ITEMS := {
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
 	"forage_shell": {"name": "조개", "sell": 35},
+	"forage_trash": {"name": "젖은 쓰레기", "sell": 12},
+	"forage_glass": {"name": "유리 조각", "sell": 34},
+	"bait": {"name": "미끼", "sell": 2},
 	"forage_coral": {"name": "산호", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
@@ -1186,6 +1235,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
+	"forage_trash", "forage_glass", "bait",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -1193,7 +1243,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
 const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
-	"forage_shell", "forage_coral"]   # 잡초는 화분 재료 · 조개/산호는 해변(바다 해금 후)
+	"forage_shell", "forage_coral", "forage_trash", "forage_glass"]
+	# 잡초는 화분 재료 · 조개/산호/쓰레기/유리는 해변(바다 해금 후)
 const BUG_IDS := ["bug_butterfly", "bug_dragonfly", "bug_firefly"]
 # 곤충 출현 조건
 const BUGS := {
@@ -1623,10 +1674,11 @@ const RECIPES := {
 	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40},
 	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65},
 	"dish_sashimi": {"needs": {"fish_trout": 1, "winter_radish": 1}, "energy": 85},
-	"dish_eel_rice": {"needs": {"fish_eel": 1, "rice": 1}, "energy": 110},
+	# 장어덮밥·연어 스테이크·빙어 튀김은 해변 노점에서 레시피를 사야 배운다
+	"dish_eel_rice": {"needs": {"fish_eel": 1, "rice": 1}, "energy": 110, "locked": true},
 	"dish_crab_soup": {"needs": {"fish_crab": 1, "onion": 1}, "energy": 95},
-	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120},
-	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70},
+	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120, "locked": true},
+	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70, "locked": true},
 	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60},
 	# ---- 귀한 것 (컬렉션 보상으로 열린다) ----
 	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160, "locked": true},
@@ -2506,6 +2558,11 @@ func quest_pool(kind: String) -> Array:
 					out.append(fid)
 		"forage":
 			out = FORAGE_IDS + BUG_IDS
+			if not sea_open:
+				# 아직 바다를 모른다 — 해변 채집물은 의뢰로 내지 않는다
+				for bid: String in ["forage_shell", "forage_coral",
+						"forage_trash", "forage_glass"]:
+					out.erase(bid)
 		"mineral":
 			out = ["ore", "gem"]
 		"dish":
@@ -2663,6 +2720,8 @@ func reset_all() -> void:
 	fisher_quest = ""
 	fisher_choice = 0
 	sea_open = false
+	merchant_errand = ""
+	stall_hours = []
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -2984,6 +3043,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
 		"sea_open": sea_open, "story2_phase": story2_phase,
+		"merchant_errand": merchant_errand, "stall_hours": stall_hours,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

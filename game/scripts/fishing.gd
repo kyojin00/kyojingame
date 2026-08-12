@@ -39,6 +39,12 @@ func _start_fishing() -> void:
 		return
 	m.fishing_state = "waiting"
 	m.fishing_timer = randf_range(1.5, 4.0) * GameData.fish_wait_mult()
+	# 해변 노점에서 산 미끼 — 던질 때 하나씩 쓰고, 입질이 훨씬 빨리 온다
+	if int(GameData.items.get("bait", 0)) > 0:
+		GameData.items["bait"] = int(GameData.items["bait"]) - 1
+		m.fishing_timer *= 0.45
+		m.hud.show_message("미끼를 꿰었다 — 입질이 빨리 온다! (남은 미끼 %d)"
+			% int(GameData.items["bait"]))
 	Sound.play_sfx("sfx_cast")
 
 

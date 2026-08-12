@@ -26,6 +26,9 @@ func npc_place_now(npc_id: String) -> String:
 	if not fest.is_empty() and GameData.minutes >= GameData.FEST_START \
 			and GameData.minutes < GameData.FEST_END:
 		return str(fest.place)
+	# 민지는 노점 시간이 되면 해변으로 내려간다 (하루 3번, 1시간씩)
+	if npc_id == "merchant" and GameData.merchant_at_stall():
+		return "stall"
 	var plan: Array = m.NPC_SCHEDULE.get(npc_id, [])
 	if plan.is_empty():
 		return ""
@@ -40,6 +43,8 @@ func npc_place_now(npc_id: String) -> String:
 func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	var t := Vector2i(-999, -999)
 	match place:
+		"stall":
+			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
 		"plaza":
 			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13))
 		"board":
