@@ -205,20 +205,20 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.hline(13 + dx, 18 + dx, y, 'B')            # 옷깃 (목 아래 그늘)
     g.hline(15 + dx, 16 + dx, y + 2, 'B')        # 앞섶 단추 두 개
     g.hline(15 + dx, 16 + dx, y + 4, 'B')
-    # 팔: 소매 3픽셀 폭 + 세 칸 손. 앞으로 흔들면 소매가 늘어나며 내려가고
+    # 팔: 소매 4픽셀 폭 + 네 칸 손. 앞으로 흔들면 소매가 늘어나며 내려가고
     # 뒤로 가면 접히며 올라간다 — 어깨는 늘 몸통에 붙어 있다.
-    for sx, sw, side in ((7, swing, 'left'), (22, -swing, 'right')):
+    for sx, sw, side in ((6, swing, 'left'), (22, -swing, 'right')):
         if side == skip:
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        g.rect(sx, y + 1, sx + 2, y + 4 + dy, 'b')
-        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 4 + dy,
+        g.rect(sx, y + 1, sx + 3, y + 4 + dy, 'b')
+        g.vline(sx if side == 'left' else sx + 3, y + 1, y + 4 + dy,
                 'L' if side == 'left' else 'B')
-        g.hline(sx, sx + 2, y + 5 + dy, 'B')                     # 소매단
-        g.rect(sx, y + 6 + dy, sx + 2, y + 8 + dy, 's')          # 손
-        g.hline(sx + 1, sx + 2, y + 8 + dy, 'S')                 # 손 그늘
+        g.hline(sx, sx + 3, y + 5 + dy, 'B')                     # 소매단
+        g.rect(sx, y + 6 + dy, sx + 3, y + 8 + dy, 's')          # 손
+        g.hline(sx + 2, sx + 3, y + 8 + dy, 'S')                 # 손 그늘
 
 
 def legs_down(g, stride, dx=0, sq=0):
@@ -266,15 +266,15 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     cells = {}
     for yy in range(y + 1, hy):
         t = (yy - (y + 1)) / max(1, hy - 1 - (y + 1))
-        x = c - 1 + round(swing * t)
-        for j, cc in enumerate(('B', 'b', 'L')):
+        x = c - 2 + round(swing * t)
+        for j, cc in enumerate(('B', 'b', 'b', 'L')):
             cells[(x + j, yy)] = 'B' if yy == hy - 1 else cc     # 마지막 줄은 소매단
-    hx = c - 1 + swing
-    for j in range(3):
+    hx = c - 2 + swing
+    for j in range(4):
         for k in range(3):
-            cells[(hx + j, hy + k)] = 's'                        # 손 (세 칸)
-    cells[(hx + 1, hy + 2)] = 'S'
+            cells[(hx + j, hy + k)] = 's'                        # 손 (네 칸)
     cells[(hx + 2, hy + 2)] = 'S'
+    cells[(hx + 3, hy + 2)] = 'S'
     for (x, yy) in cells:                                        # 획 둘레 윤곽선
         for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
@@ -325,18 +325,18 @@ def torso_up(g, bob, swing, dx=0, skip=None):
     g.vline(10 + dx, y + 1, y + 8, 'B')          # 팔과 몸 사이 솔기
     g.vline(21 + dx, y + 1, y + 8, 'B')
     g.hline(13 + dx, 18 + dx, y + 5, 'B')        # 등판 주름
-    for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
+    for sx, sw, side in ((6, -swing, 'left'), (22, swing, 'right')):
         if side == skip:                         # 뒤모습이라 팔 위상이 좌우 반대
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        g.rect(sx, y + 1, sx + 2, y + 4 + dy, 'b')
-        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 4 + dy,
+        g.rect(sx, y + 1, sx + 3, y + 4 + dy, 'b')
+        g.vline(sx if side == 'left' else sx + 3, y + 1, y + 4 + dy,
                 'L' if side == 'left' else 'B')
-        g.hline(sx, sx + 2, y + 5 + dy, 'B')
-        g.rect(sx, y + 6 + dy, sx + 2, y + 8 + dy, 's')
-        g.hline(sx + 1, sx + 2, y + 8 + dy, 'S')
+        g.hline(sx, sx + 3, y + 5 + dy, 'B')
+        g.rect(sx, y + 6 + dy, sx + 3, y + 8 + dy, 's')
+        g.hline(sx + 2, sx + 3, y + 8 + dy, 'S')
 
 
 def legs_up(g, stride, dx=0, sq=0):
