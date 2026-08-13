@@ -24,7 +24,7 @@ var bumped := false  # 이동하려 했지만 완전히 막혔는가 (스토리 
 #   2. 걷기 프레임을 쓰지 않는다. 안 그러면 말 위에서 걸어다닌다.
 #      대신 말 걸음에 맞춰 몸이 오르내린다.
 #
-# 캐릭터 도트: 128x192, 내용은 4~189행, 0.5배로 그린다 (발이 원점).
+# 캐릭터 도트: 128x192, 내용은 12~191행, 0.5배로 그린다 (발이 원점).
 # 그래서 텍스처 r행은 발밑 기준 (r - 188) * 0.5 만큼 위에 온다.
 const HORSE_SCALE := 1.15
 const RIDER_ROWS := 192.0      # 캐릭터 텍스처 세로
@@ -66,7 +66,7 @@ var horse_sprite: Sprite2D
 #
 # ---- 휘두르기 도트 ----
 #
-# 남자 캐릭터는 `assets/ref/new_boy3/`에서 방향당 네 장을 뽑아 두었다
+# 남자 캐릭터는 `assets/ref/dot_boy/make_sprites.py`가 방향당 네 장을 그린다
 # (`new_boy_<방향>_swing_0..3` = 감기 시작 · 다 감음 · 내리침 · 되돌아옴).
 # 여자 캐릭터는 아직 없어서 `_swing_frame`이 ""를 돌려주고, 그때는 아래
 # 몸통 회전으로 대신한다. 도트를 뽑아 이름만 맞추면 그날부터 켜진다.
@@ -108,14 +108,14 @@ const SWING_POSE := {
 #   도트에서 읽은 값 (발밑 가운데가 원점) -> 여기 적는 값
 #   node.x = 도트.x / 2 ,  node.y = (도트.y + 2) / 2      (offset -64,-188 · 0.5배)
 #
-# 값은 `assets/ref/new_boy3/`의 도트에 눈금을 얹어 놓고 주먹 한가운데를 읽었다.
-# **그림을 다시 뽑으면 여기도 다시 읽어야 한다** — 안 맞으면 도구가 손에서 뜬다.
-# 도트가 없는 방향은 여기에도 없고, SWING_POSE의 이어지는 식을 쓴다.
+# 값은 `assets/ref/dot_boy/make_sprites.py`가 주먹을 그린 자리에서 계산해
+# 실행 끝에 찍어 준다 — **그림을 다시 뽑으면 찍힌 값을 여기 그대로 옮긴다.**
+# 안 맞으면 도구가 손에서 뜬다. 도트가 없는 방향은 SWING_POSE의 식을 쓴다.
 const SWING_HAND_DOT := {
 	# 감기 시작 · 다 감음(머리 위) · 내리침 · 되돌아옴
-	"side": [Vector2(-18, -57), Vector2(-9, -86), Vector2(16, -16), Vector2(19, -37)],
-	"down": [Vector2(-18, -57), Vector2(-9, -86), Vector2(16, -34), Vector2(16, -35)],
-	"up": [Vector2(19, -56), Vector2(10, -87), Vector2(-19, -17), Vector2(-16, -34)],
+	"side": [Vector2(-19.5, -55), Vector2(-7.5, -91), Vector2(16.5, -16), Vector2(10.5, -37)],
+	"down": [Vector2(-22.5, -58), Vector2(-7.5, -91), Vector2(16.5, -34), Vector2(13.5, -37)],
+	"up": [Vector2(19.5, -58), Vector2(7.5, -88), Vector2(-16.5, -34), Vector2(-13.5, -37)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
