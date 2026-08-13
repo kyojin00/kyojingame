@@ -82,6 +82,8 @@ func _apply_save(d: Dictionary) -> void:
 	if GameData.spear_quest == "visit":
 		GameData.spear_quest = "pending"   # 걸어오다 저장했으면 다시 걸어온다
 	GameData.chief_house_lv = int(d.get("chief_house_lv", 0))
+	GameData.story4_phase = str(d.get("story4_phase", ""))
+	GameData.zones_open = d.get("zones_open", [])
 	# 숲속의 집 이야기가 생기기 전 세이브: 이미 선물을 주고받던 사이면
 	# (호감도가 쌓여 있으면) 호감도 콘텐츠는 열린 채로 이어 준다
 	var had_aff := false
@@ -277,6 +279,11 @@ func _apply_save(d: Dictionary) -> void:
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()
+	# 확장 구역이 생기기 전 세이브에서 플레이어가 이제-잠긴 땅에 서 있으면
+	# 광장으로 옮겨 준다 (잠긴 구역은 들어갈 수 없다)
+	var pt := m.player_tile()
+	if not GameData.is_tile_owned(pt.x, pt.y):
+		m.player.position = Vector2(78 * m.TILE + 16, 20 * m.TILE + 16)
 	# 격자가 통째로 바뀌었다 — 「돌아가는 칸」 목록을 다시 만든다
 	m.farming.rebuild()
 

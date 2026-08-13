@@ -826,6 +826,40 @@ func move_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 4: 오래된 마을의 경계 ----
+#
+# 마을 동쪽 다리 건너, 낡은 표지판이 옛 마을의 경계를 알린다.
+# 표지판을 확인하고(→"ask") 이장에게 물어보면 오래된 마을 지도를 보여
+# 준다 — 지금 쓰는 땅은 옛 교진 마을의 일부일 뿐이다. 이야기 끝에 첫
+# 구역이 열리고(→"done"), 남은 구역은 이장의 「마을 확장 이야기」에서
+# 재료를 들여 하나씩 되살린다.
+#
+# 규칙: 해금 전 구역은 들어갈 수 없고(집터·설치물도 불가), 해금하면
+# 보통 땅과 똑같이 쓴다.
+var story4_phase := ""             # "" -> "ask"(이장에게 묻기) -> "done"
+var zones_open: Array = []         # 열린 구역 id 목록
+const VILLAGE_ZONES := {
+	"east_north": {"rect": Rect2i(100, 1, 20, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(100, 21, 20, 23), "name": "옛 마을 남동쪽 터"},
+}
+const ZONE_ORDER := ["east_north", "east_south"]
+const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
+
+
+# 이 칸이 속한 (아직 잠긴/열린) 확장 구역 id — 구역 밖이면 ""
+func zone_at(x: int, y: int) -> String:
+	for zid: String in VILLAGE_ZONES:
+		if (VILLAGE_ZONES[zid].rect as Rect2i).has_point(Vector2i(x, y)):
+			return zid
+	return ""
+
+
+func story4_objective_short() -> String:
+	if story4_phase == "ask":
+		return "낡은 표지판에 대해 이장에게 물어보자 (E)"
+	return ""
+
+
 # ---- 메인 스토리 5: 숲속에서 발견한 집 ----
 #
 # 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 무진이 마을로 이사 온다.
@@ -2195,8 +2229,10 @@ var fish_caught := {}  # 도감용 누적 기록
 # 부지 구입 시스템은 삭제했다. 맵은 처음부터 전부 오갈 수 있고,
 # 다음 마을은 이후 이야기(스토리)로 열린다.
 
-func is_tile_owned(_x: int, _y: int) -> bool:
-	return true
+func is_tile_owned(x: int, y: int) -> bool:
+	# 메인 스토리 4의 확장 구역만 잠긴다 — 그 밖의 땅은 전부 오갈 수 있다
+	var zid := zone_at(x, y)
+	return zid == "" or zid in zones_open
 
 
 # ---- NPC / 퀘스트 ----
@@ -3031,6 +3067,8 @@ func reset_all() -> void:
 	mom_quest = ""
 	mom_quests_done = []
 	spear_quest = ""
+	story4_phase = ""
+	zones_open = []
 	chief_house_lv = 0
 	hall_noticed = false
 	shop_seeds = ["wheat", "corn"]
@@ -3365,6 +3403,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
 		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
+		"story4_phase": story4_phase, "zones_open": zones_open,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

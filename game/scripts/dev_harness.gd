@@ -66,10 +66,14 @@ func _debug_tick() -> void:
 				nids.append(n2.id)
 			var hut0: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
 				== "chief_hut" and GameData.chief_house_lv == 0
+			# 새 게임에는 낡은 표지판이 서 있고, 동쪽 확장 구역은 잠겨 있다
+			var zone0: bool = str(m.objects.get(m.OLD_SIGN, {}).get("kind", "")) == "sign" \
+				and GameData.story4_phase == "" \
+				and not GameData.is_tile_owned(105, 10) and not m.is_passable(Vector2i(105, 10))
 			print("VILLAGE_INIT_OK=", GameData.village_built.is_empty()
-				and houses == 0 and nids == ["chief"] and hut0,
+				and houses == 0 and nids == ["chief"] and hut0 and zone0,
 				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids,
-				" 이장오두막=", hut0)
+				" 이장오두막=", hut0, " 동쪽구역잠김=", zone0)
 		elif m.story._story_snapped and m.story._story_t >= 3.8:
 			get_tree().quit()
 		return
@@ -557,6 +561,64 @@ func _debug_tick() -> void:
 			print("HIDDEN_OK=", rare_ok and coral_ok and relic_ok,
 				" 확률(1렙)=", rare1, " (10렙)=", rare10,
 				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
+		263:
+			# 메인 스토리 4 「오래된 마을의 경계」: 낡은 표지판(E) ->
+			# 이장에게 묻기 -> 오래된 지도 -> 첫 구역 해금 ->
+			# 남은 구역은 이장의 「마을 확장 이야기」로 되살린다
+			m.dialog.close()
+			GameData.story4_phase = ""
+			GameData.zones_open = []
+			var zin := Vector2i(105, 10)          # east_north 안쪽 칸
+			m.objects.erase(zin)
+			m.grid[zin.y][zin.x].ground = "grass"
+			var sign_ok: bool = str(m.objects.get(m.OLD_SIGN, {}).get("kind", "")) == "sign"
+			var locked_ok: bool = not GameData.is_tile_owned(zin.x, zin.y) \
+				and not m.is_passable(zin)
+			# 잠긴 구역에는 집터를 못 놓는다
+			GameData.items["housing_kit"] = int(GameData.items.get("housing_kit", 0)) + 1
+			var plot_deny: bool = not m.story.try_place_home_plot(Vector2i(107, 10))
+			# 표지판 확인 -> 이장에게 묻는 목표
+			m.story.examine_old_sign()
+			var sign_seq: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._begin_story4()
+			var ask_ok: bool = GameData.story4_phase == "ask" \
+				and GameData.story4_objective_short() != ""
+			# 이장 대화(오래된 마을 지도) -> 첫 구역 해금
+			m.story._start_story4_dialog()
+			var chief_seq: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._end_story4()
+			var open1: bool = GameData.story4_phase == "done" \
+				and GameData.zones_open.has("east_north") \
+				and GameData.is_tile_owned(zin.x, zin.y) and m.is_passable(zin)
+			# 둘째 구역은 아직 잠김 -> 「마을 확장 이야기」에서 재료로 해금
+			var lock2: bool = not GameData.is_tile_owned(105, 30)
+			var wood0: int = GameData.wood
+			GameData.wood = maxi(GameData.wood, 200)
+			GameData.stone = maxi(GameData.stone, 200)
+			var wood1: int = GameData.wood
+			m.village._unlock_zone("east_south")
+			var open2: bool = GameData.zones_open.has("east_south") \
+				and GameData.is_tile_owned(105, 30) \
+				and GameData.wood == wood1 - int(GameData.ZONE_COST["east_south"][0])
+			# 해금한 구역엔 집터를 놓을 수 있다 (자리를 고르고 놓아 본다)
+			for py in range(6, 12):
+				for px2 in range(103, 112):
+					m.objects.erase(Vector2i(px2, py))
+					m.grid[py][px2].ground = "grass"
+			var plot_after: bool = m.story.try_place_home_plot(Vector2i(107, 10))
+			m.objnode._remove_object(Vector2i(107, 10))   # 정리 (집터 회수)
+			if plot_after:
+				GameData.home_plots.pop_back()
+			GameData.wood = wood0
+			m.dialog.close()
+			print("STORY4_OK=", sign_ok and locked_ok and plot_deny and sign_seq
+				and ask_ok and chief_seq and open1 and lock2 and open2 and plot_after,
+				" 표지판=", sign_ok, " 잠김=", locked_ok, " 집터거부=", plot_deny,
+				" 표지판대화=", sign_seq, " 묻기=", ask_ok, " 지도대화=", chief_seq,
+				" 첫구역=", open1, " 둘째잠김=", lock2, " 둘째해금=", open2,
+				" 집터허용=", plot_after)
 		264:
 			# 이장 거처·마을 성장: 오두막 -> (주민 증가) 새 집 ->
 			# (주민 10명) 마을회관 해금·건설 -> 이장 낮 근무

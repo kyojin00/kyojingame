@@ -307,6 +307,9 @@ const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있�
 const FISH_CLEAR := Rect2i(69, 34, 30, 13) # 이 안에는 나무/돌을 두지 않는다
 const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
 # (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
+# 메인 스토리 4 — 동쪽 다리 건너, 옛 마을의 경계를 알리는 낡은 표지판.
+# 너머(GameData.VILLAGE_ZONES)는 구역을 해금해야 들어갈 수 있다.
+const OLD_SIGN := Vector2i(99, 9)
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
@@ -602,6 +605,9 @@ func _ready() -> void:
 			GameData.move_quest = "done"
 			GameData.forest_quest = "done"
 			GameData.affinity_open = true
+			# 스토리 4(마을 확장)도 끝난 샌드박스 — 검증은 263이 처음부터 돌린다
+			GameData.story4_phase = "done"
+			GameData.zones_open = GameData.ZONE_ORDER.duplicate()
 			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용

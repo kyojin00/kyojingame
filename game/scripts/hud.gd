@@ -414,6 +414,7 @@ func refresh(force := false) -> void:
 	var fisher_obj := GameData.fisher_objective_short()
 	var move_obj := GameData.move_objective_short()
 	var forest_obj := GameData.forest_objective_short()
+	var story4_obj := GameData.story4_objective_short()
 	if story_obj != "":
 		track.append("목표: " + story_obj)
 	elif story2_obj != "":
@@ -424,6 +425,8 @@ func refresh(force := false) -> void:
 		track.append("목표: " + move_obj)
 	elif forest_obj != "":
 		track.append("목표: " + forest_obj)
+	elif story4_obj != "":
+		track.append("목표: " + story4_obj)
 	elif obj != "":
 		# 밭 갈기(메인 스토리 2)는 「목표」, 마을 생활 안내는 「안내(선택)」
 		var flag := GameData.tutorial_current_flag()

@@ -96,6 +96,45 @@ func _next_village_build() -> String:
 	return ""
 
 
+# 마을 확장(메인 스토리 4 이후) — 버려진 옛 마을 구역을 순서대로 되살린다.
+# 해금 전 구역은 들어갈 수도, 집터·설치물을 놓을 수도 없다.
+func _open_zone_dialog() -> void:
+	var next_zid := ""
+	for zid: String in GameData.ZONE_ORDER:
+		if zid not in GameData.zones_open:
+			next_zid = zid
+			break
+	if next_zid == "":
+		m.dialog.open("마을 확장",
+			"「버려졌던 구역은 이제 다 되살렸네.\n옛 교진 마을이 전부 돌아온 걸세 — 고맙네!」",
+			[["뿌듯하네요", null]])
+		return
+	var zname := str(GameData.VILLAGE_ZONES[next_zid].name)
+	var cost: Array = GameData.ZONE_COST[next_zid]
+	m.dialog.open("마을 확장 — %s" % zname,
+		"「다음은 %s 차례일세.\n수풀을 걷고 길을 트려면 재료가 필요하네.」\n\n필요: 목재 %d · 석재 %d (보유 %d·%d)" %
+			[zname, int(cost[0]), int(cost[1]), GameData.wood, GameData.stone],
+		[["되살리기", _unlock_zone.bind(next_zid)], ["다음에", null]])
+
+
+func _unlock_zone(zid: String) -> void:
+	m.dialog.close()
+	var cost: Array = GameData.ZONE_COST[zid]
+	if GameData.wood < int(cost[0]) or GameData.stone < int(cost[1]):
+		m.hud.show_message("재료가 모자라다 — 목재 %d · 석재 %d가 필요하다." %
+			[int(cost[0]), int(cost[1])])
+		return
+	GameData.wood -= int(cost[0])
+	GameData.stone -= int(cost[1])
+	GameData.zones_open.append(zid)
+	Sound.play_sfx("sfx_place")
+	m.hud.quest_toast("마을 확장!")
+	m.hud.show_message("%s를 되살렸다! 마을이 넓어졌다. (지도 M)" %
+		str(GameData.VILLAGE_ZONES[zid].name), 6.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
 func _open_village_build_dialog() -> void:
 	var pid := _next_village_build()
 	if pid == "":
@@ -170,6 +209,9 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "chief" and GameData.forest_quest == "ask":
 		m.story._start_forest_ask_dialog()
 		return
+	if npc.id == "chief" and GameData.story4_phase == "ask":
+		m.story._start_story4_dialog()   # 낡은 표지판 이야기 (메인 스토리 4)
+		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return
@@ -188,6 +230,8 @@ func _talk_to(npc: Node2D) -> void:
 		var plain_choices: Array = [["대화 끝", null]]
 		if npc.id == "chief" and GameData.story_phase == "done":
 			plain_choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
+		if npc.id == "chief" and GameData.story4_phase == "done":
+			plain_choices.insert(0, ["마을 확장 이야기", _open_zone_dialog])
 		if npc.id == "chief" and GameData.festival_open():
 			plain_choices.insert(0, ["축제 이야기", _open_festival_dialog])
 		m.dialog.open_seq(str(def.name), _npc_portrait(npc.id), [
@@ -230,6 +274,9 @@ func _talk_to(npc: Node2D) -> void:
 	# 이장은 마을 발전(빈 부지에 건물 세우기)을 맡고 있다
 	if npc.id == "chief" and GameData.story_phase == "done":
 		choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
+	# 마을 확장(스토리 4 이후) — 버려진 구역을 재료를 들여 되살린다
+	if npc.id == "chief" and GameData.story4_phase == "done":
+		choices.insert(0, ["마을 확장 이야기", _open_zone_dialog])
 	# 축제날에는 이장이 진행을 맡는다
 	if npc.id == "chief" and GameData.festival_open():
 		choices.insert(0, ["축제 이야기", _open_festival_dialog])

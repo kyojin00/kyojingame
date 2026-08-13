@@ -259,6 +259,8 @@ func _build_village() -> void:
 		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
+	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
+	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
 	# (광장의 가로등·벤치는 없앴다 — 밤이 되면 마을도 캄캄하다)
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
 	for x in range(60, 99):

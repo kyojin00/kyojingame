@@ -282,6 +282,21 @@ func _draw_map() -> void:
 		var a: Vector2i = main.VILLAGE_PLOTS[pid].anchor
 		_place_label(a.x, a.y, str(main.VILLAGE_PLOTS[pid].name))
 
+	# 옛 마을 확장 구역 (메인 스토리 4) — 표지판을 본 뒤부터 지도에 나타난다.
+	# 잠긴 구역은 빗금 테두리 + 이름, 열린 구역은 이름만 남긴다.
+	if GameData.story4_phase != "":
+		for zid: String in GameData.ZONE_ORDER:
+			var zr: Rect2i = GameData.VILLAGE_ZONES[zid].rect
+			var pr := Rect2(_ox + zr.position.x * _cell, _oy + zr.position.y * _cell,
+				zr.size.x * _cell, zr.size.y * _cell)
+			var locked: bool = zid not in GameData.zones_open
+			if locked:
+				canvas.draw_rect(pr, Color(0.5, 0.15, 0.12, 0.28))
+			canvas.draw_rect(pr, Color(0.9, 0.55, 0.3, 0.8) if locked
+				else Color(0.55, 0.8, 0.45, 0.6), false, 2.0)
+			_label(Vector2(pr.get_center().x - 40.0, pr.get_center().y),
+				str(GameData.VILLAGE_ZONES[zid].name) + (" (잠김)" if locked else ""))
+
 	# 내 위치: 눈에 잘 띄는 마커 (고리 + 깜빡이는 점 + 라벨)
 	var pp := Vector2(_ox + main.player.position.x / 32.0 * _cell,
 		_oy + main.player.position.y / 32.0 * _cell)

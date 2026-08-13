@@ -1785,12 +1785,71 @@ func _can_place_house(a: Vector2i) -> bool:
 		for x in range(a.x - 1, a.x + 6):
 			if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.MAP_H - 1:
 				return false
+			if not GameData.is_tile_owned(x, y):
+				return false  # 아직 해금하지 않은 마을 구역에는 집터를 못 놓는다
 			var cell: Dictionary = m.grid[y][x]
 			if cell.ground != "grass" or str(cell.get("crop_id", "")) != "":
 				return false
 			if m.objects.has(Vector2i(x, y)):
 				return false
 	return true
+
+
+# ---- 메인 스토리 4: 오래된 마을의 경계 ----
+#
+# 동쪽 다리 건너 낡은 표지판(E) -> 이장에게 물어보기 -> 오래된 마을
+# 지도 -> 첫 구역 해금 + 마을 확장 시스템 정식 해금.
+# 남은 구역은 이장의 「마을 확장 이야기」(village_ui)에서 되살린다.
+func examine_old_sign() -> void:
+	match GameData.story4_phase:
+		"":
+			m.dialog.open_seq("낡은 표지판", null, [
+				{"text": "비바람에 삭아 반쯤 기운 나무 표지판이다.\n지워진 글씨를 겨우 읽어 본다.\n\n『교○ 마을 — 동쪽 경계』"},
+				{"text": "표지판 너머는 수풀이 우거져 들어갈 수 없다.\n마을의 경계...? 오래전에 세운 것 같은데.\n\n이장님이라면 뭔가 알고 있을지도 모른다."},
+			], _begin_story4)
+		"ask":
+			m.dialog.open("낡은 표지판",
+				"『교○ 마을 — 동쪽 경계』\n\n이장님에게 이 표지판에 대해 물어보자.",
+				[["닫기", null]])
+		_:
+			m.dialog.open("낡은 표지판",
+				"『교○ 마을 — 동쪽 경계』\n\n옛 마을의 경계 표지판이다. 버려졌던 땅이\n이제 다시 마을로 돌아오고 있다.",
+				[["닫기", null]])
+
+
+func _begin_story4() -> void:
+	GameData.story4_phase = "ask"
+	m.hud.quest_toast("새 목표: 이장에게 물어보자")
+	m.saveio.save_now()
+
+
+func _start_story4_dialog() -> void:
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "「동쪽 다리 건너 낡은 표지판 말인가?\n허허... 그걸 다 찾아냈구먼.」"},
+		{"text": "「그건 예전에 쓰던 **마을의 경계 표지판**일세.\n잠깐 기다려 보게 — 보여줄 게 있네.」"},
+		{"text": "(이장님이 장롱 깊숙한 곳에서 누렇게 바랜\n두루마리를 꺼내 조심스럽게 펼친다)\n\n— 오래된 교진 마을의 지도다."},
+		{"text": "「보게나. 지금 우리가 쓰는 땅은 옛 교진 마을의\n일부일 뿐이야. 동쪽 강 너머까지, 예전엔 전부\n마을이었다네.」"},
+		{"text": "「사람이 하나둘 떠나면서 바깥 구역부터 차례로\n버려졌지. 지금은 수풀만 무성하네만...」"},
+		{"text": "「자네가 온 뒤로 마을이 다시 살아나고 있잖나.\n버려진 구역, 자네가 하나씩 되살려 보게!」",
+			"portrait": chief_happy},
+		{"text": "「우선 다리 건너 북동쪽 터부터 다시 쓰세.\n나머지 구역도 준비가 되면 나한테 말을 걸게 —\n「마을 확장 이야기」로 하나씩 열어 주겠네.」",
+			"portrait": chief_happy},
+	], _end_story4)
+
+
+func _end_story4() -> void:
+	if GameData.story4_phase != "ask":
+		return
+	GameData.story4_phase = "done"
+	if not GameData.zones_open.has("east_north"):
+		GameData.zones_open.append("east_north")
+	m.hud.quest_toast("마을 확장 해금!")
+	m.hud.show_message("옛 마을 북동쪽 터가 열렸다! 동쪽 다리 너머로 마을이 넓어졌다.\n"
+		+ "남은 구역은 이장님의 「마을 확장 이야기」에서 되살릴 수 있다. (지도 M)", 7.0)
+	m.queue_redraw()
+	m.saveio.save_now()
 
 
 # 이사 온 무진과의 첫인사
