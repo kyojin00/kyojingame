@@ -19,8 +19,9 @@ func at_fishing_spot() -> bool:
 
 
 func fishing_spot_center() -> Vector2:
-	var p: Vector2i = m.FISH_PIERS[0]
-	return Vector2(p.x * m.TILE + 16, (m.VILLAGE_RIVER_Y + m.RIVER_ROWS - 2) * m.TILE + 16)
+	# 강가 잔디밭 한가운데 (부두는 없어졌다 — 물가에 서서 던진다)
+	var cx := (m.FISH_YARD_X0 + m.FISH_YARD_X1) / 2
+	return Vector2(cx * m.TILE + 16, m.DOCK_Y * m.TILE + 16)
 
 
 func _start_fishing() -> void:
@@ -32,7 +33,7 @@ func _start_fishing() -> void:
 	# 「낚시」 목표를 받은 동안에는 마을 남쪽 낚시터에서 배운다.
 	# (목표를 끝낸 뒤에는 어느 물가에서든 낚을 수 있다)
 	if GameData.tutorial_current_flag() == "fish" and not at_fishing_spot():
-		m.hud.show_message("마을 남쪽 강가의 낚시터로 가자! 부두에서 낚싯대를 던진다. (지도 M)", 4.0)
+		m.hud.show_message("마을 남쪽 강가의 낚시터로 가자! 물가에 서서 낚싯대를 던진다. (지도 M)", 4.0)
 		return
 	if not m.actions.can_use_tile(t):
 		m.hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")

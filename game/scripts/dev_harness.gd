@@ -574,13 +574,13 @@ func _debug_tick() -> void:
 				and str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) == "chief_hut"
 			# 마을회관: 주민 10명 미만이면 마을 발전 목록에서 빠진다
 			GameData.village_built.erase("hall")
-			var gate_before: bool = res0 < GameData.HALL_RESIDENTS \
+			var gate_before: bool = res0 <= GameData.HALL_RESIDENTS \
 				and m.village._next_village_build() != "hall"
-			var dummies: Array = []                 # 임시 주민을 10명까지 채운다
-			while m.village_residents() < GameData.HALL_RESIDENTS:
+			var dummies: Array = []                 # 임시 주민을 10명 초과까지 채운다
+			while m.village_residents() <= GameData.HALL_RESIDENTS:
 				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
 				dummies.append(m.npcs[m.npcs.size() - 1])
-			var gate_after: bool = m.village_residents() >= GameData.HALL_RESIDENTS \
+			var gate_after: bool = m.village_residents() > GameData.HALL_RESIDENTS \
 				and m.village._next_village_build() == "hall"
 			GameData.wood += 120
 			GameData.stone += 80
@@ -595,9 +595,9 @@ func _debug_tick() -> void:
 			GameData.minutes = 7.0 * 60.0
 			var off_work: bool = m.npcmgr.npc_place_now("chief") != "hallwork"
 			GameData.minutes = keep_min2
-			var dummy: Node2D = m.npcs[m.npcs.size() - 1]
-			m.npcs.erase(dummy)                    # 임시 주민 정리
-			dummy.queue_free()
+			for dummy: Node2D in dummies:           # 임시 주민 정리
+				m.npcs.erase(dummy)
+				dummy.queue_free()
 			print("CHIEFGROW_OK=", hut_ok and res_ok and up_ok and gate_before
 				and gate_after and hall_ok and work and off_work,
 				" 오두막=", hut_ok, " 주민수=", res_ok, "(", res0, "명)",

@@ -22,11 +22,16 @@ const WEATHER_STAR := 5
 # ---- 작물 ----
 # grow_days = 성장에 필요한 게임 시간(시). 초반 작물은 빨리, 비쌀수록 오래.
 const CROPS := {
+	# 밀 — 잡화점이 처음부터 파는 두 씨앗 중 하나. 사철 자라는 주식이다.
+	"wheat": {"name": "밀", "seed_price": 30, "sell_price": 75, "grow_days": 3,
+		"seasons": [SPRING, SUMMER, FALL, WINTER]},
 	"potato": {"name": "감자", "seed_price": 30, "sell_price": 80, "grow_days": 2, "seasons": [SPRING]},
 	"carrot": {"name": "당근", "seed_price": 40, "sell_price": 110, "grow_days": 3, "seasons": [SPRING]},
 	"strawberry": {"name": "딸기", "seed_price": 60, "sell_price": 170, "grow_days": 4, "seasons": [SPRING]},
 	"tomato": {"name": "토마토", "seed_price": 50, "sell_price": 130, "grow_days": 3, "seasons": [SUMMER]},
-	"corn": {"name": "옥수수", "seed_price": 75, "sell_price": 150, "grow_days": 4, "seasons": [SUMMER, FALL]},
+	# 옥수수 — 처음부터 파는 두 번째 씨앗 (그래서 봄에도 심을 수 있다)
+	"corn": {"name": "옥수수", "seed_price": 40, "sell_price": 150, "grow_days": 4,
+		"seasons": [SPRING, SUMMER, FALL]},
 	"watermelon": {"name": "수박", "seed_price": 120, "sell_price": 380, "grow_days": 7, "seasons": [SUMMER]},
 	"pumpkin": {"name": "호박", "seed_price": 100, "sell_price": 320, "grow_days": 7, "seasons": [FALL]},
 	"eggplant": {"name": "가지", "seed_price": 45, "sell_price": 120, "grow_days": 3, "seasons": [FALL]},
@@ -52,6 +57,7 @@ const CROPS := {
 	"herb_leaf": {"name": "약초잎", "seed_price": 40, "sell_price": 105, "grow_days": 3, "seasons": [SPRING, SUMMER, FALL, WINTER]},
 }
 const CROP_IDS := [
+	"wheat",
 	"potato", "carrot", "strawberry", "spinach", "onion", "pea",
 	"tomato", "corn", "watermelon", "pepper", "melon", "garlic",
 	"pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice",
@@ -690,11 +696,18 @@ var village_built: Array = []
 # 이장은 처음부터 마을의 작고 낡은 오두막에서 산다 (제대로 된 집·회관 없음).
 # 주민이 늘면(대략 4~6명 기준 — 아직 미확정, 전체 NPC 수가 정해지면 조정)
 # 어느 날 아침 마을 사람들이 이장의 새 집을 지어 준다.
-# 플레이어 포함 주민이 10명 이상이면 마을회관을 지을 수 있다 — 완공되면
-# 이장은 낮에 회관에서 업무를 보고, 집은 그대로 유지된다.
+# 총 주민 수(플레이어 포함)가 10명을 넘어가면 마을회관이 해금된다 — 강제로
+# 숫자를 맞추는 게 아니라, 게임을 진행하며 주민이 이사 올 때마다 조건을
+# 재확인하는 트리거다. 완공되면 이장은 낮에 회관에서 업무를 보고,
+# 집은 그대로 유지된다.
 var chief_house_lv := 0            # 0=낡은 오두막 / 1=제대로 된 이장 집
 const CHIEF_HOUSE_RESIDENTS := 5   # 새 집 기준 주민 수 (4~6 사이 — 추후 조정)
-const HALL_RESIDENTS := 10         # 마을회관 해금 기준 (플레이어 포함)
+const HALL_RESIDENTS := 10         # 이 수를 「넘어가면」 마을회관 해금 (플레이어 포함)
+var hall_noticed := false          # 해금 순간의 아침 안내를 한 번만 띄운다
+
+# 잡화점 씨앗 선반에 진열되는 씨앗 — 처음에는 밀·옥수수 두 종뿐이고,
+# 게임을 진행하면서 하나씩 늘어난다.
+var shop_seeds: Array = ["wheat", "corn"]
 
 # 메인 스토리 2에서 짓는 첫 상점의 재료 (main.VILLAGE_BUILD_COST.general과 같게)
 const SHOP_BUILD_WOOD := 30
@@ -1464,6 +1477,7 @@ func discover(id: String) -> bool:
 		return false
 	discovered[id] = day
 	_check_collections()
+	_check_recipe_unlocks()
 	return true
 
 
@@ -1496,6 +1510,8 @@ var recipes_unlocked: Array = []
 var collections_done: Array = []
 # 방금 열린 것 — hud가 꺼내 배너를 띄운다 (여기서는 UI를 못 부른다)
 var collection_pending: Array = []
+# 방금 떠오른 기본 요리 레시피 — hud가 꺼내 토스트를 띄운다
+var recipe_pending: Array = []
 
 
 # 이 묶음에서 몇 개를 모았나 (몬스터는 처치 기록을 본다)
@@ -1564,6 +1580,7 @@ const REAGENTS := {
 	"carrot": {"earth": 1, "life": 1},
 	"strawberry": {"life": 2, "water": 1},
 	"tomato": {"fire": 2, "life": 1},
+	"wheat": {"earth": 1, "light": 1},
 	"corn": {"light": 1, "earth": 1},
 	"watermelon": {"water": 3},
 	"pumpkin": {"earth": 2, "fire": 1},
@@ -2022,9 +2039,28 @@ func ingredient_count(id: String) -> int:
 	return int(produce[id]) if CROPS.has(id) else int(items[id])
 
 
-# 잠긴 레시피인가 (컬렉션 보상으로 열린다)
+# 잠긴 레시피인가 — 모든 요리는 배워야 만들 수 있다.
+# 조리대는 빈 채로 시작하고, 인게임 플레이로만 하나씩 열린다:
+#   기본 요리  재료를 전부 발견하면 저절로 떠오른다 (_check_recipe_unlocks)
+#   locked 표시 퀘스트·컬렉션·상점(노점) 같은 정해진 길로만 열린다
 func recipe_locked(id: String) -> bool:
-	return bool(RECIPES[id].get("locked", false)) and id not in recipes_unlocked
+	return id not in recipes_unlocked
+
+
+# 재료를 새로 발견할 때마다 — 재료를 다 아는 기본 요리가 떠오른다.
+# (locked 표시가 붙은 요리는 여기서 열리지 않는다)
+func _check_recipe_unlocks() -> void:
+	for rid: String in RECIPE_IDS:
+		if bool(RECIPES[rid].get("locked", false)) or rid in recipes_unlocked:
+			continue
+		var know_all := true
+		for k in RECIPES[rid].needs:
+			if not discovered.has(k):
+				know_all = false
+				break
+		if know_all:
+			recipes_unlocked.append(rid)
+			recipe_pending.append(rid)   # hud가 꺼내 토스트를 띄운다
 
 
 func can_cook(id: String) -> bool:
@@ -2526,7 +2562,7 @@ const TUTORIAL_ORDER := [
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
 	["build", "울타리나 스프링클러를 설치해보자"],
-	["fish", "마을 남쪽 낚시터(부두)에서 물고기를 낚자"],
+	["fish", "마을 남쪽 낚시터(강가)에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
 # 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
@@ -2996,6 +3032,9 @@ func reset_all() -> void:
 	mom_quests_done = []
 	spear_quest = ""
 	chief_house_lv = 0
+	hall_noticed = false
+	shop_seeds = ["wheat", "corn"]
+	recipe_pending = []
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -3325,6 +3364,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"home_plots": home_plots,
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
 		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
+		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

@@ -535,6 +535,13 @@ func _draw_room() -> void:
 
 	# 그림자 + 안내
 	canvas.draw_rect(Rect2(ppos.x - 4, ppos.y - 2, 8, 3), Color(0, 0, 0, 0.22))
+
+	# 밤에는 집 안도 대체로 어둡다 — 바깥과 같은 시각 곡선으로 어두워진다
+	var night_a := clampf((GameData.minutes - 18.0 * 60.0) / (6.0 * 60.0), 0.0, 1.0)
+	if night_a > 0.0:
+		canvas.draw_rect(Rect2(ROOM.position.x, ROOM.position.y - 60,
+			ROOM.size.x, ROOM.size.y + 60), Color(0.04, 0.04, 0.09, night_a * 0.62))
+
 	if deco_mode:
 		_draw_deco_ui()
 	else:

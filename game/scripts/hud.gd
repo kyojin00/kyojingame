@@ -493,6 +493,14 @@ func _process(delta: float) -> void:
 				if main != null else null,
 			"head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_catch")
+	# 재료를 다 발견해서 방금 떠오른 기본 요리 레시피
+	while not GameData.recipe_pending.is_empty():
+		var rid: String = GameData.recipe_pending.pop_front()
+		_toast_queue.append({"head": "요리 레시피가 떠올랐다!",
+			"body": "%s — 집 조리대에서 만들 수 있다" % GameData.ITEMS[rid].name,
+			"icon": main.tex.get(rid) if main != null else null,
+			"head_col": Color(0.85, 0.6, 0.15)})
+		Sound.play_sfx("sfx_catch")
 	if minimap_panel != null and main != null:
 		# 실내(집·동굴·가게 방)에서는 바깥 지도를 띄우지 않는다
 		minimap_panel.visible = not (main.interior.visible or main.cave.visible

@@ -309,6 +309,10 @@ func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
 	_style_tabs()
+	# 구매 탭 이름은 열린 분류를 따른다 — 생활용품 선반을 열었는데
+	# 탭이 「씨앗」으로 적혀 있던 버그를 고쳤다.
+	$Panel/V/Tabs/BuyBtn.text = {"seed": "씨앗", "life": "생활용품",
+		"tool": "도구", "misc": "기타", "stall": "노점"}.get(buy_cat, "구매")
 	if _head != null:
 		_head.text = "- %s -" % shop_title
 		_money.text = "%d" % GameData.money
@@ -339,7 +343,11 @@ func _rebuild() -> void:
 						int(GameData.ITEMS[rid].sell)], rb2, [["coin", rprice]]))
 			_note("민지가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
 		if buy_cat in ["", "seed"]:
+			# 진열되는 씨앗은 shop_seeds에 있는 것뿐 — 처음에는 밀·옥수수 둘이고,
+			# 게임을 진행하면서 하나씩 들어온다. 그중에서도 제철만 내놓는다.
 			for id in GameData.CROP_IDS:
+				if id not in GameData.shop_seeds:
+					continue
 				var def: Dictionary = GameData.CROPS[id]
 				if GameData.season() not in def.seasons:
 					continue  # 제철 씨앗만 판매
@@ -349,6 +357,7 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("icon_seed", "%s 씨앗" % def.name,
 					"보유 %d개 · 수확까지 %d시간" % [GameData.seeds[id], def.grow_days], b,
 					[["coin", price]]))
+			_note("새 씨앗은 마을이 자라면 하나씩 들어온다.")
 			if GameData.merchant_discount():
 				_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
 		if buy_cat in ["", "tool"]:

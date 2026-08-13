@@ -286,13 +286,10 @@ const EAST_RIVER_X := 97                   # 마을 동쪽 바깥을 흐르는 �
 const RIVER_ROWS := 4                      # 강 폭 (낚시터를 깊게 하려고 넓혔다)                # 마을 남쪽 외곽을 흐르는 강 (2칸)
 const DOCK_Y := 39                         # 강가 낚시터(부두)
 # ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
-# 강을 따라 길게 깔린 나무 데크 + 물 쪽으로 내민 부두 두 개 +
-# 강가 마당(표지판·가로등·벤치). 「낚시」 목표는 여기서 진행한다.
+# 강가 잔디밭에서 강을 보고 낚싯대를 던진다. 「낚시」 목표는 여기서
+# 진행한다. (강 위로 내밀던 나무 데크·부두는 없앴다)
 const FISH_YARD_X0 := 70
 const FISH_YARD_X1 := 95
-const FISH_DECK_X0 := 71                   # 강 첫 줄(y=27)에 깔리는 데크
-const FISH_DECK_X1 := 94
-const FISH_PIERS := [Vector2i(72, 73), Vector2i(80, 81), Vector2i(88, 89)]  # 물로 내민 부두 (x 구간)
 const FISH_SIGN := Vector2i(70, 38)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
 const SEA_RIDGE_Y := 77            # 바위 능선 줄 — 바다로 가는 길을 막는다
@@ -306,15 +303,10 @@ const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
 const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
-const FISH_LAMPS := [Vector2i(72, 37), Vector2i(79, 37), Vector2i(86, 37), Vector2i(93, 37)]
-const FISH_BENCHES := [Vector2i(75, 38), Vector2i(83, 38), Vector2i(91, 38)]
 const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있다」
 const FISH_CLEAR := Rect2i(69, 34, 30, 13) # 이 안에는 나무/돌을 두지 않는다
 const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
-const PLAZA_LAMPS := [Vector2i(71, 15), Vector2i(84, 15),
-	Vector2i(71, 24), Vector2i(84, 24)]
-const PLAZA_BENCHES := [Vector2i(73, 19), Vector2i(73, 21),
-	Vector2i(83, 19), Vector2i(83, 21)]
+# (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.

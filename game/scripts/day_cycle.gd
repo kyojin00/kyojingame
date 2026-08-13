@@ -197,6 +197,15 @@ func _next_day(passed_out: bool) -> void:
 		m.hud.quest_toast("이장님의 새 집 완공!")
 		m.hud.show_message("마을 사람들이 힘을 모아 이장님의 낡은 오두막을\n제대로 된 집으로 다시 지어 드렸다!", 6.0)
 
+	# 마을회관 해금 트리거 — 주민 수를 강제로 맞추는 게 아니라, 게임을
+	# 진행하며 총 주민이 10명을 「넘어가는」 아침에 한 번 알려 준다.
+	# (실제 건설은 게시판의 마을 발전 목록에서 한다)
+	if not GameData.hall_noticed and not GameData.village_built.has("hall") \
+			and m.village_residents() > GameData.HALL_RESIDENTS:
+		GameData.hall_noticed = true
+		m.hud.quest_toast("마을회관 해금!")
+		m.hud.show_message("마을 사람이 %d명을 넘었다! 이제 게시판에서\n마을회관을 지을 수 있다." % GameData.HALL_RESIDENTS, 6.0)
+
 	m.saveio.save_now()
 
 	var note := ""
@@ -238,9 +247,10 @@ func _next_day(passed_out: bool) -> void:
 	m.farming.rebuild()
 
 func _update_night() -> void:
+	# 가로등이 없는 마을 — 해가 지면 정말로 캄캄해진다
 	var start := 18.0 * 60.0
 	var a := clampf((GameData.minutes - start) / (6.0 * 60.0), 0.0, 1.0)
-	var c := Color(1, 1, 1).lerp(Color(0.5, 0.48, 0.72), a)
+	var c := Color(1, 1, 1).lerp(Color(0.16, 0.15, 0.26), a)
 	if m.weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]:
 		c *= Color(0.78, 0.8, 0.88)  # 비 오는 날은 어둑하게
 	elif m.weather_now() == GameData.WEATHER_FOG:

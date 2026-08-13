@@ -295,7 +295,7 @@ func interact() -> void:
 			m.village._open_greenhouse_dialog()
 			return
 		if obj.kind == "sign" and t == m.FISH_SIGN:
-			m.dialog.open("낚시터", "교진 마을 낚시터.\n\n부두 끝에 서서 강을 보고 낚싯대(E)를 던지면 된다.\n"
+			m.dialog.open("낚시터", "교진 마을 낚시터.\n\n강가에 서서 물을 보고 낚싯대(E)를 던지면 된다.\n"
 				+ "입질(!)이 오면 다시 E!\n\n붕어 · 잉어 · 메기... 그리고 아주 드물게\n황금잉어가 올라온다고 한다.",
 				[["알겠다", null]])
 			return

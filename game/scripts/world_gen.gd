@@ -38,10 +38,9 @@ func _build_map() -> void:
 
 	_build_village()
 
-	# 농장 -> 마을 공용 길
-	for y in range(m.ROAD.position.y, m.ROAD.end.y):
-		for x in range(m.ROAD.position.x, m.ROAD.end.x):
-			m.grid[y][x].ground = "path"
+	# 농장 -> 마을 이음새는 잔디 그대로 둔다 (흙길은 깔지 않는다 —
+	# 바닥 타일은 앞으로 플레이어가 직접 깐다. m.ROAD 직사각형은
+	# 자연물이 스폰되지 않는 통행로로 계속 쓰인다)
 
 	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
 	m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
@@ -105,10 +104,7 @@ func _build_map() -> void:
 		for gy2 in range(m.GREENHOUSE.position.y, m.GREENHOUSE.end.y):
 			for gx2 in range(m.GREENHOUSE.position.x, m.GREENHOUSE.end.x):
 				m.grid[gy2][gx2].ground = "soil"
-	for p: Vector2i in m.FISH_LAMPS:
-		m.objects[p] = {"kind": "deco_lamp", "hp": 0}
-	for p: Vector2i in m.FISH_BENCHES:
-		m.objects[p] = {"kind": "deco_bench", "hp": 0}
+	# (낚시터의 가로등·벤치도 없앴다)
 
 	_build_sea()
 
@@ -223,26 +219,9 @@ func _place_stall(with_node := true) -> void:
 # 교진 마을: 건물은 하나도 짓지 않는다.
 # 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
 func _build_village() -> void:
-	# 마을을 가로지르는 큰길 (서쪽 입구 -> 동쪽) — 인도는 모두 3줄이다
-	for y in range(m.MAIN_STREET_Y, m.MAIN_STREET_Y + m.ROAD_W):
-		for x in range(60, 99):
-			m.grid[y][x].ground = "path"
-	# 중앙 광장 (아주 넓은 평지)
-	for y in range(m.PLAZA.position.y, m.PLAZA.end.y):
-		for x in range(m.PLAZA.position.x, m.PLAZA.end.x):
-			m.grid[y][x].ground = "path"
-	# 남북 인도: 큰길 <-> 광장 <-> 낚시터 (3줄)
-	for i in m.ROAD_W:
-		var nx: int = m.NS_LANE_X + i
-		for y in range(m.MAIN_STREET_Y, m.PLAZA.position.y):
-			m.grid[y][nx].ground = "path"
-		for y in range(m.PLAZA.end.y, m.DOCK_Y + 1):
-			m.grid[y][nx].ground = "path"
-	# 서쪽·동쪽 건물 줄 앞을 지나는 세로 인도 (마당 문이 여기로 붙는다, 3줄)
-	for i in m.ROAD_W:
-		for y in range(m.MAIN_STREET_Y, m.DOCK_Y):
-			m.grid[y][m.WEST_LANE_X + i].ground = "path"
-			m.grid[y][m.EAST_LANE_X + i].ground = "path"
+	# 흙길은 더 이상 깔지 않는다 — 마을 바닥은 잔디이고, 길·광장 바닥은
+	# 앞으로 플레이어가 직접 타일을 깔아 꾸미는 구조로 간다.
+	# (물을 건너는 나무 다리만 _bridge_roads가 놓아 준다)
 	# 광장 한가운데 분수
 	for y in range(m.FOUNTAIN.position.y, m.FOUNTAIN.end.y):
 		for x in range(m.FOUNTAIN.position.x, m.FOUNTAIN.end.x):
@@ -255,23 +234,12 @@ func _build_village() -> void:
 	for x in [m.EAST_RIVER_X, m.EAST_RIVER_X + 1]:
 		for y in range(1, m.VILLAGE_RIVER_Y):
 			m.grid[y][x].ground = "water"
-	# 마을 남쪽 끝 낚시터: 강가 마당 + 강 위로 뻗은 나무 부두.
-	# 「낚시」 목표는 여기서 진행한다 (물가는 여러 곳이지만 낚시터는 여기 하나뿐).
-	for x in range(m.FISH_YARD_X0, m.FISH_YARD_X1 + 1):
-		for y in [m.DOCK_Y - 3, m.DOCK_Y - 2, m.DOCK_Y - 1, m.DOCK_Y]:
-			m.grid[y][x].ground = "path"
-	# 강 첫 줄에 데크를 길게 깔고, 거기서 부두 두 개를 물 쪽으로 내민다.
-	# 데크에서 아래를 보거나 부두 끝에서 좌우를 보고 낚싯대를 던진다.
-	for x in range(m.FISH_DECK_X0, m.FISH_DECK_X1 + 1):
-		m.grid[m.VILLAGE_RIVER_Y][x].ground = "dock"
-	for p: Vector2i in m.FISH_PIERS:
-		for x in range(p.x, p.y + 1):
-			for dy in range(1, m.RIVER_ROWS - 1):
-				m.grid[m.VILLAGE_RIVER_Y + dy][x].ground = "dock"
-	# 강 건너 남쪽 부지로 이어지는 작은 다리
+	# 마을 남쪽 끝 낚시터: 강가 잔디밭에서 강을 보고 낚싯대를 던진다.
+	# (강 위로 내밀던 나무 부두·데크는 없앴다 — 「낚시」 목표는 그대로 여기)
+	# 강 건너 남쪽 부지로 이어지는 작은 나무 다리
 	for x in [63, 64]:
 		for y in range(m.VILLAGE_RIVER_Y, m.VILLAGE_RIVER_Y + m.RIVER_ROWS):
-			m.grid[y][x].ground = "path"
+			m.grid[y][x].ground = "dock"
 
 	# 길이 물 위를 지나야 하면 다리를 놓는다.
 	# (강을 옮기거나 길을 늘릴 때 길이 끊기는 일을 없앤다)
@@ -291,10 +259,7 @@ func _build_village() -> void:
 		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
-	for p: Vector2i in m.PLAZA_LAMPS:
-		m.objects[p] = {"kind": "deco_lamp", "hp": 0}
-	for p: Vector2i in m.PLAZA_BENCHES:
-		m.objects[p] = {"kind": "deco_bench", "hp": 0}
+	# (광장의 가로등·벤치는 없앴다 — 밤이 되면 마을도 캄캄하다)
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
 	for x in range(60, 99):
 		for y in [1, 43]:
@@ -304,15 +269,15 @@ func _build_village() -> void:
 				m.objects[rim] = {"kind": "tree", "hp": m.TREE_HP}
 
 
-# 인도가 지나야 할 자리가 물이면 나무 다리를 놓는다.
-# 길을 먼저 깔고 강을 나중에 그리므로, 강이 덮어 버린 자리를 여기서 되살린다.
-func _bridge_roads() -> void:
+# 사람이 오가는 동선이 물을 건너는 자리 — 나무 다리를 놓아도 되는 칸들.
+# (흙길은 없어졌지만 옛 길 자리 그대로가 마을의 동선이다.
+#  세이브 로드 때 옛 부두를 걷어 내는 판정에도 이 목록을 쓴다)
+func bridge_tiles() -> Dictionary:
 	var lines: Array = []
 	# 큰길 (가로 3줄)
 	for i in m.ROAD_W:
 		lines.append([Vector2i(60, m.MAIN_STREET_Y + i), Vector2i(98, m.MAIN_STREET_Y + i)])
-	# 세로 인도 3종 (각 3줄). 구간은 길을 깔 때와 똑같이 잡는다 —
-	# 광장 안은 이미 평지이므로 지나가지 않는다 (분수 위에 다리가 놓이면 안 된다).
+	# 세로 동선 3종 (각 3줄) — 분수 위에 다리가 놓이지 않게 광장은 지나지 않는다
 	for i in m.ROAD_W:
 		lines.append([Vector2i(m.NS_LANE_X + i, m.MAIN_STREET_Y),
 			Vector2i(m.NS_LANE_X + i, m.PLAZA.position.y - 1)])
@@ -322,18 +287,30 @@ func _bridge_roads() -> void:
 			Vector2i(m.WEST_LANE_X + i, m.DOCK_Y - 1)])
 		lines.append([Vector2i(m.EAST_LANE_X + i, m.MAIN_STREET_Y),
 			Vector2i(m.EAST_LANE_X + i, m.DOCK_Y - 1)])
+	var tiles := {}
 	for line: Array in lines:
 		var a: Vector2i = line[0]
 		var b: Vector2i = line[1]
 		var step := Vector2i(signi(b.x - a.x), signi(b.y - a.y))
 		var at := a
 		while true:
-			if at.x >= 0 and at.y >= 0 and at.x < m.MAP_W and at.y < m.MAP_H \
-					and m.grid[at.y][at.x].ground == "water":
-				m.grid[at.y][at.x].ground = "dock"   # 나무 다리
+			tiles[at] = true
 			if at == b:
 				break
 			at += step
+	# 강 건너 남쪽 부지로 이어지는 작은 다리
+	for x in [63, 64]:
+		for y in range(m.VILLAGE_RIVER_Y, m.VILLAGE_RIVER_Y + m.RIVER_ROWS):
+			tiles[Vector2i(x, y)] = true
+	return tiles
+
+
+# 동선이 지나야 할 자리가 물이면 나무 다리를 놓는다.
+func _bridge_roads() -> void:
+	for at: Vector2i in bridge_tiles():
+		if at.x >= 0 and at.y >= 0 and at.x < m.MAP_W and at.y < m.MAP_H \
+				and m.grid[at.y][at.x].ground == "water":
+			m.grid[at.y][at.x].ground = "dock"   # 나무 다리
 
 
 # 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
@@ -360,41 +337,7 @@ func _build_yard(anchor: Vector2i) -> void:
 			if m.objects.has(Vector2i(x, y)):
 				continue
 			m.objects[Vector2i(x, y)] = {"kind": "fence", "hp": 0, "fixed": true}
-	# 문 앞에서 가장 가까운 길까지 흙길을 낸다
-	_connect_to_road(Vector2i(door.x, yard.end.y - 1))
-
-
-# 이 칸에서 가장 가까운 길까지 흙길을 깐다 (오브젝트가 없는 칸만 지난다)
-func _connect_to_road(from: Vector2i) -> void:
-	if from.x < 0 or from.y < 0 or from.x >= m.MAP_W or from.y >= m.MAP_H:
-		return
-	if m.grid[from.y][from.x].ground == "path":
-		return
-	var prev := {from: from}
-	var queue: Array[Vector2i] = [from]
-	var head := 0
-	var goal := Vector2i(-999, -999)
-	while head < queue.size():
-		var cur: Vector2i = queue[head]
-		head += 1
-		if m.grid[cur.y][cur.x].ground == "path" and cur != from:
-			goal = cur
-			break
-		for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
-			var n: Vector2i = cur + d
-			if prev.has(n) or not m.VILLAGE_REGION.has_point(n):
-				continue
-			if m.objects.has(n) or m.grid[n.y][n.x].ground == "water":
-				continue
-			prev[n] = cur
-			queue.append(n)
-	if goal.x == -999:
-		return
-	var at := goal
-	while at != from:
-		m.grid[at.y][at.x].ground = "path"
-		at = prev[at]
-	m.grid[from.y][from.x].ground = "path"
+	# (문 앞 흙길은 더 이상 내지 않는다 — 바닥 타일은 플레이어 몫이다)
 
 
 # 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,

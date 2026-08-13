@@ -89,8 +89,8 @@ func _next_village_build() -> String:
 	for pid in m.VILLAGE_BUILD_ORDER:
 		if GameData.village_built.has(pid):
 			continue
-		# 마을회관은 주민(플레이어 포함) 10명부터 — 마을 성장의 정점
-		if pid == "hall" and m.village_residents() < GameData.HALL_RESIDENTS:
+		# 마을회관은 주민(플레이어 포함)이 10명을 넘어야 — 마을 성장의 정점
+		if pid == "hall" and m.village_residents() <= GameData.HALL_RESIDENTS:
 			continue
 		return pid
 	return ""
@@ -102,7 +102,7 @@ func _open_village_build_dialog() -> void:
 		if not GameData.village_built.has("hall"):
 			m.dialog.open("마을 발전",
 				"지금 지을 수 있는 건물은 다 세웠네.\n\n남은 건 마을회관뿐인데... 회관은 마을 사람이\n"
-				+ "%d명은 되어야 의미가 있지. (지금 %d명)\n주민이 더 늘면 다시 이야기함세." %
+				+ "%d명은 넘어야 의미가 있지. (지금 %d명)\n주민이 더 늘면 다시 이야기함세." %
 					[GameData.HALL_RESIDENTS, m.village_residents()],
 				[["알겠습니다", null]])
 			return

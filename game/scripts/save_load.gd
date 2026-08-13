@@ -197,6 +197,17 @@ func _apply_save(d: Dictionary) -> void:
 	for k in d.get("forage_caught", {}):
 		GameData.forage_caught[k] = int(d.forage_caught[k])
 	_backfill_discovered()
+	GameData.hall_noticed = bool(d.get("hall_noticed", false))
+	# 씨앗 진열이 생기기 전 세이브: 기본 두 종(밀·옥수수)으로 시작한다
+	GameData.shop_seeds = d.get("shop_seeds", ["wheat", "corn"])
+	# 조리대가 빈 채로 시작하는 개편 전 세이브: 이미 만들어 본 요리와,
+	# 재료를 전부 발견해 둔 기본 요리는 아는 것으로 쳐 준다
+	for rid: String in GameData.RECIPE_IDS:
+		if int(GameData.recipes_cooked.get(rid, 0)) > 0 \
+				and rid not in GameData.recipes_unlocked:
+			GameData.recipes_unlocked.append(rid)
+	GameData._check_recipe_unlocks()
+	GameData.recipe_pending.clear()   # 로드 직후엔 토스트를 쏟아내지 않는다
 	for k in d.get("produce_silver", {}):
 		GameData.produce_silver[k] = int(d.produce_silver[k])
 	for k in d.get("produce_gold", {}):
@@ -238,9 +249,21 @@ func _apply_save(d: Dictionary) -> void:
 			cell.crop_day = growth
 			cell.dead = s.size() > 4 and int(s[4]) == 1
 			cell.half_fed = s.size() > 5 and int(s[5]) == 1
+	# 흙길·부두가 없어졌다 — 옛 세이브의 길은 잔디로, 다리 동선 밖의
+	# 데크(부두)는 물로 되돌린다 (다리 자리는 그대로 나무 다리)
+	var bridges: Dictionary = m.worldgen.bridge_tiles()
+	for y in m.MAP_H:
+		for x in m.MAP_W:
+			var cell: Dictionary = m.grid[y][x]
+			if cell.ground == "path":
+				cell.ground = "grass"
+			elif cell.ground == "dock" and not bridges.has(Vector2i(x, y)):
+				cell.ground = "water"
 	if d.has("objects"):
 		m.objects.clear()
 		for o in d.objects:
+			if str(o[2]) in ["deco_lamp", "deco_bench"]:
+				continue   # 가로등·벤치는 없앴다 — 옛 세이브에서 걷어 낸다
 			var od := {"kind": o[2], "hp": int(o[3])}
 			if o.size() > 4 and int(o[4]) == 1:
 				od["apple"] = true
