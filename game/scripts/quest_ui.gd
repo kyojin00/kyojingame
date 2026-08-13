@@ -236,6 +236,31 @@ func _rebuild() -> void:
 				GameData.item_display_name(str(o.item)), int(o.qty), int(o.reward)])
 		_line("    마을 광장 게시판(E)에서 골라 수락하자.", COL_SUB)
 
+	# 상인의 부탁 — 해변 노점 (재료 수량은 가방과 실시간 연동:
+	# 이 창은 열려 있는 동안 0.5초마다 다시 그려진다)
+	if GameData.merchant_errand == "doing":
+		_line("")
+		_line("[상인의 부탁 — 해변에 노점 차리기]", COL_HEAD)
+		_line("  민지가 해변에서 장사할 노점을 만들고 싶어 한다.", COL_SUB)
+		var w_have := mini(GameData.wood, GameData.STALL_WOOD)
+		var s_have := mini(int(GameData.items.get("forage_shell", 0)),
+			GameData.STALL_SHELLS)
+		var w_ok := w_have >= GameData.STALL_WOOD
+		var s_ok := s_have >= GameData.STALL_SHELLS
+		_line("  필요한 재료", COL_HEAD)
+		_line("    목재  %d / %d%s" % [w_have, GameData.STALL_WOOD,
+			"  ✓" if w_ok else ""], COL_DONE if w_ok else COL_NOW)
+		_line("    조개  %d / %d%s" % [s_have, GameData.STALL_SHELLS,
+			"  ✓" if s_ok else ""], COL_DONE if s_ok else COL_NOW)
+		_line("  진행 상황", COL_HEAD)
+		_line("    V 민지와 이야기하기", COL_DONE)
+		if w_ok and s_ok:
+			_line("    > 민지에게 재료를 가져다주기", COL_NOW)
+		else:
+			_line("    > 재료 모으기 (해변에서 조개 줍기)", COL_NOW)
+		_line("    O 해변에 노점 열기", COL_DIM)
+		_line("  보상: 해변 노점 개장 + 하트 모양 러그", COL_SUB)
+
 	# 할아버지의 부탁 — 기본 안내가 끝난 뒤 이어지는 본 게임의 길잡이.
 	# 다음 부탁은 미리 보여주지 않는다 (받았을 때 편지로 읽는다).
 	_line("")

@@ -184,26 +184,35 @@ func _build_tracker_scroll() -> void:
 				and ev.button_index == MOUSE_BUTTON_LEFT:
 			Sound.play_sfx("sfx_ui")
 			main.quest_ui.toggle())
-	# 두루마리 안: 퀘스트 제목 -> 📍 현재 목표(강조) -> 짧은 설명·안내
-	panel.offset_bottom = 168.0           # 세 층이 들어가게 살짝 키운다
+	# 두루마리 안은 딱 세 줄 — 퀘스트 이름(1줄) / 지금 할 행동(최대 2줄) /
+	# 「Q 상세보기」. 설명·재료·진행 상황은 전부 Q 상세 창의 몫이다.
+	# 모든 글자는 말줄임(…)과 줄 수 제한으로 두루마리 밖으로 못 나간다.
+	panel.offset_bottom = 142.0           # 작고 귀여운 메모 크기 (226x84)
 	quest_title_label = Label.new()
-	quest_title_label.position = Vector2(14, 12)
-	quest_title_label.size = Vector2(198, 16)
+	quest_title_label.position = Vector2(16, 10)
+	quest_title_label.size = Vector2(192, 15)
 	quest_title_label.add_theme_font_size_override("font_size", 12)
 	quest_title_label.add_theme_color_override("font_color", Color(0.32, 0.2, 0.08))
+	quest_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	quest_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(quest_title_label)
 	goal_label = Label.new()
-	goal_label.position = Vector2(14, 29)
-	goal_label.size = Vector2(198, 34)
+	goal_label.position = Vector2(16, 27)
+	goal_label.size = Vector2(192, 32)
 	goal_label.add_theme_font_size_override("font_size", 12)
 	goal_label.add_theme_color_override("font_color", Color(0.78, 0.42, 0.02))
 	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal_label.max_lines_visible = 2
+	goal_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	goal_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(goal_label)
-	# 기존 objective_label은 설명·부가 안내 줄로 내려앉는다
-	objective_label.position = Vector2(14, 64)
-	objective_label.size = Vector2(198, 92)
+	# 기존 objective_label은 「Q 상세보기」 한 줄짜리 안내로만 쓴다
+	objective_label.position = Vector2(16, 60)
+	objective_label.size = Vector2(192, 13)
+	objective_label.add_theme_font_size_override("font_size", 10)
+	objective_label.add_theme_color_override("font_color", Color(0.55, 0.45, 0.3))
+	objective_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	objective_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var deco := Control.new()
 	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -439,27 +448,27 @@ func refresh(force := false) -> void:
 		GameData.day_in_season(), GameData.clock_text()])
 	_put(money_label, "%dG" % GameData.money)
 
-	# 두루마리 퀘스트 트래커: 제목 / 📍 현재 목표(강조) / 짧은 설명.
+	# 미니 퀘스트창: 「지금 어떤 퀘스트를, 지금 뭘 하면 되는지」 두 가지만.
+	# 설명·재료·진행 상황·보상은 전부 Q 상세 창에서 본다.
 	# tracked_quest()가 스토리 단계를 따라가므로 단계가 바뀌면 즉시 갱신된다
 	var tq := GameData.tracked_quest()
-	_put(quest_title_label, str(tq.get("title", "")))
-	var new_goal := str(tq.get("obj", ""))
-	_put(goal_label, ("📍 " + new_goal) if new_goal != "" else "")
-	_watch_goal(new_goal)
-	var track := []
-	if str(tq.get("desc", "")) != "":
-		track.append(str(tq.desc))
-	# 축제날은 그날 할 일을 맨 위로 올린다
-	var fl := GameData.festival_line()
-	if fl != "":
-		track.push_front("★ " + fl)
-	if GameData.u_intro_state == 1:
-		track.append("목표: U 키로 능력치를 확인해 보자")
-	var qline: String = GameData.quest_line()
-	if qline != "":
-		track.append("의뢰: " + qline)
-	track.append("%s: 퀘스트 창" % GameData.key_label("open_quest"))
-	_put(objective_label, "\n".join(track))
+	var t_title := str(tq.get("title", ""))
+	var t_goal := str(tq.get("obj", ""))
+	if t_goal == "":
+		# 메인 퀘스트가 없을 때만 축제·오늘의 의뢰가 자리를 잇는다
+		var fl := GameData.festival_line()
+		var qline: String = GameData.quest_line()
+		if fl != "":
+			t_title = "계절 축제"
+			t_goal = fl
+		elif qline != "":
+			t_title = "오늘의 의뢰"
+			t_goal = qline
+	$TrackerPanel.visible = t_goal != ""
+	_put(quest_title_label, t_title)
+	_put(goal_label, ("📍 " + t_goal) if t_goal != "" else "")
+	_watch_goal(str(tq.get("obj", "")))
+	_put(objective_label, "%s 상세보기" % GameData.key_label("open_quest"))
 
 	_refresh_hotbar()
 
@@ -487,11 +496,11 @@ func show_message(text: String, dur := 2.5) -> void:
 	msg_timer = dur
 
 
-# ---- 새 목표 알림 — 목표가 바뀌는 순간 상단 중앙에 2.6초 떠 있다 ----
+# ---- 새 목표 알림 ----
+# 목표가 바뀌는 순간 알려 준다. 보상/완료 토스트와 같은 자리에 겹쳐
+# 뜨지 않도록, 별도 배너 대신 **같은 토스트 대기열**에 태운다 —
+# 화면 위에는 언제나 알림이 하나만 보인다.
 var _goal_seen := "<init>"
-var _goal_banner: PanelContainer = null
-var _goal_banner_body: Label = null
-var _goal_banner_t := 0.0
 
 
 func _watch_goal(goal: String) -> void:
@@ -501,66 +510,16 @@ func _watch_goal(goal: String) -> void:
 	_goal_seen = goal
 	if first or goal == "":
 		return   # 게임을 막 켰을 때·목표가 사라질 때는 조용히
-	_show_goal_banner(goal)
-
-
-func _show_goal_banner(goal: String) -> void:
-	if _goal_banner == null:
-		_goal_banner = PanelContainer.new()
-		var st := StyleBoxFlat.new()
-		st.bg_color = Color(0.97, 0.93, 0.83, 0.96)
-		st.border_color = Color(0.45, 0.3, 0.16)
-		st.set_border_width_all(3)
-		st.set_corner_radius_all(9)
-		st.content_margin_left = 20.0
-		st.content_margin_right = 20.0
-		st.content_margin_top = 5.0
-		st.content_margin_bottom = 7.0
-		_goal_banner.add_theme_stylebox_override("panel", st)
-		_goal_banner.anchor_left = 0.5
-		_goal_banner.anchor_right = 0.5
-		_goal_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		_goal_banner.offset_top = 58.0
-		_goal_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var v := VBoxContainer.new()
-		v.add_theme_constant_override("separation", 0)
-		_goal_banner.add_child(v)
-		var head := Label.new()
-		head.text = "새로운 목표"
-		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		head.add_theme_font_size_override("font_size", 12)
-		head.add_theme_color_override("font_color", Color(0.62, 0.44, 0.26))
-		v.add_child(head)
-		_goal_banner_body = Label.new()
-		_goal_banner_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		_goal_banner_body.add_theme_font_size_override("font_size", 17)
-		_goal_banner_body.add_theme_color_override("font_color", Color(0.32, 0.2, 0.1))
-		v.add_child(_goal_banner_body)
-		add_child(_goal_banner)
-	_goal_banner_body.text = goal
-	_goal_banner.visible = true
-	_goal_banner.modulate.a = 0.0
-	_goal_banner_t = 0.0
+	for t in _toast_queue:
+		if str(t.get("body", "")) == goal:
+			return   # 같은 목표가 이미 대기 중이면 또 쌓지 않는다
+	_toast_queue.append({"head": "새로운 목표", "body": goal, "icon": null,
+		"head_col": Color(0.78, 0.42, 0.02)})
 	Sound.play_sfx("sfx_ui")
-
-
-func _update_goal_banner(delta: float) -> void:
-	if _goal_banner == null or not _goal_banner.visible:
-		return
-	_goal_banner_t += delta
-	if _goal_banner_t < 0.25:
-		_goal_banner.modulate.a = _goal_banner_t / 0.25
-	elif _goal_banner_t < 2.2:
-		_goal_banner.modulate.a = 1.0
-	elif _goal_banner_t < 2.8:
-		_goal_banner.modulate.a = (2.8 - _goal_banner_t) / 0.6
-	else:
-		_goal_banner.visible = false
 
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
-	_update_goal_banner(delta)
 	# 제작대에서 방금 완성된 것 (game_data는 UI를 못 부른다)
 	while not GameData.desk_done_pending.is_empty():
 		var made: String = GameData.desk_done_pending.pop_front()
