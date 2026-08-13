@@ -127,7 +127,7 @@ HEAD_DOWN = [
     "..OOssssssssOO..",
     ".OssHHHHHHHHssO.",
     ".OsHHHHHHHHHHsO.",
-    "OssHHHHHHHHHHssO",
+    ".OsHHHHHHHHHHsO.",
     "OsssHHHHHHHHsssO",
     "OssssssssssssssO",
     "OssssssssssssssO",
@@ -137,10 +137,10 @@ HEAD_DOWN = [
     "Osss" "ee" "ssss" "ee" "sssO",
     "Osss" "ei" "ssss" "ie" "sssO",
     "OrrssssssssssrrO",
-    "Ossssss" "mm" "ssssssO",
-    "OssssssssssssssO",
+    ".Osssss" "mm" "sssssO.",
     ".OssssssssssssO.",
-    "..OOOssssssOOO..",
+    "..OssssssssssO..",
+    "...OOssssssOO...",
 ]
 
 HEAD_SIDE = [   # 오른쪽을 본다
@@ -148,20 +148,20 @@ HEAD_SIDE = [   # 오른쪽을 본다
     "..OOssssssssOO..",
     ".OSsHHHHHHHHssO.",
     ".OSHHHHHHHHHHsO.",
-    "OSsHHHHHHHHHHssO",
+    ".OSHHHHHHHHHHsO.",
     "OSssHHHHHHHHsssO",
     "OSsssssssssssssO",
     "OSsssssssssssssO",
-    "OSssssssssssssO"[:14] + "sO",
+    "OSsssssssssssssO",
     "OSsssssss" "eee" "sssO",
     "OSsssssss" "ee" "ssssO",
     "OSsssssss" "ee" "ssssO",
     "OSsssssss" "ei" "ssssO",
     "OSssssrrsssssssO",
-    "OSssssssss" "mm" "sssO",
-    "OssssssssssssssO",
+    ".OSsssssss" "mm" "ssO.",
     ".OssssssssssssO.",
-    "..OOOssssssOOO..",
+    "..OssssssssssO..",
+    "...OOssssssOO...",
 ]
 
 HEAD_UP = [
@@ -169,7 +169,7 @@ HEAD_UP = [
     "..OOssssssssOO..",
     ".OssHHHHHHHHssO.",
     ".OsHHHHHHHHHHsO.",
-    "OssHHHHHHHHHHssO",
+    ".OsHHHHHHHHHHsO.",
     "OsssHHHHHHHHsssO",
     "OssssssssssssssO",
     "OssssssssssssssO",
@@ -178,11 +178,11 @@ HEAD_UP = [
     "OssssssssssssssO",
     "OssssssssssssssO",
     "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OSssssssssssssSO",
     "OSssssssssssssSO",
     ".OSssssssssssSO.",
-    "..OOOSSSSSSOOO..",
+    ".OSssssssssssSO.",
+    "..OSssssssssSO..",
+    "...OOSSSSSSOO...",
 ]
 
 HEAD_X = 8
