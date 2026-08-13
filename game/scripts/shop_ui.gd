@@ -399,18 +399,18 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피",
 					"24시간 무인 판매함 (제값의 80%) · 재료: 목재 5 · 금속 고리 2",
 					tcp, [["coin", 400]]))
-			# 집터 — 새 주민의 집을 짓는 큰 공사 (스토리 3에서 이장이 알려준다)
-			if GameData.move_quest in ["build", "wait", "greet", "done"]:
-				if "housing_kit" in GameData.recipes_unlocked:
-					items_box.add_child(_mk_row("housing_kit", "집터 레시피 (배움)",
-						"집 책상에서 만든다 — 목재 60 · 석재 40 · 못 4"))
-				else:
-					var hcp := _mk_button("구매",
-						_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
-					hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
-					items_box.add_child(_mk_row("housing_kit", "집터 레시피",
-						"빈 집터를 마련한다 (이주 수락의 선행 조건) · 재료: 목재 60 · 석재 40 · 못 4",
-						hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
+			# 집터 — 원할 때 언제든 미리 지어 둘 수 있는 큰 공사.
+			# (이주 편지는 빈 집터가 이미 있어야만 수락할 수 있다)
+			if "housing_kit" in GameData.recipes_unlocked:
+				items_box.add_child(_mk_row("housing_kit", "집터 레시피 (배움)",
+					"집 책상에서 만든다 — 목재 60 · 석재 40 · 못 4"))
+			else:
+				var hcp := _mk_button("구매",
+					_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
+				hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
+				items_box.add_child(_mk_row("housing_kit", "집터 레시피",
+					"빈 집터를 미리 마련해 둔다 (이주 수락의 선행 조건) · 재료: 목재 60 · 석재 40 · 못 4",
+					hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
 		if buy_cat in ["", "misc"]:
 			# 마음을 전하는 것들
 			_note("— 마음을 전하는 것 —")

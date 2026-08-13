@@ -608,6 +608,9 @@ func _ready() -> void:
 			# 스토리 4(마을 확장)도 끝난 샌드박스 — 검증은 263이 처음부터 돌린다
 			GameData.story4_phase = "done"
 			GameData.zones_open = GameData.ZONE_ORDER.duplicate()
+			# 이주 인사도 전부 끝난 샌드박스 — 도착 연출 검증은 265가 돌린다
+			GameData.npc_greeted = ["merchant", "blacksmith", "rancher",
+				"fisher", "explorer"]
 			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용
@@ -971,6 +974,7 @@ const STORY_GATE_ROWS := [16, 17]   # 막히는 줄 (나머지 줄은 울타리�
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
+var house_preview := false                 # 집터 자리 고르기 (동물의 숲식 범위 표시)
 const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)
 const POSTMAN_TALK_DIST := 60.0            # E로 말을 걸 수 있는 거리
 const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따라온다
@@ -1098,6 +1102,9 @@ func _process(delta: float) -> void:
 	story._move_update(delta)
 	story._forest_update(delta)
 	story._spear_update(delta)
+	story._movein_update(delta)
+	if house_preview:
+		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_tree_fall(delta)
@@ -1208,6 +1215,26 @@ func _unhandled_input(event: InputEvent) -> void:
 				story._close_story()  # 부지/엔딩: 정상 종료 루틴 (HUD 복구 등)
 			get_viewport().set_input_as_handled()
 		return
+	if house_preview:
+		# 집터 자리 고르기 — 좌클릭: 설치 / 우클릭·ESC: 취소
+		if event.is_action_pressed("ui_cancel") \
+				or (event is InputEventMouseButton and event.pressed
+					and event.button_index == MOUSE_BUTTON_RIGHT):
+			house_preview = false
+			hud.show_message("집터 설치를 그만뒀다.")
+			overlay.queue_redraw()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouseMotion:
+			actions.mouse_screen = event.position
+			return
+		if event is InputEventMouseButton and event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT:
+			actions.mouse_screen = event.position
+			story.confirm_house_preview()
+			overlay.queue_redraw()
+			get_viewport().set_input_as_handled()
+			return
 	if ui_open():
 		if event.is_action_pressed("ui_cancel"):
 			shop.close()

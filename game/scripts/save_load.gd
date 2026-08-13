@@ -84,6 +84,26 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.chief_house_lv = int(d.get("chief_house_lv", 0))
 	GameData.story4_phase = str(d.get("story4_phase", ""))
 	GameData.zones_open = d.get("zones_open", [])
+	GameData.arrivals = d.get("arrivals", [])
+	GameData.npc_greeted = d.get("npc_greeted", [])
+	# 첫 인사 시스템이 생기기 전 세이브: 이미 지어져 영업하던 건물의
+	# 주인들은 인사를 마친 것으로 친다 (무진도 이사가 끝났으면 마찬가지)
+	if not d.has("npc_greeted"):
+		for pid: String in GameData.village_built:
+			var owner := str(m.VILLAGE_NPC.get(pid, ""))
+			if owner != "" and owner not in GameData.npc_greeted:
+				GameData.npc_greeted.append(owner)
+		if GameData.move_quest == "done" \
+				and "explorer" not in GameData.npc_greeted:
+			GameData.npc_greeted.append("explorer")
+	# 인사만 남기고 저장한 세이브: 무진이 다시 찾아오도록 대기열에 태운다
+	if GameData.move_quest == "greet":
+		var has_ex := false
+		for a2 in GameData.arrivals:
+			if str(a2.id) == "explorer":
+				has_ex = true
+		if not has_ex:
+			GameData.arrivals.append({"id": "explorer", "day": GameData.day - 1})
 	# 숲속의 집 이야기가 생기기 전 세이브: 이미 선물을 주고받던 사이면
 	# (호감도가 쌓여 있으면) 호감도 콘텐츠는 열린 채로 이어 준다
 	var had_aff := false

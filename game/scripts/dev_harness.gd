@@ -665,6 +665,63 @@ func _debug_tick() -> void:
 				" 오두막=", hut_ok, " 주민수=", res_ok, "(", res0, "명)",
 				" 새집=", up_ok, " 회관잠금=", gate_before, " 회관해금=", gate_after,
 				" 회관건설=", hall_ok, " 낮근무=", work, " 아침집=", off_work)
+		265:
+			# 이주 NPC 공통 「완공 다음 날, 직접 찾아와 첫 인사」 +
+			# 집터 자리 고르기 프리뷰 (동물의 숲식 범위 표시)
+			m.dialog.close()
+			# ① 첫 인사 전에는 잡화점 문이 닫혀 있고 주인도 없다
+			GameData.npc_greeted.erase("merchant")
+			for nm in m.npcs.duplicate():
+				if nm.id == "merchant":
+					m.npcs.erase(nm)
+					nm.queue_free()
+			m.npcmgr._sync_village_npcs()
+			var no_spawn := true
+			for nm2 in m.npcs:
+				if nm2.id == "merchant":
+					no_spawn = false
+			m.actions._enter_building("general")
+			var door_locked: bool = not m.shop_room.visible
+			# ② 완공 다음 날 — 민지가 직접 걸어와 인사한다
+			GameData.arrivals = [{"id": "merchant", "day": GameData.day - 1}]
+			m.story._movein_update(0.016)
+			var came: bool = m.story_cutscene and m.story._movein_walker != null
+			m.story._movein_walker.position = m.player.position + Vector2(0.0, 40.0)
+			m.story._movein_update(0.016)
+			var hello: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._end_movein("merchant")
+			var settled: bool = GameData.npc_greeted.has("merchant") \
+				and GameData.arrivals.is_empty() and not m.story_cutscene
+			m.actions._enter_building("general")
+			var door_open: bool = m.shop_room.visible
+			m.shop_room.close()
+			# ③ 집터 프리뷰 — 가방 클릭으로 켜지고, 칸 판정대로 놓인다
+			GameData.items["housing_kit"] = int(GameData.items.get("housing_kit", 0)) + 1
+			m.story.request_place_house()
+			var prev_on: bool = m.house_preview
+			var bad_tile: bool = not m.story._house_tile_ok(
+				m.FOUNTAIN.position.x, m.FOUNTAIN.position.y)   # 분수(물)는 빨강
+			var hdoor2 := Vector2i(20, 55)
+			for hy2 in range(49, 60):
+				for hx2 in range(14, 27):
+					m.objnode._remove_object(Vector2i(hx2, hy2))
+					m.grid[hy2][hx2].ground = "grass"
+					m.grid[hy2][hx2].crop_id = ""
+			var good_tile: bool = m.story._house_tile_ok(hdoor2.x, hdoor2.y)
+			m.story.confirm_house_preview(hdoor2)
+			var placed2: bool = not m.house_preview \
+				and str(m.objects.get(hdoor2, {}).get("kind", "")) == "homeplot"
+			m.story._pickup_home_plot(hdoor2)     # 정리 — 집터를 도로 거둔다
+			GameData.items["housing_kit"] = int(GameData.items["housing_kit"]) - 1
+			m.dialog.close()
+			print("ARRIVE_OK=", no_spawn and door_locked and came and hello
+				and settled and door_open and prev_on and bad_tile and good_tile
+				and placed2,
+				" 미등장=", no_spawn, " 문닫힘=", door_locked, " 방문=", came,
+				" 인사=", hello, " 정착=", settled, " 문열림=", door_open,
+				" 프리뷰=", prev_on, " 빨강=", bad_tile, " 초록=", good_tile,
+				" 설치=", placed2)
 		262:
 			# 밤 기절 서브퀘(이장의 걱정) + 초반 무기(돌 창·돌 검) + 화살 +
 			# 컬렉션 「풋내기 모험가의 무기」
@@ -852,11 +909,14 @@ func _debug_tick() -> void:
 				and int(GameData.items["move_letter"]) == letters0 - 1
 			GameData.day += 1                      # 다음 날 — 무진이 이사 온다
 			m.story._move_update(0.016)
+			# 공통 규칙: 무진이 직접 찾아온다 (도착 연출 시작 -> 걸어오는 중)
+			m.story._movein_update(0.016)
 			var have_ex := false
 			for nx in m.npcs:
 				if nx.id == "explorer":
 					have_ex = true
-			var greet_q: bool = GameData.move_quest == "greet" and have_ex
+			var greet_q: bool = GameData.move_quest == "greet" and have_ex \
+				and m.story_cutscene
 			m.story._start_move_greet_dialog()
 			var greet_talk: bool = m.dialog.visible
 			m.dialog.skip_seq()                    # 첫인사 끝 -> 이사 완료

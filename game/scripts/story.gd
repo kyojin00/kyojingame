@@ -1640,12 +1640,13 @@ func _move_update(_delta: float) -> void:
 		# 편지는 가방에 남는다 — 나중에 다시 꺼내 읽고 수락할 수 있다
 		GameData.items["move_letter"] = int(GameData.items.get("move_letter", 0)) + 1
 		_start_move_letter_dialog()
-	# 집을 지은 다음 날 — 무진이 정말로 이사 온다
+	# 집을 지은 다음 날 — 무진이 정말로 이사 오고, 직접 인사하러 온다
+	# (이주 NPC 공통 규칙: 확정일 다음 날, 본인이 플레이어를 찾아온다)
 	elif GameData.move_quest == "wait" and GameData.day > GameData.move_day:
 		GameData.move_quest = "greet"
-		m.npcmgr._sync_village_npcs()
+		GameData.arrivals.append({"id": "explorer", "day": GameData.move_day})
 		m.hud.quest_toast("무진이 이사 왔다!")
-		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다. 인사하러 가 보자.", 6.0)
+		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다.\n무진이 곧 인사하러 올 것 같다.", 6.0)
 
 
 func _start_move_letter_dialog() -> void:
@@ -1696,20 +1697,31 @@ func _end_move_chief() -> void:
 
 # 가방에서 집터를 클릭하면 — 바라보는 풀밭에 **빈 집터**를 마련해 둔다.
 # 집은 아직 서지 않는다. 이주 편지를 수락하는 순간, 빈 집터에 집이 지어진다.
+# 가방에서 집터를 클릭하면 — 「동물의 숲」식 자리 고르기가 시작된다.
+# 마우스를 따라 집이 차지할 범위가 초록(가능)/빨강(불가)으로 비쳐 보이고,
+# 좌클릭으로 설치, 우클릭/ESC로 취소한다. (renderer._draw_house_preview)
 func request_place_house() -> void:
 	if int(GameData.items.get("housing_kit", 0)) <= 0:
 		m.hud.show_message("집터가 없다 — 잡화점 레시피를 사서 제작대에서 만들자.")
 		return
-	var door: Vector2i = m.actions.target_tile()
+	m.house_preview = true
+	m.hud.show_message("집터 자리 고르기 — 초록이면 놓을 수 있다.\n좌클릭: 설치 · 우클릭/ESC: 취소", 6.0)
+	m.overlay.queue_redraw()
+
+
+# 지금 마우스가 가리키는 칸이 집터의 현관이 된다 (거리 제한 없음)
+func preview_door() -> Vector2i:
+	var mp: Vector2 = m.get_canvas_transform().affine_inverse() * m.actions.mouse_screen
+	return Vector2i(int(floor(mp.x / m.TILE)), int(floor(mp.y / m.TILE)))
+
+
+func confirm_house_preview(door := Vector2i(-999, -999)) -> void:
+	if door.x == -999:
+		door = preview_door()
 	if not _can_place_house(door - Vector2i(2, 3)):
-		m.hud.show_message("여기는 집터를 놓을 수 없다 — 넓게 트인 풀밭을 바라보고 다시 쓰자.", 4.0)
+		m.hud.show_message("여기는 집터를 놓을 수 없다 — 빨간 칸이 없는 넓은 풀밭을 고르자.", 4.0)
 		return
-	m.dialog.open("빈 집터", "지금 바라보는 자리에 빈 집터를 마련해 둘까?\n(이주 편지를 수락하면 여기에 집이 지어진다)",
-		[["마련하기", _confirm_place_plot.bind(door)], ["다른 곳에", null]])
-
-
-func _confirm_place_plot(door: Vector2i) -> void:
-	m.dialog.close()
+	m.house_preview = false
 	try_place_home_plot(door)
 
 
@@ -1780,17 +1792,22 @@ func _try_accept_move() -> void:
 
 # 집이 설 자리: 해금된 땅의 넓게 트인 풀밭 (물·모래·나무·건물·작물 금지).
 # 아직 열리지 않은 지역은 숲(fixed 나무)이나 모래·물이라 여기서 걸러진다.
+# 집터 한 칸의 조건 — 프리뷰가 초록/빨강을 칠할 때도 이 판정을 그대로 쓴다
+func _house_tile_ok(x: int, y: int) -> bool:
+	if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.MAP_H - 1:
+		return false
+	if not GameData.is_tile_owned(x, y):
+		return false  # 아직 해금하지 않은 마을 구역에는 집터를 못 놓는다
+	var cell: Dictionary = m.grid[y][x]
+	if cell.ground != "grass" or str(cell.get("crop_id", "")) != "":
+		return false
+	return not m.objects.has(Vector2i(x, y))
+
+
 func _can_place_house(a: Vector2i) -> bool:
 	for y in range(a.y - 1, a.y + 5):
 		for x in range(a.x - 1, a.x + 6):
-			if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.MAP_H - 1:
-				return false
-			if not GameData.is_tile_owned(x, y):
-				return false  # 아직 해금하지 않은 마을 구역에는 집터를 못 놓는다
-			var cell: Dictionary = m.grid[y][x]
-			if cell.ground != "grass" or str(cell.get("crop_id", "")) != "":
-				return false
-			if m.objects.has(Vector2i(x, y)):
+			if not _house_tile_ok(x, y):
 				return false
 	return true
 
@@ -1873,6 +1890,108 @@ func _end_move_greet() -> void:
 		# 정착 다음 날, 무진의 숲 모험이 시작된다 (숲속에서 발견한 집으로 이어진다)
 		GameData.forest_quest = "settle"
 		GameData.forest_day = GameData.day
+	_end_movein("explorer")   # 첫 인사 마무리 (공통 시스템과 같은 결)
+
+
+# ---- 이주 NPC의 첫 인사 (공통 시스템) ----
+#
+# 건물 완공/이사 확정 「다음 날」, 그 NPC가 직접 플레이어를 찾아와
+# 첫 인사를 나눈다. 인사를 마쳐야(npc_greeted) 영업과 일과가 시작된다.
+# 걸어오는 연출은 「이장의 걱정」(_spear_update)과 같은 결이다.
+var _movein_walker: Node2D = null
+
+
+func _movein_npc_node(nid: String) -> Node2D:
+	for n in m.npcs:
+		if n.id == nid:
+			return n
+	return null
+
+
+func _movein_update(delta: float) -> void:
+	if Net.is_guest() or GameData.arrivals.is_empty():
+		return
+	if _movein_walker == null:
+		# 확정일 다음 날부터, 플레이어가 야외에 한가할 때 찾아온다
+		var a: Dictionary = GameData.arrivals[0]
+		if GameData.day <= int(a.day):
+			return
+		if m.ui_open() or m.dialog.visible or m.story_cutscene \
+				or m.interior.visible or m.cave.visible or m.house_preview:
+			return
+		var hh := GameData.minutes / 60.0
+		if hh < 6.0 or hh >= 19.0:
+			return   # 밤에는 찾아오지 않는다
+		var nid := str(a.id)
+		var walker := _movein_npc_node(nid)
+		if walker == null:
+			var pt := m.player_tile()
+			m.npcmgr._spawn_npc(nid, Vector2i(pt.x - 1, pt.y + 5))
+			walker = m.npcs[m.npcs.size() - 1]
+		_movein_walker = walker
+		m.story_cutscene = true
+		walker.scripted = true
+		walker.position = m.player.position + Vector2(-30.0, 170.0)
+		m.hud.show_message("누군가 이쪽으로 걸어온다...", 4.0)
+	elif not m.dialog.visible:
+		var to: Vector2 = m.player.position + Vector2(0.0, 40.0) - _movein_walker.position
+		if to.length() > 10.0:
+			_movein_walker.moving = true
+			_movein_walker.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
+				else ("down" if absf(to.y) >= absf(to.x)
+				else ("right" if to.x > 0.0 else "left"))
+			_movein_walker.position += to.normalized() * 110.0 * delta
+			_movein_walker.anim_time += delta
+			_movein_walker._update_sprite()
+		else:
+			_movein_walker.moving = false
+			_movein_walker._update_sprite()
+			_start_movein_dialog(str(GameData.arrivals[0].id))
+
+
+func _start_movein_dialog(nid: String) -> void:
+	# 무진(스토리 3)은 자기만의 첫인사가 있다 — 끝나면 같은 마무리를 탄다
+	if nid == "explorer" and GameData.move_quest == "greet":
+		_start_move_greet_dialog()
+		return
+	var def: Dictionary = GameData.NPCS[nid]
+	var bname := "가게"
+	for pid: String in m.VILLAGE_NPC:
+		if str(m.VILLAGE_NPC[pid]) == nid:
+			bname = str(m.VILLAGE_PLOTS[pid].name)
+			break
+	var entries: Array = []
+	if nid == "merchant":
+		entries = [
+			{"text": "「안녕! 네가 이 마을을 살리고 있다는\n그 사람이지? 나는 민지야.」"},
+			{"text": "「어제 세워 준 잡화점, 정말 고마워!\n밤새 진열을 끝냈어. 오늘부터 영업 시작이야.」",
+				"portrait": m.tex["npc_merchant_portrait_happy"]},
+			{"text": "「씨앗이든 뭐든 필요하면 들러!\n좋은 물건 잔뜩 갖다 놨으니까. 잘 부탁해~」",
+				"portrait": m.tex["npc_merchant_portrait_happy"]},
+		]
+	else:
+		entries = [
+			{"text": "「안녕하세요! 오늘부터 %s를 맡게 된\n%s라고 해요.」" % [bname, def.name]},
+			{"text": "「어제는 이사 준비로 정신이 없어서...\n인사가 늦었네요. 오늘부터 문을 엽니다!」"},
+			{"text": "「앞으로 잘 부탁드려요. 언제든 놀러 오세요!」"},
+		]
+	m.dialog.open_seq(str(def.name), m.tex["npc_%s_portrait_normal" % nid],
+		entries, _end_movein.bind(nid))
+
+
+func _end_movein(nid: String) -> void:
+	m.story_cutscene = false
+	if _movein_walker != null:
+		_movein_walker.scripted = false
+	_movein_walker = null
+	if not GameData.npc_greeted.has(nid):
+		GameData.npc_greeted.append(nid)
+	for i in GameData.arrivals.size():
+		if str(GameData.arrivals[i].id) == nid:
+			GameData.arrivals.remove_at(i)
+			break
+	m.npcmgr._sync_village_npcs()
+	m.hud.quest_toast("%s이(가) 마을에 자리 잡았다!" % GameData.NPCS[nid].name)
 	m.saveio.save_now()
 
 

@@ -770,7 +770,7 @@ func _item_entries() -> Array:
 			e["desc"] = "낚시 미끼 — 낚싯대를 던질 때 하나씩 쓴다. 입질이 훨씬 빨라진다"
 		elif id == "housing_kit":
 			e["tab"] = "place"   # 제작·배치 탭 — 재료 칸과 섞이지 않는다
-			e["desc"] = "빈 집터를 마련한다 — 놓을 풀밭을 바라보고 여기서 클릭.\n빈 집터가 있어야 이주 편지를 수락할 수 있다"
+			e["desc"] = "빈 집터를 마련한다 — 클릭하면 자리 고르기가 시작된다.\n(초록=가능 · 좌클릭 설치) 빈 집터가 있어야 이주 편지를 수락할 수 있다"
 			e["place"] = true
 		elif id == "move_letter":
 			e["tab"] = "place"

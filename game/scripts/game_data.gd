@@ -822,8 +822,22 @@ func move_objective_short() -> String:
 		"wait":
 			return "집이 완성됐다 — 내일 무진이 이사 온다"
 		"greet":
-			return "이사 온 무진에게 인사하러 가 보자 (새 집 앞, E)"
+			return "무진이 인사하러 오고 있다 — 야외에서 기다리자"
 	return ""
+
+
+# ---- 이주 NPC의 첫 인사 (공통 시스템) ----
+#
+# 건물이 완공되거나 이사가 확정된 「그날」에는 아직 영업도 일과도 없다.
+# **다음 날** 아침, 그 NPC가 직접 플레이어를 찾아와 첫 인사를 나눈 뒤부터
+# 정상적으로 장사(생활)를 시작한다. 앞으로 이주해 오는 모든 NPC 공통.
+# (낚시꾼은 자기 퀘스트로 이미 인사를 나누는 특수 경로 — 여기 안 탄다)
+var arrivals: Array = []      # [{"id": npc_id, "day": 확정된 날}] — 방문 대기열
+var npc_greeted: Array = []   # 첫 인사를 마친 NPC id — 이때부터 영업/일과
+
+
+func npc_open(nid: String) -> bool:
+	return nid in npc_greeted
 
 
 # ---- 메인 스토리 4: 오래된 마을의 경계 ----
@@ -3017,7 +3031,7 @@ func _init() -> void:
 		produce[id] = 0
 	for id in ITEM_IDS:
 		items[id] = 0
-	seeds["potato"] = 5
+	# 시작 가방은 완전히 비어 있다 — 씨앗 하나까지 전부 인게임에서 얻는다
 	_reset_skills()
 	furniture = []   # 처음 집엔 세간이 없다 — 집을 확장하면 기본 가구가 생긴다
 
@@ -3097,6 +3111,8 @@ func reset_all() -> void:
 	spear_quest = ""
 	story4_phase = ""
 	zones_open = []
+	arrivals = []
+	npc_greeted = []
 	chief_house_lv = 0
 	hall_noticed = false
 	shop_seeds = ["wheat", "corn"]
@@ -3434,6 +3450,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
 		"story4_phase": story4_phase, "zones_open": zones_open,
+		"arrivals": arrivals, "npc_greeted": npc_greeted,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

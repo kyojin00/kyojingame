@@ -149,6 +149,7 @@ func _draw_overlay() -> void:
 	_draw_festival()
 	_draw_greenhouse()
 	_draw_building_signs()
+	_draw_house_preview()
 
 	# 낚시 인디케이터 (대기: 점점점 / 입질: 노란 느낌표)
 	if m.player != null:
@@ -353,6 +354,37 @@ func _nearest_object_pos(kind: String) -> Variant:
 			best_d = d
 			best = p
 	return best
+
+
+# 집터 자리 고르기 (동물의 숲식) — 마우스가 가리키는 곳에 집이 차지할
+# 범위를 칸마다 초록(가능)/빨강(불가)으로 비춰 보여준다.
+# 굵은 테두리는 집 몸체(5x4), 노란 칸은 현관이 될 자리다.
+func _draw_house_preview() -> void:
+	if not m.house_preview:
+		return
+	var door: Vector2i = m.story.preview_door()
+	var a := door - Vector2i(2, 3)
+	for y in range(a.y - 1, a.y + 5):
+		for x in range(a.x - 1, a.x + 6):
+			var col := Color(0.3, 0.9, 0.4, 0.28) if m.story._house_tile_ok(x, y) \
+				else Color(0.95, 0.3, 0.25, 0.4)
+			m.overlay.draw_rect(Rect2(x * m.TILE + 1, y * m.TILE + 1,
+				m.TILE - 2, m.TILE - 2), col)
+	# 집 몸체(5x4) 테두리 + 현관 칸
+	var ok := m.story._can_place_house(a)
+	m.overlay.draw_rect(Rect2(a.x * m.TILE, a.y * m.TILE, 5 * m.TILE, 4 * m.TILE),
+		Color(1, 1, 1, 0.9) if ok else Color(1, 0.5, 0.4, 0.9), false, 2.0)
+	m.overlay.draw_rect(Rect2(door.x * m.TILE + 4, door.y * m.TILE + 4,
+		m.TILE - 8, m.TILE - 8), Color(1, 0.85, 0.3, 0.65))
+	var tip := "좌클릭: 집터 설치 · 우클릭/ESC: 취소" if ok \
+		else "빨간 칸이 있으면 놓을 수 없다"
+	var f: Font = m.UI_FONT
+	var tw: float = f.get_string_size(tip, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+	var tp := Vector2(a.x * m.TILE + 2.5 * m.TILE - tw / 2.0, (a.y - 2) * m.TILE)
+	m.overlay.draw_string_outline(f, tp, tip, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 3,
+		Color(0.1, 0.08, 0.05))
+	m.overlay.draw_string(f, tp, tip, HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
+		Color(1, 0.95, 0.8))
 
 
 func _draw_nav_arrow() -> void:

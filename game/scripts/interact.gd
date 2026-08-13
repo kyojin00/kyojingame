@@ -46,6 +46,11 @@ func _enter_building(kind: String) -> void:
 				[["닫기", null]])
 		return
 	if m.shop_room.has_room(kind):
+		# 주인이 아직 첫 인사를 안 했으면 이사 준비 중 — 문이 닫혀 있다
+		var owner := str(m.VILLAGE_NPC.get(kind, ""))
+		if owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
+			m.hud.show_message("이사 준비로 분주한 모양이다.\n내일 주인이 직접 인사하러 온다고 했다.", 4.0)
+			return
 		m.shop_room.open(kind)   # 가게마다 다른 방으로 들어간다
 		return
 	m.hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %

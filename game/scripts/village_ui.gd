@@ -73,10 +73,13 @@ func _build_shop() -> void:
 	GameData.village_built.append("general")
 	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
 	m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
-	m.npcmgr._sync_village_npcs()   # 상점 주인 민지가 마을에 온다
+	# 민지는 오늘 밤 이삿짐을 옮기고, **내일** 직접 인사하러 온다.
+	# 인사를 나눠야 상점 문이 열린다 (이주 NPC 공통 규칙)
+	if not GameData.npc_greeted.has("merchant"):
+		GameData.arrivals.append({"id": "merchant", "day": GameData.day})
 	Sound.play_sfx("sfx_place")
 	m.hud.quest_toast("상점 완성!")
-	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n민지가 씨앗과 생필품을 팔기 시작했다.")
+	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n주인 민지는 내일 이사 와서 인사하러 온다고 한다.")
 	m.dialog.set_buttons([["좋아!", null]])
 	if GameData.story2_phase == "shop":
 		GameData.story2_phase = "fisher"
@@ -176,10 +179,17 @@ func _build_village_building(pid: String) -> void:
 		if GameData.story2_phase == "shop":
 			GameData.story2_phase = "fisher"   # 이장 경로로 지어도 이야기는 이어진다
 	m.worldgen._fill_building(plot.anchor, pid)
+	# 주인이 있는 건물은 바로 영업하지 않는다 — 다음 날 주인이 직접
+	# 찾아와 첫 인사를 나눈 뒤부터 문을 연다 (이주 NPC 공통 규칙)
+	var owner := str(m.VILLAGE_NPC.get(pid, ""))
+	var greet_note := ""
+	if owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
+		GameData.arrivals.append({"id": owner, "day": GameData.day})
+		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
 	m.npcmgr._sync_village_npcs()
 	Sound.play_sfx("sfx_place")
 	m.hud.quest_toast("%s 완공!" % plot.name)
-	m.dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼." % plot.name)
+	m.dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼.%s" % [plot.name, greet_note])
 	m.dialog.set_buttons([["좋군요!", null]])
 	m.queue_redraw()
 	m.saveio.save_now()
