@@ -36,7 +36,7 @@ var _forced_tip := ""         # 검증 하네스에서 툴팁을 고정할 도�
 # 탭: 한 번에 한 종류만 보여 준다 (아이템이 늘어나도 밀리지 않게)
 const TABS := [
 	["tool", "도구"], ["gear", "장비"], ["crop", "씨앗·작물"],
-	["res", "자원"], ["food", "요리"], ["place", "제작·배치"],
+	["res", "재료"], ["food", "요리"], ["place", "제작·배치"],
 ]
 var _tab := "tool"
 
@@ -333,23 +333,37 @@ func _rebuild() -> void:
 		_line("여기에 담긴 것이 없다.", Color(0.35, 0.22, 0.1))
 
 
-# 장비 탭: 지금 낀 것 + 합계 능력치 + 가진 장비 (눌러서 장착/해제)
+# 장비 탭: 아바타(부위 슬롯) + 합계 능력치 + 가진 장비 (눌러서 장착/해제)
 func _build_gear_tab() -> void:
-	_line("[장착 중]", Color(0.65, 0.85, 0.6))
-	for slot: String in GameData.GEAR_SLOTS:
-		var gid: String = str(GameData.equipped.get(slot, ""))
-		var slot_name: String = GameData.GEAR_SLOT_NAMES[slot]
-		if gid == "":
-			items_box.add_child(_mk_row(null, "%s — 없음" % slot_name, "",
-				Color(0.72, 0.66, 0.6)))
-			continue
-		var row := _mk_row(main.tex.get(gid), "%s · %s" % [slot_name, GameData.GEAR[gid].name],
-			"해제")
-		row.pressed.connect(func() -> void:
-			GameData.unequip_slot(slot)
-			Sound.play_sfx("sfx_ui")
-			_rebuild())
-		items_box.add_child(row)
+	# ---- 메이플식 장비 창: 왼쪽에 사람 실루엣 + 부위별 슬롯 ----
+	var panel := Control.new()
+	panel.custom_minimum_size = Vector2(0, 210)
+	items_box.add_child(panel)
+	var av := TextureRect.new()
+	av.texture = main.tex.get(GameData.player_down_tex(false, "idle", 0.0))
+	av.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	av.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	av.modulate = Color(0.34, 0.32, 0.38)      # 실루엣 느낌
+	av.position = Vector2(96, 6)
+	av.size = Vector2(120, 196)
+	panel.add_child(av)
+	# 부위 슬롯 — 왼줄(모자/무기/장갑) · 오른줄(상의/하의/신발) · 아래(장신구)
+	# 무기·상의(방어구)·장신구만 실제 장비 칸이고 나머지는 아직 준비 중이다
+	var defs := [
+		["모자", "", Vector2(30, 6)],
+		["무기", "weapon", Vector2(30, 76)],
+		["장갑", "", Vector2(30, 146)],
+		["상의", "armor", Vector2(238, 6)],
+		["하의", "", Vector2(238, 76)],
+		["신발", "", Vector2(238, 146)],
+		["장신구", "charm", Vector2(134, 158)],
+	]
+	for sd: Array in defs:
+		panel.add_child(_mk_gear_slot(str(sd[0]), str(sd[1]), sd[2]))
+	# 세트 시너지 — 같은 테마를 여러 부위 차면 보너스가 얹힌다
+	var set_txt := GameData.gear_set_text()
+	if set_txt != "":
+		_line("세트 효과: " + set_txt, Color(0.65, 0.5, 0.2))
 
 	# 합계 — 이 숫자가 실제로 게임에 적용된다
 	var totals: Array[String] = []
@@ -381,6 +395,53 @@ func _build_gear_tab() -> void:
 		items_box.add_child(row2)
 	if not any:
 		_line("아직 장비가 없다. 대장간(제작 탭)에서 만들 수 있다.", Color(0.35, 0.22, 0.1))
+
+
+# 아바타 옆 부위 슬롯 한 칸 — 실제 장비 칸은 장착물이 보이고 눌러서 해제,
+# 아직 준비 안 된 부위는 어둡게 잠겨 있다
+func _mk_gear_slot(label: String, slot_id: String, pos: Vector2) -> Control:
+	var wrap := Control.new()
+	wrap.position = pos
+	wrap.custom_minimum_size = Vector2(66, 64)
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(50, 50)
+	b.position = Vector2(8, 0)
+	b.focus_mode = Control.FOCUS_NONE
+	var gid := str(GameData.equipped.get(slot_id, "")) if slot_id != "" else ""
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.32, 0.22, 0.12) if slot_id != "" else Color(0.24, 0.18, 0.12)
+	st.border_color = Color(1, 0.84, 0.37) if gid != "" \
+		else (Color(0.55, 0.42, 0.25) if slot_id != "" else Color(0.32, 0.26, 0.18))
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(5)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st)
+	b.add_theme_stylebox_override("pressed", st)
+	if gid != "":
+		b.icon = main.tex.get(gid)
+		b.expand_icon = true
+		b.tooltip_text = "%s — 눌러서 해제\n%s" % [GameData.GEAR[gid].name,
+			GameData.gear_stat_text(gid)]
+		b.pressed.connect(func() -> void:
+			GameData.unequip_slot(slot_id)
+			Sound.play_sfx("sfx_ui")
+			_rebuild())
+	elif slot_id != "":
+		b.tooltip_text = "%s 칸 — 아래 [가진 장비]에서 장착" % label
+	else:
+		b.tooltip_text = "%s 칸 — 아직 준비 중" % label
+		b.disabled = true
+	wrap.add_child(b)
+	var l := Label.new()
+	l.text = label
+	l.position = Vector2(0, 48)
+	l.custom_minimum_size = Vector2(66, 0)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color",
+		Color(0.85, 0.78, 0.66) if slot_id != "" else Color(0.55, 0.5, 0.42))
+	wrap.add_child(l)
+	return wrap
 
 
 func _mk_tab_button(id: String, label: String) -> Button:

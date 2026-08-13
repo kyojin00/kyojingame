@@ -413,15 +413,61 @@ const GEAR_IDS := ["gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 var owned_gear: Array = []
 var equipped := {"weapon": "", "armor": "", "charm": ""}
 
+# ---- 세트 장비 시너지 (메이플식) ----
+# 같은 테마의 장비를 여러 부위 장착하면 개수 구간마다 보너스가 얹힌다.
+# 새 세트는 표에 한 줄이면 된다 — pieces에 든 장비 중 장착 수를 세고,
+# bonus의 「그 개수 이하 구간」 보너스를 전부 더한다.
+const GEAR_SETS := [
+	{"id": "iron", "name": "무쇠 세트",
+		"pieces": ["gear_sword_iron", "gear_vest_iron", "gear_charm_ember"],
+		"bonus": {2: {"defense": 5.0}, 3: {"power": 2.0, "defense": 8.0}}},
+	{"id": "star", "name": "별빛 세트",
+		"pieces": ["gear_sword_star", "gear_vest_star", "gear_charm_wind"],
+		"bonus": {2: {"luck": 2.0}, 3: {"power": 3.0, "luck": 3.0, "speed": 6.0}}},
+]
 
-# 장착 중인 장비의 능력치 합
+
+# 이 세트에서 몇 부위를 차고 있나
+func gear_set_count(gset: Dictionary) -> int:
+	var n := 0
+	for gid: String in gset.pieces:
+		if gid in equipped.values():
+			n += 1
+	return n
+
+
+# 장착 중인 장비의 능력치 합 (+ 세트 보너스)
 func gear_stat(key: String) -> float:
 	var sum := 0.0
 	for slot: String in GEAR_SLOTS:
 		var gid: String = str(equipped.get(slot, ""))
 		if gid != "" and GEAR.has(gid):
 			sum += float(GEAR[gid].stats.get(key, 0.0))
+	for gset: Dictionary in GEAR_SETS:
+		var n := gear_set_count(gset)
+		for need in gset.bonus:
+			if n >= int(need):
+				sum += float((gset.bonus[need] as Dictionary).get(key, 0.0))
 	return sum
+
+
+# 지금 발동 중인 세트 효과 설명 (가방 장비 탭·능력치 창에서 보여준다)
+func gear_set_text() -> String:
+	var parts: Array[String] = []
+	for gset: Dictionary in GEAR_SETS:
+		var n := gear_set_count(gset)
+		var best := 0
+		for need in gset.bonus:
+			if n >= int(need) and int(need) > best:
+				best = int(need)
+		if best > 0:
+			var stat_bits: Array[String] = []
+			for need in gset.bonus:
+				if n >= int(need):
+					for k: String in gset.bonus[need]:
+						stat_bits.append("%s +%s" % [k, str(gset.bonus[need][k])])
+			parts.append("%s %d부위 (%s)" % [gset.name, n, " · ".join(stat_bits)])
+	return " / ".join(parts)
 
 
 func gear_speed_mult() -> float:
@@ -2160,38 +2206,40 @@ func cook(id: String) -> bool:
 #   zone  초록 구간의 폭(작을수록 어렵다) · stages 몇 번 맞춰야 하는가
 #   speed 찌가 움직이는 빠르기 · w 같은 조건 안에서의 흔한 정도
 const FISH := [
-	# 사계절 — 아무 때나 무는 것들
+	# 계절 로스터는 완전히 갈린다 — 일반 물고기는 저마다 한 계절에만
+	# 문다 (안개·폭풍·별밤 같은 날씨 어종과 전설급만 계절 무관).
+	# 흔한 것들
 	{"id": "fish_crucian", "w": 1.00, "zone": 96.0, "stages": 1, "speed": 1.00,
-		"seasons": [], "time": "", "weather": [], "hint": "가볍게 톡 —"},
+		"seasons": [SPRING], "time": "", "weather": [], "hint": "가볍게 톡 —"},
 	{"id": "fish_minnow", "w": 0.90, "zone": 100.0, "stages": 1, "speed": 0.95,
-		"seasons": [], "time": "", "weather": [], "hint": "톡, 톡 —"},
+		"seasons": [SUMMER], "time": "", "weather": [], "hint": "톡, 톡 —"},
 	{"id": "fish_loach", "w": 0.70, "zone": 88.0, "stages": 1, "speed": 1.15,
-		"seasons": [SPRING, SUMMER, FALL], "time": "", "weather": [], "hint": "꿈틀거린다"},
+		"seasons": [FALL], "time": "", "weather": [], "hint": "꿈틀거린다"},
 	# 봄
 	{"id": "fish_bitterling", "w": 0.65, "zone": 92.0, "stages": 1, "speed": 1.00,
 		"seasons": [SPRING], "time": "", "weather": [], "hint": "가볍게 톡 —"},
 	{"id": "fish_carp", "w": 0.55, "zone": 84.0, "stages": 2, "speed": 1.12,
-		"seasons": [SPRING, SUMMER], "time": "", "weather": [], "hint": "제법 당긴다!"},
+		"seasons": [SUMMER], "time": "", "weather": [], "hint": "제법 당긴다!"},
 	{"id": "fish_sweetfish", "w": 0.40, "zone": 70.0, "stages": 2, "speed": 1.30,
 		"seasons": [SPRING], "time": "morning", "weather": [], "hint": "빠르다!"},
 	{"id": "fish_trout", "w": 0.35, "zone": 66.0, "stages": 2, "speed": 1.35,
-		"seasons": [SPRING, WINTER], "time": "morning", "weather": [], "hint": "빠르다!"},
+		"seasons": [WINTER], "time": "morning", "weather": [], "hint": "빠르다!"},
 	# 여름
 	{"id": "fish_mandarin", "w": 0.32, "zone": 58.0, "stages": 2, "speed": 1.45,
 		"seasons": [SUMMER], "time": "day", "weather": [], "hint": "홱 채간다!"},
 	{"id": "fish_catfish", "w": 0.45, "zone": 54.0, "stages": 2, "speed": 1.30,
-		"seasons": [SUMMER, FALL], "time": "night", "weather": [], "hint": "묵직하다!!"},
+		"seasons": [SUMMER], "time": "night", "weather": [], "hint": "묵직하다!!"},
 	{"id": "fish_eel", "w": 0.30, "zone": 50.0, "stages": 3, "speed": 1.40,
 		"seasons": [SUMMER], "time": "night", "weather": [WEATHER_RAIN], "hint": "미끄럽게 빠져나간다!!"},
 	{"id": "fish_snakehead", "w": 0.25, "zone": 48.0, "stages": 3, "speed": 1.50,
-		"seasons": [SUMMER, FALL], "time": "night", "weather": [], "hint": "낚싯대가 휜다!!!"},
+		"seasons": [FALL], "time": "night", "weather": [], "hint": "낚싯대가 휜다!!!"},
 	# 가을
 	{"id": "fish_crab", "w": 0.45, "zone": 78.0, "stages": 1, "speed": 0.85,
 		"seasons": [FALL], "time": "", "weather": [], "hint": "게걸음처럼 옆으로 —"},
 	{"id": "fish_salmon", "w": 0.30, "zone": 52.0, "stages": 3, "speed": 1.50,
 		"seasons": [FALL], "time": "morning", "weather": [], "hint": "거슬러 오른다!!"},
 	{"id": "fish_rainbow", "w": 0.30, "zone": 56.0, "stages": 2, "speed": 1.40,
-		"seasons": [SPRING, FALL], "time": "", "weather": [WEATHER_RAIN], "hint": "무지개빛이 스친다!"},
+		"seasons": [SPRING], "time": "", "weather": [WEATHER_RAIN], "hint": "무지개빛이 스친다!"},
 	# 겨울
 	{"id": "fish_smelt", "w": 0.75, "zone": 90.0, "stages": 1, "speed": 1.05,
 		"seasons": [WINTER], "time": "", "weather": [], "hint": "가볍게 톡 —"},

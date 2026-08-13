@@ -417,9 +417,15 @@ func use_tool() -> void:
 					var zone: float = float(m.pending_fish.zone)
 					if int(GameData.affinity["fisher"]) >= 50:
 						zone *= 1.25
-					# 귀한 물고기일수록 여러 번 · 좁게 · 빠르게 (game_data.FISH)
+					# 값이 나갈수록 손맛이 맵다 — 판매가에 비례해
+					# 초록 판정 바가 확 좁아지고 커서가 훨씬 빨라진다
+					var price := int(GameData.ITEMS.get(
+						str(m.pending_fish.id), {}).get("sell", 0))
+					var rare := clampf(float(price) / 800.0, 0.0, 1.0)
+					zone *= 1.0 - 0.55 * rare
+					var spd := float(m.pending_fish.speed) * (1.0 + 1.1 * rare)
 					m.fishing_ui.start(zone, int(m.pending_fish.stages),
-						float(m.pending_fish.speed), str(m.pending_fish.hint))
+						spd, str(m.pending_fish.hint))
 	# 멀티: 내 행동을 다른 플레이어에게 반영 (낚싯대는 로컬 진행)
 	if not m._remote_acting:
 		if Net.is_guest() and GameData.tool != "rod":

@@ -9,6 +9,7 @@ extends CanvasLayer
 var main: Node2D
 var _box: VBoxContainer
 var _refresh := 0.0
+var _sel := ""            # 격자에서 고른 레시피 (상세·만들기 버튼이 아래 뜬다)
 
 
 func _ready() -> void:
@@ -105,36 +106,45 @@ func _rebuild() -> void:
 			row.add_child(left)
 			_box.add_child(row)
 
-	# ---- 만들 수 있는 것 ----
+	# ---- 만들 수 있는 것 — 일러스트 격자 (그림을 눌러 고른다) ----
 	_line("")
-	_line("[가구 만들기]  — 완성되면 낡은 것과 바뀐다", Color(0.95, 0.8, 0.5))
+	_line("[가구 만들기]  그림을 눌러 고르고, 아래 「만들기」", Color(0.95, 0.8, 0.5))
+	var grid := GridContainer.new()
+	grid.columns = 6
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	_box.add_child(grid)
+	# 배운 레시피만 격자에 놓는다 — 모르는 건 보이지 않는다
+	var shown: Array[String] = []
 	for id: String in GameData.DESK_RECIPES:
-		var def: Dictionary = GameData.DESK_RECIPES[id]
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 8)
-		var b := Button.new()
-		b.text = "만들기"
-		b.focus_mode = Control.FOCUS_NONE
-		var why := _cant_reason(id)
-		b.disabled = why != ""
-		b.pressed.connect(func() -> void:
-			if GameData.desk_start(id):
+		var def0: Dictionary = GameData.DESK_RECIPES[id]
+		if bool(def0.get("locked", false)) and id not in GameData.recipes_unlocked:
+			continue
+		shown.append(id)
+		grid.add_child(_mk_cell(id))
+	if shown.is_empty():
+		_line("     아직 아는 레시피가 없다 — 상점·이야기에서 배워 온다",
+			Color(0.6, 0.55, 0.48))
+	if _sel != "" and _sel in shown:
+		var def: Dictionary = GameData.DESK_RECIPES[_sel]
+		var why := _cant_reason(_sel)
+		var owned := "  (지금: %s)" % GameData.BED_NAMES[GameData.bed_lv] \
+			if str(def.kind) == "bed" else ""
+		_line("")
+		_line("%s — %s%s" % [def.name, _cost_text(def.cost), owned],
+			Color(0.95, 0.9, 0.8))
+		_line("  %s" % (why if why != "" else str(def.desc)),
+			Color(0.6, 0.55, 0.48) if why != "" else Color(0.68, 0.62, 0.52))
+		var mk := Button.new()
+		mk.text = "만들기"
+		mk.focus_mode = Control.FOCUS_NONE
+		mk.disabled = why != ""
+		mk.pressed.connect(func() -> void:
+			if GameData.desk_start(_sel):
 				Sound.play_sfx("sfx_place")
 				main.saveio.save_now()
 			_rebuild())
-		row.add_child(b)
-		var nm2 := Label.new()
-		var owned := "  (지금: %s)" % GameData.BED_NAMES[GameData.bed_lv] \
-			if str(def.kind) == "bed" else ""
-		nm2.text = "%s — %s%s" % [def.name, _cost_text(def.cost), owned]
-		nm2.add_theme_color_override("font_color",
-			Color(0.9, 0.85, 0.75) if why == "" else Color(0.6, 0.55, 0.48))
-		row.add_child(nm2)
-		_box.add_child(row)
-		if why != "":
-			_line("     %s" % why, Color(0.6, 0.55, 0.48))
-		else:
-			_line("     %s" % def.desc, Color(0.68, 0.62, 0.52))
+		_box.add_child(mk)
 
 	# ---- 손보기 (제작대 업글, 즉시) ----
 	_line("")
@@ -163,6 +173,51 @@ func _rebuild() -> void:
 		_box.add_child(row2)
 	else:
 		_line("[손보기]  더 손볼 데가 없다 — 장인의 솜씨다.", Color(0.68, 0.62, 0.52))
+
+
+# 격자 한 칸 — 아이템 일러스트 + 만들 수 있으면 초록 테두리
+func _mk_cell(id: String) -> Button:
+	var def: Dictionary = GameData.DESK_RECIPES[id]
+	var why := _cant_reason(id)
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(58, 58)
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = "%s — %s" % [def.name, _cost_text(def.cost)]
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.3, 0.23, 0.15)
+	st.border_color = Color(0.95, 0.85, 0.4) if _sel == id \
+		else (Color(0.45, 0.75, 0.4) if why == "" else Color(0.45, 0.36, 0.26))
+	st.set_border_width_all(3 if _sel == id else 2)
+	st.set_corner_radius_all(4)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st)
+	b.add_theme_stylebox_override("pressed", st)
+	# 일러스트 — 아이템/가구/도구 그림을 이 순서로 찾는다
+	var tex: Texture2D = null
+	for cand in [id, "icon_" + id, str(def.get("furn", "")),
+			str(def.get("tool", "")), "icon_" + str(def.get("tool", "")),
+			"bed_old" if str(def.kind) == "bed" else "", "recipe"]:
+		if str(cand) != "" and main.tex.has(cand):
+			tex = main.tex[cand]
+			break
+	if tex != null:
+		var ic := TextureRect.new()
+		ic.texture = tex
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ic.offset_left = 6
+		ic.offset_top = 6
+		ic.offset_right = -6
+		ic.offset_bottom = -6
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ic.modulate = Color(1, 1, 1) if why == "" else Color(0.55, 0.55, 0.55)
+		b.add_child(ic)
+	b.pressed.connect(func() -> void:
+		_sel = id
+		Sound.play_sfx("sfx_ui")
+		_rebuild())
+	return b
 
 
 func _cost_text(cost: Dictionary) -> String:

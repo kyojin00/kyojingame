@@ -203,8 +203,36 @@ func _process(delta: float) -> void:
 
 func _at_counter() -> bool:
 	var c := _counter()
-	return absf(ppos.y - c.end.y) < 46.0 \
-		and ppos.x > c.position.x - 20.0 and ppos.x < c.end.x + 20.0
+	if absf(ppos.y - c.end.y) < 46.0 \
+			and ppos.x > c.position.x - 20.0 and ppos.x < c.end.x + 20.0:
+		return true
+	# 주인(계산대 뒤에 서 있는 사람) 곁이어도 말이 걸린다 —
+	# 계산대 띠에서 살짝 벗어나 서면 E가 조용히 씹히던 버그 수정
+	var keeper := Vector2(c.get_center().x, c.position.y)
+	return (ppos - keeper).length() < 110.0
+
+
+# 계산대/주인/선반과의 상호작용 한 줄 — E와 마우스 클릭이 같이 쓴다
+func _try_interact() -> bool:
+	var si := _shelf_near()
+	if si >= 0:
+		# 선반에서 산다 — 그 카테고리의 물건만 진열된다
+		main.shop.open("buy", ["buy"],
+			"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
+		return true
+	if _at_counter():
+		var d := _def()
+		if str(d.get("action", "")) != "":
+			main.room_action(str(d.action))   # 여관·연구소·도서관
+		elif room_id == "general":
+			# 민지에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
+			main.village.open_merchant_counter()
+		elif str(d.tab) == "":
+			main.hud.show_message(str(d.hint), 4.0)
+		else:
+			main.shop.open(str(d.tab), d.tabs, str(d.name))
+		return true
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -212,23 +240,30 @@ func _unhandled_input(event: InputEvent) -> void:
 			or main.inventory_ui.visible:
 		return
 	if event.is_action_pressed("interact"):
-		var si := _shelf_near()
-		if si >= 0:
-			# 선반에서 산다 — 그 카테고리의 물건만 진열된다
-			main.shop.open("buy", ["buy"],
-				"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
-		elif _at_counter():
-			var d := _def()
-			if str(d.get("action", "")) != "":
-				main.room_action(str(d.action))   # 여관·연구소·도서관
-			elif room_id == "general":
-				# 민지에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
-				main.village.open_merchant_counter()
-			elif str(d.tab) == "":
-				main.hud.show_message(str(d.hint), 4.0)
-			else:
-				main.shop.open(str(d.tab), d.tabs, str(d.name))
+		if not _try_interact():
+			main.hud.show_message("선반 앞에서 E: 구매 · 계산대(주인)에게 다가가 E: 대화", 3.0)
 		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		# 주인이나 계산대·선반을 클릭해도 말이 걸린다
+		var mp: Vector2 = event.position
+		var c := _counter()
+		var keeper_r := Rect2(c.get_center().x - 40, c.position.y - 108, 80, 110)
+		if keeper_r.has_point(mp) or c.grow(24).has_point(mp):
+			if (ppos - Vector2(c.get_center().x, c.end.y)).length() < 190.0:
+				_try_interact()
+			else:
+				main.hud.show_message("좀 더 가까이 가서 말을 걸자.", 3.0)
+			get_viewport().set_input_as_handled()
+		else:
+			for i in SHELVES.size():
+				if _shelf_rect(i).grow(14).has_point(mp):
+					if _shelf_near() == i:
+						_try_interact()
+					else:
+						main.hud.show_message("선반 앞으로 다가가서 E!", 3.0)
+					get_viewport().set_input_as_handled()
+					break
 	elif event.is_action_pressed("ui_cancel"):
 		close()
 		get_viewport().set_input_as_handled()
