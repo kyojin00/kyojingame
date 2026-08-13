@@ -112,10 +112,10 @@ const SWING_POSE := {
 # 실행 끝에 찍어 준다 — **그림을 다시 뽑으면 찍힌 값을 여기 그대로 옮긴다.**
 # 안 맞으면 도구가 손에서 뜬다. 도트가 없는 방향은 SWING_POSE의 식을 쓴다.
 const SWING_HAND_DOT := {
-	# 감기 시작 · 다 감음(머리 위) · 내리침 · 되돌아옴
-	"side": [Vector2(-19.5, -61), Vector2(-16.5, -88), Vector2(22.5, -19), Vector2(16.5, -34)],
-	"down": [Vector2(-22.5, -58), Vector2(-22.5, -85), Vector2(19.5, -34), Vector2(16.5, -37)],
-	"up": [Vector2(19.5, -55), Vector2(16.5, -88), Vector2(-4.5, -88), Vector2(19.5, -64)],
+	# 감기 시작 · 다 감음(머리 옆) · 내리침 · 되돌아옴
+	"side": [Vector2(-16.5, -55), Vector2(-16.5, -67), Vector2(19.5, -22), Vector2(16.5, -34)],
+	"down": [Vector2(-19.5, -52), Vector2(-19.5, -70), Vector2(13.5, -34), Vector2(10.5, -37)],
+	"up": [Vector2(19.5, -55), Vector2(19.5, -70), Vector2(-1.5, -88), Vector2(19.5, -61)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
