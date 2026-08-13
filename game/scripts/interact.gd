@@ -269,6 +269,12 @@ func interact() -> void:
 		if obj.kind == "trash_bin":
 			m.village.open_trash_bin(t)
 			return
+		if obj.kind == "homeplot":
+			# 빈 집터 팻말 — 회수하면 집터가 가방으로 돌아온다
+			m.dialog.open("빈 집터",
+				"새 주민을 위해 마련해 둔 빈 집터다.\n이주 희망 편지를 수락하면 여기에 집이 지어진다.",
+				[["회수하기", m.story._pickup_home_plot.bind(t)], ["닫기", null]])
+			return
 		if obj.kind == "board":
 			m.village._open_quest_board()
 			return

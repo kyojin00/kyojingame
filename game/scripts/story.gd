@@ -1637,6 +1637,8 @@ func _move_update(_delta: float) -> void:
 			and GameData.story2_phase == "done" and GameData.day > GameData.move_day \
 			and not m.ui_open() and not m.dialog.visible and not m.story_cutscene:
 		GameData.move_quest = "letter"
+		# 편지는 가방에 남는다 — 나중에 다시 꺼내 읽고 수락할 수 있다
+		GameData.items["move_letter"] = int(GameData.items.get("move_letter", 0)) + 1
 		_start_move_letter_dialog()
 	# 집을 지은 다음 날 — 무진이 정말로 이사 온다
 	elif GameData.move_quest == "wait" and GameData.day > GameData.move_day:
@@ -1674,10 +1676,12 @@ func _start_move_chief_dialog() -> void:
 		{"text": "「그리고 말인데... 앞으로 이런 편지는\n굳이 나한테 가져올 필요 없네.」",
 			"portrait": chief_normal},
 		{"text": "「자네 덕에 상점도 생기고, 마을에 조금씩\n활기가 돌고 있잖나. 새 주민을 받을지는\n이제 자네가 정하게.」"},
-		{"text": "「집 자리도 자네가 직접 골라 주게.\n아직 열리지 않은 땅만 아니면 어디든 좋네.」"},
+		{"text": "「단, 명심할 게 하나 있네 — 사람을 초대하려면\n**먼저 그 사람이 살 빈 집터**를 마련해 둬야 하네.」"},
+		{"text": "「빈 집터가 없으면 편지를 수락할 수 없어.\n앞으로 오는 편지도 전부 마찬가질세.」"},
+		{"text": "「집터 자리는 자네가 직접 골라 주게.\n아직 열리지 않은 땅만 아니면 어디든 좋네.」"},
 		{"text": "「집터는 민지네 잡화점에서 레시피를 판다네.\n값도 재료도 꽤 들지만... 마을 일이니 부탁함세.」",
 			"portrait": chief_happy},
-		{"text": "「앞으로도 우리 마을을 잘 부탁하네.」",
+		{"text": "「집터를 마련했으면 **편지를 다시 읽고**\n수락해 주게. 앞으로도 우리 마을을 잘 부탁하네.」",
 			"portrait": chief_happy},
 	], _end_move_chief)
 
@@ -1685,48 +1689,93 @@ func _start_move_chief_dialog() -> void:
 func _end_move_chief() -> void:
 	if GameData.move_quest == "show":
 		GameData.move_quest = "build"
-		m.hud.quest_toast("집터를 마련해 새 주민의 집 자리를 정하자")
-		m.hud.show_message("잡화점 생활용품 선반에서 집터 레시피를 판다.\n(제작 재료: 목재 60 · 석재 40 · 못 4 — 집 제작대에서)", 7.0)
+		m.hud.quest_toast("빈 집터를 마련하고 편지를 수락하자")
+		m.hud.show_message("잡화점에서 집터 레시피 구매 → 제작대에서 제작 → 풀밭에 설치.\n빈 집터가 생기면 가방의 편지를 다시 읽고 수락할 수 있다.", 7.0)
 	m.saveio.save_now()
 
 
-# 가방에서 집터를 클릭하면 — 바라보는 풀밭에 집 자리를 정한다
+# 가방에서 집터를 클릭하면 — 바라보는 풀밭에 **빈 집터**를 마련해 둔다.
+# 집은 아직 서지 않는다. 이주 편지를 수락하는 순간, 빈 집터에 집이 지어진다.
 func request_place_house() -> void:
-	if GameData.move_quest != "build" or int(GameData.items.get("housing_kit", 0)) <= 0:
-		m.hud.show_message("지금은 집터를 쓸 일이 없다.")
+	if int(GameData.items.get("housing_kit", 0)) <= 0:
+		m.hud.show_message("집터가 없다 — 잡화점 레시피를 사서 제작대에서 만들자.")
 		return
 	var door: Vector2i = m.actions.target_tile()
 	if not _can_place_house(door - Vector2i(2, 3)):
-		m.hud.show_message("여기는 집을 지을 수 없다 — 넓게 트인 풀밭을 바라보고 다시 쓰자.", 4.0)
+		m.hud.show_message("여기는 집터를 놓을 수 없다 — 넓게 트인 풀밭을 바라보고 다시 쓰자.", 4.0)
 		return
-	m.dialog.open("집터", "지금 바라보는 자리에 새 주민의 집을 지을까?\n(조준한 칸이 현관이 된다)",
-		[["짓기", _confirm_place_house.bind(door)], ["다른 곳에", null]])
+	m.dialog.open("빈 집터", "지금 바라보는 자리에 빈 집터를 마련해 둘까?\n(이주 편지를 수락하면 여기에 집이 지어진다)",
+		[["마련하기", _confirm_place_plot.bind(door)], ["다른 곳에", null]])
 
 
-func _confirm_place_house(door: Vector2i) -> void:
+func _confirm_place_plot(door: Vector2i) -> void:
 	m.dialog.close()
-	try_place_move_house(door)
+	try_place_home_plot(door)
 
 
-# door 칸이 현관이 되도록 집을 놓는다. 성공하면 true.
-func try_place_move_house(door: Vector2i) -> bool:
-	if GameData.move_quest != "build" or int(GameData.items.get("housing_kit", 0)) <= 0:
+# door 칸이 현관이 되도록 빈 집터를 놓는다. 성공하면 true.
+func try_place_home_plot(door: Vector2i) -> bool:
+	if int(GameData.items.get("housing_kit", 0)) <= 0:
 		return false
 	var a := door - Vector2i(2, 3)
 	if not _can_place_house(a):
 		return false
 	GameData.items["housing_kit"] = int(GameData.items["housing_kit"]) - 1
-	GameData.move_house = a
-	m.worldgen._fill_building(a)
-	m.objects.erase(m.door_tile(a))
-	GameData.move_quest = "wait"
-	GameData.move_day = GameData.day
+	GameData.home_plots.append({"x": a.x, "y": a.y, "used": false})
+	m.objnode._place_object(door, "homeplot", 0)   # 현관 자리에 집터 팻말
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("새 주민의 집 완공!")
-	m.hud.show_message("집이 다 지어졌다. 내일이면 무진이 이사 온다!", 5.0)
+	m.hud.quest_toast("빈 집터 완성!")
+	m.hud.show_message("빈 집터를 마련했다. 이주 희망 편지를 수락하면 여기에 집이 선다.", 5.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 	return true
+
+
+# 가방의 이주 희망 편지를 다시 읽는다 — 여기서 수락한다
+func open_move_letter() -> void:
+	if GameData.move_quest == "show":
+		m.dialog.open("이주 희망 편지",
+			"『...꼭 한번 살아 보고 싶어요. 받아 주실래요? — 무진』\n\n(먼저 이장님께 보여드리고 상의해 보자.)",
+			[["닫기", null]])
+		return
+	if GameData.move_quest != "build":
+		m.dialog.open("이주 희망 편지", "이미 답장을 보낸 편지다.\n무진의 들뜬 글씨가 눈에 선하다.",
+			[["닫기", null]])
+		return
+	m.dialog.open("이주 희망 편지",
+		"『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요? — 무진』",
+		[["수락하기", _try_accept_move], ["나중에", null]])
+
+
+# 수락 — **빈 집터가 있어야만** 된다. 없으면 편지는 그대로 남는다.
+func _try_accept_move() -> void:
+	var plot: Vector2i = GameData.first_empty_plot()
+	if plot.x < 0:
+		m.dialog.close()
+		m.hud.show_message("집터가 없어서 초대할 수 없다. 집터를 우선 만들자!", 5.0)
+		return
+	m.dialog.close()
+	# 준비해 둔 빈 집터에 집을 짓고 이사를 진행한다
+	for p: Dictionary in GameData.home_plots:
+		if int(p.x) == plot.x and int(p.y) == plot.y:
+			p.used = true
+			break
+	GameData.items["move_letter"] = maxi(0, int(GameData.items.get("move_letter", 0)) - 1)
+	GameData.move_house = plot
+	m.objnode._remove_object(m.door_tile(plot))   # 집터 팻말 철거
+	for y in range(plot.y - 1, plot.y + 5):       # 그새 자란 것들 정리
+		for x in range(plot.x - 1, plot.x + 6):
+			if m.objects.has(Vector2i(x, y)):
+				m.objnode._remove_object(Vector2i(x, y))
+	m.worldgen._fill_building(plot)
+	m.objects.erase(m.door_tile(plot))
+	GameData.move_quest = "wait"
+	GameData.move_day = GameData.day
+	Sound.play_sfx("sfx_place")
+	m.hud.quest_toast("이사 수락 — 새 주민의 집 완공!")
+	m.hud.show_message("준비해 둔 집터에 집이 지어졌다. 내일이면 무진이 이사 온다!", 5.0)
+	m.queue_redraw()
+	m.saveio.save_now()
 
 
 # 집이 설 자리: 해금된 땅의 넓게 트인 풀밭 (물·모래·나무·건물·작물 금지).
@@ -1836,3 +1885,18 @@ func _end_spear_visit() -> void:
 		GameData.spear_quest = "done"
 		m.hud.quest_toast("서브 퀘스트 완료: 이장의 걱정")
 	m.saveio.save_now()
+
+
+# 빈 집터 팻말 회수 — 집터가 가방으로 돌아온다 (아직 안 쓴 집터만)
+func _pickup_home_plot(door: Vector2i) -> void:
+	m.dialog.close()
+	var a := door - Vector2i(2, 3)
+	for p: Dictionary in GameData.home_plots.duplicate():
+		if int(p.x) == a.x and int(p.y) == a.y and not bool(p.get("used", false)):
+			GameData.home_plots.erase(p)
+			m.objnode._remove_object(door)
+			GameData.items["housing_kit"] = int(GameData.items.get("housing_kit", 0)) + 1
+			m.hud.show_message("빈 집터를 거둬 가방에 챙겼다.")
+			m.queue_redraw()
+			m.saveio.save_now()
+			return

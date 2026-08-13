@@ -565,6 +565,11 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.village.use_trash_bin())
+	# 이주 희망 편지 — 다시 읽고 수락한다
+	if bool(e.get("letter", false)):
+		b.pressed.connect(func() -> void:
+			visible = false
+			main.story.open_move_letter())
 	return b
 
 
@@ -764,8 +769,11 @@ func _item_entries() -> Array:
 		elif id == "bait":
 			e["desc"] = "낚시 미끼 — 낚싯대를 던질 때 하나씩 쓴다. 입질이 훨씬 빨라진다"
 		elif id == "housing_kit":
-			e["desc"] = "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 여기서 클릭"
+			e["desc"] = "빈 집터를 마련한다 — 놓을 풀밭을 바라보고 여기서 클릭.\n빈 집터가 있어야 이주 편지를 수락할 수 있다"
 			e["place"] = true
+		elif id == "move_letter":
+			e["desc"] = "마을로 이사 오고 싶다는 편지 — 클릭해서 다시 읽고 수락한다"
+			e["letter"] = true
 		elif id == "trash_bin":
 			e["desc"] = "24시간 무인 판매함 (제값의 80%) — 놓을 곳을 바라보고 클릭"
 			e["bin"] = true

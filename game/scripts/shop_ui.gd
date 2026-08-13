@@ -400,7 +400,7 @@ func _rebuild() -> void:
 						_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
 					hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
 					items_box.add_child(_mk_row("housing_kit", "집터 레시피",
-						"새 주민의 집을 짓는다 · 재료: 목재 60 · 석재 40 · 못 4",
+						"빈 집터를 마련한다 (이주 수락의 선행 조건) · 재료: 목재 60 · 석재 40 · 못 4",
 						hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
 		if buy_cat in ["", "misc"]:
 			# 마음을 전하는 것들

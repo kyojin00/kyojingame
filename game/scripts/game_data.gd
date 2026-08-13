@@ -771,8 +771,18 @@ func merchant_at_stall() -> bool:
 #   greet: 무진 도착 — 인사하러 가기 / done: 완료 (이주·집터 시스템 해금)
 var move_quest := ""
 var move_day := 0            # 단계 전환 기준 날 (편지 도착·이사 대기)
-var move_house := Vector2i(-999, -999)   # 플레이어가 정한 새 주민 집 자리
+var move_house := Vector2i(-999, -999)   # 무진의 집 자리 (수락한 집터)
 const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
+# 미리 마련해 둔 빈 집터들 — [{x, y, used}]. **빈 집터가 있어야만**
+# 이주 희망 편지를 수락할 수 있다 (수락하면 첫 빈 집터에 집이 지어진다)
+var home_plots: Array = []
+
+
+func first_empty_plot() -> Vector2i:
+	for p: Dictionary in home_plots:
+		if not bool(p.get("used", false)):
+			return Vector2i(int(p.x), int(p.y))
+	return Vector2i(-999, -999)
 # 쓰레기통(무인 판매함) 판매 배율 — 24시간 아무 때나 파는 대신 제값의 80%
 const TRASH_SELL_MULT := 0.8
 
@@ -782,7 +792,9 @@ func move_objective_short() -> String:
 		"show":
 			return "이주 희망 편지를 이장에게 보여주자 (E)"
 		"build":
-			return "집터로 새 주민의 집 자리를 정하자 (레시피는 잡화점)"
+			if first_empty_plot().x >= 0:
+				return "빈 집터가 생겼다 — 이주 편지(가방)를 읽고 수락하자"
+			return "빈 집터를 마련하자 (집터 레시피는 잡화점)"
 		"wait":
 			return "집이 완성됐다 — 내일 무진이 이사 온다"
 		"greet":
@@ -1355,6 +1367,7 @@ const ITEMS := {
 	"forage_relic": {"name": "고대 조각", "sell": 480},
 	"bait": {"name": "미끼", "sell": 2},
 	"housing_kit": {"name": "집터", "sell": 0},
+	"move_letter": {"name": "이주 희망 편지", "sell": 0},
 	"trash_bin": {"name": "쓰레기통", "sell": 0},
 	# 초반 무기 (도구라 개수는 없지만, 도감·컬렉션 표시용 이름이 필요하다)
 	"spear": {"name": "돌 창", "sell": 0},
@@ -1404,7 +1417,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"housing_kit", "trash_bin", "arrow", "dish_coral_tea",
+	"housing_kit", "move_letter", "trash_bin", "arrow", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -2967,6 +2980,7 @@ func reset_all() -> void:
 	move_quest = ""
 	move_day = 0
 	move_house = Vector2i(-999, -999)
+	home_plots = []
 	mom_quest = ""
 	mom_quests_done = []
 	spear_quest = ""
@@ -3296,6 +3310,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity_open": affinity_open,
 		"move_quest": move_quest, "move_day": move_day,
 		"move_house": [move_house.x, move_house.y],
+		"home_plots": home_plots,
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
 		"spear_quest": spear_quest,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

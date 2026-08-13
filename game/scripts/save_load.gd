@@ -63,10 +63,19 @@ func _apply_save(d: Dictionary) -> void:
 	var mh: Array = d.get("move_house", [])
 	GameData.move_house = Vector2i(int(mh[0]), int(mh[1])) if mh.size() == 2 \
 		else Vector2i(-999, -999)
+	GameData.home_plots = (d.get("home_plots", []) as Array)
 	# 이사 편지(스토리 3)가 생기기 전 세이브: 무진이 이미 마을에 있으면
 	# (숲속의 집 이야기가 시작됐으면) 이사는 끝난 것으로 친다
 	if GameData.move_quest == "" and GameData.forest_quest != "":
 		GameData.move_quest = "done"
+	# 편지를 읽던 중 저장했으면 다음 날 아침 다시 온다
+	if GameData.move_quest == "letter":
+		GameData.move_quest = ""
+		GameData.move_day = GameData.day - 1
+	# 집터 선행 조건이 생기기 전 세이브: 진행 중이면 편지를 가방에 챙겨 준다
+	if GameData.move_quest in ["show", "build"] \
+			and int(GameData.items.get("move_letter", 0)) <= 0:
+		GameData.items["move_letter"] = 1
 	GameData.mom_quest = str(d.get("mom_quest", ""))
 	GameData.mom_quests_done = (d.get("mom_quests_done", []) as Array)
 	GameData.spear_quest = str(d.get("spear_quest", ""))

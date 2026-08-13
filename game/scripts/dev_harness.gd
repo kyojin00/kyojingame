@@ -714,18 +714,31 @@ func _debug_tick() -> void:
 			GameData.desk_tick(999.0)
 			var kit_ok: bool = kit_started \
 				and int(GameData.items["housing_kit"]) == kit0 + 1
-			# 물가에는 못 짓는다 / 트인 풀밭에는 지어진다
-			var bad_ok: bool = not m.story.try_place_move_house(Vector2i(2, m.SEA_Y0))
+			# 집터가 없으면 수락이 막히고 편지는 그대로 남는다
+			var letters0 := int(GameData.items.get("move_letter", 0))
+			GameData.home_plots = []
+			m.story._try_accept_move()
+			var no_plot_block: bool = GameData.move_quest == "build" \
+				and int(GameData.items["move_letter"]) == letters0
+			# 물가에는 못 놓는다 / 트인 풀밭에는 빈 집터가 놓인다
+			var bad_ok: bool = not m.story.try_place_home_plot(Vector2i(2, m.SEA_Y0))
 			var hdoor := Vector2i(20, 55)
 			for hy in range(49, 60):
 				for hx in range(14, 27):
 					m.objnode._remove_object(Vector2i(hx, hy))
 					m.grid[hy][hx].ground = "grass"
 					m.grid[hy][hx].crop_id = ""
-			var placed: bool = m.story.try_place_move_house(hdoor)
-			var house2_ok: bool = placed and GameData.move_quest == "wait" \
-				and str(m.objects.get(hdoor - Vector2i(2, 3), {}).get("kind", "")) == "house" \
+			var placed: bool = m.story.try_place_home_plot(hdoor)
+			var plot_ok: bool = placed \
+				and GameData.first_empty_plot() == hdoor - Vector2i(2, 3) \
+				and str(m.objects.get(hdoor, {}).get("kind", "")) == "homeplot" \
 				and int(GameData.items["housing_kit"]) == kit0
+			# 빈 집터가 생겼으니 편지를 다시 수락한다 -> 집이 지어진다
+			m.story._try_accept_move()
+			var house2_ok: bool = GameData.move_quest == "wait" \
+				and str(m.objects.get(hdoor - Vector2i(2, 3), {}).get("kind", "")) == "house" \
+				and GameData.first_empty_plot().x < 0 \
+				and int(GameData.items["move_letter"]) == letters0 - 1
 			GameData.day += 1                      # 다음 날 — 무진이 이사 온다
 			m.story._move_update(0.016)
 			var have_ex := false
@@ -740,11 +753,12 @@ func _debug_tick() -> void:
 				and GameData.forest_quest == "settle"
 			m.dialog.close()
 			print("MOVE_OK=", letter_ok and show_q and chief_talk and build_q
-				and recipe_ok2 and kit_ok and bad_ok and house2_ok and greet_q
-				and greet_talk and move_done,
+				and recipe_ok2 and kit_ok and no_plot_block and bad_ok and plot_ok
+				and house2_ok and greet_q and greet_talk and move_done,
 				" 편지=", letter_ok, " 이장상의=", show_q and chief_talk,
 				" 결정권=", build_q, " 레시피=", recipe_ok2, " 제작=", kit_ok,
-				" 물가거부=", bad_ok, " 집완공=", house2_ok, " 이사=", greet_q,
+				" 집터없이수락거부=", no_plot_block, " 물가거부=", bad_ok,
+				" 빈집터=", plot_ok, " 수락후집완공=", house2_ok, " 이사=", greet_q,
 				" 첫인사=", greet_talk, " 완료+숲이야기로=", move_done)
 			GameData.day += 1                      # 하룻밤 자고 나면 발견담이 뜬다
 			m.story._forest_update(0.016)
