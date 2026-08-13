@@ -28,7 +28,9 @@ PAL = {
     'S': (211, 125, 92),    # 살결 그늘
     'H': (249, 196, 158),   # 살결 하이라이트
     'e': (66, 32, 30),      # 눈동자·눈썹
+    'i': (136, 70, 42),     # 홍채 (눈동자 위쪽의 밝은 갈색)
     'w': (246, 242, 234),   # 흰자
+    'r': (233, 138, 118),   # 볼터치
     'm': (170, 84, 66),     # 입
     'b': (62, 96, 186),     # 셔츠
     'B': (40, 62, 136),     # 셔츠 그늘
@@ -120,10 +122,10 @@ HEAD_DOWN = [
     "OsssssssssO",
     "OsssssssssO",
     "OeeessseeeO",
+    "OwiwssswiwO",
     "OwewssswewO",
-    "OwewssswewO",
-    "OsssssssssO",
-    "OSssmsmssSO",
+    "OsSsssssSsO",
+    "OrssmsmssrO",
     ".OsssmsssO.",
     "..OOsssOO..",
 ]
@@ -136,9 +138,9 @@ HEAD_SIDE = [   # 오른쪽을 본다
     "OSssssssssO",
     "OSssssssssO",
     "OssSssseesO",
+    "OssSssswisO",
     "OssSssswesO",
-    "OssSssswesO",
-    "OSssssssmmO",
+    "OSssrsssmmO",
     ".OssssssSO.",
     "..OOsssOO..",
 ]
@@ -177,6 +179,7 @@ def torso_down(g, bob, swing):
     g.vline(8, y, y + 5, 'L')                  # 빛 받는 왼쪽 면
     g.vline(7, y + 1, y + 5, 'B')              # 팔과 몸 사이 솔기
     g.vline(13, y + 1, y + 5, 'B')
+    g.hline(9, 11, y, 'B')                     # 옷깃 (목 아래 그늘)
     g.px(10, y + 1, 'B'); g.px(10, y + 2, 'B')  # 앞섶 선
     # 팔: 소매 2픽셀 폭 + 두 칸 손. 앞으로 흔들면 소매가 늘어나며 1px 내려가고
     # 뒤로 가면 접히며 올라간다 — 어깨는 늘 몸통에 붙어 있다.
@@ -192,6 +195,7 @@ def torso_down(g, bob, swing):
 def legs_down(g, stride):
     """앞모습 다리. stride: 화면 왼쪽 다리가 앞으로 나간 양 -2..+2"""
     g.rect(7, HIP_Y, 13, HIP_Y + 1, 'p')       # 엉덩이 띠
+    g.hline(7, 13, HIP_Y, 'P')                 # 셔츠 아랫단 그늘
     g.px(10, HIP_Y + 1, 'P')
     for x0, s in ((7, stride), (11, -stride)):
         lift = min(2, -s) if s < 0 else 0      # 뒤로 간 다리는 들려 짧아진다
@@ -236,6 +240,7 @@ def legs_side(g, stride, lean=0):
     허벅지는 엉덩이에 붙어 있고 발끝으로 갈수록 stride 만큼 기울어진다."""
     c = 10 + lean
     g.rect(c - 3, HIP_Y, c + 3, HIP_Y + 1, 'p')
+    g.hline(c - 3, c + 3, HIP_Y, 'P')          # 셔츠 아랫단 그늘
     g.px(c - 1, HIP_Y + 1, 'P')
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다
     for off, shade in ((-stride, True), (stride, False)):
