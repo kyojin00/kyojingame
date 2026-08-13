@@ -313,29 +313,33 @@ def legs_up(g, stride, dx=0, sq=0):
 # 주먹 자리는 아래에서 SWING_HAND_DOT 값으로 계산해 찍어 준다 —
 # player.gd에 그대로 옮겨 적으면 도구가 손에 붙는다.
 #
-# 프레임 설계 — 칸마다 (fist, dx, sq):
-#   fist  주먹 2x2 블록의 왼쪽 위 논리 칸
-#   dx    몸이 쏠리는 방향 (감을 때 뒤로 갈수록 크게, 내리칠 때 앞으로)
-#   sq    주저앉는 양 (내리치는 칸만 1)
+# 프레임 설계 — 칸마다 (fist, dx, sq, behind):
+#   fist    주먹 2x2 블록의 왼쪽 위 논리 칸
+#   dx      몸이 쏠리는 방향 (감을 때 뒤로 갈수록 크게, 내리칠 때 앞으로)
+#   sq      주저앉는 양 (내리치는 칸만 1)
+#   behind  팔을 머리 뒤에 그린다 — 뒷모습이 머리 **너머로** 내리치는 칸은
+#           팔뚝이 머리 저편(=캐릭터의 앞)에 있으니 머리가 가리고 주먹만
+#           위로 내민다. 앞에 그리면 팔이 뒤통수를 가로지르는 띠가 된다.
 #
-# 팔은 네 칸 모두 **앞에** 그려 어깨부터 주먹까지 다 보이게 한다 — 감은 칸의
-# 팔을 머리 뒤로 숨겨 봤더니 주먹만 혹처럼 남아 되레 어색했다. 대신 주먹을
-# 머리 꼭대기 한가운데가 아니라 **뒤통수 쪽 위**로 보내면, 팔이 뒤통수의
-# 민머리 면만 지나가고 눈은 안 덮는다 (앞모습 눈은 5~7열, 옆모습 눈은
-# 12~13열 — 감은 팔의 획은 그 반대쪽 가장자리로만 지나간다).
+# 그 밖의 팔은 **앞에** 그려 어깨부터 주먹까지 다 보이게 한다 — 주먹을
+# 머리 꼭대기 한가운데가 아니라 뒤통수 쪽 위로 보내면, 획이 민머리 면만
+# 지나가고 눈은 안 덮는다 (앞모습 눈은 5~7열, 옆모습 눈은 12~13열).
 SWING = {
     # 앞모습: 왼쪽 위로 감았다가 오른쪽 아래로 내리친다 (옛 도트와 같은 방향)
     'down': {'skip': 'left', 'shoulder': (6, 17),
-             'poses': [((2, 11), -1, 0), ((2, 2), -2, 0),
-                       ((16, 19), 1, 1), ((15, 18), 0, 0)]},
-    # 뒷모습: 등을 보이니 반대 — 오른쪽 위에서 왼쪽 아래로
+             'poses': [((2, 11), -1, 0, False), ((2, 2), -2, 0, False),
+                       ((16, 19), 1, 1, False), ((15, 18), 0, 0, False)]},
+    # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽이다. 내리침이 왼쪽
+    # 아래(화면 쪽 = 등 뒤)로 오면 제 뒤를 치는 그림이 된다 — 주먹은
+    # 옆에서 감아올려 머리 **너머로** 뻗는다 (도구는 게임이 몸 뒤에 그려
+    # 저편(=앞)에 있는 것처럼 보인다).
     'up':   {'skip': 'right', 'shoulder': (14, 17),
-             'poses': [((17, 11), 1, 0), ((17, 2), 2, 0),
-                       ((3, 19), -1, 1), ((4, 18), 0, 0)]},
+             'poses': [((16, 12), 1, 0, False), ((15, 1), 2, 0, False),
+                       ((8, 1), -1, 1, True), ((16, 9), 0, 0, False)]},
     # 옆모습(오른쪽 보기): 뒤로 감았다가 앞으로 내리친다
     'side': {'skip': None, 'shoulder': (10, 17),
-             'poses': [((3, 10), -1, 0), ((4, 1), -2, 0),
-                       ((17, 24), 2, 1), ((15, 19), 1, 0)]},
+             'poses': [((3, 10), -1, 0, False), ((4, 1), -2, 0, False),
+                       ((17, 24), 2, 1, False), ((15, 19), 1, 0, False)]},
 }
 
 
@@ -365,7 +369,7 @@ def arm_stroke(g, x0, y0, fx, fy):
 
 def swing_frame(direction, phase):
     spec = SWING[direction]
-    (fx, fy), dx, sq = spec['poses'][phase]
+    (fx, fy), dx, sq, behind = spec['poses'][phase]
     g = G()
     if direction == 'side':
         # 발은 네 장 내내 같은 자리를 디디고(벌린 자세), 엉덩이·다리 윗동이
@@ -379,9 +383,13 @@ def swing_frame(direction, phase):
         legs_up(g, 0, dx, sq)
         torso_up(g, sq, 0, dx, skip=spec['skip'])
     art = PARTS[direction][0]
-    head(g, art, sq, dx)
     sx, sy = spec['shoulder']
-    arm_stroke(g, sx + dx, sy + sq, fx, fy)
+    if behind:
+        arm_stroke(g, sx + dx, sy + sq, fx, fy)
+        head(g, art, sq, dx)                   # 머리가 팔을 덮고 주먹만 남는다
+    else:
+        head(g, art, sq, dx)
+        arm_stroke(g, sx + dx, sy + sq, fx, fy)
     g.outline()
     return g
 
@@ -389,7 +397,7 @@ def swing_frame(direction, phase):
 def hand_dot(direction, phase):
     """player.gd SWING_HAND_DOT 값 — 주먹 2x2 블록 한가운데의 node 좌표.
     도트 원점은 발밑 가운데(픽셀 64,190), node = 그림의 절반 크기."""
-    (fx, fy), _, _ = SWING[direction]['poses'][phase]
+    (fx, fy), _, _, _ = SWING[direction]['poses'][phase]
     dot_x = PAD_X + fx * 6 + 6 - 64
     dot_y = fy * 6 + 6 - 190
     return (round(dot_x / 2.0 * 10) / 10, round((dot_y + 2) / 2.0 * 10) / 10)
