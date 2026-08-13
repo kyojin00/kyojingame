@@ -1908,6 +1908,25 @@ func _movein_npc_node(nid: String) -> Node2D:
 	return null
 
 
+# 플레이어 곁의 「걸어서 설 수 있는」 칸 — 물·오브젝트·건물 위는 안 된다.
+# (예전엔 플레이어 아래 170px에 그냥 텔레포트해서, 호숫가·분수 곁에서는
+#  NPC가 물속에 서던 버그가 있었다)
+func _walk_tile_near_player(dist: int) -> Vector2i:
+	var pt := m.player_tile()
+	var cands: Array[Vector2i] = []
+	for d in range(dist, 0, -1):
+		cands += [Vector2i(0, d), Vector2i(-1, d), Vector2i(1, d),
+			Vector2i(-d, 0), Vector2i(d, 0), Vector2i(0, -d),
+			Vector2i(-d, d), Vector2i(d, d)]
+	for off: Vector2i in cands:
+		if m.is_passable(pt + off):
+			return pt + off
+	return pt
+
+
+var _movein_route: Array = []
+
+
 func _movein_update(delta: float) -> void:
 	if Net.is_guest() or GameData.arrivals.is_empty():
 		return
@@ -1924,29 +1943,47 @@ func _movein_update(delta: float) -> void:
 			return   # 밤에는 찾아오지 않는다
 		var nid := str(a.id)
 		var walker := _movein_npc_node(nid)
+		var start := _walk_tile_near_player(5)   # 물·장애물 없는 칸에서 등장
 		if walker == null:
-			var pt := m.player_tile()
-			m.npcmgr._spawn_npc(nid, Vector2i(pt.x - 1, pt.y + 5))
+			m.npcmgr._spawn_npc(nid, start)
 			walker = m.npcs[m.npcs.size() - 1]
 		_movein_walker = walker
 		m.story_cutscene = true
 		walker.scripted = true
-		walker.position = m.player.position + Vector2(-30.0, 170.0)
+		walker.visible = true
+		walker.position = Vector2(start.x * m.TILE + 16, start.y * m.TILE + 16)
+		# 플레이어 바로 곁(통행 가능 칸)까지는 길찾기로 걸어온다 — 물을 건너지 않는다
+		var goal := _walk_tile_near_player(1)
+		_movein_route = m.npcmgr._tile_path(start, goal)
 		m.hud.show_message("누군가 이쪽으로 걸어온다...", 4.0)
 	elif not m.dialog.visible:
-		var to: Vector2 = m.player.position + Vector2(0.0, 40.0) - _movein_walker.position
-		if to.length() > 10.0:
-			_movein_walker.moving = true
-			_movein_walker.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
-				else ("down" if absf(to.y) >= absf(to.x)
-				else ("right" if to.x > 0.0 else "left"))
-			_movein_walker.position += to.normalized() * 110.0 * delta
-			_movein_walker.anim_time += delta
-			_movein_walker._update_sprite()
-		else:
-			_movein_walker.moving = false
-			_movein_walker._update_sprite()
-			_start_movein_dialog(str(GameData.arrivals[0].id))
+		if not _movein_route.is_empty():
+			var wp: Vector2 = _movein_route[0]
+			var to: Vector2 = wp - _movein_walker.position
+			if to.length() < 6.0:
+				_movein_walker.position = wp
+				_movein_route.pop_front()
+			else:
+				_movein_walker.moving = true
+				_movein_walker.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
+					else ("down" if absf(to.y) >= absf(to.x)
+					else ("right" if to.x > 0.0 else "left"))
+				_movein_walker.position += to.normalized() * 110.0 * delta
+				_movein_walker.anim_time += delta
+				_movein_walker._update_sprite()
+			return
+		# 길이 끝났다 — 플레이어가 그새 멀어졌으면 새 길을 잡고, 곁이면 인사
+		var to2: Vector2 = m.player.position - _movein_walker.position
+		if to2.length() > 80.0:
+			var wt := Vector2i(int(floor(_movein_walker.position.x / m.TILE)),
+				int(floor(_movein_walker.position.y / m.TILE)))
+			_movein_route = m.npcmgr._tile_path(wt, _walk_tile_near_player(1))
+			if _movein_route.is_empty():
+				_start_movein_dialog(str(GameData.arrivals[0].id))   # 길이 없다 — 그 자리에서
+			return
+		_movein_walker.moving = false
+		_movein_walker._update_sprite()
+		_start_movein_dialog(str(GameData.arrivals[0].id))
 
 
 func _start_movein_dialog(nid: String) -> void:
@@ -1981,6 +2018,7 @@ func _start_movein_dialog(nid: String) -> void:
 
 func _end_movein(nid: String) -> void:
 	m.story_cutscene = false
+	_movein_route = []
 	if _movein_walker != null:
 		_movein_walker.scripted = false
 	_movein_walker = null
@@ -2014,8 +2052,9 @@ func _spear_update(delta: float) -> void:
 		GameData.spear_quest = "visit"
 		m.story_cutscene = true
 		chief.scripted = true
-		# 화면 밖에서 걸어오는 느낌 — 플레이어 남쪽에서 다가온다
-		chief.position = m.player.position + Vector2(-30.0, 170.0)
+		# 화면 밖에서 걸어오는 느낌 — 물·장애물 없는 곁 칸에서 다가온다
+		var st := _walk_tile_near_player(5)
+		chief.position = Vector2(st.x * m.TILE + 16, st.y * m.TILE + 16)
 		m.hud.show_message("이장님이 급히 걸어온다...", 4.0)
 	elif GameData.spear_quest == "visit" and not m.dialog.visible:
 		var chief2: Variant = _story_chief()

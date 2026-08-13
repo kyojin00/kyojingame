@@ -695,7 +695,11 @@ func _debug_tick() -> void:
 			# ② 완공 다음 날 — 민지가 직접 걸어와 인사한다
 			GameData.arrivals = [{"id": "merchant", "day": GameData.day - 1}]
 			m.story._movein_update(0.016)
-			var came: bool = m.story_cutscene and m.story._movein_walker != null
+			var came: bool = m.story_cutscene and m.story._movein_walker != null \
+				and m.is_passable(Vector2i(
+					int(m.story._movein_walker.position.x / m.TILE),
+					int(m.story._movein_walker.position.y / m.TILE)))   # 물속 스폰 금지
+			m.story._movein_route = []               # 걸어온 셈 치고
 			m.story._movein_walker.position = m.player.position + Vector2(0.0, 40.0)
 			m.story._movein_update(0.016)
 			var hello: bool = m.dialog.visible
