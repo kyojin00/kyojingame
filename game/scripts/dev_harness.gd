@@ -515,18 +515,20 @@ func _debug_tick() -> void:
 			var pot_started: bool = GameData.desk_start("flower_pot")
 			GameData.desk_tick(999.0)
 			var ring_before := int(GameData.items["forage_ring"])
+			var bin_item0 := int(GameData.items.get("trash_bin", 0))
 			var bin_started: bool = GameData.desk_start("trash_bin")
 			GameData.desk_tick(999.0)
 			var made_ids: Array = []
 			for fi in GameData.furniture:
 				made_ids.append(str(fi.id))
-			var furn_ok: bool = GameData.furniture.size() == furn0 + 2 \
-				and "plant" in made_ids and "trash_bin" in made_ids \
-				and GameData.FURNITURE.has("trash_bin") \
+			# 화분은 세간으로, 쓰레기통은 아이템(설치형 무인 판매함)으로 나온다
+			var furn_ok: bool = GameData.furniture.size() == furn0 + 1 \
+				and "plant" in made_ids and GameData.FURNITURE.has("trash_bin") \
+				and int(GameData.items["trash_bin"]) == bin_item0 + 1 \
 				and int(GameData.items["forage_ring"]) == ring_before - 2
 			print("RECIPE2_OK=", learned and pot_started and bin_started and furn_ok,
 				" 배움=", learned, " 화분제작=", pot_started, " 쓰레기통제작=", bin_started,
-				" 세간=", furn_ok, " ", made_ids)
+				" 산출=", furn_ok, " ", made_ids)
 			# ---- 희귀 채집물: 기본 0.1% + 해변 채집 레벨로 조금씩 상승 ----
 			var keep_beach: Variant = GameData.skills.get("beach")
 			GameData.skills["beach"] = {"lv": 1, "xp": 0.0}
@@ -552,6 +554,52 @@ func _debug_tick() -> void:
 			print("HIDDEN_OK=", rare_ok and coral_ok and relic_ok,
 				" 확률(1렙)=", rare1, " (10렙)=", rare10,
 				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
+		353:
+			# 쓰레기통 = 24시간 무인 판매함 — 설치(바깥/집 안)·80% 판매·회수
+			GameData.items["trash_bin"] = int(GameData.items.get("trash_bin", 0)) + 2
+			var keep_pos: Vector2 = m.player.position
+			var keep_dir: String = m.player.dir
+			m.player.position = Vector2(24 * m.TILE + 16, 56 * m.TILE + 16)
+			m.player.dir = "down"
+			m._sel_target = Vector2i(-999, -999)
+			m._mouse_target = Vector2i(-999, -999)
+			var bin_t := Vector2i(24, 57)
+			m.objnode._remove_object(bin_t)
+			var bins0 := int(GameData.items["trash_bin"])
+			m.village.use_trash_bin()
+			var placed_out: bool = str(m.objects.get(bin_t, {}).get("kind", "")) == "trash_bin" \
+				and int(GameData.items["trash_bin"]) == bins0 - 1
+			m.village.open_trash_bin(bin_t)
+			var bin_menu: bool = m.dialog.visible
+			m.village._trash_sell()
+			var sell80: bool = m.shop.visible and absf(m.shop.sell_mult - 0.8) < 0.001
+			GameData.items["forage_glass"] = 10       # 34G짜리 — 80%면 개당 27G
+			var money_t: int = GameData.money
+			m.shop._on_sell_item("forage_glass")
+			var paid: bool = GameData.money == money_t + int(34 * 0.8) * 10 \
+				and int(GameData.items["forage_glass"]) == 0
+			m.shop.close()
+			m.shop.open("sell", ["sell"], "잡화점 — 판매")
+			var normal100: bool = absf(m.shop.sell_mult - 1.0) < 0.001
+			m.shop.close()
+			var bins1 := int(GameData.items["trash_bin"])
+			m.village._trash_pickup(bin_t)
+			var picked_up: bool = not m.objects.has(bin_t) \
+				and int(GameData.items["trash_bin"]) == bins1 + 1
+			# 집 안(확장된 집): 세간으로 들여놓는다
+			m.interior.open()
+			var furn_b: int = GameData.furniture.size()
+			m.village.use_trash_bin()
+			var in_house: bool = GameData.furniture.size() == furn_b + 1 \
+				and str(GameData.furniture[furn_b].id) == "trash_bin"
+			m.interior.close()
+			m.player.position = keep_pos
+			m.player.dir = keep_dir
+			print("TRASHBIN_OK=", placed_out and bin_menu and sell80 and paid
+				and normal100 and picked_up and in_house,
+				" 설치=", placed_out, " 메뉴=", bin_menu, " 판매80=", sell80,
+				" 정산=", paid, " 정상가=", normal100, " 회수=", picked_up,
+				" 집안설치=", in_house)
 		350:
 			# 메인 스토리 3 「새로운 주민의 이사」 -> 5 「숲속에서 발견한 집」 전체 체인:
 			# 이주 편지 -> 이장 상의(결정권 이양) -> 집터 레시피·제작 -> 집 자리

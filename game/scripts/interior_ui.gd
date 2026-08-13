@@ -234,6 +234,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif (ppos - DESK.get_center()).length() < 78.0:
 			main.desk_ui.open()
 			get_viewport().set_input_as_handled()
+		elif _near_trash_bin():
+			# 집 안 쓰레기통 — 24시간 무인 판매 (제값의 80%)
+			main.shop.open("sell", ["sell"], "쓰레기통 — 무인 판매", "",
+				GameData.TRASH_SELL_MULT)
+			get_viewport().set_input_as_handled()
 		elif (ppos - BED.get_center()).length() < 82.0:
 			if GameData.has_bed:
 				main.daycycle.request_sleep()
@@ -737,3 +742,13 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(p.x + 1, p.y + h - 9, w - 2, 3), Color(0.3, 0.34, 0.38))
 			canvas.draw_rect(Rect2(p.x, p.y + 3, w, 5), Color(0.36, 0.42, 0.46))
 			canvas.draw_rect(Rect2(p.x + w / 2.0 - 4, p.y, 8, 4), Color(0.3, 0.34, 0.38))
+
+
+# 세간으로 들여놓은 쓰레기통 곁에 서 있는가 (E: 무인 판매)
+func _near_trash_bin() -> bool:
+	for f in GameData.furniture:
+		if str(f.get("id", "")) != "trash_bin":
+			continue
+		if (ppos - Vector2(float(f.x) + 12.0, float(f.y) + 16.0)).length() < 60.0:
+			return true
+	return false

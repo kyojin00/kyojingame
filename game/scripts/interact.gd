@@ -266,6 +266,9 @@ func interact() -> void:
 		if obj.kind == "stall":
 			m.village.open_stall()
 			return
+		if obj.kind == "trash_bin":
+			m.village.open_trash_bin(t)
+			return
 		if obj.kind == "board":
 			m.village._open_quest_board()
 			return

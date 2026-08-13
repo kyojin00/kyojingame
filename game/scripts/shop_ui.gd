@@ -13,6 +13,7 @@ var shop_title := "상점"
 # 선반 구매: 잡화점 선반에서 열면 그 카테고리만 보인다
 #   "" = 전부 / seed 씨앗 / life 생활용품 / tool 도구·부품 / misc 기타
 var buy_cat := ""
+var sell_mult := 1.0       # 판매 배율 (쓰레기통 무인 판매 = 0.8)
 var last_sell_cells := 0   # 검증용 — 판매 격자에 깔린 칸 수
 var _head: Label
 var _money: Label
@@ -276,9 +277,12 @@ func _on_tab(t: String) -> void:
 
 # allowed_tabs: 이 가게에서 쓸 수 있는 탭 (비우면 t 하나만)
 # cat: 선반에서 열었을 때의 구매 카테고리 ("" = 전부)
-func open(t: String, allowed_tabs: Array = [], title := "", cat := "") -> void:
+# mult: 판매 배율 — 쓰레기통(무인 판매함)은 0.8로 연다
+func open(t: String, allowed_tabs: Array = [], title := "", cat := "",
+		mult := 1.0) -> void:
 	tab = t
 	buy_cat = cat
+	sell_mult = mult
 	shop_title = title if title != "" else "상점"
 	allowed = allowed_tabs if not allowed_tabs.is_empty() else [t]
 	for key in TAB_BUTTONS:
@@ -333,16 +337,6 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row(rid, "%s 레시피" % rname,
 					"체력 +%d · 팔면 %dG" % [int(GameData.RECIPES[rid].energy),
 						int(GameData.ITEMS[rid].sell)], rb2, [["coin", rprice]]))
-			_note("— 노점 한정 생활용품 레시피 —")
-			if "trash_bin" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피 (배움)",
-					"집 책상에서 만든다 — 목재 5 · 금속 고리 2"))
-			else:
-				var tcp := _mk_button("구매", _on_buy_recipe.bind("trash_bin", 400))
-				tcp.disabled = GameData.money < 400
-				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피",
-					"집에 놓는 튼튼한 쓰레기통 · 재료: 목재 5 · 금속 고리 2",
-					tcp, [["coin", 400]]))
 			_note("민지가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
 		if buy_cat in ["", "seed"]:
 			for id in GameData.CROP_IDS:
@@ -386,6 +380,16 @@ func _rebuild() -> void:
 				pcp.disabled = GameData.money < 200
 				items_box.add_child(_mk_row("flower_pot", "화분 레시피",
 					"집을 꾸미는 화분 · 재료: 잡초 5", pcp, [["coin", 200]]))
+			# 쓰레기통 — 24시간 무인 판매함 (제값의 80%). 원하는 곳에 설치한다.
+			if "trash_bin" in GameData.recipes_unlocked:
+				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피 (배움)",
+					"집 책상에서 만든다 — 목재 5 · 금속 고리 2 (고리는 해변에서)"))
+			else:
+				var tcp := _mk_button("구매", _on_buy_recipe.bind("trash_bin", 400))
+				tcp.disabled = GameData.money < 400
+				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피",
+					"24시간 무인 판매함 (제값의 80%) · 재료: 목재 5 · 금속 고리 2",
+					tcp, [["coin", 400]]))
 			# 집터 — 새 주민의 집을 짓는 큰 공사 (스토리 3에서 이장이 알려준다)
 			if GameData.move_quest in ["build", "wait", "greet", "done"]:
 				if "housing_kit" in GameData.recipes_unlocked:
@@ -412,6 +416,9 @@ func _rebuild() -> void:
 		# 판매: 가방과 같은 격자 — 일러스트만 보이고, 마우스를 올리면
 		# 이름·판매 가격이 툴팁으로 뜬다. 클릭하면 그 묶음을 전부 판다.
 		last_sell_cells = 0
+		if sell_mult < 1.0:
+			_note("무인 판매함 — 24시간 아무 때나, 대신 제값의 %d%%로 팔린다."
+				% int(sell_mult * 100.0))
 		_note("가방과 같은 격자다. 마우스를 올리면 이름·가격 · 클릭: 전부 판매")
 		var grid := GridContainer.new()
 		grid.columns = 9
@@ -430,7 +437,8 @@ func _rebuild() -> void:
 			if gold > 0:
 				qtxt += " · 금 %d" % gold
 			grid.add_child(_mk_sell_cell("mature_" + id, str(def.name), count,
-				int(def.sell_price), GameData.produce_sell_value(id),
+				int(def.sell_price * sell_mult),
+				int(GameData.produce_sell_value(id) * sell_mult),
 				qtxt, _on_sell.bind(id)))
 			last_sell_cells += 1
 		for id in GameData.ITEM_IDS:
@@ -441,7 +449,8 @@ func _rebuild() -> void:
 			if int(def.sell) <= 0:
 				continue  # 값이 없는 것(빗자루·꽃다발 등)은 팔지 않는다
 			grid.add_child(_mk_sell_cell(id, str(def.name), count,
-				int(def.sell), int(def.sell) * count, "", _on_sell_item.bind(id)))
+				int(def.sell * sell_mult), int(def.sell * sell_mult) * count,
+				"", _on_sell_item.bind(id)))
 			last_sell_cells += 1
 		items_box.add_child(grid)
 		if last_sell_cells == 0:
@@ -649,7 +658,8 @@ func _on_buy(id: String) -> void:
 
 
 func _on_sell(id: String) -> void:
-	var amount: int = GameData.produce_sell_value(id)  # 은/금 품질은 더 비싸게
+	# 은/금 품질은 더 비싸게 · 쓰레기통(무인 판매함)은 제값의 80%
+	var amount: int = int(GameData.produce_sell_value(id) * sell_mult)
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
@@ -663,7 +673,7 @@ func _on_sell(id: String) -> void:
 
 func _on_sell_item(id: String) -> void:
 	var def: Dictionary = GameData.ITEMS[id]
-	var amount: int = def.sell * GameData.items[id]
+	var amount: int = int(def.sell * sell_mult) * int(GameData.items[id])
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount

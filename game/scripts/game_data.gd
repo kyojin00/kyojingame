@@ -767,6 +767,8 @@ var move_quest := ""
 var move_day := 0            # 단계 전환 기준 날 (편지 도착·이사 대기)
 var move_house := Vector2i(-999, -999)   # 플레이어가 정한 새 주민 집 자리
 const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
+# 쓰레기통(무인 판매함) 판매 배율 — 24시간 아무 때나 파는 대신 제값의 80%
+const TRASH_SELL_MULT := 0.8
 
 
 func move_objective_short() -> String:
@@ -862,9 +864,10 @@ const DESK_RECIPES := {
 	"flower_pot": {"name": "화분", "cost": {"weed": 5},
 		"kind": "furniture", "furn": "plant", "locked": true, "shop": "잡화점",
 		"desc": "집을 꾸미는 화분 — 완성되면 방에 놓인다 (레시피는 잡화점에서)"},
+	# 쓰레기통 — 24시간 무인 판매함. 만들어서 원하는 곳(집 안/바깥)에 설치한다.
 	"trash_bin": {"name": "쓰레기통", "cost": {"wood": 5, "forage_ring": 2},
-		"kind": "furniture", "furn": "trash_bin", "locked": true, "shop": "해변 노점",
-		"desc": "튼튼한 쓰레기통 — 완성되면 방에 놓인다 (레시피는 해변 노점에서)"},
+		"kind": "item", "give": "trash_bin", "locked": true, "shop": "잡화점",
+		"desc": "넣은 물건을 제값의 80%에 파는 무인 판매함 — 가방에서 꺼내 설치한다"},
 	# 집터 — 새 주민의 집을 지을 자리 (메인 스토리 3에서 해금, 일부러 무겁다)
 	"housing_kit": {"name": "집터", "cost": {"wood": 60, "stone": 40, "nail": 4},
 		"kind": "item", "give": "housing_kit", "locked": true, "shop": "잡화점",
@@ -1292,6 +1295,7 @@ const ITEMS := {
 	"forage_relic": {"name": "고대 조각", "sell": 480},
 	"bait": {"name": "미끼", "sell": 2},
 	"housing_kit": {"name": "집터", "sell": 0},
+	"trash_bin": {"name": "쓰레기통", "sell": 0},
 	"forage_coral": {"name": "산호 조각", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
@@ -1336,7 +1340,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"housing_kit", "dish_coral_tea",
+	"housing_kit", "trash_bin", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",

@@ -872,3 +872,71 @@ func _attach_quest_bang(label: String) -> void:
 			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw.tween_interval(0.3)
 		return
+
+
+# ---- 쓰레기통: 24시간 무인 판매함 ----
+#
+# 제작대에서 만든 쓰레기통(아이템)을 가방에서 꺼내 원하는 곳에 설치한다.
+# 집 안이면 세간으로, 바깥이면 바라보는 칸에 놓인다.
+# E로 열어 아무 때나 팔 수 있는 대신 제값의 80%만 받는다 —
+# 밤에 몬스터를 뚫고 노점까지 가기 어려울 때를 위한 판매 수단이다.
+
+func use_trash_bin() -> void:
+	if int(GameData.items.get("trash_bin", 0)) <= 0:
+		return
+	# 집 안: 세간으로 들여놓는다 (꾸미기 F로 옮긴다)
+	if m.interior.visible:
+		if GameData.house_lv < 2:
+			# 오두막에는 세간을 놓을 자리가 없다 (가구는 확장한 집부터)
+			m.hud.show_message("오두막은 너무 좁다 — 집을 확장하면 안에도 놓을 수 있다.\n지금은 바깥에 설치하자.", 5.0)
+			return
+		GameData.items["trash_bin"] = int(GameData.items["trash_bin"]) - 1
+		GameData.furniture.append({"id": "trash_bin",
+			"x": 430.0 + float(GameData.furniture.size() % 4) * 40.0,
+			"y": 255.0 + float(GameData.furniture.size() / 4 % 3) * 30.0})
+		Sound.play_sfx("sfx_place")
+		m.hud.quest_toast("쓰레기통을 들여놓았다")
+		m.hud.show_message("가까이에서 E: 무인 판매 (제값의 80%) · 꾸미기(F)로 옮길 수 있다", 5.0)
+		m.interior.canvas.queue_redraw()
+		m.saveio.save_now()
+		return
+	# 바깥: 바라보는 칸에 설치한다
+	var t: Vector2i = m.actions.target_tile()
+	if t.x < 1 or t.y < 1 or t.x >= m.MAP_W - 1 or t.y >= m.MAP_H - 1 \
+			or m.objects.has(t) or m.grid[t.y][t.x].ground in ["water", "dock"] \
+			or m.grid[t.y][t.x].crop_id != "" or m.actions._tile_overlaps_player(t):
+		m.hud.show_message("여기에는 놓을 수 없다 — 비어 있는 땅을 바라보고 쓰자.")
+		return
+	GameData.items["trash_bin"] = int(GameData.items["trash_bin"]) - 1
+	m.objnode._place_object(t, "trash_bin", 0)
+	Sound.play_sfx("sfx_place")
+	m.hud.show_message("쓰레기통 설치! E로 열면 24시간 팔 수 있다 (제값의 80%).", 5.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
+# 바깥에 설치한 쓰레기통에서 E
+func open_trash_bin(t: Vector2i) -> void:
+	m.dialog.open("쓰레기통", "24시간 무인 판매함이다.\n여기 넣은 물건은 제값의 %d%%로 팔린다."
+		% int(GameData.TRASH_SELL_MULT * 100.0), [
+		["판매하기", _trash_sell],
+		["회수하기", _trash_pickup.bind(t)],
+		["닫기", null],
+	])
+
+
+func _trash_sell() -> void:
+	m.dialog.close()
+	m.shop.open("sell", ["sell"], "쓰레기통 — 무인 판매", "", GameData.TRASH_SELL_MULT)
+
+
+func _trash_pickup(t: Vector2i) -> void:
+	m.dialog.close()
+	if str(m.objects.get(t, {}).get("kind", "")) != "trash_bin":
+		return
+	m.objnode._remove_object(t)
+	GameData.items["trash_bin"] = int(GameData.items.get("trash_bin", 0)) + 1
+	Sound.play_sfx("sfx_place")
+	m.hud.show_message("쓰레기통을 도로 챙겼다.")
+	m.queue_redraw()
+	m.saveio.save_now()

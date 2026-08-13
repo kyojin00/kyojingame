@@ -559,6 +559,11 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.story.request_place_house())
+	# 쓰레기통도 슬롯을 눌러 설치한다 (집 안=세간 · 바깥=바라보는 칸)
+	if bool(e.get("bin", false)):
+		b.pressed.connect(func() -> void:
+			visible = false
+			main.village.use_trash_bin())
 	return b
 
 
@@ -760,6 +765,9 @@ func _item_entries() -> Array:
 		elif id == "housing_kit":
 			e["desc"] = "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 여기서 클릭"
 			e["place"] = true
+		elif id == "trash_bin":
+			e["desc"] = "24시간 무인 판매함 (제값의 80%) — 놓을 곳을 바라보고 클릭"
+			e["bin"] = true
 		elif id == "broom":
 			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
 		elif id in ["nail", "cloth", "rope", "hinge"]:

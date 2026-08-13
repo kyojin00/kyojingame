@@ -728,7 +728,7 @@ const OBJECT_SCALES := {
 	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
-	"forage_ring": 1.1, "forage_relic": 1.2,
+	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
