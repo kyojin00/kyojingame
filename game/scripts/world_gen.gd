@@ -437,6 +437,27 @@ func _fill_building(anchor: Vector2i, kind: String = "") -> void:
 	_spawn_house_node(anchor, kind)
 
 
+# 숲 깊은 곳의 집 (메인 스토리 5) — 이장에게 물어본 순간 세상에 놓인다.
+# 빽빽한 스토리 숲(fixed 나무)을 걷어 내고 오솔길을 깐 뒤 집을 세운다.
+func _spawn_forest_house() -> void:
+	var a: Vector2i = m.FOREST_HOUSE_ANCHOR
+	if str(m.objects.get(a, {}).get("kind", "")) == "house":
+		return
+	# 집터 빈터
+	for y in range(a.y - 2, a.y + 6):
+		for x in range(a.x - 3, a.x + 9):
+			m.objnode._remove_object(Vector2i(x, y))
+	# 숲길(y18) 남쪽에서 문 앞까지 내려오는 좁은 오솔길
+	for y in range(m.STORY_ROAD_Y1 + 1, a.y + 5):
+		for x in [m.FOREST_TRAIL_X, m.FOREST_TRAIL_X + 1]:
+			m.objnode._remove_object(Vector2i(x, y))
+			if m.grid[y][x].ground == "grass":
+				m.grid[y][x].ground = "path"
+	_fill_building(a)
+	m.objects.erase(m.door_tile(a))
+	m.queue_redraw()
+
+
 func _trim_paths_under_building(anchor: Vector2i) -> void:
 	var door := m.door_tile(anchor)
 	for y in range(anchor.y - 2, anchor.y + 4):

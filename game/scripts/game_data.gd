@@ -753,6 +753,33 @@ func merchant_at_stall() -> bool:
 	return false
 
 
+# ---- 메인 스토리 5: 숲속에서 발견한 집 ----
+#
+# 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 무진이 마을로 이사 온다.
+# 숲을 쏘다니던 무진이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
+# 그 집에는 아픈 딸을 돌보는 모녀가 조용히 살고 있었다.
+# 이 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
+#   "": 아직 / arrive: 무진 등장 — 말 걸기 / settle: 정착 (다음 날 아침까지) /
+#   found: 숲속 집 발견담 — 무진에게 말 걸기 / ask: 이장에게 물어보기 /
+#   visit: 숲 깊은 곳의 집 방문 (문 앞 E) / done: 완료
+var forest_quest := ""
+var forest_day := 0          # 무진이 정착한 날 — 다음 날 아침 발견담이 뜬다
+var affinity_open := false   # 호감도 콘텐츠(하트·선물) 해금 여부
+
+
+func forest_objective_short() -> String:
+	match forest_quest:
+		"arrive":
+			return "마을 광장에 낯선 사람이 왔다 — 말을 걸어 보자 (E)"
+		"found":
+			return "무진이 할 말이 있는 듯하다 — 말을 걸어 보자 (E)"
+		"ask":
+			return "숲속의 집에 대해 이장에게 물어보자 (E)"
+		"visit":
+			return "숲 깊은 곳의 집을 찾아가 보자 (문 앞에서 E)"
+	return ""
+
+
 # 해변 채집 능력치 — 조개가 다시 밀려오는 간격(게임 분)과 한 번에 줍는 양.
 # 기본은 10~15분에 하나. 레벨이 오르면 리젠이 빨라지고, 3레벨마다 +1개.
 func shell_respawn_minutes() -> float:
@@ -2210,8 +2237,62 @@ const NPCS := {
 	"secret50": "자네 할아버지가 이 마을에 처음 왔을 때, 다들 미친 사람 취급했어.\n나만 빼고. 그 눈빛은... 미친 게 아니라 믿는 사람의 눈이었거든.",
 	"secret100": "그 양반이 마지막으로 한 말을 전해주지. '덕수, 내 손주가 오면\n일곱 가지를 모을 걸세. 그때 이 마을은 기적을 보게 될 거야.'",
 	},
+	# ---- 메인 스토리 5에서 합류하는 사람들 ----
+	"explorer": {"name": "무진", "birthday": [FALL, 7], "romance": false,
+	"lines": [
+		"이 마을, 걸어서 안 가 본 데가 없어. ...아마도?",
+		"지도 밖이 제일 재밌는 법이야.",
+		"동굴 가 봤어? 밑으로 내려갈수록 심장이 뛰지!",
+		"가만히 있으면 몸이 근질근질해서 말이야.",
+		"오늘은 어느 쪽으로 가 볼까... 같이 갈래?",
+	],
+	"morning": ["아침 공기 좋다! 이런 날은 멀리 가야지."],
+	"night": ["별 보면서 걷는 것도 모험이라면 모험이지."],
+	"aff30": ["너도 꽤 모험가 기질이 있단 말이지.",
+		"다음에 좋은 데 찾으면 너한테 제일 먼저 알려줄게."],
+	"aff70": ["혼자 다니는 게 좋았는데... 요즘은 둘이 다니는 게 더 좋아.",
+		"내 지도에 네 이름으로 표시해 둔 곳이 있어. 언젠가 같이 가자."],
+	"loves": ["dish_stew", "forage_relic", "fish_stormjack"],
+	"likes": ["forage_berry", "forage_glass", "dish_baked_potato"],
+	"hates": ["sludge"],
+	},
+	"forest_mom": {"name": "연화", "birthday": [SPRING, 20], "romance": false,
+	"lines": [
+		"숲의 아침 공기는 약이 돼요. 그래서 여기 살아요.",
+		"솔이가 요즘은 얼굴빛이 많이 좋아졌어요.",
+		"조용한 게 좋아서... 마을엔 잘 안 내려가요.",
+		"약초를 달여 두었는데, 향이 참 좋죠?",
+	],
+	"morning": ["이슬 마르기 전 숲이 제일 예뻐요."],
+	"night": ["밤 숲은 차요. 감기 조심하세요."],
+	"aff30": ["당신이 오는 날은 솔이가 문 앞을 서성여요.",
+		"따뜻한 차 한 잔 하고 가요."],
+	"aff70": ["사람이 그리웠나 봐요, 우리 둘 다.\n와 줘서 고마워요.",
+		"이 숲에 온 게 잘한 일이었다고, 요즘 처음 생각해요."],
+	"loves": ["forage_herb", "dish_moon_tea", "dish_coral_tea"],
+	"likes": ["forage_berry", "dish_soup", "dish_onion_soup"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"forest_girl": {"name": "솔이", "birthday": [SUMMER, 14], "romance": false,
+	"lines": [
+		"기침이 많이 나아졌어요. 숲 공기 덕분이래요!",
+		"창문으로 다람쥐가 보여요. 이름도 지어 줬어요.",
+		"언젠가 마을 축제에 가 보고 싶어요.",
+		"오늘은 엄마랑 산딸기잼을 만들었어요!",
+	],
+	"morning": ["아침엔 새소리 세기 놀이를 해요. 오늘은 일곱!"],
+	"night": ["이 시간엔 자야 하는데... 쉿, 비밀이에요."],
+	"aff30": ["오늘도 와 줬네요! 헤헤.",
+		"나중에 내가 제일 좋아하는 나무 보여줄게요."],
+	"aff70": ["있잖아요, 다 나으면요...\n제일 먼저 같이 바다에 가고 싶어요.",
+		"엄마가 그러는데, 좋은 사람이 오면 병도 빨리 낫는대요."],
+	"loves": ["dish_jam", "forage_berry", "dish_melon_ice"],
+	"likes": ["forage_shell", "bug_butterfly", "dish_punch"],
+	"hates": ["sludge", "potion_ember"],
+	},
 }
-var affinity := {"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0}
+var affinity := {"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
+	"explorer": 0, "forest_mom": 0, "forest_girl": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
 const RING_PRICE := 12000
@@ -2769,6 +2850,9 @@ func reset_all() -> void:
 	sea_open = false
 	merchant_errand = ""
 	stall_hours = []
+	forest_quest = ""
+	forest_day = 0
+	affinity_open = false
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -3091,6 +3175,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
 		"sea_open": sea_open, "story2_phase": story2_phase,
 		"merchant_errand": merchant_errand, "stall_hours": stall_hours,
+		"forest_quest": forest_quest, "forest_day": forest_day,
+		"affinity_open": affinity_open,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

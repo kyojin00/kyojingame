@@ -203,6 +203,16 @@ const TEXTURE_NAMES := [
 	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
 	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
 	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
+	# 메인 스토리 5: 모험가 무진 + 숲속의 모녀 (연화·솔이)
+	"npc_explorer_down_0", "npc_explorer_down_1", "npc_explorer_up_0",
+	"npc_explorer_up_1", "npc_explorer_side_0", "npc_explorer_side_1",
+	"npc_explorer_portrait_normal", "npc_explorer_portrait_happy",
+	"npc_forest_mom_down_0", "npc_forest_mom_down_1", "npc_forest_mom_up_0",
+	"npc_forest_mom_up_1", "npc_forest_mom_side_0", "npc_forest_mom_side_1",
+	"npc_forest_mom_portrait_normal", "npc_forest_mom_portrait_happy",
+	"npc_forest_girl_down_0", "npc_forest_girl_down_1", "npc_forest_girl_up_0",
+	"npc_forest_girl_up_1", "npc_forest_girl_side_0", "npc_forest_girl_side_1",
+	"npc_forest_girl_portrait_normal", "npc_forest_girl_portrait_happy",
 	"weed_plant",
 	"bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
@@ -362,7 +372,8 @@ const NPC_PLAZA := {
 	"fisher": Vector2i(80, 19),
 }
 # 건물이 없는 NPC(이장)의 집 자리
-const NPC_HOME := {"chief": Vector2i(72, 20)}
+const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
+	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28)}
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
@@ -933,6 +944,10 @@ const STORY_ROAD_Y0 := 15
 const STORY_ROAD_Y1 := 18                  # 15·16·17·18 = 4줄
 const STORY_ROAD_X0 := 18
 const STORY_ROAD_X1 := 47
+# 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
+const FOREST_HOUSE_ANCHOR := Vector2i(30, 24)
+const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
+const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 무진이 처음 서성이는 광장 언저리
 const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
@@ -1067,6 +1082,7 @@ func _process(delta: float) -> void:
 	_bgm_tick(delta)
 	story._story_update(delta)
 	story._fisher_update(delta)
+	story._forest_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_tree_fall(delta)

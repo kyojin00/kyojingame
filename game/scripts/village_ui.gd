@@ -136,7 +136,7 @@ func _build_village_building(pid: String) -> void:
 
 
 func _talk_to(npc: Node2D) -> void:
-	# 스토리 대화가 먼저다 — 낚시꾼 첫 만남 / 호미 받기
+	# 스토리 대화가 먼저다 — 낚시꾼 첫 만남 / 호미 받기 / 숲속의 집
 	# (편지는 우체부가 직접 전한다 — 이장에게 대신 전달하는 과정은 없다)
 	if npc.id == "chief" and GameData.story2_phase == "farm_talk":
 		m.story._start_farm_dialog()
@@ -144,18 +144,42 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "fisher" and GameData.fisher_quest == "meet":
 		m.story._start_fisher_dialog()
 		return
+	if npc.id == "explorer" and GameData.forest_quest == "arrive":
+		m.story._start_explorer_arrive_dialog()
+		return
+	if npc.id == "explorer" and GameData.forest_quest == "found":
+		m.story._start_explorer_found_dialog()
+		return
+	if npc.id == "chief" and GameData.forest_quest == "ask":
+		m.story._start_forest_ask_dialog()
+		return
+	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
+		m.story._start_forest_house_dialog()
+		return
 	var def: Dictionary = GameData.NPCS[npc.id]
-	if not npc.talked_today:
-		npc.talked_today = true
-		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
-	# 봄 꽃놀이: 말을 건 사람을 하나씩 세어 둔다
+	# 봄 꽃놀이: 말을 건 사람을 하나씩 세어 둔다 (호감도 해금과 무관)
 	if GameData.festival_open() and str(GameData.festival_today().id) == "flower" \
 			and not GameData.fest_greeted.has(npc.id):
 		GameData.fest_greeted.append(npc.id)
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
-		if GameData.fest_greeted.size() >= GameData.NPCS.size():
+		if GameData.fest_greeted.size() >= m.npcs.size():
 			_finish_festival()
 			return
+	# 호감도 콘텐츠는 「숲속에서 발견한 집」(스토리 5)을 끝내야 열린다 —
+	# 그전에는 하트·호감도·선물 없이 담백한 인사만 나눈다
+	if not GameData.affinity_open:
+		var plain_choices: Array = [["대화 끝", null]]
+		if npc.id == "chief" and GameData.story_phase == "done":
+			plain_choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
+		if npc.id == "chief" and GameData.festival_open():
+			plain_choices.insert(0, ["축제 이야기", _open_festival_dialog])
+		m.dialog.open_seq(str(def.name), _npc_portrait(npc.id), [
+			{"text": GameData.npc_line(npc.id), "choices": plain_choices},
+		])
+		return
+	if not npc.talked_today:
+		npc.talked_today = true
+		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
 	# 계절·날씨·시간대·호감도·연애 단계에 맞는 대사를 고른다 (game_data.npc_line)
 	var line: String = GameData.npc_line(npc.id)
 	var aff := mini(int(GameData.affinity[npc.id]), 100)

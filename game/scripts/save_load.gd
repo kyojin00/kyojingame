@@ -56,6 +56,15 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.sea_open = bool(d.get("sea_open", false))
 	GameData.merchant_errand = str(d.get("merchant_errand", ""))
 	GameData.stall_hours = (d.get("stall_hours", []) as Array)
+	GameData.forest_quest = str(d.get("forest_quest", ""))
+	GameData.forest_day = int(d.get("forest_day", 0))
+	# 숲속의 집 이야기가 생기기 전 세이브: 이미 선물을 주고받던 사이면
+	# (호감도가 쌓여 있으면) 호감도 콘텐츠는 열린 채로 이어 준다
+	var had_aff := false
+	for ak in d.get("affinity", {}):
+		if int(d.affinity[ak]) >= 10:
+			had_aff = true
+	GameData.affinity_open = bool(d.get("affinity_open", had_aff))
 	# 노점은 다 지었는데 오늘 방문 시각이 없다 (옛 세이브/자정 전 저장) — 새로 뽑는다
 	if GameData.merchant_errand == "done" and GameData.stall_hours.is_empty():
 		GameData.roll_stall_hours()

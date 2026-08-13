@@ -552,6 +552,65 @@ func _debug_tick() -> void:
 			print("HIDDEN_OK=", rare_ok and coral_ok and relic_ok,
 				" 확률(1렙)=", rare1, " (10렙)=", rare10,
 				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
+		350:
+			# 메인 스토리 5 「숲속에서 발견한 집」:
+			# 무진 이사 -> (다음 날) 숲속 집 발견담 -> 이장도 모름 -> 모녀 만남
+			# -> 완료와 함께 호감도 콘텐츠 해금
+			GameData.forest_quest = ""
+			GameData.affinity_open = false
+			m.story._forest_update(0.016)
+			var arrived: bool = GameData.forest_quest == "arrive" \
+				and GameData.forest_objective_short() != ""
+			var have_ex := false
+			var chief_npc: Node2D = null
+			for n3 in m.npcs:
+				if n3.id == "explorer":
+					have_ex = true
+				elif n3.id == "chief":
+					chief_npc = n3
+			# 해금 전에는 하트·선물 없이 담백한 대화만 나온다
+			m.village._talk_to(chief_npc)
+			var gated: bool = m.dialog.visible and not GameData.affinity_open
+			m.dialog.close()
+			m.story._start_explorer_arrive_dialog()
+			var talk1: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._end_explorer_arrive()
+			var settled: bool = GameData.forest_quest == "settle"
+			GameData.day += 1                      # 하룻밤 자고 나면 발견담이 뜬다
+			m.story._forest_update(0.016)
+			var found_q: bool = GameData.forest_quest == "found" \
+				and GameData.forest_objective_short() != ""
+			m.story._start_explorer_found_dialog()
+			m.dialog.close()
+			m.story._end_explorer_found()
+			var ask_q: bool = GameData.forest_quest == "ask"
+			m.story._start_forest_ask_dialog()
+			m.dialog.close()
+			m.story._end_forest_ask()
+			var house_ok: bool = GameData.forest_quest == "visit" \
+				and str(m.objects.get(m.FOREST_HOUSE_ANCHOR, {}).get("kind", "")) == "house" \
+				and m.is_passable(m.door_tile(m.FOREST_HOUSE_ANCHOR))
+			var mom_ok := false
+			var girl_ok := false
+			for n5 in m.npcs:
+				if n5.id == "forest_mom":
+					mom_ok = true
+				elif n5.id == "forest_girl":
+					girl_ok = true
+			m.story._start_forest_house_dialog()
+			var meet: bool = m.dialog.visible
+			m.dialog.skip_seq()                    # 남은 대사 접기 -> 완료 처리
+			var done_ok: bool = GameData.forest_quest == "done" and GameData.affinity_open
+			m.dialog.close()
+			GameData.day -= 1
+			print("FOREST_OK=", arrived and have_ex and gated and talk1 and settled
+				and found_q and ask_q and house_ok and mom_ok and girl_ok and meet
+				and done_ok,
+				" 이사=", arrived, " 무진=", have_ex, " 해금전잠금=", gated,
+				" 정착=", settled, " 발견담=", found_q, " 이장도모름=", ask_q,
+				" 숲속의집=", house_ok, " 연화=", mom_ok, " 솔이=", girl_ok,
+				" 만남=", meet, " 완료+호감도해금=", done_ok)
 		338:
 			# 퀘스트 5 재현: 바위벽 앞까지 실제 이동 판정으로 붙은 뒤 E
 			var rx := 30

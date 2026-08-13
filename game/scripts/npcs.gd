@@ -98,6 +98,31 @@ func _sync_village_npcs() -> void:
 		if not have_fisher:
 			_spawn_npc("fisher", m.FISHER_ARRIVE)
 
+	# 모험가 무진 — 스토리 5로 이사 온다 (건물 없이 광장 언저리에서 지낸다)
+	if GameData.forest_quest != "":
+		var have_ex := false
+		for n in m.npcs:
+			if n.id == "explorer":
+				have_ex = true
+				break
+		if not have_ex:
+			_spawn_npc("explorer", m.EXPLORER_ARRIVE)
+
+	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
+	if GameData.forest_quest in ["visit", "done"]:
+		for fid: String in ["forest_mom", "forest_girl"]:
+			var have_f := false
+			for n in m.npcs:
+				if n.id == fid:
+					have_f = true
+					break
+			if have_f:
+				continue
+			_spawn_npc(fid, m.NPC_HOME[fid])
+			# 마을이 아니라 숲속 집 둘레만 서성인다
+			m.npcs[m.npcs.size() - 1].region = Rect2i(
+				m.FOREST_HOUSE_ANCHOR.x - 3, m.FOREST_HOUSE_ANCHOR.y + 3, 12, 5)
+
 
 func _tile_path(start: Vector2i, goal: Vector2i) -> Array:
 	if start == goal:

@@ -15,6 +15,9 @@ var m: KyojinMain    # main.gd
 func _door_kind_at(t: Vector2i) -> String:
 	if GameData.house_lv >= 1 and t == m.door_tile(m.HOME_ANCHOR):
 		return "home"
+	if GameData.forest_quest in ["visit", "done"] \
+			and t == m.door_tile(m.FOREST_HOUSE_ANCHOR):
+		return "forest_house"
 	for pid: String in GameData.village_built:
 		if m.VILLAGE_PLOTS.has(pid) and t == m.door_tile(m.VILLAGE_PLOTS[pid].anchor):
 			return pid
@@ -25,6 +28,15 @@ func _enter_building(kind: String) -> void:
 	m.riding.dismount_horse()   # 말을 타고 실내로 들어갈 수는 없다
 	if kind == "home":
 		m.interior.open()
+		return
+	if kind == "forest_house":
+		# 숲속의 집 (스토리 5): 첫 방문이면 모녀와의 만남, 이후에는 짧은 인사
+		if GameData.forest_quest == "visit":
+			m.story._start_forest_house_dialog()
+		else:
+			m.dialog.open("숲속의 집",
+				"문틈으로 약초 달이는 향이 은은하게 흘러나온다.\n연화와 솔이는 집 근처를 산책하는 모양이다.",
+				[["닫기", null]])
 		return
 	if m.shop_room.has_room(kind):
 		m.shop_room.open(kind)   # 가게마다 다른 방으로 들어간다

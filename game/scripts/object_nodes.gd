@@ -52,6 +52,10 @@ func _spawn_objects() -> void:
 		m.objects.erase(m.door_tile(m.HOME_ANCHOR))
 		m.worldgen._spawn_house_node(m.HOME_ANCHOR)
 		m.worldgen._trim_paths_under_building(m.HOME_ANCHOR)
+	if GameData.forest_quest in ["visit", "done"]:
+		# 숲속의 집 (스토리 5) — 저장된 발자취 그대로 그림만 다시 세운다
+		m.objects.erase(m.door_tile(m.FOREST_HOUSE_ANCHOR))
+		m.worldgen._spawn_house_node(m.FOREST_HOUSE_ANCHOR)
 	for pos: Vector2i in m.objects:
 		if m.objects[pos].kind != "house":
 			_spawn_object_node(pos, m.objects[pos].kind)

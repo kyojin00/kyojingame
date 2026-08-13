@@ -1505,3 +1505,121 @@ func hidden_beach_find(fid: String) -> void:
 			{"text": "[숨겨진 이야기가 연구 노트(N)에 기록됐다:\n「물에 잠긴 마을」]"},
 		])
 	m.saveio.save_now()
+
+
+# ---- 메인 스토리 5: 숲속에서 발견한 집 ----
+#
+# 첫 수확(스토리 2 완료) 뒤 모험가 무진이 마을로 이사 온다.
+# 숲을 쏘다니던 무진이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
+# 그 집에는 아픈 딸(솔이)을 돌보는 어머니(연화)가 조용히 살고 있었다.
+# 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
+
+func _forest_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 첫 수확 뒤 — 무진이 마을 광장에 나타난다
+	if GameData.forest_quest == "" and GameData.story_phase == "done" \
+			and GameData.story2_phase == "done":
+		GameData.forest_quest = "arrive"
+		m.npcmgr._sync_village_npcs()
+		m.hud.quest_toast("메인 스토리: 숲속에서 발견한 집")
+		m.hud.show_message("마을 광장에 처음 보는 사람이 서성인다. 말을 걸어 보자.", 6.0)
+	# 정착한 다음 날 아침 — 무진이 숲에서 뭔가를 발견했다
+	elif GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
+		GameData.forest_quest = "found"
+		m.hud.quest_toast("무진이 할 말이 있는 듯하다")
+
+
+# 광장의 무진에게 말을 걸면 — 이사 인사 (모험을 좋아하는 성격)
+func _start_explorer_arrive_dialog() -> void:
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("무진", m.tex["npc_explorer_portrait_happy"], [
+		{"text": "「어! 안녕? 나는 무진.\n오늘부로 이 마을 주민이 된 사람!」"},
+		{"text": "「한곳에 오래 못 붙어 있는 성격인데 말이야,\n이 동네는 숲도 강도 바다도 있다며?」",
+			"portrait": m.tex["npc_explorer_portrait_normal"]},
+		{"text": "「당분간 여기 살면서 구석구석 모험해 볼 참이야.\n%s(이)라고? 잘 부탁해!」" % nm,
+			"portrait": m.tex["npc_explorer_portrait_happy"]},
+	], _end_explorer_arrive)
+
+
+func _end_explorer_arrive() -> void:
+	if GameData.forest_quest == "arrive":
+		GameData.forest_quest = "settle"
+		GameData.forest_day = GameData.day
+		m.hud.quest_toast("새 주민: 모험가 무진")
+		m.hud.show_message("무진이 마을에 정착했다. 내일은 또 어딜 쏘다닐까?", 5.0)
+	m.saveio.save_now()
+
+
+# 다음 날 — 무진이 숲 깊은 곳에서 수상한 집을 봤다며 조사를 부탁한다
+func _start_explorer_found_dialog() -> void:
+	m.dialog.open_seq("무진", m.tex["npc_explorer_portrait_normal"], [
+		{"text": "「야, 마침 잘 왔어!\n어제 서쪽 숲을 온종일 헤집고 다녔거든?」"},
+		{"text": "「그런데 숲 '깊은 곳'에 말이야...\n집이 한 채 덩그러니 있는 거야.」"},
+		{"text": "「저 우거진 숲속에 누가 산다고?\n아무리 생각해도 이상하단 말이지.」"},
+		{"text": "「같이 좀 알아봐 줘. 이장님이라면 뭔가 아실지도?\n나는... 그, 왠지 으스스해서 말이야.」",
+			"portrait": m.tex["npc_explorer_portrait_happy"]},
+	], _end_explorer_found)
+
+
+func _end_explorer_found() -> void:
+	if GameData.forest_quest == "found":
+		GameData.forest_quest = "ask"
+		m.hud.quest_toast("숲속의 집에 대해 이장에게 물어보자")
+	m.saveio.save_now()
+
+
+# 이장에게 물어본다 — 이장도 모르는 집
+func _start_forest_ask_dialog() -> void:
+	m.dialog.open_seq("이장 덕수", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「숲 깊은 곳에... 집이 있다고?」"},
+		{"text": "「내가 이 마을 이장을 삼십 년 했네만,\n그런 집이 있단 얘기는 처음 듣는구먼.」"},
+		{"text": "「빈집일 리는 없고... 영 마음에 걸리는군.\n미안하네만, 자네가 직접 가서 살펴봐 주겠나?」"},
+	], _end_forest_ask)
+
+
+func _end_forest_ask() -> void:
+	if GameData.forest_quest == "ask":
+		GameData.forest_quest = "visit"
+		m.worldgen._spawn_forest_house()
+		m.npcmgr._sync_village_npcs()   # 모녀가 집 앞에 있다
+		m.hud.quest_toast("숲 깊은 곳의 집을 찾아가 보자")
+		m.hud.show_message("숲길(서쪽) 남쪽으로 난 오솔길을 따라 내려가 보자.", 6.0)
+	m.saveio.save_now()
+
+
+# 숲속 집의 모녀 — 문을 두드리면(또는 연화·솔이에게 말을 걸면) 사정을 듣는다
+func _start_forest_house_dialog() -> void:
+	var mom_n: Texture2D = m.tex["npc_forest_mom_portrait_normal"]
+	var mom_h: Texture2D = m.tex["npc_forest_mom_portrait_happy"]
+	var girl_h: Texture2D = m.tex["npc_forest_girl_portrait_happy"]
+	m.story_cutscene = true
+	m.dialog.open_seq("숲속의 집", null, [
+		{"text": "(문을 두드리자, 한참 만에 조심스럽게 문이 열렸다.)"},
+		{"text": "「...누구세요? 이 깊은 숲까지 어떻게...」",
+			"name": "연화", "portrait": mom_n},
+		{"text": "「엄마, 손님이에요? 우와, 진짜 손님이다!」",
+			"name": "솔이", "portrait": girl_h},
+		{"text": "「어머, 놀라게 해서 죄송해요. 저는 연화라고 해요.\n여기서 딸 솔이와 둘이 살고 있어요.」",
+			"name": "연화", "portrait": mom_n},
+		{"text": "「마을에는 거의 내려가지 않아서...\n이장님께서도 저희를 모르셨을 거예요.」",
+			"name": "연화"},
+		{"text": "「우리 솔이가... 몸이 약해요. 의원 말이,\n공기 좋고 조용한 곳에서 지내야 한다더군요.」",
+			"name": "연화"},
+		{"text": "「그래서 이 숲에 자리를 잡았어요.\n숲 공기 덕분인지 요즘은 많이 좋아졌답니다.」",
+			"name": "연화", "portrait": mom_h},
+		{"text": "「저 이제 기침도 거의 안 해요!\n나중에 마을 축제에도 가 보고 싶어요.」",
+			"name": "솔이", "portrait": girl_h},
+		{"text": "「숨기려던 건 아니에요. 그저 조용히 지내고 싶었을 뿐...\n괜찮으시다면, 가끔 놀러 오세요.」",
+			"name": "연화", "portrait": mom_h},
+	], _end_forest_quest)
+
+
+func _end_forest_quest() -> void:
+	m.story_cutscene = false
+	if GameData.forest_quest != "done":
+		GameData.forest_quest = "done"
+		GameData.affinity_open = true
+		m.hud.quest_toast("메인 스토리 완료: 숲속에서 발견한 집")
+		m.hud.show_message("호감도 해금! 퀘스트 너머, 사람들의 이야기가 열렸다.\n주민에게 말을 걸어 마음을 나누고 선물도 건네 보자.", 7.0)
+	m.saveio.save_now()
