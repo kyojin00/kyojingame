@@ -205,20 +205,21 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.hline(13 + dx, 18 + dx, y, 'B')            # 옷깃 (목 아래 그늘)
     g.hline(15 + dx, 16 + dx, y + 2, 'B')        # 앞섶 단추 두 개
     g.hline(15 + dx, 16 + dx, y + 4, 'B')
-    # 팔: 소매 4픽셀 폭 + 네 칸 손. 앞으로 흔들면 소매가 늘어나며 내려가고
+    # 팔: 소매 3픽셀 폭 + 세 칸 손. 앞으로 흔들면 소매가 늘어나며 내려가고
     # 뒤로 가면 접히며 올라간다 — 어깨는 늘 몸통에 붙어 있다.
-    for sx, sw, side in ((6, swing, 'left'), (22, -swing, 'right')):
+    # (4칸으로 키워 봤더니 정면 어깨가 벌어져 어색했다 — 옆모습만 4칸.)
+    for sx, sw, side in ((7, swing, 'left'), (22, -swing, 'right')):
         if side == skip:
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        g.rect(sx, y + 1, sx + 3, y + 4 + dy, 'b')
-        g.vline(sx if side == 'left' else sx + 3, y + 1, y + 4 + dy,
+        g.rect(sx, y + 1, sx + 2, y + 4 + dy, 'b')
+        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 4 + dy,
                 'L' if side == 'left' else 'B')
-        g.hline(sx, sx + 3, y + 5 + dy, 'B')                     # 소매단
-        g.rect(sx, y + 6 + dy, sx + 3, y + 8 + dy, 's')          # 손
-        g.hline(sx + 2, sx + 3, y + 8 + dy, 'S')                 # 손 그늘
+        g.hline(sx, sx + 2, y + 5 + dy, 'B')                     # 소매단
+        g.rect(sx, y + 6 + dy, sx + 2, y + 8 + dy, 's')          # 손
+        g.hline(sx + 1, sx + 2, y + 8 + dy, 'S')                 # 손 그늘
 
 
 def legs_down(g, stride, dx=0, sq=0):
@@ -325,18 +326,18 @@ def torso_up(g, bob, swing, dx=0, skip=None):
     g.vline(10 + dx, y + 1, y + 8, 'B')          # 팔과 몸 사이 솔기
     g.vline(21 + dx, y + 1, y + 8, 'B')
     g.hline(13 + dx, 18 + dx, y + 5, 'B')        # 등판 주름
-    for sx, sw, side in ((6, -swing, 'left'), (22, swing, 'right')):
+    for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
         if side == skip:                         # 뒤모습이라 팔 위상이 좌우 반대
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        g.rect(sx, y + 1, sx + 3, y + 4 + dy, 'b')
-        g.vline(sx if side == 'left' else sx + 3, y + 1, y + 4 + dy,
+        g.rect(sx, y + 1, sx + 2, y + 4 + dy, 'b')
+        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 4 + dy,
                 'L' if side == 'left' else 'B')
-        g.hline(sx, sx + 3, y + 5 + dy, 'B')
-        g.rect(sx, y + 6 + dy, sx + 3, y + 8 + dy, 's')
-        g.hline(sx + 2, sx + 3, y + 8 + dy, 'S')
+        g.hline(sx, sx + 2, y + 5 + dy, 'B')
+        g.rect(sx, y + 6 + dy, sx + 2, y + 8 + dy, 's')
+        g.hline(sx + 1, sx + 2, y + 8 + dy, 'S')
 
 
 def legs_up(g, stride, dx=0, sq=0):
