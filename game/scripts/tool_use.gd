@@ -386,7 +386,6 @@ func use_tool() -> void:
 				m.hud.show_message(
 					"울타리가 닫혔다! 목초지 %d칸 — 안에 있는 동물은 알아서 배부르고 "
 					% m.pasture.size() + "생산물도 더 준다.", 5.0)
-			m.tutorial_notify("build")
 		"sprinkler":
 			if obj != null or cell.ground == "water" or cell.crop_id != "" \
 					or m.actions._tile_overlaps_player(t):
@@ -402,7 +401,6 @@ func use_tool() -> void:
 			m.farming._sprinkle(t)                      # 설치하자마자 바로 적신다
 			Sound.play_sfx("sfx_place")
 			m.hud.show_message("스프링클러 설치! 주변 4칸에 계속 물을 준다.")
-			m.tutorial_notify("build")
 		"spear", "sword":
 			_weapon_swing(t)
 		"rod":

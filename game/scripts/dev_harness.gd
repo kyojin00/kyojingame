@@ -2161,6 +2161,125 @@ func _debug_tick() -> void:
 			GameData.bed_lv = keep_bedlv
 			GameData.story2_phase = "done"
 			m.interior._layout()
+		301:
+			# #103/#104/#105: 마을 생활 안내 분리(스토리 3에 열림) + 게시판 1번 퀘
+			# + 퀘스트 카탈로그 분류(cat/ep) + Q창 좌우 분할
+			var keep_tut: Dictionary = GameData.tutorial.duplicate()
+			var keep_guide := GameData.guide_active
+			var keep_move := GameData.move_quest
+			GameData.tutorial = GameData.fresh_tutorial()
+			GameData.guide_active = false
+			var no_build := true
+			for pair in GameData.TUTORIAL_ORDER:
+				if str(pair[0]) == "build":
+					no_build = false
+			# 안내가 잠겨 있으면 안내 목표는 나오지 않고, 알림도 무시된다
+			for f in GameData.STORY2_FLAGS:
+				GameData.tutorial[f] = true
+			var none_flag := GameData.tutorial_current_flag() == ""
+			m.tutorial_notify("board")
+			var ignored: bool = not GameData.tutorial.get("board", false)
+			# 스토리 3이 열면 1번 목표 = 의뢰 게시판
+			GameData.guide_active = true
+			var first := GameData.tutorial_current_flag() == "board"
+			var keep_money := GameData.money
+			m.village._open_quest_board()
+			m.dialog.close()
+			var board_done: bool = GameData.tutorial.get("board", false) \
+				and GameData.money == keep_money + 100
+			# 「새로운 주민의 이사」= 메인 스토리 3으로 분류되고 Q창에 뜬다
+			GameData.move_quest = "show"
+			var cat_ok := false
+			for q: Dictionary in GameData.quest_catalog():
+				if str(q.id) == "move" and str(q.get("cat", "")) == "main" \
+						and str(q.get("ep", "")) == "메인 스토리 3":
+					cat_ok = true
+			m.quest_ui._sel = "move"
+			m.quest_ui.toggle()
+			var listed: bool = m.quest_ui.list_box.get_child_count() > 0 \
+				and m.quest_ui.detail_box.get_child_count() > 0
+			m.quest_ui.close()
+			print("GUIDE_OK=", no_build and none_flag and ignored and first
+				and board_done and cat_ok and listed,
+				" 설치퀘삭제=", no_build, " 잠금=", none_flag and ignored,
+				" 게시판1번=", first, " 게시판달성=", board_done,
+				" 이사=메인3=", cat_ok, " Q창좌우=", listed)
+			GameData.move_quest = keep_move
+			GameData.tutorial = keep_tut
+			GameData.guide_active = keep_guide
+		302:
+			# #103: 스프링클러 = 수확 보상에서 빠지고 잡화점 레시피(배우면 해금)
+			var keep_ut: Array = GameData.unlocked_tools.duplicate()
+			GameData.unlocked_tools.erase("sprinkler")
+			GameData.recipes_unlocked.erase("sprinkler")
+			var not_in_harvest: bool = \
+				"sprinkler" not in GameData.TUTORIAL_UNLOCKS["harvest"]
+			var disp := GameData.recipe_display_name("sprinkler") == "스프링클러"
+			var on_sale: bool = m.shop._recipe_on_sale("sprinkler")
+			GameData.give_recipe("sprinkler")
+			var scroll_in_bag := int(GameData.recipe_items.get("sprinkler", 0)) == 1
+			var gone_while_owned: bool = not m.shop._recipe_on_sale("sprinkler")
+			var learned := GameData.learn_recipe("sprinkler")
+			var tool_open := GameData.is_tool_unlocked("sprinkler") \
+				and "sprinkler" in GameData.recipes_unlocked
+			var gone_after: bool = not m.shop._recipe_on_sale("sprinkler")
+			print("SPRECIPE_OK=", not_in_harvest and disp and on_sale
+				and scroll_in_bag and gone_while_owned and learned and tool_open
+				and gone_after,
+				" 수확보상제외=", not_in_harvest, " 이름=", disp,
+				" 판매중=", on_sale, " 두루마리=", scroll_in_bag,
+				" 구매후목록제거=", gone_while_owned and gone_after,
+				" 배우면해금=", learned and tool_open)
+			GameData.unlocked_tools = keep_ut
+		305:
+			# #104: 초록 풀숲 드랍 — 기본 잡초, 약초는 1%
+			var herb := 0
+			var weed_n := 0
+			for i in 400:
+				if GameData.weed_drop_id() == "forage_herb":
+					herb += 1
+				else:
+					weed_n += 1
+			print("WEEDDROP_OK=", herb < 40 and weed_n > 360,
+				" 약초=", herb, "/400 잡초=", weed_n, "/400")
+		306:
+			# #104: 의뢰 게시판 필터 — 해금한 도구·지역·제철로만 의뢰가 붙는다
+			var keep_ut2: Array = GameData.unlocked_tools.duplicate()
+			var keep_md := GameData.mine_deepest
+			GameData.unlocked_tools.erase("rod")
+			GameData.unlocked_tools.erase("pickaxe")
+			var no_fish: bool = GameData.quest_pool("fish").is_empty()
+			var no_min: bool = GameData.quest_pool("mineral").is_empty()
+			GameData.unlocked_tools.append("rod")
+			GameData.unlocked_tools.append("pickaxe")
+			var fish_pool: Array = GameData.quest_pool("fish")
+			var season_ok: bool = not fish_pool.is_empty()
+			for fid in fish_pool:
+				for f: Dictionary in GameData.FISH:
+					if str(f.id) == str(fid):
+						season_ok = season_ok and (f.weather as Array).is_empty() \
+							and ((f.seasons as Array).is_empty()
+								or GameData.season() in f.seasons)
+			var no_herb: bool = "forage_herb" not in GameData.quest_pool("forage")
+			GameData.mine_deepest = 1
+			var no_gem: bool = "gem" not in GameData.quest_pool("mineral")
+			GameData.mine_deepest = 5
+			var gem_deep: bool = "gem" in GameData.quest_pool("mineral")
+			GameData.mine_deepest = keep_md
+			GameData.unlocked_tools = keep_ut2
+			print("QUESTPOOL_OK=", no_fish and no_min and season_ok and no_herb
+				and no_gem and gem_deep,
+				" 낚싯대없음=", no_fish, " 곡괭이없음=", no_min,
+				" 제철만=", season_ok, " 약초금지=", no_herb,
+				" 보석3층=", no_gem and gem_deep)
+		309:
+			# #103: 메인 스토리 완결 — 전체 화면 연출이 뜨고 알아서 걷힌다
+			m.hud.story_banner("메인 스토리 검사", "완결 연출")
+			var shown: bool = m.hud._sb_layer != null and m.hud._sb_layer.visible
+			m.hud._update_story_banner(5.0)
+			var gone_fx: bool = not m.hud._sb_layer.visible
+			print("STORYFX_OK=", shown and gone_fx,
+				" 표시=", shown, " 자동닫힘=", gone_fx)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()

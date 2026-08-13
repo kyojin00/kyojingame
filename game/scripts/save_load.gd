@@ -87,6 +87,14 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
 	GameData.recipe_items = d.get("recipe_items", {})
+	# 발견 기록과 배운 레시피 — 저장에는 실려 있었는데 읽는 쪽이 없어서
+	# 재로드 때 백필로만 어림잡던 구멍을 메웠다 (처음 얻은 날, 배운
+	# 레시피가 이제 그대로 살아난다)
+	for k in d.get("discovered", {}):
+		GameData.discovered[k] = int(d.discovered[k])
+	for rid in d.get("recipes_unlocked", []):
+		if str(rid) not in GameData.recipes_unlocked:
+			GameData.recipes_unlocked.append(str(rid))
 	GameData.tracked_pick = str(d.get("tracked_pick", ""))
 	GameData.respawn_queue = d.get("respawn_queue", [])
 	# 첫 인사 시스템이 생기기 전 세이브: 이미 지어져 영업하던 건물의
@@ -179,6 +187,16 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.quest_offers = d.get("quest_offers", [])
 	# 구버전 저장에는 튜토리얼 정보가 없다 → 완료로 간주
 	GameData.tutorial = d.get("tutorial", {"active": false})
+	# 마을 생활 안내 분리(스토리 3과 함께 시작) 이전 세이브:
+	# 안내 목표를 전부 초기화하고, 스토리 3을 이미 시작했으면 안내도 연다
+	GameData.guide_active = bool(d.get("guide_active",
+		str(d.get("move_quest", "")) != ""))
+	if not d.has("guide_active"):
+		for pair in GameData.TUTORIAL_ORDER:
+			if pair[0] not in GameData.STORY2_FLAGS:
+				GameData.tutorial[pair[0]] = false
+		if GameData.tutorial.get("active", true) == false:
+			GameData.tutorial["active"] = true   # 리셋한 안내를 다시 진행할 수 있게
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
 	GameData.alchemy_known = d.get("alchemy_known", [])
@@ -201,6 +219,11 @@ func _apply_save(d: Dictionary) -> void:
 		# 없는 장비를 끼고 있는 저장은 무시한다 (표에서 빠진 장비 등)
 		GameData.equipped[slot] = gid if GameData.owned_gear.has(gid) else ""
 	GameData.unlocked_tools = d.get("unlocked_tools", GameData.ALL_TOOLS.duplicate())
+	# 스프링클러가 퀘스트 보상에서 잡화점 레시피(농사 Lv3)로 바뀌었다 —
+	# 레시피 없이 열려 있던 구세이브의 스프링클러는 회수한다 (설치물은 유지)
+	if GameData.unlocked_tools.has("sprinkler") \
+			and "sprinkler" not in GameData.recipes_unlocked:
+		GameData.unlocked_tools.erase("sprinkler")
 	for k in d.get("mob_kills", {}):
 		GameData.mob_kills[k] = int(d.mob_kills[k])
 	GameData.apply_skills_data(d.get("skills", {}))

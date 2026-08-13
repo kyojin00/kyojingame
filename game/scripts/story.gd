@@ -857,8 +857,8 @@ func home_entered() -> void:
 	if GameData.story_phase != "home_open":
 		return
 	GameData.story_phase = "greet"
-	m.hud.quest_toast("새 보금자리")
-	m.hud.show_message("메인 스토리 1 완료! 집을 둘러보고 밖으로 나가 보자.", 6.0)
+	m.hud.story_banner("메인 스토리 1 완결", "우체부 아저씨와의 첫 만남")
+	m.hud.show_message("집을 둘러보고 밖으로 나가 보자.", 6.0)
 	m.saveio.save_now()
 
 
@@ -1358,10 +1358,13 @@ func tutorial_notify(flag: String) -> void:
 	if flag == "harvest" and GameData.story2_phase == "farm":
 		GameData.story2_phase = "done"
 		GameData.move_day = GameData.day   # 다음 날 아침, 이주 희망 편지가 온다
-		m.hud.quest_toast("메인 스토리 2 완료!")
+		m.hud.story_banner("메인 스토리 2 완결", "마을을 깨우다")
 		m.saveio.save_now()
 	var tut: Dictionary = GameData.tutorial
 	if not tut.get("active", false) or tut.get(flag, true):
+		return
+	# 마을 생활 안내(스토리2 밖 목표)는 스토리 3이 열어 줘야 진행된다
+	if flag not in GameData.STORY2_FLAGS and not GameData.guide_active:
 		return
 	tut[flag] = true
 	Sound.play_sfx("sfx_catch")
@@ -1418,7 +1421,7 @@ func _open_grandpa_letter() -> void:
 	Sound.play_sfx("sfx_ui")
 	m.dialog.open("할아버지의 부탁 — %s" % q.name,
 		"%s\n\n· %s" % [q.letter, q.desc],
-		[["해보겠습니다", null]], m.tex.get("icon_note"))
+		[["해보겠습니다", null]], m.tex.get("icon_letter"))
 
 
 func _grandpa_update(delta: float) -> void:
@@ -1616,7 +1619,7 @@ func _end_forest_quest() -> void:
 	if GameData.forest_quest != "done":
 		GameData.forest_quest = "done"
 		GameData.affinity_open = true
-		m.hud.quest_toast("메인 스토리 완료: 숲속에서 발견한 집")
+		m.hud.story_banner("메인 스토리 5 완결", "숲속에서 발견한 집")
 		m.hud.show_message("호감도 해금! 퀘스트 너머, 사람들의 이야기가 열렸다.\n주민에게 말을 걸어 마음을 나누고 선물도 건네 보자.", 7.0)
 	m.saveio.save_now()
 
@@ -1639,6 +1642,9 @@ func _move_update(_delta: float) -> void:
 		GameData.move_quest = "letter"
 		# 편지는 가방에 남는다 — 나중에 다시 꺼내 읽고 수락할 수 있다
 		GameData.items["move_letter"] = int(GameData.items.get("move_letter", 0)) + 1
+		# 메인 스토리 3과 함께 「마을 생활 안내」가 열린다 —
+		# 이때부터 안내 목표가 퀘스트 창(Q)에 나오고, 원하면 핀으로 고정한다
+		GameData.guide_active = true
 		_start_move_letter_dialog()
 	# 집을 지은 다음 날 — 무진이 정말로 이사 오고, 직접 인사하러 온다
 	# (이주 NPC 공통 규칙: 확정일 다음 날, 본인이 플레이어를 찾아온다)
@@ -1650,7 +1656,7 @@ func _move_update(_delta: float) -> void:
 
 
 func _start_move_letter_dialog() -> void:
-	m.dialog.open_seq("이주 희망 편지", null, [
+	m.dialog.open_seq("이주 희망 편지", m.tex.get("icon_letter"), [
 		{"text": "(문 앞에 낯선 편지가 한 통 놓여 있었다.)"},
 		{"text": "『안녕하세요! 저는 무진이라고 해요.\n여기저기 떠돌며 모험하는 걸 좋아하는 소년이에요.』"},
 		{"text": "『소문을 들었어요. 조용하던 교진 마을에\n다시 활기가 돌기 시작했다고요!』"},
@@ -1662,7 +1668,8 @@ func _start_move_letter_dialog() -> void:
 func _end_move_letter() -> void:
 	if GameData.move_quest == "letter":
 		GameData.move_quest = "show"
-		m.hud.quest_toast("메인 스토리: 새로운 주민의 이사")
+		m.hud.quest_toast("메인 스토리 3 — 새로운 주민의 이사")
+		m.hud.quest_toast("마을 생활 안내가 열렸다! (Q에서 확인)")
 	m.saveio.save_now()
 
 
@@ -1748,15 +1755,15 @@ func open_move_letter() -> void:
 	if GameData.move_quest == "show":
 		m.dialog.open("이주 희망 편지",
 			"『...꼭 한번 살아 보고 싶어요. 받아 주실래요? — 무진』\n\n(먼저 이장님께 보여드리고 상의해 보자.)",
-			[["닫기", null]])
+			[["닫기", null]], m.tex.get("icon_letter"))
 		return
 	if GameData.move_quest != "build":
 		m.dialog.open("이주 희망 편지", "이미 답장을 보낸 편지다.\n무진의 들뜬 글씨가 눈에 선하다.",
-			[["닫기", null]])
+			[["닫기", null]], m.tex.get("icon_letter"))
 		return
 	m.dialog.open("이주 희망 편지",
 		"『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요? — 무진』",
-		[["수락하기", _try_accept_move], ["나중에", null]])
+		[["수락하기", _try_accept_move], ["나중에", null]], m.tex.get("icon_letter"))
 
 
 # 수락 — **빈 집터가 있어야만** 된다. 없으면 편지는 그대로 남는다.
@@ -1862,7 +1869,7 @@ func _end_story4() -> void:
 	GameData.story4_phase = "done"
 	if not GameData.zones_open.has("east_north"):
 		GameData.zones_open.append("east_north")
-	m.hud.quest_toast("마을 확장 해금!")
+	m.hud.story_banner("메인 스토리 4 완결", "오래된 마을의 경계")
 	m.hud.show_message("옛 마을 북동쪽 터가 열렸다! 동쪽 다리 너머로 마을이 넓어졌다.\n"
 		+ "남은 구역은 이장님의 「마을 확장 이야기」에서 되살릴 수 있다. (지도 M)", 7.0)
 	m.queue_redraw()
@@ -1885,7 +1892,7 @@ func _start_move_greet_dialog() -> void:
 func _end_move_greet() -> void:
 	if GameData.move_quest in ["greet", "wait"]:
 		GameData.move_quest = "done"
-		m.hud.quest_toast("메인 스토리 완료: 새로운 주민의 이사")
+		m.hud.story_banner("메인 스토리 3 완결", "새로운 주민의 이사")
 		m.hud.show_message("이주 편지·집터 시스템 해금!\n앞으로 이주 희망 편지는 이장 허락 없이 네가 직접 결정한다.", 7.0)
 		# 정착 다음 날, 무진의 숲 모험이 시작된다 (숲속에서 발견한 집으로 이어진다)
 		GameData.forest_quest = "settle"

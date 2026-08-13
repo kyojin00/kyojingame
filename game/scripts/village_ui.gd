@@ -734,6 +734,8 @@ func _romance_gift(npc_id: String, item_id: String, aff: int) -> void:
 
 
 func _open_quest_board() -> void:
+	# 마을 생활 안내 1번 — 의뢰 게시판을 처음 열어 보면 달성
+	m.tutorial_notify("board")
 	var q: Dictionary = GameData.quest
 	if q.is_empty():
 		if GameData.quest_offers.is_empty():

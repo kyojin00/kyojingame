@@ -261,6 +261,115 @@ func quest_toast(title: String) -> void:
 	Sound.play_sfx("sfx_catch")
 
 
+# ---- 메인 스토리 완결 연출 (전체 화면) ----
+#
+# 상단 구석에 스치던 작은 토스트 대신, 화면을 잠깐 어둡게 하고
+# 한가운데에 큼직하게 「메인 스토리 N 완결」을 띄운다. 클릭하면 닫힌다.
+var _sb_layer: CanvasLayer = null
+var _sb_dim: ColorRect
+var _sb_box: Control
+var _sb_head: Label
+var _sb_title: Label
+var _sb_sub: Label
+var _sb_time := 0.0
+var _sb_dur := 4.6
+
+
+func story_banner(head: String, title: String) -> void:
+	if _sb_layer == null:
+		_make_story_banner()
+	_sb_head.text = "✦  %s  ✦" % head
+	_sb_title.text = title
+	_sb_time = 0.0
+	# 검증 하네스에서는 짧게 스치고 지나간다 (다음 스텝 입력을 막지 않게)
+	_sb_dur = 0.8 if OS.get_environment("KYOJIN_SHOT") != "" else 4.6
+	_sb_layer.visible = true
+	Sound.play_sfx("sfx_catch")
+
+
+func _make_story_banner() -> void:
+	_sb_layer = CanvasLayer.new()
+	_sb_layer.layer = 40
+	_sb_layer.visible = false
+	add_child(_sb_layer)
+
+	_sb_dim = ColorRect.new()
+	_sb_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sb_dim.color = Color(0, 0, 0, 0.55)
+	_sb_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_sb_dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed:
+			_sb_time = maxf(_sb_time, _sb_dur - 0.35))
+	_sb_layer.add_child(_sb_dim)
+
+	_sb_box = Control.new()
+	_sb_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sb_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sb_box.pivot_offset = Vector2(480, 250)
+	_sb_layer.add_child(_sb_box)
+
+	# 위아래 가는 금줄 — 두루마리를 펼친 듯한 띠
+	for y in [196.0, 316.0]:
+		var rule := ColorRect.new()
+		rule.position = Vector2(270, y)
+		rule.size = Vector2(420, 2)
+		rule.color = Color(1.0, 0.84, 0.37, 0.8)
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sb_box.add_child(rule)
+
+	_sb_head = Label.new()
+	_sb_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_sb_head.offset_top = 210
+	_sb_head.offset_bottom = 240
+	_sb_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sb_head.add_theme_font_override("font", FONT_SMALL)
+	_sb_head.add_theme_font_size_override("font_size", 20)
+	_sb_head.add_theme_color_override("font_color", Color(1.0, 0.84, 0.37))
+	_sb_head.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	_sb_head.add_theme_constant_override("outline_size", 5)
+	_sb_box.add_child(_sb_head)
+
+	_sb_title = Label.new()
+	_sb_title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_sb_title.offset_top = 244
+	_sb_title.offset_bottom = 296
+	_sb_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sb_title.add_theme_font_override("font", FONT_SMALL)
+	_sb_title.add_theme_font_size_override("font_size", 34)
+	_sb_title.add_theme_color_override("font_color", Color(0.98, 0.94, 0.84))
+	_sb_title.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	_sb_title.add_theme_constant_override("outline_size", 6)
+	_sb_box.add_child(_sb_title)
+
+	_sb_sub = Label.new()
+	_sb_sub.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_sb_sub.offset_top = 330
+	_sb_sub.offset_bottom = 350
+	_sb_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sb_sub.text = "이야기는 계속된다  (클릭해서 닫기)"
+	_sb_sub.add_theme_font_override("font", FONT_SMALL)
+	_sb_sub.add_theme_font_size_override("font_size", 12)
+	_sb_sub.add_theme_color_override("font_color", Color(0.85, 0.8, 0.7, 0.85))
+	_sb_sub.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	_sb_sub.add_theme_constant_override("outline_size", 3)
+	_sb_box.add_child(_sb_sub)
+
+
+func _update_story_banner(delta: float) -> void:
+	if _sb_layer == null or not _sb_layer.visible:
+		return
+	_sb_time += delta
+	var a := clampf(_sb_time / 0.35, 0.0, 1.0)               # 스르륵 나타나고
+	if _sb_time > _sb_dur - 0.5:
+		a = minf(a, clampf((_sb_dur - _sb_time) / 0.5, 0.0, 1.0))  # 스르륵 사라진다
+	_sb_dim.color.a = 0.55 * a
+	_sb_box.modulate.a = a
+	var pop := 1.0 + 0.06 * (1.0 - minf(_sb_time / 0.35, 1.0))    # 살짝 커졌다 앉는다
+	_sb_box.scale = Vector2(pop, pop)
+	if _sb_time >= _sb_dur:
+		_sb_layer.visible = false
+
+
 func reward_toast(item_name: String, icon: Texture2D) -> void:
 	_toast_queue.append({"head": "보상 획득!", "body": item_name, "icon": icon,
 		"head_col": Color(0.85, 0.6, 0.15)})
@@ -520,6 +629,7 @@ func _watch_goal(goal: String) -> void:
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	_update_story_banner(delta)
 	# 제작대에서 방금 완성된 것 (game_data는 UI를 못 부른다)
 	while not GameData.desk_done_pending.is_empty():
 		var made: String = GameData.desk_done_pending.pop_front()

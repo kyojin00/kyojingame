@@ -892,6 +892,7 @@ func _item_entries() -> Array:
 			e["place"] = true
 		elif id == "move_letter":
 			e["tab"] = "place"
+			e["icon"] = "icon_letter"
 			e["desc"] = "마을로 이사 오고 싶다는 편지 — 클릭해서 다시 읽고 수락한다"
 			e["letter"] = true
 		elif id == "trash_bin":

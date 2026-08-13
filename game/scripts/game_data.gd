@@ -851,6 +851,10 @@ var move_quest := ""
 var move_day := 0            # 단계 전환 기준 날 (편지 도착·이사 대기)
 var move_house := Vector2i(-999, -999)   # 무진의 집 자리 (수락한 집터)
 const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
+# 스프링클러는 퀘스트 보상이 아니라 잡화점 레시피가 됐다 —
+# 농사 실력이 이만큼 붙어야 선반에 올라온다
+const SPRINKLER_FARM_LV := 3
+const SPRINKLER_RECIPE_PRICE := 500
 # 미리 마련해 둔 빈 집터들 — [{x, y, used}]. **빈 집터가 있어야만**
 # 이주 희망 편지를 수락할 수 있다 (수락하면 첫 빈 집터에 집이 지어진다)
 var home_plots: Array = []
@@ -952,33 +956,48 @@ func _quest_brief(s: String) -> String:
 
 # 지금 진행 중인 퀘스트 전부 — 미니창 고정(핀) 선택지가 된다.
 # 앞쪽일수록 「자동」일 때 우선순위가 높다 (메인 스토리 먼저).
+# 진행 중 퀘스트 카탈로그 — Q창(좌측 목록/우측 상세)과 미니 트래커가 함께 쓴다.
+# 항목: id/title/obj/desc + cat("main"/"sub"/"guide"/"daily") + ep(메인 회차 라벨)
+#       + npc(퀘스트를 준 인물 — 초상화 키의 가운데 토막) + reward(보상 안내문)
 func quest_catalog() -> Array:
 	var out: Array = []
 	var o := story_objective_short()
 	if o != "":
 		var cur := story_current_quest()
 		out.append({"id": "story1", "title": str(cur.get("name", "처음 온 마을")),
-			"obj": o, "desc": _quest_brief(str(cur.get("story", "")))})
+			"obj": o, "desc": _quest_brief(str(cur.get("story", ""))),
+			"cat": "main", "ep": "메인 스토리 1", "npc": "postman",
+			"reward": "새 도구와 나만의 집"})
 	o = story2_objective_short()
 	if o != "":
 		out.append({"id": "story2", "title": "마을을 깨우다", "obj": o,
-			"desc": "이장의 부탁 — 마을에 다시 활기를 불어넣자."})
+			"desc": "이장의 부탁 — 마을에 다시 활기를 불어넣자.",
+			"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
+			"reward": "상점·바다·밭 — 마을의 기틀"})
 	o = fisher_objective_short()
 	if o != "":
 		out.append({"id": "fisher", "title": "낚시꾼과 바닷길", "obj": o,
-			"desc": "낯선 낚시꾼이 황금잉어 소문을 듣고 왔다."})
+			"desc": "낯선 낚시꾼이 황금잉어 소문을 듣고 왔다.",
+			"cat": "main", "ep": "메인 스토리 2", "npc": "fisher",
+			"reward": "바다·해변 해금 + 간이낚싯대"})
 	o = move_objective_short()
 	if o != "":
 		out.append({"id": "move", "title": "새로운 주민의 이사", "obj": o,
-			"desc": "무진이 마을에 살고 싶다는 편지를 보내왔다."})
+			"desc": "무진이 마을에 살고 싶다는 편지를 보내왔다.",
+			"cat": "main", "ep": "메인 스토리 3", "npc": "explorer",
+			"reward": "이주 편지·집터 시스템 해금"})
 	o = forest_objective_short()
 	if o != "":
 		out.append({"id": "forest", "title": "숲속에서 발견한 집", "obj": o,
-			"desc": "무진이 숲 깊은 곳에서 수상한 집을 봤다고 한다."})
+			"desc": "무진이 숲 깊은 곳에서 수상한 집을 봤다고 한다.",
+			"cat": "main", "ep": "메인 스토리 5", "npc": "explorer",
+			"reward": "숲속 모녀와의 만남"})
 	o = story4_objective_short()
 	if o != "":
 		out.append({"id": "story4", "title": "오래된 마을의 경계", "obj": o,
-			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다."})
+			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다.",
+			"cat": "main", "ep": "메인 스토리 4", "npc": "chief",
+			"reward": "마을 확장 해금"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -986,27 +1005,52 @@ func quest_catalog() -> Array:
 		out.append({"id": "stall", "title": "상인의 부탁 — 해변 노점",
 			"obj": "민지에게 재료를 가져다주기" if ready
 				else "재료 모으기 — 목재 %d·조개 %d" % [STALL_WOOD, STALL_SHELLS],
-			"desc": "민지가 해변에서 장사할 노점을 내고 싶어 한다."})
+			"desc": "민지가 해변에서 장사할 노점을 내고 싶어 한다.",
+			"cat": "sub", "npc": "merchant",
+			"reward": "해변 노점 개장 + 하트 모양 러그"})
 	o = tutorial_objective_short()
 	if o != "":
 		var flag := tutorial_current_flag()
 		if flag in STORY2_FLAGS:
 			out.append({"id": "tutorial", "title": "마을을 깨우다", "obj": o,
-				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자."})
+				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자.",
+				"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
+				"reward": _tut_reward_text(flag)})
 		else:
 			out.append({"id": "tutorial", "title": "마을 생활 안내", "obj": o,
-				"desc": "안 해도 되지만, 하면 마을살이가 수월해진다."})
+				"desc": "이장이 알려 주는 마을살이 요령. 안 해도 되지만,\n하면 살림이 수월해진다.",
+				"cat": "guide", "npc": "chief",
+				"reward": _tut_reward_text(flag)})
 	# 오늘의 의뢰 (게시판에서 수락한 것)
 	var ql := quest_line()
 	if ql != "":
 		out.append({"id": "errand", "title": "오늘의 의뢰", "obj": ql,
-			"desc": "마을 광장 게시판의 납품 의뢰다."})
+			"desc": "마을 광장 게시판의 납품 의뢰다.",
+			"cat": "daily", "npc": "",
+			"reward": "%dG" % int(quest.get("reward", 0))})
 	var gl := grandpa_line()
 	if gl != "":
 		out.append({"id": "grandpa", "title": "할아버지의 부탁",
 			"obj": gl.replace("목표: ", ""),
-			"desc": "연구 노트에 남은 할아버지의 흔적을 따라가자."})
+			"desc": "연구 노트에 남은 할아버지의 흔적을 따라가자.",
+			"cat": "sub", "npc": "", "reward": "연구 노트의 빈 장이 채워진다"})
 	return out
+
+
+# 안내 목표의 보상 안내문 ("100G" / "목재 5" 식)
+func _tut_reward_text(flag: String) -> String:
+	var r: Dictionary = TUTORIAL_REWARDS.get(flag, {})
+	var parts := []
+	if r.has("money"):
+		parts.append("%dG" % int(r.money))
+	if r.has("wood"):
+		parts.append("목재 %d" % int(r.wood))
+	if r.has("stone"):
+		parts.append("석재 %d" % int(r.stone))
+	var unlocked: Array = TUTORIAL_UNLOCKS.get(flag, [])
+	for tid in unlocked:
+		parts.append("%s 해금" % TOOL_KOR.get(tid, tid))
+	return " · ".join(parts)
 
 
 # 미니창 고정 — ""=자동(맨 앞 퀘스트), 아니면 quest_catalog의 id.
@@ -1675,6 +1719,12 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"potion_guard", "potion_moon", "sludge"]
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
+# 초록 풀숲(잡초·약초 자리)을 뽑았을 때 실제로 나오는 것 —
+# 기본은 잡초, 아주 드물게(1%) 약초가 섞여 나온다
+func weed_drop_id() -> String:
+	return "forage_herb" if randf() < 0.01 else "weed"
+
+
 const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
@@ -1731,6 +1781,8 @@ func recipe_display_name(rid: String) -> String:
 		return str(ITEMS[rid].name)
 	if DESK_RECIPES.has(rid):
 		return str(DESK_RECIPES[rid].name)
+	if TOOL_KOR.has(rid):
+		return str(TOOL_KOR[rid])
 	return rid
 
 
@@ -1743,6 +1795,9 @@ func learn_recipe(rid: String) -> bool:
 		recipe_items.erase(rid)
 	if rid not in recipes_unlocked:
 		recipes_unlocked.append(rid)
+	# 도구 레시피(스프링클러 등)는 배우는 순간 도구 자체가 열린다
+	if rid in ALL_TOOLS and not unlocked_tools.has(rid):
+		unlocked_tools.append(rid)
 	return true
 
 
@@ -2800,6 +2855,7 @@ const TUTORIAL_ORDER := [
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
 	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
+	["board", "마을 광장 의뢰 게시판(E)에서 오늘의 의뢰를 살펴보자"],
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
@@ -2807,17 +2863,17 @@ const TUTORIAL_ORDER := [
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
-	["build", "울타리나 스프링클러를 설치해보자"],
 	["fish", "마을 남쪽 낚시터(강가)에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
 # 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
-# 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 전부 열린다
+# 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 열린다.
+# 스프링클러는 여기서 빠졌다 — 농사 Lv3부터 잡화점에서 레시피를 판다.
 # (마을 생활 안내는 선택이므로 도구를 잠그지 않는다)
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"harvest": ["axe", "pickaxe", "fence", "sprinkler", "rod"],
+	"harvest": ["axe", "pickaxe", "fence", "rod"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
 # 돌 창·돌 검은 제작대에서 만들어 해금하는 무기다 (레시피: 이장/추후 서브퀘)
@@ -2834,10 +2890,10 @@ const TUTORIAL_REWARDS := {
 	"plant": {"money": 50},
 	"water": {"money": 100},
 	"harvest": {"money": 100},
+	"board": {"money": 100},
 	"chop": {"wood": 5},
 	"slept": {"money": 150},
 	"mine": {"stone": 5},
-	"build": {"money": 150},
 	"fish": {"money": 200},
 	"shop": {"money": 300},
 }
@@ -2864,6 +2920,9 @@ const TOOL_KOR := {
 	"spear": "돌 창", "sword": "돌 검",
 }
 var tutorial := {"active": false}
+# 마을 생활 안내 시작 여부 — 메인 스토리 3(이주 편지)이 시작될 때 함께 열린다.
+# 그 전에는 안내 목표가 퀘스트 창에도, 트래커에도 나오지 않는다.
+var guide_active := false
 var unlocked_tools: Array = ALL_TOOLS.duplicate()
 
 
@@ -2888,8 +2947,8 @@ const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
 	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
-	"slept": "침대에서 자기",
-	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
+	"slept": "침대에서 자기", "board": "의뢰 게시판 보기 (광장)",
+	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)",
 	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
 }
 
@@ -2920,6 +2979,9 @@ func tutorial_current_flag() -> String:
 	if not tutorial.get("active", false):
 		return ""
 	for pair in TUTORIAL_ORDER:
+		# 마을 생활 안내(스토리2 밖 목표)는 스토리 3이 열어 줘야 나온다
+		if pair[0] not in STORY2_FLAGS and not guide_active:
+			continue
 		if not tutorial.get(pair[0], false):
 			return pair[0]
 	return ""
@@ -3115,29 +3177,51 @@ func quest_pool(kind: String) -> Array:
 	var out: Array = []
 	match kind:
 		"crop":
+			# 지금 구할 수 있는 씨앗(상점 판매 중이거나 이미 갖고 있는 것)만
 			for id: String in CROP_IDS:
-				if season() in CROPS[id].seasons:
+				if season() not in CROPS[id].seasons:
+					continue
+				if id in shop_seeds or int(seeds.get(id, 0)) > 0 \
+						or int(produce.get(id, 0)) > 0:
 					out.append(id)
 		"fish":
+			# 낚싯대가 없으면 물고기 의뢰 자체가 나오지 않는다
+			if not is_tool_unlocked("rod"):
+				return []
 			# 전설급은 의뢰로 내지 않는다 — 못 잡아서 표가 막힌다
 			var legendary := ["fish_golden", "fish_king", "fish_dragon",
 				"fish_ghost", "fish_starcarp", "fish_moonfish"]
 			for f: Dictionary in FISH:
 				var fid := str(f.id)
-				if fid not in legendary:
-					out.append(fid)
+				if fid in legendary:
+					continue
+				# 이번 계절에 물지 않거나 특정 날씨에만 무는 놈도 뺀다 —
+				# 지금 당장 잡을 수 있는 물고기로만 의뢰가 붙는다
+				if not (f.weather as Array).is_empty():
+					continue
+				if not (f.seasons as Array).is_empty() \
+						and season() not in f.seasons:
+					continue
+				out.append(fid)
 		"forage":
 			out = FORAGE_IDS + BUG_IDS
 			# 산호 조각·고대 조각은 0.1%짜리 희귀 채집물 — 의뢰로 내면 표가 막힌다
 			out.erase("forage_coral")
 			out.erase("forage_relic")
+			out.erase("forage_herb")   # 약초도 1% 희귀 드랍이 됐다 — 의뢰 금지
 			if not sea_open:
 				# 아직 바다를 모른다 — 해변 채집물은 의뢰로 내지 않는다
 				for bid: String in ["forage_shell", "forage_trash",
 						"forage_glass", "forage_ring"]:
 					out.erase(bid)
 		"mineral":
-			out = ["ore", "gem"]
+			# 곡괭이가 없으면 광물 의뢰가 나오지 않고, 보석은 동굴을
+			# 3층까지 내려가 본 뒤에야 의뢰에 붙는다
+			if not is_tool_unlocked("pickaxe"):
+				return []
+			out = ["ore"]
+			if mine_deepest >= 3:
+				out.append("gem")
 		"dish":
 			# 한 번이라도 만들어 본 요리만 의뢰로 나온다
 			for rid: String in RECIPE_IDS:
@@ -3611,6 +3695,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"quest": quest,
 		"quest_offers": quest_offers,
 		"tutorial": tutorial,
+		"guide_active": guide_active,
 		"alchemy_known": alchemy_known,
 		"alchemy_brews": alchemy_brews,
 		"alchemy_fails": alchemy_fails,

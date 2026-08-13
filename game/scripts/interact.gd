@@ -235,6 +235,9 @@ func interact() -> void:
 			m.objnode._remove_object(t)
 			if fid == "weed":
 				GameData.queue_respawn("weed")   # 3~5일 뒤 다른 빈자리에서
+			if fid in ["weed", "forage_herb"]:
+				# 초록 풀숲은 기본이 잡초 — 약초는 1%짜리 행운이다
+				fid = GameData.weed_drop_id()
 			var got := 1
 			if fid in m.BEACH_FORAGE:
 				got = GameData.beach_pick_count()   # 해변 채집 레벨: 한 번에 더 줍는다

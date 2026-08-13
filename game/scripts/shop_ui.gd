@@ -297,6 +297,12 @@ func close() -> void:
 	visible = false
 
 
+# 아직 안 산(안 배운) 레시피만 선반에 놓는다 — 사는 순간 목록에서 사라진다
+func _recipe_on_sale(rid: String) -> bool:
+	return not GameData.recipe_items.has(rid) \
+		and rid not in GameData.recipes_unlocked
+
+
 func _mk_button(text: String, on_pressed: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -331,13 +337,8 @@ func _rebuild() -> void:
 			_note("— 노점 한정 레시피 (집 조리대에서 만든다) —")
 			for rid: String in GameData.STALL_RECIPE_IDS:
 				var rname := str(GameData.ITEMS[rid].name)
-				if not GameData.recipe_locked(rid):
-					items_box.add_child(_mk_row("recipe", "%s 레시피 (배움)" % rname,
-						"재료를 모아 집 조리대에서 만들자"))
-					continue
-				if GameData.recipe_items.has(rid):
-					items_box.add_child(_mk_row("recipe", "%s 레시피 (보유 중)" % rname,
-						"가방(제작·배치)에서 클릭해 배우자"))
+				# 이미 산(또는 배운) 레시피는 목록에서 바로 사라진다
+				if not GameData.recipe_locked(rid) or GameData.recipe_items.has(rid):
 					continue
 				var rprice := int(GameData.STALL_RECIPES[rid])
 				var rb2 := _mk_button("구매", _on_buy_dish_recipe.bind(rid, rprice))
@@ -373,13 +374,8 @@ func _rebuild() -> void:
 			_note("— 요리 레시피 (생선 요리) —")
 			for did: String in GameData.SHOP_DISH_IDS:
 				var dname := str(GameData.ITEMS[did].name)
-				if not GameData.recipe_locked(did):
-					items_box.add_child(_mk_row("recipe", "%s 레시피 (배움)" % dname,
-						"재료를 모아 집 조리대에서 만들자"))
-					continue
-				if GameData.recipe_items.has(did):
-					items_box.add_child(_mk_row("recipe", "%s 레시피 (보유 중)" % dname,
-						"가방(제작·배치)에서 클릭해 배우자"))
+				# 이미 산(또는 배운) 레시피는 목록에서 바로 사라진다
+				if not GameData.recipe_locked(did) or GameData.recipe_items.has(did):
 					continue
 				var dprice := int(GameData.SHOP_DISH_RECIPES[did])
 				var db := _mk_button("구매", _on_buy_dish_recipe.bind(did, dprice))
@@ -387,52 +383,39 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("recipe", "%s 레시피" % dname,
 					"체력 +%d" % int(GameData.RECIPES[did].energy),
 					db, [["coin", dprice]]))
-			# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다
+			# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다.
+			# 산(또는 배운) 레시피는 목록에서 바로 사라진다 — 재구매 없음.
 			_note("— 생활용품 레시피 —")
-			if GameData.recipe_items.has("broom"):
-				items_box.add_child(_mk_row("recipe", "빗자루 레시피 (보유 중)",
-					"가방(제작·배치)에서 클릭해 배우자"))
-			elif "broom" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("recipe", "빗자루 레시피 (배움)",
-					"집 책상에서 만든다 — 잡초 1"))
-			else:
+			if _recipe_on_sale("broom"):
 				var rcp := _mk_button("구매", _on_buy_recipe.bind("broom", 300))
 				rcp.disabled = GameData.money < 300
 				items_box.add_child(_mk_row("recipe", "빗자루 레시피",
 					"집 안의 먼지를 쓸어 낸다 · 재료: 잡초 1", rcp, [["coin", 300]]))
-			if GameData.recipe_items.has("flower_pot"):
-				items_box.add_child(_mk_row("recipe", "화분 레시피 (보유 중)",
-					"가방(제작·배치)에서 클릭해 배우자"))
-			elif "flower_pot" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("recipe", "화분 레시피 (배움)",
-					"집 책상에서 만든다 — 잡초 5"))
-			else:
+			if _recipe_on_sale("flower_pot"):
 				var pcp := _mk_button("구매", _on_buy_recipe.bind("flower_pot", 200))
 				pcp.disabled = GameData.money < 200
 				items_box.add_child(_mk_row("recipe", "화분 레시피",
 					"집을 꾸미는 화분 · 재료: 잡초 5", pcp, [["coin", 200]]))
 			# 쓰레기통 — 24시간 무인 판매함 (제값의 80%). 원하는 곳에 설치한다.
-			if GameData.recipe_items.has("trash_bin"):
-				items_box.add_child(_mk_row("recipe", "쓰레기통 레시피 (보유 중)",
-					"가방(제작·배치)에서 클릭해 배우자"))
-			elif "trash_bin" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("recipe", "쓰레기통 레시피 (배움)",
-					"집 책상에서 만든다 — 목재 5 · 금속 고리 2 (고리는 해변에서)"))
-			else:
+			if _recipe_on_sale("trash_bin"):
 				var tcp := _mk_button("구매", _on_buy_recipe.bind("trash_bin", 400))
 				tcp.disabled = GameData.money < 400
 				items_box.add_child(_mk_row("recipe", "쓰레기통 레시피",
 					"24시간 무인 판매함 (제값의 80%) · 재료: 목재 5 · 금속 고리 2",
 					tcp, [["coin", 400]]))
+			# 스프링클러 — 농사 실력이 붙어야(Lv3) 이장이 잡화점에 들여놓는다
+			if GameData.skill_lv("farm") >= GameData.SPRINKLER_FARM_LV \
+					and _recipe_on_sale("sprinkler") \
+					and not GameData.is_tool_unlocked("sprinkler"):
+				var scp := _mk_button("구매",
+					_on_buy_recipe.bind("sprinkler", GameData.SPRINKLER_RECIPE_PRICE))
+				scp.disabled = GameData.money < GameData.SPRINKLER_RECIPE_PRICE
+				items_box.add_child(_mk_row("recipe", "스프링클러 레시피",
+					"주변 4칸에 계속 물을 주는 설치물 (농사 Lv3 달성 기념 입고)",
+					scp, [["coin", GameData.SPRINKLER_RECIPE_PRICE]]))
 			# 집터 — 원할 때 언제든 미리 지어 둘 수 있는 큰 공사.
 			# (이주 편지는 빈 집터가 이미 있어야만 수락할 수 있다)
-			if GameData.recipe_items.has("housing_kit"):
-				items_box.add_child(_mk_row("recipe", "집터 레시피 (보유 중)",
-					"가방(제작·배치)에서 클릭해 배우자"))
-			elif "housing_kit" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("recipe", "집터 레시피 (배움)",
-					"집 책상에서 만든다 — 목재 60 · 석재 40 · 못 4"))
-			else:
+			if _recipe_on_sale("housing_kit"):
 				var hcp := _mk_button("구매",
 					_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
 				hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
