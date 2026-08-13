@@ -2161,6 +2161,27 @@ func _debug_tick() -> void:
 			GameData.bed_lv = keep_bedlv
 			GameData.story2_phase = "done"
 			m.interior._layout()
+		334:
+			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
+			var keep_seed_slots: Array = GameData.tool_slots.duplicate()
+			var keep_tool := GameData.tool
+			if not GameData.is_tool_unlocked("seed"):
+				GameData.unlocked_tools.append("seed")
+			if not GameData.tool_slots.has("seed"):
+				GameData.tool_slots[0] = ""      # 빈 칸을 보장해 자동 장착 경로를 태운다
+			GameData.seeds["corn"] = maxi(1, int(GameData.seeds.get("corn", 0)))
+			GameData.seeds["wheat"] = maxi(1, int(GameData.seeds.get("wheat", 0)))
+			m.inventory_ui._pick_seed("corn")
+			var picked_corn := GameData.current_seed_id() == "corn" \
+				and GameData.tool == "seed" and GameData.tool_slots.has("seed")
+			m.inventory_ui._pick_seed("wheat")
+			var picked_wheat := GameData.current_seed_id() == "wheat"
+			var bedart: bool = m.tex.has("bed_wood")
+			print("SEEDPICK_OK=", picked_corn and picked_wheat and bedart,
+				" 옥수수선택=", picked_corn, " 밀선택=", picked_wheat,
+				" 침대아트=", bedart)
+			GameData.tool_slots = keep_seed_slots
+			GameData.tool = keep_tool
 		392: get_tree().quit()
 
 

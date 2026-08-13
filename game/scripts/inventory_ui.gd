@@ -631,6 +631,23 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.story.open_move_letter())
+	# 씨앗 — 누르면 그 씨앗을 골라 들고, 드래그하면 씨앗 주머니를 슬롯에 건다
+	var seed_id := str(e.get("seed_pick", ""))
+	if seed_id != "":
+		b.pressed.connect(func() -> void:
+			_pick_seed(seed_id))
+		b.set_drag_forwarding(
+			func(_pos: Vector2) -> Variant:
+				GameData.seed_index = maxi(0, GameData.owned_seed_ids().find(seed_id))
+				var pv := TextureRect.new()
+				pv.texture = b.icon
+				pv.custom_minimum_size = Vector2(36, 36)
+				pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				pv.stretch_mode = TextureRect.STRETCH_SCALE
+				b.set_drag_preview(pv)
+				return {"kind": "tool_pick", "tool": "seed"},
+			func(_pos: Vector2, _data: Variant) -> bool: return false,
+			func(_pos: Vector2, _data: Variant) -> void: pass)
 	# 레시피 두루마리 — 「배우기」를 눌러야 진짜로 익힌다
 	var learn_id := str(e.get("learn", ""))
 	if learn_id != "":
@@ -642,6 +659,27 @@ func _mk_item_slot(e: Dictionary) -> Button:
 				["나중에", null],
 			]))
 	return b
+
+
+# 씨앗 슬롯 클릭 → 그 씨앗을 고르고 씨앗 주머니를 든다 (바로 파종 가능)
+func _pick_seed(sid: String) -> void:
+	var idx: int = GameData.owned_seed_ids().find(sid)
+	if idx < 0:
+		return
+	GameData.seed_index = idx
+	# 씨앗 주머니가 빠른 슬롯에 없으면 빈 칸에 자동 장착부터
+	if GameData.is_tool_unlocked("seed") and not GameData.tool_slots.has("seed"):
+		for i in GameData.tool_slots.size():
+			if GameData.tool_slots[i] == "":
+				GameData.tool_slots[i] = "seed"
+				Sound.play_sfx("sfx_place")
+				break
+	main.toolwork.set_tool("seed")
+	if GameData.tool == "seed":
+		Sound.play_sfx("sfx_ui")
+		main.hud.show_message("%s 씨앗을 들었다 — 호미로 간 밭에서 클릭/E로 심는다."
+			% GameData.CROPS[sid].name)
+	_rebuild()
 
 
 func m_learn(rid: String) -> void:
@@ -764,10 +802,10 @@ func _item_entries() -> Array:
 			"desc": "바위를 캐면 얻는다. 스프링클러·축사 재료"})
 	for id in GameData.CROP_IDS:
 		if GameData.seeds[id] > 0:
-			out.append({"tab": "crop", "icon": "icon_seed",
+			out.append({"tab": "crop", "icon": "icon_seed", "seed_pick": id,
 				"name": "%s 씨앗" % GameData.CROPS[id].name, "count": GameData.seeds[id],
 				"tip": "%s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]],
-				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일"
+				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일\n클릭: 이 씨앗 들기 · 드래그: 빠른 슬롯 장착"
 					% int(GameData.CROPS[id].grow_days)})
 	for id in GameData.CROP_IDS:
 		var def: Dictionary = GameData.CROPS[id]

@@ -229,7 +229,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_sweep_kitchen()
 			else:
 				main.hud.show_message(
-					"먼지와 잡동사니에 뭔가 묻혀 있다... 빗자루가 있으면 치울 수 있을 텐데. (잡화점에 레시피)", 4.0)
+					"먼지와 잡동사니가 쌓여 있다. 빗자루가 있으면 E키로 바로 쓸어 낼 수 있다.", 4.0)
 			get_viewport().set_input_as_handled()
 		elif (ppos - DESK.get_center()).length() < 78.0:
 			main.desk_ui.open()
@@ -642,6 +642,13 @@ func _draw_bed() -> void:
 		var s := minf(r.size.x / t.get_width(), r.size.y / t.get_height())
 		var sz := Vector2(t.get_width(), t.get_height()) * s
 		canvas.draw_texture_rect(t, Rect2(r.get_center() - sz / 2.0, sz), false)
+	elif GameData.has_bed and GameData.bed_lv == 1 and main.tex.has("bed_wood"):
+		# 직접 만든 나무 침대 — 올려 준 손그림
+		var tw: Texture2D = main.tex["bed_wood"]
+		var rw := BED.grow(10)
+		var sw := minf(rw.size.x / tw.get_width(), rw.size.y / tw.get_height())
+		var szw := Vector2(tw.get_width(), tw.get_height()) * sw
+		canvas.draw_texture_rect(tw, Rect2(rw.get_center() - szw / 2.0, szw), false)
 	elif GameData.has_bed:
 		canvas.draw_rect(BED.grow(2), Color(0.35, 0.23, 0.14))
 		canvas.draw_rect(BED, Color(0.75, 0.3, 0.28))
