@@ -258,24 +258,31 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     g.px(c - 3, y + 1, 'B')
     if not draw_arm:
         return
-    # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다.
-    # 몸판과 같은 파랑이라 소매 둘레에 윤곽선을 직접 둘러 뗀다.
+    # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다. 앞모습 팔과 같은
+    # 길이(어깨 y+1 ~ 손끝 y+8, 엉덩이 높이)로 내린다 — 짧으면 티가 난다.
+    # 몸판과 같은 파랑이라, 획을 통째로 모아 둘레를 윤곽선으로 한 번에
+    # 두른다 (픽셀마다 낱개로 두르면 대각선에서 조각조각 깨져 보인다).
     hy = y + 6 - (1 if abs(swing) >= 2 else 0) - (1 if abs(swing) >= 3 else 0)
+    cells = {}
     for yy in range(y + 1, hy):
         t = (yy - (y + 1)) / max(1, hy - 1 - (y + 1))
         x = c - 1 + round(swing * t)
-        g.px(x - 1, yy, 'O')
-        if yy == hy - 1:
-            g.rect(x, yy, x + 2, yy, 'B')        # 소매단
-        else:
-            g.px(x, yy, 'B')                     # 소매 뒷면 그늘
-            g.px(x + 1, yy, 'b')
-            g.px(x + 2, yy, 'L')                 # 소매 앞면 빛
-        g.px(x + 3, yy, 'O')
+        for j, cc in enumerate(('B', 'b', 'L')):
+            cells[(x + j, yy)] = 'B' if yy == hy - 1 else cc     # 마지막 줄은 소매단
     hx = c - 1 + swing
-    g.px(hx - 1, hy, 'O'); g.px(hx + 3, hy, 'O')                 # 손 둘레
-    g.rect(hx, hy, hx + 2, hy + 1, 's')                          # 손
-    g.hline(hx + 1, hx + 2, hy + 1, 'S')
+    for j in range(3):
+        for k in range(3):
+            cells[(hx + j, hy + k)] = 's'                        # 손 (세 칸)
+    cells[(hx + 1, hy + 2)] = 'S'
+    cells[(hx + 2, hy + 2)] = 'S'
+    for (x, yy) in cells:                                        # 획 둘레 윤곽선
+        for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
+            if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
+                continue
+            if g.d[ny][nx] != '.':
+                g.d[ny][nx] = 'O'
+    for (x, yy), cc in cells.items():
+        g.px(x, yy, cc)
 
 
 def legs_side(g, stride, lean=0, dx=0, sq=0):
