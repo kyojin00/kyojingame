@@ -178,7 +178,7 @@ func _cost_text(cost: Dictionary) -> String:
 func _cant_reason(id: String) -> String:
 	var def: Dictionary = GameData.DESK_RECIPES[id]
 	if bool(def.get("locked", false)) and id not in GameData.recipes_unlocked:
-		return "레시피를 몰라서 못 만든다 — 잡화점에서 배울 수 있다"
+		return "레시피를 몰라서 못 만든다 — %s에서 배울 수 있다" % str(def.get("shop", "잡화점"))
 	if str(def.kind) == "bed":
 		if GameData.bed_lv >= int(def.lv):
 			return "이미 이만한 침대가 있다"

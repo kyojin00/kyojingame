@@ -136,10 +136,8 @@ func _build_village_building(pid: String) -> void:
 
 
 func _talk_to(npc: Node2D) -> void:
-	# 스토리 대화가 먼저다 — 편지 전달 / 낚시꾼 첫 만남 / 호미 받기
-	if npc.id == "chief" and GameData.story_phase == "deliver":
-		m.story._start_delivery_dialog()
-		return
+	# 스토리 대화가 먼저다 — 낚시꾼 첫 만남 / 호미 받기
+	# (편지는 우체부가 직접 전한다 — 이장에게 대신 전달하는 과정은 없다)
 	if npc.id == "chief" and GameData.story2_phase == "farm_talk":
 		m.story._start_farm_dialog()
 		return
@@ -779,16 +777,32 @@ func _merchant_errand_turnin() -> void:
 	GameData.roll_stall_hours()
 	m.worldgen._place_stall()
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("해변 노점 완성!")
 	m.queue_redraw()
-	m.saveio.save_now()
+	m.saveio.save_now()   # 재료를 받은 순간 저장 — 대화 중에 꺼져도 노점은 서 있다
 	if Net.is_host():
 		m.netsync._broadcast_stats()
+	# 마무리 흐름: 노점 완성 → 하트 러그 지급 → 집 꾸미기 권유 →
+	# 상점 인테리어 레시피 안내 → (대화가 다 끝난 뒤) 퀘스트 완료 표시
 	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant", true), [
 		{"text": "고마워! 바로 해변에 노점을 차렸어.\n능선 아래 모래밭에 있으니 놀러 와."},
-		{"text": "나는 하루에 세 번, 한 시간씩 나가 있을 거야.\n내가 있을 때만 물건을 살 수 있어."},
-		{"text": "아, 물건을 파는 건 언제든 돼 —\n바구니에 값만 두고 가면 되니까!"},
-	], open_merchant_counter)
+		{"text": "나는 하루에 세 번, 한 시간씩 나가 있을 거야.\n내가 있을 때만 물건을 살 수 있어.\n(물건을 파는 건 언제든 — 무인 판매!)"},
+		{"text": "그리고 이건 도와준 보답!\n\n[하트 모양 러그를 받았다]", "event": _give_heart_rug},
+		{"text": "집 안에서 꾸미기(F)를 눌러서 깔아 봐.\n집 꾸미는 재미, 은근히 쏠쏠하다?"},
+		{"text": "우리 가게에서도 가끔 집을 꾸밀 수 있는\n예쁜 아이템을 만드는 레시피를 팔고 있으니까,\n자주 와서 구경해~"},
+	], _end_stall_quest)
+
+
+# 보상: 하트 모양 러그 — 집 세간으로 바로 들어온다 (꾸미기 F로 옮긴다)
+func _give_heart_rug() -> void:
+	GameData.furniture.append({"id": "heart_rug", "x": 366.0, "y": 285.0})
+	Sound.play_sfx("sfx_heart")
+	m.hud.reward_toast("하트 모양 러그", m.tex.get("icon_heart"))
+
+
+func _end_stall_quest() -> void:
+	m.hud.quest_toast("서브 퀘스트 완료: %s" % MERCHANT_QUEST_NAME)
+	m.saveio.save_now()
+	open_merchant_counter()
 
 
 # ---- 해변 노점 ----

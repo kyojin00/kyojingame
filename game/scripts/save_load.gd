@@ -63,6 +63,12 @@ func _apply_save(d: Dictionary) -> void:
 	# 대기로 이어 준다 (옛 세이브는 마을이 이미 다 서 있다)
 	GameData.story2_phase = str(d.get("story2_phase",
 		"done" if str(d.get("fisher_quest", "")) == "done" else "fisher"))
+	# 무건물 시작 버그(reset_all 잔재가 ALL을 다시 채우던 시절) 세이브 교정:
+	# 스토리가 거기까지 안 갔으면 건물이 서 있을 수 없다
+	if GameData.story_phase != "done" or GameData.story2_phase == "":
+		GameData.village_built = []
+	elif GameData.story2_phase == "shop":
+		GameData.village_built.erase("general")   # 상점은 퀘스트로 지어야 한다
 	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
 	# 발견한 것으로 친다 — 쓰던 부엌이 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",

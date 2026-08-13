@@ -108,6 +108,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["forage_trash"]
 		"forage_glass":
 			texture = m.tex["forage_glass"]
+		"forage_ring":
+			texture = m.tex["forage_ring"]
+		"forage_relic":
+			texture = m.tex["forage_relic"]
 		"stall":
 			# 민지의 해변 노점 — 차양 지붕이 위로 솟아 있어 밑변을 칸에 맞춘다
 			texture = m.tex["stall"]

@@ -414,6 +414,20 @@ func _rebuild_story() -> void:
 			_line("  · %s" % memo[1], GOLD)
 		else:
 			_line("  · (%d%%를 채우면 열린다)" % int(float(memo[0]) * 100.0), DIM)
+
+	# 바다가 남긴 이야기 — 해변의 매우 희귀한 조각을 주우면 열린다
+	if GameData.sea_open:
+		_line("")
+		_head("[바다가 남긴 이야기]")
+		if GameData.discovered.has("forage_relic"):
+			_line("  · 물에 잠긴 마을", GOLD)
+			_line("     고대 조각의 무늬가 보여 준 풍경 — 바다 밑에는 아주 오래전", Color(0.35, 0.27, 0.16))
+			_line("     가라앉은 마을이 잠들어 있고, 그 사이를 황금빛 그림자가 헤엄친다.", Color(0.35, 0.27, 0.16))
+			_line("     ...철수가 쫓는 황금잉어와 무슨 관계가 있을까?", Color(0.35, 0.27, 0.16))
+		else:
+			_line("  · (해변에 아주 드물게 밀려오는 옛 조각이 이야기를 안다)", DIM)
+		if GameData.discovered.has("forage_coral"):
+			_line("  · 바다가 피운 꽃 — 산호 조각으로 「산호빛 차」를 달일 수 있다", GOLD)
 	_line("")
 
 

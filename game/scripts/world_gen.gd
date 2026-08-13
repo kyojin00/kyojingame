@@ -178,15 +178,24 @@ func _try_spawn_shell(with_node := true) -> bool:
 	var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(m.BEACH_Y0, m.SEA_Y0 - 1))
 	if m.objects.has(pos) or m.grid[pos.y][pos.x].ground != "sand":
 		return false
-	# 조개가 흔하고, 파도에 떠밀려 온 쓰레기·유리 조각도 섞인다. 산호는 귀하다.
-	var roll := randf()
+	# 기본은 조개(흔함)·비닐봉지·유리 조각·금속 고리.
+	# 산호 조각·고대 조각은 각각 기본 0.1%의 매우 희귀한 채집물 —
+	# 해변 채집 레벨이 오르면 확률이 조금씩 오른다 (beach_rare_chance).
 	var kind := "forage_shell"
-	if roll < 0.08:
+	var rare := GameData.beach_rare_chance()
+	var roll := randf()
+	if roll < rare:
 		kind = "forage_coral"
-	elif roll < 0.26:
-		kind = "forage_trash"
-	elif roll < 0.36:
-		kind = "forage_glass"
+	elif roll < rare * 2.0:
+		kind = "forage_relic"
+	else:
+		var r2 := randf()
+		if r2 < 0.15:
+			kind = "forage_trash"
+		elif r2 < 0.30:
+			kind = "forage_glass"
+		elif r2 < 0.45:
+			kind = "forage_ring"
 	if with_node:
 		m.objnode._place_object(pos, kind, 0)
 	else:

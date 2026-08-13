@@ -215,9 +215,13 @@ func interact() -> void:
 				m.toolwork.gain_skill("beach", 6.0)
 			else:
 				m.toolwork.gain_skill("forest", 3.0)
+			var first_find: bool = not GameData.discovered.has(fid)
 			GameData.items[fid] += got
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
 			GameData.discover(fid)
+			# 산호 조각·고대 조각: 처음 주우면 숨겨진 이야기/레시피가 열린다
+			if first_find and fid in ["forage_coral", "forage_relic"]:
+				m.story.hidden_beach_find(fid)
 			Sound.play_sfx("sfx_harvest")
 			m.renderer.spawn_particles(t, "sparkle")
 			m.hud.show_message("%s%s 채집! 연구 노트에 기록됐다."

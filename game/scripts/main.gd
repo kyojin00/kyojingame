@@ -171,7 +171,7 @@ const TEXTURE_NAMES := [
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "kitchen_counter",
-	"stall", "bait",
+	"stall", "bait", "flower_pot", "trash_bin",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
 	"house_library", "house_ranch", "house_fish",
@@ -290,8 +290,10 @@ const SEA_Y0 := 83                 # 여기부터 남쪽 끝까지 바다
 const SEA_GATE := [Vector2i(63, 77), Vector2i(64, 77)]  # 곡괭이로 캐서 여는 길목
 const FISHER_ARRIVE := Vector2i(78, 23)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
 const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...) 최대 수
-# 해변 모래밭에 밀려오는 것들 — 조개가 흔하고, 쓰레기·유리 조각도 섞인다
-const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass"]
+# 해변 모래밭에만 밀려오는 것들 — 조개·비닐봉지·유리 조각·금속 고리(기본),
+# 산호 조각·고대 조각(매우 희귀 — 숨겨진 이야기·레시피와 이어진다)
+const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
+	"forage_ring", "forage_relic"]
 const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
 const FISH_LAMPS := [Vector2i(72, 37), Vector2i(79, 37), Vector2i(86, 37), Vector2i(93, 37)]
 const FISH_BENCHES := [Vector2i(75, 38), Vector2i(83, 38), Vector2i(91, 38)]
@@ -547,6 +549,12 @@ func _ready() -> void:
 			story_cutscene = false
 			story._postman_state = "follow"
 			story._postman.position = player.position + Vector2(-42, 6)
+		elif GameData.story_phase == "deliver":
+			# 이장에게 가던 도중 저장했다면 우체부가 다시 걸어가 편지를 전한다
+			story._spawn_postman()
+			story_cutscene = false
+			story._postman_state = "deliver"
+			story._postman.position = player.position + Vector2(-42, 6)
 		elif GameData.story_phase == "greet":
 			# 집에 들어간 직후 저장했다면, 나온 셈 치고 이장이 다가온다
 			story.start_home_greet.call_deferred()
@@ -693,6 +701,7 @@ const OBJECT_SCALES := {
 	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
+	"forage_ring": 1.1, "forage_relic": 1.2,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
@@ -854,7 +863,8 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 # 채집·벌목·채광 대상이 되는 것들
 const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
-	"forage_shell", "forage_coral", "forage_trash", "forage_glass"]
+	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
+	"forage_ring", "forage_relic"]
 
 # E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
 const WORK_LOCK_TIME := 0.9

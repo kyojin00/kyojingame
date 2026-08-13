@@ -632,8 +632,14 @@ const FURNITURE := {
 	"bookshelf": {"name": "책장", "price": 300, "w": 54, "h": 72, "solid": true},
 	"lamp": {"name": "램프", "price": 150, "w": 18, "h": 39, "solid": true},
 	"small_table": {"name": "탁자", "price": 140, "w": 42, "h": 36, "solid": true},
+	# 사는 게 아니라 제작대에서 만들거나 선물로 받는 세간
+	# (FURNITURE_IDS 밖 = 꾸미기 상점 미노출)
+	"trash_bin": {"name": "쓰레기통", "price": 0, "w": 24, "h": 33, "solid": true},
+	"heart_rug": {"name": "하트 러그", "price": 0, "w": 96, "h": 78, "solid": false},
 }
 const FURNITURE_IDS := ["table", "chair", "chest", "rug", "plant", "bookshelf", "lamp", "small_table"]
+# 제작·선물로 들여놓는 세간 — 집 확장 때 기본 세간에 밀려 지워지면 안 된다
+const CRAFT_FURN := ["plant", "trash_bin", "heart_rug"]
 var furniture: Array = []  # [{id, x, y}]
 
 
@@ -757,6 +763,12 @@ func beach_pick_count() -> int:
 	return 1 + int((skill_lv("beach") - 1) / 3.0)   # 4 · 7 · 10레벨에 +1
 
 
+# 산호 조각·고대 조각이 밀려올 확률 (각각). 기본 0.1% — 매우 희귀하다.
+# 해변 채집 레벨이 오르면 조금씩 오른다 (10레벨에 0.37%).
+func beach_rare_chance() -> float:
+	return 0.001 + 0.0003 * (skill_lv("beach") - 1)
+
+
 func fisher_objective_short() -> String:
 	match fisher_quest:
 		"meet":
@@ -787,9 +799,16 @@ const DESK_UPGRADES := [
 ]
 # 만들 수 있는 것 — kind "bed"는 완성되는 순간 침대가 바뀐다
 const DESK_RECIPES := {
-	"broom": {"name": "빗자루", "cost": {"weed": 5, "wood": 3},
-		"kind": "item", "give": "broom", "locked": true,
+	"broom": {"name": "빗자루", "cost": {"weed": 1},
+		"kind": "item", "give": "broom", "locked": true, "shop": "잡화점",
 		"desc": "집 안의 먼지를 쓸어 낸다 (레시피는 잡화점에서)"},
+	# kind "furniture": 완성되면 집에 세간으로 들어온다 (꾸미기 F로 옮긴다)
+	"flower_pot": {"name": "화분", "cost": {"weed": 5},
+		"kind": "furniture", "furn": "plant", "locked": true, "shop": "잡화점",
+		"desc": "집을 꾸미는 화분 — 완성되면 방에 놓인다 (레시피는 잡화점에서)"},
+	"trash_bin": {"name": "쓰레기통", "cost": {"wood": 5, "forage_ring": 2},
+		"kind": "furniture", "furn": "trash_bin", "locked": true, "shop": "해변 노점",
+		"desc": "튼튼한 쓰레기통 — 완성되면 방에 놓인다 (레시피는 해변 노점에서)"},
 	"bed_wood": {"name": "나무 침대", "cost": {"wood": 25, "nail": 2},
 		"kind": "bed", "lv": 1, "desc": "아침 기력이 가득 찬다"},
 	"bed_soft": {"name": "푹신한 침대", "cost": {"wood": 30, "cloth": 5, "milk": 3},
@@ -883,6 +902,11 @@ func desk_tick(delta: float) -> void:
 			var give := str(def.give)
 			items[give] = int(items.get(give, 0)) + 1
 			discover(give)
+		elif str(def.kind) == "furniture":
+			# 방 가운데쯤에 들여놓는다 — 겹치지 않게 조금씩 밀고, 꾸미기(F)로 옮긴다
+			furniture.append({"id": str(def.furn),
+				"x": 430.0 + float(furniture.size() % 4) * 40.0,
+				"y": 255.0 + float(furniture.size() / 4 % 3) * 30.0})
 		discover(str(job.id))
 		desk_done_pending.append(str(def.name))
 	desk_queue = still
@@ -971,8 +995,8 @@ const STORY1_QUESTS := [
 		"task": "우체부 아저씨와 함께 마을 방향으로 가자 (화살표 방향)",
 		"story": "바위를 치워 마침내 길이 열렸다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
-		"task": "마을 이장을 찾아가 편지를 전하자 (E)",
-		"story": "마을 어귀에서 우체부 아저씨가 작별 인사를 하며 편지를 맡겼다. 이장님을 찾아 편지를 전하면 긴 여정이 끝난다."},
+		"task": "우체부 아저씨를 따라 이장님께 가자 (화살표 방향)",
+		"story": "드디어 마을에 도착했다. 우체부 아저씨가 이장님께 직접 편지를 전하러 간다. 함께 따라가 보자."},
 	{"name": "새 보금자리",
 		"task": "이장님이 내어 준 집(마을 서쪽)에 들어가 보자 (문 앞 E)",
 		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
@@ -1016,7 +1040,7 @@ func story_objective_short() -> String:
 		"travel":
 			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
 		"deliver":
-			return "이장님을 찾아가 편지를 전하자 (화살표 방향, E)"
+			return "우체부 아저씨를 따라 이장님께 가자 (화살표 방향)"
 		"home_open":
 			return "이장님이 내어 준 집에 들어가 보자 (마을 서쪽, 화살표 방향)"
 		"greet":
@@ -1176,6 +1200,7 @@ const ITEMS := {
 	"dish_fish_soup": {"name": "생선 맑은국", "sell": 180},
 	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 700},
 	"dish_moon_tea": {"name": "달빛차", "sell": 640},
+	"dish_coral_tea": {"name": "산호빛 차", "sell": 560},
 	"dish_feast": {"name": "한상차림", "sell": 1100},
 	# 컬렉션 보상으로 열리는 요리 레시피
 	"butter": {"name": "버터", "sell": 180},
@@ -1189,10 +1214,12 @@ const ITEMS := {
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
 	"forage_shell": {"name": "조개", "sell": 35},
-	"forage_trash": {"name": "젖은 쓰레기", "sell": 12},
+	"forage_trash": {"name": "젖은 비닐봉지", "sell": 12},
 	"forage_glass": {"name": "유리 조각", "sell": 34},
+	"forage_ring": {"name": "금속 고리", "sell": 28},
+	"forage_relic": {"name": "고대 조각", "sell": 480},
 	"bait": {"name": "미끼", "sell": 2},
-	"forage_coral": {"name": "산호", "sell": 260},
+	"forage_coral": {"name": "산호 조각", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
 	"bug_dragonfly": {"name": "잠자리", "sell": 50},
@@ -1235,7 +1262,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
-	"forage_trash", "forage_glass", "bait",
+	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
+	"dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -1243,8 +1271,10 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
 const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
-	"forage_shell", "forage_coral", "forage_trash", "forage_glass"]
-	# 잡초는 화분 재료 · 조개/산호/쓰레기/유리는 해변(바다 해금 후)
+	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
+	"forage_ring", "forage_relic"]
+	# 잡초는 화분 재료 · 조개/비닐봉지/유리/금속 고리는 해변(바다 해금 후)
+	# 산호 조각·고대 조각은 해변의 매우 희귀한 채집물 (숨겨진 콘텐츠와 연결)
 const BUG_IDS := ["bug_butterfly", "bug_dragonfly", "bug_firefly"]
 # 곤충 출현 조건
 const BUGS := {
@@ -1683,6 +1713,8 @@ const RECIPES := {
 	# ---- 귀한 것 (컬렉션 보상으로 열린다) ----
 	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160, "locked": true},
 	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150, "locked": true},
+	# 숨겨진 레시피 — 해변에서 산호 조각을 처음 주우면 떠오른다
+	"dish_coral_tea": {"needs": {"forage_coral": 1, "forage_herb": 2}, "energy": 150, "locked": true},
 	"dish_feast": {"needs": {"fish_king": 1, "pumpkin": 1, "rice": 2}, "energy": 220, "locked": true},
 	# ---- 마음이 담긴 요리 (♥ 컬렉션 보상) ----
 	"butter": {"needs": {"milk": 1}, "energy": 20, "locked": true},
@@ -1698,7 +1730,7 @@ const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbre
 	"dish_garlic_bread", "dish_spinach_saute",
 	"dish_grilled_fish", "dish_stew", "dish_sashimi", "dish_eel_rice", "dish_crab_soup",
 	"dish_salmon_steak", "dish_smelt_fry", "dish_fish_soup",
-	"dish_golden_roast", "dish_moon_tea", "dish_feast",
+	"dish_golden_roast", "dish_moon_tea", "dish_coral_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn"]
 var recipes_cooked := {}  # 도감: id -> 만든 횟수
 # 최후의 연금술(유니콘의 뿔)을 완성했는가 — 엔딩 후에도 자유 플레이 계속
@@ -2558,10 +2590,13 @@ func quest_pool(kind: String) -> Array:
 					out.append(fid)
 		"forage":
 			out = FORAGE_IDS + BUG_IDS
+			# 산호 조각·고대 조각은 0.1%짜리 희귀 채집물 — 의뢰로 내면 표가 막힌다
+			out.erase("forage_coral")
+			out.erase("forage_relic")
 			if not sea_open:
 				# 아직 바다를 모른다 — 해변 채집물은 의뢰로 내지 않는다
-				for bid: String in ["forage_shell", "forage_coral",
-						"forage_trash", "forage_glass"]:
+				for bid: String in ["forage_shell", "forage_trash",
+						"forage_glass", "forage_ring"]:
 					out.erase(bid)
 		"mineral":
 			out = ["ore", "gem"]
@@ -2751,8 +2786,8 @@ func reset_all() -> void:
 	# 시작 시 도구/씨앗은 아무것도 주지 않는다 — 스토리·퀘스트로 획득하는 구조
 	unlocked_tools = []
 	tree_regrow = []
-	# 마을은 처음부터 다 세워져 있다 (건물을 하나씩 짓는 단계는 없앴다)
-	village_built = ALL_VILLAGE_PLOTS.duplicate()
+	# 마을은 무건물로 시작한다 — village_built는 위(스토리 절)에서 이미 []다.
+	# (여기서 ALL을 다시 채우던 옛 줄이 남아 초기 마을에 건물이 다 서 있었다)
 	house_lv = 0
 	has_bed = false
 	explored = {}
