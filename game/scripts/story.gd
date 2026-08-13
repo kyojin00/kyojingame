@@ -818,12 +818,13 @@ func _story_open_home() -> void:
 
 
 func _story_give_hoe() -> void:
-	# 정착 준비: 이장이 환영 선물로 호미와 씨앗을 건넨다 (밭갈기 목표의 시작)
+	# 정착 준비: 이장이 환영 선물로 호미와 씨앗 살 밑천을 건넨다.
+	# 씨앗은 공짜로 주지 않는다 — 잡화점에서 직접 사는 게 농사의 시작이다.
 	if not GameData.is_tool_unlocked("hoe"):
 		GameData.unlocked_tools.append("hoe")
-	GameData.seeds["potato"] += 3
-	m.hud.reward_toast("호미 × 1 · 감자 씨앗 × 3", m.tex["icon_hoe"])
-	m.hud.show_message("호미는 가방(I)에서 슬롯에 넣어야 쓸 수 있다.", 5.0)
+	GameData.money += 200
+	m.hud.reward_toast("호미 × 1 · 씨앗 살 밑천 200G", m.tex["icon_hoe"])
+	m.hud.show_message("호미는 가방(I)에서 슬롯에 넣어야 쓴다.\n씨앗은 잡화점 씨앗 선반에서 사자!", 5.0)
 
 
 func _end_delivery() -> void:
@@ -947,7 +948,7 @@ func _start_farm_dialog() -> void:
 			"event": _story_give_hoe},
 		{"text": "「호미로 집 앞 풀밭을 갈아 밭을 만들어 보게. 농사가 이 마을의 근본일세.」",
 			"portrait": chief_happy},
-		{"text": "「씨앗이 모자라면 상점에서 사면 되네. 급할 것 없으니 천천히 하게나.」"},
+		{"text": "「씨앗은 민지네 상점 씨앗 선반에서 사면 되네.\n같이 넣어 둔 밑천이면 충분할 걸세. 천천히 하게나.」"},
 	], _end_farm_intro)
 
 
@@ -1344,7 +1345,6 @@ func _skip_tutorial() -> void:
 	m.worldgen._reveal_sea()
 	m.npcmgr._sync_village_npcs()
 	GameData.fisher_quest = "done"
-	GameData.seeds["potato"] += 3
 	_apply_story_camera()
 	if _postman != null:
 		_postman.queue_free()

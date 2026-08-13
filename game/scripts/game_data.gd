@@ -2694,7 +2694,7 @@ const TUTORIAL_REWARDS := {
 	"moved": {"money": 50},
 	"map": {"money": 50},
 	"quest": {"money": 50},
-	"note": {"seeds": {"potato": 2}},
+	"note": {"money": 50},   # 씨앗을 그냥 주지 않는다 — 상점에서 사는 게 시작이다
 	"till": {"money": 30},
 	"plant": {"money": 50},
 	"water": {"money": 100},
