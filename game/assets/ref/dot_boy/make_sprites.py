@@ -313,8 +313,11 @@ def legs_up(g, stride, dx=0, sq=0):
 # 주먹 자리는 아래에서 SWING_HAND_DOT 값으로 계산해 찍어 준다 —
 # player.gd에 그대로 옮겨 적으면 도구가 손에 붙는다.
 #
-# 프레임 설계 — 칸마다 (fist, dx, sq, behind):
+# 프레임 설계 — 칸마다 (fist, elbow, dx, sq, behind):
 #   fist    주먹 2x2 블록의 왼쪽 위 논리 칸
+#   elbow   팔꿈치가 오는 논리 칸 — 어깨-주먹 직선에서 바깥으로 뺀 자리.
+#           일직선으로 그으면 팔이 막대기처럼 쭉 뻗어 로봇 같다. 감을 때는
+#           팔꿈치가 굽어 있다가 내리치는 칸에서 거의 펴지는 게 자연스럽다.
 #   dx      몸이 쏠리는 방향 (감을 때 뒤로 갈수록 크게, 내리칠 때 앞으로)
 #   sq      주저앉는 양 (내리치는 칸만 1)
 #   behind  팔을 머리 뒤에 그린다 — 뒷모습이 머리 **너머로** 내리치는 칸은
@@ -327,33 +330,41 @@ def legs_up(g, stride, dx=0, sq=0):
 SWING = {
     # 앞모습: 왼쪽 위로 감았다가 오른쪽 아래로 내리친다 (옛 도트와 같은 방향)
     'down': {'skip': 'left', 'shoulder': (6, 17),
-             'poses': [((2, 11), -1, 0, False), ((2, 2), -2, 0, False),
-                       ((16, 19), 1, 1, False), ((15, 18), 0, 0, False)]},
+             'poses': [((2, 11), (3, 15), -1, 0, False),
+                       ((2, 2), (1, 10), -2, 0, False),
+                       ((16, 19), (11, 16), 1, 1, False),
+                       ((15, 18), (10, 16), 0, 0, False)]},
     # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽이다. 내리침이 왼쪽
     # 아래(화면 쪽 = 등 뒤)로 오면 제 뒤를 치는 그림이 된다 — 주먹은
     # 옆에서 감아올려 머리 **너머로** 뻗는다 (도구는 게임이 몸 뒤에 그려
     # 저편(=앞)에 있는 것처럼 보인다).
     'up':   {'skip': 'right', 'shoulder': (14, 17),
-             'poses': [((16, 12), 1, 0, False), ((15, 1), 2, 0, False),
-                       ((8, 1), -1, 1, True), ((16, 9), 0, 0, False)]},
+             'poses': [((16, 12), (17, 14), 1, 0, False),
+                       ((15, 1), (18, 9), 2, 0, False),
+                       ((8, 1), (11, 8), -1, 1, True),
+                       ((16, 9), (17, 12), 0, 0, False)]},
     # 옆모습(오른쪽 보기): 뒤로 감았다가 앞으로 내리친다
     'side': {'skip': None, 'shoulder': (10, 17),
-             'poses': [((3, 10), -1, 0, False), ((4, 1), -2, 0, False),
-                       ((17, 24), 2, 1, False), ((15, 19), 1, 0, False)]},
+             'poses': [((3, 10), (5, 14), -1, 0, False),
+                       ((4, 1), (4, 9), -2, 0, False),
+                       ((17, 24), (15, 20), 2, 1, False),
+                       ((15, 19), (12, 19), 1, 0, False)]},
 }
 
 
-def arm_stroke(g, x0, y0, fx, fy):
-    """어깨(x0,y0)에서 주먹 블록(fx,fy)까지 2픽셀 굵기 팔을 긋는다.
-    몸이나 머리 위를 지나가므로 획 둘레의 칠해진 칸을 윤곽선으로 눌러 뗀다."""
+def arm_stroke(g, x0, y0, fx, fy, ex=None, ey=None):
+    """어깨(x0,y0)에서 (팔꿈치를 거쳐) 주먹 블록(fx,fy)까지 2픽셀 굵기로
+    팔을 긋는다. 몸이나 머리 위를 지나가므로 획 둘레를 윤곽선으로 눌러 뗀다."""
     cells = set()
-    steps = max(abs(fx - x0), abs(fy - y0), 1)
-    for i in range(steps + 1):
-        t = i / steps
-        x, y = round(x0 + (fx - x0) * t), round(y0 + (fy - y0) * t)
-        for ddx in (0, 1):
-            for ddy in (0, 1):
-                cells.add((x + ddx, y + ddy))
+    pts = [(x0, y0)] + ([(ex, ey)] if ex is not None else []) + [(fx, fy)]
+    for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+        steps = max(abs(bx - ax), abs(by - ay), 1)
+        for i in range(steps + 1):
+            t = i / steps
+            x, y = round(ax + (bx - ax) * t), round(ay + (by - ay) * t)
+            for ddx in (0, 1):
+                for ddy in (0, 1):
+                    cells.add((x + ddx, y + ddy))
     hand = {(fx, fy), (fx + 1, fy), (fx, fy + 1), (fx + 1, fy + 1)}
     cells |= hand
     for (x, y) in cells:                       # 획 둘레 윤곽선
@@ -369,7 +380,7 @@ def arm_stroke(g, x0, y0, fx, fy):
 
 def swing_frame(direction, phase):
     spec = SWING[direction]
-    (fx, fy), dx, sq, behind = spec['poses'][phase]
+    (fx, fy), (ex, ey), dx, sq, behind = spec['poses'][phase]
     g = G()
     if direction == 'side':
         # 발은 네 장 내내 같은 자리를 디디고(벌린 자세), 엉덩이·다리 윗동이
@@ -385,11 +396,11 @@ def swing_frame(direction, phase):
     art = PARTS[direction][0]
     sx, sy = spec['shoulder']
     if behind:
-        arm_stroke(g, sx + dx, sy + sq, fx, fy)
+        arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
         head(g, art, sq, dx)                   # 머리가 팔을 덮고 주먹만 남는다
     else:
         head(g, art, sq, dx)
-        arm_stroke(g, sx + dx, sy + sq, fx, fy)
+        arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
     g.outline()
     return g
 
@@ -397,7 +408,7 @@ def swing_frame(direction, phase):
 def hand_dot(direction, phase):
     """player.gd SWING_HAND_DOT 값 — 주먹 2x2 블록 한가운데의 node 좌표.
     도트 원점은 발밑 가운데(픽셀 64,190), node = 그림의 절반 크기."""
-    (fx, fy), _, _, _ = SWING[direction]['poses'][phase]
+    (fx, fy), _, _, _, _ = SWING[direction]['poses'][phase]
     dot_x = PAD_X + fx * 6 + 6 - 64
     dot_y = fy * 6 + 6 - 190
     return (round(dot_x / 2.0 * 10) / 10, round((dot_y + 2) / 2.0 * 10) / 10)
