@@ -81,6 +81,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.spear_quest = str(d.get("spear_quest", ""))
 	if GameData.spear_quest == "visit":
 		GameData.spear_quest = "pending"   # 걸어오다 저장했으면 다시 걸어온다
+	GameData.chief_house_lv = int(d.get("chief_house_lv", 0))
 	# 숲속의 집 이야기가 생기기 전 세이브: 이미 선물을 주고받던 사이면
 	# (호감도가 쌓여 있으면) 호감도 콘텐츠는 열린 채로 이어 준다
 	var had_aff := false

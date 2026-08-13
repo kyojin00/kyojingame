@@ -92,6 +92,11 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 빈 집터 팻말 — 이주 편지를 수락하면 이 자리에 집이 선다
 			texture = m.tex["board_unlock"]
 			offset = Vector2(0, -texture.get_height())
+		"chief_hut":
+			# 이장의 거처 — 낡은 오두막에서 시작해, 마을이 크면 새 집이 된다
+			texture = m.tex["chief_house"] if GameData.chief_house_lv >= 1 \
+				else m.tex["chief_hut"]
+			offset = Vector2(0, -texture.get_height())
 		"board":
 			# 의뢰 게시판 — 다리 둘 달린 큰 코르크 게시판
 			texture = m.tex["board_quest"]

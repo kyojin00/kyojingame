@@ -682,8 +682,19 @@ var player_name := ""
 # 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
 # 재료를 모아 하나씩 세운다. (건물 id는 main.gd의 VILLAGE_PLOTS 키)
 const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
-	"library", "fish"]
+	"library", "fish", "hall"]
 var village_built: Array = []
+
+# ---- 이장 거처 · 마을 성장 ----
+#
+# 이장은 처음부터 마을의 작고 낡은 오두막에서 산다 (제대로 된 집·회관 없음).
+# 주민이 늘면(대략 4~6명 기준 — 아직 미확정, 전체 NPC 수가 정해지면 조정)
+# 어느 날 아침 마을 사람들이 이장의 새 집을 지어 준다.
+# 플레이어 포함 주민이 10명 이상이면 마을회관을 지을 수 있다 — 완공되면
+# 이장은 낮에 회관에서 업무를 보고, 집은 그대로 유지된다.
+var chief_house_lv := 0            # 0=낡은 오두막 / 1=제대로 된 이장 집
+const CHIEF_HOUSE_RESIDENTS := 5   # 새 집 기준 주민 수 (4~6 사이 — 추후 조정)
+const HALL_RESIDENTS := 10         # 마을회관 해금 기준 (플레이어 포함)
 
 # 메인 스토리 2에서 짓는 첫 상점의 재료 (main.VILLAGE_BUILD_COST.general과 같게)
 const SHOP_BUILD_WOOD := 30
@@ -2984,6 +2995,7 @@ func reset_all() -> void:
 	mom_quest = ""
 	mom_quests_done = []
 	spear_quest = ""
+	chief_house_lv = 0
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -3312,7 +3324,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"move_house": [move_house.x, move_house.y],
 		"home_plots": home_plots,
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
-		"spear_quest": spear_quest,
+		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

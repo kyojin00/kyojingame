@@ -187,6 +187,16 @@ func _next_day(passed_out: bool) -> void:
 	# 민지의 해변 노점: 오늘 나와 있을 시각(하루 3번, 1시간씩)을 새로 뽑는다
 	GameData.roll_stall_hours()
 
+	# 마을 성장: 주민이 늘면 어느 날 아침, 마을 사람들이 이장의 낡은 오두막을
+	# 제대로 된 집으로 다시 지어 드린다
+	if GameData.chief_house_lv == 0 \
+			and m.village_residents() >= GameData.CHIEF_HOUSE_RESIDENTS:
+		GameData.chief_house_lv = 1
+		m.objnode._remove_object(m.CHIEF_HUT)
+		m.objnode._place_object(m.CHIEF_HUT, "chief_hut", 0)
+		m.hud.quest_toast("이장님의 새 집 완공!")
+		m.hud.show_message("마을 사람들이 힘을 모아 이장님의 낡은 오두막을\n제대로 된 집으로 다시 지어 드렸다!", 6.0)
+
 	m.saveio.save_now()
 
 	var note := ""

@@ -171,7 +171,7 @@ const TEXTURE_NAMES := [
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "kitchen_counter",
-	"stall", "bait", "flower_pot", "trash_bin",
+	"stall", "bait", "flower_pot", "trash_bin", "chief_hut", "chief_house",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
 	"house_library", "house_ranch", "house_fish",
@@ -339,17 +339,27 @@ const VILLAGE_PLOTS := {
 	# 동쪽 줄 (동쪽 세로 길가)
 	"library": {"anchor": Vector2i(91, 12), "name": "도서관"},
 	"fish":    {"anchor": Vector2i(91, 26), "name": "수산시장"},
+	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
+	"hall":    {"anchor": Vector2i(80, 28), "name": "마을회관"},
 }
+# 이장의 거처 — 처음부터 마을에 있는 작고 낡은 오두막 (광장 북서쪽).
+# 주민이 늘면 제대로 된 집으로 다시 지어진다 (GameData.chief_house_lv)
+const CHIEF_HUT := Vector2i(71, 11)
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
-const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
+const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish", "hall"]
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
 	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
 	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
-	"ranch": [80, 40], "fish": [100, 60],
+	"ranch": [80, 40], "fish": [100, 60], "hall": [120, 80],
 }
+
+
+# 마을 주민 수 (플레이어 포함) — 이장 새 집·마을회관 해금 기준
+func village_residents() -> int:
+	return npcs.size() + 1
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 	"ranch": "rancher", "fish": "fisher"}
@@ -382,7 +392,7 @@ const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타�
 const BUILDING_NAMES := {
 	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
 	"lab": "연구소", "inn": "여관", "library": "도서관",
-	"ranch": "목장 상회", "fish": "수산시장",
+	"ranch": "목장 상회", "fish": "수산시장", "hall": "마을회관",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 # 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
@@ -729,7 +739,7 @@ const OBJECT_SCALES := {
 	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
-	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
+	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4, "chief_hut": 2.0,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.

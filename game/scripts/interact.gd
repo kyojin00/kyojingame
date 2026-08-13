@@ -269,6 +269,19 @@ func interact() -> void:
 		if obj.kind == "trash_bin":
 			m.village.open_trash_bin(t)
 			return
+		if obj.kind == "chief_hut":
+			if GameData.chief_house_lv >= 1:
+				m.dialog.open("이장의 집",
+					"마을 사람들이 힘을 모아 지어 드린 이장님의 새 집이다.\n"
+					+ ("낮에는 마을회관에서 업무를 보신다." if GameData.village_built.has("hall")
+						else "창가에 화분이 가지런하다."),
+					[["닫기", null]])
+			else:
+				m.dialog.open("이장의 오두막",
+					"이장님이 사는 작고 낡은 오두막이다.\n"
+					+ "마을이 살아나면 제대로 된 집을 지어 드리고 싶다...",
+					[["닫기", null]])
+			return
 		if obj.kind == "homeplot":
 			# 빈 집터 팻말 — 회수하면 집터가 가방으로 돌아온다
 			m.dialog.open("빈 집터",

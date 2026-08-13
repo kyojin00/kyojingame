@@ -64,9 +64,12 @@ func _debug_tick() -> void:
 			var nids: Array = []
 			for n2 in m.npcs:
 				nids.append(n2.id)
+			var hut0: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
+				== "chief_hut" and GameData.chief_house_lv == 0
 			print("VILLAGE_INIT_OK=", GameData.village_built.is_empty()
-				and houses == 0 and nids == ["chief"],
-				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids)
+				and houses == 0 and nids == ["chief"] and hut0,
+				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids,
+				" 이장오두막=", hut0)
 		elif m.story._story_snapped and m.story._story_t >= 3.8:
 			get_tree().quit()
 		return
@@ -554,6 +557,52 @@ func _debug_tick() -> void:
 			print("HIDDEN_OK=", rare_ok and coral_ok and relic_ok,
 				" 확률(1렙)=", rare1, " (10렙)=", rare10,
 				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
+		264:
+			# 이장 거처·마을 성장: 오두막 -> (주민 증가) 새 집 ->
+			# (주민 10명) 마을회관 해금·건설 -> 이장 낮 근무
+			var hut_ok: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
+				== "chief_hut" and GameData.chief_house_lv == 0
+			var res0: int = m.village_residents()
+			var res_ok: bool = res0 == m.npcs.size() + 1
+			# 새 집 업그레이드 (아침 훅과 같은 조건·코드)
+			var can_up: bool = GameData.chief_house_lv == 0 \
+				and res0 >= GameData.CHIEF_HOUSE_RESIDENTS
+			GameData.chief_house_lv = 1
+			m.objnode._remove_object(m.CHIEF_HUT)
+			m.objnode._place_object(m.CHIEF_HUT, "chief_hut", 0)
+			var up_ok: bool = can_up and GameData.chief_house_lv == 1 \
+				and str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) == "chief_hut"
+			# 마을회관: 주민 10명 미만이면 마을 발전 목록에서 빠진다
+			GameData.village_built.erase("hall")
+			var gate_before: bool = res0 < GameData.HALL_RESIDENTS \
+				and m.village._next_village_build() != "hall"
+			var dummies: Array = []                 # 임시 주민을 10명까지 채운다
+			while m.village_residents() < GameData.HALL_RESIDENTS:
+				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				dummies.append(m.npcs[m.npcs.size() - 1])
+			var gate_after: bool = m.village_residents() >= GameData.HALL_RESIDENTS \
+				and m.village._next_village_build() == "hall"
+			GameData.wood += 120
+			GameData.stone += 80
+			m.village._build_village_building("hall")
+			var hall_ok: bool = GameData.village_built.has("hall") \
+				and str(m.objects.get(m.VILLAGE_PLOTS["hall"].anchor,
+					{}).get("kind", "")) == "house"
+			# 이장 낮 근무 (9~17시 회관) — 집은 그대로다
+			var keep_min2: float = GameData.minutes
+			GameData.minutes = 12.0 * 60.0
+			var work: bool = m.npcmgr.npc_place_now("chief") == "hallwork"
+			GameData.minutes = 7.0 * 60.0
+			var off_work: bool = m.npcmgr.npc_place_now("chief") != "hallwork"
+			GameData.minutes = keep_min2
+			var dummy: Node2D = m.npcs[m.npcs.size() - 1]
+			m.npcs.erase(dummy)                    # 임시 주민 정리
+			dummy.queue_free()
+			print("CHIEFGROW_OK=", hut_ok and res_ok and up_ok and gate_before
+				and gate_after and hall_ok and work and off_work,
+				" 오두막=", hut_ok, " 주민수=", res_ok, "(", res0, "명)",
+				" 새집=", up_ok, " 회관잠금=", gate_before, " 회관해금=", gate_after,
+				" 회관건설=", hall_ok, " 낮근무=", work, " 아침집=", off_work)
 		262:
 			# 밤 기절 서브퀘(이장의 걱정) + 초반 무기(돌 창·돌 검) + 화살 +
 			# 컬렉션 「풋내기 모험가의 무기」

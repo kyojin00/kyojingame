@@ -29,6 +29,11 @@ func npc_place_now(npc_id: String) -> String:
 	# 민지는 노점 시간이 되면 해변으로 내려간다 (하루 3번, 1시간씩)
 	if npc_id == "merchant" and GameData.merchant_at_stall():
 		return "stall"
+	# 마을회관이 서면 이장은 낮(9~17시)에 회관에서 업무를 본다 (집은 그대로)
+	if npc_id == "chief" and GameData.village_built.has("hall"):
+		var hh := GameData.minutes / 60.0
+		if hh >= 9.0 and hh < 17.0:
+			return "hallwork"
 	var plan: Array = m.NPC_SCHEDULE.get(npc_id, [])
 	if plan.is_empty():
 		return ""
@@ -45,6 +50,8 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	match place:
 		"stall":
 			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
+		"hallwork":
+			t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
 		"plaza":
 			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13))
 		"board":

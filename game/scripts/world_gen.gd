@@ -284,6 +284,8 @@ func _build_village() -> void:
 
 	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
 	m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
+	# 이장의 거처 — 처음부터 있는 작고 낡은 오두막 (마을의 유일한 지붕)
+	m.objects[m.CHIEF_HUT] = {"kind": "chief_hut", "hp": 0}
 	# 상점 터 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 여기서 짓는다)
 	if not GameData.village_built.has("general"):
 		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
