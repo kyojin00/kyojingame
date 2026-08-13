@@ -794,6 +794,14 @@ const STALL_SHELLS := 5        # 노점 재료: 조개 (장식 겸 진열대)
 const STALL_VISITS := 3        # 하루 방문 횟수
 const STALL_VISIT_MIN := 60    # 1회 방문 시간 (게임 분)
 # 노점 한정 레시피 — 잡화점 선반에는 없는 낚시 요리들. id -> 가격
+# 잡화점 생활용품 선반의 요리 레시피 (생선 요리 — 사서 「배우기」)
+const SHOP_DISH_RECIPES := {
+	"dish_grilled_fish": 200, "dish_fish_soup": 300, "dish_stew": 400,
+	"dish_crab_soup": 500, "dish_sashimi": 600,
+}
+const SHOP_DISH_IDS := ["dish_grilled_fish", "dish_fish_soup", "dish_stew",
+	"dish_crab_soup", "dish_sashimi"]
+
 const STALL_RECIPES := {
 	"dish_smelt_fry": 800, "dish_eel_rice": 1500, "dish_salmon_steak": 1600,
 }
@@ -2085,15 +2093,17 @@ const RECIPES := {
 	"dish_garlic_bread": {"needs": {"garlic": 1, "corn": 1}, "energy": 50},
 	"dish_spinach_saute": {"needs": {"spinach": 2, "garlic": 1}, "energy": 55},
 	# ---- 물에서 나오는 것 ----
-	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40},
-	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65},
-	"dish_sashimi": {"needs": {"fish_trout": 1, "winter_radish": 1}, "energy": 85},
+	# 생선 요리는 물고기를 잡았다고 저절로 떠오르지 않는다 —
+	# 잡화점에서 레시피(SHOP_DISH_RECIPES)를 사서 배운다
+	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40, "locked": true},
+	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65, "locked": true},
+	"dish_sashimi": {"needs": {"fish_trout": 1, "winter_radish": 1}, "energy": 85, "locked": true},
 	# 장어덮밥·연어 스테이크·빙어 튀김은 해변 노점에서 레시피를 사야 배운다
 	"dish_eel_rice": {"needs": {"fish_eel": 1, "rice": 1}, "energy": 110, "locked": true},
-	"dish_crab_soup": {"needs": {"fish_crab": 1, "onion": 1}, "energy": 95},
+	"dish_crab_soup": {"needs": {"fish_crab": 1, "onion": 1}, "energy": 95, "locked": true},
 	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120, "locked": true},
 	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70, "locked": true},
-	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60},
+	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60, "locked": true},
 	# ---- 귀한 것 (컬렉션 보상으로 열린다) ----
 	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160, "locked": true},
 	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150, "locked": true},

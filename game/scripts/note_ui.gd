@@ -177,13 +177,8 @@ func close() -> void:
 	visible = false
 
 
-func _process(delta: float) -> void:
-	if not visible:
-		return
-	_refresh_timer -= delta
-	if _refresh_timer <= 0.0:
-		_refresh_timer = 0.5
-		_rebuild()
+# 도감은 여는 순간에만 다시 그린다 — 예전처럼 0.5초마다 격자를 부수고
+# 다시 지으면, 마우스를 올려 둔 칸이 사라지면서 툴팁이 금방 꺼졌다.
 
 
 func _line(text: String, color := Color(0.24, 0.17, 0.09)) -> void:
@@ -243,7 +238,7 @@ func _rebuild_collect() -> void:
 	for id in GameData.CROP_IDS:
 		var n := int(GameData.crops_harvested.get(id, 0))
 		rows.append({"icon": "mature_" + id, "name": GameData.CROPS[id].name,
-			"found": n > 0, "count_text": "수확 %d회" % n,
+			"found": n > 0,
 			"desc": "%s 씨앗 %dG" % [GameData.season_list(id), GameData.CROPS[id].seed_price],
 			"date": GameData.discovered_on(id), "hint": "밭에 심어 거둬 보자"})
 	_grid(rows)
@@ -254,7 +249,7 @@ func _rebuild_collect() -> void:
 	for fid in GameData.FISH_IDS:
 		var caught := int(GameData.fish_caught.get(fid, 0))
 		rows.append({"icon": fid, "name": GameData.ITEMS[fid].name,
-			"found": caught > 0, "count_text": "%d마리 · %dG" % [caught, GameData.ITEMS[fid].sell],
+			"found": caught > 0, "count_text": "%dG" % GameData.ITEMS[fid].sell,
 			"desc": _fish_desc(fid),
 			"date": GameData.discovered_on(fid), "hint": _fish_desc(fid)})
 	_grid(rows)
@@ -265,7 +260,7 @@ func _rebuild_collect() -> void:
 	for rid in GameData.RECIPE_IDS:
 		var made := int(GameData.recipes_cooked.get(rid, 0))
 		rows.append({"icon": rid, "name": GameData.ITEMS[rid].name,
-			"found": made > 0, "count_text": "%d번 만들었다" % made,
+			"found": made > 0,
 			"desc": "회복 %d · %dG" % [int(GameData.RECIPES[rid].energy), GameData.ITEMS[rid].sell],
 			"date": GameData.discovered_on(rid), "hint": "조리대에서 실험해 보자"})
 	_grid(rows)
@@ -291,7 +286,7 @@ func _rebuild_collect() -> void:
 	for fid2 in GameData.FORAGE_IDS + GameData.BUG_IDS:
 		var got := int(GameData.forage_caught.get(fid2, 0))
 		rows.append({"icon": fid2, "name": GameData.ITEMS[fid2].name,
-			"found": got > 0, "count_text": "%d개" % got,
+			"found": got > 0,
 			"desc": "들과 숲에서", "date": GameData.discovered_on(fid2),
 			"hint": "들판과 계절을 살펴보자"})
 	_grid(rows)
@@ -302,7 +297,7 @@ func _rebuild_collect() -> void:
 	for mid2 in GameData.MOBS:
 		var kills := int(GameData.mob_kills.get(mid2, 0))
 		rows.append({"icon": mid2 + "_0", "name": GameData.MOBS[mid2].name,
-			"found": kills > 0, "count_text": "%d마리 처치" % kills,
+			"found": kills > 0,
 			"desc": GameData.MOBS[mid2].desc, "date": "",
 			"hint": "동굴에서 만나보자"})
 	_grid(rows)
@@ -310,15 +305,17 @@ func _rebuild_collect() -> void:
 	_line("")
 	var known_f := 0
 	for fo in GameData.FORMULA_IDS:
-		if GameData.knows_formula(fo):
+		if int(GameData.alchemy_brews.get(fo, 0)) > 0 or GameData.discovered.has(fo):
 			known_f += 1
 	_head("[물약]  %d / %d" % [known_f, GameData.FORMULA_IDS.size()])
 	rows = []
 	for fo2 in GameData.FORMULA_IDS:
-		var knows := GameData.knows_formula(fo2)
 		var def: Dictionary = GameData.FORMULAS[fo2]
+		# 조합법을 「아는 것」과 「빚어 본 것」은 다르다 — 도감에는
+		# 실제로 한 병이라도 얻어 봐야 등록된다
 		rows.append({"icon": fo2, "name": def.name,
-			"found": knows, "count_text": "%d병" % int(GameData.alchemy_brews.get(fo2, 0)),
+			"found": int(GameData.alchemy_brews.get(fo2, 0)) > 0
+				or GameData.discovered.has(fo2),
 			"desc": str(def.effect), "date": GameData.discovered_on(fo2),
 			"hint": "재료 셋을 조합대에 올려 보자"})
 	_grid(rows)

@@ -257,7 +257,6 @@ func _build_village() -> void:
 # 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
 # 문 앞 한 줄만 터 두고, 거기서 가장 가까운 길까지 흙길을 잇는다.
 func _build_yard(anchor: Vector2i) -> void:
-	var door := m.door_tile(anchor)
 	var yard := Rect2i(anchor.x - m.YARD_PAD, anchor.y - m.YARD_PAD,
 		5 + m.YARD_PAD * 2, 4 + m.YARD_PAD * 2)
 	# 마당 안은 잔디 (길이 건물 밑으로 지나가지 않게)
@@ -266,19 +265,8 @@ func _build_yard(anchor: Vector2i) -> void:
 			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
 				continue
 			m.grid[y][x].ground = "grass"
-	# 울타리: 마당 테두리. 문 앞 칸만 비운다
-	for y in range(yard.position.y, yard.end.y):
-		for x in range(yard.position.x, yard.end.x):
-			var edge: bool = x == yard.position.x or x == yard.end.x - 1 \
-				or y == yard.position.y or y == yard.end.y - 1
-			if not edge or x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
-				continue
-			if x == door.x:
-				continue  # 드나드는 통로
-			if m.objects.has(Vector2i(x, y)):
-				continue
-			m.objects[Vector2i(x, y)] = {"kind": "fence", "hp": 0, "fixed": true}
-	# (문 앞 흙길은 더 이상 내지 않는다 — 바닥 타일은 플레이어 몫이다)
+	# (건물을 감싸던 마당 울타리는 없앴다 — 마당은 잔디로 트여 있다.
+	#  문 앞 흙길도 더 이상 내지 않는다 — 바닥 타일은 플레이어 몫이다)
 
 
 # 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,

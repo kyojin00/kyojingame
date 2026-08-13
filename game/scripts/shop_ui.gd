@@ -368,6 +368,25 @@ func _rebuild() -> void:
 			# 부품(못·경첩)은 잡화점이 아니라 대장간에서 판다
 			_note("도구·부품은 대장간에서 다룬다. 새 물건이 들어오면 이 선반에 놓인다.")
 		if buy_cat in ["", "life"]:
+			# 요리 레시피 — 물고기를 잡았다고 저절로 떠오르지 않는다.
+			# 여기서 사서 가방(제작·배치)의 두루마리로 배운다
+			_note("— 요리 레시피 (생선 요리) —")
+			for did: String in GameData.SHOP_DISH_IDS:
+				var dname := str(GameData.ITEMS[did].name)
+				if not GameData.recipe_locked(did):
+					items_box.add_child(_mk_row("recipe", "%s 레시피 (배움)" % dname,
+						"재료를 모아 집 조리대에서 만들자"))
+					continue
+				if GameData.recipe_items.has(did):
+					items_box.add_child(_mk_row("recipe", "%s 레시피 (보유 중)" % dname,
+						"가방(제작·배치)에서 클릭해 배우자"))
+					continue
+				var dprice := int(GameData.SHOP_DISH_RECIPES[did])
+				var db := _mk_button("구매", _on_buy_dish_recipe.bind(did, dprice))
+				db.disabled = GameData.money < dprice
+				items_box.add_child(_mk_row("recipe", "%s 레시피" % dname,
+					"체력 +%d" % int(GameData.RECIPES[did].energy),
+					db, [["coin", dprice]]))
 			# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다
 			_note("— 생활용품 레시피 —")
 			if GameData.recipe_items.has("broom"):
@@ -755,7 +774,8 @@ func _on_buy_bait() -> void:
 
 # 노점 한정 요리 레시피 — 사면 집 조리대의 잠긴 칸이 열린다
 func _on_buy_dish_recipe(id: String, price: int) -> void:
-	if GameData.money < price or not GameData.recipe_locked(id):
+	if GameData.money < price or not GameData.recipe_locked(id) \
+			or GameData.recipe_items.has(id):
 		return
 	GameData.money -= price
 	GameData.today_spent += price

@@ -285,6 +285,10 @@ func _apply_save(d: Dictionary) -> void:
 		for o in d.objects:
 			if str(o[2]) in ["deco_lamp", "deco_bench"]:
 				continue   # 가로등·벤치는 없앴다 — 옛 세이브에서 걷어 낸다
+			if str(o[2]) == "fence" and o.size() > 7 and int(o[7]) == 1 \
+					and int(o[0]) >= 54:
+				continue   # 건물 마당을 감싸던 고정 울타리도 없앴다
+				# (숲길의 스토리 울타리는 x<54라 그대로 남는다)
 			var od := {"kind": o[2], "hp": int(o[3])}
 			if o.size() > 4 and int(o[4]) == 1:
 				od["apple"] = true
