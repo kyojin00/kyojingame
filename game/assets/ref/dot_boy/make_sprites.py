@@ -118,7 +118,7 @@ HEAD_DOWN = [
     "OssHHHHHssO",
     "OsssssssssO",
     "OsssssssssO",
-    "OsssssssssO",
+    "OseessseesO",
     "OseessseesO",
     "OseessseesO",
     "OsssssssssO",
@@ -136,7 +136,7 @@ HEAD_SIDE = [   # 오른쪽을 본다
     "OSssssssssO",
     "OssSssssesO",
     "OssSssssesO",
-    "OssSssssssO",
+    "OssSssssesO",
     "OSsssssmssO",
     ".OsssssssO.",
     "..OOsssOO..",
@@ -176,12 +176,15 @@ def torso_down(g, bob, swing):
     g.vline(7, y, y + 5, 'L')                  # 빛 받는 왼쪽 면
     g.px(8, y, 'L')
     g.px(10, y + 1, 'B'); g.px(10, y + 2, 'B')  # 앞섶 선
-    # 팔: 소매 1픽셀 폭 + 손. 앞으로 흔들면 1px 내려가고 뒤로 가면 1px 올라간다.
-    for sx, sw in ((6, swing), (14, -swing)):
+    # 팔: 소매 2픽셀 폭 + 두 칸 손. 앞으로 흔들면 소매가 늘어나며 1px 내려가고
+    # 뒤로 가면 접히며 올라간다 — 어깨는 늘 몸통에 붙어 있다.
+    for sx, sw in ((5, swing), (14, -swing)):
         dy = (1 if sw >= 2 else 0) - (1 if sw <= -2 else 0)
-        g.vline(sx, y + 1 + dy, y + 3 + dy, 'b' if sx == 14 else 'L')
-        g.px(sx, y + 4 + dy, 'B')
-        g.px(sx, y + 5 + dy, 's')              # 손
+        g.rect(sx, y + 1, sx + 1, y + 2 + dy, 'b')
+        g.vline(5 if sx == 5 else 15, y + 1, y + 2 + dy, 'L' if sx == 5 else 'B')
+        g.rect(sx, y + 3 + dy, sx + 1, y + 3 + dy, 'B')          # 소매단
+        g.rect(sx, y + 4 + dy, sx + 1, y + 5 + dy, 's')          # 손
+        g.px(sx + (0 if sx == 14 else 1), y + 5 + dy, 'S')       # 손 그늘
 
 
 def legs_down(g, stride):
@@ -208,11 +211,13 @@ def torso_side(g, bob, swing, lean=0):
     g.vline(c + 3, y, y + 5, 'L')              # 앞면이 밝다
     g.vline(c - 3, y, y + 5, 'B')              # 등쪽 그늘
     # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다. 몸판과 구분되게 그늘색.
-    hy = y + 5 - (1 if abs(swing) >= 2 else 0)
+    hy = y + 4 - (1 if abs(swing) >= 2 else 0)   # 손이 시작하는 행
     for yy in range(y + 1, hy):
         t = (yy - (y + 1)) / max(1, hy - 1 - (y + 1))
-        g.px(c + round(swing * t), yy, 'B')
-    g.px(c + swing, hy, 's')                   # 손
+        x = c - 1 + round(swing * t)
+        g.rect(x, yy, x + 1, yy, 'B')          # 소매 2픽셀 폭
+    g.rect(c - 1 + swing, hy, c + swing, hy + 1, 's')            # 손
+    g.px(c + swing, hy + 1, 'S')
 
 
 def legs_side(g, stride, lean=0):
@@ -245,11 +250,13 @@ def torso_up(g, bob, swing):
     g.hline(7, 13, y, 'B')                     # 어깨 그늘
     g.hline(7, 13, y + 6, 'B')
     g.vline(7, y, y + 5, 'L')
-    for sx, sw in ((6, -swing), (14, swing)):  # 뒤모습이라 팔 위상이 좌우 반대
+    for sx, sw in ((5, -swing), (14, swing)):  # 뒤모습이라 팔 위상이 좌우 반대
         dy = (1 if sw >= 2 else 0) - (1 if sw <= -2 else 0)
-        g.vline(sx, y + 1 + dy, y + 3 + dy, 'b' if sx == 14 else 'L')
-        g.px(sx, y + 4 + dy, 'B')
-        g.px(sx, y + 5 + dy, 's')
+        g.rect(sx, y + 1, sx + 1, y + 2 + dy, 'b')
+        g.vline(5 if sx == 5 else 15, y + 1, y + 2 + dy, 'L' if sx == 5 else 'B')
+        g.rect(sx, y + 3 + dy, sx + 1, y + 3 + dy, 'B')
+        g.rect(sx, y + 4 + dy, sx + 1, y + 5 + dy, 's')
+        g.px(sx + (0 if sx == 14 else 1), y + 5 + dy, 'S')
 
 
 def legs_up(g, stride):
