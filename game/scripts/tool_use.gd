@@ -401,6 +401,8 @@ func use_tool() -> void:
 			Sound.play_sfx("sfx_place")
 			m.hud.show_message("스프링클러 설치! 주변 4칸에 계속 물을 준다.")
 			m.tutorial_notify("build")
+		"spear", "sword":
+			_weapon_swing(t)
 		"rod":
 			match m.fishing_state:
 				"":
@@ -581,3 +583,51 @@ func _update_hit_fx(delta: float) -> void:
 			cam.offset = Vector2(randf_range(-k, k), randf_range(-k, k))
 		elif cam.offset != Vector2.ZERO:
 			cam.offset = Vector2.ZERO
+
+
+# ---- 초반 무기: 돌 창 · 돌 검 ----
+#
+# 밤에 나타나는 몬스터(지네)를 후려친다.
+#   돌 창: 느리지만 한 방이 강하다 (지네를 한 방에)
+#   돌 검: 빠르게 두 번 벤다 — 둘째 타는 순수 무기 위력만 (전체 화력은 비슷)
+var _weapon_cd := 0.0   # main._process가 매 프레임 줄여 준다
+
+
+func _weapon_swing(t: Vector2i) -> void:
+	if _weapon_cd > 0.0:
+		return
+	_weapon_cd = 1.1 if GameData.tool == "spear" else 0.8
+	swing_at(t, "wood", GameData.tool == "spear")
+	_weapon_hit(true)
+	if GameData.tool == "sword":
+		get_tree().create_timer(0.16).timeout.connect(_weapon_hit.bind(false))
+
+
+func _weapon_hit(with_bonus: bool) -> void:
+	var dmg: float = GameData.tool_stat(GameData.tool, "power")
+	if with_bonus:
+		dmg += GameData.combat_bonus() + GameData.gear_stat("power")
+	var face: Vector2 = m.FACE_VECS[m.player.dir]
+	for mob in m.night_mobs.duplicate():
+		if not is_instance_valid(mob.node):
+			continue
+		var v: Vector2 = mob.node.position - m.player.position
+		if v.length() > 74.0:
+			continue
+		if v.length() > 22.0 and v.normalized().dot(face) < 0.25:
+			continue
+		mob["hp"] = float(mob.get("hp", 4.0)) - dmg
+		if float(mob.hp) <= 0.0:
+			mob.node.queue_free()
+			m.night_mobs.erase(mob)
+			Sound.play_sfx("sfx_pick", 0.2)
+			m.renderer.spawn_particles(m.player_tile(), "stone")
+			gain_skill("combat", 6.0)
+			if randf() < 0.3:
+				m.doing.gain_item("arrow", 1)
+				m.hud.show_message("지네를 쓰러뜨렸다! 화살을 떨어뜨렸다.")
+			else:
+				m.hud.show_message("지네를 쓰러뜨렸다!")
+		else:
+			# 밀려나며 잠시 주춤한다
+			mob.node.position += v.normalized() * 44.0

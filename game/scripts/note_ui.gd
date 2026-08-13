@@ -225,11 +225,13 @@ func _rebuild_collect() -> void:
 		var have := GameData.collection_have(col)
 		var total := (col.ids as Array).size()
 		var done: bool = str(col.id) in GameData.collections_done
+		var rname := "" if str(col.reward) == "" else str(GameData.ITEMS[col.reward].name)
 		if done:
-			_line("  ★ %s %d/%d — %s 레시피!" % [col.name, have, total,
-				GameData.ITEMS[col.reward].name], GOLD)
+			_line("  ★ %s %d/%d%s" % [col.name, have, total,
+				(" — %s 레시피!" % rname) if rname != "" else " — 완성!"], GOLD)
 		else:
-			var reward_hint := "???" if have < total - 1 else str(GameData.ITEMS[col.reward].name)
+			var reward_hint := "???" if have < total - 1 \
+				else (rname if rname != "" else "완성 기념")
 			_line("  %s %d/%d — 보상: %s" % [col.name, have, total, reward_hint], DIM)
 
 	_line("")

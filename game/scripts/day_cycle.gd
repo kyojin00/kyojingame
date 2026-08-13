@@ -43,7 +43,8 @@ func _update_night_mobs(delta: float) -> void:
 		spr.scale = Vector2(1.4, 1.4)
 		node.add_child(spr)
 		m.world.add_child(node)
-		m.night_mobs.append({"node": node, "spr": spr, "anim": 0.0})
+		# hp: 돌 창(강타)은 한 방, 돌 검(연격)은 두 번 휘둘러야 잡는다
+		m.night_mobs.append({"node": node, "spr": spr, "anim": 0.0, "hp": 4.0})
 		m.hud.show_message("어둠 속에서 무언가 기어오는 소리가 들린다...", 4.0)
 	# 루프 변수 이름을 mob으로 둔다. 예전에는 이것도 `m`이었는데, 모듈에서는
 	# `m`이 main이라 안쪽에서 main을 통째로 가려 버린다.
@@ -64,6 +65,9 @@ func _update_night_mobs(delta: float) -> void:
 			m.player.position += (m.player.position - mob.node.position).normalized() * 36.0
 			if GameData.energy <= 0.0 and not m.day_transitioning:
 				m.hud.show_message("정신을 잃고 쓰러졌다...")
+				# 밤 몬스터에게 당해 기절 — 다음 날 아침 이장이 찾아온다 (서브퀘)
+				if GameData.spear_quest == "":
+					GameData.spear_quest = "pending"
 				_fade_next_day(true)
 
 

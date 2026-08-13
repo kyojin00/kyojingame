@@ -219,6 +219,7 @@ const TEXTURE_NAMES := [
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
+	"icon_spear", "icon_sword", "arrow",
 	# 대장간 장비 (무기·방어구·장신구)
 	"gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
@@ -1088,6 +1089,7 @@ func _process(delta: float) -> void:
 	story._fisher_update(delta)
 	story._move_update(delta)
 	story._forest_update(delta)
+	story._spear_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_tree_fall(delta)
@@ -1113,6 +1115,7 @@ func _process(delta: float) -> void:
 			_growth_timer = 0.0
 		# 해변: 게임 시간 10~15분마다 조개가 하나씩 밀려온다 (상한에서 멈춘다)
 		if GameData.sea_open and not Net.is_guest():
+			toolwork._weapon_cd = maxf(0.0, toolwork._weapon_cd - delta)
 			_shell_cd -= delta * MIN_PER_SEC
 			if _shell_cd <= 0.0:
 				_shell_cd = GameData.shell_respawn_minutes()

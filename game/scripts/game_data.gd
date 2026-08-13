@@ -301,6 +301,12 @@ const TOOL_STATS := {
 		"grow": {"power": 1, "stamina": -0.5, "luck": 1}},
 	"rod":     {"base": {"power": 1, "reach": 1, "stamina": 2, "luck": 1},
 		"grow": {}},
+	# 초반 무기 — 창은 느리지만 한 방이 강하고, 검은 빠르게 두 번 벤다.
+	# (전체 화력은 비슷하게 — 성향 따라 고르는 무기)
+	"spear":   {"base": {"power": 4, "reach": 1, "stamina": 5, "luck": 0},
+		"grow": {}},
+	"sword":   {"base": {"power": 1.5, "reach": 1, "stamina": 3, "luck": 0},
+		"grow": {}},
 }
 
 
@@ -814,6 +820,13 @@ var MOM_QUESTS: Array = []
 var mom_quest := ""                # 진행 중인 퀘스트 id ("" = 없음)
 var mom_quests_done: Array = []    # 끝낸 퀘스트 id들
 
+# ---- 밤 기절 조건부 서브 퀘스트 (이장의 걱정) ----
+# 밤에 몬스터에게 당해 기절하면, 다음 날 아침 이장이 직접 찾아와
+# 돌 창 레시피를 준다 (상점 구매가 아니라 이 서브퀘로만 얻는다).
+#   "": 아직 / pending: 간밤에 기절했다 — 아침에 이장이 온다 /
+#   visit: 이장이 걸어오는 중 / done: 완료 (돌 창 레시피 획득)
+var spear_quest := ""
+
 
 func mom_quest_open() -> bool:
 	return forest_quest == "done"
@@ -906,6 +919,13 @@ const DESK_RECIPES := {
 	"housing_kit": {"name": "집터", "cost": {"wood": 60, "stone": 40, "nail": 4},
 		"kind": "item", "give": "housing_kit", "locked": true, "shop": "잡화점",
 		"desc": "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 가방에서 쓴다"},
+	# 초반 무기 — kind "tool": 완성되면 도구가 해금된다 (가방에서 슬롯에 장착)
+	"spear": {"name": "돌 창", "cost": {"wood": 3, "stone": 2},
+		"kind": "tool", "tool": "spear", "locked": true, "shop": "이장",
+		"desc": "느리지만 한 방이 묵직한 창 — 밤 몬스터를 상대한다 (레시피는 이장에게)"},
+	"sword": {"name": "돌 검", "cost": {"wood": 2, "stone": 3},
+		"kind": "tool", "tool": "sword", "locked": true, "shop": "훗날의 부탁",
+		"desc": "빠르게 두 번 베는 검 — 화력은 창과 비슷하다 (레시피는 어느 부탁의 보상)"},
 	"bed_wood": {"name": "나무 침대", "cost": {"wood": 25, "nail": 2},
 		"kind": "bed", "lv": 1, "desc": "아침 기력이 가득 찬다"},
 	"bed_soft": {"name": "푹신한 침대", "cost": {"wood": 30, "cloth": 5, "milk": 3},
@@ -1004,6 +1024,12 @@ func desk_tick(delta: float) -> void:
 			furniture.append({"id": str(def.furn),
 				"x": 430.0 + float(furniture.size() % 4) * 40.0,
 				"y": 255.0 + float(furniture.size() / 4 % 3) * 30.0})
+		elif str(def.kind) == "tool":
+			# 무기·도구 — 완성되는 순간 도구가 해금된다 (가방에서 슬롯에 장착)
+			var tid := str(def.tool)
+			if tid not in unlocked_tools:
+				unlocked_tools.append(tid)
+			discover(tid)
 		discover(str(job.id))
 		desk_done_pending.append(str(def.name))
 	desk_queue = still
@@ -1330,6 +1356,10 @@ const ITEMS := {
 	"bait": {"name": "미끼", "sell": 2},
 	"housing_kit": {"name": "집터", "sell": 0},
 	"trash_bin": {"name": "쓰레기통", "sell": 0},
+	# 초반 무기 (도구라 개수는 없지만, 도감·컬렉션 표시용 이름이 필요하다)
+	"spear": {"name": "돌 창", "sell": 0},
+	"sword": {"name": "돌 검", "sell": 0},
+	"arrow": {"name": "화살", "sell": 15},
 	"forage_coral": {"name": "산호 조각", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
@@ -1374,7 +1404,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"housing_kit", "trash_bin", "dish_coral_tea",
+	"housing_kit", "trash_bin", "arrow", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -1434,6 +1464,9 @@ const COLLECTIONS := [
 		"ids": ["fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden"]},
 	{"id": "cave_watch", "name": "동굴 관찰자", "reward": "dish_feast",
 		"ids": ["slime", "bat", "ghost", "treant"]},
+	# 초반 무기 3종 — 창·검은 제작대에서 만들고, 화살은 몬스터가 떨어뜨린다
+	{"id": "starter_weapons", "name": "풋내기 모험가의 무기", "reward": "",
+		"ids": ["spear", "sword", "arrow"]},
 ]
 var recipes_unlocked: Array = []
 var collections_done: Array = []
@@ -1457,7 +1490,8 @@ func _check_collections() -> void:
 		if collection_have(col) < (col.ids as Array).size():
 			continue
 		collections_done.append(col.id)
-		if not (col.reward in recipes_unlocked):
+		# 보상이 없는 컬렉션(무기 도감 등)은 완성 배너만 띄운다
+		if str(col.reward) != "" and not (col.reward in recipes_unlocked):
 			recipes_unlocked.append(col.reward)
 		collection_pending.append(col)
 
@@ -2480,7 +2514,9 @@ const TUTORIAL_UNLOCKS := {
 	"harvest": ["axe", "pickaxe", "fence", "sprinkler", "rod"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
-const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+# 돌 창·돌 검은 제작대에서 만들어 해금하는 무기다 (레시피: 이장/추후 서브퀘)
+const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler",
+	"rod", "spear", "sword"]
 
 # 튜토리얼 목표 달성 보상 (도구 해금과 별개)
 const TUTORIAL_REWARDS := {
@@ -2506,8 +2542,10 @@ const TOOL_SLOT_COUNT := 9
 
 static func default_tool_slots() -> Array:
 	var slots: Array = ALL_TOOLS.duplicate()
-	while slots.size() < TOOL_SLOT_COUNT:
-		slots.append("")
+	slots.resize(TOOL_SLOT_COUNT)   # 도구가 슬롯보다 많으면 뒤(무기)는 직접 장착한다
+	for i in slots.size():
+		if slots[i] == null:
+			slots[i] = ""
 	return slots
 
 
@@ -2517,6 +2555,7 @@ const TOOL_KOR := {
 	"hoe": "호미", "water": "물뿌리개", "seed": "씨앗",
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리",
 	"sprinkler": "스프링클러", "rod": "낚싯대",
+	"spear": "돌 창", "sword": "돌 검",
 }
 var tutorial := {"active": false}
 var unlocked_tools: Array = ALL_TOOLS.duplicate()
@@ -2930,6 +2969,7 @@ func reset_all() -> void:
 	move_house = Vector2i(-999, -999)
 	mom_quest = ""
 	mom_quests_done = []
+	spear_quest = ""
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -3257,6 +3297,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"move_quest": move_quest, "move_day": move_day,
 		"move_house": [move_house.x, move_house.y],
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
+		"spear_quest": spear_quest,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

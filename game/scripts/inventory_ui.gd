@@ -1,7 +1,8 @@
 # 인벤토리 (I): 도구 선택 + 보유 중인 씨앗/수확물/생산물/자원.
 extends CanvasLayer
 
-const TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+const TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod",
+	"spear", "sword"]
 const TOOL_ICONS := {
 	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed",
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
@@ -768,6 +769,8 @@ func _item_entries() -> Array:
 		elif id == "trash_bin":
 			e["desc"] = "24시간 무인 판매함 (제값의 80%) — 놓을 곳을 바라보고 클릭"
 			e["bin"] = true
+		elif id == "arrow":
+			e["desc"] = "몬스터가 떨어뜨린 화살 — 도감 「풋내기 모험가의 무기」 수집품"
 		elif id == "broom":
 			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
 		elif id in ["nail", "cloth", "rope", "hinge"]:

@@ -6,6 +6,7 @@ const TOOL_ICONS := {
 	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed",
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
 	"sprinkler": "sprinkler", "rod": "icon_rod",
+	"spear": "icon_spear", "sword": "icon_sword",
 }
 
 
@@ -18,11 +19,13 @@ const TOOL_LABELS := {
 	"hoe": "호미", "water": "물뿌리개",
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리 (목재1)",
 	"sprinkler": "스프링클러 (목재2·석재2)", "rod": "낚싯대",
+	"spear": "돌 창 (느리고 강하게)", "sword": "돌 검 (빠르게 두 번)",
 }
 # 도구 -> 관련 숙련도
 const TOOL_SKILL := {
 	"hoe": "farm", "water": "farm", "seed": "farm",
 	"axe": "forest", "pickaxe": "mine", "rod": "fish",
+	"spear": "combat", "sword": "combat",
 }
 # 나무 프레임 팔레트
 const WOOD_TEXT := Color(0.29, 0.16, 0.06)
@@ -480,10 +483,14 @@ func _process(delta: float) -> void:
 	# 컬렉션이 방금 찼으면 배너로 알린다 (game_data는 UI를 못 부른다)
 	while not GameData.collection_pending.is_empty():
 		var col: Dictionary = GameData.collection_pending.pop_front()
-		var rname: String = GameData.ITEMS[col.reward].name
+		# 보상 없는 컬렉션(무기 도감 등)은 완성 배너만
+		var body := "묶음을 전부 모았다!"
+		if str(col.reward) != "":
+			body = "%s 레시피가 열렸다!" % GameData.ITEMS[col.reward].name
 		_toast_queue.append({"head": "★ 도감 완성 — %s!" % col.name,
-			"body": "%s 레시피가 열렸다!" % rname,
-			"icon": main.tex.get(col.reward) if main != null else null,
+			"body": body,
+			"icon": (main.tex.get(col.reward) if str(col.reward) != "" else null) \
+				if main != null else null,
 			"head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_catch")
 	if minimap_panel != null and main != null:

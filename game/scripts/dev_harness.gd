@@ -554,6 +554,76 @@ func _debug_tick() -> void:
 			print("HIDDEN_OK=", rare_ok and coral_ok and relic_ok,
 				" 확률(1렙)=", rare1, " (10렙)=", rare10,
 				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
+		262:
+			# 밤 기절 서브퀘(이장의 걱정) + 초반 무기(돌 창·돌 검) + 화살 +
+			# 컬렉션 「풋내기 모험가의 무기」
+			m.dialog.close()
+			GameData.spear_quest = ""
+			GameData.recipes_unlocked.erase("spear")
+			GameData.recipes_unlocked.erase("sword")
+			# ① 밤에 지네에게 당해 기절한 셈 — 다음 날 아침 이장이 걸어온다
+			GameData.spear_quest = "pending"
+			m.story._spear_update(0.016)
+			var visiting: bool = GameData.spear_quest == "visit"
+			for i in 60:
+				m.story._spear_update(0.1)
+			var spear_talk: bool = m.dialog.visible
+			m.dialog.skip_seq()                    # 대사 접기 -> 레시피 지급 + 완료
+			var spear_done: bool = GameData.spear_quest == "done" \
+				and "spear" in GameData.recipes_unlocked
+			m.dialog.close()
+			print("SPEARQ_OK=", visiting and spear_talk and spear_done,
+				" 이장방문=", visiting, " 대화=", spear_talk,
+				" 레시피+완료=", spear_done)
+			# ② 제작 -> 도구 해금 -> 장착 -> 몬스터 타격
+			GameData.wood += 20
+			GameData.stone += 20
+			var sp_started: bool = GameData.desk_start("spear")
+			GameData.desk_tick(999.0)
+			GameData.recipes_unlocked.append("sword")   # (훗날 서브퀘 보상 대행)
+			var sw_started: bool = GameData.desk_start("sword")
+			GameData.desk_tick(999.0)
+			var both_unlocked: bool = GameData.is_tool_unlocked("spear") \
+				and GameData.is_tool_unlocked("sword")
+			# 가짜 밤 몬스터를 코앞에 세우고 창으로 한 방
+			var mnode := Node2D.new()
+			m.world.add_child(mnode)
+			mnode.position = m.player.position + m.FACE_VECS[m.player.dir] * 40.0
+			m.night_mobs.append({"node": mnode, "spr": null, "anim": 0.0, "hp": 4.0})
+			var keep_tool: String = GameData.tool
+			m.toolwork.set_tool("spear")
+			m.toolwork._weapon_cd = 0.0
+			m.toolwork.use_tool()
+			var spear_kill: bool = m.night_mobs.is_empty() \
+				and m.toolwork._weapon_cd > 1.0    # 느린 박자 (강타)
+			# 검: 빠른 박자 — 첫 타는 약하다 (둘째 타는 타이머로 이어진다)
+			var mnode2 := Node2D.new()
+			m.world.add_child(mnode2)
+			mnode2.position = m.player.position + m.FACE_VECS[m.player.dir] * 40.0
+			var mob2 := {"node": mnode2, "spr": null, "anim": 0.0, "hp": 10.0}
+			m.night_mobs.append(mob2)
+			var keep_slot: String = GameData.tool_slots[0]
+			GameData.tool_slots[0] = "sword"
+			m.toolwork.set_tool("sword")
+			m.toolwork._weapon_cd = 0.0
+			m.toolwork.use_tool()
+			var sword_hit: bool = float(mob2.hp) < 10.0 and float(mob2.hp) > 0.0 \
+				and m.toolwork._weapon_cd < 1.0    # 창보다 빠른 박자
+			m.night_mobs.clear()
+			mnode2.queue_free()
+			GameData.tool_slots[0] = keep_slot
+			m.toolwork.set_tool(keep_tool)
+			print("WEAPON_OK=", sp_started and sw_started and both_unlocked
+				and spear_kill and sword_hit,
+				" 제작=", sp_started and sw_started, " 해금=", both_unlocked,
+				" 창강타=", spear_kill, " 검연타=", sword_hit)
+			# ③ 컬렉션: 창·검(제작으로 발견) + 화살 -> 「풋내기 모험가의 무기」
+			m.doing.gain_item("arrow", 1)
+			GameData.discover("arrow")
+			GameData._check_collections()
+			print("WEAPONCOL_OK=", "starter_weapons" in GameData.collections_done
+				and GameData.discovered.has("spear") and GameData.discovered.has("sword"),
+				" 완성=", "starter_weapons" in GameData.collections_done)
 		353:
 			# 쓰레기통 = 24시간 무인 판매함 — 설치(바깥/집 안)·80% 판매·회수
 			GameData.items["trash_bin"] = int(GameData.items.get("trash_bin", 0)) + 2

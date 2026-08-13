@@ -393,13 +393,27 @@ func _unhandled_input(event: InputEvent) -> void:
 func _attack() -> void:
 	if attack_cd > 0.0:
 		return
-	attack_cd = 0.35
+	# 무기 리듬: 돌 창 = 느리게 한 방 강하게 · 돌 검 = 빠르게 두 번 ·
+	# 그 밖(맨손)은 도끼 힘으로 기본 박자
+	var wpn: String = GameData.tool if GameData.tool in ["spear", "sword"] else ""
+	attack_cd = 1.1 if wpn == "spear" else (0.8 if wpn == "sword" else 0.35)
 	swing_t = 0.15
 	Sound.play_sfx("sfx_chop", 0.2)
+	_attack_hit(wpn, true)
+	if wpn == "sword":
+		# 둘째 타 — 순수 무기 위력만 (보너스가 두 번 실리지 않게)
+		get_tree().create_timer(0.16).timeout.connect(func() -> void:
+			if visible:
+				swing_t = 0.15
+				_attack_hit(wpn, false))
+
+
+func _attack_hit(wpn: String, first: bool) -> void:
 	var reach := ppos + _dir_vec() * 28.0
-	# 공격력 = 도끼의 「위력」 + 전투 숙련도 + 장착한 무기
-	var dmg: float = GameData.tool_stat("axe", "power") + GameData.combat_bonus() \
-		+ GameData.gear_stat("power")
+	# 공격력 = 무기(없으면 도끼)의 「위력」 + 전투 숙련도 + 장착한 장비
+	var dmg: float = GameData.tool_stat("axe" if wpn == "" else wpn, "power")
+	if first:
+		dmg += GameData.combat_bonus() + GameData.gear_stat("power")
 	# 몬스터 타격
 	for m in monsters:
 		if (m.pos - reach).length() < 28.0 or (m.pos - ppos).length() < 24.0:
@@ -420,6 +434,9 @@ func _attack() -> void:
 						if randf() < 0.2:
 							main.doing.gain_item("ore", 1)
 							main.hud.show_message("박쥐가 광석을 떨어뜨렸다!")
+						elif randf() < 0.15:
+							main.doing.gain_item("arrow", 1)
+							main.hud.show_message("박쥐가 화살을 떨어뜨렸다!")
 					"ghost":
 						main.doing.gain_item("ore", 1)
 						if randf() < 0.15:
@@ -434,7 +451,9 @@ func _attack() -> void:
 				if monsters.is_empty():
 					_floor_clear()
 			return
-	# 광석 채굴
+	# 광석 채굴 (첫 타에서만 — 연격 둘째 타가 광석까지 캐면 두 배가 된다)
+	if not first:
+		return
 	var rt := Vector2i(int((reach.x - OX) / TS), int((reach.y - OY) / TS))
 	if ores.has(rt):
 		ores.erase(rt)

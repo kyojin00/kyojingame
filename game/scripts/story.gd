@@ -1766,3 +1766,73 @@ func _end_move_greet() -> void:
 		GameData.forest_quest = "settle"
 		GameData.forest_day = GameData.day
 	m.saveio.save_now()
+
+
+# ---- 밤 기절 조건부 서브 퀘스트: 이장의 걱정 ----
+#
+# 밤에 몬스터(지네)에게 당해 기절하면 spear_quest가 "pending"이 되고,
+# 다음 날 아침 이장이 플레이어에게 직접 걸어와 돌 창 레시피를 준다.
+# (상점에서 살 수 없다 — 이 서브퀘로만 얻는 레시피)
+
+func _spear_update(delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.spear_quest == "pending":
+		if GameData.story_phase != "done" or m.ui_open() or m.dialog.visible \
+				or m.story_cutscene or m.interior.visible or m.cave.visible:
+			return
+		var chief: Variant = _story_chief()
+		if chief == null or not chief.visible:
+			return
+		GameData.spear_quest = "visit"
+		m.story_cutscene = true
+		chief.scripted = true
+		# 화면 밖에서 걸어오는 느낌 — 플레이어 남쪽에서 다가온다
+		chief.position = m.player.position + Vector2(-30.0, 170.0)
+		m.hud.show_message("이장님이 급히 걸어온다...", 4.0)
+	elif GameData.spear_quest == "visit" and not m.dialog.visible:
+		var chief2: Variant = _story_chief()
+		if chief2 == null:
+			_start_spear_dialog()   # 이장이 없으면 (있을 수 없는 상황) 바로 대화
+			return
+		var to: Vector2 = m.player.position + Vector2(0.0, 40.0) - chief2.position
+		if to.length() > 10.0:
+			chief2.moving = true
+			chief2.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
+				else ("down" if absf(to.y) >= absf(to.x)
+				else ("right" if to.x > 0.0 else "left"))
+			chief2.position += to.normalized() * 110.0 * delta
+			chief2.anim_time += delta
+			chief2._update_sprite()
+		else:
+			chief2.moving = false
+			chief2._update_sprite()
+			_start_spear_dialog()
+
+
+func _start_spear_dialog() -> void:
+	m.dialog.open_seq("이장 덕수", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「이보게! 몸은 좀 괜찮은가?」"},
+		{"text": "「간밤에 그 몹쓸 벌레들한테 당해 쓰러졌다고\n들었네. 얼마나 놀랐는지...」"},
+		{"text": "「밤의 들판은 위험하다네.\n맨몸으로 다녀서는 안 돼.」"},
+		{"text": "「옜네 — 내가 젊을 적 쓰던\n돌 창 만드는 법일세.」", "event": _grant_spear_recipe},
+		{"text": "「목재 3개와 돌 2개면 집 제작대에서 만들 수 있네.\n느리지만 한 방이 묵직하지. 밤엔 꼭 챙겨 다니게!」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+	], _end_spear_visit)
+
+
+func _grant_spear_recipe() -> void:
+	if "spear" not in GameData.recipes_unlocked:
+		GameData.recipes_unlocked.append("spear")
+	m.hud.reward_toast("돌 창 레시피", m.tex.get("icon_spear"))
+
+
+func _end_spear_visit() -> void:
+	m.story_cutscene = false
+	var chief: Variant = _story_chief()
+	if chief != null:
+		chief.scripted = false
+	if GameData.spear_quest != "done":
+		GameData.spear_quest = "done"
+		m.hud.quest_toast("서브 퀘스트 완료: 이장의 걱정")
+	m.saveio.save_now()
