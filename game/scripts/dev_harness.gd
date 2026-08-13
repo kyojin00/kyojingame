@@ -495,7 +495,13 @@ func _debug_tick() -> void:
 				and GameData.money == money0 - GameData.BAIT_PRICE
 			var locked0: bool = GameData.recipe_locked("dish_smelt_fry")
 			m.shop._on_buy_dish_recipe("dish_smelt_fry", GameData.STALL_RECIPES["dish_smelt_fry"])
-			var recipe_ok: bool = locked0 and not GameData.recipe_locked("dish_smelt_fry")
+			# 사도 바로 배워지지 않는다 — 두루마리로 들어오고, 배워야 열린다
+			var scroll_ok: bool = GameData.recipe_items.has("dish_smelt_fry") \
+				and GameData.recipe_locked("dish_smelt_fry")
+			GameData.learn_recipe("dish_smelt_fry")
+			var recipe_ok: bool = locked0 and scroll_ok \
+				and not GameData.recipe_locked("dish_smelt_fry") \
+				and not GameData.recipe_items.has("dish_smelt_fry")
 			m.shop.close()
 			GameData.minutes = 8.0 * 60.0        # 이른 아침 — 민지가 없다
 			var away: bool = not GameData.merchant_at_stall()
@@ -516,7 +522,11 @@ func _debug_tick() -> void:
 			# ---- 화분(잡화점)·쓰레기통(노점) 레시피: 구매 -> 제작대 -> 집 세간 ----
 			m.shop._on_buy_recipe("flower_pot", 200)
 			m.shop._on_buy_recipe("trash_bin", 400)
-			var learned: bool = "flower_pot" in GameData.recipes_unlocked \
+			var scroll2: bool = GameData.recipe_items.has("flower_pot") \
+				and GameData.recipe_items.has("trash_bin")
+			GameData.learn_recipe("flower_pot")
+			GameData.learn_recipe("trash_bin")
+			var learned: bool = scroll2 and "flower_pot" in GameData.recipes_unlocked \
 				and "trash_bin" in GameData.recipes_unlocked
 			var furn0: int = GameData.furniture.size()
 			var pot_started: bool = GameData.desk_start("flower_pot")
@@ -729,6 +739,7 @@ func _debug_tick() -> void:
 			GameData.spear_quest = ""
 			GameData.recipes_unlocked.erase("spear")
 			GameData.recipes_unlocked.erase("sword")
+			GameData.recipe_items.erase("spear")
 			# ① 밤에 지네에게 당해 기절한 셈 — 다음 날 아침 이장이 걸어온다
 			GameData.spear_quest = "pending"
 			m.story._spear_update(0.016)
@@ -736,9 +747,11 @@ func _debug_tick() -> void:
 			for i in 60:
 				m.story._spear_update(0.1)
 			var spear_talk: bool = m.dialog.visible
-			m.dialog.skip_seq()                    # 대사 접기 -> 레시피 지급 + 완료
+			m.dialog.skip_seq()                    # 대사 접기 -> 두루마리 지급 + 완료
+			var spear_scroll: bool = GameData.recipe_items.has("spear")
+			GameData.learn_recipe("spear")         # 가방에서 「배우기」
 			var spear_done: bool = GameData.spear_quest == "done" \
-				and "spear" in GameData.recipes_unlocked
+				and spear_scroll and "spear" in GameData.recipes_unlocked
 			m.dialog.close()
 			print("SPEARQ_OK=", visiting and spear_talk and spear_done,
 				" 이장방문=", visiting, " 대화=", spear_talk,
@@ -785,13 +798,15 @@ func _debug_tick() -> void:
 				and spear_kill and sword_hit,
 				" 제작=", sp_started and sw_started, " 해금=", both_unlocked,
 				" 창강타=", spear_kill, " 검연타=", sword_hit)
-			# ③ 컬렉션: 창·검(제작으로 발견) + 화살 -> 「풋내기 모험가의 무기」
+			# ③ 컬렉션 표는 비워 뒀다 — 미리 열려 보이는 것 없이, 발견 기록만 쌓인다
 			m.doing.gain_item("arrow", 1)
 			GameData.discover("arrow")
 			GameData._check_collections()
-			print("WEAPONCOL_OK=", "starter_weapons" in GameData.collections_done
+			print("WEAPONCOL_OK=", GameData.COLLECTIONS.is_empty()
+				and GameData.collections_done.is_empty()
 				and GameData.discovered.has("spear") and GameData.discovered.has("sword"),
-				" 완성=", "starter_weapons" in GameData.collections_done)
+				" 표비움=", GameData.COLLECTIONS.is_empty(),
+				" 발견기록=", GameData.discovered.has("spear"))
 		353:
 			# 쓰레기통 = 24시간 무인 판매함 — 설치(바깥/집 안)·80% 판매·회수
 			GameData.items["trash_bin"] = int(GameData.items.get("trash_bin", 0)) + 2
@@ -872,6 +887,7 @@ func _debug_tick() -> void:
 			# 집터 레시피 구매(비싸다) + 제작(재료가 많이 든다)
 			var money_b: int = GameData.money
 			m.shop._on_buy_recipe("housing_kit", GameData.HOUSING_KIT_PRICE)
+			GameData.learn_recipe("housing_kit")   # 가방 두루마리에서 배운다
 			var recipe_ok2: bool = "housing_kit" in GameData.recipes_unlocked \
 				and GameData.money == money_b - GameData.HOUSING_KIT_PRICE
 			GameData.wood += 60
@@ -1929,25 +1945,24 @@ func _debug_tick() -> void:
 				" 두번으로는안됨=", not_yet, " 세번에발견=", found)
 			GameData.desk_done_pending.clear()
 		385:
-			# 발견 기록 + 컬렉션 보상
+			# 발견 기록 — 컬렉션 표는 비워 뒀다 (locked 요리는 열리지 않아야 한다)
 			GameData.discovered.clear()
 			GameData.collections_done.clear()
 			GameData.recipes_unlocked.clear()
 			GameData.collection_pending.clear()
+			GameData.recipe_pending.clear()
 			var was_locked := GameData.recipe_locked("dish_fried_egg")
-			# 봄의 밭 여섯을 채우면 계란후라이 레시피가 열려야 한다
-			for cid2: String in ["potato", "carrot", "strawberry", "spinach", "onion"]:
+			for cid2: String in ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]:
 				GameData.discover(cid2)
-			var before_full := not GameData.recipe_locked("dish_fried_egg")
-			GameData.discover("pea")
-			var unlocked := not GameData.recipe_locked("dish_fried_egg")
-			var pending := GameData.collection_pending.size() == 1
+			var still_locked := GameData.recipe_locked("dish_fried_egg")  # locked 요리는 그대로
+			var basic_open := not GameData.recipe_locked("dish_baked_potato")  # 기본 요리는 떠오른다
+			var no_banner := GameData.collection_pending.is_empty()
 			var dated := GameData.discovered_on("pea") != ""
 			var again := not GameData.discover("pea")   # 두 번째는 기록하지 않는다
-			print("COLLECT_OK=", was_locked and not before_full and unlocked
-				and pending and dated and again,
-				" 잠겨있었다=", was_locked, " 5개로는안열림=", not before_full,
-				" 6개로열림=", unlocked, " 배너대기=", pending,
+			print("COLLECT_OK=", GameData.COLLECTIONS.is_empty() and was_locked
+				and still_locked and basic_open and no_banner and dated and again,
+				" 표비움=", GameData.COLLECTIONS.is_empty(), " 잠긴요리유지=", still_locked,
+				" 기본요리떠오름=", basic_open, " 배너없음=", no_banner,
 				" 날짜=", GameData.discovered_on("pea"), " 중복차단=", again)
 			# 상점 해금: 재료를 겪기 전에는 대장간이 안 벼려 준다
 			GameData.owned_gear.erase("gear_sword_iron")

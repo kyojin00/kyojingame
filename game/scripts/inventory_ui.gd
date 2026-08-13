@@ -570,7 +570,26 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.story.open_move_letter())
+	# 레시피 두루마리 — 「배우기」를 눌러야 진짜로 익힌다
+	var learn_id := str(e.get("learn", ""))
+	if learn_id != "":
+		b.pressed.connect(func() -> void:
+			main.dialog.open("%s 레시피" % GameData.recipe_display_name(learn_id),
+				"두루마리를 펼쳐 읽는다.\n이 레시피를 배울까?", [
+				["배우기", func() -> void:
+					m_learn(learn_id)],
+				["나중에", null],
+			]))
 	return b
+
+
+func m_learn(rid: String) -> void:
+	main.dialog.close()
+	if GameData.learn_recipe(rid):
+		Sound.play_sfx("sfx_catch")
+		main.hud.show_message("%s 레시피를 배웠다! 조리대/제작대에 칸이 생겼다."
+			% GameData.recipe_display_name(rid))
+	_rebuild()
 
 
 func _mk_tool_slot(slot_i: int) -> Button:
@@ -792,4 +811,14 @@ func _item_entries() -> Array:
 			e["color"] = Color(0.85, 0.82, 0.95)
 			e["desc"] = "채집·수집품"
 		out.append(e)
+
+	# 레시피 두루마리 — 사거나 받은 레시피. 클릭해 「배우기」를 눌러야
+	# 조리대/제작대에 칸이 생긴다 (제작·배치 탭)
+	for rid: String in GameData.recipe_items:
+		var rn := GameData.recipe_display_name(rid)
+		out.append({"tab": "place", "icon": "recipe",
+			"name": "%s 레시피" % rn, "count": int(GameData.recipe_items[rid]),
+			"tip": "%s 레시피 x%d" % [rn, int(GameData.recipe_items[rid])],
+			"desc": "클릭해서 배우면 조리대/제작대에서 만들 수 있다",
+			"learn": rid})
 	return out

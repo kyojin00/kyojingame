@@ -1532,28 +1532,41 @@ func discover(id: String) -> bool:
 # ---- 컬렉션 ----
 #
 # 묶음을 다 모으면 잠긴 레시피가 열린다 (메이플 몬스터컬렉션식).
-# 앞은 쉽고 갈수록 귀해진다. 보상은 전부 요리 레시피다.
-const COLLECTIONS := [
-	{"id": "spring_field", "name": "봄의 밭", "reward": "dish_fried_egg",
-		"ids": ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]},
-	{"id": "summer_field", "name": "여름의 밭", "reward": "butter",
-		"ids": ["tomato", "corn", "watermelon", "pepper", "melon", "garlic"]},
-	{"id": "fall_field", "name": "가을의 밭", "reward": "dish_egg_roll",
-		"ids": ["pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice"]},
-	{"id": "winter_field", "name": "겨울의 밭", "reward": "dish_omurice",
-		"ids": ["winter_radish", "leek", "beet", "snow_cabbage"]},
-	{"id": "everyday_fish", "name": "흔한 물고기", "reward": "dish_butter_corn",
-		"ids": ["fish_crucian", "fish_minnow", "fish_loach", "fish_carp", "fish_smelt"]},
-	{"id": "weather_fish", "name": "궂은 날의 물고기", "reward": "dish_moon_tea",
-		"ids": ["fish_eel", "fish_rainbow", "fish_lenok", "fish_mistfish", "fish_stormjack"]},
-	{"id": "night_legends", "name": "밤의 전설", "reward": "dish_golden_roast",
-		"ids": ["fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden"]},
-	{"id": "cave_watch", "name": "동굴 관찰자", "reward": "dish_feast",
-		"ids": ["slime", "bat", "ghost", "treant"]},
-	# 초반 무기 3종 — 창·검은 제작대에서 만들고, 화살은 몬스터가 떨어뜨린다
-	{"id": "starter_weapons", "name": "풋내기 모험가의 무기", "reward": "",
-		"ids": ["spear", "sword", "arrow"]},
-]
+# **지금은 전부 비워 뒀다** — 아무것도 진행하지 않았는데 미리 열려
+# 보이던 현상을 걷어냈고, 앞으로는 따로 지정해 주는 컬렉션만
+# 이 표에 한 줄씩 등록한다. (형식: id/name/reward/ids)
+const COLLECTIONS := []
+# ---- 레시피 아이템 ----
+#
+# 사거나 받은 레시피는 곧바로 배워지지 않는다 — 가방의 「제작·배치」
+# 칸에 두루마리(아이템)로 들어오고, 클릭해 「배우기」를 눌러야 습득된다.
+var recipe_items := {}   # recipe id -> 보유 개수
+
+
+func give_recipe(rid: String) -> void:
+	recipe_items[rid] = int(recipe_items.get(rid, 0)) + 1
+
+
+func recipe_display_name(rid: String) -> String:
+	if ITEMS.has(rid):
+		return str(ITEMS[rid].name)
+	if DESK_RECIPES.has(rid):
+		return str(DESK_RECIPES[rid].name)
+	return rid
+
+
+# 두루마리를 읽어 레시피를 익힌다 — 이때부터 조리대/제작대에 칸이 생긴다
+func learn_recipe(rid: String) -> bool:
+	if int(recipe_items.get(rid, 0)) <= 0:
+		return false
+	recipe_items[rid] = int(recipe_items[rid]) - 1
+	if int(recipe_items[rid]) <= 0:
+		recipe_items.erase(rid)
+	if rid not in recipes_unlocked:
+		recipes_unlocked.append(rid)
+	return true
+
+
 var recipes_unlocked: Array = []
 var collections_done: Array = []
 # 방금 열린 것 — hud가 꺼내 배너를 띄운다 (여기서는 UI를 못 부른다)
@@ -3113,6 +3126,7 @@ func reset_all() -> void:
 	zones_open = []
 	arrivals = []
 	npc_greeted = []
+	recipe_items = {}
 	chief_house_lv = 0
 	hall_noticed = false
 	shop_seeds = ["wheat", "corn"]
@@ -3451,6 +3465,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
 		"story4_phase": story4_phase, "zones_open": zones_open,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
+		"recipe_items": recipe_items,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

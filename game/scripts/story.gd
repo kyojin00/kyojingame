@@ -2049,9 +2049,11 @@ func _start_spear_dialog() -> void:
 
 
 func _grant_spear_recipe() -> void:
-	if "spear" not in GameData.recipes_unlocked:
-		GameData.recipes_unlocked.append("spear")
-	m.hud.reward_toast("돌 창 레시피", m.tex.get("icon_spear"))
+	# 받은 레시피도 곧바로 배워지지 않는다 — 가방에서 「배우기」
+	if "spear" not in GameData.recipes_unlocked \
+			and not GameData.recipe_items.has("spear"):
+		GameData.give_recipe("spear")
+	m.hud.reward_toast("돌 창 레시피 (가방에서 배우자)", m.tex.get("recipe"))
 
 
 func _end_spear_visit() -> void:
