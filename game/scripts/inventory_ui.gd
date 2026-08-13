@@ -35,8 +35,8 @@ var _hover_slots: Array = []  # 툴팁 판정용 [{b, tool, title, body}]
 var _forced_tip := ""         # 검증 하네스에서 툴팁을 고정할 도구 id
 # 탭: 한 번에 한 종류만 보여 준다 (아이템이 늘어나도 밀리지 않게)
 const TABS := [
-	["tool", "도구"], ["gear", "장비"], ["seed", "씨앗"], ["crop", "작물"],
-	["res", "자원"], ["food", "요리"],
+	["tool", "도구"], ["gear", "장비"], ["crop", "씨앗·작물"],
+	["res", "자원"], ["food", "요리"], ["place", "제작·배치"],
 ]
 var _tab := "tool"
 
@@ -684,7 +684,7 @@ func _item_entries() -> Array:
 			"desc": "바위를 캐면 얻는다. 스프링클러·축사 재료"})
 	for id in GameData.CROP_IDS:
 		if GameData.seeds[id] > 0:
-			out.append({"tab": "seed", "icon": "icon_seed",
+			out.append({"tab": "crop", "icon": "icon_seed",
 				"name": "%s 씨앗" % GameData.CROPS[id].name, "count": GameData.seeds[id],
 				"tip": "%s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]],
 				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일"
@@ -769,12 +769,15 @@ func _item_entries() -> Array:
 		elif id == "bait":
 			e["desc"] = "낚시 미끼 — 낚싯대를 던질 때 하나씩 쓴다. 입질이 훨씬 빨라진다"
 		elif id == "housing_kit":
+			e["tab"] = "place"   # 제작·배치 탭 — 재료 칸과 섞이지 않는다
 			e["desc"] = "빈 집터를 마련한다 — 놓을 풀밭을 바라보고 여기서 클릭.\n빈 집터가 있어야 이주 편지를 수락할 수 있다"
 			e["place"] = true
 		elif id == "move_letter":
+			e["tab"] = "place"
 			e["desc"] = "마을로 이사 오고 싶다는 편지 — 클릭해서 다시 읽고 수락한다"
 			e["letter"] = true
 		elif id == "trash_bin":
+			e["tab"] = "place"
 			e["desc"] = "24시간 무인 판매함 (제값의 80%) — 놓을 곳을 바라보고 클릭"
 			e["bin"] = true
 		elif id == "arrow":

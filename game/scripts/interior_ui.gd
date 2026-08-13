@@ -267,7 +267,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		cursor = (ppos / GRID).floor() * GRID
 		Sound.play_sfx("sfx_ui")
 	elif event.is_action_pressed("ui_cancel"):
-		close()
+		# ESC로 집 밖으로 튕겨 나가던 버그 수정 — 바깥과 같은 게임 메뉴를
+		# 띄운다. 밖으로 나가는 길은 아랫문뿐이다.
+		Sound.play_sfx("sfx_ui")
+		main.dialog.open("게임 메뉴", "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)", [
+			["저장 후 타이틀로", main._back_to_title],
+			["계속하기", null],
+		])
+		get_viewport().set_input_as_handled()
 
 
 func _craft_bed() -> void:

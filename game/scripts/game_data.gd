@@ -2796,6 +2796,34 @@ func grandpa_all_done() -> bool:
 	return grandpa_step >= GRANDPA_QUESTS.size()
 
 
+# 완료한 퀘스트의 기록 — 퀘스트 창(Q)은 완료 항목을 숨기고, 이 목록은
+# 나중에 도서관 콘텐츠(지난 이야기 돌아보기)에서 보여줄 밑재료다.
+func completed_quests() -> Array:
+	var out: Array = []
+	var s1_idx: int = STORY1_QUESTS.size() if story_phase == "done" \
+		else int(STORY1_PHASE_IDX.get(story_phase, 0))
+	for i in mini(s1_idx, STORY1_QUESTS.size()):
+		out.append(str(STORY1_QUESTS[i].name))
+	if village_built.has("general"):
+		out.append("마을의 첫 상점을 세웠다")
+	if fisher_quest == "done":
+		out.append("바닷길을 열었다 (낚시꾼과 바위 능선)")
+	if story2_phase == "done":
+		out.append("메인 스토리 2 — 마을을 깨우다")
+	if move_quest == "done":
+		out.append("메인 스토리 3 — 새로운 주민의 이사")
+	if story4_phase == "done":
+		out.append("메인 스토리 4 — 오래된 마을의 경계")
+	if forest_quest == "done":
+		out.append("메인 스토리 5 — 숲속에서 발견한 집")
+	for pair in TUTORIAL_ORDER:
+		if tutorial.get(pair[0], false):
+			out.append(str(pair[1]))
+	for i in mini(grandpa_step, GRANDPA_QUESTS.size()):
+		out.append(str(GRANDPA_QUESTS[i].name))
+	return out
+
+
 func grandpa_current() -> Dictionary:
 	if tutorial.get("active", false) or grandpa_all_done():
 		return {}
@@ -3075,8 +3103,10 @@ func reset_all() -> void:
 	recipe_pending = []
 	story2_phase = ""
 	village_built = []
-	if DEV_MODE:
-		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
+	if DEV_MODE and OS.get_environment("KYOJIN_SHOT") != "":
+		# 검증 하네스 전용: 기본 아이템을 잔뜩 들고 시작한다.
+		# 보통 새 게임은 (DEV_MODE라도) 가방이 완전히 비어 있다 —
+		# 재료는 전부 게임을 진행하며 직접 얻는다.
 		wood = DEV_STOCK
 		stone = DEV_STOCK
 		for id in CROP_IDS:

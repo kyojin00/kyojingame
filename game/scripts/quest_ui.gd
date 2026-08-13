@@ -122,61 +122,62 @@ func _rebuild() -> void:
 		_line("")
 		_line("--------------------------------", Color(0.75, 0.63, 0.42))
 
-	# 메인 스토리 1 전체 퀘스트 목록 (완료 후에도 기록으로 남는다)
-	_line("[메인 스토리 1 — 우체부 아저씨와의 첫 만남]", COL_HEAD)
-	var cur_idx: int = GameData.STORY1_QUESTS.size() if ph == "done" \
-		else int(GameData.STORY1_PHASE_IDX.get(ph, GameData.STORY1_QUESTS.size()))
-	for i in GameData.STORY1_QUESTS.size():
-		var qd: Dictionary = GameData.STORY1_QUESTS[i]
-		if ph == "done" or i < cur_idx:
-			_line("  V %s (완료)" % qd.name, COL_DONE)
-		elif i == cur_idx:
-			_line("  > %s — %s" % [qd.name, qd.task], COL_NOW)
-		else:
-			_line("  - ???", COL_DIM)
-			break  # 다음 퀘스트는 미리 보여주지 않는다
-	_line("")
+	# 메인 스토리 1 — 완료한 퀘스트는 더 이상 여기 남기지 않는다.
+	# (지난 기록은 나중에 도서관 콘텐츠에서 돌아본다 — GameData.completed_quests)
+	if ph != "done":
+		_line("[메인 스토리 1 — 우체부 아저씨와의 첫 만남]", COL_HEAD)
+		var cur_idx: int = int(GameData.STORY1_PHASE_IDX.get(ph, GameData.STORY1_QUESTS.size()))
+		for i in GameData.STORY1_QUESTS.size():
+			var qd: Dictionary = GameData.STORY1_QUESTS[i]
+			if i < cur_idx:
+				continue   # 완료 — 숨긴다
+			elif i == cur_idx:
+				_line("  > %s — %s" % [qd.name, qd.task], COL_NOW)
+			else:
+				_line("  - ???", COL_DIM)
+				break  # 다음 퀘스트는 미리 보여주지 않는다
+		_line("")
 
 	# 스토리 진행 중에는 스토리에만 집중한다
 	if ph != "done":
 		return
 
-	# 메인 스토리 2 — 상점 짓기 -> 낚시꾼과 바다 -> 밭 일구기 (이 순서)
-	_line("[메인 스토리 2 — 마을을 깨우다]", COL_HEAD)
+	# 메인 스토리 2 — 상점 짓기 -> 낚시꾼과 바다 -> 밭 일구기 (이 순서).
+	# 다 끝났으면 절 자체를 숨긴다 (완료 기록은 도서관 콘텐츠 몫).
 	var s2: String = GameData.story2_phase
-	var shop_txt := "재료를 모아 상점을 짓자 (목재 %d·돌 %d)" \
-		% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]
-	if GameData.village_built.has("general"):
-		_line("  V " + shop_txt, COL_DONE)
-	elif s2 == "shop":
-		_line("  > " + shop_txt, COL_NOW)
-	else:
-		_line("  - ???", COL_DIM)
 	var fq: String = GameData.fisher_quest
-	if fq == "":
-		_line("  - ??? (상점이 서면 이어진다)", COL_DIM)
-	else:
-		var order := ["meet", "follow", "open", "done"]
-		var steps := ["낯선 낚시꾼에게 말을 걸어 보자",
-			"낚시꾼과 함께 남쪽 바위 능선으로 가자",
-			"길목의 커다란 바위를 캐서 바닷길을 열자",
-			"바다·해변 해금 + 간이낚싯대 (낚시 해금)"]
-		var idx := order.find(fq)
-		for i in steps.size():
-			if i < idx or fq == "done":
-				_line("  V " + steps[i], COL_DONE)
-			elif i == idx:
-				_line("  > " + steps[i], COL_NOW)
+	if s2 != "done":
+		_line("[메인 스토리 2 — 마을을 깨우다]", COL_HEAD)
+		var shop_txt := "재료를 모아 상점을 짓자 (목재 %d·돌 %d)" \
+			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]
+		if not GameData.village_built.has("general"):
+			if s2 == "shop":
+				_line("  > " + shop_txt, COL_NOW)
 			else:
-				_line("  - " + steps[i], COL_DIM)
-	if s2 == "farm_talk":
-		_line("  > 이장에게 가 보자 — 마을의 선물이 기다린다", COL_NOW)
-	elif s2 in ["farm", "done"]:
-		_line("  V 이장에게 호미와 씨앗을 받았다", COL_DONE)
-		_tut_section(true)   # 밭 갈기 -> 씨앗 -> 물 -> 첫 수확
-	else:
-		_line("  - ??? (바닷길이 열리면 이어진다)", COL_DIM)
-	_line("")
+				_line("  - ???", COL_DIM)
+		if fq == "":
+			_line("  - ??? (상점이 서면 이어진다)", COL_DIM)
+		elif fq != "done":
+			var order := ["meet", "follow", "open", "done"]
+			var steps := ["낯선 낚시꾼에게 말을 걸어 보자",
+				"낚시꾼과 함께 남쪽 바위 능선으로 가자",
+				"길목의 커다란 바위를 캐서 바닷길을 열자",
+				"바다·해변 해금 + 간이낚싯대 (낚시 해금)"]
+			var idx := order.find(fq)
+			for i in steps.size():
+				if i < idx:
+					continue   # 완료 — 숨긴다
+				elif i == idx:
+					_line("  > " + steps[i], COL_NOW)
+				else:
+					_line("  - " + steps[i], COL_DIM)
+		if s2 == "farm_talk":
+			_line("  > 이장에게 가 보자 — 마을의 선물이 기다린다", COL_NOW)
+		elif s2 == "farm":
+			_tut_section(true)   # 밭 갈기 -> 씨앗 -> 물 -> 첫 수확
+		else:
+			_line("  - ??? (바닷길이 열리면 이어진다)", COL_DIM)
+		_line("")
 
 	# 마을 생활 안내 (선택 서브퀘스트)
 	if GameData.tutorial.get("active", false):
@@ -246,7 +247,7 @@ func _rebuild() -> void:
 		for i in GameData.GRANDPA_QUESTS.size():
 			var gq: Dictionary = GameData.GRANDPA_QUESTS[i]
 			if i < step:
-				_line("  V %s (완료)" % gq.name, COL_DONE)
+				continue   # 완료한 부탁은 숨긴다 (기록은 도서관 콘텐츠 몫)
 			elif i == step:
 				var now: int = mini(GameData.grandpa_count(str(gq.count)), int(gq.goal))
 				_line("  > %s — %s" % [gq.name, gq.desc], COL_NOW)
@@ -282,7 +283,7 @@ func _tut_section(story2: bool) -> void:
 		if (pair[0] in GameData.STORY2_FLAGS) != story2:
 			continue
 		if GameData.tutorial.get(pair[0], false):
-			_line("  V " + pair[1], COL_DONE)
+			continue   # 완료한 항목은 숨긴다 (기록은 도서관 콘텐츠 몫)
 		elif not current_found:
 			current_found = true
 			_line("  > " + pair[1], COL_NOW)

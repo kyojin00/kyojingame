@@ -751,7 +751,8 @@ func _on_buy_dish_recipe(id: String, price: int) -> void:
 	GameData.today_spent += price
 	GameData.recipes_unlocked.append(id)
 	Sound.play_sfx("sfx_coin")
-	main.hud.quest_toast("%s 레시피를 배웠다" % GameData.ITEMS[id].name)
+	# 구매는 퀘스트가 아니다 — 담백하게 얻었다고만 알린다
+	main.hud.show_message("%s 레시피를(을) 얻었다" % GameData.ITEMS[id].name)
 	_rebuild()
 
 
@@ -763,7 +764,7 @@ func _on_buy_recipe(id: String, price: int) -> void:
 	GameData.today_spent += price
 	GameData.recipes_unlocked.append(id)
 	Sound.play_sfx("sfx_coin")
-	main.hud.quest_toast("%s 레시피를 배웠다" % GameData.DESK_RECIPES[id].name)
+	main.hud.show_message("%s 레시피를(을) 얻었다" % GameData.DESK_RECIPES[id].name)
 	_rebuild()
 
 
