@@ -93,6 +93,51 @@ func _process(delta: float) -> void:
 		_rebuild()
 
 
+# 미니창(우측 상단)에 띄울 퀘스트 고르기 — 메인을 미뤄 두고 서브만
+# 따라가고 싶을 때, 원하는 퀘스트를 골라 고정(핀)한다.
+func _build_pin_row() -> void:
+	var cat: Array = GameData.quest_catalog()
+	if cat.is_empty():
+		return
+	_line("[미니창에 띄울 퀘스트]  — 눌러서 고정", COL_HEAD)
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 6)
+	flow.add_theme_constant_override("v_separation", 4)
+	items_box.add_child(flow)
+	flow.add_child(_mk_pin_btn("자동 (메인 우선)", "",
+		GameData.tracked_pick == ""))
+	for q: Dictionary in cat:
+		flow.add_child(_mk_pin_btn(str(q.title), str(q.id),
+			GameData.tracked_pick == str(q.id)))
+	_line("")
+
+
+func _mk_pin_btn(label: String, pick: String, on: bool) -> Button:
+	var b := Button.new()
+	b.text = ("📌 " + label) if on else label
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 13)
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.85, 0.72, 0.45) if on else Color(0.88, 0.8, 0.62)
+	st.border_color = Color(0.72, 0.45, 0.06) if on else Color(0.62, 0.5, 0.32)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(5)
+	st.content_margin_left = 8.0
+	st.content_margin_right = 8.0
+	st.content_margin_top = 2.0
+	st.content_margin_bottom = 2.0
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("hover", st)
+	b.add_theme_stylebox_override("pressed", st)
+	b.add_theme_color_override("font_color", COL_TEXT)
+	b.add_theme_color_override("font_hover_color", COL_TEXT)
+	b.pressed.connect(func() -> void:
+		GameData.tracked_pick = pick
+		Sound.play_sfx("sfx_ui")
+		_rebuild())
+	return b
+
+
 func _line(text: String, color := COL_TEXT) -> void:
 	var l := Label.new()
 	l.text = text
@@ -104,6 +149,8 @@ func _line(text: String, color := COL_TEXT) -> void:
 func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
+
+	_build_pin_row()
 
 	var ph: String = GameData.story_phase
 

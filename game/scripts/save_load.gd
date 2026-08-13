@@ -87,6 +87,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
 	GameData.recipe_items = d.get("recipe_items", {})
+	GameData.tracked_pick = str(d.get("tracked_pick", ""))
 	GameData.respawn_queue = d.get("respawn_queue", [])
 	# 첫 인사 시스템이 생기기 전 세이브: 이미 지어져 영업하던 건물의
 	# 주인들은 인사를 마친 것으로 친다 (무진도 이사가 끝났으면 마찬가지)

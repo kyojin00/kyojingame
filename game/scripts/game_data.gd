@@ -950,45 +950,79 @@ func _quest_brief(s: String) -> String:
 	return t
 
 
-func tracked_quest() -> Dictionary:
+# 지금 진행 중인 퀘스트 전부 — 미니창 고정(핀) 선택지가 된다.
+# 앞쪽일수록 「자동」일 때 우선순위가 높다 (메인 스토리 먼저).
+func quest_catalog() -> Array:
+	var out: Array = []
 	var o := story_objective_short()
 	if o != "":
 		var cur := story_current_quest()
-		return {"title": str(cur.get("name", "처음 온 마을")), "obj": o,
-			"desc": _quest_brief(str(cur.get("story", "")))}
+		out.append({"id": "story1", "title": str(cur.get("name", "처음 온 마을")),
+			"obj": o, "desc": _quest_brief(str(cur.get("story", "")))})
 	o = story2_objective_short()
 	if o != "":
-		return {"title": "마을을 깨우다", "obj": o,
-			"desc": "이장의 부탁 — 마을에 다시 활기를 불어넣자."}
+		out.append({"id": "story2", "title": "마을을 깨우다", "obj": o,
+			"desc": "이장의 부탁 — 마을에 다시 활기를 불어넣자."})
 	o = fisher_objective_short()
 	if o != "":
-		return {"title": "낚시꾼과 바닷길", "obj": o,
-			"desc": "낯선 낚시꾼이 황금잉어 소문을 듣고 왔다."}
+		out.append({"id": "fisher", "title": "낚시꾼과 바닷길", "obj": o,
+			"desc": "낯선 낚시꾼이 황금잉어 소문을 듣고 왔다."})
 	o = move_objective_short()
 	if o != "":
-		return {"title": "새로운 주민의 이사", "obj": o,
-			"desc": "무진이 마을에 살고 싶다는 편지를 보내왔다."}
+		out.append({"id": "move", "title": "새로운 주민의 이사", "obj": o,
+			"desc": "무진이 마을에 살고 싶다는 편지를 보내왔다."})
 	o = forest_objective_short()
 	if o != "":
-		return {"title": "숲속에서 발견한 집", "obj": o,
-			"desc": "무진이 숲 깊은 곳에서 수상한 집을 봤다고 한다."}
+		out.append({"id": "forest", "title": "숲속에서 발견한 집", "obj": o,
+			"desc": "무진이 숲 깊은 곳에서 수상한 집을 봤다고 한다."})
 	o = story4_objective_short()
 	if o != "":
-		return {"title": "오래된 마을의 경계", "obj": o,
-			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다."}
+		out.append({"id": "story4", "title": "오래된 마을의 경계", "obj": o,
+			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다."})
+	# 서브: 상인의 노점 심부름
+	if merchant_errand == "doing":
+		var ready := wood >= STALL_WOOD \
+			and int(items.get("forage_shell", 0)) >= STALL_SHELLS
+		out.append({"id": "stall", "title": "상인의 부탁 — 해변 노점",
+			"obj": "민지에게 재료를 가져다주기" if ready
+				else "재료 모으기 — 목재 %d·조개 %d" % [STALL_WOOD, STALL_SHELLS],
+			"desc": "민지가 해변에서 장사할 노점을 내고 싶어 한다."})
 	o = tutorial_objective_short()
 	if o != "":
 		var flag := tutorial_current_flag()
 		if flag in STORY2_FLAGS:
-			return {"title": "마을을 깨우다", "obj": o,
-				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자."}
-		return {"title": "마을 생활 안내", "obj": o,
-			"desc": "안 해도 되지만, 하면 마을살이가 수월해진다."}
+			out.append({"id": "tutorial", "title": "마을을 깨우다", "obj": o,
+				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자."})
+		else:
+			out.append({"id": "tutorial", "title": "마을 생활 안내", "obj": o,
+				"desc": "안 해도 되지만, 하면 마을살이가 수월해진다."})
+	# 오늘의 의뢰 (게시판에서 수락한 것)
+	var ql := quest_line()
+	if ql != "":
+		out.append({"id": "errand", "title": "오늘의 의뢰", "obj": ql,
+			"desc": "마을 광장 게시판의 납품 의뢰다."})
 	var gl := grandpa_line()
 	if gl != "":
-		return {"title": "할아버지의 부탁", "obj": gl.replace("목표: ", ""),
-			"desc": "연구 노트에 남은 할아버지의 흔적을 따라가자."}
-	return {}
+		out.append({"id": "grandpa", "title": "할아버지의 부탁",
+			"obj": gl.replace("목표: ", ""),
+			"desc": "연구 노트에 남은 할아버지의 흔적을 따라가자."})
+	return out
+
+
+# 미니창 고정 — ""=자동(맨 앞 퀘스트), 아니면 quest_catalog의 id.
+# 고정한 퀘스트가 끝나면(목록에서 사라지면) 자동으로 되돌아간다.
+var tracked_pick := ""
+
+
+func tracked_quest() -> Dictionary:
+	var cat := quest_catalog()
+	if cat.is_empty():
+		return {}
+	if tracked_pick != "":
+		for q: Dictionary in cat:
+			if str(q.id) == tracked_pick:
+				return q
+	return cat[0]
 
 
 # 지금 말을 걸어야 하는 퀘스트 NPC 머리 위 표시.
@@ -3276,6 +3310,7 @@ func reset_all() -> void:
 	arrivals = []
 	npc_greeted = []
 	recipe_items = {}
+	tracked_pick = ""
 	respawn_queue = []
 	chief_house_lv = 0
 	hall_noticed = false
@@ -3615,7 +3650,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
 		"story4_phase": story4_phase, "zones_open": zones_open,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
-		"recipe_items": recipe_items, "respawn_queue": respawn_queue,
+		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,
