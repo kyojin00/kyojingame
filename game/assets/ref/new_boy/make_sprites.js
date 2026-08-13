@@ -21,6 +21,36 @@ const SETS = [
 	{ name: 'new_boy_up', files: ['up_walk_0', 'up_walk_1', 'up_walk_2', 'up_walk_3', 'up_idle'] },
 ];
 
+// ---- 휘두르기(도끼질·곡괭이질) 3프레임 — 원본이 있으면 같이 뽑는다 ----
+//
+// 아직 이 폴더에 원본이 없다. 아래 이름으로 넣고 다시 돌리면 그대로 나온다.
+//
+//   <방향>_swing_0.png   다 감아올린 자세 — 도구가 어깨 뒤로 넘어가고 몸이 젖혀진 순간
+//   <방향>_swing_1.png   내리치는 중간 — 도구가 얼굴 옆을 스치고 팔이 펴지는 순간
+//   <방향>_swing_2.png   다 내리친 자세 — 도구가 발치에 닿고 허리가 굽은 순간
+//
+// (<방향> = down / side / up. 옆모습은 오른쪽을 보는 것만 찍으면 된다 —
+//  왼쪽은 게임에서 좌우로 뒤집어 쓴다)
+//
+// **걷기 원본과 같은 촬영·같은 거리여야 한다.** 크기 기준(SCALE)은 걷기·서기
+// 15장의 머리 크기 중앙값 하나뿐이라, 따로 찍어 거리가 다르면 휘두를 때만
+// 캐릭터가 커졌다 작아진다.
+//
+// 세 장이 다 있어야 한 방향이 켜진다. 두 장만 넣으면 건너뛰고 알려 준다 —
+// 반만 켜지면 게임에서 한 위상만 도트가 되고 나머지는 서기 자세로 튄다.
+const SWING = ['swing_0', 'swing_1', 'swing_2'];
+for (const set of SETS) {
+	const dir = set.name.replace('new_boy_', '');
+	const want = SWING.map(s => `${dir}_${s}`);
+	const have = want.filter(f => fs.existsSync(REF + f + '.png'));
+	if (have.length === want.length) set.files.push(...want);
+	else if (have.length) console.warn(`! ${dir}: 휘두르기 원본이 ${have.length}/3장뿐 — 건너뛴다`);
+}
+
+// 출력 이름: 0~3 걷기 / 4 서기 / 5~7 휘두르기
+const outName = (set, i) => i < 4 ? `${set.name}_walk_${i}`
+	: (i === 4 ? `${set.name}_idle` : `${set.name}_swing_${i - 5}`);
+
 const load = n => PNG.sync.read(fs.readFileSync(REF + n + '.png'));
 const median = a => { const v = a.slice().sort((x, y) => x - y); return v[v.length >> 1]; };
 
@@ -79,15 +109,18 @@ function sample(p, ax, ay, s, tx, ty) {
 // --- 1) 15장 전체를 재서 배율 하나를 정한다 ---
 const imgs = {}, met = {};
 for (const set of SETS) for (const f of set.files) { imgs[f] = load(f); met[f] = scan(imgs[f]); }
-const all = SETS.flatMap(s => s.files);
+// 크기 기준은 **걷기·서기 15장으로만** 잡는다. 나중에 휘두르기 원본을
+// 넣어도 이미 뽑아 둔 15장이 밀리지 않게 하려는 것이다.
+const all = SETS.flatMap(s => s.files.slice(0, 5));
 const SCALE = HEAD_H / median(all.map(f => met[f].headH));
 
 // --- 2) 방향마다 바닥선을 정한다 (그 방향에서 발이 가장 낮게 닿는 프레임) ---
 const jobs = [];
 for (const set of SETS) {
-	const ground = Math.max(...set.files.map(f => met[f].y1));
+	// 바닥선도 걷기·서기 5장으로만 정한다 (같은 이유)
+	const ground = Math.max(...set.files.slice(0, 5).map(f => met[f].y1));
 	set.files.forEach((f, i) => {
-		const name = i < 4 ? `${set.name}_walk_${i}` : `${set.name}_idle`;
+		const name = outName(set, i);
 		const px = [];
 		const ax = hipX(imgs[f], met[f]);
 		for (let ty = 0; ty < FH; ty++) for (let tx = 0; tx < FW; tx++)
@@ -150,6 +183,10 @@ function preview(name, list) {
 preview('preview_idle.png', ['new_boy_down_idle', 'new_boy_side_idle', 'new_boy_up_idle']);
 for (const d of ['down', 'side', 'up'])
 	preview(`preview_${d}_walk.png`, [0, 1, 2, 3].map(i => `new_boy_${d}_walk_${i}`));
+for (const set of SETS) if (set.files.length > 5) {
+	const d = set.name.replace('new_boy_', '');
+	preview(`preview_${d}_swing.png`, [0, 1, 2].map(i => `${set.name}_swing_${i}`));
+}
 
 console.log('frames', jobs.length, 'scale', SCALE.toFixed(4),
 	'headH', all.map(f => met[f].headH).join(','), 'palette', cent.length);

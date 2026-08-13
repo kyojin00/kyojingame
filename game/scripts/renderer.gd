@@ -85,15 +85,31 @@ func _draw_greenhouse() -> void:
 
 
 func spawn_particles(t: Vector2i, kind: String) -> void:
-	var d: Array = m.PARTICLE_DEFS[kind]
-	var center := Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
-	for i in d[1]:
+	spawn_burst(Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16), kind)
+
+
+# 칸이 아니라 **월드 좌표** 아무 데서나 터뜨린다. 나무 우듬지처럼 칸 한가운데가
+# 아닌 곳에서 잎이 떨어져야 할 때 쓴다.
+#   mult   개수 배수 (0.5면 절반만)
+#   spread 처음 흩어져 있는 반경
+func spawn_burst(center: Vector2, kind: String, mult: float = 1.0,
+		spread: float = 5.0) -> void:
+	var d: Dictionary = m.PARTICLE_DEFS[kind]
+	var drift: float = float(d.get("drift", 14.0))
+	var life: float = float(d.get("life", 1.0))
+	var size: float = float(d.get("size", 1.0))
+	var sway: float = float(d.get("sway", 0.0))
+	for i in int(ceilf(float(d.n) * mult)):
 		m.particles.append({
-			"p": center + Vector2(randf_range(-5, 5), randf_range(-4, 2)),
-			"v": Vector2(randf_range(-14, 14), d[2] + randf_range(-8, 8)),
-			"c": d[0],
-			"life": randf_range(0.3, 0.55),
-			"g": d[3],
+			"p": center + Vector2(randf_range(-spread, spread),
+				randf_range(-spread * 0.8, spread * 0.4)),
+			"v": Vector2(randf_range(-drift, drift), float(d.up) + randf_range(-8, 8)),
+			"c": d.c,
+			"life": randf_range(0.3, 0.55) * life,
+			"g": float(d.g),
+			"size": size,
+			"sway": sway,
+			"phase": randf_range(0.0, TAU),
 		})
 
 
@@ -106,6 +122,9 @@ func _update_particles(delta: float) -> void:
 		if pt.life <= 0.0:
 			continue
 		pt.v.y += pt.g * delta
+		# 나뭇잎은 떨어지면서 좌우로 팔랑거린다
+		if float(pt.sway) > 0.0:
+			pt.p.x += sin(float(pt.phase) + float(pt.life) * 9.0) * float(pt.sway) * delta
 		pt.p += pt.v * delta
 		alive.append(pt)
 	m.particles = alive
@@ -153,7 +172,8 @@ func _draw_overlay() -> void:
 			_draw_bang(fn.position + Vector2(0, -124))
 
 	for pt in m.particles:
-		m.overlay.draw_rect(Rect2(pt.p, Vector2(1, 1)), pt.c)
+		var s: float = float(pt.size)
+		m.overlay.draw_rect(Rect2(pt.p, Vector2(s, s)), pt.c)
 
 	# 경험치 획득 플로팅 텍스트
 	for ft in m.float_texts:

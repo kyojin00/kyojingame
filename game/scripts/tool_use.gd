@@ -259,10 +259,16 @@ func use_tool() -> void:
 					return
 				obj.hp -= int(GameData.tool_stat("axe", "power"))
 				Sound.play_sfx("sfx_chop", 0.15)
-				swing_at(t, "wood")
-				m.objnode._refresh_tree_sprite(t)
-				if obj.hp <= 0:
-					m.objnode._remove_object(t, true)
+				var felled: bool = obj.hp <= 0
+				# 판정은 여기서 끝난다. 그림이 바뀌는 것은 **날이 닿는 순간**이다 —
+				# 마지막 한 방이면 그 박자에 맞춰 나무가 옆으로 쓰러지기 시작한다.
+				if felled:
+					swing_at(t, "wood", true)
+					m.objnode._fell_tree(t, _fall_side(t))
+				else:
+					swing_at(t, "wood", false,
+						func() -> void: m.objnode._refresh_tree_sprite(t))
+				if felled:
 					# 숲길을 막고 있던 나무는 다시 자라지 않는다 (길이 도로 막히면 안 된다)
 					var story_gate: bool = GameData.story_phase != "done" \
 						and m.STORY_GATE_XS.has(t.x) \
@@ -320,7 +326,8 @@ func use_tool() -> void:
 				Sound.play_sfx("sfx_pick", 0.15)
 				swing_at(t, "stone")
 				if obj.hp <= 0:
-					m.objnode._remove_object(t, true)
+					# 돌도 곡괭이 날이 닿는 순간에 맞춰 튄다 (main.HIT_AT)
+					m.objnode._remove_object(t, true, m.HIT_AT)
 					var stone_got := m.STONE_PER_ROCK
 					if randf() < GameData.bonus_drop_chance("mine"):
 						stone_got += 1
@@ -340,7 +347,8 @@ func use_tool() -> void:
 				Sound.play_sfx("sfx_pick", 0.15)
 				swing_at(t, "stone", true)
 				if obj.hp <= 0:
-					m.objnode._remove_object(t, true)
+					# 돌도 곡괭이 날이 닿는 순간에 맞춰 튄다 (main.HIT_AT)
+					m.objnode._remove_object(t, true, m.HIT_AT)
 					GameData.stone += m.BIGROCK_STONE
 					m.hud.show_message("커다란 바위를 캐냈다! 돌 +%d" % m.BIGROCK_STONE)
 					m.doing._maybe_drop_recipe("bigrock")
@@ -449,13 +457,31 @@ func _tool_target_nearby() -> Vector2i:
 	return best
 
 
-func swing_at(t: Vector2i, particle: String, heavy: bool = false) -> void:
+# 나무는 도끼질한 사람의 **반대쪽**으로 넘어간다 (내 쪽으로 덮치면 이상하다).
+# 정면에서 딱 맞춰 찍어 좌우가 갈리지 않으면 칸마다 정해진 쪽으로 넘긴다 —
+# randf()를 쓰면 같은 나무가 볼 때마다 다른 쪽으로 쓰러진다.
+func _fall_side(t: Vector2i) -> float:
+	# 함께하기: 다른 사람이 벤 나무다. 여기 내 캐릭터 자리를 보면 엉뚱한 쪽으로
+	# 넘어가니 칸으로만 정한다 (어느 화면에서 보든 같은 쪽으로 쓰러진다)
+	if m.player == null or m._remote_acting:
+		return 1.0 if m._hash01(t.x * 17 + 2, t.y * 23 + 9) > 0.5 else -1.0
+	var d: float = float(t.x * m.TILE + 16) - m.player.position.x
+	if absf(d) < 1.0:
+		return 1.0 if m._hash01(t.x * 17 + 2, t.y * 23 + 9) > 0.5 else -1.0
+	return signf(d)
+
+
+# 도구를 휘두른다. `after`는 **날이 닿는 순간**에 한 번 불린다 —
+# 손상 단계 그림 교체처럼 「눈에 보이는 일」을 여기 실어 보낸다.
+func swing_at(t: Vector2i, particle: String, heavy: bool = false,
+		after: Callable = Callable()) -> void:
 	var here := m.player_tile()
 	var face := Vector2(t.x - here.x, t.y - here.y)
 	if face == Vector2.ZERO:
 		face = _dir_to_vec(m.player.dir)
 	m.player.start_swing(GameData.tool, face.normalized(), m.SWING_TIME)
-	m._pending_hits.append({"t": m.HIT_AT, "tile": t, "particle": particle, "heavy": heavy})
+	m._pending_hits.append({"t": m.HIT_AT, "tile": t, "particle": particle,
+		"heavy": heavy, "after": after})
 
 
 func _dir_to_vec(d: String) -> Vector2:
@@ -475,13 +501,44 @@ func _land_hit(h: Dictionary) -> void:
 	m.renderer.spawn_particles(t, str(h.particle))
 	if m.obj_nodes.has(t):
 		var node: Node2D = m.obj_nodes[t]
+		_end_shake(node)   # 연타로 흔들림이 겹치면 기준 크기·자리가 밀린다
 		var here := m.player_tile()
 		var dir := Vector2(t.x - here.x, t.y - here.y)
+		var spr: Sprite2D = node.get_child(0) as Sprite2D
 		m._obj_shakes.append({"node": node, "base": node.position,
-			"t": m.SHAKE_TIME, "dir": (dir.normalized() if dir != Vector2.ZERO else Vector2.DOWN)})
+			"t": m.SHAKE_TIME,
+			"dir": (dir.normalized() if dir != Vector2.ZERO else Vector2.DOWN),
+			"spr": spr, "sc": (spr.scale if spr != null else Vector2.ONE)})
+		# 나무는 맞을 때마다 우듬지에서 잎이 떨어진다
+		if str(m.objects.get(t, {}).get("kind", "")) == "tree":
+			m.renderer.spawn_burst(node.position + Vector2(16, -86), "leaf", 0.5, 14.0)
+	# 그림 쪽 마무리 (손상 단계 교체 · 쓰러지기 시작)
+	var after: Variant = h.get("after", null)
+	if after is Callable and (after as Callable).is_valid():
+		(after as Callable).call()
 	if bool(h.heavy):
 		m._cam_shake = 0.18
 		m._cam_shake_amp = 3.0
+
+
+# 흔들리던 대상을 원래 자리·크기로 되돌린다
+func _restore_shake(sh: Dictionary) -> void:
+	var nv: Variant = sh.node
+	if is_instance_valid(nv):
+		(nv as Node2D).position = sh.base
+	var sv: Variant = sh.get("spr", null)
+	if sv != null and is_instance_valid(sv):
+		(sv as Sprite2D).scale = sh.sc
+
+
+func _end_shake(node: Node2D) -> void:
+	for sh in m._obj_shakes.duplicate():
+		# 이미 사라진 대상도 이 김에 걷어낸다 (지운 노드와 비교하지 않으려는 뜻도 있다)
+		var nv: Variant = sh.node
+		if is_instance_valid(nv) and nv != node:
+			continue
+		_restore_shake(sh)
+		m._obj_shakes.erase(sh)
 
 
 func _update_hit_fx(delta: float) -> void:
@@ -501,11 +558,20 @@ func _update_hit_fx(delta: float) -> void:
 			continue
 		var node: Node2D = nv
 		if sh.t <= 0.0:
-			node.position = sh.base
+			_restore_shake(sh)
 			m._obj_shakes.erase(sh)
 			continue
 		var p: float = sh.t / m.SHAKE_TIME
 		node.position = sh.base + sh.dir * sin(p * PI * 5.0) * 3.5 * p
+		# 날이 파고들 때 그림이 납작하게 눌렸다 펴진다.
+		# 원점이 밑동이라 위아래로 줄이면 밑동은 그대로 있고 우듬지만 내려앉는다.
+		# p는 1(맞는 순간)에서 0으로 줄어든다 — 제일 눌린 곳이 맞는 그 프레임이다.
+		var sv: Variant = sh.get("spr", null)
+		if sv != null and is_instance_valid(sv):
+			var base_sc: Vector2 = sh.sc
+			var q: float = p * p * m.HIT_SQUASH
+			(sv as Sprite2D).scale = Vector2(base_sc.x * (1.0 + q * 0.55),
+				base_sc.y * (1.0 - q))
 	# 화면 흔들림 (커다란 바위처럼 묵직한 것만)
 	var cam := m.player.get_node_or_null("Camera") as Camera2D
 	if cam != null:
