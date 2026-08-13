@@ -114,7 +114,7 @@ const SWING_POSE := {
 const SWING_HAND_DOT := {
 	# 감기 시작 · 다 감음(머리 옆) · 내리침 · 되돌아옴
 	"side": [Vector2(-16.5, -55), Vector2(-16.5, -67), Vector2(19.5, -22), Vector2(16.5, -34)],
-	"down": [Vector2(-19.5, -52), Vector2(-19.5, -70), Vector2(13.5, -34), Vector2(10.5, -37)],
+	"down": [Vector2(-19.5, -52), Vector2(-22.5, -70), Vector2(13.5, -34), Vector2(10.5, -37)],
 	"up": [Vector2(19.5, -55), Vector2(19.5, -70), Vector2(7.5, -67), Vector2(19.5, -61)],
 }
 const TOOL_ICONS := {

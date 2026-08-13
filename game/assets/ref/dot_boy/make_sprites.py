@@ -51,7 +51,7 @@ STRIDE = [0, 2, 1, -1, -2]
 BOB = [0, 1, 0, 0, 1]
 
 # 세로 배치 (bob 적용 전 기준 행)
-HEAD_Y = 2               # 머리 꼭대기
+HEAD_Y = 3               # 머리 꼭대기
 SHIRT_Y = 16             # 셔츠 위 (목은 그 한 행 위)
 HIP_Y = 22               # 바지 위 (엉덩이 띠 2행)
 LEG_Y = 24               # 다리 기둥 시작
@@ -114,61 +114,63 @@ class G:
 
 
 # ------------------------------------------------------------------- 머리
-# 방향마다 한 장을 그려 두고 bob 만큼 통째로 내린다. 폭 13 (열 4~16),
-# 높이 14 (행 2~15) — 키의 절반 가까운 돔형 대두. 민머리라 정수리 하이라이트.
+# 방향마다 한 장을 그려 두고 bob 만큼 통째로 내린다. 폭 11 (열 5~15),
+# 높이 12 (행 3~14) — 돔형이되 키의 절반까지는 안 가는 크기.
+# (13x14로 키워 봤더니 너무 컸다.) 민머리라 정수리 하이라이트.
+#
+# 눈: 까만 눈망울 3x3에 한가운데 흰 반짝이(w) 한 점, 그 아래 따뜻한
+# 홍채 반사(i) 한 점 — 인형 눈처럼 반짝인다. 눈썹 선은 뺐다 (있으면
+# 인상이 굳는다). 눈 밑 그늘 S와 볼터치 r가 눈매를 받친다.
 
 HEAD_DOWN = [
-    "....OOOOO....",
-    "..OOsssssOO..",
-    ".OssHHHHHssO.",
-    ".OsHHHHHHHsO.",
-    "OssHHHHHHHssO",
-    "OsssssssssssO",
-    "OsssssssssssO",
-    "OseeessseeesO",
-    "OswiwssswiwsO",
-    "OswewssswewsO",
-    "OssSsssssSssO",
-    "OrsssmsmsssrO",
-    ".OssssmssssO.",
-    "..OOsssssOO..",
+    "..OOOOOOO..",
+    ".OsHHHHHsO.",
+    "OssHHHHHssO",
+    "OsssssssssO",
+    "OsssssssssO",
+    "O" "ses" "sss" "ses" "O",
+    "O" "ewe" "sss" "ewe" "O",
+    "O" "eie" "sss" "eie" "O",
+    "OrSsssssSrO",
+    "OsssmsmsssO",
+    ".OsssmsssO.",
+    "..OOsssOO..",
 ]
 
 HEAD_SIDE = [   # 오른쪽을 본다
-    "....OOOOO....",
-    "..OOsssssOO..",
-    ".OSsHHHHHssO.",
-    ".OSHHHHHHHsO.",
-    "OSssssssssssO",
-    "OSssssssssssO",
-    "OSssssssssssO",
-    "OsssssssseesO",
-    "OsssssssswisO",
-    "OsssssssswesO",
-    "OSssssssssssO",
-    "OSsssrsssmmsO",
-    ".OssssssssSO.",
-    "..OOsssssOO..",
+    "..OOOOOOO..",
+    ".OsHHHHHsO.",
+    "OSsHHHHHssO",
+    "OSssssssssO",
+    "OSssssssssO",
+    "OSsssss" "se" "sO",
+    "OSsssss" "we" "sO",
+    "Ossssss" "ei" "sO",
+    "OSssrsssssO",
+    "OSssssssmmO",
+    ".OsssssssO.",
+    "..OOsssOO..",
 ]
 
 HEAD_UP = [
-    "....OOOOO....",
-    "..OOsssssOO..",
-    ".OssHHHHHssO.",
-    ".OsHHHHHHHsO.",
-    "OssHHHHHHHssO",
-    "OsssssssssssO",
-    "OsssssssssssO",
-    "OsssssssssssO",
-    "OsssssssssssO",
-    "OsssssssssssO",
-    "OSsssssssssSO",
-    "OSsssssssssSO",
-    ".OSsssssssSO.",
-    "..OOSSSSSOO..",
+    "..OOOOOOO..",
+    ".OsHHHHHsO.",
+    "OssHHHHHssO",
+    "OsssssssssO",
+    "OsssssssssO",
+    "OsssssssssO",
+    "OsssssssssO",
+    "OsssssssssO",
+    "OsssssssssO",
+    "OSsssssssSO",
+    ".OSsssssSO.",
+    "..OOSSSOO..",
 ]
 
-HEAD_X = 4
+for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
+    assert all(len(r) == 11 for r in _art), [r for r in _art if len(r) != 11]
+
+HEAD_X = 5
 
 
 def head(g, art, bob, lean=0):
@@ -337,7 +339,7 @@ SWING = {
     # 앞모습: 왼쪽 위로 감았다가 오른쪽 아래로 내리친다 (옛 도트와 같은 방향)
     'down': {'skip': 'left', 'shoulder': (6, 17),
              'poses': [((3, 13), (3, 15), -1, 0, False),
-                       ((3, 7), (1, 12), -2, 0, False),
+                       ((2, 7), (1, 12), -2, 0, False),
                        ((14, 19), (10, 16), 1, 1, False),
                        ((13, 18), (9, 16), 0, 0, False)]},
     # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽이다. 내리침이 왼쪽
