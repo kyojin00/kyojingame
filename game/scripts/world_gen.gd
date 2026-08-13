@@ -30,8 +30,7 @@ func _build_map() -> void:
 	for y in range(28, 35):
 		for x in range(45, 53):
 			m.grid[y][x].ground = "water"
-	# (y 34~35의 옛 개천은 없앴다 — 마을이 넓어지면서 광장 남쪽을 갈라 놓았다.
-	#  마을 강은 남쪽 외곽 VILLAGE_RIVER_Y 하나뿐이다)
+	# (호수는 마을 서쪽 낚시터가 됐다 — 마을을 가르던 강은 전부 없앴다)
 	for y in range(48, 54):          # 깊은 숲 연못
 		for x in range(70, 79):
 			m.grid[y][x].ground = "water"
@@ -221,29 +220,13 @@ func _place_stall(with_node := true) -> void:
 func _build_village() -> void:
 	# 흙길은 더 이상 깔지 않는다 — 마을 바닥은 잔디이고, 길·광장 바닥은
 	# 앞으로 플레이어가 직접 타일을 깔아 꾸미는 구조로 간다.
-	# (물을 건너는 나무 다리만 _bridge_roads가 놓아 준다)
 	# 광장 한가운데 분수
 	for y in range(m.FOUNTAIN.position.y, m.FOUNTAIN.end.y):
 		for x in range(m.FOUNTAIN.position.x, m.FOUNTAIN.end.x):
 			m.grid[y][x].ground = "water"
 
-	# 마을 바깥쪽을 따라 흐르는 강 (광장을 가로막지 않는다)
-	for y in range(m.VILLAGE_RIVER_Y, m.VILLAGE_RIVER_Y + m.RIVER_ROWS):
-		for x in range(46, 89):
-			m.grid[y][x].ground = "water"
-	for x in [m.EAST_RIVER_X, m.EAST_RIVER_X + 1]:
-		for y in range(1, m.VILLAGE_RIVER_Y):
-			m.grid[y][x].ground = "water"
-	# 마을 남쪽 끝 낚시터: 강가 잔디밭에서 강을 보고 낚싯대를 던진다.
-	# (강 위로 내밀던 나무 부두·데크는 없앴다 — 「낚시」 목표는 그대로 여기)
-	# 강 건너 남쪽 부지로 이어지는 작은 나무 다리
-	for x in [63, 64]:
-		for y in range(m.VILLAGE_RIVER_Y, m.VILLAGE_RIVER_Y + m.RIVER_ROWS):
-			m.grid[y][x].ground = "dock"
-
-	# 길이 물 위를 지나야 하면 다리를 놓는다.
-	# (강을 옮기거나 길을 늘릴 때 길이 끊기는 일을 없앤다)
-	_bridge_roads()
+	# (마을을 가르던 강과 다리는 전부 없앴다 — 물을 걷어낸 자리는
+	#  잔디로 이어지고, 낚시터는 서쪽 호수로 옮겼다)
 
 	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
 	for pid: String in GameData.village_built:
@@ -269,50 +252,6 @@ func _build_village() -> void:
 			if m.grid[y][x].ground == "grass" and not m.objects.has(rim) \
 					and m._hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
 				m.objects[rim] = {"kind": "tree", "hp": m.TREE_HP}
-
-
-# 사람이 오가는 동선이 물을 건너는 자리 — 나무 다리를 놓아도 되는 칸들.
-# (흙길은 없어졌지만 옛 길 자리 그대로가 마을의 동선이다.
-#  세이브 로드 때 옛 부두를 걷어 내는 판정에도 이 목록을 쓴다)
-func bridge_tiles() -> Dictionary:
-	var lines: Array = []
-	# 큰길 (가로 3줄)
-	for i in m.ROAD_W:
-		lines.append([Vector2i(60, m.MAIN_STREET_Y + i), Vector2i(98, m.MAIN_STREET_Y + i)])
-	# 세로 동선 3종 (각 3줄) — 분수 위에 다리가 놓이지 않게 광장은 지나지 않는다
-	for i in m.ROAD_W:
-		lines.append([Vector2i(m.NS_LANE_X + i, m.MAIN_STREET_Y),
-			Vector2i(m.NS_LANE_X + i, m.PLAZA.position.y - 1)])
-		lines.append([Vector2i(m.NS_LANE_X + i, m.PLAZA.end.y),
-			Vector2i(m.NS_LANE_X + i, m.DOCK_Y)])
-		lines.append([Vector2i(m.WEST_LANE_X + i, m.MAIN_STREET_Y),
-			Vector2i(m.WEST_LANE_X + i, m.DOCK_Y - 1)])
-		lines.append([Vector2i(m.EAST_LANE_X + i, m.MAIN_STREET_Y),
-			Vector2i(m.EAST_LANE_X + i, m.DOCK_Y - 1)])
-	var tiles := {}
-	for line: Array in lines:
-		var a: Vector2i = line[0]
-		var b: Vector2i = line[1]
-		var step := Vector2i(signi(b.x - a.x), signi(b.y - a.y))
-		var at := a
-		while true:
-			tiles[at] = true
-			if at == b:
-				break
-			at += step
-	# 강 건너 남쪽 부지로 이어지는 작은 다리
-	for x in [63, 64]:
-		for y in range(m.VILLAGE_RIVER_Y, m.VILLAGE_RIVER_Y + m.RIVER_ROWS):
-			tiles[Vector2i(x, y)] = true
-	return tiles
-
-
-# 동선이 지나야 할 자리가 물이면 나무 다리를 놓는다.
-func _bridge_roads() -> void:
-	for at: Vector2i in bridge_tiles():
-		if at.x >= 0 and at.y >= 0 and at.x < m.MAP_W and at.y < m.MAP_H \
-				and m.grid[at.y][at.x].ground == "water":
-			m.grid[at.y][at.x].ground = "dock"   # 나무 다리
 
 
 # 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
@@ -485,22 +424,77 @@ func _advance_tree_growth() -> void:
 	GameData.tree_regrow = keep
 
 
+# 자연물 상한 — 리젠이 맵을 가득 채우지 않게 종류별로 막는다
+const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 45}
+# 자연물이 절대 나면 안 되는 곳 — 스토리 숲길(길목이 도로 막히면 안 된다)
+const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9)]
+
+
+# 이 칸에 자연물이 나도 되는가 — 나무/돌/잡초가 전부 같은 검사를 쓴다.
+# 건물·문 앞·통행로·농작물·설치물·다른 자연물·물가를 전부 피한다.
+func _respawn_ok(pos: Vector2i, kind: String) -> bool:
+	if pos.x < 1 or pos.y < 1 or pos.x >= m.MAP_W - 1 or pos.y >= m.MAP_H - 1:
+		return false
+	var cell: Dictionary = m.grid[pos.y][pos.x]
+	if m.objects.has(pos) or cell.ground != "grass" or str(cell.crop_id) != "":
+		return false
+	if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos) \
+			or m.FISH_CLEAR.has_point(pos) or m.GREENHOUSE.has_point(pos):
+		return false  # 마을·큰길·낚시터 어귀·온실 터에는 나지 않는다
+	for r: Rect2i in NO_SPAWN_RECTS:
+		if r.has_point(pos):
+			return false
+	# 마을 밖 집(무진의 집·숲속의 집) 문 앞도 비워 둔다
+	for anchor: Vector2i in [GameData.move_house, m.FOREST_HOUSE_ANCHOR]:
+		if anchor.x >= 0 and (pos - m.door_tile(anchor)).length() < 3.0:
+			return false
+	if (pos - m.player_tile()).length() < 4.0:
+		return false
+	if not _nature_clear(pos, kind if kind != "weed" else "rock"):
+		return false  # 이웃 자연물과의 간격 — 통로가 통째로 막히지 않는다
+	return true
+
+
+func _nature_count(kind: String) -> int:
+	var n := 0
+	for pos in m.objects:
+		if String(m.objects[pos].kind) == kind:
+			n += 1
+	return n
+
+
+# 아침 리젠 — 캐서 없앤 나무/돌/잡초가 3~5일 뒤(respawn_queue),
+# 맵의 「빈자리 검사」를 통과한 랜덤 위치에서 새로 자란다.
+# 잡초는 그와 별개로 시간이 지나면 저절로도 돋는다 (상한 안에서).
 func _respawn_resources() -> void:
-	for attempt in 6:
-		var kind := "tree" if randf() < 0.5 else "rock"
-		var chance := 0.4 if kind == "tree" else 0.3
-		if randf() > chance:
+	var keep: Array = []
+	for e in GameData.respawn_queue:
+		if int(e.due) > GameData.day:
+			keep.append(e)
 			continue
-		var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
-		var cell: Dictionary = m.grid[pos.y][pos.x]
-		if m.objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
-			continue
-		if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
-			continue  # 마을/길에는 리스폰하지 않는다
-		if (pos - m.player_tile()).length() < 4.0:
-			continue
-		m.objnode._place_object(pos, kind, m.TREE_HP if kind == "tree" else m.ROCK_HP)
-		break
+		var kind := str(e.kind)
+		if _nature_count(kind) >= int(NATURE_CAP.get(kind, 999)):
+			continue   # 이미 빽빽하다 — 이 리젠은 조용히 사라진다
+		var placed := false
+		for attempt in 30:
+			var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
+			if not _respawn_ok(pos, kind):
+				continue   # 못 놓는 자리면 강제하지 않고 다른 자리를 다시 찾는다
+			m.objnode._place_object(pos, kind,
+				m.TREE_HP if kind == "tree" else (m.ROCK_HP if kind == "rock" else 0))
+			placed = true
+			break
+		if not placed:
+			e["due"] = GameData.day + 1   # 오늘은 자리가 없다 — 내일 다시
+			keep.append(e)
+	GameData.respawn_queue = keep
+	# 잡초 자연 발생 — 하루 몇 포기씩, 같은 검사로
+	if _nature_count("weed") < int(NATURE_CAP["weed"]):
+		for attempt in 5:
+			var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
+			if _respawn_ok(pos2, "weed"):
+				m.objnode._place_object(pos2, "weed", 0)
+				break
 
 
 # 아침마다 열매/약초가 풀밭에 돋아난다 (최대 12개 유지)

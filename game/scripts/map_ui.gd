@@ -272,8 +272,7 @@ func _draw_map() -> void:
 		# 글씨는 아래쪽에 — 위에 두면 「농장」·「축사」 라벨과 겹쳐 읽을 수 없다
 		_label(Vector2(_ox + h.x * _cell, _oy + h.y * _cell + _cell + 20), "말")
 	_place_label(74, 13, "중앙 광장")
-	_place_label(74, 34, "낚시터")
-	_place_label(40, 27, "호수")
+	_place_label(46, 31, "호수 낚시터")
 	_place_label(50, 1, "동굴")
 	# 지어진 마을 건물만 이름을 보여준다 (빈 부지는 표시하지 않는다)
 	for pid: String in GameData.village_built:

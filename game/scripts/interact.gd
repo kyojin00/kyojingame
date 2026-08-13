@@ -233,6 +233,8 @@ func interact() -> void:
 		if String(obj.kind).begins_with("forage_") or String(obj.kind) == "weed":
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
+			if fid == "weed":
+				GameData.queue_respawn("weed")   # 3~5일 뒤 다른 빈자리에서
 			var got := 1
 			if fid in m.BEACH_FORAGE:
 				got = GameData.beach_pick_count()   # 해변 채집 레벨: 한 번에 더 줍는다

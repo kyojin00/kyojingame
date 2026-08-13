@@ -121,6 +121,9 @@ func _grid(entries: Array) -> void:
 		if found and main.tex.has(str(e.icon)) and main.tex[str(e.icon)] != null:
 			var icon := TextureRect.new()
 			icon.texture = main.tex[str(e.icon)]
+			# 원본이 커도 칸 안에 맞춰 줄어든다 (잡초 그림이 칸을 뚫고
+			# 크게 보이던 버그 — expand_mode 기본값이 원본 크기를 강제했다)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			icon.set_anchors_preset(Control.PRESET_FULL_RECT)

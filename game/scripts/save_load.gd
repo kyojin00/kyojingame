@@ -87,6 +87,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
 	GameData.recipe_items = d.get("recipe_items", {})
+	GameData.respawn_queue = d.get("respawn_queue", [])
 	# 첫 인사 시스템이 생기기 전 세이브: 이미 지어져 영업하던 건물의
 	# 주인들은 인사를 마친 것으로 친다 (무진도 이사가 끝났으면 마찬가지)
 	if not d.has("npc_greeted"):
@@ -272,16 +273,13 @@ func _apply_save(d: Dictionary) -> void:
 			cell.crop_day = growth
 			cell.dead = s.size() > 4 and int(s[4]) == 1
 			cell.half_fed = s.size() > 5 and int(s[5]) == 1
-	# 흙길·부두가 없어졌다 — 옛 세이브의 길은 잔디로, 다리 동선 밖의
-	# 데크(부두)는 물로 되돌린다 (다리 자리는 그대로 나무 다리)
-	var bridges: Dictionary = m.worldgen.bridge_tiles()
+	# 흙길·부두·다리가 전부 없어졌다 — 옛 세이브의 길/데크는 잔디로.
+	# (옛 강 물칸은 위의 물 규칙 덕에 새 지형(잔디)을 그대로 따른다)
 	for y in m.MAP_H:
 		for x in m.MAP_W:
 			var cell: Dictionary = m.grid[y][x]
-			if cell.ground == "path":
+			if cell.ground in ["path", "dock"]:
 				cell.ground = "grass"
-			elif cell.ground == "dock" and not bridges.has(Vector2i(x, y)):
-				cell.ground = "water"
 	if d.has("objects"):
 		m.objects.clear()
 		for o in d.objects:

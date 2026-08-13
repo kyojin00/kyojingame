@@ -24,7 +24,7 @@ class_name KyojinMain
 extends Node2D
 
 # 월드를 넓혔다. 마을·농장 좌표는 그대로 두고 남쪽·동쪽에 야생을 붙인다.
-const MAP_W := 120
+const MAP_W := 168   # 동쪽으로 크게 넓혔다 — 새 건물·콘텐츠가 들어설 땅
 const MAP_H := 90
 const TILE := 32
 
@@ -281,16 +281,14 @@ const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 �
 const PLAZA := Rect2i(70, 14, 16, 12)      # 중앙 광장 (아주 넓은 평지)
 const FOUNTAIN := Rect2i(76, 18, 4, 4)     # 광장 중앙 분수
 const FOUNTAIN_DECO := Vector2i(77, 20)    # 분수 조형물 (분수 한가운데)
-const VILLAGE_RIVER_Y := 40
-const EAST_RIVER_X := 97                   # 마을 동쪽 바깥을 흐르는 강 (2칸)
-const RIVER_ROWS := 4                      # 강 폭 (낚시터를 깊게 하려고 넓혔다)                # 마을 남쪽 외곽을 흐르는 강 (2칸)
-const DOCK_Y := 39                         # 강가 낚시터(부두)
-# ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
-# 강가 잔디밭에서 강을 보고 낚싯대를 던진다. 「낚시」 목표는 여기서
-# 진행한다. (강 위로 내밀던 나무 데크·부두는 없앴다)
-const FISH_YARD_X0 := 70
-const FISH_YARD_X1 := 95
-const FISH_SIGN := Vector2i(70, 38)
+# (마을을 가르던 남쪽 강과 동쪽 세로 강은 없앴다 — 맵은 하나로 이어진
+#  큰 육지다. 물은 서쪽 호수·깊은 숲 연못·남쪽 바다만 남는다)
+# ---- 낚시터 (마을 서쪽 호수, 맵에 하나뿐) ----
+# 호숫가 잔디밭에서 물을 보고 낚싯대를 던진다. 「낚시」 목표는 여기.
+const DOCK_Y := 35                         # 호수 남쪽 물가 (물은 y 28~34)
+const FISH_YARD_X0 := 44
+const FISH_YARD_X1 := 54
+const FISH_SIGN := Vector2i(43, 35)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
 const SEA_RIDGE_Y := 77            # 바위 능선 줄 — 바다로 가는 길을 막는다
 const BEACH_Y0 := 78               # 모래사장 (능선 아래 ~ 바다 위)
@@ -303,8 +301,9 @@ const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
 const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
-const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있다」
-const FISH_CLEAR := Rect2i(69, 34, 30, 13) # 이 안에는 나무/돌을 두지 않는다
+const FISH_SPOT := Rect2i(42, 26, 14, 12)   # 이 안이면 「낚시터에 있다」
+# 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
+const FISH_CLEAR := Rect2i(41, 24, 20, 14)
 const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
 # (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
 # 메인 스토리 4 — 동쪽 다리 건너, 옛 마을의 경계를 알리는 낡은 표지판.

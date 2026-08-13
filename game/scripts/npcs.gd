@@ -57,9 +57,9 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 		"board":
 			t = m.BOARD_POS + Vector2i(0, 1)
 		"pier":
-			# 낚시대회 때는 다섯이 한 칸에 겹치지 않게 강가 마당에 나란히 선다
+			# 낚시대회 때는 다섯이 한 칸에 겹치지 않게 호수 남쪽 물가에 선다
 			var i: int = maxi(0, m.NPC_PIER_ORDER.find(npc_id))
-			t = Vector2i(m.FISH_YARD_X0 + 2 + i * 3, m.DOCK_Y - 1)
+			t = Vector2i(m.FISH_YARD_X0 + 2 + i * 2, m.DOCK_Y + 1)
 		_:
 			# 자기 건물 문 앞 (집도 일터도 같은 건물이다)
 			for pid: String in m.VILLAGE_NPC:

@@ -881,6 +881,17 @@ func move_objective_short() -> String:
 var arrivals: Array = []      # [{"id": npc_id, "day": 확정된 날}] — 방문 대기열
 var npc_greeted: Array = []   # 첫 인사를 마친 NPC id — 이때부터 영업/일과
 
+# ---- 자연물 리젠 ----
+# 나무/돌/잡초를 캐서 없애면 그 자리가 아니라, 3~5일 뒤(자원마다 랜덤)
+# 맵의 「빈자리 검사」를 통과한 랜덤 위치에서 새로 자란다.
+# (world_gen._respawn_resources가 아침마다 처리 — 세이브에 그대로 남는다)
+var respawn_queue: Array = []   # [{"kind", "removed": 제거일, "due": 리젠 예정일}]
+
+
+func queue_respawn(kind: String) -> void:
+	respawn_queue.append({"kind": kind, "removed": day,
+		"due": day + randi_range(3, 5)})
+
 
 func npc_open(nid: String) -> bool:
 	return nid in npc_greeted
@@ -899,8 +910,8 @@ func npc_open(nid: String) -> bool:
 var story4_phase := ""             # "" -> "ask"(이장에게 묻기) -> "done"
 var zones_open: Array = []         # 열린 구역 id 목록
 const VILLAGE_ZONES := {
-	"east_north": {"rect": Rect2i(100, 1, 20, 20), "name": "옛 마을 북동쪽 터"},
-	"east_south": {"rect": Rect2i(100, 21, 20, 23), "name": "옛 마을 남동쪽 터"},
+	"east_north": {"rect": Rect2i(100, 1, 68, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(100, 21, 68, 23), "name": "옛 마을 남동쪽 터"},
 }
 const ZONE_ORDER := ["east_north", "east_south"]
 const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
@@ -3175,6 +3186,7 @@ func reset_all() -> void:
 	arrivals = []
 	npc_greeted = []
 	recipe_items = {}
+	respawn_queue = []
 	chief_house_lv = 0
 	hall_noticed = false
 	shop_seeds = ["wheat", "corn"]
@@ -3513,7 +3525,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
 		"story4_phase": story4_phase, "zones_open": zones_open,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
-		"recipe_items": recipe_items,
+		"recipe_items": recipe_items, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

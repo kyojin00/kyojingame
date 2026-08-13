@@ -218,9 +218,9 @@ func _debug_tick() -> void:
 			m.player.position = Vector2(88 * m.TILE + 16, 2 * m.TILE + 16)  # 맵 끝 배경 확인
 		213: _save_shot("_edge.png")                    # 맵 밖 배경 + 가운데 정렬
 		214:
-			# 낚시터 (마을 남쪽 강가 부두)
-			m.player.position = Vector2(74 * m.TILE + 16, m.DOCK_Y * m.TILE + 16)
-			m.player.dir = "down"
+			# 낚시터 (마을 서쪽 호수 남쪽 물가)
+			m.player.position = Vector2(49 * m.TILE + 16, m.DOCK_Y * m.TILE + 16)
+			m.player.dir = "up"
 			m.toolwork.set_tool("rod")
 		217: _save_shot("_pier.png")
 		218:
@@ -1315,7 +1315,7 @@ func _debug_tick() -> void:
 					seen_w[n5] = true
 					q.append(n5)
 			var plaza := Vector2i(m.PLAZA.position.x + 3, m.PLAZA.position.y + 3)
-			var pier := Vector2i(m.NS_LANE_X + 1, m.DOCK_Y - 1)
+			var pier := Vector2i(49, m.DOCK_Y + 1)   # 호수 남쪽 물가
 			print("WORLD_PATH_OK=", seen_w.has(plaza) and seen_w.has(pier),
 				" 광장=", seen_w.has(plaza), " 낚시터=", seen_w.has(pier),
 				" 걸어갈 수 있는 칸=", seen_w.size())

@@ -274,7 +274,8 @@ func use_tool() -> void:
 						and m.STORY_GATE_XS.has(t.x) \
 						and t.y >= m.STORY_ROAD_Y0 and t.y <= m.STORY_ROAD_Y1
 					if not story_gate:
-						GameData.tree_regrow.append([t.x, t.y, 1])  # 다음 날 어린 나무
+						# 3~5일 뒤, 맵의 빈자리 어딘가에서 새 나무가 자란다
+						GameData.queue_respawn("tree")
 					var wood_got := m.WOOD_PER_TREE
 					if randf() < GameData.bonus_drop_chance("forest"):
 						wood_got += 1
@@ -328,6 +329,7 @@ func use_tool() -> void:
 				if obj.hp <= 0:
 					# 돌도 곡괭이 날이 닿는 순간에 맞춰 튄다 (main.HIT_AT)
 					m.objnode._remove_object(t, true, m.HIT_AT)
+					GameData.queue_respawn("rock")   # 3~5일 뒤 다른 빈자리에서
 					var stone_got := m.STONE_PER_ROCK
 					if randf() < GameData.bonus_drop_chance("mine"):
 						stone_got += 1
