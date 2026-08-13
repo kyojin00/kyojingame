@@ -1660,8 +1660,8 @@ func _bgm_tick(delta: float) -> void:
 func _want_bgm() -> String:
 	if cave.visible:
 		return "bgm_cave"
-	if shop_room.visible or shop.visible:
-		return "bgm_shop"
+	# 집이나 가게에 들어가도 배경음은 그대로 흐른다 —
+	# 곡이 바뀌는 별세계는 동굴뿐이다 (bgm_shop 전환은 없앴다)
 	if GameData.festival_open():
 		return "bgm_festival"
 	var h := GameData.minutes / 60.0

@@ -364,16 +364,9 @@ func _rebuild() -> void:
 			_note("새 씨앗은 마을이 자라면 하나씩 들어온다.")
 			if GameData.merchant_discount():
 				_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
-		if buy_cat in ["", "tool"]:
-			# 부품 — 제작대(집 책상)에서 가구를 만들 때 쓴다
-			_note("— 도구 부품 (제작대 재료) —")
-			for pid: String in ["nail"]:
-				var pdef: Dictionary = GameData.ITEMS[pid]
-				var pprice := int(pdef.sell) * 2
-				var pb2 := _mk_button("구매", _on_buy_part.bind(pid, pprice))
-				pb2.disabled = GameData.money < pprice
-				items_box.add_child(_mk_row(pid, str(pdef.name),
-					"보유 %d개" % GameData.items[pid], pb2, [["coin", pprice]]))
+		if buy_cat == "tool":
+			# 부품(못·경첩)은 잡화점이 아니라 대장간에서 판다
+			_note("도구·부품은 대장간에서 다룬다. 새 물건이 들어오면 이 선반에 놓인다.")
 		if buy_cat in ["", "life"]:
 			# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다
 			_note("— 생활용품 레시피 —")
@@ -573,14 +566,15 @@ func _rebuild() -> void:
 		items_box.add_child(_mk_row("wedding_ring", "청혼 반지",
 			"보유 %d개 · 연인에게 (호감도 100)" % GameData.items["wedding_ring"],
 			rb, [["coin", GameData.RING_PRICE]]))
-		# 부품 — 경첩은 대장간에서만 (제작대 손보기 재료)
-		var hdef: Dictionary = GameData.ITEMS["hinge"]
-		var hprice := int(hdef.sell) * 2
-		var hb2 := _mk_button("구매", _on_buy_part.bind("hinge", hprice))
-		hb2.disabled = GameData.money < hprice
-		items_box.add_child(_mk_row("hinge", str(hdef.name),
-			"보유 %d개 · 제작대 손보기에 쓴다" % GameData.items["hinge"], hb2,
-			[["coin", hprice]]))
+		# 부품 — 못·경첩은 대장간에서만 (집터·침대·제작대 손보기 재료)
+		for pid: String in ["nail", "hinge"]:
+			var pdef: Dictionary = GameData.ITEMS[pid]
+			var pprice := int(pdef.sell) * 2
+			var pb2 := _mk_button("구매", _on_buy_part.bind(pid, pprice))
+			pb2.disabled = GameData.money < pprice
+			items_box.add_child(_mk_row(pid, str(pdef.name),
+				"보유 %d개 · 제작대 재료" % GameData.items[pid], pb2,
+				[["coin", pprice]]))
 		# 대장간 제작: 부위별로 묶어 보여 준다
 		for slot: String in GameData.GEAR_SLOTS:
 			var eq: String = str(GameData.equipped.get(slot, ""))
