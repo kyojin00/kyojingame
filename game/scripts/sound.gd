@@ -32,18 +32,29 @@ func _ready() -> void:
 	AudioServer.add_bus()
 	AudioServer.set_bus_name(2, "SFX")
 
-	for n in SFX_NAMES + BGM_NAMES:
-		var ext := "mp3" if n == "bgm_main" else "wav"
+	# 효과음은 wav (짧아서 그대로 두는 편이 낫다), BGM은 ogg.
+	# BGM을 wav로 두면 47MB인데 ogg로는 6MB다. 게다가 wav는 들여올 때 어차피
+	# 손실 압축(QOA)되므로, ogg 쪽이 용량도 작고 음질도 낫다.
+	for n in SFX_NAMES:
+		streams[n] = load("res://assets/audio/%s.wav" % n)
+	for n in BGM_NAMES:
+		var ext := "mp3" if n == "bgm_main" else "ogg"
 		streams[n] = load("res://assets/audio/%s.%s" % [n, ext])
 	# BGM 루프 설정 (형마다 다르다)
 	for n in BGM_NAMES:
 		var st: AudioStream = streams[n]
-		if st is AudioStreamWAV:
-			st.loop_mode = AudioStreamWAV.LOOP_FORWARD
-			st.loop_begin = 0
-			st.loop_end = st.data.size() / 2  # 16bit mono
-		elif st is AudioStreamMP3:
+		if st is AudioStreamOggVorbis or st is AudioStreamMP3:
 			st.loop = true
+		elif st is AudioStreamWAV:
+			# 혹시 wav를 도로 넣었을 때를 위해 남겨 둔다.
+			# 끝은 **길이(초) x 초당 프레임**으로 잡아야 한다. 예전엔
+			# `data.size() / 2`(16bit니까 2바이트 = 1프레임)로 셌는데, 들여올 때
+			# 압축되면 data가 압축된 바이트라 그 셈이 안 맞는다 — 열 곡이 전부
+			# 5분의 1 지점에서 되감겼다.
+			var w: AudioStreamWAV = st
+			w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			w.loop_begin = 0
+			w.loop_end = int(round(w.get_length() * float(w.mix_rate)))
 
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.bus = "BGM"

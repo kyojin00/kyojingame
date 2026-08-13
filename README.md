@@ -167,4 +167,5 @@ NPC/마을 → 사운드 → 스팀 출시 순서로 진행합니다.
 
 - 폰트: [GNU Unifont](https://unifoundry.com/unifont/) (SIL OFL 1.1) 한글 서브셋
 - 도트 그래픽: 자체 제작 (픽셀 데이터 → PNG 변환 스크립트)
-- 사운드: 자체 제작 (파이썬 칩튠 신디사이저 스크립트로 BGM/효과음 합성)
+- 사운드: 자체 제작 (파이썬 칩튠 신디사이저 스크립트로 BGM/효과음 합성).
+  BGM은 ogg, 효과음은 wav — `game/assets/audio/`

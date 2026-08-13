@@ -1335,6 +1335,27 @@ func _debug_tick() -> void:
 			for bn: String in Sound.BGM_NAMES:
 				if Sound.streams.has(bn) and Sound.streams[bn] != null:
 					loaded += 1
+			# 곡이 **끝까지 가서** 되감기는가. 예전에 wav 루프 끝을
+			# 「data 바이트/2」로 셌는데, 들여올 때 압축되면 그 셈이 안 맞아
+			# 열 곡이 전부 5분의 1 지점에서 되감겼다 (소리만 들어서는 모른다).
+			var loop_bad: Array = []
+			for bn: String in Sound.BGM_NAMES:
+				var s0: AudioStream = Sound.streams.get(bn)
+				if s0 is AudioStreamWAV:
+					var w: AudioStreamWAV = s0
+					var want := int(round(w.get_length() * float(w.mix_rate)))
+					if w.loop_mode == AudioStreamWAV.LOOP_DISABLED \
+							or absf(float(w.loop_end - want)) > float(want) * 0.02:
+						loop_bad.append("%s(%d/%d)" % [bn, w.loop_end, want])
+				elif s0 is AudioStreamOggVorbis:
+					if not (s0 as AudioStreamOggVorbis).loop:
+						loop_bad.append(bn + "(ogg 루프꺼짐)")
+				elif s0 is AudioStreamMP3:
+					if not (s0 as AudioStreamMP3).loop:
+						loop_bad.append(bn + "(mp3 루프꺼짐)")
+				else:
+					loop_bad.append(bn + "(모르는 형식)")
+			print("BGM_LOOP_OK=", loop_bad.is_empty(), " 어긋난 곡=", loop_bad)
 			var save_pos := m.player.position
 			var save_min := GameData.minutes
 			m.player.position = Vector2(74 * m.TILE + 16, 20 * m.TILE + 16)   # 광장
