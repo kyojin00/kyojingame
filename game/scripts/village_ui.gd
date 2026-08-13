@@ -222,9 +222,17 @@ func _talk_to(npc: Node2D) -> void:
 	# 축제날에는 이장이 진행을 맡는다
 	if npc.id == "chief" and GameData.festival_open():
 		choices.insert(0, ["축제 이야기", _open_festival_dialog])
+	# 연화의 서브 퀘스트 — 「대화 끝」 바로 위에 실제 퀘스트 이름으로 뜬다
+	var mom_q: Dictionary = {}
+	if npc.id == "forest_mom":
+		mom_q = _mom_quest_option()
+		if not mom_q.is_empty():
+			choices.insert(choices.size() - 1, [str(mom_q.label), mom_q.cb])
 	m.dialog.open_seq(title, _npc_portrait(npc.id), [
 		{"text": line, "choices": choices},
 	])
+	if not mom_q.is_empty():
+		_attach_quest_bang(str(mom_q.label))
 
 
 func in_greenhouse(t: Vector2i) -> bool:
@@ -940,3 +948,67 @@ func _trash_pickup(t: Vector2i) -> void:
 	m.hud.show_message("쓰레기통을 도로 챙겼다.")
 	m.queue_redraw()
 	m.saveio.save_now()
+
+
+# ---- 숲속 엄마(연화)의 서브 퀘스트 ----
+#
+# 스토리 5를 끝내야 열린다. 솔이에게 줄 요리·음식·재료를 부탁하는 심부름 —
+# 세부 내용은 GameData.MOM_QUESTS 표가 정한다 (표가 비어 있으면 선택지 없음).
+# 표에 줄만 추가하면 받기 -> 모으기 -> 전달 -> 보상까지 여기 코드가 다 굴린다.
+
+func _mom_quest_option() -> Dictionary:
+	var q: Dictionary = GameData.mom_next_quest()
+	if q.is_empty():
+		return {}
+	if GameData.mom_quest == "":
+		return {"label": str(q.name), "cb": _mom_quest_start.bind(str(q.id))}
+	return {"label": str(q.name), "cb": _mom_quest_turnin.bind(str(q.id))}
+
+
+func _mom_quest_start(qid: String) -> void:
+	var q: Dictionary = GameData.mom_next_quest()
+	if q.is_empty() or str(q.id) != qid or GameData.mom_quest != "":
+		return
+	GameData.mom_quest = qid
+	var entries: Array = [{"text": "저... 부탁 하나 드려도 될까요?"}]
+	if str(q.get("ask", "")) != "":
+		entries.append({"text": str(q.ask)})
+	entries.append({"text": "우리 솔이에게 줄 %s %d개가 필요해요.\n구해다 주시면 꼭 사례할게요." \
+		% [GameData.item_display_name(str(q.item)), int(q.qty)]})
+	m.dialog.open_seq("연화", _npc_portrait("forest_mom"), entries, func() -> void:
+		m.hud.quest_toast("연화의 부탁: %s" % str(q.name))
+		m.saveio.save_now())
+
+
+func _mom_quest_turnin(qid: String) -> void:
+	var q: Dictionary = GameData.mom_next_quest()
+	if q.is_empty() or str(q.id) != qid:
+		return
+	var need := int(q.qty)
+	var have: int = GameData.ingredient_count(str(q.item))
+	if have < need:
+		m.dialog.open_seq("연화", _npc_portrait("forest_mom"), [
+			{"text": "%s은(는) 좀 모였나요?\n(진행중: %d/%d)" \
+				% [GameData.item_display_name(str(q.item)), have, need]},
+		])
+		return
+	GameData.consume_ingredient(str(q.item), need)
+	if int(q.get("money", 0)) > 0:
+		GameData.money += int(q.money)
+		GameData.today_earned += int(q.money)
+		m.hud.reward_toast("%dG" % int(q.money), m.tex["icon_coin"])
+	if int(q.get("affinity", 0)) > 0:
+		GameData.affinity["forest_mom"] = int(GameData.affinity["forest_mom"]) \
+			+ int(q.affinity)
+	GameData.mom_quests_done.append(qid)
+	GameData.mom_quest = ""
+	Sound.play_sfx("sfx_heart")
+	m.hud.quest_toast("연화의 부탁 완료: %s" % str(q.name))
+	if Net.is_host():
+		m.netsync._broadcast_stats()
+	m.saveio.save_now()
+	var thanks: Array = [{"text": "정말 고마워요!\n솔이가 얼마나 기뻐할지 몰라요."}]
+	if str(q.get("thanks", "")) != "":
+		thanks.append({"text": str(q.thanks),
+			"portrait": _npc_portrait("forest_mom", true)})
+	m.dialog.open_seq("연화", _npc_portrait("forest_mom", true), thanks)

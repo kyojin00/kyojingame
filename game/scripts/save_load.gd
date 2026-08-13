@@ -67,6 +67,8 @@ func _apply_save(d: Dictionary) -> void:
 	# (숲속의 집 이야기가 시작됐으면) 이사는 끝난 것으로 친다
 	if GameData.move_quest == "" and GameData.forest_quest != "":
 		GameData.move_quest = "done"
+	GameData.mom_quest = str(d.get("mom_quest", ""))
+	GameData.mom_quests_done = (d.get("mom_quests_done", []) as Array)
 	# 숲속의 집 이야기가 생기기 전 세이브: 이미 선물을 주고받던 사이면
 	# (호감도가 쌓여 있으면) 호감도 콘텐츠는 열린 채로 이어 준다
 	var had_aff := false

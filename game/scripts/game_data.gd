@@ -798,6 +798,40 @@ var forest_day := 0          # 무진이 정착한 날 — 다음 날 아침 발
 var affinity_open := false   # 호감도 콘텐츠(하트·선물) 해금 여부
 
 
+# ---- 숲속 엄마(연화)의 서브 퀘스트 시스템 ----
+#
+# 스토리 5(숲속에서 발견한 집)를 끝내야 받을 수 있다.
+# 방향: 연화가 솔이에게 줄 요리·음식·재료를 부탁하는 심부름.
+#
+# 세부 퀘스트는 아직 정하지 않았다 — 정해지면 MOM_QUESTS에 한 줄씩 넣는다:
+#   {"id": "porridge", "name": "솔이의 죽 재료",       # 선택지에 뜨는 실제 이름
+#    "item": "potato", "qty": 3,                       # 필요한 것 (작물/아이템 id)
+#    "money": 300, "affinity": 5,                      # 보상 (돈·연화 호감도)
+#    "ask": "요즘 솔이가 죽이 먹고 싶다네요.",           # (선택) 부탁 대사 한 줄
+#    "thanks": "이걸로 푹 끓여 줘야겠어요."}             # (선택) 감사 대사 한 줄
+# 표가 비어 있으면 선택지가 아예 뜨지 않는다. 앞에서부터 순서대로 하나씩 열린다.
+var MOM_QUESTS: Array = []
+var mom_quest := ""                # 진행 중인 퀘스트 id ("" = 없음)
+var mom_quests_done: Array = []    # 끝낸 퀘스트 id들
+
+
+func mom_quest_open() -> bool:
+	return forest_quest == "done"
+
+
+# 지금 연화가 보여 줄 퀘스트 (진행 중이면 그것, 아니면 다음 것. 없으면 {})
+func mom_next_quest() -> Dictionary:
+	if not mom_quest_open():
+		return {}
+	for q: Dictionary in MOM_QUESTS:
+		if mom_quest != "":
+			if str(q.id) == mom_quest:
+				return q
+		elif str(q.id) not in mom_quests_done:
+			return q
+	return {}
+
+
 func forest_objective_short() -> String:
 	match forest_quest:
 		"arrive":
@@ -2894,6 +2928,8 @@ func reset_all() -> void:
 	move_quest = ""
 	move_day = 0
 	move_house = Vector2i(-999, -999)
+	mom_quest = ""
+	mom_quests_done = []
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -3220,6 +3256,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"affinity_open": affinity_open,
 		"move_quest": move_quest, "move_day": move_day,
 		"move_house": [move_house.x, move_house.y],
+		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

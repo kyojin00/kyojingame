@@ -708,6 +708,40 @@ func _debug_tick() -> void:
 				" 발견담=", found_q, " 이장도모름=", ask_q,
 				" 숲속의집=", house_ok, " 연화=", mom_ok, " 솔이=", girl_ok,
 				" 만남=", meet, " 완료+호감도해금=", done_ok)
+			# ---- 연화의 서브 퀘스트 시스템 (표 주도 — 임시 퀘스트로 흐름만 검증) ----
+			GameData.MOM_QUESTS = [{"id": "_test", "name": "솔이의 감자죽 재료",
+				"item": "weed", "qty": 3, "money": 120, "affinity": 4}]
+			# 스토리 5 완료 전에는 잠긴다
+			var keep_fq: String = GameData.forest_quest
+			GameData.forest_quest = "visit"
+			var locked_before: bool = GameData.mom_next_quest().is_empty()
+			GameData.forest_quest = keep_fq            # "done"으로 복귀
+			var offered: bool = not GameData.mom_next_quest().is_empty() \
+				and not m.village._mom_quest_option().is_empty()
+			m.village._mom_quest_start("_test")
+			var accepted: bool = GameData.mom_quest == "_test" and m.dialog.visible
+			m.dialog.close()
+			GameData.items["weed"] = 1                 # 모자라면 진행 중 안내만
+			m.village._mom_quest_turnin("_test")
+			var still: bool = GameData.mom_quest == "_test"
+			m.dialog.close()
+			GameData.items["weed"] = 3
+			var money_m: int = GameData.money
+			var aff_m := int(GameData.affinity["forest_mom"])
+			m.village._mom_quest_turnin("_test")
+			var served: bool = GameData.mom_quest == "" \
+				and "_test" in GameData.mom_quests_done \
+				and GameData.money == money_m + 120 \
+				and int(GameData.affinity["forest_mom"]) == aff_m + 4 \
+				and int(GameData.items["weed"]) == 0
+			var no_more: bool = GameData.mom_next_quest().is_empty()   # 표를 다 비웠다
+			m.dialog.close()
+			GameData.MOM_QUESTS = []                   # 임시 표 정리
+			GameData.mom_quests_done.erase("_test")
+			print("MOMQUEST_OK=", locked_before and offered and accepted and still
+				and served and no_more,
+				" 해금전잠금=", locked_before, " 제안=", offered, " 수락=", accepted,
+				" 진행중=", still, " 납품보상=", served, " 표소진=", no_more)
 		338:
 			# 퀘스트 5 재현: 바위벽 앞까지 실제 이동 판정으로 붙은 뒤 E
 			var rx := 30
