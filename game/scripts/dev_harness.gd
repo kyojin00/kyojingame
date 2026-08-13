@@ -768,6 +768,34 @@ func _debug_tick() -> void:
 					and not GameData.weather_wet(GameData.WEATHER_FOG)
 					and not GameData.weather_wet(GameData.WEATHER_STAR),
 				" harsh(안개)=", GameData.weather_harsh(GameData.WEATHER_FOG))
+		240:
+			# 휘두르기 네 위상을 한 장씩 찍는다. 도구가 **주먹에 붙어** 따라가는지,
+			# 도트가 위상마다 제대로 바뀌는지는 수치로는 안 보이고 그림을 봐야 한다.
+			# (주먹 자리는 player.gd의 SWING_HAND_DOT에 손으로 적어 넣은 값이라
+			#  그림을 다시 뽑으면 여기서 어긋난 게 드러난다)
+			m.player.position = Vector2(29 * m.TILE + 16, 40 * m.TILE + 16)
+			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
+			m.toolwork.set_tool("axe")
+			_swing_pose(0)
+		# 위상마다 **두 프레임** 붙들었다가 찍는다. 한 프레임만 세우면
+		# 그림이 그려지기 전에 다음 위상으로 넘어가 한 칸씩 밀려 찍힌다
+		# (플레이어의 _process와 이 tick 중 어느 쪽이 먼저인지에 달렸다).
+		241: _swing_pose(0)
+		242:
+			_save_shot("_swing_p0.png")
+			_swing_pose(1)
+		243: _swing_pose(1)
+		244:
+			_save_shot("_swing_p1.png")
+			_swing_pose(2)
+		245: _swing_pose(2)
+		246:
+			_save_shot("_swing_p2.png")
+			_swing_pose(3)
+		247: _swing_pose(3)
+		248:
+			_save_shot("_swing_p3.png")
+			m.player.swing_t = 0.0
 		370:
 			# 캐기 모션: 휘두르기 -> (0.15초 뒤) 파편 + 대상 흔들림
 			m.player.position = Vector2(29 * m.TILE + 16, 40 * m.TILE + 16)
@@ -876,13 +904,30 @@ func _debug_tick() -> void:
 					and absf(sw_start) < 0.01 and absf(sw_end) < 0.01,
 				" 시작=", "%.2f" % sw_start, " 다감음=", "%.2f" % sw_wind,
 				" 타격=", "%.2f" % sw_hit, " 끝=", "%.2f" % sw_end)
-			# 상·하체를 갈라 그린다 — 다리는 붙박이(각 0), 상체만 돈다
-			print("SWING_SPLIT_OK=", m.player.upper_sprite.visible
-					and m.player.sprite.region_enabled
-					and absf(m.player.upper_sprite.rotation) > 0.05
-					and is_equal_approx(m.player.sprite.rotation, 0.0),
-				" 상체각=", "%.2f" % m.player.upper_sprite.rotation,
-				" 다리각=", "%.2f" % m.player.sprite.rotation)
+			# 자세는 둘 중 **하나로만** 만든다.
+			#   도트가 있으면 그림이 자세를 쥐고 몸은 안 가른다
+			#   도트가 없으면 상·하체를 갈라 상체만 돌린다 (다리는 각 0)
+			# 둘 다 하면 허리가 두 번 접히고, 자른 자리가 그림의 팔을 가로지른다.
+			var dot: String = m.player._swing_frame(m.player._swing_key())
+			var split_ok: bool = (m.player.upper_sprite.visible
+				and m.player.sprite.region_enabled
+				and absf(m.player.upper_sprite.rotation) > 0.05
+				and is_equal_approx(m.player.sprite.rotation, 0.0))
+			print("SWING_SPLIT_OK=", split_ok != (dot != ""),
+				" 도트=", dot, " 갈라그림=", split_ok,
+				" 상체각=", "%.2f" % m.player.upper_sprite.rotation)
+			# 위상은 진행도를 따라 0->1->2->3으로 **한 번씩만** 지나야 한다.
+			# swing_c로 가르면 감을 때와 되돌아올 때가 같은 값을 지나서
+			# 한 위상이 두 번 나온다 (팔이 갔다가 되짚어 오는 것처럼 보인다).
+			var seq: Array = []
+			var keep_t: float = m.player.swing_t
+			for k in 40:
+				m.player.swing_t = m.player.swing_len * (1.0 - float(k) / 39.0)
+				var ph: int = m.player.swing_phase()
+				if seq.is_empty() or seq[-1] != ph:
+					seq.append(ph)
+			m.player.swing_t = keep_t
+			print("SWING_PHASE_OK=", seq == [0, 1, 2, 3], " 위상=", seq)
 			_save_shot("_swing.png")
 		270:
 			# 나무 쓰러지는 모션.
@@ -1671,6 +1716,24 @@ func _send_click(world_pos: Vector2) -> void:
 	# 캔버스 변환은 main(Node2D)의 것이다 — 하네스는 그냥 Node라 자기 것이 없다
 	ev.position = get_viewport().get_screen_transform() * (m.get_canvas_transform() * world_pos)
 	Input.parse_input_event(ev)
+
+
+# 휘두르기를 원하는 위상에 세워 둔다 (오른쪽을 보고 도끼).
+#
+# 동작 길이를 **아주 길게** 늘여 놓고 그 안의 비율로 세운다. 0.34초짜리
+# 그대로 두면 헤드리스에서 한 프레임이 0.1초씩 걸릴 때 세워 둔 위상이
+# 그려지기도 전에 지나가 버린다 (실제로 한 칸씩 밀려 찍혔다).
+# 위상 경계는 swing_len이 아니라 HIT_AT/SWING_TIME으로 잡히므로 안 흔들린다.
+func _swing_pose(phase: int) -> void:
+	const MID := [0.075, 0.30, 0.55, 0.85]
+	const HOLD := 200.0
+	m.player.dir = "right"
+	m.player.start_swing("axe", Vector2.RIGHT, m.SWING_TIME)
+	m.player.swing_len = HOLD
+	m.player.swing_t = HOLD * (1.0 - MID[phase])
+	m.player._swing_visual()
+	if m.player.swing_phase() != phase:
+		print("SWING_POSE_MISS: 노린 위상=", phase, " 실제=", m.player.swing_phase())
 
 
 func _save_shot(suffix: String) -> void:

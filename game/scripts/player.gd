@@ -64,20 +64,24 @@ var horse_sprite: Sprite2D
 # **내리치는 정점(+1)을 main.HIT_AT에 맞춰 둔다.** 예전에는 정점이 0.17초인데
 # 판정은 0.15초에 나서, 도끼가 아직 내려오는 중에 나무가 맞았다.
 #
-# ---- 휘두르기 도트가 생기면 ----
+# ---- 휘두르기 도트 ----
 #
-# `assets/ref/new_boy/make_sprites.js`의 SETS에 swing 세트를 추가해
-# `new_boy_<방향>_swing_0..2`를 뽑고, main.TEXTURE_NAMES에 이름을 넣으면 끝이다.
-# `_swing_frame`이 그림이 있는지 보고 알아서 갈아끼우고, 몸 회전은
-# SWING_LEAN_DOT까지 줄어든다 (도트가 이미 자세를 가지고 있으니 덜 굽혀야 한다).
+# 남자 캐릭터는 `assets/ref/new_boy3/`에서 방향당 네 장을 뽑아 두었다
+# (`new_boy_<방향>_swing_0..3` = 감기 시작 · 다 감음 · 내리침 · 되돌아옴).
+# 여자 캐릭터는 아직 없어서 `_swing_frame`이 ""를 돌려주고, 그때는 아래
+# 몸통 회전으로 대신한다. 도트를 뽑아 이름만 맞추면 그날부터 켜진다.
+#
+# 도트가 있으면 **몸을 가르지 않는다**. 그림이 이미 굽힌 자세라 거기에
+# 상체 회전을 또 얹으면 두 번 굽는다.
 const SWING_WAIST := 136        # 상·하체를 자르는 텍스처 행 (주먹 아래 · 반바지 한가운데)
 const SWING_OVERLAP := 9        # 상체를 이만큼 더 아래까지 그린다 (자른 자국을 덮는다)
 const SWING_LEAN := 0.34        # 상체가 감겼다 펴지는 최대 각(라디안)
-const SWING_LEAN_DOT := 0.14    # 휘두르기 도트가 있을 때 (도트가 자세를 맡는다)
+const SWING_LEAN_DOT := 0.05    # 휘두르기 도트가 있을 때 (도트가 자세를 맡는다)
 const SWING_SHIFT := 5.0        # 내리치는 쪽으로 몸이 쏠리는 거리(px)
 const SWING_SQUASH := 0.06      # 닿는 순간 몸이 눌리는 정도
 const SWING_HOLD := 0.10        # 히트스톱: 정점에서 머무는 구간 (진행도 0~1 기준)
 const SWING_TRAIL := 6          # 도구 잔상으로 남기는 자취 수
+const SWING_FRAMES := 4         # 방향당 휘두르기 도트 장수
 
 # 방향마다 손이 있는 자리와 휘두르는 폭이 다르다.
 #   hand   손잡이 끝이 오는 자리 (발밑 기준 node 좌표. x는 sign_x로 뒤집힌다)
@@ -86,20 +90,32 @@ const SWING_TRAIL := 6          # 도구 잔상으로 남기는 자취 수
 #   arc    도구가 그리는 호 전체(라디안)
 #   tilt   상체를 굽히는 정도 (뒷모습은 팔이 안 보여 조금 덜 굽힌다)
 #   shift  무게가 쏠리는 방향
+#   spin   도구가 도는 쪽. 앞·옆은 왼쪽에서 감아 오른쪽으로 내리치는데
+#          **뒷모습만 반대**다 — 등을 보이고 몸을 비틀어 치는 그림이라
+#          주먹이 오른쪽 위에서 왼쪽 아래로 간다 (도트를 재 보면 그렇다).
 const SWING_POSE := {
 	"down": {"hand": Vector2(10, -36), "mid": 0.85, "arc": 2.6, "tilt": 1.0,
-		"shift": Vector2(1, 3)},
+		"shift": Vector2(1, 3), "spin": 1.0},
 	"up": {"hand": Vector2(-9, -40), "mid": 0.80, "arc": 2.4, "tilt": 0.75,
-		"shift": Vector2(1, -3)},
+		"shift": Vector2(1, -3), "spin": -1.0},
 	"side": {"hand": Vector2(12, -38), "mid": 0.95, "arc": 2.9, "tilt": 1.0,
-		"shift": Vector2(5, 1)},
+		"shift": Vector2(5, 1), "spin": 1.0},
 }
 # 휘두르기 도트가 있을 때, 위상마다 **주먹이 실제로 가 있는 자리**.
-# 도구 손잡이 끝을 여기 얹는다. 값은 make_swing_src.js가 찍어 준다 —
-# 팔을 돌린 각도에서 주먹 중심을 계산한 것이라 그림과 어긋나지 않는다.
+# 도구 손잡이 끝을 여기 얹는다. node 좌표 = 그림이 화면에 나온 크기 기준이라
+# 도트 좌표의 절반이다 (스프라이트를 0.5배로 그린다).
+#
+#   도트에서 읽은 값 (발밑 가운데가 원점) -> 여기 적는 값
+#   node.x = 도트.x / 2 ,  node.y = (도트.y + 2) / 2      (offset -64,-188 · 0.5배)
+#
+# 값은 `assets/ref/new_boy3/`의 도트에 눈금을 얹어 놓고 주먹 한가운데를 읽었다.
+# **그림을 다시 뽑으면 여기도 다시 읽어야 한다** — 안 맞으면 도구가 손에서 뜬다.
 # 도트가 없는 방향은 여기에도 없고, SWING_POSE의 이어지는 식을 쓴다.
 const SWING_HAND_DOT := {
-	"side": [Vector2(-19, -57), Vector2(8, -50), Vector2(6, -33)],
+	# 감기 시작 · 다 감음(머리 위) · 내리침 · 되돌아옴
+	"side": [Vector2(-18, -57), Vector2(-9, -86), Vector2(16, -16), Vector2(19, -37)],
+	"down": [Vector2(-18, -57), Vector2(-9, -86), Vector2(16, -34), Vector2(16, -35)],
+	"up": [Vector2(19, -56), Vector2(10, -87), Vector2(-19, -17), Vector2(-16, -34)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
@@ -110,6 +126,15 @@ const TOOL_ICONS := {
 # (자루 오른쪽 아래 - 날 왼쪽 위). 그대로 쓰면 오른쪽을 보고 휘두를 때
 # 날이 등 뒤를 향한다. 가방 아이콘은 그대로 두고 **휘두를 때만** 뒤집는다.
 const TOOL_MIRROR := ["axe"]
+# 도구를 **쥐는 자리** (아이콘 그림 안의 픽셀). 여기를 축으로 돌리고,
+# 여기가 주먹에 온다. 32x32 칸의 한가운데 아래(16,30)로 두면 자루 끝이
+# 모서리에 그려진 도구는 손에서 10px 넘게 떠 보인다 — 도끼는 자루가
+# 오른쪽 아래, 곡괭이·호미는 왼쪽 아래에 있다.
+const TOOL_GRIP := {
+	"icon_axe": Vector2(25, 30), "icon_axe_stone": Vector2(26, 30),
+	"icon_pickaxe": Vector2(3, 30), "icon_hoe": Vector2(4, 23),
+	"icon_water": Vector2(13, 23),
+}
 
 var _was_riding := false        # 그림자 크기를 다시 그릴 때만 쓴다
 var swing_t := 0.0              # 남은 시간
@@ -121,6 +146,7 @@ var _base_offset := Vector2.ZERO # scenes/player.tscn이 정한 스프라이트 
 var _split := false             # 지금 상·하체를 갈라 그리는 중인가
 var _trail: Array = []          # 도구 끝이 지나간 자취 (node 좌표)
 var _tool_mirror := false       # 지금 든 도구 그림을 좌우로 뒤집어야 하는가
+var _tool_grip := Vector2(16, 30)  # 지금 든 도구를 쥐는 자리 (아이콘 안 픽셀)
 
 
 func _ready() -> void:
@@ -141,7 +167,8 @@ func _ready() -> void:
 	add_child(upper_sprite)
 	move_child(upper_sprite, sprite.get_index() + 1)   # 다리 위에 겹친다
 
-	# 손에 들리는 도구 (휘두를 때만 보인다). 손잡이 끝을 축으로 돈다.
+	# 손에 들리는 도구 (휘두를 때만 보인다). 쥐는 자리를 축으로 돈다
+	# (offset은 도구·좌우뒤집기에 따라 _swing_visual이 다시 잡는다).
 	tool_sprite = Sprite2D.new()
 	tool_sprite.centered = false
 	tool_sprite.offset = Vector2(-16, -30)
@@ -161,6 +188,7 @@ func start_swing(tool_id: String, face: Vector2, length: float) -> void:
 	if not main.tex.has(icon):
 		return
 	tool_sprite.texture = main.tex[icon]
+	_tool_grip = TOOL_GRIP.get(icon, Vector2(16, 30))
 	_tool_mirror = TOOL_MIRROR.has(tool_id)
 	swing_face = face if face != Vector2.ZERO else Vector2.DOWN
 	swing_len = maxf(0.14, length)
@@ -211,21 +239,33 @@ func _swing_frame(key: String) -> String:
 	var base := GameData.swing_tex_base(key)
 	if base == "":
 		return ""
-	# **세 장이 다 있어야 켠다.** 한 장만 넣으면 그 위상에서만 도트가 되고
+	# **네 장이 다 있어야 켠다.** 한 장만 넣으면 그 위상에서만 도트가 되고
 	# 나머지 위상은 서기 자세로 튀어, 휘두르다 말고 깜빡인다.
 	# (손으로 한 장씩 그려 넣을 때 실제로 겪는다)
-	for i in 3:
+	for i in SWING_FRAMES:
 		if not main.tex.has("%s_%d" % [base, i]):
 			return ""
 	return "%s_%d" % [base, swing_phase()]
 
 
-# 지금 위상 (0=다 감음 / 1=내리치는 중 / 2=다 내리침)
+# 지금 위상 (0=감기 시작 / 1=다 감음 / 2=내리침 / 3=되돌아옴).
+#
+# 시간(진행도)으로 가른다. `swing_c`로 가르면 감을 때와 되돌아올 때가 같은
+# 값을 지나서 한 위상이 두 번 나온다 — 팔이 갔다가 되짚어 오는 것처럼 보인다.
+#
+# 내리치는 그림(2)은 **판정 순간부터 남은 시간의 절반 넘게** 붙들어 둔다.
+# 히트스톱(0.03초)만큼만 보이면 두 프레임 만에 지나가서, 정작 제일 중요한
+# 「맞은 자세」가 눈에 안 남는다.
 func swing_phase() -> int:
-	var c := swing_c()
-	if c > 0.55:
-		return 2
-	return 1 if c > -0.4 else 0
+	if swing_len <= 0.0:
+		return 0
+	var p: float = 1.0 - swing_t / swing_len
+	var hit := _hit_p()
+	if p < hit * 0.34:
+		return 0
+	if p < hit:
+		return 1
+	return 2 if p < hit + (1.0 - hit) * 0.55 else 3
 
 
 # 휘두르는 동안 쓰는 방향 딱지 ("down"/"up"/"side")
@@ -274,7 +314,9 @@ func _swing_visual() -> void:
 
 	# 몸: 허리를 축으로 상체만 감았다 내리친다. 다리는 그 자리에서 버틴다.
 	# 말 위에서는 가르지 않는다 — 안장에 앉히느라 이미 몸을 잘라 놨다.
-	var can_split: bool = not GameData.riding and sprite.texture != null
+	# **도트가 있으면 아예 안 가른다** — 그림이 이미 굽힌 자세라 또 굽히면
+	# 허리가 두 번 접히고, 자른 자리가 그림의 팔을 가로지른다.
+	var can_split: bool = dot == "" and not GameData.riding and sprite.texture != null
 	if can_split:
 		var tw: float = sprite.texture.get_width()
 		var th: float = sprite.texture.get_height()
@@ -314,10 +356,18 @@ func _swing_visual() -> void:
 
 	# 도구: 손 높이에서 호를 그린다
 	var hand: Vector2 = pose.hand
+	var spin: float = sign_x * float(pose.spin)
 	tool_sprite.visible = true
-	tool_sprite.flip_h = (sign_x < 0.0) != _tool_mirror
+	tool_sprite.flip_h = (spin < 0.0) != _tool_mirror
+	# 쥐는 자리를 node 원점(=주먹)에 맞춘다. 좌우로 뒤집으면 그림 안의 x도
+	# 뒤집히므로 offset을 그만큼 반대로 잡아야 축이 자루 끝에 그대로 있는다.
+	if tool_sprite.texture != null:
+		var tw := float(tool_sprite.texture.get_width())
+		tool_sprite.offset = Vector2(
+			-(tw - 1.0 - _tool_grip.x) if tool_sprite.flip_h else -_tool_grip.x,
+			-_tool_grip.y)
 	# 감을 때는 어깨 뒤로 세우고(c=-1), 내리칠 때는 발치까지 넘긴다(c=+1)
-	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * sign_x
+	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * spin
 	if dot != "" and SWING_HAND_DOT.has(key):
 		# 도트가 자세를 쥐고 있다 — 도구는 그 프레임의 주먹 자리에 얹는다
 		hand = SWING_HAND_DOT[key][swing_phase()]

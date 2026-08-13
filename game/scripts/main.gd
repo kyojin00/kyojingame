@@ -644,13 +644,14 @@ func _load_textures() -> void:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
 	for id: String in GameData.FORAGE_IDS:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
-	# 휘두르기 도트는 **있으면 쓴다**. 아직 안 뽑았으면 없는 채로 둔다 —
-	# player.gd가 몸통을 굽혀 대신한다. TEXTURE_NAMES에 넣으면 없을 때 터지므로
-	# 여기서만 따로 챙긴다. 그림을 sprites/에 떨어뜨리면 그날부터 켜진다.
-	# (뽑는 법은 assets/ref/new_boy/make_sprites.js 위쪽 주석)
+	# 휘두르기 도트는 **있으면 쓴다**. 남자는 new_boy3/에서 뽑아 뒀고 여자는
+	# 아직 없다 — 없는 쪽은 player.gd가 몸통을 굽혀 대신한다. TEXTURE_NAMES에
+	# 넣으면 없을 때 터지므로 여기서만 따로 챙긴다. 그림을 sprites/에
+	# 떨어뜨리면 그날부터 켜진다.
+	# (뽑는 법은 assets/ref/new_boy3/make_sprites.js 위쪽 주석)
 	for g: String in ["new_boy", "player_f"]:
 		for d: String in ["down", "up", "side"]:
-			for i in 3:
+			for i in 4:   # player.gd의 SWING_FRAMES와 같은 수
 				var sn := "%s_%s_swing_%d" % [g, d, i]
 				var sp := "res://assets/sprites/%s.png" % sn
 				if ResourceLoader.exists(sp):
