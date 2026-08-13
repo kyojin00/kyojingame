@@ -219,7 +219,7 @@ const TEXTURE_NAMES := [
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
-	"icon_spear", "icon_sword", "arrow", "desk",
+	"icon_spear", "icon_sword", "arrow", "desk", "recipe",
 	# 대장간 장비 (무기·방어구·장신구)
 	"gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
