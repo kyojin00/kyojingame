@@ -286,7 +286,9 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     g.rect(c - 4 + dx, HIP_Y + sq, c + 5 + dx, HIP_Y + 2 + sq, 'p')
     g.hline(c - 4 + dx, c + 5 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
     g.px(c + dx, HIP_Y + 2 + sq, 'P')
-    # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다
+    # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다.
+    # 옆에서 본 다리는 앞뒤 두께가 몸통과 비슷해야 한다 — 7칸 폭
+    # (몸통 10칸). 가늘게 그리면 상자 밑에 젓가락을 꽂은 꼴이 된다.
     for off, shade in ((-stride, True), (stride, False)):
         lift = 2 if off < 0 else 0             # 뒤로 간 다리는 뒤꿈치가 들린다
         pc, kc = ('P', 'K') if shade else ('p', 'k')
@@ -295,12 +297,14 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
             t = (yy - (HIP_Y + 2 + sq)) / (GROUND - HIP_Y - 2 - sq)  # 엉덩이 0 → 발 1
             x = 15 + round(off * t + dx * (1 - t)) + lean
             cc = pc if yy <= bot - 4 else kc
-            g.rect(x - 2, yy, x + 2, yy, cc)
+            g.rect(x - 3, yy, x + 3, yy, cc)
+            if not shade and yy <= bot - 4:
+                g.px(x - 3, yy, 'P')           # 가까운 다리 뒤쪽 그늘 선
         x = 15 + off + lean
         if off > 0:
-            g.px(x + 3, bot, kc)               # 앞으로 디딘 발끝
+            g.px(x + 4, bot, kc)               # 앞으로 디딘 발끝
         elif off < 0:
-            g.px(x - 3, bot, kc)               # 뒤로 차는 뒤꿈치
+            g.px(x - 4, bot, kc)               # 뒤로 차는 뒤꿈치
 
 
 def torso_up(g, bob, swing, dx=0, skip=None):
