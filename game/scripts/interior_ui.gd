@@ -490,24 +490,20 @@ func _draw_room() -> void:
 		y += h
 		row += 1
 
-	# 제작대 — 단계가 오를수록 결이 곱고 공구가 는다
-	var desk_top := Color(0.52, 0.36, 0.2) if GameData.desk_lv == 0 \
-		else (Color(0.6, 0.43, 0.24) if GameData.desk_lv == 1 else Color(0.66, 0.5, 0.3))
-	canvas.draw_rect(Rect2(DESK.position.x + 6, DESK.position.y + 30, 8, DESK.size.y - 30),
-		Color(0.4, 0.27, 0.15))
-	canvas.draw_rect(Rect2(DESK.end.x - 14, DESK.position.y + 30, 8, DESK.size.y - 30),
-		Color(0.4, 0.27, 0.15))
-	canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y + 18, DESK.size.x, 14), desk_top)
-	canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y + 18, DESK.size.x, 3),
-		desk_top.lightened(0.25))
+	# 제작대 — 유저가 그린 책상 도트(desk.png). 밑변을 DESK 칸 바닥선에 맞춘다
+	var desk_tex: Texture2D = main.tex["desk"]
+	var desk_h := DESK.size.x * desk_tex.get_height() / float(desk_tex.get_width())
+	var desk_y := DESK.end.y - desk_h
+	canvas.draw_texture_rect(desk_tex,
+		Rect2(DESK.position.x, desk_y, DESK.size.x, desk_h), false)
 	# 위에 놓인 것들: 망치는 늘, 톱은 1단계부터, 등불은 2단계부터
-	canvas.draw_rect(Rect2(DESK.position.x + 14, DESK.position.y + 6, 6, 14), Color(0.35, 0.35, 0.4))
-	canvas.draw_rect(Rect2(DESK.position.x + 10, DESK.position.y + 4, 14, 6), Color(0.5, 0.5, 0.56))
+	canvas.draw_rect(Rect2(DESK.position.x + 22, desk_y + 6, 6, 14), Color(0.35, 0.35, 0.4))
+	canvas.draw_rect(Rect2(DESK.position.x + 18, desk_y + 4, 14, 6), Color(0.5, 0.5, 0.56))
 	if GameData.desk_lv >= 1:
-		canvas.draw_rect(Rect2(DESK.position.x + 44, DESK.position.y + 8, 26, 4), Color(0.72, 0.72, 0.78))
-		canvas.draw_rect(Rect2(DESK.position.x + 40, DESK.position.y + 6, 6, 10), Color(0.45, 0.3, 0.18))
+		canvas.draw_rect(Rect2(DESK.position.x + 48, desk_y + 12, 26, 4), Color(0.72, 0.72, 0.78))
+		canvas.draw_rect(Rect2(DESK.position.x + 44, desk_y + 10, 6, 10), Color(0.45, 0.3, 0.18))
 	if GameData.desk_lv >= 2:
-		canvas.draw_rect(Rect2(DESK.end.x - 26, DESK.position.y + 2, 10, 16), Color(0.9, 0.75, 0.4))
+		canvas.draw_rect(Rect2(DESK.end.x - 30, desk_y + 4, 10, 16), Color(0.9, 0.75, 0.4))
 	# 만드는 중이면 위에 진행 막대가 뜬다
 	if not GameData.desk_queue.is_empty():
 		var j: Dictionary = GameData.desk_queue[0]
