@@ -312,6 +312,38 @@ func _rebuild() -> void:
 			_money_icon.texture = main.tex["icon_coin"]
 
 	if tab == "buy":
+		if buy_cat == "stall":
+			# 해변 노점: 낚시용품 + 잡화점 선반에는 없는 레시피
+			_note("— 낚시용품 —")
+			var bt := _mk_button("구매", _on_buy_bait)
+			bt.disabled = GameData.money < GameData.BAIT_PRICE
+			items_box.add_child(_mk_row("bait", "미끼",
+				"보유 %d개 · 낚싯대를 던질 때 하나씩 쓴다 — 입질이 훨씬 빨라진다"
+				% int(GameData.items.get("bait", 0)), bt, [["coin", GameData.BAIT_PRICE]]))
+			_note("— 노점 한정 레시피 (집 조리대에서 만든다) —")
+			for rid: String in GameData.STALL_RECIPE_IDS:
+				var rname := str(GameData.ITEMS[rid].name)
+				if not GameData.recipe_locked(rid):
+					items_box.add_child(_mk_row(rid, "%s 레시피 (배움)" % rname,
+						"재료를 모아 집 조리대에서 만들자"))
+					continue
+				var rprice := int(GameData.STALL_RECIPES[rid])
+				var rb2 := _mk_button("구매", _on_buy_dish_recipe.bind(rid, rprice))
+				rb2.disabled = GameData.money < rprice
+				items_box.add_child(_mk_row(rid, "%s 레시피" % rname,
+					"체력 +%d · 팔면 %dG" % [int(GameData.RECIPES[rid].energy),
+						int(GameData.ITEMS[rid].sell)], rb2, [["coin", rprice]]))
+			_note("— 노점 한정 생활용품 레시피 —")
+			if "trash_bin" in GameData.recipes_unlocked:
+				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피 (배움)",
+					"집 책상에서 만든다 — 목재 5 · 금속 고리 2"))
+			else:
+				var tcp := _mk_button("구매", _on_buy_recipe.bind("trash_bin", 400))
+				tcp.disabled = GameData.money < 400
+				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피",
+					"집에 놓는 튼튼한 쓰레기통 · 재료: 목재 5 · 금속 고리 2",
+					tcp, [["coin", 400]]))
+			_note("민지가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
 		if buy_cat in ["", "seed"]:
 			for id in GameData.CROP_IDS:
 				var def: Dictionary = GameData.CROPS[id]
@@ -340,12 +372,20 @@ func _rebuild() -> void:
 			_note("— 생활용품 레시피 —")
 			if "broom" in GameData.recipes_unlocked:
 				items_box.add_child(_mk_row("broom", "빗자루 레시피 (배움)",
-					"집 책상에서 만든다 — 잡초 5 · 목재 3"))
+					"집 책상에서 만든다 — 잡초 1"))
 			else:
 				var rcp := _mk_button("구매", _on_buy_recipe.bind("broom", 300))
 				rcp.disabled = GameData.money < 300
 				items_box.add_child(_mk_row("broom", "빗자루 레시피",
-					"집 안의 먼지를 쓸어 낸다 · 재료: 잡초 5 · 목재 3", rcp, [["coin", 300]]))
+					"집 안의 먼지를 쓸어 낸다 · 재료: 잡초 1", rcp, [["coin", 300]]))
+			if "flower_pot" in GameData.recipes_unlocked:
+				items_box.add_child(_mk_row("flower_pot", "화분 레시피 (배움)",
+					"집 책상에서 만든다 — 잡초 5"))
+			else:
+				var pcp := _mk_button("구매", _on_buy_recipe.bind("flower_pot", 200))
+				pcp.disabled = GameData.money < 200
+				items_box.add_child(_mk_row("flower_pot", "화분 레시피",
+					"집을 꾸미는 화분 · 재료: 잡초 5", pcp, [["coin", 200]]))
 		if buy_cat in ["", "misc"]:
 			# 마음을 전하는 것들
 			_note("— 마음을 전하는 것 —")
@@ -657,6 +697,30 @@ func _on_buy_part(item_id: String, price: int) -> void:
 	GameData.items[item_id] += 1
 	GameData.discover(item_id)
 	Sound.play_sfx("sfx_coin")
+	_rebuild()
+
+
+# 노점 낚시용품: 미끼 하나 (던질 때 자동으로 쓴다)
+func _on_buy_bait() -> void:
+	if GameData.money < GameData.BAIT_PRICE:
+		return
+	GameData.money -= GameData.BAIT_PRICE
+	GameData.today_spent += GameData.BAIT_PRICE
+	GameData.items["bait"] = int(GameData.items.get("bait", 0)) + 1
+	GameData.discover("bait")
+	Sound.play_sfx("sfx_coin")
+	_rebuild()
+
+
+# 노점 한정 요리 레시피 — 사면 집 조리대의 잠긴 칸이 열린다
+func _on_buy_dish_recipe(id: String, price: int) -> void:
+	if GameData.money < price or not GameData.recipe_locked(id):
+		return
+	GameData.money -= price
+	GameData.today_spent += price
+	GameData.recipes_unlocked.append(id)
+	Sound.play_sfx("sfx_coin")
+	main.hud.quest_toast("%s 레시피를 배웠다" % GameData.ITEMS[id].name)
 	_rebuild()
 
 

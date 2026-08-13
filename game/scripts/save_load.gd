@@ -54,10 +54,21 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.fisher_quest = str(d.get("fisher_quest", ""))
 	GameData.fisher_choice = int(d.get("fisher_choice", 0))
 	GameData.sea_open = bool(d.get("sea_open", false))
+	GameData.merchant_errand = str(d.get("merchant_errand", ""))
+	GameData.stall_hours = (d.get("stall_hours", []) as Array)
+	# 노점은 다 지었는데 오늘 방문 시각이 없다 (옛 세이브/자정 전 저장) — 새로 뽑는다
+	if GameData.merchant_errand == "done" and GameData.stall_hours.is_empty():
+		GameData.roll_stall_hours()
 	# 스토리 2 재배열 전 세이브: 낚시꾼을 끝냈으면 완료로, 아니면 낚시꾼
 	# 대기로 이어 준다 (옛 세이브는 마을이 이미 다 서 있다)
 	GameData.story2_phase = str(d.get("story2_phase",
 		"done" if str(d.get("fisher_quest", "")) == "done" else "fisher"))
+	# 무건물 시작 버그(reset_all 잔재가 ALL을 다시 채우던 시절) 세이브 교정:
+	# 스토리가 거기까지 안 갔으면 건물이 서 있을 수 없다
+	if GameData.story_phase != "done" or GameData.story2_phase == "":
+		GameData.village_built = []
+	elif GameData.story2_phase == "shop":
+		GameData.village_built.erase("general")   # 상점은 퀘스트로 지어야 한다
 	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
 	# 발견한 것으로 친다 — 쓰던 부엌이 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",
@@ -143,6 +154,11 @@ func _apply_save(d: Dictionary) -> void:
 				furn.y = float(furn.y) * 1.5
 	for k in d.get("recipes_cooked", {}):
 		GameData.recipes_cooked[k] = int(d.recipes_cooked[k])
+	# 노점 한정 레시피가 생기기 전 세이브: 이미 만들어 본 요리는 아는 것으로 친다
+	for rid: String in GameData.STALL_RECIPE_IDS:
+		if int(GameData.recipes_cooked.get(rid, 0)) > 0 \
+				and rid not in GameData.recipes_unlocked:
+			GameData.recipes_unlocked.append(rid)
 	GameData.owned_pets = d.get("owned_pets", [])
 	GameData.active_pet = str(d.get("active_pet", ""))
 	for k in d.get("forage_caught", {}):

@@ -210,14 +210,18 @@ func interact() -> void:
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
 			var got := 1
-			if fid in ["forage_shell", "forage_coral"]:
+			if fid in m.BEACH_FORAGE:
 				got = GameData.beach_pick_count()   # 해변 채집 레벨: 한 번에 더 줍는다
 				m.toolwork.gain_skill("beach", 6.0)
 			else:
 				m.toolwork.gain_skill("forest", 3.0)
+			var first_find: bool = not GameData.discovered.has(fid)
 			GameData.items[fid] += got
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
 			GameData.discover(fid)
+			# 산호 조각·고대 조각: 처음 주우면 숨겨진 이야기/레시피가 열린다
+			if first_find and fid in ["forage_coral", "forage_relic"]:
+				m.story.hidden_beach_find(fid)
 			Sound.play_sfx("sfx_harvest")
 			m.renderer.spawn_particles(t, "sparkle")
 			m.hud.show_message("%s%s 채집! 연구 노트에 기록됐다."
@@ -239,6 +243,9 @@ func interact() -> void:
 			return
 		if obj.kind == "plotsite":
 			m.village._open_shop_site_dialog()
+			return
+		if obj.kind == "stall":
+			m.village.open_stall()
 			return
 		if obj.kind == "board":
 			m.village._open_quest_board()

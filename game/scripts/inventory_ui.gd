@@ -742,6 +742,16 @@ func _item_entries() -> Array:
 			e["desc"] = "해변 모래밭에 밀려온 조개. 시간이 지나면 또 밀려온다"
 		elif id == "forage_coral":
 			e["desc"] = "파도가 실어 온 산호 가지 — 해변에서 드물게 보인다"
+		elif id == "forage_trash":
+			e["desc"] = "파도에 밀려온 젖은 비닐봉지. 해변 노점에서 팔면 치워 준다"
+		elif id == "forage_glass":
+			e["desc"] = "모래에 반쯤 묻혀 있던 유리 조각 — 파도에 매끈하게 닳았다"
+		elif id == "forage_ring":
+			e["desc"] = "파도에 밀려온 녹슨 금속 고리 — 쓰레기통 재료로 쓴다 (제작대)"
+		elif id == "forage_relic":
+			e["desc"] = "알 수 없는 무늬가 새겨진 옛 돌조각 — 아주 드물게 밀려온다"
+		elif id == "bait":
+			e["desc"] = "낚시 미끼 — 낚싯대를 던질 때 하나씩 쓴다. 입질이 훨씬 빨라진다"
 		elif id == "broom":
 			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
 		elif id in ["nail", "cloth", "rope", "hinge"]:

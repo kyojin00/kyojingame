@@ -136,10 +136,8 @@ func _build_village_building(pid: String) -> void:
 
 
 func _talk_to(npc: Node2D) -> void:
-	# 스토리 대화가 먼저다 — 편지 전달 / 낚시꾼 첫 만남 / 호미 받기
-	if npc.id == "chief" and GameData.story_phase == "deliver":
-		m.story._start_delivery_dialog()
-		return
+	# 스토리 대화가 먼저다 — 낚시꾼 첫 만남 / 호미 받기
+	# (편지는 우체부가 직접 전한다 — 이장에게 대신 전달하는 과정은 없다)
 	if npc.id == "chief" and GameData.story2_phase == "farm_talk":
 		m.story._start_farm_dialog()
 		return
@@ -683,3 +681,164 @@ func _turn_in_quest() -> void:
 		m.netsync._req_quest.rpc_id(1, "turnin")
 	elif Net.is_host():
 		m.netsync._broadcast_stats()
+
+
+# ---- 잡화점 계산대: 민지와의 대화 메뉴 ----
+#
+# 계산대에서 E를 눌러도 판매 창이 바로 열리지 않는다.
+# 먼저 인사말이 나오고, 선택지로 갈라진다:
+#   판매하기 / 대화하기 / (서브 퀘스트 — 있을 때만, ❗ 통통) / 대화 그만두기
+# 퀘스트 선택지는 언제나 「대화 그만두기」 바로 위에 선다.
+#
+# 첫 서브 퀘스트 「해변에 노점 차리기」는 바다가 열린 뒤부터 받을 수 있다.
+# 재료(목재·조개)를 모아다 주면 해변에 민지의 노점이 선다.
+
+const MERCHANT_QUEST_NAME := "해변에 노점 차리기"
+
+# 「대화하기」에서 일상 대사 대신 반반 확률로 나오는 가게 팁
+const MERCHANT_TIPS := [
+	"씨앗은 가운데 선반에서 골라 가면 돼.\n팻말 보고 찾으면 빨라!",
+	"나랑 친해지면(하트 50) 물건값을\n깎아 준다는 소문이 있어. 소문이야, 소문.",
+	"작물은 나한테 팔면 바로 현금!\n그래도 요리로 만들면 더 비싸게 쳐줘.",
+	"게시판 의뢰도 잊지 말고 확인해.\n쏠쏠한 부수입이 되거든.",
+]
+
+
+func open_merchant_counter() -> void:
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	var btns: Array = [
+		["판매하기", _merchant_sell],
+		["대화하기", _merchant_chat],
+	]
+	var q := _merchant_quest_option()
+	if not q.is_empty():
+		btns.append([str(q.label), q.cb])   # 「대화 그만두기」 바로 위
+	btns.append(["대화 그만두기", null])
+	m.dialog.open("잡화점 민지", "어어, %s! 무슨 일이야?" % nm,
+		btns, _npc_portrait("merchant"))
+	if not q.is_empty():
+		_attach_quest_bang(str(q.label))
+
+
+func _merchant_sell() -> void:
+	m.dialog.close()
+	m.shop.open("sell", ["sell"], "잡화점 — 판매")
+
+
+func _merchant_chat() -> void:
+	var line := str(MERCHANT_TIPS[randi() % MERCHANT_TIPS.size()]) \
+		if randf() < 0.5 else GameData.npc_line("merchant")
+	# 대사가 끝나면 다시 선택지 메뉴로 돌아온다
+	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant"), [
+		{"text": line},
+	], open_merchant_counter)
+
+
+# 지금 보여 줄 퀘스트 선택지. 없으면 빈 사전.
+# 라벨은 고정 문구("퀘스트 받기")가 아니라 실제 퀘스트 이름을 쓴다.
+# 노점 퀘스트는 바다가 열린 뒤부터 — 그전에는 선택지 자체가 없다.
+func _merchant_quest_option() -> Dictionary:
+	if not GameData.sea_open:
+		return {}
+	match GameData.merchant_errand:
+		"":
+			return {"label": MERCHANT_QUEST_NAME, "cb": _merchant_errand_start}
+		"doing":
+			return {"label": MERCHANT_QUEST_NAME, "cb": _merchant_errand_turnin}
+	return {}
+
+
+func _merchant_errand_start() -> void:
+	GameData.merchant_errand = "doing"
+	m.saveio.save_now()
+	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant"), [
+		{"text": "바다가 열렸다며? 실은 나, 해변에\n작은 노점을 내는 게 꿈이었어."},
+		{"text": "낚시용품이랑 바다 요리 레시피를 팔고,\n해변에서 주운 것들도 사 주는 가게!"},
+		{"text": "목재 %d개랑 조개 %d개만 구해다 줄래?\n진열대랑 장식으로 쓰게." \
+			% [GameData.STALL_WOOD, GameData.STALL_SHELLS]},
+	], func() -> void:
+		m.hud.quest_toast("서브 퀘스트: %s" % MERCHANT_QUEST_NAME)
+		open_merchant_counter())
+
+
+func _merchant_errand_turnin() -> void:
+	var have_w: int = GameData.wood
+	var have_s := int(GameData.items.get("forage_shell", 0))
+	if have_w < GameData.STALL_WOOD or have_s < GameData.STALL_SHELLS:
+		m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant"), [
+			{"text": "재료는 좀 모였어?\n(목재 %d/%d · 조개 %d/%d)" \
+				% [have_w, GameData.STALL_WOOD, have_s, GameData.STALL_SHELLS]},
+		], open_merchant_counter)
+		return
+	GameData.wood -= GameData.STALL_WOOD
+	GameData.items["forage_shell"] = have_s - GameData.STALL_SHELLS
+	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 8
+	GameData.merchant_errand = "done"
+	GameData.roll_stall_hours()
+	m.worldgen._place_stall()
+	Sound.play_sfx("sfx_place")
+	m.queue_redraw()
+	m.saveio.save_now()   # 재료를 받은 순간 저장 — 대화 중에 꺼져도 노점은 서 있다
+	if Net.is_host():
+		m.netsync._broadcast_stats()
+	# 마무리 흐름: 노점 완성 → 하트 러그 지급 → 집 꾸미기 권유 →
+	# 상점 인테리어 레시피 안내 → (대화가 다 끝난 뒤) 퀘스트 완료 표시
+	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant", true), [
+		{"text": "고마워! 바로 해변에 노점을 차렸어.\n능선 아래 모래밭에 있으니 놀러 와."},
+		{"text": "나는 하루에 세 번, 한 시간씩 나가 있을 거야.\n내가 있을 때만 물건을 살 수 있어.\n(물건을 파는 건 언제든 — 무인 판매!)"},
+		{"text": "그리고 이건 도와준 보답!\n\n[하트 모양 러그를 받았다]", "event": _give_heart_rug},
+		{"text": "집 안에서 꾸미기(F)를 눌러서 깔아 봐.\n집 꾸미는 재미, 은근히 쏠쏠하다?"},
+		{"text": "우리 가게에서도 가끔 집을 꾸밀 수 있는\n예쁜 아이템을 만드는 레시피를 팔고 있으니까,\n자주 와서 구경해~"},
+	], _end_stall_quest)
+
+
+# 보상: 하트 모양 러그 — 집 세간으로 바로 들어온다 (꾸미기 F로 옮긴다)
+func _give_heart_rug() -> void:
+	GameData.furniture.append({"id": "heart_rug", "x": 366.0, "y": 285.0})
+	Sound.play_sfx("sfx_heart")
+	m.hud.reward_toast("하트 모양 러그", m.tex.get("icon_heart"))
+
+
+func _end_stall_quest() -> void:
+	m.hud.quest_toast("서브 퀘스트 완료: %s" % MERCHANT_QUEST_NAME)
+	m.saveio.save_now()
+	open_merchant_counter()
+
+
+# ---- 해변 노점 ----
+#
+# 구매(미끼·노점 한정 레시피)는 민지가 나와 있는 시간에만,
+# 판매는 민지가 없어도 언제든 할 수 있다.
+func open_stall() -> void:
+	if GameData.merchant_at_stall():
+		m.shop.open("buy", ["buy", "sell"], "해변 노점", "stall")
+	else:
+		m.hud.show_message("민지가 자리에 없다 — 판매만 할 수 있다.\n"
+			+ "(민지는 하루 세 번, 한 시간씩 노점에 나온다)", 4.0)
+		m.shop.open("sell", ["sell"], "해변 노점 (무인 판매)")
+
+
+# 퀘스트 선택지 버튼에 노란 느낌표를 단다.
+# 도트 게임답게 위아래로 통통 튀는 애니메이션을 건다.
+func _attach_quest_bang(label: String) -> void:
+	for c in m.dialog.buttons_box.get_children():
+		if not (c is Button) or (c as Button).text != label:
+			continue
+		var btn := c as Button
+		btn.text = "     " + label                     # 느낌표 앉을 자리
+		var bang := Label.new()
+		bang.text = "!"
+		bang.add_theme_font_size_override("font_size", 18)
+		bang.add_theme_color_override("font_color", Color("ffd75e"))
+		bang.add_theme_color_override("font_outline_color", Color(0.36, 0.2, 0.02))
+		bang.add_theme_constant_override("outline_size", 4)
+		bang.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bang.position = Vector2(9, 5)
+		btn.add_child(bang)
+		var tw := bang.create_tween().set_loops()
+		tw.tween_property(bang, "position:y", 1.0, 0.22) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(bang, "position:y", 5.0, 0.22) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_interval(0.3)
+		return

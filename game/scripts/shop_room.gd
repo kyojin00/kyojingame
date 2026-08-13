@@ -222,8 +222,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if str(d.get("action", "")) != "":
 				main.room_action(str(d.action))   # 여관·연구소·도서관
 			elif room_id == "general":
-				# 민지에게는 판매만 — 구매는 선반에서
-				main.shop.open("sell", ["sell"], "잡화점 — 판매")
+				# 민지에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
+				main.village.open_merchant_counter()
 			elif str(d.tab) == "":
 				main.hud.show_message(str(d.hint), 4.0)
 			else:

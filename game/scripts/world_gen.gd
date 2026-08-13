@@ -147,11 +147,12 @@ func _build_sea() -> void:
 	if GameData.sea_open:
 		var have := false
 		for pos in m.objects:
-			if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+			if String(m.objects[pos].kind) in m.BEACH_FORAGE:
 				have = true
 				break
 		if not have:
 			_seed_beach_forage(false)   # 노드는 뒤이어 _spawn_objects가 만든다
+		_place_stall(false)
 
 
 # 길이 열리는 순간 능선 너머가 드러난다 — 숲을 걷어내고 바다와 모래사장을 깐다
@@ -163,6 +164,7 @@ func _reveal_sea() -> void:
 			m.objnode._remove_object(pos)
 			m.grid[y][x].ground = "water" if y >= m.SEA_Y0 else "sand"
 	_seed_beach_forage()
+	_place_stall()
 	m.queue_redraw()
 
 
@@ -176,12 +178,46 @@ func _try_spawn_shell(with_node := true) -> bool:
 	var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(m.BEACH_Y0, m.SEA_Y0 - 1))
 	if m.objects.has(pos) or m.grid[pos.y][pos.x].ground != "sand":
 		return false
-	var kind := "forage_shell" if randf() < 0.88 else "forage_coral"
+	# 기본은 조개(흔함)·비닐봉지·유리 조각·금속 고리.
+	# 산호 조각·고대 조각은 각각 기본 0.1%의 매우 희귀한 채집물 —
+	# 해변 채집 레벨이 오르면 확률이 조금씩 오른다 (beach_rare_chance).
+	var kind := "forage_shell"
+	var rare := GameData.beach_rare_chance()
+	var roll := randf()
+	if roll < rare:
+		kind = "forage_coral"
+	elif roll < rare * 2.0:
+		kind = "forage_relic"
+	else:
+		var r2 := randf()
+		if r2 < 0.15:
+			kind = "forage_trash"
+		elif r2 < 0.30:
+			kind = "forage_glass"
+		elif r2 < 0.45:
+			kind = "forage_ring"
 	if with_node:
 		m.objnode._place_object(pos, kind, 0)
 	else:
 		m.objects[pos] = {"kind": kind, "hp": 0}
 	return true
+
+
+# 민지의 해변 노점 — 서브 퀘스트를 끝냈으면 늘 이 자리에 서 있다.
+# 바다를 다시 까는 코드(_build_sea/_reveal_sea)가 해변을 통째로 밀기 때문에
+# 그때마다 여기서 도로 세워 준다 (세이브 로드 후에도 이 경로로 복원된다).
+func _place_stall(with_node := true) -> void:
+	if GameData.merchant_errand != "done":
+		return
+	var cur := str(m.objects.get(m.STALL_TILE, {}).get("kind", ""))
+	if cur == "stall":
+		return
+	if cur != "":
+		m.objnode._remove_object(m.STALL_TILE)   # 자리에 밀려온 조개 따위는 치운다
+	if with_node:
+		m.objnode._place_object(m.STALL_TILE, "stall", 0)
+	else:
+		m.objects[m.STALL_TILE] = {"kind": "stall", "hp": 0}
 
 
 # 교진 마을: 건물은 하나도 짓지 않는다.
@@ -531,7 +567,7 @@ func _respawn_forage() -> void:
 func _tick_beach() -> void:
 	var shells := 0
 	for pos in m.objects:
-		if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+		if String(m.objects[pos].kind) in m.BEACH_FORAGE:
 			shells += 1
 	if shells >= m.SHELL_CAP:
 		return

@@ -56,6 +56,17 @@ func _debug_tick() -> void:
 				" 위막힘=", not m.is_passable(Vector2i(52, 7)),
 				" 아래막힘=", not m.is_passable(Vector2i(52, 11)),
 				" 길열림=", m.is_passable(Vector2i(52, 9)))
+			# 새 게임 초기 마을: 건물 0채 + NPC는 이장뿐이어야 한다
+			var houses := 0
+			for hp in m.objects:
+				if String(m.objects[hp].kind) == "house":
+					houses += 1
+			var nids: Array = []
+			for n2 in m.npcs:
+				nids.append(n2.id)
+			print("VILLAGE_INIT_OK=", GameData.village_built.is_empty()
+				and houses == 0 and nids == ["chief"],
+				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids)
 		elif m.story._story_snapped and m.story._story_t >= 3.8:
 			get_tree().quit()
 		return
@@ -401,6 +412,146 @@ func _debug_tick() -> void:
 			m.map_ui.reset_view()
 		335: _save_shot("_mapdrag.png")
 		336: m.map_ui.close()
+		337:
+			# 상인 대화 메뉴: 계산대 E -> 인사말 + [판매/대화/퀘스트❗/그만두기].
+			# 퀘스트 선택지는 실제 퀘스트 이름으로, 「그만두기」 바로 위에 선다.
+			GameData.merchant_errand = ""
+			GameData.sea_open = true           # 노점 퀘스트는 바다가 열려야 보인다
+			m.village.open_merchant_counter()
+			var labels: Array = []
+			var bang_ok := false
+			for c in m.dialog.buttons_box.get_children():
+				if c.is_queued_for_deletion() or not (c is Button):
+					continue
+				labels.append((c as Button).text.strip_edges())
+				for cc in c.get_children():
+					if cc is Label and (cc as Label).text == "!":
+						bang_ok = true
+			var menu_ok: bool = m.dialog.visible and labels.size() == 4 \
+				and labels[0] == "판매하기" and labels[1] == "대화하기" \
+				and labels[2] == m.village.MERCHANT_QUEST_NAME \
+				and labels[3] == "대화 그만두기"
+			# 바다가 닫혀 있으면 퀘스트 선택지가 아예 안 보인다
+			GameData.sea_open = false
+			m.village.open_merchant_counter()
+			var closed_n := 0
+			for c2 in m.dialog.buttons_box.get_children():
+				if not c2.is_queued_for_deletion() and c2 is Button:
+					closed_n += 1
+			GameData.sea_open = true
+			print("MERCHANT_TALK_OK=", menu_ok and bang_ok and closed_n == 3,
+				" 메뉴=", menu_ok, " 느낌표=", bang_ok, " 바다전=", closed_n, "개(3)")
+			# 퀘스트 수락 -> 재료 전달 -> 노점 설치 + 방문 시각 3개
+			m.village._merchant_errand_start()
+			var doing: bool = GameData.merchant_errand == "doing"
+			GameData.wood += GameData.STALL_WOOD
+			GameData.items["forage_shell"] = int(GameData.items.get("forage_shell", 0)) \
+				+ GameData.STALL_SHELLS
+			var shell_before := int(GameData.items["forage_shell"])
+			m.village._merchant_errand_turnin()
+			var built: bool = GameData.merchant_errand == "done" \
+				and str(m.objects.get(m.STALL_TILE, {}).get("kind", "")) == "stall" \
+				and int(GameData.items["forage_shell"]) \
+					== shell_before - GameData.STALL_SHELLS
+			var sched_ok: bool = GameData.stall_hours.size() == GameData.STALL_VISITS
+			for i in GameData.stall_hours.size():
+				var s := int(GameData.stall_hours[i])
+				if s < 9 * 60 or s > 18 * 60:
+					sched_ok = false
+				if i > 0 and s - int(GameData.stall_hours[i - 1]) < GameData.STALL_VISIT_MIN:
+					sched_ok = false
+			# 마무리 대화를 끝까지 넘긴다 -> 보상(하트 러그)이 세간으로 들어오고
+			# 대화가 다 끝난 뒤에야 퀘스트 완료 표시가 뜬다
+			var talking: bool = m.dialog.visible
+			m.dialog.skip_seq()
+			var rug_ok := false
+			for fi2 in GameData.furniture:
+				if str(fi2.id) == "heart_rug":
+					rug_ok = true
+			rug_ok = rug_ok and talking and GameData.FURNITURE.has("heart_rug")
+			m.dialog.close()
+			print("STALL_QUEST_OK=", doing and built and sched_ok and rug_ok,
+				" 수락=", doing, " 설치=", built, " 시각표=", sched_ok,
+				" 하트러그=", rug_ok, " ", GameData.stall_hours)
+		339:
+			# 노점 이용: 민지가 있을 때만 구매(미끼·한정 레시피), 판매는 상시
+			var keep_min: float = GameData.minutes
+			GameData.minutes = float(GameData.stall_hours[0]) + 5.0
+			var here: bool = GameData.merchant_at_stall()
+			m.village.open_stall()
+			var open_full: bool = m.shop.visible and m.shop.allowed == ["buy", "sell"] \
+				and m.shop.tab == "buy"
+			var money0: int = GameData.money
+			var bait0 := int(GameData.items.get("bait", 0))
+			m.shop._on_buy_bait()
+			var bait_ok: bool = int(GameData.items["bait"]) == bait0 + 1 \
+				and GameData.money == money0 - GameData.BAIT_PRICE
+			var locked0: bool = GameData.recipe_locked("dish_smelt_fry")
+			m.shop._on_buy_dish_recipe("dish_smelt_fry", GameData.STALL_RECIPES["dish_smelt_fry"])
+			var recipe_ok: bool = locked0 and not GameData.recipe_locked("dish_smelt_fry")
+			m.shop.close()
+			GameData.minutes = 8.0 * 60.0        # 이른 아침 — 민지가 없다
+			var away: bool = not GameData.merchant_at_stall()
+			m.village.open_stall()
+			var sell_only: bool = m.shop.visible and m.shop.allowed == ["sell"]
+			m.shop.close()
+			GameData.minutes = keep_min
+			# 해변 채집물 확장: 쓰레기/유리 그림·아이템 등록 확인
+			var kinds_ok: bool = m.tex.get("forage_trash") != null \
+				and m.tex.get("forage_glass") != null and m.tex.get("stall") != null \
+				and m.tex.get("bait") != null and GameData.ITEMS.has("forage_trash") \
+				and GameData.ITEMS.has("forage_glass")
+			print("STALL_SHOP_OK=", here and open_full and bait_ok and recipe_ok
+				and away and sell_only and kinds_ok,
+				" 방문중=", here, " 구매판매=", open_full, " 미끼=", bait_ok,
+				" 레시피=", recipe_ok, " 부재=", away, " 판매만=", sell_only,
+				" 등록=", kinds_ok)
+			# ---- 화분(잡화점)·쓰레기통(노점) 레시피: 구매 -> 제작대 -> 집 세간 ----
+			m.shop._on_buy_recipe("flower_pot", 200)
+			m.shop._on_buy_recipe("trash_bin", 400)
+			var learned: bool = "flower_pot" in GameData.recipes_unlocked \
+				and "trash_bin" in GameData.recipes_unlocked
+			var furn0: int = GameData.furniture.size()
+			var pot_started: bool = GameData.desk_start("flower_pot")
+			GameData.desk_tick(999.0)
+			var ring_before := int(GameData.items["forage_ring"])
+			var bin_started: bool = GameData.desk_start("trash_bin")
+			GameData.desk_tick(999.0)
+			var made_ids: Array = []
+			for fi in GameData.furniture:
+				made_ids.append(str(fi.id))
+			var furn_ok: bool = GameData.furniture.size() == furn0 + 2 \
+				and "plant" in made_ids and "trash_bin" in made_ids \
+				and GameData.FURNITURE.has("trash_bin") \
+				and int(GameData.items["forage_ring"]) == ring_before - 2
+			print("RECIPE2_OK=", learned and pot_started and bin_started and furn_ok,
+				" 배움=", learned, " 화분제작=", pot_started, " 쓰레기통제작=", bin_started,
+				" 세간=", furn_ok, " ", made_ids)
+			# ---- 희귀 채집물: 기본 0.1% + 해변 채집 레벨로 조금씩 상승 ----
+			var keep_beach: Variant = GameData.skills.get("beach")
+			GameData.skills["beach"] = {"lv": 1, "xp": 0.0}
+			var rare1: float = GameData.beach_rare_chance()
+			GameData.skills["beach"] = {"lv": 10, "xp": 0.0}
+			var rare10: float = GameData.beach_rare_chance()
+			GameData.skills["beach"] = keep_beach
+			var rare_ok: bool = absf(rare1 - 0.001) < 0.00001 and rare10 > rare1 \
+				and rare10 < 0.01
+			# ---- 숨겨진 콘텐츠: 산호 조각 -> 레시피 / 고대 조각 -> 이야기 ----
+			GameData.discovered.erase("forage_coral")
+			GameData.discovered.erase("forage_relic")
+			GameData.recipes_unlocked.erase("dish_coral_tea")
+			var tea_locked_before: bool = GameData.recipe_locked("dish_coral_tea")
+			m.story.hidden_beach_find("forage_coral")
+			var coral_ok: bool = tea_locked_before \
+				and not GameData.recipe_locked("dish_coral_tea") and m.dialog.visible
+			m.dialog.close()
+			m.story.hidden_beach_find("forage_relic")
+			var relic_ok: bool = m.dialog.visible
+			m.dialog.close()
+			GameData.discover("forage_relic")   # 노트 「물에 잠긴 마을」 해금 상태로
+			print("HIDDEN_OK=", rare_ok and coral_ok and relic_ok,
+				" 확률(1렙)=", rare1, " (10렙)=", rare10,
+				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
 		338:
 			# 퀘스트 5 재현: 바위벽 앞까지 실제 이동 판정으로 붙은 뒤 E
 			var rx := 30
@@ -1373,7 +1524,7 @@ func _debug_tick() -> void:
 			var water: bool = m.grid[m.MAP_H - 2][30].ground == "water"
 			var shells := 0
 			for pos in m.objects:
-				if String(m.objects[pos].kind) in ["forage_shell", "forage_coral"]:
+				if String(m.objects[pos].kind) in m.BEACH_FORAGE:
 					shells += 1
 			var shell_ok: bool = GameData.ITEMS.has("forage_shell") \
 				and m.tex.has("forage_shell") and m.tex.has("forage_coral") and shells > 0
@@ -1400,7 +1551,7 @@ func _debug_tick() -> void:
 				m.worldgen._tick_beach()
 			var after := 0
 			for pos2 in m.objects:
-				if String(m.objects[pos2].kind) in ["forage_shell", "forage_coral"]:
+				if String(m.objects[pos2].kind) in m.BEACH_FORAGE:
 					after += 1
 			print("BEACH_OK=", base_n == 1 and lv_n > base_n and t2 < t1 * 0.7
 				and after <= m.SHELL_CAP,
@@ -1418,10 +1569,10 @@ func _debug_tick() -> void:
 			GameData.story2_phase = ""
 			GameData.house_lv = 0
 			GameData.has_bed = false
-			m.story._end_farewell()
+			m.story._end_arrival()
 			var farewell := GameData.story_phase == "deliver" \
 				and GameData.story_objective_short() != ""
-			m.story._start_delivery_dialog()   # 이장에게 E — 편지 전달
+			m.story._start_delivery_dialog()   # 우체부가 이장에게 직접 전달
 			var deliver_talk := m.dialog.visible
 			m.dialog.close()
 			m.story._end_delivery()

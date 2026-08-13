@@ -307,12 +307,12 @@ func _story_update(delta: float) -> void:
 				_start_rock_dialog()
 		"travel":
 			_update_postman(delta, story_shot)
-			# 마을 어귀에 다다르면 우체부가 작별 인사를 하며 편지를 맡긴다
+			# 마을 어귀에 다다르면 우체부가 함께 이장에게 가자고 한다
 			if _postman_state == "follow" and not m.dialog.visible \
 					and m.player_tile().x >= 58:
 				m.story_cutscene = true
 				_postman_state = "talk"
-				_start_farewell_dialog()
+				_start_arrival_dialog()
 		"deliver":
 			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
 		"home_open":
@@ -395,18 +395,20 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 				_postman_spr.texture = m.tex["npc_postman_side_0"]
 				_postman_spr.flip_h = false  # 바위(오른쪽)를 바라본다
 		"deliver":
-			# 이장에게 걸어가 편지를 전달한다
+			# 이장에게 직접 걸어가 편지를 전달한다 (플레이어는 따라간다)
 			var chief := _story_chief()
 			if chief == null:
-				_postman_state = "talk"
-				_start_delivery_dialog()
+				if not m.dialog.visible:
+					_postman_state = "talk"
+					_start_delivery_dialog()
 				return
 			var to2: Vector2 = chief.position + Vector2(-40, 0) - _postman.position
 			if to2.length() > 8.0:
 				_postman.position += to2.normalized() * 90.0 * delta
 				_postman_spr.texture = m.tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
 				_postman_spr.flip_h = to2.x < 0
-			else:
+			elif not m.dialog.visible:
+				# 플레이어가 다른 대화 중이면 그 대화가 끝날 때까지 기다린다
 				_postman_state = "talk"
 				_postman_spr.texture = m.tex["npc_postman_side_0"]
 				_postman_spr.flip_h = false
@@ -750,51 +752,55 @@ func _story_chief() -> Node2D:
 	return null
 
 
-# 마을 어귀: 우체부가 작별 인사를 하고 편지를 플레이어에게 맡긴다
-func _start_farewell_dialog() -> void:
-	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+# 마을 어귀: 우체부는 떠나지 않는다 — 함께 이장에게 편지를 전하러 간다
+func _start_arrival_dialog() -> void:
 	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
 		{"text": "「다 왔군! 여기가 교진 마을일세.」"},
-		{"text": "「그런데 미안하네만... 나는 이 길로 다음 배달을 가야 해서 말이야.」",
-			"portrait": m.tex["npc_postman_portrait_normal"]},
-		{"text": "「이 편지를 자네가 이장님께 전해 주겠나? 광장 근처에 계실 걸세.」"},
-		{"text": "「자네와의 숲길, 즐거웠네. 잘 지내게, %s!」" % nm,
-			"portrait": m.tex["npc_postman_portrait_happy"]},
-	], _end_farewell)
+		{"text": "「그럼 이장님께 편지를 전해 드려야지.\n광장 근처에 계실 걸세 — 같이 가세나!」"},
+	], _end_arrival)
 
 
-func _end_farewell() -> void:
+func _end_arrival() -> void:
 	m.story_cutscene = false
 	GameData.story_phase = "deliver"
 	_apply_story_camera()
 	_apply_story_visibility()
-	m.hud.quest_toast("마을로 이동")
-	m.hud.show_message("우체부 아저씨의 편지를 이장님께 전하자. (화살표 방향)", 6.0)
-	if _postman != null:   # 우체부는 마을 북쪽 길로 떠난다
-		_postman_path = m.npcmgr._tile_path(
-			Vector2i(int(_postman.position.x / m.TILE), int(_postman.position.y / m.TILE)),
-			Vector2i(m.VILLAGE_EXIT_X, 1))
-		_postman_fade = 1.0
-		_postman_state = "leave"
+	m.hud.quest_toast("마을 도착")
+	m.hud.show_message("우체부 아저씨를 따라 이장님께 가자. (화살표 방향)", 6.0)
+	if _postman != null:
+		_postman_state = "deliver"   # 이장에게 곧장 걸어간다
 	m.saveio.save_now()
 
 
-# 이장에게 말을 걸면(E) 편지를 전한다 — village_ui._talk_to가 부른다
+# 우체부가 이장에게 **직접** 편지를 전한다 — 플레이어는 곁에서 지켜본다.
+# (예전에는 우체부가 떠나고 플레이어가 대신 전달했는데, 그 과정은 없앴다)
 func _start_delivery_dialog() -> void:
 	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
 	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	var post_normal: Texture2D = m.tex["npc_postman_portrait_normal"]
+	var post_happy: Texture2D = m.tex["npc_postman_portrait_happy"]
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	m.story_cutscene = true
-	m.dialog.open_seq("이장 덕수", chief_normal, [
-		{"text": "(우체부 아저씨가 맡긴 편지를 건넸다...)", "name": "나", "portrait": null},
-		{"text": "「오, 우체부 양반의 편지로군. 고맙네!」", "portrait": chief_happy},
-		{"text": "「...편지에 자네 얘기도 적혀 있구먼. 험한 숲길을 자네가 열었다고?」"},
-		{"text": "「%s(이)라고 했나. 교진 마을에 온 것을 환영하네!」" % nm,
-			"portrait": chief_happy},
-		{"text": "「자네 할아버지가 지내던 집이 마을 서쪽에 그대로 있네.」"},
-		{"text": "「오래 비워 둬서 낡았네만... 오늘부터 자네 집일세.」",
-			"portrait": chief_happy, "event": _story_open_home},
-		{"text": "「먼저 들어가서 짐을 풀게. 나도 곧 따라감세.」"},
+	m.dialog.open_seq("우체부 아저씨", post_happy, [
+		{"text": "「이장님! 편지 배달 왔습니다.」"},
+		{"text": "「오, 우체부 양반! 먼 길 오느라 고생했네.」",
+			"name": "이장 덕수", "portrait": chief_happy},
+		{"text": "(우체부 아저씨가 이장님께 편지를 건넸다.)",
+			"name": "", "portrait": null},
+		{"text": "「요즘 마을은 좀 어떻습니까? 오는 길에 보니\n광장이 영 한산하던데요.」",
+			"name": "우체부 아저씨", "portrait": post_normal},
+		{"text": "「보다시피 조용하네... 젊은 사람들이 하나둘 떠나서\n남은 건 빈터뿐이라네.」",
+			"name": "이장 덕수", "portrait": chief_normal},
+		{"text": "「그래도 마을로 드는 숲길이 훤히 뚫려 있던데요!\n여기 이 친구가 열었지 뭡니까.」",
+			"name": "우체부 아저씨", "portrait": post_happy},
+		{"text": "「호오... 편지에도 자네 얘기가 적혀 있구먼.\n%s(이)라고 했나. 교진 마을에 온 것을 환영하네!」" % nm,
+			"name": "이장 덕수", "portrait": chief_happy},
+		{"text": "「자네 할아버지가 지내던 집이 마을 서쪽에 그대로 있네.\n오래 비워 둬서 낡았네만... 오늘부터 자네 집일세.」",
+			"name": "이장 덕수", "portrait": chief_happy, "event": _story_open_home},
+		{"text": "「그럼 나는 다음 배달을 가야겠구먼.」",
+			"name": "우체부 아저씨", "portrait": post_normal},
+		{"text": "「자네와의 숲길, 즐거웠네. 잘 지내게, %s!」" % nm,
+			"name": "우체부 아저씨", "portrait": post_happy},
 	], _end_delivery)
 
 
@@ -826,8 +832,15 @@ func _end_delivery() -> void:
 	_story_open_home()   # 대화를 스킵해도 집은 열린다
 	_apply_story_camera()
 	_apply_story_visibility()
-	m.hud.quest_toast("이장에게 편지 전달")
+	m.hud.quest_toast("편지 전달 완료")
 	m.hud.show_message("마을 서쪽, 이장님이 내어 준 집에 들어가 보자. (문 앞에서 E)", 6.0)
+	# 인사를 마친 우체부는 마을 북쪽 길을 따라 떠난다
+	if _postman != null:
+		_postman_path = m.npcmgr._tile_path(
+			Vector2i(int(_postman.position.x / m.TILE), int(_postman.position.y / m.TILE)),
+			Vector2i(m.VILLAGE_EXIT_X, 1))
+		_postman_fade = 1.0
+		_postman_state = "leave"
 	m.saveio.save_now()
 
 
@@ -1460,3 +1473,35 @@ func _finish_grandpa() -> void:
 			[["반드시 찾아낼게요", null]], m.tex.get("icon_note"))
 	else:
 		_open_grandpa_letter()
+
+
+# ---- 해변의 숨겨진 콘텐츠 ----
+#
+# 산호 조각·고대 조각은 0.1%짜리 매우 희귀한 해변 채집물.
+# 처음 줍는 순간, 그 조각에 얽힌 숨겨진 이야기가 흘러나오고
+# 산호 조각은 숨겨진 레시피(산호빛 차)까지 열어 준다.
+func hidden_beach_find(fid: String) -> void:
+	if fid == "forage_coral":
+		if "dish_coral_tea" not in GameData.recipes_unlocked:
+			GameData.recipes_unlocked.append("dish_coral_tea")
+		m.hud.quest_toast("숨겨진 레시피 발견: 산호빛 차")
+		m.dialog.open_seq("산호 조각", null, [
+			{"text": "파도 사이에서 붉게 빛나는 조각을 주웠다.\n"
+				+ "물에 담그자 은은한 노을빛이 번진다."},
+			{"text": "할아버지의 노트 귀퉁이에 이런 낙서가 있었지 —\n"
+				+ "\"바다가 꽃을 피우면, 약초와 함께 달여 보거라.\""},
+			{"text": "[숨겨진 레시피를 배웠다: 산호빛 차]\n집 조리대에 새 칸이 생겼다."},
+		])
+	elif fid == "forage_relic":
+		m.hud.quest_toast("숨겨진 이야기 발견: 물에 잠긴 마을")
+		m.dialog.open_seq("고대 조각", null, [
+			{"text": "모래 깊숙이 박힌 낡은 돌조각.\n"
+				+ "닳아 버린 표면에 알 수 없는 무늬가 새겨져 있다."},
+			{"text": "…무늬를 손끝으로 따라가자, 머릿속에\n"
+				+ "본 적 없는 풍경이 스친다. 물속에 가라앉은 지붕들,\n"
+				+ "그 사이를 헤엄치는 커다란 황금빛 그림자."},
+			{"text": "이 바다 밑에는, 아주 오래전 가라앉은\n"
+				+ "마을이 잠들어 있는지도 모른다."},
+			{"text": "[숨겨진 이야기가 연구 노트(N)에 기록됐다:\n「물에 잠긴 마을」]"},
+		])
+	m.saveio.save_now()

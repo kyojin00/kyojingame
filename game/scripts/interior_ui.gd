@@ -313,8 +313,10 @@ func _upgrade_house() -> void:
 	GameData.wood -= GameData.HOUSE_UPGRADE_WOOD
 	GameData.stone -= GameData.HOUSE_UPGRADE_STONE
 	GameData.house_lv = 2
-	if GameData.furniture.is_empty():
-		GameData.furniture = GameData.default_furniture()  # 확장 기념 기본 세간
+	# 확장 기념 기본 세간 — 오두막에서 만들어 둔 세간(화분·쓰레기통)은 그대로 둔다
+	if GameData.furniture.all(func(f: Dictionary) -> bool:
+			return str(f.get("id", "")) in GameData.CRAFT_FURN):
+		GameData.furniture = GameData.default_furniture() + GameData.furniture
 	_layout()
 	canvas.queue_redraw()
 	Sound.play_sfx("sfx_place")
@@ -713,3 +715,25 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(p, Vector2(w, h - 6)), Color(0.55, 0.38, 0.24))
 			canvas.draw_rect(Rect2(p.x + 3, p.y + h - 6, 4, 6), Color(0.42, 0.28, 0.17))
 			canvas.draw_rect(Rect2(p.x + w - 7, p.y + h - 6, 4, 6), Color(0.42, 0.28, 0.17))
+		"heart_rug":
+			# 노점 퀘스트 보상 — 연분홍 러그에 큰 하트
+			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.93, 0.78, 0.8))
+			canvas.draw_rect(Rect2(p + Vector2(4, 4), Vector2(w - 8, h - 8)), Color(0.97, 0.86, 0.87))
+			var hc := Color(0.89, 0.42, 0.5)
+			var cx := p.x + w / 2.0
+			var cy := p.y + h / 2.0
+			canvas.draw_rect(Rect2(cx - 18, cy - 12, 15, 12), hc)   # 왼쪽 봉우리
+			canvas.draw_rect(Rect2(cx + 3, cy - 12, 15, 12), hc)    # 오른쪽 봉우리
+			canvas.draw_rect(Rect2(cx - 21, cy - 6, 42, 10), hc)    # 몸통
+			canvas.draw_rect(Rect2(cx - 15, cy + 4, 30, 7), hc)
+			canvas.draw_rect(Rect2(cx - 8, cy + 11, 16, 5), hc)
+			canvas.draw_rect(Rect2(cx - 3, cy + 16, 6, 3), hc)      # 뾰족한 끝
+			canvas.draw_rect(Rect2(cx - 14, cy - 9, 6, 5), Color(0.98, 0.68, 0.74))
+		"trash_bin":
+			# 제작대에서 만드는 쓰레기통 — 통(회청색) + 금속 고리 두 줄 + 뚜껑
+			canvas.draw_rect(Rect2(p.x + 2, p.y + 6, w - 4, h - 6), Color(0.44, 0.5, 0.54))
+			canvas.draw_rect(Rect2(p.x + 4, p.y + 8, 4, h - 10), Color(0.58, 0.64, 0.68))
+			canvas.draw_rect(Rect2(p.x + 1, p.y + 11, w - 2, 3), Color(0.3, 0.34, 0.38))
+			canvas.draw_rect(Rect2(p.x + 1, p.y + h - 9, w - 2, 3), Color(0.3, 0.34, 0.38))
+			canvas.draw_rect(Rect2(p.x, p.y + 3, w, 5), Color(0.36, 0.42, 0.46))
+			canvas.draw_rect(Rect2(p.x + w / 2.0 - 4, p.y, 8, 4), Color(0.3, 0.34, 0.38))
