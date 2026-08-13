@@ -241,16 +241,16 @@ func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int
 
 
 @rpc("any_peer", "reliable")
-func _req_shop(op: String, id: String) -> void:
+func _req_shop(op: String, id: String, qty := -1) -> void:
 	if not Net.is_host():
 		return
 	match op:
 		"buy_seed":
 			m.shop._on_buy(id)
 		"sell_crop":
-			m.shop._on_sell(id)
+			m.shop._on_sell(id, qty)
 		"sell_item":
-			m.shop._on_sell_item(id)
+			m.shop._on_sell_item(id, qty)
 		"buy_animal":
 			m.shop._on_buy_animal(id)
 		"buy_pet":

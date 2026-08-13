@@ -236,7 +236,7 @@ func _mk_sell_cell(icon_name: String, title: String, count: int,
 	b.add_theme_stylebox_override("normal", st)
 	b.add_theme_stylebox_override("hover", st2)
 	b.add_theme_stylebox_override("pressed", st2)
-	b.tooltip_text = "%s x%d\n개당 %dG · 전부 %dG%s\n(클릭: 전부 판매)" \
+	b.tooltip_text = "%s x%d\n개당 %dG · 전부 %dG%s\n(클릭: 수량 골라 판매)" \
 		% [title, count, unit, total, ("\n" + sub) if sub != "" else ""]
 	if main != null and main.tex.has(icon_name):
 		var ic := TextureRect.new()
@@ -476,7 +476,7 @@ func _rebuild() -> void:
 			grid.add_child(_mk_sell_cell("mature_" + id, str(def.name), count,
 				int(def.sell_price * sell_mult),
 				int(GameData.produce_sell_value(id) * sell_mult),
-				qtxt, _on_sell.bind(id)))
+				qtxt, _open_sell_picker.bind("crop", id, str(def.name))))
 			last_sell_cells += 1
 		for id in GameData.ITEM_IDS:
 			var count: int = GameData.items[id]
@@ -487,7 +487,7 @@ func _rebuild() -> void:
 				continue  # 값이 없는 것(빗자루·꽃다발 등)은 팔지 않는다
 			grid.add_child(_mk_sell_cell(id, str(def.name), count,
 				int(def.sell * sell_mult), int(def.sell * sell_mult) * count,
-				"", _on_sell_item.bind(id)))
+				"", _open_sell_picker.bind("item", id, str(def.name))))
 			last_sell_cells += 1
 		items_box.add_child(grid)
 		if last_sell_cells == 0:
@@ -695,29 +695,42 @@ func _on_buy(id: String) -> void:
 	_rebuild()
 
 
-func _on_sell(id: String) -> void:
-	# 은/금 품질은 더 비싸게 · 쓰레기통(무인 판매함)은 제값의 80%
-	var amount: int = int(GameData.produce_sell_value(id) * sell_mult)
+# qty -1 = 전량 (옛 호출·멀티 호환). 부분 판매는 일반 -> 은 -> 금 순으로
+# 내놓는다 — 값비싼 품질이 마지막까지 가방에 남는다.
+func _on_sell(id: String, qty := -1) -> void:
+	var def: Dictionary = GameData.CROPS[id]
+	var left: int = qty if qty >= 0 else 999999
+	var amount := 0
+	var take_n: int = mini(int(GameData.produce[id]), left)
+	amount += take_n * int(def.sell_price * sell_mult)
+	GameData.produce[id] = int(GameData.produce[id]) - take_n
+	left -= take_n
+	var take_s: int = mini(int(GameData.produce_silver.get(id, 0)), left)
+	amount += take_s * int(def.sell_price * 1.25 * sell_mult)
+	GameData.produce_silver[id] = int(GameData.produce_silver.get(id, 0)) - take_s
+	left -= take_s
+	var take_g: int = mini(int(GameData.produce_gold.get(id, 0)), left)
+	amount += take_g * int(def.sell_price * 1.5 * sell_mult)
+	GameData.produce_gold[id] = int(GameData.produce_gold.get(id, 0)) - take_g
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
-	GameData.produce[id] = 0
-	GameData.produce_silver[id] = 0
-	GameData.produce_gold[id] = 0
 	if main != null and not main._remote_acting:
-		main.doing.net_shop("sell_crop", id)
+		main.doing.net_shop("sell_crop", id, qty)
 	_rebuild()
 
 
-func _on_sell_item(id: String) -> void:
+func _on_sell_item(id: String, qty := -1) -> void:
 	var def: Dictionary = GameData.ITEMS[id]
-	var amount: int = int(def.sell * sell_mult) * int(GameData.items[id])
+	var n: int = int(GameData.items[id]) if qty < 0 \
+		else mini(qty, int(GameData.items[id]))
+	var amount: int = int(def.sell * sell_mult) * n
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
-	GameData.items[id] = 0
+	GameData.items[id] = int(GameData.items[id]) - n
 	if main != null and not main._remote_acting:
-		main.doing.net_shop("sell_item", id)
+		main.doing.net_shop("sell_item", id, qty)
 	_rebuild()
 
 
@@ -852,3 +865,151 @@ func _on_upgrade(id: String) -> void:
 	if main != null and not main._remote_acting:
 		main.doing.net_shop("upgrade", id)
 	_rebuild()
+
+
+# ---- 판매 수량 선택 ----
+#
+# 셀을 클릭하면 이 패널이 뜬다. -10/-1/+1/+10(Shift = x10)으로 수량을
+# 맞추고, **「팔기」 버튼을 눌러야만** 거래가 된다 — 실수로 전량이
+# 팔려 나가는 일을 막는다. 기본값은 전량이다.
+var _qty_layer: PanelContainer = null
+var _qty_kind := ""
+var _qty_id := ""
+var _qty := 0
+var _qty_max := 0
+var _qty_label: Label = null
+var _qty_total: Label = null
+var _qty_title: Label = null
+
+
+func _sell_qty_max(kind: String, id: String) -> int:
+	if kind == "crop":
+		return int(GameData.produce[id]) + int(GameData.produce_silver.get(id, 0)) \
+			+ int(GameData.produce_gold.get(id, 0))
+	return int(GameData.items[id])
+
+
+# 일반 -> 은 -> 금 순서 그대로 미리 계산한 판매 금액 (패널의 실시간 합계)
+func _sell_qty_value(kind: String, id: String, qty: int) -> int:
+	if kind == "item":
+		return int(GameData.ITEMS[id].sell * sell_mult) * qty
+	var def: Dictionary = GameData.CROPS[id]
+	var left := qty
+	var amount := 0
+	var take_n: int = mini(int(GameData.produce[id]), left)
+	amount += take_n * int(def.sell_price * sell_mult)
+	left -= take_n
+	var take_s: int = mini(int(GameData.produce_silver.get(id, 0)), left)
+	amount += take_s * int(def.sell_price * 1.25 * sell_mult)
+	left -= take_s
+	amount += mini(int(GameData.produce_gold.get(id, 0)), left) \
+		* int(def.sell_price * 1.5 * sell_mult)
+	return amount
+
+
+func _open_sell_picker(kind: String, id: String, disp: String) -> void:
+	_qty_kind = kind
+	_qty_id = id
+	_qty_max = _sell_qty_max(kind, id)
+	_qty = _qty_max          # 기본은 전량 — 그래도 「팔기」를 눌러야 팔린다
+	if _qty_max <= 0:
+		return
+	if _qty_layer == null:
+		_qty_layer = PanelContainer.new()
+		var st := StyleBoxFlat.new()
+		st.bg_color = Color(0.97, 0.93, 0.83, 0.98)
+		st.border_color = Color(0.45, 0.3, 0.16)
+		st.set_border_width_all(3)
+		st.set_corner_radius_all(9)
+		st.set_content_margin_all(10)
+		_qty_layer.add_theme_stylebox_override("panel", st)
+		_qty_layer.anchor_left = 0.5
+		_qty_layer.anchor_right = 0.5
+		_qty_layer.anchor_top = 0.5
+		_qty_layer.anchor_bottom = 0.5
+		_qty_layer.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_qty_layer.grow_vertical = Control.GROW_DIRECTION_BOTH
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 6)
+		_qty_layer.add_child(v)
+		_qty_title = Label.new()
+		_qty_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_qty_title.add_theme_font_size_override("font_size", 16)
+		_qty_title.add_theme_color_override("font_color", Color(0.32, 0.2, 0.1))
+		v.add_child(_qty_title)
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 4)
+		v.add_child(row)
+		for step: int in [-10, -1]:
+			row.add_child(_mk_qty_btn(step))
+		_qty_label = Label.new()
+		_qty_label.custom_minimum_size = Vector2(72, 0)
+		_qty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_qty_label.add_theme_font_size_override("font_size", 19)
+		_qty_label.add_theme_color_override("font_color", Color(0.32, 0.2, 0.1))
+		row.add_child(_qty_label)
+		for step2: int in [1, 10]:
+			row.add_child(_mk_qty_btn(step2))
+		var row2 := HBoxContainer.new()
+		row2.alignment = BoxContainer.ALIGNMENT_CENTER
+		row2.add_theme_constant_override("separation", 6)
+		v.add_child(row2)
+		var half := _mk_button("절반", func() -> void: _set_qty(_qty_max / 2))
+		var all := _mk_button("전량", func() -> void: _set_qty(_qty_max))
+		row2.add_child(half)
+		row2.add_child(all)
+		_qty_total = Label.new()
+		_qty_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_qty_total.add_theme_font_size_override("font_size", 15)
+		_qty_total.add_theme_color_override("font_color", Color(0.62, 0.44, 0.26))
+		v.add_child(_qty_total)
+		var row3 := HBoxContainer.new()
+		row3.alignment = BoxContainer.ALIGNMENT_CENTER
+		row3.add_theme_constant_override("separation", 10)
+		v.add_child(row3)
+		var sellb := _mk_button("팔기", _confirm_sell)
+		sellb.custom_minimum_size = Vector2(96, 32)
+		row3.add_child(sellb)
+		var cancelb := _mk_button("취소", func() -> void: _qty_layer.visible = false)
+		cancelb.custom_minimum_size = Vector2(72, 32)
+		row3.add_child(cancelb)
+		var hint := Label.new()
+		hint.text = "Shift + 버튼: 10배씩"
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.add_theme_font_size_override("font_size", 11)
+		hint.add_theme_color_override("font_color", Color(0.6, 0.52, 0.4))
+		v.add_child(hint)
+		$Panel.add_child(_qty_layer)
+	_qty_title.text = disp
+	_qty_layer.visible = true
+	_refresh_qty()
+
+
+func _mk_qty_btn(step: int) -> Button:
+	var b := _mk_button(("+%d" % step) if step > 0 else str(step),
+		func() -> void:
+			var mul := 10 if Input.is_key_pressed(KEY_SHIFT) else 1
+			_set_qty(_qty + step * mul))
+	b.custom_minimum_size = Vector2(44, 30)
+	return b
+
+
+func _set_qty(q: int) -> void:
+	_qty = clampi(q, 1, _qty_max)
+	_refresh_qty()
+
+
+func _refresh_qty() -> void:
+	_qty_label.text = "%d / %d" % [_qty, _qty_max]
+	_qty_total.text = "판매 금액: %dG" % _sell_qty_value(_qty_kind, _qty_id, _qty)
+
+
+func _confirm_sell() -> void:
+	_qty_layer.visible = false
+	if _sell_qty_max(_qty_kind, _qty_id) <= 0:
+		return
+	if _qty_kind == "crop":
+		_on_sell(_qty_id, _qty)
+	else:
+		_on_sell_item(_qty_id, _qty)

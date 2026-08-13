@@ -10,11 +10,11 @@ extends Node
 var m: KyojinMain    # main.gd
 
 
-func net_shop(op: String, id: String) -> void:
+func net_shop(op: String, id: String, qty := -1) -> void:
 	if Net.is_host():
 		m.netsync._broadcast_stats()
 	elif Net.is_guest():
-		m.netsync._req_shop.rpc_id(1, op, id)
+		m.netsync._req_shop.rpc_id(1, op, id, qty)
 
 
 func record_kill(mob: String) -> void:
