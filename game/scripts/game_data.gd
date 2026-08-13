@@ -931,6 +931,86 @@ func story4_objective_short() -> String:
 	return ""
 
 
+# ---- 우측 상단 퀘스트 추적창 ----
+#
+# 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
+# hud가 매 프레임 이걸 읽어 그리므로, 단계가 바뀌면 즉시 갱신된다.
+func _quest_brief(s: String) -> String:
+	var t := s.split("\n")[0]
+	if t.length() > 36:
+		t = t.substr(0, 35) + "…"
+	return t
+
+
+func tracked_quest() -> Dictionary:
+	var o := story_objective_short()
+	if o != "":
+		var cur := story_current_quest()
+		return {"title": str(cur.get("name", "처음 온 마을")), "obj": o,
+			"desc": _quest_brief(str(cur.get("story", "")))}
+	o = story2_objective_short()
+	if o != "":
+		return {"title": "마을을 깨우다", "obj": o,
+			"desc": "이장의 부탁 — 마을에 다시 활기를 불어넣자."}
+	o = fisher_objective_short()
+	if o != "":
+		return {"title": "낚시꾼과 바닷길", "obj": o,
+			"desc": "낯선 낚시꾼이 황금잉어 소문을 듣고 왔다."}
+	o = move_objective_short()
+	if o != "":
+		return {"title": "새로운 주민의 이사", "obj": o,
+			"desc": "무진이 마을에 살고 싶다는 편지를 보내왔다."}
+	o = forest_objective_short()
+	if o != "":
+		return {"title": "숲속에서 발견한 집", "obj": o,
+			"desc": "무진이 숲 깊은 곳에서 수상한 집을 봤다고 한다."}
+	o = story4_objective_short()
+	if o != "":
+		return {"title": "오래된 마을의 경계", "obj": o,
+			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다."}
+	o = tutorial_objective_short()
+	if o != "":
+		var flag := tutorial_current_flag()
+		if flag in STORY2_FLAGS:
+			return {"title": "마을을 깨우다", "obj": o,
+				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자."}
+		return {"title": "마을 생활 안내", "obj": o,
+			"desc": "안 해도 되지만, 하면 마을살이가 수월해진다."}
+	var gl := grandpa_line()
+	if gl != "":
+		return {"title": "할아버지의 부탁", "obj": gl.replace("목표: ", ""),
+			"desc": "연구 노트에 남은 할아버지의 흔적을 따라가자."}
+	return {}
+
+
+# 지금 말을 걸어야 하는 퀘스트 NPC 머리 위 표시.
+#   "!" 아직 대화하지 않은 대상 / "?" 납품(보고)할 수 있는 대상
+func quest_npc_marks() -> Dictionary:
+	var marks := {}
+	if story2_phase == "farm_talk":
+		marks["chief"] = "!"
+	if fisher_quest == "meet":
+		marks["fisher"] = "!"
+	if move_quest == "show":
+		marks["chief"] = "!"
+	match forest_quest:
+		"arrive", "found":
+			marks["explorer"] = "!"
+		"ask":
+			marks["chief"] = "!"
+		"visit":
+			marks["forest_mom"] = "!"
+	if story4_phase == "ask":
+		marks["chief"] = "!"
+	if merchant_errand == "doing":
+		# 노점 재료를 다 모았으면 민지에게 가져다주자
+		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
+			marks["merchant"] = "?"
+	if mom_quest_open() and mom_quest != "":
+		marks["forest_mom"] = "?"
+	return marks
+
+
 # ---- 메인 스토리 5: 숲속에서 발견한 집 ----
 #
 # 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 무진이 마을로 이사 온다.

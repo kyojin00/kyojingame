@@ -167,10 +167,16 @@ func _draw_overlay() -> void:
 	# 말을 걸어 달라는 표시: 머리 위에서 통통 튀는 느낌표
 	if m.story._postman != null and m.story._postman_state == "wait" and not m.ui_open():
 		_draw_bang(m.story._postman.position + Vector2(0, -136))
-	if GameData.fisher_quest == "meet" and not m.ui_open():
-		var fn: Variant = m.story._fisher_node()
-		if fn != null and fn.visible:
-			_draw_bang(fn.position + Vector2(0, -124))
+	# 퀘스트 대상 NPC 표시 — ! 말을 걸어야 할 사람 / ? 납품(보고)할 사람
+	# (대상은 GameData.quest_npc_marks()가 스토리 단계를 보고 정한다)
+	if not m.ui_open():
+		var marks: Dictionary = GameData.quest_npc_marks()
+		for mn in m.npcs:
+			if mn.visible and marks.has(mn.id):
+				if str(marks[mn.id]) == "!":
+					_draw_bang(mn.position + Vector2(0, -124))
+				else:
+					_draw_question(mn.position + Vector2(0, -124))
 
 	for pt in m.particles:
 		var s: float = float(pt.size)
@@ -198,6 +204,23 @@ func _draw_bang(pos: Vector2) -> void:
 	for r: Rect2 in [body, dot]:
 		m.overlay.draw_rect(r.grow(2.0), Color(0.12, 0.08, 0.05, 0.92))  # 외곽선
 		m.overlay.draw_rect(r, Color(1.0, 0.86, 0.25))
+
+
+# 납품/보고가 가능한 NPC 머리 위 물음표 — 느낌표와 같은 픽셀 결
+func _draw_question(pos: Vector2) -> void:
+	var bob := absf(sin(m.weather_time * 4.0)) * 6.0
+	var p := pos + Vector2(0, -bob)
+	var segs: Array = [
+		Rect2(p + Vector2(-8, 0), Vector2(14, 5)),    # 윗머리
+		Rect2(p + Vector2(2, 4), Vector2(5, 7)),      # 오른쪽 내림
+		Rect2(p + Vector2(-3, 10), Vector2(8, 5)),    # 가운데 꺾임
+		Rect2(p + Vector2(-3, 14), Vector2(5, 5)),    # 목
+		Rect2(p + Vector2(-3, 24), Vector2(6, 7)),    # 점
+	]
+	for r: Rect2 in segs:
+		m.overlay.draw_rect(r.grow(2.0), Color(0.12, 0.08, 0.05, 0.92))
+	for r: Rect2 in segs:
+		m.overlay.draw_rect(r, Color(0.55, 0.95, 0.45))
 
 
 func _context_hint() -> Array:

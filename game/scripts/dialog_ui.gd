@@ -24,6 +24,10 @@ var buttons_box: HBoxContainer
 var portrait: TextureRect
 var skip_btn: Button
 
+var _deco: Control = null          # 스티치·나뭇잎·진행 화살표를 그리는 겹
+var _name_plate: PanelContainer = null
+var _deco_t := 0.0
+
 var _seq: Array = []
 var _seq_idx := -1
 var _seq_name := ""
@@ -34,14 +38,22 @@ var _seq_has_choices := false
 
 # 대화창은 화면 아래 가운데에 고정하고, 내용 높이만큼만 커진다.
 # (예전에는 645x210으로 고정이라 짧은 대사에서도 빈 공간이 크게 남았다)
-const PANEL_W := 520
+#
+# 따뜻한 우드톤 팔레트 — 밝은 크림 속지 + 진한 브라운 테두리 +
+# 나무 명패식 이름 탭. 퀘스트 추적창도 같은 톤을 쓴다.
+const PANEL_W := 470               # 화면을 덜 가리게 조금 줄였다
 const BOTTOM_MARGIN := 56          # 아래 핫바를 가리지 않는 높이
-const FONT_TITLE := 17
+const FONT_TITLE := 16
 const FONT_BODY := 17
 const FONT_BTN := 15
 const FONT_SKIP := 13
 const SKIP_W := 76
-const PORTRAIT := 64
+const PORTRAIT := 58
+const COL_CREAM := Color(0.97, 0.93, 0.83, 0.97)   # 속지 (밝은 크림)
+const COL_WOOD := Color(0.62, 0.44, 0.26)          # 명패·장식 (우드 브라운)
+const COL_WOOD_DK := Color(0.45, 0.3, 0.16)        # 테두리 (진한 브라운)
+const COL_INK := Color(0.32, 0.2, 0.1)             # 본문 글자 (잉크 브라운)
+const COL_LEAF := Color(0.45, 0.62, 0.32)          # 나뭇잎 장식
 
 
 func _ready() -> void:
@@ -67,13 +79,21 @@ func _ready() -> void:
 	panel.offset_bottom = -BOTTOM_MARGIN
 	panel.custom_minimum_size = Vector2(PANEL_W, 0)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
-	style.border_color = Color(0.42, 0.36, 0.55)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(9)
+	style.bg_color = COL_CREAM
+	style.border_color = COL_WOOD_DK
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(9)          # 모서리를 살짝 둥글게
+	style.set_content_margin_all(8)
 	panel.add_theme_stylebox_override("panel", style)
 	root.add_child(panel)
+
+	# 아기자기한 디테일 — 네 귀퉁이 스티치 점 + 왼쪽 위 나뭇잎 한 장 +
+	# 대화가 이어질 때 오른쪽 아래에서 콩콩 뛰는 진행 화살표(▼)
+	_deco = Control.new()
+	_deco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_deco.draw.connect(_draw_deco)
+	panel.add_child(_deco)
 
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 9)
@@ -98,24 +118,35 @@ func _ready() -> void:
 	top.add_theme_constant_override("separation", 4)
 	v.add_child(top)
 
-	var lpad := Control.new()
-	lpad.custom_minimum_size = Vector2(SKIP_W, 0)
-	top.add_child(lpad)
-
+	# 이름은 작은 나무 명패 탭에 얹는다 (왼쪽 정렬)
+	_name_plate = PanelContainer.new()
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = COL_WOOD
+	pstyle.border_color = COL_WOOD_DK
+	pstyle.set_border_width_all(2)
+	pstyle.set_corner_radius_all(6)
+	pstyle.content_margin_left = 10.0
+	pstyle.content_margin_right = 10.0
+	pstyle.content_margin_top = 1.0
+	pstyle.content_margin_bottom = 1.0
+	_name_plate.add_theme_stylebox_override("panel", pstyle)
+	_name_plate.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top.add_child(_name_plate)
 	title_label = Label.new()
-	title_label.add_theme_color_override("font_color", Color("ffd75e"))
+	title_label.add_theme_color_override("font_color", Color(0.99, 0.95, 0.86))
 	title_label.add_theme_font_size_override("font_size", FONT_TITLE)
-	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(title_label)
+	_name_plate.add_child(title_label)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(spacer)
 
 	# 대사가 여러 줄 남았을 때만 보인다 (ESC와 같은 동작)
 	skip_btn = Button.new()
 	skip_btn.text = "건너뛰기 >>"
 	skip_btn.tooltip_text = "이 대화를 건너뛴다 (ESC)"
 	skip_btn.add_theme_font_size_override("font_size", FONT_SKIP)
-	skip_btn.add_theme_color_override("font_color", Color(0.72, 0.68, 0.82))
+	skip_btn.add_theme_color_override("font_color", COL_WOOD)
 	skip_btn.custom_minimum_size = Vector2(SKIP_W, 0)
 	skip_btn.focus_mode = Control.FOCUS_NONE
 	skip_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -125,11 +156,13 @@ func _ready() -> void:
 
 	body_label = Label.new()
 	body_label.add_theme_font_size_override("font_size", FONT_BODY)
+	body_label.add_theme_color_override("font_color", COL_INK)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# 글자는 상자 한가운데에 놓는다 (가로·세로 모두)
+	# 글자는 상자 한가운데에 놓는다 (가로·세로 모두).
+	# 세로 최소 높이를 줄여 대사에 필요한 만큼만 차지한다
 	body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	body_label.custom_minimum_size = Vector2(0, 44)
+	body_label.custom_minimum_size = Vector2(0, 34)
 	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body_label)
@@ -140,10 +173,59 @@ func _ready() -> void:
 	v.add_child(buttons_box)
 
 
+# 선택지 버튼도 같은 우드톤 — 크림 바탕에 진한 브라운 테두리
+func _style_btn(btn: Button) -> void:
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.9, 0.82, 0.66)
+	st.border_color = COL_WOOD_DK
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(6)
+	st.content_margin_left = 10.0
+	st.content_margin_right = 10.0
+	st.content_margin_top = 3.0
+	st.content_margin_bottom = 3.0
+	btn.add_theme_stylebox_override("normal", st)
+	var hv: StyleBoxFlat = st.duplicate()
+	hv.bg_color = Color(0.96, 0.9, 0.75)
+	btn.add_theme_stylebox_override("hover", hv)
+	btn.add_theme_stylebox_override("pressed", st)
+	btn.add_theme_color_override("font_color", COL_INK)
+	btn.add_theme_color_override("font_hover_color", COL_INK)
+	btn.add_theme_color_override("font_pressed_color", COL_INK)
+
+
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	_deco_t += delta
+	if _deco != null:
+		_deco.queue_redraw()   # 진행 화살표가 콩콩 뛰도록
+
+
+# 귀퉁이 스티치 점 4개 + 명패 옆 나뭇잎 + 진행 화살표.
+# 장식은 글자 영역 밖(테두리 근처)에만 둔다 — 가독성이 먼저다.
+func _draw_deco() -> void:
+	var sz: Vector2 = _deco.size
+	var dot := COL_WOOD
+	for c: Vector2 in [Vector2(5, 5), Vector2(sz.x - 8, 5),
+			Vector2(5, sz.y - 8), Vector2(sz.x - 8, sz.y - 8)]:
+		_deco.draw_rect(Rect2(c, Vector2(3, 3)), dot)
+	# 왼쪽 위 작은 나뭇잎 (픽셀 두 장)
+	_deco.draw_rect(Rect2(12, 4, 4, 3), COL_LEAF)
+	_deco.draw_rect(Rect2(15, 2, 3, 3), COL_LEAF.lightened(0.2))
+	# 대화가 더 남았으면 오른쪽 아래에서 ▼가 콩콩 뛴다
+	if in_seq() and not _seq_has_choices:
+		var bob := absf(sin(_deco_t * 4.0)) * 3.0
+		var p := Vector2(sz.x - 18, sz.y - 12 + bob - 3.0)
+		_deco.draw_colored_polygon(PackedVector2Array([
+			p, p + Vector2(8, 0), p + Vector2(4, 5)]), COL_WOOD_DK)
+
+
 # buttons: [[라벨, Callable], ...] — 콜백이 null이면 닫기 동작
 func open(title_text: String, body_text: String, buttons: Array,
 		portrait_tex: Texture2D = null) -> void:
 	title_label.text = title_text
+	_name_plate.visible = title_text != ""   # 이름 없는 안내창엔 명패도 없다
 	body_label.text = body_text
 	# 일반 안내창에는 건너뛸 대사가 없다 — 시퀀스가 다시 켜 준다
 	skip_btn.visible = false
@@ -156,6 +238,7 @@ func open(title_text: String, body_text: String, buttons: Array,
 		btn.text = b[0]
 		btn.add_theme_font_size_override("font_size", FONT_BTN)
 		btn.focus_mode = Control.FOCUS_NONE
+		_style_btn(btn)
 		if b[1] != null:
 			btn.pressed.connect(b[1])
 		else:
@@ -178,6 +261,7 @@ func set_buttons(buttons: Array) -> void:
 		btn.text = b[0]
 		btn.add_theme_font_size_override("font_size", FONT_BTN)
 		btn.focus_mode = Control.FOCUS_NONE
+		_style_btn(btn)
 		if b[1] != null:
 			btn.pressed.connect(b[1])
 		else:

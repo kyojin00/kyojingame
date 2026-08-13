@@ -168,10 +168,43 @@ func _mm_dot(pos: Vector2, x0: int, y0: int, col: Color) -> void:
 
 # ---- 퀘스트 트래커: 픽셀아트 두루마리 ----
 
+var quest_title_label: Label = null   # 퀘스트 제목 (진한 브라운)
+var goal_label: Label = null          # 📍 현재 목표 (강조색 — 제일 눈에 띈다)
+
+
 func _build_tracker_scroll() -> void:
 	var panel: Panel = $TrackerPanel
 	var empty := StyleBoxEmpty.new()
 	panel.add_theme_stylebox_override("panel", empty)
+	# 클릭하면 퀘스트 상세 창(Q)이 열린다
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.tooltip_text = "클릭: 퀘스트 상세 (%s)" % GameData.key_label("open_quest")
+	panel.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed \
+				and ev.button_index == MOUSE_BUTTON_LEFT:
+			Sound.play_sfx("sfx_ui")
+			main.quest_ui.toggle())
+	# 두루마리 안: 퀘스트 제목 -> 📍 현재 목표(강조) -> 짧은 설명·안내
+	panel.offset_bottom = 168.0           # 세 층이 들어가게 살짝 키운다
+	quest_title_label = Label.new()
+	quest_title_label.position = Vector2(14, 12)
+	quest_title_label.size = Vector2(198, 16)
+	quest_title_label.add_theme_font_size_override("font_size", 12)
+	quest_title_label.add_theme_color_override("font_color", Color(0.32, 0.2, 0.08))
+	quest_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(quest_title_label)
+	goal_label = Label.new()
+	goal_label.position = Vector2(14, 29)
+	goal_label.size = Vector2(198, 34)
+	goal_label.add_theme_font_size_override("font_size", 12)
+	goal_label.add_theme_color_override("font_color", Color(0.78, 0.42, 0.02))
+	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(goal_label)
+	# 기존 objective_label은 설명·부가 안내 줄로 내려앉는다
+	objective_label.position = Vector2(14, 64)
+	objective_label.size = Vector2(198, 92)
+	objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var deco := Control.new()
 	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
 	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -406,37 +439,16 @@ func refresh(force := false) -> void:
 		GameData.day_in_season(), GameData.clock_text()])
 	_put(money_label, "%dG" % GameData.money)
 
-	# 두루마리 퀘스트 트래커 (최소 문구)
+	# 두루마리 퀘스트 트래커: 제목 / 📍 현재 목표(강조) / 짧은 설명.
+	# tracked_quest()가 스토리 단계를 따라가므로 단계가 바뀌면 즉시 갱신된다
+	var tq := GameData.tracked_quest()
+	_put(quest_title_label, str(tq.get("title", "")))
+	var new_goal := str(tq.get("obj", ""))
+	_put(goal_label, ("📍 " + new_goal) if new_goal != "" else "")
+	_watch_goal(new_goal)
 	var track := []
-	var story_obj := GameData.story_objective_short()
-	var obj := GameData.tutorial_objective_short()
-	var story2_obj := GameData.story2_objective_short()
-	var fisher_obj := GameData.fisher_objective_short()
-	var move_obj := GameData.move_objective_short()
-	var forest_obj := GameData.forest_objective_short()
-	var story4_obj := GameData.story4_objective_short()
-	if story_obj != "":
-		track.append("목표: " + story_obj)
-	elif story2_obj != "":
-		track.append("목표: " + story2_obj)
-	elif fisher_obj != "":
-		track.append("목표: " + fisher_obj)
-	elif move_obj != "":
-		track.append("목표: " + move_obj)
-	elif forest_obj != "":
-		track.append("목표: " + forest_obj)
-	elif story4_obj != "":
-		track.append("목표: " + story4_obj)
-	elif obj != "":
-		# 밭 갈기(메인 스토리 2)는 「목표」, 마을 생활 안내는 「안내(선택)」
-		var flag := GameData.tutorial_current_flag()
-		track.append(("목표: " if flag in GameData.STORY2_FLAGS
-			else "안내(선택): ") + obj)
-	else:
-		# 기본 안내가 끝나면 할아버지의 부탁이 그 자리를 잇는다
-		var gl := GameData.grandpa_line()
-		if gl != "":
-			track.append(gl)
+	if str(tq.get("desc", "")) != "":
+		track.append(str(tq.desc))
 	# 축제날은 그날 할 일을 맨 위로 올린다
 	var fl := GameData.festival_line()
 	if fl != "":
@@ -475,8 +487,80 @@ func show_message(text: String, dur := 2.5) -> void:
 	msg_timer = dur
 
 
+# ---- 새 목표 알림 — 목표가 바뀌는 순간 상단 중앙에 2.6초 떠 있다 ----
+var _goal_seen := "<init>"
+var _goal_banner: PanelContainer = null
+var _goal_banner_body: Label = null
+var _goal_banner_t := 0.0
+
+
+func _watch_goal(goal: String) -> void:
+	if goal == _goal_seen:
+		return
+	var first := _goal_seen == "<init>"
+	_goal_seen = goal
+	if first or goal == "":
+		return   # 게임을 막 켰을 때·목표가 사라질 때는 조용히
+	_show_goal_banner(goal)
+
+
+func _show_goal_banner(goal: String) -> void:
+	if _goal_banner == null:
+		_goal_banner = PanelContainer.new()
+		var st := StyleBoxFlat.new()
+		st.bg_color = Color(0.97, 0.93, 0.83, 0.96)
+		st.border_color = Color(0.45, 0.3, 0.16)
+		st.set_border_width_all(3)
+		st.set_corner_radius_all(9)
+		st.content_margin_left = 20.0
+		st.content_margin_right = 20.0
+		st.content_margin_top = 5.0
+		st.content_margin_bottom = 7.0
+		_goal_banner.add_theme_stylebox_override("panel", st)
+		_goal_banner.anchor_left = 0.5
+		_goal_banner.anchor_right = 0.5
+		_goal_banner.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_goal_banner.offset_top = 58.0
+		_goal_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 0)
+		_goal_banner.add_child(v)
+		var head := Label.new()
+		head.text = "새로운 목표"
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		head.add_theme_font_size_override("font_size", 12)
+		head.add_theme_color_override("font_color", Color(0.62, 0.44, 0.26))
+		v.add_child(head)
+		_goal_banner_body = Label.new()
+		_goal_banner_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_goal_banner_body.add_theme_font_size_override("font_size", 17)
+		_goal_banner_body.add_theme_color_override("font_color", Color(0.32, 0.2, 0.1))
+		v.add_child(_goal_banner_body)
+		add_child(_goal_banner)
+	_goal_banner_body.text = goal
+	_goal_banner.visible = true
+	_goal_banner.modulate.a = 0.0
+	_goal_banner_t = 0.0
+	Sound.play_sfx("sfx_ui")
+
+
+func _update_goal_banner(delta: float) -> void:
+	if _goal_banner == null or not _goal_banner.visible:
+		return
+	_goal_banner_t += delta
+	if _goal_banner_t < 0.25:
+		_goal_banner.modulate.a = _goal_banner_t / 0.25
+	elif _goal_banner_t < 2.2:
+		_goal_banner.modulate.a = 1.0
+	elif _goal_banner_t < 2.8:
+		_goal_banner.modulate.a = (2.8 - _goal_banner_t) / 0.6
+	else:
+		_goal_banner.visible = false
+
+
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	_update_goal_banner(delta)
 	# 제작대에서 방금 완성된 것 (game_data는 UI를 못 부른다)
 	while not GameData.desk_done_pending.is_empty():
 		var made: String = GameData.desk_done_pending.pop_front()

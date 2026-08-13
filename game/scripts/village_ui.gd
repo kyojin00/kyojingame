@@ -196,6 +196,12 @@ func _build_village_building(pid: String) -> void:
 
 
 func _talk_to(npc: Node2D) -> void:
+	# 마을 도착 이벤트 순서 고정: 우체부 -> 이장 -> 자유 행동.
+	# 우체부의 필수 대화(편지 전달)가 끝나기 전에는 이장과 이야기할 수
+	# 없다 — story_phase가 이벤트 플래그다 ("deliver"를 지나야 완료).
+	if npc.id == "chief" and GameData.story_phase in ["travel", "deliver"]:
+		m.hud.show_message("우선 우체부 아저씨와 이야기해보자.")
+		return
 	# 스토리 대화가 먼저다 — 낚시꾼 첫 만남 / 호미 받기 / 숲속의 집
 	# (편지는 우체부가 직접 전한다 — 이장에게 대신 전달하는 과정은 없다)
 	if npc.id == "chief" and GameData.story2_phase == "farm_talk":
