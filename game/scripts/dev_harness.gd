@@ -553,30 +553,81 @@ func _debug_tick() -> void:
 				" 확률(1렙)=", rare1, " (10렙)=", rare10,
 				" 산호레시피=", coral_ok, " 고대이야기=", relic_ok)
 		350:
-			# 메인 스토리 5 「숲속에서 발견한 집」:
-			# 무진 이사 -> (다음 날) 숲속 집 발견담 -> 이장도 모름 -> 모녀 만남
-			# -> 완료와 함께 호감도 콘텐츠 해금
+			# 메인 스토리 3 「새로운 주민의 이사」 -> 5 「숲속에서 발견한 집」 전체 체인:
+			# 이주 편지 -> 이장 상의(결정권 이양) -> 집터 레시피·제작 -> 집 자리
+			# 직접 선정 -> 다음 날 무진 이사·첫인사 -> (다음 날) 숲속 집 발견담
+			# -> 이장도 모름 -> 모녀 만남 -> 호감도 해금
+			GameData.move_quest = ""
 			GameData.forest_quest = ""
 			GameData.affinity_open = false
-			m.story._forest_update(0.016)
-			var arrived: bool = GameData.forest_quest == "arrive" \
-				and GameData.forest_objective_short() != ""
-			var have_ex := false
+			GameData.move_house = Vector2i(-999, -999)
+			GameData.move_day = GameData.day - 1
+			for n0 in m.npcs.duplicate():          # 샌드박스가 미리 깔아 둔 무진 제거
+				if n0.id == "explorer":
+					m.npcs.erase(n0)
+					n0.queue_free()
+			m.story._move_update(0.016)
+			var letter_ok: bool = m.dialog.visible and GameData.move_quest == "letter"
+			m.dialog.close()
+			m.story._end_move_letter()
+			var show_q: bool = GameData.move_quest == "show" \
+				and GameData.move_objective_short() != ""
 			var chief_npc: Node2D = null
 			for n3 in m.npcs:
-				if n3.id == "explorer":
-					have_ex = true
-				elif n3.id == "chief":
+				if n3.id == "chief":
 					chief_npc = n3
-			# 해금 전에는 하트·선물 없이 담백한 대화만 나온다
+			# 해금 전에는 하트·선물 없이 담백한 대화만... 인데 지금은 이장이
+			# 스토리 대화(이주 상의)를 먼저 꺼낸다 — 훅이 잘 걸리는지 본다
 			m.village._talk_to(chief_npc)
-			var gated: bool = m.dialog.visible and not GameData.affinity_open
+			var chief_talk: bool = m.dialog.visible
 			m.dialog.close()
-			m.story._start_explorer_arrive_dialog()
-			var talk1: bool = m.dialog.visible
+			m.story._end_move_chief()
+			var build_q: bool = GameData.move_quest == "build"
+			# 집터 레시피 구매(비싸다) + 제작(재료가 많이 든다)
+			var money_b: int = GameData.money
+			m.shop._on_buy_recipe("housing_kit", GameData.HOUSING_KIT_PRICE)
+			var recipe_ok2: bool = "housing_kit" in GameData.recipes_unlocked \
+				and GameData.money == money_b - GameData.HOUSING_KIT_PRICE
+			GameData.wood += 60
+			GameData.stone += 40
+			GameData.items["nail"] = int(GameData.items.get("nail", 0)) + 4
+			var kit0 := int(GameData.items.get("housing_kit", 0))
+			var kit_started: bool = GameData.desk_start("housing_kit")
+			GameData.desk_tick(999.0)
+			var kit_ok: bool = kit_started \
+				and int(GameData.items["housing_kit"]) == kit0 + 1
+			# 물가에는 못 짓는다 / 트인 풀밭에는 지어진다
+			var bad_ok: bool = not m.story.try_place_move_house(Vector2i(2, m.SEA_Y0))
+			var hdoor := Vector2i(20, 55)
+			for hy in range(49, 60):
+				for hx in range(14, 27):
+					m.objnode._remove_object(Vector2i(hx, hy))
+					m.grid[hy][hx].ground = "grass"
+					m.grid[hy][hx].crop_id = ""
+			var placed: bool = m.story.try_place_move_house(hdoor)
+			var house2_ok: bool = placed and GameData.move_quest == "wait" \
+				and str(m.objects.get(hdoor - Vector2i(2, 3), {}).get("kind", "")) == "house" \
+				and int(GameData.items["housing_kit"]) == kit0
+			GameData.day += 1                      # 다음 날 — 무진이 이사 온다
+			m.story._move_update(0.016)
+			var have_ex := false
+			for nx in m.npcs:
+				if nx.id == "explorer":
+					have_ex = true
+			var greet_q: bool = GameData.move_quest == "greet" and have_ex
+			m.story._start_move_greet_dialog()
+			var greet_talk: bool = m.dialog.visible
+			m.dialog.skip_seq()                    # 첫인사 끝 -> 이사 완료
+			var move_done: bool = GameData.move_quest == "done" \
+				and GameData.forest_quest == "settle"
 			m.dialog.close()
-			m.story._end_explorer_arrive()
-			var settled: bool = GameData.forest_quest == "settle"
+			print("MOVE_OK=", letter_ok and show_q and chief_talk and build_q
+				and recipe_ok2 and kit_ok and bad_ok and house2_ok and greet_q
+				and greet_talk and move_done,
+				" 편지=", letter_ok, " 이장상의=", show_q and chief_talk,
+				" 결정권=", build_q, " 레시피=", recipe_ok2, " 제작=", kit_ok,
+				" 물가거부=", bad_ok, " 집완공=", house2_ok, " 이사=", greet_q,
+				" 첫인사=", greet_talk, " 완료+숲이야기로=", move_done)
 			GameData.day += 1                      # 하룻밤 자고 나면 발견담이 뜬다
 			m.story._forest_update(0.016)
 			var found_q: bool = GameData.forest_quest == "found" \
@@ -603,12 +654,10 @@ func _debug_tick() -> void:
 			m.dialog.skip_seq()                    # 남은 대사 접기 -> 완료 처리
 			var done_ok: bool = GameData.forest_quest == "done" and GameData.affinity_open
 			m.dialog.close()
-			GameData.day -= 1
-			print("FOREST_OK=", arrived and have_ex and gated and talk1 and settled
-				and found_q and ask_q and house_ok and mom_ok and girl_ok and meet
-				and done_ok,
-				" 이사=", arrived, " 무진=", have_ex, " 해금전잠금=", gated,
-				" 정착=", settled, " 발견담=", found_q, " 이장도모름=", ask_q,
+			GameData.day -= 2
+			print("FOREST_OK=", found_q and ask_q and house_ok and mom_ok
+				and girl_ok and meet and done_ok,
+				" 발견담=", found_q, " 이장도모름=", ask_q,
 				" 숲속의집=", house_ok, " 연화=", mom_ok, " 솔이=", girl_ok,
 				" 만남=", meet, " 완료+호감도해금=", done_ok)
 		338:

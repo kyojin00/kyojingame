@@ -409,6 +409,7 @@ func refresh(force := false) -> void:
 	var obj := GameData.tutorial_objective_short()
 	var story2_obj := GameData.story2_objective_short()
 	var fisher_obj := GameData.fisher_objective_short()
+	var move_obj := GameData.move_objective_short()
 	var forest_obj := GameData.forest_objective_short()
 	if story_obj != "":
 		track.append("목표: " + story_obj)
@@ -416,6 +417,8 @@ func refresh(force := false) -> void:
 		track.append("목표: " + story2_obj)
 	elif fisher_obj != "":
 		track.append("목표: " + fisher_obj)
+	elif move_obj != "":
+		track.append("목표: " + move_obj)
 	elif forest_obj != "":
 		track.append("목표: " + forest_obj)
 	elif obj != "":

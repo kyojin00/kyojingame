@@ -753,6 +753,35 @@ func merchant_at_stall() -> bool:
 	return false
 
 
+# ---- 메인 스토리 3: 새로운 주민의 이사 (편지 이주 + 집터 건설) ----
+#
+# 첫 수확 다음 날, 처음으로 「이주 희망 편지」가 도착한다. 보낸 사람은
+# 호기심 많고 모험을 좋아하는 소년 무진. 이장과 상의해 받아주기로 하고,
+# 이장은 앞으로의 이사 결정권을 플레이어에게 맡긴다. 집터 레시피(비싸다)를
+# 사서 재료를 모아 집터를 만들고, 해금된 땅 중 원하는 풀밭에 집 자리를
+# 직접 정하면 집이 지어진다. 다음 날 무진이 이사 와 첫인사를 나눈다.
+#   "": 아직 / letter: 편지 읽는 중 / show: 이장에게 보여주기 /
+#   build: 집터 레시피 구매·제작·설치 / wait: 완공 — 내일 이사 온다 /
+#   greet: 무진 도착 — 인사하러 가기 / done: 완료 (이주·집터 시스템 해금)
+var move_quest := ""
+var move_day := 0            # 단계 전환 기준 날 (편지 도착·이사 대기)
+var move_house := Vector2i(-999, -999)   # 플레이어가 정한 새 주민 집 자리
+const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
+
+
+func move_objective_short() -> String:
+	match move_quest:
+		"show":
+			return "이주 희망 편지를 이장에게 보여주자 (E)"
+		"build":
+			return "집터로 새 주민의 집 자리를 정하자 (레시피는 잡화점)"
+		"wait":
+			return "집이 완성됐다 — 내일 무진이 이사 온다"
+		"greet":
+			return "이사 온 무진에게 인사하러 가 보자 (새 집 앞, E)"
+	return ""
+
+
 # ---- 메인 스토리 5: 숲속에서 발견한 집 ----
 #
 # 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 무진이 마을로 이사 온다.
@@ -836,6 +865,10 @@ const DESK_RECIPES := {
 	"trash_bin": {"name": "쓰레기통", "cost": {"wood": 5, "forage_ring": 2},
 		"kind": "furniture", "furn": "trash_bin", "locked": true, "shop": "해변 노점",
 		"desc": "튼튼한 쓰레기통 — 완성되면 방에 놓인다 (레시피는 해변 노점에서)"},
+	# 집터 — 새 주민의 집을 지을 자리 (메인 스토리 3에서 해금, 일부러 무겁다)
+	"housing_kit": {"name": "집터", "cost": {"wood": 60, "stone": 40, "nail": 4},
+		"kind": "item", "give": "housing_kit", "locked": true, "shop": "잡화점",
+		"desc": "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 가방에서 쓴다"},
 	"bed_wood": {"name": "나무 침대", "cost": {"wood": 25, "nail": 2},
 		"kind": "bed", "lv": 1, "desc": "아침 기력이 가득 찬다"},
 	"bed_soft": {"name": "푹신한 침대", "cost": {"wood": 30, "cloth": 5, "milk": 3},
@@ -1258,6 +1291,7 @@ const ITEMS := {
 	"forage_ring": {"name": "금속 고리", "sell": 28},
 	"forage_relic": {"name": "고대 조각", "sell": 480},
 	"bait": {"name": "미끼", "sell": 2},
+	"housing_kit": {"name": "집터", "sell": 0},
 	"forage_coral": {"name": "산호 조각", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
 	"bug_butterfly": {"name": "나비", "sell": 30},
@@ -1302,7 +1336,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"dish_coral_tea",
+	"housing_kit", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -2853,6 +2887,9 @@ func reset_all() -> void:
 	forest_quest = ""
 	forest_day = 0
 	affinity_open = false
+	move_quest = ""
+	move_day = 0
+	move_house = Vector2i(-999, -999)
 	story2_phase = ""
 	village_built = []
 	if DEV_MODE:
@@ -3177,6 +3214,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"merchant_errand": merchant_errand, "stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,
 		"affinity_open": affinity_open,
+		"move_quest": move_quest, "move_day": move_day,
+		"move_house": [move_house.x, move_house.y],
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,

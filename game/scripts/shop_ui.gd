@@ -386,6 +386,18 @@ func _rebuild() -> void:
 				pcp.disabled = GameData.money < 200
 				items_box.add_child(_mk_row("flower_pot", "화분 레시피",
 					"집을 꾸미는 화분 · 재료: 잡초 5", pcp, [["coin", 200]]))
+			# 집터 — 새 주민의 집을 짓는 큰 공사 (스토리 3에서 이장이 알려준다)
+			if GameData.move_quest in ["build", "wait", "greet", "done"]:
+				if "housing_kit" in GameData.recipes_unlocked:
+					items_box.add_child(_mk_row("housing_kit", "집터 레시피 (배움)",
+						"집 책상에서 만든다 — 목재 60 · 석재 40 · 못 4"))
+				else:
+					var hcp := _mk_button("구매",
+						_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
+					hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
+					items_box.add_child(_mk_row("housing_kit", "집터 레시피",
+						"새 주민의 집을 짓는다 · 재료: 목재 60 · 석재 40 · 못 4",
+						hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
 		if buy_cat in ["", "misc"]:
 			# 마음을 전하는 것들
 			_note("— 마음을 전하는 것 —")

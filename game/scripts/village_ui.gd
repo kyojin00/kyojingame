@@ -144,6 +144,12 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "fisher" and GameData.fisher_quest == "meet":
 		m.story._start_fisher_dialog()
 		return
+	if npc.id == "chief" and GameData.move_quest == "show":
+		m.story._start_move_chief_dialog()
+		return
+	if npc.id == "explorer" and GameData.move_quest == "greet":
+		m.story._start_move_greet_dialog()
+		return
 	if npc.id == "explorer" and GameData.forest_quest == "arrive":
 		m.story._start_explorer_arrive_dialog()
 		return

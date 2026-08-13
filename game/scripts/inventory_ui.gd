@@ -554,6 +554,11 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			main.doing.do_eat(eat_id)
 			_rebuild())
+	# 집터는 슬롯을 눌러 바라보는 자리에 설치한다 (스토리 3)
+	if bool(e.get("place", false)):
+		b.pressed.connect(func() -> void:
+			visible = false
+			main.story.request_place_house())
 	return b
 
 
@@ -752,6 +757,9 @@ func _item_entries() -> Array:
 			e["desc"] = "알 수 없는 무늬가 새겨진 옛 돌조각 — 아주 드물게 밀려온다"
 		elif id == "bait":
 			e["desc"] = "낚시 미끼 — 낚싯대를 던질 때 하나씩 쓴다. 입질이 훨씬 빨라진다"
+		elif id == "housing_kit":
+			e["desc"] = "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 여기서 클릭"
+			e["place"] = true
 		elif id == "broom":
 			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
 		elif id in ["nail", "cloth", "rope", "hinge"]:

@@ -58,6 +58,15 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.stall_hours = (d.get("stall_hours", []) as Array)
 	GameData.forest_quest = str(d.get("forest_quest", ""))
 	GameData.forest_day = int(d.get("forest_day", 0))
+	GameData.move_quest = str(d.get("move_quest", ""))
+	GameData.move_day = int(d.get("move_day", 0))
+	var mh: Array = d.get("move_house", [])
+	GameData.move_house = Vector2i(int(mh[0]), int(mh[1])) if mh.size() == 2 \
+		else Vector2i(-999, -999)
+	# 이사 편지(스토리 3)가 생기기 전 세이브: 무진이 이미 마을에 있으면
+	# (숲속의 집 이야기가 시작됐으면) 이사는 끝난 것으로 친다
+	if GameData.move_quest == "" and GameData.forest_quest != "":
+		GameData.move_quest = "done"
 	# 숲속의 집 이야기가 생기기 전 세이브: 이미 선물을 주고받던 사이면
 	# (호감도가 쌓여 있으면) 호감도 콘텐츠는 열린 채로 이어 준다
 	var had_aff := false

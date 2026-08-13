@@ -1357,6 +1357,7 @@ func tutorial_notify(flag: String) -> void:
 	# 첫 수확 = 메인 스토리 2의 마지막 목표 (안내 체크리스트와는 무관하다)
 	if flag == "harvest" and GameData.story2_phase == "farm":
 		GameData.story2_phase = "done"
+		GameData.move_day = GameData.day   # 다음 날 아침, 이주 희망 편지가 온다
 		m.hud.quest_toast("메인 스토리 2 완료!")
 		m.saveio.save_now()
 	var tut: Dictionary = GameData.tutorial
@@ -1517,15 +1518,10 @@ func hidden_beach_find(fid: String) -> void:
 func _forest_update(_delta: float) -> void:
 	if Net.is_guest():
 		return
-	# 첫 수확 뒤 — 무진이 마을 광장에 나타난다
-	if GameData.forest_quest == "" and GameData.story_phase == "done" \
-			and GameData.story2_phase == "done":
-		GameData.forest_quest = "arrive"
-		m.npcmgr._sync_village_npcs()
-		m.hud.quest_toast("메인 스토리: 숲속에서 발견한 집")
-		m.hud.show_message("마을 광장에 처음 보는 사람이 서성인다. 말을 걸어 보자.", 6.0)
-	# 정착한 다음 날 아침 — 무진이 숲에서 뭔가를 발견했다
-	elif GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
+	# 무진의 이야기는 이사(메인 스토리 3)가 끝난 다음 날부터 이어진다 —
+	# _end_move_greet가 forest_quest를 "settle"로 넘겨 준다.
+	# 정착한 다음 날 아침, 숲을 쏘다니던 무진이 뭔가를 발견했다.
+	if GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
 		GameData.forest_quest = "found"
 		m.hud.quest_toast("무진이 할 말이 있는 듯하다")
 
@@ -1622,4 +1618,151 @@ func _end_forest_quest() -> void:
 		GameData.affinity_open = true
 		m.hud.quest_toast("메인 스토리 완료: 숲속에서 발견한 집")
 		m.hud.show_message("호감도 해금! 퀘스트 너머, 사람들의 이야기가 열렸다.\n주민에게 말을 걸어 마음을 나누고 선물도 건네 보자.", 7.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 3: 새로운 주민의 이사 ----
+#
+# 첫 수확 다음 날, 처음으로 「이주 희망 편지」가 도착한다 (편지 이주 시스템의
+# 소개). 이장과 상의해 소년 무진을 받아주기로 하고, 이장은 앞으로의 이사
+# 결정권을 플레이어에게 맡긴다. 집터(비싼 레시피 + 많은 재료)를 만들어
+# 해금된 땅의 풀밭에 집 자리를 직접 정하면 집이 서고, 다음 날 무진이
+# 이사 와 첫인사를 나눈다. 완료하면 이주 편지·집터 시스템이 해금된다.
+
+func _move_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 첫 수확 다음 날 아침 — 이주 희망 편지가 도착한다
+	if GameData.move_quest == "" and GameData.story_phase == "done" \
+			and GameData.story2_phase == "done" and GameData.day > GameData.move_day \
+			and not m.ui_open() and not m.dialog.visible and not m.story_cutscene:
+		GameData.move_quest = "letter"
+		_start_move_letter_dialog()
+	# 집을 지은 다음 날 — 무진이 정말로 이사 온다
+	elif GameData.move_quest == "wait" and GameData.day > GameData.move_day:
+		GameData.move_quest = "greet"
+		m.npcmgr._sync_village_npcs()
+		m.hud.quest_toast("무진이 이사 왔다!")
+		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다. 인사하러 가 보자.", 6.0)
+
+
+func _start_move_letter_dialog() -> void:
+	m.dialog.open_seq("이주 희망 편지", null, [
+		{"text": "(문 앞에 낯선 편지가 한 통 놓여 있었다.)"},
+		{"text": "『안녕하세요! 저는 무진이라고 해요.\n여기저기 떠돌며 모험하는 걸 좋아하는 소년이에요.』"},
+		{"text": "『소문을 들었어요. 조용하던 교진 마을에\n다시 활기가 돌기 시작했다고요!』"},
+		{"text": "『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요?』"},
+		{"text": "(마을로 이사 오고 싶다는 편지다.\n이장님께 보여드리고 상의해 보자.)"},
+	], _end_move_letter)
+
+
+func _end_move_letter() -> void:
+	if GameData.move_quest == "letter":
+		GameData.move_quest = "show"
+		m.hud.quest_toast("메인 스토리: 새로운 주민의 이사")
+	m.saveio.save_now()
+
+
+# 이장과 상의 — 이번 이사를 받아주기로 하고, 앞으로의 결정권을 넘겨받는다
+func _start_move_chief_dialog() -> void:
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "「이주 희망 편지라... 어디 보세.」"},
+		{"text": "「모험을 좋아하는 소년이구먼. 좋네!\n젊은 사람이 온다면야 마을이야 환영이지.」",
+			"portrait": chief_happy},
+		{"text": "「그리고 말인데... 앞으로 이런 편지는\n굳이 나한테 가져올 필요 없네.」",
+			"portrait": chief_normal},
+		{"text": "「자네 덕에 상점도 생기고, 마을에 조금씩\n활기가 돌고 있잖나. 새 주민을 받을지는\n이제 자네가 정하게.」"},
+		{"text": "「집 자리도 자네가 직접 골라 주게.\n아직 열리지 않은 땅만 아니면 어디든 좋네.」"},
+		{"text": "「집터는 민지네 잡화점에서 레시피를 판다네.\n값도 재료도 꽤 들지만... 마을 일이니 부탁함세.」",
+			"portrait": chief_happy},
+		{"text": "「앞으로도 우리 마을을 잘 부탁하네.」",
+			"portrait": chief_happy},
+	], _end_move_chief)
+
+
+func _end_move_chief() -> void:
+	if GameData.move_quest == "show":
+		GameData.move_quest = "build"
+		m.hud.quest_toast("집터를 마련해 새 주민의 집 자리를 정하자")
+		m.hud.show_message("잡화점 생활용품 선반에서 집터 레시피를 판다.\n(제작 재료: 목재 60 · 석재 40 · 못 4 — 집 제작대에서)", 7.0)
+	m.saveio.save_now()
+
+
+# 가방에서 집터를 클릭하면 — 바라보는 풀밭에 집 자리를 정한다
+func request_place_house() -> void:
+	if GameData.move_quest != "build" or int(GameData.items.get("housing_kit", 0)) <= 0:
+		m.hud.show_message("지금은 집터를 쓸 일이 없다.")
+		return
+	var door: Vector2i = m.actions.target_tile()
+	if not _can_place_house(door - Vector2i(2, 3)):
+		m.hud.show_message("여기는 집을 지을 수 없다 — 넓게 트인 풀밭을 바라보고 다시 쓰자.", 4.0)
+		return
+	m.dialog.open("집터", "지금 바라보는 자리에 새 주민의 집을 지을까?\n(조준한 칸이 현관이 된다)",
+		[["짓기", _confirm_place_house.bind(door)], ["다른 곳에", null]])
+
+
+func _confirm_place_house(door: Vector2i) -> void:
+	m.dialog.close()
+	try_place_move_house(door)
+
+
+# door 칸이 현관이 되도록 집을 놓는다. 성공하면 true.
+func try_place_move_house(door: Vector2i) -> bool:
+	if GameData.move_quest != "build" or int(GameData.items.get("housing_kit", 0)) <= 0:
+		return false
+	var a := door - Vector2i(2, 3)
+	if not _can_place_house(a):
+		return false
+	GameData.items["housing_kit"] = int(GameData.items["housing_kit"]) - 1
+	GameData.move_house = a
+	m.worldgen._fill_building(a)
+	m.objects.erase(m.door_tile(a))
+	GameData.move_quest = "wait"
+	GameData.move_day = GameData.day
+	Sound.play_sfx("sfx_place")
+	m.hud.quest_toast("새 주민의 집 완공!")
+	m.hud.show_message("집이 다 지어졌다. 내일이면 무진이 이사 온다!", 5.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+	return true
+
+
+# 집이 설 자리: 해금된 땅의 넓게 트인 풀밭 (물·모래·나무·건물·작물 금지).
+# 아직 열리지 않은 지역은 숲(fixed 나무)이나 모래·물이라 여기서 걸러진다.
+func _can_place_house(a: Vector2i) -> bool:
+	for y in range(a.y - 1, a.y + 5):
+		for x in range(a.x - 1, a.x + 6):
+			if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.MAP_H - 1:
+				return false
+			var cell: Dictionary = m.grid[y][x]
+			if cell.ground != "grass" or str(cell.get("crop_id", "")) != "":
+				return false
+			if m.objects.has(Vector2i(x, y)):
+				return false
+	return true
+
+
+# 이사 온 무진과의 첫인사
+func _start_move_greet_dialog() -> void:
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("무진", m.tex["npc_explorer_portrait_happy"], [
+		{"text": "「아! 혹시 네가 %s?\n편지 받아 줘서 정말 고마워!」" % nm},
+		{"text": "「나는 무진. 오늘부터 이 마을 주민이야.\n집도 네가 직접 골라 준 자리라며? 마음에 쏙 들어!」"},
+		{"text": "「나는 한곳에 가만히 못 있는 성격이라...\n내일부터 마을 구석구석 모험하고 다닐 거야.」",
+			"portrait": m.tex["npc_explorer_portrait_normal"]},
+		{"text": "「좋은 거 찾으면 제일 먼저 알려줄게.\n또 보자, 잘 부탁해!」",
+			"portrait": m.tex["npc_explorer_portrait_happy"]},
+	], _end_move_greet)
+
+
+func _end_move_greet() -> void:
+	if GameData.move_quest in ["greet", "wait"]:
+		GameData.move_quest = "done"
+		m.hud.quest_toast("메인 스토리 완료: 새로운 주민의 이사")
+		m.hud.show_message("이주 편지·집터 시스템 해금!\n앞으로 이주 희망 편지는 이장 허락 없이 네가 직접 결정한다.", 7.0)
+		# 정착 다음 날, 무진의 숲 모험이 시작된다 (숲속에서 발견한 집으로 이어진다)
+		GameData.forest_quest = "settle"
+		GameData.forest_day = GameData.day
 	m.saveio.save_now()

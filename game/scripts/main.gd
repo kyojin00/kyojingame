@@ -595,6 +595,10 @@ func _ready() -> void:
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 			GameData.story2_phase = "done"
+			# 스토리 3·5는 끝난 샌드박스로 시작한다 (검증은 350이 처음부터 돌린다)
+			GameData.move_quest = "done"
+			GameData.forest_quest = "done"
+			GameData.affinity_open = true
 			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
 			GameData.house_lv = 2         # 집/부엌/침대 캡처용
@@ -1082,6 +1086,7 @@ func _process(delta: float) -> void:
 	_bgm_tick(delta)
 	story._story_update(delta)
 	story._fisher_update(delta)
+	story._move_update(delta)
 	story._forest_update(delta)
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)

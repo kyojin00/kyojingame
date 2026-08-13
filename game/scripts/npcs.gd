@@ -98,15 +98,19 @@ func _sync_village_npcs() -> void:
 		if not have_fisher:
 			_spawn_npc("fisher", m.FISHER_ARRIVE)
 
-	# 모험가 무진 — 스토리 5로 이사 온다 (건물 없이 광장 언저리에서 지낸다)
-	if GameData.forest_quest != "":
+	# 모험가 무진 — 이주 편지(스토리 3)로 이사 온다. 자기 집(플레이어가
+	# 지어 준 자리) 앞에서 스폰되고, 마을을 자유롭게 쏘다닌다.
+	if GameData.move_quest in ["greet", "done"] or GameData.forest_quest != "":
 		var have_ex := false
 		for n in m.npcs:
 			if n.id == "explorer":
 				have_ex = true
 				break
 		if not have_ex:
-			_spawn_npc("explorer", m.EXPLORER_ARRIVE)
+			var ex_spawn: Vector2i = m.EXPLORER_ARRIVE
+			if GameData.move_house.x >= 0:
+				ex_spawn = m.door_tile(GameData.move_house) + Vector2i(0, 1)
+			_spawn_npc("explorer", ex_spawn)
 
 	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
 	if GameData.forest_quest in ["visit", "done"]:

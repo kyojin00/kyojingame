@@ -18,6 +18,8 @@ func _door_kind_at(t: Vector2i) -> String:
 	if GameData.forest_quest in ["visit", "done"] \
 			and t == m.door_tile(m.FOREST_HOUSE_ANCHOR):
 		return "forest_house"
+	if GameData.move_house.x >= 0 and t == m.door_tile(GameData.move_house):
+		return "move_house"
 	for pid: String in GameData.village_built:
 		if m.VILLAGE_PLOTS.has(pid) and t == m.door_tile(m.VILLAGE_PLOTS[pid].anchor):
 			return pid
@@ -28,6 +30,11 @@ func _enter_building(kind: String) -> void:
 	m.riding.dismount_horse()   # 말을 타고 실내로 들어갈 수는 없다
 	if kind == "home":
 		m.interior.open()
+		return
+	if kind == "move_house":
+		m.dialog.open("무진의 집",
+			"새 주민 무진의 집이다. 문패에 나침반이 그려져 있다.\n(무진은 마을 어딘가를 쏘다니는 중이다)",
+			[["닫기", null]])
 		return
 	if kind == "forest_house":
 		# 숲속의 집 (스토리 5): 첫 방문이면 모녀와의 만남, 이후에는 짧은 인사
