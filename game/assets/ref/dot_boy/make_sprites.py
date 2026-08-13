@@ -205,16 +205,23 @@ def torso_down(g, bob, swing, dx=0, skip=None):
         g.px(sx + (1 if side == 'left' else 0), y + 5 + dy, 'S')  # 손 그늘
 
 
-def legs_down(g, stride):
-    """앞모습 다리. stride: 화면 왼쪽 다리가 앞으로 나간 양 -2..+2"""
-    g.rect(7, HIP_Y, 13, HIP_Y + 1, 'p')       # 엉덩이 띠
-    g.hline(7, 13, HIP_Y, 'P')                 # 셔츠 아랫단 그늘
-    g.px(10, HIP_Y + 1, 'P')
+def legs_down(g, stride, dx=0, sq=0):
+    """앞모습 다리. stride: 화면 왼쪽 다리가 앞으로 나간 양 -2..+2
+    dx/sq: 휘두르기 때 몸이 쏠리고 주저앉는 양 — 엉덩이는 몸통을 따라가고
+    발은 디딘 자리에 남아, 다리가 엉덩이에서 발로 기울어진다."""
+    g.rect(7 + dx, HIP_Y + sq, 13 + dx, HIP_Y + 1 + sq, 'p')   # 엉덩이 띠
+    g.hline(7 + dx, 13 + dx, HIP_Y + sq, 'P')  # 셔츠 아랫단 그늘
+    g.px(10 + dx, HIP_Y + 1 + sq, 'P')
     for x0, s in ((7, stride), (11, -stride)):
         lift = min(2, -s) if s < 0 else 0      # 뒤로 간 다리는 들려 짧아진다
         pc = 'P' if lift else 'p'              # 들린 다리는 그늘에 잠긴다
-        g.rect(x0, LEG_Y, x0 + 2, GROUND - 3 - lift, pc)
-        g.px(x0 + 2, LEG_Y, 'P')
+        top = LEG_Y + sq
+        for yy in range(top, GROUND - 2 - lift):
+            t = (yy - (HIP_Y + 1 + sq)) / (GROUND - HIP_Y - 1 - sq)
+            xx = x0 + round(dx * (1 - t))      # 엉덩이 쪽만 dx만큼 쏠린다
+            g.rect(xx, yy, xx + 2, yy, pc)
+            if yy == top:
+                g.px(xx + 2, yy, 'P')
         g.rect(x0, GROUND - 2 - lift, x0 + 2, GROUND - lift, 'k')
         g.hline(x0, x0 + 2, GROUND - lift, 'K')
 
@@ -249,21 +256,22 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     g.px(hx + 1, hy + 1, 'S')
 
 
-def legs_side(g, stride, lean=0):
+def legs_side(g, stride, lean=0, dx=0, sq=0):
     """옆모습 다리. stride: 가까운 다리가 앞으로 나간 양 -2..+2
-    허벅지는 엉덩이에 붙어 있고 발끝으로 갈수록 stride 만큼 기울어진다."""
+    허벅지는 엉덩이에 붙어 있고 발끝으로 갈수록 stride 만큼 기울어진다.
+    dx/sq: 휘두르기 쏠림·주저앉음 (엉덩이만 따라가고 발은 제자리)."""
     c = 10 + lean
-    g.rect(c - 3, HIP_Y, c + 3, HIP_Y + 1, 'p')
-    g.hline(c - 3, c + 3, HIP_Y, 'P')          # 셔츠 아랫단 그늘
-    g.px(c - 1, HIP_Y + 1, 'P')
+    g.rect(c - 3 + dx, HIP_Y + sq, c + 3 + dx, HIP_Y + 1 + sq, 'p')
+    g.hline(c - 3 + dx, c + 3 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
+    g.px(c - 1 + dx, HIP_Y + 1 + sq, 'P')
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다
     for off, shade in ((-stride, True), (stride, False)):
         lift = 1 if off < 0 else 0             # 뒤로 간 다리는 뒤꿈치가 들린다
         pc, kc = ('P', 'K') if shade else ('p', 'k')
         bot = GROUND - lift
-        for yy in range(LEG_Y, bot + 1):
-            t = (yy - (HIP_Y + 1)) / (GROUND - HIP_Y - 1)   # 엉덩이 0 → 발 1
-            x = 10 + round(off * t) + lean
+        for yy in range(LEG_Y + sq, bot + 1):
+            t = (yy - (HIP_Y + 1 + sq)) / (GROUND - HIP_Y - 1 - sq)  # 엉덩이 0 → 발 1
+            x = 10 + round(off * t + dx * (1 - t)) + lean
             cc = pc if yy <= bot - 3 else kc
             g.rect(x - 1, yy, x + 1, yy, cc)
         x = 10 + off + lean
@@ -295,8 +303,8 @@ def torso_up(g, bob, swing, dx=0, skip=None):
         g.px(sx + (1 if side == 'left' else 0), y + 5 + dy, 'S')
 
 
-def legs_up(g, stride):
-    legs_down(g, stride)                       # 뒤모습 다리는 앞모습과 같은 규칙
+def legs_up(g, stride, dx=0, sq=0):
+    legs_down(g, stride, dx, sq)               # 뒤모습 다리는 앞모습과 같은 규칙
 
 
 # --------------------------------------------------------------- 휘두르기
@@ -360,13 +368,15 @@ def swing_frame(direction, phase):
     (fx, fy), dx, sq = spec['poses'][phase]
     g = G()
     if direction == 'side':
-        legs_side(g, 2)                        # 앞뒤로 벌려 디딘 자세 (네 장 공통)
+        # 발은 네 장 내내 같은 자리를 디디고(벌린 자세), 엉덩이·다리 윗동이
+        # 몸통을 따라 쏠린다 — 허리가 어긋나지 않고 다리도 같이 움직인다.
+        legs_side(g, 2, 0, dx, sq)
         torso_side(g, sq, 0, dx, draw_arm=False)
     elif direction == 'down':
-        legs_down(g, 0)
+        legs_down(g, 0, dx, sq)
         torso_down(g, sq, 0, dx, skip=spec['skip'])
     else:
-        legs_up(g, 0)
+        legs_up(g, 0, dx, sq)
         torso_up(g, sq, 0, dx, skip=spec['skip'])
     art = PARTS[direction][0]
     head(g, art, sq, dx)
