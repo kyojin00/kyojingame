@@ -352,18 +352,21 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
         bot = GROUND - lift
         hip_row = HIP_Y + 2 + sq
         knee_row = (hip_row + bot) // 2 + 1
+        ankle_row = bot - 4                    # 여기까지만 기울고, 발은 통짜다
         for yy in range(LEG_Y - 1 + sq, bot + 1):   # 띠 아래 줄부터 겹쳐 잇는다
             if yy <= knee_row:                 # 허벅지
                 f = (yy - hip_row) / max(1, knee_row - hip_row)
                 o = knee_off * f
-            else:                              # 정강이
-                f = (yy - knee_row) / max(1, bot - knee_row)
+            elif yy <= ankle_row:              # 정강이 (발목에서 발 위치에 닿는다)
+                f = (yy - knee_row) / max(1, ankle_row - knee_row)
                 o = knee_off + (foot_off - knee_off) * f
+            else:                              # 발 — 줄마다 어긋나면 신발이 깨진다
+                o = foot_off
             t = (yy - hip_row) / (GROUND - hip_row)
             x = 15 + round(o + dx * (1 - t)) + lean
-            cc = pc if yy <= bot - 4 else kc
+            cc = pc if yy <= ankle_row else kc
             if yy == bot:
-                g.rect(x - 2, yy, x + 2, yy, cc)   # 바닥은 좁게 (둥근 발)
+                g.rect(x - 2, yy, x + 3, yy, cc)   # 뒤꿈치만 둥글게 (앞은 앞코로)
             else:
                 g.rect(x - 3, yy, x + 3, yy, cc)
             if not shade and hip_row < yy <= bot - 4:  # 띠에 겹친 줄은 건드리지
