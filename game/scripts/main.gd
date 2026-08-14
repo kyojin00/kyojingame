@@ -151,22 +151,6 @@ var doing: KyojinDoing = null
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
-	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
-	"player_f_down_walk_0", "player_f_down_walk_1",
-	"player_f_down_walk_2", "player_f_down_walk_3", "player_f_down_walk_4",
-	"player_f_side_walk_0", "player_f_side_walk_1",
-	"player_f_side_walk_2", "player_f_side_walk_3", "player_f_side_walk_4",
-	"player_f_up_walk_0", "player_f_up_walk_1",
-	"player_f_up_walk_2", "player_f_up_walk_3", "player_f_up_walk_4",
-	"new_boy_down_idle", "new_boy_side_idle", "new_boy_up_idle",
-	"new_boy_down_walk_0", "new_boy_down_walk_1",
-	"new_boy_down_walk_2", "new_boy_down_walk_3", "new_boy_down_walk_4",
-	"new_boy_side_walk_0", "new_boy_side_walk_1",
-	"new_boy_side_walk_2", "new_boy_side_walk_3", "new_boy_side_walk_4",
-	"new_boy_down_blink", "new_boy_side_blink",
-	"player_f_down_blink", "player_f_side_blink",
-	"new_boy_up_walk_0", "new_boy_up_walk_1",
-	"new_boy_up_walk_2", "new_boy_up_walk_3", "new_boy_up_walk_4",
 	"egg", "golden_egg", "milk", "ore", "star_ore", "gem", "memory_piece",
 	"ghost_essence", "gold_crop", "world_branch",
 	# 물고기 · 요리 · 다 자란 작물은 _load_textures가 GameData의 표를 보고
@@ -424,6 +408,7 @@ func _ready() -> void:
 	doing = _mount("player_actions", "PlayerActions")
 
 	_load_textures()
+	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
 	worldgen._build_map()
 	farming.rebuild()
 
@@ -563,6 +548,7 @@ func _ready() -> void:
 	var loaded := GameData.load_game()
 	if loaded.size() > 0:
 		saveio._apply_save(loaded)
+		apply_appearance()   # 세이브에 담긴 외형으로 다시 굽는다
 		story._apply_story_camera.call_deferred()
 		# 스토리 도중 저장했다면 우체부 아저씨가 계속 동행한다
 		if GameData.story_phase == "approach":
@@ -677,17 +663,46 @@ func _load_textures() -> void:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
 	for id: String in GameData.FORAGE_IDS:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
-	# 휘두르기 도트는 **있으면 쓴다**. 남녀 모두 ref/dot_boy/make_sprites.py가
-	# 그려 둔다 — 없는 쪽이 생기면 player.gd가 몸통을 굽혀 대신한다.
-	# TEXTURE_NAMES에 넣으면 없을 때 터지므로 여기서만 따로 챙긴다. 그림을
-	# sprites/에 떨어뜨리면 그날부터 켜진다.
-	for g: String in ["new_boy", "player_f"]:
-		for d: String in ["down", "up", "side"]:
-			for i in 5:   # player.gd의 SWING_FRAMES와 같은 수
-				var sn := "%s_%s_swing_%d" % [g, d, i]
-				var sp := "res://assets/sprites/%s.png" % sn
-				if ResourceLoader.exists(sp):
-					tex[sn] = load(sp)
+	# 플레이어 도트 — 머리 스타일(외형 템플릿)마다 한 벌씩. ref/dot_boy/
+	# make_sprites.py가 표준 팔레트로 그려 둔다. 없는 프레임은 조용히
+	# 건너뛴다 (휘두르기 도트가 없으면 player.gd가 몸통을 굽혀 대신한다).
+	for g: String in GameData.HAIR_PREFIX:
+		for sfx: String in _player_suffixes():
+			var sn := "%s_%s" % [g, sfx]
+			var sp := "res://assets/sprites/%s.png" % sn
+			if ResourceLoader.exists(sp):
+				tex[sn] = load(sp)
+
+
+# 플레이어 한 벌을 이루는 프레임 이름들 (idle 3 + walk 15 + blink 2 + swing 15)
+func _player_suffixes() -> Array[String]:
+	var out: Array[String] = ["down_idle", "up_idle", "side_idle",
+		"down_blink", "side_blink"]
+	for d: String in ["down", "up", "side"]:
+		for i in 5:
+			out.append("%s_walk_%d" % [d, i])
+		for i in 5:   # player.gd의 SWING_FRAMES와 같은 수
+			out.append("%s_swing_%d" % [d, i])
+	return out
+
+
+# 고른 외형을 플레이어 텍스처로 굽는다 — 게임은 언제나 pc_* 이름만 본다.
+# 머리 스타일이 원본 한 벌을 정하고, 옷·바지·신발 색은 표준 팔레트를
+# 골라 둔 색으로 바꿔 만든다 (GameData.recolor_player_image).
+func apply_appearance() -> void:
+	var ap: Dictionary = GameData.appearance
+	var src: String = GameData.HAIR_PREFIX[clampi(int(ap.hair), 0, GameData.HAIR_PREFIX.size() - 1)]
+	var plain: bool = int(ap.shirt) == 0 and int(ap.pants) == 0 and int(ap.shoes) == 0
+	for sfx: String in _player_suffixes():
+		var t: Texture2D = tex.get("%s_%s" % [src, sfx])
+		if t == null:
+			continue
+		if plain:
+			tex["pc_" + sfx] = t
+		else:
+			var img: Image = t.get_image()
+			GameData.recolor_player_image(img, ap)
+			tex["pc_" + sfx] = ImageTexture.create_from_image(img)
 
 
 # 맵 밖 배경 색조 (어두운 숲처럼 보이게)

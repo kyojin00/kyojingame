@@ -602,8 +602,7 @@ func _update_sprite() -> void:
 			player_sprite.flip_h = pdir == "left"
 	# 맞은 직후엔 눈을 질끈 감는다 (깜빡임 그림 재활용 — 뒷모습은 눈이 없다)
 	if hurt_cd > 0.55 and pdir != "up":
-		tex_name = "%s_%s_blink" % ["new_boy" if GameData.gender == "m" else "player_f",
-			"side" if (pdir == "left" or pdir == "right") else "down"]
+		tex_name = "pc_%s_blink" % ("side" if (pdir == "left" or pdir == "right") else "down")
 	player_sprite.texture = main.tex[tex_name]
 	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
 	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM

@@ -720,7 +720,64 @@ const PETS := {
 const PET_IDS := ["dog", "cat", "owl", "rabbit"]
 var owned_pets: Array = []
 var active_pet := ""
-var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
+var gender := "m"  # 플레이어 성별 (m/f) — 옛 세이브 호환용 (외형은 appearance가 쥔다)
+
+# ---- 플레이어 외형 (타이틀 「새로 시작」에서 고른다) ----
+# 머리는 스타일별로 도트 한 벌씩 있고(HAIR_PREFIX), 옷·바지·신발은
+# 표준 팔레트(파랑 셔츠·갈색 바지·밤색 신발)로 뽑은 도트의 색을
+# 실행 중에 갈아입힌다 (recolor_player_image). 게임 코드는 언제나
+# 조립 결과인 pc_* 텍스처만 본다 (main.apply_appearance가 굽는다).
+var appearance := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0}
+const HAIR_PREFIX := ["new_boy", "hair_short", "hair_spiky", "player_f"]
+const HAIR_NAMES := ["민머리", "짧은 머리", "삐죽 머리", "긴 머리"]
+const SHIRT_NAMES := ["파랑", "분홍", "초록", "노랑"]
+const PANTS_NAMES := ["갈색", "남색", "잿빛", "카키"]
+const SHOES_NAMES := ["밤색", "검정", "빨강", "파랑"]
+# [기본, 그늘, 밝은 면] — 0번이 도트가 실제로 칠해진 표준 팔레트다
+const APPEAR_SHIRT := [
+	[[58, 88, 168], [38, 58, 120], [94, 126, 200]],
+	[[214, 96, 116], [158, 60, 82], [232, 138, 152]],
+	[[74, 138, 84], [48, 98, 60], [112, 176, 118]],
+	[[206, 160, 60], [158, 114, 38], [232, 196, 102]],
+]
+const APPEAR_PANTS := [
+	[[134, 88, 46], [98, 62, 32], [158, 108, 58]],
+	[[64, 76, 116], [44, 54, 86], [88, 102, 144]],
+	[[110, 110, 118], [80, 80, 88], [140, 140, 148]],
+	[[126, 122, 72], [92, 88, 50], [154, 150, 96]],
+]
+const APPEAR_SHOES := [
+	[[82, 53, 33], [56, 37, 25]],
+	[[50, 48, 52], [32, 31, 35]],
+	[[150, 58, 46], [106, 38, 30]],
+	[[60, 76, 140], [40, 52, 102]],
+]
+
+
+# 표준 팔레트로 뽑힌 플레이어 도트의 옷 색을 ap 선택에 맞춰 바꾼다.
+# 색은 생성기(make_sprites.py PAL)와 정확히 같은 값이라 픽셀 단위로 맞는다.
+func recolor_player_image(img: Image, ap: Dictionary) -> void:
+	var mp := {}
+	for tbl_sel in [[APPEAR_SHIRT, int(ap.shirt)], [APPEAR_PANTS, int(ap.pants)],
+			[APPEAR_SHOES, int(ap.shoes)]]:
+		var tbl: Array = tbl_sel[0]
+		var sel: int = clampi(int(tbl_sel[1]), 0, tbl.size() - 1)
+		if sel == 0:
+			continue
+		for i in (tbl[0] as Array).size():
+			var s: Array = tbl[0][i]
+			var dst: Array = tbl[sel][i]
+			mp[Color8(s[0], s[1], s[2]).to_rgba32()] = Color8(dst[0], dst[1], dst[2])
+	if mp.is_empty():
+		return
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a == 0.0:
+				continue
+			var key := c.to_rgba32()
+			if mp.has(key):
+				img.set_pixel(x, y, mp[key])
 # 메인 스토리 1 「우체부 아저씨와의 첫 만남」 진행 단계
 # enter: 숲 안으로 들어가보기 / approach: 우체부 접근·대화 /
 # equip: 나무도끼를 가방 슬롯에 장착 / chop: 나무를 베어보자 / done: 완료
@@ -1479,43 +1536,37 @@ func story_objective_short() -> String:
 
 
 func player_tex(part: String) -> String:
-	# 여자 캐릭터 텍스처 이름 (남자는 new_boy_* 를 그대로 쓴다)
-	return "player_f_" + part
+	# 플레이어 텍스처 이름 — 고른 외형으로 구워 둔 pc_* 를 본다
+	# (main.apply_appearance가 머리 스타일 + 옷 색으로 만들어 둔다)
+	return "pc_" + part
 
 
 # 휘두르기 도트 이름의 앞부분 (key = "down"/"up"/"side").
-# 남녀 모두 assets/ref/dot_boy/make_sprites.py가 방향당 네 장을 그려 둔다
-# (감기 시작 · 다 감음 · 내리침 · 되돌아옴). 골격이 같아 주먹 자리
-# (player.gd SWING_HAND_DOT)도 공용이다.
+# 모든 머리 스타일이 같은 골격이라 주먹 자리(player.gd SWING_HAND_DOT)도 공용이다.
 func swing_tex_base(key: String) -> String:
-	if gender == "m":
-		return "new_boy_%s_swing" % key
-	return "player_f_%s_swing" % key
+	return "pc_%s_swing" % key
 
 
 func player_side_tex(is_moving: bool, _suffix: String, t: float) -> String:
 	# 옆모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
-	var g := "new_boy" if gender == "m" else "player_f"
 	if not is_moving:
-		return g + "_side_idle"
-	return "%s_side_walk_%d" % [g, int(t * 8.0) % 5]
+		return "pc_side_idle"
+	return "pc_side_walk_%d" % (int(t * 8.0) % 5)
 
 
 func player_down_tex(is_moving: bool, _suffix: String, t: float) -> String:
 	# 앞모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	var g := "new_boy" if gender == "m" else "player_f"
 	if not is_moving:
-		return g + "_down_idle"
-	return "%s_down_walk_%d" % [g, int(t * 8.0) % 5]
+		return "pc_down_idle"
+	return "pc_down_walk_%d" % (int(t * 8.0) % 5)
 
 
 func player_up_tex(is_moving: bool, _suffix: String, t: float) -> String:
 	# 뒷모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	var g := "new_boy" if gender == "m" else "player_f"
 	if not is_moving:
-		return g + "_up_idle"
-	return "%s_up_walk_%d" % [g, int(t * 8.0) % 5]
+		return "pc_up_idle"
+	return "pc_up_walk_%d" % (int(t * 8.0) % 5)
 
 
 # 벌목 누적 횟수 (스토리 중 15그루째에 우체부가 능력치 창을 알려준다)
@@ -1531,9 +1582,7 @@ var story_rock_state := 0
 
 func player_idle_tex(dirn: String) -> String:
 	# 대기: 단일 서기 프레임. 숨쉬기는 스프라이트 세로 스케일로 연출한다 (player.gd)
-	if gender == "m":
-		return "new_boy_%s_idle" % dirn
-	return player_tex(dirn + "_idle")
+	return "pc_%s_idle" % dirn
 
 
 # 이동 속도 보정 (펫 + 바람 물약)
@@ -2498,11 +2547,12 @@ func is_tile_owned(x: int, y: int) -> bool:
 # 지금 맞는 갈래를 모아 그 안에서 하나를 뽑는다.
 #
 #   birthday  [계절, 날] — 그날 선물은 세 배로 오른다
+#   gender    성별 (m/f) — 호감도·결혼 이벤트가 참고한다
 #   romance   연애할 수 있는가 (마을 어른 둘은 아니다)
 #   loves     아주 좋아함 +30 · likes 좋아함 +18 · hates 싫어함 -6
 #             (표에 없는 것은 +8)
 const NPCS := {
-	"merchant": {"name": "민지", "birthday": [SPRING, 12], "romance": true,
+	"merchant": {"name": "민지", "birthday": [SPRING, 12], "gender": "f", "romance": true,
 	"lines": [
 		"어서 와! 오늘도 농사는 잘 되고 있어?",
 		"제철 씨앗이 제일 잘 자라. 가게 안으로 들어와!",
@@ -2545,7 +2595,7 @@ const NPCS := {
 	"secret50": "너희 할아버지... 우리 가게 단골이었어. 늘 이상한 걸 찾으셨지.\n'달빛을 먹고 자란 작물'이라던가... 밭에서도 기적이 자란다고 하셨어.",
 	"secret100": "떠나시기 전에 그러셨어. '내 연구는 이 마을 전부에 흩어져 있다'고.\n밭, 호수, 숲, 동굴... 그리고 사람들 속에도. 이제 그 말뜻을 알겠니?",
 	},
-	"fisher": {"name": "철수", "birthday": [SUMMER, 3], "romance": true,
+	"fisher": {"name": "철수", "birthday": [SUMMER, 3], "gender": "m", "romance": true,
 	"lines": [
 		"입질이 오면 초록 구간에서 낚아채는 거야.",
 		"황금잉어는 정말 귀하지... 나도 두 번밖에 못 봤어.",
@@ -2586,7 +2636,7 @@ const NPCS := {
 	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
 	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
 	},
-	"rancher": {"name": "보라", "birthday": [FALL, 20], "romance": true,
+	"rancher": {"name": "보라", "birthday": [FALL, 20], "gender": "f", "romance": true,
 	"lines": [
 		"동물은 사랑을 먹고 자라. 매일 쓰다듬어 줘!",
 		"닭이 낳은 달걀은 아침에 거둬야 신선해.",
@@ -2627,7 +2677,7 @@ const NPCS := {
 	"secret50": "너희 할아버지, 동물들이 유난히 따랐어.\n'동물이 주는 건 생산물이 아니라 마음'이라고 입버릇처럼 말씀하셨지.",
 	"secret100": "언젠가 금빛으로 빛나는 달걀을 보여주신 적이 있어.\n'사랑받은 닭만이 낳을 수 있다'며... 나는 아직도 그게 꿈같아.",
 	},
-	"blacksmith": {"name": "무쇠", "birthday": [WINTER, 8], "romance": false,
+	"blacksmith": {"name": "무쇠", "birthday": [WINTER, 8], "gender": "m", "romance": false,
 	"lines": [
 		"광석을 가져오면 도구를 벼려주지. 대장간으로 와.",
 		"동굴 깊은 곳 광석일수록 좋은 쇠가 된다.",
@@ -2660,7 +2710,7 @@ const NPCS := {
 	"secret50": "자네 할아버지? 별난 양반이었지. 광석을 사 가면서\n'이건 녹이려는 게 아니라 별을 담으려는 거야'라고 하더군.",
 	"secret100": "떠나기 전에 화로를 빌려 갔어. 뭘 만들었는지는 끝내 안 보여줬지만...\n그날 밤 대장간 굴뚝에서 무지개색 연기가 올라왔다네.",
 	},
-	"chief": {"name": "덕수", "birthday": [FALL, 5], "romance": false,
+	"chief": {"name": "덕수", "birthday": [FALL, 5], "gender": "m", "romance": false,
 	"lines": [
 		"우리 마을에 젊은 사람이 오니 좋구먼.",
 		"부지 문서는 내가 관리하고 있네. 표지판에서 사면 돼.",
@@ -2694,7 +2744,7 @@ const NPCS := {
 	"secret100": "그 양반이 마지막으로 한 말을 전해주지. '덕수, 내 손주가 오면\n일곱 가지를 모을 걸세. 그때 이 마을은 기적을 보게 될 거야.'",
 	},
 	# ---- 메인 스토리 5에서 합류하는 사람들 ----
-	"explorer": {"name": "무진", "birthday": [FALL, 7], "romance": false,
+	"explorer": {"name": "무진", "birthday": [FALL, 7], "gender": "m", "romance": false,
 	"lines": [
 		"이 마을, 걸어서 안 가 본 데가 없어. ...아마도?",
 		"지도 밖이 제일 재밌는 법이야.",
@@ -2712,7 +2762,7 @@ const NPCS := {
 	"likes": ["forage_berry", "forage_glass", "dish_baked_potato"],
 	"hates": ["sludge"],
 	},
-	"forest_mom": {"name": "연화", "birthday": [SPRING, 20], "romance": false,
+	"forest_mom": {"name": "연화", "birthday": [SPRING, 20], "gender": "f", "romance": false,
 	"lines": [
 		"숲의 아침 공기는 약이 돼요. 그래서 여기 살아요.",
 		"솔이가 요즘은 얼굴빛이 많이 좋아졌어요.",
@@ -2729,7 +2779,7 @@ const NPCS := {
 	"likes": ["forage_berry", "dish_soup", "dish_onion_soup"],
 	"hates": ["sludge", "forage_trash"],
 	},
-	"forest_girl": {"name": "솔이", "birthday": [SUMMER, 14], "romance": false,
+	"forest_girl": {"name": "솔이", "birthday": [SUMMER, 14], "gender": "f", "romance": false,
 	"lines": [
 		"기침이 많이 나아졌어요. 숲 공기 덕분이래요!",
 		"창문으로 다람쥐가 보여요. 이름도 지어 줬어요.",
@@ -2793,6 +2843,11 @@ func gift_value(npc_id: String, item_id: String) -> int:
 	if base > 0 and is_birthday(npc_id):
 		base *= 3          # 생일에는 세 배
 	return base
+
+
+# NPC 성별 (m/f) — 호감도·결혼 이벤트가 참고한다
+func npc_gender(npc_id: String) -> String:
+	return str((NPCS.get(npc_id, {}) as Dictionary).get("gender", "m"))
 
 
 # 지금 상황에 맞는 대사를 하나 고른다.
@@ -3744,6 +3799,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
 		"gender": gender,
+		"appearance": appearance,
 		"main_story": story_phase,
 		"tile": 32,
 		"player": [player_pos.x, player_pos.y],
