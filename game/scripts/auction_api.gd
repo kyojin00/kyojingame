@@ -80,12 +80,18 @@ func fetch(mine_only := false) -> void:
 	if busy:
 		return
 	busy = true
-	var q := REST + "farm_auctions?select=*&order=created_at.desc&limit=%d" % PAGE
 	if mine_only:
-		q += "&seller_id=eq." + GameData.farm_id.uri_encode()
-	else:
-		q += "&status=eq.open"
-	_send(q, HTTPClient.METHOD_GET, null, PackedStringArray(),
+		# 내 글은 함수로 받는다 — 목록에는 seller_id(내 농장 열쇠)가 실리지
+		# 않으므로, 열쇠를 아는 사람만 볼 수 있는 이 길로 온다
+		_send(REST + "rpc/farm_auction_mine", HTTPClient.METHOD_POST,
+			{"p_seller_id": GameData.farm_id}, PackedStringArray(),
+			func(code: int, res: Variant) -> void:
+				fetched.emit(res if code == 200 and typeof(res) == TYPE_ARRAY else []))
+		return
+	# 장터 목록 — 볼 수 있는 칸만 골라 받는다 (남의 열쇠는 서버가 안 준다)
+	var cols := "id,seller_name,cat,item_id,qty,quality,price,status,created_at"
+	_send(REST + "farm_auctions?select=%s&status=eq.open&order=created_at.desc&limit=%d"
+		% [cols, PAGE], HTTPClient.METHOD_GET, null, PackedStringArray(),
 		func(code: int, res: Variant) -> void:
 			fetched.emit(res if code == 200 and typeof(res) == TYPE_ARRAY else []))
 
