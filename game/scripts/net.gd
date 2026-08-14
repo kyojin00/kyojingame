@@ -8,6 +8,14 @@ const MAX_PLAYERS := 4
 
 var mode: int = Mode.SOLO
 var last_ip := ""     # 게스트가 찾아간 호스트 주소 (접속 화면에 보여 준다)
+# 방 코드 안내판 — 호스트가 방을 열면 코드를 받고, 손님은 코드로 주소를 찾는다
+var rooms: Node = null
+
+
+func _ready() -> void:
+	rooms = preload("res://scripts/room_api.gd").new()
+	rooms.name = "Rooms"
+	add_child(rooms)
 
 
 func is_host() -> bool:
@@ -55,6 +63,8 @@ func join_game(ip: String, port := DEFAULT_PORT) -> Error:
 
 
 func reset() -> void:
+	if rooms != null:
+		rooms.close_room()      # 열어 둔 방은 닫고 나간다
 	if multiplayer.multiplayer_peer != null:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = null

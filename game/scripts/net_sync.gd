@@ -17,6 +17,56 @@ extends Node
 var m: KyojinMain    # main.gd
 var _connect_ip := ""   # 접속 화면에 보여 줄 호스트 주소
 
+# ---- 게스트 요청 검문 ----
+#
+# 게스트가 보내는 `_req_*`는 **고친 게임에서 오는 것일 수 있다.** 예전에는
+# 그대로 반영해서, 조작한 클라이언트가 돈과 물건을 무한히 만들 수 있었다.
+# 호스트가 문지기 노릇을 한다 — 너무 잦은 요청은 흘리고, 말이 안 되는 값은
+# 버린다. (진짜 방어는 서버 권위 창고지만, 여기서 막을 수 있는 건 막는다)
+const REQ_PER_SEC := 12.0        # peer 하나가 초당 보낼 수 있는 요청
+const REQ_BURST := 30.0          # 잠깐 몰릴 때 허용치
+const AUCTION_MONEY_CAP := 9_000_000   # 장터 한 번에 오갈 수 있는 돈
+var _req_tokens := {}            # peer_id -> 남은 토큰
+var _req_last := {}              # peer_id -> 마지막으로 채운 시각(초)
+
+
+# 이 요청을 받아 줄까? (토큰 버킷 — 평소엔 넉넉하고 쏟아지면 막는다)
+func _allow(cost := 1.0) -> bool:
+	var pid := multiplayer.get_remote_sender_id()
+	var now := Time.get_ticks_msec() / 1000.0
+	var last: float = float(_req_last.get(pid, now))
+	var have: float = float(_req_tokens.get(pid, REQ_BURST))
+	have = minf(REQ_BURST, have + (now - last) * REQ_PER_SEC)
+	_req_last[pid] = now
+	if have < cost:
+		_req_tokens[pid] = have
+		return false
+	_req_tokens[pid] = have - cost
+	return true
+
+
+# 게임이 아는 물건인가 (아무 이름이나 보내 창고를 늘리지 못하게)
+func _known_goods(cat: String, id: String) -> bool:
+	match cat:
+		"seed", "produce":
+			return GameData.CROPS.has(id)
+		"tool":
+			return GameData.ALL_TOOLS.has(id)
+		_:
+			return GameData.ITEMS.has(id) or id == "wood" or id == "stone"
+
+
+# 요청한 게스트가 그 칸 가까이에 있는가 (맵 반대편을 건드리지 못하게)
+func _near_sender(t: Vector2i) -> bool:
+	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+		return false
+	var pid := multiplayer.get_remote_sender_id()
+	if not m.remote_players.has(pid):
+		return true      # 아직 자리를 못 받았으면 통과시킨다 (첫 프레임)
+	var p: Vector2 = m.remote_players[pid].position
+	var d := Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16) - p
+	return d.length() < m.TILE * 3.0
+
 
 func _show_connecting() -> void:
 	_connect_ip = Net.last_ip
@@ -56,6 +106,8 @@ func _on_peer_disconnected(id: int) -> void:
 	if m.remote_players.has(id):
 		m.remote_players[id].queue_free()
 		m.remote_players.erase(id)
+	_req_tokens.erase(id)      # 검문 기록도 함께 치운다
+	_req_last.erase(id)
 	if Net.is_host():
 		m.hud.show_message("일꾼이 농장을 떠났다.")
 
@@ -109,7 +161,8 @@ var _snap_buf := ""              # 게스트: 받아 쌓는 중인 스냅샷
 
 @rpc("any_peer", "reliable")
 func _req_snapshot() -> void:
-	if not Net.is_host():
+	# 맵 전체를 보내는 무거운 요청이라 값을 비싸게 매긴다 (도배 방지)
+	if not Net.is_host() or not _allow(10.0):
 		return
 	var who := multiplayer.get_remote_sender_id()
 	var json := _make_snapshot_json()
@@ -157,6 +210,8 @@ func _recv_snapshot(json: String) -> void:
 	m.queue_redraw()
 
 
+# 위치 갱신은 초당 15번 오는 것이 정상이라 검문에서 뺀다 (막으면 걸음이 끊긴다).
+# 세계를 바꾸지 않고 남의 그림 자리만 옮기므로, 조작해도 손해가 없다.
 @rpc("any_peer", "unreliable_ordered")
 func _sync_pos(x: float, y: float, dir: String, moving: bool) -> void:
 	var pid := multiplayer.get_remote_sender_id()
@@ -278,7 +333,13 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 @rpc("any_peer", "reliable")
 func _req_auction(cat: String, id: String, qty: int, quality: int,
 		money_delta: int) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow():
+		return
+	# 값이 말이 되는지부터 본다 — 예전에는 그대로 반영해서 조작한 게스트가
+	# 돈을 무한히 만들 수 있었다
+	if absi(qty) > 999 or absi(money_delta) > AUCTION_MONEY_CAP:
+		return
+	if id != "" and not _known_goods(cat, id):
 		return
 	GameData.money = maxi(0, GameData.money + money_delta)
 	if id != "" and qty != 0:
@@ -329,8 +390,12 @@ func _net_stats(json: String) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
+	if not _known_goods("tool", tool) and tool != "":
+		return
+	if not _near_sender(Vector2i(tx, ty)):
+		return      # 맵 반대편 칸을 건드리려는 요청
 	var saved_tool: String = GameData.tool
 	var saved_energy: float = GameData.energy
 	m._target_override = Vector2i(tx, ty)
@@ -351,7 +416,7 @@ func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int
 
 @rpc("any_peer", "reliable")
 func _req_shop(op: String, id: String, qty := -1) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	match op:
 		"buy_seed":
@@ -373,7 +438,7 @@ func _req_shop(op: String, id: String, qty := -1) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_feed(index: int) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	if index >= 0 and index < m.animals.size():
 		m.animals[index].fed = true
@@ -381,7 +446,7 @@ func _req_feed(index: int) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_kill(mob: String) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	if GameData.MOBS.has(mob):
 		GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
@@ -390,7 +455,7 @@ func _req_kill(mob: String) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_gain(id: String, count: int) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	if GameData.items.has(id) and count > 0 and count <= 50:
 		GameData.items[id] += count
@@ -402,7 +467,7 @@ func _req_gain(id: String, count: int) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_cook(id: String) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	if GameData.RECIPES.has(id) and GameData.cook(id):
 		_broadcast_stats()
@@ -410,7 +475,7 @@ func _req_cook(id: String) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_eat(id: String) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	if GameData.RECIPES.has(id) and int(GameData.items[id]) > 0:
 		GameData.items[id] -= 1
@@ -419,7 +484,7 @@ func _req_eat(id: String) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_furniture(furn_json: String, money_delta: int) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
 		return
 	var arr: Variant = JSON.parse_string(furn_json)
 	if typeof(arr) != TYPE_ARRAY or absi(money_delta) > 1000:
@@ -431,7 +496,9 @@ func _req_furniture(furn_json: String, money_delta: int) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_gift(npc_id: String, kind: String, item_id: String) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
+		return
+	if not GameData.NPCS.has(npc_id):
 		return
 	# 게스트가 직접 고른 품목을 차감한다
 	if kind == "produce" and int(GameData.produce.get(item_id, 0)) > 0:
@@ -446,7 +513,9 @@ func _req_gift(npc_id: String, kind: String, item_id: String) -> void:
 
 @rpc("any_peer", "reliable")
 func _req_quest(op: String) -> void:
-	if not Net.is_host():
+	if not Net.is_host() or not _allow(1.0):
+		return
+	if op not in ["accept", "turnin"]:
 		return
 	if op == "accept" and not GameData.quest.is_empty():
 		GameData.quest.accepted = true

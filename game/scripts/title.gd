@@ -296,41 +296,77 @@ func _build_mp_panel() -> void:
 	mp_panel.add_child(v)
 
 	var title := Label.new()
-	title.text = "함께하기 (같은 네트워크)"
+	title.text = "함께하기 — 방 코드로 만나기"
 	title.add_theme_color_override("font_color", Color("ffd75e"))
 	v.add_child(title)
 
-	v.add_child(_mk_button("방 만들기 (호스트)", _on_host))
+	v.add_child(_mk_button("방 만들기 (코드가 나온다)", _on_host))
 
+	# 방 코드 여섯 글자 — 친구가 이걸 치면 내 농장으로 들어온다
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	v.add_child(row)
 	ip_edit = LineEdit.new()
-	ip_edit.text = "127.0.0.1"
-	ip_edit.placeholder_text = "호스트 IP"
+	ip_edit.placeholder_text = "방 코드 6글자"
+	ip_edit.max_length = 6
 	ip_edit.custom_minimum_size = Vector2(210, 0)
 	ip_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ip_edit.text_changed.connect(func(t: String) -> void:
+		var up := t.to_upper()
+		if up != t:
+			ip_edit.text = up
+			ip_edit.caret_column = up.length())
 	row.add_child(ip_edit)
 	row.add_child(_mk_button("참가", _on_join))
 
 	mp_status = Label.new()
 	mp_status.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
-	mp_status.text = "호스트의 농장(저장)을 함께 가꾼다.\n호스트: 방 만들기 / 친구: IP 입력 후 참가"
+	mp_status.text = "호스트의 농장(저장)을 함께 가꾼다.\n호스트가 방을 만들어 나온 코드를 친구에게 알려 주자."
 	v.add_child(mp_status)
 
 	v.add_child(_mk_button("닫기", func() -> void: mp_panel.visible = false))
 
 
+# 방 만들기 — ENet 서버를 먼저 세우고, 장터 서버에서 코드를 받아 온다.
+# 코드를 보여 준 뒤 「시작하기」를 누르면 농장으로 들어간다.
 func _on_host() -> void:
 	if Net.host_game() != OK:
 		mp_status.text = "방 만들기 실패... 포트(7777)를 확인하자."
 		return
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	mp_status.text = "방을 여는 중..."
+	Net.rooms.opened.connect(_on_room_opened, CONNECT_ONE_SHOT)
+	Net.rooms.open_room(GameData.seller_name(), Net.DEFAULT_PORT)
 
 
+func _on_room_opened(ok: bool, code: String, msg: String) -> void:
+	if not ok:
+		# 코드를 못 받아도 같은 네트워크라면 IP로 놀 수 있다 — 그대로 들어간다
+		mp_status.text = "%s\n코드 없이 방은 열렸다 (같은 공유기라면 접속된다)." % msg
+		get_tree().create_timer(2.5).timeout.connect(func() -> void:
+			get_tree().change_scene_to_file("res://scenes/main.tscn"))
+		return
+	mp_status.text = "방 코드: %s\n친구에게 알려 주자. 잠시 뒤 농장으로 들어간다." % code
+	get_tree().create_timer(2.0).timeout.connect(func() -> void:
+		get_tree().change_scene_to_file("res://scenes/main.tscn"))
+
+
+# 참가 — 코드로 주소를 물어보고, 받은 주소로 붙는다
 func _on_join() -> void:
-	if Net.join_game(ip_edit.text.strip_edges()) != OK:
-		mp_status.text = "접속 시작 실패... IP를 확인하자."
+	var code := ip_edit.text.strip_edges().to_upper()
+	if code.length() < 4:
+		mp_status.text = "방 코드 6글자를 넣자."
+		return
+	mp_status.text = "방을 찾는 중..."
+	Net.rooms.found.connect(_on_room_found, CONNECT_ONE_SHOT)
+	Net.rooms.find_room(code)
+
+
+func _on_room_found(ok: bool, ip: String, port: int, msg: String) -> void:
+	if not ok:
+		mp_status.text = msg
+		return
+	if Net.join_game(ip, port) != OK:
+		mp_status.text = "접속 시작 실패... 잠시 뒤 다시 해보자."
 		return
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
