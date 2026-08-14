@@ -275,37 +275,32 @@ def scene_box(g, f):
         g.p(bx1 + DEP + 1, y, OUTLINE)              # 오른쪽 뒷모서리
     for y in range(by0 + 1, by1 + 1):               # 앞판·옆판 경계선
         g.p(bx1, y, (92, 60, 34))
-    # 분리형 뚜껑 — 상자 오른쪽에 기대 세워 두었다. 참고 사진처럼
-    # 뚜껑의 넓은 직사각형 면이 정면으로 보이고, 살짝만 기울어 있다.
-    # 왼쪽 모서리가 상자 옆판에 걸치고 오른발이 바닥에 닿는다.
-    lx0, lx1 = 112, 152
-    for x in range(lx0, lx1 + 1):
-        t = x - lx0
-        yt = 22 + t * 12 // 40                      # 위 모서리 (오른쪽으로 살짝 처짐)
-        yb = 58 + t * 6 // 40                       # 아래 모서리 (바닥선)
-        for y in range(yt, yb + 1):
-            g.p(x, y, (142, 98, 52))                # 넓은 면
-        g.p(x, yt, (176, 128, 70))                  # 위 테두리 (뚜껑 옆벽 두께)
-        g.p(x, yt + 1, (158, 112, 60))
-        g.p(x, yb, (104, 70, 38))                   # 아래 그늘
-        g.p(x, yt - 1, OUTLINE)
-        g.p(x, yb + 1, OUTLINE)
-        for k in (13, 26):                          # 널 이음새 (기울기를 따라)
-            y = yt + k
-            if y < yb - 1:
-                g.p(x, y, (114, 76, 42))
-    for y in range(21, 59):                         # 왼쪽 테두리 (상자에 걸친 쪽)
-        g.p(lx0, y + 0, (158, 112, 60)) if y - 21 < 2 else None
-    for x in (lx0, lx0 + 1):                        # 왼쪽 옆벽 두께
-        for y in range(22, 59):
-            g.p(x, y, (118, 80, 44))
-    for y in range(21, 60):                         # 좌우 윤곽
-        g.p(lx0 - 1, y, OUTLINE)
-    for y in range(33, 66):
-        g.p(lx1 + 1, y, OUTLINE)
-    g.rrect(lx0 + 4, 26, lx0 + 8, 30, (128, 130, 138), 2)   # 쇠장식
-    g.p(lx0 + 6, 28, (176, 178, 186))
-    g.rect(lx0 + 2, 62, lx1 - 2, 63, (94, 62, 34))  # 발치 그림자
+    # 분리형 뚜껑 — 상자 옆 바닥에 놓여 있다. 상자 윗면(개구부)과 같은
+    # 깊이 방향(오른쪽 위)을 따르는 평행사변형이라 그림과 원근이 맞는다.
+    LDEP, LRISE = 12, 5
+    lx0, lx1, lyb = 112, 156, 60
+    for t in range(LDEP + 1):
+        y = lyb - round(t * LRISE / LDEP)
+        g.rect(lx0 + t, y, min(lx1 + t, W - 2), y, (150, 104, 56))
+    for t in (4, 8):                                # 널 이음새 — 깊이 방향 중간
+        y = lyb - round(t * LRISE / LDEP)
+        g.rect(lx0 + t + 2, y, min(lx1 + t - 2, W - 2), y, (122, 84, 46))
+    g.rect(lx0, lyb + 1, lx1, lyb + 2, (112, 76, 42))   # 앞모서리 두께 (옆벽)
+    g.rect(lx0, lyb + 3, lx1, lyb + 3, (86, 56, 32))
+    for x in range(lx0 - 1, lx1 + 2):               # 앞 바닥선 윤곽
+        g.p(x, lyb + 4, OUTLINE)
+    for t in range(LDEP + 1):                       # 좌우 비스듬한 윤곽
+        y = lyb - round(t * LRISE / LDEP)
+        g.p(lx0 + t - 1, y, OUTLINE)
+        g.p(min(lx1 + t + 1, W - 1), y, OUTLINE)
+        g.p(lx0 + t - 1, y + 1, OUTLINE)
+        if lx1 + t + 1 < W - 1:
+            g.p(lx1 + t + 1, lyb + 1 if t == 0 else y + 1, OUTLINE)
+    for x in range(lx0 + LDEP, min(lx1 + LDEP + 1, W - 1)):   # 뒷모서리 윤곽
+        g.p(x, lyb - LRISE - 1, OUTLINE)
+    g.rrect(lx0 + 3, lyb - 2, lx0 + 7, lyb, (128, 130, 138), 2)   # 쇠장식
+    g.p(lx0 + 5, lyb - 1, (176, 178, 186))
+    g.rect(lx0 + 2, lyb + 5, lx1 - 2, lyb + 5, (94, 62, 34))      # 바닥 그림자
     # 연구 노트 — 열린 상자 안에서 비스듬히 고개를 내민다
     nb_top = by0 - 10
     for y in range(nb_top, by0):
@@ -379,8 +374,6 @@ def scene_box(g, f):
     # 구석 실루엣 소품 — 컷신처럼 앞을 어둡게 막는다
     for cx2, cy2, cr in ((6, 70, 9), (12, 66, 6), (2, 62, 6)):      # 화분 덤불
         g.disk(cx2, cy2, cr, (22, 16, 26))
-    g.rect(150, 60, 167, 71, (22, 16, 26))          # 낡은 궤짝 실루엣
-    g.rect(148, 56, 167, 59, (30, 22, 34))
 
 
 # ---------------------------------------------------- 3. 할아버지의 편지
