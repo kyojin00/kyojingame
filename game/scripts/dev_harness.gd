@@ -644,19 +644,22 @@ func _debug_tick() -> void:
 			m.objnode._place_object(m.CHIEF_HUT, "chief_hut", 0)
 			var up_ok: bool = can_up and GameData.chief_house_lv == 1 \
 				and str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) == "chief_hut"
-			# 마을회관: 주민 10명 미만이면 마을 발전 목록에서 빠진다
+			# 마을회관: 스토리 9(주민 초대)를 밟지 않으면 목록에서 빠진다
 			GameData.village_built.erase("hall")
-			var gate_before: bool = res0 <= GameData.HALL_RESIDENTS \
-				and m.village._next_village_build() != "hall"
+			var keep_s9: String = GameData.story9_phase
+			GameData.story9_phase = ""
+			var gate_before: bool = m.village._next_village_build() != "hall"
 			var dummies: Array = []                 # 임시 주민을 10명 초과까지 채운다
 			while m.village_residents() <= GameData.HALL_RESIDENTS:
 				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
 				dummies.append(m.npcs[m.npcs.size() - 1])
+			GameData.story9_phase = "build"         # 스토리 9의 건설 단계
 			var gate_after: bool = m.village_residents() > GameData.HALL_RESIDENTS \
 				and m.village._next_village_build() == "hall"
 			GameData.wood += 120
 			GameData.stone += 80
 			m.village._build_village_building("hall")
+			GameData.story9_phase = keep_s9
 			var hall_ok: bool = GameData.village_built.has("hall") \
 				and str(m.objects.get(m.VILLAGE_PLOTS["hall"].anchor,
 					{}).get("kind", "")) == "house"
@@ -1694,6 +1697,124 @@ func _debug_tick() -> void:
 				" 도착=", arrived and spawned, " 삼자대화=", trio_near
 				and trio_open and trio_aff, " 붙잡기=", leave_open and persuaded,
 				" 말없이떠남=", gone and fw_read, " 유니콘뿔제거=", no_horn)
+		269:
+			# #126: 메인 스토리 9 「마을회관」 — 이장 부탁 -> 주민 초대 ->
+			# 회관 건설 -> 개관식 -> 점진 해금(명부/창고 12명/프로젝트 15명/
+			# 회의 20명) + 창고 루팅·쓰레기 수거·기부·프로젝트·회의 효과
+			m.dialog.close()
+			var k9_aff: Dictionary = GameData.affinity.duplicate()
+			GameData.village_built.erase("hall")
+			GameData.story9_phase = ""
+			GameData.story8_phase = "done"
+			m.story._story9_update(0.016)
+			var s9_ask: bool = GameData.story9_phase == "ask" \
+				and GameData.quest_npc_marks().get("chief", "") == "!"
+			m.story._start_hall_ask_dialog()
+			m.dialog.skip_seq()
+			var s9_invite: bool = GameData.story9_phase == "invite" \
+				and GameData.story9_objective_short() != "" \
+				and m.village._next_village_build() != "hall"
+			# 주민이 10명(플레이어 제외)을 넘어가면 건설 단계가 절로 열린다
+			var s9_dummies: Array = []
+			while m.village_residents() <= GameData.HALL_RESIDENTS:
+				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				s9_dummies.append(m.npcs[m.npcs.size() - 1])
+			m.story._story9_update(0.016)
+			var s9_build: bool = GameData.story9_phase == "build" \
+				and m.village._next_village_build() == "hall"
+			GameData.wood += 120
+			GameData.stone += 80
+			m.village._build_village_building("hall")
+			m.dialog.close()
+			# 개관식 — 회관 접수대(room_action)에서 이장과 이야기해야 끝난다
+			m.village.room_action("hall")
+			var s9_rite: bool = m.dialog.visible and GameData.story9_phase == "build"
+			m.dialog.skip_seq()
+			var s9_done: bool = GameData.story9_phase == "done"
+			m.dialog.close()
+			# 점진 해금 — 지금 주민 11명: 명부는 열리고 창고(12명)부터는 잠김
+			var s9_lock: bool = not GameData.hall_feature_open("store") \
+				and not GameData.hall_feature_open("project") \
+				and not GameData.hall_feature_open("meet") \
+				and GameData.hall_next_feature_text() != ""
+			while m.village_residents() < GameData.HALL_STORE_RES:
+				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				s9_dummies.append(m.npcs[m.npcs.size() - 1])
+			m.story._story9_update(0.016)
+			var s9_store_open: bool = GameData.hall_feature_open("store") \
+				and not GameData.hall_feature_open("project")
+			while m.village_residents() < GameData.HALL_MEET_RES:
+				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				s9_dummies.append(m.npcs[m.npcs.size() - 1])
+			m.story._story9_update(0.016)
+			var s9_meet_open: bool = GameData.hall_feature_open("project") \
+				and GameData.hall_feature_open("meet")
+			# 창고 — 하루 한 번 운 루팅 (허탕/획득), 쓰레기 수거 지원금
+			GameData.hall_stock = {"forage_berry": 2}
+			GameData.hall_loot_day = 0
+			var s9_b0 := int(GameData.items["forage_berry"])
+			var s9_miss: bool = GameData.hall_loot(0.99) == "miss"
+			var s9_once: bool = GameData.hall_loot(0.0) == ""   # 오늘은 끝
+			GameData.hall_loot_day = 0
+			var s9_hit: bool = GameData.hall_loot(0.0) == "forage_berry" \
+				and int(GameData.items["forage_berry"]) == s9_b0 + 1 \
+				and int(GameData.hall_stock.get("forage_berry", 0)) == 1
+			GameData.items["forage_trash"] = int(GameData.items["forage_trash"]) + 3
+			var s9_m0: int = GameData.money
+			var s9_t0 := int(GameData.items["forage_trash"])
+			var s9_trash: bool = GameData.hall_dump_trash() == s9_t0 \
+				and GameData.money == s9_m0 + GameData.HALL_TRASH_G * s9_t0 \
+				and int(GameData.items["forage_trash"]) == 0
+			# 아침 기부 — 주민이 물건을 놓고 간다 (200번 굴리면 사실상 확정)
+			var s9_st0 := GameData.hall_stock_total()
+			var s9_donate: bool = GameData.hall_donate_morning(200) > 0 \
+				and GameData.hall_stock_total() > s9_st0
+			# 공동 프로젝트 — 재료를 내면 완성 기록 + 온 주민 호감도 +3
+			GameData.wood += 40
+			GameData.stone += 20
+			GameData.money += 2000
+			var s9_aff0 := int(GameData.affinity["chief"])
+			m.village._do_hall_project("lamps")
+			var s9_proj: bool = GameData.hall_projects.has("lamps") \
+				and int(GameData.affinity["chief"]) == s9_aff0 + 3
+			# 마을 회의 — 간식 나눔 가결 효과 (온 주민 호감도 +4)
+			GameData.money += 800
+			var s9_aff1 := int(GameData.affinity["chief"])
+			m.village._meet_apply("snack")
+			var s9_meet: bool = int(GameData.affinity["chief"]) == s9_aff1 + 4
+			# 새 일반 주민 7명 — 풀 10명·프로필·호감도·도트 8장씩
+			var s9_pool: bool = GameData.SETTLER_POOL.size() == 10
+			var s9_tex := true
+			for sp: String in ["miner", "florist", "carpenter", "herbalist",
+					"painter", "musician", "weaver"]:
+				if m.tex.get("npc_%s_down_0" % sp) == null \
+						or m.tex.get("npc_%s_portrait_normal" % sp) == null \
+						or not GameData.NPCS.has(sp) \
+						or not GameData.affinity.has(sp) \
+						or GameData.settler_kind(sp) != "normal":
+					s9_tex = false
+			# 뒷정리 — 임시 주민·광장 장식·호감도 되돌리기
+			for p9: Dictionary in GameData.HALL_PROJECTS:
+				for t9: Array in p9.tiles:
+					var tt9 := Vector2i(int(t9[0]), int(t9[1]))
+					if str(m.objects.get(tt9, {}).get("kind", "")) == str(p9.kind):
+						m.objnode._remove_object(tt9)
+			for dmy9: Node2D in s9_dummies:
+				m.npcs.erase(dmy9)
+				dmy9.queue_free()
+			m.story._story9_update(0.016)
+			GameData.affinity = k9_aff
+			m.hud._toast_queue.clear()
+			print("STORY9_OK=", s9_ask and s9_invite and s9_build and s9_rite
+				and s9_done and s9_lock and s9_store_open and s9_meet_open
+				and s9_miss and s9_once and s9_hit and s9_trash and s9_donate
+				and s9_proj and s9_meet and s9_pool and s9_tex,
+				" 부탁=", s9_ask, " 초대=", s9_invite, " 해금=", s9_build,
+				" 개관식=", s9_rite and s9_done, " 점진잠금=", s9_lock,
+				" 창고12=", s9_store_open, " 회의20=", s9_meet_open,
+				" 루팅=", s9_miss and s9_once and s9_hit, " 수거=", s9_trash,
+				" 기부=", s9_donate, " 프로젝트=", s9_proj, " 회의효과=", s9_meet,
+				" 새주민7=", s9_pool and s9_tex)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

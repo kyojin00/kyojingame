@@ -1169,6 +1169,151 @@ func story8_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 9: 마을의 심장, 마을회관 ----
+#
+# 스토리 8(목동 정착)을 끝내면, 이장이 옛 교진 마을의 회관을 떠올리며
+# 「주민을 초대해 마을을 키워 달라」고 부탁한다. 주민(플레이어 제외)이
+# 10명이 되면 회관 건설이 열리고, 완공 후 접수대의 이장과 개관식을
+# 하면 완결. 회관 기능은 한꺼번에 주어지지 않는다 — 마을이 클수록
+# 하나씩 열린다 (개관: 명부·캘린더 / 12명: 창고 / 15명: 공동 프로젝트 /
+# 20명: 마을 회의).
+#   "": 아직 / ask: 이장의 부탁 듣기 / invite: 주민 초대하기 /
+#   build: 회관 짓기(완공 후 개관식) / done: 완료
+var story9_phase := ""
+var residents_now := 1             # 지금 마을 주민 수 (플레이어 포함, main이 갱신)
+const HALL_STORE_RES := 12         # 마을 창고 해금 (플레이어 포함 주민 수)
+const HALL_PROJECT_RES := 15       # 공동 프로젝트 해금
+const HALL_MEET_RES := 20          # 마을 회의 해금
+const HALL_STOCK_MAX := 30         # 창고에 쌓이는 기부품 상한
+const HALL_TRASH_G := 5            # 쓰레기 수거 미화 지원금 (개당)
+const HALL_MEET_COOLDOWN := 7      # 마을 회의 간격 (일)
+
+# 회관 창고 — 주민들이 아침마다 이따금 놓고 가는 물건 (id -> 수)
+var hall_stock := {}
+var hall_loot_day := 0             # 마지막으로 창고를 뒤적인 날 (하루 한 번)
+var hall_trash_total := 0          # 지금까지 수거한 쓰레기 (마을 미화 기록)
+var hall_projects: Array = []      # 완성한 공동 프로젝트 id
+var hall_meet_day := 0             # 마지막 마을 회의 날
+var hall_feat_noticed: Array = []  # 해금 안내를 띄운 기능 (한 번 열리면 닫히지 않는다)
+
+# 공동 프로젝트 — 광장 둘레를 다 함께 가꾼다 (순서대로 하나씩)
+#   tiles: 완성 시 세워지는 장식물 자리 (막힌 칸은 건너뛴다)
+const HALL_PROJECTS := [
+	{"id": "lamps", "name": "광장 가로등", "wood": 40, "stone": 20, "money": 2000,
+		"desc": "광장 네 귀퉁이에 가로등을 세운다.\n밤 산책이 한결 든든해진다.",
+		"tiles": [[71, 13], [83, 13], [71, 18], [83, 18]], "kind": "deco_lamp"},
+	{"id": "benches", "name": "쉼터 벤치", "wood": 60, "stone": 0, "money": 3000,
+		"desc": "광장 곁에 나무 벤치를 놓는다.\n주민들이 앉아 쉬며 수다를 떤다.",
+		"tiles": [[73, 13], [81, 13]], "kind": "deco_bench"},
+	{"id": "fountain", "name": "분수 새 단장", "wood": 0, "stone": 80, "money": 5000,
+		"desc": "낡은 분수를 반짝반짝 손본다.\n마을의 자랑거리가 된다.",
+		"tiles": [], "kind": ""},
+]
+# 아침 기부 풀 — 주민들이 창고에 놓고 가는 소박한 물건들 (보석은 귀하다)
+const HALL_DONATE_POOL := ["forage_berry", "forage_herb", "forage_shell",
+	"ore", "bait", "dish_bread", "gem"]
+
+
+func story9_objective_short() -> String:
+	match story9_phase:
+		"ask":
+			return "이장의 이야기를 들어보자 (E)"
+		"invite":
+			return "주민 초대하기 — %d/%d명 (이사 편지·빈 집터)" % [
+				maxi(residents_now - 1, 0), HALL_RESIDENTS]
+		"build":
+			if village_built.has("hall"):
+				return "마을회관이 완성됐다 — 접수대의 이장에게 (E)"
+			return "마을회관을 짓자 — 이장 「마을 발전 이야기」 (목재 120·석재 80)"
+	return ""
+
+
+# 회관 기능의 점진 해금 — 주민이 늘 때마다 하나씩 열린다.
+# 한 번 열린 기능은 주민이 줄어도 닫히지 않는다 (hall_feat_noticed).
+func hall_feature_open(feat: String) -> bool:
+	if story9_phase != "done":
+		return false
+	match feat:
+		"store":
+			return feat in hall_feat_noticed or residents_now >= HALL_STORE_RES
+		"project":
+			return feat in hall_feat_noticed or residents_now >= HALL_PROJECT_RES
+		"meet":
+			return feat in hall_feat_noticed or residents_now >= HALL_MEET_RES
+	return true
+
+
+# 다음에 열릴 기능 안내 한 줄 — 회관 공지판이 자연스럽게 예고한다
+func hall_next_feature_text() -> String:
+	if not hall_feature_open("store"):
+		return "주민이 %d명이 되면 마을 창고가 열린다. (지금 %d명)" \
+			% [HALL_STORE_RES, residents_now]
+	if not hall_feature_open("project"):
+		return "주민이 %d명이 되면 공동 프로젝트가 열린다. (지금 %d명)" \
+			% [HALL_PROJECT_RES, residents_now]
+	if not hall_feature_open("meet"):
+		return "주민이 %d명이 되면 마을 회의가 열린다. (지금 %d명)" \
+			% [HALL_MEET_RES, residents_now]
+	return "마을의 모든 살림이 돌아가고 있다."
+
+
+func hall_stock_total() -> int:
+	var n := 0
+	for iid in hall_stock:
+		n += int(hall_stock[iid])
+	return n
+
+
+# 아침 기부 — 주민마다 낮은 확률로 창고에 물건을 놓고 간다.
+# residents: 굴릴 주민 수 (플레이어 제외). 돌아오는 값은 쌓인 개수.
+func hall_donate_morning(residents: int) -> int:
+	if not hall_feature_open("store"):
+		return 0
+	var added := 0
+	for _i in residents:
+		if hall_stock_total() >= HALL_STOCK_MAX:
+			break
+		if randf() < 0.12:
+			var iid := str(HALL_DONATE_POOL[randi() % HALL_DONATE_POOL.size()])
+			if iid == "gem" and randf() > 0.2:
+				iid = "forage_berry"   # 보석은 웬만해선 안 나온다
+			hall_stock[iid] = int(hall_stock.get(iid, 0)) + 1
+			added += 1
+	return added
+
+
+# 창고 뒤적이기 — 하루 한 번, 행운이 좋으면 보관품 하나를 얻는다.
+# roll: 테스트용 강제 굴림(0~1). 음수면 랜덤. 돌아오는 값:
+#   "" = 오늘 이미 뒤적였거나 창고가 비었다 / "miss" = 허탕 / 아이템 id = 획득
+func hall_loot(roll := -1.0) -> String:
+	if hall_loot_day == day or hall_stock.is_empty():
+		return ""
+	hall_loot_day = day
+	var r := roll if roll >= 0.0 else randf()
+	if r >= 0.35 + total_luck() * 0.03:   # 행운이 높을수록 손맛이 좋다
+		return "miss"
+	var ids: Array = hall_stock.keys()
+	var iid := str(ids[randi() % ids.size()])
+	hall_stock[iid] = int(hall_stock[iid]) - 1
+	if int(hall_stock[iid]) <= 0:
+		hall_stock.erase(iid)
+	items[iid] = int(items.get(iid, 0)) + 1
+	discover(iid)
+	return iid
+
+
+# 쓰레기 비우기 — 가방의 쓰레기를 회관 수거함에 몽땅 넣는다.
+# 마을 미화 지원금(개당 5G)을 받는다. 돌아오는 값은 넣은 개수.
+func hall_dump_trash() -> int:
+	var n := int(items.get("forage_trash", 0))
+	if n <= 0:
+		return 0
+	items["forage_trash"] = 0
+	hall_trash_total += n
+	money += HALL_TRASH_G * n
+	return n
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1248,6 +1393,12 @@ func quest_catalog() -> Array:
 			"desc": "동물들과 초원을 찾아 떠도는 목동이 마을에 왔다.",
 			"cat": "main", "ep": "메인 스토리 8", "npc": s8npc,
 			"reward": "목장 상회 해금 — 동물을 키울 수 있다"})
+	o = story9_objective_short()
+	if o != "":
+		out.append({"id": "story9", "title": "마을의 심장, 마을회관", "obj": o,
+			"desc": "이장의 꿈 — 주민을 모아 마을회관을 되살리자.",
+			"cat": "main", "ep": "메인 스토리 9", "npc": "chief",
+			"reward": "마을회관 — 명부·창고·프로젝트가 차례로 열린다"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1363,6 +1514,12 @@ func quest_npc_marks() -> Dictionary:
 		"build":
 			if village_built.has("ranch"):
 				marks["rancher"] = "!"
+	match story9_phase:
+		"ask":
+			marks["chief"] = "!"
+		"build":
+			if village_built.has("hall"):
+				marks["chief"] = "!"   # 회관 접수대에서 개관식을 하자
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -2714,9 +2871,16 @@ const NPC_KIND := {
 	"rancher": "core", "fisher": "core", "librarian": "core",
 	"explorer": "core", "forest_mom": "core", "forest_girl": "core",
 	"farmer": "normal", "foodie": "normal", "angler": "normal",
+	"miner": "normal", "florist": "normal", "carpenter": "normal",
+	"herbalist": "normal", "painter": "normal", "musician": "normal",
+	"weaver": "normal",
 	"alchemist": "special",
 }
-const SETTLER_POOL := ["farmer", "foodie", "angler"]   # 일반 주민 후보
+# 일반 주민 후보 — 앞쪽일수록 먼저 편지를 보내기 쉽다 (랜덤이지만 풀 순서대로
+# 소문이 도는 셈). 전부 정착하면 최대 주민 21명 (핵심 9 + 일반 10 +
+# 특수 1 + 플레이어) — 마을 회의(20명)는 마을을 알뜰히 키워야 열린다.
+const SETTLER_POOL := ["farmer", "foodie", "angler", "miner", "florist",
+	"carpenter", "herbalist", "painter", "musician", "weaver"]
 const ALCHEMIST_NOTE := 0.5        # 연금술사 해금 — 연구 노트 50%
 const SETTLER_OFFER_CHANCE := 0.25 # 아침마다 편지가 올 확률
 const LEAVE_AFF := 20              # 이 밑이면 떠날 마음이 생긴다
@@ -3325,6 +3489,90 @@ const NPCS := {
 	"likes": ["fish_crucian", "bait", "dish_grilled_fish"],
 	"hates": ["sludge", "forage_trash"],
 	},
+	"miner": {"name": "바우", "birthday": [SPRING, 8], "gender": "m", "romance": false,
+	"lines": [
+		"이 마을 굴, 돌이 살아 있다며? 곡괭이가 근질근질해.",
+		"돌은 거짓말을 안 해. 두드린 만큼 내준다니까.",
+		"동굴 깊은 데는 조심해. 반짝이는 건 다 이유가 있어.",
+		"광석 냄새 맡는 데는 내 코가 제일이지. 킁킁.",
+		"오늘도 한 짐 캐고 왔더니 어깨가 뻐근하구먼.",
+	],
+	"loves": ["gem", "forage_relic", "star_ore"],
+	"likes": ["ore", "dish_baked_potato"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"florist": {"name": "봄이", "birthday": [SPRING, 3], "gender": "f", "romance": false,
+	"lines": [
+		"이 마을은 바람에서 꽃냄새가 나요. 그래서 왔어요.",
+		"창가에 화분 하나만 놓아도 집이 웃는답니다.",
+		"나비가 앉는 꽃은 좋은 꽃이에요. 진짜예요.",
+		"봄 꽃놀이 날엔 광장을 꽃으로 가득 채울 거예요!",
+		"시든 꽃도 씨앗을 남겨요. 끝이 아니라는 거죠.",
+	],
+	"loves": ["flower_pot", "bug_butterfly"],
+	"likes": ["forage_berry", "forage_herb"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"carpenter": {"name": "덕구", "birthday": [SUMMER, 19], "gender": "m", "romance": false,
+	"lines": [
+		"좋은 나무가 많은 마을이라 들었네. 대패질할 맛 나겠어.",
+		"못 하나도 제자리에 박혀야 집이 백 년을 가지.",
+		"삐걱대는 마루는 나한테 맡기게. 금방일세.",
+		"나무는 베인 뒤에도 산다네 — 집이 되고, 의자가 되고.",
+		"자네 집 문지방, 지나가다 보니 손 좀 봐야겠던데?",
+	],
+	"loves": ["dish_feast", "forage_relic"],
+	"likes": ["nail", "hinge"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"herbalist": {"name": "향이", "birthday": [SUMMER, 27], "gender": "f", "romance": false,
+	"lines": [
+		"산비탈 약초 냄새가 여기까지 나서 따라왔지 뭐예요.",
+		"쓴맛 나는 풀일수록 몸에는 약이 된답니다.",
+		"이슬 마르기 전에 캔 약초가 제일 좋아요.",
+		"어디 결리는 데는 없어요? 안색이 좀...",
+		"차 한 잔 우려 드릴까요? 마음이 가라앉아요.",
+	],
+	"loves": ["forage_herb", "dish_moon_tea"],
+	"likes": ["forage_berry", "potion_energy"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"painter": {"name": "청람", "birthday": [FALL, 21], "gender": "m", "romance": false,
+	"lines": [
+		"이 마을의 노을빛... 물감으로는 도저히 못 만들겠더군요.",
+		"바다 산호 색을 아세요? 세상에 그런 빨강은 또 없어요.",
+		"오늘은 광장을 그렸어요. 사람 웃는 소리까지 담고 싶은데.",
+		"그림은 눈으로 그리는 게 아니라 발로 그리는 거예요. 많이 걷죠.",
+		"언젠가 이 마을 전부를 한 폭에 담을 겁니다.",
+	],
+	"loves": ["forage_coral", "gem"],
+	"likes": ["forage_shell", "forage_glass"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"musician": {"name": "한별", "birthday": [WINTER, 7], "gender": "f", "romance": false,
+	"lines": [
+		"파도 소리, 새소리, 망치 소리... 이 마을은 통째로 노래예요.",
+		"달밤에 광장에서 한 곡 연주해도 될까요?",
+		"반딧불이 나는 밤엔 느린 곡이 어울려요.",
+		"축제 때는 제가 흥을 맡을게요. 기대해요!",
+		"슬픈 날엔 노래가 약이에요. 언제든 불러 줘요.",
+	],
+	"loves": ["bug_firefly", "dish_punch"],
+	"likes": ["forage_shell", "dish_bread"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"weaver": {"name": "솜이", "birthday": [WINTER, 16], "gender": "f", "romance": false,
+	"lines": [
+		"베틀 놓을 조용한 방 한 칸이면 저는 충분해요.",
+		"실 한 올 한 올이 모여 천이 되죠. 마을도 그래요.",
+		"겨울이 오기 전에 다들 목도리 하나씩 떠 드릴게요.",
+		"고운 천을 짜는 날엔 콧노래가 절로 나와요.",
+		"당신 옷소매, 뜯어진 데 이리 줘 봐요. 금방 기워요.",
+	],
+	"loves": ["cloth", "dish_pie"],
+	"likes": ["rope", "forage_berry"],
+	"hates": ["sludge", "forage_trash"],
+	},
 	# ---- 특수 주민 (연구 노트 50%에서 해금 — 소문을 듣고 찾아온다) ----
 	"alchemist": {"name": "묘연", "birthday": [WINTER, 24], "gender": "f", "romance": false,
 	"lines": [
@@ -3343,7 +3591,9 @@ const NPCS := {
 var affinity := {"librarian": 0,
 	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
 	"explorer": 0, "forest_mom": 0, "forest_girl": 0,
-	"farmer": 0, "foodie": 0, "angler": 0, "alchemist": 0}
+	"farmer": 0, "foodie": 0, "angler": 0, "miner": 0, "florist": 0,
+	"carpenter": 0, "herbalist": 0, "painter": 0, "musician": 0,
+	"weaver": 0, "alchemist": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
 const RING_PRICE := 12000
@@ -3683,6 +3933,8 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 7 — 식지 않는 화로")
 	if story8_phase == "done":
 		out.append("메인 스토리 8 — 초원에서 온 목동")
+	if story9_phase == "done":
+		out.append("메인 스토리 9 — 마을의 심장, 마을회관")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -4011,6 +4263,14 @@ func reset_all() -> void:
 	old_book_stored = false
 	story7_phase = ""
 	story8_phase = ""
+	story9_phase = ""
+	residents_now = 1
+	hall_stock = {}
+	hall_loot_day = 0
+	hall_trash_total = 0
+	hall_projects = []
+	hall_meet_day = 0
+	hall_feat_noticed = []
 	zones_open = []
 	arrivals = []
 	npc_greeted = []
@@ -4367,6 +4627,10 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story6_phase": story6_phase, "story6_day": story6_day,
 		"old_book_stored": old_book_stored,
 		"story7_phase": story7_phase, "story8_phase": story8_phase,
+		"story9_phase": story9_phase, "hall_stock": hall_stock,
+		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
+		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,
+		"hall_feat_noticed": hall_feat_noticed,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

@@ -179,6 +179,27 @@ const TEXTURE_NAMES := [
 	"npc_alchemist_down_0", "npc_alchemist_down_1", "npc_alchemist_up_0",
 	"npc_alchemist_up_1", "npc_alchemist_side_0", "npc_alchemist_side_1",
 	"npc_alchemist_portrait_normal", "npc_alchemist_portrait_happy",
+	"npc_miner_down_0", "npc_miner_down_1", "npc_miner_up_0",
+	"npc_miner_up_1", "npc_miner_side_0", "npc_miner_side_1",
+	"npc_miner_portrait_normal", "npc_miner_portrait_happy",
+	"npc_florist_down_0", "npc_florist_down_1", "npc_florist_up_0",
+	"npc_florist_up_1", "npc_florist_side_0", "npc_florist_side_1",
+	"npc_florist_portrait_normal", "npc_florist_portrait_happy",
+	"npc_carpenter_down_0", "npc_carpenter_down_1", "npc_carpenter_up_0",
+	"npc_carpenter_up_1", "npc_carpenter_side_0", "npc_carpenter_side_1",
+	"npc_carpenter_portrait_normal", "npc_carpenter_portrait_happy",
+	"npc_herbalist_down_0", "npc_herbalist_down_1", "npc_herbalist_up_0",
+	"npc_herbalist_up_1", "npc_herbalist_side_0", "npc_herbalist_side_1",
+	"npc_herbalist_portrait_normal", "npc_herbalist_portrait_happy",
+	"npc_painter_down_0", "npc_painter_down_1", "npc_painter_up_0",
+	"npc_painter_up_1", "npc_painter_side_0", "npc_painter_side_1",
+	"npc_painter_portrait_normal", "npc_painter_portrait_happy",
+	"npc_musician_down_0", "npc_musician_down_1", "npc_musician_up_0",
+	"npc_musician_up_1", "npc_musician_side_0", "npc_musician_side_1",
+	"npc_musician_portrait_normal", "npc_musician_portrait_happy",
+	"npc_weaver_down_0", "npc_weaver_down_1", "npc_weaver_up_0",
+	"npc_weaver_up_1", "npc_weaver_side_0", "npc_weaver_side_1",
+	"npc_weaver_portrait_normal", "npc_weaver_portrait_happy",
 	"stall", "bait", "flower_pot", "trash_bin", "chief_hut", "chief_house",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
@@ -390,6 +411,13 @@ const NPC_SCHEDULE := {
 	"foodie":     [[6, "home"], [11, "plaza"], [16, "home"]],
 	"angler":     [[6, "home"], [9, "pier"], [14, "plaza"], [17, "home"]],
 	"alchemist":  [[6, "home"], [12, "plaza"], [16, "home"]],
+	"miner":      [[6, "home"], [9, "plaza"], [13, "home"]],
+	"florist":    [[6, "home"], [10, "plaza"], [16, "home"]],
+	"carpenter":  [[6, "home"], [11, "plaza"], [15, "home"]],
+	"herbalist":  [[6, "home"], [9, "plaza"], [14, "home"]],
+	"painter":    [[6, "home"], [12, "plaza"], [17, "home"]],
+	"musician":   [[6, "home"], [13, "plaza"], [17, "home"]],
+	"weaver":     [[6, "home"], [10, "plaza"], [14, "home"]],
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
 const NPC_PLAZA := {
@@ -399,6 +427,10 @@ const NPC_PLAZA := {
 	# 이사 온 주민들 — 광장 남쪽에 삼삼오오 모여 수다를 떤다
 	"farmer": Vector2i(72, 17), "foodie": Vector2i(74, 17),
 	"angler": Vector2i(78, 17), "alchemist": Vector2i(76, 15),
+	"miner": Vector2i(76, 19), "florist": Vector2i(72, 15),
+	"carpenter": Vector2i(78, 15), "herbalist": Vector2i(74, 19),
+	"painter": Vector2i(82, 17), "musician": Vector2i(76, 17),
+	"weaver": Vector2i(82, 15),
 }
 # 건물이 없는 NPC(이장)의 집 자리
 const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
@@ -1178,6 +1210,7 @@ func _process(delta: float) -> void:
 	story._story6_update(delta)
 	story._story7_update(delta)
 	story._story8_update(delta)
+	story._story9_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

@@ -85,6 +85,13 @@ const ROOMS := {
 		"tab": "", "tabs": [], "action": "read",
 		"hint": "할아버지의 연구를 뒤쫓는다 (다음 전설 재료 힌트)",
 	},
+	"hall": {
+		"name": "마을회관", "keeper": "chief",
+		"wall": Color(0.42, 0.35, 0.26), "floor": Color(0.62, 0.54, 0.42),
+		"counter": Color(0.46, 0.36, 0.26), "deco": "town",
+		"tab": "", "tabs": [], "action": "hall",
+		"hint": "주민 명부와 마을 살림을 본다",
+	},
 }
 
 var main: Node2D
@@ -518,6 +525,23 @@ func _draw_deco(kind: String, wall: Color) -> void:
 			canvas.draw_rect(Rect2(716, 340, 92, 12), Color(0.34, 0.4, 0.44))
 			for i in 3:
 				canvas.draw_rect(Rect2(722 + i * 28, 284, 20, 16), Color(0.7, 0.6, 0.35))
+		"town":
+			# 마을회관: 마을 게시판 + 교진 마을 깃발 + 서류장
+			canvas.draw_rect(Rect2(148, 176, 124, 74), Color(0.3, 0.21, 0.13))   # 게시판 틀
+			canvas.draw_rect(Rect2(154, 182, 112, 62), Color(0.78, 0.68, 0.48))
+			for i in 3:
+				canvas.draw_rect(Rect2(161 + i * 36, 190, 28, 20),
+					Color(0.95, 0.92, 0.84))                                     # 붙은 공지들
+				canvas.draw_rect(Rect2(161 + i * 36, 216, 28, 20),
+					Color(0.9, 0.86, 0.76))
+			canvas.draw_rect(Rect2(788, 176, 8, 96), Color(0.45, 0.32, 0.18))    # 깃대
+			canvas.draw_rect(Rect2(724, 182, 64, 36), Color(0.72, 0.3, 0.28))    # 마을 깃발
+			canvas.draw_rect(Rect2(724, 194, 64, 5), Color(0.9, 0.82, 0.55))
+			for i in 2:                                                          # 서류장
+				canvas.draw_rect(Rect2(700 + i * 54, 300, 46, 58), Color(0.42, 0.31, 0.2))
+				for j in 3:
+					canvas.draw_rect(Rect2(704 + i * 54, 306 + j * 18, 38, 12),
+						Color(0.58, 0.46, 0.3))
 		"books":
 			# 도서관: 책장 두 벌 (책등 색을 섞는다)
 			var spine := [Color(0.7, 0.3, 0.28), Color(0.32, 0.44, 0.62),

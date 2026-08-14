@@ -205,14 +205,19 @@ func _next_day(passed_out: bool) -> void:
 		m.hud.event_toast("이장님의 새 집 완공!")
 		m.hud.show_message("마을 사람들이 힘을 모아 이장님의 낡은 오두막을\n제대로 된 집으로 다시 지어 드렸다!", 6.0)
 
-	# 마을회관 해금 트리거 — 주민 수를 강제로 맞추는 게 아니라, 게임을
-	# 진행하며 총 주민이 10명을 「넘어가는」 아침에 한 번 알려 준다.
-	# (실제 건설은 게시판의 마을 발전 목록에서 한다)
-	if not GameData.hall_noticed and not GameData.village_built.has("hall") \
-			and m.village_residents() > GameData.HALL_RESIDENTS:
-		GameData.hall_noticed = true
-		m.hud.event_toast("마을회관 해금!")
-		m.hud.show_message("마을 사람이 %d명을 넘었다! 이제 게시판에서\n마을회관을 지을 수 있다." % GameData.HALL_RESIDENTS, 6.0)
+	# 마을회관 (메인 스토리 9) — 해금 알림은 story._story9_update가 맡고,
+	# 여기서는 개관 후의 살림을 돌본다: 회관 기능의 점진 해금 안내와
+	# 주민들의 아침 창고 기부. 한 번 열린 기능은 닫히지 않는다.
+	if GameData.story9_phase == "done":
+		for feat: Array in [["store", GameData.HALL_STORE_RES, "마을 창고"],
+				["project", GameData.HALL_PROJECT_RES, "공동 프로젝트"],
+				["meet", GameData.HALL_MEET_RES, "마을 회의"]]:
+			if str(feat[0]) not in GameData.hall_feat_noticed \
+					and m.village_residents() >= int(feat[1]):
+				GameData.hall_feat_noticed.append(str(feat[0]))
+				m.hud.event_toast("%s 해금!" % str(feat[2]))
+				m.hud.show_message("주민이 %d명이 됐다! 마을회관에서\n「%s」이(가) 열렸다." % [int(feat[1]), str(feat[2])], 6.0)
+		GameData.hall_donate_morning(m.npcs.size())
 
 	m.saveio.save_now()
 

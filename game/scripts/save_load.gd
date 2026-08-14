@@ -293,6 +293,16 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.forage_caught[k] = int(d.forage_caught[k])
 	_backfill_discovered()
 	GameData.hall_noticed = bool(d.get("hall_noticed", false))
+	# 메인 스토리 9 (마을회관) — 회관이 이미 서 있는 구세이브는 완결로 본다
+	GameData.story9_phase = str(d.get("story9_phase", ""))
+	if GameData.story9_phase == "" and GameData.village_built.has("hall"):
+		GameData.story9_phase = "done"
+	GameData.hall_stock = d.get("hall_stock", {})
+	GameData.hall_loot_day = int(d.get("hall_loot_day", 0))
+	GameData.hall_trash_total = int(d.get("hall_trash_total", 0))
+	GameData.hall_projects = Array(d.get("hall_projects", []))
+	GameData.hall_meet_day = int(d.get("hall_meet_day", 0))
+	GameData.hall_feat_noticed = Array(d.get("hall_feat_noticed", []))
 	# 씨앗 진열이 생기기 전 세이브: 기본 두 종(밀·옥수수)으로 시작한다
 	GameData.shop_seeds = d.get("shop_seeds", ["wheat", "corn"])
 	# 조리대가 빈 채로 시작하는 개편 전 세이브: 이미 만들어 본 요리와,
@@ -373,6 +383,8 @@ func _apply_save(d: Dictionary) -> void:
 		if not m.objects.has(m.AUCTION_POS):
 			m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
 		m.worldgen._migrate_farm_layout()
+	# 회관 공동 프로젝트의 가로등·벤치는 위에서 걷혔다 — 완성 기록대로 되살린다
+	m.village.restore_hall_project_deco()
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()

@@ -2609,6 +2609,75 @@ func _end_ranch_done() -> void:
 	m.saveio.save_now()
 
 
+# ---- 메인 스토리 9: 마을의 심장, 마을회관 ----
+#
+# 스토리 8을 끝내면 이장이 옛 교진 마을의 회관을 떠올리며 「주민을
+# 초대해 달라」고 부탁한다. 주민(플레이어 제외) 10명 -> 회관 건설 해금 ->
+# 완공 후 접수대의 이장과 개관식 -> 완결. 회관 기능(명부·캘린더·창고·
+# 프로젝트·회의)은 마을이 클수록 하나씩 열린다 — 한꺼번에 주지 않는다.
+
+func _story9_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 회관 해금·기능 게이트가 함께 쓰는 「지금 주민 수」 거울
+	GameData.residents_now = m.village_residents()
+	# 시작: 스토리 8 완결 — 커진 마을을 보며 이장이 옛 회관을 떠올린다
+	if GameData.story9_phase == "" and GameData.story8_phase == "done":
+		GameData.story9_phase = "ask"
+		m.hud.quest_start_toast("이장이 마을의 앞날을 이야기하고 싶어 한다")
+		m.saveio.save_now()
+	# 주민 10명(플레이어 제외)이 모이면 회관 건설이 열린다
+	if GameData.story9_phase == "invite" \
+			and m.village_residents() > GameData.HALL_RESIDENTS:
+		GameData.story9_phase = "build"
+		m.hud.event_toast("마을회관 해금!")
+		m.hud.quest_start_toast("마을회관을 짓자 — 이장 「마을 발전 이야기」")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 이장의 부탁: 주민을 초대해 마을을 키워 달라
+func _start_hall_ask_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「어서 오게. 요즘 마을을 보고 있자면...\n꼭 옛날로 돌아간 것 같구먼.」"},
+		{"text": "「옛 교진 마을엔 마을회관이 있었다네.\n주민 명부며 마을 살림이며, 다 거기서\n돌아갔지. 마을의 심장이었어.」"},
+		{"text": "「하지만 회관은 사람이 모여야 뜻이 있는 법 —\n텅 빈 마을에 세워 봐야 헛간일 뿐일세.」"},
+		{"text": "「자네가 주민을 초대해 주게. 빈 집터를 두면\n이사 오고 싶다는 편지가 올 걸세.\n나까지 합쳐 %d명이면 충분하네.」" % GameData.HALL_RESIDENTS,
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+		{"text": "「사람이 모이면 회관 터는 광장 남쪽에\n비워 두겠네. 마을의 심장이 다시 뛰는 걸\n꼭 보고 싶구먼.」"},
+	], _end_hall_ask)
+
+
+func _end_hall_ask() -> void:
+	if GameData.story9_phase == "ask":
+		GameData.story9_phase = "invite"
+		m.hud.story_banner("메인 스토리 9 시작", "마을의 심장, 마을회관")
+		m.hud.quest_start_toast("주민을 초대하자 — 목표 %d명 (지금 %d명)" %
+			[GameData.HALL_RESIDENTS, maxi(GameData.residents_now - 1, 0)])
+	m.saveio.save_now()
+
+
+# 퀘스트 2 — 개관식: 완공된 회관 접수대에서 이장과 (스토리 9 완결)
+func _start_hall_open_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_happy"], [
+		{"text": "「왔는가! 보게, 이 튼튼한 서까래며 넓은\n마루며... 옛 회관보다 낫구먼!」"},
+		{"text": "「자네가 초대한 이웃들 덕에 마을이 이렇게\n북적이게 됐네. 다 자네 덕일세.」"},
+		{"text": "(이장이 접수대에 두툼한 장부를 펼쳐 놓았다.\n첫 장에 주민들의 이름이 적혀 있다.)"},
+		{"text": "「여기서 주민 명부와 마을 소식을 볼 수 있네.\n낮에는 내가 지키고 있겠네.」",
+			"portrait": m.tex["npc_chief_portrait_normal"]},
+		{"text": "「그리고 말일세 — 마을이 더 크면 회관이\n할 수 있는 일도 늘어난다네. 창고며 공동\n프로젝트며... 천천히, 차근차근 함세.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+	], _end_hall_open)
+
+
+func _end_hall_open() -> void:
+	if GameData.story9_phase != "build" or not GameData.village_built.has("hall"):
+		return
+	GameData.story9_phase = "done"
+	m.hud.story_banner("메인 스토리 9 완결", "마을의 심장, 마을회관")
+	m.hud.show_message("마을회관이 문을 열었다! 접수대에서 주민 명부와\n마을 소식을 볼 수 있다 — 마을이 클수록 할 일이 늘어난다.", 8.0)
+	m.saveio.save_now()
+
+
 # ---- 엔딩: 연화의 항아리 ----
 #
 # 연구 노트 100% + 생명의 물 여섯 병을 모아 연화를 찾아가면,
@@ -2641,6 +2710,13 @@ const SETTLE_LETTERS := {
 	"foodie": "『안녕하세요~ 교진 마을 음식이 그렇게 맛있다면서요?\n먹는 게 인생의 낙인 다미라고 해요.\n저도 그 마을에서 살아 보고 싶어요!』",
 	"angler": "『물 좋고 고기 잘 문다는 소문을 들었습니다.\n낚싯대 하나 메고 떠도는 강태라고 합니다.\n마을 물가 한켠을 내어 주시겠습니까?』",
 	"alchemist": "『당신의 연구 이야기가 바람을 타고 들려왔어요.\n그분의 노트를 잇는 사람이 있다니...\n연금술사 묘연, 그 마을에서 연구를 함께하고 싶어요.』",
+	"miner": "『굴이 깊고 돌이 좋다는 소문을 들었소.\n곡괭이 하나로 잔뼈가 굵은 광부 바우요.\n방 한 칸 내주면 돌 캐는 소리로 보답하리다!』",
+	"florist": "『바람에 실려 온 꽃냄새를 따라왔어요.\n꽃을 가꾸는 봄이라고 해요.\n마을 골목마다 꽃을 피워 드리고 싶어요!』",
+	"carpenter": "『나무 좋은 마을이라 들었네. 목수 덕구일세.\n삐걱대는 문짝이든 기울어진 서까래든\n내 대패가 지나가면 반듯해진다네. 받아 주겠나?』",
+	"herbalist": "『산비탈 약초 냄새가 여기까지 나더군요.\n약초를 다루는 향이라고 합니다.\n아픈 이웃에게 차 한 잔 우려 드리며 살고 싶어요.』",
+	"painter": "『그 마을 노을이 그렇게 곱다면서요.\n떠돌이 화가 청람이라 합니다.\n그 빛을 화폭에 담게 자리 하나 내주시겠습니까?』",
+	"musician": "『파도 소리가 노래 같은 마을이라 들었어요.\n악사 한별이에요. 축제엔 흥을, 슬픈 날엔\n위로를 — 노래로 보답할게요!』",
+	"weaver": "『베틀 놓을 조용한 방 한 칸이면 됩니다.\n길쌈꾼 솜이라고 해요. 겨울이 오기 전에\n마을 분들 목도리를 떠 드리고 싶어요.』",
 }
 
 

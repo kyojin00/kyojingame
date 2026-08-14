@@ -1,9 +1,17 @@
-// 이사 주민 4명 스프라이트 — 보라(rancher) 도트를 팔레트 스왑해서 만든다
+// 이사 주민 스프라이트 — 보라(rancher) 도트를 팔레트 스왑해서 만든다
 // (사서 서하를 만든 make_librarian.js 와 같은 방식·같은 판정).
 //   farmer    순돌 — 옷: 밀짚빛 카키 / 머리: 짙은 갈색
 //   foodie    다미 — 옷: 감귤빛 주황 / 머리: 밤색
 //   angler    강태 — 옷: 바닷빛 파랑 / 머리: 흑청색
 //   alchemist 묘연 — 옷: 어스름 보라 / 머리: 잿빛 은발
+// -- 마을회관(스토리 9) 확장 주민 7명 --
+//   miner     바우 — 옷: 석탄빛 잿색 / 머리: 숯검정
+//   florist   봄이 — 옷: 연분홍 / 머리: 밝은 갈색
+//   carpenter 덕구 — 옷: 진갈색 작업복 / 머리: 흑갈색
+//   herbalist 향이 — 옷: 풀빛 초록 / 머리: 녹갈색
+//   painter   청람 — 옷: 청록 / 머리: 남빛
+//   musician  한별 — 옷: 자주 와인 / 머리: 붉은 밤색
+//   weaver    솜이 — 옷: 미색 아이보리 / 머리: 연한 밤색
 // 피부·윤곽선은 그대로. 다시 뽑으려면 이 스크립트만 돌리면 된다.
 const fs = require('fs'), { PNG } = require('pngjs');
 const FRAMES = ['down_0', 'down_1', 'up_0', 'up_1', 'side_0', 'side_1',
@@ -26,6 +34,34 @@ const SETTLERS = {
   alchemist: {
     cloth: (r, g, b) => [Math.round(r * 0.52 + 26), Math.round(g * 0.34 + 12), Math.min(255, Math.round(b * 0.62 + 66))],
     hair:  (r, g, b) => [Math.round(r * 0.72 + 52), Math.round(g * 0.74 + 52), Math.round(b * 0.80 + 56)],
+  },
+  miner: {
+    cloth: (r, g, b) => [Math.round(r * 0.34 + 24), Math.round(g * 0.36 + 24), Math.round(b * 0.42 + 26)],
+    hair:  (r, g, b) => [Math.round(r * 0.22 + 6), Math.round(g * 0.22 + 6), Math.round(b * 0.24 + 8)],
+  },
+  florist: {
+    cloth: (r, g, b) => [Math.min(255, Math.round(r * 0.98 + 40)), Math.round(g * 0.62 + 46), Math.round(b * 0.68 + 52)],
+    hair:  (r, g, b) => [Math.min(255, Math.round(r * 0.78 + 34)), Math.round(g * 0.62 + 22), Math.round(b * 0.46 + 12)],
+  },
+  carpenter: {
+    cloth: (r, g, b) => [Math.round(r * 0.52 + 14), Math.round(g * 0.42 + 10), Math.round(b * 0.32 + 6)],
+    hair:  (r, g, b) => [Math.round(r * 0.34 + 4), Math.round(g * 0.28 + 4), Math.round(b * 0.24 + 4)],
+  },
+  herbalist: {
+    cloth: (r, g, b) => [Math.round(r * 0.36 + 16), Math.round(g * 0.62 + 40), Math.round(b * 0.36 + 16)],
+    hair:  (r, g, b) => [Math.round(r * 0.36 + 8), Math.round(g * 0.38 + 14), Math.round(b * 0.28 + 6)],
+  },
+  painter: {
+    cloth: (r, g, b) => [Math.round(r * 0.26 + 12), Math.round(g * 0.56 + 40), Math.round(b * 0.58 + 48)],
+    hair:  (r, g, b) => [Math.round(r * 0.22 + 8), Math.round(g * 0.28 + 12), Math.round(b * 0.52 + 34)],
+  },
+  musician: {
+    cloth: (r, g, b) => [Math.round(r * 0.64 + 34), Math.round(g * 0.30 + 10), Math.round(b * 0.44 + 28)],
+    hair:  (r, g, b) => [Math.round(r * 0.56 + 20), Math.round(g * 0.32 + 6), Math.round(b * 0.30 + 6)],
+  },
+  weaver: {
+    cloth: (r, g, b) => [Math.min(255, Math.round(r * 0.86 + 62)), Math.min(255, Math.round(g * 0.84 + 58)), Math.round(b * 0.78 + 48)],
+    hair:  (r, g, b) => [Math.round(r * 0.66 + 26), Math.round(g * 0.52 + 18), Math.round(b * 0.42 + 12)],
   },
 };
 

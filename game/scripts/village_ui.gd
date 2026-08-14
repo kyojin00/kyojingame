@@ -92,8 +92,9 @@ func _next_village_build() -> String:
 	for pid in m.VILLAGE_BUILD_ORDER:
 		if GameData.village_built.has(pid):
 			continue
-		# 마을회관은 주민(플레이어 포함)이 10명을 넘어야 — 마을 성장의 정점
-		if pid == "hall" and m.village_residents() <= GameData.HALL_RESIDENTS:
+		# 마을회관은 메인 스토리 9 — 이장의 부탁(주민 초대)을 받고
+		# 주민 10명을 모아야 지을 수 있다 (마을 성장의 정점)
+		if pid == "hall" and GameData.story9_phase != "build":
 			continue
 		# 도서관은 메인 스토리 6에서 사서와 이야기를 마쳐야 지을 수 있다
 		if pid == "library" and GameData.story6_phase != "build":
@@ -197,6 +198,9 @@ func _build_village_building(pid: String) -> void:
 		# 목동도 이미 마을에 와 있다 (스토리 8 방문객) — 보라에게 말을 걸면
 		# 정착 이야기가 이어진다
 		greet_note = "\n목동 아가씨가 벌써 상회 앞에서 들떠 있구먼 — 말을 걸어 보게."
+	elif pid == "hall":
+		# 마을회관 — 개관식은 접수대에서 이장과 (메인 스토리 9의 끝맺음)
+		greet_note = "\n내일부터 낮에는 내가 회관을 지키겠네.\n접수대로 와 주게 — 개관식을 해야지!"
 	elif owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
 		GameData.arrivals.append({"id": owner, "day": GameData.day})
 		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
@@ -320,6 +324,10 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "rancher" and GameData.story8_phase == "build" \
 			and GameData.village_built.has("ranch"):
 		m.story._start_ranch_done_dialog()
+		return
+	# 메인 스토리 9 — 마을의 심장, 마을회관
+	if npc.id == "chief" and GameData.story9_phase == "ask":
+		m.story._start_hall_ask_dialog()
 		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
@@ -503,6 +511,330 @@ func room_action(kind: String) -> void:
 			_open_lab_dialog()
 		"read":
 			_open_library_dialog()
+		"hall":
+			# 완공 직후에는 개관식부터 — 그다음부터 회관 살림이 열린다
+			if GameData.story9_phase == "build":
+				m.story._start_hall_open_dialog()
+			else:
+				_open_hall_dialog()
+
+
+# ---- 마을회관 (메인 스토리 9) ----
+#
+# 접수대의 이장에게서 마을 살림을 본다. 기능은 마을 크기에 따라
+# 점진적으로 열린다 — 개관: 주민 명부·마을 소식 / 12명: 마을 창고 /
+# 15명: 공동 프로젝트 / 20명: 마을 회의. 잠긴 기능은 공지가 예고한다.
+
+func _open_hall_dialog() -> void:
+	if GameData.story9_phase != "done":
+		m.dialog.open("마을회관", "아직 문을 열지 않았다.", [["닫기", null]])
+		return
+	var body := "이장이 두툼한 장부를 넘기고 있다.\n\n주민 %d명 (플레이어 포함)\n%s" \
+		% [m.village_residents(), GameData.hall_next_feature_text()]
+	var btns: Array = [["주민 명부 보기", _open_hall_roster.bind(0)],
+		["마을 소식·캘린더", _open_hall_notice_dialog]]
+	if GameData.hall_feature_open("store"):
+		btns.append(["마을 창고", _open_hall_store_dialog])
+	if GameData.hall_feature_open("project"):
+		btns.append(["공동 프로젝트", _open_hall_project_dialog])
+	if GameData.hall_feature_open("meet"):
+		btns.append(["마을 회의", _open_hall_meeting_dialog])
+	btns.append(["나가기", null])
+	m.dialog.open("마을회관", body, btns)
+
+
+# 주민 명부 — 온 마을 사람의 이름·분류·호감도를 장부처럼 넘겨 본다
+const HALL_PAGE := 7
+const HALL_KIND_KOR := {"core": "토박이", "normal": "이웃", "special": "귀한 손님"}
+
+
+func _open_hall_roster(page: int) -> void:
+	var rows: Array = []
+	for kind in ["core", "normal", "special"]:   # 토박이 먼저, 장부 순서대로
+		for n in m.npcs:
+			if GameData.settler_kind(n.id) != kind or not GameData.NPCS.has(n.id):
+				continue
+			var def: Dictionary = GameData.NPCS[n.id]
+			var aff := mini(int(GameData.affinity.get(n.id, 0)), 100)
+			var mark := ""
+			if GameData.spouse == n.id:
+				mark = " [배우자]"
+			elif GameData.dating == n.id:
+				mark = " [연인]"
+			rows.append("· %s%s — ♥%d (%s)" % [def.name, mark, aff,
+				HALL_KIND_KOR.get(kind, kind)])
+	var pages := maxi(1, int(ceil(rows.size() / float(HALL_PAGE))))
+	page = clampi(page, 0, pages - 1)
+	var body := "주민 %d명이 장부에 적혀 있다. (%d/%d장)\n\n" \
+		% [rows.size(), page + 1, pages]
+	for i in range(page * HALL_PAGE, mini((page + 1) * HALL_PAGE, rows.size())):
+		body += str(rows[i]) + "\n"
+	var btns: Array = []
+	if page + 1 < pages:
+		btns.append(["다음 장", _open_hall_roster.bind(page + 1)])
+	if page > 0:
+		btns.append(["앞 장", _open_hall_roster.bind(page - 1)])
+	btns.append(["장부를 덮는다", _open_hall_dialog])
+	m.dialog.open("주민 명부", body, btns)
+
+
+# 마을 소식·캘린더 — 축제 일정과 마을의 지금, 그리고 다음 목표의 예고
+func _open_hall_notice_dialog() -> void:
+	var body := "— %s %d일, 주민 %d명 —\n\n[계절 축제]\n" \
+		% [GameData.season_name(), GameData.day_in_season(), m.village_residents()]
+	for s in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
+		var f: Dictionary = GameData.FESTIVALS[s]
+		var mark := " ★오늘!" if not GameData.festival_today().is_empty() \
+			and GameData.season() == s and GameData.day_in_season() == int(f.day) else ""
+		body += "· %s %d일 — %s%s\n" % [GameData.SEASON_NAMES[s], int(f.day),
+			str(f.name), mark]
+	body += "\n[마을 공지]\n"
+	if not GameData.empty_houses.is_empty():
+		body += "· 빈 집 %d채 — 새 이웃을 기다린다.\n" % GameData.empty_houses.size()
+	if GameData.hall_trash_total > 0:
+		body += "· 지금까지 수거한 쓰레기 %d개 — 마을이 깨끗하다!\n" \
+			% GameData.hall_trash_total
+	if not GameData.hall_projects.is_empty():
+		body += "· 완성한 공동 프로젝트 %d건.\n" % GameData.hall_projects.size()
+	body += "· %s" % GameData.hall_next_feature_text()
+	m.dialog.open("마을 소식·캘린더", body, [["돌아가기", _open_hall_dialog]])
+
+
+# 마을 창고 — 주민 기부품 보관 + 쓰레기 수거함 + 하루 한 번 운 루팅
+func _open_hall_store_dialog() -> void:
+	var body := "주민들이 나눠 쓰는 살림 창고.\n이따금 누군가 물건을 놓고 간다.\n\n"
+	if GameData.hall_stock.is_empty():
+		body += "지금은 텅 비어 있다."
+	else:
+		body += "보관품:"
+		for iid in GameData.hall_stock:
+			body += " %s x%d ·" % [GameData.ITEMS[iid].name,
+				int(GameData.hall_stock[iid])]
+		body = body.trim_suffix(" ·")
+	var btns: Array = []
+	if GameData.hall_loot_day != GameData.day and not GameData.hall_stock.is_empty():
+		btns.append(["창고를 뒤적인다 (하루 한 번)", _hall_loot_pick])
+	var trash := int(GameData.items.get("forage_trash", 0))
+	if trash > 0:
+		btns.append(["쓰레기 %d개 비우기 (+%dG)" % [trash,
+			trash * GameData.HALL_TRASH_G], _hall_dump])
+	btns.append(["돌아가기", _open_hall_dialog])
+	m.dialog.open("마을 창고", body, btns)
+
+
+func _hall_loot_pick() -> void:
+	var got := GameData.hall_loot()
+	Sound.play_sfx("sfx_place")
+	if got == "miss":
+		m.dialog.open("마을 창고", "구석구석 뒤적여 봤지만...\n오늘은 쓸 만한 게 손에 잡히지 않았다.",
+			[["아쉽다", _open_hall_dialog]])
+	elif got != "":
+		m.dialog.open("마을 창고", "먼지 쌓인 구석에서 %s을(를) 찾았다!\n(가방에 넣었다)"
+			% GameData.ITEMS[got].name, [["웬 떡이냐", _open_hall_dialog]])
+	else:
+		_open_hall_store_dialog()
+	m.saveio.save_now()
+
+
+func _hall_dump() -> void:
+	var n := GameData.hall_dump_trash()
+	if n > 0:
+		Sound.play_sfx("sfx_catch")
+		m.hud.event_toast("마을 미화 +%dG!" % (n * GameData.HALL_TRASH_G))
+		m.saveio.save_now()
+	_open_hall_store_dialog()
+
+
+# 공동 프로젝트 — 재료를 모아 광장을 함께 가꾼다 (순서대로 하나씩)
+func _open_hall_project_dialog() -> void:
+	var next: Dictionary = {}
+	for p: Dictionary in GameData.HALL_PROJECTS:
+		if str(p.id) not in GameData.hall_projects:
+			next = p
+			break
+	if next.is_empty():
+		m.dialog.open("공동 프로젝트",
+			"계획한 프로젝트는 모두 끝났다.\n광장이 몰라보게 근사해졌다!",
+			[["뿌듯하다", _open_hall_dialog]])
+		return
+	var body := "다음 프로젝트 — 「%s」\n%s\n\n필요: " % [str(next.name), str(next.desc)]
+	var parts: Array = []
+	if int(next.wood) > 0:
+		parts.append("목재 %d (보유 %d)" % [int(next.wood), GameData.wood])
+	if int(next.stone) > 0:
+		parts.append("석재 %d (보유 %d)" % [int(next.stone), GameData.stone])
+	if int(next.money) > 0:
+		parts.append("%dG (보유 %d)" % [int(next.money), GameData.money])
+	body += " · ".join(parts)
+	var ok: bool = GameData.wood >= int(next.wood) \
+		and GameData.stone >= int(next.stone) and GameData.money >= int(next.money)
+	var btns: Array = [["돌아가기", _open_hall_dialog]]
+	if ok:
+		btns.insert(0, ["재료를 내놓는다", _do_hall_project.bind(str(next.id))])
+	m.dialog.open("공동 프로젝트", body if ok else body + "\n(재료가 모자란다)", btns)
+
+
+func _do_hall_project(pid: String) -> void:
+	var p: Dictionary = {}
+	for cand: Dictionary in GameData.HALL_PROJECTS:
+		if str(cand.id) == pid:
+			p = cand
+			break
+	if p.is_empty() or pid in GameData.hall_projects \
+			or GameData.wood < int(p.wood) or GameData.stone < int(p.stone) \
+			or GameData.money < int(p.money):
+		return
+	GameData.wood -= int(p.wood)
+	GameData.stone -= int(p.stone)
+	GameData.money -= int(p.money)
+	GameData.today_spent += int(p.money)
+	GameData.hall_projects.append(pid)
+	_place_hall_project_deco(p)
+	# 마을이 좋아지면 다들 기뻐한다 — 온 주민의 마음이 조금씩 따뜻해진다
+	for n in m.npcs:
+		if GameData.affinity.has(n.id):
+			GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 3
+	Sound.play_sfx("sfx_place")
+	m.hud.event_toast("「%s」 완성!" % str(p.name))
+	m.hud.show_message("마을 사람들과 함께 「%s」을(를) 끝냈다!\n다들 무척 기뻐한다. (온 주민 호감도 +3)"
+		% str(p.name), 6.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+	if m.dialog.visible:
+		_open_hall_project_dialog()
+
+
+# 완성한 프로젝트의 장식물을 광장에 세운다 (막힌 칸은 건너뛴다).
+# 옛 세이브 로더가 가로등·벤치를 걷어내므로, 로드 후에도 여기로 되살린다.
+func _place_hall_project_deco(p: Dictionary) -> void:
+	if str(p.kind) == "":
+		return
+	for t: Array in p.tiles:
+		var tile := Vector2i(int(t[0]), int(t[1]))
+		if not m.objects.has(tile) and m.is_passable(tile):
+			m.objnode._place_object(tile, str(p.kind), 0)
+
+
+func restore_hall_project_deco() -> void:
+	for p: Dictionary in GameData.HALL_PROJECTS:
+		if str(p.id) in GameData.hall_projects:
+			_place_hall_project_deco(p)
+
+
+# 마을 회의 — 주민 20명의 큰 마을만 여는 자리 (7일에 한 번)
+func _open_hall_meeting_dialog() -> void:
+	var left: int = GameData.HALL_MEET_COOLDOWN \
+		- (GameData.day - GameData.hall_meet_day)
+	if GameData.hall_meet_day > 0 and left > 0:
+		m.dialog.open("마을 회의",
+			"회의는 얼마 전에 끝났다.\n다음 회의까지 %d일 남았다." % left,
+			[["돌아가기", _open_hall_dialog]])
+		return
+	m.dialog.open("마을 회의",
+		"주민들이 회관 마루에 둘러앉았다.\n안건을 올리면 다 같이 투표한다.\n(회의는 %d일에 한 번 열 수 있다)"
+			% GameData.HALL_MEET_COOLDOWN, [
+		["안건: 마을 대청소의 날", _meet_vote.bind("clean")],
+		["안건: 간식 나눔 (800G)", _meet_vote.bind("snack")],
+		["안건: 주민 퇴출", _open_expel_picker],
+		["돌아가기", _open_hall_dialog],
+	])
+
+
+# 투표 — 마음이 가까운 주민일수록 내 안건에 손을 들어 준다
+func _meet_vote(agenda: String) -> void:
+	if agenda == "snack" and GameData.money < 800:
+		m.dialog.open("마을 회의", "간식을 살 돈이 모자라다... (800G)",
+			[["돌아가기", _open_hall_meeting_dialog]])
+		return
+	var yes := 0
+	var no := 0
+	for n in m.npcs:
+		if randf() < 0.35 + float(int(GameData.affinity.get(n.id, 0))) / 200.0:
+			yes += 1
+		else:
+			no += 1
+	GameData.hall_meet_day = GameData.day
+	var passed: bool = yes > no
+	if passed:
+		_meet_apply(agenda)
+	var verdict := "가결!" if passed else "부결..."
+	m.dialog.open("마을 회의 — 투표 결과",
+		"찬성 %d · 반대 %d — %s\n%s" % [yes, no, verdict,
+			_meet_result_text(agenda, passed)],
+		[["회의를 마친다", null]])
+	m.saveio.save_now()
+
+
+func _meet_result_text(agenda: String, passed: bool) -> String:
+	if not passed:
+		return "다음 회의 때 다시 올려 보자.\n(평소 이웃들과 가깝게 지내면 표가 는다)"
+	match agenda:
+		"clean":
+			return "다 같이 해변과 들의 쓰레기를 말끔히 치웠다!\n(온 주민 호감도 +2)"
+		"snack":
+			return "광장에 간식 잔치가 벌어졌다!\n(온 주민 호감도 +4)"
+	return ""
+
+
+func _meet_apply(agenda: String) -> void:
+	match agenda:
+		"clean":
+			# 온 마을의 쓰레기를 걷어 낸다 (해변 채집 쓰레기)
+			for t: Vector2i in m.objects.keys():
+				if str(m.objects[t].get("kind", "")) == "forage_trash":
+					m.objnode._remove_object(t)
+			for n in m.npcs:
+				if GameData.affinity.has(n.id):
+					GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 2
+			m.queue_redraw()
+		"snack":
+			GameData.money -= 800
+			GameData.today_spent += 800
+			for n in m.npcs:
+				if GameData.affinity.has(n.id):
+					GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 4
+	Sound.play_sfx("sfx_catch")
+
+
+# 주민 퇴출 — 이사 온 주민(일반·특수)만 안건에 올릴 수 있다
+func _open_expel_picker() -> void:
+	if GameData.settlers.is_empty():
+		m.dialog.open("마을 회의",
+			"퇴출 안건에 올릴 수 있는 건 이사 온 주민뿐인데,\n지금은 해당하는 사람이 없다.",
+			[["돌아가기", _open_hall_meeting_dialog]])
+		return
+	var btns: Array = []
+	for nid: String in GameData.settlers:
+		btns.append(["%s (♥%d)" % [GameData.NPCS[nid].name,
+			int(GameData.affinity.get(nid, 0))], _meet_expel_vote.bind(nid)])
+	btns.append(["그만두기", _open_hall_meeting_dialog])
+	m.dialog.open("주민 퇴출 안건", "무거운 안건이다...\n누구를 올릴까?", btns)
+
+
+# 퇴출 투표 — 마을의 미움을 산 주민일수록 찬성이 쏟아진다
+func _meet_expel_vote(nid: String) -> void:
+	var target_aff := int(GameData.affinity.get(nid, 0))
+	var yes := 0
+	var no := 0
+	for n in m.npcs:
+		if n.id == nid:
+			continue
+		if randf() < clampf(0.85 - target_aff * 0.006, 0.1, 0.9):
+			yes += 1
+		else:
+			no += 1
+	GameData.hall_meet_day = GameData.day
+	var nm := str(GameData.NPCS[nid].name)
+	if yes > no:
+		m.story._settler_depart(nid, false)
+		m.dialog.open("마을 회의 — 투표 결과",
+			"찬성 %d · 반대 %d — 가결.\n%s이(가) 무거운 얼굴로 짐을 쌌다...\n빈 집은 새 이웃을 기다린다." % [yes, no, nm],
+			[["회의를 마친다", null]])
+	else:
+		m.dialog.open("마을 회의 — 투표 결과",
+			"찬성 %d · 반대 %d — 부결.\n%s은(는) 마을에 남는다. 다들 뒤가 좀 머쓱해졌다." % [yes, no, nm],
+			[["회의를 마친다", null]])
+	m.saveio.save_now()
 
 
 func _open_inn_dialog() -> void:
