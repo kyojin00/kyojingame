@@ -683,7 +683,7 @@ func _load_textures() -> void:
 	# sprites/에 떨어뜨리면 그날부터 켜진다.
 	for g: String in ["new_boy", "player_f"]:
 		for d: String in ["down", "up", "side"]:
-			for i in 4:   # player.gd의 SWING_FRAMES와 같은 수
+			for i in 5:   # player.gd의 SWING_FRAMES와 같은 수
 				var sn := "%s_%s_swing_%d" % [g, d, i]
 				var sp := "res://assets/sprites/%s.png" % sn
 				if ResourceLoader.exists(sp):
