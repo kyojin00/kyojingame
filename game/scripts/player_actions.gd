@@ -17,6 +17,18 @@ func net_shop(op: String, id: String, qty := -1) -> void:
 		m.netsync._req_shop.rpc_id(1, op, id, qty)
 
 
+# 경매장(바깥 장터)에서 물건·돈이 오간 결과를 함께하기 세계에 반영한다.
+# 지갑과 창고가 공용이라 게스트가 사고팔면 호스트 쪽도 같이 움직여야 한다.
+# qty > 0 이면 창고로 들어오고, < 0 이면 나간다. 부른 쪽은 이미 제 화면에
+# 반영해 둔 상태이고 (낙관적), 호스트의 통계 방송이 정답으로 덮는다.
+func net_auction(cat: String, id: String, qty: int, quality: int,
+		money_delta: int) -> void:
+	if Net.is_guest():
+		m.netsync._req_auction.rpc_id(1, cat, id, qty, quality, money_delta)
+	elif Net.is_host():
+		m.netsync._broadcast_stats()
+
+
 func record_kill(mob: String) -> void:
 	GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
 	GameData._check_collections()   # 「동굴 관찰자」는 처치 기록으로 찬다

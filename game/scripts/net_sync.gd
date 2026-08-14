@@ -274,6 +274,30 @@ func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 	m.queue_redraw()
 	m.farming.rebuild()
 
+# 게스트가 장터에서 사고팔았다 — 공용 지갑·창고에 반영하고 다시 뿌린다
+@rpc("any_peer", "reliable")
+func _req_auction(cat: String, id: String, qty: int, quality: int,
+		money_delta: int) -> void:
+	if not Net.is_host():
+		return
+	GameData.money = maxi(0, GameData.money + money_delta)
+	if id != "" and qty != 0:
+		match cat:
+			"seed":
+				GameData.seeds[id] = maxi(0, int(GameData.seeds.get(id, 0)) + qty)
+			"produce":
+				GameData.produce[id] = maxi(0, int(GameData.produce.get(id, 0)) + qty)
+				if quality == 1:
+					GameData.produce_silver[id] = maxi(0,
+						int(GameData.produce_silver.get(id, 0)) + qty)
+				elif quality == 2:
+					GameData.produce_gold[id] = maxi(0,
+						int(GameData.produce_gold.get(id, 0)) + qty)
+			_:
+				GameData.items[id] = maxi(0, int(GameData.items.get(id, 0)) + qty)
+	_broadcast_stats()
+
+
 func _broadcast_stats() -> void:
 	if Net.is_host():
 		_net_stats.rpc(JSON.stringify(GameData.build_stats()))

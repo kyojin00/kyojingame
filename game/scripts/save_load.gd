@@ -343,6 +343,9 @@ func _apply_save(d: Dictionary) -> void:
 			if o.size() > 7 and int(o[7]) == 1:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
 			m.objects[Vector2i(int(o[0]), int(o[1]))] = od
+		# 경매 게시판이 생기기 전 세이브 — 광장에 세워 준다
+		if not m.objects.has(m.AUCTION_POS):
+			m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
 		m.worldgen._migrate_farm_layout()
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)

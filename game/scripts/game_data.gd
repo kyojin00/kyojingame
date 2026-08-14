@@ -233,19 +233,49 @@ func window_mode_label() -> String:
 	return "전체 화면" if window_mode == "fullscreen" else "창 " + window_mode
 
 
+# ---- 경매장 신원 ----
+#
+# 장터(바깥 서버)에는 로그인이 없다. 대신 이 컴퓨터가 처음 켤 때 무작위
+# 문자열을 하나 만들어 설정 파일에 두고, 그것으로 「내 농장」을 가른다.
+# 이 값이 있어야 내가 올린 글을 거두고 대금을 받을 수 있으므로 지우지 않는다.
+var farm_id := ""
+
+
+func _ensure_farm_id() -> void:
+	if farm_id != "":
+		return
+	var chars := "abcdefghijklmnopqrstuvwxyz0123456789"
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for i in 24:
+		farm_id += chars[rng.randi() % chars.length()]
+	save_settings()
+
+
+# 장터에 보이는 내 이름 (이름을 안 지었으면 기본값)
+func seller_name() -> String:
+	var n := player_name.strip_edges()
+	return n.substr(0, 24) if n != "" else "이름 없는 농부"
+
+
 func save_settings() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"window": window_mode}))
+		f.store_string(JSON.stringify({"window": window_mode, "farm_id": farm_id}))
 
 
 func load_settings() -> void:
 	if not FileAccess.file_exists(SETTINGS_PATH):
+		_ensure_farm_id()
 		return
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.READ)
 	if f == null:
+		_ensure_farm_id()
 		return
 	var d: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(d) == TYPE_DICTIONARY:
+		farm_id = str(d.get("farm_id", ""))
+	_ensure_farm_id()
 	if typeof(d) == TYPE_DICTIONARY and d.has("window"):
 		window_mode = str(d.window)
 		# 구버전 해상도 설정은 현재 기본값으로 교체
