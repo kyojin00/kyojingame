@@ -538,6 +538,8 @@ func _ready() -> void:
 		multiplayer.peer_disconnected.connect(netsync._on_peer_disconnected)
 	if Net.is_guest():
 		multiplayer.server_disconnected.connect(netsync._on_server_disconnected)
+		# 접속 실패 — 이 신호를 안 받으면 「접속하는 중...」에서 하염없이 멈춘다
+		multiplayer.connection_failed.connect(netsync._on_connection_failed)
 		# 게스트: 로컬 저장 대신 호스트 스냅샷을 기다린다
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
@@ -1234,7 +1236,10 @@ const PASTURE_GOLDEN_EGG := 0.09       # 목초지 닭의 황금 달걀 확률 (
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.is_guest() and not _net_ready:
-		return  # 접속 완료 전에는 조작 금지
+		# 접속 완료 전에는 조작 금지 — 다만 기다리다 그만둘 수는 있어야 한다
+		if event.is_action_pressed("ui_cancel"):
+			_back_to_title()
+		return
 	if _name_layer != null:
 		return  # 이름 입력 중에는 다른 조작을 받지 않는다
 	if story_cutscene and story._postman_state == "approach" and story._postman != null \

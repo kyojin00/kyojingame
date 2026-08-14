@@ -7,6 +7,7 @@ const DEFAULT_PORT := 7777
 const MAX_PLAYERS := 4
 
 var mode: int = Mode.SOLO
+var last_ip := ""     # 게스트가 찾아간 호스트 주소 (접속 화면에 보여 준다)
 
 
 func is_host() -> bool:
@@ -49,6 +50,7 @@ func join_game(ip: String, port := DEFAULT_PORT) -> Error:
 		return err
 	multiplayer.multiplayer_peer = peer
 	mode = Mode.GUEST
+	last_ip = "%s:%d" % [ip, port]
 	return OK
 
 

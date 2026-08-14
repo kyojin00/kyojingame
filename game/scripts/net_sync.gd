@@ -15,9 +15,11 @@ class_name KyojinNetSync
 extends Node
 
 var m: KyojinMain    # main.gd
+var _connect_ip := ""   # 접속 화면에 보여 줄 호스트 주소
 
 
 func _show_connecting() -> void:
+	_connect_ip = Net.last_ip
 	var layer := CanvasLayer.new()
 	layer.layer = 55
 	layer.name = "Connecting"
@@ -27,7 +29,7 @@ func _show_connecting() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(bg)
 	m._connect_label = Label.new()
-	m._connect_label.text = "호스트에 접속하는 중..."
+	m._connect_label.text = "호스트를 찾는 중... (%s)\n\nESC: 취소하고 타이틀로" % _connect_ip
 	m._connect_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	m._connect_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	m._connect_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -61,6 +63,17 @@ func _on_peer_disconnected(id: int) -> void:
 func _on_server_disconnected() -> void:
 	Net.reset()
 	get_tree().change_scene_to_file("res://scenes/title.tscn")
+
+
+# 호스트를 못 찾았다 (IP가 틀렸거나 방이 없거나 방화벽에 막혔다).
+# 왜 안 됐는지 알려 주고 잠시 뒤 타이틀로 돌아간다.
+func _on_connection_failed() -> void:
+	if m._connect_label != null and is_instance_valid(m._connect_label):
+		m._connect_label.text = "호스트에 닿지 못했다...\n" \
+			+ "IP(%s)와 방화벽(7777 포트)을 확인하자.\n곧 타이틀로 돌아간다." % _connect_ip
+	get_tree().create_timer(3.0).timeout.connect(func() -> void:
+		if Net.is_guest() and not m._net_ready:
+			m._back_to_title())
 
 
 func _make_snapshot_json() -> String:
@@ -157,7 +170,30 @@ func _sync_pos(x: float, y: float, dir: String, moving: bool) -> void:
 	m.remote_players[pid].set_state(Vector2(x, y), dir, moving)
 
 
+# 접속 화면에 지금 어디까지 왔는지 적는다. 「접속하는 중...」에서 멈춰
+# 있을 때 연결이 안 붙은 것인지, 붙었는데 농장을 못 받는 것인지 구별된다.
+# (조각을 받기 시작하면 _recv_snapshot_part가 진행률로 덮어쓴다)
+func _update_connect_label() -> void:
+	if m._connect_label == null or not is_instance_valid(m._connect_label) \
+			or not Net.is_guest() or m._net_ready or _snap_buf != "":
+		return
+	var peer := multiplayer.multiplayer_peer
+	var esc := "\n\nESC: 취소하고 타이틀로"
+	if peer == null:
+		m._connect_label.text = "연결이 끊어졌다..." + esc
+		return
+	match peer.get_connection_status():
+		MultiplayerPeer.CONNECTION_DISCONNECTED:
+			m._connect_label.text = "호스트를 찾지 못했다...\n" \
+				+ "IP(%s)와 방화벽(7777 포트)을 확인하자." % _connect_ip + esc
+		MultiplayerPeer.CONNECTION_CONNECTING:
+			m._connect_label.text = "호스트를 찾는 중... (%s)" % _connect_ip + esc
+		_:
+			m._connect_label.text = "연결됐다! 농장을 넘겨받는 중..." + esc
+
+
 func _net_process(delta: float) -> void:
+	_update_connect_label()
 	# **붙어 있을 때만** 내보낸다. 모드만 보고 쏘면 게스트가 방을 찾는 동안,
 	# 또는 연결이 끊긴 뒤에 "not connected" 오류가 매 프레임 쌓인다.
 	if not Net.connected():
