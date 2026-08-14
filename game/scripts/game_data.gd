@@ -241,6 +241,14 @@ func window_mode_label() -> String:
 var farm_id := ""
 
 
+# 장터에서 「내 농장」을 가리키는 값. 로그인했으면 **서버가 발급한 계정 id**를
+# 쓰고(그 편이 안전하다), 아니면 이 컴퓨터가 만든 farm_id로 버틴다.
+func farm_key() -> String:
+	if Auth.signed_in():
+		return Auth.uid
+	return farm_id
+
+
 func _ensure_farm_id() -> void:
 	if farm_id != "":
 		return
