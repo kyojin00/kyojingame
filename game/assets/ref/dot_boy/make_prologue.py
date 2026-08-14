@@ -223,8 +223,8 @@ def scene_box(g, f):
     br = [1.0, 1.1, 0.92, 1.05][f]
     g.pool(52, 56, int(66 * br), int(17 * br), (255, 190, 90),
            ((0.35, 0.35), (0.7, 0.2), (1.0, 0.1)))
-    # 상자 그림자 — 비스듬한 몸통을 따라 바닥에 진다
-    g.pool(92, 63, 42, 6, (60, 36, 30), ((1.0, 0.45),))
+    # 상자 그림자 — 촛불(왼쪽)의 반대편으로 길게 진다
+    g.pool(104, 64, 46, 6, (60, 36, 30), ((0.55, 0.5), (1.0, 0.28)))
     # 나무 상자 — 정육면체를 비스듬히 본 입체 (앞판 + 옆판 + 열린 뚜껑).
     # 깊이 방향은 오른쪽 위(DEP, -RISE)로 물러난다.
     bx0, bx1 = 60, 104
@@ -235,20 +235,28 @@ def scene_box(g, f):
         off = round(i * 4 / 17)
         g.rect(70 + off, 13 + i, 114 + off, 13 + i, (96, 64, 38))
     g.rect(72, 13, 116, 14, (116, 80, 46))          # 뚜껑 안쪽 테
+    off_b = round(16 * 4 / 17)
+    g.rect(70 + off_b, 28, 114 + off_b, 28, (134, 94, 52))   # 뚜껑 널 두께
+    g.rect(70 + off_b, 29, 114 + off_b, 29, (156, 112, 62))
     for x in range(69, 116):
         g.p(x, 12, OUTLINE)
     for i in range(18):
         off = round(i * 4 / 17)
         g.p(69 + off, 12 + i, OUTLINE)
         g.p(115 + off, 12 + i, OUTLINE)
-    # 상자 속 — 비스듬히 열린 윗면 (평행사변형)
+    # 상자 속 — 비스듬히 열린 윗면. 둘레에 널 두께(테두리)가 보인다
     for t in range(DEP + 1):
         y = by0 - round(t * RISE / DEP)
-        g.rect(bx0 + t, y, bx1 + t, y, (38, 25, 17))
+        g.rect(bx0 + t, y, bx1 + t, y, (150, 104, 56))       # 널 윗면
+    for t in range(2, DEP - 1):
+        y = by0 - round(t * RISE / DEP)
+        g.rect(bx0 + t + 3, y, bx1 + t - 3, y, (38, 25, 17)) # 속 어둠
     # 옆판 — 깊이 방향으로 물러나는 어두운 면
     for x in range(bx1, bx1 + DEP + 1):
         dy = round((x - bx1) * RISE / DEP)
         g.rect(x, by0 - dy + 2, x, by1 - dy, (106, 70, 38))
+        g.p(x, by1 - dy, (84, 54, 30))              # 접지 그늘
+        g.p(x, by1 - dy - 1, (94, 62, 34))
         if (x - bx1) in (5, 10):                    # 옆판 널 이음새
             g.rect(x, by0 - dy + 3, x, by1 - dy - 1, (88, 58, 32))
     # 앞판
@@ -256,6 +264,15 @@ def scene_box(g, f):
     for y in range(by0 + 7, by1 - 1, 7):
         g.rect(bx0 + 1, y, bx1 - 1, y, (112, 74, 40))
     g.rect(bx0 + 2, by0, bx1 - 2, by0 + 1, (172, 122, 66))
+    for y in range(by0 + 2, by1):                   # 촛불 쪽(왼쪽)이 밝다
+        g.p(bx0 + 1, y, (162, 114, 60))
+        g.p(bx0 + 2, y, (152, 106, 56))
+    for y in range(by0 + 2, by1):                   # 반대쪽은 어스름
+        g.p(bx1 - 2, y, (124, 84, 44))
+        g.p(bx1 - 1, y, (116, 78, 42))
+    for y in range(by0 + 7, by1 - 1, 7):            # 널마다 못 두 개
+        g.p(bx0 + 7, y + 3, (88, 58, 32))
+        g.p(bx1 - 7, y + 3, (88, 58, 32))
     for x0 in (bx0, bx1 - 4):                       # 앞판 쇠장식
         g.rrect(x0, by0, x0 + 4, by0 + 5, (128, 130, 138), 2)
         g.rrect(x0, by1 - 5, x0 + 4, by1, (104, 106, 114), 2)
@@ -295,6 +312,11 @@ def scene_box(g, f):
     g.rect(ev0 + 3, et - 1, ev1 + 1, et - 1, OUTLINE)
     g.rect(ev0, eb + 1, ev1, eb + 1, OUTLINE)
     g.rect(ev0 + 2, et, ev1 + 2, et, (250, 244, 222))
+    for y in range(et + 1, eb + 1):                 # 촛불 반대쪽 봉투 그늘
+        off = (eb - y) // 7
+        g.p(ev1 - 1 + off, y, (222, 206, 172))
+        g.p(ev1 + off, y, (214, 196, 162))
+    g.rect(ev1 + 2, eb + 1, ev1 + 6, eb + 1, (94, 62, 34))
     for i in range(13):                                         # 봉투 접힌 V
         y = et + 1 + i // 2
         off = (eb - y) // 7
