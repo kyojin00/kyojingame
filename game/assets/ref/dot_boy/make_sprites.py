@@ -204,6 +204,9 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.vline(10 + dx, y + 1, y + 10, 'B')         # 팔과 몸 사이 솔기
     g.vline(21 + dx, y + 1, y + 10, 'B')
     g.hline(13 + dx, 18 + dx, y, 'B')            # 옷깃 (목 아래 그늘)
+    for cx in (10 + dx, 21 + dx):                # 어깨·밑단 모서리를 깎는다
+        g.px(cx, y, '.')                         # (깎인 자리는 윤곽선이 채워
+        g.px(cx, y + 11, '.')                    #  둥근 어깨·허리가 된다)
     g.hline(15 + dx, 16 + dx, y + 2, 'B')        # 앞섶 단추 세 개
     g.hline(15 + dx, 16 + dx, y + 4, 'B')
     g.hline(15 + dx, 16 + dx, y + 6, 'B')
@@ -223,6 +226,9 @@ def torso_down(g, bob, swing, dx=0, skip=None):
         g.hline(sx, sx + 2, y + 7 + dy, 'B')                     # 소매단
         g.rect(sx, y + 8 + dy, sx + 2, y + 10 + dy, 's')         # 손
         g.hline(sx + 1, sx + 2, y + 10 + dy, 'S')                # 손 그늘
+        out = sx if side == 'left' else sx + 2   # 바깥쪽 열
+        g.px(out, y + 1, '.')                    # 어깨 소매 모서리 깎기
+        g.px(out, y + 10 + dy, '.')              # 주먹 끝 모서리 깎기
 
 
 def legs_down(g, stride, dx=0, sq=0):
@@ -232,6 +238,8 @@ def legs_down(g, stride, dx=0, sq=0):
     g.rect(10 + dx, HIP_Y + sq, 21 + dx, HIP_Y + 2 + sq, 'p')   # 엉덩이 띠
     g.hline(10 + dx, 21 + dx, HIP_Y + sq, 'P')  # 셔츠 아랫단 그늘
     g.rect(15 + dx, HIP_Y + 2 + sq, 16 + dx, HIP_Y + 2 + sq, 'P')
+    g.px(10 + dx, HIP_Y + sq, '.')              # 엉덩이 띠 모서리 깎기
+    g.px(21 + dx, HIP_Y + sq, '.')
     for x0, s in ((10, stride), (17, -stride)):
         lift = min(3, -s) if s < 0 else 0      # 뒤로 간 다리는 들려 짧아진다
         pc = 'P' if lift else 'p'              # 들린 다리는 그늘에 잠긴다
@@ -249,8 +257,8 @@ def legs_down(g, stride, dx=0, sq=0):
             g.px(inner + off, yy, 'P')
             if yy == top:
                 g.hline(x0 + off, x0 + 4 + off, yy, 'P')
-        g.rect(x0 + bend, GROUND - 3 - lift, x0 + 4 + bend, GROUND - lift, 'k')
-        g.hline(x0 + bend, x0 + 4 + bend, GROUND - lift, 'K')
+        g.rect(x0 + bend, GROUND - 3 - lift, x0 + 4 + bend, GROUND - 1 - lift, 'k')
+        g.hline(x0 + 1 + bend, x0 + 3 + bend, GROUND - lift, 'K')  # 바닥은 좁게 (둥근 신발)
         g.px((x0 if x0 == 17 else x0 + 4) + bend, GROUND - 1 - lift, 'K')
 
 
@@ -265,6 +273,9 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     g.px(c + 4, y + 1, 'L')
     g.vline(c - 4, y, y + 10, 'B')             # 등쪽 그늘
     g.px(c - 3, y + 1, 'B')
+    for cx in (c - 4, c + 5):                  # 어깨·밑단 모서리 깎기
+        g.px(cx, y, '.')
+        g.px(cx, y + 11, '.')
     if not draw_arm:
         return
     # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다. 앞모습 팔과 같은
@@ -307,6 +318,8 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     g.rect(c - 4 + dx, HIP_Y + sq, c + 5 + dx, HIP_Y + 2 + sq, 'p')
     g.hline(c - 4 + dx, c + 5 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
     g.px(c + dx, HIP_Y + 2 + sq, 'P')
+    g.px(c - 4 + dx, HIP_Y + sq, '.')          # 엉덩이 띠 모서리 깎기
+    g.px(c + 5 + dx, HIP_Y + sq, '.')
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다.
     # 옆에서 본 다리는 앞뒤 두께가 몸통과 비슷해야 한다 — 7칸 폭
     # (몸통 10칸). 가늘게 그리면 상자 밑에 젓가락을 꽂은 꼴이 된다.
@@ -333,14 +346,17 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
             t = (yy - hip_row) / (GROUND - hip_row)
             x = 15 + round(o + dx * (1 - t)) + lean
             cc = pc if yy <= bot - 4 else kc
-            g.rect(x - 3, yy, x + 3, yy, cc)
+            if yy == bot:
+                g.rect(x - 2, yy, x + 2, yy, cc)   # 바닥은 좁게 (둥근 발)
+            else:
+                g.rect(x - 3, yy, x + 3, yy, cc)
             if not shade and yy <= bot - 4:
                 g.px(x - 3, yy, 'P')           # 가까운 다리 뒤쪽 그늘 선
         x = 15 + foot_off + lean
         if off > 0:
-            g.px(x + 4, bot, kc)               # 앞으로 디딘 발끝
+            g.px(x + 4, bot - 1, kc)           # 앞으로 디딘 발끝
         elif off < 0:
-            g.px(x - 4, bot, kc)               # 뒤로 차는 뒤꿈치
+            g.px(x - 4, bot - 1, kc)           # 뒤로 차는 뒤꿈치
 
 
 def torso_up(g, bob, swing, dx=0, skip=None):
@@ -354,6 +370,9 @@ def torso_up(g, bob, swing, dx=0, skip=None):
     g.vline(10 + dx, y + 1, y + 10, 'B')         # 팔과 몸 사이 솔기
     g.vline(21 + dx, y + 1, y + 10, 'B')
     g.hline(13 + dx, 18 + dx, y + 6, 'B')        # 등판 주름
+    for cx in (10 + dx, 21 + dx):                # 어깨·밑단 모서리 깎기
+        g.px(cx, y, '.')
+        g.px(cx, y + 11, '.')
     for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
         if side == skip:                         # 뒤모습이라 팔 위상이 좌우 반대
             continue
@@ -366,6 +385,9 @@ def torso_up(g, bob, swing, dx=0, skip=None):
         g.hline(sx, sx + 2, y + 7 + dy, 'B')
         g.rect(sx, y + 8 + dy, sx + 2, y + 10 + dy, 's')
         g.hline(sx + 1, sx + 2, y + 10 + dy, 'S')
+        out = sx if side == 'left' else sx + 2
+        g.px(out, y + 1, '.')                    # 어깨 소매 모서리 깎기
+        g.px(out, y + 10 + dy, '.')              # 주먹 끝 모서리 깎기
 
 
 def legs_up(g, stride, dx=0, sq=0):
