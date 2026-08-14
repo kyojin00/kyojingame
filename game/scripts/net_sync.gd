@@ -282,6 +282,18 @@ func _req_auction(cat: String, id: String, qty: int, quality: int,
 		return
 	GameData.money = maxi(0, GameData.money + money_delta)
 	if id != "" and qty != 0:
+		if cat == "tool":
+			# 도구는 하나뿐 — 들어오면 해금하고 등급을 올리고, 나가면 잠근다
+			if qty > 0:
+				if not GameData.unlocked_tools.has(id):
+					GameData.unlocked_tools.append(id)
+				if GameData.tool_level.has(id):
+					GameData.tool_level[id] = maxi(int(GameData.tool_level[id]),
+						maxi(1, quality))
+			else:
+				GameData.unlocked_tools.erase(id)
+			_broadcast_stats()
+			return
 		match cat:
 			"seed":
 				GameData.seeds[id] = maxi(0, int(GameData.seeds.get(id, 0)) + qty)
@@ -294,7 +306,12 @@ func _req_auction(cat: String, id: String, qty: int, quality: int,
 					GameData.produce_gold[id] = maxi(0,
 						int(GameData.produce_gold.get(id, 0)) + qty)
 			_:
-				GameData.items[id] = maxi(0, int(GameData.items.get(id, 0)) + qty)
+				if id == "wood":
+					GameData.wood = maxi(0, GameData.wood + qty)
+				elif id == "stone":
+					GameData.stone = maxi(0, GameData.stone + qty)
+				else:
+					GameData.items[id] = maxi(0, int(GameData.items.get(id, 0)) + qty)
 	_broadcast_stats()
 
 
