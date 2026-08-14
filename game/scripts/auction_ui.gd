@@ -117,10 +117,13 @@ func _on_fetched(rows: Array) -> void:
 	_rebuild()
 
 
-func _on_listed(ok: bool, msg: String) -> void:
+func _on_listed(ok: bool, msg: String, fee: int) -> void:
 	_status = msg
 	if ok:
 		Sound.play_sfx("sfx_coin")
+		if fee > 0:                       # 수수료는 올릴 때 뗀다 (돌려주지 않는다)
+			GameData.money = maxi(0, GameData.money - fee)
+			_sync("", "", 0, 0, -fee)
 		_pick_id = ""
 		_tab = "mine"
 		_refresh()
@@ -444,6 +447,9 @@ func _build_sell() -> void:
 		return
 	_line("내 창고 — 올릴 것을 누르자. (칸 아래 숫자가 가진 개수)",
 		Color(0.95, 0.8, 0.5))
+	_line("장터 규칙: 동시에 10개까지 · 하루 20건 · 30초에 한 번 · 수수료 5%\n"
+		+ "값은 잡화점 기준의 0.5배 ~ 10배 안에서만 매길 수 있다.",
+		Color(0.7, 0.68, 0.62))
 	var grid := GridContainer.new()
 	grid.columns = 9
 	grid.add_theme_constant_override("h_separation", 5)
@@ -563,7 +569,8 @@ func _build_price_picker() -> void:
 	_line("%s — 몇 개를 얼마에 올릴까? (가진 것 %d개)"
 		% [_label_of(_pick_cat, _pick_id, _pick_quality), have],
 		Color(0.95, 0.8, 0.5))
-	_line("(값은 묶음 전체의 값이다. 팔리면 「내 물건」에서 대금을 받는다)")
+	_line("(값은 묶음 전체의 값이다. 팔리면 「내 등록·대금」에서 받는다)\n"
+		+ "올릴 때 값의 5%를 수수료로 뗀다 — 거둬도 수수료는 돌아오지 않는다.")
 
 	if _pick_cat == "tool":
 		_line("도구는 하나뿐이라 올리면 내 손에서 떠난다. 팔리기 전엔 거둘 수 있다.",
