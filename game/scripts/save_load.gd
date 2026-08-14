@@ -100,7 +100,12 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.old_book_stored = bool(d.get("old_book_stored", false))
 	GameData.story7_phase = str(d.get("story7_phase", ""))
 	GameData.story8_phase = str(d.get("story8_phase", ""))
-	GameData.water_life_found = d.get("water_life_found", {})
+	# 생명의 물 — 이제 「분야 만렙」의 증표다. 옛 세이브의 활동 출처
+	# 키(tree/rock 등)는 버리고, 이미 만렙인 분야는 로드 때 소급해 준다
+	GameData.water_life_found = {}
+	for wk in d.get("water_life_found", {}):
+		if str(wk) in GameData.ENDING_SKILLS:
+			GameData.water_life_found[str(wk)] = true
 	GameData.dream_ready = bool(d.get("dream_ready", false))
 	GameData.dream_seen = bool(d.get("dream_seen", false))
 	GameData.arrive_day = int(d.get("arrive_day", 0))
@@ -255,6 +260,9 @@ func _apply_save(d: Dictionary) -> void:
 	for k in d.get("mob_kills", {}):
 		GameData.mob_kills[k] = int(d.mob_kills[k])
 	GameData.apply_skills_data(d.get("skills", {}))
+	# 이미 만렙에 닿아 있던 분야는 생명의 물을 소급해 받는다
+	for sid: String in GameData.ENDING_SKILLS:
+		GameData.check_skill_water(sid)
 	if d.has("furniture"):
 		GameData.apply_furniture_data(d.furniture)
 		if int(d.get("tile", 16)) != m.TILE:

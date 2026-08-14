@@ -618,8 +618,9 @@ const SKILLS := {
 	"cook": {"name": "요리", "effect": "요리 회복량 +5%/Lv"},
 	# 숲 채집과 해변 채집을 합친 하나의 「채집」 숙련이다
 	"beach": {"name": "채집", "effect": "숲·해변 채집량 3Lv마다 +1 · 조개 리젠 +8%/Lv"},
+	"ranch": {"name": "목장", "effect": "쓰다듬은 동물이 생산물을 더 줄 확률 +3%/Lv"},
 }
-const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach"]
+const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach", "ranch"]
 const SKILL_MAX_LV := 10
 var skills := {}
 
@@ -648,6 +649,8 @@ func add_skill_xp(id: String, amount: float) -> int:
 		s.xp = float(s.xp) - skill_xp_needed(int(s.lv))
 		s.lv = int(s.lv) + 1
 		leveled = int(s.lv)
+	if leveled >= SKILL_MAX_LV:
+		check_skill_water(id)   # 만렙 증표 — 생명의 물 한 병
 	return leveled
 
 
@@ -1886,6 +1889,11 @@ const ITEMS := {
 	# 엔딩 유품·물약 — 팔 수 없다
 	"water_life": {"name": "생명의 물", "sell": 0},
 	"potion_dream": {"name": "기억의 물약", "sell": 0},
+	"relic_hat": {"name": "할머니의 모자", "sell": 0},
+	"relic_watch": {"name": "할머니의 시계", "sell": 0},
+	"relic_bracelet": {"name": "할머니의 팔찌", "sell": 0},
+	"relic_ring": {"name": "할머니의 반지", "sell": 0},
+	"relic_necklace": {"name": "할머니의 목걸이", "sell": 0},
 	"weed": {"name": "잡초", "sell": 5},
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
@@ -1947,7 +1955,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
-	"water_life", "potion_dream",
+	"water_life", "potion_dream", "relic_hat", "relic_watch",
+	"relic_bracelet", "relic_ring", "relic_necklace",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
 	"housing_kit", "move_letter", "old_book", "trash_bin", "arrow", "dish_coral_tea",
@@ -2552,19 +2561,22 @@ func can_final_alchemy() -> bool:
 
 # ---- 진짜 엔딩: 꿈속의 배웅 ----
 #
+# 게임의 핵심 목표는 **할아버지의 연구 노트를 100% 채우는 것**이다.
 # 해금 조건:
 #   1) 연구 노트 100% (note_progress().ratio >= 1.0)
-#   2) 「생명의 물」 6병 — 할아버지가 마을 곳곳에 남긴 유품.
-#      여섯 활동(벌목/채광/낚시/채집/동굴 상자/수확)에서 아주 드물게
-#      한 병씩만 발견된다 (출처당 1병, water_life_found)
-#   3) 연금술에 밝은 연화(숲속의 집)를 찾아가면 항아리에 물을 붓고
-#      「기억의 물약」을 만들어 준다
-#   4) 물약을 마시고(가방) 침대에서 잠들면 — 꿈속 엔딩 시퀀스
+#   2) 「할머니의 유품」 5종 — 시계·모자·팔찌·반지·목걸이.
+#      노트가 20% 차오를 때마다 유품 하나의 힌트가 순서대로 열리고,
+#      힌트가 열린 유품만 그 장소에서 아주 드물게 발견된다 (RELICS)
+#   3) 일곱 분야(채광/벌목/농사/요리/전투/낚시/목장) **만렙** —
+#      만렙을 찍을 때마다 「생명의 물」 한 병 (총 7병, water_life_found)
+#   4) 연화(숲속의 집)를 찾아가 항아리에 일곱 병을 붓고
+#      「기억의 물약」을 받아, 마시고 침대에서 잠들면 — 꿈속 엔딩
 # 엔딩(꿈)이 끝나면 dream_seen이 켜지고 자유 플레이로 이어진다.
-var water_life_found := {}    # 출처 -> true (tree/rock/fish/forage/cave/harvest)
-const WATER_LIFE_SOURCES := ["tree", "rock", "fish", "forage", "cave", "harvest"]
-const WATER_LIFE_CHANCE := 0.004   # 활동당 발견 확률 (동굴 상자는 20%)
-var water_pending := 0        # 방금 발견한 병 수 — hud가 꺼내 토스트를 띄운다
+
+# 생명의 물 — 일곱 분야를 만렙까지 갈고닦은 증표
+const ENDING_SKILLS := ["mine", "forest", "farm", "cook", "combat", "fish", "ranch"]
+var water_life_found := {}    # 만렙 분야 id -> true
+var water_pending := 0        # 방금 받은 병 수 — hud가 꺼내 토스트를 띄운다
 var dream_ready := false      # 기억의 물약을 마셨다 — 오늘 밤 꿈속 엔딩
 var dream_seen := false       # 꿈속 엔딩을 봤다 (자유 플레이 계속)
 # 통계 리포트용 기록
@@ -2573,26 +2585,69 @@ var arrive_clock := ""        # 그 시각 ("오후 2:15")
 var playtime_sec := 0.0       # 실제 플레이 시간 (초)
 var rocks_mined := 0          # 깬 바위 수
 
+# 할머니의 유품 5종 — 순서 = 힌트 해금 순서 (노트 20%마다 하나씩).
+# 힌트가 열린 유품만 그 자리에서 발견된다. 확률·수치는 추후 조정 (임시값)
+const RELICS := [
+	{"id": "relic_hat", "name": "할머니의 모자", "chance": 0.05,
+		"hint": "동굴 50층 아래, 광석을 깨다 보면 낡은 모자가 나온다더라..."},
+	{"id": "relic_watch", "name": "할머니의 시계", "chance": 0.015,
+		"hint": "바다 물고기를 낚다 보면 낚싯줄에 시계가 걸려 온다더라..."},
+	{"id": "relic_bracelet", "name": "할머니의 팔찌", "chance": 0.015,
+		"hint": "해변의 모래를 뒤지다 보면 팔찌가 반짝인다더라..."},
+	{"id": "relic_ring", "name": "할머니의 반지", "chance": 0.04,
+		"hint": "금빛으로 여문 작물 속에 반지가 숨어 있다더라..."},
+	{"id": "relic_necklace", "name": "할머니의 목걸이", "chance": 0.25,
+		"hint": "동굴의 가장 크고 오래된 나무 괴물이 목걸이를 지킨다더라..."},
+]
+var relic_pending := ""       # 방금 발견한 유품 이름 — hud가 꺼내 토스트
 
-# 아주 드물게 「생명의 물」이 나온다. 출처당 한 병뿐이다.
-# roll에 0.0을 주면 무조건 성공 (검증 하네스용) — 평소엔 생략한다.
-func try_water_life(source: String, roll := -1.0) -> bool:
-	if water_life_found.has(source):
+
+# i번째 유품의 힌트가 열렸는가 — 노트 20%마다 하나씩 (0번=20% ... 4번=100%)
+func relic_hint_open(i: int) -> bool:
+	return note_progress().ratio >= 0.2 * float(i + 1) - 0.0001
+
+
+func relics_owned() -> int:
+	var n := 0
+	for r: Dictionary in RELICS:
+		if int(items[r.id]) > 0:
+			n += 1
+	return n
+
+
+# 유품 발견 굴림 — 힌트가 열려 있고 아직 없을 때만.
+# roll에 0.0을 주면 무조건 성공, force_hint는 검증 하네스 전용이다.
+func try_relic(i: int, roll := -1.0, force_hint := false) -> bool:
+	var def: Dictionary = RELICS[i]
+	if int(items[def.id]) > 0:
 		return false
-	var chance: float = 0.2 if source == "cave" else WATER_LIFE_CHANCE
+	if not force_hint and not relic_hint_open(i):
+		return false
 	var r := randf() if roll < 0.0 else roll
-	if r >= chance:
+	if r >= float(def.chance):
 		return false
-	water_life_found[source] = true
+	items[def.id] = 1
+	discover(str(def.id))
+	relic_pending = str(def.name)
+	return true
+
+
+# 분야가 만렙에 닿으면 생명의 물 한 병 — 분야당 한 번뿐이다
+func check_skill_water(id: String) -> void:
+	if id not in ENDING_SKILLS or water_life_found.has(id):
+		return
+	if skill_lv(id) < SKILL_MAX_LV:
+		return
+	water_life_found[id] = true
 	items["water_life"] += 1
 	discover("water_life")
 	water_pending += 1
-	return true
 
 
 # 꿈속 엔딩으로 갈 준비가 됐는가 — 연화가 항아리를 꺼내 주는 조건
 func ending_ready() -> bool:
-	return water_life_found.size() >= WATER_LIFE_SOURCES.size() \
+	return water_life_found.size() >= ENDING_SKILLS.size() \
+		and relics_owned() >= RELICS.size() \
 		and note_progress().ratio >= 1.0 and not dream_seen \
 		and int(items["potion_dream"]) == 0 and not dream_ready
 
@@ -2616,7 +2671,8 @@ func roll_quality(luck := 0.0) -> int:
 func add_produce(id: String, quality: int) -> void:
 	produce[id] += 1
 	discover(id)
-	try_water_life("harvest")   # 아주 드물게 밭고랑에서 유품 병이 나온다
+	if quality == 2:
+		try_relic(3)   # 금빛 작물 속의 「할머니의 반지」 (힌트가 열린 뒤부터)
 	if quality == 2:
 		produce_gold[id] = int(produce_gold.get(id, 0)) + 1
 	elif quality == 1:
@@ -3708,6 +3764,7 @@ func reset_all() -> void:
 	ending_seen = false
 	water_life_found = {}
 	water_pending = 0
+	relic_pending = ""
 	dream_ready = false
 	dream_seen = false
 	arrive_day = 0

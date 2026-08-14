@@ -2637,23 +2637,24 @@ func _end_ranch_done() -> void:
 
 func _start_elixir_dialog() -> void:
 	m.dialog.open_seq("연화", m.tex["npc_forest_mom_portrait_normal"], [
-		{"text": "「그 병들... 어디서 찾았니?\n...맙소사. 「생명의 물」이구나.」"},
-		{"text": "「할아버지께서 살아 계실 적에 말씀하셨어.\n여섯 병의 물이 다시 한자리에 모이면 —」"},
-		{"text": "「— 꿈속에서, 보고 싶은 사람을\n만날 수 있다고.」"},
+		{"text": "「그 병들... 그리고 그 유품들.\n...맙소사. 정말 다 모았구나.」"},
+		{"text": "「일곱 갈래 삶을 끝까지 갈고닦은 물과,\n할머님의 다섯 유품 —」"},
+		{"text": "「할아버지께서 말씀하셨어. 이것들이 다시\n한자리에 모이면, 꿈속에서 보고 싶은 사람을\n만날 수 있다고.」"},
 		{"text": "(연화가 낡은 항아리를 꺼내\n생명의 물을 한 병씩 천천히 부었다.)"},
 		{"text": "(항아리 속에서 은은한 빛이 피어오른다...)"},
 		{"text": "「자 — 「기억의 물약」이야.\n오늘 밤, 마시고 푹 자렴.」",
 			"portrait": m.tex["npc_forest_mom_portrait_happy"]},
-		{"text": "「좋은 꿈 꾸길. ...분명, 만나고 싶던 분이\n기다리고 계실 거야.」"},
+		{"text": "「좋은 꿈 꾸길. ...분명, 만나고 싶던 분들이\n기다리고 계실 거야.」"},
 	], _end_elixir)
 
 
 func _end_elixir() -> void:
-	if int(GameData.items["water_life"]) < GameData.WATER_LIFE_SOURCES.size() \
+	if int(GameData.items["water_life"]) < GameData.ENDING_SKILLS.size() \
+			or GameData.relics_owned() < GameData.RELICS.size() \
 			or int(GameData.items["potion_dream"]) > 0 \
 			or GameData.dream_ready or GameData.dream_seen:
 		return
-	GameData.items["water_life"] = 0   # 여섯 병 모두 항아리로
+	GameData.items["water_life"] = 0   # 일곱 병 모두 항아리로 (유품은 간직한다)
 	GameData.items["potion_dream"] = 1
 	GameData.discover("potion_dream")
 	m.hud.event_toast("기억의 물약을 얻었다!")

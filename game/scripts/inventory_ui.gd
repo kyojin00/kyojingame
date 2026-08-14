@@ -896,8 +896,12 @@ func _item_entries() -> Array:
 			e["eat"] = id
 		elif id == "water_life":
 			e["color"] = Color(0.55, 0.8, 1.0)
-			e["desc"] = "할아버지가 남긴 유품 병 — 맑게 빛나는 물이 담겨 있다 (%d/%d)" \
-				% [n2, GameData.WATER_LIFE_SOURCES.size()]
+			e["desc"] = "한 분야를 만렙까지 갈고닦은 증표 — 맑게 빛나는 물이다 (%d/%d)" \
+				% [n2, GameData.ENDING_SKILLS.size()]
+		elif id.begins_with("relic_"):
+			e["color"] = Color(0.95, 0.75, 0.85)
+			e["desc"] = "할머니의 유품 — 세월이 묻어 있지만 소중히 닦여 있다\n(%d/%d · 연구 노트(N)에 힌트가 있다)" \
+				% [GameData.relics_owned(), GameData.RELICS.size()]
 		elif id == "potion_dream":
 			e["tab"] = "food"
 			e["color"] = Color(0.85, 0.75, 1.0)

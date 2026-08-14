@@ -1486,33 +1486,55 @@ func _debug_tick() -> void:
 				" 목동방문=", s8_start and visitor, " 이장상의=", s8_ask,
 				" 목장게이트=", gated8, " 건설해금=", s8_build, " 정착=", s8_done)
 		267:
-			# #123: 꿈속 엔딩 — 생명의 물 수집·연화의 항아리·물약·꿈 시퀀스
+			# #123/#124: 꿈속 엔딩 — 7분야 만렙 증표·유품 5종·항아리·물약·꿈
 			var keep_found: Dictionary = GameData.water_life_found.duplicate()
 			var keep_wl := int(GameData.items["water_life"])
 			var keep_pd := int(GameData.items["potion_dream"])
 			var keep_dr := GameData.dream_ready
 			var keep_ds := GameData.dream_seen
+			var keep_skl: Dictionary = {}
+			for sid0: String in GameData.ENDING_SKILLS:
+				keep_skl[sid0] = (GameData.skills[sid0] as Dictionary).duplicate()
+			var keep_rel: Dictionary = {}
+			for rd0: Dictionary in GameData.RELICS:
+				keep_rel[rd0.id] = int(GameData.items[rd0.id])
+				GameData.items[rd0.id] = 0
 			m.dialog.close()
-			# ① 생명의 물 — 출처당 한 병뿐, 같은 출처는 두 번 안 나온다
+			# ① 생명의 물 — 분야 만렙을 찍는 순간 한 병 (분야당 한 번뿐)
 			GameData.water_life_found = {}
 			GameData.items["water_life"] = 0
 			GameData.items["potion_dream"] = 0
 			GameData.dream_ready = false
 			GameData.dream_seen = false
-			var first: bool = GameData.try_water_life("tree", 0.0)
-			var dup: bool = not GameData.try_water_life("tree", 0.0)
-			for src: String in ["rock", "fish", "forage", "cave", "harvest"]:
-				GameData.try_water_life(src, 0.0)
+			GameData.skills["mine"] = {"lv": GameData.SKILL_MAX_LV - 1, "xp": 0.0}
+			GameData.add_skill_xp("mine", 999999.0)   # 진짜 레벨업 경로로 만렙
+			var first: bool = GameData.water_life_found.has("mine") \
+				and int(GameData.items["water_life"]) == 1
+			GameData.check_skill_water("mine")   # 같은 분야는 두 번 안 준다
+			var dup: bool = int(GameData.items["water_life"]) == 1
+			for sid1: String in GameData.ENDING_SKILLS:
+				GameData.skills[sid1] = {"lv": GameData.SKILL_MAX_LV, "xp": 0.0}
+				GameData.check_skill_water(sid1)
 			GameData.water_pending = 0
-			var six: bool = int(GameData.items["water_life"]) == 6 \
-				and GameData.water_life_found.size() == 6
+			var six: bool = int(GameData.items["water_life"]) == 7 \
+				and GameData.water_life_found.size() == 7
+			# ①-2 할머니의 유품 — 하나씩만, 마지막 힌트는 노트 100%에서 열린다
+			var r_first: bool = GameData.try_relic(0, 0.0, true)
+			var r_dup: bool = not GameData.try_relic(0, 0.0, true)
+			var r_hint: bool = not GameData.relic_hint_open(4) \
+				or GameData.note_progress().ratio >= 1.0
+			for ri in [1, 2, 3, 4]:
+				GameData.try_relic(ri, 0.0, true)
+			GameData.relic_pending = ""
+			var relics5: bool = GameData.relics_owned() == 5
 			# ② 노트가 100%가 아니면 연화는 항아리를 꺼내지 않는다
 			var gate_note: bool = not GameData.ending_ready() \
 				and GameData.note_progress().ratio < 1.0
-			# ③ 항아리 — 여섯 병을 붓고 기억의 물약을 받는다
+			# ③ 항아리 — 일곱 병을 붓고 기억의 물약을 받는다 (유품은 간직)
 			m.story._end_elixir()
 			var elixir: bool = int(GameData.items["potion_dream"]) == 1 \
-				and int(GameData.items["water_life"]) == 0
+				and int(GameData.items["water_life"]) == 0 \
+				and GameData.relics_owned() == 5
 			# ④ 물약을 마시면 오늘 밤 꿈이 준비된다
 			m.inventory_ui._drink_dream()
 			var drank: bool = GameData.dream_ready \
@@ -1552,11 +1574,17 @@ func _debug_tick() -> void:
 			GameData.items["potion_dream"] = keep_pd
 			GameData.dream_ready = keep_dr
 			GameData.dream_seen = keep_ds
-			print("ENDING_OK=", first and dup and six and gate_note and elixir
+			for sid2: String in keep_skl:
+				GameData.skills[sid2] = keep_skl[sid2]
+			for rid2: String in keep_rel:
+				GameData.items[rid2] = int(keep_rel[rid2])
+			print("ENDING_OK=", first and dup and six and r_first and r_dup
+				and r_hint and relics5 and gate_note and elixir
 				and drank and dreamed and grandpa_line and stats_on
 				and stat_n0 >= 10 and credits_on and has_postman
 				and has_all_line and outro_on and woke,
-				" 첫병=", first, " 중복차단=", dup, " 여섯병=", six,
+				" 만렙첫병=", first, " 중복차단=", dup, " 일곱병=", six,
+				" 유품=", r_first and r_dup and relics5, " 힌트게이트=", r_hint,
 				" 노트게이트=", gate_note, " 항아리=", elixir, " 마심=", drank,
 				" 꿈=", dreamed and grandpa_line, " 통계=", stats_on,
 				"(", stat_n0, "줄) 배웅=", credits_on and has_postman

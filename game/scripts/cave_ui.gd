@@ -472,6 +472,8 @@ func _attack_hit(wpn: String, first: bool) -> void:
 				Sound.play_sfx("sfx_pick", 0.2)
 				main.doing.record_kill(m.type)
 				main.toolwork.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0, "treant": 40.0}[m.type])
+				if m.type == "treant":
+					GameData.try_relic(4)   # 나무 괴물이 지키던 「할머니의 목걸이」
 				match m.type:
 					"slime":
 						if randf() < 0.35:
@@ -509,6 +511,8 @@ func _attack_hit(wpn: String, first: bool) -> void:
 		main.doing.gain_item("ore", n)
 		main.hud.show_message("광석 %d개 획득!" % n if n > 1 else "광석 획득!")
 		main.toolwork.gain_skill("mine", 8.0)
+		if floor_num >= 50:
+			GameData.try_relic(0)   # 깊은 층 광석 속의 「할머니의 모자」
 
 
 func _floor_clear() -> void:
@@ -547,7 +551,6 @@ func _interact() -> void:
 				int(GameData.forage_caught.get("forage_herb", 0)) + herb
 			msg += ", 약초 %d개" % herb
 		main.hud.show_message(msg + "를 얻었다!")
-		GameData.try_water_life("cave")   # 상자 밑바닥의 유품 병 (20%)
 		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
 		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
 		if floor_num >= 5:

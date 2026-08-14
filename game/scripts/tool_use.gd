@@ -284,7 +284,6 @@ func use_tool() -> void:
 					GameData.wood += wood_got
 					GameData.discover("wood")   # 도감 「기본 재료」 등록
 					GameData.trees_chopped += 1
-					GameData.try_water_life("tree")   # 그루터기 틈의 유품 병 (희귀)
 					m.hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
 					m.doing._maybe_drop_recipe("tree")
 					# 길목을 뚫었다면 진행도를 갱신한다
@@ -341,7 +340,6 @@ func use_tool() -> void:
 					GameData.stone += stone_got
 					GameData.discover("stone")   # 도감 「기본 재료」 등록
 					GameData.rocks_mined += 1
-					GameData.try_water_life("rock")   # 바위 틈의 유품 병 (희귀)
 					m.hud.show_message("돌을 캤다! 석재 +%d" % stone_got)
 					m.doing._maybe_drop_recipe("rock")
 					m.tutorial_notify("mine")

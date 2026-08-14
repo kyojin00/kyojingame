@@ -213,6 +213,7 @@ func interact() -> void:
 		else:
 			animal.fed = true
 			Sound.play_sfx("sfx_heart")
+			m.toolwork.gain_skill("ranch", 6.0)   # 동물을 돌본 손길이 쌓인다
 			if Net.is_guest():
 				m.netsync._req_feed.rpc_id(1, m.animals.find(animal))
 			m.hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
@@ -256,7 +257,8 @@ func interact() -> void:
 			GameData.items[fid] += got
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
 			GameData.discover(fid)
-			GameData.try_water_life("forage")   # 풀숲·모래 속 유품 병 (희귀)
+			if fid in m.BEACH_FORAGE:
+				GameData.try_relic(2)   # 모래 속의 「할머니의 팔찌」
 			# 산호 조각·고대 조각: 처음 주우면 숨겨진 이야기/레시피가 열린다
 			if first_find and fid in ["forage_coral", "forage_relic"]:
 				m.story.hidden_beach_find(fid)

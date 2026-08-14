@@ -11,7 +11,7 @@ var _refresh_timer := 0.0
 const SKILL_ICONS := {
 	"farm": "icon_hoe", "fish": "icon_rod", "forest": "icon_axe",
 	"mine": "icon_pickaxe", "combat": "icon_sword", "cook": "recipe",
-	"beach": "forage_shell",
+	"beach": "forage_shell", "ranch": "egg",
 }
 
 

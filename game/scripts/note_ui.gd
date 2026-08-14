@@ -216,6 +216,23 @@ func _rebuild() -> void:
 func _rebuild_collect() -> void:
 	_line("새로운 것을 발견하면 빈 페이지가 채워진다. 칸에 마우스를 올려 보자.", DIM)
 
+	# 할아버지의 마지막 부탁 — 게임의 핵심 목표와 엔딩 재료의 진행 상황.
+	# 노트가 20% 차오를 때마다 할머니의 유품 힌트가 하나씩 열린다
+	_line("")
+	_head("[할아버지의 마지막 부탁]")
+	_line("  이 노트를 100% 채우는 것 — 그것이 할아버지의 연구의 끝이다.", DIM)
+	_line("  생명의 물 %d/%d — 일곱 분야(채광·벌목·농사·요리·전투·낚시·목장)를" %
+		[GameData.water_life_found.size(), GameData.ENDING_SKILLS.size()], DIM)
+	_line("  만렙까지 갈고닦으면 한 병씩 손에 들어온다.", DIM)
+	for i in GameData.RELICS.size():
+		var rdef: Dictionary = GameData.RELICS[i]
+		if int(GameData.items[rdef.id]) > 0:
+			_line("  ★ %s — 찾았다!" % str(rdef.name), GOLD)
+		elif GameData.relic_hint_open(i):
+			_line("  %s — 『%s』" % [str(rdef.name), str(rdef.hint)], DIM)
+		else:
+			_line("  ???  — 노트 %d%%에서 힌트가 열린다" % int(20 * (i + 1)), DIM)
+
 	# 컬렉션 — 묶음을 다 모으면 레시피가 열린다
 	_line("")
 	_head("[컬렉션]")

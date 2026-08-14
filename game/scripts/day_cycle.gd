@@ -163,6 +163,9 @@ func _next_day(passed_out: bool) -> void:
 				int(a.position.y / m.TILE)))
 			var product: String = GameData.ANIMALS[a.type].product
 			var n_out := 2 if (in_pen and randf() < m.PASTURE_BONUS) else 1
+			# 목장 숙련 — 정성이 쌓이면 생산물이 하나 더 (3%/Lv)
+			if randf() < 0.03 * (GameData.skill_lv("ranch") - 1):
+				n_out += 1
 			GameData.items[product] += n_out
 			collected[product] = int(collected.get(product, 0)) + n_out
 			GameData.discover(product)

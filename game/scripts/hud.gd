@@ -695,15 +695,23 @@ func _process(delta: float) -> void:
 				if main != null else null,
 			"head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_catch")
-	# 방금 발견한 「생명의 물」 — 할아버지의 유품 병 (아주 드물다)
+	# 만렙 증표 「생명의 물」 — 일곱 분야를 끝까지 갈고닦으면 한 병씩
 	while GameData.water_pending > 0:
 		GameData.water_pending -= 1
-		_toast_queue.append({"head": "✨ 생명의 물을 발견했다!",
-			"body": "할아버지의 손길이 느껴지는 유리병이다 (%d/%d)" %
+		_toast_queue.append({"head": "✨ 생명의 물을 얻었다!",
+			"body": "한 분야를 끝까지 갈고닦은 증표다 (%d/%d)" %
 				[int(GameData.items["water_life"]),
-				GameData.WATER_LIFE_SOURCES.size()],
+				GameData.ENDING_SKILLS.size()],
 			"icon": main.tex.get("water_life") if main != null else null,
 			"head_col": Color(0.4, 0.65, 0.9)})
+		Sound.play_sfx("sfx_catch")
+	# 방금 발견한 「할머니의 유품」 — 노트 힌트를 따라 찾아낸 희귀 수집품
+	if GameData.relic_pending != "":
+		_toast_queue.append({"head": "💍 %s 발견!" % GameData.relic_pending,
+			"body": "할머니의 유품이다... 소중히 간직하자 (%d/%d)" %
+				[GameData.relics_owned(), GameData.RELICS.size()],
+			"icon": null, "head_col": Color(0.85, 0.55, 0.75)})
+		GameData.relic_pending = ""
 		Sound.play_sfx("sfx_catch")
 	# 재료를 다 발견해서 방금 떠오른 기본 요리 레시피
 	while not GameData.recipe_pending.is_empty():
