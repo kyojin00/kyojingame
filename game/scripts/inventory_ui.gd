@@ -328,7 +328,7 @@ func _rebuild() -> void:
 		return
 
 	# 아이템 탭: 네모 슬롯 격자 — 같은 아이템은 한 칸에 모이고, 칸에 아이콘·수량
-	_line("마우스를 올리면 설명이 보인다" +
+	_line("마우스를 올리면 설명이 보인다 · 우클릭: 장터에 올리기" +
 		(" · 요리는 클릭해서 바로 먹는다" if _tab == "food" else ""), Color(0.35, 0.22, 0.1))
 	var grid := GridContainer.new()
 	grid.columns = 10
@@ -623,6 +623,17 @@ func _mk_item_slot(e: Dictionary) -> Button:
 	b.add_child(num)
 
 	var body := str(e.get("desc", ""))
+	# 장터에 올릴 수 있는 것은 우클릭으로 바로 경매장 값 매기기 창까지 간다
+	# (게시판까지 걸어가지 않아도 가방에서 내놓을 수 있다)
+	var auc: Array = e.get("auc", [])
+	if auc.size() == 3:
+		body += "\n\n[우클릭] 장터에 올리기"
+		b.gui_input.connect(func(ev: InputEvent) -> void:
+			if ev is InputEventMouseButton and ev.pressed \
+					and ev.button_index == MOUSE_BUTTON_RIGHT:
+				accept_event()
+				close()
+				main.auction_ui.open_sell(str(auc[0]), str(auc[1]), int(auc[2])))
 	_hover_slots.append({"b": b, "title": str(e.name), "body": body,
 		"count": "보유 중: %d개" % int(e.count)})
 
@@ -841,6 +852,7 @@ func _item_entries() -> Array:
 	for id in GameData.CROP_IDS:
 		if GameData.seeds[id] > 0:
 			out.append({"tab": "crop", "icon": "icon_seed", "seed_pick": id,
+				"auc": ["seed", id, 0],
 				"name": "%s 씨앗" % GameData.CROPS[id].name, "count": GameData.seeds[id],
 				"tip": "%s 씨앗 x%d" % [GameData.CROPS[id].name, GameData.seeds[id]],
 				"desc": "밭(호미로 간 땅)에 심자. 수확까지 %d일\n클릭: 이 씨앗 들기 · 드래그: 빠른 슬롯 장착"
@@ -850,20 +862,20 @@ func _item_entries() -> Array:
 		var n := int(GameData.produce[id])
 		if n > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id, "name": str(def.name),
-				"count": n, "sell": int(def.sell_price),
+				"count": n, "sell": int(def.sell_price), "auc": ["produce", id, 0],
 				"tip": "%s x%d" % [def.name, n],
 				"desc": "마을 잡화점(판매 탭)에 팔 수 있다"})
 		var ns := int(GameData.produce_silver.get(id, 0))
 		if ns > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id,
-				"name": "%s (은)" % def.name, "count": ns,
+				"name": "%s (은)" % def.name, "count": ns, "auc": ["produce", id, 1],
 				"sell": int(def.sell_price * 1.25), "color": Color(0.85, 0.88, 0.95),
 				"tip": "%s (은품질) x%d" % [def.name, ns],
 				"desc": "은품질 — 일반보다 비싸게 팔린다 (1.25배)"})
 		var ng := int(GameData.produce_gold.get(id, 0))
 		if ng > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id,
-				"name": "%s (금)" % def.name, "count": ng,
+				"name": "%s (금)" % def.name, "count": ng, "auc": ["produce", id, 2],
 				"sell": int(def.sell_price * 1.5), "color": Color(1.0, 0.88, 0.45),
 				"tip": "%s (금품질) x%d" % [def.name, ng],
 				"desc": "금품질 — 최고 품질! 가장 비싸게 팔린다 (1.5배)"})
@@ -873,7 +885,7 @@ func _item_entries() -> Array:
 			continue
 		var idef: Dictionary = GameData.ITEMS[id]
 		var e := {"tab": "res", "name": str(idef.name), "count": n2,
-			"sell": int(idef.get("sell", 0)),
+			"sell": int(idef.get("sell", 0)), "auc": ["item", id, 0],
 			"tip": "%s x%d" % [idef.name, n2]}
 		for cand in [id, id + "_0", "forage_" + id]:
 			if main.tex.has(cand):
@@ -882,6 +894,7 @@ func _item_entries() -> Array:
 		if bool(idef.get("legend", false)):
 			e["color"] = Color(1.0, 0.85, 0.4)
 			e["sell"] = 0
+			e.erase("auc")   # 전설 재료는 장터에도 올릴 수 없다
 			e["desc"] = "전설의 재료 — 연구 노트의 마지막 연금술에 쓰인다 (판매 불가)"
 		elif id.begins_with("fish_"):
 			# 물고기는 요리 재료다 — 요리 칸이 아니라 재료 칸에 정렬
