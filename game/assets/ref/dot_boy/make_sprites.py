@@ -237,36 +237,37 @@ def legs_down(g, stride, dx=0, sq=0):
     """앞모습 다리. stride: 화면 왼쪽 다리가 앞으로 나간 양 -3..+3
     dx/sq: 휘두르기 때 몸이 쏠리고 주저앉는 양 — 엉덩이는 몸통을 따라가고
     발은 디딘 자리에 남아, 다리가 엉덩이에서 발로 기울어진다."""
-    g.rect(10 + dx, HIP_Y + sq, 21 + dx, HIP_Y + 2 + sq, 'p')   # 엉덩이 띠
-    g.hline(10 + dx, 21 + dx, HIP_Y + sq, 'P')  # 셔츠 아랫단 그늘
+    # 바지는 셔츠보다 한 칸씩 안으로 들어간다 (11~20, 셔츠는 10~21) —
+    # 셔츠 밑단이 바지를 살짝 덮은 실루엣이라, 폭이 아래로 갈수록
+    # 좁아지기만 하고 옆으로 되튀어나오는 데가 없다.
+    g.rect(11 + dx, HIP_Y + sq, 20 + dx, HIP_Y + 2 + sq, 'p')   # 엉덩이 띠
+    g.hline(11 + dx, 20 + dx, HIP_Y + sq, 'P')  # 셔츠 아랫단 그늘
     g.rect(15 + dx, HIP_Y + 2 + sq, 16 + dx, HIP_Y + 2 + sq, 'P')
-    g.px(10 + dx, HIP_Y + sq, '.')              # 엉덩이 띠 모서리 깎기
-    g.px(21 + dx, HIP_Y + sq, '.')
-    for x0, s in ((10, stride), (17, -stride)):
+    for x0, s in ((11, stride), (17, -stride)):
         lift = min(3, -s) if s < 0 else 0      # 뒤로 간 다리는 들려 짧아진다
         pc = 'P' if lift else 'p'              # 들린 다리는 그늘에 잠긴다
-        inner = x0 + 4 if x0 == 10 else x0     # 가랑이 쪽 그늘 열
+        inner = x0 + 3 if x0 == 11 else x0     # 가랑이 쪽 그늘 열
         top = LEG_Y + sq
         # 들린 다리는 무릎 아래가 안쪽으로 접힌다 (정면에서 본 무릎 굽힘)
-        bend = (1 if x0 == 10 else -1) if lift >= 2 else 0
+        bend = (1 if x0 == 11 else -1) if lift >= 2 else 0
         knee_row = (top + GROUND - lift) // 2
-        outer = x0 if x0 == 10 else x0 + 4     # 빛 받는 바깥 열 (왼쪽 다리만)
+        outer = x0 if x0 == 11 else x0 + 3     # 빛 받는 바깥 열 (왼쪽 다리만)
         for yy in range(top, GROUND - 3 - lift):
             t = (yy - (HIP_Y + 2 + sq)) / (GROUND - HIP_Y - 2 - sq)
             off = round(dx * (1 - t))          # 엉덩이 쪽만 dx만큼 쏠린다
             if yy > knee_row:
                 off += bend
-            g.rect(x0 + off, yy, x0 + 4 + off, yy, pc)
+            g.rect(x0 + off, yy, x0 + 3 + off, yy, pc)
             g.px(inner + off, yy, 'P')
-            if not lift and x0 == 10:
+            if not lift and x0 == 11:
                 g.px(outer + off, yy, 'q')     # 왼쪽 다리 하이라이트
             if yy in (top, GROUND - 4 - lift):
-                g.hline(x0 + off, x0 + 4 + off, yy, 'P')   # 허리·발목 접단
-        g.rect(x0 + bend, GROUND - 3 - lift, x0 + 4 + bend, GROUND - 1 - lift, 'k')
-        g.hline(x0 + 1 + bend, x0 + 3 + bend, GROUND - lift, 'K')  # 바닥은 좁게 (둥근 신발)
-        g.px((x0 if x0 == 17 else x0 + 4) + bend, GROUND - 1 - lift, 'K')
-        g.px(x0 + 2 + bend, GROUND - 3 - lift, 'p')        # 신발 코 광
-        g.px(x0 + 3 + bend, GROUND - 3 - lift, 'p')
+                g.hline(x0 + off, x0 + 3 + off, yy, 'P')   # 허리·발목 접단
+        g.rect(x0 + bend, GROUND - 3 - lift, x0 + 3 + bend, GROUND - 1 - lift, 'k')
+        g.hline(x0 + 1 + bend, x0 + 2 + bend, GROUND - lift, 'K')  # 바닥은 좁게 (둥근 신발)
+        g.px((x0 if x0 == 17 else x0 + 3) + bend, GROUND - 1 - lift, 'K')
+        g.px(x0 + 1 + bend, GROUND - 3 - lift, 'p')        # 신발 코 광
+        g.px(x0 + 2 + bend, GROUND - 3 - lift, 'p')
 
 
 def torso_side(g, bob, swing, lean=0, draw_arm=True):
@@ -322,13 +323,13 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     허벅지는 엉덩이에 붙어 있고 발끝으로 갈수록 stride 만큼 기울어진다.
     dx/sq: 휘두르기 쏠림·주저앉음 (엉덩이만 따라가고 발은 제자리)."""
     c = 15 + lean
-    g.rect(c - 4 + dx, HIP_Y + sq, c + 5 + dx, HIP_Y + 2 + sq, 'p')
-    g.hline(c - 4 + dx, c + 5 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
-    g.hline(c - 4 + dx, c + 5 + dx, HIP_Y + 2 + sq, 'P')  # 가랑이 그늘 줄 —
-    # 띠(10칸)와 다리(7칸) 사이 단차를 그늘로 눌러 다리가 그늘 속에서
+    # 바지는 몸통(10칸)보다 한 칸씩 안으로 들어간 8칸 — 셔츠 밑단이
+    # 바지를 덮은 실루엣이라 옆으로 되튀어나오는 데가 없다.
+    g.rect(c - 3 + dx, HIP_Y + sq, c + 4 + dx, HIP_Y + 2 + sq, 'p')
+    g.hline(c - 3 + dx, c + 4 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
+    g.hline(c - 3 + dx, c + 4 + dx, HIP_Y + 2 + sq, 'P')  # 가랑이 그늘 줄 —
+    # 띠와 다리(7칸) 사이 단차를 그늘로 눌러 다리가 그늘 속에서
     # 나오는 것처럼 잇는다. 허벅지도 이 줄까지 겹쳐 세로로 이어진다.
-    g.px(c - 4 + dx, HIP_Y + sq, '.')          # 엉덩이 띠 모서리 깎기
-    g.px(c + 5 + dx, HIP_Y + sq, '.')
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다.
     # 옆에서 본 다리는 앞뒤 두께가 몸통과 비슷해야 한다 — 7칸 폭
     # (몸통 10칸). 가늘게 그리면 상자 밑에 젓가락을 꽂은 꼴이 된다.
