@@ -973,6 +973,12 @@ func _item_entries() -> Array:
 			e["bin"] = true
 		elif id == "arrow":
 			e["desc"] = "몬스터가 떨어뜨린 화살 — 도감 「풋내기 모험가의 무기」 수집품"
+		elif id == "crystal":
+			e["desc"] = "깊은 층 광맥에 섞여 있던 수정 — 컬렉션 「동굴의 광물」 표본"
+		elif id == "cave_moss":
+			e["desc"] = "축축한 이끼방에서 떼어 온 이끼 — 컬렉션 「동굴의 생명」 표본"
+		elif id == "glow_shroom":
+			e["desc"] = "어둠 속에서 은은히 빛나는 버섯 — 컬렉션 「동굴의 생명」 표본"
 		elif id == "broom":
 			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
 		elif id in ["nail", "cloth", "rope", "hinge"]:

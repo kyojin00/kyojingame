@@ -1815,6 +1815,157 @@ func _debug_tick() -> void:
 				" 루팅=", s9_miss and s9_once and s9_hit, " 수거=", s9_trash,
 				" 기부=", s9_donate, " 프로젝트=", s9_proj, " 회의효과=", s9_meet,
 				" 새주민7=", s9_pool and s9_tex)
+		275:
+			# #127: 메인 스토리 10 「동굴과 탐험」 — 서하의 발견 -> 동굴 조사
+			# (15층 + 새 표본 2종) -> 보고 완결 + 컬렉션 게이트/영구 보상
+			m.dialog.close()
+			GameData.story10_phase = ""
+			GameData.story9_phase = "done"
+			var s10_cmin: Dictionary = {}
+			var s10_clife: Dictionary = {}
+			for c10: Dictionary in GameData.COLLECTIONS:
+				if str(c10.id) == "col_cave_mineral":
+					s10_cmin = c10
+				elif str(c10.id) == "col_cave_life":
+					s10_clife = c10
+			# 시작 전: 새 표본 잠김 + 동굴 컬렉션이 노트에 없다
+			var s10_gate: bool = not GameData.story10_open() \
+				and not GameData.collection_open(s10_cmin) \
+				and not GameData.collection_open(s10_clife)
+			m.story._story10_update(0.016)
+			var s10_note: bool = GameData.story10_phase == "note" \
+				and GameData.quest_npc_marks().get("librarian", "") == "!"
+			m.story._start_cave_note_dialog()
+			m.dialog.skip_seq()
+			var s10_survey: bool = GameData.story10_phase == "survey" \
+				and GameData.story10_open() and GameData.collection_open(s10_cmin) \
+				and GameData.story10_objective_short() != "" \
+				and not GameData.story10_survey_done()
+			# 발광 버섯 — 조사가 시작되면 3층부터 돋아난다 (층마다 1~2개)
+			var s10_keep_wt: bool = m.cave.worldtree
+			m.cave.worldtree = false
+			m.cave.floor_num = 3
+			m.cave._gen_floor()
+			var s10_shroom: bool = m.cave.shrooms.size() >= 1
+			# 목표 달성: 15층 도달 + 표본 2종 발견 -> 서하에게 ? 표식
+			GameData.mine_reach(GameData.STORY10_DEPTH)
+			m.doing.gain_item("crystal", 1)
+			m.doing.gain_item("glow_shroom", 1)
+			var s10_cond: bool = GameData.story10_survey_done() \
+				and GameData.quest_npc_marks().get("librarian", "") == "?"
+			m.story._start_cave_report_dialog()
+			m.dialog.skip_seq()
+			var s10_done: bool = GameData.story10_phase == "done"
+			m.dialog.close()
+			# 컬렉션을 채우면 영구 보상 — 곡괭이 기력 -25% · 동굴 광석 +1 ·
+			# 동굴 이동 속도 +10% (기획: 컬렉션 보상의 첫 강한 체감)
+			m.doing.gain_item("ore", 1)
+			m.doing.gain_item("gem", 1)
+			m.doing.gain_item("star_shard", 1)
+			m.doing.gain_item("cave_moss", 1)
+			GameData.mob_kills["slime"] = maxi(1, int(GameData.mob_kills.get("slime", 0)))
+			GameData.mob_kills["bat"] = maxi(1, int(GameData.mob_kills.get("bat", 0)))
+			GameData.mob_kills["ghost"] = maxi(1, int(GameData.mob_kills.get("ghost", 0)))
+			GameData._check_collections()
+			var s10_cols: bool = "col_cave_mineral" in GameData.collections_done \
+				and "col_cave_life" in GameData.collections_done
+			var s10_perk: bool = absf(GameData.perk_pick_stamina_mult()
+					- GameData.CAVE_COL_STAMINA) < 0.001 \
+				and GameData.perk_cave_ore_bonus() == 1 \
+				and absf(GameData.perk_cave_speed_mult()
+					- GameData.CAVE_COL_SPEED) < 0.001
+			# 표본 3종 — 아이템 표·아이콘이 다 갖춰졌는가
+			var s10_items := true
+			for cid: String in GameData.CAVE_FINDS:
+				if m.tex.get(cid) == null or not GameData.ITEMS.has(cid):
+					s10_items = false
+			# 뒷정리
+			m.cave.worldtree = s10_keep_wt
+			m.cave.shrooms.clear()
+			GameData.collection_pending.clear()
+			m.hud._toast_queue.clear()
+			print("STORY10_OK=", s10_gate and s10_note and s10_survey and s10_shroom
+				and s10_cond and s10_done and s10_cols and s10_perk and s10_items,
+				" 게이트=", s10_gate, " 발견=", s10_note, " 조사=", s10_survey,
+				" 버섯=", s10_shroom, " 목표=", s10_cond, " 완결=", s10_done,
+				" 컬렉션=", s10_cols, " 영구보상=", s10_perk, " 표본3종=", s10_items)
+		276:
+			# #128: 메인 스토리 11 「할머니의 모자」 — 회의+노트 20% 조건 ->
+			# 이장이 직접 찾아옴 -> 단서 3인 -> 동굴 50층 확정 드랍 ->
+			# 도서관 「할머니의 기록」 1장 (점진 공개)
+			m.dialog.close()
+			GameData.story10_phase = "done"
+			GameData.story11_phase = ""
+			GameData.story11_clues = []
+			GameData.items["relic_hat"] = 0
+			var k11_aff: Dictionary = GameData.affinity.duplicate()
+			var k11_crops: Dictionary = GameData.crops_harvested.duplicate()
+			# 노트 20%를 확실히 넘겨 둔다 (핵심 주민 호감도 + 수확 기록)
+			for aid: String in GameData.NPCS:
+				if GameData.settler_kind(aid) == "core":
+					GameData.affinity[aid] = 100
+			for cid2: String in GameData.CROP_IDS:
+				GameData.crops_harvested[cid2] = \
+					maxi(1, int(GameData.crops_harvested.get(cid2, 0)))
+			GameData.minerals_found["ore"] = true
+			GameData.minerals_found["gem"] = true
+			# ① 마을 회의를 아직 안 했으면 이야기가 시작되지 않는다
+			var k11_meet: int = GameData.hall_meet_day
+			GameData.hall_meet_day = 0
+			m.story._story11_update(0.016)
+			var s11_wait: bool = GameData.story11_phase == "" \
+				and not GameData.story11_ready()
+			# ② 조건 완비 -> 이장이 걸어오는 연출 -> 대화 -> 단서 수집
+			GameData.hall_meet_day = maxi(1, k11_meet)
+			var s11_ready: bool = GameData.story11_ready()
+			m.story._story11_update(0.016)
+			var s11_visit: bool = GameData.story11_phase == "visit" \
+				and m.story_cutscene
+			m.story._start_hat_visit_dialog()   # 걷기는 생략 — 바로 대화
+			m.dialog.skip_seq()
+			var s11_clue0: bool = GameData.story11_phase == "clue" \
+				and not m.story_cutscene \
+				and GameData.quest_npc_marks().get("blacksmith", "") == "!"
+			# ③ 단서 세 사람 — 다 들으면 「깊은 굴」 단계
+			m.story._start_hat_clue_dialog("blacksmith")
+			m.dialog.skip_seq()
+			m.story._start_hat_clue_dialog("librarian")
+			m.dialog.skip_seq()
+			var s11_mid: bool = GameData.story11_phase == "clue" \
+				and GameData.story11_clues.size() == 2
+			m.story._start_hat_clue_dialog("forest_mom")
+			m.dialog.skip_seq()
+			var s11_deep: bool = GameData.story11_phase == "deep" \
+				and GameData.story11_objective_short() != ""
+			# ④ 50층 광석 채굴 — 이야기 중에는 굴림이 확정으로 넘어간다
+			#    (cave_ui가 story11_phase=="deep"이면 roll 0.0을 넘긴다)
+			var roll11 := 0.0 if GameData.story11_phase == "deep" else -1.0
+			var s11_drop: bool = GameData.try_relic(0, roll11) \
+				and int(GameData.items["relic_hat"]) == 1
+			m.story._story11_update(0.016)
+			var s11_rec: bool = GameData.story11_phase == "record"
+			# ⑤ 도서관 서가에 「할머니의 기록」이 생겼다 — 첫 장만 열린다
+			m.village._open_library_dialog()
+			var s11_lib: bool = m.dialog.visible
+			m.dialog.close()
+			m.story.open_grandma_records()
+			var s11_read: bool = m.dialog.visible and GameData.grandma_read >= 1
+			m.dialog.close()
+			m.story._end_grandma_record()
+			var s11_done: bool = GameData.story11_phase == "done" \
+				and GameData.completed_quests().has("메인 스토리 11 — 할머니의 모자")
+			# 뒷정리
+			GameData.affinity = k11_aff
+			GameData.crops_harvested = k11_crops
+			GameData.relic_pending = ""
+			m.hud._toast_queue.clear()
+			print("STORY11_OK=", s11_wait and s11_ready and s11_visit and s11_clue0
+				and s11_mid and s11_deep and s11_drop and s11_rec and s11_lib
+				and s11_read and s11_done,
+				" 회의게이트=", s11_wait, " 조건=", s11_ready, " 방문=", s11_visit,
+				" 단서시작=", s11_clue0, " 단서2=", s11_mid, " 깊은굴=", s11_deep,
+				" 모자확정=", s11_drop, " 기록단계=", s11_rec,
+				" 서가=", s11_lib, " 첫장=", s11_read, " 완결=", s11_done)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
@@ -2370,19 +2521,26 @@ func _debug_tick() -> void:
 				" 두번으로는안됨=", not_yet, " 세번에발견=", found)
 			GameData.desk_done_pending.clear()
 		385:
-			# 발견 기록 — 컬렉션은 지정한 「초반 음식」 하나뿐이고, 진행 전에는
-			# 완성으로 치지 않는다 (locked 요리는 열리지 않아야 한다)
+			# 발견 기록 — 지정 컬렉션은 「초반 음식」+동굴 2종(스토리 10 게이트)
+			# 뿐이고, 진행 전에는 완성으로 치지 않는다 (locked 요리도 그대로)
 			GameData.discovered.clear()
 			GameData.collections_done.clear()
 			GameData.recipes_unlocked.clear()
 			GameData.collection_pending.clear()
 			GameData.recipe_pending.clear()
+			var keep_s10c: String = GameData.story10_phase
+			GameData.story10_phase = ""   # 동굴 컬렉션이 잠긴 상태 기준으로 본다
 			var was_locked := GameData.recipe_locked("dish_fried_egg")
 			for cid2: String in ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]:
 				GameData.discover(cid2)
-			var only_food: bool = GameData.COLLECTIONS.size() == 1 \
+			var only_food: bool = GameData.COLLECTIONS.size() == 3 \
 				and str(GameData.COLLECTIONS[0].id) == "col_food_starter" \
 				and GameData.collections_done.is_empty()
+			# 동굴 컬렉션은 스토리 10 조사 전에는 노트에 나타나지 않는다
+			for gcol: Dictionary in GameData.COLLECTIONS:
+				if str(gcol.get("gate", "")) != "" and GameData.collection_open(gcol):
+					only_food = false
+			GameData.story10_phase = keep_s10c
 			var still_locked := GameData.recipe_locked("dish_fried_egg")  # locked 요리는 그대로
 			var basic_open := not GameData.recipe_locked("dish_baked_potato")  # 기본 요리는 떠오른다
 			var no_banner := GameData.collection_pending.is_empty()

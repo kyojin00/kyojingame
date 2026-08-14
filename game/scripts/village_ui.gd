@@ -329,6 +329,21 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "chief" and GameData.story9_phase == "ask":
 		m.story._start_hall_ask_dialog()
 		return
+	# 메인 스토리 10 — 동굴과 탐험
+	if npc.id == "librarian" and GameData.story10_phase == "note":
+		m.story._start_cave_note_dialog()
+		return
+	if npc.id == "librarian" and GameData.story10_phase == "survey":
+		m.story._start_cave_report_dialog()
+		return
+	# 메인 스토리 11 — 할머니의 모자 (이장이 걸어오기 전에 먼저 말 걸어도)
+	if npc.id == "chief" and GameData.story11_phase == "visit":
+		m.story._start_hat_visit_dialog()
+		return
+	if GameData.story11_phase == "clue" and npc.id in GameData.STORY11_CLUE_NPCS \
+			and npc.id not in GameData.story11_clues:
+		m.story._start_hat_clue_dialog(npc.id)
+		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return
@@ -897,11 +912,14 @@ func _do_breed() -> void:
 
 func _open_library_dialog() -> void:
 	# 도서관 서가 — 오래된 책(스토리 6) · 마을의 기록 · 할아버지의 메모
+	# · 할머니의 기록 (유품을 찾을 때마다 한 장씩, 스토리 11)
 	var btns: Array = []
 	if GameData.old_book_stored:
 		btns.append(["오래된 책 보기", _open_old_book_dialog])
 	btns.append(["마을의 기록 보기", _open_records_dialog])
 	btns.append(["할아버지의 메모 찾기", _open_grandpa_memo_dialog])
+	if GameData.relics_owned() > 0:
+		btns.append(["할머니의 기록 읽기", m.story.open_grandma_records])
 	btns.append(["나가기", null])
 	m.dialog.open("도서관",
 		"나무 냄새가 나는 아담한 서가.\n서하가 책과 마을의 기록을 정리해 두었다.", btns)

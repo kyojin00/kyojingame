@@ -2678,6 +2678,223 @@ func _end_hall_open() -> void:
 	m.saveio.save_now()
 
 
+# ---- 메인 스토리 10: 동굴과 탐험 ----
+#
+# 마을의 기반이 완성되면(스토리 9), 서하가 복원을 끝낸 오래된 책의
+# 마지막 장에서 할아버지의 「동굴 표본 조사」 기록을 찾아낸다.
+# 조사(깊이 15층 + 새 표본 2종)를 마치고 보고하면 완결.
+# 연구 노트의 동굴 컬렉션을 다 채우면 영구 채광·탐험 보상이 몸에 밴다.
+
+func _story10_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 시작: 스토리 9 완결 — 서하가 복원 막바지의 발견을 들고 찾아온다
+	if GameData.story10_phase == "" and GameData.story9_phase == "done":
+		GameData.story10_phase = "note"
+		m.hud.quest_start_toast("도서관의 서하가 찾고 있다")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 서하의 발견: 오래된 책 마지막 장, 할아버지의 동굴 조사
+func _start_cave_note_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_happy"], [
+		{"text": "「왔군요! 드디어... 오래된 책의 복원이\n마지막 장까지 닿았어요.」"},
+		{"text": "(서하가 조심스레 책장을 넘긴다. 광석과 버섯,\n이끼가 빼곡히 그려진 장이 나타났다.)"},
+		{"text": "「할아버님의 동굴 표본 조사예요. 『깊은 굴은\n살아 있다 — 빛나는 돌과 자라는 것들을\n기록하라』... 그런데 여기, 빈 칸들이 있어요.」",
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「할아버님도 다 못 채우신 거예요. 당신의\n연구 노트에 이 장을 옮겨 둘게요 —\n동굴 표본 두 묶음이에요.」"},
+		{"text": "「우선 %d층까지 내려가서, 책에 그려진\n새 표본을 두 종류만 찾아와 주세요.\n조사가 시작되면 동굴도 달라 보일 거예요.」" % GameData.STORY10_DEPTH,
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「그리고... 묶음을 끝까지 채우면, 할아버님의\n요령이 몸에 밴대요. 책에 그렇게 적혀 있어요.\n『다 아는 자의 곡괭이는 가볍다』 — 라고요.」"},
+	], _end_cave_note)
+
+
+func _end_cave_note() -> void:
+	if GameData.story10_phase == "note":
+		GameData.story10_phase = "survey"
+		m.hud.story_banner("메인 스토리 10 시작", "동굴과 탐험")
+		m.hud.quest_start_toast("동굴 조사 — %d층 도달 + 새 표본 %d종 발견" %
+			[GameData.STORY10_DEPTH, GameData.STORY10_FINDS])
+		m.hud.show_message("연구 노트(N)에 동굴 컬렉션 두 쪽이 열렸다!\n다 채우면 채광·탐험에 영구 보상이 붙는다.", 7.0)
+	m.saveio.save_now()
+
+
+# 퀘스트 2 — 조사 보고: 목표를 채우고 서하에게 (스토리 10 완결)
+func _start_cave_report_dialog() -> void:
+	if not GameData.story10_survey_done():
+		m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+			{"text": "「조사는 어때요? 깊이 %d층, 그리고 책에\n그려진 새 표본 %d종 — 지금은 %d층에\n표본 %d종이네요.」" % [
+				GameData.STORY10_DEPTH, GameData.STORY10_FINDS,
+				mini(GameData.mine_deepest, GameData.STORY10_DEPTH),
+				GameData.cave_finds_found()]},
+			{"text": "「수정은 깊은 층 광맥에, 발광 버섯은 어두운\n굴 바닥에, 이끼는 축축한 이끼방에...\n서두르지 말고요. 안전이 먼저예요.」"},
+		])
+		return
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_happy"], [
+		{"text": "「이 표본... 정말 찾아냈군요! 책의 그림과\n똑같아요. 할아버님이 보셨다면 정말\n기뻐하셨을 거예요.」"},
+		{"text": "(서하가 표본을 찬찬히 살펴 그리고는,\n연구 노트의 빈 칸에 조심스레 옮겨 적었다.)"},
+		{"text": "「이제 이 조사는 당신 거예요. 동굴 컬렉션의\n남은 칸도 언젠가 다 채워질 거예요 —\n묶음이 완성되는 날, 몸으로 느끼실 거예요.」",
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「『다 아는 자의 곡괭이는 가볍다』...\n할아버님의 말씀, 꼭 확인해 보세요.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+	], _end_cave_report)
+
+
+func _end_cave_report() -> void:
+	if GameData.story10_phase != "survey" or not GameData.story10_survey_done():
+		return
+	GameData.story10_phase = "done"
+	m.hud.story_banner("메인 스토리 10 완결", "동굴과 탐험")
+	m.hud.show_message("할아버지의 동굴 조사를 이어받았다!\n연구 노트(N)의 동굴 컬렉션을 채우면 영구 보상이 열린다.", 7.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 11: 할머니의 모자 ----
+#
+# 스토리 10 완결 + 마을 회의 경험 + 노트 20%가 차면, 이장이 직접
+# 플레이어를 찾아와 걸어온다 (「이장의 걱정」과 같은 연출).
+# 주민 단서 -> 동굴 50층 광석에서 모자(확정) -> 도서관 「할머니의 기록」.
+
+func _story11_update(delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 시작: 조건이 차면 이장이 하던 일을 멈추고 이쪽으로 걸어온다
+	if GameData.story11_phase == "" and GameData.story11_ready():
+		if m.ui_open() or m.dialog.visible or m.story_cutscene \
+				or m.interior.visible or m.cave.visible or m.house_preview:
+			return
+		var chief: Variant = _story_chief()
+		if chief == null or not chief.visible:
+			return
+		GameData.story11_phase = "visit"
+		m.story_cutscene = true
+		chief.scripted = true
+		var st := _walk_tile_near_player(5)
+		chief.position = Vector2(st.x * m.TILE + 16, st.y * m.TILE + 16)
+		m.hud.show_message("이장님이 무언가 결심한 얼굴로 걸어온다...", 4.0)
+		return
+	# 걸어오는 중 — 곁에 닿으면 이야기를 꺼낸다.
+	# (걸어오다 저장하고 껐다 켜도 여기서 연출을 다시 잡는다)
+	if GameData.story11_phase == "visit" and not m.dialog.visible:
+		var chief2: Variant = _story_chief()
+		if chief2 == null:
+			_start_hat_visit_dialog()
+			return
+		m.story_cutscene = true
+		chief2.scripted = true
+		var to: Vector2 = m.player.position + Vector2(0.0, 40.0) - chief2.position
+		if to.length() > 10.0:
+			chief2.moving = true
+			chief2.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
+				else ("down" if absf(to.y) >= absf(to.x)
+				else ("right" if to.x > 0.0 else "left"))
+			chief2.position += to.normalized() * 110.0 * delta
+			chief2.anim_time += delta
+			chief2._update_sprite()
+		else:
+			chief2.moving = false
+			chief2._update_sprite()
+			_start_hat_visit_dialog()
+		return
+	# 동굴 50층에서 모자를 찾았다 — 도서관의 기록으로 이어진다
+	if GameData.story11_phase in ["clue", "deep"] \
+			and int(GameData.items.get("relic_hat", 0)) > 0:
+		GameData.story11_phase = "record"
+		m.hud.quest_start_toast("도서관에서 「할머니의 기록」을 읽어 보자")
+		m.saveio.save_now()
+
+
+func _start_hat_visit_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「...자네, 잠깐 시간 좀 내주겠나.\n오늘은 마을 일이 아니라... 옛날얘기일세.」"},
+		{"text": "「자네 연구 노트가 제법 두툼해졌다고\n들었네. 그럼 이제 말해도 되겠지.」"},
+		{"text": "「자네 할머님 말일세. 그분에겐 아끼던\n유품이 다섯 있었네 — 하나같이 어디에\n있는지 아무도 모르지만.」"},
+		{"text": "「그중 첫째가 챙 넓은 모자였네. 밭에서도,\n굴에서도 늘 쓰고 계셨지... 그러다 어느 날\n굴 깊은 곳에 두고 오셨다네.」"},
+		{"text": "「나이 든 사람들은 아직 그 모자를 기억하네.\n무쇠, 사서 선생, 그리고 숲의 연화 —\n먼저 이야기를 들어 보게.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+		{"text": "「서두를 것 없네. 밭 갈고 고기 잡던 대로\n지내면서, 준비가 되면 굴로 내려가게.\n...할머님이 기다리셨을 걸세.」"},
+	], _end_hat_visit)
+
+
+func _end_hat_visit() -> void:
+	m.story_cutscene = false
+	var chief: Variant = _story_chief()
+	if chief != null:
+		chief.scripted = false
+	if GameData.story11_phase == "visit":
+		GameData.story11_phase = "clue"
+		GameData.story11_clues = []
+		m.hud.story_banner("메인 스토리 11 시작", "할머니의 모자")
+		m.hud.quest_start_toast("주민들에게 할머니의 모자 이야기를 듣자 (0/%d)"
+			% GameData.STORY11_CLUE_NPCS.size())
+	m.saveio.save_now()
+
+
+# 단서 — 세 사람이 저마다 기억하는 할머니의 모자
+const HAT_CLUES := {
+	"blacksmith": [
+		{"text": "「할머님 모자? ...기억하네. 광부들 도시락을\n싸 들고 굴까지 내려오시던 분이었지.」"},
+		{"text": "「우리 아버지가 그러셨네 — 그 모자는 아주\n깊은 곳, 승강기도 안 닿던 막장에서\n사라졌다고. 쉰 층은 됐을 거라더군.」"},
+		{"text": "「내려갈 거면 장비부터 벼리고 가게.\n쉰 층은... 장난이 아닐세.」"},
+	],
+	"librarian": [
+		{"text": "「할머님 이야기요? 부녀회 명부에서 성함을\n봤어요. 기록엔 이렇게 남아 있어요 —\n『챙 넓은 모자의 그분』.」"},
+		{"text": "「광산 일지에 이런 구절도 있어요.\n『깊은 막장의 광맥은 물건을 삼킨다.\n삼킨 것은 돌과 한 몸이 된다』...」"},
+		{"text": "「모자가 아직 그곳에 있다면 — 광석 틈에\n섞여 있을 거예요. 캐다 보면, 분명.」"},
+	],
+	"forest_mom": [
+		{"text": "「할머님의 모자... 그래, 어머니께 들은 적이\n있어. 볕이 강한 날엔 그 모자 그늘에\n마을 아이들이 다 들어갔다고.」"},
+		{"text": "「할아버님은 평생 그 모자를 찾으려\n동굴을 헤매셨대. ...끝내 못 찾으셨지만.」"},
+		{"text": "「네가 찾아 준다면 — 두 분 모두에게\n그보다 큰 선물은 없을 거야.」"},
+	],
+}
+
+
+func _start_hat_clue_dialog(nid: String) -> void:
+	var nm := str(GameData.NPCS[nid].name)
+	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid),
+		HAT_CLUES[nid].duplicate(), _end_hat_clue.bind(nid))
+
+
+func _end_hat_clue(nid: String) -> void:
+	if GameData.story11_phase != "clue" or nid in GameData.story11_clues:
+		return
+	GameData.story11_clues.append(nid)
+	var n := GameData.story11_clues.size()
+	var total := GameData.STORY11_CLUE_NPCS.size()
+	if n >= total:
+		GameData.story11_phase = "deep"
+		m.hud.quest_start_toast("동굴 %d층으로 — 광석 틈에 모자가 잠들어 있다"
+			% GameData.STORY11_FLOOR)
+	else:
+		m.hud.event_toast("단서 %d/%d" % [n, total])
+	m.saveio.save_now()
+
+
+# 도서관 「할머니의 기록」 — 유품 하나에 한 장씩 열린다 (점진 공개)
+func open_grandma_records() -> void:
+	var owned := GameData.relics_owned()
+	if owned <= 0:
+		return
+	var body := "서하가 부녀회 명부와 광산 일지를 모아\n할머니의 발자취를 정리해 두었다.\n\n"
+	body += str(GameData.GRANDMA_RECORDS[0]) if owned >= 1 else ""
+	if owned < GameData.RELICS.size():
+		body += "\n\n(남은 기록 %d장 — 다음 유품을 찾으면 열린다)" \
+			% (GameData.RELICS.size() - owned)
+	GameData.grandma_read = maxi(GameData.grandma_read, 1)
+	m.dialog.open("할머니의 기록 (%d/%d)" % [owned, GameData.RELICS.size()],
+		body, [["소중히 읽었다", _end_grandma_record]])
+
+
+func _end_grandma_record() -> void:
+	if GameData.story11_phase != "record":
+		return
+	GameData.story11_phase = "done"
+	m.hud.story_banner("메인 스토리 11 완결", "할머니의 모자")
+	m.hud.show_message("첫 번째 유품을 찾았다. 할머니의 기록은 유품을\n찾을 때마다 한 장씩 열린다 — 이야기는 계속된다.", 7.0)
+	m.saveio.save_now()
+
+
 # ---- 엔딩: 연화의 항아리 ----
 #
 # 연구 노트 100% + 생명의 물 여섯 병을 모아 연화를 찾아가면,

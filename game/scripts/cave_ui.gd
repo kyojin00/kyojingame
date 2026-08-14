@@ -34,6 +34,7 @@ var player_sprite: Sprite2D
 var floor_num := 1
 var walls := {}         # Vector2i -> true
 var ores := {}          # Vector2i -> true
+var shrooms := {}       # Vector2i -> true — 발광 버섯 (스토리 10 조사 후, 3층+)
 var monsters: Array = []
 var chest_pos := Vector2i(-1, -1)
 var stairs_pos := Vector2i(-1, -1)
@@ -163,6 +164,7 @@ func _mark_reachable() -> void:
 func _gen_floor() -> void:
 	walls.clear()
 	ores.clear()
+	shrooms.clear()
 	monsters.clear()
 	seen.clear()
 	chest_pos = Vector2i(-1, -1)
@@ -229,6 +231,14 @@ func _gen_floor() -> void:
 		if p.x >= 0:
 			ores[p] = true
 
+	# 발광 버섯 (스토리 10 「동굴과 탐험」) — 조사가 시작된 뒤, 3층부터
+	# 어두운 굴 바닥에 돋아난다. E로 딴다 (연구 노트 동굴 컬렉션 표본)
+	if GameData.story10_open() and not worldtree and floor_num >= 3:
+		for i in randi_range(1, 2):
+			var sp := _free_tile(6.0)
+			if sp.x >= 0:
+				shrooms[sp] = true
+
 	# 보물방은 상자가 처음부터 놓여 있다
 	if special == "treasure":
 		var cp := _free_tile(4.0)
@@ -285,12 +295,14 @@ func _spawn_mob(type: String, hp: int) -> void:
 func _free_tile(min_dist: float) -> Vector2i:
 	for attempt in 60:
 		var p := Vector2i(randi_range(1, GW - 2), randi_range(1, GH - 2))
-		if reachable.has(p) and not ores.has(p) and p != chest_pos and p != entry_pos \
+		if reachable.has(p) and not ores.has(p) and not shrooms.has(p) \
+				and p != chest_pos and p != entry_pos \
 				and float(p.distance_to(entry_pos)) >= min_dist:
 			return p
 	# 멀리 떨어진 자리를 못 찾았으면 거리 조건을 풀고 아무 데나
 	for p2: Vector2i in reachable:
-		if not ores.has(p2) and p2 != entry_pos and p2 != chest_pos:
+		if not ores.has(p2) and not shrooms.has(p2) \
+				and p2 != entry_pos and p2 != chest_pos:
 			return p2
 	return Vector2i(-1, -1)
 
@@ -334,7 +346,8 @@ func _process(delta: float) -> void:
 			pdir = "right" if v.x > 0 else "left"  # 대각선 포함 옆모습
 		else:
 			pdir = "down" if v.y > 0 else "up"
-		var np := ppos + v * 170.0 * delta
+		# 컬렉션 「동굴의 생명」 완성 — 동굴 지리가 익어 발걸음이 빨라진다
+		var np := ppos + v * 170.0 * GameData.perk_cave_speed_mult() * delta
 		var stuck := _blocked_at(ppos)
 		if stuck or not _blocked_at(Vector2(np.x, ppos.y)):
 			ppos.x = clampf(np.x, OX + 8, OX + GW * TS - 8)
@@ -507,12 +520,21 @@ func _attack_hit(wpn: String, first: bool) -> void:
 	if ores.has(rt):
 		ores.erase(rt)
 		Sound.play_sfx("sfx_pick", 0.1)
-		var n := 2 if randf() < GameData.bonus_drop_chance("mine") else 1
+		# 컬렉션 「동굴의 광물」 완성 — 광석이 늘 하나 더 나온다
+		var n := (2 if randf() < GameData.bonus_drop_chance("mine") else 1) \
+			+ GameData.perk_cave_ore_bonus()
 		main.doing.gain_item("ore", n)
 		main.hud.show_message("광석 %d개 획득!" % n if n > 1 else "광석 획득!")
 		main.toolwork.gain_skill("mine", 8.0)
+		# 동굴 조사(스토리 10) — 깊은 층 광맥에는 수정이 섞여 있다
+		if GameData.story10_open() and floor_num >= 5 and randf() < 0.12:
+			main.doing.gain_item("crystal", 1)
+			main.hud.show_message("광맥 틈에서 수정을 캤다!")
 		if floor_num >= 50:
-			GameData.try_relic(0)   # 깊은 층 광석 속의 「할머니의 모자」
+			# 깊은 층 광석 속의 「할머니의 모자」 — 스토리 11 「깊은 굴」
+			# 단계에서는 확정으로 나온다 (단서를 다 모은 뒤의 발견 연출)
+			GameData.try_relic(0,
+				0.0 if GameData.story11_phase == "deep" else -1.0)
 
 
 func _floor_clear() -> void:
@@ -528,6 +550,16 @@ func _interact() -> void:
 	if pt.distance_to(entry_pos) < 2.0:
 		close()
 		return
+	# 발광 버섯 따기 (스토리 10 표본)
+	for sp: Vector2i in shrooms:
+		if pt.distance_to(sp) < 1.8:
+			shrooms.erase(sp)
+			Sound.play_sfx("sfx_pick", 0.1)
+			var sn := 2 if randf() < 0.3 else 1
+			main.doing.gain_item("glow_shroom", sn)
+			main.hud.show_message("은은히 빛나는 발광 버섯을 땄다!"
+				+ (" (x%d)" % sn if sn > 1 else ""))
+			return
 	# 보상 상자
 	if chest_pos.x >= 0 and pt.distance_to(chest_pos) < 1.8:
 		var ore_n := 2 + floor_num
@@ -550,6 +582,15 @@ func _interact() -> void:
 			GameData.forage_caught["forage_herb"] = \
 				int(GameData.forage_caught.get("forage_herb", 0)) + herb
 			msg += ", 약초 %d개" % herb
+		# 동굴 조사(스토리 10) — 이끼방 상자엔 동굴 이끼가 붙어 있다
+		if GameData.story10_open():
+			if special == "grove":
+				var moss := 2 + floor_num / 5
+				main.doing.gain_item("cave_moss", moss)
+				msg += ", 동굴 이끼 %d개" % moss
+			elif randf() < 0.2:
+				main.doing.gain_item("cave_moss", 1)
+				msg += ", 동굴 이끼 1개"
 		main.hud.show_message(msg + "를 얻었다!")
 		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
 		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
@@ -676,6 +717,10 @@ func _draw_minimap() -> void:
 		if seen.has(t2):
 			canvas.draw_rect(Rect2(ox + t2.x * cell, oy + t2.y * cell, cell, cell),
 				Color(0.85, 0.72, 0.35))
+	for t3: Vector2i in shrooms:
+		if seen.has(t3):
+			canvas.draw_rect(Rect2(ox + t3.x * cell, oy + t3.y * cell, cell, cell),
+				Color(0.4, 0.95, 0.85))
 	if stairs_pos.x >= 0 and seen.has(stairs_pos):
 		canvas.draw_rect(Rect2(ox + stairs_pos.x * cell - 1, oy + stairs_pos.y * cell - 1,
 			cell + 2, cell + 2), Color(0.5, 0.9, 1.0))
@@ -706,6 +751,12 @@ func _draw_cave() -> void:
 			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)
 	for pos: Vector2i in ores:
 		canvas.draw_texture_rect(main.tex["ore_node"],
+			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)
+	for pos: Vector2i in shrooms:
+		# 발광 버섯 — 둘레에 은은한 빛무리를 깔아 어둠 속에서도 눈에 띈다
+		canvas.draw_circle(Vector2(OX + (pos.x + 0.5) * TS, OY + (pos.y + 0.5) * TS),
+			TS * 0.8, Color(0.4, 0.95, 0.85, 0.13))
+		canvas.draw_texture_rect(main.tex["glow_shroom"],
 			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)
 	if chest_pos.x >= 0:
 		canvas.draw_texture_rect(main.tex["chest"],

@@ -151,6 +151,9 @@ func use_tool() -> void:
 		var cost := GameData.tool_stat(GameData.tool, "stamina") \
 			* (GameData.STAMINA_NIGHT_MULT if night else GameData.STAMINA_DAY_MULT) \
 			* GameData.gear_stamina_mult()   # 장신구: 기력 절약
+		# 컬렉션 「동굴의 광물」 완성 — 다 아는 자의 곡괭이는 가볍다
+		if GameData.tool == "pickaxe":
+			cost *= GameData.perk_pick_stamina_mult()
 		if cost > 0.0:
 			GameData.energy = maxf(0.0, GameData.energy - cost)
 		if night and randf() < 0.15:

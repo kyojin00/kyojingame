@@ -207,6 +207,8 @@ const TEXTURE_NAMES := [
 	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
+	# 동굴 표본 (메인 스토리 10)
+	"crystal", "cave_moss", "glow_shroom",
 	# 연금술 물약 (조합대 결과물)
 	"water_life", "potion_dream",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
@@ -1211,6 +1213,8 @@ func _process(delta: float) -> void:
 	story._story7_update(delta)
 	story._story8_update(delta)
 	story._story9_update(delta)
+	story._story10_update(delta)
+	story._story11_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

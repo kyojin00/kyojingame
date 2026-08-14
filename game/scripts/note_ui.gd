@@ -237,6 +237,8 @@ func _rebuild_collect() -> void:
 	_line("")
 	_head("[컬렉션]")
 	for col: Dictionary in GameData.COLLECTIONS:
+		if not GameData.collection_open(col):
+			continue   # 이야기로 잠긴 묶음 — 스토리 10 조사가 시작되면 나타난다
 		var have := GameData.collection_have(col)
 		var total := (col.ids as Array).size()
 		var done: bool = str(col.id) in GameData.collections_done

@@ -303,6 +303,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.hall_projects = Array(d.get("hall_projects", []))
 	GameData.hall_meet_day = int(d.get("hall_meet_day", 0))
 	GameData.hall_feat_noticed = Array(d.get("hall_feat_noticed", []))
+	GameData.story10_phase = str(d.get("story10_phase", ""))
+	GameData.story11_phase = str(d.get("story11_phase", ""))
+	GameData.story11_clues = Array(d.get("story11_clues", []))
+	GameData.grandma_read = int(d.get("grandma_read", 0))
 	# 씨앗 진열이 생기기 전 세이브: 기본 두 종(밀·옥수수)으로 시작한다
 	GameData.shop_seeds = d.get("shop_seeds", ["wheat", "corn"])
 	# 조리대가 빈 채로 시작하는 개편 전 세이브: 이미 만들어 본 요리와,

@@ -1322,6 +1322,107 @@ func hall_dump_trash() -> int:
 	return n
 
 
+# ---- 메인 스토리 10: 동굴과 탐험 ----
+#
+# 스토리 9(마을회관)로 마을의 기반이 완성되면, 서하가 복원을 끝낸
+# 오래된 책 마지막 장에서 할아버지의 「동굴 표본 조사」 기록을 찾아낸다.
+# 연구 노트에 동굴 컬렉션 두 쪽이 열리고, 조사가 시작되면 동굴에
+# 새 표본(수정·동굴 이끼·발광 버섯)이 모습을 드러낸다.
+# 컬렉션을 다 채우면 **플레이에 실질적으로 도움이 되는 영구 보상**이
+# 처음으로 강하게 체감되도록 설계했다 (아래 CAVE_COL_* 참고).
+#   "": 아직 / note: 서하의 발견 듣기 / survey: 동굴 조사
+#   (깊이 15층 + 표본 2종 발견 -> 서하에게 보고) / done: 완료
+var story10_phase := ""
+const STORY10_DEPTH := 15          # 조사 목표 깊이 (승강기 세 칸)
+const CAVE_FINDS := ["crystal", "cave_moss", "glow_shroom"]   # 새 표본 3종
+const STORY10_FINDS := 2           # 보고에 필요한 표본 종 수 (이끼방은 운이라 2종)
+
+
+# 동굴 조사가 시작됐는가 — 새 표본은 이때부터 동굴에 나타난다
+func story10_open() -> bool:
+	return story10_phase in ["survey", "done"]
+
+
+func cave_finds_found() -> int:
+	var n := 0
+	for id: String in CAVE_FINDS:
+		if discovered.has(id):
+			n += 1
+	return n
+
+
+# 조사 목표를 다 채웠는가 (서하에게 보고할 수 있는가)
+func story10_survey_done() -> bool:
+	return mine_deepest >= STORY10_DEPTH and cave_finds_found() >= STORY10_FINDS
+
+
+func story10_objective_short() -> String:
+	match story10_phase:
+		"note":
+			return "도서관의 서하가 찾고 있다 (E)"
+		"survey":
+			if story10_survey_done():
+				return "서하에게 동굴 조사 결과를 알리자 (E)"
+			return "동굴 조사 — 깊이 %d/%d층 · 새 표본 %d/%d종" % [
+				mini(mine_deepest, STORY10_DEPTH), STORY10_DEPTH,
+				mini(cave_finds_found(), STORY10_FINDS), STORY10_FINDS]
+	return ""
+
+
+# ---- 메인 스토리 11: 할머니의 모자 ----
+#
+# 스토리 10 완결 + 마을 회의를 한 번 진행 + 연구 노트 20% —
+# 조건이 차면 이장이 직접 플레이어를 찾아와 첫 유품 이야기를 꺼낸다.
+# 주민들에게 단서를 모으고(그동안 농사·낚시·강화 등 자유 생활 그대로),
+# 동굴 50층 광석을 캐다 「할머니의 모자」를 발견한다 (이야기 중에는
+# 확정 드랍 — try_relic(0)의 굴림을 cave_ui가 확정으로 넘긴다).
+# 모자를 얻으면 도서관에 「할머니의 기록」 첫 장이 열린다 — 기록은
+# 유품 하나에 한 장씩, 한 번에 다 공개하지 않는다.
+#   "": 아직 / visit: 이장이 찾아온다(연출) / clue: 단서 수집 /
+#   deep: 동굴 50층 — 광석에서 모자 발견 / record: 도서관 기록 / done
+var story11_phase := ""
+var story11_clues: Array = []      # 단서를 들려준 주민 id
+const STORY11_CLUE_NPCS := ["blacksmith", "librarian", "forest_mom"]
+const STORY11_NOTE := 0.2          # 시작 조건 — 연구 노트 진행률
+const STORY11_FLOOR := 50          # 모자가 잠든 깊이 (RELICS[0]의 힌트 층)
+var grandma_read := 0              # 「할머니의 기록」 읽은 장 수 (점진 공개)
+
+# 할머니의 기록 — 유품 하나를 찾을 때마다 한 장씩 열린다 (RELICS 순서)
+const GRANDMA_RECORDS := [
+	"『교진 마을 부녀회 명부』 — 빛바랜 명단 맨 앞에 할머니의 이름이 있다.\n\n"
+	+ "「밭일 나갈 때도 늘 그 챙 넓은 모자를 쓰고 계셨지. 광부들 도시락을\n"
+	+ "싸 들고 굴까지 내려가시던 분은 마을에 그분뿐이었어.」 — 옛 주민의 메모.\n\n"
+	+ "할아버지의 글씨가 여백에 작게 남아 있다.\n「당신이 굴에 두고 온 모자, 내가 꼭 찾아다 주리다.」",
+	"『두 사람의 시계』 — 다음 유품을 찾으면 열린다.",
+	"『바닷가의 약속』 — 다음 유품을 찾으면 열린다.",
+	"『금빛 밭의 계절』 — 다음 유품을 찾으면 열린다.",
+	"『숲이 지킨 마음』 — 다음 유품을 찾으면 열린다.",
+]
+
+
+# 시작 조건 — 마을 기반 완성(스토리 10) + 회의 경험 + 노트 20%
+func story11_ready() -> bool:
+	return story10_phase == "done" and hall_meet_day > 0 \
+		and note_progress().ratio >= STORY11_NOTE
+
+
+func story11_objective_short() -> String:
+	match story11_phase:
+		"visit":
+			return "이장이 무언가 할 말이 있는 듯 이쪽으로 온다"
+		"clue":
+			return "주민들에게 할머니의 모자 이야기를 듣자 (%d/%d)" % [
+				story11_clues.size(), STORY11_CLUE_NPCS.size()]
+		"deep":
+			if int(items.get("relic_hat", 0)) > 0:
+				return "할머니의 모자를 찾았다!"
+			return "동굴 %d층의 광석을 캐자 (최고 기록 %d층)" % [
+				STORY11_FLOOR, mine_deepest]
+		"record":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1407,6 +1508,21 @@ func quest_catalog() -> Array:
 			"desc": "이장의 꿈 — 주민을 모아 마을회관을 되살리자.",
 			"cat": "main", "ep": "메인 스토리 9", "npc": "chief",
 			"reward": "마을회관 — 명부·창고·프로젝트가 차례로 열린다"})
+	o = story10_objective_short()
+	if o != "":
+		out.append({"id": "story10", "title": "동굴과 탐험", "obj": o,
+			"desc": "오래된 책 마지막 장 — 할아버지의 동굴 표본 조사.",
+			"cat": "main", "ep": "메인 스토리 10", "npc": "librarian",
+			"reward": "동굴 컬렉션 — 채우면 영구 채광·탐험 보상"})
+	o = story11_objective_short()
+	if o != "":
+		var s11npc := "chief"
+		if story11_phase == "record":
+			s11npc = "librarian"
+		out.append({"id": "story11", "title": "할머니의 모자", "obj": o,
+			"desc": "첫 번째 유품 — 깊은 굴 어딘가에 잠들어 있다.",
+			"cat": "main", "ep": "메인 스토리 11", "npc": s11npc,
+			"reward": "할머니의 모자 + 도서관 「할머니의 기록」"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1528,6 +1644,17 @@ func quest_npc_marks() -> Dictionary:
 		"build":
 			if village_built.has("hall"):
 				marks["chief"] = "!"   # 회관 접수대에서 개관식을 하자
+	match story10_phase:
+		"note":
+			marks["librarian"] = "!"
+		"survey":
+			if story10_survey_done():
+				marks["librarian"] = "?"   # 조사 결과를 보고하자
+	# 스토리 11 — 단서를 아직 안 들려준 주민에게 ❗
+	if story11_phase == "clue":
+		for cnid: String in STORY11_CLUE_NPCS:
+			if cnid not in story11_clues:
+				marks[cnid] = "!"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -2033,6 +2160,10 @@ const ITEMS := {
 	"ore": {"name": "광석", "sell": 50},
 	"gem": {"name": "보석", "sell": 220},
 	"star_shard": {"name": "별빛 조각", "sell": 300},
+	# 동굴 표본 (메인 스토리 10) — 조사가 시작돼야 동굴에 모습을 드러낸다
+	"crystal": {"name": "수정", "sell": 160},
+	"cave_moss": {"name": "동굴 이끼", "sell": 45},
+	"glow_shroom": {"name": "발광 버섯", "sell": 120},
 	"bouquet": {"name": "꽃다발", "sell": 0},
 	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
 	"nail": {"name": "못", "sell": 15},
@@ -2145,7 +2276,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_rainbow", "fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish",
 	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
 	"fish_king", "fish_dragon",
-	"ore", "gem", "star_shard", "bouquet", "wedding_ring",
+	"ore", "gem", "star_shard", "crystal", "cave_moss", "glow_shroom",
+	"bouquet", "wedding_ring",
 	"nail", "cloth", "rope", "hinge", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
@@ -2212,18 +2344,53 @@ func discover(id: String) -> bool:
 # 따로 지정해 주는 컬렉션만 이 표에 한 줄씩 등록한다.
 #   형식: id/name/reward(레시피 id 또는 "")/ids
 #   perk  "" 아니면 완성 시 영구 버프 — "speed"는 이동 속도 소폭 증가
+#   gate  "" 아니면 이 이야기가 열려야 노트에 나타난다 ("story10" 등)
 const COLLECTIONS := [
 	{"id": "col_food_starter", "name": "초반 음식", "reward": "",
 		"perk": "speed", "perk_text": "이동 속도 소폭 증가 (영구)",
 		"ids": ["dish_berry_jam", "flour", "dish_bread", "dish_berry_toast"]},
+	# 동굴 컬렉션 (메인 스토리 10) — 채우면 채광·탐험에 실질적인 영구 보상.
+	# 단순 진행률이 아니라 「모으니 몸이 달라진다」를 처음 강하게 체감시킨다.
+	{"id": "col_cave_mineral", "name": "동굴의 광물", "reward": "",
+		"perk": "mining", "perk_text": "곡괭이 기력 소모 -25% · 동굴 광석 +1 (영구)",
+		"gate": "story10",
+		"ids": ["ore", "gem", "star_shard", "crystal"]},
+	{"id": "col_cave_life", "name": "동굴의 생명", "reward": "",
+		"perk": "cave_speed", "perk_text": "동굴 이동 속도 +10% (영구)",
+		"gate": "story10",
+		"ids": ["cave_moss", "glow_shroom", "slime", "bat", "ghost"]},
 ]
 
 # 「초반 음식」 완성 보상 — 걸음이 영구히 조금 빨라진다
 const FOOD_COL_SPEED := 1.05
+# 동굴 컬렉션 완성 보상 — 채광·탐험이 몸에 밴다 (할아버지의 요령)
+const CAVE_COL_STAMINA := 0.75    # 곡괭이 기력 소모 배수
+const CAVE_COL_SPEED := 1.1       # 동굴 이동 속도 배수
 
 
 func perk_speed_mult() -> float:
 	return FOOD_COL_SPEED if "col_food_starter" in collections_done else 1.0
+
+
+# 「동굴의 광물」 — 곡괭이질이 가벼워지고, 동굴 광석이 하나 더 나온다
+func perk_pick_stamina_mult() -> float:
+	return CAVE_COL_STAMINA if "col_cave_mineral" in collections_done else 1.0
+
+
+func perk_cave_ore_bonus() -> int:
+	return 1 if "col_cave_mineral" in collections_done else 0
+
+
+# 「동굴의 생명」 — 동굴 지리가 눈에 익어 발걸음이 빨라진다
+func perk_cave_speed_mult() -> float:
+	return CAVE_COL_SPEED if "col_cave_life" in collections_done else 1.0
+
+
+# 이야기로 잠긴 컬렉션은 노트에도 없고, 완성 판정도 하지 않는다
+func collection_open(col: Dictionary) -> bool:
+	if str(col.get("gate", "")) == "story10":
+		return story10_open()
+	return true
 # ---- 레시피 아이템 ----
 #
 # 사거나 받은 레시피는 곧바로 배워지지 않는다 — 가방의 「제작·배치」
@@ -2279,7 +2446,7 @@ func collection_have(col: Dictionary) -> int:
 
 func _check_collections() -> void:
 	for col: Dictionary in COLLECTIONS:
-		if col.id in collections_done:
+		if col.id in collections_done or not collection_open(col):
 			continue
 		if collection_have(col) < (col.ids as Array).size():
 			continue
@@ -3943,6 +4110,10 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 8 — 초원에서 온 목동")
 	if story9_phase == "done":
 		out.append("메인 스토리 9 — 마을의 심장, 마을회관")
+	if story10_phase == "done":
+		out.append("메인 스토리 10 — 동굴과 탐험")
+	if story11_phase == "done":
+		out.append("메인 스토리 11 — 할머니의 모자")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -4272,6 +4443,10 @@ func reset_all() -> void:
 	story7_phase = ""
 	story8_phase = ""
 	story9_phase = ""
+	story10_phase = ""
+	story11_phase = ""
+	story11_clues = []
+	grandma_read = 0
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -4635,7 +4810,10 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story6_phase": story6_phase, "story6_day": story6_day,
 		"old_book_stored": old_book_stored,
 		"story7_phase": story7_phase, "story8_phase": story8_phase,
-		"story9_phase": story9_phase, "hall_stock": hall_stock,
+		"story9_phase": story9_phase, "story10_phase": story10_phase,
+		"story11_phase": story11_phase, "story11_clues": story11_clues,
+		"grandma_read": grandma_read,
+		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,
 		"hall_feat_noticed": hall_feat_noticed,
