@@ -293,10 +293,11 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
         g.px(cx, y + 11, '.')
     if not draw_arm:
         return
-    # 팔은 같은 쪽 다리와 반대로(교차 보행), 다리보다 두 배 크게 젓는다 —
-    # 손이 몸통 앞뒤로 벗어나야 팔을 젓는 게 보인다. 크게 저을수록
-    # 진자 호를 따라 손이 위로 올라간다.
-    swing = -swing * 2
+    # 팔은 같은 쪽 다리와 반대로(교차 보행), 다리 보폭보다 한 칸만 크게 —
+    # 손이 몸통 가장자리를 살짝 벗어나는 정도가 자연스럽다 (두 배로
+    # 저었더니 팔만 허우적댔다). 크게 저을수록 진자 호를 따라 손이
+    # 위로 올라간다.
+    swing = -(swing + (1 if swing > 0 else -1 if swing < 0 else 0))
     # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다. 앞모습 팔과 같은
     # 길이(어깨 y+1 ~ 손끝 y+10, 엉덩이 높이)로 내린다 — 짧으면 티가 난다.
     # 몸판과 같은 파랑이라, 획을 통째로 모아 둘레를 윤곽선으로 한 번에
@@ -313,12 +314,16 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
         x = c - 2 + round(swing * t)
         for j, cc in enumerate(('B', 'b', 'b', 'b', 'b')):
             cells[(x + j, yy)] = 'B' if yy == hy - 1 else cc     # 마지막 줄은 소매단
+    # 손: 팔 기울기를 따라 줄마다 어긋나게(전단) 그린다 — 손목이 팔
+    # 방향으로 꺾여 보인다. 좌우 평행이동만 하면 손만 둥둥 떠다닌다.
     hx = c - 1 + swing
-    for j in range(4):
-        for k in range(3):
-            cells[(hx + j, hy + k)] = 's'                        # 손 (네 칸)
-    cells[(hx + 2, hy + 2)] = 'S'
-    cells[(hx + 3, hy + 2)] = 'S'
+    for k in range(3):
+        ox = round(swing * k / 7)
+        for j in range(4):
+            cells[(hx + j + ox, hy + k)] = 's'
+    ox2 = round(swing * 2 / 7)
+    cells[(hx + 2 + ox2, hy + 2)] = 'S'
+    cells[(hx + 3 + ox2, hy + 2)] = 'S'
     for (x, yy) in cells:                                        # 획 둘레 윤곽선
         for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
