@@ -240,7 +240,7 @@ func _next_day(passed_out: bool) -> void:
 		% [stats[0], stats[1], stats[2], GameData.money, note]
 	m.summary.open(s_title, s_body)
 	if Net.is_host():
-		m.netsync._net_new_day.rpc(m.netsync._make_snapshot_json(), s_title, s_body)
+		m.netsync.send_new_day(m.netsync._make_snapshot_json(), s_title, s_body)
 	m.queue_redraw()
 	# 밤새 물기가 마르고 작물이 자랐다 — 「돌아가는 칸」 목록을 다시 만든다.
 	# 어딘가에서 touch를 빠뜨려도 여기서 하루 안에 저절로 맞춰진다.

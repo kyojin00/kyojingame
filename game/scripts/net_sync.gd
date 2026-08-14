@@ -32,8 +32,9 @@ func _show_connecting() -> void:
 	m._connect_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	m._connect_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	layer.add_child(m._connect_label)
-	# 12초 안에 스냅샷을 못 받으면 타이틀로
-	get_tree().create_timer(12.0).timeout.connect(func() -> void:
+	# 스냅샷을 끝내 못 받으면 타이틀로. 맵 전체를 조각으로 받아오므로
+	# 넉넉히 기다린다 (조각이 오는 동안은 라벨에 진행률이 찍힌다).
+	get_tree().create_timer(30.0).timeout.connect(func() -> void:
 		if not m._net_ready and Net.is_guest():
 			m._back_to_title())
 
@@ -84,14 +85,44 @@ func _make_snapshot_json() -> String:
 	return JSON.stringify(GameData.build_save(g, m.player.position, objs, anims))
 
 
+# 스냅샷은 **맵 전체**라 커서(168x90칸이면 300KB를 넘는다) 한 번에 못 보낸다.
+# 한 번에 밀어 넣으면 통째로 유실되고, 게스트는 12초를 기다리다 타이틀로
+# 튕긴다 — 맵을 넓힌 뒤 접속이 안 되던 원인이 이것이다. 조각으로 끊어
+# 보내고 게스트가 다시 이어 붙인다.
+const SNAP_CHUNK := 24000        # 조각 하나의 글자 수
+
+var _snap_buf := ""              # 게스트: 받아 쌓는 중인 스냅샷
+
+
 @rpc("any_peer", "reliable")
 func _req_snapshot() -> void:
 	if not Net.is_host():
 		return
-	_recv_snapshot.rpc_id(multiplayer.get_remote_sender_id(), _make_snapshot_json())
+	var who := multiplayer.get_remote_sender_id()
+	var json := _make_snapshot_json()
+	var total: int = int(ceil(float(json.length()) / SNAP_CHUNK))
+	for i in total:
+		_recv_snapshot_part.rpc_id(who, json.substr(i * SNAP_CHUNK, SNAP_CHUNK),
+			i, total)
 
 
+# 조각 하나 도착. 첫 조각에서 버퍼를 비우고, 마지막 조각에서 펼친다.
+# (요청이 두 번 나가 조각이 겹쳐 와도 첫 조각이 버퍼를 지우므로 안전하다)
 @rpc("authority", "reliable")
+func _recv_snapshot_part(part: String, idx: int, total: int) -> void:
+	if idx == 0:
+		_snap_buf = ""
+	_snap_buf += part
+	if idx < total - 1:
+		if m._connect_label != null:
+			m._connect_label.text = "농장을 받아오는 중... %d%%" \
+				% int(float(idx + 1) / total * 100.0)
+		return
+	var json := _snap_buf
+	_snap_buf = ""
+	_recv_snapshot(json)
+
+
 func _recv_snapshot(json: String) -> void:
 	var d: Variant = JSON.parse_string(json)
 	if typeof(d) != TYPE_DICTIONARY:
@@ -353,7 +384,30 @@ func _req_quest(op: String) -> void:
 	_broadcast_stats()
 
 
+# 새 날도 맵 전체를 보내므로 스냅샷과 똑같이 조각내 보낸다 (day_cycle이 부른다).
+func send_new_day(json: String, title_text: String, body: String) -> void:
+	var total: int = int(ceil(float(json.length()) / SNAP_CHUNK))
+	for i in total:
+		_recv_new_day_part.rpc(json.substr(i * SNAP_CHUNK, SNAP_CHUNK), i, total,
+			title_text, body)
+
+
+var _day_buf := ""
+
+
 @rpc("authority", "reliable")
+func _recv_new_day_part(part: String, idx: int, total: int,
+		title_text: String, body: String) -> void:
+	if idx == 0:
+		_day_buf = ""
+	_day_buf += part
+	if idx < total - 1:
+		return
+	var json := _day_buf
+	_day_buf = ""
+	_net_new_day(json, title_text, body)
+
+
 func _net_new_day(json: String, title_text: String, body: String) -> void:
 	var d: Variant = JSON.parse_string(json)
 	if typeof(d) != TYPE_DICTIONARY:
