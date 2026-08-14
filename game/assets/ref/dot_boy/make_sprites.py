@@ -165,8 +165,8 @@ HEAD_SIDE = [   # 오른쪽을 본다
     "OSssssrrsssssss" "S",
     ".OSsssssss" "mm" "ssO.",
     ".OssssssssssssO.",
-    "..OssssssssssO..",
-    "...OOssssssOO...",
+    "..O" "sssssssssss" "O.",
+    "...OO" "ssssssss" "O..",
 ]
 
 HEAD_UP = [
@@ -604,8 +604,8 @@ HEAD_SIDE_F = [   # 오른쪽을 본다
     "Ohh" "sss" "rr" "sssssss" "S",
     ".hhh" "ssssss" "mm" "ss" "O.",
     ".hhh" "ssssssssss" "O.",
-    ".hhh" "sssssssss" "O..",
-    ".hhh" "O" "ssssss" "OO" "...",
+    ".hhh" "ssssssssss" "O.",
+    ".hhh" "O" "ssssssss" "O" "..",
     ".hhh" "............",
     ".hhh" "............",
     ".ggg" "............",
