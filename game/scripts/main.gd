@@ -1632,8 +1632,11 @@ var _snapshot_retry := 0.0
 # 게스트 행동 요청: 호스트가 같은 로직을 실행하고 결과를 전파한다
 var _target_override := Vector2i(-999, -999)
 var _perp_override := Vector2i.ZERO
-var _forced_seed := ""
-var _remote_acting := false
+# 이 둘은 다른 스크립트(net_sync·tool_use·shop_ui·hud)가 읽는 공용 상태다.
+# 언더스코어를 붙이면 「이 클래스 안에서만 쓰는 값」으로 보여 안 쓰인다는
+# 경고가 뜬다 — 밖에서 쓰는 값이니 이름에도 그렇게 적는다.
+var forced_seed := ""
+var remote_acting := false
 
 
 # 게스트가 상점 조작 후 호출 (호스트면 즉시 전파)
