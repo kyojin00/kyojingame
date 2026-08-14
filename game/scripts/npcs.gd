@@ -66,6 +66,10 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 				if m.VILLAGE_NPC[pid] == npc_id and GameData.village_built.has(pid):
 					t = m.door_tile(m.VILLAGE_PLOTS[pid].anchor) + Vector2i(0, 1)
 					break
+			# 이사 온 주민은 집터에 지은 자기 집이 곧 거처다
+			if t.x == -999 and GameData.settler_homes.has(npc_id):
+				var sh: Array = GameData.settler_homes[npc_id]
+				t = m.door_tile(Vector2i(int(sh[0]), int(sh[1]))) + Vector2i(0, 1)
 			if t.x == -999:
 				t = m.NPC_HOME.get(npc_id, Vector2i(72, 20))
 	if m.is_passable(t):
@@ -143,6 +147,18 @@ func _sync_village_npcs() -> void:
 				break
 		if not have_ran:
 			_spawn_npc("rancher", m.NPC_HOME["rancher"])
+
+	# 이사 온 일반/특수 주민 — 집터에 지은 자기 집 곁에서 지낸다
+	for nid: String in GameData.settlers:
+		var have_s := false
+		for n in m.npcs:
+			if n.id == nid:
+				have_s = true
+				break
+		if not have_s and GameData.settler_homes.has(nid):
+			var h: Array = GameData.settler_homes[nid]
+			_spawn_npc(nid,
+				m.door_tile(Vector2i(int(h[0]), int(h[1]))) + Vector2i(0, 1))
 
 	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
 	if GameData.forest_quest in ["visit", "done"]:

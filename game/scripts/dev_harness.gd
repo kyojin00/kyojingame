@@ -1589,6 +1589,111 @@ func _debug_tick() -> void:
 				" 꿈=", dreamed and grandpa_line, " 통계=", stats_on,
 				"(", stat_n0, "줄) 배웅=", credits_on and has_postman
 				and has_all_line, " 기상=", outro_on and woke)
+		268:
+			# #125: 주민 분류·이사(입주/이탈)·삼자 대화·유니콘 뿔 제거
+			var k_settlers: Array = GameData.settlers.duplicate()
+			var k_homes: Dictionary = GameData.settler_homes.duplicate()
+			var k_empty: Array = GameData.empty_houses.duplicate()
+			var k_offer := GameData.settler_offer
+			var k_arrive := GameData.settler_arrive
+			var k_leaving := GameData.settler_leaving
+			var k_move := GameData.move_quest
+			var k_sl := int(GameData.items["settle_letter"])
+			var k_fl := int(GameData.items["farewell_letter"])
+			var k_aff_f := int(GameData.affinity["farmer"])
+			var k_aff_d := int(GameData.affinity["foodie"])
+			m.dialog.close()
+			# ① 분류 — 필수/일반/특수
+			var kinds: bool = GameData.settler_kind("chief") == "core" \
+				and GameData.settler_kind("farmer") == "normal" \
+				and GameData.settler_kind("alchemist") == "special"
+			# 연금술사는 노트 50% 전에는 후보에도 안 오른다
+			var no_alch: bool = GameData.note_progress().ratio >= 0.5 \
+				or "alchemist" not in GameData.settler_candidates()
+			# ② 입주 — 편지 수락 -> 빈 집 배정 -> 다음 날 아침 도착
+			GameData.move_quest = "done"
+			GameData.settlers = []
+			GameData.settler_homes = {}
+			GameData.empty_houses = [[60, 40]]
+			GameData.settler_offer = "farmer"
+			GameData.items["settle_letter"] = 1
+			GameData.settler_arrive = ""
+			GameData.settler_leaving = ""
+			m.story._settle_accept()
+			var accepted: bool = GameData.settler_arrive == "farmer" \
+				and GameData.settler_homes.has("farmer") \
+				and int(GameData.items["settle_letter"]) == 0 \
+				and GameData.empty_houses.is_empty()
+			GameData.settler_arrive_day = GameData.day - 1
+			m.story._settler_update(0.1)
+			var arrived: bool = "farmer" in GameData.settlers
+			var spawned := false
+			for na in m.npcs:
+				if na.id == "farmer":
+					spawned = true
+			# ③ 삼자 대화 — 곁의 두 주민 사이에 끼면 질문+선택지, 호감도 상승
+			var fnode: Variant = null
+			for nb in m.npcs:
+				if nb.id == "farmer":
+					fnode = nb
+			m.npcmgr._spawn_npc("foodie", Vector2i(int(fnode.position.x / m.TILE) + 1,
+				int(fnode.position.y / m.TILE)))
+			var dnode: Node2D = m.npcs[m.npcs.size() - 1]
+			dnode.position = fnode.position + Vector2(48, 0)
+			m.player.position = fnode.position + Vector2(0, 40)
+			var buddy: Variant = m.village._chat_buddy(fnode)
+			var trio_near: bool = buddy != null
+			m.village._start_trio_dialog(fnode, buddy)
+			var trio_open: bool = m.dialog.visible
+			m.dialog.close()
+			m.village._trio_pick("foodie")
+			var trio_aff: bool = int(GameData.affinity["foodie"]) == k_aff_d + 6
+			# ④ 이탈 — 「이사 가고 싶다」 대화에서 붙잡으면 남는다
+			GameData.settler_leaving = "farmer"
+			m.story.start_leaving_dialog("farmer")
+			var leave_open: bool = m.dialog.visible
+			m.dialog.close()
+			var aff_before := int(GameData.affinity["farmer"])
+			m.story._leave_persuade("farmer")
+			var persuaded: bool = GameData.settler_leaving == "" \
+				and int(GameData.affinity["farmer"]) == aff_before + 15
+			# 말없이 떠나면 빈 집과 작별 편지가 남는다
+			m.story._settler_depart("farmer", true)
+			var gone: bool = "farmer" not in GameData.settlers \
+				and not GameData.empty_houses.is_empty() \
+				and int(GameData.items["farewell_letter"]) == k_fl + 1 \
+				and GameData.last_farewell == "순돌"
+			m.story.open_farewell_letter()
+			var fw_read: bool = m.dialog.visible \
+				and int(GameData.items["farewell_letter"]) == k_fl
+			m.dialog.close()
+			# ⑤ 유니콘 뿔 리소스 제거 — 최후의 연금술 진입점이 사라졌다
+			var no_horn: bool = not m.has_method("show_ending") \
+				and not m.story.has_method("show_ending")
+			# 뒷정리
+			for nc in m.npcs.duplicate():
+				if nc.id in ["farmer", "foodie"]:
+					m.npcs.erase(nc)
+					nc.queue_free()
+			m.hud._toast_queue.clear()
+			GameData.settlers = k_settlers
+			GameData.settler_homes = k_homes
+			GameData.empty_houses = k_empty
+			GameData.settler_offer = k_offer
+			GameData.settler_arrive = k_arrive
+			GameData.settler_leaving = k_leaving
+			GameData.move_quest = k_move
+			GameData.items["settle_letter"] = k_sl
+			GameData.items["farewell_letter"] = k_fl
+			GameData.affinity["farmer"] = k_aff_f
+			GameData.affinity["foodie"] = k_aff_d
+			print("SETTLER_OK=", kinds and no_alch and accepted and arrived
+				and spawned and trio_near and trio_open and trio_aff
+				and leave_open and persuaded and gone and fw_read and no_horn,
+				" 분류=", kinds, " 특수잠금=", no_alch, " 수락=", accepted,
+				" 도착=", arrived and spawned, " 삼자대화=", trio_near
+				and trio_open and trio_aff, " 붙잡기=", leave_open and persuaded,
+				" 말없이떠남=", gone and fw_read, " 유니콘뿔제거=", no_horn)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

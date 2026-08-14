@@ -112,6 +112,17 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.arrive_clock = str(d.get("arrive_clock", ""))
 	GameData.playtime_sec = float(d.get("playtime_sec", 0.0))
 	GameData.rocks_mined = int(d.get("rocks_mined", 0))
+	GameData.settlers = d.get("settlers", [])
+	GameData.settler_homes = d.get("settler_homes", {})
+	GameData.empty_houses = d.get("empty_houses", [])
+	GameData.settler_offer = str(d.get("settler_offer", ""))
+	GameData.settler_offer_day = int(d.get("settler_offer_day", 0))
+	GameData.settler_arrive = str(d.get("settler_arrive", ""))
+	GameData.settler_arrive_day = int(d.get("settler_arrive_day", 0))
+	GameData.settler_leaving = str(d.get("settler_leaving", ""))
+	GameData.settler_leave_day = int(d.get("settler_leave_day", 0))
+	GameData.npc_last_talk = d.get("npc_last_talk", {})
+	GameData.last_farewell = str(d.get("last_farewell", ""))
 	# 구세이브 호환 — 목장 상회가 이야기(스토리 8) 도입 전에 이미 서
 	# 있었다면, 그 세이브에서는 8장을 완료로 친다 (방문객 연출이 이미
 	# 정착한 보라와 겹치지 않게)

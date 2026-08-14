@@ -419,24 +419,8 @@ func _rebuild() -> void:
 		d2.add_theme_color_override("font_color", Color(0.62, 0.58, 0.75))
 		formula_box.add_child(d2)
 
-	# 마지막 연금술 — 일곱 재료가 다 모이면 여기서 끝을 낸다
-	# (예전에는 연구 노트 안에 버튼이 있었다. 연금술은 조합대에서 한다)
-	if GameData.legends_owned() > 0 and not GameData.ending_seen:
-		var fl := Label.new()
-		fl.text = "\n[마지막 연금술] 일곱 재료 %d / %d" % [GameData.legends_owned(),
-			GameData.LEGENDS.size()]
-		fl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
-		formula_box.add_child(fl)
-		var fb := _mk_button("마지막 연금술을 시작한다", func() -> void:
-			close()
-			main.show_ending())
-		fb.disabled = not GameData.can_final_alchemy()
-		formula_box.add_child(fb)
-	elif GameData.ending_seen:
-		var fl2 := Label.new()
-		fl2.text = "\n[유니콘의 뿔] 조합대 위에서 조용히 빛나고 있다."
-		fl2.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
-		formula_box.add_child(fl2)
+	# (유니콘의 뿔 「마지막 연금술」은 걷어냈다 — 엔딩은 꿈속의 배웅 하나다.
+	#  전설 재료 7종은 연구 노트를 채우는 수집 목표로만 남는다)
 
 	var left: int = GameData.unknown_formulas().size()
 	var tail := Label.new()

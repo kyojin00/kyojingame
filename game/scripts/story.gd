@@ -1318,27 +1318,7 @@ func _close_story() -> void:
 	m.hud.visible = true
 
 
-# 최후의 연금술 (연구 노트에서 재료 7종을 모두 모으면 실행 가능)
-func show_ending() -> void:
-	GameData.ending_seen = true
-	m.saveio.save_now()
-	m.hud.visible = false
-	_story_mode = "ending"
-	var kills := 0
-	for k in GameData.mob_kills:
-		kills += int(GameData.mob_kills[k])
-	var fish_n := 0
-	for k in GameData.fish_caught:
-		fish_n += int(GameData.fish_caught[k])
-	var prog: Dictionary = GameData.note_progress()
-	_story_pages = m.ENDING_PAGES.duplicate()
-	_story_pages.append(["연구의 기록",
-		"함께한 날: %d일째\n연구 노트: %d/%d 페이지\n낚은 물고기: %d마리 · 처치한 몬스터: %d\n만든 요리: %d종류\n\n...그리고 교진 마을의 나날은 계속된다." %
-		[GameData.day, int(prog.filled), int(prog.total), fish_n, kills,
-		GameData.recipes_cooked.size()]])
-	_build_story_ui()
-	_story_idx = 0
-	_show_story_page()
+# (유니콘의 뿔 「최후의 연금술」 엔딩은 걷어냈다 — 엔딩은 ending_ui 하나다)
 
 
 func _story_add_button(text: String, cb: Callable) -> void:
@@ -2646,6 +2626,204 @@ func _start_elixir_dialog() -> void:
 			"portrait": m.tex["npc_forest_mom_portrait_happy"]},
 		{"text": "「좋은 꿈 꾸길. ...분명, 만나고 싶던 분들이\n기다리고 계실 거야.」"},
 	], _end_elixir)
+
+
+# ---- 주민 이사 시스템 — 일반/특수 주민의 입주와 이탈 ----
+#
+# 스토리 3(무진의 이사)을 겪은 뒤부터, 빈 집터(또는 떠난 주민이 남긴
+# 빈 집)가 있으면 아침마다 낮은 확률로 「이사 신청 편지」가 온다.
+# 가방에서 읽고 수락해야 입주한다. 연금술사 묘연(특수)은 연구 노트
+# 50%를 넘기면 소문을 듣고 확정적으로 편지를 보낸다.
+# 정착한 주민은 호감도가 낮거나 오래 말을 안 걸면 떠날 마음이 생긴다.
+
+const SETTLE_LETTERS := {
+	"farmer": "『안녕하십니까! 흙 좋기로 소문난 교진 마을에\n밭 한 뙈기 일구고 싶은 농부, 순돌이라고 합니다.\n받아 주신다면 부지런히 살겠습니다!』",
+	"foodie": "『안녕하세요~ 교진 마을 음식이 그렇게 맛있다면서요?\n먹는 게 인생의 낙인 다미라고 해요.\n저도 그 마을에서 살아 보고 싶어요!』",
+	"angler": "『물 좋고 고기 잘 문다는 소문을 들었습니다.\n낚싯대 하나 메고 떠도는 강태라고 합니다.\n마을 물가 한켠을 내어 주시겠습니까?』",
+	"alchemist": "『당신의 연구 이야기가 바람을 타고 들려왔어요.\n그분의 노트를 잇는 사람이 있다니...\n연금술사 묘연, 그 마을에서 연구를 함께하고 싶어요.』",
+}
+
+
+func _settler_update(_delta: float) -> void:
+	if Net.is_guest() or GameData.move_quest != "done":
+		return
+	# ① 이사 도착 — 수락한 다음 날 아침, 새 주민이 자리를 잡는다
+	if GameData.settler_arrive != "" and GameData.day > GameData.settler_arrive_day:
+		var nid := GameData.settler_arrive
+		GameData.settler_arrive = ""
+		if nid not in GameData.settlers:
+			GameData.settlers.append(nid)
+		if not GameData.npc_greeted.has(nid):
+			GameData.npc_greeted.append(nid)
+		GameData.npc_last_talk[nid] = GameData.day
+		m.npcmgr._sync_village_npcs()
+		m.hud.event_toast("%s이(가) 마을에 이사 왔다!" % GameData.NPCS[nid].name)
+		m.saveio.save_now()
+	# ② 이사 신청 편지 — 하루 한 번만 굴린다 (들어올 자리가 있어야)
+	if GameData.settler_offer == "" and GameData.settler_arrive == "" \
+			and int(GameData.items["settle_letter"]) == 0 \
+			and GameData.settler_offer_day != GameData.day:
+		GameData.settler_offer_day = GameData.day
+		var cands: Array = GameData.settler_candidates()
+		var has_spot: bool = GameData.first_empty_plot().x >= 0 \
+			or not GameData.empty_houses.is_empty()
+		if not cands.is_empty() and has_spot:
+			# 특수 주민(연금술사)은 조건이 차면 소문을 듣고 반드시 온다
+			var special: bool = str(cands[0]) == "alchemist"
+			if special or randf() < GameData.SETTLER_OFFER_CHANCE:
+				GameData.settler_offer = str(cands[0]) if special \
+					else str(cands[randi() % cands.size()])
+				GameData.items["settle_letter"] = 1
+				m.hud.quest_start_toast("이사 신청 편지가 왔다 — 가방(I)에서 읽어 보자")
+				m.saveio.save_now()
+	# ③ 이탈 — 아침마다 정착 주민들의 마음을 살핀다
+	if GameData.settler_leave_day != GameData.day:
+		GameData.settler_leave_day = GameData.day
+		for nid2: String in GameData.settlers.duplicate():
+			if GameData.settler_leaving == nid2:
+				continue
+			var aff := int(GameData.affinity[nid2])
+			if aff >= GameData.SAFE_AFF:
+				continue   # 마음이 깊으면 떠날 생각을 하지 않는다
+			var neglected: bool = GameData.day \
+				- int(GameData.npc_last_talk.get(nid2, GameData.day)) \
+				> GameData.NEGLECT_DAYS
+			if aff >= GameData.LEAVE_AFF and not neglected:
+				continue
+			if randf() >= GameData.LEAVE_CHANCE:
+				continue
+			if randf() < GameData.SILENT_LEAVE:
+				_settler_depart(nid2, true)   # 드물게 — 말없이 편지만 남기고
+			else:
+				GameData.settler_leaving = nid2   # 직접 말하러 온다 (❗)
+				m.saveio.save_now()
+
+
+# 이사 신청 편지 읽기 (가방에서 클릭)
+func open_settle_letter() -> void:
+	var nid := GameData.settler_offer
+	if nid == "" or int(GameData.items["settle_letter"]) <= 0:
+		GameData.items["settle_letter"] = 0
+		return
+	var body: String = str(SETTLE_LETTERS.get(nid, "『마을에서 살고 싶습니다.』"))
+	m.dialog.open("이사 신청 편지 — %s" % GameData.NPCS[nid].name, body, [
+		["이사를 수락한다", _settle_accept],
+		["정중히 거절한다", _settle_decline],
+		["나중에 정한다", null],
+	])
+
+
+func _settle_accept() -> void:
+	var nid := GameData.settler_offer
+	if nid == "":
+		m.dialog.close()
+		return
+	# 자리: 떠난 주민이 남긴 빈 집이 먼저, 없으면 빈 집터에 새로 짓는다
+	var anchor := Vector2i(-999, -999)
+	if not GameData.empty_houses.is_empty():
+		var h: Array = GameData.empty_houses.pop_front()
+		anchor = Vector2i(int(h[0]), int(h[1]))
+	else:
+		var plot: Vector2i = GameData.first_empty_plot()
+		if plot.x < 0:
+			m.dialog.close()
+			m.hud.show_message("빈 집터가 없다 — 집터를 마련하면 초대할 수 있다.", 5.0)
+			return
+		for p: Dictionary in GameData.home_plots:
+			if int(p.x) == plot.x and int(p.y) == plot.y:
+				p.used = true
+				break
+		anchor = plot
+		m.objnode._remove_object(m.door_tile(plot))
+		for y in range(plot.y - 1, plot.y + 5):
+			for x in range(plot.x - 1, plot.x + 6):
+				if m.objects.has(Vector2i(x, y)):
+					m.objnode._remove_object(Vector2i(x, y))
+		m.worldgen._fill_building(plot)
+		m.objects.erase(m.door_tile(plot))
+	m.dialog.close()
+	GameData.items["settle_letter"] = 0
+	GameData.settler_offer = ""
+	GameData.settler_homes[nid] = [anchor.x, anchor.y]
+	GameData.settler_arrive = nid
+	GameData.settler_arrive_day = GameData.day
+	Sound.play_sfx("sfx_place")
+	m.hud.event_toast("이사 수락 — 내일 %s이(가) 온다!" % GameData.NPCS[nid].name)
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
+func _settle_decline() -> void:
+	m.dialog.close()
+	GameData.items["settle_letter"] = 0
+	GameData.settler_offer = ""
+	m.hud.show_message("정중히 거절하는 답장을 보냈다. 인연이 닿으면 또 편지가 올 것이다.", 5.0)
+	m.saveio.save_now()
+
+
+# 「이사를 가고 싶다」 — 떠나려는 주민의 속마음 (붙잡을 수 있다)
+func start_leaving_dialog(nid: String) -> void:
+	var nm := str(GameData.NPCS[nid].name)
+	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid), [
+		{"text": "「...저기, 할 말이 있어.」"},
+		{"text": "「요즘 마을 생활이 영 겉도는 것 같아서...\n나, 이사를 가 볼까 해.」"},
+		{"text": "「넌... 어떻게 생각해?」", "choices": [
+			["가지 마! 내가 더 잘할게", _leave_persuade.bind(nid)],
+			["...네 뜻이 그렇다면", _leave_letgo.bind(nid)],
+		]},
+	])
+
+
+func _leave_persuade(nid: String) -> void:
+	m.dialog.close()
+	GameData.settler_leaving = ""
+	GameData.affinity[nid] = int(GameData.affinity[nid]) + 15
+	GameData.npc_last_talk[nid] = GameData.day
+	Sound.play_sfx("sfx_heart")
+	m.hud.show_message("%s이(가) 조금 놀란 얼굴로... 이내 배시시 웃었다. (호감도 +15)\n앞으로 자주 들여다보자 — 마음이 식으면 또 떠나고 싶어진다."
+		% GameData.NPCS[nid].name, 6.0)
+	m.saveio.save_now()
+
+
+func _leave_letgo(nid: String) -> void:
+	m.dialog.close()
+	GameData.settler_leaving = ""
+	_settler_depart(nid, false)
+
+
+# 주민이 마을을 떠난다 — 집은 빈 채로 남아 다음 주민을 기다린다
+func _settler_depart(nid: String, silent: bool) -> void:
+	GameData.settlers.erase(nid)
+	if GameData.settler_leaving == nid:
+		GameData.settler_leaving = ""
+	if GameData.settler_homes.has(nid):
+		GameData.empty_houses.append(GameData.settler_homes[nid])
+		GameData.settler_homes.erase(nid)
+	for n in m.npcs.duplicate():
+		if n.id == nid:
+			m.npcs.erase(n)
+			n.queue_free()
+	var nm := str(GameData.NPCS[nid].name)
+	if silent:
+		GameData.items["farewell_letter"] = \
+			int(GameData.items["farewell_letter"]) + 1
+		GameData.last_farewell = nm
+		m.hud.show_message("%s이(가) 말없이 마을을 떠났다...\n문 앞에 짧은 편지 한 통만 남아 있었다. (가방 I)" % nm, 7.0)
+	else:
+		m.hud.show_message("%s이(가) 마을을 떠났다.\n빈 집은 남아 있다 — 언젠가 새 이웃이 올 것이다." % nm, 6.0)
+	m.saveio.save_now()
+
+
+# 말없이 떠난 주민의 작별 편지 (가방에서 클릭)
+func open_farewell_letter() -> void:
+	if int(GameData.items["farewell_letter"]) <= 0:
+		return
+	GameData.items["farewell_letter"] = \
+		int(GameData.items["farewell_letter"]) - 1
+	var nm := str(GameData.last_farewell)
+	m.dialog.open("짧은 작별 편지",
+		"『미안, 인사도 없이 떠나서.\n그동안 고마웠어. 몸 건강히 지내. — %s』\n\n(다음 이웃에게는 더 자주 말을 걸어 주자...)" % nm,
+		[["편지를 접는다", null]])
 
 
 func _end_elixir() -> void:

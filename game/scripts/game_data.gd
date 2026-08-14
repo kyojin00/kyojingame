@@ -1372,6 +1372,9 @@ func quest_npc_marks() -> Dictionary:
 	# 엔딩 준비 완료 — 연화가 항아리를 꺼낼 차례다
 	if ending_ready():
 		marks["forest_mom"] = "!"
+	# 떠나려는 주민 — 하고 싶은 말이 있다
+	if settler_leaving != "":
+		marks[settler_leaving] = "!"
 	return marks
 
 
@@ -1919,6 +1922,8 @@ const ITEMS := {
 	# 엔딩 유품·물약 — 팔 수 없다
 	"water_life": {"name": "생명의 물", "sell": 0},
 	"potion_dream": {"name": "기억의 물약", "sell": 0},
+	"settle_letter": {"name": "이사 신청 편지", "sell": 0},
+	"farewell_letter": {"name": "짧은 작별 편지", "sell": 0},
 	"relic_hat": {"name": "할머니의 모자", "sell": 0},
 	"relic_watch": {"name": "할머니의 시계", "sell": 0},
 	"relic_bracelet": {"name": "할머니의 팔찌", "sell": 0},
@@ -1987,6 +1992,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"water_life", "potion_dream", "relic_hat", "relic_watch",
 	"relic_bracelet", "relic_ring", "relic_necklace",
+	"settle_letter", "farewell_letter",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
 	"housing_kit", "move_letter", "old_book", "trash_bin", "arrow", "dish_coral_tea",
@@ -2561,6 +2567,10 @@ func note_progress() -> Dictionary:
 		if minerals_found.get(mineral, false):
 			filled += 1
 	for npc_id in NPCS:
+		# 이사 오고 가는 일반/특수 주민은 노트 페이지에 넣지 않는다 —
+		# 떠날 수 있는 사람으로 100%가 막히면 안 된다 (필수 주민만 센다)
+		if str(NPC_KIND.get(npc_id, "core")) != "core":
+			continue
 		total += 2  # 호감도 50 / 100 이야기
 		if int(affinity[npc_id]) >= 50:
 			filled += 1
@@ -2685,6 +2695,87 @@ func ending_ready() -> bool:
 func playtime_text() -> String:
 	var mins := int(playtime_sec / 60.0)
 	return "%d시간 %d분" % [mins / 60, mins % 60]
+
+
+# ---- 주민 분류 · 이사 시스템 (입주/이탈) ----
+#
+# 주민은 세 갈래다:
+#   core    필수 주민 — 메인 스토리로 확정 입주 (이장·민지·무쇠·보라·
+#           철수·서하·무진·연화·솔이). 절대 마을을 떠나지 않는다.
+#   normal  일반 주민 — 빈 집터가 있으면 랜덤으로 「이사 신청 편지」를
+#           보내 오는 생활형 캐릭터 (농부 순돌·미식가 다미·낚시광 강태)
+#   special 특수 주민 — 조건을 채워야 해금 (연금술사 묘연 — 연구 노트 50%)
+# 편지를 수락해야 입주하고, 호감도가 낮거나(LEAVE_AFF 미만) 오래
+# 말을 걸지 않으면(NEGLECT_DAYS) 떠날 마음이 생긴다 — 대개는 직접
+# 「이사 가고 싶다」고 말하지만(붙잡을 수 있다), 드물게는 말없이
+# 편지 한 통만 남기고 떠난다. 호감도 SAFE_AFF 이상이면 절대 안 떠난다.
+const NPC_KIND := {
+	"chief": "core", "merchant": "core", "blacksmith": "core",
+	"rancher": "core", "fisher": "core", "librarian": "core",
+	"explorer": "core", "forest_mom": "core", "forest_girl": "core",
+	"farmer": "normal", "foodie": "normal", "angler": "normal",
+	"alchemist": "special",
+}
+const SETTLER_POOL := ["farmer", "foodie", "angler"]   # 일반 주민 후보
+const ALCHEMIST_NOTE := 0.5        # 연금술사 해금 — 연구 노트 50%
+const SETTLER_OFFER_CHANCE := 0.25 # 아침마다 편지가 올 확률
+const LEAVE_AFF := 20              # 이 밑이면 떠날 마음이 생긴다
+const SAFE_AFF := 40               # 이 위면 절대 떠나지 않는다
+const NEGLECT_DAYS := 7            # 이만큼 말을 안 걸면 서운해한다
+const LEAVE_CHANCE := 0.25         # 조건이 찼을 때 아침마다 떠날 확률
+const SILENT_LEAVE := 0.2          # 그중 말없이 떠나는 비율
+var settlers: Array = []           # 정착한 일반/특수 주민 id
+var settler_homes := {}            # nid -> [x, y] (집 앵커)
+var empty_houses: Array = []       # 떠난 주민이 남긴 빈 집 — 재입주 우선
+var settler_offer := ""            # 읽지 않은 이사 신청 편지의 주인
+var settler_offer_day := 0         # 마지막으로 편지를 굴린 날
+var settler_arrive := ""           # 내일 아침 이사 올 주민
+var settler_arrive_day := 0
+var settler_leaving := ""          # 「이사 가고 싶다」 말하려는 주민 (❗)
+var settler_leave_day := 0         # 마지막으로 이탈을 굴린 날
+var npc_last_talk := {}            # nid -> 마지막으로 대화한 날
+var last_farewell := ""            # 마지막으로 말없이 떠난 주민 이름 (편지용)
+
+
+func settler_kind(nid: String) -> String:
+	return str(NPC_KIND.get(nid, "core"))
+
+
+# 다음 이사 신청 후보 — 특수 주민(조건 충족)이 먼저, 그다음 일반 랜덤.
+# 떠난 주민도 다시 올 수 있다 (마을은 계속 살아 움직인다)
+func settler_candidates() -> Array:
+	var out: Array = []
+	if note_progress().ratio >= ALCHEMIST_NOTE and "alchemist" not in settlers \
+			and settler_arrive != "alchemist":
+		out.append("alchemist")
+	for nid: String in SETTLER_POOL:
+		if nid not in settlers and settler_arrive != nid:
+			out.append(nid)
+	return out
+
+
+# ---- 주민 삼자 대화 — 모여서 떠드는 이야깃거리 ----
+# %A = 말을 거는 쪽 / %B = 상대 / 선택지마다 호감도가 오르는 쪽이 다르다
+const TRIO_TOPICS := [
+	{"q": "「어어, 마침 잘 왔어! %B는 축구보다 야구가\n좋다는데, 넌 어떻게 생각해?」",
+		"a1": "나도 야구가 좋아!", "w1": "b",
+		"a2": "역시 공은 발로 차야지!", "w2": "a"},
+	{"q": "「%B가 그러는데 바다는 노을 질 때가 최고래.\n난 아침 바다가 좋은데 — 넌?」",
+		"a1": "노을 지는 바다지!", "w1": "b",
+		"a2": "아침 바다가 최고야!", "w2": "a"},
+	{"q": "「%B랑 내기했거든 — 밥에는 국이냐, 반찬이냐.\n%B는 국파야. 네 생각은?」",
+		"a1": "당연히 국이지!", "w1": "b",
+		"a2": "반찬이 본체지!", "w2": "a"},
+	{"q": "「비 오는 날 말이야, %B는 집이 최고라는데\n난 빗속 산책도 좋거든. 넌 어때?」",
+		"a1": "집에서 뒹굴뒹굴!", "w1": "b",
+		"a2": "우산 쓰고 산책!", "w2": "a"},
+	{"q": "「%B는 겨울이 제일 좋대. 눈 때문이라나.\n난 봄이 좋은데 — 너는?」",
+		"a1": "겨울 눈이 낭만이지!", "w1": "b",
+		"a2": "역시 꽃 피는 봄!", "w2": "a"},
+	{"q": "「%B랑 얘기 중이었어 — 든든한 아침이냐,\n느긋한 늦잠이냐! 너라면?」",
+		"a1": "아침밥은 못 참지!", "w1": "b",
+		"a2": "늦잠이 보약이야!", "w2": "a"},
+]
 
 
 # 수확 품질 굴리기: 0=일반 1=은 2=금 (농사 숙련도가 높을수록 좋다)
@@ -3197,10 +3288,62 @@ const NPCS := {
 	"secret50": "그 오래된 책 말이에요... 표지 안쪽에 글씨가 한 줄 숨어 있었어요.\n「기록은 남기는 자의 것」 — 당신 할아버지 필체와 닮았더라고요.",
 	"secret100": "복원하다 알았어요. 그 책, 이 마을의 옛 기록이 맞아요.\n그리고 마지막 장은... 아직 쓰이지 않은 채 비어 있어요. 당신 몫인가 봐요.",
 	},
+	# ---- 일반 주민 (이사 신청 편지로 들어오는 생활형 캐릭터) ----
+	"farmer": {"name": "순돌", "birthday": [SPRING, 22], "gender": "m", "romance": false,
+	"lines": [
+		"흙냄새가 좋아서 이 마을로 왔어. 자네 밭 구경해도 되나?",
+		"작물은 주인 발소리를 듣고 자란다니까!",
+		"올해는 뭘 심을 건가? 난 감자에 한 표.",
+		"거름이야말로 농사의 반이지. 아무렴.",
+		"해 뜨면 밭으로, 해 지면 집으로 — 이만한 삶이 없어.",
+	],
+	"loves": ["pumpkin", "dish_baked_potato", "gold_crop"],
+	"likes": ["potato", "corn", "dish_soup"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"foodie": {"name": "다미", "birthday": [SUMMER, 5], "gender": "f", "romance": false,
+	"lines": [
+		"이 마을 음식 소문 듣고 왔잖아~ 냄새부터 다르더라!",
+		"오늘은 뭐 맛있는 거 만들었어? 냄새가 나는데?",
+		"요리는 사랑이야. 진짜야. 먹어 보면 알아.",
+		"민지네 가게 신상 레시피 봤어? 못 참지.",
+		"맛있는 걸 먹을 때만큼은 세상이 다 예뻐 보여.",
+	],
+	"loves": ["dish_feast", "dish_berry_toast", "dish_golden_roast"],
+	"likes": ["dish_bread", "dish_jam", "dish_punch"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"angler": {"name": "강태", "birthday": [FALL, 9], "gender": "m", "romance": false,
+	"lines": [
+		"물 좋다는 소문 듣고 낚싯대 하나 들고 왔지.",
+		"어제 이만~한 놈을 놓쳤다니까? 진짜라니까?",
+		"낚시는 기다림의 미학이야. 인생처럼.",
+		"철수 씨랑은 라이벌이야. 본인은 모르지만.",
+		"입질 없는 날엔 그냥 물멍만 해도 좋아.",
+	],
+	"loves": ["fish_golden", "dish_sashimi", "fish_king"],
+	"likes": ["fish_crucian", "bait", "dish_grilled_fish"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	# ---- 특수 주민 (연구 노트 50%에서 해금 — 소문을 듣고 찾아온다) ----
+	"alchemist": {"name": "묘연", "birthday": [WINTER, 24], "gender": "f", "romance": false,
+	"lines": [
+		"이 마을, 오래된 연구의 기운이 흐르고 있어요.",
+		"당신의 노트... 그분의 연구를 잇고 있군요. 흥미로워요.",
+		"재료 셋이 만나면 하나의 답이 나오죠. 연금술은 정직해요.",
+		"달이 밝은 밤엔 좋은 물약이 나와요. 정말이에요.",
+		"별의 가루, 유령의 숨결... 세상엔 아직 신비가 남아 있어요.",
+	],
+	"loves": ["potion_moon", "ghost_essence", "star_ore"],
+	"likes": ["forage_herb", "gem", "potion_energy"],
+	"hates": ["sludge", "forage_trash"],
+	},
+
 }
 var affinity := {"librarian": 0,
 	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
-	"explorer": 0, "forest_mom": 0, "forest_girl": 0}
+	"explorer": 0, "forest_mom": 0, "forest_girl": 0,
+	"farmer": 0, "foodie": 0, "angler": 0, "alchemist": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
 const RING_PRICE := 12000
@@ -3797,6 +3940,17 @@ func reset_all() -> void:
 	relic_pending = ""
 	dream_ready = false
 	dream_seen = false
+	settlers = []
+	settler_homes = {}
+	empty_houses = []
+	settler_offer = ""
+	settler_offer_day = 0
+	settler_arrive = ""
+	settler_arrive_day = 0
+	settler_leaving = ""
+	settler_leave_day = 0
+	npc_last_talk = {}
+	last_farewell = ""
 	arrive_day = 0
 	arrive_clock = ""
 	playtime_sec = 0.0
@@ -4228,6 +4382,14 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"dream_seen": dream_seen, "arrive_day": arrive_day,
 		"arrive_clock": arrive_clock, "playtime_sec": playtime_sec,
 		"rocks_mined": rocks_mined,
+		"settlers": settlers, "settler_homes": settler_homes,
+		"empty_houses": empty_houses, "settler_offer": settler_offer,
+		"settler_offer_day": settler_offer_day,
+		"settler_arrive": settler_arrive,
+		"settler_arrive_day": settler_arrive_day,
+		"settler_leaving": settler_leaving,
+		"settler_leave_day": settler_leave_day,
+		"npc_last_talk": npc_last_talk, "last_farewell": last_farewell,
 		"crops_harvested": crops_harvested,
 		"minerals_found": minerals_found,
 		"memory_given": memory_given,

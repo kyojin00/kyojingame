@@ -167,6 +167,18 @@ const TEXTURE_NAMES := [
 	"npc_librarian_down_0", "npc_librarian_down_1", "npc_librarian_up_0",
 	"npc_librarian_up_1", "npc_librarian_side_0", "npc_librarian_side_1",
 	"npc_librarian_portrait_normal", "npc_librarian_portrait_happy",
+	"npc_farmer_down_0", "npc_farmer_down_1", "npc_farmer_up_0",
+	"npc_farmer_up_1", "npc_farmer_side_0", "npc_farmer_side_1",
+	"npc_farmer_portrait_normal", "npc_farmer_portrait_happy",
+	"npc_foodie_down_0", "npc_foodie_down_1", "npc_foodie_up_0",
+	"npc_foodie_up_1", "npc_foodie_side_0", "npc_foodie_side_1",
+	"npc_foodie_portrait_normal", "npc_foodie_portrait_happy",
+	"npc_angler_down_0", "npc_angler_down_1", "npc_angler_up_0",
+	"npc_angler_up_1", "npc_angler_side_0", "npc_angler_side_1",
+	"npc_angler_portrait_normal", "npc_angler_portrait_happy",
+	"npc_alchemist_down_0", "npc_alchemist_down_1", "npc_alchemist_up_0",
+	"npc_alchemist_up_1", "npc_alchemist_side_0", "npc_alchemist_side_1",
+	"npc_alchemist_portrait_normal", "npc_alchemist_portrait_happy",
 	"stall", "bait", "flower_pot", "trash_bin", "chief_hut", "chief_house",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
@@ -373,12 +385,20 @@ const NPC_SCHEDULE := {
 	# 도서관 앞으로 저절로 풀린다 (npc_place_tile의 기본 규칙)
 	"librarian":  [[6, "plaza"], [9, "work"], [13, "plaza"], [15, "work"]],
 	"fisher":     [[6, "home"], [8, "pier"], [13, "plaza"], [15, "pier"]],
+	# 이사 온 일반/특수 주민 — 오전엔 집 곁, 낮엔 광장에서 어울린다
+	"farmer":     [[6, "home"], [10, "plaza"], [15, "home"]],
+	"foodie":     [[6, "home"], [11, "plaza"], [16, "home"]],
+	"angler":     [[6, "home"], [9, "pier"], [14, "plaza"], [17, "home"]],
+	"alchemist":  [[6, "home"], [12, "plaza"], [16, "home"]],
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
 const NPC_PLAZA := {
 	"chief": Vector2i(74, 13), "merchant": Vector2i(70, 15),
 	"blacksmith": Vector2i(80, 15), "rancher": Vector2i(70, 19),
 	"fisher": Vector2i(80, 19),
+	# 이사 온 주민들 — 광장 남쪽에 삼삼오오 모여 수다를 떤다
+	"farmer": Vector2i(72, 17), "foodie": Vector2i(74, 17),
+	"angler": Vector2i(78, 17), "alchemist": Vector2i(76, 15),
 }
 # 건물이 없는 NPC(이장)의 집 자리
 const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
@@ -1080,14 +1100,7 @@ const STORY_PAGES := [
 	["물려받은 농장", "마을 어귀, 할아버지가 머물던 작은 농장.\n오래 방치되어 잡초가 무성하고\n시설은 낡아 있었다.\n\n당분간은... 여기서 살아가 보자.\n농사도 짓고, 이웃도 사귀면서."],
 ]
 
-# 진 엔딩: 전설 재료 7종을 모아 최후의 연금술로 '유니콘의 뿔'을 완성한다.
-# (최종 목표는 게임 내에서 이 순간까지 절대 공개되지 않는다)
-const ENDING_PAGES := [
-	["마지막 연금술", "연구실 책상 위에 일곱 재료를 늘어놓았다.\n\n달빛 작물, 황금잉어, 세계수 가지,\n별빛 광석, 유령의 정수, 황금 달걀,\n그리고... 할아버지의 기억 조각."],
-	["완성되는 노트", "재료를 노트의 마지막 장에 겹쳐 놓자,\n빈 페이지에 글씨가 스며들 듯 떠올랐다.\n\n할아버지가 평생 찾아 헤매던 것.\n그것은 자연 어디에도 없는 재료 —\n일곱 개의 정성이 모여야만 태어나는 것."],
-	["유니콘의 뿔", "빛이 잦아들자, 책상 위에는\n나선형으로 빛나는 뿔 하나가 놓여 있었다.\n\n세상에 단 하나뿐인, 유니콘의 뿔.\n\n사람들이 비웃던 할아버지의 연구는\n허황된 꿈이 아니었다."],
-	["이어진 꿈", "'내가 이루지 못한 꿈을\n네가 이어주었으면 좋겠다.'\n\n...할아버지, 보이시나요.\n농사를 짓고, 물고기를 잡고,\n사람들과 웃고 지내던 그 모든 날들이\n전부 할아버지의 연구였어요.\n\n그리고 오늘, 그 꿈이 완성됐어요."],
-]
+# (유니콘의 뿔 엔딩은 걷어냈다 — 엔딩은 꿈속의 배웅(ending_ui) 하나다)
 
 
 # ---- 할아버지의 부탁 ----
@@ -1165,6 +1178,7 @@ func _process(delta: float) -> void:
 	story._story6_update(delta)
 	story._story7_update(delta)
 	story._story8_update(delta)
+	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
 	_work_lock = maxf(_work_lock - delta, 0.0)
@@ -1697,10 +1711,6 @@ var remote_acting := false
 # (연출 본체는 scripts/story.gd에 있다)
 func tutorial_notify(flag: String) -> void:
 	story.tutorial_notify(flag)
-
-
-func show_ending() -> void:
-	story.show_ending()
 
 
 # 상점 안(shop_room.gd)에서 부르는 창구 — 본체는 scripts/village_ui.gd

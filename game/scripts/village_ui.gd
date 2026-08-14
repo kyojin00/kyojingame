@@ -209,6 +209,50 @@ func _build_village_building(pid: String) -> void:
 	m.saveio.save_now()
 
 
+# ---- 주민 삼자 대화 — 수다 떠는 둘 사이에 끼어든다 ----
+var _trio_day := -1
+var _trio_pairs: Array = []
+
+
+# 곁(3칸)에서 함께 서 있는 다른 주민 — 삼자 대화의 상대.
+# 상대도 플레이어 곁에 있어야 한다 (수다 떠는 무리에 「걸어 들어간」 상황)
+func _chat_buddy(npc: Node2D) -> Variant:
+	for n in m.npcs:
+		if n == npc or not n.visible:
+			continue
+		if n.position.distance_to(npc.position) < 96.0 \
+				and n.position.distance_to(m.player.position) < 120.0:
+			return n
+	return null
+
+
+func _start_trio_dialog(a: Node2D, b: Node2D) -> void:
+	var an := str(GameData.NPCS[a.id].name)
+	var bn := str(GameData.NPCS[b.id].name)
+	GameData.npc_last_talk[b.id] = GameData.day
+	var topic: Dictionary = GameData.TRIO_TOPICS[randi() % GameData.TRIO_TOPICS.size()]
+	var q: String = str(topic.q).replace("%B", bn)
+	m.dialog.open_seq(an, _npc_portrait(a.id), [
+		{"text": "(%s와(과) %s이(가) 한창 수다를 떨고 있다.)" % [an, bn]},
+		{"text": q, "choices": [
+			[str(topic.a1), _trio_pick.bind(
+				b.id if str(topic.w1) == "b" else a.id)],
+			[str(topic.a2), _trio_pick.bind(
+				b.id if str(topic.w2) == "b" else a.id)],
+			["웃으며 듣기만 한다", null],
+		]},
+	])
+
+
+func _trio_pick(win_id: String) -> void:
+	m.dialog.close()
+	GameData.affinity[win_id] = int(GameData.affinity[win_id]) + 6
+	Sound.play_sfx("sfx_heart")
+	m.hud.show_message("%s이(가) 신나서 맞장구쳤다! (호감도 +6)"
+		% GameData.NPCS[win_id].name, 4.0)
+	m.saveio.save_now()
+
+
 func _talk_to(npc: Node2D) -> void:
 	# 마을 도착 이벤트 순서 고정: 우체부 -> 이장 -> 자유 행동.
 	# 우체부의 필수 대화(편지 전달)가 끝나기 전에는 이장과 이야기할 수
@@ -285,6 +329,25 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "forest_mom" and GameData.ending_ready():
 		m.story._start_elixir_dialog()
 		return
+	# 대화 기록 — 오래 말을 안 걸면 이사 온 주민이 서운해한다
+	GameData.npc_last_talk[npc.id] = GameData.day
+	# 떠나려는 주민 — 「이사를 가고 싶다」 (붙잡을 수 있다)
+	if npc.id == GameData.settler_leaving:
+		m.story.start_leaving_dialog(npc.id)
+		return
+	# 곁에서 수다 떨던 주민들 사이에 끼면 삼자 대화가 된다 (짝마다 하루 한 번)
+	if GameData.affinity_open and not m.story_cutscene:
+		var buddy: Variant = _chat_buddy(npc)
+		if buddy != null:
+			if _trio_day != GameData.day:
+				_trio_day = GameData.day
+				_trio_pairs = []
+			var pk: String = npc.id + "|" + buddy.id
+			var pk2: String = buddy.id + "|" + npc.id
+			if not _trio_pairs.has(pk) and not _trio_pairs.has(pk2):
+				_trio_pairs.append(pk)
+				_start_trio_dialog(npc, buddy)
+				return
 	var def: Dictionary = GameData.NPCS[npc.id]
 	# 봄 꽃놀이: 말을 건 사람을 하나씩 세어 둔다 (호감도 해금과 무관)
 	if GameData.festival_open() and str(GameData.festival_today().id) == "flower" \

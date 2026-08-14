@@ -647,6 +647,16 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.story.open_move_letter())
+	# 이사 신청 편지 — 읽고 수락/거절한다
+	if bool(e.get("settle", false)):
+		b.pressed.connect(func() -> void:
+			visible = false
+			main.story.open_settle_letter())
+	# 작별 편지 — 떠난 주민의 마지막 인사
+	if bool(e.get("farewell", false)):
+		b.pressed.connect(func() -> void:
+			visible = false
+			main.story.open_farewell_letter())
 	# 기억의 물약 — 마시면 오늘 밤 꿈속 엔딩으로 이어진다
 	if bool(e.get("dream", false)):
 		b.pressed.connect(func() -> void:
@@ -949,6 +959,16 @@ func _item_entries() -> Array:
 			e["icon"] = "icon_letter"
 			e["desc"] = "마을로 이사 오고 싶다는 편지 — 클릭해서 다시 읽고 수락한다"
 			e["letter"] = true
+		elif id == "settle_letter":
+			e["tab"] = "place"
+			e["icon"] = "icon_letter"
+			e["desc"] = "새 이웃이 보낸 이사 신청 편지 — 클릭해서 읽고 수락/거절한다"
+			e["settle"] = true
+		elif id == "farewell_letter":
+			e["tab"] = "place"
+			e["icon"] = "icon_letter"
+			e["desc"] = "떠난 주민이 남긴 짧은 편지 — 클릭해서 읽는다"
+			e["farewell"] = true
 		elif id == "trash_bin":
 			e["tab"] = "place"
 			e["desc"] = "24시간 무인 판매함 (제값의 80%) — 놓을 곳을 바라보고 클릭"
