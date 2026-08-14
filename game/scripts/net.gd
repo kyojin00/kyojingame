@@ -21,6 +21,17 @@ func active() -> bool:
 	return mode != Mode.SOLO
 
 
+# 실제로 **연결이 붙어 있는가**. active()는 모드만 보므로, 접속 중이거나
+# (게스트가 방을 찾는 동안) 끊긴 뒤에도 참이다. RPC는 붙어 있을 때만
+# 보낼 수 있으니 — 아니면 "not connected" 오류가 매 프레임 쏟아진다 —
+# 무언가를 rpc로 보내기 전에는 이쪽을 본다.
+func connected() -> bool:
+	if mode == Mode.SOLO or multiplayer.multiplayer_peer == null:
+		return false
+	return multiplayer.multiplayer_peer.get_connection_status() \
+		== MultiplayerPeer.CONNECTION_CONNECTED
+
+
 func host_game(port := DEFAULT_PORT) -> Error:
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_server(port, MAX_PLAYERS - 1)

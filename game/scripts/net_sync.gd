@@ -127,13 +127,14 @@ func _sync_pos(x: float, y: float, dir: String, moving: bool) -> void:
 
 
 func _net_process(delta: float) -> void:
-	if not Net.active():
+	# **붙어 있을 때만** 내보낸다. 모드만 보고 쏘면 게스트가 방을 찾는 동안,
+	# 또는 연결이 끊긴 뒤에 "not connected" 오류가 매 프레임 쌓인다.
+	if not Net.connected():
 		return
 	if Net.is_guest() and not m._net_ready:
 		# 스냅샷 재요청 (유실 대비)
 		m._snapshot_retry -= delta
-		if m._snapshot_retry <= 0.0 and multiplayer.multiplayer_peer != null \
-				and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		if m._snapshot_retry <= 0.0:
 			m._snapshot_retry = 2.0
 			_req_snapshot.rpc_id(1)
 	m._pos_sync_timer -= delta
