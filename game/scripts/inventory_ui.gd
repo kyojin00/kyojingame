@@ -631,7 +631,7 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.gui_input.connect(func(ev: InputEvent) -> void:
 			if ev is InputEventMouseButton and ev.pressed \
 					and ev.button_index == MOUSE_BUTTON_RIGHT:
-				accept_event()
+				b.accept_event()   # 이 창은 CanvasLayer라 버튼이 대신 삼킨다
 				close()
 				main.auction_ui.open_sell(str(auc[0]), str(auc[1]), int(auc[2])))
 	_hover_slots.append({"b": b, "title": str(e.name), "body": body,
