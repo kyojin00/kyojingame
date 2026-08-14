@@ -406,6 +406,24 @@ func spawn_old_barn() -> void:
 	m.queue_redraw()
 
 
+# 옛 전망대 (메인 스토리 18) — 단서를 다 모으면 언덕 위에 드러난다.
+# 전망대 하나와 흔적 세 곳(무너진 의자·새겨진 돌·굽은 나무)이 서고,
+# 둘레는 걸어 다닐 수 있게 비운다.
+func spawn_hill() -> void:
+	if str(m.objects.get(m.HILL_POS, {}).get("kind", "")) == "old_lookout":
+		return
+	var r: Rect2i = m.HILL_AREA
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			m.objnode._remove_object(Vector2i(x, y))
+	m.objects[m.HILL_POS] = {"kind": "old_lookout", "hp": 0}
+	m.objects[m.HILL_TRACE_TILES["bench"]] = {"kind": "old_bench", "hp": 0}
+	m.objects[m.HILL_TRACE_TILES["stone"]] = {"kind": "carved_stone", "hp": 0}
+	m.objects[m.HILL_TRACE_TILES["tree"]] = {"kind": "bent_tree", "hp": 0}
+	m.objnode._spawn_objects()
+	m.queue_redraw()
+
+
 # 마을 온천 (메인 스토리 15) — 수맥을 되살리면 바위 탕에 물이 찬다.
 # 오브젝트 하나로 서고, 둘레 한 칸은 드나들 수 있게 비워 둔다.
 func _spawn_onsen() -> void:
@@ -502,7 +520,8 @@ func _advance_tree_growth() -> void:
 # 자연물 상한 — 리젠이 맵을 가득 채우지 않게 종류별로 막는다
 const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 70}
 # 자연물이 절대 나면 안 되는 곳 — 스토리 숲길(길목이 도로 막히면 안 된다)
-const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9)]
+# 자연물이 다시 나면 안 되는 자리 — 농장 앞마당, 옛 전망대 언덕(m.HILL_AREA)
+const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9), Rect2i(26, 1, 11, 6)]
 
 
 # 이 칸에 자연물이 나도 되는가 — 나무/돌/잡초가 전부 같은 검사를 쓴다.

@@ -179,6 +179,12 @@ func close() -> void:
 	visible = false
 
 
+# 연구 노트의 마지막 페이지 (메인 스토리 19) — 노트를 덮고 읽는다
+func _open_last_page() -> void:
+	close()
+	main.story.open_last_page()
+
+
 # 도감은 여는 순간에만 다시 그린다 — 예전처럼 0.5초마다 격자를 부수고
 # 다시 지으면, 마우스를 올려 둔 칸이 사라지면서 툴팁이 금방 꺼졌다.
 
@@ -226,6 +232,28 @@ func _rebuild_collect() -> void:
 	_line("  생명의 물 %d/%d — 일곱 분야(채광·벌목·농사·요리·전투·낚시·목장)를" %
 		[GameData.water_life_found.size(), GameData.ENDING_SKILLS.size()], DIM)
 	_line("  만렙까지 갈고닦으면 한 병씩 손에 들어온다.", DIM)
+	# 스토리 19가 열렸으면 분야별로 어디까지 왔는지 한눈에 보여준다
+	if GameData.story19_phase != "":
+		var parts: Array = []
+		for sid: String in GameData.ENDING_SKILLS:
+			var kor: String = str(GameData.SKILL_WATER_NAME.get(sid, sid))
+			parts.append(("★" + kor) if GameData.water_life_found.has(sid)
+				else "%s %d/%d" % [kor, GameData.skill_lv(sid), GameData.SKILL_MAX_LV])
+		_line("  " + " · ".join(parts),
+			GOLD if GameData.water_count() >= GameData.ENDING_SKILLS.size() else DIM)
+	if GameData.note_last_page_open():
+		_line("")
+		_head("[마지막 페이지]")
+		if GameData.story19_phase == "done":
+			_line("  「답은 마을에서 가장 오래된 자리에 있다.", GOLD)
+			_line("   한 번도 제대로 들어가 본 적 없는 그곳.", GOLD)
+			_line("   일곱 병이 문을 여는 열쇠다.」", GOLD)
+		else:
+			var btn := Button.new()
+			btn.text = "잠겨 있던 마지막 페이지를 펼친다"
+			btn.focus_mode = Control.FOCUS_NONE
+			btn.pressed.connect(_open_last_page)
+			items_box.add_child(btn)
 	for i in GameData.RELICS.size():
 		var rdef: Dictionary = GameData.RELICS[i]
 		if int(GameData.items[rdef.id]) > 0:

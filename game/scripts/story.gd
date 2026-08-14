@@ -2918,6 +2918,10 @@ func _end_grandma_record() -> void:
 		m.hud.show_message("네 번째 유품을 찾았다. 남은 유품은 하나 —\n두 분의 마지막 이야기가 기다리고 있다.", 7.0)
 		m.saveio.save_now()
 		return
+	if GameData.story18_phase == "tale":
+		# 마지막 장을 덮고 나면 서하와 긴 이야기가 이어진다 (스토리 18 완결)
+		_start_watch_last_dialog()
+		return
 
 
 # ---- 메인 스토리 12: 숲의 연금술사 ----
@@ -3767,6 +3771,267 @@ func old_barn_examine() -> void:
 		+ "★ 할머니의 목걸이를 찾았다!",
 		[["도서관에 가져가 보자", null]])
 	m.hud.quest_start_toast("도서관에서 「할머니의 기록」을 읽어 보자")
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 18: 할머니의 시계 ----
+#
+# 마지막 유품. 도서관에 꽂힌 할아버지의 오래된 메모 -> 사서·주민 단서 ->
+# 마을 밖 옛 전망대. 여기서는 무언가를 줍는 게 아니라 **흔적을 하나씩
+# 살피며** 두 분의 마지막을 알아 간다. 세 흔적을 다 본 뒤라야 전망대
+# 밑의 보관함이 눈에 들어온다. 유품 다섯이 모두 모이는 장이라 대화가
+# 앞선 유품들보다 길다.
+
+func _story18_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story18_phase == "" and GameData.story18_ready():
+		GameData.story18_phase = "memo"
+		m.hud.quest_start_toast("도서관에 못 보던 종이 뭉치가 꽂혀 있다")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 도서관: 할아버지의 오래된 메모
+func _start_watch_memo_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「...오셨군요. 잠깐 앉으실래요?」"},
+		{"text": "「연구 노트가 여기까지 채워지니, 서고 안쪽 상자에\n들어 있던 종이 뭉치가 눈에 들어오더라고요.\n할아버님 글씨였어요.」"},
+		{"text": "「기록이라기보다는... 편지에 가까워요.\n누구에게 부치지도 않은.」"},
+		{"text": "(서하가 조심스럽게 종이를 펼쳐 놓는다.\n가장자리가 손때에 닳아 얇아져 있었다.)"},
+		{"text": "「『그 사람이 걷기 힘들어진 뒤로, 우리는 한 달에\n한 번 언덕에 올랐다. 한나절이 걸려도\n꼭 가자고 했다』.」"},
+		{"text": "「『거기서 보면 마을이 다 보인다. 그 사람은 늘\n우리 밭이 저기 있네, 하고 손가락으로 짚었다』.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「그리고 마지막 장에... 시계 이야기가 있어요.\n할아버님이 평생 차고 다니시던 그 시계요.」"},
+		{"text": "「『나는 그 시계를 언덕에 묻었다.\n차마 볼 수가 없어서』.」"},
+		{"text": "(잠시 아무도 말하지 않았다.)"},
+		{"text": "「...언덕이 어디인지는 적혀 있지 않아요.\n마을 밖 어딘가라는 것뿐.」",
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「오래 사신 분들은 아실 거예요.\n두 분이 어디로 오르셨는지.」"},
+	], _end_watch_memo)
+
+
+func _end_watch_memo() -> void:
+	if GameData.story18_phase == "memo":
+		GameData.story18_phase = "clue"
+		GameData.story18_heard = []
+		m.hud.story_banner("메인 스토리 18 시작", "할머니의 시계")
+		m.hud.quest_start_toast("주민들에게 그 언덕 이야기를 듣자 (0/%d)"
+			% GameData.STORY18_TALES)
+	m.saveio.save_now()
+
+
+const HILL_TALES := [
+	"「언덕? 아아... 마을 북서쪽, 길 위로 난 비탈 말이지.\n예전엔 거기 나무 전망대가 하나 서 있었어.」",
+	"「두 분이 자주 오르셨지. 할머님 걸음이 느려진\n뒤로도 말이야. 할아버지가 앞에서 손을 잡고,\n반나절씩 걸려서.」",
+	"「마지막으로 뵌 것도 그 언덕에서였네.\n두 분이 나란히 앉아 마을을 내려다보고 계셨지.\n...그 뒤로는 아무도 거기 안 올라가.」",
+]
+
+
+func story18_hear(nid: String) -> void:
+	if GameData.story18_phase != "clue" or nid in GameData.story18_heard:
+		return
+	var idx := mini(GameData.story18_heard.size(), HILL_TALES.size() - 1)
+	GameData.story18_heard.append(nid)
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_normal" % nid),
+		[{"text": str(HILL_TALES[idx])}], _end_hill_tale)
+
+
+func _end_hill_tale() -> void:
+	if GameData.story18_phase != "clue":
+		return
+	var n := GameData.story18_heard.size()
+	if n >= GameData.STORY18_TALES:
+		GameData.story18_phase = "hill"
+		GameData.story18_traces = []
+		m.worldgen.spawn_hill()
+		m.hud.event_toast("옛 전망대 발견!")
+		m.hud.quest_start_toast("전망대의 흔적을 하나씩 살펴보자")
+	else:
+		m.hud.event_toast("이야기 %d/%d" % [n, GameData.STORY18_TALES])
+	m.saveio.save_now()
+
+
+# 언덕의 흔적 세 곳 (E) — 살필 때마다 두 분의 마지막이 조금씩 드러난다
+func hill_trace(tid: String) -> void:
+	var def: Dictionary = {}
+	for t: Dictionary in GameData.HILL_TRACES:
+		if str(t.id) == tid:
+			def = t
+			break
+	if def.is_empty():
+		return
+	if GameData.story18_phase != "hill":
+		m.dialog.open(str(def.name), str(def.text), [["가만히 바라본다", null]])
+		return
+	if tid in GameData.story18_traces:
+		m.dialog.open(str(def.name), str(def.text), [["한 번 더 읽어 본다", null]])
+		return
+	GameData.story18_traces.append(tid)
+	var left: int = GameData.HILL_TRACES.size() - GameData.story18_traces.size()
+	var body := str(def.text)
+	if left > 0:
+		body += "\n\n(아직 살펴보지 않은 흔적이 %d곳 남았다.)" % left
+	else:
+		body += "\n\n(...전망대 발판 밑, 흙이 한 번 파였다가\n다시 덮인 자국이 눈에 들어온다.)"
+	m.dialog.open(str(def.name), body, [["닫기", _end_hill_trace]])
+
+
+func _end_hill_trace() -> void:
+	m.dialog.close()
+	if GameData.story18_phase != "hill":
+		return
+	if GameData.story18_traces.size() >= GameData.HILL_TRACES.size():
+		GameData.story18_phase = "box"
+		m.hud.quest_start_toast("전망대 발판 밑을 살펴보자 (E)")
+	else:
+		m.hud.event_toast("흔적 %d/%d" % [GameData.story18_traces.size(),
+			GameData.HILL_TRACES.size()])
+	m.saveio.save_now()
+
+
+# 옛 전망대 (E) — 흔적을 다 살핀 뒤라야 발판 밑의 보관함이 보인다
+func hill_lookout_examine() -> void:
+	if GameData.story18_phase == "hill":
+		m.dialog.open("옛 전망대",
+			"삭은 발판이 발밑에서 삐걱거린다.\n여기 서면 마을이 한눈에 들어온다.\n\n"
+			+ "(둘레의 흔적부터 하나씩 살펴보자. %d/%d)" % [
+				GameData.story18_traces.size(), GameData.HILL_TRACES.size()],
+			[["둘러본다", null]])
+		return
+	if GameData.story18_phase != "box":
+		m.dialog.open("옛 전망대",
+			"마을이 한눈에 들어온다.\n논밭도, 지붕들도, 굴뚝의 연기까지.\n\n"
+			+ "「우리 밭이 저기 있네.」\n— 누군가 여기서 그렇게 말했을 것이다.",
+			[["한참을 바라본다", null]])
+		return
+	GameData.story18_phase = "tale"
+	GameData.try_relic(4, 0.0, true)   # 「할머니의 시계」
+	Sound.play_sfx("sfx_catch")
+	m.dialog.open_seq("", null, [
+		{"text": "(발판 밑의 흙을 걷어냈다.\n손가락 두 마디쯤 파 내려가자 나무 상자가 나왔다.)"},
+		{"text": "(빗물이 스미지 않게 기름 먹인 천으로\n몇 겹이나 싸여 있다. 아주 조심스럽게.)"},
+		{"text": "(천을 벗기자 낡은 손목시계가 나왔다.\n바늘은 오래전에 멈춰 있다.)"},
+		{"text": "(상자 안쪽 뚜껑에 글씨가 새겨져 있었다.\n칼끝으로 한 획씩 눌러 새긴 글씨다.)"},
+		{"text": "「먼저 가서 기다릴 테니, 늦게 와요.」"},
+		{"text": "(...할머니가 마지막 날 하신 말씀이라고,\n메모에 적혀 있었다.)"},
+		{"text": "★ 할머니의 시계를 찾았다!\n— 유품 다섯이 모두 모였다."},
+	], _end_watch_found)
+	m.saveio.save_now()
+
+
+func _end_watch_found() -> void:
+	m.hud.event_toast("유품 5/5 — 할머니의 시계")
+	m.hud.quest_start_toast("도서관에서 마지막 기록을 읽자")
+	m.saveio.save_now()
+
+
+# 스토리 18 완결 — 도서관에서 마지막 기록을 읽고 나면 이어지는 긴 마무리.
+# 지금까지의 기록이 하나로 이어지고, 할아버지가 왜 평생 연구를 놓지
+# 못했는지가 드러난다. 그리고 마지막 줄이 스토리 19를 연다.
+func _start_watch_last_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「...다섯 개, 다 찾으셨군요.」"},
+		{"text": "(서하가 그동안 정리한 기록들을 책상 위에\n날짜 순으로 늘어놓는다. 명부, 조석표, 혼인 기록,\n사료 장부, 그리고 편지.)"},
+		{"text": "「따로 있을 땐 몰랐는데, 이렇게 이어 놓고 보니\n전부 한 사람 이야기예요.」"},
+		{"text": "「할아버님은 연구가 목적이 아니셨어요.\n...밭을 알고, 바다를 알고, 짐승을 알면\n그 사람이 살던 자리를 아는 거라고 여기신 거죠.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「할머님이 좋아하시던 것들을 하나씩 배우면서,\n그걸 전부 노트에 적으셨던 거예요.\n혼자 남은 사람이 할 수 있는 일이 그것뿐이라.」"},
+		{"text": "(멈춘 시계를 손바닥 위에 올려 본다.\n생각보다 가볍다.)"},
+		{"text": "「...노트가 왜 그렇게 두꺼운지 알겠어요.\n한 사람 몫이 아니라, 두 사람 몫이었으니까.」",
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「그런데 한 가지, 아직 못 푼 게 있어요.」"},
+		{"text": "「편지 맨 끝에 이런 문장이 있거든요 —」"},
+		{"text": "「『일곱 가지 분야를 끝까지 익힌 사람에게\n남겨지는 것이 있다. 그것은 내가 준비해 둔\n마지막 몫이다』.」"},
+		{"text": "「일곱 가지... 채광, 벌목, 농사, 요리,\n전투, 낚시, 목장. 할아버님이 노트를 나누신\n그 일곱이겠죠.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「끝까지 익힌 사람. ...그게 무슨 뜻인지는\n아마 직접 가 보셔야 알 거예요.」"},
+	], _end_watch_last)
+
+
+func _end_watch_last() -> void:
+	if GameData.story18_phase != "tale":
+		return
+	GameData.story18_phase = "done"
+	GameData.story18_done_day = GameData.day
+	GameData.grandma_read = maxi(GameData.grandma_read, GameData.RELICS.size())
+	m.hud.story_banner("메인 스토리 18 완결", "할머니의 시계")
+	m.hud.show_message("다섯 유품이 모두 제자리로 돌아왔다.\n남은 것은 할아버지가 준비해 둔 마지막 몫뿐이다.", 8.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 19: 일곱 갈래의 삶 ----
+#
+# 시계를 찾으면 곧바로 열린다. 일곱 분야를 만렙까지 올릴 때마다 그
+# 분야의 증표로 생명의 물이 한 병 생기고(이미 만렙인 분야는 소급),
+# 일곱 병이 다 모이면 연구 노트의 마지막 페이지가 열린다. 순서는
+# 강제하지 않는다 — 자유 생활 그 자체가 이 장의 내용이다.
+
+func _story19_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story19_phase == "" and GameData.story19_ready():
+		GameData.story19_phase = "seek"
+		var back := GameData.water_backfill()   # 이미 만렙인 분야는 소급 지급
+		m.hud.story_banner("메인 스토리 19 시작", "일곱 갈래의 삶")
+		if back.is_empty():
+			m.hud.quest_start_toast("일곱 분야를 끝까지 익히자 — 생명의 물 0/%d"
+				% GameData.ENDING_SKILLS.size())
+		m.saveio.save_now()
+		return
+	if GameData.story19_phase != "seek":
+		return
+	# 만렙을 찍은 분야마다 짧은 전용 연출 — 다른 창이 없을 때 하나씩
+	if m.ui_open():
+		return
+	for id: String in GameData.ENDING_SKILLS:
+		if GameData.water_life_found.has(id) and id not in GameData.story19_shown:
+			GameData.story19_shown.append(id)
+			_show_water_scene(id)
+			return
+	if GameData.water_count() >= GameData.ENDING_SKILLS.size():
+		GameData.story19_phase = "page"
+		m.hud.event_toast("생명의 물 7/7 — 노트의 마지막 페이지가 열렸다")
+		m.hud.quest_start_toast("연구 노트(N)의 마지막 페이지를 읽자")
+		m.saveio.save_now()
+
+
+# 한 분야를 끝까지 익혔을 때의 짧은 연출 — 병 하나가 손에 남는다
+func _show_water_scene(id: String) -> void:
+	var name_kor: String = str(GameData.SKILL_WATER_NAME.get(id, id))
+	var line: String = str(GameData.SKILL_WATER_LINE.get(id, ""))
+	Sound.play_sfx("sfx_heart")
+	m.dialog.open_seq("", null, [
+		{"text": "── %s, 끝까지 ──\n\n%s" % [name_kor, line]},
+		{"text": "(가방 속에서 무언가 서늘해졌다.\n맑은 물이 담긴 작은 병 하나 —\n언제 들어왔는지 알 수 없다.)"},
+		{"text": "★ 생명의 물 (%s) — %d/%d" % [name_kor,
+			GameData.water_count(), GameData.ENDING_SKILLS.size()]},
+	], _end_water_scene)
+
+
+func _end_water_scene() -> void:
+	m.saveio.save_now()
+
+
+# 연구 노트의 마지막 페이지 (note_ui가 부른다) — 스토리 20으로 이어진다
+func open_last_page() -> void:
+	if not GameData.note_last_page_open():
+		return
+	m.dialog.open_seq("", null, [
+		{"text": "(일곱 병을 노트 위에 나란히 올려놓자,\n마지막 장에 눌어붙어 있던 종이가\n스르르 떨어져 나왔다.)"},
+		{"text": "「일곱 갈래를 다 걸어 본 사람만이 이 장을\n펼칠 수 있다. 그렇게 정해 두었다.」"},
+		{"text": "「내가 평생 매달린 것은 결국 한 가지 물음이었다.\n— 이 땅이 무엇을 품고 있는가.」"},
+		{"text": "「답은 마을에서 가장 오래된 자리에 있다.\n한 번도 제대로 들어가 본 적 없는 그곳.\n일곱 병이 문을 여는 열쇠다.」"},
+		{"text": "(그 아래로는 글씨가 흐려 읽히지 않는다.\n...하지만 어디를 말하는지는 알 것 같다.)"},
+	], _end_last_page)
+
+
+func _end_last_page() -> void:
+	if GameData.story19_phase != "page":
+		return
+	GameData.story19_phase = "done"
+	m.hud.story_banner("메인 스토리 19 완결", "일곱 갈래의 삶")
+	m.hud.show_message("일곱 병이 준비됐다.\n마지막 장소가 기다리고 있다.", 7.0)
 	m.saveio.save_now()
 
 

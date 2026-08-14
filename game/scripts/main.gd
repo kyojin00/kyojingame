@@ -211,6 +211,8 @@ const TEXTURE_NAMES := [
 	"crystal", "cave_moss", "glow_shroom", "old_box",
 	# 온천 복구 (메인 스토리 15)
 	"onsen", "rock_wedge", "spring_water",
+	# 옛 전망대 (메인 스토리 18) — 굽은 나무는 tree_bare를 쓴다
+	"old_lookout", "old_bench", "carved_stone",
 	# 연금술 물약 (조합대 결과물)
 	"water_life", "potion_dream",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
@@ -343,6 +345,15 @@ const OLD_FARM := Rect2i(20, 44, 10, 7)
 # 옛 헛간 (메인 스토리 17) — 목장 남쪽에 방치된 헛간과 그 둘레
 const OLD_BARN := Vector2i(14, 30)
 const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
+# 옛 전망대 (메인 스토리 18) — 마을 북서쪽 외곽, 길 위쪽 언덕.
+# 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
+const HILL_POS := Vector2i(31, 3)
+const HILL_AREA := Rect2i(26, 1, 11, 6)
+const HILL_TRACE_TILES := {
+	"bench": Vector2i(28, 4),
+	"stone": Vector2i(34, 4),
+	"tree": Vector2i(27, 1),
+}
 # 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
 # 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
 const BRACELET_ROCK := Vector2i(8, 82)
@@ -1239,6 +1250,8 @@ func _process(delta: float) -> void:
 	story._story15_update(delta)
 	story._story16_update(delta)
 	story._story17_update(delta)
+	story._story18_update(delta)
+	story._story19_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

@@ -121,6 +121,16 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"old_barn":
 			texture = m.tex["barn"]    # 방치된 옛 헛간 (메인 스토리 17)
 			offset = Vector2(0, -160)
+		"old_lookout":
+			texture = m.tex["old_lookout"]   # 옛 전망대 (메인 스토리 18)
+			offset = Vector2(0, -100)
+		"old_bench":
+			texture = m.tex["old_bench"]     # 무너진 나무 의자
+		"carved_stone":
+			texture = m.tex["carved_stone"]  # 글씨가 새겨진 돌
+		"bent_tree":
+			texture = m.tex["tree_bare"]     # 마을 쪽으로 굽은 나무
+			offset = Vector2(0, -100)
 		"fence":
 			texture = m.tex["fence"]
 		"sprinkler":

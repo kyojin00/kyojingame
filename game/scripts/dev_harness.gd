@@ -1503,7 +1503,10 @@ func _debug_tick() -> void:
 				keep_rel[rd0.id] = int(GameData.items[rd0.id])
 				GameData.items[rd0.id] = 0
 			m.dialog.close()
-			# ① 생명의 물 — 분야 만렙을 찍는 순간 한 병 (분야당 한 번뿐)
+			# ① 생명의 물 — 분야 만렙을 찍는 순간 한 병 (분야당 한 번뿐).
+			#    병은 스토리 19가 열린 뒤에만 생긴다
+			var keep_s19 := GameData.story19_phase
+			GameData.story19_phase = "seek"
 			GameData.water_life_found = {}
 			GameData.items["water_life"] = 0
 			GameData.items["potion_dream"] = 0
@@ -1572,6 +1575,7 @@ func _debug_tick() -> void:
 			var woke: bool = not m.ending.visible and GameData.dream_seen \
 				and not GameData.dream_ready and m.hud.visible
 			m.hud._toast_queue.clear()
+			GameData.story19_phase = keep_s19
 			GameData.water_life_found = keep_found
 			GameData.items["water_life"] = keep_wl
 			GameData.items["potion_dream"] = keep_pd
@@ -2474,6 +2478,186 @@ func _debug_tick() -> void:
 				" 미완차단=", s17_block, " 정리·돌보기=", s17_ready,
 				" 목걸이=", s17_find, " 기록·완결=", s17_lib and s17_done,
 				" 유품순서=", s17_order)
+		283:
+			# #135: 메인 스토리 18 「할머니의 시계」 — 도서관 메모 -> 주민 단서
+			# -> 옛 전망대의 흔적 셋 -> 발판 밑 보관함 -> 마지막 기록·완결
+			m.dialog.close()
+			GameData.story17_phase = "done"
+			GameData.story18_phase = ""
+			GameData.story18_heard = []
+			GameData.story18_traces = []
+			GameData.items["relic_watch"] = 0
+			for hp: Vector2i in [m.HILL_POS, m.HILL_TRACE_TILES["bench"],
+					m.HILL_TRACE_TILES["stone"], m.HILL_TRACE_TILES["tree"]]:
+				m.objnode._remove_object(hp)
+			# 노트를 후반부(80%)까지 채운다 — 스텝이 끝나면 되돌린다
+			var k18_crops: Dictionary = GameData.crops_harvested.duplicate()
+			var k18_fish: Dictionary = GameData.fish_caught.duplicate()
+			var k18_mobs: Dictionary = GameData.mob_kills.duplicate()
+			var k18_cook: Dictionary = GameData.recipes_cooked.duplicate()
+			var k18_aff: Dictionary = GameData.affinity.duplicate()
+			for c18: String in GameData.CROP_IDS:
+				GameData.crops_harvested[c18] = maxi(1, int(GameData.crops_harvested.get(c18, 0)))
+			for f18: String in GameData.FISH_IDS:
+				GameData.fish_caught[f18] = maxi(1, int(GameData.fish_caught.get(f18, 0)))
+			for mb18: String in GameData.MOBS:
+				GameData.mob_kills[mb18] = maxi(1, int(GameData.mob_kills.get(mb18, 0)))
+			for rc18: String in GameData.RECIPE_IDS:
+				GameData.recipes_cooked[rc18] = maxi(1, int(GameData.recipes_cooked.get(rc18, 0)))
+			for a18: String in GameData.NPCS:
+				GameData.affinity[a18] = 100
+			GameData.minerals_found["ore"] = true
+			GameData.minerals_found["gem"] = true
+			var s18_note: bool = GameData.note_progress().ratio >= GameData.STORY18_NOTE
+			# ① 스토리 17 직후에는 시작되지 않는다 (자유 생활)
+			GameData.story17_done_day = GameData.day
+			m.story._story18_update(0.016)
+			var s18_wait: bool = GameData.story18_phase == ""
+			GameData.story17_done_day = GameData.day - GameData.STORY18_REST_DAYS
+			m.story._story18_update(0.016)
+			var s18_memo: bool = GameData.story18_phase == "memo" \
+				and GameData.quest_npc_marks().get("librarian", "") == "!"
+			m.story._start_watch_memo_dialog()
+			m.dialog.skip_seq()
+			var s18_clue: bool = GameData.story18_phase == "clue"
+			# ② 주민 단서 셋 (같은 사람은 한 번만) -> 옛 전망대가 드러난다
+			m.story.story18_hear("chief")
+			m.dialog.skip_seq()
+			m.story.story18_hear("chief")
+			m.dialog.close()
+			var s18_once: bool = GameData.story18_heard.size() == 1
+			m.story.story18_hear("blacksmith")
+			m.dialog.skip_seq()
+			m.story.story18_hear("librarian")
+			m.dialog.skip_seq()
+			var s18_hill: bool = GameData.story18_phase == "hill" \
+				and str(m.objects.get(m.HILL_POS, {}).get("kind", "")) == "old_lookout" \
+				and str(m.objects.get(m.HILL_TRACE_TILES["stone"], {}).get(
+					"kind", "")) == "carved_stone"
+			# ③ 흔적을 다 살피기 전에는 보관함이 열리지 않는다
+			m.story.hill_lookout_examine()
+			var s18_block: bool = m.dialog.visible \
+				and GameData.story18_phase == "hill" \
+				and int(GameData.items["relic_watch"]) == 0
+			m.dialog.close()
+			m.story.hill_trace("bench")
+			m.story._end_hill_trace()
+			m.story.hill_trace("bench")   # 같은 흔적은 두 번 세지 않는다
+			m.dialog.close()
+			var s18_tr_once: bool = GameData.story18_traces.size() == 1
+			m.story.hill_trace("stone")
+			m.story._end_hill_trace()
+			m.story.hill_trace("tree")
+			m.story._end_hill_trace()
+			var s18_box: bool = GameData.story18_phase == "box"
+			# ④ 발판 밑 보관함 -> 시계 (유품 다섯 완성)
+			m.story.hill_lookout_examine()
+			var s18_find: bool = GameData.story18_phase == "tale" \
+				and int(GameData.items["relic_watch"]) == 1
+			m.dialog.skip_seq()
+			# ⑤ 도서관 5장 -> 서하와의 마지막 대화 -> 완결 (스토리 19 복선)
+			m.story.open_grandma_records()
+			var s18_lib: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._end_grandma_record()
+			var s18_last: bool = m.dialog.visible \
+				and GameData.story18_phase == "tale"
+			m.dialog.skip_seq()
+			var s18_done: bool = GameData.story18_phase == "done" \
+				and GameData.story18_done_day == GameData.day \
+				and GameData.completed_quests().has("메인 스토리 18 — 할머니의 시계")
+			var s18_rec5: bool = str(GameData.GRANDMA_RECORDS[4]).contains(
+				"먼저 가서 기다릴 테니")
+			GameData.crops_harvested = k18_crops
+			GameData.fish_caught = k18_fish
+			GameData.mob_kills = k18_mobs
+			GameData.recipes_cooked = k18_cook
+			GameData.affinity = k18_aff
+			GameData.relic_pending = ""
+			m.hud._toast_queue.clear()
+			print("STORY18_OK=", s18_note and s18_wait and s18_memo and s18_clue
+				and s18_once and s18_hill and s18_block and s18_tr_once
+				and s18_box and s18_find and s18_lib and s18_last and s18_done
+				and s18_rec5,
+				" 노트80=", s18_note, " 자유생활=", s18_wait, " 메모=", s18_memo,
+				" 단서=", s18_clue, " 중복없음=", s18_once, " 전망대=", s18_hill,
+				" 미조사차단=", s18_block, " 흔적중복=", s18_tr_once,
+				" 흔적완료=", s18_box, " 시계=", s18_find,
+				" 기록·마지막대화=", s18_lib and s18_last, " 완결=", s18_done,
+				" 5장본문=", s18_rec5)
+		284:
+			# #136: 메인 스토리 19 「일곱 갈래의 삶」 — 만렙마다 생명의 물 한 병,
+			# 이미 만렙인 분야는 소급 지급, 일곱 병이면 노트 마지막 페이지
+			m.dialog.close()
+			var k19_skl: Dictionary = {}
+			for sid19: String in GameData.ENDING_SKILLS:
+				k19_skl[sid19] = (GameData.skills[sid19] as Dictionary).duplicate()
+			var k19_found: Dictionary = GameData.water_life_found.duplicate()
+			var k19_wl := int(GameData.items["water_life"])
+			GameData.water_life_found = {}
+			GameData.items["water_life"] = 0
+			GameData.story19_shown = []
+			GameData.story19_phase = ""
+			GameData.story18_phase = "done"
+			# ① 스토리 19가 열리기 전에는 만렙을 찍어도 병이 생기지 않는다
+			GameData.skills["mine"] = {"lv": GameData.SKILL_MAX_LV - 1, "xp": 0.0}
+			GameData.add_skill_xp("mine", 999999.0)
+			var s19_gate: bool = GameData.water_count() == 0
+			# ② 스토리가 열리면 이미 만렙인 분야는 소급해서 채워진다
+			GameData.skills["fish"] = {"lv": GameData.SKILL_MAX_LV, "xp": 0.0}
+			m.story._story19_update(0.016)
+			var s19_back: bool = GameData.story19_phase == "seek" \
+				and GameData.water_count() == 2 \
+				and int(GameData.items["water_life"]) == 2
+			# ③ 분야마다 짧은 전용 연출이 한 번씩 (같은 분야는 다시 안 나온다)
+			m.story._story19_update(0.016)
+			var s19_scene: bool = m.dialog.visible \
+				and GameData.story19_shown.size() == 1
+			m.dialog.skip_seq()
+			m.story._story19_update(0.016)
+			m.dialog.skip_seq()
+			m.story._story19_update(0.016)
+			var s19_scene_once: bool = GameData.story19_shown.size() == 2 \
+				and not m.dialog.visible
+			# ④ 순서는 강제하지 않는다 — 아무 분야나 만렙이면 한 병
+			GameData.skills["cook"] = {"lv": GameData.SKILL_MAX_LV - 1, "xp": 0.0}
+			GameData.add_skill_xp("cook", 999999.0)
+			var s19_any: bool = GameData.water_count() == 3 \
+				and GameData.water_life_found.has("cook")
+			var s19_lock: bool = not GameData.note_last_page_open()
+			# ⑤ 일곱 병 -> 노트의 마지막 페이지가 열린다
+			for sid20: String in GameData.ENDING_SKILLS:
+				GameData.skills[sid20] = {"lv": GameData.SKILL_MAX_LV, "xp": 0.0}
+				GameData.check_skill_water(sid20)
+			for i in 12:
+				if GameData.story19_phase != "seek":
+					break
+				m.story._story19_update(0.016)
+				m.dialog.skip_seq()
+				m.dialog.close()
+			var s19_page: bool = GameData.story19_phase == "page" \
+				and GameData.water_count() == GameData.ENDING_SKILLS.size() \
+				and GameData.note_last_page_open()
+			# ⑥ 마지막 페이지를 읽으면 마지막 장소의 단서 -> 스토리 20으로
+			m.story.open_last_page()
+			var s19_read: bool = m.dialog.visible
+			m.dialog.skip_seq()
+			var s19_done: bool = GameData.story19_phase == "done" \
+				and GameData.completed_quests().has("메인 스토리 19 — 일곱 갈래의 삶")
+			for sid21: String in k19_skl:
+				GameData.skills[sid21] = k19_skl[sid21]
+			GameData.water_life_found = k19_found
+			GameData.items["water_life"] = k19_wl
+			GameData.water_pending = 0
+			m.hud._toast_queue.clear()
+			print("STORY19_OK=", s19_gate and s19_back and s19_scene
+				and s19_scene_once and s19_any and s19_lock and s19_page
+				and s19_read and s19_done,
+				" 시작전차단=", s19_gate, " 소급지급=", s19_back,
+				" 전용연출=", s19_scene, " 연출중복없음=", s19_scene_once,
+				" 순서자유=", s19_any, " 페이지잠김=", s19_lock,
+				" 일곱병·해금=", s19_page, " 마지막페이지=", s19_read,
+				" 완결=", s19_done)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

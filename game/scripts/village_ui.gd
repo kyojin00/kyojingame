@@ -411,11 +411,21 @@ func _talk_to(npc: Node2D) -> void:
 	if GameData.story17_phase == "clue" and npc.id not in GameData.story17_heard:
 		m.story.story17_hear(npc.id)
 		return
-	# 유품을 찾아 온 날 — 도서관에서 새 기록이 열린다 (스토리 16·17)
+	# 메인 스토리 18 — 할머니의 시계 (옛 전망대)
+	if npc.id == "librarian" and GameData.story18_phase == "memo":
+		m.story._start_watch_memo_dialog()
+		return
+	if GameData.story18_phase == "clue" and npc.id not in GameData.story18_heard:
+		m.story.story18_hear(npc.id)
+		return
+	# 유품을 찾아 온 날 — 도서관에서 새 기록이 열린다 (스토리 16·17·18)
 	if npc.id == "librarian" and GameData.story16_phase == "tale":
 		m.story.open_grandma_records()
 		return
 	if npc.id == "librarian" and GameData.story17_phase == "tale":
+		m.story.open_grandma_records()
+		return
+	if npc.id == "librarian" and GameData.story18_phase == "tale":
 		m.story.open_grandma_records()
 		return
 	# 온천에 몸을 담그러 온 주민 — 물가에선 이야기가 길어진다 (스토리 15)

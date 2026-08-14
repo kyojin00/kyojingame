@@ -446,6 +446,22 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.story17_done_day = int(d.get("story17_done_day", 0))
 	if GameData.story17_phase != "":
 		m.worldgen.spawn_old_barn()   # 드러난 옛 헛간은 그 자리에 남는다
+	# ---- 메인 스토리 18 (할머니의 시계) · 19 (일곱 갈래의 삶) ----
+	GameData.story18_phase = str(d.get("story18_phase", ""))
+	GameData.story18_heard = Array(d.get("story18_heard", []))
+	GameData.story18_traces = Array(d.get("story18_traces", []))
+	GameData.story18_done_day = int(d.get("story18_done_day", 0))
+	GameData.story19_phase = str(d.get("story19_phase", ""))
+	GameData.story19_shown = Array(d.get("story19_shown", []))
+	if GameData.story18_phase in ["hill", "box", "tale", "done"]:
+		m.worldgen.spawn_hill()   # 한 번 오른 언덕은 그대로 남는다
+	# 옛 세이브 보정 — 스토리 19가 열리기 전에 받아 둔 생명의 물이 있으면
+	# 이야기를 이미 시작한 것으로 본다 (병이 사라지지 않게)
+	if GameData.story19_phase == "" and not GameData.water_life_found.is_empty():
+		GameData.story19_phase = "seek"
+		for wid: String in GameData.water_life_found:
+			if wid not in GameData.story19_shown:
+				GameData.story19_shown.append(wid)
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()

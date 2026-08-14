@@ -1418,7 +1418,17 @@ const GRANDMA_RECORDS := [
 	+ "「목에 걸던 목걸이를 아이들이 자꾸 잡아당겨서, 일할 땐 늘 어딘가에\n"
 	+ "벗어 두곤 했다. 그날도 그랬을 거다. ...그 사람이 떠난 뒤로,\n"
 	+ "나는 그 헛간 근처를 지나가지 못했다.」",
-	"『마지막 언덕』 — 다음 유품을 찾으면 열린다.",
+	"『마지막 언덕』 — 여기서부터는 기록이 아니라 편지다.\n"
+	+ "서하가 흩어진 종이들을 날짜 순으로 이어 붙여 두었다.\n\n"
+	+ "「그 사람이 걷기 힘들어진 뒤로, 우리는 한 달에 한 번\n"
+	+ "언덕에 올랐다. 한나절이 걸려도 꼭 가자고 했다.\n"
+	+ "『우리 밭이 저기 있네』 — 늘 그렇게 손가락으로 짚었지.」\n\n"
+	+ "「마지막으로 오른 날, 그 사람은 차고 있던 시계를 풀어\n"
+	+ "내 손에 쥐여 주었다. 『먼저 가서 기다릴 테니, 늦게 와요.』\n"
+	+ "...나는 그 시계를 언덕에 묻었다. 차마 볼 수가 없어서.」\n\n"
+	+ "「이제 와 적어 둔다. 언젠가 이 노트를 이어받을 누군가가\n"
+	+ "이 언덕을 찾아 준다면, 그때는 시계를 꺼내 주기를.\n"
+	+ "멈춘 시계라도, 다시 누군가의 손목 위에서 돌기를.」",
 ]
 
 
@@ -1883,6 +1893,116 @@ func story17_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 18: 할머니의 시계 ----
+#
+# 마지막 유품. 스토리 17 뒤 자유 생활 + 연구 노트가 후반까지 차면,
+# 도서관에서 할아버지의 오래된 메모가 열린다 — 늘 차고 다니던 시계와
+# 두 분이 자주 오르던 언덕. 단서를 좇아 마을 밖 옛 전망대에 오르면
+# 흔적을 하나씩 살피며 두 분의 마지막 추억을 알게 되고, 마지막에
+# 숨겨진 보관함에서 시계가 나온다. 유품 다섯이 모두 모이는 장이라
+# 연출과 대화가 앞선 유품보다 길다.
+#   "": 아직 / memo: 도서관의 오래된 메모 / clue: 사서·주민 단서 /
+#   hill: 전망대 흔적 조사(세 곳) / box: 숨겨진 보관함 /
+#   tale: 도서관 마지막 기록 / done
+var story18_phase := ""
+var story18_traces: Array = []     # 살펴본 흔적
+const STORY18_REST_DAYS := 3
+const STORY18_NOTE := 0.8          # 후반부까지 찬 연구 노트
+const STORY18_TALES := 3
+
+# 전망대의 흔적 세 곳 — 살필 때마다 두 분의 마지막이 조금씩 드러난다
+const HILL_TRACES := [
+	{"id": "bench", "name": "무너진 나무 의자",
+		"text": "비바람에 삭은 의자 하나가 언덕 끝을 보고 놓여 있다.\n등받이에 두 사람이 나란히 기댔던 자국이 남았다.\n\n"
+			+ "「걷기 힘들어진 뒤로, 그 사람은 여기까지 오는 데\n한나절이 걸렸다. 그래도 매번 오자고 했다.」"},
+	{"id": "stone", "name": "글씨가 새겨진 돌",
+		"text": "납작한 돌에 두 글자가 나란히 새겨져 있다.\n한쪽 글씨는 삐뚤빼뚤, 다른 쪽은 반듯하다.\n\n"
+			+ "「그 사람이 먼저 새기고, 내 것은 내가 새겼다.\n손이 떨려 반듯하지 못했다고 한참을 웃었지.」"},
+	{"id": "tree", "name": "굽은 나무",
+		"text": "바람을 오래 맞아 마을 쪽으로 굽은 나무 한 그루.\n밑동에 낡은 끈이 감겨 있다.\n\n"
+			+ "「여기서 보면 마을이 다 보인다. 그 사람은 늘\n『우리 밭이 저기 있네』 하고 손가락으로 짚었다.\n마지막 날에도 그랬다.」"},
+]
+
+
+func story18_ready() -> bool:
+	return story17_phase == "done" and note_progress().ratio >= STORY18_NOTE \
+		and day >= story17_done_day + STORY18_REST_DAYS
+
+
+func story18_objective_short() -> String:
+	match story18_phase:
+		"memo":
+			return "도서관에서 할아버지의 오래된 메모를 읽자"
+		"clue":
+			return "사서와 주민들에게 그 언덕 이야기를 듣자 (%d/%d)" % [
+				story18_heard.size(), STORY18_TALES]
+		"hill":
+			return "옛 전망대의 흔적을 살펴보자 (%d/%d)" % [
+				story18_traces.size(), HILL_TRACES.size()]
+		"box":
+			return "전망대의 숨겨진 보관함을 열어 보자 (E)"
+		"tale":
+			return "도서관에서 마지막 기록을 읽자"
+	return ""
+
+
+var story18_heard: Array = []
+var story18_done_day := 0          # 시계를 찾은 날 — 스토리 19가 여기서 이어진다
+
+
+# ---- 메인 스토리 19: 일곱 갈래의 삶 (생명의 물) ----
+#
+# 마지막 유품을 찾으면, 할아버지의 기록에서 「일곱 가지 분야를 끝까지
+# 익힌 사람에게 남겨지는 것」이라는 구절이 드러난다. 채광·벌목·농사·
+# 요리·전투·낚시·목장을 만렙까지 올릴 때마다 그 분야의 증표로 생명의
+# 물이 한 병씩 주어지고(이미 만렙인 분야는 소급 지급), 일곱 병이 다
+# 모이면 노트의 마지막 페이지가 열린다 — 스토리 20으로 이어진다.
+#   "": 아직 / seek: 일곱 분야 만렙 도전(자유 생활) / page: 마지막 페이지 /
+#   done: 마지막 장소의 단서를 얻음
+var story19_phase := ""
+var story19_shown: Array = []      # 전용 연출을 이미 본 분야 id
+
+
+func story19_ready() -> bool:
+	return story18_phase == "done"
+
+
+func water_count() -> int:
+	return water_life_found.size()
+
+
+# 분야 이름 — 만렙 연출과 노트의 생명의 물 칸에 쓴다
+const SKILL_WATER_NAME := {
+	"mine": "채광", "forest": "벌목", "farm": "농사", "cook": "요리",
+	"combat": "전투", "fish": "낚시", "ranch": "목장",
+}
+# 만렙 연출의 한 줄 — 그 분야를 끝까지 익혔다는 것이 어떤 의미인지
+const SKILL_WATER_LINE := {
+	"mine": "「굴의 어둠이 더는 무섭지 않다.\n어느 돌을 때려야 하는지, 손이 먼저 안다.」",
+	"forest": "「나무가 어느 쪽으로 넘어갈지 보인다.\n베어 낸 자리마다 다시 심을 줄도 알게 됐다.」",
+	"farm": "「흙을 쥐면 목이 마른지 아닌지 알 수 있다.\n할아버지가 늘 하시던 그 말이, 이제야.」",
+	"cook": "「불의 세기를, 간을, 뜸 들이는 시간을 — 이제는\n누구에게 물어보지 않아도 된다.」",
+	"combat": "「겁이 사라진 건 아니다. 다만 겁을 안고도\n한 발 더 나아갈 수 있게 됐을 뿐이다.」",
+	"fish": "「물낯만 봐도 무엇이 있는지 알겠다.\n기다릴 줄 알게 된 것이, 아마 제일 큰 변화다.」",
+	"ranch": "「짐승들이 먼저 다가온다.\n『짐승들의 어머니』라 불리던 분도 이랬을까.」",
+}
+
+
+func story19_objective_short() -> String:
+	match story19_phase:
+		"seek":
+			return "일곱 갈래의 삶 — 생명의 물 %d/%d" % [
+				water_count(), ENDING_SKILLS.size()]
+		"page":
+			return "연구 노트(N)의 마지막 페이지가 열렸다"
+	return ""
+
+
+# 노트의 마지막 페이지 — 생명의 물 일곱 병이 다 모이면 읽을 수 있다
+func note_last_page_open() -> bool:
+	return water_count() >= ENDING_SKILLS.size() and story19_phase != ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -2042,6 +2162,19 @@ func quest_catalog() -> Array:
 			"cat": "main", "ep": "메인 스토리 17",
 			"npc": "librarian" if story17_phase == "tale" else "rancher",
 			"reward": "할머니의 목걸이 + 「할머니의 기록」 4장"})
+	o = story18_objective_short()
+	if o != "":
+		out.append({"id": "story18", "title": "할머니의 시계", "obj": o,
+			"desc": "두 분이 마지막으로 함께 오른 언덕 — 마지막 유품.",
+			"cat": "main", "ep": "메인 스토리 18",
+			"npc": "librarian" if story18_phase in ["memo", "tale"] else "",
+			"reward": "할머니의 시계 — 유품 다섯이 모두 모인다"})
+	o = story19_objective_short()
+	if o != "":
+		out.append({"id": "story19", "title": "일곱 갈래의 삶", "obj": o,
+			"desc": "일곱 분야를 끝까지 익힌 사람에게 남겨지는 것.",
+			"cat": "main", "ep": "메인 스토리 19", "npc": "",
+			"reward": "생명의 물 7종 + 연구 노트 마지막 페이지"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -2213,6 +2346,11 @@ func quest_npc_marks() -> Dictionary:
 		marks["rancher"] = "!"
 	elif story17_phase == "tale":
 		marks["librarian"] = "!"
+	# 스토리 18 — 마지막 유품. 도서관에서 열리고 도서관에서 닫힌다
+	if story18_phase in ["memo", "tale"]:
+		marks["librarian"] = "!"
+	elif story18_phase == "clue":
+		marks["librarian"] = "?"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -3569,8 +3707,12 @@ func try_relic(i: int, roll := -1.0, force_hint := false) -> bool:
 	return true
 
 
-# 분야가 만렙에 닿으면 생명의 물 한 병 — 분야당 한 번뿐이다
+# 분야가 만렙에 닿으면 생명의 물 한 병 — 분야당 한 번뿐이다.
+# 스토리 19(일곱 갈래의 삶)가 시작된 뒤에만 병이 생긴다. 그 전에 이미
+# 만렙을 찍어 둔 분야는 스토리가 열릴 때 소급해서 한꺼번에 채워진다.
 func check_skill_water(id: String) -> void:
+	if story19_phase == "":
+		return
 	if id not in ENDING_SKILLS or water_life_found.has(id):
 		return
 	if skill_lv(id) < SKILL_MAX_LV:
@@ -3579,6 +3721,19 @@ func check_skill_water(id: String) -> void:
 	items["water_life"] += 1
 	discover("water_life")
 	water_pending += 1
+
+
+# 이미 만렙인 분야를 소급해서 채운다 — 채운 분야 id 목록을 돌려준다
+func water_backfill() -> Array:
+	var got: Array = []
+	for id: String in ENDING_SKILLS:
+		if water_life_found.has(id) or skill_lv(id) < SKILL_MAX_LV:
+			continue
+		water_life_found[id] = true
+		items["water_life"] += 1
+		discover("water_life")
+		got.append(id)
+	return got
 
 
 # 꿈속 엔딩으로 갈 준비가 됐는가 — 연화가 항아리를 꺼내 주는 조건
@@ -4688,6 +4843,10 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 16 — 할머니의 반지")
 	if story17_phase == "done":
 		out.append("메인 스토리 17 — 할머니의 목걸이")
+	if story18_phase == "done":
+		out.append("메인 스토리 18 — 할머니의 시계")
+	if story19_phase == "done":
+		out.append("메인 스토리 19 — 일곱 갈래의 삶")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -5049,6 +5208,12 @@ func reset_all() -> void:
 	story17_clear = 0
 	story17_care = 0
 	story17_done_day = 0
+	story18_phase = ""
+	story18_heard = []
+	story18_traces = []
+	story18_done_day = 0
+	story19_phase = ""
+	story19_shown = []
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -5430,6 +5595,9 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story17_phase": story17_phase, "story16_done_day": story16_done_day,
 		"story17_heard": story17_heard, "story17_clear": story17_clear,
 		"story17_care": story17_care, "story17_done_day": story17_done_day,
+		"story18_phase": story18_phase, "story18_heard": story18_heard,
+		"story18_traces": story18_traces, "story18_done_day": story18_done_day,
+		"story19_phase": story19_phase, "story19_shown": story19_shown,
 		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,

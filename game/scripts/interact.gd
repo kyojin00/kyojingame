@@ -354,6 +354,16 @@ func interact() -> void:
 		if obj.kind == "old_barn":
 			m.story.old_barn_examine()   # 옛 헛간 (메인 스토리 17)
 			return
+		if obj.kind == "old_lookout":
+			m.story.hill_lookout_examine()   # 옛 전망대 (메인 스토리 18)
+			return
+		if obj.kind in ["old_bench", "carved_stone", "bent_tree"]:
+			# 전망대 언덕의 흔적 세 곳 — 살피면 두 분의 마지막이 드러난다
+			for tid: String in m.HILL_TRACE_TILES:
+				if m.HILL_TRACE_TILES[tid] == t:
+					m.story.hill_trace(tid)
+					break
+			return
 		if obj.kind == "house":
 			_enter_building(_building_kind_at(t))
 			return
