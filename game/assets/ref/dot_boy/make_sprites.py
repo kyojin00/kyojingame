@@ -187,6 +187,21 @@ HEAD_UP = [
 HEAD_X = 8
 
 
+def closed_eyes(art):
+    """눈 뜬 머리에서 깜빡임(눈 감은) 머리를 만든다 — 눈 두 줄은 살결로
+    지우고 맨 아랫줄만 감은 속눈썹 선으로 남긴다. 눈썹은 그대로."""
+    out = list(art)
+    for r, mp in ((8, {'e': 's', 'w': 's', 'i': 's'}),
+                  (9, {'e': 's', 'w': 's', 'i': 's'}),
+                  (10, {'i': 'e', 'w': 'e'})):
+        out[r] = ''.join(mp.get(c, c) for c in art[r])
+    return out
+
+
+HEAD_DOWN_BLINK = closed_eyes(HEAD_DOWN)
+HEAD_SIDE_BLINK = closed_eyes(HEAD_SIDE)
+
+
 # ------------------------------------------------------------------- 몸통
 # bob 은 머리·몸통·팔에만 적용하고 다리는 늘 땅을 밟는다.
 
@@ -566,11 +581,11 @@ for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
 def head(g, art, bob, lean=0):
     g.blit(art, HEAD_X + lean, HEAD_Y + bob)
     # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
-    if art is HEAD_DOWN:                       # 눈높이 양옆에 볼록 한 칸
+    if art is HEAD_DOWN or art is HEAD_DOWN_BLINK:   # 눈높이 양옆에 볼록 한 칸
         for ex in (7, 24):
             g.px(ex + lean, 11 + bob, 's')
             g.px(ex + lean, 12 + bob, 'S')
-    elif art is HEAD_SIDE:                     # 옆모습은 귓바퀴 모양
+    elif art is HEAD_SIDE or art is HEAD_SIDE_BLINK:  # 옆모습은 귓바퀴 모양
         g.px(12 + lean, 11 + bob, 'S')
         g.px(13 + lean, 11 + bob, 'S')
         g.px(12 + lean, 12 + bob, 'S')
@@ -680,8 +695,8 @@ for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
 
 
-def render_set(heads, ref_prefix, out_prefix):
-    """머리 그림만 갈아 끼워 전체 프레임(정지+걷기+휘두르기)을 뽑는다.
+def render_set(heads, blinks, ref_prefix, out_prefix):
+    """머리 그림만 갈아 끼워 전체 프레임(정지+걷기+휘두르기+깜빡임)을 뽑는다.
     지금 PAL 값으로 즉시 그려 두므로, 부른 뒤 PAL을 바꿔도 안 변한다."""
     for d in heads:
         PARTS[d] = (heads[d], PARTS[d][1], PARTS[d][2])
@@ -692,6 +707,11 @@ def render_set(heads, ref_prefix, out_prefix):
             images[f'{d}_walk_{i}'] = frame(d, STRIDE[i], BOB[i]).render()
         for i in range(4):
             images[f'{d}_swing_{i}'] = swing_frame(d, i).render()
+    for d, art in blinks.items():              # 눈 감은 정지 한 장씩
+        keep = PARTS[d]
+        PARTS[d] = (art, keep[1], keep[2])
+        images[f'{d}_blink'] = frame(d).render()
+        PARTS[d] = keep
     for k, im in images.items():
         im.save(os.path.join(REF, f'{ref_prefix}{k}.png'))
         im.save(os.path.join(OUT, f'{out_prefix}{k}.png'))
@@ -699,12 +719,14 @@ def render_set(heads, ref_prefix, out_prefix):
 
 
 FRAMES = render_set(
-    {'down': HEAD_DOWN, 'side': HEAD_SIDE, 'up': HEAD_UP}, '', 'new_boy_')
+    {'down': HEAD_DOWN, 'side': HEAD_SIDE, 'up': HEAD_UP},
+    {'down': HEAD_DOWN_BLINK, 'side': HEAD_SIDE_BLINK}, '', 'new_boy_')
 
 # 여자: 셔츠를 분홍으로 갈아입힌다 (팔레트를 바꾸고 다시 뽑는다)
 PAL.update({'b': (214, 96, 116), 'B': (158, 60, 82), 'L': (232, 138, 152)})
 FRAMES_F = render_set(
     {'down': HEAD_DOWN_F, 'side': HEAD_SIDE_F, 'up': HEAD_UP_F},
+    {'down': closed_eyes(HEAD_DOWN_F), 'side': closed_eyes(HEAD_SIDE_F)},
     'f_', 'player_f_')
 
 # player.gd SWING_HAND_DOT에 옮겨 적을 주먹 좌표 (남녀 같은 골격이라 공용)

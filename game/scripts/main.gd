@@ -163,6 +163,8 @@ const TEXTURE_NAMES := [
 	"new_boy_down_walk_2", "new_boy_down_walk_3", "new_boy_down_walk_4",
 	"new_boy_side_walk_0", "new_boy_side_walk_1",
 	"new_boy_side_walk_2", "new_boy_side_walk_3", "new_boy_side_walk_4",
+	"new_boy_down_blink", "new_boy_side_blink",
+	"player_f_down_blink", "player_f_side_blink",
 	"new_boy_up_walk_0", "new_boy_up_walk_1",
 	"new_boy_up_walk_2", "new_boy_up_walk_3", "new_boy_up_walk_4",
 	"egg", "golden_egg", "milk", "ore", "star_ore", "gem", "memory_piece",

@@ -501,6 +501,13 @@ func _update_sprite() -> void:
 		if swing_name != "":
 			tex_name = swing_name
 			sprite.flip_h = swing_face.x < -0.3
+	# 가만히 서 있을 때 가끔 눈을 깜빡인다. anim_time은 걸을 때만 흐르므로
+	# 실시간 시계를 쓴다 (뒷모습은 눈이 안 보여서 제외)
+	if not walking and not swinging and not riding and dir != "up":
+		if fmod(Time.get_ticks_msec() / 1000.0, 3.7) < 0.13:
+			var g := "new_boy" if GameData.gender == "m" else "player_f"
+			var v := "side" if (dir == "left" or dir == "right") else "down"
+			tex_name = "%s_%s_blink" % [g, v]
 	sprite.texture = main.tex[tex_name]
 	# 서 있을 때 숨쉬기: 프레임 대신 세로 스케일을 살짝 키웠다 줄인다
 	# (스프라이트 offset이 발 기준이라 발은 그대로, 머리만 오르내린다)
