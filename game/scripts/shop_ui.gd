@@ -643,8 +643,10 @@ func _rebuild() -> void:
 					stat_line))
 				continue
 			var next: Dictionary = levels[level - 1]
+			# 화로가 되살아나면(스토리 7 완결) 골드 비용이 20% 싸진다
+			var gold_cost := GameData.forge_price(int(next.money))
 			var b := _mk_button("강화", _on_upgrade.bind(id))
-			b.disabled = GameData.money < next.money or GameData.wood < next.wood \
+			b.disabled = GameData.money < gold_cost or GameData.wood < next.wood \
 				or GameData.items["ore"] < next.ore
 			var gain := GameData.tool_stat_gain_text(id)
 			var sub := "%s → %s" % [stat_line, next.desc]
@@ -652,8 +654,10 @@ func _rebuild() -> void:
 				sub = "%s   (%s)" % [next.desc, gain]
 			items_box.add_child(_mk_row(icon,
 				"%s Lv.%d → %d" % [up.name, level, level + 1], sub, b,
-				[["coin", int(next.money)], ["wood", int(next.wood)],
+				[["coin", gold_cost], ["wood", int(next.wood)],
 				["ore", int(next.ore)]]))
+		if GameData.story7_phase == "done":
+			_note("되살아난 화로가 힘차게 타오른다 — 강화 골드 비용 20% 할인 중!")
 		_note("광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d · 스프링클러: 목재 %d+석재 %d" % [
 			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD,
 			GameData.SPRINKLER_COST_STONE])
@@ -874,11 +878,12 @@ func _on_upgrade(id: String) -> void:
 	if level - 1 >= levels.size():
 		return
 	var next: Dictionary = levels[level - 1]
-	if GameData.money < next.money or GameData.wood < next.wood \
+	var gold_cost := GameData.forge_price(int(next.money))
+	if GameData.money < gold_cost or GameData.wood < next.wood \
 			or GameData.items["ore"] < next.ore:
 		return
 	Sound.play_sfx("sfx_coin")
-	GameData.money -= next.money
+	GameData.money -= gold_cost
 	GameData.wood -= int(next.wood)
 	GameData.items["ore"] -= int(next.ore)
 	GameData.tool_level[id] = level + 1

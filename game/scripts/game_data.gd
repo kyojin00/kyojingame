@@ -1077,6 +1077,65 @@ func story6_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 7: 식지 않는 화로 ----
+#
+# 스토리 6(오래된 책과 사서)을 끝내면, 대장장이 무쇠의 화로가 식어 간다.
+# 무쇠의 고민 -> 서하가 복원 중인 오래된 책에서 옛 대장간 구절을 찾음 ->
+# 동굴 깊은 곳의 광석·보석을 모아 화로를 되살린다.
+# 완결하면 화로가 뜨거워져 도구 강화 골드 비용이 20% 싸진다.
+#   "": 아직 / worry: 무쇠의 고민 듣기 / lore: 서하에게 물어보기 /
+#   gather: 광석·보석 모아 무쇠에게 / done: 완료
+var story7_phase := ""
+const STORY7_ORE := 15    # 화로 재점화 재료: 광석
+const STORY7_GEM := 2     # 화로 재점화 재료: 보석 (동굴 3층부터 나온다)
+const FORGE_DISCOUNT := 0.8   # 완결 보상 — 강화 골드 비용 배수
+
+
+# 화로가 되살아나면 도구 강화의 골드 비용이 싸진다 (재료는 그대로)
+func forge_price(base: int) -> int:
+	return int(base * FORGE_DISCOUNT) if story7_phase == "done" else base
+
+
+func story7_objective_short() -> String:
+	match story7_phase:
+		"worry":
+			return "대장장이 무쇠의 이야기를 들어보자 (E)"
+		"lore":
+			return "도서관의 서하에게 옛 대장간 이야기를 물어보자"
+		"gather":
+			if int(items.get("ore", 0)) >= STORY7_ORE \
+					and int(items.get("gem", 0)) >= STORY7_GEM:
+				return "무쇠에게 재료를 가져다주자 (E)"
+			return "재료 모으기 — 광석 %d·보석 %d (보유 %d·%d)" % [
+				STORY7_ORE, STORY7_GEM,
+				int(items.get("ore", 0)), int(items.get("gem", 0))]
+	return ""
+
+
+# ---- 메인 스토리 8: 초원에서 온 목동 ----
+#
+# 스토리 7(식지 않는 화로)을 끝내면, 동물들과 초원을 찾아 떠도는 목동
+# 보라가 마을을 찾아온다. 보라의 사정 -> 이장 상의 -> 목장 상회 건설
+# (스토리 게이트) -> 보라 정착. 완결하면 목장 상회에서 동물·축사·말·펫을
+# 들일 수 있다 — 동물 사육의 정식 개방이다.
+#   "": 아직 / visit: 낯선 목동 만나기 / ask: 이장과 상의 /
+#   build: 목장 상회 짓기(완공 후 보라에게) / done: 완료
+var story8_phase := ""
+
+
+func story8_objective_short() -> String:
+	match story8_phase:
+		"visit":
+			return "마을에 온 낯선 목동을 만나보자"
+		"ask":
+			return "목장 이야기를 이장과 상의하자 (E)"
+		"build":
+			if village_built.has("ranch"):
+				return "목장 상회가 완성됐다 — 보라에게 말을 걸자"
+			return "목장 상회를 짓자 — 이장 「마을 발전 이야기」 (목재 80·석재 40)"
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1142,6 +1201,20 @@ func quest_catalog() -> Array:
 			"desc": "풀숲에서 파낸 오래된 책 — 마을의 기록일지도 모른다.",
 			"cat": "main", "ep": "메인 스토리 6", "npc": s6npc,
 			"reward": "도서관 해금 + 사서 정착"})
+	o = story7_objective_short()
+	if o != "":
+		var s7npc := "librarian" if story7_phase == "lore" else "blacksmith"
+		out.append({"id": "story7", "title": "식지 않는 화로", "obj": o,
+			"desc": "무쇠의 화로가 식어 간다 — 옛 대장간의 비밀을 찾자.",
+			"cat": "main", "ep": "메인 스토리 7", "npc": s7npc,
+			"reward": "도구 강화 골드 비용 20% 할인"})
+	o = story8_objective_short()
+	if o != "":
+		var s8npc := "chief" if story8_phase == "ask" else "rancher"
+		out.append({"id": "story8", "title": "초원에서 온 목동", "obj": o,
+			"desc": "동물들과 초원을 찾아 떠도는 목동이 마을에 왔다.",
+			"cat": "main", "ep": "메인 스토리 8", "npc": s8npc,
+			"reward": "목장 상회 해금 — 동물을 키울 수 있다"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1240,6 +1313,23 @@ func quest_npc_marks() -> Dictionary:
 		"build":
 			if village_built.has("library"):
 				marks["librarian"] = "!"
+	match story7_phase:
+		"worry":
+			marks["blacksmith"] = "!"
+		"lore":
+			marks["librarian"] = "!"
+		"gather":
+			if int(items.get("ore", 0)) >= STORY7_ORE \
+					and int(items.get("gem", 0)) >= STORY7_GEM:
+				marks["blacksmith"] = "!"
+	match story8_phase:
+		"visit":
+			marks["rancher"] = "!"
+		"ask":
+			marks["chief"] = "!"
+		"build":
+			if village_built.has("ranch"):
+				marks["rancher"] = "!"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -3297,6 +3387,10 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 5 — 숲속에서 발견한 집")
 	if story6_phase == "done":
 		out.append("메인 스토리 6 — 오래된 책과 사서")
+	if story7_phase == "done":
+		out.append("메인 스토리 7 — 식지 않는 화로")
+	if story8_phase == "done":
+		out.append("메인 스토리 8 — 초원에서 온 목동")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -3603,6 +3697,8 @@ func reset_all() -> void:
 	story6_phase = ""
 	story6_day = 0
 	old_book_stored = false
+	story7_phase = ""
+	story8_phase = ""
 	zones_open = []
 	arrivals = []
 	npc_greeted = []
@@ -3958,6 +4054,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story4_phase": story4_phase, "zones_open": zones_open,
 		"story6_phase": story6_phase, "story6_day": story6_day,
 		"old_book_stored": old_book_stored,
+		"story7_phase": story7_phase, "story8_phase": story8_phase,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

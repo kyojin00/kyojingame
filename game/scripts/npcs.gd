@@ -133,6 +133,17 @@ func _sync_village_npcs() -> void:
 		if not have_lib:
 			_spawn_npc("librarian", m.NPC_HOME["librarian"])
 
+	# 목동 보라 — 초원을 보러 온 방문객 (스토리 8).
+	# 목장 상회가 완성되고 정착 대화를 마쳐야 정식 주민이 된다.
+	if GameData.story8_phase in ["visit", "ask", "build", "done"]:
+		var have_ran := false
+		for n in m.npcs:
+			if n.id == "rancher":
+				have_ran = true
+				break
+		if not have_ran:
+			_spawn_npc("rancher", m.NPC_HOME["rancher"])
+
 	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
 	if GameData.forest_quest in ["visit", "done"]:
 		for fid: String in ["forest_mom", "forest_girl"]:

@@ -1402,6 +1402,89 @@ func _debug_tick() -> void:
 			m.player.swing_t = keep_t
 			print("SWING_PHASE_OK=", seq == [0, 1, 2, 3, 4], " 위상=", seq)
 			_save_shot("_swing.png")
+		266:
+			# #122: 메인 스토리 7 「식지 않는 화로」·8 「초원에서 온 목동」 흐름
+			var k_s6 := GameData.story6_phase
+			var k_s7 := GameData.story7_phase
+			var k_s8 := GameData.story8_phase
+			var k_built78: Array = GameData.village_built.duplicate()
+			var k_greet78: Array = GameData.npc_greeted.duplicate()
+			var k_ore78 := int(GameData.items["ore"])
+			var k_gem78 := int(GameData.items["gem"])
+			var had_rancher := false
+			for n8 in m.npcs:
+				if n8.id == "rancher":
+					had_rancher = true
+			m.dialog.close()
+			# 스토리 7 — 시작 조건: 스토리 6 완결 + 대장간 + 무쇠 정착
+			GameData.story6_phase = "done"
+			GameData.story7_phase = ""
+			GameData.story8_phase = ""
+			if not GameData.village_built.has("smith"):
+				GameData.village_built.append("smith")
+			if not GameData.npc_greeted.has("blacksmith"):
+				GameData.npc_greeted.append("blacksmith")
+			m.story._story7_update(0.1)
+			var s7_start: bool = GameData.story7_phase == "worry"
+			m.story._end_forge_worry()
+			var s7_lore: bool = GameData.story7_phase == "lore"
+			m.story._end_forge_lore()
+			var s7_gather: bool = GameData.story7_phase == "gather"
+			# 재료가 모자라면 화로는 켜지지 않는다
+			GameData.items["ore"] = 0
+			GameData.items["gem"] = 0
+			m.story._end_forge_fire()
+			var s7_block: bool = GameData.story7_phase == "gather"
+			GameData.items["ore"] = GameData.STORY7_ORE
+			GameData.items["gem"] = GameData.STORY7_GEM
+			m.story._end_forge_fire()
+			var s7_done: bool = GameData.story7_phase == "done" \
+				and int(GameData.items["ore"]) == 0 \
+				and int(GameData.items["gem"]) == 0
+			var s7_disc: bool = GameData.forge_price(100) == 80
+			# 스토리 8 — 목동 방문 → 이장 상의 → 목장 게이트 → 완공 → 정착
+			m.story._story8_update(0.1)
+			var s8_start: bool = GameData.story8_phase == "visit"
+			var visitor := false
+			for n9 in m.npcs:
+				if n9.id == "rancher":
+					visitor = true
+			m.story._end_rancher_visit()
+			var s8_ask: bool = GameData.story8_phase == "ask"
+			GameData.village_built = ["post", "general", "smith", "library"]
+			var gated8: bool = m.village._next_village_build() != "ranch"
+			m.story._end_ranch_chief()
+			var s8_build: bool = GameData.story8_phase == "build" \
+				and m.village._next_village_build() == "ranch"
+			GameData.npc_greeted.erase("rancher")
+			GameData.village_built.append("ranch")
+			m.story._end_ranch_done()
+			var s8_done: bool = GameData.story8_phase == "done" \
+				and GameData.npc_greeted.has("rancher")
+			# 뒷정리 — 화면·상태를 시험 전으로 되돌린다
+			m.dialog.close()
+			m.hud._toast_queue.clear()
+			if m.hud._sb_layer != null:
+				m.hud._sb_layer.visible = false
+			GameData.story6_phase = k_s6
+			GameData.story7_phase = k_s7
+			GameData.story8_phase = k_s8
+			GameData.village_built = k_built78
+			GameData.npc_greeted = k_greet78
+			GameData.items["ore"] = k_ore78
+			GameData.items["gem"] = k_gem78
+			if not had_rancher:
+				for n10 in m.npcs.duplicate():
+					if n10.id == "rancher":
+						m.npcs.erase(n10)
+						n10.queue_free()
+			print("STORY78_OK=", s7_start and s7_lore and s7_gather and s7_block
+				and s7_done and s7_disc and s8_start and visitor and s8_ask
+				and gated8 and s8_build and s8_done,
+				" 화로시작=", s7_start, " 책구절=", s7_lore, " 수집=", s7_gather,
+				" 부족차단=", s7_block, " 재점화=", s7_done, " 할인=", s7_disc,
+				" 목동방문=", s8_start and visitor, " 이장상의=", s8_ask,
+				" 목장게이트=", gated8, " 건설해금=", s8_build, " 정착=", s8_done)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

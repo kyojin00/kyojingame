@@ -2446,3 +2446,180 @@ func _end_library_done() -> void:
 	m.hud.story_banner("메인 스토리 6 완결", "오래된 책과 사서")
 	m.hud.show_message("사서 서하가 마을에 정착했다!\n도서관에서 오래된 책과 마을의 기록을 볼 수 있다.", 7.0)
 	m.saveio.save_now()
+
+
+# ---- 메인 스토리 7: 식지 않는 화로 ----
+#
+# 스토리 6을 끝내면 대장장이 무쇠의 화로가 식어 간다. 서하가 복원 중인
+# 오래된 책에서 옛 교진 대장간의 비법을 찾아내고, 동굴 깊은 곳의
+# 광석·보석으로 화로를 되살린다. 완결하면 강화 골드 비용이 싸진다.
+
+func _story7_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 시작: 스토리 6 완결 + 무쇠가 마을에 자리 잡은 뒤
+	if GameData.story7_phase == "" and GameData.story6_phase == "done" \
+			and GameData.village_built.has("smith") \
+			and GameData.npc_greeted.has("blacksmith"):
+		GameData.story7_phase = "worry"
+		m.hud.quest_start_toast("대장장이 무쇠의 이야기를 들어보자")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 무쇠의 고민: 화로의 불이 예전 같지 않다
+func _start_forge_worry_dialog() -> void:
+	m.dialog.open_seq("무쇠", m.tex["npc_blacksmith_portrait_normal"], [
+		{"text": "「...왔는가. 마침 잘 왔네.」"},
+		{"text": "「요즘 화로가 이상해. 불이 예전만큼\n오르질 않아. 아무리 풀무질을 해도 말이지.」"},
+		{"text": "「이대로면 쇠를 벼리는 값이 자꾸 오를 걸세.\n좋은 쇠는 좋은 불에서 나오는 법이거든.」"},
+		{"text": "「할아버지 세대에게 듣기로, 옛 교진 마을의\n대장간 불은 백 년을 꺼지지 않았다더군.」"},
+		{"text": "「그 비법이 어딘가 남아 있지 않겠나...\n혹시 도서관의 그 오래된 책 말일세.」"},
+		{"text": "「사서 선생이 복원 중이라 들었네.\n옛 대장간 이야기가 있는지 물어봐 주게.」"},
+	], _end_forge_worry)
+
+
+func _end_forge_worry() -> void:
+	if GameData.story7_phase == "worry":
+		GameData.story7_phase = "lore"
+		m.hud.story_banner("메인 스토리 7 시작", "식지 않는 화로")
+		m.hud.quest_start_toast("도서관의 서하에게 물어보자")
+	m.saveio.save_now()
+
+
+# 퀘스트 2 — 서하가 복원 중인 책에서 옛 대장간 구절을 찾아낸다
+func _start_forge_lore_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「옛 대장간이요? 잠깐만요...\n마침 복원이 끝난 장이 있어요.」"},
+		{"text": "(서하가 오래된 책을 조심스레 펼친다.\n숯과 불꽃 그림이 그려진 장이다.)"},
+		{"text": "「여기예요 — 『화로가 식거든 깊은 굴의 돌을\n녹여라. 별처럼 반짝이는 돌이 불씨를 지킨다』.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「깊은 굴의 돌이라면... 동굴의 광석,\n그리고 반짝이는 돌은 보석이겠네요.」"},
+		{"text": "「광석 %d개와 보석 %d개 — 이만큼이면 화로를\n다시 살릴 수 있대요. 보석은 동굴 깊은 층에서\n나온다고 들었어요.」" % [GameData.STORY7_ORE, GameData.STORY7_GEM],
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「무쇠 씨에게 이 이야기를 전해 주세요.\n책이 마을을 돕네요 — 기뻐요.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+	], _end_forge_lore)
+
+
+func _end_forge_lore() -> void:
+	if GameData.story7_phase == "lore":
+		GameData.story7_phase = "gather"
+		m.hud.quest_start_toast("광석 %d·보석 %d를 모아 무쇠에게 가져가자"
+			% [GameData.STORY7_ORE, GameData.STORY7_GEM])
+	m.saveio.save_now()
+
+
+# 퀘스트 3 — 재료를 모아 화로를 되살린다 (스토리 7 완결)
+func _start_forge_fire_dialog() -> void:
+	var ore := int(GameData.items.get("ore", 0))
+	var gem := int(GameData.items.get("gem", 0))
+	if ore < GameData.STORY7_ORE or gem < GameData.STORY7_GEM:
+		m.dialog.open_seq("무쇠", m.tex["npc_blacksmith_portrait_normal"], [
+			{"text": "「재료는 좀 모였는가? 광석 %d개와 보석 %d개 —\n지금은 광석 %d·보석 %d로군.」" %
+				[GameData.STORY7_ORE, GameData.STORY7_GEM, ore, gem]},
+			{"text": "「보석은 동굴 깊은 층에서 나온다네.\n서두를 것 없네 — 안전이 먼저야.」"},
+		])
+		return
+	m.dialog.open_seq("무쇠", m.tex["npc_blacksmith_portrait_normal"], [
+		{"text": "「오오... 가져왔군! 이만하면 충분하네.」"},
+		{"text": "(무쇠가 광석과 보석을 화로에 넣고\n힘차게 풀무질을 시작했다.)"},
+		{"text": "(불꽃이 파랗게, 이윽고 하얗게 —\n화로가 눈부시게 타오른다!)"},
+		{"text": "「하하! 이 불이야, 이 불!\n옛 어른들이 지키던 바로 그 불일세!」",
+			"portrait": m.tex["npc_blacksmith_portrait_happy"]},
+		{"text": "「고맙네. 화로가 살아났으니 벼리는 품이\n한결 덜 들 걸세 — 강화 값을 깎아 주지!」",
+			"portrait": m.tex["npc_blacksmith_portrait_happy"]},
+	], _end_forge_fire)
+
+
+func _end_forge_fire() -> void:
+	if GameData.story7_phase != "gather":
+		return
+	if int(GameData.items.get("ore", 0)) < GameData.STORY7_ORE \
+			or int(GameData.items.get("gem", 0)) < GameData.STORY7_GEM:
+		return
+	GameData.items["ore"] -= GameData.STORY7_ORE
+	GameData.items["gem"] -= GameData.STORY7_GEM
+	GameData.story7_phase = "done"
+	m.hud.story_banner("메인 스토리 7 완결", "식지 않는 화로")
+	m.hud.show_message("화로가 되살아났다! 대장간의 도구 강화 골드 비용이 20% 싸진다.", 7.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 8: 초원에서 온 목동 ----
+#
+# 스토리 7을 끝내면 동물들과 초원을 찾아 떠도는 목동 보라가 마을에 온다.
+# 보라의 사정 -> 이장 상의 -> 목장 상회 건설(스토리 게이트) -> 정착.
+# 완결하면 목장 상회에서 동물·축사·말·펫을 들일 수 있다.
+
+func _story8_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 시작: 스토리 7 완결 — 다음 날부터가 아니라 곧장, 소문처럼 찾아온다
+	if GameData.story8_phase == "" and GameData.story7_phase == "done":
+		GameData.story8_phase = "visit"
+		m.npcmgr._sync_village_npcs()   # 보라가 광장 곁에 나타난다 (방문객)
+		m.hud.quest_start_toast("마을에 온 낯선 목동을 만나보자")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 떠도는 목동 보라: 초원이 마음에 들지만 상회가 없다
+func _start_rancher_visit_dialog() -> void:
+	m.dialog.open_seq("보라", m.tex["npc_rancher_portrait_normal"], [
+		{"text": "「아, 안녕! 나는 보라 — 동물들이랑\n좋은 초원을 찾아 떠돌아다니는 목동이야.」"},
+		{"text": "「대장간 화로가 되살아난 마을이 있다길래\n구경 왔는데... 여기 초원, 정말 좋다!」",
+			"portrait": m.tex["npc_rancher_portrait_happy"]},
+		{"text": "「부드러운 풀에 맑은 물... 우리 애들이\n살기엔 더할 나위 없는 곳이야.」"},
+		{"text": "「그런데 동물을 맡기고 먹이를 대 줄\n목장 상회가 없네. 그게 없으면 동물은\n키우기 어렵거든.」",
+			"portrait": m.tex["npc_rancher_portrait_normal"]},
+		{"text": "「이장님께 한번 여쭤봐 줄래? 상회 자리만\n생기면, 나 여기 정착하고 싶어!」",
+			"portrait": m.tex["npc_rancher_portrait_happy"]},
+	], _end_rancher_visit)
+
+
+func _end_rancher_visit() -> void:
+	if GameData.story8_phase == "visit":
+		GameData.story8_phase = "ask"
+		m.hud.story_banner("메인 스토리 8 시작", "초원에서 온 목동")
+		m.hud.quest_start_toast("목장 이야기를 이장과 상의하자")
+	m.saveio.save_now()
+
+
+# 퀘스트 2 — 이장과 상의: 목장 상회를 짓기로 한다
+func _start_ranch_chief_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「목동이 왔다고? 허어, 마을에 동물이라...\n옛날엔 집집마다 닭 울음이 들렸는데 말일세.」"},
+		{"text": "「초원이야 넉넉하지. 목동이 자리만 잡으면\n마을이 또 한 번 살아나겠구먼.」"},
+		{"text": "「좋네! 목장 상회 자리는 비워 두겠네.\n서쪽 길가 — 대장간 아랫자리일세.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+		{"text": "「재료가 모이면 「마을 발전 이야기」로 오게.\n목재 80에 석재 40 — 다 같이 세워 봄세!」"},
+	], _end_ranch_chief)
+
+
+func _end_ranch_chief() -> void:
+	if GameData.story8_phase == "ask":
+		GameData.story8_phase = "build"
+		m.hud.quest_start_toast("목장 상회 건설을 준비하자")
+	m.saveio.save_now()
+
+
+# 퀘스트 3 — 목장 상회 완성: 보라가 정착한다 (스토리 8 완결)
+func _start_ranch_done_dialog() -> void:
+	m.dialog.open_seq("보라", m.tex["npc_rancher_portrait_happy"], [
+		{"text": "「우와아... 진짜 지어 줬네!\n지붕도 튼튼하고, 마당도 널찍하고!」"},
+		{"text": "「정했어. 나, 이 마을의 목동 할래!\n우리 애들도 다 데려올 거야.」"},
+		{"text": "「상회에서 닭이랑 소도 분양하고, 축사도\n지어 줄게. 말이랑 귀여운 펫도 있어!」",
+			"portrait": m.tex["npc_rancher_portrait_normal"]},
+		{"text": "「동물은 사랑을 먹고 자라 — 매일 쓰다듬어\n주는 거 잊지 마! 앞으로 잘 부탁해~」",
+			"portrait": m.tex["npc_rancher_portrait_happy"]},
+	], _end_ranch_done)
+
+
+func _end_ranch_done() -> void:
+	if GameData.story8_phase != "build" or not GameData.village_built.has("ranch"):
+		return
+	GameData.story8_phase = "done"
+	if not GameData.npc_greeted.has("rancher"):
+		GameData.npc_greeted.append("rancher")   # 정식 주민으로 정착
+	m.hud.story_banner("메인 스토리 8 완결", "초원에서 온 목동")
+	m.hud.show_message("목동 보라가 마을에 정착했다!\n목장 상회에서 동물·축사·말·펫을 들일 수 있다.", 7.0)
+	m.saveio.save_now()

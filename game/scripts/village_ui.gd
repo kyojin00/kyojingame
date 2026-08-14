@@ -98,6 +98,9 @@ func _next_village_build() -> String:
 		# 도서관은 메인 스토리 6에서 사서와 이야기를 마쳐야 지을 수 있다
 		if pid == "library" and GameData.story6_phase != "build":
 			continue
+		# 목장 상회는 메인 스토리 8에서 목동·이장과 이야기를 마쳐야 지을 수 있다
+		if pid == "ranch" and GameData.story8_phase != "build":
+			continue
 		return pid
 	return ""
 
@@ -190,6 +193,10 @@ func _build_village_building(pid: String) -> void:
 		# 사서는 이미 마을에 와 있다 (스토리 6 방문객) — 이사 대기열 없이
 		# 도서관 앞의 서하에게 직접 말을 걸면 정착 이야기가 이어진다
 		greet_note = "\n사서 선생이 벌써 도서관 앞을 서성이는구먼 — 말을 걸어 보게."
+	elif pid == "ranch":
+		# 목동도 이미 마을에 와 있다 (스토리 8 방문객) — 보라에게 말을 걸면
+		# 정착 이야기가 이어진다
+		greet_note = "\n목동 아가씨가 벌써 상회 앞에서 들떠 있구먼 — 말을 걸어 보게."
 	elif owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
 		GameData.arrivals.append({"id": owner, "day": GameData.day})
 		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
@@ -248,6 +255,27 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "librarian" and GameData.story6_phase == "build" \
 			and GameData.village_built.has("library"):
 		m.story._start_library_done_dialog()
+		return
+	# 메인 스토리 7 — 식지 않는 화로
+	if npc.id == "blacksmith" and GameData.story7_phase == "worry":
+		m.story._start_forge_worry_dialog()
+		return
+	if npc.id == "librarian" and GameData.story7_phase == "lore":
+		m.story._start_forge_lore_dialog()
+		return
+	if npc.id == "blacksmith" and GameData.story7_phase == "gather":
+		m.story._start_forge_fire_dialog()
+		return
+	# 메인 스토리 8 — 초원에서 온 목동
+	if npc.id == "rancher" and GameData.story8_phase == "visit":
+		m.story._start_rancher_visit_dialog()
+		return
+	if npc.id == "chief" and GameData.story8_phase == "ask":
+		m.story._start_ranch_chief_dialog()
+		return
+	if npc.id == "rancher" and GameData.story8_phase == "build" \
+			and GameData.village_built.has("ranch"):
+		m.story._start_ranch_done_dialog()
 		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()

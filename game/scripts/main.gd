@@ -379,7 +379,8 @@ const NPC_PLAZA := {
 # 건물이 없는 NPC(이장)의 집 자리
 const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
 	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28),
-	"librarian": Vector2i(76, 14)}   # 방문객 시절 — 광장 분수 곁
+	"librarian": Vector2i(76, 14),   # 방문객 시절 — 광장 분수 곁
+	"rancher": Vector2i(70, 20)}     # 방문객 시절 — 광장 남서쪽 풀밭
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
@@ -1141,6 +1142,8 @@ func _process(delta: float) -> void:
 	story._spear_update(delta)
 	story._movein_update(delta)
 	story._story6_update(delta)
+	story._story7_update(delta)
+	story._story8_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
 	_work_lock = maxf(_work_lock - delta, 0.0)

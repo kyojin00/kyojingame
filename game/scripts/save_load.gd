@@ -98,6 +98,13 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.story6_phase = str(d.get("story6_phase", ""))
 	GameData.story6_day = int(d.get("story6_day", 0))
 	GameData.old_book_stored = bool(d.get("old_book_stored", false))
+	GameData.story7_phase = str(d.get("story7_phase", ""))
+	GameData.story8_phase = str(d.get("story8_phase", ""))
+	# 구세이브 호환 — 목장 상회가 이야기(스토리 8) 도입 전에 이미 서
+	# 있었다면, 그 세이브에서는 8장을 완료로 친다 (방문객 연출이 이미
+	# 정착한 보라와 겹치지 않게)
+	if GameData.story8_phase == "" and d.get("village_built", []).has("ranch"):
+		GameData.story8_phase = "done"
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
 	GameData.recipe_items = d.get("recipe_items", {})
