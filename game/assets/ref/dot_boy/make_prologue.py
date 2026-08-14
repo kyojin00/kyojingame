@@ -275,32 +275,37 @@ def scene_box(g, f):
         g.p(bx1 + DEP + 1, y, OUTLINE)              # 오른쪽 뒷모서리
     for y in range(by0 + 1, by1 + 1):               # 앞판·옆판 경계선
         g.p(bx1, y, (92, 60, 34))
-    # 분리형 뚜껑 — 상자 오른쪽 모서리에 걸쳐 비스듬히 기대 두었다.
-    # 참고 사진처럼 뚜껑 윗면 + 테두리(얕은 쟁반형 뚜껑의 옆면)가 보인다.
-    # 상자 다음에 그려 모서리를 살짝 덮는다 — 걸쳐 놓은 것으로 읽힌다.
-    def lid_top(x):
-        return 24 + (x - 106) * 34 // 40
-    for x in range(106, 146):
-        yt = lid_top(x)
-        m1 = min(yt + 11, H - 2)
-        m2 = min(yt + 16, H - 2)
-        for y in range(yt, m1):                     # 윗면 — 촛불빛을 받아 밝다
-            g.p(x, y, (150, 106, 58))
-        for y in range(m1, m2):                     # 테두리 두께 (뚜껑 옆면)
-            g.p(x, y, (106, 72, 40))
-        g.p(x, yt, (176, 128, 70))                  # 윗모서리 하이라이트
-        g.p(x, m1, (86, 56, 32))                    # 윗면·테두리 경계
+    # 분리형 뚜껑 — 상자 오른쪽에 기대 세워 두었다. 참고 사진처럼
+    # 뚜껑의 넓은 직사각형 면이 정면으로 보이고, 살짝만 기울어 있다.
+    # 왼쪽 모서리가 상자 옆판에 걸치고 오른발이 바닥에 닿는다.
+    lx0, lx1 = 112, 152
+    for x in range(lx0, lx1 + 1):
+        t = x - lx0
+        yt = 22 + t * 12 // 40                      # 위 모서리 (오른쪽으로 살짝 처짐)
+        yb = 58 + t * 6 // 40                       # 아래 모서리 (바닥선)
+        for y in range(yt, yb + 1):
+            g.p(x, y, (142, 98, 52))                # 넓은 면
+        g.p(x, yt, (176, 128, 70))                  # 위 테두리 (뚜껑 옆벽 두께)
+        g.p(x, yt + 1, (158, 112, 60))
+        g.p(x, yb, (104, 70, 38))                   # 아래 그늘
         g.p(x, yt - 1, OUTLINE)
-        g.p(x, m2, OUTLINE)
-        y6 = yt + 6                                 # 널 이음새 한 줄
-        if y6 < m1:
-            g.p(x, y6, (128, 88, 48))
-    for y in range(lid_top(106) - 1, lid_top(106) + 17):    # 마구리 윤곽
-        g.p(105, y, OUTLINE)
-    for y in range(lid_top(145) - 1, min(lid_top(145) + 17, H - 1)):
-        g.p(146, y, OUTLINE)
-    g.rrect(109, 27, 112, 30, (128, 130, 138), 2)   # 뚜껑 쇠장식
-    g.rect(138, 64, 152, 65, (94, 62, 34))          # 발치 그림자
+        g.p(x, yb + 1, OUTLINE)
+        for k in (13, 26):                          # 널 이음새 (기울기를 따라)
+            y = yt + k
+            if y < yb - 1:
+                g.p(x, y, (114, 76, 42))
+    for y in range(21, 59):                         # 왼쪽 테두리 (상자에 걸친 쪽)
+        g.p(lx0, y + 0, (158, 112, 60)) if y - 21 < 2 else None
+    for x in (lx0, lx0 + 1):                        # 왼쪽 옆벽 두께
+        for y in range(22, 59):
+            g.p(x, y, (118, 80, 44))
+    for y in range(21, 60):                         # 좌우 윤곽
+        g.p(lx0 - 1, y, OUTLINE)
+    for y in range(33, 66):
+        g.p(lx1 + 1, y, OUTLINE)
+    g.rrect(lx0 + 4, 26, lx0 + 8, 30, (128, 130, 138), 2)   # 쇠장식
+    g.p(lx0 + 6, 28, (176, 178, 186))
+    g.rect(lx0 + 2, 62, lx1 - 2, 63, (94, 62, 34))  # 발치 그림자
     # 연구 노트 — 열린 상자 안에서 비스듬히 고개를 내민다
     nb_top = by0 - 10
     for y in range(nb_top, by0):
