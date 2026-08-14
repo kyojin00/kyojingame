@@ -346,7 +346,9 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     for off, shade in ((-stride, True), (stride, False)):
         back = off < 0
         lift = 2 if back else 0                # 뒤로 간 다리는 뒤꿈치가 들린다
-        knee_off = off * (0.35 if back else 0.55)
+        # 허벅지도 엉덩이를 축으로 크게 흔든다 — 무릎이 보폭의 2/3까지
+        # 따라가야 다리 전체가 젓는다 (작으면 정강이만 까딱거린다).
+        knee_off = off * (0.65 if back else 0.75)
         foot_off = round(off * 1.35) if back else off
         pc, kc = ('P', 'K') if shade else ('p', 'k')
         bot = GROUND - lift
