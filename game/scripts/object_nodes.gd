@@ -101,6 +101,11 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 의뢰 게시판 — 다리 둘 달린 큰 코르크 게시판
 			texture = m.tex["board_quest"]
 			offset = Vector2(0, -texture.get_height())
+		"auction":
+			# 경매 게시판 — 같은 판에 금빛을 입혀 의뢰 게시판과 구별한다
+			texture = m.tex["board_quest"]
+			offset = Vector2(0, -texture.get_height())
+			modulate = Color(1.15, 1.0, 0.62)
 		"sign":
 			if pos == m.GREENHOUSE_SIGN:
 				texture = m.tex["board_unlock"]  # 온실 터도 「구역 해금」 게시판

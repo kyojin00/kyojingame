@@ -314,6 +314,9 @@ func interact() -> void:
 		if obj.kind == "board":
 			m.village._open_quest_board()
 			return
+		if obj.kind == "auction":
+			m.auction_ui.open()
+			return
 		if obj.kind == "sign" and t == m.OLD_SIGN:
 			m.story.examine_old_sign()
 			return

@@ -95,6 +95,7 @@ var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
 var ending: CanvasLayer
+var auction_ui: CanvasLayer   # 경매장 (광장 경매 게시판 — 바깥 서버와 통신)
 var cave: CanvasLayer
 var shop_room: CanvasLayer
 var pet: Node2D
@@ -301,6 +302,7 @@ const FISH_SPOT := Rect2i(42, 26, 14, 12)   # 이 안이면 「낚시터에 있�
 # 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
 const FISH_CLEAR := Rect2i(41, 24, 20, 14)
 const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
+const AUCTION_POS := Vector2i(85, 14)      # 경매 게시판 (온 세상 농부들의 장터)
 # (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
 # 메인 스토리 4 — 동쪽 다리 건너, 옛 마을의 경계를 알리는 낡은 표지판.
 # 너머(GameData.VILLAGE_ZONES)는 구역을 해금해야 들어갈 수 있다.
@@ -502,6 +504,10 @@ func _ready() -> void:
 	stats_ui = preload("res://scripts/stats_ui.gd").new()
 	stats_ui.main = self
 	add_child(stats_ui)
+
+	auction_ui = preload("res://scripts/auction_ui.gd").new()
+	auction_ui.main = self
+	add_child(auction_ui)
 
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
@@ -916,7 +922,8 @@ func ui_open() -> bool:
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or (shop_room != null and shop_room.visible) \
 		or cooking_ui.visible or alchemy_ui.visible or quest_ui.visible or note_ui.visible \
-		or stats_ui.visible or _name_layer != null or village._gift_layer != null \
+		or stats_ui.visible or auction_ui.visible \
+		or _name_layer != null or village._gift_layer != null \
 		or (story.story_layer != null and story.story_layer.visible)
 
 

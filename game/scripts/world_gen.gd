@@ -241,6 +241,8 @@ func _build_village() -> void:
 	if not GameData.village_built.has("general"):
 		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
+	# 경매 게시판 — 다른 농장 사람들과 사고파는 장터로 이어진다
+	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
 	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
 	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
