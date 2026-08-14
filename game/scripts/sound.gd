@@ -85,24 +85,43 @@ func play_bgm(season_key: String) -> void:
 	play_track("bgm_" + season_key)
 
 
+# 곡마다 녹음(마스터링) 크기가 제각각이라, 곡이 바뀌는 순간 갑자기
+# 작아지거나 커지게 들렸다 — 동굴 곡이 기본 곡보다 3.6dB나 작았다.
+# 실측 RMS 기준으로 기본 곡(bgm_main, -14.6dB)에 맞춰 보정한다.
+const TRACK_GAIN := {
+	"bgm_cave": 3.6, "bgm_fall": 1.6, "bgm_festival": 0.5, "bgm_night": 0.0,
+	"bgm_shop": 1.4, "bgm_spring": 2.1, "bgm_summer": 1.1, "bgm_title": 0.2,
+	"bgm_village": 2.5, "bgm_winter": -0.4, "bgm_main": 0.0,
+}
+
+
 # 곡을 바꾼다. 뚝 끊으면 귀에 거슬려서 0.6초에 걸쳐 갈아 끼운다.
 func play_track(name: String) -> void:
-	if name == current_bgm or not streams.has(name):
+	if not streams.has(name):
+		return
+	var gain: float = float(TRACK_GAIN.get(name, 0.0))
+	if name == current_bgm:
+		# 같은 곡인데 소리가 멎어 있으면(어떤 이유로든) 조용히 다시 건다 —
+		# 예전에는 여기서 그냥 돌아가서, 한 번 멎은 브금이 영영 안 돌아왔다
+		if not bgm_player.playing:
+			bgm_player.stream = streams[name]
+			bgm_player.volume_db = gain
+			bgm_player.play()
 		return
 	current_bgm = name
 	if _fade != null and _fade.is_valid():
 		_fade.kill()
 	if not bgm_player.playing:
 		bgm_player.stream = streams[name]
-		bgm_player.volume_db = 0.0
+		bgm_player.volume_db = gain
 		bgm_player.play()
 		return
 	_fade = create_tween()
-	_fade.tween_property(bgm_player, "volume_db", -40.0, 0.3)
+	_fade.tween_property(bgm_player, "volume_db", gain - 40.0, 0.3)
 	_fade.tween_callback(func() -> void:
 		bgm_player.stream = streams[name]
 		bgm_player.play())
-	_fade.tween_property(bgm_player, "volume_db", 0.0, 0.3)
+	_fade.tween_property(bgm_player, "volume_db", gain, 0.3)
 
 
 func stop_bgm() -> void:

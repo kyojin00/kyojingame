@@ -2284,6 +2284,34 @@ func _debug_tick() -> void:
 			var gone_fx: bool = not m.hud._sb_layer.visible
 			print("STORYFX_OK=", shown and gone_fx,
 				" 표시=", shown, " 자동닫힘=", gone_fx)
+		311:
+			# #107: 오브젝트가 없어도 도끼/곡괭이가 휘둘러지고, 앞의 밤
+			# 몬스터를 무기처럼 히트박스로 때린다
+			var keep_tool2 := GameData.tool
+			GameData.tool = "axe"
+			m.toolwork._weapon_cd = 0.0
+			var mob_node := Node2D.new()
+			m.add_child(mob_node)
+			mob_node.position = m.player.position \
+				+ m.FACE_VECS[m.player.dir] * 30.0
+			m.night_mobs.append({"node": mob_node, "hp": 1.0})
+			var mobs_before := m.night_mobs.size()
+			m.toolwork._swing_empty(m.player_tile())
+			var swung: bool = m.toolwork._weapon_cd > 0.0
+			var hit: bool = m.night_mobs.size() == mobs_before - 1
+			# 쿨다운 중에는 연타가 안 먹는다
+			var cd_before: float = m.toolwork._weapon_cd
+			m.toolwork._swing_empty(m.player_tile())
+			var cooldown_ok: bool = m.toolwork._weapon_cd == cd_before
+			for mob in m.night_mobs.duplicate():
+				if mob.node == mob_node:
+					m.night_mobs.erase(mob)
+			if is_instance_valid(mob_node):
+				mob_node.queue_free()
+			m.toolwork._weapon_cd = 0.0
+			GameData.tool = keep_tool2
+			print("SWINGEMPTY_OK=", swung and hit and cooldown_ok,
+				" 휘두름=", swung, " 명중=", hit, " 쿨다운=", cooldown_ok)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()
