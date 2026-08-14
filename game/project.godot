@@ -13,10 +13,12 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+# Auth가 맨 앞이다 — 오토로드는 **먼저 선언된 것만** 참조할 수 있어서,
+# 뒤에 두면 GameData가 Auth를 못 찾는다 (파싱 오류)
+Auth="*res://scripts/auth_api.gd"
 GameData="*res://scripts/game_data.gd"
 Sound="*res://scripts/sound.gd"
 Net="*res://scripts/net.gd"
-Auth="*res://scripts/auth_api.gd"
 
 [display]
 
