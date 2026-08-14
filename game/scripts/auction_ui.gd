@@ -26,6 +26,9 @@ var _pick_id := ""
 var _pick_quality := 0
 var _pick_qty := 1
 var _pick_price := 0
+# 금고 — 서버가 쥔 창고 (여기 있는 것만 장터에 올릴 수 있다)
+var _vault := {}          # {gold, items[], left_value, left_gold}
+var _vault_loaded := false
 
 
 func _ready() -> void:
@@ -78,6 +81,8 @@ func _ready() -> void:
 	api.listed.connect(_on_listed)
 	api.bought.connect(_on_bought)
 	api.claimed.connect(_on_claimed)
+	api.vault.connect(_on_vault)
+	api.moved.connect(_on_moved)
 
 
 func open() -> void:
@@ -102,11 +107,33 @@ func _unhandled_input(event: InputEvent) -> void:
 func _refresh() -> void:
 	_loading = true
 	_rebuild()
-	if _tab == "sell":
-		_loading = false
-		_rebuild()
+	if _tab == "vault" or _tab == "sell":
+		api.vault_state()
 		return
 	api.fetch(_tab == "mine")
+
+
+func _on_vault(state: Dictionary) -> void:
+	_vault = state
+	_vault_loaded = true
+	_loading = false
+	_rebuild()
+
+
+func _on_moved(ok: bool, msg: String) -> void:
+	_status = msg
+	if ok:
+		Sound.play_sfx("sfx_coin")
+	api.vault_state()
+
+
+# 금고에 든 개수 (장터에 올릴 때 이만큼까지 된다)
+func _vault_qty(cat: String, id: String, quality: int) -> int:
+	for it: Dictionary in _vault.get("items", []):
+		if str(it.get("cat", "")) == cat and str(it.get("item_id", "")) == id \
+				and int(it.get("quality", 0)) == quality:
+			return int(it.get("qty", 0))
+	return 0
 
 
 # ---- 서버 응답 ----
@@ -120,32 +147,20 @@ func _on_fetched(rows: Array) -> void:
 func _on_listed(ok: bool, msg: String, fee: int) -> void:
 	_status = msg
 	if ok:
-		Sound.play_sfx("sfx_coin")
-		if fee > 0:                       # 수수료는 올릴 때 뗀다 (돌려주지 않는다)
-			GameData.money = maxi(0, GameData.money - fee)
-			_sync("", "", 0, 0, -fee)
+		Sound.play_sfx("sfx_coin")        # 수수료는 금고 돈에서 서버가 뗀다
 		_pick_id = ""
 		_tab = "mine"
 		_refresh()
 	else:
-		# 실패했으면 맡겨 둔 물건을 돌려준다 (등록할 때 미리 뺐다)
-		_give_back(_pick_cat, _pick_id, _pick_qty, _pick_quality)
-		_sync(_pick_cat, _pick_id, _pick_qty, _pick_quality, 0)
-		_rebuild()
+		_rebuild()   # 금고에서 빠지지 않았으니 돌려줄 것이 없다
 
 
 func _on_bought(ok: bool, msg: String, row: Dictionary) -> void:
 	_status = msg
 	if ok:
 		Sound.play_sfx("sfx_coin")
-		# 산 것도, 거둔 것도 결국 내 창고로 들어온다.
-		# (산 것은 여기서 값을 치른다 — 거둔 것은 냈던 물건이 돌아오는 것)
-		var paid := int(row.get("price", 0)) if str(row.get("status", "")) == "sold" else 0
-		GameData.money -= paid
-		_give_back(str(row.get("cat", "")), str(row.get("item_id", "")),
-			int(row.get("qty", 0)), int(row.get("quality", 0)))
-		_sync(str(row.get("cat", "")), str(row.get("item_id", "")),
-			int(row.get("qty", 0)), int(row.get("quality", 0)), -paid)
+		# 산 물건도, 거둔 물건도 **금고로** 들어간다 (돈도 금고에서 오간다).
+		# 게임 창고로 가져오려면 「금고」 칸에서 꺼내면 된다.
 		_refresh()
 	else:
 		_rebuild()
@@ -378,11 +393,15 @@ func _rebuild() -> void:
 	for c in _box.get_children():
 		c.queue_free()
 	_mk_tab("market", "장터 둘러보기")
-	_mk_tab("sell", "내 창고에서 올리기")
-	_mk_tab("mine", "내 등록·대금")
+	_mk_tab("vault", "금고")
+	_mk_tab("sell", "올리기")
+	_mk_tab("mine", "내 등록")
 	_status_label.text = _status if _status != "" else \
-		"내 이름: %s · 소지금 %dG" % [GameData.seller_name(), GameData.money]
+		"내 이름: %s · 소지금 %dG · 금고 %dG (장터는 금고 돈으로 산다)" \
+		% [GameData.seller_name(), GameData.money, int(_vault.get("gold", 0))]
 	match _tab:
+		"vault":
+			_build_vault()
 		"sell":
 			_build_sell()
 		"mine":
@@ -406,19 +425,13 @@ func _build_market() -> void:
 		var sub := "%dG · %s" % [price, str(r.get("seller_name", "?"))]
 		_mk_row(str(r.get("cat", "item")), str(r.get("item_id", "")),
 			int(r.get("quality", 0)), int(r.get("qty", 1)), sub,
-			"사기", func() -> void: api.buy(int(r.get("id", 0))),
-			GameData.money >= price)
+			"사기", func() -> void: api.buy(int(r.get("id", 0))))
 
 
 # 내 물건 — 올려 둔 것 거두기 + 대금 받기
 func _build_mine() -> void:
-	var claim := Button.new()
-	claim.text = "팔린 대금 받기"
-	claim.focus_mode = Control.FOCUS_NONE
-	claim.pressed.connect(func() -> void:
-		Sound.play_sfx("sfx_ui")
-		api.claim())
-	_box.add_child(claim)
+	_line("팔리면 대금이 곧바로 금고에 들어간다. (「금고」 칸에서 꺼내자)",
+		Color(0.7, 0.68, 0.62))
 	if _loading:
 		_line("내 물건을 살펴보는 중...")
 		return
@@ -431,8 +444,7 @@ func _build_mine() -> void:
 		var sold := st == "sold"
 		var sub := "%dG · " % int(r.get("price", 0))
 		if sold:
-			sub += "%s에게 팔림" % str(r.get("buyer_name", "누군가"))
-			sub += " · 대금 받음" if bool(r.get("claimed", false)) else " · 대금 대기"
+			sub += "%s에게 팔림 · 대금은 금고에" % str(r.get("buyer_name", "누군가"))
 		else:
 			sub += "팔리는 중"
 		_mk_row(str(r.get("cat", "item")), str(r.get("item_id", "")),
@@ -444,14 +456,137 @@ func _build_mine() -> void:
 
 
 # 등록 — 창고에서 고르고 값을 매긴다
-# 내 창고 한눈에 — 가방처럼 아이콘 격자로 늘어놓고, 누르면 값 매기기로 간다
+# 금고 — 게임 창고에서 넣고, 금고에서 빼고, 돈도 오간다
+func _build_vault() -> void:
+	if _loading and not _vault_loaded:
+		_line("금고를 여는 중...")
+		return
+	var gold := int(_vault.get("gold", 0))
+	_line("금고 돈 %dG · 오늘 더 넣을 수 있는 값 %dG · 돈 %dG"
+		% [gold, int(_vault.get("left_value", 0)), int(_vault.get("left_gold", 0))],
+		Color(0.95, 0.8, 0.5))
+	_line("장터는 금고 안에서만 돈다 — 올릴 물건과 수수료·물건값을 여기 넣어 두자.",
+		Color(0.7, 0.68, 0.62))
+
+	# 돈 넣고 빼기
+	var grow := HBoxContainer.new()
+	grow.add_theme_constant_override("separation", 6)
+	var gl := Label.new()
+	gl.text = "돈"
+	gl.custom_minimum_size = Vector2(40, 0)
+	grow.add_child(gl)
+	for amt in [1000, 10000]:
+		var bin := Button.new()
+		bin.text = "+%d 넣기" % amt
+		bin.focus_mode = Control.FOCUS_NONE
+		bin.disabled = GameData.money < amt
+		bin.pressed.connect(func() -> void:
+			Sound.play_sfx("sfx_ui")
+			GameData.money -= amt
+			_sync("", "", 0, 0, -amt)
+			api.vault_deposit("", "", 0, 0, amt))
+		grow.add_child(bin)
+	for amt2 in [1000, 10000]:
+		var bout := Button.new()
+		bout.text = "%d 빼기" % amt2
+		bout.focus_mode = Control.FOCUS_NONE
+		bout.disabled = gold < amt2
+		bout.pressed.connect(func() -> void:
+			Sound.play_sfx("sfx_ui")
+			GameData.money += amt2
+			_sync("", "", 0, 0, amt2)
+			api.vault_withdraw("", "", 0, 0, amt2))
+		grow.add_child(bout)
+	_box.add_child(grow)
+
+	# 금고에 든 물건 — 눌러서 하나씩 뺀다
+	_line("금고 속 (누르면 하나 꺼낸다)", Color(0.9, 0.86, 0.7))
+	var vg := GridContainer.new()
+	vg.columns = 9
+	vg.add_theme_constant_override("h_separation", 5)
+	vg.add_theme_constant_override("v_separation", 5)
+	var anyv := false
+	for it: Dictionary in _vault.get("items", []):
+		var n := int(it.get("qty", 0))
+		if n <= 0:
+			continue
+		anyv = true
+		var cat := str(it.get("cat", "item"))
+		var id := str(it.get("item_id", ""))
+		var q := int(it.get("quality", 0))
+		vg.add_child(_mk_vault_cell(cat, id, q, n, false))
+	_box.add_child(vg)
+	if not anyv:
+		_line("금고가 비어 있다.", Color(0.7, 0.66, 0.6))
+
+	# 게임 창고 — 눌러서 하나씩 넣는다
+	_line("내 창고 (누르면 금고에 하나 넣는다)", Color(0.9, 0.86, 0.7))
+	var ig := GridContainer.new()
+	ig.columns = 9
+	ig.add_theme_constant_override("h_separation", 5)
+	ig.add_theme_constant_override("v_separation", 5)
+	var anyi := false
+	for e in _stock_entries():
+		anyi = true
+		ig.add_child(_mk_vault_cell(str(e.cat), str(e.id), int(e.q), int(e.n), true))
+	_box.add_child(ig)
+	if not anyi:
+		_line("창고에 넣을 것이 없다.", Color(0.7, 0.66, 0.6))
+
+
+# 금고 칸 하나 — into=true 면 창고에서 금고로, false 면 금고에서 창고로
+func _mk_vault_cell(cat: String, id: String, q: int, n: int, into: bool) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(54, 54)
+	b.focus_mode = Control.FOCUS_NONE
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.tooltip_text = "%s x%d\n%s" % [_label_of(cat, id, q), n,
+		"누르면 금고에 하나 넣는다" if into else "누르면 창고로 하나 꺼낸다"]
+	var tn := _icon_of(cat, id)
+	if main != null and main.tex.has(tn):
+		b.icon = main.tex[tn]
+	else:
+		b.text = _label_of(cat, id, q).left(2)
+	var num := Label.new()
+	num.text = str(n)
+	num.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	num.offset_left = -38
+	num.offset_top = -15
+	num.offset_right = -3
+	num.offset_bottom = -1
+	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	num.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
+	num.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.14))
+	num.add_theme_constant_override("outline_size", 3)
+	num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(num)
+	b.pressed.connect(func() -> void:
+		Sound.play_sfx("sfx_ui")
+		if into:
+			if not _take_out(cat, id, 1, q):
+				_status = "창고에 없다."
+				_rebuild()
+				return
+			api.vault_deposit(cat, id, 1, q, 0)
+		else:
+			_give_back(cat, id, 1, q)
+			_sync(cat, id, 1, q, 0)
+			api.vault_withdraw(cat, id, 1, q, 0))
+	return b
+
+
+# 금고에 든 것만 올릴 수 있다 (서버가 쥔 창고 — 게임의 말을 안 믿는다)
 func _build_sell() -> void:
 	if _pick_id != "":
 		_build_price_picker()
 		return
-	_line("내 창고 — 올릴 것을 누르자. (칸 아래 숫자가 가진 개수)",
+	if _loading and not _vault_loaded:
+		_line("금고를 여는 중...")
+		return
+	_line("금고에 든 것만 장터에 올릴 수 있다. (「금고」 칸에서 넣고 오자)",
 		Color(0.95, 0.8, 0.5))
-	_line("장터 규칙: 동시에 10개까지 · 하루 20건 · 30초에 한 번 · 수수료 5%\n"
+	_line("규칙: 동시에 10개까지 · 하루 20건 · 30초에 한 번 · 수수료 5%(금고 돈에서)\n"
 		+ "값은 잡화점 기준의 0.5배 ~ 10배 안에서만 매길 수 있다.",
 		Color(0.7, 0.68, 0.62))
 	var grid := GridContainer.new()
@@ -459,14 +594,37 @@ func _build_sell() -> void:
 	grid.add_theme_constant_override("h_separation", 5)
 	grid.add_theme_constant_override("v_separation", 5)
 	var any := false
-	for e in _stock_entries():
+	for it: Dictionary in _vault.get("items", []):
+		var n := int(it.get("qty", 0))
+		if n <= 0:
+			continue
 		any = true
-		grid.add_child(_mk_stock_cell(e))
+		var cat := str(it.get("cat", "item"))
+		var id := str(it.get("item_id", ""))
+		var q := int(it.get("quality", 0))
+		grid.add_child(_mk_stock_cell({"cat": cat, "id": id, "q": q, "n": n,
+			"base": _base_of(cat, id, q)}))
 	_box.add_child(grid)
 	if not any:
-		_line("올릴 만한 것이 창고에 없다.")
-		_line("수확물·씨앗·목재·석재·광석·물고기·요리·도구까지 전부 올릴 수 있다.",
-			Color(0.7, 0.66, 0.6))
+		_line("금고가 비어 있다. 「금고」 칸에서 물건을 넣자.")
+
+
+# 잡화점 기준값 (값을 매길 때 길잡이로 보여 준다)
+func _base_of(cat: String, id: String, quality: int) -> int:
+	match cat:
+		"seed":
+			return int(GameData.CROPS[id].seed_price) if GameData.CROPS.has(id) else 1
+		"produce":
+			var mult: int = [1, 2, 3][clampi(quality, 0, 2)]
+			return int(GameData.CROPS[id].sell_price) * mult \
+				if GameData.CROPS.has(id) else 1
+		"tool":
+			return 300 * maxi(1, quality)
+		_:
+			if id == "wood" or id == "stone":
+				return 10
+			return maxi(1, int(GameData.ITEMS[id].get("sell", 1))) \
+				if GameData.ITEMS.has(id) else 1
 
 
 # 창고에 있는 것들 — [종류, id, 품질, 개수, 잡화점 기준값]
@@ -569,12 +727,12 @@ func _pick(cat: String, id: String, quality: int, have: int, base: int) -> void:
 
 
 func _build_price_picker() -> void:
-	var have := _have_of(_pick_cat, _pick_id, _pick_quality)
+	var have := _vault_qty(_pick_cat, _pick_id, _pick_quality)   # 금고에 든 만큼
 	_line("%s — 몇 개를 얼마에 올릴까? (가진 것 %d개)"
 		% [_label_of(_pick_cat, _pick_id, _pick_quality), have],
 		Color(0.95, 0.8, 0.5))
-	_line("(값은 묶음 전체의 값이다. 팔리면 「내 등록·대금」에서 받는다)\n"
-		+ "올릴 때 값의 5%를 수수료로 뗀다 — 거둬도 수수료는 돌아오지 않는다.")
+	_line("(값은 묶음 전체의 값이다. 팔리면 대금이 금고로 들어온다)\n"
+		+ "올릴 때 값의 5%를 금고 돈에서 수수료로 뗀다 — 거둬도 돌아오지 않는다.")
 
 	if _pick_cat == "tool":
 		_line("도구는 하나뿐이라 올리면 내 손에서 떠난다. 팔리기 전엔 거둘 수 있다.",
@@ -655,14 +813,9 @@ func _have_of(cat: String, id: String, quality: int) -> int:
 	return int(GameData.items.get(id, 0))
 
 
-# 올리기 — 물건은 **먼저** 창고에서 뺀다. 서버가 거절하면 돌려준다.
-# (안 빼면 올려 둔 것을 집에서 또 팔아 두 번 챙길 수 있다)
+# 올리기 — 물건은 **금고에서** 빠진다 (서버가 판단한다). 게임 창고는 건드리지 않는다
 func _do_list() -> void:
 	Sound.play_sfx("sfx_ui")
-	if not _take_out(_pick_cat, _pick_id, _pick_qty, _pick_quality):
-		_status = "창고에 그만큼 없다."
-		_rebuild()
-		return
 	_status = "장터에 올리는 중..."
 	_rebuild()
 	api.list_item(_pick_cat, _pick_id, _pick_qty, _pick_quality, _pick_price)

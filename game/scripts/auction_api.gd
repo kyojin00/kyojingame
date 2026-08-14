@@ -18,6 +18,8 @@ signal listed(ok: bool, msg: String, fee: int)
 signal fetched(rows: Array)
 signal bought(ok: bool, msg: String, row: Dictionary)
 signal claimed(count: int, gold: int)
+signal vault(state: Dictionary)               # 금고 상태 도착
+signal moved(ok: bool, msg: String)           # 금고에 넣기·빼기 결과
 
 const URL := "https://crtjpqlseizzwzkrctte.supabase.co"
 # 공개 키 — 읽기/등록만 되는 열쇠다 (고치고 지우는 길은 서버가 막아 뒀다)
@@ -155,6 +157,46 @@ func cancel(id: int) -> void:
 				bought.emit(true, "물건을 다시 거뒀다.", res)
 			else:
 				bought.emit(false, _why(code, res), {}))
+
+
+# ---- 금고 ----
+#
+# 장터에 올릴 물건은 **먼저 금고에 넣어야** 한다. 금고 잔고는 서버만 고치므로,
+# 고친 게임이 없는 물건을 올리지 못한다. 넣는 길에는 하루 한도가 있다.
+func vault_state() -> void:
+	if busy:
+		return
+	busy = true
+	_send(REST + "rpc/farm_vault_state", HTTPClient.METHOD_POST,
+		{"p_owner": GameData.farm_key()}, PackedStringArray(),
+		func(code: int, res: Variant) -> void:
+			vault.emit(res if code == 200 and typeof(res) == TYPE_DICTIONARY else {}))
+
+
+func vault_deposit(cat: String, item_id: String, qty: int, quality: int,
+		gold: int) -> void:
+	_vault_move("farm_vault_deposit", cat, item_id, qty, quality, gold)
+
+
+func vault_withdraw(cat: String, item_id: String, qty: int, quality: int,
+		gold: int) -> void:
+	_vault_move("farm_vault_withdraw", cat, item_id, qty, quality, gold)
+
+
+func _vault_move(fn: String, cat: String, item_id: String, qty: int,
+		quality: int, gold: int) -> void:
+	if busy:
+		return
+	busy = true
+	_send(REST + "rpc/" + fn, HTTPClient.METHOD_POST, {
+			"p_owner": GameData.farm_key(), "p_cat": cat, "p_item_id": item_id,
+			"p_qty": qty, "p_quality": quality, "p_gold": gold,
+		}, PackedStringArray(),
+		func(code: int, res: Variant) -> void:
+			if code != 200 or typeof(res) != TYPE_DICTIONARY:
+				moved.emit(false, _why(code, res))
+				return
+			moved.emit(bool(res.get("ok", false)), str(res.get("msg", ""))))
 
 
 # ---- 대금 받기 ----
