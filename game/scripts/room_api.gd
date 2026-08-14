@@ -9,7 +9,7 @@
 #   found(ok, ip, port, msg)  코드로 찾은 결과
 extends Node
 
-signal opened(ok: bool, code: String, msg: String)
+signal opened(ok: bool, room_code: String, msg: String)   # 인자 이름은 멤버(code)와 겹치지 않게
 signal found(ok: bool, ip: String, port: int, msg: String)
 
 const URL := "https://crtjpqlseizzwzkrctte.supabase.co"

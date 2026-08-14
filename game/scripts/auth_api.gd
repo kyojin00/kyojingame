@@ -12,7 +12,7 @@
 # 굴러간다 — 로그인 때문에 게임이 멈추지는 않는다.
 extends Node
 
-signal ready_changed(signed_in: bool)
+signal ready_changed(ok: bool)   # 인자 이름은 함수명(signed_in)과 겹치지 않게
 
 const URL := "https://crtjpqlseizzwzkrctte.supabase.co"
 const KEY := "sb_publishable_1mNGh1HIXYxaS6D9TYAkvw_jHW_xGDQ"
