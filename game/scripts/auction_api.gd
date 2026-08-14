@@ -14,7 +14,7 @@
 #   claimed(count, gold) 대금 수령
 extends Node
 
-signal listed(ok: bool, msg: String)
+signal listed(ok: bool, msg: String, fee: int)
 signal fetched(rows: Array)
 signal bought(ok: bool, msg: String, row: Dictionary)
 signal claimed(count: int, gold: int)
@@ -91,21 +91,25 @@ func fetch(mine_only := false) -> void:
 
 
 # ---- 등록 ----
+#
+# 직접 넣지 않고 서버 함수를 부른다 — 슬롯 상한·하루 횟수·쿨다운·수수료·
+# 가격 상하한을 **서버가** 본다 (고친 게임으로 우회할 수 없게).
 func list_item(cat: String, item_id: String, qty: int, quality: int, price: int) -> void:
 	if busy:
 		return
 	busy = true
-	_send(REST + "farm_auctions", HTTPClient.METHOD_POST, {
-			"seller_id": GameData.farm_id,
-			"seller_name": GameData.seller_name(),
-			"cat": cat, "item_id": item_id,
-			"qty": qty, "quality": quality, "price": price,
-		}, PackedStringArray(["Prefer: return=representation"]),
+	_send(REST + "rpc/farm_auction_list", HTTPClient.METHOD_POST, {
+			"p_seller_id": GameData.farm_id,
+			"p_seller_name": GameData.seller_name(),
+			"p_cat": cat, "p_item_id": item_id,
+			"p_qty": qty, "p_quality": quality, "p_price": price,
+		}, PackedStringArray(),
 		func(code: int, res: Variant) -> void:
-			if code == 201:
-				listed.emit(true, "장터에 올렸다!")
-			else:
-				listed.emit(false, _why(code, res)))
+			if code != 200 or typeof(res) != TYPE_DICTIONARY:
+				listed.emit(false, _why(code, res), 0)
+				return
+			listed.emit(bool(res.get("ok", false)), str(res.get("msg", "")),
+				int(res.get("fee", 0))))
 
 
 # ---- 사기 ----
