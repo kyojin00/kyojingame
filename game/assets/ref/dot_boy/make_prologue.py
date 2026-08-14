@@ -223,24 +223,55 @@ def scene_box(g, f):
     br = [1.0, 1.1, 0.92, 1.05][f]
     g.pool(52, 56, int(66 * br), int(17 * br), (255, 190, 90),
            ((0.35, 0.35), (0.7, 0.2), (1.0, 0.1)))
-    # 상자 그림자 — 바닥에 딱 붙인다
-    g.pool(86, 62, 34, 5, (60, 36, 30), ((1.0, 0.45),))
-    # 나무 상자 — 실루엣을 따라 도는 윤곽선 (검은 사각 틀이 아니라)
-    bx0, bx1 = 60, 112
-    by0, by1 = 32, 61
-    g.rrect(bx0 + 1, by0 - 12, bx1 - 1, by0 - 1, OUTLINE, 3)        # 뚜껑 윤곽
-    g.rrect(bx0 - 1, by0 - 1, bx1 + 1, by1 + 1, OUTLINE, 4)         # 몸통 윤곽
-    g.rrect(bx0 + 2, by0 - 11, bx1 - 2, by0 - 2, (96, 64, 38), 3)   # 뚜껑
-    g.rect(bx0 + 4, by0 - 11, bx1 - 4, by0 - 10, (66, 44, 28))
+    # 상자 그림자 — 비스듬한 몸통을 따라 바닥에 진다
+    g.pool(92, 63, 42, 6, (60, 36, 30), ((1.0, 0.45),))
+    # 나무 상자 — 정육면체를 비스듬히 본 입체 (앞판 + 옆판 + 열린 뚜껑).
+    # 깊이 방향은 오른쪽 위(DEP, -RISE)로 물러난다.
+    bx0, bx1 = 60, 104
+    by0, by1 = 36, 61
+    DEP, RISE = 14, 6
+    # 열린 뚜껑 — 뒷모서리에서 위로 젖혀져 비스듬히 서 있다
+    for i in range(17):
+        off = round(i * 4 / 17)
+        g.rect(70 + off, 13 + i, 114 + off, 13 + i, (96, 64, 38))
+    g.rect(72, 13, 116, 14, (116, 80, 46))          # 뚜껑 안쪽 테
+    for x in range(69, 116):
+        g.p(x, 12, OUTLINE)
+    for i in range(18):
+        off = round(i * 4 / 17)
+        g.p(69 + off, 12 + i, OUTLINE)
+        g.p(115 + off, 12 + i, OUTLINE)
+    # 상자 속 — 비스듬히 열린 윗면 (평행사변형)
+    for t in range(DEP + 1):
+        y = by0 - round(t * RISE / DEP)
+        g.rect(bx0 + t, y, bx1 + t, y, (38, 25, 17))
+    # 옆판 — 깊이 방향으로 물러나는 어두운 면
+    for x in range(bx1, bx1 + DEP + 1):
+        dy = round((x - bx1) * RISE / DEP)
+        g.rect(x, by0 - dy + 2, x, by1 - dy, (106, 70, 38))
+        if (x - bx1) in (5, 10):                    # 옆판 널 이음새
+            g.rect(x, by0 - dy + 3, x, by1 - dy - 1, (88, 58, 32))
+    # 앞판
     g.rrect(bx0, by0, bx1, by1, (140, 96, 50), 3)
     for y in range(by0 + 7, by1 - 1, 7):
         g.rect(bx0 + 1, y, bx1 - 1, y, (112, 74, 40))
     g.rect(bx0 + 2, by0, bx1 - 2, by0 + 1, (172, 122, 66))
-    for x0 in (bx0, bx1 - 4):                       # 쇠장식
+    for x0 in (bx0, bx1 - 4):                       # 앞판 쇠장식
         g.rrect(x0, by0, x0 + 4, by0 + 5, (128, 130, 138), 2)
         g.rrect(x0, by1 - 5, x0 + 4, by1, (104, 106, 114), 2)
         g.p(x0 + 2, by0 + 2, (176, 178, 186))
-    g.rect(bx0 + 2, by0 - 1, bx1 - 2, by0 + 2, (40, 26, 18))   # 속 그늘
+    # 윤곽선 — 입체 실루엣을 따라 돈다
+    for y in range(by0, by1 + 2):
+        g.p(bx0 - 1, y, OUTLINE)                    # 왼쪽 모서리
+    for x in range(bx0 - 1, bx1 + 1):
+        g.p(x, by1 + 1, OUTLINE)                    # 앞 바닥선
+    for x in range(bx1, bx1 + DEP + 1):             # 옆 바닥선 (비스듬)
+        dy = round((x - bx1) * RISE / DEP)
+        g.p(x + 1, by1 - dy + 1, OUTLINE)
+    for y in range(by0 - RISE + 2, by1 - RISE + 1):
+        g.p(bx1 + DEP + 1, y, OUTLINE)              # 오른쪽 뒷모서리
+    for y in range(by0 + 1, by1 + 1):               # 앞판·옆판 경계선
+        g.p(bx1, y, (92, 60, 34))
     # 연구 노트 — 열린 상자 안에서 비스듬히 고개를 내민다
     nb_top = by0 - 10
     for y in range(nb_top, by0):
