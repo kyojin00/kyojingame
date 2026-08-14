@@ -137,11 +137,21 @@ func _process(delta: float) -> void:
 # 카탈로그 + 정보 항목(아직 수락 안 한 의뢰, 계절 축제)을 한 줄로 편다
 func _entries() -> Array:
 	var out: Array = []
+	# 메인 스토리는 「지금 진행 중인 하나」만 보여 준다 — 완료했거나
+	# 아직 닿지 않은 회차는 목록에서 숨긴다 (서브퀘는 전부 그대로)
+	var main_shown := false
 	for q: Dictionary in GameData.quest_catalog():
 		var e := q.duplicate()
 		if not e.has("cat"):
 			e["cat"] = "sub"
+		if str(e.cat) == "main":
+			if main_shown:
+				continue
+			main_shown = true
 		out.append(e)
+	# 마을 소식은 마을에 도착한 뒤에야 열린다 (숲길 진행 중에는 숨김)
+	if GameData.story_phase != "done":
+		return out
 	# 게시판에 붙어 있는(아직 수락 전) 의뢰 — 정보로 보여 준다
 	if GameData.quest_line() == "" and not GameData.quest_offers.is_empty():
 		out.append({"id": "info_offers", "cat": "info", "title": "게시판의 의뢰",

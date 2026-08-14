@@ -2415,6 +2415,44 @@ func _debug_tick() -> void:
 			GameData.recipe_items.erase("dish_grilled_fish")
 			print("KITCHENGATE_OK=", blocked and bought,
 				" 차단+힌트=", blocked, " 해금후구매=", bought)
+		319:
+			# #113: Q창 메인 1개만 + 마을 도착 전 「마을 소식」 숨김 + 말풍선 토스트
+			var keep_sp := GameData.story_phase
+			var keep_s6 := GameData.story6_phase
+			var keep_mv := GameData.move_quest
+			# 메인 두 줄기를 동시에 살려 놓고 목록을 뽑아 본다
+			GameData.story_phase = "done"
+			GameData.story6_phase = "show_chief"
+			GameData.move_quest = "show"
+			var mains := 0
+			var has_info := false
+			for e: Dictionary in m.quest_ui._entries():
+				if str(e.get("cat", "")) == "main":
+					mains += 1
+				if str(e.get("cat", "")) == "info":
+					has_info = true
+			var one_main: bool = mains == 1
+			var info_town: bool = has_info
+			# 마을 도착 전 — 마을 소식이 아예 없어야 한다
+			GameData.story_phase = "travel"
+			var info_field := false
+			for e: Dictionary in m.quest_ui._entries():
+				if str(e.get("cat", "")) == "info":
+					info_field = true
+			# 말풍선 시작 토스트 — bounce 표식이 실려 큐에 들어간다
+			m.hud._toast_queue.clear()
+			m.hud.quest_start_toast("검사용 퀘스트")
+			var bubbled: bool = not m.hud._toast_queue.is_empty() \
+				and bool(m.hud._toast_queue[0].get("bounce", false)) \
+				and str(m.hud._toast_queue[0].head).contains("새로운 퀘스트")
+			m.hud._toast_queue.clear()
+			GameData.story_phase = keep_sp
+			GameData.story6_phase = keep_s6
+			GameData.move_quest = keep_mv
+			print("QUESTLIST_OK=", one_main and info_town and not info_field
+				and bubbled,
+				" 메인1개=", one_main, " 마을소식(도착후)=", info_town,
+				" 마을소식(도착전숨김)=", not info_field, " 말풍선=", bubbled)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()

@@ -256,12 +256,12 @@ func _story_update(delta: float) -> void:
 				GameData.story_phase = "approach"
 				m.hud.show_message("더 이상 갈 수 없는 길인 것 같다.", 4.0)
 				if story_shot:
-					m.hud.quest_toast("숲 안으로 들어가보기")
+					m.hud.quest_start_toast("숲 안으로 들어가보기")
 					_spawn_postman()
 				else:
 					# 자막을 읽을 시간을 준 뒤 완료 처리 + 우체부 등장
 					get_tree().create_timer(1.3).timeout.connect(func() -> void:
-						m.hud.quest_toast("숲 안으로 들어가보기")
+						m.hud.quest_start_toast("숲 안으로 들어가보기")
 						_spawn_postman())
 		"approach":
 			_update_postman(delta, story_shot)
@@ -281,7 +281,7 @@ func _story_update(delta: float) -> void:
 			# 받은 나무도끼를 가방에서 빠른 슬롯에 넣으면 퀘스트 2 완료
 			if GameData.tool_slots.has("axe"):
 				GameData.story_phase = "chop"
-				m.hud.quest_toast("나무도끼를 장착해보기")
+				m.hud.quest_start_toast("나무도끼를 장착해보기")
 				m.hud.show_message("숫자키로 도끼를 선택하고, 나무를 클릭한 뒤 E로 베어보자!", 6.0)
 		"chop":
 			_update_postman(delta, story_shot)
@@ -297,7 +297,7 @@ func _story_update(delta: float) -> void:
 			if m.map_ui.visible and not _story_map_opened:
 				_story_map_opened = true
 			elif _story_map_opened and not m.map_ui.visible and not m.dialog.visible:
-				m.hud.quest_toast("지도를 확인해보자")
+				m.hud.quest_start_toast("지도를 확인해보자")
 				GameData.story_phase = "rock"  # 대화는 토스트 뒤에 이어진다
 				get_tree().create_timer(1.4).timeout.connect(_after_map_dialog)
 		"rock":
@@ -551,7 +551,7 @@ func _story_tree_chopped() -> void:
 	# 벌목 퀘스트 완료 (보상: 목재) -> 완료 연출 후 우체부 아저씨의 다음 대화로 자동 연결.
 	# 아직 마을로 가지 않는다 — 숲길을 개척하며 갈림길까지 함께 이동한다.
 	GameData.story_phase = "path"
-	m.hud.quest_toast("나무를 베어보자")
+	m.hud.quest_start_toast("나무를 베어보자")
 	m.hud.reward_toast("목재 × %d" % m.WOOD_PER_TREE, m.tex["icon_wood"])
 	get_tree().create_timer(1.6).timeout.connect(_start_travel_dialog)
 
@@ -680,7 +680,7 @@ func _end_rock_quest() -> void:
 	m.story_cutscene = false
 	GameData.story_rock_state = 3
 	GameData.story_phase = "travel"
-	m.hud.quest_toast("마을로 가는 길을 열어보자")
+	m.hud.quest_start_toast("마을로 가는 길을 열어보자")
 	m.hud.reward_toast("나무 곡괭이 (정식 획득)", m.tex["icon_pickaxe"])
 	_apply_story_camera()
 	_apply_story_visibility()
@@ -748,7 +748,7 @@ func _update_u_intro() -> void:
 		GameData.u_intro_state = 2
 	elif GameData.u_intro_state == 2 and not m.stats_ui.visible:
 		GameData.u_intro_state = 3
-		m.hud.quest_toast("자신의 능력 확인해보기")
+		m.hud.quest_start_toast("자신의 능력 확인해보기")
 
 
 func _story_chief() -> Node2D:
@@ -936,9 +936,8 @@ func _end_home_greet() -> void:
 	var chief: Variant = _story_chief()
 	if chief != null:
 		chief.scripted = false
-	m.hud.quest_toast("메인 스토리 2 — 상점을 짓자")
-	m.hud.show_message("메인 스토리 2 시작! 목재 %d·돌 %d을 모아 상점 터 게시판(광장 북쪽)에서 상점을 짓자."
-		% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE], 7.0)
+	# 검은 알림 바 대신 말풍선 연출만 — 자세한 재료는 트래커/Q창이 보여 준다
+	m.hud.quest_start_toast("메인 스토리 2 — 상점을 짓자")
 	m.saveio.save_now()
 
 
@@ -962,7 +961,7 @@ func _end_farm_intro() -> void:
 	GameData.story2_phase = "farm"
 	if not GameData.is_tool_unlocked("hoe"):
 		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
-	m.hud.quest_toast("밭을 일구자")
+	m.hud.quest_start_toast("밭을 일구자")
 	m.hud.show_message("호미로 밭을 갈아 농사를 시작하자! (밭 갈기 → 씨앗 → 물 → 수확)", 6.0)
 	m.saveio.save_now()
 
@@ -1089,7 +1088,7 @@ func _fisher_choose(pick: int) -> void:
 func _end_fisher_meet() -> void:
 	GameData.fisher_quest = "follow"
 	_fisher_gate_talked = false
-	m.hud.quest_toast("낚시꾼과 함께 바다로")
+	m.hud.quest_start_toast("낚시꾼과 함께 바다로")
 	m.hud.show_message("낚시꾼과 함께 남쪽 바위 능선으로 가자. (화살표 방향)", 6.0)
 	m.saveio.save_now()
 
@@ -1109,7 +1108,7 @@ func _start_fisher_gate_dialog() -> void:
 			fisher.moving = false
 			fisher.dir = "right"
 			fisher._update_sprite()
-		m.hud.quest_toast("바닷길을 열자")
+		m.hud.quest_start_toast("바닷길을 열자")
 		m.hud.show_message("곡괭이로 길목의 커다란 바위를 캐자!", 5.0)
 		m.saveio.save_now())
 
@@ -1508,7 +1507,7 @@ func _finish_grandpa() -> void:
 			parts.append("%s 씨앗 x%d" % [GameData.CROPS[sid].name, int(reward.seeds[sid])])
 	if not parts.is_empty():
 		m.hud.reward_toast(", ".join(parts), m.tex["icon_coin"])
-	m.hud.quest_toast("할아버지의 부탁 — %s" % q.name)
+	m.hud.quest_start_toast("할아버지의 부탁 — %s" % q.name)
 	if Net.is_host():
 		m.netsync._broadcast_stats()
 	m.saveio.save_now()
@@ -1571,7 +1570,7 @@ func _forest_update(_delta: float) -> void:
 	# 정착한 다음 날 아침, 숲을 쏘다니던 무진이 뭔가를 발견했다.
 	if GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
 		GameData.forest_quest = "found"
-		m.hud.quest_toast("무진이 할 말이 있는 듯하다")
+		m.hud.quest_start_toast("무진이 할 말이 있는 듯하다")
 
 
 # 광장의 무진에게 말을 걸면 — 이사 인사 (모험을 좋아하는 성격)
@@ -1609,7 +1608,7 @@ func _start_explorer_found_dialog() -> void:
 func _end_explorer_found() -> void:
 	if GameData.forest_quest == "found":
 		GameData.forest_quest = "ask"
-		m.hud.quest_toast("숲속의 집에 대해 이장에게 물어보자")
+		m.hud.quest_start_toast("숲속의 집에 대해 이장에게 물어보자")
 	m.saveio.save_now()
 
 
@@ -1627,7 +1626,7 @@ func _end_forest_ask() -> void:
 		GameData.forest_quest = "visit"
 		m.worldgen._spawn_forest_house()
 		m.npcmgr._sync_village_npcs()   # 모녀가 집 앞에 있다
-		m.hud.quest_toast("숲 깊은 곳의 집을 찾아가 보자")
+		m.hud.quest_start_toast("숲 깊은 곳의 집을 찾아가 보자")
 		m.hud.show_message("숲길(서쪽) 남쪽으로 난 오솔길을 따라 내려가 보자.", 6.0)
 	m.saveio.save_now()
 
@@ -1713,8 +1712,8 @@ func _start_move_letter_dialog() -> void:
 func _end_move_letter() -> void:
 	if GameData.move_quest == "letter":
 		GameData.move_quest = "show"
-		m.hud.quest_toast("메인 스토리 3 — 새로운 주민의 이사")
-		m.hud.quest_toast("마을 생활 안내가 열렸다! (Q에서 확인)")
+		m.hud.quest_start_toast("메인 스토리 3 — 새로운 주민의 이사")
+		m.hud.quest_start_toast("마을 생활 안내가 열렸다! (Q에서 확인)")
 	m.saveio.save_now()
 
 
@@ -2306,7 +2305,7 @@ func examine_old_book(t: Vector2i) -> void:
 
 
 func _end_book_found() -> void:
-	m.hud.quest_toast("메인 스토리 6 — 오래된 책과 사서")
+	m.hud.quest_start_toast("메인 스토리 6 — 오래된 책과 사서")
 	m.saveio.save_now()
 
 
@@ -2324,7 +2323,7 @@ func _start_book_chief_dialog() -> void:
 func _end_book_chief() -> void:
 	if GameData.story6_phase == "show_chief":
 		GameData.story6_phase = "ask_post"
-		m.hud.quest_toast("우체부 아저씨에게 편지를 부탁하자")
+		m.hud.quest_start_toast("우체부 아저씨에게 편지를 부탁하자")
 	m.saveio.save_now()
 
 
@@ -2346,7 +2345,7 @@ func _end_book_post() -> void:
 	if GameData.story6_phase == "ask_post":
 		GameData.story6_phase = "wait"
 		GameData.story6_day = GameData.day
-		m.hud.quest_toast("사서의 답장을 기다리자")
+		m.hud.quest_start_toast("사서의 답장을 기다리자")
 	_despawn_book_post()
 	m.saveio.save_now()
 
@@ -2364,7 +2363,7 @@ func _start_book_reply_dialog() -> void:
 func _end_book_reply() -> void:
 	if GameData.story6_phase == "wait":
 		GameData.story6_phase = "visit"
-		m.hud.quest_toast("마을에 찾아온 사서를 만나보자")
+		m.hud.quest_start_toast("마을에 찾아온 사서를 만나보자")
 	_despawn_book_post()
 	m.npcmgr._sync_village_npcs()   # 사서가 광장 곁에 나타난다 (방문객)
 	m.saveio.save_now()
@@ -2389,7 +2388,7 @@ func _start_librarian_book_dialog() -> void:
 func _end_librarian_book() -> void:
 	if GameData.story6_phase == "visit":
 		GameData.story6_phase = "told"
-		m.hud.quest_toast("사서의 이야기를 이장에게 전하자")
+		m.hud.quest_start_toast("사서의 이야기를 이장에게 전하자")
 	m.saveio.save_now()
 
 
@@ -2407,7 +2406,7 @@ func _start_book_chief2_dialog() -> void:
 func _end_book_chief2() -> void:
 	if GameData.story6_phase == "told":
 		GameData.story6_phase = "build"
-		m.hud.quest_toast("도서관 건설을 준비하자")
+		m.hud.quest_start_toast("도서관 건설을 준비하자")
 	m.saveio.save_now()
 
 

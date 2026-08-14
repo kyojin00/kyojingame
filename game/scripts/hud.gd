@@ -261,6 +261,13 @@ func quest_toast(title: String) -> void:
 	Sound.play_sfx("sfx_catch")
 
 
+# 퀘스트 시작 — 딱딱한 검은 알림 대신, 통통 튀며 내려오는 말풍선으로
+func quest_start_toast(title: String) -> void:
+	_toast_queue.append({"head": "📜 새로운 퀘스트!", "body": title, "icon": null,
+		"head_col": Color(0.85, 0.5, 0.12), "bounce": true})
+	Sound.play_sfx("sfx_ui")
+
+
 # ---- 메인 스토리 완결 연출 (전체 화면) ----
 #
 # 상단 구석에 스치던 작은 토스트 대신, 화면을 잠깐 어둡게 하고
@@ -376,26 +383,40 @@ func reward_toast(item_name: String, icon: Texture2D) -> void:
 	Sound.play_sfx("sfx_catch")
 
 
+var _toast_bounce := false
+
+
 func _show_next_toast() -> void:
 	var d: Dictionary = _toast_queue.pop_front()
 	_toast = Panel.new()
-	_toast.add_theme_stylebox_override("panel", _wood_style())
+	# 둥근 크림색 말풍선 — 딱딱한 나무판 대신 아기자기하게
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.99, 0.95, 0.83, 0.98)
+	st.border_color = Color(0.62, 0.4, 0.18)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(14)
+	st.shadow_color = Color(0.15, 0.09, 0.03, 0.25)
+	st.shadow_size = 4
+	st.shadow_offset = Vector2(0, 3)
+	_toast.add_theme_stylebox_override("panel", st)
 	var has_icon: bool = d.icon != null
 	var tw := 250
-	_toast.position = Vector2((960 - tw) / 2.0, -50)
-	_toast.size = Vector2(tw, 44)
+	_toast.position = Vector2((960 - tw) / 2.0, -54)
+	_toast.size = Vector2(tw, 46)
+	_toast.pivot_offset = Vector2(tw / 2.0, 23.0)
+	_toast_bounce = bool(d.get("bounce", false))
 	var head := Label.new()
 	head.text = str(d.head)
-	head.position = Vector2(44 if has_icon else 12, 4)
-	head.size = Vector2(tw - 50, 16)
+	head.position = Vector2(44 if has_icon else 14, 5)
+	head.size = Vector2(tw - 52, 16)
 	head.add_theme_font_override("font", FONT_SMALL)
 	head.add_theme_font_size_override("font_size", 12)
 	head.add_theme_color_override("font_color", d.head_col)
 	_toast.add_child(head)
 	var body := Label.new()
 	body.text = str(d.body)
-	body.position = Vector2(44 if has_icon else 12, 21)
-	body.size = Vector2(tw - 50, 18)
+	body.position = Vector2(44 if has_icon else 14, 22)
+	body.size = Vector2(tw - 52, 18)
 	body.add_theme_font_override("font", FONT_SMALL)
 	body.add_theme_font_size_override("font_size", 13)
 	body.add_theme_color_override("font_color", WOOD_TEXT)
@@ -403,7 +424,7 @@ func _show_next_toast() -> void:
 	if has_icon:
 		var ic := TextureRect.new()
 		ic.texture = d.icon
-		ic.position = Vector2(8, 8)
+		ic.position = Vector2(10, 9)
 		ic.size = Vector2(28, 28)
 		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ic.stretch_mode = TextureRect.STRETCH_SCALE
@@ -418,9 +439,24 @@ func _update_toast(delta: float) -> void:
 			_show_next_toast()
 		return
 	_toast_t += delta
-	# 슬라이드 인 (0~0.25초) -> 유지 -> 페이드 아웃 (마지막 0.4초)
+	# 톡 떨어져서 한 번 튕기고 자리 잡는다 -> 유지 -> 페이드 아웃
 	var slide := clampf(_toast_t / 0.25, 0.0, 1.0)
-	_toast.position.y = -50.0 + (58.0 + 50.0) * (1.0 - (1.0 - slide) * (1.0 - slide))
+	var y := -54.0 + (58.0 + 54.0) * (1.0 - (1.0 - slide) * (1.0 - slide))
+	if _toast_t > 0.25 and _toast_t < 0.85:
+		# 감쇠하는 바운스 — 말풍선이 통통 튀는 느낌
+		var bt := _toast_t - 0.25
+		y += -absf(sin(bt * 10.5)) * 9.0 * maxf(0.0, 1.0 - bt / 0.6)
+	_toast.position.y = y
+	# 시작 알림(bounce)은 살짝 커졌다 앉으며 갸웃갸웃한다
+	if _toast_bounce and _toast_t < 1.0:
+		var pop := 1.0 + 0.14 * maxf(0.0, 1.0 - _toast_t / 0.3) \
+			* sin(_toast_t * 16.0 + 1.2)
+		_toast.scale = Vector2(pop, pop)
+		_toast.rotation_degrees = sin(_toast_t * 9.0) * 2.2 \
+			* maxf(0.0, 1.0 - _toast_t / 1.0)
+	else:
+		_toast.scale = Vector2.ONE
+		_toast.rotation_degrees = 0.0
 	var fade := clampf((TOAST_TIME - _toast_t) / 0.4, 0.0, 1.0)
 	_toast.modulate.a = fade
 	if _toast_t >= TOAST_TIME:
