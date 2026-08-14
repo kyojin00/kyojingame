@@ -28,13 +28,19 @@ const PAGE := 60          # 한 번에 받아 오는 글 수
 var busy := false         # 요청이 하나만 돌게 (버튼 연타 방지)
 
 
+# 로그인했으면 그 계정 토큰, 아니면 공개 키 (오토로드는 실행할 때 집는다)
+func _bearer() -> String:
+	var a := get_node_or_null("/root/Auth")
+	return str(a.bearer()) if a != null else KEY
+
+
 func _headers(extra := PackedStringArray()) -> PackedStringArray:
 	# 로그인했으면 그 계정의 토큰으로 간다 — 서버가 신원을 **토큰에서** 읽으므로
 	# 클라이언트가 남의 이름을 대도 소용이 없다. 로그인 전이면 공개 키를 쓰고,
 	# 그때는 예전처럼 farm_id로 신원을 가린다.
 	var h := PackedStringArray([
 		"apikey: " + KEY,
-		"Authorization: Bearer " + Auth.bearer(),
+		"Authorization: Bearer " + _bearer(),
 		"Content-Type: application/json",
 	])
 	h.append_array(extra)
