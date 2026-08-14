@@ -338,16 +338,34 @@ func _on_host() -> void:
 	Net.rooms.open_room(GameData.seller_name(), Net.DEFAULT_PORT)
 
 
+# 코드가 나오면 **기다린다.** 저절로 넘어가면 코드를 못 보고 지나친다
+# (농장에 들어간 뒤에도 화면 오른쪽 위에 계속 떠 있긴 하다)
 func _on_room_opened(ok: bool, code: String, msg: String) -> void:
 	if not ok:
-		# 코드를 못 받아도 같은 네트워크라면 IP로 놀 수 있다 — 그대로 들어간다
+		# 코드를 못 받아도 같은 네트워크라면 주소로 놀 수 있다
 		mp_status.text = "%s\n코드 없이 방은 열렸다 (같은 공유기라면 접속된다)." % msg
-		get_tree().create_timer(2.5).timeout.connect(func() -> void:
-			get_tree().change_scene_to_file("res://scenes/main.tscn"))
+		_show_start_button("농장으로 들어가기")
 		return
-	mp_status.text = "방 코드: %s\n친구에게 알려 주자. 잠시 뒤 농장으로 들어간다." % code
-	get_tree().create_timer(2.0).timeout.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/main.tscn"))
+	_room_code = code
+	mp_status.text = "방 코드   %s\n친구에게 알려 주자. (농장 안에서도 오른쪽 위에 계속 보인다)" % code
+	_show_start_button("복사하고 시작하기")
+
+
+var _room_code := ""
+var _start_row: HBoxContainer = null
+
+
+func _show_start_button(text: String) -> void:
+	if _start_row != null and is_instance_valid(_start_row):
+		_start_row.queue_free()
+	_start_row = HBoxContainer.new()
+	_start_row.add_theme_constant_override("separation", 8)
+	_start_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	(mp_panel.get_child(0) as VBoxContainer).add_child(_start_row)
+	_start_row.add_child(_mk_button(text, func() -> void:
+		if _room_code != "":
+			DisplayServer.clipboard_set(_room_code)   # 붙여넣어 알려 주기 편하게
+		get_tree().change_scene_to_file("res://scenes/main.tscn")))
 
 
 # 참가 — 코드로 주소를 물어보고, 받은 주소로 붙는다

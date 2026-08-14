@@ -42,6 +42,9 @@ var _slot_selected: StyleBoxFlat
 
 @onready var day_label: Label = $ClockPanel/DayLabel
 @onready var clock_label: Label = $ClockPanel/ClockLabel
+# 방 코드 — 함께하기 방을 열어 둔 동안 시계 아래에 늘 떠 있다
+# (타이틀에서 한 번 보고 지나치면 다시 볼 데가 없었다)
+@onready var room_label: Label = $RoomLabel
 @onready var money_label: Label = $ClockPanel/MoneyLabel
 @onready var energy_bar: ProgressBar = $EnergyPanel/EnergyBar
 @onready var msg_label: Label = $Message
@@ -594,6 +597,16 @@ func refresh(force := false) -> void:
 	_put(clock_label, "%s %d일 · %s" % [GameData.season_name(),
 		GameData.day_in_season(), GameData.clock_text()])
 	_put(money_label, "%dG" % GameData.money)
+
+	# 방 코드: 호스트면 내 코드를, 손님이면 들어온 방을 보여 준다
+	var rcode := ""
+	if Net.is_host() and Net.rooms != null:
+		rcode = str(Net.rooms.code)
+	if rcode != "":
+		_put(room_label, "방 코드  %s" % rcode)
+	elif Net.is_guest():
+		_put(room_label, "함께하는 중")
+	room_label.visible = rcode != "" or Net.is_guest()
 
 	# 미니 퀘스트창: 「지금 어떤 퀘스트를, 지금 뭘 하면 되는지」 두 가지만.
 	# 설명·재료·진행 상황·보상은 전부 Q 상세 창에서 본다.
