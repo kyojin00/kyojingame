@@ -24,7 +24,7 @@ var _beat := 0.0
 func _headers() -> PackedStringArray:
 	return PackedStringArray([
 		"apikey: " + KEY,
-		"Authorization: Bearer " + KEY,
+		"Authorization: Bearer " + Auth.bearer(),
 		"Content-Type: application/json",
 	])
 

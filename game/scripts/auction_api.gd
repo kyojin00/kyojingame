@@ -3,7 +3,7 @@
 # 세계(함께하기)와 달리 여기는 **바깥 서버**다. 내 농장이 무엇을 올렸는지
 # 다른 농장에서도 보이고, 접속을 꺼도 글이 남는다.
 #
-# 신원은 로그인 없이 `GameData.farm_id` 하나로 가른다 — 게임을 처음 켤 때
+# 신원은 로그인 없이 `GameData.farm_key()` 하나로 가른다 — 게임을 처음 켤 때
 # 만들어 설정 파일에 넣어 두는 무작위 문자열이다. 남의 글을 건드리지
 # 못하게 사기·거두기·대금 받기는 전부 서버 함수(rpc)로만 한다.
 #
@@ -29,9 +29,12 @@ var busy := false         # 요청이 하나만 돌게 (버튼 연타 방지)
 
 
 func _headers(extra := PackedStringArray()) -> PackedStringArray:
+	# 로그인했으면 그 계정의 토큰으로 간다 — 서버가 신원을 **토큰에서** 읽으므로
+	# 클라이언트가 남의 이름을 대도 소용이 없다. 로그인 전이면 공개 키를 쓰고,
+	# 그때는 예전처럼 farm_id로 신원을 가린다.
 	var h := PackedStringArray([
 		"apikey: " + KEY,
-		"Authorization: Bearer " + KEY,
+		"Authorization: Bearer " + Auth.bearer(),
 		"Content-Type: application/json",
 	])
 	h.append_array(extra)
@@ -84,7 +87,7 @@ func fetch(mine_only := false) -> void:
 		# 내 글은 함수로 받는다 — 목록에는 seller_id(내 농장 열쇠)가 실리지
 		# 않으므로, 열쇠를 아는 사람만 볼 수 있는 이 길로 온다
 		_send(REST + "rpc/farm_auction_mine", HTTPClient.METHOD_POST,
-			{"p_seller_id": GameData.farm_id}, PackedStringArray(),
+			{"p_seller_id": GameData.farm_key()}, PackedStringArray(),
 			func(code: int, res: Variant) -> void:
 				fetched.emit(res if code == 200 and typeof(res) == TYPE_ARRAY else []))
 		return
@@ -105,7 +108,7 @@ func list_item(cat: String, item_id: String, qty: int, quality: int, price: int)
 		return
 	busy = true
 	_send(REST + "rpc/farm_auction_list", HTTPClient.METHOD_POST, {
-			"p_seller_id": GameData.farm_id,
+			"p_seller_id": GameData.farm_key(),
 			"p_seller_name": GameData.seller_name(),
 			"p_cat": cat, "p_item_id": item_id,
 			"p_qty": qty, "p_quality": quality, "p_price": price,
@@ -124,7 +127,7 @@ func buy(id: int) -> void:
 		return
 	busy = true
 	_send(REST + "rpc/farm_auction_buy", HTTPClient.METHOD_POST, {
-			"p_id": id, "p_buyer_id": GameData.farm_id,
+			"p_id": id, "p_buyer_id": GameData.farm_key(),
 			"p_buyer_name": GameData.seller_name(),
 		}, PackedStringArray(),
 		func(code: int, res: Variant) -> void:
@@ -140,7 +143,7 @@ func cancel(id: int) -> void:
 		return
 	busy = true
 	_send(REST + "rpc/farm_auction_cancel", HTTPClient.METHOD_POST,
-		{"p_id": id, "p_seller_id": GameData.farm_id}, PackedStringArray(),
+		{"p_id": id, "p_seller_id": GameData.farm_key()}, PackedStringArray(),
 		func(code: int, res: Variant) -> void:
 			if code == 200 and typeof(res) == TYPE_DICTIONARY:
 				bought.emit(true, "물건을 다시 거뒀다.", res)
@@ -157,7 +160,7 @@ func claim() -> void:
 		return
 	busy = true
 	_send(REST + "rpc/farm_auction_claim", HTTPClient.METHOD_POST,
-		{"p_seller_id": GameData.farm_id}, PackedStringArray(),
+		{"p_seller_id": GameData.farm_key()}, PackedStringArray(),
 		func(code: int, res: Variant) -> void:
 			if code != 200 or typeof(res) != TYPE_ARRAY:
 				claimed.emit(0, 0)

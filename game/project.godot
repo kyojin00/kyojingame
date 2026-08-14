@@ -16,6 +16,7 @@ config/icon="res://icon.svg"
 GameData="*res://scripts/game_data.gd"
 Sound="*res://scripts/sound.gd"
 Net="*res://scripts/net.gd"
+Auth="*res://scripts/auth_api.gd"
 
 [display]
 
