@@ -565,6 +565,18 @@ for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
 
 def head(g, art, bob, lean=0):
     g.blit(art, HEAD_X + lean, HEAD_Y + bob)
+    # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
+    if art is HEAD_DOWN:                       # 눈높이 양옆에 볼록 한 칸
+        for ex in (7, 24):
+            g.px(ex + lean, 11 + bob, 's')
+            g.px(ex + lean, 12 + bob, 'S')
+    elif art is HEAD_SIDE:                     # 옆모습은 귓바퀴 모양
+        g.px(12 + lean, 11 + bob, 'S')
+        g.px(13 + lean, 11 + bob, 'S')
+        g.px(12 + lean, 12 + bob, 'S')
+        g.px(13 + lean, 12 + bob, 's')
+        g.px(12 + lean, 13 + bob, 'S')
+        g.px(13 + lean, 13 + bob, 'S')
 
 
 def frame(direction, stride=None, bob=0):
@@ -602,7 +614,7 @@ HEAD_DOWN_F = [
     ".OhhjjjjjjjjhhO.",
     ".OhjjjjjjjjjjhO.",
     "OhhjjjjjjjjjjhhO",
-    "OhhhhhhhhhhhhhhO",
+    "OhhjjhhhhhhjjhhO",
     "Ohh" "ssssssssss" "hhO",
     "Oh" "s" "eee" "ssss" "eee" "s" "h" "O",
     "Oh" "ss" "ew" "ssss" "we" "ss" "h" "O",
@@ -623,12 +635,12 @@ HEAD_SIDE_F = [   # 오른쪽을 본다
     ".OhhjjjjjjjjhhO.",
     ".OhjjjjjjjjjjhO.",
     "OhhjjjjjjjjjjhhO",
-    "OhhhhhhhhhhhhhhO",
+    "OhhhjjhhhhhhhhhO",
     "Ohhhhhhhh" "ssssss" "O",
     "Ohhhh" "ssss" "eee" "sss" "O",
-    "Ohhh" "ssssss" "ew" "sss" "O",
-    "Ohhh" "ssssss" "ee" "sss" "O",
-    "Ohhh" "ssssss" "ei" "ssss",
+    "OhjhssssssewsssO",
+    "OhjhsssssseesssO",
+    "Ohjhsssssseissss",
     "Ohh" "sss" "rr" "sssssss" "S",
     ".hhh" "ssssss" "mm" "ss" "O.",
     ".hhh" "ssssssssss" "O.",
@@ -644,16 +656,16 @@ HEAD_UP_F = [
     ".OhhjjjjjjjjhhO.",
     ".OhjjjjjjjjjjhO.",
     "OhhjjjjjjjjjjhhO",
-    "OhhhhhhhhhhhhhhO",
-    "OhhhhhhhhhhhhhhO",
-    "OhhhhhhhhhhhhhhO",
-    "OhhhhhhhhhhhhhhO",
-    "OhhhhhhhhhhhhhhO",
-    "OhhhhhhhhhhhhhhO",
-    "OhhhhhhhhhhhhhhO",
+    "OhhhjhhhhhhjhhhO",
+    "OhhhjhhhhhhjhhhO",
+    "OhhhjhhhhhhjhhhO",
+    "OhhhjhhhhhhjhhhO",
+    "OhhhjhhhhhhjhhhO",
+    "OhhhjhhhhhhjhhhO",
+    "OhhhjhhhhhhjhhhO",
     "OghhhhhhhhhhhhgO",
-    ".hhhhhhhhhhhhhh.",
-    ".hhhhhhhhhhhhhh.",
+    ".hhhjhhhhhhjhhh.",
+    ".hhhjhhhhhhjhhh.",
     ".hghhhhhhhhhhgh.",
     ".gghhhhhhhhhhgg.",
     "..gggggggggggg..",
