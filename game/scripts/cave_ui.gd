@@ -43,6 +43,15 @@ var anim_time := 0.0
 var attack_cd := 0.0
 var hurt_cd := 0.0
 var swing_t := 0.0
+# ---- 피격 연출 ----
+# 맞는 순간: 하얀 번쩍 한 프레임 -> 붉은 기 + 눈 질끈, 히트스톱, 화면 흔들림,
+# 미끄러지는 넉백. 남은 무적시간에는 점멸해서 언제 다시 맞는지 보여 준다.
+var hurt_flash := 0.0            # 하얀 번쩍 남은 시간
+var hitstop := 0.0               # 세상이 한숨 멎는 시간
+var shake_t := 0.0               # 화면 흔들림 남은 시간
+var shake_off := Vector2.ZERO    # 이번 프레임의 흔들림 (화면 px)
+var kb_vel := Vector2.ZERO       # 피격 넉백 속도 — 순간이동 대신 미끄러진다
+var dmg_pops: Array = []         # 피해 숫자 팝업 {pos, t, txt}
 
 
 func _ready() -> void:
@@ -74,6 +83,14 @@ func open(wt: bool = false, start_floor: int = 1) -> void:
 	floor_num = 1 if wt else maxi(1, start_floor)
 	GameData.mine_reach(floor_num)
 	_gen_floor()
+	# 지난 방문의 피격 연출이 남아 있지 않게
+	hurt_cd = 0.0
+	hurt_flash = 0.0
+	hitstop = 0.0
+	shake_t = 0.0
+	shake_off = Vector2.ZERO
+	kb_vel = Vector2.ZERO
+	dmg_pops.clear()
 	visible = true
 	Sound.play_sfx("sfx_place")
 	if worldtree:
@@ -291,9 +308,18 @@ func _process(delta: float) -> void:
 	if not visible or main.dialog.visible or main.summary.visible \
 			or main.inventory_ui.visible:
 		return
+	# 히트스톱 — 맞는 순간 아주 잠깐 모두 멈춘다 (타격이 몸에 박힌다)
+	if hitstop > 0.0:
+		hitstop -= delta
+		canvas.queue_redraw()
+		return
 	attack_cd -= delta
 	hurt_cd -= delta
 	swing_t -= delta
+	hurt_flash = maxf(0.0, hurt_flash - delta)
+	shake_t = maxf(0.0, shake_t - delta)
+	shake_off = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) \
+		* 3.0 * ZOOM * (shake_t / 0.18) if shake_t > 0.0 else Vector2.ZERO
 	_update_cam(delta)
 	_mark_seen()
 
@@ -312,6 +338,14 @@ func _process(delta: float) -> void:
 		if stuck or not _blocked_at(Vector2(ppos.x, np.y)):
 			ppos.y = clampf(np.y, OY + 8, OY + GH * TS - 8)
 		anim_time += delta
+
+	# 피격 넉백 — 몇 프레임에 걸쳐 밀려나며 잦아든다 (순간이동보다 자연스럽다)
+	if kb_vel != Vector2.ZERO:
+		var kp := ppos + kb_vel * delta
+		if not _blocked_at(kp):
+			ppos.x = clampf(kp.x, OX + 8, OX + GW * TS - 8)
+			ppos.y = clampf(kp.y, OY + 8, OY + GH * TS - 8)
+		kb_vel = kb_vel.move_toward(Vector2.ZERO, 1100.0 * delta)
 
 	# 몬스터
 	for m in monsters:
@@ -356,19 +390,29 @@ func _process(delta: float) -> void:
 		# 접촉 피해 (종류별)
 		if hurt_cd <= 0.0 and (m.pos - ppos).length() < 24.0:
 			hurt_cd = 0.9
+			hurt_flash = 0.09      # 하얀 번쩍 한 프레임
+			hitstop = 0.05
+			shake_t = 0.18
 			var dmg: float = {"slime": 8.0, "bat": 6.0, "ghost": 12.0, "treant": 20.0}[m.type]
 			# 부엉이 펫 + 방어구가 받는 피해를 줄인다
-			GameData.energy -= dmg * GameData.pet_cave_def_mult() * GameData.gear_defense_mult()
+			var taken: float = dmg * GameData.pet_cave_def_mult() * GameData.gear_defense_mult()
+			GameData.energy -= taken
 			Sound.play_sfx("sfx_miss")
-			# 넉백은 막히지 않은 곳으로만 (벽/바위 끼임 방지)
-			var kb: Vector2 = ppos + (ppos - m.pos).normalized() * 20.0
-			if not _blocked_at(kb):
-				ppos = kb
+			# 넉백은 미끄러짐으로 — _blocked_at이 프레임마다 확인하므로 벽에 안 낀다
+			kb_vel = (ppos - m.pos).normalized() * 240.0
+			dmg_pops.append({"pos": ppos + Vector2(0.0, -46.0), "t": 0.8,
+				"txt": "-%d" % maxi(1, int(round(taken)))})
 			if GameData.energy <= 0.0:
 				GameData.energy = 10.0
 				close()
 				main.hud.show_message("동굴에서 쫓겨났다... 기력이 바닥났다!")
 				return
+
+	# 피해 숫자 — 떠오르며 사라진다
+	for pp in dmg_pops:
+		pp.t -= delta
+		pp.pos.y -= 26.0 * delta
+	dmg_pops = dmg_pops.filter(func(pp: Dictionary) -> bool: return pp.t > 0.0)
 
 	_update_sprite()
 	canvas.queue_redraw()
@@ -556,11 +600,23 @@ func _update_sprite() -> void:
 		_:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			player_sprite.flip_h = pdir == "left"
+	# 맞은 직후엔 눈을 질끈 감는다 (깜빡임 그림 재활용 — 뒷모습은 눈이 없다)
+	if hurt_cd > 0.55 and pdir != "up":
+		tex_name = "%s_%s_blink" % ["new_boy" if GameData.gender == "m" else "player_f",
+			"side" if (pdir == "left" or pdir == "right") else "down"]
 	player_sprite.texture = main.tex[tex_name]
 	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
 	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
 	player_sprite.position = _to_screen(ppos) + Vector2(-32, -95) * ZOOM
-	player_sprite.modulate = Color(1, 0.55, 0.55) if hurt_cd > 0.6 else Color(1, 1, 1)
+	if hurt_flash > 0.0:
+		player_sprite.modulate = Color(2.6, 2.6, 2.6)   # 맞는 순간 하얀 번쩍
+	elif hurt_cd > 0.55:
+		player_sprite.modulate = Color(1, 0.5, 0.5)     # 아픈 붉은 기
+	elif hurt_cd > 0.0:
+		# 남은 무적시간 동안 점멸 — 언제부터 다시 맞는지 눈에 보인다
+		player_sprite.modulate = Color(1, 1, 1, 0.4 if fmod(hurt_cd, 0.14) < 0.07 else 1.0)
+	else:
+		player_sprite.modulate = Color(1, 1, 1)
 
 
 # 주인공 둘레를 미니맵에 드러낸다 (한 화면에 안 들어오니 길잡이가 필요하다)
@@ -591,7 +647,7 @@ func _update_cam(delta: float) -> void:
 
 
 func _to_screen(p: Vector2) -> Vector2:
-	return (p - cam) * ZOOM + VIEW / 2.0
+	return (p - cam) * ZOOM + VIEW / 2.0 + shake_off
 
 
 # 미니맵 (오른쪽 아래) — 가 본 곳만 보여 준다.
@@ -628,8 +684,8 @@ func _draw_minimap() -> void:
 
 
 func _draw_cave() -> void:
-	# 여기서부터 그리는 것은 모두 카메라 기준 + ZOOM 배
-	canvas.draw_set_transform(VIEW / 2.0 - cam * ZOOM, 0.0, Vector2(ZOOM, ZOOM))
+	# 여기서부터 그리는 것은 모두 카메라 기준 + ZOOM 배 (+ 피격 흔들림)
+	canvas.draw_set_transform(VIEW / 2.0 - cam * ZOOM + shake_off, 0.0, Vector2(ZOOM, ZOOM))
 	# 바닥
 	canvas.draw_rect(Rect2(OX, OY, GW * TS, GH * TS),
 		Color(0.16, 0.24, 0.18) if worldtree else Color(0.22, 0.19, 0.24))
@@ -666,6 +722,15 @@ func _draw_cave() -> void:
 	if swing_t > 0.0:
 		var reach := ppos + _dir_vec() * 28.0
 		canvas.draw_rect(Rect2(reach.x - 12, reach.y - 12, 24, 24), Color(1, 0.9, 0.5, 0.5))
+
+	# 피해 숫자 — 맞은 자리에서 떠올라 옅어지며 사라진다
+	for pp in dmg_pops:
+		var a: float = clampf(float(pp.t) / 0.35, 0.0, 1.0)
+		var pos: Vector2 = pp.pos + Vector2(-14.0, 0.0)
+		canvas.draw_string_outline(main.UI_FONT, pos, str(pp.txt),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 3, Color(0.1, 0.03, 0.03, a))
+		canvas.draw_string(main.UI_FONT, pos, str(pp.txt),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1.0, 0.36, 0.3, a))
 
 	# ---- 여기부터는 화면 고정 (카메라를 따라가지 않는다) ----
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
