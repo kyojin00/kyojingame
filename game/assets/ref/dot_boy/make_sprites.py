@@ -232,6 +232,14 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     # (4칸으로 키워 봤더니 정면 어깨가 벌어져 어색했다 — 옆모습만 4칸.)
     for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
         if side == skip:
+            # 휘두르는 팔 쪽: 어깨 캡 밑을 두 줄 이어 둔다 — 안 이으면
+            # 몸판(10~21)에서 캡(8~9)만 혹처럼 튀어나오고, 그 밑이 파였다가
+            # 휘두르는 팔에서 다시 불거져 실루엣이 층진다.
+            if side == 'left':
+                g.rect(8 + dx, y + 1, 9 + dx, y + 2, 'b')
+                g.px(8 + dx, y + 1, 'L')
+            else:
+                g.rect(22 + dx, y + 1, 23 + dx, y + 2, 'b')
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
