@@ -63,6 +63,15 @@ class Canvas:
                     self.rect(0, y, W - 1, y, mix(c0, c1, k))
                     break
 
+    def dim(self, kr, kg, kb, lift=8):
+        """화면 전체를 어스름 쪽으로 누른다 — 밤하늘 장면처럼 광원이
+        주인공이 되도록 바탕을 낮추는 밑작업."""
+        for y in range(H):
+            for x in range(W):
+                r, g, b = self.px[x, y]
+                self.px[x, y] = (int(r * kr + lift), int(g * kg + lift * 0.7),
+                                 int(b * kb + lift))
+
     def lighten(self, lx, ly, radius, power, warm=(90, 62, 20)):
         """한 점에서 퍼지는 온기 — 거리 감쇠로 밝힌다 (촛불·달무리)."""
         for y in range(max(0, ly - radius), min(H, ly + radius)):
@@ -114,12 +123,13 @@ def retro(im):
             d = (((x - cx) ** 2 + (y - cy) ** 2) ** 0.5) / maxd
             v = 1.0 - 0.30 * d * d
             r, g, b = r * v, g * v, b * v
-            # 오더드 디더링 + 굵은 색 계단 (14단)
-            dth = (BAYER[y % 4][x % 4] - 7.5) * 1.7
+            # 오더드 디더링 + 굵은 색 계단 — 밤하늘 장면처럼 온 화면이
+            # 체크무늬 도트 직조로 짜인 듯 보이게 세게 건다
+            dth = (BAYER[y % 4][x % 4] - 7.5) * 2.8
             out = []
             for ch in (r, g, b):
                 ch = max(0.0, min(255.0, ch + dth))
-                out.append(int(ch // 14) * 14 + 7)
+                out.append(int(ch // 16) * 16 + 8)
             px[x, y] = tuple(out)
     return im
 
@@ -187,12 +197,12 @@ def scene_grandpa(g, f):
         for y in range(yf, H):
             g.p(x, y, HILL)
     # 언덕 낱알 질감 — 판판한 실루엣이 손으로 찍은 듯 거칠어진다
-    for _ in range(170):
+    for _ in range(80):
         x = rnd.randrange(W)
         yf = int(92 - 9 * math.sin(x / 33.0))
         if yf < H - 1:
             g.p(x, rnd.randrange(yf, H), (24, 22, 42))
-    for _ in range(110):
+    for _ in range(55):
         x = rnd.randrange(W)
         yb = int(82 - 7 * math.sin(x / 46.0 + 1.2))
         yf = int(92 - 9 * math.sin(x / 33.0))
@@ -249,7 +259,7 @@ def scene_box(g, f):
     for _ in range(60):                             # 판자 나뭇결
         x, y = rnd.randrange(W), rnd.randrange(56)
         g.rect(x, y, x + rnd.randrange(2, 6), y, (36, 24, 18))
-    speckle(g, rnd, 0, 0, W, 57, [(26, 18, 14), (42, 30, 22), (36, 24, 18)], 240)
+    speckle(g, rnd, 0, 0, W, 57, [(26, 18, 14), (42, 30, 22), (36, 24, 18)], 110)
     # 벽에 걸린 낡은 지도
     g.rrect(16, 12, 60, 42, (120, 104, 76), 3)
     g.rect(18, 12, 58, 13, (86, 72, 52))
@@ -283,7 +293,7 @@ def scene_box(g, f):
         x, y = rnd.randrange(W), rnd.randrange(60, H - 2)
         g.rect(x, y, x + rnd.randrange(3, 8), y, (82, 56, 34))
     speckle(g, rnd, 0, 60, W, H - 1,
-            [(72, 50, 30), (94, 64, 40), (114, 80, 48)], 190, dash=2)
+            [(72, 50, 30), (94, 64, 40), (114, 80, 48)], 90, dash=2)
     g.rect(0, 58, W - 1, 58, (128, 92, 56))
     # 밧줄 뭉치 (상자 오른쪽)
     for ring, rr in ((0, 7), (1, 5), (2, 3)):
@@ -313,7 +323,7 @@ def scene_box(g, f):
         x, y = rnd.randrange(bx0 + 2, bx1 - 2), rnd.randrange(by0 + 2, by1 - 2)
         g.rect(x, y, x + rnd.randrange(2, 5), y, (120, 86, 48))
     speckle(g, rnd, bx0 + 2, by0 + 2, bx1 - 1, by1 - 1,
-            [(122, 86, 48), (144, 106, 60)], 90)
+            [(122, 86, 48), (144, 106, 60)], 45)
     g.rect(bx0 + 3, by0, bx1 - 3, by0 + 1, (160, 118, 68))
     for x0 in (bx0, bx1 - 5):                       # 모서리 쇠장식 + 못
         g.rrect(x0, by0, x0 + 5, by0 + 6, (118, 120, 126), 3)
@@ -345,6 +355,8 @@ def scene_box(g, f):
         g.p(61, y + 2, (206, 192, 164))
     g.rrect(50, 52, 65, 55, (140, 128, 110), 2)
     g.rect(52, 52, 63, 52, (168, 156, 136))
+    # 밤하늘 그림체 — 방을 어둠으로 누르고 촛불이 화면을 밝힌다
+    g.dim(0.72, 0.68, 0.74)
     flame = [((57, 26), (57, 27), (58, 28)),
              ((57, 25), (57, 26), (57, 27)),
              ((58, 26), (57, 27), (57, 28)),
@@ -352,8 +364,9 @@ def scene_box(g, f):
     g.p(*flame[0], (255, 244, 180))
     g.p(*flame[1], (255, 214, 110))
     g.p(*flame[2], (238, 148, 66))
-    radius = [66, 72, 62, 70][f]
-    g.lighten(57, 28, radius, 0.26)
+    radius = [86, 94, 80, 90][f]
+    g.lighten(57, 28, radius, 0.55)
+    g.lighten(57, 28, 14, 0.5, (110, 80, 30))       # 불꽃 바로 곁 달무리
     # 먼지 — 촛불 빛 속을 떠다닌다
     for i in range(7):
         mx = 66 + (i * 23) % 90
@@ -368,7 +381,7 @@ def scene_letter(g, f):
     for _ in range(50):                             # 탁자 나뭇결
         x, y = rnd.randrange(W), rnd.randrange(H)
         g.rect(x, y, x + rnd.randrange(3, 8), y, (52, 36, 26))
-    speckle(g, rnd, 0, 0, W, H, [(34, 24, 18), (56, 40, 28)], 150)
+    speckle(g, rnd, 0, 0, W, H, [(34, 24, 18), (56, 40, 28)], 70)
     # 잉크병 (왼쪽 위 구석)
     g.rrect(8, 14, 24, 34, (44, 52, 72), 3)
     g.rect(10, 14, 22, 16, (60, 70, 94))
@@ -392,7 +405,7 @@ def scene_letter(g, f):
         x, y = rnd.randrange(32, 221), rnd.randrange(9, 99)
         g.p(x, y, (226, 210, 175))
     speckle(g, rnd, 32, 9, 221, 99,
-            [(224, 208, 172), (240, 228, 198), (216, 198, 160)], 320)
+            [(224, 208, 172), (240, 228, 198), (216, 198, 160)], 130)
     speckle(g, rnd, 32, 9, 221, 99, [(214, 196, 158)], 70, dash=2)  # 섬유결
     for x in range(33, 222):                        # 접힌 자국
         g.p(x, 38, (212, 196, 160))
@@ -445,8 +458,9 @@ def scene_letter(g, f):
                 (216, 210, 194) if k % 2 else (188, 180, 162))
     g.rect(qx - 3, qy + 1, qx, qy + 2, (60, 48, 36))    # 펜촉
     g.p(qx - 4, qy + 2, (30, 26, 22))                   # 촉 끝 잉크
-    # 촛불 빛이 오른쪽 위에서 일렁인다
-    g.lighten(210, 6, [88, 96, 82, 92][f], [0.16, 0.20, 0.13, 0.18][f])
+    # 밤하늘 그림체 — 어둠으로 누른 뒤 촛불 빛이 오른쪽 위에서 일렁인다
+    g.dim(0.78, 0.74, 0.80)
+    g.lighten(210, 6, [116, 124, 108, 120][f], [0.38, 0.46, 0.32, 0.42][f])
 
 
 # ---------------------------------------------------- 4. 잡초 무성한 농장
@@ -612,6 +626,10 @@ def scene_farm(g, f):
         else:
             g.p(bx - 1, by, (60, 60, 70))
             g.p(bx + 1, by, (60, 60, 70))
+    # 밤하늘 그림체 — 한낮 대신 해질녘 어스름. 화면을 누르고 해가 달아오른다
+    g.dim(0.82, 0.74, 0.80)
+    g.lighten(196, 52, 74, 0.55, (100, 66, 22))
+    g.lighten(196, 52, 26, 0.45, (120, 84, 30))
 
 
 # ------------------------------------------------------------------- 출력
