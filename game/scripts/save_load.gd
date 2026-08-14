@@ -417,6 +417,21 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.story13_phase = str(d.get("story13_phase", ""))
 	GameData.story13_heard = Array(d.get("story13_heard", []))
 	GameData.story12_done_day = int(d.get("story12_done_day", 0))
+	# ---- 메인 스토리 14 (마을의 첫 축제) · 15 (마른 온천) ----
+	GameData.story14_phase = str(d.get("story14_phase", ""))
+	GameData.story13_done_day = int(d.get("story13_done_day", 0))
+	GameData.story14_tasks = Array(d.get("story14_tasks", []))
+	GameData.story14_greet = Array(d.get("story14_greet", []))
+	GameData.story14_fest_day = int(d.get("story14_fest_day", 0))
+	GameData.story14_toss = bool(d.get("story14_toss", false))
+	GameData.story15_phase = str(d.get("story15_phase", ""))
+	GameData.story14_done_day = int(d.get("story14_done_day", 0))
+	GameData.story15_mobs = int(d.get("story15_mobs", 0))
+	GameData.story15_ore = int(d.get("story15_ore", 0))
+	GameData.onsen_open = bool(d.get("onsen_open", false))
+	GameData.onsen_day = int(d.get("onsen_day", 0))
+	if GameData.onsen_open:
+		m.worldgen._spawn_onsen()   # 되살린 온천은 로드 후에도 그 자리에
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()

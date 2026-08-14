@@ -2146,6 +2146,174 @@ func _debug_tick() -> void:
 				" 바위=", s13_spot, " 원거리차단=", s13_far, " 특별입질=", s13_bite,
 				" 상담=", s13_ask, " 재료차단=", s13_block, " 재료표식=", s13_mark,
 				" 팔찌=", s13_relic, " 기록완결=", s13_lib and s13_done)
+		279:
+			# #131: 메인 스토리 14 「마을의 첫 축제」 — 자유 생활 -> 회관 회의
+			# -> 준비(여섯 중 셋 선택) -> 이튿날 광장 축제(전용 대사·투호)
+			# -> 이장의 마무리 -> 회관 「축제·행사 일정」 해금
+			m.dialog.close()
+			GameData.story13_phase = "done"
+			GameData.story14_phase = ""
+			GameData.story14_tasks = []
+			GameData.story14_greet = []
+			if not GameData.village_built.has("hall"):
+				GameData.village_built.append("hall")
+			var k14_aff: Dictionary = GameData.affinity.duplicate()
+			var k14_wood: int = GameData.wood
+			# ① 스토리 13 직후에는 시작되지 않는다 (자유 생활 보장)
+			GameData.story13_done_day = GameData.day
+			m.story._story14_update(0.016)
+			var s14_wait: bool = GameData.story14_phase == "" \
+				and not GameData.story14_ready() \
+				and not GameData.hall_calendar_open()
+			GameData.story13_done_day = GameData.day - GameData.STORY14_REST_DAYS
+			m.story._story14_update(0.016)
+			var s14_meet: bool = GameData.story14_phase == "meet" \
+				and GameData.quest_npc_marks().get("chief", "") == "!"
+			m.story._start_fest_meet_dialog()
+			m.dialog.skip_seq()
+			var s14_prep: bool = GameData.story14_phase == "prep" \
+				and GameData.story14_objective_short() != ""
+			# ② 준비 — 재료가 모자라면 못 내고, 셋만 내면 끝난다
+			GameData.wood = 0
+			var s14_short: bool = not GameData.fest_deliver("wood")
+			GameData.wood = 200
+			var s14_w1: bool = GameData.fest_deliver("wood") \
+				and GameData.wood == 200 - 30
+			var s14_dup: bool = not GameData.fest_deliver("wood")
+			GameData.items["egg"] = int(GameData.items["egg"]) + 6
+			GameData.items["flower_pot"] = int(GameData.items.get("flower_pot", 0)) + 2
+			var s14_w2: bool = GameData.fest_deliver("ranch") \
+				and GameData.fest_deliver("flower")
+			var s14_ready: bool = GameData.fest_prep_done() \
+				and GameData.quest_npc_marks().get("chief", "") == "?"
+			# ③ 주민들도 저마다 준비 중이다 (한 사람당 한 번)
+			var s14_greet: bool = m.story.story14_prep_greet("blacksmith")
+			m.dialog.close()
+			var s14_greet2: bool = not m.story.story14_prep_greet("blacksmith")
+			# ④ 이장에게 알리면 이튿날 축제 — 그날이 와야 열린다
+			m.story._start_fest_ready_dialog()
+			m.dialog.skip_seq()
+			var s14_fest: bool = GameData.story14_phase == "fest" \
+				and GameData.story14_fest_day == GameData.day + 1 \
+				and not m.story.story14_fest_greet("chief")
+			GameData.day += 1
+			var s14_open: bool = m.story.story14_fest_greet("merchant")
+			m.dialog.close()
+			# ⑤ 투호 미니게임 — 상금 + 첫 참가 때 온 주민 호감도
+			var money14: int = GameData.money
+			var aff14: int = int(GameData.affinity["chief"])
+			m.story._fest_toss()
+			var s14_toss: bool = GameData.story14_toss \
+				and GameData.money >= money14 \
+				and int(GameData.affinity["chief"]) == aff14 + 2
+			m.dialog.close()
+			# ⑥ 마무리 — 캘린더 해금
+			m.story._start_fest_end_dialog()
+			m.dialog.skip_seq()
+			var s14_done: bool = GameData.story14_phase == "done" \
+				and GameData.hall_calendar_open() \
+				and GameData.story14_done_day == GameData.day \
+				and GameData.completed_quests().has("메인 스토리 14 — 마을의 첫 축제")
+			GameData.day -= 1
+			GameData.wood = k14_wood
+			GameData.affinity = k14_aff
+			GameData.money = money14
+			m.hud._toast_queue.clear()
+			print("STORY14_OK=", s14_wait and s14_meet and s14_prep and s14_short
+				and s14_w1 and s14_dup and s14_w2 and s14_ready and s14_greet
+				and s14_greet2 and s14_fest and s14_open and s14_toss and s14_done,
+				" 자유생활=", s14_wait, " 회의=", s14_meet, " 준비시작=", s14_prep,
+				" 재료부족차단=", s14_short, " 내놓기=", s14_w1, " 중복차단=", s14_dup,
+				" 셋완료=", s14_w2 and s14_ready, " 주민준비대사=", s14_greet
+				and s14_greet2, " 이튿날=", s14_fest and s14_open,
+				" 투호=", s14_toss, " 완결·캘린더=", s14_done)
+		280:
+			# #132: 메인 스토리 15 「마른 온천」 — 이장 이야기 -> 도서관 기록
+			# -> 무쇠의 착암 쐐기 -> 동굴 20층+ 수맥(전투·채광) -> 묘연의
+			# 물 확인 -> 온천 부활(하루 한 번 입욕) + 주민 온천 나들이
+			m.dialog.close()
+			GameData.story14_phase = "done"
+			GameData.story15_phase = ""
+			GameData.onsen_open = false
+			GameData.items["rock_wedge"] = 0
+			GameData.items["spring_water"] = 0
+			m.objnode._remove_object(m.ONSEN_POS)
+			# ① 스토리 14 직후에는 시작되지 않는다
+			GameData.story14_done_day = GameData.day
+			m.story._story15_update(0.016)
+			var s15_wait: bool = GameData.story15_phase == "" \
+				and not GameData.story15_ready()
+			GameData.story14_done_day = GameData.day - GameData.STORY15_REST_DAYS
+			m.story._story15_update(0.016)
+			var s15_tale: bool = GameData.story15_phase == "tale" \
+				and GameData.quest_npc_marks().get("chief", "") == "!"
+			m.story._start_onsen_tale_dialog()
+			m.dialog.skip_seq()
+			m.story._start_onsen_book_dialog()
+			m.dialog.skip_seq()
+			var s15_tool: bool = GameData.story15_phase == "tool"
+			# ② 착암 쐐기 — 재료가 모자라면 안 벼려 준다
+			var k15_ore: int = int(GameData.items["ore"])
+			var k15_shard: int = int(GameData.items["star_shard"])
+			GameData.items["ore"] = 0
+			m.story._start_onsen_tool_dialog()
+			m.dialog.skip_seq()
+			var s15_short: bool = GameData.story15_phase == "tool" \
+				and int(GameData.items["rock_wedge"]) == 0
+			GameData.items["ore"] = GameData.STORY15_TOOL_ORE
+			GameData.items["star_shard"] = GameData.STORY15_TOOL_SHARD
+			m.story._start_onsen_tool_dialog()
+			m.dialog.skip_seq()
+			var s15_wedge: bool = GameData.story15_phase == "dig" \
+				and int(GameData.items["rock_wedge"]) == 1 \
+				and int(GameData.items["ore"]) == 0
+			# ③ 수맥 — 얕은 층은 세지 않는다. 깊은 층에서 다 치우면 물이 솟는다
+			m.story.story15_dig_progress("mob", 5)
+			var s15_shallow: bool = GameData.story15_mobs == 0
+			for i in GameData.STORY15_MOBS:
+				m.story.story15_dig_progress("mob", GameData.STORY15_DEPTH)
+			for i in GameData.STORY15_ORE - 1:
+				m.story.story15_dig_progress("ore", GameData.STORY15_DEPTH)
+			var s15_mid: bool = GameData.story15_phase == "dig" \
+				and not GameData.story15_dig_done()
+			m.story.story15_dig_progress("ore", GameData.STORY15_DEPTH + 3)
+			var s15_burst: bool = GameData.story15_phase == "water" \
+				and int(GameData.items["spring_water"]) == 1 \
+				and int(GameData.items["rock_wedge"]) == 0
+			# ④ 묘연의 확인 -> 온천 부활
+			m.story._start_onsen_water_dialog()
+			m.dialog.skip_seq()
+			var s15_done: bool = GameData.story15_phase == "done" \
+				and GameData.onsen_open \
+				and str(m.objects.get(m.ONSEN_POS, {}).get("kind", "")) == "onsen" \
+				and GameData.completed_quests().has("메인 스토리 15 — 마른 온천")
+			# ⑤ 입욕 — 하루 한 번, 체력이 가득 찬다
+			GameData.onsen_day = 0
+			GameData.energy = 20.0
+			var min15: float = GameData.minutes
+			var s15_bath: bool = GameData.onsen_bathe() \
+				and GameData.energy >= GameData.ENERGY_MAX \
+				and GameData.minutes > min15
+			var s15_once: bool = not GameData.onsen_bathe()
+			# ⑥ 저녁이면 주민이 온천에 몸을 담그러 온다
+			var keep_min15: float = GameData.minutes
+			GameData.minutes = 18.0 * 60.0
+			var s15_goer: bool = m.npcmgr.npc_place_now("blacksmith") == "onsen" \
+				and m.npcmgr.npc_place_tile("blacksmith", "onsen").x > 0
+			GameData.minutes = 12.0 * 60.0
+			var s15_day: bool = m.npcmgr.npc_place_now("blacksmith") != "onsen"
+			GameData.minutes = keep_min15
+			GameData.items["ore"] = k15_ore
+			GameData.items["star_shard"] = k15_shard
+			m.hud._toast_queue.clear()
+			print("STORY15_OK=", s15_wait and s15_tale and s15_tool and s15_short
+				and s15_wedge and s15_shallow and s15_mid and s15_burst
+				and s15_done and s15_bath and s15_once and s15_goer and s15_day,
+				" 자유생활=", s15_wait, " 이야기=", s15_tale, " 기록=", s15_tool,
+				" 재료부족=", s15_short, " 쐐기=", s15_wedge,
+				" 얕은층제외=", s15_shallow, " 진행중=", s15_mid,
+				" 수맥돌파=", s15_burst, " 온천부활=", s15_done,
+				" 입욕=", s15_bath and s15_once, " 주민나들이=", s15_goer and s15_day)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

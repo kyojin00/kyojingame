@@ -10,6 +10,10 @@ extends Node
 var m: KyojinMain    # main.gd
 
 
+# 온천이 열리면 저녁마다 몸을 담그러 가는 사람들 (메인 스토리 15)
+const ONSEN_GOERS := ["blacksmith", "chief", "merchant"]
+
+
 func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
 	var n: Node2D = preload("res://scripts/npc.gd").new()
 	n.main = m
@@ -29,6 +33,11 @@ func npc_place_now(npc_id: String) -> String:
 	# 민지는 노점 시간이 되면 해변으로 내려간다 (하루 3번, 1시간씩)
 	if npc_id == "merchant" and GameData.merchant_at_stall():
 		return "stall"
+	# 온천이 되살아나면 저녁에 몸을 담그러 가는 사람들이 생긴다 (스토리 15)
+	if GameData.onsen_open and npc_id in ONSEN_GOERS:
+		var oh := GameData.minutes / 60.0
+		if oh >= 17.0 and oh < 19.5:
+			return "onsen"
 	# 마을회관이 서면 이장은 낮(9~17시)에 회관에서 업무를 본다 (집은 그대로)
 	if npc_id == "chief" and GameData.village_built.has("hall"):
 		var hh := GameData.minutes / 60.0
@@ -52,6 +61,10 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
 		"hallwork":
 			t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
+		"onsen":
+			# 온천 앞 — 셋이 겹치지 않게 한 칸씩 벌려 선다
+			var oi: int = maxi(0, ONSEN_GOERS.find(npc_id))
+			t = m.ONSEN_POS + Vector2i(oi - 1, 2)
 		"plaza":
 			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13))
 		"board":

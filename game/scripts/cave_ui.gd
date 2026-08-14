@@ -484,6 +484,8 @@ func _attack_hit(wpn: String, first: bool) -> void:
 				monsters.erase(m)
 				Sound.play_sfx("sfx_pick", 0.2)
 				main.doing.record_kill(m.type)
+				# 막힌 수맥을 지키던 것들 (메인 스토리 15)
+				main.story.story15_dig_progress("mob", floor_num)
 				main.toolwork.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0, "treant": 40.0}[m.type])
 				if m.type == "treant":
 					GameData.try_relic(4)   # 나무 괴물이 지키던 「할머니의 목걸이」
@@ -526,6 +528,8 @@ func _attack_hit(wpn: String, first: bool) -> void:
 		main.doing.gain_item("ore", n)
 		main.hud.show_message("광석 %d개 획득!" % n if n > 1 else "광석 획득!")
 		main.toolwork.gain_skill("mine", 8.0)
+		# 수맥을 막고 무너져 쌓인 바위 (메인 스토리 15)
+		main.story.story15_dig_progress("ore", floor_num)
 		# 동굴 조사(스토리 10) — 깊은 층 광맥에는 수정이 섞여 있다
 		if GameData.story10_open() and floor_num >= 5 and randf() < 0.12:
 			main.doing.gain_item("crystal", 1)

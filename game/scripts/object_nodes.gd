@@ -115,6 +115,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"cave":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
+		"onsen":
+			texture = m.tex["onsen"]   # 마을 온천 (메인 스토리 15)
+			offset = Vector2(0, -100)
 		"fence":
 			texture = m.tex["fence"]
 		"sprinkler":

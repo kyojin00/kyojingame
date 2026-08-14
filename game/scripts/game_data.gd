@@ -1578,6 +1578,205 @@ func story13_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 14: 마을의 첫 축제 ----
+#
+# 스토리 13 뒤 자유 생활을 며칠 보내면, 이장이 마을회관에서 회의를 열어
+# 「주민이 이만큼 늘었으니 우리 손으로 첫 축제를 열자」고 제안한다.
+# 준비는 여섯 가지 중 **셋만 고르면 된다** — 지금까지 연 생활 콘텐츠
+# (농사·요리·낚시·목장·벌목·제작)에서 하나씩 가져왔다. 주민들도 저마다
+# 맡은 몫을 준비하니 혼자 차리는 축제가 아니다.
+# 준비가 끝나면 이튿날 광장에서 축제가 열리고(전용 대사 + 투호 미니게임),
+# 이장의 마무리 인사와 함께 회관의 「축제·행사 일정」이 정식 해금된다.
+#   "": 아직 / meet: 회관 회의 / prep: 준비(3/6) /
+#   fest: 축제 당일 — 광장 / done: 완료
+var story14_phase := ""
+var story13_done_day := 0          # 스토리 13을 끝낸 날 (자유 생활 보장)
+var story14_tasks: Array = []      # 끝낸 준비 항목 id
+var story14_greet: Array = []      # 준비 이야기를 들려준 주민
+var story14_fest_day := 0          # 축제가 열리는 날
+var story14_toss := false          # 투호 미니게임을 해 봤는가
+const STORY14_REST_DAYS := 3       # 스토리 13 뒤 이만큼 지나야 시작 (임시)
+const STORY14_PICK := 3            # 여섯 항목 중 몇 개만 하면 되는가
+
+# 축제 준비 항목 — kind로 「무엇을 세는가」가 갈린다. 맡은 주민은 저마다
+# 제 몫을 준비하고 있고, 플레이어는 그중 셋만 거들면 된다.
+const FEST_TASKS := [
+	{"id": "crop", "name": "잔치상 채소", "kind": "produce", "need": 10,
+		"npc": "chief", "desc": "광장 상에 올릴 밭 것들 (아무 작물)"},
+	{"id": "dish", "name": "나눔 음식", "kind": "dish", "need": 3,
+		"npc": "merchant", "desc": "다 같이 나눠 먹을 요리 (아무 요리)"},
+	{"id": "fish", "name": "구이용 물고기", "kind": "fish", "need": 3,
+		"npc": "fisher", "desc": "숯불에 구울 생선 (아무 물고기)"},
+	{"id": "ranch", "name": "목장 잔치상", "kind": "ranch", "need": 6,
+		"npc": "rancher", "desc": "달걀과 우유"},
+	{"id": "wood", "name": "모닥불 장작", "kind": "wood", "need": 30,
+		"npc": "blacksmith", "desc": "광장 한복판에 지필 장작"},
+	{"id": "flower", "name": "광장 꽃 장식", "kind": "flower", "need": 2,
+		"npc": "librarian", "desc": "화분 (제작대에서 만든다)"},
+]
+
+
+# 준비 항목의 지금 보유량 — 종류를 가리지 않고 뭉쳐 센다
+func fest_have(kind: String) -> int:
+	var n := 0
+	if kind == "produce":
+		for cid in produce:
+			n += int(produce[cid])
+	elif kind == "dish":
+		for rid: String in RECIPE_IDS:
+			n += int(items.get(rid, 0))
+	elif kind == "fish":
+		for fid: String in FISH_IDS:
+			n += int(items.get(fid, 0))
+	elif kind == "ranch":
+		n = int(items.get("egg", 0)) + int(items.get("milk", 0))
+	elif kind == "wood":
+		n = wood
+	elif kind == "flower":
+		n = int(items.get("flower_pot", 0))
+	return n
+
+
+func _fest_consume(kind: String, need: int) -> void:
+	var left := need
+	if kind == "produce":
+		for cid in produce:
+			if left <= 0:
+				break
+			var take: int = mini(left, int(produce[cid]))
+			if take > 0:
+				consume_produce(cid, take)
+				left -= take
+		return
+	if kind == "wood":
+		wood = maxi(0, wood - need)
+		return
+	var ids: Array = ["flower_pot"]
+	if kind == "dish":
+		ids = RECIPE_IDS
+	elif kind == "fish":
+		ids = FISH_IDS
+	elif kind == "ranch":
+		ids = ["egg", "milk"]
+	for iid: String in ids:
+		if left <= 0:
+			break
+		var t2: int = mini(left, int(items.get(iid, 0)))
+		if t2 > 0:
+			items[iid] = int(items[iid]) - t2
+			left -= t2
+
+
+# 준비 항목 내놓기 — 재료를 내면 그 몫이 끝난다
+func fest_deliver(tid: String) -> bool:
+	if tid in story14_tasks:
+		return false
+	for t: Dictionary in FEST_TASKS:
+		if str(t.id) != tid:
+			continue
+		if fest_have(str(t.kind)) < int(t.need):
+			return false
+		_fest_consume(str(t.kind), int(t.need))
+		story14_tasks.append(tid)
+		return true
+	return false
+
+
+func fest_prep_done() -> bool:
+	return story14_tasks.size() >= STORY14_PICK
+
+
+# 시작 조건 (임시) — 스토리 13 완결 + 자유 생활 며칠 + 회관이 서 있을 것
+func story14_ready() -> bool:
+	return story13_phase == "done" and village_built.has("hall") \
+		and day >= story13_done_day + STORY14_REST_DAYS
+
+
+# 회관의 「축제·행사 일정」 — 첫 축제를 치러야 정식으로 열린다
+func hall_calendar_open() -> bool:
+	return story14_phase == "done"
+
+
+func story14_objective_short() -> String:
+	match story14_phase:
+		"meet":
+			return "마을회관에서 이장의 회의를 듣자"
+		"prep":
+			return "축제 준비 — 여섯 가지 중 %d/%d 완료 (회관에서 내놓기)" % [
+				story14_tasks.size(), STORY14_PICK]
+		"fest":
+			if day < story14_fest_day:
+				return "내일 광장에서 첫 축제가 열린다!"
+			return "광장의 축제를 즐기자 — 이장에게 말을 걸면 마무리한다"
+	return ""
+
+
+# ---- 메인 스토리 15: 마른 온천 ----
+#
+# 스토리 14 뒤 자유 생활을 며칠 보내면, 이장이 옛 온천 이야기를 꺼낸다.
+# 서하의 옛 기록으로 온천수가 동굴 지하 수맥과 이어져 있었음을 알고,
+# 무쇠에게 수맥을 뚫을 「착암 쐐기」를 벼려 받아 동굴 깊은 곳(20층+)에서
+# 무너진 바위와 몬스터를 헤치며 수맥을 되살린다. 솟은 물은 묘연이
+# 살펴 준 뒤에야 마을 온천으로 흐른다 — 복구하면 온천 시설이 열린다.
+#   "": 아직 / tale: 이장의 옛 온천 이야기 / book: 도서관 기록 /
+#   tool: 대장간 착암 쐐기 / dig: 동굴 수맥 뚫기 /
+#   water: 묘연의 물 확인 / done: 온천 부활
+var story15_phase := ""
+var story14_done_day := 0
+var story15_mobs := 0              # 수맥 둘레에서 처치한 몬스터
+var story15_ore := 0               # 무너져 쌓인 바위·광석을 걷어낸 수
+var onsen_open := false            # 온천 시설 해금
+var onsen_day := 0                 # 마지막으로 입욕한 날 (하루 한 번)
+const STORY15_REST_DAYS := 3
+const STORY15_DEPTH := 20          # 수맥이 막힌 깊이
+const STORY15_MOBS := 8            # 수맥 둘레를 지키던 것들
+const STORY15_ORE := 12            # 무너져 쌓인 바위·광석
+const STORY15_TOOL_ORE := 20       # 착암 쐐기 재료
+const STORY15_TOOL_SHARD := 2
+const ONSEN_HOURS := 2.0           # 입욕에 흐르는 시간
+
+
+func story15_ready() -> bool:
+	return story14_phase == "done" \
+		and day >= story14_done_day + STORY15_REST_DAYS
+
+
+func story15_dig_done() -> bool:
+	return story15_mobs >= STORY15_MOBS and story15_ore >= STORY15_ORE
+
+
+# 온천에 몸을 담근다 — 하루 한 번, 시간이 흐르고 체력이 가득 찬다
+func onsen_bathe() -> bool:
+	if not onsen_open or onsen_day == day:
+		return false
+	onsen_day = day
+	energy = ENERGY_MAX
+	minutes = minf(minutes + ONSEN_HOURS * 60.0, DAY_END - 60.0)
+	return true
+
+
+func story15_objective_short() -> String:
+	match story15_phase:
+		"tale":
+			return "이장에게 옛 온천 이야기를 듣자 (E)"
+		"book":
+			return "도서관에서 온천 기록을 찾아보자"
+		"tool":
+			if int(items.get("rock_wedge", 0)) > 0:
+				return "착암 쐐기를 들고 동굴로 내려가자"
+			return "무쇠에게 착암 쐐기를 부탁하자 — 광석 %d·별빛 조각 %d" % [
+				STORY15_TOOL_ORE, STORY15_TOOL_SHARD]
+		"dig":
+			if story15_dig_done():
+				return "수맥을 막던 바위를 쐐기로 뚫자 (동굴 %d층+)" % STORY15_DEPTH
+			return "동굴 %d층 아래 수맥 — 몬스터 %d/%d · 바위 %d/%d" % [
+				STORY15_DEPTH, mini(story15_mobs, STORY15_MOBS), STORY15_MOBS,
+				mini(story15_ore, STORY15_ORE), STORY15_ORE]
+		"water":
+			return "솟아난 물을 묘연에게 보여주자"
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1703,6 +1902,26 @@ func quest_catalog() -> Array:
 			"desc": "바다가 간직해 온 두 번째 유품 — 낡은 상자의 비밀.",
 			"cat": "main", "ep": "메인 스토리 13", "npc": s13npc,
 			"reward": "할머니의 팔찌 + 「할머니의 기록」 2장"})
+	o = story14_objective_short()
+	if o != "":
+		out.append({"id": "story14", "title": "마을의 첫 축제", "obj": o,
+			"desc": "주민이 늘었다 — 우리 손으로 첫 축제를 열자.",
+			"cat": "main", "ep": "메인 스토리 14", "npc": "chief",
+			"reward": "마을회관 「축제·행사 일정」 해금"})
+	o = story15_objective_short()
+	if o != "":
+		var s15npc := "chief"
+		match story15_phase:
+			"book":
+				s15npc = "librarian"
+			"tool":
+				s15npc = "blacksmith"
+			"water":
+				s15npc = "alchemist"
+		out.append({"id": "story15", "title": "마른 온천", "obj": o,
+			"desc": "언젠가부터 물이 끊긴 마을의 옛 온천.",
+			"cat": "main", "ep": "메인 스토리 15", "npc": s15npc,
+			"reward": "온천 해금 — 몸을 담그면 체력이 가득 찬다"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1849,6 +2068,24 @@ func quest_npc_marks() -> Dictionary:
 		"open":
 			if story13_mats_ok():
 				marks["alchemist"] = "?"
+	# 스토리 14 — 회의·축제는 이장이 이끈다
+	if story14_phase == "meet":
+		marks["chief"] = "!"
+	elif story14_phase == "prep" and fest_prep_done():
+		marks["chief"] = "?"
+	elif story14_phase == "fest" and day >= story14_fest_day:
+		marks["chief"] = "?"
+	# 스토리 15 — 온천: 이장 → 서하 → 무쇠 → 동굴 → 묘연
+	match story15_phase:
+		"tale":
+			marks["chief"] = "!"
+		"book":
+			marks["librarian"] = "!"
+		"tool":
+			if int(items.get("rock_wedge", 0)) == 0:
+				marks["blacksmith"] = "!"
+		"water":
+			marks["alchemist"] = "?"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -2360,6 +2597,9 @@ const ITEMS := {
 	"glow_shroom": {"name": "발광 버섯", "sell": 120},
 	# 낡은 작은 상자 (메인 스토리 13) — 바다가 돌려준 것. 팔 수 없다
 	"old_box": {"name": "낡은 작은 상자", "sell": 0},
+	# 온천 복구 (메인 스토리 15) — 수맥을 뚫는 쐐기와 솟아난 물의 표본
+	"rock_wedge": {"name": "착암 쐐기", "sell": 0},
+	"spring_water": {"name": "샘물 표본", "sell": 0},
 	"bouquet": {"name": "꽃다발", "sell": 0},
 	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
 	"nail": {"name": "못", "sell": 15},
@@ -2473,7 +2713,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
 	"fish_king", "fish_dragon",
 	"ore", "gem", "star_shard", "crystal", "cave_moss", "glow_shroom",
-	"old_box", "bouquet", "wedding_ring",
+	"old_box", "rock_wedge", "spring_water", "bouquet", "wedding_ring",
 	"nail", "cloth", "rope", "hinge", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
@@ -4314,6 +4554,10 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 12 — 숲의 연금술사")
 	if story13_phase == "done":
 		out.append("메인 스토리 13 — 할머니의 팔찌")
+	if story14_phase == "done":
+		out.append("메인 스토리 14 — 마을의 첫 축제")
+	if story15_phase == "done":
+		out.append("메인 스토리 15 — 마른 온천")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -4652,6 +4896,18 @@ func reset_all() -> void:
 	story13_phase = ""
 	story13_heard = []
 	story12_done_day = 0
+	story14_phase = ""
+	story13_done_day = 0
+	story14_tasks = []
+	story14_greet = []
+	story14_fest_day = 0
+	story14_toss = false
+	story15_phase = ""
+	story14_done_day = 0
+	story15_mobs = 0
+	story15_ore = 0
+	onsen_open = false
+	onsen_day = 0
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -5021,6 +5277,12 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story12_phase": story12_phase, "story12_heard": story12_heard,
 		"story13_phase": story13_phase, "story13_heard": story13_heard,
 		"story12_done_day": story12_done_day,
+		"story14_phase": story14_phase, "story13_done_day": story13_done_day,
+		"story14_tasks": story14_tasks, "story14_greet": story14_greet,
+		"story14_fest_day": story14_fest_day, "story14_toss": story14_toss,
+		"story15_phase": story15_phase, "story14_done_day": story14_done_day,
+		"story15_mobs": story15_mobs, "story15_ore": story15_ore,
+		"onsen_open": onsen_open, "onsen_day": onsen_day,
 		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,

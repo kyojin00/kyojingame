@@ -347,6 +347,9 @@ func interact() -> void:
 		if obj.kind == "cave":
 			m.village._open_mine_dialog()
 			return
+		if obj.kind == "onsen":
+			m.story.onsen_enter()   # 마을 온천 (메인 스토리 15) — 하루 한 번
+			return
 		if obj.kind == "house":
 			_enter_building(_building_kind_at(t))
 			return

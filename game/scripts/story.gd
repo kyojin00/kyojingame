@@ -2899,6 +2899,7 @@ func _end_grandma_record() -> void:
 		return
 	if GameData.story13_phase == "record":
 		GameData.story13_phase = "done"
+		GameData.story13_done_day = GameData.day   # 다음 이야기 전, 자유 생활
 		m.hud.story_banner("메인 스토리 13 완결", "할머니의 팔찌")
 		m.hud.show_message("두 번째 유품을 찾았다. 바다도 약속은 지킨다 —\n남은 유품들이 어딘가에서 기다리고 있다.", 7.0)
 		m.saveio.save_now()
@@ -3212,6 +3213,360 @@ func _start_box_open_dialog() -> void:
 		{"text": "「그분 노트에 적어 둬요. 그리고...\n도서관의 사서 씨도 분명 반가워할 거예요.」",
 			"portrait": m.tex["npc_alchemist_portrait_happy"]},
 	], _end_box_open)
+
+
+# ---- 메인 스토리 14: 마을의 첫 축제 ----
+#
+# 스토리 13 뒤 자유 생활을 며칠 보내면 이장이 회관에서 회의를 연다.
+# 준비는 여섯 중 셋만 — 주민들도 저마다 제 몫을 맡는다.
+# 이튿날 광장에서 축제(전용 대사 + 투호) -> 이장의 마무리 -> 캘린더 해금.
+
+func _story14_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story14_phase == "" and GameData.story14_ready():
+		GameData.story14_phase = "meet"
+		m.hud.quest_start_toast("이장이 마을회관에서 회의를 연다고 한다")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 회관 회의: 첫 공식 축제를 열자
+func _start_fest_meet_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_happy"], [
+		{"text": "「다들 모였는가! 오늘 회의는 좋은 이야길세.」"},
+		{"text": "「자네가 온 뒤로 주민이 이만큼 늘었네.\n빈집만 늘어가던 마을이 말이야...」"},
+		{"text": "「그래서 말인데 — 우리 손으로 축제를\n열어 보세! 옛날엔 계절마다 모이는 날이\n있었지만, 마을이 여는 첫 공식 축제일세.」"},
+		{"text": "「준비할 건 많네만, 다들 하나씩 맡기로 했네.\n나는 밭 것을, 민지는 음식을, 철수는 생선을,\n보라는 목장 것을, 무쇠는 장작을...」",
+			"portrait": m.tex["npc_chief_portrait_normal"]},
+		{"text": "「자네는 그중 %d가지만 거들어 주게.\n어느 걸 맡을지는 자네가 고르고 —\n회관 접수대에 내놓으면 되네.」" % GameData.STORY14_PICK,
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+	], _end_fest_meet)
+
+
+func _end_fest_meet() -> void:
+	if GameData.story14_phase == "meet":
+		GameData.story14_phase = "prep"
+		GameData.story14_tasks = []
+		GameData.story14_greet = []
+		m.hud.story_banner("메인 스토리 14 시작", "마을의 첫 축제")
+		m.hud.quest_start_toast("축제 준비 — 여섯 가지 중 %d가지만 고르자"
+			% GameData.STORY14_PICK)
+	m.saveio.save_now()
+
+
+# 준비 기간의 주민 대사 — 다들 제 몫을 챙기고 있다 (한 사람당 한 번)
+const PREP_LINES := {
+	"chief": "「내 몫은 밭 것일세. 무를 뽑아 두었지.\n자네는 자네가 고른 것만 챙기게!」",
+	"merchant": "「나는 음식 담당! 가게 문 일찍 닫고\n하루 종일 부칠 거야. 기대해도 좋아~」",
+	"blacksmith": "「장작은 내가 팬다. 팔 힘이야 남아돌지.\n모닥불은 크게 지펴야 제맛이거든.」",
+	"fisher": "「생선은 내가 맡았어! 새벽에 나가서\n제일 좋은 놈으로 골라 올 거야.」",
+	"rancher": "「달걀이랑 우유는 우리 애들이 책임져!\n애들도 축제라니까 신났나 봐~」",
+	"librarian": "「저는 광장 장식을 맡았어요.\n화분을 어디에 둘지 도면까지 그렸답니다.」",
+	"explorer": "「축제라니! 내가 숲에서 재밌는 얘깃거리\n하나 물어 오지. 밤에 들려줄게.」",
+	"forest_mom": "「솔이가 축제 이야기에 잠을 못 자더라.\n우리도 그날은 마을로 내려갈게.」",
+	"forest_girl": "「엄마가 축제 가도 된댔어요!\n저 광장 처음 가 봐요...!」",
+}
+const PREP_LINE_DEFAULT := "「축제 준비 도와줄까? 나도 뭐라도 하고 싶은데!\n마을에 이런 날이 다 오네.」"
+
+
+func story14_prep_greet(nid: String) -> bool:
+	if GameData.story14_phase != "prep" or nid in GameData.story14_greet:
+		return false
+	GameData.story14_greet.append(nid)
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_happy" % nid,
+			m.tex.get("npc_%s_portrait_normal" % nid)),
+		[{"text": str(PREP_LINES.get(nid, PREP_LINE_DEFAULT))}])
+	return true
+
+
+# 준비를 마치고 이장에게 — 축제는 이튿날 광장에서
+func _start_fest_ready_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_happy"], [
+		{"text": "「오오, 이만하면 넉넉하네! 자네 덕에\n상이 그득하겠구먼.」"},
+		{"text": "「다른 사람들 몫도 다 들어왔네.\n광장에 자리도 다 잡아 두었고 말이야.」"},
+		{"text": "「그럼 — 내일 아침, 광장에서 보세!\n마을의 첫 축제일세!」"},
+	], _end_fest_ready)
+
+
+func _end_fest_ready() -> void:
+	if GameData.story14_phase != "prep" or not GameData.fest_prep_done():
+		return
+	GameData.story14_phase = "fest"
+	GameData.story14_fest_day = GameData.day + 1
+	GameData.story14_toss = false
+	m.hud.event_toast("내일은 마을 축제!")
+	m.hud.quest_start_toast("내일 아침, 광장에서 첫 축제가 열린다")
+	m.saveio.save_now()
+
+
+# 축제 당일 — 주민들의 축제 전용 대사
+const FEST_LINES := {
+	"chief": "「하하! 이 사람들 좀 보게 —\n마을이 이렇게 북적인 게 대체 몇 해 만인가!」",
+	"merchant": "「자, 부침개 갓 부쳤어요~ 오늘은 공짜!\n축제니까 특별히!」",
+	"blacksmith": "「모닥불 잘 타지? 내가 팬 장작일세.\n...불빛이 좋구먼. 참 좋아.」",
+	"fisher": "「생선 구이 하나 들고 가! 내가 새벽에\n직접 낚은 거라니까?」",
+	"rancher": "「우리 애들도 데려왔어! 저기 봐,\n닭이 아이들이랑 놀고 있잖아~」",
+	"librarian": "「화분 배치, 예쁘죠? ...오늘은 책 대신\n사람들을 구경하고 있어요.」",
+	"explorer": "「축제 좋다! 여기저기 떠돌아다녔지만\n이런 밤은 오랜만이야.」",
+	"forest_mom": "「솔이가 저렇게 웃는 건 참 오랜만이야.\n...데려오길 잘했어. 고마워.」",
+	"forest_girl": "「저기요! 저기 불꽃 봤어요?\n오늘 하루가 제일 재밌어요!」",
+}
+const FEST_LINE_DEFAULT := "「이런 날이 오다니! 이 마을로 오길 잘했어.\n내년에도 꼭 열자, 응?」"
+
+
+func story14_fest_greet(nid: String) -> bool:
+	if GameData.story14_phase != "fest" or GameData.day < GameData.story14_fest_day:
+		return false
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_happy" % nid,
+			m.tex.get("npc_%s_portrait_normal" % nid)),
+		[{"text": str(FEST_LINES.get(nid, FEST_LINE_DEFAULT))}])
+	return true
+
+
+# 축제 진행 — 이장에게 말을 걸면 놀거리와 마무리를 고른다
+func open_fest_day_dialog() -> void:
+	var btns: Array = [
+		["투호 던지기 (미니게임)", _fest_toss],
+		["축제를 마무리한다", _start_fest_end_dialog],
+		["더 둘러본다", null],
+	]
+	m.dialog.open("마을 축제",
+		"광장 한복판에 모닥불이 타오르고,\n상에는 마을 사람들이 낸 음식이 그득하다.\n\n"
+		+ "「즐기고 있는가? 놀거리도 있다네!」", btns)
+
+
+# 투호 — 세 번 던져 맞힌 수만큼 상금 (행운이 높으면 잘 들어간다)
+func _fest_toss() -> void:
+	var hit := 0
+	for i in 3:
+		if randf() < 0.5 + GameData.total_luck() * 0.02:
+			hit += 1
+	var prize := hit * 300
+	GameData.money += prize
+	Sound.play_sfx("sfx_coin" if hit > 0 else "sfx_miss")
+	var body := "화살 셋을 항아리에 던졌다 — %d개 명중!\n\n" % hit
+	if hit >= 3:
+		body += "「세 발 다 넣다니! 오늘의 주인공일세!」\n상금 %dG를 받았다." % prize
+	elif hit > 0:
+		body += "「좋아, 좋아! 제법이구먼.」\n상금 %dG를 받았다." % prize
+	else:
+		body += "「하하, 다음엔 더 잘 되겠지!\n자, 부침개나 한 장 들게.」"
+	if not GameData.story14_toss:
+		GameData.story14_toss = true
+		for n in m.npcs:
+			if GameData.affinity.has(n.id):
+				GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 2
+		body += "\n\n(다 같이 웃고 떠들었다 — 온 주민 호감도 +2)"
+	m.dialog.open("투호 던지기", body, [["즐거웠다", open_fest_day_dialog]])
+	m.saveio.save_now()
+
+
+# 축제 마무리 — 처음 왔을 때와 견주는 이장의 인사 (스토리 14 완결)
+func _start_fest_end_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_happy"], [
+		{"text": "「...자네, 처음 이 마을에 왔던 날 기억하나?」"},
+		{"text": "「집도 상점도 없고, 나 하나 남아\n빈 집만 지키고 있었지. 솔직히 말하면 —\n이 마을은 끝났다고 생각했다네.」",
+			"portrait": m.tex["npc_chief_portrait_normal"]},
+		{"text": "(모닥불 너머로 웃음소리가 번진다.\n상점 주인도, 대장장이도, 아이들도,\n숲에서 내려온 모녀까지 모두 여기 있다.)"},
+		{"text": "「그런데 지금 이 소리 좀 듣게.\n...고맙네. 정말로.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+		{"text": "「앞으로는 회관에서 축제와 행사 일정을\n제대로 챙기겠네. 다음 계절 축제도\n마을이 함께 준비하는 걸세!」"},
+	], _end_fest_day)
+
+
+func _end_fest_day() -> void:
+	if GameData.story14_phase != "fest":
+		return
+	GameData.story14_phase = "done"
+	GameData.story14_done_day = GameData.day
+	m.hud.story_banner("메인 스토리 14 완결", "마을의 첫 축제")
+	m.hud.show_message("마을의 첫 축제가 끝났다!\n마을회관에서 「축제·행사 일정」을 볼 수 있게 됐다.", 7.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 15: 마른 온천 ----
+#
+# 이장의 옛 온천 이야기 -> 서하의 기록(동굴 지하 수맥) -> 무쇠의 착암
+# 쐐기 -> 동굴 20층 아래에서 몬스터·무너진 바위를 치우고 수맥을 뚫기 ->
+# 묘연의 물 확인 -> 마을 온천 부활 (하루 한 번 입욕 = 체력 회복).
+
+func _story15_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story15_phase == "" and GameData.story15_ready():
+		GameData.story15_phase = "tale"
+		m.hud.quest_start_toast("이장이 옛날 이야기를 하나 들려주고 싶어 한다")
+		m.saveio.save_now()
+	# 온천이 되살아나 있으면 세상에 놓아 둔다 (로드 직후 포함)
+	if GameData.onsen_open:
+		m.worldgen._spawn_onsen()
+
+
+# 퀘스트 1 — 이장: 물이 끊긴 옛 온천
+func _start_onsen_tale_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「축제 때 하도 옛날 얘기가 나와서 말인데 —\n자네, 우리 마을에 온천이 있었던 건 아나?」"},
+		{"text": "「마을 북쪽 바위 밑에서 김이 폴폴 나는\n작은 탕이었네. 밭일 끝나고 다들 거기\n몸을 담갔지. 자네 할아버지도 단골이었고.」"},
+		{"text": "「그런데 어느 해부터 물이 뚝 끊겼어.\n바위만 덩그러니 남고... 이유는 아무도 몰라.」"},
+		{"text": "「사서 선생이라면 옛 기록에서 뭔가\n찾아낼지도 모르겠구먼. 한번 물어봐 주겠나?」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+	], _end_onsen_tale)
+
+
+func _end_onsen_tale() -> void:
+	if GameData.story15_phase == "tale":
+		GameData.story15_phase = "book"
+		m.hud.story_banner("메인 스토리 15 시작", "마른 온천")
+		m.hud.quest_start_toast("도서관에서 온천 기록을 찾아보자")
+	m.saveio.save_now()
+
+
+# 퀘스트 2 — 서하: 온천수는 동굴 지하 수맥과 이어져 있었다
+func _start_onsen_book_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「온천이요? ...아, 있어요! 옛 마을 지질도.\n여기 물길이 그려져 있네요.」"},
+		{"text": "(빛바랜 도면에 마을 북쪽 바위에서\n땅속으로 뻗어 내려가는 실선이 있다.\n선은 동굴 깊은 곳까지 이어진다.)"},
+		{"text": "「온천수는 동굴 지하 수맥에서 올라오던\n거예요. 기록엔 『%d길 아래 물길이 무너져\n막혔다』고 적혀 있고요.」" % GameData.STORY15_DEPTH,
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「바위가 무너져 길을 막은 거라면...\n사람 손으로 뚫을 수 있을지도 몰라요.\n무쇠 씨에게 연장을 부탁해 보세요.」"},
+	], _end_onsen_book)
+
+
+func _end_onsen_book() -> void:
+	if GameData.story15_phase == "book":
+		GameData.story15_phase = "tool"
+		m.hud.quest_start_toast("무쇠에게 수맥을 뚫을 연장을 부탁하자")
+	m.saveio.save_now()
+
+
+# 퀘스트 3 — 무쇠: 착암 쐐기를 벼린다
+func _start_onsen_tool_dialog() -> void:
+	var ore := int(GameData.items.get("ore", 0))
+	var shard := int(GameData.items.get("star_shard", 0))
+	if ore < GameData.STORY15_TOOL_ORE or shard < GameData.STORY15_TOOL_SHARD:
+		m.dialog.open_seq("무쇠", m.tex["npc_blacksmith_portrait_normal"], [
+			{"text": "「수맥을 막은 바위를 뚫겠다고?\n그럼 보통 곡괭이로는 안 되지.」"},
+			{"text": "「착암 쐐기를 벼려 주겠네 —\n광석 %d개와 별빛 조각 %d개를 가져오게.\n(지금 광석 %d·조각 %d)」" % [
+				GameData.STORY15_TOOL_ORE, GameData.STORY15_TOOL_SHARD, ore, shard]},
+		])
+		return
+	m.dialog.open_seq("무쇠", m.tex["npc_blacksmith_portrait_normal"], [
+		{"text": "「좋아, 재료는 넉넉하군. 잠깐 기다리게.」"},
+		{"text": "(화로가 하얗게 타오르고, 무쇠가\n쇠를 접고 또 접어 뾰족한 쐐기를 벼렸다.)"},
+		{"text": "「자, 착암 쐐기일세. 바위 결을 찾아\n한 번에 때리게 — 힘으로 하는 게 아니야.」",
+			"portrait": m.tex["npc_blacksmith_portrait_happy"]},
+		{"text": "「깊은 굴은 위험하네. 무너진 자리엔\n으레 험한 것들이 꼬이는 법이니\n무기부터 챙기게.」"},
+	], _end_onsen_tool)
+
+
+func _end_onsen_tool() -> void:
+	if GameData.story15_phase != "tool" \
+			or int(GameData.items.get("ore", 0)) < GameData.STORY15_TOOL_ORE \
+			or int(GameData.items.get("star_shard", 0)) < GameData.STORY15_TOOL_SHARD:
+		return
+	GameData.items["ore"] = int(GameData.items["ore"]) - GameData.STORY15_TOOL_ORE
+	GameData.items["star_shard"] = int(GameData.items["star_shard"]) \
+		- GameData.STORY15_TOOL_SHARD
+	GameData.items["rock_wedge"] = 1
+	GameData.discover("rock_wedge")
+	GameData.story15_phase = "dig"
+	GameData.story15_mobs = 0
+	GameData.story15_ore = 0
+	m.hud.reward_toast("착암 쐐기", m.tex.get("rock_wedge"))
+	m.hud.quest_start_toast("동굴 %d층 아래 — 수맥을 막은 자리를 치우자"
+		% GameData.STORY15_DEPTH)
+	m.saveio.save_now()
+
+
+# 동굴에서 수맥 둘레를 치운다 (cave_ui가 처치·채굴 때마다 부른다)
+func story15_dig_progress(kind: String, floor_num: int) -> void:
+	if GameData.story15_phase != "dig" or floor_num < GameData.STORY15_DEPTH:
+		return
+	if kind == "mob":
+		GameData.story15_mobs += 1
+	else:
+		GameData.story15_ore += 1
+	if not GameData.story15_dig_done():
+		return
+	# 다 치웠다 — 쐐기를 박아 넣으면 물이 솟는다
+	GameData.story15_phase = "water"
+	GameData.items["rock_wedge"] = 0
+	GameData.items["spring_water"] = 1
+	GameData.discover("spring_water")
+	Sound.play_sfx("sfx_catch")
+	m.hud.event_toast("수맥이 뚫렸다!")
+	m.hud.show_message("무너진 바위를 다 걷어내고 쐐기를 박아 넣자 —\n쩍, 하고 금이 가며 따뜻한 물이 솟아올랐다!\n표본을 한 병 담았다. 묘연에게 보여주자.", 8.0)
+	m.saveio.save_now()
+
+
+# 퀘스트 4 — 묘연: 물의 상태를 살핀다 (스토리 15 완결)
+func _start_onsen_water_dialog() -> void:
+	m.dialog.open_seq("묘연", m.tex["npc_alchemist_portrait_normal"], [
+		{"text": "「물이 다시 솟았다고요? 어디 봐요.」"},
+		{"text": "(묘연이 표본을 등불에 비추고,\n손끝으로 찍어 맛을 보았다.)"},
+		{"text": "「...좋은 물이에요. 땅속 깊은 데서\n돌을 오래 지나온 물. 몸을 담그면\n피로가 풀릴 거예요.」",
+			"portrait": m.tex["npc_alchemist_portrait_happy"]},
+		{"text": "「막힌 데를 뚫었으니 마을 쪽 탕에도\n곧 물이 찰 거예요. ...옛날에 그분도\n거기서 자주 쉬셨다던데.」"},
+	], _end_onsen_water)
+
+
+func _end_onsen_water() -> void:
+	if GameData.story15_phase != "water":
+		return
+	GameData.items["spring_water"] = 0
+	GameData.story15_phase = "done"
+	GameData.onsen_open = true
+	m.worldgen._spawn_onsen()
+	m.npcmgr._sync_village_npcs()
+	m.hud.story_banner("메인 스토리 15 완결", "마른 온천")
+	m.hud.show_message("마을 북쪽 온천에 다시 물이 찼다!\n하루 한 번 몸을 담그면 체력이 가득 찬다. (E)", 8.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
+# 온천 (E) — 하루 한 번 입욕
+func onsen_enter() -> void:
+	if GameData.onsen_day == GameData.day:
+		m.dialog.open("마을 온천",
+			"오늘은 이미 실컷 담갔다.\n김이 오르는 물결을 바라보기만 해도 개운하다.",
+			[["내일 또 오자", null]])
+		return
+	m.dialog.open("마을 온천",
+		"바위 틈에서 더운 물이 콸콸 솟는다.\n김 너머로 마을 지붕들이 어른거린다.\n\n몸을 담그면 %d시간이 흐르고 체력이 가득 찬다."
+			% int(GameData.ONSEN_HOURS),
+		[["몸을 담근다", _do_onsen], ["나중에", null]])
+
+
+# 온천에 몸을 담그러 온 주민의 이야기 — 마을이 달라졌다는 실감
+const ONSEN_LINES := {
+	"blacksmith": ["「크으... 이 맛이지. 화로 앞에서 굳은 어깨가\n싹 풀린다니까.」",
+		"「자네 아니었으면 이 물은 영영 안 나왔을 걸세.\n덕분에 늙은 뼈가 호강하는구먼.」"],
+	"chief": ["「하아... 젊었을 적엔 매일 여기서 살다시피 했지.\n다시 담글 줄은 몰랐네.」",
+		"「물이 도니 마을에 온기가 도는 것 같구먼.\n자네 할아버지도 여기 단골이었네.」"],
+	"merchant": ["「장사 끝나고 오는 게 요즘 낙이야~\n어깨 결림이 싹 가셔!」",
+		"「이참에 온천 앞에 노점을 하나 더 낼까?\n...농담이야, 농담!」"],
+}
+const ONSEN_LINE_DEFAULT := "「온천 좋다~ 이런 게 있었는지도 몰랐어.\n마을에 하나쯤 있으니 참 좋네.」"
+
+
+func onsen_npc_line(nid: String) -> void:
+	var lines: Array = ONSEN_LINES.get(nid, [ONSEN_LINE_DEFAULT])
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_happy" % nid,
+			m.tex.get("npc_%s_portrait_normal" % nid)),
+		[{"text": str(lines[randi() % lines.size()])}])
+
+
+func _do_onsen() -> void:
+	if not GameData.onsen_bathe():
+		return
+	Sound.play_sfx("sfx_sleep")
+	m.saveio.save_now()
+	m.dialog.open("마을 온천",
+		"뜨끈한 물에 어깨까지 담갔다.\n뭉친 데가 스르르 풀린다...\n\n체력이 가득 찼다!",
+		[["개운하다", null]])
 
 
 func _end_box_open() -> void:

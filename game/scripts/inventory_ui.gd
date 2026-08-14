@@ -979,6 +979,10 @@ func _item_entries() -> Array:
 			e["desc"] = "축축한 이끼방에서 떼어 온 이끼 — 컬렉션 「동굴의 생명」 표본"
 		elif id == "glow_shroom":
 			e["desc"] = "어둠 속에서 은은히 빛나는 버섯 — 컬렉션 「동굴의 생명」 표본"
+		elif id == "rock_wedge":
+			e["desc"] = "무쇠가 벼려 준 착암 쐐기 — 무너진 바위를 결대로 쪼갠다.\n동굴 깊은 곳의 막힌 수맥을 뚫는 데 쓴다"
+		elif id == "spring_water":
+			e["desc"] = "되살아난 수맥에서 담은 따뜻한 물 한 병 — 묘연에게 보여주자"
 		elif id == "old_box":
 			e["desc"] = "바닷물에 오래 잠겨 있던 낡은 작은 상자 — 녹슬어 열 수 없다.\n억지로 열면 안의 것까지 상한다... 연금술사라면 방법을 알 텐데"
 		elif id == "broom":

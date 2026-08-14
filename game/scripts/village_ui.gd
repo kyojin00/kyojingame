@@ -367,6 +367,40 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "alchemist" and GameData.story13_phase in ["box", "open"]:
 		m.story._alch_house_door()
 		return
+	# 메인 스토리 14 — 마을의 첫 축제
+	if npc.id == "chief" and GameData.story14_phase == "meet":
+		m.story._start_fest_meet_dialog()
+		return
+	if npc.id == "chief" and GameData.story14_phase == "prep" \
+			and GameData.fest_prep_done():
+		m.story._start_fest_ready_dialog()
+		return
+	if npc.id == "chief" and GameData.story14_phase == "fest" \
+			and GameData.day >= GameData.story14_fest_day:
+		m.story.open_fest_day_dialog()
+		return
+	if GameData.story14_phase == "fest" and m.story.story14_fest_greet(npc.id):
+		return   # 축제 당일 — 다들 들떠 있다
+	if GameData.story14_phase == "prep" and m.story.story14_prep_greet(npc.id):
+		return   # 준비 기간 — 저마다 맡은 몫을 이야기한다 (한 번씩)
+	# 메인 스토리 15 — 마른 온천
+	if npc.id == "chief" and GameData.story15_phase == "tale":
+		m.story._start_onsen_tale_dialog()
+		return
+	if npc.id == "librarian" and GameData.story15_phase == "book":
+		m.story._start_onsen_book_dialog()
+		return
+	if npc.id == "blacksmith" and GameData.story15_phase == "tool" \
+			and int(GameData.items.get("rock_wedge", 0)) == 0:
+		m.story._start_onsen_tool_dialog()
+		return
+	if npc.id == "alchemist" and GameData.story15_phase == "water":
+		m.story._start_onsen_water_dialog()
+		return
+	# 온천에 몸을 담그러 온 주민 — 물가에선 이야기가 길어진다 (스토리 15)
+	if GameData.onsen_open and m.npcmgr.npc_place_now(npc.id) == "onsen":
+		m.story.onsen_npc_line(npc.id)
+		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return
@@ -570,7 +604,11 @@ func _open_hall_dialog() -> void:
 	var body := "이장이 두툼한 장부를 넘기고 있다.\n\n주민 %d명 (플레이어 포함)\n%s" \
 		% [m.village_residents(), GameData.hall_next_feature_text()]
 	var btns: Array = [["주민 명부 보기", _open_hall_roster.bind(0)],
-		["마을 소식·캘린더", _open_hall_notice_dialog]]
+		["축제·행사 일정" if GameData.hall_calendar_open() else "마을 공지",
+			_open_hall_notice_dialog]]
+	# 첫 축제 준비 중에는 접수대가 준비물 접수처가 된다 (메인 스토리 14)
+	if GameData.story14_phase == "prep":
+		btns.insert(0, ["★ 축제 준비물 내놓기", _open_fest_prep_dialog])
 	if GameData.hall_feature_open("store"):
 		btns.append(["마을 창고", _open_hall_store_dialog])
 	if GameData.hall_feature_open("project"):
@@ -618,14 +656,20 @@ func _open_hall_roster(page: int) -> void:
 
 # 마을 소식·캘린더 — 축제 일정과 마을의 지금, 그리고 다음 목표의 예고
 func _open_hall_notice_dialog() -> void:
-	var body := "— %s %d일, 주민 %d명 —\n\n[계절 축제]\n" \
+	var body := "— %s %d일, 주민 %d명 —\n\n" \
 		% [GameData.season_name(), GameData.day_in_season(), m.village_residents()]
-	for s in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
-		var f: Dictionary = GameData.FESTIVALS[s]
-		var mark := " ★오늘!" if not GameData.festival_today().is_empty() \
-			and GameData.season() == s and GameData.day_in_season() == int(f.day) else ""
-		body += "· %s %d일 — %s%s\n" % [GameData.SEASON_NAMES[s], int(f.day),
-			str(f.name), mark]
+	# 축제·행사 일정은 마을이 첫 축제를 치러야 정식으로 걸린다 (메인 스토리 14)
+	if GameData.hall_calendar_open():
+		body += "[축제·행사 일정]\n"
+		for s in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
+			var f: Dictionary = GameData.FESTIVALS[s]
+			var mark := " ★오늘!" if not GameData.festival_today().is_empty() \
+				and GameData.season() == s \
+				and GameData.day_in_season() == int(f.day) else ""
+			body += "· %s %d일 — %s%s\n" % [GameData.SEASON_NAMES[s], int(f.day),
+				str(f.name), mark]
+	else:
+		body += "[축제·행사 일정]\n· 아직 마을이 함께 치른 축제가 없다.\n"
 	body += "\n[마을 공지]\n"
 	if not GameData.empty_houses.is_empty():
 		body += "· 빈 집 %d채 — 새 이웃을 기다린다.\n" % GameData.empty_houses.size()
@@ -636,6 +680,39 @@ func _open_hall_notice_dialog() -> void:
 		body += "· 완성한 공동 프로젝트 %d건.\n" % GameData.hall_projects.size()
 	body += "· %s" % GameData.hall_next_feature_text()
 	m.dialog.open("마을 소식·캘린더", body, [["돌아가기", _open_hall_dialog]])
+
+
+# 축제 준비물 접수 (메인 스토리 14) — 여섯 가지 중 셋만 고르면 된다.
+# 나머지는 주민들이 저마다 맡았다 — 어느 걸 거들지는 플레이어가 고른다.
+func _open_fest_prep_dialog() -> void:
+	var body := "접수대에 준비물 장부가 펼쳐져 있다.\n%d/%d 완료 — 여섯 가지 중 셋만 거들면 된다.\n" \
+		% [GameData.story14_tasks.size(), GameData.STORY14_PICK]
+	var btns: Array = []
+	for t: Dictionary in GameData.FEST_TASKS:
+		var tid := str(t.id)
+		var who: String = str(GameData.NPCS[str(t.npc)].name)
+		var have: int = GameData.fest_have(str(t.kind))
+		if tid in GameData.story14_tasks:
+			body += "\n★ %s — 완료! (%s와 함께)" % [str(t.name), who]
+			continue
+		body += "\n· %s %d/%d — %s (%s 담당)" % [str(t.name),
+			mini(have, int(t.need)), int(t.need), str(t.desc), who]
+		if have >= int(t.need) and not GameData.fest_prep_done():
+			btns.append(["%s 내놓기" % str(t.name), _fest_deliver.bind(tid)])
+	if GameData.fest_prep_done():
+		body += "\n\n준비는 이만하면 됐다 — 이장에게 알리자!"
+	btns.append(["돌아가기", _open_hall_dialog])
+	m.dialog.open("축제 준비물", body, btns)
+
+
+func _fest_deliver(tid: String) -> void:
+	if not GameData.fest_deliver(tid):
+		return
+	Sound.play_sfx("sfx_place")
+	m.hud.event_toast("축제 준비 %d/%d!"
+		% [GameData.story14_tasks.size(), GameData.STORY14_PICK])
+	m.saveio.save_now()
+	_open_fest_prep_dialog()
 
 
 # 마을 창고 — 주민 기부품 보관 + 쓰레기 수거함 + 하루 한 번 운 루팅

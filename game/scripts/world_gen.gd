@@ -360,6 +360,19 @@ func _spawn_alch_house() -> void:
 	m.queue_redraw()
 
 
+# 마을 온천 (메인 스토리 15) — 수맥을 되살리면 바위 탕에 물이 찬다.
+# 오브젝트 하나로 서고, 둘레 한 칸은 드나들 수 있게 비워 둔다.
+func _spawn_onsen() -> void:
+	var t: Vector2i = m.ONSEN_POS
+	if str(m.objects.get(t, {}).get("kind", "")) == "onsen":
+		return
+	for y in range(t.y - 1, t.y + 2):
+		for x in range(t.x - 1, t.x + 2):
+			m.objnode._remove_object(Vector2i(x, y))
+	m.objnode._place_object(t, "onsen", 0)
+	m.queue_redraw()
+
+
 func _trim_paths_under_building(anchor: Vector2i) -> void:
 	var door := m.door_tile(anchor)
 	for y in range(anchor.y - 2, anchor.y + 4):

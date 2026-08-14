@@ -209,6 +209,8 @@ const TEXTURE_NAMES := [
 	"ore_node", "chest", "stairs",
 	# 동굴 표본 (메인 스토리 10) · 낡은 상자 (메인 스토리 13)
 	"crystal", "cave_moss", "glow_shroom", "old_box",
+	# 온천 복구 (메인 스토리 15)
+	"onsen", "rock_wedge", "spring_water",
 	# 연금술 물약 (조합대 결과물)
 	"water_life", "potion_dream",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
@@ -333,6 +335,8 @@ const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
 const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
+# 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
+const ONSEN_POS := Vector2i(66, 6)
 # 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
 # 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
 const BRACELET_ROCK := Vector2i(8, 82)
@@ -1225,6 +1229,8 @@ func _process(delta: float) -> void:
 	story._story11_update(delta)
 	story._story12_update(delta)
 	story._story13_update(delta)
+	story._story14_update(delta)
+	story._story15_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
