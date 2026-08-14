@@ -87,6 +87,32 @@ func open() -> void:
 	_refresh()
 
 
+# 가방에서 우클릭으로 바로 들어오는 입구 — 고른 물건의 값 매기기 창을 편다
+# (게시판까지 걸어가지 않아도 창고에 있는 것을 그 자리에서 내놓을 수 있다)
+func open_sell(cat: String, id: String, quality: int) -> void:
+	visible = true
+	_tab = "sell"
+	_rows = []
+	_loading = false
+	var have := _have_of(cat, id, quality)
+	if have <= 0:
+		_status = "창고에 없다."
+		_pick_id = ""
+		_rebuild()
+		return
+	var base := 1
+	match cat:
+		"seed":
+			base = int(GameData.CROPS[id].seed_price) if GameData.CROPS.has(id) else 1
+		"produce":
+			var mult: int = [1, 2, 3][clampi(quality, 0, 2)]   # 은·금은 더 쳐 준다
+			base = int(GameData.CROPS[id].sell_price) * mult \
+				if GameData.CROPS.has(id) else 1
+		_:
+			base = int(GameData.ITEMS[id].get("sell", 1)) if GameData.ITEMS.has(id) else 1
+	_pick(cat, id, quality, have, base)
+
+
 func close() -> void:
 	visible = false
 
