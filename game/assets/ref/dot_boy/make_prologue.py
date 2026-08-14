@@ -230,32 +230,6 @@ def scene_box(g, f):
     bx0, bx1 = 60, 104
     by0, by1 = 36, 61
     DEP, RISE = 14, 6
-    # 분리형 뚜껑 — 벗겨서 상자 뒤 오른편에 비스듬히 기대 두었다.
-    # 크기는 상자 개구부와 같다: 기운 길이(대각선) = 상자 가로 44,
-    # 판 폭 = 개구부 깊이 언저리 15. 상자보다 먼저 그려 아랫부분이 가려진다.
-    def lid_top(x):
-        return 20 + (x - 104) * 26 // 36
-    for x in range(104, 140):
-        yt = lid_top(x)
-        yb = min(yt + 15, H - 2)
-        for y in range(yt, yb):
-            g.p(x, y, (108, 74, 42))
-        g.p(x, yt, (140, 98, 54))                   # 널 두께 (윗모서리 두 줄)
-        g.p(x, yt + 1, (128, 88, 48))
-        g.p(x, yt - 1, OUTLINE)
-        g.p(x, yb, OUTLINE)
-    for k in (6, 11):                               # 뚜껑 널 이음새
-        for x in range(104, 140):
-            y = lid_top(x) + k
-            if y < H - 2:
-                g.p(x, y, (90, 60, 34))
-    for y in range(lid_top(104) - 1, lid_top(104) + 16):    # 마구리 윤곽
-        g.p(103, y, OUTLINE)
-    for y in range(lid_top(139) - 1, min(lid_top(139) + 16, H - 1)):
-        g.p(140, y, OUTLINE)
-    g.rrect(105, 21, 108, 24, (128, 130, 138), 2)   # 뚜껑 쇠장식
-    g.p(106, 22, (176, 178, 186))
-    g.rect(128, 62, 144, 63, (94, 62, 34))          # 뚜껑 발치 그림자
     # 상자 속 — 비스듬히 열린 윗면. 둘레에 널 두께(테두리)가 보인다
     for t in range(DEP + 1):
         y = by0 - round(t * RISE / DEP)
@@ -301,6 +275,32 @@ def scene_box(g, f):
         g.p(bx1 + DEP + 1, y, OUTLINE)              # 오른쪽 뒷모서리
     for y in range(by0 + 1, by1 + 1):               # 앞판·옆판 경계선
         g.p(bx1, y, (92, 60, 34))
+    # 분리형 뚜껑 — 상자 오른쪽 모서리에 걸쳐 비스듬히 기대 두었다.
+    # 참고 사진처럼 뚜껑 윗면 + 테두리(얕은 쟁반형 뚜껑의 옆면)가 보인다.
+    # 상자 다음에 그려 모서리를 살짝 덮는다 — 걸쳐 놓은 것으로 읽힌다.
+    def lid_top(x):
+        return 24 + (x - 106) * 34 // 40
+    for x in range(106, 146):
+        yt = lid_top(x)
+        m1 = min(yt + 11, H - 2)
+        m2 = min(yt + 16, H - 2)
+        for y in range(yt, m1):                     # 윗면 — 촛불빛을 받아 밝다
+            g.p(x, y, (150, 106, 58))
+        for y in range(m1, m2):                     # 테두리 두께 (뚜껑 옆면)
+            g.p(x, y, (106, 72, 40))
+        g.p(x, yt, (176, 128, 70))                  # 윗모서리 하이라이트
+        g.p(x, m1, (86, 56, 32))                    # 윗면·테두리 경계
+        g.p(x, yt - 1, OUTLINE)
+        g.p(x, m2, OUTLINE)
+        y6 = yt + 6                                 # 널 이음새 한 줄
+        if y6 < m1:
+            g.p(x, y6, (128, 88, 48))
+    for y in range(lid_top(106) - 1, lid_top(106) + 17):    # 마구리 윤곽
+        g.p(105, y, OUTLINE)
+    for y in range(lid_top(145) - 1, min(lid_top(145) + 17, H - 1)):
+        g.p(146, y, OUTLINE)
+    g.rrect(109, 27, 112, 30, (128, 130, 138), 2)   # 뚜껑 쇠장식
+    g.rect(138, 64, 152, 65, (94, 62, 34))          # 발치 그림자
     # 연구 노트 — 열린 상자 안에서 비스듬히 고개를 내민다
     nb_top = by0 - 10
     for y in range(nb_top, by0):
