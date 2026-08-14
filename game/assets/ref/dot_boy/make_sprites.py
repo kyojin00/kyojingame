@@ -202,6 +202,70 @@ HEAD_DOWN_BLINK = closed_eyes(HEAD_DOWN)
 HEAD_SIDE_BLINK = closed_eyes(HEAD_SIDE)
 
 
+# ------------------------------------------------- 머리 스타일 (외형 템플릿)
+# 민머리 그림에 머리카락을 심어 「짧은 머리」「삐죽 머리」를 만든다.
+# 게임의 외형 선택(타이틀 새로 시작)이 이 세트들 중에서 고른다.
+
+def _hairify(row, lo, hi, to='h'):
+    """row의 lo..hi 칸 중 살결(s/S/H)만 머리카락으로 바꾼다."""
+    return ''.join(to if lo <= i <= hi and c in 'sSH' else c
+                   for i, c in enumerate(row))
+
+
+def add_hair(spiky):
+    """(down, side, up) 민머리 -> 짧은 머리. spiky면 정수리에 삐죽 가닥."""
+    down = list(HEAD_DOWN)
+    side = list(HEAD_SIDE)
+    up = list(HEAD_UP)
+    # 앞모습: 정수리~이마(1~5줄) + 구레나룻(6~7줄 바깥 한 칸)
+    for r in range(1, 6):
+        down[r] = _hairify(down[r], 0, 15)
+    down[2] = _hairify(down[2], 5, 9, 'j')       # 윗머리에 빛
+    down[3] = _hairify(down[3], 5, 8, 'j')
+    for r in (6, 7):
+        down[r] = _hairify(down[r], 1, 1, 'g') if r == 6 else down[r]
+        down[r] = _hairify(down[r], 14, 14, 'g')
+    down[6] = _hairify(down[6], 1, 1, 'g')
+    # 옆모습(오른쪽 보기): 정수리(1~5줄) + 뒤통수(왼쪽 열, 11줄까지)
+    for r in range(1, 6):
+        side[r] = _hairify(side[r], 0, 15)
+    side[2] = _hairify(side[2], 5, 9, 'j')
+    side[3] = _hairify(side[3], 5, 8, 'j')
+    for r in range(6, 12):                       # 뒤통수-목덜미
+        side[r] = _hairify(side[r], 1, 2 if r < 9 else 1, 'g')
+    side[6] = _hairify(side[6], 3, 4)            # 뒤통수 윗머리 볼륨
+    side[7] = _hairify(side[7], 3, 3)
+    # 뒷모습: 뒤통수 전체(1~10줄), 11줄에 목덜미 그늘
+    for r in range(1, 11):
+        up[r] = _hairify(up[r], 0, 15)
+    up[2] = _hairify(up[2], 5, 10, 'j')
+    up[3] = _hairify(up[3], 5, 9, 'j')
+    up[9] = _hairify(up[9], 0, 15, 'g')
+    up[10] = _hairify(up[10], 0, 15, 'g')
+    if spiky:
+        # 정수리 위로 삐죽 솟은 가닥 — 윤곽선은 outline()이 둘러 준다
+        for art in (down, side, up):
+            art[0] = ''.join('h' if i in (5, 8, 11) else c
+                             for i, c in enumerate(art[0]))
+    return down, side, up
+
+
+HEADS_SHORT = add_hair(False)
+HEADS_SPIKY = add_hair(True)
+# 깜빡임 머리는 한 번만 만들어 돌려쓴다 — head()가 귀를 그릴지 그림의
+# **동일성**(is)으로 판단하므로, 매번 새로 만들면 귀가 사라진다.
+HEADS_SHORT_BLINK = (closed_eyes(HEADS_SHORT[0]), closed_eyes(HEADS_SHORT[1]))
+HEADS_SPIKY_BLINK = (closed_eyes(HEADS_SPIKY[0]), closed_eyes(HEADS_SPIKY[1]))
+
+# 귀를 그릴 머리 그림 목록 (여자는 머리카락이 귀를 덮으므로 없다)
+EARS_DOWN = [HEAD_DOWN, HEAD_DOWN_BLINK,
+             HEADS_SHORT[0], HEADS_SHORT_BLINK[0],
+             HEADS_SPIKY[0], HEADS_SPIKY_BLINK[0]]
+EARS_SIDE = [HEAD_SIDE, HEAD_SIDE_BLINK,
+             HEADS_SHORT[1], HEADS_SHORT_BLINK[1],
+             HEADS_SPIKY[1], HEADS_SPIKY_BLINK[1]]
+
+
 # ------------------------------------------------------------------- 몸통
 # bob 은 머리·몸통·팔에만 적용하고 다리는 늘 땅을 밟는다.
 
@@ -622,11 +686,11 @@ for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
 def head(g, art, bob, lean=0):
     g.blit(art, HEAD_X + lean, HEAD_Y + bob)
     # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
-    if art is HEAD_DOWN or art is HEAD_DOWN_BLINK:   # 눈높이 양옆에 볼록 한 칸
+    if any(art is a for a in EARS_DOWN):             # 눈높이 양옆에 볼록 한 칸
         for ex in (7, 24):
             g.px(ex + lean, 11 + bob, 's')
             g.px(ex + lean, 12 + bob, 'S')
-    elif art is HEAD_SIDE or art is HEAD_SIDE_BLINK:  # 옆모습은 귓바퀴 모양
+    elif any(art is a for a in EARS_SIDE):           # 옆모습은 귓바퀴 모양
         g.px(12 + lean, 11 + bob, 'S')
         g.px(13 + lean, 11 + bob, 'S')
         g.px(12 + lean, 12 + bob, 'S')
@@ -759,12 +823,23 @@ def render_set(heads, blinks, ref_prefix, out_prefix):
     return images
 
 
+# 네 세트(머리 스타일) 모두 **같은 표준 팔레트**(파란 셔츠·갈색 바지)로
+# 뽑는다 — 옷 색은 게임이 외형 선택에 맞춰 실행 중에 갈아입힌다
+# (game_data.gd recolor_player_image가 이 PAL 값을 그대로 찾아 바꾼다).
 FRAMES = render_set(
     {'down': HEAD_DOWN, 'side': HEAD_SIDE, 'up': HEAD_UP},
     {'down': HEAD_DOWN_BLINK, 'side': HEAD_SIDE_BLINK}, '', 'new_boy_')
 
-# 여자: 셔츠를 분홍으로 갈아입힌다 (팔레트를 바꾸고 다시 뽑는다)
-PAL.update({'b': (214, 96, 116), 'B': (158, 60, 82), 'L': (232, 138, 152)})
+FRAMES_S = render_set(
+    {'down': HEADS_SHORT[0], 'side': HEADS_SHORT[1], 'up': HEADS_SHORT[2]},
+    {'down': HEADS_SHORT_BLINK[0], 'side': HEADS_SHORT_BLINK[1]},
+    'short_', 'hair_short_')
+
+FRAMES_K = render_set(
+    {'down': HEADS_SPIKY[0], 'side': HEADS_SPIKY[1], 'up': HEADS_SPIKY[2]},
+    {'down': HEADS_SPIKY_BLINK[0], 'side': HEADS_SPIKY_BLINK[1]},
+    'spiky_', 'hair_spiky_')
+
 FRAMES_F = render_set(
     {'down': HEAD_DOWN_F, 'side': HEAD_SIDE_F, 'up': HEAD_UP_F},
     {'down': closed_eyes(HEAD_DOWN_F), 'side': closed_eyes(HEAD_SIDE_F)},
@@ -808,7 +883,8 @@ def gif(images, name, keys, ms=125):
                 duration=ms, loop=0)
 
 
-for images, tag in ((FRAMES, ''), (FRAMES_F, 'f_')):
+for images, tag in ((FRAMES, ''), (FRAMES_F, 'f_'),
+                    (FRAMES_S, 'short_'), (FRAMES_K, 'spiky_')):
     strip(images, f'preview_{tag}idle.png', ['down_idle', 'side_idle', 'up_idle'])
     for d in ('down', 'side', 'up'):
         keys = [f'{d}_walk_{i}' for i in range(WALK)]

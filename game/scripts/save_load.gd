@@ -41,6 +41,16 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.money = int(d.money)
 	GameData.energy = float(d.energy)
 	GameData.gender = str(d.get("gender", "m"))
+	# 외형 — 외형 시스템 이전의 세이브는 성별에서 옛 기본 모습을 만든다
+	# (남자 = 민머리·파란 셔츠, 여자 = 긴 머리·분홍 셔츠)
+	var was_f := GameData.gender == "f"
+	var ap: Dictionary = d.get("appearance", {})
+	GameData.appearance = {
+		"hair": int(ap.get("hair", 3 if was_f else 0)),
+		"shirt": int(ap.get("shirt", 1 if was_f else 0)),
+		"pants": int(ap.get("pants", 0)),
+		"shoes": int(ap.get("shoes", 0)),
+	}
 	GameData.story_phase = str(d.get("main_story", "done"))
 	GameData.tree_regrow = d.get("tree_regrow", [])
 	GameData.player_name = str(d.get("player_name", ""))

@@ -138,17 +138,45 @@ func _on_new_game() -> void:
 
 
 func _start_new(g: String) -> void:
+	# (개발 스크린샷 등 옛 경로) 성별만으로 옛 기본 외형을 만든다
 	GameData.gender = g
+	GameData.appearance = {"hair": 3 if g == "f" else 0,
+		"shirt": 1 if g == "f" else 0, "pants": 0, "shoes": 0}
 	if FileAccess.file_exists(GameData.SAVE_PATH):
 		DirAccess.remove_absolute(GameData.SAVE_PATH)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
+# ---- 외형 만들기 (새로 시작) ----
+# 성별(호감도·결혼 이벤트용) + 머리/상의/바지/신발 템플릿 4종씩.
+# 미리보기는 표준 팔레트 도트를 골라 둔 색으로 바로 갈아입혀 보여 준다.
+
+var _appear := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0}
+var _appear_gender := "m"
+var _appear_preview: TextureRect = null
+var _appear_labels := {}
+const APPEAR_ROWS := [["gender", "성별"], ["hair", "머리"],
+	["shirt", "상의"], ["pants", "바지"], ["shoes", "신발"]]
+
+
+func _appear_names(part: String) -> Array:
+	match part:
+		"gender":
+			return ["남자", "여자"]
+		"hair":
+			return GameData.HAIR_NAMES
+		"shirt":
+			return GameData.SHIRT_NAMES
+		"pants":
+			return GameData.PANTS_NAMES
+	return GameData.SHOES_NAMES
+
+
 func _build_gender_panel() -> void:
 	gender_panel = PanelContainer.new()
 	gender_panel.visible = false
-	gender_panel.position = Vector2(345, 205)
-	gender_panel.custom_minimum_size = Vector2(270, 0)
+	gender_panel.position = Vector2(280, 140)
+	gender_panel.custom_minimum_size = Vector2(400, 0)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
 	style.border_color = Color(0.42, 0.36, 0.55)
@@ -157,16 +185,86 @@ func _build_gender_panel() -> void:
 	style.set_content_margin_all(12)
 	gender_panel.add_theme_stylebox_override("panel", style)
 	add_child(gender_panel)
+
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
 	gender_panel.add_child(v)
-	var l := Label.new()
-	l.text = "누구로 시작할까?"
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_color_override("font_color", Color("ffd75e"))
-	v.add_child(l)
-	v.add_child(_mk_button("남자아이", func() -> void: _start_new("m")))
-	v.add_child(_mk_button("여자아이", func() -> void: _start_new("f")))
+	var title := Label.new()
+	title.text = "우리 캐릭터 만들기"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_color_override("font_color", Color("ffd75e"))
+	v.add_child(title)
+
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 14)
+	v.add_child(h)
+
+	_appear_preview = TextureRect.new()
+	_appear_preview.custom_minimum_size = Vector2(128, 192)
+	_appear_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_appear_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_appear_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	h.add_child(_appear_preview)
+
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 4)
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	h.add_child(rows)
+	for pair in APPEAR_ROWS:
+		var part: String = pair[0]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		var name_l := Label.new()
+		name_l.text = pair[1]
+		name_l.custom_minimum_size = Vector2(44, 0)
+		row.add_child(name_l)
+		row.add_child(_mk_button("◀", func() -> void: _appear_cycle(part, -1)))
+		var val := Label.new()
+		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		val.add_theme_color_override("font_color", Color(0.92, 0.9, 0.8))
+		_appear_labels[part] = val
+		row.add_child(val)
+		row.add_child(_mk_button("▶", func() -> void: _appear_cycle(part, 1)))
+		rows.add_child(row)
+
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 8)
+	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(bottom)
+	bottom.add_child(_mk_button("이걸로 시작!", _start_selected))
+	bottom.add_child(_mk_button("닫기", func() -> void: gender_panel.visible = false))
+	_appear_refresh()
+
+
+func _appear_cycle(part: String, dir: int) -> void:
+	if part == "gender":
+		_appear_gender = "f" if _appear_gender == "m" else "m"
+	else:
+		_appear[part] = wrapi(int(_appear[part]) + dir, 0, _appear_names(part).size())
+	_appear_refresh()
+
+
+func _appear_refresh() -> void:
+	for part in _appear_labels:
+		var idx: int = 0 if part != "gender" else (0 if _appear_gender == "m" else 1)
+		if part != "gender":
+			idx = int(_appear[part])
+		_appear_labels[part].text = str(_appear_names(part)[idx])
+	# 미리보기: 고른 머리의 정면 서기 한 장을 고른 색으로 갈아입힌다
+	var t: Texture2D = load("res://assets/sprites/%s_down_idle.png"
+		% GameData.HAIR_PREFIX[int(_appear.hair)])
+	var img: Image = t.get_image()
+	GameData.recolor_player_image(img, _appear)
+	_appear_preview.texture = ImageTexture.create_from_image(img)
+
+
+func _start_selected() -> void:
+	GameData.gender = _appear_gender
+	GameData.appearance = _appear.duplicate()
+	if FileAccess.file_exists(GameData.SAVE_PATH):
+		DirAccess.remove_absolute(GameData.SAVE_PATH)
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
 func _on_settings() -> void:
