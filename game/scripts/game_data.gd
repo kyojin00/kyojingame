@@ -826,7 +826,7 @@ var story2_phase := ""
 func story2_objective_short() -> String:
 	match story2_phase:
 		"shop":
-			return "재료를 모아 상점을 짓자 (목재 %d·돌 %d) — 광장 북쪽 상점 터 게시판 E" \
+			return "재료를 모아 상점을 짓자 (목재 %d·돌 %d) — 상점 터 게시판에서 E" \
 				% [SHOP_BUILD_WOOD, SHOP_BUILD_STONE]
 		"farm_talk":
 			return "이장에게 가 보자 (E)"
@@ -1020,11 +1020,11 @@ func story6_objective_short() -> String:
 		"show_chief":
 			return "오래된 책을 이장에게 보여주자 (E)"
 		"ask_post":
-			return "우체부 아저씨에게 편지를 부탁하자 (우체국 터 앞)"
+			return "우체부 아저씨를 찾아가 편지를 부탁하자"
 		"wait":
 			return "사서의 답장을 기다리자 (며칠 걸린다)"
 		"visit":
-			return "마을에 찾아온 사서를 만나보자 (광장)"
+			return "마을에 찾아온 사서를 만나보자"
 		"told":
 			return "사서의 이야기를 이장에게 전하자 (E)"
 		"build":
@@ -1295,7 +1295,7 @@ func fisher_objective_short() -> String:
 		"meet":
 			return "마을 광장의 낚시꾼에게 말을 걸어 보자 (E)"
 		"follow":
-			return "낚시꾼과 함께 남쪽 바위 능선으로 가자"
+			return "낚시꾼과 함께 바위 능선으로 가자"
 		"open":
 			return "곡괭이로 길목의 커다란 바위를 캐서 바닷길을 열자"
 	return ""
@@ -1537,7 +1537,7 @@ const STORY1_QUESTS := [
 		"task": "우체부 아저씨를 따라 이장님께 가자",
 		"story": "드디어 마을에 도착했다. 우체부 아저씨가 이장님께 직접 편지를 전하러 간다. 함께 따라가 보자."},
 	{"name": "새 보금자리",
-		"task": "이장님이 내어 준 집(마을 서쪽)에 들어가 보자 (문 앞 E)",
+		"task": "이장님이 내어 준 집에 들어가 보자 (문 앞 E)",
 		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
 ]
 # 단계 -> 지금 진행 중인 퀘스트 번호. home_open: 편지는 전했고, 집에 들어가면
@@ -1581,7 +1581,7 @@ func story_objective_short() -> String:
 		"deliver":
 			return "우체부 아저씨를 따라 이장님께 가자"
 		"home_open":
-			return "이장님이 내어 준 집에 들어가 보자 (마을 서쪽)"
+			return "이장님이 내어 준 집에 들어가 보자"
 		"greet":
 			return "집을 둘러보고 밖으로 나가 보자 (아랫문)"
 	return ""
@@ -2992,7 +2992,7 @@ const TUTORIAL_ORDER := [
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
 	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
-	["board", "마을 광장 의뢰 게시판(E)에서 오늘의 의뢰를 살펴보자"],
+	["board", "의뢰 게시판(E)에서 오늘의 의뢰를 살펴보자"],
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
@@ -3000,7 +3000,7 @@ const TUTORIAL_ORDER := [
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
-	["fish", "마을 남쪽 낚시터(강가)에서 물고기를 낚자"],
+	["fish", "낚시터에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
 # 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
@@ -3084,7 +3084,7 @@ const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
 	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
-	"slept": "침대에서 자기", "board": "의뢰 게시판 보기 (광장)",
+	"slept": "침대에서 자기", "board": "의뢰 게시판 보기",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)",
 	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
 }

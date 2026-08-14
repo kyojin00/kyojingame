@@ -184,10 +184,10 @@ func _build_tracker_scroll() -> void:
 				and ev.button_index == MOUSE_BUTTON_LEFT:
 			Sound.play_sfx("sfx_ui")
 			main.quest_ui.toggle())
-	# 두루마리 안은 딱 세 줄 — 퀘스트 이름(1줄) / 지금 할 행동(최대 2줄) /
-	# 「Q 상세보기」. 설명·재료·진행 상황은 전부 Q 상세 창의 몫이다.
+	# 두루마리 안은 딱 두 줄 — 퀘스트 이름(1줄) / 지금 할 행동(최대 2줄).
+	# 설명·재료·진행 상황은 전부 Q 상세 창의 몫이다 (클릭하면 열린다).
 	# 모든 글자는 말줄임(…)과 줄 수 제한으로 두루마리 밖으로 못 나간다.
-	panel.offset_bottom = 142.0           # 작고 귀여운 메모 크기 (226x84)
+	panel.offset_bottom = 128.0           # 작고 귀여운 메모 크기 (226x70)
 	quest_title_label = Label.new()
 	quest_title_label.position = Vector2(16, 10)
 	quest_title_label.size = Vector2(192, 15)
@@ -206,14 +206,8 @@ func _build_tracker_scroll() -> void:
 	goal_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	goal_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(goal_label)
-	# 기존 objective_label은 「Q 상세보기」 한 줄짜리 안내로만 쓴다
-	objective_label.position = Vector2(16, 60)
-	objective_label.size = Vector2(192, 13)
-	objective_label.add_theme_font_size_override("font_size", 10)
-	objective_label.add_theme_color_override("font_color", Color(0.55, 0.45, 0.3))
-	objective_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	objective_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 「Q 상세보기」 안내 줄은 없앴다 — 트래커 클릭·툴팁이 그 역할을 한다
+	objective_label.visible = false
 	var deco := Control.new()
 	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
 	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -609,11 +603,17 @@ func refresh(force := false) -> void:
 		elif qline != "":
 			t_title = "오늘의 의뢰"
 			t_goal = qline
-	$TrackerPanel.visible = t_goal != ""
+	# Q창(상세)이 열려 있는 동안에는 미니 트래커·핫바가 그 위로 비치지 않게
+	var qopen: bool = main != null and main.quest_ui != null \
+		and main.quest_ui.visible
+	$TrackerPanel.visible = t_goal != "" and not qopen
+	hotbar_panel.visible = not qopen
+	if qopen and msg_label.visible:
+		msg_label.visible = false      # 하단 안내 바도 Q창 위로 비치지 않게
+		$MessageBg.visible = false
 	_put(quest_title_label, t_title)
 	_put(goal_label, ("📍 " + t_goal) if t_goal != "" else "")
 	_watch_goal(str(tq.get("obj", "")))
-	_put(objective_label, "%s 상세보기" % GameData.key_label("open_quest"))
 
 	_refresh_hotbar()
 

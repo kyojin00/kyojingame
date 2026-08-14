@@ -155,7 +155,7 @@ func _entries() -> Array:
 	# 게시판에 붙어 있는(아직 수락 전) 의뢰 — 정보로 보여 준다
 	if GameData.quest_line() == "" and not GameData.quest_offers.is_empty():
 		out.append({"id": "info_offers", "cat": "info", "title": "게시판의 의뢰",
-			"obj": "마을 광장 게시판(E)에서 하나를 골라 수락하자", "npc": "",
+			"obj": "의뢰 게시판(E)에서 하나를 골라 수락하자", "npc": "",
 			"desc": "오늘 게시판에 의뢰 %d건이 붙어 있다. 하나만 고를 수 있다."
 				% GameData.quest_offers.size(), "reward": ""})
 	# 계절 축제 안내
