@@ -285,12 +285,40 @@ func close() -> void:
 
 func open_seq(speaker: String, portrait_tex: Texture2D, entries: Array,
 		on_end := Callable()) -> void:
-	_seq = entries
+	_seq = _paginate_seq(entries)
 	_seq_idx = -1
 	_seq_name = speaker
 	_seq_portrait = portrait_tex
 	_seq_on_end = on_end
 	_advance_seq()
+
+
+# 대사 한 페이지는 **두 줄까지**다 — 창이 불필요하게 커지지 않도록,
+# 세 줄이 넘는 대사는 두 줄씩 끊어 다음 페이지로 자연스럽게 이어진다.
+# 이벤트는 첫 조각에서, 선택지·이름 같은 나머지 성질은 마지막 조각에 남는다.
+func _paginate_seq(entries: Array) -> Array:
+	var paged: Array = []
+	for e_v in entries:
+		var e: Dictionary = e_v
+		var lines: PackedStringArray = str(e.get("text", "")).split("\n")
+		if lines.size() <= 2:
+			paged.append(e)
+			continue
+		var i := 0
+		while i < lines.size():
+			var last: bool = i + 2 >= lines.size()
+			var pg := {"text": "\n".join(lines.slice(i, mini(i + 2, lines.size())))}
+			if e.has("portrait"):
+				pg["portrait"] = e.portrait
+			if e.has("name"):
+				pg["name"] = e.name
+			if i == 0 and e.has("event"):
+				pg["event"] = e.event
+			if last and e.has("choices"):
+				pg["choices"] = e.choices
+			paged.append(pg)
+			i += 2
+	return paged
 
 
 func in_seq() -> bool:

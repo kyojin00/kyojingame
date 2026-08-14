@@ -145,7 +145,7 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 
 
 func _draw_overlay() -> void:
-	_draw_nav_arrow()
+	# 길라잡이 화살표는 없앴다 — 퀘스트 목표 문구와 길 자체로 안내한다
 	_draw_festival()
 	_draw_greenhouse()
 	_draw_building_signs()
@@ -304,69 +304,6 @@ func _context_hint() -> Array:
 	return []
 
 
-func nav_target() -> Variant:
-	if GameData.story_phase == "approach" and m.story._postman != null:
-		return m.story._postman.position          # 첫 만남: 우체부에게 가는 길 안내
-	if GameData.story_phase == "path":
-		# 갈림길까지 숲길 안내
-		return Vector2(m.STORY_FORK.x * m.TILE + 16, m.STORY_FORK.y * m.TILE + 16)
-	if GameData.story_phase == "rock":
-		# 커다란 바위까지 안내, 바위를 캔 뒤에는 우체부 아저씨에게
-		if GameData.story_rock_state >= 2 and m.story._postman != null:
-			return m.story._postman.position
-		return Vector2(m.STORY_ROCK.x * m.TILE + 16, m.STORY_ROCK.y * m.TILE + 16)
-	if GameData.story_phase == "travel":
-		# 마을 이장에게 가는 길 안내
-		var chief: Node2D = m.story._story_chief()
-		if chief != null:
-			return chief.position
-	if GameData.story_phase == "deliver":
-		# 이장을 찾아가 편지를 전하자
-		var chief2: Node2D = m.story._story_chief()
-		if chief2 != null:
-			return chief2.position
-	if GameData.story_phase == "home_open":
-		# 이장이 내어 준 집 문 앞으로 안내
-		return Vector2(m.HOME_ANCHOR.x * m.TILE + 2 * m.TILE + 16,
-			(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
-	if GameData.story_phase != "done":
-		return null  # 숲 구간에서는 화살표를 띄우지 않는다
-	# 낚시꾼 퀘스트: 낚시꾼 -> 남쪽 능선 길목
-	match GameData.fisher_quest:
-		"meet":
-			var fn: Variant = m.story._fisher_node()
-			if fn != null:
-				return fn.position
-		"follow", "open":
-			return Vector2(m.SEA_GATE[0].x * m.TILE + 32.0,
-				m.SEA_GATE[0].y * m.TILE - 16.0)
-	# 메인 스토리 2: 상점 터 / 호미를 주려는 이장
-	if GameData.story2_phase == "shop":
-		var gd: Vector2i = m.door_tile(m.VILLAGE_PLOTS["general"].anchor)
-		return Vector2(gd.x * m.TILE + 16, gd.y * m.TILE + 16)
-	if GameData.story2_phase == "farm_talk":
-		var chief3: Node2D = m.story._story_chief()
-		if chief3 != null:
-			return chief3.position
-	match GameData.tutorial_current_flag():
-		"slept":
-			# 우리집(마을 서쪽) 문 앞
-			return Vector2(m.HOME_ANCHOR.x * m.TILE + 2 * m.TILE + 16,
-				(m.HOME_ANCHOR.y + 4) * m.TILE + 16)
-		"shop":
-			if not GameData.village_built.has("general"):
-				return null  # 잡화점은 마을 발전으로 지어야 생긴다
-			var ga: Vector2i = m.VILLAGE_PLOTS["general"].anchor
-			return Vector2((ga.x + 2) * m.TILE + 16, (ga.y + 4) * m.TILE + 16)
-		"fish":
-			return m.fishing.fishing_spot_center()   # 마을 남쪽 낚시터 부두
-		"chop":
-			return _nearest_object_pos("tree")
-		"mine":
-			return _nearest_object_pos("rock")
-	return null
-
-
 func _nearest_object_pos(kind: String) -> Variant:
 	var best: Variant = null
 	var best_d := INF
@@ -410,33 +347,6 @@ func _draw_house_preview() -> void:
 		Color(0.1, 0.08, 0.05))
 	m.overlay.draw_string(f, tp, tip, HORIZONTAL_ALIGNMENT_LEFT, -1, 16,
 		Color(1, 0.95, 0.8))
-
-
-func _draw_nav_arrow() -> void:
-	if m.player == null or m.ui_open():
-		return
-	var target: Variant = nav_target()
-	if target == null:
-		return
-	var to: Vector2 = target - m.player.position
-	if to.length() < 40.0:
-		return  # 목적지 근처에서는 숨긴다
-	# 길라잡이 화살표는 한눈에 들어와야 한다 — 크게 그리고 검은 테두리를 두른다
-	var dirv := to.normalized()
-	var bob := sin(m.weather_time * 6.0) * 4.0
-	var base := m.player.position + Vector2(0, -84) + dirv * (44.0 + bob)
-	var tip := base + dirv * 20.0
-	var left := base + dirv.rotated(2.5) * 13.0
-	var right := base + dirv.rotated(-2.5) * 13.0
-	var tail := base - dirv * 3.0
-	var edge := 3.0
-	m.overlay.draw_colored_polygon(PackedVector2Array([
-		tip + dirv * edge,
-		left + dirv.rotated(2.5) * edge,
-		tail - dirv * edge,
-		right + dirv.rotated(-2.5) * edge]), Color(0.12, 0.08, 0.04, 0.85))
-	m.overlay.draw_colored_polygon(PackedVector2Array([tip, left, tail, right]),
-		Color(1, 0.85, 0.3, 0.97))
 
 
 func _draw_context_hint() -> void:

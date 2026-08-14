@@ -572,7 +572,7 @@ func _start_travel_dialog() -> void:
 		{"text": "「이렇게 나무를 베어 길을 만들면서 가면 되겠네.」"},
 		{"text": "「%s, 이 숲길을 따라 가보세. 막힌 나무는 자네가 부탁하네.」" % nm},
 	], func() -> void:
-		m.hud.show_message("화살표를 따라 숲길을 개척하며 나아가자!", 6.0))
+		m.hud.show_message("나무를 베어 숲길을 개척하며 나아가자!", 6.0))
 
 
 func _start_fork_dialog() -> void:
@@ -601,7 +601,7 @@ func _after_map_dialog() -> void:
 		{"text": "「이제 우리가 어디쯤 있는지 알겠나?」"},
 		{"text": "「마을은 이쪽 방향일세. 계속 가보세.」"},
 	], func() -> void:
-		m.hud.show_message("길을 따라 마을 방향으로 가보자 (화살표 방향)", 6.0))
+		m.hud.show_message("열린 길을 따라 마을로 가보자.", 6.0))
 
 
 func _start_rock_dialog() -> void:
@@ -687,7 +687,7 @@ func _end_rock_quest() -> void:
 	m.hud.reward_toast("나무 곡괭이 (정식 획득)", m.tex["icon_pickaxe"])
 	_apply_story_camera()
 	_apply_story_visibility()
-	m.hud.show_message("우체부 아저씨와 함께 마을로 가자! (화살표 방향)", 6.0)
+	m.hud.show_message("우체부 아저씨와 함께 길을 따라 마을로 가자!", 6.0)
 	m.saveio.save_now()
 
 
@@ -775,7 +775,7 @@ func _end_arrival() -> void:
 	_apply_story_camera()
 	_apply_story_visibility()
 	m.hud.quest_toast("마을 도착")
-	m.hud.show_message("우체부 아저씨를 따라 이장님께 가자. (화살표 방향)", 6.0)
+	m.hud.show_message("우체부 아저씨를 따라 이장님께 가자.", 6.0)
 	if _postman != null:
 		_postman_state = "deliver"   # 이장에게 곧장 걸어간다
 	m.saveio.save_now()
@@ -1092,7 +1092,7 @@ func _end_fisher_meet() -> void:
 	GameData.fisher_quest = "follow"
 	_fisher_gate_talked = false
 	m.hud.quest_start_toast("낚시꾼과 함께 바다로")
-	m.hud.show_message("낚시꾼과 함께 남쪽 바위 능선으로 가자. (화살표 방향)", 6.0)
+	m.hud.show_message("낚시꾼과 함께 남쪽 바위 능선으로 가자.", 6.0)
 	m.saveio.save_now()
 
 

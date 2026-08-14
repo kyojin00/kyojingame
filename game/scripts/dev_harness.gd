@@ -2453,6 +2453,21 @@ func _debug_tick() -> void:
 				and bubbled,
 				" 메인1개=", one_main, " 마을소식(도착후)=", info_town,
 				" 마을소식(도착전숨김)=", not info_field, " 말풍선=", bubbled)
+		322:
+			# #115: 대사 한 페이지 2줄 제한 — 긴 대사는 두 줄씩 다음 장으로
+			m.dialog.open_seq("검사", null, [
+				{"text": "하나\n둘\n셋\n넷\n다섯", "choices": [["끝", null]]},
+			])
+			var pages: int = m.dialog._seq.size()
+			var two_lines := true
+			for e2: Dictionary in m.dialog._seq:
+				if str(e2.get("text", "")).split("\n").size() > 2:
+					two_lines = false
+			var choice_last: bool = m.dialog._seq[pages - 1].has("choices") \
+				and not m.dialog._seq[0].has("choices")
+			m.dialog.close()
+			print("DIALOG2LINE_OK=", pages == 3 and two_lines and choice_last,
+				" 페이지=", pages, "/3 두줄=", two_lines, " 선택지끝장=", choice_last)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()
