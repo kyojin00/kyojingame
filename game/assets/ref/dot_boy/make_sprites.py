@@ -58,7 +58,7 @@ BOB = [0, 2, 1, 1, 2]
 
 # 세로 배치 (bob 적용 전 기준 행). 몸통 12행 + 다리 14행 — 처음(10+12)보다
 # 1.2배쯤 길다. 몸통이 짧으면 거기 묶인 팔도 짧아져 머리만 큰 비율이 된다.
-HEAD_Y = 0               # 머리 꼭대기 (캔버스 위 여백까지 키로 쓴다)
+HEAD_Y = 2               # 머리 꼭대기 (두상 16행 — 18행은 길쭉했다)
 SHIRT_Y = 19             # 셔츠 위 (목은 그 한 행 위)
 HIP_Y = 31               # 바지 위 (엉덩이 띠 3행)
 LEG_Y = 34               # 다리 기둥 시작
@@ -132,9 +132,7 @@ HEAD_DOWN = [
     "..OOssssssssOO..",
     ".OssHHHHHHHHssO.",
     ".OsHHHHHHHHHHsO.",
-    ".OsHHHHHHHHHHsO.",
     "OsssHHHHHHHHsssO",
-    "OsssssssssssssSO",
     "OsssssssssssssSO",
     "OsssssssssssssSO",
     "Oss" "eee" "ssss" "eee" "sSO",
@@ -153,9 +151,7 @@ HEAD_SIDE = [   # 오른쪽을 본다
     "..OOssssssssOO..",
     ".OSsHHHHHHHHssO.",
     ".OSHHHHHHHHHHsO.",
-    ".OSHHHHHHHHHHsO.",
     "OSssHHHHHHHHsssO",
-    "OSsssssssssssssO",
     "OSsssssssssssssO",
     "OSsssssssssssssO",
     "OSsssssss" "eee" "sssO",
@@ -174,9 +170,7 @@ HEAD_UP = [
     "..OOssssssssOO..",
     ".OssHHHHHHHHssO.",
     ".OsHHHHHHHHHHsO.",
-    ".OsHHHHHHHHHHsO.",
     "OsssHHHHHHHHsssO",
-    "OssssssssssssssO",
     "OssssssssssssssO",
     "OssssssssssssssO",
     "OssssssssssssssO",
@@ -565,7 +559,7 @@ PARTS = {
 }
 
 for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
-    assert len(_art) == 18 and all(len(r) == 16 for r in _art), \
+    assert len(_art) == 16 and all(len(r) == 16 for r in _art), \
         [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
 
 
@@ -607,9 +601,7 @@ HEAD_DOWN_F = [
     "..OOhhhhhhhhOO..",
     ".OhhjjjjjjjjhhO.",
     ".OhjjjjjjjjjjhO.",
-    ".OhjjjjjjjjjjhO.",
     "OhhjjjjjjjjjjhhO",
-    "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
     "Ohh" "ssssssssss" "hhO",
     "Oh" "s" "eee" "ssss" "eee" "s" "h" "O",
@@ -630,9 +622,7 @@ HEAD_SIDE_F = [   # 오른쪽을 본다
     "..OOhhhhhhhhOO..",
     ".OhhjjjjjjjjhhO.",
     ".OhjjjjjjjjjjhO.",
-    ".OhjjjjjjjjjjhO.",
     "OhhjjjjjjjjjjhhO",
-    "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
     "Ohhhhhhhh" "ssssss" "O",
     "Ohhhh" "ssss" "eee" "sss" "O",
@@ -653,9 +643,7 @@ HEAD_UP_F = [
     "..OOhhhhhhhhOO..",
     ".OhhjjjjjjjjhhO.",
     ".OhjjjjjjjjjjhO.",
-    ".OhjjjjjjjjjjhO.",
     "OhhjjjjjjjjjjhhO",
-    "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
@@ -671,10 +659,10 @@ HEAD_UP_F = [
     "....gggggggg....",
 ]
 
-# 여자 머리는 어깨 위까지 — 18행 얼굴 + 2행 머리채 = 20행.
+# 여자 머리는 어깨 위까지 — 16행 얼굴 + 2행 머리채 = 18행.
 # 머리를 몸 위에 겹쳐 그리므로 늘어난 행이 어깨를 자연스럽게 덮는다.
 for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
-    assert len(_art) == 20 and all(len(r) == 16 for r in _art), \
+    assert len(_art) == 18 and all(len(r) == 16 for r in _art), \
         [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
 
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
