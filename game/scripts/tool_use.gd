@@ -141,12 +141,12 @@ func use_tool() -> void:
 	if not _tool_has_job(m.actions.target_tile()) and _try_harvest(m.actions.target_tile()):
 		return
 	# 그 밖의 도구는 슬롯에 장착하고 직접 선택해 손에 든 상태여야만 쓸 수 있다
-	if not m._remote_acting and not GameData.tool_slots.has(GameData.tool):
+	if not m.remote_acting and not GameData.tool_slots.has(GameData.tool):
 		m.hud.show_message("가방(I)에서 도구를 슬롯에 장착하고 숫자키로 선택하자!")
 		return
 	# 도구를 쓰면 장비의 「기력 소모」만큼 힘이 든다.
 	# 밤에는 그대로, 낮에는 가볍게. (수확은 맨손이라 들지 않는다)
-	if not m._remote_acting:
+	if not m.remote_acting:
 		var night := GameData.is_night()
 		var cost := GameData.tool_stat(GameData.tool, "stamina") \
 			* (GameData.STAMINA_NIGHT_MULT if night else GameData.STAMINA_DAY_MULT) \
@@ -218,7 +218,7 @@ func use_tool() -> void:
 			elif m.grid[t.y][t.x].ground != "soil":
 				m.hud.show_message("물을 줄 곳이 아니다.")
 		"seed":
-			var id := m._forced_seed if m._forced_seed != "" else GameData.current_seed_id()
+			var id := m.forced_seed if m.forced_seed != "" else GameData.current_seed_id()
 			if id == "":
 				m.hud.show_message("씨앗이 없다. 마을 잡화점에서 사자.")
 				return
@@ -427,7 +427,7 @@ func use_tool() -> void:
 					m.fishing_ui.start(zone, int(m.pending_fish.stages),
 						spd, str(m.pending_fish.hint))
 	# 멀티: 내 행동을 다른 플레이어에게 반영 (낚싯대는 로컬 진행)
-	if not m._remote_acting:
+	if not m.remote_acting:
 		if Net.is_guest() and GameData.tool != "rod":
 			m.netsync._req_tool.rpc_id(1, t.x, t.y, GameData.tool, seed_now,
 				m.actions._current_perp().x, m.actions._current_perp().y)
@@ -471,7 +471,7 @@ func _tool_target_nearby() -> Vector2i:
 func _fall_side(t: Vector2i) -> float:
 	# 함께하기: 다른 사람이 벤 나무다. 여기 내 캐릭터 자리를 보면 엉뚱한 쪽으로
 	# 넘어가니 칸으로만 정한다 (어느 화면에서 보든 같은 쪽으로 쓰러진다)
-	if m.player == null or m._remote_acting:
+	if m.player == null or m.remote_acting:
 		return 1.0 if m._hash01(t.x * 17 + 2, t.y * 23 + 9) > 0.5 else -1.0
 	var d: float = float(t.x * m.TILE + 16) - m.player.position.x
 	if absf(d) < 1.0:

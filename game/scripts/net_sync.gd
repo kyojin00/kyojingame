@@ -227,16 +227,16 @@ func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int
 	var saved_energy: float = GameData.energy
 	m._target_override = Vector2i(tx, ty)
 	m._perp_override = Vector2i(px, py)
-	m._forced_seed = seed_id
-	m._remote_acting = true
+	m.forced_seed = seed_id
+	m.remote_acting = true
 	GameData.tool = tool
 	m.toolwork.use_tool()
 	GameData.tool = saved_tool
 	GameData.energy = saved_energy  # 게스트 기력은 게스트 로컬 관리
-	m._remote_acting = false
+	m.remote_acting = false
 	m._target_override = Vector2i(-999, -999)
 	m._perp_override = Vector2i.ZERO
-	m._forced_seed = ""
+	m.forced_seed = ""
 	_broadcast_area(Vector2i(tx, ty))
 	_broadcast_stats()
 
