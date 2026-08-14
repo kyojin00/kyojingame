@@ -1405,9 +1405,20 @@ const GRANDMA_RECORDS := [
 	+ "뒷장에는 서툰 그림 — 바위에 기대앉은 두 사람과, 물결 위의 노을.\n"
 	+ "「폭풍이 몰아치던 해, 바다는 많은 것을 가져갔다.\n"
 	+ "...하지만 언젠가 돌려주리라 믿는다. 바다도 약속은 지키니까.」",
-	"『두 사람의 시계』 — 다음 유품을 찾으면 열린다.",
-	"『금빛 밭의 계절』 — 다음 유품을 찾으면 열린다.",
-	"『숲이 지킨 마음』 — 다음 유품을 찾으면 열린다.",
+	"『두 사람의 시작』 — 빛바랜 혼인 기록과, 그 사이에 끼워진 사진 한 장.\n\n"
+	+ "「그 사람은 마을 밖 옛 농지에서 일하던 처녀였다. 나는 밭 가는 법을\n"
+	+ "가르쳐 달라는 핑계로 매일 그 밭을 찾아갔지. ...핑계인 걸\n"
+	+ "그 사람도 알고 있었을 거다.」\n\n"
+	+ "「혼인하던 해 봄, 나는 반지 하나를 겨우 마련했다. 그 사람은 그걸\n"
+	+ "끼고도 밭일을 했고, 어느 날 흙 속에 잃어버렸다며 한참을 울었다.\n"
+	+ "괜찮다고, 내가 언젠가 꼭 찾아 주겠다고 했었는데.」",
+	"『동물과 함께한 나날』 — 낡은 사료 장부 뒤에 적힌 글.\n\n"
+	+ "「그 사람은 짐승을 참 잘 다뤘다. 아픈 송아지가 있으면 밤을 새워\n"
+	+ "곁을 지켰고, 목장 사람들은 그 사람을 『짐승들의 어머니』라 불렀지.」\n\n"
+	+ "「목에 걸던 목걸이를 아이들이 자꾸 잡아당겨서, 일할 땐 늘 어딘가에\n"
+	+ "벗어 두곤 했다. 그날도 그랬을 거다. ...그 사람이 떠난 뒤로,\n"
+	+ "나는 그 헛간 근처를 지나가지 못했다.」",
+	"『마지막 언덕』 — 다음 유품을 찾으면 열린다.",
 ]
 
 
@@ -1777,6 +1788,101 @@ func story15_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 16: 할머니의 반지 ----
+#
+# 세 번째 유품. 스토리 15 뒤 자유 생활을 며칠 보내고 연구 노트가
+# 어느 정도 차면, 도서관에서 두 분의 혼인 기록이 열린다 — 반지는
+# 마을 밖 「옛 농지」에서 흙 속에 잃어버렸다. 전투가 아니라 **농사·
+# 벌목·채집**으로 푸는 장이다: 우거진 옛 농지를 걷어내고(잡초·돌·나무),
+# 땅을 다시 갈다 보면 흙 속에서 낡은 상자가 나온다.
+#   "": 아직 / record: 도서관 혼인 기록 / clue: 주민 단서 /
+#   clear: 옛 농지 정리 + 밭 갈기 / tale: 도서관 새 기록 / done
+var story16_phase := ""
+var story15_done_day := 0
+var story16_heard: Array = []
+var story16_clear := 0             # 걷어낸 잡초·돌·나무
+var story16_till := 0              # 갈아엎은 밭
+const STORY16_REST_DAYS := 3
+const STORY16_NOTE := 0.6          # 도서관 혼인 기록이 열리는 노트 진행률
+const STORY16_TALES := 3
+const STORY16_CLEAR := 8           # 옛 농지에서 걷어낼 자연물
+const STORY16_TILL := 6            # 다시 갈 밭 칸
+
+
+func story16_ready() -> bool:
+	return story15_phase == "done" and note_progress().ratio >= STORY16_NOTE \
+		and day >= story15_done_day + STORY16_REST_DAYS
+
+
+func story16_field_done() -> bool:
+	return story16_clear >= STORY16_CLEAR and story16_till >= STORY16_TILL
+
+
+func story16_objective_short() -> String:
+	match story16_phase:
+		"record":
+			return "도서관에서 두 분의 오래된 기록을 읽자"
+		"clue":
+			return "주민들에게 옛 농지 이야기를 듣자 (%d/%d)" % [
+				story16_heard.size(), STORY16_TALES]
+		"clear":
+			if story16_field_done():
+				return "옛 농지를 한 번 더 갈아 보자 — 흙 속에 무언가 있다"
+			return "옛 농지 되살리기 — 정리 %d/%d · 밭 갈기 %d/%d" % [
+				mini(story16_clear, STORY16_CLEAR), STORY16_CLEAR,
+				mini(story16_till, STORY16_TILL), STORY16_TILL]
+		"tale":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
+# ---- 메인 스토리 17: 할머니의 목걸이 ----
+#
+# 네 번째 유품. 보라가 낡은 마구간 창고를 치우다 할머니 이름이 적힌
+# 천 조각을 찾아내며 시작한다. **목장·동물 돌보기·탐색**의 장이다:
+# 방치된 옛 헛간 둘레를 치우고 동물들을 돌보다 보면, 낡은 사료통
+# 아래에서 목걸이가 나온다.
+#   "": 아직 / cloth: 보라의 천 조각 / clue: 주민 단서 /
+#   barn: 옛 헛간 정리 + 동물 돌보기 / tale: 도서관 기록 / done
+var story17_phase := ""
+var story16_done_day := 0
+var story17_heard: Array = []
+var story17_done_day := 0          # 스토리 17을 끝낸 날 (다음 이야기의 자유 생활)
+var story17_clear := 0             # 헛간 둘레에서 걷어낸 것
+var story17_care := 0              # 동물을 돌본 횟수
+const STORY17_REST_DAYS := 3
+const STORY17_TALES := 3
+const STORY17_CLEAR := 6
+const STORY17_CARE := 5
+
+
+func story17_ready() -> bool:
+	return story16_phase == "done" \
+		and day >= story16_done_day + STORY17_REST_DAYS
+
+
+func story17_barn_done() -> bool:
+	return story17_clear >= STORY17_CLEAR and story17_care >= STORY17_CARE
+
+
+func story17_objective_short() -> String:
+	match story17_phase:
+		"cloth":
+			return "보라가 무언가 찾아냈다고 한다 (E)"
+		"clue":
+			return "주민들에게 할머니와 목장 이야기를 듣자 (%d/%d)" % [
+				story17_heard.size(), STORY17_TALES]
+		"barn":
+			if story17_barn_done():
+				return "옛 헛간의 낡은 사료통을 살펴보자 (E)"
+			return "옛 헛간 — 주변 정리 %d/%d · 동물 돌보기 %d/%d" % [
+				mini(story17_clear, STORY17_CLEAR), STORY17_CLEAR,
+				mini(story17_care, STORY17_CARE), STORY17_CARE]
+		"tale":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1922,6 +2028,20 @@ func quest_catalog() -> Array:
 			"desc": "언젠가부터 물이 끊긴 마을의 옛 온천.",
 			"cat": "main", "ep": "메인 스토리 15", "npc": s15npc,
 			"reward": "온천 해금 — 몸을 담그면 체력이 가득 찬다"})
+	o = story16_objective_short()
+	if o != "":
+		out.append({"id": "story16", "title": "할머니의 반지", "obj": o,
+			"desc": "혼인하던 해 봄, 흙 속에 묻힌 세 번째 유품.",
+			"cat": "main", "ep": "메인 스토리 16",
+			"npc": "librarian" if story16_phase in ["record", "tale"] else "",
+			"reward": "할머니의 반지 + 「할머니의 기록」 3장"})
+	o = story17_objective_short()
+	if o != "":
+		out.append({"id": "story17", "title": "할머니의 목걸이", "obj": o,
+			"desc": "짐승들의 어머니라 불리던 사람 — 네 번째 유품.",
+			"cat": "main", "ep": "메인 스토리 17",
+			"npc": "librarian" if story17_phase == "tale" else "rancher",
+			"reward": "할머니의 목걸이 + 「할머니의 기록」 4장"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -2086,6 +2206,13 @@ func quest_npc_marks() -> Dictionary:
 				marks["blacksmith"] = "!"
 		"water":
 			marks["alchemist"] = "?"
+	# 스토리 16·17 — 유품 이야기의 시작과 끝은 도서관·목장에서
+	if story16_phase in ["record", "tale"]:
+		marks["librarian"] = "!"
+	if story17_phase == "cloth":
+		marks["rancher"] = "!"
+	elif story17_phase == "tale":
+		marks["librarian"] = "!"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -3395,18 +3522,19 @@ var rocks_mined := 0          # 깬 바위 수
 
 # 할머니의 유품 5종 — 순서 = 힌트 해금 순서 (노트 20%마다 하나씩).
 # 힌트가 열린 유품만 그 자리에서 발견된다. 확률·수치는 추후 조정 (임시값)
+# 유품은 이야기 순서대로 놓는다 — 노트 20%마다 힌트가 하나씩 열리고,
+# 각 유품은 제 이야기(스토리 11·13·16·17·18)에서 확정으로 손에 들어온다.
 const RELICS := [
 	{"id": "relic_hat", "name": "할머니의 모자", "chance": 0.05,
 		"hint": "동굴 50층 아래, 광석을 깨다 보면 낡은 모자가 나온다더라..."},
-	# 팔찌는 둘째 유품 — 랜덤 드랍이 아니라 스토리 13(낡은 상자)으로 얻는다
 	{"id": "relic_bracelet", "name": "할머니의 팔찌", "chance": 1.0,
 		"hint": "두 분이 자주 걷던 해변 어딘가... 바다가 간직하고 있다더라."},
-	{"id": "relic_watch", "name": "할머니의 시계", "chance": 0.015,
-		"hint": "바다 물고기를 낚다 보면 낚싯줄에 시계가 걸려 온다더라..."},
-	{"id": "relic_ring", "name": "할머니의 반지", "chance": 0.04,
-		"hint": "금빛으로 여문 작물 속에 반지가 숨어 있다더라..."},
-	{"id": "relic_necklace", "name": "할머니의 목걸이", "chance": 0.25,
-		"hint": "동굴의 가장 크고 오래된 나무 괴물이 목걸이를 지킨다더라..."},
+	{"id": "relic_ring", "name": "할머니의 반지", "chance": 1.0,
+		"hint": "마을 밖 옛 농지 — 흙을 갈아엎다 보면 무언가 나온다더라."},
+	{"id": "relic_necklace", "name": "할머니의 목걸이", "chance": 1.0,
+		"hint": "동물들이 오가던 옛 목장 언저리에 잠들어 있다더라."},
+	{"id": "relic_watch", "name": "할머니의 시계", "chance": 1.0,
+		"hint": "두 분이 마지막으로 함께 오르던 언덕 위, 그 자리에..."},
 ]
 var relic_pending := ""       # 방금 발견한 유품 이름 — hud가 꺼내 토스트
 
@@ -3567,8 +3695,6 @@ func roll_quality(luck := 0.0) -> int:
 func add_produce(id: String, quality: int) -> void:
 	produce[id] += 1
 	discover(id)
-	if quality == 2:
-		try_relic(3)   # 금빛 작물 속의 「할머니의 반지」 (힌트가 열린 뒤부터)
 	if quality == 2:
 		produce_gold[id] = int(produce_gold.get(id, 0)) + 1
 	elif quality == 1:
@@ -4558,6 +4684,10 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 14 — 마을의 첫 축제")
 	if story15_phase == "done":
 		out.append("메인 스토리 15 — 마른 온천")
+	if story16_phase == "done":
+		out.append("메인 스토리 16 — 할머니의 반지")
+	if story17_phase == "done":
+		out.append("메인 스토리 17 — 할머니의 목걸이")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -4908,6 +5038,17 @@ func reset_all() -> void:
 	story15_ore = 0
 	onsen_open = false
 	onsen_day = 0
+	story16_phase = ""
+	story15_done_day = 0
+	story16_heard = []
+	story16_clear = 0
+	story16_till = 0
+	story17_phase = ""
+	story16_done_day = 0
+	story17_heard = []
+	story17_clear = 0
+	story17_care = 0
+	story17_done_day = 0
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -5283,6 +5424,12 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story15_phase": story15_phase, "story14_done_day": story14_done_day,
 		"story15_mobs": story15_mobs, "story15_ore": story15_ore,
 		"onsen_open": onsen_open, "onsen_day": onsen_day,
+		"story16_phase": story16_phase, "story15_done_day": story15_done_day,
+		"story16_heard": story16_heard, "story16_clear": story16_clear,
+		"story16_till": story16_till,
+		"story17_phase": story17_phase, "story16_done_day": story16_done_day,
+		"story17_heard": story17_heard, "story17_clear": story17_clear,
+		"story17_care": story17_care, "story17_done_day": story17_done_day,
 		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,

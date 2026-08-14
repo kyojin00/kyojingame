@@ -196,6 +196,10 @@ func use_tool() -> void:
 						m.farming._wet(c, m.WET_ALL_DAY)
 					m.renderer.spawn_particles(pos, "dirt")
 					worked = true
+					# 옛 농지를 다시 가는 일 — 다 갈고 나면 흙 속의 상자가 나온다
+					if m.story.story16_dig_box(pos):
+						return
+					m.story.story16_field_work("till", pos)
 				if worked:
 					Sound.play_sfx("sfx_hoe", 0.1)
 					m.tutorial_notify("till")

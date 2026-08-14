@@ -397,6 +397,27 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "alchemist" and GameData.story15_phase == "water":
 		m.story._start_onsen_water_dialog()
 		return
+	# 메인 스토리 16 — 할머니의 반지 (옛 농지)
+	if npc.id == "librarian" and GameData.story16_phase == "record":
+		m.story._start_ring_record_dialog()
+		return
+	if GameData.story16_phase == "clue" and npc.id not in GameData.story16_heard:
+		m.story.story16_hear(npc.id)
+		return
+	# 메인 스토리 17 — 할머니의 목걸이 (옛 헛간)
+	if npc.id == "rancher" and GameData.story17_phase == "cloth":
+		m.story._start_barn_cloth_dialog()
+		return
+	if GameData.story17_phase == "clue" and npc.id not in GameData.story17_heard:
+		m.story.story17_hear(npc.id)
+		return
+	# 유품을 찾아 온 날 — 도서관에서 새 기록이 열린다 (스토리 16·17)
+	if npc.id == "librarian" and GameData.story16_phase == "tale":
+		m.story.open_grandma_records()
+		return
+	if npc.id == "librarian" and GameData.story17_phase == "tale":
+		m.story.open_grandma_records()
+		return
 	# 온천에 몸을 담그러 온 주민 — 물가에선 이야기가 길어진다 (스토리 15)
 	if GameData.onsen_open and m.npcmgr.npc_place_now(npc.id) == "onsen":
 		m.story.onsen_npc_line(npc.id)

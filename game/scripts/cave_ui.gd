@@ -487,8 +487,6 @@ func _attack_hit(wpn: String, first: bool) -> void:
 				# 막힌 수맥을 지키던 것들 (메인 스토리 15)
 				main.story.story15_dig_progress("mob", floor_num)
 				main.toolwork.gain_skill("combat", {"slime": 6.0, "bat": 8.0, "ghost": 12.0, "treant": 40.0}[m.type])
-				if m.type == "treant":
-					GameData.try_relic(4)   # 나무 괴물이 지키던 「할머니의 목걸이」
 				match m.type:
 					"slime":
 						if randf() < 0.35:

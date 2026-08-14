@@ -360,6 +360,52 @@ func _spawn_alch_house() -> void:
 	m.queue_redraw()
 
 
+# 옛 농지 (메인 스토리 16) — 오래 묵어 잡초·돌·나무가 우거진 채 드러난다.
+# 플레이어가 이미 쓰고 있던 칸(작물·설치물)은 건드리지 않는다.
+func seed_old_farm() -> void:
+	var r: Rect2i = m.OLD_FARM
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			var p := Vector2i(x, y)
+			if m.objects.has(p) or str(m.grid[y][x].crop_id) != "":
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue
+			var h := m._hash01(x * 13 + 3, y * 17 + 9)
+			if h < 0.34:
+				m.objects[p] = {"kind": "weed", "hp": 0}
+			elif h < 0.5:
+				m.objects[p] = {"kind": "rock", "hp": m.ROCK_HP}
+			elif h < 0.6 and _nature_clear(p, "tree"):
+				m.objects[p] = {"kind": "tree", "hp": m.TREE_HP}
+	m.objnode._spawn_objects()
+	m.queue_redraw()
+
+
+# 옛 헛간 (메인 스토리 17) — 목장 남쪽에 방치된 헛간. 둘레엔 잡동사니가
+# 쌓여 있다 (치울 거리 = 잡초·돌)
+func spawn_old_barn() -> void:
+	if str(m.objects.get(m.OLD_BARN, {}).get("kind", "")) == "old_barn":
+		return
+	var r: Rect2i = m.OLD_BARN_AREA
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			var p := Vector2i(x, y)
+			if m.objects.has(p) or m.grid[y][x].ground != "grass":
+				continue
+			var h := m._hash01(x * 7 + 5, y * 11 + 2)
+			if h < 0.3:
+				m.objects[p] = {"kind": "weed", "hp": 0}
+			elif h < 0.42:
+				m.objects[p] = {"kind": "rock", "hp": m.ROCK_HP}
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			m.objects.erase(m.OLD_BARN + Vector2i(dx, dy))
+	m.objects[m.OLD_BARN] = {"kind": "old_barn", "hp": 0}
+	m.objnode._spawn_objects()
+	m.queue_redraw()
+
+
 # 마을 온천 (메인 스토리 15) — 수맥을 되살리면 바위 탕에 물이 찬다.
 # 오브젝트 하나로 서고, 둘레 한 칸은 드나들 수 있게 비워 둔다.
 func _spawn_onsen() -> void:

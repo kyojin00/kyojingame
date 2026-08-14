@@ -432,6 +432,20 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.onsen_day = int(d.get("onsen_day", 0))
 	if GameData.onsen_open:
 		m.worldgen._spawn_onsen()   # 되살린 온천은 로드 후에도 그 자리에
+	# ---- 메인 스토리 16 (할머니의 반지) · 17 (할머니의 목걸이) ----
+	GameData.story16_phase = str(d.get("story16_phase", ""))
+	GameData.story15_done_day = int(d.get("story15_done_day", 0))
+	GameData.story16_heard = Array(d.get("story16_heard", []))
+	GameData.story16_clear = int(d.get("story16_clear", 0))
+	GameData.story16_till = int(d.get("story16_till", 0))
+	GameData.story17_phase = str(d.get("story17_phase", ""))
+	GameData.story16_done_day = int(d.get("story16_done_day", 0))
+	GameData.story17_heard = Array(d.get("story17_heard", []))
+	GameData.story17_clear = int(d.get("story17_clear", 0))
+	GameData.story17_care = int(d.get("story17_care", 0))
+	GameData.story17_done_day = int(d.get("story17_done_day", 0))
+	if GameData.story17_phase != "":
+		m.worldgen.spawn_old_barn()   # 드러난 옛 헛간은 그 자리에 남는다
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()

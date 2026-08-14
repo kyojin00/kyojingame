@@ -221,6 +221,7 @@ func interact() -> void:
 			animal.fed = true
 			Sound.play_sfx("sfx_heart")
 			m.toolwork.gain_skill("ranch", 6.0)   # 동물을 돌본 손길이 쌓인다
+			m.story.story17_barn_work("care")     # 옛 헛간 이야기 (스토리 17)
 			if Net.is_guest():
 				m.netsync._req_feed.rpc_id(1, m.animals.find(animal))
 			m.hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
@@ -349,6 +350,9 @@ func interact() -> void:
 			return
 		if obj.kind == "onsen":
 			m.story.onsen_enter()   # 마을 온천 (메인 스토리 15) — 하루 한 번
+			return
+		if obj.kind == "old_barn":
+			m.story.old_barn_examine()   # 옛 헛간 (메인 스토리 17)
 			return
 		if obj.kind == "house":
 			_enter_building(_building_kind_at(t))

@@ -2314,6 +2314,166 @@ func _debug_tick() -> void:
 				" 얕은층제외=", s15_shallow, " 진행중=", s15_mid,
 				" 수맥돌파=", s15_burst, " 온천부활=", s15_done,
 				" 입욕=", s15_bath and s15_once, " 주민나들이=", s15_goer and s15_day)
+		281:
+			# #133: 메인 스토리 16 「할머니의 반지」 — 도서관 혼인 기록 ->
+			# 주민 단서 -> 옛 농지 정리·밭 갈기(농사·벌목·채집) -> 흙 속의
+			# 상자에서 세 번째 유품 -> 도서관 3장
+			m.dialog.close()
+			GameData.story15_phase = "done"
+			GameData.story16_phase = ""
+			GameData.story16_heard = []
+			GameData.items["relic_ring"] = 0
+			m.story._ring_found = false
+			var k16_crops: Dictionary = GameData.crops_harvested.duplicate()
+			var k16_fish: Dictionary = GameData.fish_caught.duplicate()
+			var k16_aff: Dictionary = GameData.affinity.duplicate()
+			for a16: String in GameData.NPCS:
+				if GameData.settler_kind(a16) == "core":
+					GameData.affinity[a16] = 100
+			for c16: String in GameData.CROP_IDS:
+				GameData.crops_harvested[c16] = \
+					maxi(1, int(GameData.crops_harvested.get(c16, 0)))
+			for f16: String in GameData.FISH_IDS:
+				GameData.fish_caught[f16] = \
+					maxi(1, int(GameData.fish_caught.get(f16, 0)))
+			GameData.minerals_found["ore"] = true
+			GameData.minerals_found["gem"] = true
+			# ① 스토리 15 직후에는 시작되지 않는다
+			GameData.story15_done_day = GameData.day
+			m.story._story16_update(0.016)
+			var s16_wait: bool = GameData.story16_phase == ""
+			GameData.story15_done_day = GameData.day - GameData.STORY16_REST_DAYS
+			m.story._story16_update(0.016)
+			var s16_rec: bool = GameData.story16_phase == "record" \
+				and GameData.quest_npc_marks().get("librarian", "") == "!"
+			m.story._start_ring_record_dialog()
+			m.dialog.skip_seq()
+			var s16_clue: bool = GameData.story16_phase == "clue"
+			# ② 주민 단서 셋 -> 옛 농지가 우거진 채 드러난다
+			m.story.story16_hear("chief")
+			m.dialog.skip_seq()
+			m.story.story16_hear("chief")
+			m.dialog.close()
+			var s16_once: bool = GameData.story16_heard.size() == 1
+			m.story.story16_hear("merchant")
+			m.dialog.skip_seq()
+			m.story.story16_hear("blacksmith")
+			m.dialog.skip_seq()
+			var farm_objs := 0
+			for fy in range(m.OLD_FARM.position.y, m.OLD_FARM.end.y):
+				for fx in range(m.OLD_FARM.position.x, m.OLD_FARM.end.x):
+					if m.objects.has(Vector2i(fx, fy)):
+						farm_objs += 1
+			var s16_field: bool = GameData.story16_phase == "clear" and farm_objs > 0
+			# ③ 밭 밖에서 한 일은 세지 않는다
+			m.story.story16_field_work("clear", Vector2i(60, 60))
+			var s16_out: bool = GameData.story16_clear == 0
+			# 정리와 밭 갈기 — 둘 다 채워야 상자가 나온다
+			var ft16: Vector2i = m.OLD_FARM.position + Vector2i(1, 1)
+			for i in GameData.STORY16_CLEAR:
+				m.story.story16_field_work("clear", ft16)
+			for i in GameData.STORY16_TILL - 1:
+				m.story.story16_field_work("till", ft16)
+			var s16_mid: bool = not GameData.story16_field_done() \
+				and not m.story.story16_dig_box(ft16)
+			m.story.story16_field_work("till", ft16)
+			var s16_ready: bool = GameData.story16_field_done()
+			# ④ 한 번 더 갈면 흙 속의 상자 -> 반지
+			var s16_box: bool = m.story.story16_dig_box(ft16) \
+				and GameData.story16_phase == "tale" \
+				and int(GameData.items["relic_ring"]) == 1 \
+				and GameData.relics_owned() >= 1
+			m.dialog.close()
+			# ⑤ 도서관 3장 -> 완결
+			m.story.open_grandma_records()
+			var s16_lib: bool = m.dialog.visible and GameData.grandma_read >= 1
+			m.dialog.close()
+			m.story._end_grandma_record()
+			var s16_done: bool = GameData.story16_phase == "done" \
+				and GameData.completed_quests().has("메인 스토리 16 — 할머니의 반지")
+			GameData.crops_harvested = k16_crops
+			GameData.fish_caught = k16_fish   # 뒤 스텝(상점 진열)을 오염시키지 않게
+			GameData.affinity = k16_aff
+			GameData.relic_pending = ""
+			m.hud._toast_queue.clear()
+			print("STORY16_OK=", s16_wait and s16_rec and s16_clue and s16_once
+				and s16_field and s16_out and s16_mid and s16_ready and s16_box
+				and s16_lib and s16_done,
+				" 자유생활=", s16_wait, " 혼인기록=", s16_rec, " 단서=", s16_clue,
+				" 중복없음=", s16_once, " 옛농지=", s16_field,
+				" 구역밖제외=", s16_out, " 진행중=", s16_mid, " 정리완료=", s16_ready,
+				" 상자·반지=", s16_box, " 기록·완결=", s16_lib and s16_done)
+		282:
+			# #134: 메인 스토리 17 「할머니의 목걸이」 — 보라의 천 조각 ->
+			# 주민 단서 -> 옛 헛간 정리 + 동물 돌보기 -> 사료통 아래 목걸이
+			m.dialog.close()
+			GameData.story16_phase = "done"
+			GameData.story17_phase = ""
+			GameData.story17_heard = []
+			GameData.items["relic_necklace"] = 0
+			m.objnode._remove_object(m.OLD_BARN)
+			# ① 스토리 16 직후에는 시작되지 않는다
+			GameData.story16_done_day = GameData.day
+			m.story._story17_update(0.016)
+			var s17_wait: bool = GameData.story17_phase == ""
+			GameData.story16_done_day = GameData.day - GameData.STORY17_REST_DAYS
+			m.story._story17_update(0.016)
+			var s17_cloth: bool = GameData.story17_phase == "cloth" \
+				and GameData.quest_npc_marks().get("rancher", "") == "!"
+			m.story._start_barn_cloth_dialog()
+			m.dialog.skip_seq()
+			var s17_clue: bool = GameData.story17_phase == "clue"
+			# ② 주민 단서 셋 -> 옛 헛간이 드러난다
+			m.story.story17_hear("chief")
+			m.dialog.skip_seq()
+			m.story.story17_hear("merchant")
+			m.dialog.skip_seq()
+			m.story.story17_hear("blacksmith")
+			m.dialog.skip_seq()
+			var s17_barn: bool = GameData.story17_phase == "barn" \
+				and str(m.objects.get(m.OLD_BARN, {}).get("kind", "")) == "old_barn"
+			# ③ 헛간 둘레 정리 + 동물 돌보기 — 둘 다 채워야 사료통이 열린다
+			m.story.story17_barn_work("clear", Vector2i(60, 60))
+			var s17_out: bool = GameData.story17_clear == 0
+			var bt17: Vector2i = m.OLD_BARN + Vector2i(2, 2)
+			for i in GameData.STORY17_CLEAR:
+				m.story.story17_barn_work("clear", bt17)
+			m.story.old_barn_examine()
+			var s17_block: bool = m.dialog.visible \
+				and GameData.story17_phase == "barn" \
+				and int(GameData.items["relic_necklace"]) == 0
+			m.dialog.close()
+			for i in GameData.STORY17_CARE:
+				m.story.story17_barn_work("care")
+			var s17_ready: bool = GameData.story17_barn_done()
+			# ④ 사료통 아래에서 목걸이
+			m.story.old_barn_examine()
+			var s17_find: bool = GameData.story17_phase == "tale" \
+				and int(GameData.items["relic_necklace"]) == 1
+			m.dialog.close()
+			# ⑤ 도서관 4장 -> 완결
+			m.story.open_grandma_records()
+			var s17_lib: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._end_grandma_record()
+			var s17_done: bool = GameData.story17_phase == "done" \
+				and GameData.story17_done_day == GameData.day \
+				and GameData.completed_quests().has("메인 스토리 17 — 할머니의 목걸이")
+			# ⑥ 유품 순서 — 모자·팔찌·반지·목걸이·시계
+			var s17_order: bool = str(GameData.RELICS[2].id) == "relic_ring" \
+				and str(GameData.RELICS[3].id) == "relic_necklace" \
+				and str(GameData.RELICS[4].id) == "relic_watch" \
+				and GameData.GRANDMA_RECORDS.size() == GameData.RELICS.size()
+			GameData.relic_pending = ""
+			m.hud._toast_queue.clear()
+			print("STORY17_OK=", s17_wait and s17_cloth and s17_clue and s17_barn
+				and s17_out and s17_block and s17_ready and s17_find and s17_lib
+				and s17_done and s17_order,
+				" 자유생활=", s17_wait, " 천조각=", s17_cloth, " 단서=", s17_clue,
+				" 옛헛간=", s17_barn, " 구역밖제외=", s17_out,
+				" 미완차단=", s17_block, " 정리·돌보기=", s17_ready,
+				" 목걸이=", s17_find, " 기록·완결=", s17_lib and s17_done,
+				" 유품순서=", s17_order)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

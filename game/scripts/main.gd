@@ -337,6 +337,12 @@ const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_g
 const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
 # 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
 const ONSEN_POS := Vector2i(66, 6)
+# 옛 농지 (메인 스토리 16) — 마을 서쪽, 오래 묵어 수풀이 우거진 밭.
+# 단서를 다 모으면 잡초·돌·나무가 우거진 채로 드러난다
+const OLD_FARM := Rect2i(20, 44, 10, 7)
+# 옛 헛간 (메인 스토리 17) — 목장 남쪽에 방치된 헛간과 그 둘레
+const OLD_BARN := Vector2i(14, 30)
+const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
 # 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
 # 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
 const BRACELET_ROCK := Vector2i(8, 82)
@@ -1231,6 +1237,8 @@ func _process(delta: float) -> void:
 	story._story13_update(delta)
 	story._story14_update(delta)
 	story._story15_update(delta)
+	story._story16_update(delta)
+	story._story17_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

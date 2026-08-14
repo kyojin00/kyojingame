@@ -118,6 +118,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"onsen":
 			texture = m.tex["onsen"]   # 마을 온천 (메인 스토리 15)
 			offset = Vector2(0, -100)
+		"old_barn":
+			texture = m.tex["barn"]    # 방치된 옛 헛간 (메인 스토리 17)
+			offset = Vector2(0, -160)
 		"fence":
 			texture = m.tex["fence"]
 		"sprinkler":
@@ -222,6 +225,11 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 
 
 func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> void:
+	# 묵은 땅을 걷어내는 일 — 옛 농지(스토리 16)·옛 헛간(스토리 17)에서만 센다
+	var gone := str(m.objects.get(pos, {}).get("kind", ""))
+	if gone in ["weed", "rock", "tree"]:
+		m.story.story16_field_work("clear", pos)
+		m.story.story17_barn_work("clear", pos)
 	m.objects.erase(pos)
 	if m.obj_nodes.has(pos):
 		var node: Node2D = m.obj_nodes[pos]

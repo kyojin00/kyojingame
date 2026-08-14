@@ -2903,6 +2903,21 @@ func _end_grandma_record() -> void:
 		m.hud.story_banner("메인 스토리 13 완결", "할머니의 팔찌")
 		m.hud.show_message("두 번째 유품을 찾았다. 바다도 약속은 지킨다 —\n남은 유품들이 어딘가에서 기다리고 있다.", 7.0)
 		m.saveio.save_now()
+		return
+	if GameData.story16_phase == "tale":
+		GameData.story16_phase = "done"
+		GameData.story16_done_day = GameData.day
+		m.hud.story_banner("메인 스토리 16 완결", "할머니의 반지")
+		m.hud.show_message("세 번째 유품을 찾았다. 흙이 오래 품고 있던 약속 —\n할아버지는 끝내 지키고 싶었던 것이다.", 7.0)
+		m.saveio.save_now()
+		return
+	if GameData.story17_phase == "tale":
+		GameData.story17_phase = "done"
+		GameData.story17_done_day = GameData.day
+		m.hud.story_banner("메인 스토리 17 완결", "할머니의 목걸이")
+		m.hud.show_message("네 번째 유품을 찾았다. 남은 유품은 하나 —\n두 분의 마지막 이야기가 기다리고 있다.", 7.0)
+		m.saveio.save_now()
+		return
 
 
 # ---- 메인 스토리 12: 숲의 연금술사 ----
@@ -3537,6 +3552,222 @@ func onsen_enter() -> void:
 		"바위 틈에서 더운 물이 콸콸 솟는다.\n김 너머로 마을 지붕들이 어른거린다.\n\n몸을 담그면 %d시간이 흐르고 체력이 가득 찬다."
 			% int(GameData.ONSEN_HOURS),
 		[["몸을 담근다", _do_onsen], ["나중에", null]])
+
+
+# ---- 메인 스토리 16: 할머니의 반지 ----
+#
+# 도서관의 혼인 기록 -> 주민 단서 -> 마을 밖 옛 농지를 걷어내고 다시
+# 갈다 보면 흙 속에서 낡은 상자가 나온다. 전투 없이 농사·벌목·채집으로.
+
+func _story16_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story16_phase == "" and GameData.story16_ready():
+		GameData.story16_phase = "record"
+		m.hud.quest_start_toast("도서관에 못 보던 기록이 한 장 꽂혀 있다")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 도서관: 두 분의 혼인 기록과 잃어버린 반지
+func _start_ring_record_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「마침 잘 오셨어요. 옛 혼인 기록을 정리하다가\n두 분의 이름을 찾았거든요.」"},
+		{"text": "(누렇게 바랜 종이에 두 이름이 나란히 적혀 있다.\n그 사이에 낡은 사진 한 장이 끼워져 있었다.)"},
+		{"text": "「할아버님 글씨로 여백에 이렇게 적혀 있어요 —\n『혼인하던 해 봄, 겨우 마련한 반지.\n그 사람은 그걸 끼고도 밭일을 했다』.」"},
+		{"text": "「그리고... 『어느 날 흙 속에 잃어버렸다며\n한참을 울었다. 언젠가 꼭 찾아 주겠다고\n했었는데』 — 여기서 끊겨요.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「그 밭이 어디였을까요. 마을 밖 어딘가라는데...\n오래 사신 분들께 여쭤보세요.」"},
+	], _end_ring_record)
+
+
+func _end_ring_record() -> void:
+	if GameData.story16_phase == "record":
+		GameData.story16_phase = "clue"
+		GameData.story16_heard = []
+		m.hud.story_banner("메인 스토리 16 시작", "할머니의 반지")
+		m.hud.quest_start_toast("주민들에게 옛 농지 이야기를 듣자 (0/%d)"
+			% GameData.STORY16_TALES)
+	m.saveio.save_now()
+
+
+const FARM_TALES := [
+	"「옛 농지? 아아, 마을 서쪽 밭 말이지.\n지금은 수풀만 우거졌지만 예전엔 거기가\n제일 기름졌어.」",
+	"「자네 할머님이 거기서 일하셨지.\n할아버지가 밭 가는 법 배우겠다고 매일\n찾아갔다는 얘기, 다들 알고 있었어. 하하.」",
+	"「그 밭은 오래 묵어서 이제 잡초에 돌투성이야.\n제대로 갈아엎으려면 하루로는 어림없을걸?\n...그래도 자네라면 하겠지.」",
+]
+
+
+func story16_hear(nid: String) -> void:
+	if GameData.story16_phase != "clue" or nid in GameData.story16_heard:
+		return
+	var idx := mini(GameData.story16_heard.size(), FARM_TALES.size() - 1)
+	GameData.story16_heard.append(nid)
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_normal" % nid),
+		[{"text": str(FARM_TALES[idx])}], _end_farm_tale)
+
+
+func _end_farm_tale() -> void:
+	if GameData.story16_phase != "clue":
+		return
+	var n := GameData.story16_heard.size()
+	if n >= GameData.STORY16_TALES:
+		GameData.story16_phase = "clear"
+		GameData.story16_clear = 0
+		GameData.story16_till = 0
+		m.worldgen.seed_old_farm()
+		m.hud.event_toast("옛 농지 발견!")
+		m.hud.quest_start_toast("마을 서쪽 옛 농지 — 걷어내고 다시 갈아 보자")
+	else:
+		m.hud.event_toast("이야기 %d/%d" % [n, GameData.STORY16_TALES])
+	m.saveio.save_now()
+
+
+# 옛 농지에서 걷어내고(clear) 갈아엎을(till) 때마다 — tool_use가 부른다
+func story16_field_work(kind: String, t: Vector2i) -> void:
+	if GameData.story16_phase != "clear" or not m.OLD_FARM.has_point(t):
+		return
+	if kind == "till":
+		GameData.story16_till += 1
+	else:
+		GameData.story16_clear += 1
+	if GameData.story16_field_done() and not _ring_found:
+		m.hud.show_message("옛 밭이 제법 밭다워졌다.\n흙을 한 번 더 갈아 보자 — 무언가 걸리는 느낌이다.", 5.0)
+
+
+var _ring_found := false
+
+
+# 다 갈아엎은 밭을 한 번 더 갈면 흙 속에서 낡은 상자가 나온다
+func story16_dig_box(t: Vector2i) -> bool:
+	if GameData.story16_phase != "clear" or not GameData.story16_field_done() \
+			or not m.OLD_FARM.has_point(t):
+		return false
+	_ring_found = true
+	GameData.try_relic(2, 0.0, true)   # 「할머니의 반지」 — 노트·유품 현황 반영
+	GameData.story16_phase = "tale"
+	Sound.play_sfx("sfx_catch")
+	m.renderer.spawn_particles(t, "sparkle")
+	m.dialog.open("흙 속의 상자",
+		"호미 끝에 딱딱한 것이 걸렸다.\n흙을 헤치자 손바닥만 한 나무 상자가 나왔다.\n\n"
+		+ "(뚜껑은 삭아 힘없이 열렸다. 그 안에 —\n흙이 묻은 채로, 작은 반지 하나.)\n\n"
+		+ "★ 할머니의 반지를 찾았다!",
+		[["도서관에 가져가 보자", null]])
+	m.hud.quest_start_toast("도서관에서 「할머니의 기록」을 읽어 보자")
+	m.saveio.save_now()
+	return true
+
+
+# ---- 메인 스토리 17: 할머니의 목걸이 ----
+#
+# 보라가 낡은 창고에서 찾아낸 천 조각 -> 주민 단서 -> 방치된 옛 헛간
+# 둘레를 치우고 동물을 돌보다 보면 사료통 아래에서 목걸이가 나온다.
+
+func _story17_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story17_phase == "" and GameData.story17_ready():
+		GameData.story17_phase = "cloth"
+		m.worldgen.spawn_old_barn()
+		m.hud.quest_start_toast("보라가 창고에서 뭔가 찾아냈다고 한다")
+		m.saveio.save_now()
+
+
+# 퀘스트 1 — 보라: 할머니 이름이 적힌 천 조각
+func _start_barn_cloth_dialog() -> void:
+	m.dialog.open_seq("보라", m.tex["npc_rancher_portrait_normal"], [
+		{"text": "「어! 마침 잘 왔어. 이것 좀 봐 줄래?」"},
+		{"text": "(빛바랜 천 조각이다. 한쪽 귀퉁이에\n바느질로 이름 하나가 새겨져 있다.\n— 자네 할머니의 이름이었다.)"},
+		{"text": "「낡은 마구간 창고를 치우다 나왔어.\n보관함 장부에도 그 이름이 몇 번이나\n적혀 있더라고.」"},
+		{"text": "「예전에 우리 목장 자리에서 동물을 돌보던\n분이 계셨대. 아픈 송아지가 있으면 밤을\n새우셨다던데... 그분이었나 봐.」",
+			"portrait": m.tex["npc_rancher_portrait_happy"]},
+		{"text": "「마을 어른들이 더 알지도 몰라.\n물어보고 와. 나도 창고 더 뒤져 볼게!」"},
+	], _end_barn_cloth)
+
+
+func _end_barn_cloth() -> void:
+	if GameData.story17_phase == "cloth":
+		GameData.story17_phase = "clue"
+		GameData.story17_heard = []
+		m.hud.story_banner("메인 스토리 17 시작", "할머니의 목걸이")
+		m.hud.quest_start_toast("주민들에게 할머니와 목장 이야기를 듣자 (0/%d)"
+			% GameData.STORY17_TALES)
+	m.saveio.save_now()
+
+
+const BARN_TALES := [
+	"「짐승들의 어머니. 다들 그렇게 불렀지.\n자네 할머님 말일세.」",
+	"「목걸이? 아, 일할 땐 늘 어디다 벗어 두셨어.\n송아지들이 자꾸 잡아당긴다고 웃으시면서.」",
+	"「옛 헛간 말인가? 지금은 아무도 안 가.\n사료통이며 지푸라기며 그대로 썩어 가지.\n...거기 가려거든 좀 치우고 가게.」",
+]
+
+
+func story17_hear(nid: String) -> void:
+	if GameData.story17_phase != "clue" or nid in GameData.story17_heard:
+		return
+	var idx := mini(GameData.story17_heard.size(), BARN_TALES.size() - 1)
+	GameData.story17_heard.append(nid)
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_normal" % nid),
+		[{"text": str(BARN_TALES[idx])}], _end_barn_tale)
+
+
+func _end_barn_tale() -> void:
+	if GameData.story17_phase != "clue":
+		return
+	var n := GameData.story17_heard.size()
+	if n >= GameData.STORY17_TALES:
+		GameData.story17_phase = "barn"
+		GameData.story17_clear = 0
+		GameData.story17_care = 0
+		m.worldgen.spawn_old_barn()
+		m.hud.event_toast("옛 헛간 발견!")
+		m.hud.quest_start_toast("옛 헛간 — 둘레를 치우고 동물들을 돌보자")
+	else:
+		m.hud.event_toast("이야기 %d/%d" % [n, GameData.STORY17_TALES])
+	m.saveio.save_now()
+
+
+# 헛간 둘레 치우기 / 동물 돌보기 (tool_use·interact가 부른다)
+func story17_barn_work(kind: String, t := Vector2i(-999, -999)) -> void:
+	if GameData.story17_phase != "barn":
+		return
+	if kind == "care":
+		GameData.story17_care += 1
+	elif m.OLD_BARN_AREA.has_point(t):
+		GameData.story17_clear += 1
+	else:
+		return
+	if GameData.story17_barn_done():
+		m.hud.show_message("헛간이 말끔해졌다.\n구석의 낡은 사료통이 눈에 들어온다. (E)", 5.0)
+
+
+# 옛 헛간 (E) — 다 치운 뒤 사료통 아래에서 목걸이가 나온다
+func old_barn_examine() -> void:
+	if GameData.story17_phase != "barn":
+		m.dialog.open("옛 헛간",
+			"오래 비어 있던 헛간이다.\n이제는 볕이 잘 들고, 바람도 잘 통한다.",
+			[["닫기", null]])
+		return
+	if not GameData.story17_barn_done():
+		m.dialog.open("옛 헛간",
+			"지푸라기와 잡동사니가 잔뜩 쌓여 있다.\n먼저 둘레를 치우고, 동물들도 돌봐 주자.\n\n정리 %d/%d · 동물 돌보기 %d/%d" % [
+				mini(GameData.story17_clear, GameData.STORY17_CLEAR),
+				GameData.STORY17_CLEAR,
+				mini(GameData.story17_care, GameData.STORY17_CARE),
+				GameData.STORY17_CARE],
+			[["더 치워 보자", null]])
+		return
+	GameData.try_relic(3, 0.0, true)   # 「할머니의 목걸이」
+	GameData.story17_phase = "tale"
+	Sound.play_sfx("sfx_catch")
+	m.dialog.open("낡은 사료통",
+		"바닥에 눌어붙은 사료통을 힘껏 들어냈다.\n밑판 틈에 무언가 끼여 있다 —\n\n"
+		+ "(가는 사슬에 걸린 작은 목걸이.\n짐승 털이 엉킨 채로, 오래 그 자리에 있었다.)\n\n"
+		+ "★ 할머니의 목걸이를 찾았다!",
+		[["도서관에 가져가 보자", null]])
+	m.hud.quest_start_toast("도서관에서 「할머니의 기록」을 읽어 보자")
+	m.saveio.save_now()
 
 
 # 온천에 몸을 담그러 온 주민의 이야기 — 마을이 달라졌다는 실감
