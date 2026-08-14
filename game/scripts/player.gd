@@ -116,7 +116,7 @@ const SWING_HAND_DOT := {
 	# 앞·뒷모습은 옆으로 쓸지 않고 **앞으로** 내리친다(원근) — 휘두름의 주먹은
 	# 정수리 위, 내리침의 주먹은 몸 앞 가운데(앞모습) / 머리 저편(뒷모습)이다.
 	"side": [Vector2(-17, -63), Vector2(-17, -75), Vector2(21, -67), Vector2(19, -31), Vector2(17, -43)],
-	"down": [Vector2(-19, -59), Vector2(-23, -77), Vector2(-5, -91), Vector2(3, -47), Vector2(5, -51)],
+	"down": [Vector2(-19, -59), Vector2(-23, -77), Vector2(-5, -91), Vector2(1, -45), Vector2(3, -51)],
 	"up": [Vector2(19, -63), Vector2(19, -77), Vector2(9, -89), Vector2(3, -79), Vector2(19, -69)],
 }
 const TOOL_ICONS := {
