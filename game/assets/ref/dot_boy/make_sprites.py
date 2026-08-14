@@ -572,8 +572,13 @@ def swing_frame(direction, phase):
         legs_side(g, 3, 0, dx, sq)
         torso_side(g, sq, 0, dx, draw_arm=False)
     elif direction == 'down':
-        legs_down(g, 0, dx, sq)
-        torso_down(g, sq, 0, dx, skip=spec['skip'])
+        # 반대팔·발도 조금씩 따라 움직인다 — 내려치면서 몸이 사는 정도만.
+        # 반대팔은 감을 때 살짝 접혔다가 내리칠 때 뒤로 흔들리고,
+        # 오른발은 감는 동안 뒤꿈치가 한 칸 들렸다가 내리칠 때 쾅 디딘다.
+        counter = (-1, -2, 0, 2, 1)[phase]
+        step = (0, 1, 1, 0, 0)[phase]
+        legs_down(g, step, dx, sq)
+        torso_down(g, sq, counter, dx, skip=spec['skip'])
     else:
         legs_up(g, 0, dx, sq)
         torso_up(g, sq, 0, dx, skip=spec['skip'])
