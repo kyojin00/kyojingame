@@ -191,6 +191,8 @@ def scene_grandpa(g, f):
 # ---------------------------------------------------- 2. 나무 상자 (촛불 방)
 def scene_box(g, f):
     rnd = random.Random(3)
+    # 밤하늘 장면처럼 — 딱 떨어지는 검은 윤곽 대신 어두운 나무톤 가장자리
+    ED = (58, 38, 26)
     # 무늬 벽지 — 짙은 보라 바탕에 덩굴 무늬와 작은 꽃 (스타듀 벽지풍)
     g.rect(0, 0, W - 1, 40, (58, 42, 88))
     for gy in range(0, 40, 10):
@@ -224,16 +226,16 @@ def scene_box(g, f):
             g.p(sx2, sy2, (222, 228, 248))
     # 바닥 — 금빛 널마루 (쨍한 주황 골드)
     for y in range(42, H):
-        g.rect(0, y, W - 1, y, (196, 138, 58))
+        g.rect(0, y, W - 1, y, (164, 114, 52))
     for y in range(42, H, 7):
-        g.rect(0, y, W - 1, y, (156, 104, 44))      # 널 이음새
+        g.rect(0, y, W - 1, y, (132, 88, 40))      # 널 이음새
     for i, x in enumerate(range(-10, W + 20, 24)):
         for y in range(42, H):
-            g.p(x + ((y - 42) // 7) * 12, y, (156, 104, 44))
+            g.p(x + ((y - 42) // 7) * 12, y, (132, 88, 40))
     for _ in range(30):                             # 널 나뭇결
         x, y = rnd.randrange(W), rnd.randrange(43, H - 1)
         if (y % 7) != 0:
-            g.rect(x, y, x + rnd.randrange(2, 5), y, (176, 122, 50))
+            g.rect(x, y, x + rnd.randrange(2, 5), y, (148, 102, 46))
     # 달빛 줄기 — 창턱에서 바닥으로 비껴 내리는 좁은 띠 (두 단계 밝기)
     for i in range(36):
         for wdt in range(8):
@@ -245,7 +247,7 @@ def scene_box(g, f):
     # 촛불 빛 — 바닥에 넓게 고이는 웅덩이 (컷신의 벽난로 빛처럼)
     br = [1.0, 1.1, 0.92, 1.05][f]
     g.pool(52, 56, int(66 * br), int(17 * br), (255, 190, 90),
-           ((0.35, 0.35), (0.7, 0.2), (1.0, 0.1)))
+           ((0.2, 0.4), (0.4, 0.3), (0.6, 0.22), (0.8, 0.14), (1.0, 0.07)))
     # 상자 그림자 — 촛불(왼쪽)의 반대편으로 길게 진다
     g.pool(104, 64, 46, 6, (60, 36, 30), ((0.55, 0.5), (1.0, 0.28)))
     # 나무 상자 — 정육면체를 비스듬히 본 입체 (앞판 + 옆판 + 열린 뚜껑).
@@ -315,14 +317,14 @@ def scene_box(g, f):
         g.p(x0 + 3, by1 - 1, (78, 80, 88))
     # 윤곽선 — 입체 실루엣을 따라 돈다
     for y in range(by0, by1 + 2):
-        g.p(bx0 - 1, y, OUTLINE)                    # 왼쪽 모서리
+        g.p(bx0 - 1, y, ED)                    # 왼쪽 모서리
     for x in range(bx0 - 1, bx1 + 1):
-        g.p(x, by1 + 1, OUTLINE)                    # 앞 바닥선
+        g.p(x, by1 + 1, ED)                    # 앞 바닥선
     for x in range(bx1, bx1 + DEP + 1):             # 옆 바닥선 (비스듬)
         dy = round((x - bx1) * RISE / DEP)
-        g.p(x + 1, by1 - dy + 1, OUTLINE)
+        g.p(x + 1, by1 - dy + 1, ED)
     for y in range(by0 - RISE + 2, by1 - RISE + 1):
-        g.p(bx1 + DEP + 1, y, OUTLINE)              # 오른쪽 뒷모서리
+        g.p(bx1 + DEP + 1, y, ED)              # 오른쪽 뒷모서리
     for y in range(by0 + 1, by1 + 1):               # 앞판·옆판 경계선
         g.p(bx1, y, (92, 60, 34))
     # 분리형 뚜껑 — 상자 옆 바닥에 놓여 있다. 상자 윗면(개구부)과 같은
@@ -338,16 +340,16 @@ def scene_box(g, f):
     g.rect(lx0, lyb + 1, lx1, lyb + 2, (112, 76, 42))   # 앞모서리 두께 (옆벽)
     g.rect(lx0, lyb + 3, lx1, lyb + 3, (86, 56, 32))
     for x in range(lx0 - 1, lx1 + 2):               # 앞 바닥선 윤곽
-        g.p(x, lyb + 4, OUTLINE)
+        g.p(x, lyb + 4, ED)
     for t in range(LDEP + 1):                       # 좌우 비스듬한 윤곽
         y = lyb - round(t * LRISE / LDEP)
-        g.p(lx0 + t - 1, y, OUTLINE)
-        g.p(min(lx1 + t + 1, W - 1), y, OUTLINE)
-        g.p(lx0 + t - 1, y + 1, OUTLINE)
+        g.p(lx0 + t - 1, y, ED)
+        g.p(min(lx1 + t + 1, W - 1), y, ED)
+        g.p(lx0 + t - 1, y + 1, ED)
         if lx1 + t + 1 < W - 1:
-            g.p(lx1 + t + 1, lyb + 1 if t == 0 else y + 1, OUTLINE)
+            g.p(lx1 + t + 1, lyb + 1 if t == 0 else y + 1, ED)
     for x in range(lx0 + LDEP, min(lx1 + LDEP + 1, W - 1)):   # 뒷모서리 윤곽
-        g.p(x, lyb - LRISE - 1, OUTLINE)
+        g.p(x, lyb - LRISE - 1, ED)
     g.rrect(lx0 + 3, lyb - 2, lx0 + 7, lyb, (128, 130, 138), 2)   # 쇠장식
     g.p(lx0 + 5, lyb - 1, (176, 178, 186))
     g.rect(lx0 + 2, lyb + 5, lx1 - 2, lyb + 5, (94, 62, 34))      # 바닥 그림자
@@ -356,10 +358,10 @@ def scene_box(g, f):
     for y in range(nb_top, by0):
         off = (by0 - y) // 5                        # 위로 갈수록 살짝 기운다
         g.rect(80 + off, y, 102 + off, y, (74, 48, 32))
-        g.p(79 + off, y, OUTLINE)
-        g.p(103 + off, y, OUTLINE)
+        g.p(79 + off, y, ED)
+        g.p(103 + off, y, ED)
     g.rect(82, nb_top, 102, nb_top + 1, (98, 66, 42))
-    g.rect(81, nb_top - 1, 103, nb_top - 1, OUTLINE)
+    g.rect(81, nb_top - 1, 103, nb_top - 1, ED)
     g.rect(87, nb_top, 89, by0 - 1, (154, 110, 48))             # 가죽끈
     g.p(99, nb_top + 3, (150, 130, 96))                         # 모서리 장식
     g.p(100, nb_top + 3, (150, 130, 96))
@@ -368,12 +370,12 @@ def scene_box(g, f):
     g.rect(ev0, eb + 2, ev1 + 1, eb + 2, (94, 62, 34))          # 바닥 그림자
     for y in range(et, eb + 1):
         off = (eb - y) // 7                                     # 기대 선 기울기
-        g.rect(ev0 + off, y, ev1 + off, y, (238, 226, 196))
-        g.p(ev0 - 1 + off, y, OUTLINE)
-        g.p(ev1 + 1 + off, y, OUTLINE)
-    g.rect(ev0 + 3, et - 1, ev1 + 1, et - 1, OUTLINE)
-    g.rect(ev0, eb + 1, ev1, eb + 1, OUTLINE)
-    g.rect(ev0 + 2, et, ev1 + 2, et, (250, 244, 222))
+        g.rect(ev0 + off, y, ev1 + off, y, (230, 216, 184))
+        g.p(ev0 - 1 + off, y, ED)
+        g.p(ev1 + 1 + off, y, ED)
+    g.rect(ev0 + 3, et - 1, ev1 + 1, et - 1, ED)
+    g.rect(ev0, eb + 1, ev1, eb + 1, ED)
+    g.rect(ev0 + 2, et, ev1 + 2, et, (242, 232, 202))
     for y in range(et + 1, eb + 1):                 # 촛불 반대쪽 봉투 그늘
         off = (eb - y) // 7
         g.p(ev1 - 1 + off, y, (222, 206, 172))
@@ -409,7 +411,7 @@ def scene_box(g, f):
     g.p(*flame[2], (240, 150, 66))
     # 불꽃 곁 은은한 무리 — 벽에는 작고 옅게만 진다
     g.pool(32, 14, int(16 * br), int(11 * br), (255, 200, 100),
-           ((0.35, 0.3), (1.0, 0.1)))
+           ((0.25, 0.28), (0.55, 0.18), (1.0, 0.09)))
     # 나방 — 촛불 곁을 맴돈다
     mo = [(40, 9), (43, 12), (39, 14), (36, 10)][f]
     g.p(mo[0], mo[1], (214, 204, 178))
