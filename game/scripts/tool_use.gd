@@ -282,6 +282,7 @@ func use_tool() -> void:
 					if randf() < GameData.bonus_drop_chance("forest"):
 						wood_got += 1
 					GameData.wood += wood_got
+					GameData.discover("wood")   # 도감 「기본 재료」 등록
 					GameData.trees_chopped += 1
 					m.hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
 					m.doing._maybe_drop_recipe("tree")
@@ -337,6 +338,7 @@ func use_tool() -> void:
 					if randf() < GameData.bonus_drop_chance("mine"):
 						stone_got += 1
 					GameData.stone += stone_got
+					GameData.discover("stone")   # 도감 「기본 재료」 등록
 					m.hud.show_message("돌을 캤다! 석재 +%d" % stone_got)
 					m.doing._maybe_drop_recipe("rock")
 					m.tutorial_notify("mine")

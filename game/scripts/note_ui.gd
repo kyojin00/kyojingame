@@ -232,6 +232,49 @@ func _rebuild_collect() -> void:
 				else (rname if rname != "" else "완성 기념")
 			_line("  %s %d/%d — 보상: %s" % [col.name, have, total, reward_hint], DIM)
 
+	# 기본 재료 — 목재·석재·못. 세기는 어디서나 쓰이는데 도감에는 칸이
+	# 없어서 「나무·돌이 안 보인다」는 구멍이 있었다.
+	_line("")
+	var mats: Array = [
+		{"id": "wood", "icon": "icon_wood", "name": "목재",
+			"found": GameData.wood > 0 or GameData.trees_chopped > 0
+				or GameData.discovered.has("wood"),
+			"desc": "나무를 베면 얻는다 — 건축·제작의 근본"},
+		{"id": "stone", "icon": "icon_stone", "name": "석재",
+			"found": GameData.stone > 0 or GameData.discovered.has("stone"),
+			"desc": "바위를 캐면 얻는다 — 건축·설치물 재료"},
+		{"id": "nail", "icon": "nail", "name": "못",
+			"found": int(GameData.items.get("nail", 0)) > 0
+				or GameData.discovered.has("nail"),
+			"desc": "대장간에서 판다 — 집터·가구 재료"},
+	]
+	var mat_got := 0
+	var mat_rows: Array = []
+	for mt: Dictionary in mats:
+		if bool(mt.found):
+			mat_got += 1
+		mat_rows.append({"icon": mt.icon, "name": mt.name, "found": mt.found,
+			"desc": mt.desc, "date": GameData.discovered_on(str(mt.id)),
+			"hint": "마을 곳곳에서 얻을 수 있다"})
+	_head("[기본 재료]  %d / %d" % [mat_got, mats.size()])
+	_grid(mat_rows)
+
+	# 도구 — 언제나 같은 순서(ALL_TOOLS)로 깔끔하게 늘어선다
+	_line("")
+	var tool_got := 0
+	var tool_rows: Array = []
+	for t: String in GameData.ALL_TOOLS:
+		var unlocked: bool = GameData.is_tool_unlocked(t)
+		if unlocked:
+			tool_got += 1
+		var lv := int(GameData.tool_level.get(t, 1))
+		tool_rows.append({"icon": main.hud.TOOL_ICONS.get(t, ""),
+			"name": GameData.TOOL_KOR.get(t, t), "found": unlocked,
+			"desc": "강화 Lv.%d — 대장간에서 올린다" % lv, "date": "",
+			"hint": "이야기를 진행하면 손에 들어온다"})
+	_head("[도구]  %d / %d" % [tool_got, GameData.ALL_TOOLS.size()])
+	_grid(tool_rows)
+
 	_line("")
 	_head("[작물]  %s" % _count(GameData.CROP_IDS, GameData.crops_harvested))
 	var rows: Array = []
