@@ -324,7 +324,9 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     c = 15 + lean
     g.rect(c - 4 + dx, HIP_Y + sq, c + 5 + dx, HIP_Y + 2 + sq, 'p')
     g.hline(c - 4 + dx, c + 5 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
-    g.px(c + dx, HIP_Y + 2 + sq, 'P')
+    g.hline(c - 4 + dx, c + 5 + dx, HIP_Y + 2 + sq, 'P')  # 가랑이 그늘 줄 —
+    # 띠(10칸)와 다리(7칸) 사이 단차를 그늘로 눌러 다리가 그늘 속에서
+    # 나오는 것처럼 잇는다. 허벅지도 이 줄까지 겹쳐 세로로 이어진다.
     g.px(c - 4 + dx, HIP_Y + sq, '.')          # 엉덩이 띠 모서리 깎기
     g.px(c + 5 + dx, HIP_Y + sq, '.')
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다.
@@ -343,7 +345,7 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
         bot = GROUND - lift
         hip_row = HIP_Y + 2 + sq
         knee_row = (hip_row + bot) // 2 + 1
-        for yy in range(LEG_Y + sq, bot + 1):
+        for yy in range(LEG_Y - 1 + sq, bot + 1):   # 띠 아래 줄부터 겹쳐 잇는다
             if yy <= knee_row:                 # 허벅지
                 f = (yy - hip_row) / max(1, knee_row - hip_row)
                 o = knee_off * f
