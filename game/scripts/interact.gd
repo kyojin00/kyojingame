@@ -354,6 +354,14 @@ func interact() -> void:
 		if obj.kind == "old_barn":
 			m.story.old_barn_examine()   # 옛 헛간 (메인 스토리 17)
 			return
+		if obj.kind == "old_gate":
+			m.story.gate_examine()   # 오래된 돌문 (메인 스토리 20)
+			return
+		if obj.kind == "seed_sprout":
+			m.dialog.open("작은 새싹",
+				"어디서도 본 적 없는 빛깔의 새싹이다.\n무엇이 될지는 아직 아무도 모른다.",
+				[["가만히 바라본다", null]])
+			return
 		if obj.kind == "old_lookout":
 			m.story.hill_lookout_examine()   # 옛 전망대 (메인 스토리 18)
 			return

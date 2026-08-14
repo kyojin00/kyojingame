@@ -213,8 +213,10 @@ const TEXTURE_NAMES := [
 	"onsen", "rock_wedge", "spring_water",
 	# 옛 전망대 (메인 스토리 18) — 굽은 나무는 tree_bare를 쓴다
 	"old_lookout", "old_bench", "carved_stone",
+	# 가장 오래된 자리 (메인 스토리 20)
+	"old_gate", "grandpa_seed",
 	# 연금술 물약 (조합대 결과물)
-	"water_life", "potion_dream",
+	"water_life",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
 	"potion_grow", "potion_guard", "potion_moon", "sludge",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
@@ -349,6 +351,9 @@ const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
 # 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
 const HILL_POS := Vector2i(31, 3)
 const HILL_AREA := Rect2i(26, 1, 11, 6)
+# 오래된 돌문 (메인 스토리 20) — 광장 북쪽. 마을이 서기 전부터 있던 자리라
+# 처음부터 세계에 서 있다 (열리는 건 마지막 이야기에서다)
+const GATE_POS := Vector2i(78, 4)
 const HILL_TRACE_TILES := {
 	"bench": Vector2i(28, 4),
 	"stone": Vector2i(34, 4),
@@ -607,11 +612,7 @@ func _ready() -> void:
 	sleep_dialog.cancel_button_text = "안 잔다"
 	sleep_dialog.confirmed.connect(func() -> void:
 		Sound.play_sfx("sfx_sleep")
-		# 기억의 물약을 마신 밤 — 보통 잠 대신 꿈속 엔딩 시퀀스로 들어간다
-		if GameData.dream_ready and not Net.is_guest():
-			ending.begin()
-		else:
-			daycycle._fade_next_day(false))
+		daycycle._fade_next_day(false))
 	add_child(sleep_dialog)
 
 	ending = preload("res://scripts/ending_ui.gd").new()
@@ -1252,6 +1253,7 @@ func _process(delta: float) -> void:
 	story._story17_update(delta)
 	story._story18_update(delta)
 	story._story19_update(delta)
+	story._story20_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

@@ -1492,8 +1492,6 @@ func _debug_tick() -> void:
 			# #123/#124: 꿈속 엔딩 — 7분야 만렙 증표·유품 5종·항아리·물약·꿈
 			var keep_found: Dictionary = GameData.water_life_found.duplicate()
 			var keep_wl := int(GameData.items["water_life"])
-			var keep_pd := int(GameData.items["potion_dream"])
-			var keep_dr := GameData.dream_ready
 			var keep_ds := GameData.dream_seen
 			var keep_skl: Dictionary = {}
 			for sid0: String in GameData.ENDING_SKILLS:
@@ -1509,8 +1507,6 @@ func _debug_tick() -> void:
 			GameData.story19_phase = "seek"
 			GameData.water_life_found = {}
 			GameData.items["water_life"] = 0
-			GameData.items["potion_dream"] = 0
-			GameData.dream_ready = false
 			GameData.dream_seen = false
 			GameData.skills["mine"] = {"lv": GameData.SKILL_MAX_LV - 1, "xp": 0.0}
 			GameData.add_skill_xp("mine", 999999.0)   # 진짜 레벨업 경로로 만렙
@@ -1533,32 +1529,27 @@ func _debug_tick() -> void:
 				GameData.try_relic(ri, 0.0, true)
 			GameData.relic_pending = ""
 			var relics5: bool = GameData.relics_owned() == 5
-			# ② 노트가 100%가 아니면 연화는 항아리를 꺼내지 않는다
+			# ② 노트가 100%가 아니면 마지막 이야기의 조건이 차지 않는다
 			var gate_note: bool = not GameData.ending_ready() \
 				and GameData.note_progress().ratio < 1.0
-			# ③ 항아리 — 일곱 병을 붓고 기억의 물약을 받는다 (유품은 간직)
-			m.story._end_elixir()
-			var elixir: bool = int(GameData.items["potion_dream"]) == 1 \
-				and int(GameData.items["water_life"]) == 0 \
-				and GameData.relics_owned() == 5
-			# ④ 물약을 마시면 오늘 밤 꿈이 준비된다
-			m.inventory_ui._drink_dream()
-			var drank: bool = GameData.dream_ready \
-				and int(GameData.items["potion_dream"]) == 0
-			m.dialog.close()
-			# ⑤ 꿈속 시퀀스: 조부모 대사 -> 통계 리포트 -> 마을 사람들 배웅
+			# ③ 엔딩 시퀀스: 달라진 마을 -> 통계 -> 노트 마지막 줄 ->
+			#    마을 사람들 -> 마무리. 끝나도 날짜는 넘어가지 않는다
+			var keep_ds2 := GameData.dream_seen
+			GameData.dream_seen = false
 			m.ending.begin()
-			var dreamed: bool = m.ending.visible and m.ending.phase == "dream"
-			var grandpa_line := false
+			var town_on: bool = m.ending.visible and m.ending.phase == "town"
+			var town_line := false
 			for dl: Array in m.ending._lines:
-				if str(dl[1]).contains("유품을 찾아줘서 고맙다"):
-					grandpa_line = true
+				if str(dl[1]).contains("삶은 아직 끝나지 않았다"):
+					town_line = true
 			for i2 in m.ending._lines.size():
 				m.ending._advance()
 			var stats_on: bool = m.ending.phase == "stats"
 			var stat_n0: int = m.ending._lines.size()
 			while m.ending._idx < m.ending._lines.size():
 				m.ending._reveal_next_stat()
+			m.ending._advance()
+			var note_on: bool = m.ending.phase == "note"
 			m.ending._advance()
 			var credits_on: bool = m.ending.phase == "credits"
 			var has_postman := false
@@ -1571,31 +1562,30 @@ func _debug_tick() -> void:
 			while m.ending.phase == "credits":
 				m.ending._advance()
 			var outro_on: bool = m.ending.phase == "outro"
-			m.ending.wake(false)   # 날짜 전환 없이 상태만 (하네스 전용)
+			var day_before := GameData.day
+			m.ending.wake()
 			var woke: bool = not m.ending.visible and GameData.dream_seen \
-				and not GameData.dream_ready and m.hud.visible
+				and m.hud.visible and GameData.day == day_before
+			GameData.dream_seen = keep_ds2
 			m.hud._toast_queue.clear()
 			GameData.story19_phase = keep_s19
 			GameData.water_life_found = keep_found
 			GameData.items["water_life"] = keep_wl
-			GameData.items["potion_dream"] = keep_pd
-			GameData.dream_ready = keep_dr
 			GameData.dream_seen = keep_ds
 			for sid2: String in keep_skl:
 				GameData.skills[sid2] = keep_skl[sid2]
 			for rid2: String in keep_rel:
 				GameData.items[rid2] = int(keep_rel[rid2])
 			print("ENDING_OK=", first and dup and six and r_first and r_dup
-				and r_hint and relics5 and gate_note and elixir
-				and drank and dreamed and grandpa_line and stats_on
-				and stat_n0 >= 10 and credits_on and has_postman
-				and has_all_line and outro_on and woke,
+				and r_hint and relics5 and gate_note and town_on and town_line
+				and stats_on and stat_n0 >= 10 and note_on and credits_on
+				and has_postman and has_all_line and outro_on and woke,
 				" 만렙첫병=", first, " 중복차단=", dup, " 일곱병=", six,
 				" 유품=", r_first and r_dup and relics5, " 힌트게이트=", r_hint,
-				" 노트게이트=", gate_note, " 항아리=", elixir, " 마심=", drank,
-				" 꿈=", dreamed and grandpa_line, " 통계=", stats_on,
-				"(", stat_n0, "줄) 배웅=", credits_on and has_postman
-				and has_all_line, " 기상=", outro_on and woke)
+				" 노트게이트=", gate_note, " 달라진마을=", town_on and town_line,
+				" 통계=", stats_on, "(", stat_n0, "줄) 마지막기록=", note_on,
+				" 크레딧=", credits_on and has_postman and has_all_line,
+				" 계속플레이=", outro_on and woke)
 		268:
 			# #125: 주민 분류·이사(입주/이탈)·삼자 대화·유니콘 뿔 제거
 			var k_settlers: Array = GameData.settlers.duplicate()
@@ -2658,6 +2648,184 @@ func _debug_tick() -> void:
 				" 순서자유=", s19_any, " 페이지잠김=", s19_lock,
 				" 일곱병·해금=", s19_page, " 마지막페이지=", s19_read,
 				" 완결=", s19_done)
+		285:
+			# #137: 메인 스토리 20 「가장 오래된 자리」 — 세 조건 -> 서하·이장
+			# -> 돌문에 생명의 물 일곱 -> 봉인된 것 -> 씨앗과 편지 -> 심기
+			m.dialog.close()
+			m.cave.close()
+			var k20_skl: Dictionary = {}
+			for sd20: String in GameData.ENDING_SKILLS:
+				k20_skl[sd20] = (GameData.skills[sd20] as Dictionary).duplicate()
+			var k20_found: Dictionary = GameData.water_life_found.duplicate()
+			var k20_wl := int(GameData.items["water_life"])
+			var k20_rel: Dictionary = {}
+			for rd20: Dictionary in GameData.RELICS:
+				k20_rel[rd20.id] = int(GameData.items[rd20.id])
+			var k20_crops: Dictionary = GameData.crops_harvested.duplicate()
+			var k20_fish: Dictionary = GameData.fish_caught.duplicate()
+			var k20_mobs: Dictionary = GameData.mob_kills.duplicate()
+			var k20_cook: Dictionary = GameData.recipes_cooked.duplicate()
+			var k20_aff: Dictionary = GameData.affinity.duplicate()
+			var k20_ds := GameData.dream_seen
+			GameData.story19_phase = "done"
+			GameData.story20_phase = ""
+			GameData.story20_told = []
+			GameData.gate_open = false
+			GameData.seed_tile = Vector2i(-1, -1)
+			GameData.seed_water = false
+			GameData.items["grandpa_seed"] = 0
+			# ① 세 조건이 다 차야 시작된다 — 유품만 있고 노트가 덜 차면 안 된다
+			for rid20: Dictionary in GameData.RELICS:
+				GameData.items[rid20.id] = 1
+			GameData.water_life_found = {}
+			for sd21: String in GameData.ENDING_SKILLS:
+				GameData.water_life_found[sd21] = true
+			GameData.items["water_life"] = GameData.ENDING_SKILLS.size()
+			m.story._story20_update(0.016)
+			var s20_gate3: bool = GameData.story20_phase == "" \
+				and not GameData.ending_ready()
+			for c20: String in GameData.CROP_IDS:
+				GameData.crops_harvested[c20] = maxi(1, int(GameData.crops_harvested.get(c20, 0)))
+			for f20: String in GameData.FISH_IDS:
+				GameData.fish_caught[f20] = maxi(1, int(GameData.fish_caught.get(f20, 0)))
+			for mb20: String in GameData.MOBS:
+				GameData.mob_kills[mb20] = maxi(1, int(GameData.mob_kills.get(mb20, 0)))
+			for rc20: String in GameData.RECIPE_IDS:
+				GameData.recipes_cooked[rc20] = maxi(1, int(GameData.recipes_cooked.get(rc20, 0)))
+			for a20: String in GameData.NPCS:
+				GameData.affinity[a20] = 100
+			GameData.minerals_found["ore"] = true
+			GameData.minerals_found["gem"] = true
+			var k20_for: Dictionary = GameData.forage_caught.duplicate()
+			for fg20: String in GameData.FORAGE_IDS + GameData.BUG_IDS:
+				GameData.forage_caught[fg20] = maxi(1, int(GameData.forage_caught.get(fg20, 0)))
+			var k20_leg: Dictionary = {}
+			for lg20: Array in GameData.LEGENDS:
+				k20_leg[lg20[0]] = int(GameData.items[lg20[0]])
+				GameData.items[lg20[0]] = maxi(1, int(GameData.items[lg20[0]]))
+			var s20_note100: bool = GameData.note_progress().ratio >= 1.0
+			m.story._story20_update(0.016)
+			var s20_start: bool = GameData.story20_phase == "tell" \
+				and GameData.quest_npc_marks().get("librarian", "") == "!"
+			# ② 서하와 이장에게 마지막 페이지를 보여준다
+			m.story.story20_show_page("librarian")
+			m.dialog.skip_seq()
+			m.story.story20_show_page("librarian")
+			m.dialog.close()
+			var s20_once: bool = GameData.story20_told.size() == 1 \
+				and GameData.story20_phase == "tell"
+			m.story.story20_show_page("chief")
+			m.dialog.skip_seq()
+			var s20_told: bool = GameData.story20_phase == "gate"
+			# ③ 돌문은 처음부터 세계에 서 있다 — 병이 모자라면 열리지 않는다
+			var s20_stone: bool = str(m.objects.get(m.GATE_POS, {}).get(
+				"kind", "")) == "old_gate"
+			GameData.items["water_life"] = 3
+			m.story.gate_examine()
+			var s20_lack: bool = m.dialog.visible and not GameData.gate_open
+			m.dialog.close()
+			GameData.items["water_life"] = GameData.ENDING_SKILLS.size()
+			m.story._pour_water()
+			var s20_open: bool = GameData.gate_open \
+				and int(GameData.items["water_life"]) == 0
+			m.dialog.skip_seq()
+			m.dialog.close()
+			# ④ 돌문 안쪽 — 한 방뿐이고 계단이 없다, 보스가 버티고 있다
+			m.story._enter_gate()
+			var s20_room: bool = m.cave.visible and m.cave.lastroom \
+				and m.cave.stairs_pos.x < 0 and m.cave.monsters.size() >= 3 \
+				and GameData.story20_phase == "inner"
+			var s20_boss := false
+			for mb: Dictionary in m.cave.monsters:
+				if int(mb.hp) >= 60:
+					s20_boss = true
+			m.cave.monsters.clear()
+			m.cave._floor_clear()
+			var s20_chest: bool = m.cave.chest_pos.x >= 0
+			# ⑤ 보관함 — 금도 보석도 아닌 씨앗 한 알과 마지막 편지
+			m.story.final_chest()
+			var s20_seed: bool = GameData.story20_phase == "letter" \
+				and int(GameData.items["grandpa_seed"]) == 1 \
+				and GameData.seed_day == GameData.day
+			var letter_ok := false
+			for pg: Dictionary in m.dialog._seq:
+				if str(pg.get("text", "")).contains("가장 중요한 것을 이어받았"):
+					letter_ok = true
+			m.dialog.skip_seq()
+			m.dialog.close()
+			# ⑥ 다음 날 아침 — 갈고 심고 물을 주면 새싹이 돋는다
+			m.story._story20_update(0.016)
+			var s20_same: bool = GameData.story20_phase == "letter"
+			GameData.day += 1
+			m.story._story20_update(0.016)
+			var s20_plantday: bool = GameData.story20_phase == "plant"
+			var pt20 := Vector2i(m.HOME_ANCHOR.x + 2, m.HOME_ANCHOR.y + 6)
+			m.objnode._remove_object(pt20)
+			m.grid[pt20.y][pt20.x].ground = "soil"
+			var s20_plant: bool = m.story.story20_plant(pt20) \
+				and GameData.seed_tile == pt20 \
+				and int(GameData.items["grandpa_seed"]) == 0
+			m.dialog.close()
+			var s20_replant: bool = not m.story.story20_plant(pt20)
+			m.story.story20_water(pt20)
+			var s20_sprout: bool = GameData.seed_water \
+				and str(m.objects.get(pt20, {}).get("kind", "")) == "seed_sprout"
+			m.dialog.skip_seq()
+			var s20_done: bool = GameData.story20_phase == "done" \
+				and GameData.note_last_line and m.ending.visible \
+				and GameData.completed_quests().has("메인 스토리 20 — 가장 오래된 자리")
+			# ⑦ 엔딩이 끝나도 세이브는 그대로 — 자유 생활이 이어진다
+			while m.ending.phase != "outro":
+				if m.ending.phase == "stats":
+					while m.ending._idx < m.ending._lines.size():
+						m.ending._reveal_next_stat()
+				m.ending._advance()
+			var d20 := GameData.day
+			m.ending.wake()
+			var s20_free: bool = not m.ending.visible and GameData.day == d20 \
+				and m.hud.visible and not m.story_cutscene
+			# 뒷정리 — 뒤 스텝을 오염시키지 않는다
+			m.objnode._remove_object(pt20)
+			m.grid[pt20.y][pt20.x].ground = "grass"
+			GameData.seed_tile = Vector2i(-1, -1)
+			GameData.seed_water = false
+			GameData.story20_phase = ""
+			GameData.story20_told = []
+			GameData.gate_open = false
+			GameData.note_last_line = false
+			GameData.story19_phase = ""
+			GameData.day -= 1
+			GameData.dream_seen = k20_ds
+			for sd22: String in k20_skl:
+				GameData.skills[sd22] = k20_skl[sd22]
+			GameData.water_life_found = k20_found
+			GameData.items["water_life"] = k20_wl
+			for rid21: String in k20_rel:
+				GameData.items[rid21] = int(k20_rel[rid21])
+			GameData.crops_harvested = k20_crops
+			GameData.fish_caught = k20_fish
+			GameData.mob_kills = k20_mobs
+			GameData.recipes_cooked = k20_cook
+			GameData.affinity = k20_aff
+			GameData.forage_caught = k20_for
+			for lg21: String in k20_leg:
+				GameData.items[lg21] = int(k20_leg[lg21])
+			m.hud._toast_queue.clear()
+			print("STORY20_OK=", s20_gate3 and s20_note100 and s20_start
+				and s20_once and s20_told and s20_stone and s20_lack
+				and s20_open and s20_room and s20_boss and s20_chest
+				and s20_seed and letter_ok and s20_same and s20_plantday
+				and s20_plant and s20_replant and s20_sprout and s20_done
+				and s20_free,
+				" 조건3종=", s20_gate3 and s20_note100, " 시작=", s20_start,
+				" 중복없음=", s20_once, " 두사람=", s20_told,
+				" 돌문상시=", s20_stone, " 병부족차단=", s20_lack,
+				" 일곱병개방=", s20_open, " 마지막방=", s20_room,
+				" 최종보스=", s20_boss, " 보관함=", s20_chest,
+				" 씨앗·편지=", s20_seed and letter_ok,
+				" 다음날심기=", s20_same and s20_plantday and s20_plant,
+				" 중복심기차단=", s20_replant, " 새싹=", s20_sprout,
+				" 마지막기록·엔딩=", s20_done, " 계속플레이=", s20_free)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

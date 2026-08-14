@@ -435,10 +435,10 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return
-	# 엔딩 — 노트 100% + 생명의 물 여섯 병을 모으면, 연금술에 밝은
-	# 연화가 항아리를 꺼내 「기억의 물약」을 만들어 준다
-	if npc.id == "forest_mom" and GameData.ending_ready():
-		m.story._start_elixir_dialog()
+	# 메인 스토리 20 — 노트의 마지막 페이지를 서하와 이장에게 보여준다
+	if GameData.story20_phase == "tell" and npc.id in GameData.STORY20_TELL \
+			and npc.id not in GameData.story20_told:
+		m.story.story20_show_page(npc.id)
 		return
 	# 대화 기록 — 오래 말을 안 걸면 이사 온 주민이 서운해한다
 	GameData.npc_last_talk[npc.id] = GameData.day

@@ -4035,6 +4035,209 @@ func _end_last_page() -> void:
 	m.saveio.save_now()
 
 
+# ---- 메인 스토리 20: 가장 오래된 자리 (최종 엔딩) ----
+#
+# 노트 100% · 유품 다섯 · 생명의 물 일곱이 다 갖춰지면 시작한다.
+# 마지막 페이지가 가리키는 곳은 광장 북쪽의 **오래된 돌문** — 마을이
+# 서기 훨씬 전부터 그 자리에 있었고, 아무도 열지 못해 아무도 신경
+# 쓰지 않던 자리다. 일곱 병을 홈에 부으면 문이 열린다.
+
+func _story20_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story20_phase == "" and GameData.story20_ready():
+		GameData.story20_phase = "tell"
+		GameData.story20_told = []
+		m.hud.story_banner("메인 스토리 20 시작", "가장 오래된 자리")
+		m.hud.quest_start_toast("서하와 이장에게 마지막 페이지를 보여주자")
+		m.saveio.save_now()
+		return
+	# 씨앗을 받은 다음 날 아침 — 밭에 심는 하루가 시작된다
+	if GameData.story20_phase == "letter" and GameData.day > GameData.seed_day:
+		GameData.story20_phase = "plant"
+		m.hud.quest_start_toast("농장의 땅을 갈고 할아버지의 씨앗을 심자")
+		m.hud.show_message("창밖이 밝다.\n...오늘은 밭에 나가 봐야겠다.", 6.0)
+		m.saveio.save_now()
+
+
+# 마지막 페이지를 보여준다 — 서하와 이장의 짧은 대화
+const LAST_PAGE_LINES := {
+	"librarian": [
+		{"text": "「...이 글씨, 할아버님 것이 맞아요.\n마지막까지 손이 떨리지 않으셨네요.」"},
+		{"text": "「마을에서 가장 오래된 자리... 광장 북쪽 돌문이에요.\n마을이 생기기 훨씬 전부터 있었다고 기록에 나와요.」"},
+		{"text": "「아무도 못 열었어요. 그래서 다들 잊었죠.\n...할아버님만 빼고요.」"},
+	],
+	"chief": [
+		{"text": "「돌문 말인가. 내가 어릴 적에도 그 자리에 있었네.\n밀어도 보고 두드려도 봤지만, 꿈쩍도 안 했지.」"},
+		{"text": "「자네 할아버지는 거길 자주 들여다보셨네.\n무섭지 않으시냐고 물었더니 웃기만 하시더군.」"},
+		{"text": "「...가려거든 가게. 다만 하나만 약속해 주게.\n반드시 돌아오게. 마을이 기다릴 테니.」"},
+	],
+}
+
+
+func story20_show_page(nid: String) -> void:
+	if GameData.story20_phase != "tell" or nid in GameData.story20_told:
+		return
+	if nid not in GameData.STORY20_TELL:
+		return
+	GameData.story20_told.append(nid)
+	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+		m.tex.get("npc_%s_portrait_normal" % nid),
+		LAST_PAGE_LINES[nid], _end_last_page_talk)
+
+
+func _end_last_page_talk() -> void:
+	if GameData.story20_phase != "tell":
+		return
+	if GameData.story20_told.size() >= GameData.STORY20_TELL.size():
+		GameData.story20_phase = "gate"
+		m.hud.quest_start_toast("광장 북쪽의 오래된 돌문으로 가자")
+	else:
+		m.hud.event_toast("%d/%d" % [GameData.story20_told.size(),
+			GameData.STORY20_TELL.size()])
+	m.saveio.save_now()
+
+
+# 오래된 돌문 (E) — 언제나 그 자리에 있었지만, 열리는 건 오늘뿐이다
+func gate_examine() -> void:
+	if GameData.gate_open:
+		if GameData.story20_phase == "gate":
+			_enter_gate()
+			return
+		m.dialog.open("오래된 돌문",
+			"열린 채로 있다.\n안쪽에서 서늘하고 마른 바람이 불어온다.",
+			[["들어간다", _enter_gate], ["돌아선다", null]])
+		return
+	if GameData.story20_phase != "gate":
+		m.dialog.open("오래된 돌문",
+			"이끼 낀 돌기둥 둘과, 그 사이를 메운 검은 돌.\n밀어도 두드려도 꿈쩍하지 않는다.\n\n"
+			+ "(문 한가운데에 작은 홈이 일곱 개.\n무엇을 넣는 자리인지는 알 수 없다.)",
+			[["돌아선다", null]])
+		return
+	if int(GameData.items["water_life"]) < GameData.ENDING_SKILLS.size():
+		m.dialog.open("오래된 돌문",
+			"홈이 일곱 개. 생명의 물이 들어갈 자리다.\n\n지금 가진 병: %d/%d" % [
+				int(GameData.items["water_life"]), GameData.ENDING_SKILLS.size()],
+			[["돌아선다", null]])
+		return
+	m.dialog.open("오래된 돌문",
+		"홈이 일곱 개. 병도 일곱 개.\n\n(생명의 물을 전부 부으면 되돌릴 수 없다.)",
+		[["일곱 병을 붓는다", _pour_water], ["아직 아니다", null]])
+
+
+func _pour_water() -> void:
+	m.dialog.close()
+	if int(GameData.items["water_life"]) < GameData.ENDING_SKILLS.size():
+		return
+	GameData.items["water_life"] = 0
+	GameData.gate_open = true
+	Sound.play_sfx("sfx_catch")
+	m.worldgen.open_gate()
+	m.dialog.open_seq("", null, [
+		{"text": "(병을 하나씩 기울였다.\n맑은 물이 홈을 따라 흘러 들어간다.)"},
+		{"text": "(일곱 번째 병을 비운 순간 —\n돌 안쪽에서 오래 멈춰 있던 무언가가 움직였다.)"},
+		{"text": "(검은 돌이 좌우로 갈라진다.\n서늘하고 마른 바람. 그리고 아래로 뻗은 계단.)"},
+	], _after_gate_open)
+
+
+func _after_gate_open() -> void:
+	m.hud.event_toast("돌문이 열렸다")
+	m.hud.quest_start_toast("돌문 안으로 들어가자 (E)")
+	m.saveio.save_now()
+
+
+func _enter_gate() -> void:
+	m.dialog.close()
+	if GameData.story20_phase == "gate":
+		GameData.story20_phase = "inner"
+		m.saveio.save_now()
+	m.cave.open_last()
+
+
+# 봉인된 것을 물리치고 나면 나오는 보관함 — 씨앗 한 알과 마지막 편지
+func final_chest() -> void:
+	GameData.story20_phase = "letter"
+	GameData.seed_day = GameData.day
+	GameData.items["grandpa_seed"] = 1
+	GameData.discover("grandpa_seed")
+	Sound.play_sfx("sfx_coin")
+	m.dialog.open_seq("", null, [
+		{"text": "(그것이 흩어진 자리에, 낮은 나무 보관함이\n그대로 남아 있었다. 자물쇠도 없다.)"},
+		{"text": "(안에는 금도 보석도 없었다.\n손바닥만 한 천 주머니 하나와, 접힌 종이 한 장.)"},
+		{"text": "(주머니를 열자 씨앗이 한 알.\n한 번도 본 적 없는 씨앗이다.)"},
+		{"text": "『이 편지를 읽고 있다면, 자네는 일곱 갈래를\n모두 걸어 본 사람일 걸세.」"},
+		{"text": "「사람들은 내가 무언가 대단한 것을 찾으려\n땅을 파고 다녔다고 여겼지. ...아니었네.」"},
+		{"text": "「연구 노트는 수집이 아니었어.\n밭을 알고, 바다를 알고, 짐승을 알아야\n이 땅을 이해할 수 있다고 믿었을 뿐이야.」"},
+		{"text": "「그리고 그건, 그 사람이 살던 자리를\n이해하는 일이기도 했네.」"},
+		{"text": "「하나 늦게 깨달은 것이 있네 —\n연구도 소중했지만, 그 사람과 보낸 시간이\n그만큼, 아니 그보다 소중했다는 것.」"},
+		{"text": "「내 연구는 끝내 미완성이네.\n부끄럽지 않아. 다만 누군가 이어 주기를\n바랐을 뿐이지.」"},
+		{"text": "「자네는 이미 가장 중요한 것을 이어받았네.\n노트가 아니라, 이곳에서의 삶 말일세.」"},
+		{"text": "「씨앗 한 알을 남기네. 무엇이 열릴지는\n나도 모른다네. 심어 보게 — 다음으로 잇는,\n내가 줄 수 있는 마지막 선물이야.』"},
+		{"text": "(편지 끝에는 두 사람의 이름이\n나란히 적혀 있었다.)"},
+		{"text": "★ 할아버지의 씨앗을 얻었다."},
+	], _end_final_letter)
+
+
+func _end_final_letter() -> void:
+	m.cave.close()
+	m.hud.quest_start_toast("마을로 돌아가 하루를 마치자")
+	m.hud.show_message("돌문 밖으로 나왔다. 해가 기울고 있다.\n...내일 아침, 밭으로 나가자.", 7.0)
+	m.saveio.save_now()
+
+
+# 씨앗 심기 — 갈고(호미), 심고(E), 물 주고(물뿌리개). tool_use가 부른다
+func story20_till(t: Vector2i) -> void:
+	if GameData.story20_phase != "plant" or GameData.seed_tile.x >= 0:
+		return
+	if m.grid[t.y][t.x].ground != "soil":
+		return
+	m.hud.show_message("땅이 부드럽게 일궈졌다.\n할아버지의 씨앗을 심어 보자. (가방에서 씨앗을 들고 E)", 5.0)
+
+
+func story20_plant(t: Vector2i) -> bool:
+	if GameData.story20_phase != "plant" or GameData.seed_tile.x >= 0:
+		return false
+	if int(GameData.items["grandpa_seed"]) <= 0:
+		return false
+	if m.grid[t.y][t.x].ground != "soil" or m.objects.has(t):
+		return false
+	GameData.items["grandpa_seed"] = 0
+	GameData.seed_tile = t
+	GameData.seed_water = false
+	Sound.play_sfx("sfx_seed")
+	m.hud.quest_start_toast("심은 씨앗에 물을 주자")
+	m.dialog.open("할아버지의 씨앗",
+		"흙을 조금 파고, 씨앗을 눕히고, 다시 덮었다.\n처음 이 밭에 왔던 날처럼.\n\n(이제 물을 주자.)",
+		[["닫기", null]])
+	m.saveio.save_now()
+	return true
+
+
+func story20_water(t: Vector2i) -> void:
+	if GameData.story20_phase != "plant" or GameData.seed_water:
+		return
+	if t != GameData.seed_tile:
+		return
+	GameData.seed_water = true
+	Sound.play_sfx("sfx_harvest")
+	m.worldgen.spawn_seed_sprout()
+	m.dialog.open_seq("", null, [
+		{"text": "(물이 흙에 스며든다.\n한동안 아무 일도 일어나지 않았다.)"},
+		{"text": "(...흙이 조금 들썩였다.)"},
+		{"text": "(작은 새싹 하나가 고개를 내민다.\n어디서도 본 적 없는 빛깔이다.)"},
+	], _end_seed_sprout)
+
+
+func _end_seed_sprout() -> void:
+	if GameData.story20_phase != "plant":
+		return
+	GameData.story20_phase = "done"
+	GameData.note_last_line = true
+	m.hud.event_toast("새싹이 돋았다")
+	m.saveio.save_now()
+	m.ending.begin()
+
+
 # 온천에 몸을 담그러 온 주민의 이야기 — 마을이 달라졌다는 실감
 const ONSEN_LINES := {
 	"blacksmith": ["「크으... 이 맛이지. 화로 앞에서 굳은 어깨가\n싹 풀린다니까.」",
@@ -4077,23 +4280,6 @@ func _end_box_open() -> void:
 	m.saveio.save_now()
 
 
-# ---- 엔딩: 연화의 항아리 ----
-#
-# 연구 노트 100% + 생명의 물 여섯 병을 모아 연화를 찾아가면,
-# 항아리에 물을 붓고 「기억의 물약」을 만들어 준다. 마시고 잠들면
-# 꿈속 엔딩 시퀀스(ending_ui)로 이어진다.
-
-func _start_elixir_dialog() -> void:
-	m.dialog.open_seq("연화", m.tex["npc_forest_mom_portrait_normal"], [
-		{"text": "「그 병들... 그리고 그 유품들.\n...맙소사. 정말 다 모았구나.」"},
-		{"text": "「일곱 갈래 삶을 끝까지 갈고닦은 물과,\n할머님의 다섯 유품 —」"},
-		{"text": "「할아버지께서 말씀하셨어. 이것들이 다시\n한자리에 모이면, 꿈속에서 보고 싶은 사람을\n만날 수 있다고.」"},
-		{"text": "(연화가 낡은 항아리를 꺼내\n생명의 물을 한 병씩 천천히 부었다.)"},
-		{"text": "(항아리 속에서 은은한 빛이 피어오른다...)"},
-		{"text": "「자 — 「기억의 물약」이야.\n오늘 밤, 마시고 푹 자렴.」",
-			"portrait": m.tex["npc_forest_mom_portrait_happy"]},
-		{"text": "「좋은 꿈 꾸길. ...분명, 만나고 싶던 분들이\n기다리고 계실 거야.」"},
-	], _end_elixir)
 
 
 # ---- 주민 이사 시스템 — 일반/특수 주민의 입주와 이탈 ----
@@ -4301,15 +4487,3 @@ func open_farewell_letter() -> void:
 		[["편지를 접는다", null]])
 
 
-func _end_elixir() -> void:
-	if int(GameData.items["water_life"]) < GameData.ENDING_SKILLS.size() \
-			or GameData.relics_owned() < GameData.RELICS.size() \
-			or int(GameData.items["potion_dream"]) > 0 \
-			or GameData.dream_ready or GameData.dream_seen:
-		return
-	GameData.items["water_life"] = 0   # 일곱 병 모두 항아리로 (유품은 간직한다)
-	GameData.items["potion_dream"] = 1
-	GameData.discover("potion_dream")
-	m.hud.event_toast("기억의 물약을 얻었다!")
-	m.hud.show_message("가방(I)에서 기억의 물약을 마시고, 침대에서 잠들자.", 6.0)
-	m.saveio.save_now()

@@ -18,11 +18,7 @@ func request_sleep() -> void:
 	if Net.is_guest():
 		m.hud.show_message("하루는 호스트가 잠자리에 들어야 넘어간다.")
 	else:
-		# 기억의 물약을 마신 밤은 잠자리 문구부터 다르다
-		if GameData.dream_ready:
-			m.sleep_dialog.dialog_text = "왠지 아득한 졸음이 밀려온다...\n오늘 밤은 특별한 꿈을 꿀 것 같다."
-		else:
-			m.sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
+		m.sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
 		m.sleep_dialog.popup_centered()
 
 

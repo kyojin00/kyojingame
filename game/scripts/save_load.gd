@@ -455,6 +455,21 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.story19_shown = Array(d.get("story19_shown", []))
 	if GameData.story18_phase in ["hill", "box", "tale", "done"]:
 		m.worldgen.spawn_hill()   # 한 번 오른 언덕은 그대로 남는다
+	# ---- 메인 스토리 20 (가장 오래된 자리) ----
+	GameData.story20_phase = str(d.get("story20_phase", ""))
+	GameData.story20_told = Array(d.get("story20_told", []))
+	GameData.note_last_line = bool(d.get("note_last_line", false))
+	GameData.gate_open = bool(d.get("gate_open", false))
+	GameData.seed_day = int(d.get("seed_day", 0))
+	GameData.seed_water = bool(d.get("seed_water", false))
+	var st20: Array = Array(d.get("seed_tile", [-1, -1]))
+	GameData.seed_tile = Vector2i(int(st20[0]), int(st20[1])) if st20.size() == 2 \
+		else Vector2i(-1, -1)
+	m.worldgen.spawn_gate()          # 돌문은 언제나 그 자리에 있다
+	if GameData.gate_open:
+		m.worldgen.open_gate()
+	if GameData.seed_tile.x >= 0 and GameData.seed_water:
+		m.worldgen.spawn_seed_sprout()   # 돋아난 새싹은 엔딩 뒤에도 남는다
 	# 옛 세이브 보정 — 스토리 19가 열리기 전에 받아 둔 생명의 물이 있으면
 	# 이야기를 이미 시작한 것으로 본다 (병이 사라지지 않게)
 	if GameData.story19_phase == "" and not GameData.water_life_found.is_empty():

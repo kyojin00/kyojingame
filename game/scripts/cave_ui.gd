@@ -76,9 +76,29 @@ func _ready() -> void:
 
 
 var worldtree := false  # 세계수 동굴 모드 (강화 몬스터 + 3층 보스)
+var lastroom := false   # 돌문 안쪽 — 할아버지의 마지막 연구 공간 (메인 스토리 20)
+
+
+# 돌문 안쪽으로 들어간다 — 한 방뿐이고, 봉인된 것이 기다린다
+func open_last() -> void:
+	worldtree = false
+	lastroom = true
+	floor_num = 1
+	_gen_floor()
+	hurt_cd = 0.0
+	hurt_flash = 0.0
+	hitstop = 0.0
+	shake_t = 0.0
+	shake_off = Vector2.ZERO
+	kb_vel = Vector2.ZERO
+	dmg_pops.clear()
+	visible = true
+	Sound.play_sfx("sfx_place")
+	main.hud.show_message("계단 끝은 넓은 돌방이었다.\n벽마다 할아버지의 글씨 — 그리고 안쪽에서 무언가 움직인다.", 6.0)
 
 
 func open(wt: bool = false, start_floor: int = 1) -> void:
+	lastroom = false
 	if GameData.energy < 15.0:
 		main.hud.show_message("체력이 너무 낮다... 회복하고 오자. (요리를 먹거나 잠시 기다리기)")
 		return
@@ -108,6 +128,7 @@ func open(wt: bool = false, start_floor: int = 1) -> void:
 
 func close() -> void:
 	visible = false
+	lastroom = false
 	Sound.play_sfx("sfx_place")
 
 
@@ -175,7 +196,7 @@ func _gen_floor() -> void:
 	entry_pos = Vector2i(2, GH - 3)
 
 	# 층마다 모양을 바꾼다 (세계수 동굴은 언제나 너른 굴)
-	layout = "open" if worldtree else LAYOUTS[randi() % LAYOUTS.size()]
+	layout = "open" if (worldtree or lastroom) else LAYOUTS[randi() % LAYOUTS.size()]
 	special = ""
 	if not worldtree and floor_num > 1 and randf() < SPECIAL_CHANCE:
 		var keys: Array = SPECIALS.keys()
@@ -233,7 +254,7 @@ func _gen_floor() -> void:
 
 	# 발광 버섯 (스토리 10 「동굴과 탐험」) — 조사가 시작된 뒤, 3층부터
 	# 어두운 굴 바닥에 돋아난다. E로 딴다 (연구 노트 동굴 컬렉션 표본)
-	if GameData.story10_open() and not worldtree and floor_num >= 3:
+	if GameData.story10_open() and not worldtree and not lastroom and floor_num >= 3:
 		for i in randi_range(1, 2):
 			var sp := _free_tile(6.0)
 			if sp.x >= 0:
@@ -247,7 +268,13 @@ func _gen_floor() -> void:
 
 	# 몬스터 (층이 깊어질수록 종류/수 증가, 세계수 동굴은 2배 강함)
 	var hp_mult := 2 if worldtree else 1
-	if worldtree and floor_num == 3:
+	if lastroom:
+		# 봉인되어 있던 것 — 할아버지가 끝내 피해 다니던 존재와 그 그림자들
+		_spawn_mob("ghost", 70)
+		_spawn_mob("ghost", 10)
+		_spawn_mob("ghost", 10)
+		_spawn_mob("treant", 24)
+	elif worldtree and floor_num == 3:
 		# 보스층: 숲의 수호자 + 호위
 		_spawn_mob("treant", 40)
 		_spawn_mob("ghost", 4)
@@ -271,7 +298,8 @@ func _gen_floor() -> void:
 	# 찾아다니지 않고도 내려갈 수 있어야 「탐험」이 된다.
 	# (상자는 여전히 전멸 보상이다)
 	var st := _free_tile(minf(GW, GH) * 0.55)
-	stairs_pos = st if st.x >= 0 else Vector2i(GW - 3, 2)
+	stairs_pos = Vector2i(-1, -1) if lastroom \
+		else (st if st.x >= 0 else Vector2i(GW - 3, 2))
 	ppos = Vector2(OX + (entry_pos.x + 0.5) * TS, OY + (entry_pos.y + 0.5) * TS)
 	pdir = "right"
 	cam = ppos
@@ -543,6 +571,9 @@ func _floor_clear() -> void:
 	var p := _free_tile(0.0)
 	chest_pos = p if p.x >= 0 else Vector2i(GW / 2, GH / 2)
 	Sound.play_sfx("sfx_catch")
+	if lastroom:
+		main.hud.show_message("...조용해졌다.\n방 안쪽에 낮은 나무 보관함이 하나 남아 있다.", 6.0)
+		return
 	main.hud.show_message("%d층 클리어! 보상 상자가 나타났다!" % floor_num)
 
 
@@ -564,6 +595,11 @@ func _interact() -> void:
 			return
 	# 보상 상자
 	if chest_pos.x >= 0 and pt.distance_to(chest_pos) < 1.8:
+		if lastroom:
+			# 할아버지의 보관함 — 금도 보석도 아닌 것이 들어 있다
+			chest_pos = Vector2i(-1, -1)
+			main.story.final_chest()
+			return
 		var ore_n := 2 + floor_num
 		var gem_n := maxi(0, floor_num - 2)
 		if special == "vein":
@@ -796,7 +832,8 @@ func _draw_cave() -> void:
 	_draw_minimap()
 
 	# 상단 정보
-	var cave_name := "세계수 동굴" if worldtree else "동굴"
+	var cave_name := "할아버지의 마지막 방" if lastroom \
+		else ("세계수 동굴" if worldtree else "동굴")
 	var info := "%s %d층 · 몬스터 %d마리 · 체력 %d" % [cave_name, floor_num, monsters.size(), int(GameData.energy)]
 	if chest_pos.x >= 0:
 		info += " · 상자를 열자(E)!"

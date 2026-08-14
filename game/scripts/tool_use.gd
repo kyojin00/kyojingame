@@ -200,6 +200,7 @@ func use_tool() -> void:
 					if m.story.story16_dig_box(pos):
 						return
 					m.story.story16_field_work("till", pos)
+					m.story.story20_till(pos)
 				if worked:
 					Sound.play_sfx("sfx_hoe", 0.1)
 					m.tutorial_notify("till")
@@ -216,6 +217,7 @@ func use_tool() -> void:
 					m.farming._wet(c, m.WET_MANUAL)
 					m.renderer.spawn_particles(pos, "water")
 					worked = true
+					m.story.story20_water(pos)   # 할아버지의 씨앗에 주는 첫 물
 					revived = revived or was_thirsty
 			if worked:
 				Sound.play_sfx("sfx_water", 0.1)

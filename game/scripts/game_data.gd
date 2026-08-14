@@ -2003,6 +2003,53 @@ func note_last_page_open() -> bool:
 	return water_count() >= ENDING_SKILLS.size() and story19_phase != ""
 
 
+# ---- 메인 스토리 20: 가장 오래된 자리 (최종 엔딩) ----
+#
+# 세 가지가 다 갖춰져야 시작한다 — 연구 노트 100% · 유품 다섯 · 생명의 물
+# 일곱. 노트의 마지막 페이지가 가리키는 곳은 마을이 서기 훨씬 전부터
+# 광장 북쪽에 서 있던 **오래된 돌문**이다. 아무도 열지 못했고, 그래서
+# 아무도 신경 쓰지 않던 자리. 일곱 병을 홈에 부으면 문이 열리고, 그
+# 안쪽이 할아버지의 마지막 연구 공간이다.
+#   "": 아직 / tell: 사서·이장에게 보여주기 / gate: 돌문 앞으로 /
+#   inner: 돌문 안쪽 — 봉인된 것과의 마지막 / letter: 씨앗과 편지 /
+#   plant: 다음 날 농장에 씨앗 심기 / done: 엔딩을 보았다 (자유 생활 계속)
+var story20_phase := ""
+var note_last_line := false        # 노트 마지막 장에 플레이어가 남긴 한 줄
+var story20_told: Array = []       # 단서를 보여 준 사람 (서하·이장)
+var gate_open := false             # 돌문이 열렸다 (로드 후에도 열린 채)
+var seed_day := 0                  # 씨앗을 손에 넣은 날 — 다음 날 심는다
+var seed_tile := Vector2i(-1, -1)  # 씨앗을 심은 칸 (엔딩 후 자라난다)
+var seed_water := false            # 심은 뒤 물을 주었는가
+const STORY20_TELL := ["librarian", "chief"]
+
+
+func story20_ready() -> bool:
+	return story19_phase == "done" and relics_owned() >= RELICS.size() \
+		and note_progress().ratio >= 1.0
+
+
+func story20_objective_short() -> String:
+	match story20_phase:
+		"tell":
+			return "서하와 이장에게 마지막 페이지를 보여주자 (%d/%d)" % [
+				story20_told.size(), STORY20_TELL.size()]
+		"gate":
+			if gate_open:
+				return "돌문 안으로 들어가자 (E)"
+			return "광장 북쪽의 오래된 돌문 — 생명의 물 일곱 병 (E)"
+		"inner":
+			return "돌문 안쪽 — 할아버지가 피해 다니던 것이 기다린다"
+		"letter":
+			return "집으로 돌아가 하루를 마치자"
+		"plant":
+			if seed_tile.x < 0:
+				return "농장의 땅을 갈고 할아버지의 씨앗을 심자"
+			if not seed_water:
+				return "심은 씨앗에 물을 주자"
+			return "새싹이 돋았다"
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -2175,6 +2222,15 @@ func quest_catalog() -> Array:
 			"desc": "일곱 분야를 끝까지 익힌 사람에게 남겨지는 것.",
 			"cat": "main", "ep": "메인 스토리 19", "npc": "",
 			"reward": "생명의 물 7종 + 연구 노트 마지막 페이지"})
+	o = story20_objective_short()
+	if o != "":
+		var s20npc := ""
+		if story20_phase == "tell":
+			s20npc = "librarian" if "librarian" not in story20_told else "chief"
+		out.append({"id": "story20", "title": "가장 오래된 자리", "obj": o,
+			"desc": "마을보다 오래된 돌문 — 할아버지의 마지막 연구 공간.",
+			"cat": "main", "ep": "메인 스토리 20", "npc": s20npc,
+			"reward": "할아버지가 남긴 씨앗 한 알과 마지막 편지"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -2357,9 +2413,11 @@ func quest_npc_marks() -> Dictionary:
 			marks["merchant"] = "?"
 	if mom_quest_open() and mom_quest != "":
 		marks["forest_mom"] = "?"
-	# 엔딩 준비 완료 — 연화가 항아리를 꺼낼 차례다
-	if ending_ready():
-		marks["forest_mom"] = "!"
+	# 마지막 페이지를 보여줄 사람 — 서하와 이장 (메인 스토리 20)
+	if story20_phase == "tell":
+		for tid: String in STORY20_TELL:
+			if tid not in story20_told:
+				marks[tid] = "!"
 	# 떠나려는 주민 — 하고 싶은 말이 있다
 	if settler_leaving != "":
 		marks[settler_leaving] = "!"
@@ -2918,7 +2976,6 @@ const ITEMS := {
 	"forage_berry": {"name": "산딸기", "sell": 40},
 	# 엔딩 유품·물약 — 팔 수 없다
 	"water_life": {"name": "생명의 물", "sell": 0},
-	"potion_dream": {"name": "기억의 물약", "sell": 0},
 	"settle_letter": {"name": "이사 신청 편지", "sell": 0},
 	"farewell_letter": {"name": "짧은 작별 편지", "sell": 0},
 	"relic_hat": {"name": "할머니의 모자", "sell": 0},
@@ -2926,6 +2983,7 @@ const ITEMS := {
 	"relic_bracelet": {"name": "할머니의 팔찌", "sell": 0},
 	"relic_ring": {"name": "할머니의 반지", "sell": 0},
 	"relic_necklace": {"name": "할머니의 목걸이", "sell": 0},
+	"grandpa_seed": {"name": "할아버지의 씨앗", "sell": 0},
 	"weed": {"name": "잡초", "sell": 5},
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
@@ -2988,8 +3046,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
-	"water_life", "potion_dream", "relic_hat", "relic_watch",
-	"relic_bracelet", "relic_ring", "relic_necklace",
+	"water_life", "relic_hat", "relic_watch",
+	"relic_bracelet", "relic_ring", "relic_necklace", "grandpa_seed",
 	"settle_letter", "farewell_letter",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
@@ -3736,12 +3794,12 @@ func water_backfill() -> Array:
 	return got
 
 
-# 꿈속 엔딩으로 갈 준비가 됐는가 — 연화가 항아리를 꺼내 주는 조건
+# 마지막 이야기(스토리 20)의 세 가지 조건이 다 갖춰졌는가 —
+# 연구 노트 100% · 유품 다섯 · 생명의 물 일곱
 func ending_ready() -> bool:
 	return water_life_found.size() >= ENDING_SKILLS.size() \
 		and relics_owned() >= RELICS.size() \
-		and note_progress().ratio >= 1.0 and not dream_seen \
-		and int(items["potion_dream"]) == 0 and not dream_ready
+		and note_progress().ratio >= 1.0
 
 
 func playtime_text() -> String:
@@ -4847,6 +4905,8 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 18 — 할머니의 시계")
 	if story19_phase == "done":
 		out.append("메인 스토리 19 — 일곱 갈래의 삶")
+	if story20_phase == "done":
+		out.append("메인 스토리 20 — 가장 오래된 자리")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -5214,6 +5274,13 @@ func reset_all() -> void:
 	story18_done_day = 0
 	story19_phase = ""
 	story19_shown = []
+	story20_phase = ""
+	story20_told = []
+	note_last_line = false
+	gate_open = false
+	seed_day = 0
+	seed_tile = Vector2i(-1, -1)
+	seed_water = false
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -5598,6 +5665,10 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story18_phase": story18_phase, "story18_heard": story18_heard,
 		"story18_traces": story18_traces, "story18_done_day": story18_done_day,
 		"story19_phase": story19_phase, "story19_shown": story19_shown,
+		"story20_phase": story20_phase, "story20_told": story20_told,
+		"note_last_line": note_last_line, "gate_open": gate_open,
+		"seed_day": seed_day, "seed_water": seed_water,
+		"seed_tile": [seed_tile.x, seed_tile.y],
 		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,

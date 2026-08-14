@@ -44,6 +44,8 @@ func _build_map() -> void:
 	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
 	m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
 	m.objects[m.WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
+	# 오래된 돌문 (메인 스토리 20) — 마을보다 오래된 자리라 처음부터 있다
+	m.objects[m.GATE_POS] = {"kind": "old_gate", "hp": 0}
 
 	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in m.MAP_W:
@@ -403,6 +405,38 @@ func spawn_old_barn() -> void:
 			m.objects.erase(m.OLD_BARN + Vector2i(dx, dy))
 	m.objects[m.OLD_BARN] = {"kind": "old_barn", "hp": 0}
 	m.objnode._spawn_objects()
+	m.queue_redraw()
+
+
+# 오래된 돌문 (메인 스토리 20) — 마을이 서기 훨씬 전부터 그 자리에 있었다.
+# 처음부터 세워 두고, 열리기 전에는 그저 열리지 않는 돌일 뿐이다.
+func spawn_gate() -> void:
+	var t: Vector2i = m.GATE_POS
+	if str(m.objects.get(t, {}).get("kind", "")) == "old_gate":
+		return
+	for y in range(t.y - 1, t.y + 2):
+		for x in range(t.x - 1, t.x + 2):
+			m.objnode._remove_object(Vector2i(x, y))
+	m.objects[t] = {"kind": "old_gate", "hp": 0}
+	m.objnode._spawn_objects()
+	m.queue_redraw()
+
+
+# 문이 열린 표시 — 돌문 그림을 밝게 띄운다 (칸은 그대로 막혀 있다)
+func open_gate() -> void:
+	spawn_gate()
+	if m.obj_nodes.has(m.GATE_POS):
+		var spr: Sprite2D = m.obj_nodes[m.GATE_POS].get_child(0)
+		spr.modulate = Color(1.25, 1.2, 1.0)
+
+
+# 할아버지의 씨앗에서 돋은 새싹 (메인 스토리 20) — 엔딩 뒤에도 남는다
+func spawn_seed_sprout() -> void:
+	var t: Vector2i = GameData.seed_tile
+	if t.x < 0 or m.objects.has(t):
+		return
+	m.objects[t] = {"kind": "seed_sprout", "hp": 0}
+	m.objnode._spawn_object_node(t, "seed_sprout")
 	m.queue_redraw()
 
 

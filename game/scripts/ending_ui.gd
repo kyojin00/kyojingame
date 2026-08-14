@@ -8,7 +8,7 @@
 extends CanvasLayer
 
 var main: Node2D
-var phase := ""            # "" / dream / stats / credits / outro
+var phase := ""            # "" / town / stats / note / credits / outro
 var _bg: ColorRect
 var _root: Control
 var _timer := 0.0
@@ -38,7 +38,7 @@ func begin() -> void:
 	main.dialog.close()
 	visible = true
 	_make_root()
-	_start_dream()
+	_start_town()
 	Sound.stop_bgm()
 
 
@@ -82,28 +82,29 @@ func _process(delta: float) -> void:
 		_advance()
 
 
-# ---- 꿈속: 할아버지·할머니 ----
+# ---- 새싹이 돋은 아침, 달라진 마을 ----
 
-func _start_dream() -> void:
-	phase = "dream"
+func _start_town() -> void:
+	phase = "town"
 	_idx = 0
 	_timer = 0.0
 	var nm := GameData.player_name
-	var who := "손자" if GameData.gender == "m" else "손녀"
-	var call_name := ("나의 자랑스런 %s %s야." % [who, nm]) if nm != "" \
-		else ("나의 자랑스런 %s야." % who)
+	var call_name := ("%s의 밭" % nm) if nm != "" else "그 사람의 밭"
 	_lines = [
-		["", "(포근한 빛 속 — 어디선가 그리운 목소리가 들려온다.)"],
-		["할아버지", "「왔구나. ...많이 컸네, 우리 강아지.」"],
-		["할머니", "「먼 길을 혼자서도 씩씩하게 왔구나.\n밭도, 바다도, 마을도... 전부 지켜보고 있었단다.」"],
-		["할아버지", "「자신의 유품을 찾아줘서 고맙다.\n%s\n정말 고마웠단다.」" % call_name],
-		["할머니", "「네가 흘린 땀방울 하나하나가\n우리에겐 전부 편지였어.」"],
-		["할아버지", "「이제 네 이야기를 들려주렴 —\n네가 걸어온 그 눈부신 날들을.」"],
+		["", "(새싹 하나가 아침 볕을 받고 서 있다.\n어제까지 아무것도 없던 자리에.)"],
+		["", "(밭에서 마을 쪽을 올려다본다.\n처음 이 땅에 발을 디디던 날이 떠오른다.)"],
+		["", "(그때 마을에는 이장의 낡은 오두막 하나뿐이었다.)"],
+		["", "(지금은 상점의 차양이 펄럭이고,\n도서관 창가에 불이 켜져 있다.)"],
+		["", "(대장간 화로에서 연기가 오르고,\n목장 울타리 너머로 짐승들이 울음을 낸다.)"],
+		["", "(회관 앞에서는 벌써 다음 축제 이야기가 오간다.\n온천에서는 누군가 어깨를 두드리고 있다.)"],
+		["", "(숲속 오두막의 굴뚝에서도 가느다란 연기.\n연금술사도 오늘은 불을 지폈나 보다.)"],
+		["", "(그리고 %s.\n여기서부터 전부 시작됐다.)" % call_name],
+		["", "(할아버지의 연구는 여기서 끝났다.\n...하지만 이곳에서의 삶은 아직 끝나지 않았다.)"],
 	]
-	_show_dream_line()
+	_show_town_line()
 
 
-func _show_dream_line() -> void:
+func _show_town_line() -> void:
 	for c in _root.get_children():
 		c.queue_free()
 	# 프롤로그의 할아버지 그림이 꿈의 빛무리 위에 떠오른다
@@ -113,7 +114,7 @@ func _show_dream_line() -> void:
 	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(glow)
 	var pic := TextureRect.new()
-	pic.texture = main.tex.get("prologue_grandpa_0")
+	pic.texture = main.tex.get("prologue_farm_0", main.tex.get("prologue_grandpa_0"))
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	pic.custom_minimum_size = Vector2(504, 216)
@@ -379,7 +380,7 @@ func _start_outro() -> void:
 	t1.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(t1)
 	var t2 := Label.new()
-	t2.text = "함께해 주어 고맙습니다.\n그리고 — 교진 마을의 나날은 계속됩니다."
+	t2.text = "함께해 주어 고맙습니다.\n그리고 — 교진 마을의 나날은 계속됩니다.\n(밭의 새싹은 앞으로도 자랍니다)"
 	t2.position = Vector2(0, 265)
 	t2.size = Vector2(960, 70)
 	t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -388,7 +389,7 @@ func _start_outro() -> void:
 	t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(t2)
 	var b := Button.new()
-	b.text = "꿈에서 깨어나기"
+	b.text = "마을로 돌아간다"
 	b.focus_mode = Control.FOCUS_NONE
 	b.position = Vector2(400, 380)
 	b.size = Vector2(160, 42)
@@ -396,22 +397,61 @@ func _start_outro() -> void:
 	_root.add_child(b)
 
 
+# ---- 연구 노트의 마지막 줄 — 플레이어가 남기는 기록 ----
+
+func _start_note() -> void:
+	phase = "note"
+	_timer = 0.0
+	for c in _root.get_children():
+		c.queue_free()
+	var t1 := Label.new()
+	t1.text = "할아버지의 연구 노트  ―  100%"
+	t1.position = Vector2(0, 150)
+	t1.size = Vector2(960, 40)
+	t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t1.add_theme_font_size_override("font_size", 24)
+	t1.add_theme_color_override("font_color", COL_GOLD)
+	t1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(t1)
+	var t2 := Label.new()
+	t2.text = "마지막 장에는, 이 노트를 이어받은 사람의 글씨로\n한 줄이 새로 적혀 있다."
+	t2.position = Vector2(0, 205)
+	t2.size = Vector2(960, 60)
+	t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t2.add_theme_font_size_override("font_size", 15)
+	t2.add_theme_color_override("font_color", COL_DIM)
+	t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(t2)
+	var t3 := Label.new()
+	t3.text = "「할아버지의 연구는 끝났지만,\n이곳에서의 삶은 아직 끝나지 않았다.」"
+	t3.position = Vector2(0, 285)
+	t3.size = Vector2(960, 80)
+	t3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	t3.add_theme_font_size_override("font_size", 20)
+	t3.add_theme_color_override("font_color", COL_TEXT)
+	t3.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(t3)
+	_hint("클릭: 계속")
+
+
 # ---- 진행 ----
 
 func _advance() -> void:
 	match phase:
-		"dream":
+		"town":
 			_idx += 1
 			_timer = 0.0
 			if _idx >= _lines.size():
 				_start_stats()
 			else:
-				_show_dream_line()
+				_show_town_line()
 		"stats":
 			if _idx < _lines.size():
 				_reveal_next_stat()   # 클릭하면 다음 줄이 바로 떠오른다
 			else:
-				_start_credits()
+				_start_note()
+		"note":
+			_start_credits()
 		"credits":
 			_idx += 1
 			_timer = 0.0
@@ -424,9 +464,9 @@ func _advance() -> void:
 				wake()
 
 
-# 꿈에서 깨어난다 — 다음 날 아침, 자유 플레이가 이어진다
-# (advance_day=false 는 검증 하네스 전용 — 날짜 전환 없이 상태만 확인)
-func wake(advance_day := true) -> void:
+# 엔딩이 끝난다 — 세이브는 그대로, 하던 자리에서 자유 생활이 이어진다
+# (advance_day는 남겨 두지만 이제 날짜를 넘기지 않는다 — 후일담이 계속된다)
+func wake(_advance_day := true) -> void:
 	if not visible:
 		return
 	phase = ""
@@ -437,7 +477,6 @@ func wake(advance_day := true) -> void:
 	GameData.dream_seen = true
 	main.story_cutscene = false
 	main.hud.visible = true
-	if advance_day:
-		main.daycycle._fade_next_day(false)
-	main.hud.show_message("...꿈에서 깨어났다. 눈가가 조금 젖어 있다.\n창밖에는 여느 때와 같은 아침이 와 있다.", 7.0)
+	main.hud.story_banner("메인 스토리 20 완결", "가장 오래된 자리")
+	main.hud.show_message("교진 마을의 나날은 계속된다.\n새싹은 내일도, 그다음 날도 자랄 것이다.", 8.0)
 	main.saveio.save_now()
