@@ -21,10 +21,16 @@ var code := ""                # 열어 둔 방 코드 (호스트만)
 var _beat := 0.0
 
 
+# 로그인했으면 그 계정 토큰, 아니면 공개 키 (오토로드는 실행할 때 집는다)
+func _bearer() -> String:
+	var a := get_node_or_null("/root/Auth")
+	return str(a.bearer()) if a != null else KEY
+
+
 func _headers() -> PackedStringArray:
 	return PackedStringArray([
 		"apikey: " + KEY,
-		"Authorization: Bearer " + Auth.bearer(),
+		"Authorization: Bearer " + _bearer(),
 		"Content-Type: application/json",
 	])
 

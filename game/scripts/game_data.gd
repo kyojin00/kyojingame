@@ -244,8 +244,11 @@ var farm_id := ""
 # 장터에서 「내 농장」을 가리키는 값. 로그인했으면 **서버가 발급한 계정 id**를
 # 쓰고(그 편이 안전하다), 아니면 이 컴퓨터가 만든 farm_id로 버틴다.
 func farm_key() -> String:
-	if Auth.signed_in():
-		return Auth.uid
+	# 오토로드를 이름으로 부르면 등록 순서에 걸려 파싱이 깨질 수 있어
+	# 실행할 때 노드로 집는다 (없으면 예전 방식 그대로)
+	var a := get_node_or_null("/root/Auth")
+	if a != null and a.signed_in():
+		return str(a.uid)
 	return farm_id
 
 
