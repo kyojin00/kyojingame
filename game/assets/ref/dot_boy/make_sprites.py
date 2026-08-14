@@ -265,12 +265,17 @@ def legs_down(g, stride, dx=0, sq=0):
         # 들린 다리는 무릎 아래가 안쪽으로 접힌다 (정면에서 본 무릎 굽힘)
         bend = (1 if x0 == 11 else -1) if lift >= 2 else 0
         knee_row = (top + GROUND - lift) // 2
+        # 쪼그릴 때(휘두르기 내리침)는 디딘 무릎이 바깥으로 불거진다 —
+        # 무릎 언저리만 한 칸 밀고 발은 디딘 자리에 남아 다리가 굽어 보인다
+        flare = (-1 if x0 == 11 else 1) if (sq >= 2 and not lift) else 0
         outer = x0 if x0 == 11 else x0 + 3     # 빛 받는 바깥 열 (왼쪽 다리만)
         for yy in range(top, GROUND - 3 - lift):
             t = (yy - (HIP_Y + 2 + sq)) / (GROUND - HIP_Y - 2 - sq)
             off = round(dx * (1 - t))          # 엉덩이 쪽만 dx만큼 쏠린다
             if yy > knee_row:
                 off += bend
+            if flare and knee_row - 1 <= yy <= knee_row + 1:
+                off += flare
             g.rect(x0 + off, yy, x0 + 3 + off, yy, pc)
             g.px(inner + off, yy, 'P')
             if not lift and x0 == 11:
@@ -487,8 +492,8 @@ SWING = {
     'down': {'skip': 'left', 'shoulder': (9, 21),
              'poses': [((5, 16), (5, 19), -1, 0, False),
                        ((3, 7), (2, 14), -2, 0, False),
-                       ((1, 13), (4, 16), -1, 0, False),
-                       ((8, 25), (4, 24), 0, 2, False),
+                       ((2, 16), (2, 11), -1, 0, False),
+                       ((8, 27), (4, 26), 0, 2, False),
                        ((6, 19), (3, 21), 0, 0, False)]},
     # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽 — 어깨 옆으로 감아올려
     # 정수리 너머 저편으로 내리친다. 휘두름부터는 팔이 머리 저쪽(=캐릭터의
@@ -566,11 +571,14 @@ def swing_frame(direction, phase):
         torso_up(g, sq, 0, dx, skip=spec['skip'])
     art = PARTS[direction][0]
     sx, sy = spec['shoulder']
+    # 내리치는 칸은 머리를 한 칸 더 움츠린다 — 어깨 사이로 목이 파묻히는
+    # 크런치가 있어야 팔만 도는 게 아니라 온몸으로 찍는 느낌이 난다
+    hb = sq + (1 if (direction == 'down' and phase == 3) else 0)
     if behind:
         arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
-        head(g, art, sq, dx)                   # 머리가 팔을 덮고 도구만 저편에
+        head(g, art, hb, dx)                   # 머리가 팔을 덮고 도구만 저편에
     else:
-        head(g, art, sq, dx)
+        head(g, art, hb, dx)
         arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
     g.outline()
     return g

@@ -117,7 +117,7 @@ const SWING_HAND_DOT := {
 	# 닿는 왼쪽 옆에서 그대로 내리 긋고(가운데까지 억지로 안 끌고 간다),
 	# 뒷모습은 정수리 너머 저편으로 넘어가 주먹이 머리에 가려진다.
 	"side": [Vector2(-17, -63), Vector2(-17, -75), Vector2(21, -67), Vector2(19, -31), Vector2(17, -43)],
-	"down": [Vector2(-19, -59), Vector2(-23, -77), Vector2(-27, -65), Vector2(-13, -41), Vector2(-17, -53)],
+	"down": [Vector2(-19, -59), Vector2(-23, -77), Vector2(-25, -59), Vector2(-13, -37), Vector2(-17, -53)],
 	"up": [Vector2(19, -63), Vector2(19, -77), Vector2(9, -89), Vector2(3, -79), Vector2(19, -69)],
 }
 const TOOL_ICONS := {
