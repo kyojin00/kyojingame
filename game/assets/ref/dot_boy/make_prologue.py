@@ -80,6 +80,20 @@ def mix(c0, c1, k):
     return tuple(round(a + (b - a) * k) for a, b in zip(c0, c1))
 
 
+def speckle(g, rnd, x0, y0, x1, y1, colors, n, dash=0):
+    """영역에 낱알 도트를 흩뿌린다 — 판판한 면이 손으로 찍은 듯 거칠어진다.
+    dash>0 이면 점 대신 짧은 가로획(1~dash칸)을 긋는다."""
+    for _ in range(n):
+        x = rnd.randrange(x0, x1)
+        y = rnd.randrange(y0, y1)
+        c = colors[rnd.randrange(len(colors))]
+        if dash:
+            for k in range(rnd.randrange(1, dash + 1)):
+                g.p(x + k, y, c)
+        else:
+            g.p(x, y, c)
+
+
 # ------------------------------------------------------------- 레트로 마감
 # 바랜 필름 톤(뜬 검정·주저앉은 파랑) -> 비네트 -> 오더드 디더링 + 색 계단.
 BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
@@ -172,6 +186,18 @@ def scene_grandpa(g, f):
         yf = int(92 - 9 * math.sin(x / 33.0))
         for y in range(yf, H):
             g.p(x, y, HILL)
+    # 언덕 낱알 질감 — 판판한 실루엣이 손으로 찍은 듯 거칠어진다
+    for _ in range(170):
+        x = rnd.randrange(W)
+        yf = int(92 - 9 * math.sin(x / 33.0))
+        if yf < H - 1:
+            g.p(x, rnd.randrange(yf, H), (24, 22, 42))
+    for _ in range(110):
+        x = rnd.randrange(W)
+        yb = int(82 - 7 * math.sin(x / 46.0 + 1.2))
+        yf = int(92 - 9 * math.sin(x / 33.0))
+        if yb < yf - 1:
+            g.p(x, rnd.randrange(yb, yf), (34, 34, 64))
     # 풀 — 홀수 포기는 바람에 흔들린다
     for i in range(56):
         x = rnd.randrange(W)
@@ -223,6 +249,7 @@ def scene_box(g, f):
     for _ in range(60):                             # 판자 나뭇결
         x, y = rnd.randrange(W), rnd.randrange(56)
         g.rect(x, y, x + rnd.randrange(2, 6), y, (36, 24, 18))
+    speckle(g, rnd, 0, 0, W, 57, [(26, 18, 14), (42, 30, 22), (36, 24, 18)], 240)
     # 벽에 걸린 낡은 지도
     g.rrect(16, 12, 60, 42, (120, 104, 76), 3)
     g.rect(18, 12, 58, 13, (86, 72, 52))
@@ -255,6 +282,8 @@ def scene_box(g, f):
     for _ in range(40):                             # 탁자 나뭇결
         x, y = rnd.randrange(W), rnd.randrange(60, H - 2)
         g.rect(x, y, x + rnd.randrange(3, 8), y, (82, 56, 34))
+    speckle(g, rnd, 0, 60, W, H - 1,
+            [(72, 50, 30), (94, 64, 40), (114, 80, 48)], 190, dash=2)
     g.rect(0, 58, W - 1, 58, (128, 92, 56))
     # 밧줄 뭉치 (상자 오른쪽)
     for ring, rr in ((0, 7), (1, 5), (2, 3)):
@@ -283,6 +312,8 @@ def scene_box(g, f):
     for _ in range(26):                             # 상자 나뭇결
         x, y = rnd.randrange(bx0 + 2, bx1 - 2), rnd.randrange(by0 + 2, by1 - 2)
         g.rect(x, y, x + rnd.randrange(2, 5), y, (120, 86, 48))
+    speckle(g, rnd, bx0 + 2, by0 + 2, bx1 - 1, by1 - 1,
+            [(122, 86, 48), (144, 106, 60)], 90)
     g.rect(bx0 + 3, by0, bx1 - 3, by0 + 1, (160, 118, 68))
     for x0 in (bx0, bx1 - 5):                       # 모서리 쇠장식 + 못
         g.rrect(x0, by0, x0 + 5, by0 + 6, (118, 120, 126), 3)
@@ -337,6 +368,7 @@ def scene_letter(g, f):
     for _ in range(50):                             # 탁자 나뭇결
         x, y = rnd.randrange(W), rnd.randrange(H)
         g.rect(x, y, x + rnd.randrange(3, 8), y, (52, 36, 26))
+    speckle(g, rnd, 0, 0, W, H, [(34, 24, 18), (56, 40, 28)], 150)
     # 잉크병 (왼쪽 위 구석)
     g.rrect(8, 14, 24, 34, (44, 52, 72), 3)
     g.rect(10, 14, 22, 16, (60, 70, 94))
@@ -359,6 +391,9 @@ def scene_letter(g, f):
     for _ in range(180):                            # 종이 질감
         x, y = rnd.randrange(32, 221), rnd.randrange(9, 99)
         g.p(x, y, (226, 210, 175))
+    speckle(g, rnd, 32, 9, 221, 99,
+            [(224, 208, 172), (240, 228, 198), (216, 198, 160)], 320)
+    speckle(g, rnd, 32, 9, 221, 99, [(214, 196, 158)], 70, dash=2)  # 섬유결
     for x in range(33, 222):                        # 접힌 자국
         g.p(x, 38, (212, 196, 160))
         g.p(x, 68, (212, 196, 160))
@@ -468,12 +503,18 @@ def scene_farm(g, f):
         x = rnd.randrange(hx0 + 1, hx0 + 43)
         y = rnd.randrange(hy0 + 13, hy0 + 35)
         g.p(x, y, (136, 96, 54))
-    for i in range(13):                             # 지붕 (처마 끝은 둥글게)
-        cut = 1 if i < 2 else 0
-        g.rect(hx0 - 6 + i + cut, hy0 + i, hx0 + 50 - i - cut, hy0 + i, (118, 66, 52))
-    g.p(hx0 - 5, hy0 + 2, (118, 66, 52))            # 처마 밑 둥근 마감
-    g.p(hx0 + 49, hy0 + 2, (118, 66, 52))
+    # 지붕 — 위(용마루)가 좁고 아래(처마)가 넓은 세모꼴. 처마 끝은 둥글게
+    for i in range(13):
+        half = 4 + round(24 * i / 12.0)
+        cut = 1 if i >= 11 else 0
+        g.rect(hx0 + 22 - half + cut, hy0 + i, hx0 + 22 + half - cut, hy0 + i,
+               (118, 66, 52))
+    g.rect(hx0 + 19, hy0 - 1, hx0 + 25, hy0 - 1, (134, 78, 60))   # 용마루 마감
     g.rect(hx0 - 5, hy0 + 12, hx0 + 49, hy0 + 13, (86, 48, 38))
+    for i in range(30):                             # 지붕 널 질감
+        x = rnd.randrange(hx0 + 22 - (4 + 2 * (i % 12)), hx0 + 22 + 4 + 2 * (i % 12))
+        y = hy0 + (i % 12)
+        g.p(x, y, (104, 58, 46))
     for x, y in ((hx0 + 26, hy0 + 3), (hx0 + 30, hy0 + 4), (hx0 + 27, hy0 + 6),
                  (hx0 + 32, hy0 + 6), (hx0 + 29, hy0 + 8)):
         g.p(x, y, (60, 36, 30))
@@ -491,8 +532,10 @@ def scene_farm(g, f):
     g.rrect(hx0 + 5, hy0 + 20, hx0 + 12, hy0 + 27, (58, 62, 74), 2)
     g.rect(hx0 + 8, hy0 + 21, hx0 + 8, hy0 + 26, (96, 66, 40))
     g.p(hx0 + 6, hy0 + 21, (108, 114, 128))         # 유리 반사
-    g.rrect(hx0 + 38, hy0 - 8, hx0 + 43, hy0 + 2, (110, 84, 66), 2)
-    g.rect(hx0 + 39, hy0 - 8, hx0 + 42, hy0 - 7, (128, 100, 80))
+    g.rrect(hx0 + 30, hy0 - 6, hx0 + 35, hy0 + 6, (110, 84, 66), 2)
+    g.rect(hx0 + 31, hy0 - 6, hx0 + 34, hy0 - 5, (128, 100, 80))
+    g.p(hx0 + 31, hy0 - 1, (96, 72, 56))            # 굴뚝 벽돌 자국
+    g.p(hx0 + 33, hy0 + 2, (96, 72, 56))
     # 큰 나무 — 잎이 반짝이고 낙엽이 진다
     tx, ty = 36, 62
     g.rect(tx - 2, ty - 18, tx + 2, ty, (98, 66, 40))
