@@ -10,16 +10,17 @@ extends CanvasLayer
 const TS := 32.0         # 타일 (논리 픽셀)
 const OX := 0.0
 const OY := 0.0
-const ZOOM := 1.0        # 화면에 그릴 때의 배율 — 바깥 맵과 같게 (한 칸 32px)
+const ZOOM := 0.56       # 화면에 그릴 때의 배율 — 바깥 카메라(CAMERA_ZOOM)와 똑같이
 const VIEW := Vector2(960.0, 540.0)
 
-# 배율을 바깥과 같게(1.0) 낮추면서 한 화면에 보이는 칸이 늘었다 —
-# 「탐험」이 남으려면 층이 그만큼 넓어야 해서 기본 크기도 같이 키웠다
-const CAVE_W_BASE := 58  # 1층 크기
-const CAVE_H_BASE := 36
-const CAVE_GROW := 2     # 한 층 내려갈 때마다 (가로/세로)
-const CAVE_W_MAX := 96
-const CAVE_H_MAX := 64
+# 줌을 낮출 때마다 한 화면에 보이는 칸이 늘어난다 —
+# 「탐험」이 남으려면 층이 그만큼 넓어야 해서 기본 크기도 같이 키운다
+# (한 화면 53.6 x 30.1칸 · 층은 그 1.8배 이상)
+const CAVE_W_BASE := 100  # 1층 크기
+const CAVE_H_BASE := 58
+const CAVE_GROW := 2      # 한 층 내려갈 때마다 (가로/세로)
+const CAVE_W_MAX := 140
+const CAVE_H_MAX := 96
 
 var GW := CAVE_W_BASE
 var GH := CAVE_H_BASE

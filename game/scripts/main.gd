@@ -392,7 +392,8 @@ const BUILDING_NAMES := {
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 # 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
-const CAMERA_ZOOM := 0.8                   # 1200 x 675 월드 픽셀 = 37.5 x 21 타일
+const CAMERA_ZOOM := 0.56                  # 1714 x 964 월드 픽셀 = 53.6 x 30 타일
+# (0.8에서 0.7배 더 줌 아웃 — 화면에 담기는 세상이 한층 넓다)
 const UI_FONT := preload("res://assets/fonts/Galmuri11.ttf")
 const UI_FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
 
