@@ -1000,6 +1000,39 @@ func story4_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 6: 오래된 책과 사서 ----
+#
+# 스토리 5(숲속에서 발견한 집)를 끝내면 마을 어딘가 풀숲에 오래된 책이
+# 놓인다. 책 -> 이장(모름) -> 우체부 편지 -> 며칠 뒤 사서 방문 ->
+# 도서관 필요성 -> 이장 상의 -> 도서관 건설 -> 사서 정착 순서.
+# 사서 서하는 도서관이 완성되고 정착 대화를 마쳐야 정식 주민이 된다.
+var story6_phase := ""   # ""→find(책 놓임)→show_chief→ask_post→wait→visit→told→build→done
+var story6_day := 0      # 편지를 부친 날 — 이틀 뒤 답장이 온다
+const STORY6_REPLY_DAYS := 2
+# 오래된 책 보관 여부 — 완결 후 도서관 서가로 옮겨진다 (판매·삭제 금지,
+# 다음 메인 스토리에서 다시 꺼내 쓴다)
+var old_book_stored := false
+
+
+func story6_objective_short() -> String:
+	match story6_phase:
+		"show_chief":
+			return "오래된 책을 이장에게 보여주자 (E)"
+		"ask_post":
+			return "우체부 아저씨에게 편지를 부탁하자 (우체국 터 앞)"
+		"wait":
+			return "사서의 답장을 기다리자 (며칠 걸린다)"
+		"visit":
+			return "마을에 찾아온 사서를 만나보자 (광장)"
+		"told":
+			return "사서의 이야기를 이장에게 전하자 (E)"
+		"build":
+			if village_built.has("library"):
+				return "도서관이 완성됐다 — 사서에게 말을 걸자"
+			return "도서관을 짓자 — 이장 「마을 발전 이야기」 (목재 90·석재 50)"
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1055,6 +1088,16 @@ func quest_catalog() -> Array:
 			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다.",
 			"cat": "main", "ep": "메인 스토리 4", "npc": "chief",
 			"reward": "마을 확장 해금"})
+	o = story6_objective_short()
+	if o != "":
+		var s6map := {"show_chief": "chief", "ask_post": "postman",
+			"wait": "postman", "visit": "librarian", "told": "chief",
+			"build": "librarian"}
+		var s6npc: String = str(s6map.get(story6_phase, "chief"))
+		out.append({"id": "story6", "title": "오래된 책과 사서", "obj": o,
+			"desc": "풀숲에서 파낸 오래된 책 — 마을의 기록일지도 모른다.",
+			"cat": "main", "ep": "메인 스토리 6", "npc": s6npc,
+			"reward": "도서관 해금 + 사서 정착"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1145,6 +1188,14 @@ func quest_npc_marks() -> Dictionary:
 			marks["forest_mom"] = "!"
 	if story4_phase == "ask":
 		marks["chief"] = "!"
+	match story6_phase:
+		"show_chief", "told":
+			marks["chief"] = "!"
+		"visit":
+			marks["librarian"] = "!"
+		"build":
+			if village_built.has("library"):
+				marks["librarian"] = "!"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -1701,6 +1752,8 @@ const ITEMS := {
 	"bait": {"name": "미끼", "sell": 2},
 	"housing_kit": {"name": "집터", "sell": 0},
 	"move_letter": {"name": "이주 희망 편지", "sell": 0},
+	# 메인 스토리 6의 핵심 물건 — 팔 수 없고, 완결 후 도서관에 보관된다
+	"old_book": {"name": "오래된 책", "sell": 0},
 	"trash_bin": {"name": "쓰레기통", "sell": 0},
 	# 초반 무기 (도구라 개수는 없지만, 도감·컬렉션 표시용 이름이 필요하다)
 	"spear": {"name": "돌 창", "sell": 0},
@@ -1750,7 +1803,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"housing_kit", "move_letter", "trash_bin", "arrow", "dish_coral_tea",
+	"housing_kit", "move_letter", "old_book", "trash_bin", "arrow", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -2796,8 +2849,47 @@ const NPCS := {
 	"likes": ["forage_shell", "bug_butterfly", "dish_punch"],
 	"hates": ["sludge", "potion_ember"],
 	},
+	# 사서 서하 — 메인 스토리 6에서 오래된 책을 보러 왔다가 정착한다
+	"librarian": {"name": "서하", "birthday": [WINTER, 15], "romance": false,
+	"lines": [
+		"책장 넘기는 소리가 세상에서 제일 좋아요.",
+		"기록은 거짓말을 하지 않아요. 사람이 잊을 뿐이죠.",
+		"오래된 책은 함부로 펼치면 안 돼요. 종이가 바스러지거든요.",
+		"읽고 싶은 책이 있으면 언제든 도서관으로 오세요.",
+		"이 마을, 기록할 이야기가 많은 곳이에요.",
+	],
+	"season": {
+		SPRING: ["봄볕에 책을 말리기 좋은 계절이에요.",
+			"꽃가루가 책에 앉으면 얼룩이 져요. 조심조심."],
+		SUMMER: ["습기가 책의 적이에요. 요즘은 매일 서가를 살펴요.",
+			"여름엔 시원한 도서관이 최고죠?"],
+		FALL: ["독서의 계절이라고들 하죠. 저는 사계절 다지만요.",
+			"낙엽을 책갈피로 쓰면 근사해요."],
+		WINTER: ["겨울밤엔 난로 곁에서 책 한 권. 그게 전부예요.",
+			"눈 오는 소리를 들으며 책을 정리하고 있었어요."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["빗소리를 들으며 읽는 책이 제일 잘 읽혀요."],
+		WEATHER_SNOW: ["눈이 오네요. 책 배달은 못 오겠어요."],
+		WEATHER_STORM: ["폭풍이에요! 창문 틈으로 물이 새면 큰일인데..."],
+		WEATHER_FOG: ["안개 낀 날엔 옛이야기가 잘 어울려요."],
+		WEATHER_STAR: ["별이 쏟아지는 밤이에요. 천문 서적을 꺼내 볼까요."],
+	},
+	"morning": ["아침 공기 속에서 책 정리를 하면 하루가 개운해요."],
+	"night": ["밤 독서는 좋지만... 눈 버려요. 일찍 쉬세요."],
+	"aff30": ["당신이 오는 날은 책 정리가 빨리 끝나요. 이상하죠?",
+		"좋아할 만한 책을 골라 뒀어요. 다음에 보여 드릴게요."],
+	"aff70": ["오래된 책 복원이 끝나면... 제일 먼저 당신에게 읽어 줄게요.",
+		"기록보다 오래 남는 건 사람의 마음인 것 같아요. 요즘 들어서요."],
+	"loves": ["forage_relic", "dish_moon_tea", "bug_firefly"],
+	"likes": ["forage_herb", "dish_garlic_bread", "flower_pot"],
+	"hates": ["sludge", "forage_trash"],
+	"secret50": "그 오래된 책 말이에요... 표지 안쪽에 글씨가 한 줄 숨어 있었어요.\n「기록은 남기는 자의 것」 — 당신 할아버지 필체와 닮았더라고요.",
+	"secret100": "복원하다 알았어요. 그 책, 이 마을의 옛 기록이 맞아요.\n그리고 마지막 장은... 아직 쓰이지 않은 채 비어 있어요. 당신 몫인가 봐요.",
+	},
 }
-var affinity := {"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
+var affinity := {"librarian": 0,
+	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
 	"explorer": 0, "forest_mom": 0, "forest_girl": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
@@ -3132,6 +3224,8 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 4 — 오래된 마을의 경계")
 	if forest_quest == "done":
 		out.append("메인 스토리 5 — 숲속에서 발견한 집")
+	if story6_phase == "done":
+		out.append("메인 스토리 6 — 오래된 책과 사서")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -3434,6 +3528,9 @@ func reset_all() -> void:
 	mom_quests_done = []
 	spear_quest = ""
 	story4_phase = ""
+	story6_phase = ""
+	story6_day = 0
+	old_book_stored = false
 	zones_open = []
 	arrivals = []
 	npc_greeted = []
@@ -3778,6 +3875,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
 		"story4_phase": story4_phase, "zones_open": zones_open,
+		"story6_phase": story6_phase, "story6_day": story6_day,
+		"old_book_stored": old_book_stored,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

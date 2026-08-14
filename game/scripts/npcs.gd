@@ -121,6 +121,18 @@ func _sync_village_npcs() -> void:
 				ex_spawn = m.door_tile(GameData.move_house) + Vector2i(0, 1)
 			_spawn_npc("explorer", ex_spawn)
 
+	# 사서 서하 — 오래된 책을 보러 온 방문객 (스토리 6).
+	# 도서관이 완성되고 정착 대화를 마쳐야 정식 주민이 된다 —
+	# 그 전에는 건물 없이도 광장 근처에서 지내는 손님이다.
+	if GameData.story6_phase in ["visit", "told", "build", "done"]:
+		var have_lib := false
+		for n in m.npcs:
+			if n.id == "librarian":
+				have_lib = true
+				break
+		if not have_lib:
+			_spawn_npc("librarian", m.NPC_HOME["librarian"])
+
 	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
 	if GameData.forest_quest in ["visit", "done"]:
 		for fid: String in ["forest_mom", "forest_girl"]:

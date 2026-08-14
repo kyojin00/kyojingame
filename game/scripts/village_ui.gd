@@ -95,6 +95,9 @@ func _next_village_build() -> String:
 		# 마을회관은 주민(플레이어 포함)이 10명을 넘어야 — 마을 성장의 정점
 		if pid == "hall" and m.village_residents() <= GameData.HALL_RESIDENTS:
 			continue
+		# 도서관은 메인 스토리 6에서 사서와 이야기를 마쳐야 지을 수 있다
+		if pid == "library" and GameData.story6_phase != "build":
+			continue
 		return pid
 	return ""
 
@@ -183,7 +186,11 @@ func _build_village_building(pid: String) -> void:
 	# 찾아와 첫 인사를 나눈 뒤부터 문을 연다 (이주 NPC 공통 규칙)
 	var owner := str(m.VILLAGE_NPC.get(pid, ""))
 	var greet_note := ""
-	if owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
+	if pid == "library":
+		# 사서는 이미 마을에 와 있다 (스토리 6 방문객) — 이사 대기열 없이
+		# 도서관 앞의 서하에게 직접 말을 걸면 정착 이야기가 이어진다
+		greet_note = "\n사서 선생이 벌써 도서관 앞을 서성이는구먼 — 말을 걸어 보게."
+	elif owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
 		GameData.arrivals.append({"id": owner, "day": GameData.day})
 		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
 	m.npcmgr._sync_village_npcs()
@@ -227,6 +234,20 @@ func _talk_to(npc: Node2D) -> void:
 		return
 	if npc.id == "chief" and GameData.story4_phase == "ask":
 		m.story._start_story4_dialog()   # 낡은 표지판 이야기 (메인 스토리 4)
+		return
+	# 메인 스토리 6 — 오래된 책과 사서
+	if npc.id == "chief" and GameData.story6_phase == "show_chief":
+		m.story._start_book_chief_dialog()
+		return
+	if npc.id == "chief" and GameData.story6_phase == "told":
+		m.story._start_book_chief2_dialog()
+		return
+	if npc.id == "librarian" and GameData.story6_phase == "visit":
+		m.story._start_librarian_book_dialog()
+		return
+	if npc.id == "librarian" and GameData.story6_phase == "build" \
+			and GameData.village_built.has("library"):
+		m.story._start_library_done_dialog()
 		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
@@ -447,6 +468,45 @@ func _do_breed() -> void:
 
 
 func _open_library_dialog() -> void:
+	# 도서관 서가 — 오래된 책(스토리 6) · 마을의 기록 · 할아버지의 메모
+	var btns: Array = []
+	if GameData.old_book_stored:
+		btns.append(["오래된 책 보기", _open_old_book_dialog])
+	btns.append(["마을의 기록 보기", _open_records_dialog])
+	btns.append(["할아버지의 메모 찾기", _open_grandpa_memo_dialog])
+	btns.append(["나가기", null])
+	m.dialog.open("도서관",
+		"나무 냄새가 나는 아담한 서가.\n서하가 책과 마을의 기록을 정리해 두었다.", btns)
+
+
+# 스토리 6에서 발견한 오래된 책 — 도서관에 보관 중 (다음 이야기의 열쇠)
+func _open_old_book_dialog() -> void:
+	m.dialog.open("오래된 책",
+		"유리 상자 안에 오래된 책이 소중히 놓여 있다.\n\n"
+		+ "서하: 「이 마을의 옛 기록이에요. 종이가 삭아서\n"
+		+ "조금씩밖에 복원을 못 하고 있어요.\n"
+		+ "다 읽게 되는 날... 꼭 함께 읽어요.」", [["기대되네요", null]])
+
+
+# 완료한 이야기·안내를 마을의 기록으로 돌아본다
+func _open_records_dialog() -> void:
+	var done: Array = GameData.completed_quests()
+	if done.is_empty():
+		m.dialog.open("마을의 기록", "아직 기록된 이야기가 없다.\n마을의 나날이 이 책장을 채워 갈 것이다.",
+			[["닫기", null]])
+		return
+	var body := "서하가 정리한 마을의 발자취 —\n\n"
+	var n := 0
+	for name: String in done:
+		body += "· %s\n" % name
+		n += 1
+		if n >= 12:
+			body += "...그리고 %d가지 더." % (done.size() - n)
+			break
+	m.dialog.open("마을의 기록", body, [["뿌듯하다", null]])
+
+
+func _open_grandpa_memo_dialog() -> void:
 	var left: Array = []
 	for leg: Array in GameData.LEGENDS:
 		if int(GameData.items.get(str(leg[0]), 0)) <= 0:

@@ -183,6 +183,12 @@ func interact() -> void:
 	# 나무·돌·채집물을 조준하고 있으면 대화보다 채집이 우선이다
 	# (옆에 사람이 서 있어도 E가 대화로 새지 않는다)
 	var aiming_object: bool = aim != null and m.AIM_KINDS.has(aim.kind)
+	# 스토리 6: 우체국 터 앞에서 기다리는 우체부에게 편지를 부탁한다
+	if not aiming_object and m.story._book_post != null \
+			and m.story._book_post_mode == "stand" \
+			and (m.player.position - m.story._book_post.position).length() < m.POSTMAN_TALK_DIST:
+		m.story._start_book_post_dialog()
+		return
 	# 우체부 아저씨에게 말 걸기 (첫 만남 / 동행 중 보조 대화)
 	if not aiming_object and m.story._postman != null and m.story._postman_state == "wait" \
 			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
@@ -303,6 +309,9 @@ func interact() -> void:
 			return
 		if obj.kind == "sign" and t == m.OLD_SIGN:
 			m.story.examine_old_sign()
+			return
+		if obj.kind == "old_book":
+			m.story.examine_old_book(t)   # 메인 스토리 6 — 오래된 책 발견
 			return
 		if obj.kind == "sign" and t == m.GREENHOUSE_SIGN:
 			m.village._open_greenhouse_dialog()

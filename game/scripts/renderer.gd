@@ -268,6 +268,8 @@ func _context_hint() -> Array:
 				return ["E: 세계수 동굴 (위험!)", above_tile]
 			"forage_berry", "forage_herb":
 				return ["E: 채집", above_tile]
+			"old_book":
+				return ["E: 낡은 책을 살펴본다", above_tile]
 			"housesite":
 				return ["E: 집 짓기 (목재 %d)" % GameData.HOUSE_BUILD_WOOD, above_tile]
 			"tree":

@@ -141,6 +141,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"weed":
 			# 서 있을 때는 풀숲, 주우면 묶음(weed)이 인벤토리에 들어간다
 			texture = m.tex["weed_plant"]
+		"old_book":
+			# 풀숲에 반쯤 묻힌 오래된 책 — 메인 스토리 6의 시작점
+			texture = m.tex["old_book"]
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)

@@ -161,7 +161,10 @@ const TEXTURE_NAMES := [
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
-	"icon_letter",
+	"icon_letter", "old_book",
+	"npc_librarian_down_0", "npc_librarian_down_1", "npc_librarian_up_0",
+	"npc_librarian_up_1", "npc_librarian_side_0", "npc_librarian_side_1",
+	"npc_librarian_portrait_normal", "npc_librarian_portrait_happy",
 	"stall", "bait", "flower_pot", "trash_bin", "chief_hut", "chief_house",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
@@ -334,11 +337,14 @@ const CHIEF_HUT := Vector2i(71, 11)
 const YARD_PAD := 1
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
-const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish", "hall"]
+const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "library", "ranch",
+	"fish", "hall"]
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
 	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
 	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
 	"ranch": [80, 40], "fish": [100, 60], "hall": [120, 80],
+	# 도서관은 메인 스토리 6(오래된 책과 사서)에서만 열리는 건설이다
+	"library": [90, 50],
 }
 
 
@@ -347,7 +353,7 @@ func village_residents() -> int:
 	return npcs.size() + 1
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
-	"ranch": "rancher", "fish": "fisher"}
+	"ranch": "rancher", "fish": "fisher", "library": "librarian"}
 # ---- NPC 하루 일과 ----
 #
 # 시간대마다 갈 곳이 바뀐다. 목적지까지는 길찾기로 걸어가고,
@@ -359,6 +365,9 @@ const NPC_SCHEDULE := {
 	"merchant":   [[6, "home"], [9, "work"], [13, "plaza"], [15, "work"]],
 	"blacksmith": [[6, "home"], [9, "work"], [14, "plaza"], [16, "work"]],
 	"rancher":    [[6, "home"], [8, "work"], [12, "plaza"], [15, "work"]],
+	# 사서 — 방문객일 때는 work가 광장(집이 없어서)으로, 도서관이 서면
+	# 도서관 앞으로 저절로 풀린다 (npc_place_tile의 기본 규칙)
+	"librarian":  [[6, "plaza"], [9, "work"], [13, "plaza"], [15, "work"]],
 	"fisher":     [[6, "home"], [8, "pier"], [13, "plaza"], [15, "pier"]],
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
@@ -369,7 +378,8 @@ const NPC_PLAZA := {
 }
 # 건물이 없는 NPC(이장)의 집 자리
 const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
-	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28)}
+	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28),
+	"librarian": Vector2i(76, 14)}   # 방문객 시절 — 광장 분수 곁
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
@@ -930,7 +940,7 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 # 채집·벌목·채광 대상이 되는 것들
 const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
-	"forage_ring", "forage_relic"]
+	"forage_ring", "forage_relic", "old_book"]
 
 # E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
 const WORK_LOCK_TIME := 0.9
@@ -1130,6 +1140,7 @@ func _process(delta: float) -> void:
 	story._forest_update(delta)
 	story._spear_update(delta)
 	story._movein_update(delta)
+	story._story6_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
 	_work_lock = maxf(_work_lock - delta, 0.0)

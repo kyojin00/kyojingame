@@ -79,7 +79,7 @@ const ROOMS := {
 		"hint": "씨앗을 개량한다 (작물이 더 빨리·비싸게)",
 	},
 	"library": {
-		"name": "도서관", "keeper": "blacksmith",
+		"name": "도서관", "keeper": "librarian",
 		"wall": Color(0.4, 0.34, 0.24), "floor": Color(0.58, 0.5, 0.36),
 		"counter": Color(0.44, 0.34, 0.22), "deco": "books",
 		"tab": "", "tabs": [], "action": "read",

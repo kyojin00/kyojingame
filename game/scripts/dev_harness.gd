@@ -2312,6 +2312,109 @@ func _debug_tick() -> void:
 			GameData.tool = keep_tool2
 			print("SWINGEMPTY_OK=", swung and hit and cooldown_ok,
 				" 휘두름=", swung, " 명중=", hit, " 쿨다운=", cooldown_ok)
+		312:
+			# 메인 스토리 6: 오래된 책과 사서 — 전 구간을 손으로 밟아 본다
+			var keep6_forest := GameData.forest_quest
+			GameData.story6_phase = ""
+			GameData.old_book_stored = false
+			GameData.items["old_book"] = 0
+			GameData.village_built.erase("library")
+			GameData.npc_greeted.erase("librarian")
+			GameData.forest_quest = "done"
+			m.story._story6_update(0.1)
+			var placed: bool = GameData.story6_phase == "find" \
+				and m.story._old_book_exists()
+			var bt := Vector2i(-999, -999)
+			for pos: Vector2i in m.objects:
+				if str(m.objects[pos].kind) == "old_book":
+					bt = pos
+					break
+			m.story.examine_old_book(bt)
+			m.dialog.close()
+			var got_book: bool = int(GameData.items.get("old_book", 0)) == 1 \
+				and GameData.story6_phase == "show_chief"
+			m.story._start_book_chief_dialog()
+			m.dialog.close()
+			m.story._end_book_chief()
+			m.story._story6_update(0.1)   # 우체부가 우체국 터 앞에 선다
+			var post_stand: bool = GameData.story6_phase == "ask_post" \
+				and m.story._book_post != null \
+				and m.story._book_post_mode == "stand"
+			m.story._start_book_post_dialog()
+			m.dialog.close()
+			m.story._end_book_post()
+			var waiting: bool = GameData.story6_phase == "wait" \
+				and GameData.story6_day == GameData.day \
+				and m.story._book_post == null
+			m.story._start_book_reply_dialog()
+			m.dialog.close()
+			m.story._end_book_reply()
+			var lib_npc := false
+			for n in m.npcs:
+				if n.id == "librarian":
+					lib_npc = true
+			var visit_ok: bool = GameData.story6_phase == "visit" and lib_npc
+			m.story._start_librarian_book_dialog()
+			m.dialog.close()
+			m.story._end_librarian_book()
+			# 도서관은 스토리가 build에 닿기 전에는 발전 목록에 안 나온다
+			var keep6_built: Array = GameData.village_built.duplicate()
+			GameData.village_built = ["post", "general", "smith", "ranch", "fish"]
+			var gated: bool = m.village._next_village_build() != "library"
+			m.story._start_book_chief2_dialog()
+			m.dialog.close()
+			m.story._end_book_chief2()
+			var build_open: bool = GameData.story6_phase == "build" \
+				and m.village._next_village_build() == "library"
+			GameData.wood += 90
+			GameData.stone += 50
+			m.village._open_village_build_dialog()
+			m.village._build_village_building("library")
+			m.dialog.close()
+			var built: bool = GameData.village_built.has("library")
+			m.story._start_library_done_dialog()
+			m.dialog.close()
+			m.story._end_library_done()
+			var settled: bool = GameData.story6_phase == "done" \
+				and GameData.npc_greeted.has("librarian") \
+				and GameData.old_book_stored \
+				and int(GameData.items.get("old_book", 0)) == 0
+			m.village._open_library_dialog()   # 서가 — 오래된 책 보관 확인
+			var shelf: bool = m.dialog.visible
+			m.dialog.close()
+			print("STORY6_OK=", placed and got_book and post_stand and waiting
+				and visit_ok and gated and build_open and built and settled
+				and shelf,
+				" 책놓임=", placed, " 획득=", got_book, " 우체부대기=", post_stand,
+				" 답장대기=", waiting, " 사서방문=", visit_ok, " 건설잠금=", gated,
+				" 건설해금=", build_open, " 완공=", built, " 정착=", settled,
+				" 서가=", shelf)
+			# 지도에 세운 도서관은 그대로 두고 (되돌리면 그림과 어긋난다)
+			# 이야기 상태만 이어서 쓴다
+			GameData.village_built = keep6_built
+			GameData.village_built.append("library")
+			GameData.forest_quest = keep6_forest
+		315:
+			# #112: 조리대를 못 찾았으면 요리 레시피를 팔지 않는다 (힌트만)
+			var keep_kf := GameData.kitchen_found
+			var keep_money3 := GameData.money
+			GameData.kitchen_found = false
+			GameData.recipe_items.erase("dish_grilled_fish")
+			GameData.recipes_unlocked.erase("dish_grilled_fish")
+			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
+			var blocked: bool = GameData.money == keep_money3 \
+				and not GameData.recipe_items.has("dish_grilled_fish") \
+				and m.dialog.visible
+			m.dialog.close()
+			GameData.kitchen_found = true
+			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
+			var bought: bool = GameData.money == keep_money3 - 200 \
+				and GameData.recipe_items.has("dish_grilled_fish")
+			GameData.kitchen_found = keep_kf
+			GameData.money = keep_money3
+			GameData.recipe_items.erase("dish_grilled_fish")
+			print("KITCHENGATE_OK=", blocked and bought,
+				" 차단+힌트=", blocked, " 해금후구매=", bought)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()

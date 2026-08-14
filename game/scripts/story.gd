@@ -2171,3 +2171,268 @@ func _pickup_home_plot(door: Vector2i) -> void:
 			m.queue_redraw()
 			m.saveio.save_now()
 			return
+
+
+# ---- 메인 스토리 6: 오래된 책과 사서 ----
+#
+# 스토리 5(숲속에서 발견한 집)를 끝내면 마을 풀숲에 오래된 책이 놓인다.
+# 책 -> 이장(모름) -> 우체부에게 편지 부탁 -> 이틀 뒤 답장 -> 사서 방문 ->
+# 책 확인(마을의 기록, 상태가 나빠 당장은 못 읽음) -> 도서관 필요성 ->
+# 이장 상의 -> 도서관 건설 -> 사서 정착. 완결 후 책은 도서관에 보관된다.
+
+var _book_post: Node2D = null       # 스토리 6의 우체부 (부탁받기/답장 전달)
+var _book_post_spr: Sprite2D = null
+var _book_post_route: Array = []
+var _book_post_mode := ""           # "stand"(우체국 터에서 대기) / "walk"(답장 배달)
+var _book_post_anim := 0.0
+
+
+func _story6_update(delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 시작: 스토리 5를 끝내면 풀숲에 오래된 책이 놓인다
+	if GameData.story6_phase == "" and GameData.forest_quest == "done":
+		_place_old_book()
+	elif GameData.story6_phase == "find" and not _old_book_exists():
+		_place_old_book()   # 세이브 호환 — 책이 사라졌으면 다시 놓는다
+	# 편지 부탁 단계: 우체부가 우체국 터 앞에서 기다린다
+	if GameData.story6_phase == "ask_post" and _book_post == null:
+		_spawn_book_post("stand",
+			m.door_tile(m.VILLAGE_PLOTS["post"].anchor) + Vector2i(0, 1))
+	# 답장: 이틀 뒤, 낮에 야외에서 한가할 때 우체부가 걸어온다
+	if GameData.story6_phase == "wait" and _book_post == null \
+			and GameData.day > GameData.story6_day + GameData.STORY6_REPLY_DAYS - 1:
+		if m.ui_open() or m.dialog.visible or m.story_cutscene \
+				or m.interior.visible or m.cave.visible or m.house_preview:
+			return
+		var hh := GameData.minutes / 60.0
+		if hh < 6.0 or hh >= 19.0:
+			return
+		var start := _walk_tile_near_player(6)
+		_spawn_book_post("walk", start)
+		_book_post_route = m.npcmgr._tile_path(start, _walk_tile_near_player(1))
+		m.hud.show_message("우체부 아저씨가 이쪽으로 걸어온다...", 4.0)
+	# 답장을 든 우체부가 걸어온다
+	if _book_post != null and _book_post_mode == "walk" and not m.dialog.visible:
+		if not _book_post_route.is_empty():
+			var wp: Vector2 = _book_post_route[0]
+			var to: Vector2 = wp - _book_post.position
+			if to.length() < 6.0:
+				_book_post.position = wp
+				_book_post_route.pop_front()
+			else:
+				_book_post.position += to.normalized() * 110.0 * delta
+				_book_post_anim += delta
+				var f := int(_book_post_anim * 6.0) % 2
+				if absf(to.y) >= absf(to.x):
+					_book_post_spr.texture = m.tex["npc_postman_%s_%d"
+						% ["up" if to.y < 0.0 else "down", f]]
+					_book_post_spr.flip_h = false
+				else:
+					_book_post_spr.texture = m.tex["npc_postman_side_%d" % f]
+					_book_post_spr.flip_h = to.x < 0.0
+			return
+		if GameData.story6_phase == "wait":
+			_start_book_reply_dialog()
+
+
+# 광장 남동쪽 풀숲에서 빈 잔디칸을 찾아 책을 놓는다
+func _place_old_book() -> void:
+	var base := Vector2i(78, 22)
+	for r in 7:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var t := base + Vector2i(dx, dy)
+				if t.x < 1 or t.y < 1 or t.x >= m.MAP_W - 1 or t.y >= m.MAP_H - 1:
+					continue
+				if m.objects.has(t) or not m.is_passable(t):
+					continue
+				var c: Dictionary = m.grid[t.y][t.x]
+				if c.ground != "grass" or c.crop_id != "":
+					continue
+				m.objects[t] = {"kind": "old_book", "hp": 0}
+				m.objnode._spawn_object_node(t, "old_book")
+				GameData.story6_phase = "find"
+				m.saveio.save_now()
+				return
+
+
+func _old_book_exists() -> bool:
+	for pos: Vector2i in m.objects:
+		if str(m.objects[pos].kind) == "old_book":
+			return true
+	return false
+
+
+func _spawn_book_post(mode: String, tile: Vector2i) -> void:
+	_book_post = Node2D.new()
+	_book_post.position = Vector2(tile.x * m.TILE + 16, tile.y * m.TILE + 16)
+	_book_post_spr = Sprite2D.new()
+	_book_post_spr.centered = false
+	_book_post_spr.offset = Vector2(-64, -188)
+	_book_post_spr.scale = Vector2(0.56, 0.56)
+	_book_post_spr.texture = m.tex["npc_postman_down_0"]
+	_book_post.add_child(_book_post_spr)
+	m.world.add_child(_book_post)
+	_book_post_mode = mode
+	_book_post_route = []
+	_book_post_anim = 0.0
+
+
+func _despawn_book_post() -> void:
+	if _book_post != null:
+		_book_post.queue_free()
+	_book_post = null
+	_book_post_spr = null
+	_book_post_mode = ""
+	_book_post_route = []
+
+
+# 퀘스트 1 — 풀숲의 오래된 책을 조사해 줍는다
+func examine_old_book(t: Vector2i) -> void:
+	if GameData.story6_phase != "find":
+		m.dialog.open("오래된 책", "낡은 책이 풀숲에 반쯤 묻혀 있다.", [["닫기", null]])
+		return
+	m.objnode._remove_object(t)
+	GameData.items["old_book"] = 1
+	GameData.discover("old_book")
+	GameData.story6_phase = "show_chief"
+	Sound.play_sfx("sfx_catch")
+	m.dialog.open_seq("오래된 책", m.tex.get("old_book"), [
+		{"text": "(풀숲에 반쯤 묻힌 두꺼운 책을 조심스레 파냈다.)"},
+		{"text": "(가죽 표지는 닳아 해졌고 종이는 누렇게 바랬다.\n알아볼 수 없는 옛 글씨가 빼곡하다.)"},
+		{"text": "(혼자서는 도무지 모르겠다...\n이장님께 가져가 보자.)"},
+	], _end_book_found)
+
+
+func _end_book_found() -> void:
+	m.hud.quest_toast("메인 스토리 6 — 오래된 책과 사서")
+	m.saveio.save_now()
+
+
+# 퀘스트 2 — 이장도 읽지 못한다. 사서에게 편지를 보내기로
+func _start_book_chief_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「이건... 꽤나 오래된 물건이구먼.\n어디 보자...」"},
+		{"text": "「안 되겠네. 글씨가 옛 서체라 나도 못 읽겠어.\n마을 어른들도 이런 건 본 적 없을 게야.」"},
+		{"text": "「책이라면, 책을 잘 아는 사람에게\n보여주는 게 좋겠지.」"},
+		{"text": "「우체부 양반에게 부탁해 보게. 책에 밝은\n사서 선생이 한 분 계시다 들었네 —\n편지를 보내 보는 걸세.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+	], _end_book_chief)
+
+
+func _end_book_chief() -> void:
+	if GameData.story6_phase == "show_chief":
+		GameData.story6_phase = "ask_post"
+		m.hud.quest_toast("우체부 아저씨에게 편지를 부탁하자")
+	m.saveio.save_now()
+
+
+# 퀘스트 3 — 우체부에게 편지를 부탁한다 (우체국 터 앞)
+func _start_book_post_dialog() -> void:
+	if GameData.story6_phase != "ask_post":
+		return
+	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
+		{"text": "「오, 오랜만이구먼! 잘 지냈는가?\n...부탁이 있다고?」"},
+		{"text": "(오래된 책 이야기를 전하고, 책을 잘 아는 사서에게\n편지를 보내 달라고 부탁했다.)",
+			"portrait": m.tex["npc_postman_portrait_normal"]},
+		{"text": "「책에 밝은 사서 선생이라... 알지, 알아.\n편지는 내가 책임지고 전함세!」",
+			"portrait": m.tex["npc_postman_portrait_happy"]},
+		{"text": "「답장이 오려면 며칠은 걸릴 게야.\n느긋하게 기다려 보게.」"},
+	], _end_book_post)
+
+
+func _end_book_post() -> void:
+	if GameData.story6_phase == "ask_post":
+		GameData.story6_phase = "wait"
+		GameData.story6_day = GameData.day
+		m.hud.quest_toast("사서의 답장을 기다리자")
+	_despawn_book_post()
+	m.saveio.save_now()
+
+
+# 퀘스트 4 — 며칠 뒤, 우체부가 답장을 들고 찾아온다
+func _start_book_reply_dialog() -> void:
+	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
+		{"text": "「이보게! 답장일세, 답장!」"},
+		{"text": "『보내 주신 이야기는 잘 읽었습니다.\n그런 책이 남아 있다니 놀랍네요.\n꼭 직접 보고 싶습니다. 곧 찾아뵐게요. — 사서 서하』",
+			"portrait": m.tex.get("icon_letter")},
+		{"text": "「곧 마을로 오신다더군. 부지런한 분이라\n아마 벌써 광장쯤에 와 계실지도 몰라!」"},
+	], _end_book_reply)
+
+
+func _end_book_reply() -> void:
+	if GameData.story6_phase == "wait":
+		GameData.story6_phase = "visit"
+		m.hud.quest_toast("마을에 찾아온 사서를 만나보자")
+	_despawn_book_post()
+	m.npcmgr._sync_village_npcs()   # 사서가 광장 곁에 나타난다 (방문객)
+	m.saveio.save_now()
+
+
+# 퀘스트 5 — 사서가 책을 확인한다: 마을의 기록, 그리고 도서관의 필요성
+func _start_librarian_book_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「안녕하세요. 편지를 받고 온 사서, 서하라고 해요.\n그... 오래된 책, 지금 갖고 계신가요?」"},
+		{"text": "(오래된 책을 건넸다. 서하가 장갑을 끼고\n조심스레 책장을 넘긴다.)"},
+		{"text": "「...놀라워요. 이건 이 마을에 관한\n아주 오래된 기록이에요.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「다만 상태가 많이 나빠서, 지금 당장 전부\n읽어 내는 건 무리예요. 시간을 들여\n복원해야 해요.」",
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「그런데... 이상해요. 이런 기록이 나오는 마을에\n책과 기록을 보관할 곳이 하나도 없다니요.」"},
+		{"text": "「작은 도서관이 있다면 이 책도, 앞으로 발견될\n기록들도 제대로 지킬 수 있을 텐데요.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "(도서관 이야기를 이장님께 전해 보자.)"},
+	], _end_librarian_book)
+
+
+func _end_librarian_book() -> void:
+	if GameData.story6_phase == "visit":
+		GameData.story6_phase = "told"
+		m.hud.quest_toast("사서의 이야기를 이장에게 전하자")
+	m.saveio.save_now()
+
+
+# 퀘스트 6 — 이장과 상의: 작은 도서관을 짓기로 한다
+func _start_book_chief2_dialog() -> void:
+	m.dialog.open_seq("이장", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「도서관이라... 사서 선생이 그리 말씀하셨는가.」"},
+		{"text": "「하긴, 마을이 예전보다 부쩍 컸지.\n앞으로 사람도 더 늘 게고... 책과 기록을\n둘 곳이 있어야겠구먼.」"},
+		{"text": "「좋네! 마을에 작은 도서관을 짓기로 하지.\n자리는 비워 두겠네.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+		{"text": "「재료가 모이면 나에게 「마을 발전 이야기」로\n오게. 목재 90에 석재 50 — 마을 사람들도\n거들 걸세!」"},
+	], _end_book_chief2)
+
+
+func _end_book_chief2() -> void:
+	if GameData.story6_phase == "told":
+		GameData.story6_phase = "build"
+		m.hud.quest_toast("도서관 건설을 준비하자")
+	m.saveio.save_now()
+
+
+# 퀘스트 7 — 도서관 완성: 사서가 마을에 정착한다 (스토리 6 완결)
+func _start_library_done_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_happy"], [
+		{"text": "「도서관... 정말로 지어 주셨네요.\n나무 냄새가 참 좋아요.」"},
+		{"text": "「처음엔 책 한 권만 보고 돌아갈 생각이었어요.\n그런데 이 서가를 보니... 마음이 바뀌었어요.」",
+			"portrait": m.tex["npc_librarian_portrait_normal"]},
+		{"text": "「여기서 책과 기록을 관리하며 살고 싶어요.\n이 마을의 사서로요. ...받아 주실 거죠?」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「오래된 책은 도서관에 소중히 보관할게요.\n복원이 끝나는 대로, 제일 먼저 함께 읽어요.」"},
+	], _end_library_done)
+
+
+func _end_library_done() -> void:
+	if GameData.story6_phase != "build" or not GameData.village_built.has("library"):
+		return
+	GameData.story6_phase = "done"
+	if not GameData.npc_greeted.has("librarian"):
+		GameData.npc_greeted.append("librarian")   # 정식 주민으로 정착
+	# 오래된 책은 도서관 서가로 — 판매·삭제 없이 다음 이야기까지 보관된다
+	# (키를 지우면 가방 목록이 빈 키를 밟는다 — 개수만 0으로)
+	GameData.items["old_book"] = 0
+	GameData.old_book_stored = true
+	m.hud.story_banner("메인 스토리 6 완결", "오래된 책과 사서")
+	m.hud.show_message("사서 서하가 마을에 정착했다!\n도서관에서 오래된 책과 마을의 기록을 볼 수 있다.", 7.0)
+	m.saveio.save_now()
