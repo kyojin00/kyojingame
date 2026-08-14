@@ -218,8 +218,9 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     # 팔: 소매 3픽셀 폭 + 세 칸 손. 손끝이 엉덩이 띠 바로 위(아랫단)까지
     # 온다. 앞으로 흔들면 소매가 늘어나며 내려가고 뒤로 가면 접히며
     # 올라간다 — 어깨는 늘 몸통에 붙어 있다.
+    # 위상은 같은 쪽 다리와 **반대** — 왼팔은 오른다리와 함께 나간다.
     # (4칸으로 키워 봤더니 정면 어깨가 벌어져 어색했다 — 옆모습만 4칸.)
-    for sx, sw, side in ((7, swing, 'left'), (22, -swing, 'right')):
+    for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
         if side == skip:
             continue
         sx += dx
@@ -292,6 +293,7 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
         g.px(cx, y + 11, '.')
     if not draw_arm:
         return
+    swing = -swing        # 팔은 같은 쪽 다리와 반대로 — 왼팔·오른다리 교차 보행
     # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다. 앞모습 팔과 같은
     # 길이(어깨 y+1 ~ 손끝 y+10, 엉덩이 높이)로 내린다 — 짧으면 티가 난다.
     # 몸판과 같은 파랑이라, 획을 통째로 모아 둘레를 윤곽선으로 한 번에
