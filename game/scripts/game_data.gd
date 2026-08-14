@@ -4263,6 +4263,7 @@ func build_stats() -> Dictionary:
 		"seeds": seeds, "produce": produce, "items": items,
 		"fish_caught": fish_caught, "mob_kills": mob_kills, "affinity": affinity,
 		"quest": quest, "tool_level": tool_level,
+		"unlocked_tools": unlocked_tools,   # 장터에서 도구가 오가면 이것도 맞춰야 한다
 		"skills": skills, "furniture": furniture,
 		"recipes_cooked": recipes_cooked, "ending_seen": ending_seen,
 		"crops_harvested": crops_harvested, "minerals_found": minerals_found,
@@ -4300,6 +4301,10 @@ func apply_stats(d: Dictionary) -> void:
 	spouse_gift_day = int(d.get("spouse_gift_day", 0))
 	for k in d.get("tool_level", {}):
 		tool_level[k] = int(d.tool_level[k])
+	if d.has("unlocked_tools"):
+		unlocked_tools = []
+		for t in d.unlocked_tools:
+			unlocked_tools.append(str(t))
 	apply_skills_data(d.get("skills", {}))
 	if d.has("furniture"):
 		apply_furniture_data(d.furniture)

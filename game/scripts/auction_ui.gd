@@ -87,32 +87,6 @@ func open() -> void:
 	_refresh()
 
 
-# 가방에서 우클릭으로 바로 들어오는 입구 — 고른 물건의 값 매기기 창을 편다
-# (게시판까지 걸어가지 않아도 창고에 있는 것을 그 자리에서 내놓을 수 있다)
-func open_sell(cat: String, id: String, quality: int) -> void:
-	visible = true
-	_tab = "sell"
-	_rows = []
-	_loading = false
-	var have := _have_of(cat, id, quality)
-	if have <= 0:
-		_status = "창고에 없다."
-		_pick_id = ""
-		_rebuild()
-		return
-	var base := 1
-	match cat:
-		"seed":
-			base = int(GameData.CROPS[id].seed_price) if GameData.CROPS.has(id) else 1
-		"produce":
-			var mult: int = [1, 2, 3][clampi(quality, 0, 2)]   # 은·금은 더 쳐 준다
-			base = int(GameData.CROPS[id].sell_price) * mult \
-				if GameData.CROPS.has(id) else 1
-		_:
-			base = int(GameData.ITEMS[id].get("sell", 1)) if GameData.ITEMS.has(id) else 1
-	_pick(cat, id, quality, have, base)
-
-
 func close() -> void:
 	visible = false
 
@@ -194,6 +168,17 @@ func _sync(cat: String, id: String, qty: int, quality: int, money_delta: int) ->
 
 
 func _take_out(cat: String, id: String, qty: int, quality: int) -> bool:
+	if cat == "tool":
+		if not GameData.is_tool_unlocked(id):
+			return false
+		GameData.unlocked_tools.erase(id)          # 손에서 떠난다
+		var slot := GameData.tool_slots.find(id)   # 빠른 슬롯에서도 뺀다
+		if slot >= 0:
+			GameData.tool_slots[slot] = ""
+		if GameData.tool == id:
+			GameData.tool = ""
+		_sync(cat, id, -qty, quality, 0)
+		return true
 	match cat:
 		"seed":
 			if int(GameData.seeds.get(id, 0)) < qty:
@@ -218,15 +203,31 @@ func _take_out(cat: String, id: String, qty: int, quality: int) -> bool:
 			elif quality == 2:
 				GameData.produce_gold[id] = int(GameData.produce_gold[id]) - qty
 		_:
-			if int(GameData.items.get(id, 0)) < qty:
-				return false
-			GameData.items[id] = int(GameData.items[id]) - qty
+			if id == "wood":
+				if GameData.wood < qty:
+					return false
+				GameData.wood -= qty
+			elif id == "stone":
+				if GameData.stone < qty:
+					return false
+				GameData.stone -= qty
+			else:
+				if int(GameData.items.get(id, 0)) < qty:
+					return false
+				GameData.items[id] = int(GameData.items[id]) - qty
 	_sync(cat, id, -qty, quality, 0)
 	return true
 
 
 func _give_back(cat: String, id: String, qty: int, quality: int) -> void:
 	if id == "" or qty <= 0:
+		return
+	if cat == "tool":
+		if not GameData.unlocked_tools.has(id):
+			GameData.unlocked_tools.append(id)
+		# 등급은 더 좋은 쪽으로 (내 것이 이미 더 좋으면 그대로)
+		if GameData.tool_level.has(id):
+			GameData.tool_level[id] = maxi(int(GameData.tool_level[id]), maxi(1, quality))
 		return
 	match cat:
 		"seed":
@@ -238,14 +239,37 @@ func _give_back(cat: String, id: String, qty: int, quality: int) -> void:
 			elif quality == 2:
 				GameData.produce_gold[id] = int(GameData.produce_gold.get(id, 0)) + qty
 		_:
-			GameData.items[id] = int(GameData.items.get(id, 0)) + qty
+			if id == "wood":
+				GameData.wood += qty
+			elif id == "stone":
+				GameData.stone += qty
+			else:
+				GameData.items[id] = int(GameData.items.get(id, 0)) + qty
 
 
 # ---- 이름·아이콘 ----
 
+# 도구 그림 이름은 규칙이 아니라 표다 (가방 창과 같은 값)
+const TOOL_ICONS := {
+	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed",
+	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
+	"sprinkler": "sprinkler", "rod": "icon_rod",
+	"spear": "icon_spear", "sword": "icon_sword",
+}
+const TOOL_NAMES := {
+	"hoe": "호미", "water": "물뿌리개", "seed": "씨앗 주머니", "axe": "도끼",
+	"pickaxe": "곡괭이", "fence": "울타리", "sprinkler": "스프링클러",
+	"rod": "낚싯대", "spear": "작살", "sword": "검",
+}
+
+
 func _label_of(cat: String, id: String, quality: int) -> String:
 	var nm := id
 	match cat:
+		"tool":
+			nm = str(TOOL_NAMES.get(id, id))
+			if quality > 1:
+				nm += " +%d" % (quality - 1)
 		"seed":
 			if GameData.CROPS.has(id):
 				nm = "%s 씨앗" % str(GameData.CROPS[id].name)
@@ -255,7 +279,11 @@ func _label_of(cat: String, id: String, quality: int) -> String:
 			var q: String = ["", "은빛 ", "금빛 "][clampi(quality, 0, 2)]
 			nm = q + nm
 		_:
-			if GameData.ITEMS.has(id):
+			if id == "wood":
+				nm = "목재"
+			elif id == "stone":
+				nm = "석재"
+			elif GameData.ITEMS.has(id):
 				nm = str(GameData.ITEMS[id].name)
 	return nm
 
@@ -266,6 +294,12 @@ func _icon_of(cat: String, id: String) -> String:
 			return "icon_seed"
 		"produce":
 			return "mature_" + id
+	if cat == "tool":
+		return str(TOOL_ICONS.get(id, "icon_" + id))
+	if id == "wood":
+		return "icon_wood"
+	if id == "stone":
+		return "icon_stone"
 	return id
 
 
@@ -421,6 +455,8 @@ func _build_sell() -> void:
 	_box.add_child(grid)
 	if not any:
 		_line("올릴 만한 것이 창고에 없다.")
+		_line("수확물·씨앗·목재·석재·광석·물고기·요리·도구까지 전부 올릴 수 있다.",
+			Color(0.7, 0.66, 0.6))
 
 
 # 창고에 있는 것들 — [종류, id, 품질, 개수, 잡화점 기준값]
@@ -444,13 +480,25 @@ func _stock_entries() -> Array:
 		if ns > 0:
 			out.append({"cat": "seed", "id": id, "q": 0, "n": ns,
 				"base": int(GameData.CROPS[id].seed_price)})
-	for id: String in GameData.ITEM_IDS:            # 물건 (전설 재료는 뺀다)
+	# 목재·석재는 items가 아니라 따로 세는 자원이라 여기서 챙긴다
+	if GameData.wood > 0:
+		out.append({"cat": "item", "id": "wood", "q": 0, "n": GameData.wood, "base": 10})
+	if GameData.stone > 0:
+		out.append({"cat": "item", "id": "stone", "q": 0, "n": GameData.stone, "base": 10})
+	for id: String in GameData.ITEM_IDS:            # 물건 — 전설 재료까지 전부
 		var n2: int = int(GameData.items.get(id, 0))
-		var def: Dictionary = GameData.ITEMS.get(id, {})
-		if n2 <= 0 or int(def.get("sell", 0)) <= 0 or def.get("legend", false):
+		if n2 <= 0:
 			continue
+		var def: Dictionary = GameData.ITEMS.get(id, {})
 		out.append({"cat": "item", "id": id, "q": 0, "n": n2,
-			"base": int(def.sell)})
+			"base": maxi(1, int(def.get("sell", 0)))})
+	# 도구 — 하나뿐인 물건이라 올리면 내 손에서 떠난다 (등급을 함께 올린다)
+	for id: String in GameData.ALL_TOOLS:
+		if not GameData.is_tool_unlocked(id):
+			continue
+		var lv: int = int(GameData.tool_level.get(id, 1))
+		out.append({"cat": "tool", "id": id, "q": lv, "n": 1,
+			"base": 300 * lv})
 	return out
 
 
@@ -517,6 +565,9 @@ func _build_price_picker() -> void:
 		Color(0.95, 0.8, 0.5))
 	_line("(값은 묶음 전체의 값이다. 팔리면 「내 물건」에서 대금을 받는다)")
 
+	if _pick_cat == "tool":
+		_line("도구는 하나뿐이라 올리면 내 손에서 떠난다. 팔리기 전엔 거둘 수 있다.",
+			Color(0.95, 0.72, 0.5))
 	var qrow := HBoxContainer.new()
 	qrow.add_theme_constant_override("separation", 6)
 	var ql := Label.new()
@@ -571,6 +622,8 @@ func _build_price_picker() -> void:
 
 
 func _have_of(cat: String, id: String, quality: int) -> int:
+	if cat == "tool":
+		return 1 if GameData.is_tool_unlocked(id) else 0
 	match cat:
 		"seed":
 			return int(GameData.seeds.get(id, 0))
@@ -584,6 +637,10 @@ func _have_of(cat: String, id: String, quality: int) -> int:
 					return int(GameData.produce.get(id, 0)) \
 						- int(GameData.produce_silver.get(id, 0)) \
 						- int(GameData.produce_gold.get(id, 0))
+	if id == "wood":
+		return GameData.wood
+	if id == "stone":
+		return GameData.stone
 	return int(GameData.items.get(id, 0))
 
 
