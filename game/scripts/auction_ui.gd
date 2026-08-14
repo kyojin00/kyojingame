@@ -226,7 +226,7 @@ func _label_of(cat: String, id: String, quality: int) -> String:
 		"produce":
 			if GameData.CROPS.has(id):
 				nm = str(GameData.CROPS[id].name)
-			var q := ["", "은빛 ", "금빛 "][clampi(quality, 0, 2)]
+			var q: String = ["", "은빛 ", "금빛 "][clampi(quality, 0, 2)]
 			nm = q + nm
 		_:
 			if GameData.ITEMS.has(id):
@@ -394,7 +394,9 @@ func _build_sell() -> void:
 			if n <= 0:
 				continue
 			any = true
-			var base: int = int(GameData.CROPS[id].sell_price) * [1, 2, 3][q] / 1
+			# 은빛·금빛은 잡화점에서도 더 쳐 준다 (값 매길 때 기준으로 보여 준다)
+			var mult: int = [1, 2, 3][q]
+			var base: int = int(GameData.CROPS[id].sell_price) * mult
 			_mk_row("produce", id, q, n, "잡화점 기준 %dG" % base, "고르기",
 				_pick.bind("produce", id, q, n, base))
 	for id: String in GameData.CROP_IDS:            # 씨앗

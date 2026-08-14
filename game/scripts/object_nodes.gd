@@ -103,9 +103,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -texture.get_height())
 		"auction":
 			# 경매 게시판 — 같은 판에 금빛을 입혀 의뢰 게시판과 구별한다
+			# (색은 아래에서 스프라이트가 생긴 뒤에 입힌다)
 			texture = m.tex["board_quest"]
 			offset = Vector2(0, -texture.get_height())
-			modulate = Color(1.15, 1.0, 0.62)
 		"sign":
 			if pos == m.GREENHOUSE_SIGN:
 				texture = m.tex["board_unlock"]  # 온실 터도 「구역 해금」 게시판
@@ -190,6 +190,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
 		if kind == "deco_fountain":
 			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
+		elif kind == "auction":
+			spr.modulate = Color(1.15, 1.0, 0.62)  # 경매 게시판은 금빛
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
