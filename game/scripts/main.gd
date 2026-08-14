@@ -1363,12 +1363,21 @@ func _unhandled_input(event: InputEvent) -> void:
 		stats_ui.toggle()
 		return
 	if event.is_action_pressed("ui_cancel"):
-		# 게임 메뉴: 저장 후 타이틀로
+		# 게임 메뉴: 함께하기 방 코드 + 저장 후 타이틀로.
+		# (방 코드를 화면에 늘 띄우면 눈에 거슬려서 여기서 꺼내 본다)
 		Sound.play_sfx("sfx_ui")
-		dialog.open("게임 메뉴", "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)", [
-			["저장 후 타이틀로", _back_to_title],
-			["계속하기", null],
-		])
+		var body := "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)"
+		var btns := [["저장 후 타이틀로", _back_to_title], ["계속하기", null]]
+		var rcode := str(Net.rooms.code) if Net.is_host() and Net.rooms != null else ""
+		if rcode != "":
+			body = "방 코드   %s\n친구에게 알려 주면 이 농장으로 들어온다.\n\n%s" \
+				% [rcode, body]
+			btns.push_front(["코드 복사", func() -> void:
+				DisplayServer.clipboard_set(rcode)
+				hud.show_message("방 코드 %s — 복사했다!" % rcode)])
+		elif Net.is_guest():
+			body = "친구의 농장에서 함께 일하는 중이다.\n\n%s" % body
+		dialog.open("게임 메뉴", body, btns)
 		return
 	for slot_i in 9:
 		if event.is_action_pressed("tool_%d" % (slot_i + 1)):
