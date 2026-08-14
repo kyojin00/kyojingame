@@ -43,6 +43,9 @@ PAL = {
     'p': (134, 88, 46),     # 바지
     'P': (98, 62, 32),      # 바지 그늘
     'q': (158, 108, 58),    # 바지 밝은 면
+    'h': (118, 72, 40),     # 머리카락 (여자)
+    'j': (152, 100, 56),    # 머리카락 밝은 면
+    'g': (86, 52, 30),      # 머리카락 그늘
     'k': (82, 53, 33),      # 신발
     'K': (56, 37, 25),      # 신발 그늘
 }
@@ -555,20 +558,108 @@ def save(name, g):
     return g
 
 
-FRAMES = {}
-for d in ('down', 'side', 'up'):
-    FRAMES[f'{d}_idle'] = save(f'{d}_idle', frame(d))
-    for i in range(WALK):
-        FRAMES[f'{d}_walk_{i}'] = save(f'{d}_walk_{i}', frame(d, STRIDE[i], BOB[i]))
-    for i in range(4):
-        FRAMES[f'{d}_swing_{i}'] = save(f'{d}_swing_{i}', swing_frame(d, i))
+# ------------------------------------------------------- 남/녀 두 벌 생성
+# 몸·모션은 같고 머리 그림과 셔츠 색만 다르다. 여자는 밤색 단발머리
+# (앞머리 + 옆 갈래)에 분홍 셔츠 — 이름은 player_f_* 로 설치한다.
 
-# 게임에 설치 — 플레이어 텍스처 이름(new_boy_*)으로 sprites/에 복사한다.
+HEAD_DOWN_F = [
+    "....OOOOOOOO....",
+    "..OOhhhhhhhhOO..",
+    ".OhhjjjjjjjjhhO.",
+    ".OhjjjjjjjjjjhO.",
+    ".OhjjjjjjjjjjhO.",
+    "OhhjjjjjjjjjjhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "Ohh" "ssssssssss" "hhO",
+    "Oh" "s" "eee" "ssss" "eee" "s" "h" "O",
+    "Oh" "ss" "ew" "ssss" "we" "ss" "h" "O",
+    "Oh" "ss" "ee" "ssss" "ee" "ss" "h" "O",
+    "Oh" "ss" "ei" "ssss" "ie" "ss" "h" "O",
+    "Oh" "r" "ssssssssss" "r" "h" "O",
+    ".Oh" "ssss" "mm" "ssss" "h" "O.",
+    ".OssssssssssssO.",
+    "..OssssssssssO..",
+    "...OOssssssOO...",
+]
+
+HEAD_SIDE_F = [   # 오른쪽을 본다
+    "....OOOOOOOO....",
+    "..OOhhhhhhhhOO..",
+    ".OhhjjjjjjjjhhO.",
+    ".OhjjjjjjjjjjhO.",
+    ".OhjjjjjjjjjjhO.",
+    "OhhjjjjjjjjjjhhO",
+    "OhhhhhhhhhhhhhsO",
+    "OhhhhhhhhhhhsssO"[:16],
+    "Ohhhh" "ssssssssss" "O",
+    "Ohhh" "sssss" "eee" "sss" "O",
+    "Ohhh" "ssssss" "ew" "sss" "O",
+    "Ohhh" "ssssss" "ee" "sss" "O",
+    "Ohhh" "ssssss" "ei" "sss" "O",
+    "Ohh" "sss" "rr" "sssssss" "O",
+    ".Ohh" "ssssss" "mm" "ss" "O.",
+    ".Oh" "sssssssssss" "O.",
+    "..OssssssssssO..",
+    "...OOssssssOO...",
+]
+
+HEAD_UP_F = [
+    "....OOOOOOOO....",
+    "..OOhhhhhhhhOO..",
+    ".OhhjjjjjjjjhhO.",
+    ".OhjjjjjjjjjjhO.",
+    ".OhjjjjjjjjjjhO.",
+    "OhhjjjjjjjjjjhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
+    "OghhhhhhhhhhhhgO",
+    ".OghhhhhhhhhhgO.",
+    ".OghhhhhhhhhhgO.",
+    "..OghhhhhhhhgO..",
+    "...OOggggggOO...",
+]
+
+for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
+    assert len(_art) == 18 and all(len(r) == 16 for r in _art), \
+        [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
+
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
-for k, g in FRAMES.items():
-    g.render().save(os.path.join(OUT, f'new_boy_{k}.png'))
 
-# player.gd SWING_HAND_DOT에 옮겨 적을 주먹 좌표
+
+def render_set(heads, ref_prefix, out_prefix):
+    """머리 그림만 갈아 끼워 전체 프레임(정지+걷기+휘두르기)을 뽑는다.
+    지금 PAL 값으로 즉시 그려 두므로, 부른 뒤 PAL을 바꿔도 안 변한다."""
+    for d in heads:
+        PARTS[d] = (heads[d], PARTS[d][1], PARTS[d][2])
+    images = {}
+    for d in ('down', 'side', 'up'):
+        images[f'{d}_idle'] = frame(d).render()
+        for i in range(WALK):
+            images[f'{d}_walk_{i}'] = frame(d, STRIDE[i], BOB[i]).render()
+        for i in range(4):
+            images[f'{d}_swing_{i}'] = swing_frame(d, i).render()
+    for k, im in images.items():
+        im.save(os.path.join(REF, f'{ref_prefix}{k}.png'))
+        im.save(os.path.join(OUT, f'{out_prefix}{k}.png'))
+    return images
+
+
+FRAMES = render_set(
+    {'down': HEAD_DOWN, 'side': HEAD_SIDE, 'up': HEAD_UP}, '', 'new_boy_')
+
+# 여자: 셔츠를 분홍으로 갈아입힌다 (팔레트를 바꾸고 다시 뽑는다)
+PAL.update({'b': (214, 96, 116), 'B': (158, 60, 82), 'L': (232, 138, 152)})
+FRAMES_F = render_set(
+    {'down': HEAD_DOWN_F, 'side': HEAD_SIDE_F, 'up': HEAD_UP_F},
+    'f_', 'player_f_')
+
+# player.gd SWING_HAND_DOT에 옮겨 적을 주먹 좌표 (남녀 같은 골격이라 공용)
 print('SWING_HAND_DOT (player.gd):')
 for d in ('side', 'down', 'up'):
     pts = ', '.join('Vector2(%g, %g)' % hand_dot(d, i) for i in range(4))
@@ -581,11 +672,11 @@ CHECK = ((58, 58, 58), (38, 38, 38))
 SAND = (219, 172, 102)      # 참고 그림의 모랫바닥
 
 
-def strip(name, keys, z=2):
+def strip(images, name, keys, z=2):
     im = Image.new('RGB', (FW * len(keys) * z, FH * z))
     px = im.load()
     for i, k in enumerate(keys):
-        fim = FRAMES[k].render().load()
+        fim = images[k].load()
         for y in range(FH * z):
             for x in range(FW * z):
                 sx, sy = x // z, y // z
@@ -596,24 +687,26 @@ def strip(name, keys, z=2):
     im.save(os.path.join(REF, name))
 
 
-def gif(name, keys, ms=125):
+def gif(images, name, keys, ms=125):
     ims = []
     for k in keys:
         base = Image.new('RGBA', (FW, FH), SAND + (255,))
-        base.alpha_composite(FRAMES[k].render())
+        base.alpha_composite(images[k])
         ims.append(base.convert('RGB').convert('P', palette=Image.ADAPTIVE))
     ims[0].save(os.path.join(REF, name), save_all=True, append_images=ims[1:],
                 duration=ms, loop=0)
 
 
-strip('preview_idle.png', ['down_idle', 'side_idle', 'up_idle'])
-for d in ('down', 'side', 'up'):
-    keys = [f'{d}_walk_{i}' for i in range(WALK)]
-    strip(f'preview_{d}_walk.png', keys)
-    gif(f'anim_{d}_walk.gif', keys)
-    sw = [f'{d}_swing_{i}' for i in range(4)]
-    strip(f'preview_{d}_swing.png', sw)
-    gif(f'anim_{d}_swing.gif', sw, ms=170)
-gif('anim_idle.gif', ['down_idle', 'side_idle', 'up_idle'], ms=600)
+for images, tag in ((FRAMES, ''), (FRAMES_F, 'f_')):
+    strip(images, f'preview_{tag}idle.png', ['down_idle', 'side_idle', 'up_idle'])
+    for d in ('down', 'side', 'up'):
+        keys = [f'{d}_walk_{i}' for i in range(WALK)]
+        strip(images, f'preview_{tag}{d}_walk.png', keys)
+        gif(images, f'anim_{tag}{d}_walk.gif', keys)
+        sw = [f'{d}_swing_{i}' for i in range(4)]
+        strip(images, f'preview_{tag}{d}_swing.png', sw)
+        gif(images, f'anim_{tag}{d}_swing.gif', sw, ms=170)
+    gif(images, f'anim_{tag}idle.gif', ['down_idle', 'side_idle', 'up_idle'], ms=600)
 
-print('done: %d frames + previews + gifs (sprites/에 설치됨)' % len(FRAMES))
+print('done: %d+%d frames + previews + gifs (sprites/에 설치됨)'
+      % (len(FRAMES), len(FRAMES_F)))

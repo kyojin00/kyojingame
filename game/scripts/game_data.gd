@@ -1484,49 +1484,38 @@ func player_tex(part: String) -> String:
 
 
 # 휘두르기 도트 이름의 앞부분 (key = "down"/"up"/"side").
-# 실제 그림 이름은 여기에 _0(다 감음) · _1(내리치는 중) · _2(다 내리침)가 붙는다.
-#
-# **아직 그 도트가 없다.** main.TEXTURE_NAMES에 이름을 넣지 않은 동안에는
-# main.tex에도 없어서, player.gd가 알아서 몸통을 굽히는 쪽으로 대신한다.
-# 도트를 뽑아 이름만 넣으면 그날부터 켜진다 (player.gd 위쪽 주석 참고).
+# 남녀 모두 assets/ref/dot_boy/make_sprites.py가 방향당 네 장을 그려 둔다
+# (감기 시작 · 다 감음 · 내리침 · 되돌아옴). 골격이 같아 주먹 자리
+# (player.gd SWING_HAND_DOT)도 공용이다.
 func swing_tex_base(key: String) -> String:
 	if gender == "m":
 		return "new_boy_%s_swing" % key
 	return "player_f_%s_swing" % key
 
 
-func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 옆모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+func player_side_tex(is_moving: bool, _suffix: String, t: float) -> String:
+	# 옆모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
-	if gender == "m":
-		if not is_moving:
-			return "new_boy_side_idle"
-		return "new_boy_side_walk_%d" % (int(t * 8.0) % 5)
-	if suffix == "idle":
-		return player_tex("side_idle")
-	return player_tex("side_" + suffix)
+	var g := "new_boy" if gender == "m" else "player_f"
+	if not is_moving:
+		return g + "_side_idle"
+	return "%s_side_walk_%d" % [g, int(t * 8.0) % 5]
 
 
-func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 앞모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	if gender == "m":
-		if not is_moving:
-			return "new_boy_down_idle"
-		return "new_boy_down_walk_%d" % (int(t * 8.0) % 5)
-	if suffix == "idle":
-		return player_tex("down_idle")
-	return player_tex("down_" + suffix)
+func player_down_tex(is_moving: bool, _suffix: String, t: float) -> String:
+	# 앞모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	var g := "new_boy" if gender == "m" else "player_f"
+	if not is_moving:
+		return g + "_down_idle"
+	return "%s_down_walk_%d" % [g, int(t * 8.0) % 5]
 
 
-func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 뒷모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	if gender == "m":
-		if not is_moving:
-			return "new_boy_up_idle"
-		return "new_boy_up_walk_%d" % (int(t * 8.0) % 5)
-	if suffix == "idle":
-		return player_tex("up_idle")
-	return player_tex("up_" + suffix)
+func player_up_tex(is_moving: bool, _suffix: String, t: float) -> String:
+	# 뒷모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	var g := "new_boy" if gender == "m" else "player_f"
+	if not is_moving:
+		return g + "_up_idle"
+	return "%s_up_walk_%d" % [g, int(t * 8.0) % 5]
 
 
 # 벌목 누적 횟수 (스토리 중 15그루째에 우체부가 능력치 창을 알려준다)
