@@ -453,11 +453,14 @@ func _start_postman_dialog() -> void:
 		get_tree().create_timer(0.25).timeout.connect(
 			func() -> void: _snap_story("story_dialog"))
 	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_normal"], [
-		{"text": "「자네도 마을로 가는 길인가?」"},
-		{"text": "「나도 마을에 가야 하는데 말이야.」"},
-		{"text": "「이장님께 전할 편지가 있거든.」"},
-		{"text": "「그런데 이 숲을 지나야 하거든.」"},
-		{"text": "「나무가 너무 빽빽해서 혼자서는 영 쉽지가 않구먼.」"},
+		{"text": "「오, 이런 숲길에서 사람을 다 만나는구먼!\n자네도 교진 마을로 가는 길인가?」",
+			"portrait": m.tex["npc_postman_portrait_happy"]},
+		{"text": "「나는 이 근방 마을들을 도는 우체부라네.\n오늘은 꼭 전해야 할 편지가 한 통 있어서 말이지.」",
+			"portrait": m.tex["npc_postman_portrait_normal"]},
+		{"text": "「교진 마을 이장님 앞으로 온 편지인데...\n사연이 담긴 귀한 것이라, 해가 지기 전에는\n꼭 전해 드려야 하네.」"},
+		{"text": "「그런데 보게나 — 마을로 드는 길은 이 숲\n하나뿐인데, 오래 사람이 안 다녔더니 나무가\n길을 통째로 삼켜 버렸지 뭔가.」"},
+		{"text": "「이 늙은 몸으로 혼자 뚫고 가자니 영 엄두가\n안 나던 참이었네. 자네를 만난 게 천운이구먼!」",
+			"portrait": m.tex["npc_postman_portrait_happy"]},
 		{"text": "「그러고 보니, 자네 이름이 어떻게 되나?」"},
 	], _show_name_input)
 

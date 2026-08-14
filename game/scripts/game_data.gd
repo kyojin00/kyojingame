@@ -616,7 +616,8 @@ const SKILLS := {
 	"mine": {"name": "채광", "effect": "석재·광석 추가 +6%/Lv"},
 	"combat": {"name": "전투", "effect": "동굴 공격력 +0.5/Lv"},
 	"cook": {"name": "요리", "effect": "요리 회복량 +5%/Lv"},
-	"beach": {"name": "해변 채집", "effect": "조개 리젠 +8%/Lv · 3Lv마다 채집량 +1"},
+	# 숲 채집과 해변 채집을 합친 하나의 「채집」 숙련이다
+	"beach": {"name": "채집", "effect": "숲·해변 채집량 3Lv마다 +1 · 조개 리젠 +8%/Lv"},
 }
 const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach"]
 const SKILL_MAX_LV := 10

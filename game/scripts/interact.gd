@@ -244,12 +244,11 @@ func interact() -> void:
 			if fid in ["weed", "forage_herb"]:
 				# 초록 풀숲은 기본이 잡초 — 약초는 1%짜리 행운이다
 				fid = GameData.weed_drop_id()
-			var got := 1
-			if fid in m.BEACH_FORAGE:
-				got = GameData.beach_pick_count()   # 해변 채집 레벨: 한 번에 더 줍는다
-				m.toolwork.gain_skill("beach", 6.0)
-			else:
-				m.toolwork.gain_skill("forest", 3.0)
+			# 숲이든 해변이든 줍는 일은 「채집」 숙련 하나로 합산된다 —
+			# 레벨이 오르면 어디서 줍든 한 번에 더 줍는다 (3Lv마다 +1)
+			var got := GameData.beach_pick_count()
+			m.toolwork.gain_skill("beach",
+				6.0 if fid in m.BEACH_FORAGE else 3.0)
 			var first_find: bool = not GameData.discovered.has(fid)
 			GameData.items[fid] += got
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
