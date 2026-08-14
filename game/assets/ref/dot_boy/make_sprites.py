@@ -267,20 +267,22 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     # 몸판과 같은 파랑이라, 획을 통째로 모아 둘레를 윤곽선으로 한 번에
     # 두른다 (픽셀마다 낱개로 두르면 대각선에서 조각조각 깨져 보인다).
     hy = y + 8 - (1 if abs(swing) >= 2 else 0) - (1 if abs(swing) >= 3 else 0)
-    # 폭은 세 칸 — 몸통(10칸) 대비 정면 팔(몸판 12칸에 3칸)과 같은 비율.
-    # 네 칸으로 키워 봤더니 몸통 절반이 팔이 되어 비율이 어긋났다.
+    # 폭은 네 칸 — 세 칸은 몸통(10칸)에 대면 젓가락처럼 얇았다. 대신
+    # 밝은 하이라이트 줄은 넣지 않는다. 전에 네 칸이 어색했던 건 두께가
+    # 아니라 밝은 줄 때문에 팔이 몸에서 튀어 보여서였다 — 몸판 색에
+    # 그늘 한 줄만 얹으면 두꺼워도 몸에 자연스럽게 붙는다.
     cells = {}
     for yy in range(y + 1, hy):
         t = (yy - (y + 1)) / max(1, hy - 1 - (y + 1))
-        x = c - 1 + round(swing * t)
-        for j, cc in enumerate(('B', 'b', 'L')):
+        x = c - 2 + round(swing * t)
+        for j, cc in enumerate(('B', 'b', 'b', 'b')):
             cells[(x + j, yy)] = 'B' if yy == hy - 1 else cc     # 마지막 줄은 소매단
-    hx = c - 1 + swing
-    for j in range(3):
+    hx = c - 2 + swing
+    for j in range(4):
         for k in range(3):
-            cells[(hx + j, hy + k)] = 's'                        # 손 (세 칸)
-    cells[(hx + 1, hy + 2)] = 'S'
+            cells[(hx + j, hy + k)] = 's'                        # 손 (네 칸)
     cells[(hx + 2, hy + 2)] = 'S'
+    cells[(hx + 3, hy + 2)] = 'S'
     for (x, yy) in cells:                                        # 획 둘레 윤곽선
         for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
