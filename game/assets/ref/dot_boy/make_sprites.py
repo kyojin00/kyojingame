@@ -237,16 +237,21 @@ def legs_down(g, stride, dx=0, sq=0):
         pc = 'P' if lift else 'p'              # 들린 다리는 그늘에 잠긴다
         inner = x0 + 4 if x0 == 10 else x0     # 가랑이 쪽 그늘 열
         top = LEG_Y + sq
+        # 들린 다리는 무릎 아래가 안쪽으로 접힌다 (정면에서 본 무릎 굽힘)
+        bend = (1 if x0 == 10 else -1) if lift >= 2 else 0
+        knee_row = (top + GROUND - lift) // 2
         for yy in range(top, GROUND - 3 - lift):
             t = (yy - (HIP_Y + 2 + sq)) / (GROUND - HIP_Y - 2 - sq)
             off = round(dx * (1 - t))          # 엉덩이 쪽만 dx만큼 쏠린다
+            if yy > knee_row:
+                off += bend
             g.rect(x0 + off, yy, x0 + 4 + off, yy, pc)
             g.px(inner + off, yy, 'P')
             if yy == top:
                 g.hline(x0 + off, x0 + 4 + off, yy, 'P')
-        g.rect(x0, GROUND - 3 - lift, x0 + 4, GROUND - lift, 'k')
-        g.hline(x0, x0 + 4, GROUND - lift, 'K')
-        g.px(x0 if x0 == 17 else x0 + 4, GROUND - 1 - lift, 'K')
+        g.rect(x0 + bend, GROUND - 3 - lift, x0 + 4 + bend, GROUND - lift, 'k')
+        g.hline(x0 + bend, x0 + 4 + bend, GROUND - lift, 'K')
+        g.px((x0 if x0 == 17 else x0 + 4) + bend, GROUND - 1 - lift, 'K')
 
 
 def torso_side(g, bob, swing, lean=0, draw_arm=True):
@@ -305,18 +310,33 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다.
     # 옆에서 본 다리는 앞뒤 두께가 몸통과 비슷해야 한다 — 7칸 폭
     # (몸통 10칸). 가늘게 그리면 상자 밑에 젓가락을 꽂은 꼴이 된다.
+    #
+    # 무릎: 다리를 허벅지(엉덩이→무릎)와 정강이(무릎→발)로 갈라 긋는다.
+    # 뒤로 찬 다리는 무릎이 조금만 뒤로 가고 발이 더 크게 뒤로 차올라
+    # 무릎이 접힌 게 보인다. 앞 다리는 무릎이 반 발 앞서는 정도만.
     for off, shade in ((-stride, True), (stride, False)):
-        lift = 2 if off < 0 else 0             # 뒤로 간 다리는 뒤꿈치가 들린다
+        back = off < 0
+        lift = 2 if back else 0                # 뒤로 간 다리는 뒤꿈치가 들린다
+        knee_off = off * (0.35 if back else 0.55)
+        foot_off = round(off * 1.35) if back else off
         pc, kc = ('P', 'K') if shade else ('p', 'k')
         bot = GROUND - lift
+        hip_row = HIP_Y + 2 + sq
+        knee_row = (hip_row + bot) // 2 + 1
         for yy in range(LEG_Y + sq, bot + 1):
-            t = (yy - (HIP_Y + 2 + sq)) / (GROUND - HIP_Y - 2 - sq)  # 엉덩이 0 → 발 1
-            x = 15 + round(off * t + dx * (1 - t)) + lean
+            if yy <= knee_row:                 # 허벅지
+                f = (yy - hip_row) / max(1, knee_row - hip_row)
+                o = knee_off * f
+            else:                              # 정강이
+                f = (yy - knee_row) / max(1, bot - knee_row)
+                o = knee_off + (foot_off - knee_off) * f
+            t = (yy - hip_row) / (GROUND - hip_row)
+            x = 15 + round(o + dx * (1 - t)) + lean
             cc = pc if yy <= bot - 4 else kc
             g.rect(x - 3, yy, x + 3, yy, cc)
             if not shade and yy <= bot - 4:
                 g.px(x - 3, yy, 'P')           # 가까운 다리 뒤쪽 그늘 선
-        x = 15 + off + lean
+        x = 15 + foot_off + lean
         if off > 0:
             g.px(x + 4, bot, kc)               # 앞으로 디딘 발끝
         elif off < 0:
