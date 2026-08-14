@@ -577,10 +577,14 @@ HEAD_DOWN_F = [
     "Oh" "ss" "ee" "ssss" "ee" "ss" "h" "O",
     "Oh" "ss" "ei" "ssss" "ie" "ss" "h" "O",
     "Oh" "r" "ssssssssss" "r" "h" "O",
-    ".Oh" "ssss" "mm" "ssss" "h" "O.",
-    ".OssssssssssssO.",
-    "..OssssssssssO..",
-    "...OOssssssOO...",
+    ".hh" "ssss" "mm" "ssss" "hh.",
+    ".hh" "ssssssssss" "hh.",
+    ".hh" "ssssssssss" "hh.",
+    ".hh" "OO" "ssssss" "OO" "hh.",
+    ".hh" ".........." "hh.",
+    ".hh" ".........." "hh.",
+    ".gg" ".........." "gg.",
+    "..g" ".........." "g..",
 ]
 
 HEAD_SIDE_F = [   # 오른쪽을 본다
@@ -598,10 +602,14 @@ HEAD_SIDE_F = [   # 오른쪽을 본다
     "Ohhh" "ssssss" "ee" "sss" "O",
     "Ohhh" "ssssss" "ei" "sss" "O",
     "Ohh" "sss" "rr" "sssssss" "O",
-    ".Ohh" "ssssss" "mm" "ss" "O.",
-    ".Oh" "sssssssssss" "O.",
-    "..OssssssssssO..",
-    "...OOssssssOO...",
+    ".hhh" "ssssss" "mm" "ss" "O.",
+    ".hhh" "ssssssssss" "O.",
+    ".hhh" "sssssssss" "O..",
+    ".hhh" "O" "ssssss" "OO" "...",
+    ".hhh" "............",
+    ".hhh" "............",
+    ".ggg" "............",
+    "..gg" "............",
 ]
 
 HEAD_UP_F = [
@@ -619,14 +627,20 @@ HEAD_UP_F = [
     "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
     "OghhhhhhhhhhhhgO",
-    ".OghhhhhhhhhhgO.",
-    ".OghhhhhhhhhhgO.",
-    "..OghhhhhhhhgO..",
-    "...OOggggggOO...",
+    ".OhhhhhhhhhhhhO.",
+    ".OhhhhhhhhhhhhO.",
+    "..OhhhhhhhhhhO..",
+    "...OhhhhhhhhO...",
+    "..hhhhhhhhhhhh..",
+    "..hhhhhhhhhhhh..",
+    "..gghhhhhhhhgg..",
+    "....gggggggg....",
 ]
 
+# 여자 머리는 어깨까지 내려온다 — 18행 얼굴 + 4행 머리채 = 22행.
+# 머리를 몸 위에 겹쳐 그리므로 늘어난 행이 어깨·등을 자연스럽게 덮는다.
 for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
-    assert len(_art) == 18 and all(len(r) == 16 for r in _art), \
+    assert len(_art) == 22 and all(len(r) == 16 for r in _art), \
         [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
 
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
