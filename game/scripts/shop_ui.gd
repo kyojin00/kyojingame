@@ -369,6 +369,24 @@ func _rebuild() -> void:
 			# 부품(못·경첩)은 잡화점이 아니라 대장간에서 판다
 			_note("도구·부품은 대장간에서 다룬다. 새 물건이 들어오면 이 선반에 놓인다.")
 		if buy_cat in ["", "life"] and GameData.day > GameData.merchant_day:
+			# 초반 음식 레시피 — 재료를 겪어 본 순서대로 하나씩 진열된다
+			# (산딸기 주움→잼 · 밀 수확→밀가루 · 밀가루 얻음→빵 · 요리해 봄→토스트)
+			var food_rows := 0
+			for fid: String in GameData.SHOP_FOOD_IDS:
+				if not GameData.recipe_locked(fid) or GameData.recipe_items.has(fid):
+					continue
+				if not GameData.shop_food_on_sale(fid):
+					continue
+				if food_rows == 0:
+					_note("— 요리 레시피 (초반 음식) —")
+				food_rows += 1
+				var fprice := int(GameData.SHOP_FOOD_RECIPES[fid])
+				var fb := _mk_button("구매", _on_buy_dish_recipe.bind(fid, fprice))
+				fb.disabled = GameData.money < fprice
+				items_box.add_child(_mk_row("recipe",
+					"%s 레시피" % str(GameData.ITEMS[fid].name),
+					"체력 +%d" % int(GameData.RECIPES[fid].energy),
+					fb, [["coin", fprice]]))
 			# 요리 레시피 — 물고기를 잡았다고 저절로 떠오르지 않는다.
 			# 여기서 사서 가방(제작·배치)의 두루마리로 배운다.
 			# 도착 첫날은 진열 전이고, 그 요리에 드는 물고기를 낚아 봐야 선반에 오른다

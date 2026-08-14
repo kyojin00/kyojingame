@@ -874,6 +874,34 @@ func shop_dish_on_shelf(did: String) -> bool:
 			return false
 	return true
 
+
+# 초반 음식 레시피 — 잡화점에서 단계적으로 풀린다. id -> 가격
+const SHOP_FOOD_RECIPES := {
+	"dish_berry_jam": 150, "flour": 100, "dish_bread": 150,
+	"dish_berry_toast": 250,
+}
+const SHOP_FOOD_IDS := ["dish_berry_jam", "flour", "dish_bread",
+	"dish_berry_toast"]
+
+
+# 초반 음식 레시피의 진열 조건 — 재료를 겪어 본 순서대로 하나씩 열린다.
+#   산딸기잼      산딸기를 주워 본 적이 있다
+#   밀가루        밀을 처음 수확했다 (수확이 곧 발견 기록)
+#   빵            밀가루를 얻어 봤다
+#   산딸기잼 토스트  밀가루나 산딸기잼 중 하나라도 만들어 봤다
+func shop_food_on_sale(rid: String) -> bool:
+	match rid:
+		"dish_berry_jam":
+			return discovered.has("forage_berry")
+		"flour":
+			return discovered.has("wheat")
+		"dish_bread":
+			return discovered.has("flour")
+		"dish_berry_toast":
+			return int(recipes_cooked.get("flour", 0)) > 0 \
+				or int(recipes_cooked.get("dish_berry_jam", 0)) > 0
+	return false
+
 const STALL_RECIPES := {
 	"dish_smelt_fry": 800, "dish_eel_rice": 1500, "dish_salmon_steak": 1600,
 }
@@ -1722,6 +1750,11 @@ const ITEMS := {
 	"dish_soup": {"name": "야채 수프", "sell": 110},
 	"dish_jam": {"name": "딸기잼", "sell": 150},
 	"dish_cornbread": {"name": "옥수수빵", "sell": 130},
+	# 초반 음식 사슬 — 산딸기잼 → 밀가루 → 빵 → 산딸기잼 토스트
+	"dish_berry_jam": {"name": "산딸기잼", "sell": 60},
+	"flour": {"name": "밀가루", "sell": 25},
+	"dish_bread": {"name": "빵", "sell": 70},
+	"dish_berry_toast": {"name": "산딸기잼 토스트", "sell": 150},
 	"dish_grilled_fish": {"name": "생선구이", "sell": 90},
 	"dish_stew": {"name": "매운탕", "sell": 200},
 	"dish_pie": {"name": "호박파이", "sell": 280},
@@ -1810,6 +1843,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_king", "fish_dragon",
 	"ore", "gem", "star_shard", "bouquet", "wedding_ring",
 	"nail", "cloth", "rope", "hinge", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
 	"dish_pickle", "dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad",
 	"dish_sweet_potato", "dish_bean_rice", "dish_rice_cake", "dish_melon_ice",
@@ -1867,11 +1901,22 @@ func discover(id: String) -> bool:
 
 # ---- 컬렉션 ----
 #
-# 묶음을 다 모으면 잠긴 레시피가 열린다 (메이플 몬스터컬렉션식).
-# **지금은 전부 비워 뒀다** — 아무것도 진행하지 않았는데 미리 열려
-# 보이던 현상을 걷어냈고, 앞으로는 따로 지정해 주는 컬렉션만
-# 이 표에 한 줄씩 등록한다. (형식: id/name/reward/ids)
-const COLLECTIONS := []
+# 묶음을 다 모으면 보상이 열린다 (메이플 몬스터컬렉션식).
+# 따로 지정해 주는 컬렉션만 이 표에 한 줄씩 등록한다.
+#   형식: id/name/reward(레시피 id 또는 "")/ids
+#   perk  "" 아니면 완성 시 영구 버프 — "speed"는 이동 속도 소폭 증가
+const COLLECTIONS := [
+	{"id": "col_food_starter", "name": "초반 음식", "reward": "",
+		"perk": "speed", "perk_text": "이동 속도 소폭 증가 (영구)",
+		"ids": ["dish_berry_jam", "flour", "dish_bread", "dish_berry_toast"]},
+]
+
+# 「초반 음식」 완성 보상 — 걸음이 영구히 조금 빨라진다
+const FOOD_COL_SPEED := 1.05
+
+
+func perk_speed_mult() -> float:
+	return FOOD_COL_SPEED if "col_food_starter" in collections_done else 1.0
 # ---- 레시피 아이템 ----
 #
 # 사거나 받은 레시피는 곧바로 배워지지 않는다 — 가방의 「제작·배치」
@@ -2273,6 +2318,14 @@ const RECIPES := {
 	"dish_soup": {"needs": {"potato": 1, "carrot": 2}, "energy": 45},
 	"dish_jam": {"needs": {"strawberry": 3}, "energy": 35},
 	"dish_cornbread": {"needs": {"corn": 2}, "energy": 50},
+	# ---- 초반 음식 사슬 (레시피는 잡화점에서 조건부로 판다) ----
+	# 산딸기를 주워 봐야 잼이, 밀을 거둬 봐야 밀가루가 선반에 오른다.
+	# 넷을 전부 만들면 도감 「초반 음식」 컬렉션이 차고 이동 속도가 오른다
+	"dish_berry_jam": {"needs": {"forage_berry": 3}, "energy": 30, "locked": true},
+	"flour": {"needs": {"wheat": 1}, "energy": 5, "locked": true},
+	"dish_bread": {"needs": {"flour": 1}, "energy": 45, "locked": true},
+	"dish_berry_toast": {"needs": {"dish_berry_jam": 1, "dish_bread": 1},
+		"energy": 80, "locked": true},
 	"dish_eggplant": {"needs": {"eggplant": 2}, "energy": 40},
 	"dish_salad": {"needs": {"cabbage": 1, "milk": 1}, "energy": 55},
 	"dish_punch": {"needs": {"watermelon": 1, "strawberry": 1}, "energy": 60},
@@ -2315,6 +2368,7 @@ const RECIPES := {
 	"dish_butter_corn": {"needs": {"butter": 1, "corn": 1}, "energy": 60, "locked": true},
 }
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_eggplant", "dish_salad", "dish_punch", "dish_pie", "dish_pickle",
 	"dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad", "dish_sweet_potato",
 	"dish_bean_rice", "dish_rice_cake", "dish_melon_ice", "dish_onion_soup",
@@ -3812,6 +3866,14 @@ func current_seed_id() -> String:
 		return ""
 	seed_index = seed_index % owned.size()
 	return owned[seed_index]
+
+
+# 가진 씨앗 총 수 — 0이면 가방의 씨앗 주머니 항목 자체를 숨긴다
+func seed_total() -> int:
+	var n := 0
+	for id: String in CROP_IDS:
+		n += int(seeds[id])
+	return n
 
 
 func cycle_seed() -> void:

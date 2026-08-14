@@ -687,6 +687,8 @@ func _process(delta: float) -> void:
 		var body := "묶음을 전부 모았다!"
 		if str(col.reward) != "":
 			body = "%s 레시피가 열렸다!" % GameData.ITEMS[col.reward].name
+		elif str(col.get("perk", "")) == "speed":
+			body = "이동 속도가 영구히 조금 빨라졌다!"
 		_toast_queue.append({"head": "★ 도감 완성 — %s!" % col.name,
 			"body": body,
 			"icon": (main.tex.get(col.reward) if str(col.reward) != "" else null) \

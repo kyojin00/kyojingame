@@ -802,14 +802,18 @@ func _debug_tick() -> void:
 				and spear_kill and sword_hit,
 				" 제작=", sp_started and sw_started, " 해금=", both_unlocked,
 				" 창강타=", spear_kill, " 검연타=", sword_hit)
-			# ③ 컬렉션 표는 비워 뒀다 — 미리 열려 보이는 것 없이, 발견 기록만 쌓인다
+			# ③ 무기 컬렉션은 걷어냈다 — 따로 지정한 컬렉션(초반 음식)만 남고,
+			# 무기는 발견 기록만 쌓인다
 			m.doing.gain_item("arrow", 1)
 			GameData.discover("arrow")
 			GameData._check_collections()
-			print("WEAPONCOL_OK=", GameData.COLLECTIONS.is_empty()
-				and GameData.collections_done.is_empty()
+			var weapon_col := false
+			for wcol: Dictionary in GameData.COLLECTIONS:
+				if (wcol.ids as Array).has("spear") or (wcol.ids as Array).has("arrow"):
+					weapon_col = true
+			print("WEAPONCOL_OK=", not weapon_col
 				and GameData.discovered.has("spear") and GameData.discovered.has("sword"),
-				" 표비움=", GameData.COLLECTIONS.is_empty(),
+				" 무기표없음=", not weapon_col,
 				" 발견기록=", GameData.discovered.has("spear"))
 		353:
 			# 쓰레기통 = 24시간 무인 판매함 — 설치(바깥/집 안)·80% 판매·회수
@@ -1953,7 +1957,8 @@ func _debug_tick() -> void:
 				" 두번으로는안됨=", not_yet, " 세번에발견=", found)
 			GameData.desk_done_pending.clear()
 		385:
-			# 발견 기록 — 컬렉션 표는 비워 뒀다 (locked 요리는 열리지 않아야 한다)
+			# 발견 기록 — 컬렉션은 지정한 「초반 음식」 하나뿐이고, 진행 전에는
+			# 완성으로 치지 않는다 (locked 요리는 열리지 않아야 한다)
 			GameData.discovered.clear()
 			GameData.collections_done.clear()
 			GameData.recipes_unlocked.clear()
@@ -1962,14 +1967,17 @@ func _debug_tick() -> void:
 			var was_locked := GameData.recipe_locked("dish_fried_egg")
 			for cid2: String in ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]:
 				GameData.discover(cid2)
+			var only_food: bool = GameData.COLLECTIONS.size() == 1 \
+				and str(GameData.COLLECTIONS[0].id) == "col_food_starter" \
+				and GameData.collections_done.is_empty()
 			var still_locked := GameData.recipe_locked("dish_fried_egg")  # locked 요리는 그대로
 			var basic_open := not GameData.recipe_locked("dish_baked_potato")  # 기본 요리는 떠오른다
 			var no_banner := GameData.collection_pending.is_empty()
 			var dated := GameData.discovered_on("pea") != ""
 			var again := not GameData.discover("pea")   # 두 번째는 기록하지 않는다
-			print("COLLECT_OK=", GameData.COLLECTIONS.is_empty() and was_locked
+			print("COLLECT_OK=", only_food and was_locked
 				and still_locked and basic_open and no_banner and dated and again,
-				" 표비움=", GameData.COLLECTIONS.is_empty(), " 잠긴요리유지=", still_locked,
+				" 초반음식만=", only_food, " 잠긴요리유지=", still_locked,
 				" 기본요리떠오름=", basic_open, " 배너없음=", no_banner,
 				" 날짜=", GameData.discovered_on("pea"), " 중복차단=", again)
 			# 상점 해금: 재료를 겪기 전에는 대장간이 안 벼려 준다
@@ -2489,6 +2497,59 @@ func _debug_tick() -> void:
 				and day_off and day_on,
 				" 안낚음=", shelf_off, " 낚음=", shelf_on, " 황금잉어=", golden,
 				" 첫날숨김=", day_off, " 다음날=", day_on)
+		329:
+			# #121: 초반 음식 — 단계 진열·컬렉션·이속 보상 + 물고기=재료 칸 + 씨앗 숨김
+			var keep_disc: Dictionary = GameData.discovered.duplicate()
+			var keep_ck: Dictionary = GameData.recipes_cooked.duplicate()
+			var keep_cdone: Array = GameData.collections_done.duplicate()
+			for did9: String in ["forage_berry", "wheat", "flour"]:
+				GameData.discovered.erase(did9)
+			GameData.recipes_cooked.erase("flour")
+			GameData.recipes_cooked.erase("dish_berry_jam")
+			var st0: bool = not GameData.shop_food_on_sale("dish_berry_jam") \
+				and not GameData.shop_food_on_sale("flour") \
+				and not GameData.shop_food_on_sale("dish_bread") \
+				and not GameData.shop_food_on_sale("dish_berry_toast")
+			GameData.discovered["forage_berry"] = 1
+			GameData.discovered["wheat"] = 1
+			var st1: bool = GameData.shop_food_on_sale("dish_berry_jam") \
+				and GameData.shop_food_on_sale("flour") \
+				and not GameData.shop_food_on_sale("dish_bread")
+			GameData.discovered["flour"] = 1
+			GameData.recipes_cooked["flour"] = 1
+			var st2: bool = GameData.shop_food_on_sale("dish_bread") \
+				and GameData.shop_food_on_sale("dish_berry_toast")
+			# 넷을 전부 만들어 보면 「초반 음식」이 차고 걸음이 빨라진다
+			GameData.collections_done.erase("col_food_starter")
+			var v0: float = GameData.perk_speed_mult()
+			for fid2: String in ["dish_berry_jam", "flour", "dish_bread",
+					"dish_berry_toast"]:
+				GameData.discovered[fid2] = 1
+			GameData._check_collections()
+			var col_ok: bool = "col_food_starter" in GameData.collections_done
+			var sped: bool = v0 == 1.0 and GameData.perk_speed_mult() > 1.0
+			GameData.collection_pending.clear()
+			# 낚은 물고기는 요리 칸이 아니라 재료 칸에 정렬된다
+			GameData.items["fish_sweetfish"] = maxi(1,
+				int(GameData.items["fish_sweetfish"]))
+			var fish_tab := ""
+			for e3: Dictionary in m.inventory_ui._item_entries():
+				if str(e3.get("name", "")) == "은어":
+					fish_tab = str(e3.get("tab", ""))
+			# 씨앗이 하나도 없으면 가방의 씨앗 주머니 항목이 사라진다
+			var keep_seeds: Dictionary = GameData.seeds.duplicate()
+			for cid3: String in GameData.CROP_IDS:
+				GameData.seeds[cid3] = 0
+			var pouch_gone: bool = GameData.seed_total() == 0
+			GameData.seeds = keep_seeds
+			GameData.discovered = keep_disc
+			GameData.recipes_cooked = keep_ck
+			GameData.collections_done = keep_cdone
+			print("FOODCOL_OK=", st0 and st1 and st2 and col_ok and sped
+				and fish_tab == "res" and pouch_gone,
+				" 진열0=", st0, " 잼밀가루=", st1, " 빵토스트=", st2,
+				" 컬렉션=", col_ok, " 이속=", sped,
+				" 물고기재료칸=", fish_tab == "res", " 씨앗숨김=", pouch_gone)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()

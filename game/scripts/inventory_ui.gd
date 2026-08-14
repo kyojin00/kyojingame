@@ -164,6 +164,15 @@ func _tool_tip(t: String) -> Dictionary:
 		if gain != "" and GameData.UPGRADES.has(t) \
 				and lv - 1 < int(GameData.UPGRADES[t].levels.size()):
 			body += "\n강화 시  %s" % gain
+	# 씨앗 주머니 — 어떤 씨앗을 몇 개 갖고 있는지 종류별로 정확히 보여 준다
+	if t == "seed":
+		var held: Array = []
+		for id: String in GameData.CROP_IDS:
+			if int(GameData.seeds[id]) > 0:
+				held.append("%s 씨앗 x%d" % [GameData.CROPS[id].name,
+					int(GameData.seeds[id])])
+		if not held.is_empty():
+			body += "\n\n" + " · ".join(held)
 	return {"title": title, "body": body}
 
 
@@ -304,6 +313,9 @@ func _rebuild() -> void:
 		var any := false
 		for t in TOOLS:
 			if not GameData.is_tool_unlocked(t):
+				continue
+			# 씨앗이 하나도 없으면 씨앗 주머니 항목 자체를 보여 주지 않는다
+			if t == "seed" and GameData.seed_total() == 0:
 				continue
 			any = true
 			items_box.add_child(_mk_tool_row(t))
@@ -538,6 +550,12 @@ func _mk_tool_row(t: String) -> Button:
 	if GameData.TOOL_STATS.has(t):
 		right = "위력 %s · 범위 %s" % [
 			GameData.fmt_stat(st.power), GameData.fmt_stat(st.reach)]
+	elif t == "seed":
+		# 뭉뚱그리지 않는다 — 지금 골라 든 씨앗의 정확한 이름과 개수
+		var sid := GameData.current_seed_id()
+		if sid != "":
+			right = "%s 씨앗 x%d" % [GameData.CROPS[sid].name,
+				int(GameData.seeds[sid])]
 	var lv: int = int(GameData.tool_level.get(t, 1))
 	var nm: String = GameData.TOOL_KOR.get(t, t)
 	if GameData.TOOL_STATS.has(t):
@@ -844,7 +862,7 @@ func _item_entries() -> Array:
 			e["sell"] = 0
 			e["desc"] = "전설의 재료 — 연구 노트의 마지막 연금술에 쓰인다 (판매 불가)"
 		elif id.begins_with("fish_"):
-			e["tab"] = "food"
+			# 물고기는 요리 재료다 — 요리 칸이 아니라 재료 칸에 정렬
 			e["color"] = Color(0.5, 0.75, 1.0)
 			e["desc"] = "낚시로 잡은 물고기"
 			if main.note_ui != null:      # 도감과 같은 문구 — 언제 무는지
@@ -868,6 +886,9 @@ func _item_entries() -> Array:
 		elif id in ["egg", "milk"]:
 			e["color"] = Color(0.95, 0.9, 0.8)
 			e["desc"] = "축사 동물이 준 선물. 요리 재료로도 쓴다"
+		elif id == "flour":
+			e["color"] = Color(0.96, 0.94, 0.88)
+			e["desc"] = "밀을 곱게 빻은 가루 — 빵 재료 (조리대)"
 		elif id == "weed":
 			e["desc"] = "숲에서 채집할 수 있는 풀. 빗자루 재료 (제작대)"
 		elif id == "forage_shell":

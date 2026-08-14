@@ -430,8 +430,9 @@ func _process(delta: float) -> void:
 			dir = "right" if v.x > 0 else "left"
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
-		# 강아지 펫 + 장신구 + 탈 것이 이동 속도를 올린다
-		var mult := GameData.pet_speed_mult() * GameData.gear_speed_mult()
+		# 강아지 펫 + 장신구 + 탈 것 + 도감 「초반 음식」 보상이 이동 속도를 올린다
+		var mult := GameData.pet_speed_mult() * GameData.gear_speed_mult() \
+			* GameData.perk_speed_mult()
 		if GameData.riding:
 			mult *= GameData.HORSE_SPEED_MULT
 		v = v * SPEED * mult * delta
