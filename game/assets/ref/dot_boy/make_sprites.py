@@ -650,13 +650,13 @@ HEAD_UP_F = [
     "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
     "OhhhhhhhhhhhhhhO",
+    "OhhhhhhhhhhhhhhO",
     "OghhhhhhhhhhhhgO",
-    ".OhhhhhhhhhhhhO.",
-    ".OhhhhhhhhhhhhO.",
-    "..OhhhhhhhhhhO..",
-    "...OhhhhhhhhO...",
-    "..hhhhhhhhhhhh..",
-    "....gggggggg....",
+    ".hhhhhhhhhhhhhh.",
+    ".hhhhhhhhhhhhhh.",
+    ".hghhhhhhhhhhgh.",
+    ".gghhhhhhhhhhgg.",
+    "..gggggggggggg..",
 ]
 
 # 여자 머리는 어깨 위까지 — 16행 얼굴 + 2행 머리채 = 18행.
