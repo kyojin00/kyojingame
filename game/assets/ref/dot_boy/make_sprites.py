@@ -267,7 +267,10 @@ def legs_down(g, stride, dx=0, sq=0):
             if yy in (top, GROUND - 4 - lift):
                 g.hline(x0 + off, x0 + 3 + off, yy, 'P')   # 허리·발목 접단
         g.rect(x0 + bend, GROUND - 3 - lift, x0 + 3 + bend, GROUND - 1 - lift, 'k')
-        g.hline(x0 + 1 + bend, x0 + 2 + bend, GROUND - lift, 'K')  # 바닥은 좁게 (둥근 신발)
+        if lift:                               # 들린 발은 기울어 밑창이 보인다
+            g.hline(x0 + bend, x0 + 3 + bend, GROUND - lift, 'K')
+        else:
+            g.hline(x0 + 1 + bend, x0 + 2 + bend, GROUND - lift, 'K')  # 둥근 신발 바닥
         g.px((x0 if x0 == 17 else x0 + 3) + bend, GROUND - 1 - lift, 'K')
         g.px(x0 + 1 + bend, GROUND - 3 - lift, 'p')        # 신발 코 광
         g.px(x0 + 2 + bend, GROUND - 3 - lift, 'p')
@@ -372,10 +375,13 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
             if not shade and yy == bot - 3:
                 g.px(x + 2, yy, 'p')           # 신발 코 광
         x = 15 + foot_off + lean
-        if off > 0:
-            g.px(x + 4, bot - 1, kc)           # 앞으로 디딘 발끝
-        elif off < 0:
-            g.px(x - 4, bot - 1, kc)           # 뒤로 차는 뒤꿈치
+        # 앞코 — 신발이 진행 방향으로 두 칸 나온 둥근 코. 뒤로 찬 발도
+        # 코는 앞을 본다 (뒤꿈치만 들린다).
+        g.rect(x + 4, bot - 1, x + 5, bot - 1, kc)
+        g.px(x + 4, bot, kc)
+        g.px(x + 4, bot - 2, 'p' if not shade else kc)   # 발등 광
+        if off < 0:
+            g.px(x - 4, bot - 1, kc)           # 들린 뒤꿈치
 
 
 def torso_up(g, bob, swing, dx=0, skip=None):
