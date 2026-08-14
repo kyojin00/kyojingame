@@ -359,9 +359,9 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
                 g.rect(x - 2, yy, x + 2, yy, cc)   # 바닥은 좁게 (둥근 발)
             else:
                 g.rect(x - 3, yy, x + 3, yy, cc)
-            if not shade and yy <= bot - 4:
-                g.px(x - 3, yy, 'P')           # 가까운 다리 뒤쪽 그늘 선
-                if yy == bot - 4:
+            if not shade and hip_row < yy <= bot - 4:  # 띠에 겹친 줄은 건드리지
+                g.px(x - 3, yy, 'P')           # 않는다 — 가랑이 그늘 위에 밝은
+                if yy == bot - 4:              # 점이 찍히면 허리가 튀어 보인다
                     g.rect(x - 2, yy, x + 3, yy, 'P')   # 발목 접단
                 else:
                     g.px(x + 3, yy, 'q')       # 앞쪽 하이라이트
