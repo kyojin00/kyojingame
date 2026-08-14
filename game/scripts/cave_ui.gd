@@ -101,7 +101,7 @@ func open(wt: bool = false, start_floor: int = 1) -> void:
 		main.hud.show_message("동굴 %d층 — %s\nSpace: 공격 · 몬스터를 모두 잡자!"
 			% [floor_num, floor_title()], 4.0)
 		if special != "":
-			main.hud.quest_toast(str(SPECIALS[special].name))
+			main.hud.event_toast(str(SPECIALS[special].name))
 
 
 func close() -> void:
@@ -565,7 +565,7 @@ func _interact() -> void:
 		var msg2 := "동굴 %d층 — %s" % [floor_num, floor_title()]
 		if special != "":
 			msg2 += "\n" + str(SPECIALS[special].hint)
-			main.hud.quest_toast(str(SPECIALS[special].name))
+			main.hud.event_toast(str(SPECIALS[special].name))
 		if not worldtree and floor_num % 5 == 0:
 			msg2 += "\n무언가 커다란 것이 버티고 있다..."
 		if not worldtree and floor_num % GameData.MINE_ELEVATOR_STEP == 0:

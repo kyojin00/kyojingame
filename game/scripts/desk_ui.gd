@@ -161,7 +161,7 @@ func _rebuild() -> void:
 		ub.pressed.connect(func() -> void:
 			if GameData.desk_upgrade():
 				Sound.play_sfx("sfx_place")
-				main.hud.quest_toast("%s 완성" % GameData.DESK_NAMES[GameData.desk_lv])
+				main.hud.event_toast("%s 완성" % GameData.DESK_NAMES[GameData.desk_lv])
 				main.saveio.save_now()
 			_rebuild())
 		row2.add_child(ub)

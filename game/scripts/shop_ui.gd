@@ -368,15 +368,21 @@ func _rebuild() -> void:
 		if buy_cat == "tool":
 			# 부품(못·경첩)은 잡화점이 아니라 대장간에서 판다
 			_note("도구·부품은 대장간에서 다룬다. 새 물건이 들어오면 이 선반에 놓인다.")
-		if buy_cat in ["", "life"]:
+		if buy_cat in ["", "life"] and GameData.day > GameData.merchant_day:
 			# 요리 레시피 — 물고기를 잡았다고 저절로 떠오르지 않는다.
-			# 여기서 사서 가방(제작·배치)의 두루마리로 배운다
-			_note("— 요리 레시피 (생선 요리) —")
+			# 여기서 사서 가방(제작·배치)의 두루마리로 배운다.
+			# 도착 첫날은 진열 전이고, 그 요리에 드는 물고기를 낚아 봐야 선반에 오른다
+			var dish_rows := 0
 			for did: String in GameData.SHOP_DISH_IDS:
 				var dname := str(GameData.ITEMS[did].name)
 				# 이미 산(또는 배운) 레시피는 목록에서 바로 사라진다
 				if not GameData.recipe_locked(did) or GameData.recipe_items.has(did):
 					continue
+				if not GameData.shop_dish_on_shelf(did):
+					continue
+				if dish_rows == 0:
+					_note("— 요리 레시피 (생선 요리) —")
+				dish_rows += 1
 				var dprice := int(GameData.SHOP_DISH_RECIPES[did])
 				var db := _mk_button("구매", _on_buy_dish_recipe.bind(did, dprice))
 				db.disabled = GameData.money < dprice

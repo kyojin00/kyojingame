@@ -387,7 +387,7 @@ func use_tool() -> void:
 			var was: int = m.pasture.size()
 			m.farming._recount_pasture()
 			if m.pasture.size() > was:
-				m.hud.quest_toast("목초지 완성!")
+				m.hud.event_toast("목초지 완성!")
 				m.hud.show_message(
 					"울타리가 닫혔다! 목초지 %d칸 — 안에 있는 동물은 알아서 배부르고 "
 					% m.pasture.size() + "생산물도 더 준다.", 5.0)

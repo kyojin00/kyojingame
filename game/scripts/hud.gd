@@ -255,6 +255,14 @@ func quest_toast(title: String) -> void:
 	Sound.play_sfx("sfx_catch")
 
 
+# 퀘스트가 아닌 사건 알림 — 완공·해금·발견처럼 축하할 일.
+# 「퀘스트 완료!」 머리말을 아무 데나 붙이던 버릇을 여기로 분리했다.
+func event_toast(title: String) -> void:
+	_toast_queue.append({"head": "✨ 알림", "body": title, "icon": null,
+		"head_col": Color(0.55, 0.45, 0.72)})
+	Sound.play_sfx("sfx_catch")
+
+
 # 퀘스트 시작 — 딱딱한 검은 알림 대신, 통통 튀며 내려오는 말풍선으로
 func quest_start_toast(title: String) -> void:
 	_toast_queue.append({"head": "📜 새로운 퀘스트!", "body": title, "icon": null,

@@ -844,6 +844,9 @@ var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫�
 # 대화 선택지에 ❗로 뜬다. 재료를 모아다 주면 해변에 노점이 선다.
 #   "": 아직 안 받음 / doing: 재료 모으는 중 / done: 노점 완성
 var merchant_errand := ""
+# 민지가 마을에 도착해 첫 인사를 나눈 날 (0 = 아직/구세이브).
+# 도착 첫날은 잡화점에 요리 레시피 선반이 아직 없다 — 다음 날부터 진열
+var merchant_day := 0
 # 오늘 민지가 노점에 나와 있는 시각들 (분 단위 시작점). 하루 3번, 1시간씩 —
 # 매일 아침 새로 뽑는다. 민지가 있어야 노점에서 「구매」할 수 있다 (판매는 상시).
 var stall_hours: Array = []
@@ -855,10 +858,21 @@ const STALL_VISIT_MIN := 60    # 1회 방문 시간 (게임 분)
 # 잡화점 생활용품 선반의 요리 레시피 (생선 요리 — 사서 「배우기」)
 const SHOP_DISH_RECIPES := {
 	"dish_grilled_fish": 200, "dish_fish_soup": 300, "dish_stew": 400,
-	"dish_crab_soup": 500, "dish_sashimi": 600,
+	"dish_crab_soup": 500, "dish_sashimi": 600, "dish_golden_roast": 800,
 }
 const SHOP_DISH_IDS := ["dish_grilled_fish", "dish_fish_soup", "dish_stew",
-	"dish_crab_soup", "dish_sashimi"]
+	"dish_crab_soup", "dish_sashimi", "dish_golden_roast"]
+
+
+# 잡화점 요리 레시피 진열 조건 — 그 요리에 드는 물고기를 한 번이라도
+# 직접 낚아 봤어야 선반에 오른다 (민지가 "이 생선 요리법 필요하지?" 하는 셈).
+# 물고기가 안 드는 요리라면 언제나 진열.
+func shop_dish_on_shelf(did: String) -> bool:
+	var needs: Dictionary = RECIPES.get(did, {}).get("needs", {})
+	for mid: String in needs:
+		if str(mid).begins_with("fish_") and int(fish_caught.get(mid, 0)) <= 0:
+			return false
+	return true
 
 const STALL_RECIPES := {
 	"dish_smelt_fry": 800, "dish_eel_rice": 1500, "dish_salmon_steak": 1600,
@@ -2286,7 +2300,8 @@ const RECIPES := {
 	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120, "locked": true},
 	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70, "locked": true},
 	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60, "locked": true},
-	# ---- 귀한 것 (컬렉션 보상으로 열린다) ----
+	# ---- 귀한 것 ----
+	# 황금잉어 구이는 잡화점 선반(황금잉어를 낚아 본 뒤)에서 레시피를 판다
 	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160, "locked": true},
 	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150, "locked": true},
 	# 숨겨진 레시피 — 해변에서 산호 조각을 처음 주우면 떠오른다
@@ -3518,6 +3533,7 @@ func reset_all() -> void:
 	fisher_choice = 0
 	sea_open = false
 	merchant_errand = ""
+	merchant_day = 0
 	stall_hours = []
 	forest_quest = ""
 	forest_day = 0
@@ -3867,7 +3883,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
 		"sea_open": sea_open, "story2_phase": story2_phase,
-		"merchant_errand": merchant_errand, "stall_hours": stall_hours,
+		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
+		"stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,
 		"affinity_open": affinity_open,
 		"move_quest": move_quest, "move_day": move_day,

@@ -37,7 +37,7 @@ func _build_house() -> void:
 	m.dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
 		GameData.BED_WOOD)
 	m.dialog.set_buttons([["좋아!", null]])
-	m.hud.quest_toast("집 짓기")
+	m.hud.event_toast("집 짓기")
 	m.saveio.save_now()
 
 
@@ -78,7 +78,7 @@ func _build_shop() -> void:
 	if not GameData.npc_greeted.has("merchant"):
 		GameData.arrivals.append({"id": "merchant", "day": GameData.day})
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("상점 완성!")
+	m.hud.event_toast("상점 완성!")
 	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n주인 민지는 내일 이사 와서 인사하러 온다고 한다.")
 	m.dialog.set_buttons([["좋아!", null]])
 	if GameData.story2_phase == "shop":
@@ -134,7 +134,7 @@ func _unlock_zone(zid: String) -> void:
 	GameData.stone -= int(cost[1])
 	GameData.zones_open.append(zid)
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("마을 확장!")
+	m.hud.event_toast("마을 확장!")
 	m.hud.show_message("%s를 되살렸다! 마을이 넓어졌다. (지도 M)" %
 		str(GameData.VILLAGE_ZONES[zid].name), 6.0)
 	m.queue_redraw()
@@ -195,7 +195,7 @@ func _build_village_building(pid: String) -> void:
 		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
 	m.npcmgr._sync_village_npcs()
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("%s 완공!" % plot.name)
+	m.hud.event_toast("%s 완공!" % plot.name)
 	m.dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼.%s" % [plot.name, greet_note])
 	m.dialog.set_buttons([["좋군요!", null]])
 	m.queue_redraw()
@@ -370,7 +370,7 @@ func _build_greenhouse() -> void:
 				m.objnode._remove_object(t)
 			m.grid[y][x].ground = "soil"
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("온실 완공!")
+	m.hud.event_toast("온실 완공!")
 	m.saveio.save_now()
 	m.queue_redraw()
 	m.dialog.open("온실", "온실이 완성됐다!\n\n이 안에서는 계절을 타지 않는다.\n"
@@ -463,7 +463,7 @@ func _do_breed() -> void:
 	GameData.breed_level += 1
 	Sound.play_sfx("sfx_catch")
 	m.saveio.save_now()
-	m.hud.quest_toast("씨앗 개량 %d단계!" % GameData.breed_level)
+	m.hud.event_toast("씨앗 개량 %d단계!" % GameData.breed_level)
 	_open_lab_dialog()
 
 
@@ -611,7 +611,7 @@ func _finish_festival(bonus := 1.0, extra := "") -> void:
 		for nid: String in GameData.affinity:
 			GameData.affinity[nid] = mini(int(GameData.affinity[nid]) + 5, 100)
 	Sound.play_sfx("sfx_catch")
-	m.hud.quest_toast(str(f.name))
+	m.hud.event_toast(str(f.name))
 	m.hud.reward_toast("%dG" % money, m.tex["icon_coin"])
 	if Net.is_host():
 		m.netsync._broadcast_stats()
@@ -931,7 +931,7 @@ func _merchant_errand_start() -> void:
 		{"text": "목재 %d개랑 조개 %d개만 구해다 줄래?\n진열대랑 장식으로 쓰게." \
 			% [GameData.STALL_WOOD, GameData.STALL_SHELLS]},
 	], func() -> void:
-		m.hud.quest_toast("서브 퀘스트: %s" % MERCHANT_QUEST_NAME)
+		m.hud.quest_start_toast("서브 퀘스트: %s" % MERCHANT_QUEST_NAME)
 		open_merchant_counter())
 
 
@@ -1039,7 +1039,7 @@ func use_trash_bin() -> void:
 			"x": 430.0 + float(GameData.furniture.size() % 4) * 40.0,
 			"y": 255.0 + float(GameData.furniture.size() / 4 % 3) * 30.0})
 		Sound.play_sfx("sfx_place")
-		m.hud.quest_toast("쓰레기통을 들여놓았다")
+		m.hud.event_toast("쓰레기통을 들여놓았다")
 		m.hud.show_message("가까이에서 E: 무인 판매 (제값의 80%) · 꾸미기(F)로 옮길 수 있다", 5.0)
 		m.interior.canvas.queue_redraw()
 		m.saveio.save_now()
@@ -1112,7 +1112,7 @@ func _mom_quest_start(qid: String) -> void:
 	entries.append({"text": "우리 솔이에게 줄 %s %d개가 필요해요.\n구해다 주시면 꼭 사례할게요." \
 		% [GameData.item_display_name(str(q.item)), int(q.qty)]})
 	m.dialog.open_seq("연화", _npc_portrait("forest_mom"), entries, func() -> void:
-		m.hud.quest_toast("연화의 부탁: %s" % str(q.name))
+		m.hud.quest_start_toast("연화의 부탁: %s" % str(q.name))
 		m.saveio.save_now())
 
 

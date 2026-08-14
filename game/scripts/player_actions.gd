@@ -82,7 +82,7 @@ func do_brew(ids: Array) -> Dictionary:
 	var first := GameData.learn_formula(fid)
 	if first:
 		# 처음 맞힌 순간이 이 시스템의 알맹이다 — 크게 알린다
-		m.hud.quest_toast("새 조합법 발견!")
+		m.hud.event_toast("새 조합법 발견!")
 		m.dialog.open("연금술 — 새 조합법",
 			"**%s** 을(를) 만들어냈다!\n\n%s\n\n필요한 속성: %s\n조합법이 연구 노트(N)에 적혔다."
 				% [GameData.FORMULAS[fid].name, GameData.FORMULAS[fid].effect,
@@ -129,7 +129,7 @@ func _maybe_drop_recipe(source: String) -> void:
 	var fid: String = left[randi() % left.size()]
 	GameData.learn_formula(fid)
 	Sound.play_sfx("sfx_ui")
-	m.hud.quest_toast("낡은 조합법을 주웠다")
+	m.hud.event_toast("낡은 조합법을 주웠다")
 	m.hud.show_message("「%s」 조합법을 알아냈다! (%s) — 집 조합대에서 만들 수 있다"
 		% [GameData.FORMULAS[fid].name, GameData.formula_need_text(fid)], 5.0)
 

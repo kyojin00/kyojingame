@@ -290,7 +290,7 @@ func _craft_bed() -> void:
 	Sound.play_sfx("sfx_place")
 	main.dialog.set_body("낡은 침대나마 완성!\n이제 밤이 되면 잘 수 있다.\n책상(제작대)에서 더 좋은 침대를 만들 수 있다.")
 	main.dialog.set_buttons([["좋아!", null]])
-	main.hud.quest_toast("침대 만들기")
+	main.hud.event_toast("침대 만들기")
 	main.saveio.save_now()
 
 
@@ -309,7 +309,7 @@ func _sweep_kitchen() -> void:
 		+ "화구도 냄비도 그대로다... 닦으면 쓸 수 있겠다.\n\n[요리 해금] 조리대 앞에서 E", [
 		["좋아!", null],
 	])
-	main.hud.quest_toast("낡은 조리대 발견")
+	main.hud.event_toast("낡은 조리대 발견")
 	main.saveio.save_now()
 
 
@@ -334,7 +334,7 @@ func _upgrade_house() -> void:
 	Sound.play_sfx("sfx_place")
 	main.dialog.set_body("집 확장 완료!\n방이 넓어지고, 연금술 조합대와 가구 꾸미기(F)가 생겼다.")
 	main.dialog.set_buttons([["좋아!", null]])
-	main.hud.quest_toast("집 확장")
+	main.hud.event_toast("집 확장")
 	main.saveio.save_now()
 
 

@@ -2468,6 +2468,27 @@ func _debug_tick() -> void:
 			m.dialog.close()
 			print("DIALOG2LINE_OK=", pages == 3 and two_lines and choice_last,
 				" 페이지=", pages, "/3 두줄=", two_lines, " 선택지끝장=", choice_last)
+		325:
+			# #114: 잡화점 요리 레시피 — 물고기를 낚아 봐야 진열 + 상인 첫날 숨김
+			var keep_fc: Dictionary = GameData.fish_caught.duplicate()
+			var keep_md := GameData.merchant_day
+			GameData.fish_caught.erase("fish_crucian")
+			var shelf_off: bool = not GameData.shop_dish_on_shelf("dish_grilled_fish")
+			GameData.fish_caught["fish_crucian"] = 1
+			var shelf_on: bool = GameData.shop_dish_on_shelf("dish_grilled_fish")
+			var golden: bool = GameData.SHOP_DISH_IDS.has("dish_golden_roast") \
+				and not GameData.shop_dish_on_shelf("dish_golden_roast")
+			# 상인 도착 첫날은 요리 레시피 절 자체가 닫혀 있다 — 다음 날부터
+			GameData.merchant_day = GameData.day
+			var day_off: bool = not (GameData.day > GameData.merchant_day)
+			GameData.merchant_day = GameData.day - 1
+			var day_on: bool = GameData.day > GameData.merchant_day
+			GameData.fish_caught = keep_fc
+			GameData.merchant_day = keep_md
+			print("SHOPFISH_OK=", shelf_off and shelf_on and golden
+				and day_off and day_on,
+				" 안낚음=", shelf_off, " 낚음=", shelf_on, " 황금잉어=", golden,
+				" 첫날숨김=", day_off, " 다음날=", day_on)
 		334:
 			# #102: 가방 씨앗 슬롯 클릭 -> 씨앗 선택+주머니 장착, 나무 침대 아트
 			var keep_seed_slots: Array = GameData.tool_slots.duplicate()

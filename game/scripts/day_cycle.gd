@@ -194,7 +194,7 @@ func _next_day(passed_out: bool) -> void:
 		GameData.chief_house_lv = 1
 		m.objnode._remove_object(m.CHIEF_HUT)
 		m.objnode._place_object(m.CHIEF_HUT, "chief_hut", 0)
-		m.hud.quest_toast("이장님의 새 집 완공!")
+		m.hud.event_toast("이장님의 새 집 완공!")
 		m.hud.show_message("마을 사람들이 힘을 모아 이장님의 낡은 오두막을\n제대로 된 집으로 다시 지어 드렸다!", 6.0)
 
 	# 마을회관 해금 트리거 — 주민 수를 강제로 맞추는 게 아니라, 게임을
@@ -203,7 +203,7 @@ func _next_day(passed_out: bool) -> void:
 	if not GameData.hall_noticed and not GameData.village_built.has("hall") \
 			and m.village_residents() > GameData.HALL_RESIDENTS:
 		GameData.hall_noticed = true
-		m.hud.quest_toast("마을회관 해금!")
+		m.hud.event_toast("마을회관 해금!")
 		m.hud.show_message("마을 사람이 %d명을 넘었다! 이제 게시판에서\n마을회관을 지을 수 있다." % GameData.HALL_RESIDENTS, 6.0)
 
 	m.saveio.save_now()

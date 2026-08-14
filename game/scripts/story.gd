@@ -1058,7 +1058,7 @@ func _fisher_arrive() -> void:
 		fisher.visible = true
 		fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
 			m.FISHER_ARRIVE.y * m.TILE + 16)
-	m.hud.quest_toast("낯선 낚시꾼이 마을에 왔다")
+	m.hud.event_toast("낯선 낚시꾼이 마을에 왔다")
 	m.hud.show_message("항구 차림의 낯선 사람이 마을 광장에 서 있다. 말을 걸어 보자. (E)", 6.0)
 	m.saveio.save_now()
 
@@ -1167,7 +1167,7 @@ func _end_fisher_quest() -> void:
 	var fisher: Variant = _fisher_node()
 	if fisher != null:
 		fisher.scripted = false   # 이제부터는 마을 일과(부두)대로 산다
-	m.hud.quest_toast("바다 · 해변 해금!")
+	m.hud.event_toast("바다 · 해변 해금!")
 	m.hud.show_message("남쪽 바다가 열렸다! 물가 어디서든 낚시할 수 있다. 이장님이 자네를 찾는다더군. (E)", 7.0)
 	m.saveio.save_now()
 
@@ -1538,7 +1538,7 @@ func hidden_beach_find(fid: String) -> void:
 	if fid == "forage_coral":
 		if "dish_coral_tea" not in GameData.recipes_unlocked:
 			GameData.recipes_unlocked.append("dish_coral_tea")
-		m.hud.quest_toast("숨겨진 레시피 발견: 산호빛 차")
+		m.hud.event_toast("숨겨진 레시피 발견: 산호빛 차")
 		m.dialog.open_seq("산호 조각", null, [
 			{"text": "파도 사이에서 붉게 빛나는 조각을 주웠다.\n"
 				+ "물에 담그자 은은한 노을빛이 번진다."},
@@ -1547,7 +1547,7 @@ func hidden_beach_find(fid: String) -> void:
 			{"text": "[숨겨진 레시피를 배웠다: 산호빛 차]\n집 조리대에 새 칸이 생겼다."},
 		])
 	elif fid == "forage_relic":
-		m.hud.quest_toast("숨겨진 이야기 발견: 물에 잠긴 마을")
+		m.hud.event_toast("숨겨진 이야기 발견: 물에 잠긴 마을")
 		m.dialog.open_seq("고대 조각", null, [
 			{"text": "모래 깊숙이 박힌 낡은 돌조각.\n"
 				+ "닳아 버린 표면에 알 수 없는 무늬가 새겨져 있다."},
@@ -1596,7 +1596,7 @@ func _end_explorer_arrive() -> void:
 	if GameData.forest_quest == "arrive":
 		GameData.forest_quest = "settle"
 		GameData.forest_day = GameData.day
-		m.hud.quest_toast("새 주민: 모험가 무진")
+		m.hud.event_toast("새 주민: 모험가 무진")
 		m.hud.show_message("무진이 마을에 정착했다. 내일은 또 어딜 쏘다닐까?", 5.0)
 	m.saveio.save_now()
 
@@ -1702,7 +1702,7 @@ func _move_update(_delta: float) -> void:
 	elif GameData.move_quest == "wait" and GameData.day > GameData.move_day:
 		GameData.move_quest = "greet"
 		GameData.arrivals.append({"id": "explorer", "day": GameData.move_day})
-		m.hud.quest_toast("무진이 이사 왔다!")
+		m.hud.event_toast("무진이 이사 왔다!")
 		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다.\n무진이 곧 인사하러 올 것 같다.", 6.0)
 
 
@@ -1748,7 +1748,7 @@ func _start_move_chief_dialog() -> void:
 func _end_move_chief() -> void:
 	if GameData.move_quest == "show":
 		GameData.move_quest = "build"
-		m.hud.quest_toast("빈 집터를 마련하고 편지를 수락하자")
+		m.hud.quest_start_toast("빈 집터를 마련하고 편지를 수락하자")
 		m.hud.show_message("잡화점에서 집터 레시피 구매 → 제작대에서 제작 → 풀밭에 설치.\n빈 집터가 생기면 가방의 편지를 다시 읽고 수락할 수 있다.", 7.0)
 	m.saveio.save_now()
 
@@ -1794,7 +1794,7 @@ func try_place_home_plot(door: Vector2i) -> bool:
 	GameData.home_plots.append({"x": a.x, "y": a.y, "used": false})
 	m.objnode._place_object(door, "homeplot", 0)   # 현관 자리에 집터 팻말
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("빈 집터 완성!")
+	m.hud.event_toast("빈 집터 완성!")
 	m.hud.show_message("빈 집터를 마련했다. 이주 희망 편지를 수락하면 여기에 집이 선다.", 5.0)
 	m.queue_redraw()
 	m.saveio.save_now()
@@ -1842,7 +1842,7 @@ func _try_accept_move() -> void:
 	GameData.move_quest = "wait"
 	GameData.move_day = GameData.day
 	Sound.play_sfx("sfx_place")
-	m.hud.quest_toast("이사 수락 — 새 주민의 집 완공!")
+	m.hud.event_toast("이사 수락 — 새 주민의 집 완공!")
 	m.hud.show_message("준비해 둔 집터에 집이 지어졌다. 내일이면 무진이 이사 온다!", 5.0)
 	m.queue_redraw()
 	m.saveio.save_now()
@@ -2083,12 +2083,15 @@ func _end_movein(nid: String) -> void:
 	_movein_walker = null
 	if not GameData.npc_greeted.has(nid):
 		GameData.npc_greeted.append(nid)
+	# 민지 도착 첫날 기억 — 잡화점 요리 레시피 선반은 다음 날부터 깔린다
+	if nid == "merchant" and GameData.merchant_day == 0:
+		GameData.merchant_day = GameData.day
 	for i in GameData.arrivals.size():
 		if str(GameData.arrivals[i].id) == nid:
 			GameData.arrivals.remove_at(i)
 			break
 	m.npcmgr._sync_village_npcs()
-	m.hud.quest_toast("%s이(가) 마을에 자리 잡았다!" % GameData.NPCS[nid].name)
+	m.hud.event_toast("%s이(가) 마을에 자리 잡았다!" % GameData.NPCS[nid].name)
 	m.saveio.save_now()
 
 

@@ -605,8 +605,6 @@ func _mk_item_slot(e: Dictionary) -> Button:
 	b.add_child(num)
 
 	var body := str(e.get("desc", ""))
-	if int(e.get("sell", 0)) > 0:
-		body += ("\n" if body != "" else "") + "개당 %dG에 팔린다" % int(e.sell)
 	_hover_slots.append({"b": b, "title": str(e.name), "body": body,
 		"count": "보유 중: %d개" % int(e.count)})
 
@@ -813,7 +811,7 @@ func _item_entries() -> Array:
 		if n > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id, "name": str(def.name),
 				"count": n, "sell": int(def.sell_price),
-				"tip": "%s x%d (개당 %dG)" % [def.name, n, def.sell_price],
+				"tip": "%s x%d" % [def.name, n],
 				"desc": "마을 잡화점(판매 탭)에 팔 수 있다"})
 		var ns := int(GameData.produce_silver.get(id, 0))
 		if ns > 0:
@@ -881,7 +879,7 @@ func _item_entries() -> Array:
 		elif id == "forage_glass":
 			e["desc"] = "모래에 반쯤 묻혀 있던 유리 조각 — 파도에 매끈하게 닳았다"
 		elif id == "forage_ring":
-			e["desc"] = "파도에 밀려온 녹슨 금속 고리 — 쓰레기통 재료로 쓴다 (제작대)"
+			e["desc"] = "파도에 밀려온 녹슨 금속 고리"
 		elif id == "forage_relic":
 			e["desc"] = "알 수 없는 무늬가 새겨진 옛 돌조각 — 아주 드물게 밀려온다"
 		elif id == "bait":

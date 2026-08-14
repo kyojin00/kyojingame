@@ -65,6 +65,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.fisher_choice = int(d.get("fisher_choice", 0))
 	GameData.sea_open = bool(d.get("sea_open", false))
 	GameData.merchant_errand = str(d.get("merchant_errand", ""))
+	GameData.merchant_day = int(d.get("merchant_day", 0))
 	GameData.stall_hours = (d.get("stall_hours", []) as Array)
 	GameData.forest_quest = str(d.get("forest_quest", ""))
 	GameData.forest_day = int(d.get("forest_day", 0))
