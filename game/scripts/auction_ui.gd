@@ -335,9 +335,9 @@ func _rebuild() -> void:
 		c.queue_free()
 	for c in _box.get_children():
 		c.queue_free()
-	_mk_tab("market", "장터")
-	_mk_tab("sell", "등록")
-	_mk_tab("mine", "내 물건")
+	_mk_tab("market", "장터 둘러보기")
+	_mk_tab("sell", "내 창고에서 올리기")
+	_mk_tab("mine", "내 등록·대금")
 	_status_label.text = _status if _status != "" else \
 		"내 이름: %s · 소지금 %dG" % [GameData.seller_name(), GameData.money]
 	match _tab:
@@ -403,12 +403,29 @@ func _build_mine() -> void:
 
 
 # 등록 — 창고에서 고르고 값을 매긴다
+# 내 창고 한눈에 — 가방처럼 아이콘 격자로 늘어놓고, 누르면 값 매기기로 간다
 func _build_sell() -> void:
 	if _pick_id != "":
 		_build_price_picker()
 		return
-	_line("창고에서 올릴 것을 고르자.", Color(0.95, 0.8, 0.5))
+	_line("내 창고 — 올릴 것을 누르자. (칸 아래 숫자가 가진 개수)",
+		Color(0.95, 0.8, 0.5))
+	var grid := GridContainer.new()
+	grid.columns = 9
+	grid.add_theme_constant_override("h_separation", 5)
+	grid.add_theme_constant_override("v_separation", 5)
 	var any := false
+	for e in _stock_entries():
+		any = true
+		grid.add_child(_mk_stock_cell(e))
+	_box.add_child(grid)
+	if not any:
+		_line("올릴 만한 것이 창고에 없다.")
+
+
+# 창고에 있는 것들 — [종류, id, 품질, 개수, 잡화점 기준값]
+func _stock_entries() -> Array:
+	var out: Array = []
 	for id: String in GameData.CROP_IDS:            # 수확물 (품질별로 따로)
 		var total: int = int(GameData.produce.get(id, 0))
 		if total <= 0:
@@ -419,29 +436,68 @@ func _build_sell() -> void:
 			var n: int = [total - silver - gold, silver, gold][q]
 			if n <= 0:
 				continue
-			any = true
-			# 은빛·금빛은 잡화점에서도 더 쳐 준다 (값 매길 때 기준으로 보여 준다)
-			var mult: int = [1, 2, 3][q]
-			var base: int = int(GameData.CROPS[id].sell_price) * mult
-			_mk_row("produce", id, q, n, "잡화점 기준 %dG" % base, "고르기",
-				_pick.bind("produce", id, q, n, base))
+			var mult: int = [1, 2, 3][q]      # 은빛·금빛은 잡화점에서도 더 쳐 준다
+			out.append({"cat": "produce", "id": id, "q": q, "n": n,
+				"base": int(GameData.CROPS[id].sell_price) * mult})
 	for id: String in GameData.CROP_IDS:            # 씨앗
-		var n: int = int(GameData.seeds.get(id, 0))
-		if n <= 0:
-			continue
-		any = true
-		_mk_row("seed", id, 0, n, "잡화점 %dG" % int(GameData.CROPS[id].seed_price),
-			"고르기", _pick.bind("seed", id, 0, n, int(GameData.CROPS[id].seed_price)))
-	for id: String in GameData.ITEM_IDS:            # 물건
-		var n: int = int(GameData.items.get(id, 0))
+		var ns: int = int(GameData.seeds.get(id, 0))
+		if ns > 0:
+			out.append({"cat": "seed", "id": id, "q": 0, "n": ns,
+				"base": int(GameData.CROPS[id].seed_price)})
+	for id: String in GameData.ITEM_IDS:            # 물건 (전설 재료는 뺀다)
+		var n2: int = int(GameData.items.get(id, 0))
 		var def: Dictionary = GameData.ITEMS.get(id, {})
-		if n <= 0 or int(def.get("sell", 0)) <= 0 or def.get("legend", false):
+		if n2 <= 0 or int(def.get("sell", 0)) <= 0 or def.get("legend", false):
 			continue
-		any = true
-		_mk_row("item", id, 0, n, "잡화점 %dG" % int(def.sell), "고르기",
-			_pick.bind("item", id, 0, n, int(def.sell)))
-	if not any:
-		_line("올릴 만한 것이 창고에 없다.")
+		out.append({"cat": "item", "id": id, "q": 0, "n": n2,
+			"base": int(def.sell)})
+	return out
+
+
+# 창고 한 칸 — 아이콘 + 개수. 누르면 그 물건의 값 매기기로 넘어간다
+func _mk_stock_cell(e: Dictionary) -> Button:
+	var cat := str(e.cat)
+	var id := str(e.id)
+	var q := int(e.q)
+	var n := int(e.n)
+	var base := int(e.base)
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(58, 58)
+	b.focus_mode = Control.FOCUS_NONE
+	b.expand_icon = true
+	b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.tooltip_text = "%s x%d\n잡화점 기준 %dG" % [_label_of(cat, id, q), n, base]
+	var tn := _icon_of(cat, id)
+	if main != null and main.tex.has(tn):
+		b.icon = main.tex[tn]
+	else:
+		b.text = _label_of(cat, id, q).left(2)
+	# 품질은 테두리 색으로 — 은빛은 하얗게, 금빛은 노랗게
+	if q > 0:
+		var st := StyleBoxFlat.new()
+		st.bg_color = Color(0.14, 0.12, 0.2, 0.9)
+		st.border_color = Color(0.85, 0.88, 0.95) if q == 1 else Color(1.0, 0.86, 0.4)
+		st.set_border_width_all(2)
+		st.set_corner_radius_all(3)
+		st.set_content_margin_all(5)
+		b.add_theme_stylebox_override("normal", st)
+	var num := Label.new()
+	num.text = str(n)
+	num.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	num.offset_left = -40
+	num.offset_top = -16
+	num.offset_right = -3
+	num.offset_bottom = -1
+	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	num.add_theme_color_override("font_color", Color(1, 0.95, 0.8))
+	num.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.14))
+	num.add_theme_constant_override("outline_size", 3)
+	num.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(num)
+	b.pressed.connect(func() -> void:
+		Sound.play_sfx("sfx_ui")
+		_pick(cat, id, q, n, base))
+	return b
 
 
 func _pick(cat: String, id: String, quality: int, have: int, base: int) -> void:
@@ -456,7 +512,8 @@ func _pick(cat: String, id: String, quality: int, have: int, base: int) -> void:
 
 func _build_price_picker() -> void:
 	var have := _have_of(_pick_cat, _pick_id, _pick_quality)
-	_line("%s — 몇 개를 얼마에 올릴까?" % _label_of(_pick_cat, _pick_id, _pick_quality),
+	_line("%s — 몇 개를 얼마에 올릴까? (가진 것 %d개)"
+		% [_label_of(_pick_cat, _pick_id, _pick_quality), have],
 		Color(0.95, 0.8, 0.5))
 	_line("(값은 묶음 전체의 값이다. 팔리면 「내 물건」에서 대금을 받는다)")
 
