@@ -166,8 +166,13 @@ func _on_claimed(count: int, gold: int) -> void:
 
 # 함께하기: 지갑·창고가 공용이라 장터에서 오간 것을 세계에도 알린다
 func _sync(cat: String, id: String, qty: int, quality: int, money_delta: int) -> void:
-	if main != null and Net.active():
+	if main == null:
+		return
+	if Net.active():
 		main.doing.net_auction(cat, id, qty, quality, money_delta)
+	# 장터에 넘긴 물건과 받은 대금은 **곧바로** 저장한다. 안 그러면 등록해 놓고
+	# 게임을 끄면 물건이 창고에도 남고 장터에도 남는다 (복제).
+	main.saveio.save_now()
 
 
 func _take_out(cat: String, id: String, qty: int, quality: int) -> bool:
@@ -396,14 +401,13 @@ func _build_market() -> void:
 		return
 	for r: Dictionary in _rows:
 		var price := int(r.get("price", 0))
-		var mine: bool = str(r.get("seller_id", "")) == GameData.farm_id
+		# 장터 목록에는 남의 열쇠가 실리지 않는다 — 내 글인지는 서버가 판단해
+		# 「내가 올린 물건은 살 수 없다」로 걸러 준다
 		var sub := "%dG · %s" % [price, str(r.get("seller_name", "?"))]
-		if mine:
-			sub += " (나)"
 		_mk_row(str(r.get("cat", "item")), str(r.get("item_id", "")),
 			int(r.get("quality", 0)), int(r.get("qty", 1)), sub,
 			"사기", func() -> void: api.buy(int(r.get("id", 0))),
-			not mine and GameData.money >= price)
+			GameData.money >= price)
 
 
 # 내 물건 — 올려 둔 것 거두기 + 대금 받기
