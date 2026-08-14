@@ -247,7 +247,9 @@ func use_tool() -> void:
 			gain_skill("farm", 2.0)
 		"axe":
 			if obj == null:
-				m.hud.show_message("벨 것이 없다.")
+				# 벨 것이 없어도 그냥 휘두른다 — 밤 지네가 앞에 있으면
+				# 무기처럼 히트박스 판정으로 때린다
+				_swing_empty(t)
 				return
 			if obj.kind == "tree":
 				if bool(obj.get("young", false)):
@@ -320,7 +322,8 @@ func use_tool() -> void:
 				m.hud.show_message("도끼로 벨 수 없다.")
 		"pickaxe":
 			if obj == null:
-				m.hud.show_message("캘 것이 없다.")
+				# 캘 것이 없어도 그냥 휘두른다 (히트박스 판정)
+				_swing_empty(t)
 				return
 			if obj.kind == "rock":
 				obj.hp -= int(GameData.tool_stat("pickaxe", "power"))
@@ -597,6 +600,18 @@ func _update_hit_fx(delta: float) -> void:
 #   돌 창: 느리지만 한 방이 강하다 (지네를 한 방에)
 #   돌 검: 빠르게 두 번 벤다 — 둘째 타는 순수 무기 위력만 (전체 화력은 비슷)
 var _weapon_cd := 0.0   # main._process가 매 프레임 줄여 준다
+
+
+# 허공 휘두르기 — 대상 오브젝트가 없어도 도끼·곡괭이는 그냥 휘둘러진다.
+# 앞에 밤 몬스터(지네)가 있으면 무기와 같은 히트박스 판정으로 때린다.
+# 순수 도구 위력만 들어간다 (전투 보너스·장비 위력은 무기 몫).
+# 동굴 안은 cave_ui의 _attack이 이미 같은 규칙을 쓴다.
+func _swing_empty(t: Vector2i) -> void:
+	if _weapon_cd > 0.0:
+		return
+	_weapon_cd = 0.6
+	swing_at(t, "dirt")
+	_weapon_hit(false)
 
 
 func _weapon_swing(t: Vector2i) -> void:
