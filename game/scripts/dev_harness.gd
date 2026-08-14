@@ -1260,6 +1260,10 @@ func _debug_tick() -> void:
 		247: _swing_pose(3)
 		248:
 			_save_shot("_swing_p3.png")
+			_swing_pose(4)
+		249: _swing_pose(4)
+		250:
+			_save_shot("_swing_p4.png")
 			m.player.swing_t = 0.0
 		370:
 			# 캐기 모션: 휘두르기 -> (0.15초 뒤) 파편 + 대상 흔들림
@@ -1381,7 +1385,7 @@ func _debug_tick() -> void:
 			print("SWING_SPLIT_OK=", split_ok != (dot != ""),
 				" 도트=", dot, " 갈라그림=", split_ok,
 				" 상체각=", "%.2f" % m.player.upper_sprite.rotation)
-			# 위상은 진행도를 따라 0->1->2->3으로 **한 번씩만** 지나야 한다.
+			# 위상은 진행도를 따라 0->1->2->3->4로 **한 번씩만** 지나야 한다.
 			# swing_c로 가르면 감을 때와 되돌아올 때가 같은 값을 지나서
 			# 한 위상이 두 번 나온다 (팔이 갔다가 되짚어 오는 것처럼 보인다).
 			var seq: Array = []
@@ -1392,7 +1396,7 @@ func _debug_tick() -> void:
 				if seq.is_empty() or seq[-1] != ph:
 					seq.append(ph)
 			m.player.swing_t = keep_t
-			print("SWING_PHASE_OK=", seq == [0, 1, 2, 3], " 위상=", seq)
+			print("SWING_PHASE_OK=", seq == [0, 1, 2, 3, 4], " 위상=", seq)
 			_save_shot("_swing.png")
 		270:
 			# 나무 쓰러지는 모션.
@@ -2350,7 +2354,7 @@ func _send_click(world_pos: Vector2) -> void:
 # 그려지기도 전에 지나가 버린다 (실제로 한 칸씩 밀려 찍혔다).
 # 위상 경계는 swing_len이 아니라 HIT_AT/SWING_TIME으로 잡히므로 안 흔들린다.
 func _swing_pose(phase: int) -> void:
-	const MID := [0.075, 0.30, 0.55, 0.85]
+	const MID := [0.075, 0.24, 0.38, 0.60, 0.85]
 	const HOLD := 200.0
 	m.player.dir = "right"
 	m.player.start_swing("axe", Vector2.RIGHT, m.SWING_TIME)

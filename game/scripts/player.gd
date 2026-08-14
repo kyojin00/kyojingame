@@ -66,8 +66,8 @@ var horse_sprite: Sprite2D
 #
 # ---- 휘두르기 도트 ----
 #
-# 남녀 모두 `assets/ref/dot_boy/make_sprites.py`가 방향당 네 장을 그린다
-# (`new_boy_/player_f_<방향>_swing_0..3` = 감기 시작·다 감음·내리침·되돌아옴).
+# 남녀 모두 `assets/ref/dot_boy/make_sprites.py`가 방향당 다섯 장을 그린다
+# (`new_boy_/player_f_<방향>_swing_0..4` = 감기 시작·다 감음·휘두름·내리침·되돌아옴).
 # 골격이 같아 SWING_HAND_DOT도 공용이다. 도트가 없으면 `_swing_frame`이
 # ""를 돌려주고, 그때는 아래 몸통 회전으로 대신한다.
 #
@@ -81,7 +81,7 @@ const SWING_SHIFT := 5.0        # 내리치는 쪽으로 몸이 쏠리는 거리
 const SWING_SQUASH := 0.06      # 닿는 순간 몸이 눌리는 정도
 const SWING_HOLD := 0.10        # 히트스톱: 정점에서 머무는 구간 (진행도 0~1 기준)
 const SWING_TRAIL := 6          # 도구 잔상으로 남기는 자취 수
-const SWING_FRAMES := 4         # 방향당 휘두르기 도트 장수
+const SWING_FRAMES := 5         # 방향당 휘두르기 도트 장수
 
 # 방향마다 손이 있는 자리와 휘두르는 폭이 다르다.
 #   hand   손잡이 끝이 오는 자리 (발밑 기준 node 좌표. x는 sign_x로 뒤집힌다)
@@ -112,10 +112,10 @@ const SWING_POSE := {
 # 실행 끝에 찍어 준다 — **그림을 다시 뽑으면 찍힌 값을 여기 그대로 옮긴다.**
 # 안 맞으면 도구가 손에서 뜬다. 도트가 없는 방향은 SWING_POSE의 식을 쓴다.
 const SWING_HAND_DOT := {
-	# 감기 시작 · 다 감음(머리 옆) · 내리침 · 되돌아옴
-	"side": [Vector2(-17, -63), Vector2(-17, -75), Vector2(19, -31), Vector2(17, -43)],
-	"down": [Vector2(-19, -59), Vector2(-23, -77), Vector2(15, -41), Vector2(11, -45)],
-	"up": [Vector2(19, -63), Vector2(19, -77), Vector2(7, -75), Vector2(19, -69)],
+	# 감기 시작 · 다 감음(머리 옆) · 휘두름(머리 위 통과) · 내리침 · 되돌아옴
+	"side": [Vector2(-17, -63), Vector2(-17, -75), Vector2(21, -67), Vector2(19, -31), Vector2(17, -43)],
+	"down": [Vector2(-19, -59), Vector2(-23, -77), Vector2(15, -67), Vector2(15, -41), Vector2(11, -45)],
+	"up": [Vector2(19, -63), Vector2(19, -77), Vector2(11, -79), Vector2(7, -75), Vector2(19, -69)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
@@ -248,12 +248,15 @@ func _swing_frame(key: String) -> String:
 	return "%s_%d" % [base, swing_phase()]
 
 
-# 지금 위상 (0=감기 시작 / 1=다 감음 / 2=내리침 / 3=되돌아옴).
+# 지금 위상 (0=감기 시작 / 1=다 감음 / 2=휘두름 / 3=내리침 / 4=되돌아옴).
 #
 # 시간(진행도)으로 가른다. `swing_c`로 가르면 감을 때와 되돌아올 때가 같은
 # 값을 지나서 한 위상이 두 번 나온다 — 팔이 갔다가 되짚어 오는 것처럼 보인다.
 #
-# 내리치는 그림(2)은 **판정 순간부터 남은 시간의 절반 넘게** 붙들어 둔다.
+# 휘두름(2)은 가속 구간 끝자락에만 잠깐 스친다 — 머리 위를 지나는 호가
+# 한 번 보이면 충분하고, 오래 붙들면 내리침이 늦어 보인다.
+#
+# 내리치는 그림(3)은 **판정 순간부터 남은 시간의 절반 넘게** 붙들어 둔다.
 # 히트스톱(0.03초)만큼만 보이면 두 프레임 만에 지나가서, 정작 제일 중요한
 # 「맞은 자세」가 눈에 안 남는다.
 func swing_phase() -> int:
@@ -263,9 +266,11 @@ func swing_phase() -> int:
 	var hit := _hit_p()
 	if p < hit * 0.34:
 		return 0
-	if p < hit:
+	if p < hit * 0.74:
 		return 1
-	return 2 if p < hit + (1.0 - hit) * 0.55 else 3
+	if p < hit:
+		return 2
+	return 3 if p < hit + (1.0 - hit) * 0.55 else 4
 
 
 # 휘두르는 동안 쓰는 방향 딱지 ("down"/"up"/"side")

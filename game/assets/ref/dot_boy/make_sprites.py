@@ -9,7 +9,7 @@
 #
 # 귀여운 비율: 돔형 머리 16x18(키의 40%쯤) + 몸통 10행 + 짧은 다리.
 #
-# 프레임: 방향(down/side/up)마다 idle 1장 + walk 5장 + swing 4장.
+# 프레임: 방향(down/side/up)마다 idle 1장 + walk 5장 + swing 5장.
 # 걷기 5장은 사인 곡선을 5등분한 위상 [0, +3, +2, -2, -3] 으로 다리를 놓아
 # 마지막 장에서 첫 장으로 매끄럽게 이어진다 (게임이 int(t*8)%5 로 돌린다).
 #
@@ -460,7 +460,9 @@ def legs_up(g, stride, dx=0, sq=0):
 
 
 # --------------------------------------------------------------- 휘두르기
-# 방향당 4장: 감기 시작 · 다 감음 · 내리침 · 되돌아옴.
+# 방향당 5장: 감기 시작 · 다 감음 · 휘두름 · 내리침 · 되돌아옴.
+# 「휘두름」은 다 감은 팔이 내리침으로 넘어가는 중간 칸 — 없으면 주먹이
+# 머리 옆에서 반대편 아래로 한 칸에 건너뛰어 호가 안 보인다.
 # 도구는 게임(player.gd)이 주먹 자리에 얹으므로 여기서는 몸+팔만 그린다.
 # 주먹 자리는 아래에서 SWING_HAND_DOT 값으로 계산해 찍어 준다.
 #
@@ -475,11 +477,13 @@ def legs_up(g, stride, dx=0, sq=0):
 #   dx      몸이 쏠리는 방향 (감을 때 뒤로 갈수록 크게, 내리칠 때 앞으로)
 #   sq      주저앉는 양 (내리치는 칸만 2)
 #   behind  팔을 머리 뒤에 그린다 (뒷모습 내리침)
+SWING_N = 5                     # 방향당 칸 수 (player.gd SWING_FRAMES와 같아야 한다)
 SWING = {
-    # 앞모습: 왼쪽 위로 감았다가 오른쪽 아래로 내리친다
+    # 앞모습: 왼쪽 위로 감았다가 머리 위를 지나 오른쪽 아래로 내리친다
     'down': {'skip': 'left', 'shoulder': (9, 21),
              'poses': [((5, 16), (5, 19), -2, 0, False),
                        ((3, 7), (2, 14), -3, 0, False),
+                       ((22, 12), (17, 16), 2, 1, False),
                        ((22, 25), (16, 21), 2, 2, False),
                        ((20, 23), (14, 21), 0, 0, False)]},
     # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽 — 옆에서 감아올려
@@ -487,12 +491,14 @@ SWING = {
     'up':   {'skip': 'right', 'shoulder': (22, 21),
              'poses': [((24, 14), (26, 17), 2, 0, False),
                        ((24, 7), (27, 14), 3, 0, False),
+                       ((20, 6), (24, 12), -1, 0, False),
                        ((18, 8), (20, 14), -2, 2, True),
                        ((24, 11), (26, 15), 0, 0, False)]},
     # 옆모습(오른쪽 보기): 뒤로 감았다가 앞으로 내리친다
     'side': {'skip': None, 'shoulder': (15, 21),
              'poses': [((6, 14), (8, 18), -2, 0, False),
                        ((6, 8), (6, 14), -3, 0, False),
+                       ((25, 12), (19, 18), 2, 1, False),
                        ((24, 30), (23, 26), 3, 2, False),
                        ((23, 24), (18, 24), 2, 0, False)]},
 }
@@ -705,7 +711,7 @@ def render_set(heads, blinks, ref_prefix, out_prefix):
         images[f'{d}_idle'] = frame(d).render()
         for i in range(WALK):
             images[f'{d}_walk_{i}'] = frame(d, STRIDE[i], BOB[i]).render()
-        for i in range(4):
+        for i in range(SWING_N):
             images[f'{d}_swing_{i}'] = swing_frame(d, i).render()
     for d, art in blinks.items():              # 눈 감은 정지 한 장씩
         keep = PARTS[d]
@@ -732,7 +738,7 @@ FRAMES_F = render_set(
 # player.gd SWING_HAND_DOT에 옮겨 적을 주먹 좌표 (남녀 같은 골격이라 공용)
 print('SWING_HAND_DOT (player.gd):')
 for d in ('side', 'down', 'up'):
-    pts = ', '.join('Vector2(%g, %g)' % hand_dot(d, i) for i in range(4))
+    pts = ', '.join('Vector2(%g, %g)' % hand_dot(d, i) for i in range(SWING_N))
     print('  "%s": [%s],' % (d, pts))
 
 
@@ -773,7 +779,7 @@ for images, tag in ((FRAMES, ''), (FRAMES_F, 'f_')):
         keys = [f'{d}_walk_{i}' for i in range(WALK)]
         strip(images, f'preview_{tag}{d}_walk.png', keys)
         gif(images, f'anim_{tag}{d}_walk.gif', keys)
-        sw = [f'{d}_swing_{i}' for i in range(4)]
+        sw = [f'{d}_swing_{i}' for i in range(SWING_N)]
         strip(images, f'preview_{tag}{d}_swing.png', sw)
         gif(images, f'anim_{tag}{d}_swing.gif', sw, ms=170)
     gif(images, f'anim_{tag}idle.gif', ['down_idle', 'side_idle', 'up_idle'], ms=600)
