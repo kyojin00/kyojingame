@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bzbo35lft3495"
-path="res://.godot/imported/prologue_grandpa.png-7abf17f6816c6787b7a07f4c55634b5e.ctex"
+uid="uid://gtqydorm832f3"
+path="res://.godot/imported/prologue_letter_0.png-b8b3c957770dafc3f76d64d1ac15c11b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/prologue_grandpa.png"
-dest_files=["res://.godot/imported/prologue_grandpa.png-7abf17f6816c6787b7a07f4c55634b5e.ctex"]
+source_file="res://assets/sprites/prologue_letter_0.png"
+dest_files=["res://.godot/imported/prologue_letter_0.png-b8b3c957770dafc3f76d64d1ac15c11b.ctex"]
 
 [params]
 

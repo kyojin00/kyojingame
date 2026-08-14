@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ah8ulwlzufaxa"
-path="res://.godot/imported/prologue_farm.png-f6b819b32fb46f80266d0f2fe1b723fc.ctex"
+uid="uid://jedadyx37n9za"
+path="res://.godot/imported/prologue_grandpa_1.png-4b3769880e705f1351935690e467bf29.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/prologue_farm.png"
-dest_files=["res://.godot/imported/prologue_farm.png-f6b819b32fb46f80266d0f2fe1b723fc.ctex"]
+source_file="res://assets/sprites/prologue_grandpa_1.png"
+dest_files=["res://.godot/imported/prologue_grandpa_1.png-4b3769880e705f1351935690e467bf29.ctex"]
 
 [params]
 
