@@ -256,6 +256,7 @@ func interact() -> void:
 			GameData.items[fid] += got
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
 			GameData.discover(fid)
+			GameData.try_water_life("forage")   # 풀숲·모래 속 유품 병 (희귀)
 			# 산호 조각·고대 조각: 처음 주우면 숨겨진 이야기/레시피가 열린다
 			if first_find and fid in ["forage_coral", "forage_relic"]:
 				m.story.hidden_beach_find(fid)

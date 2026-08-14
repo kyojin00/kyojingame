@@ -73,6 +73,7 @@ func _on_fishing_finished(success: bool) -> void:
 		GameData.discover(id)
 		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
 		GameData.today_harvest += 1
+		GameData.try_water_life("fish")   # 낚싯줄에 걸려 온 유품 병 (희귀)
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
 		m.hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])

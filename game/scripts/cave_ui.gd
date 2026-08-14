@@ -547,6 +547,7 @@ func _interact() -> void:
 				int(GameData.forage_caught.get("forage_herb", 0)) + herb
 			msg += ", 약초 %d개" % herb
 		main.hud.show_message(msg + "를 얻었다!")
+		GameData.try_water_life("cave")   # 상자 밑바닥의 유품 병 (20%)
 		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
 		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
 		if floor_num >= 5:

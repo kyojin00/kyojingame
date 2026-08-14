@@ -774,6 +774,10 @@ func _end_arrival() -> void:
 	GameData.story_phase = "deliver"
 	_apply_story_camera()
 	_apply_story_visibility()
+	# 처음 마을에 발 디딘 순간 — 엔딩 통계 리포트가 이 날짜·시각에서 시작한다
+	if GameData.arrive_day == 0:
+		GameData.arrive_day = GameData.day
+		GameData.arrive_clock = GameData.clock_text()
 	m.hud.quest_toast("마을 도착")
 	m.hud.show_message("우체부 아저씨를 따라 이장님께 가자.", 6.0)
 	if _postman != null:
@@ -2622,4 +2626,36 @@ func _end_ranch_done() -> void:
 		GameData.npc_greeted.append("rancher")   # 정식 주민으로 정착
 	m.hud.story_banner("메인 스토리 8 완결", "초원에서 온 목동")
 	m.hud.show_message("목동 보라가 마을에 정착했다!\n목장 상회에서 동물·축사·말·펫을 들일 수 있다.", 7.0)
+	m.saveio.save_now()
+
+
+# ---- 엔딩: 연화의 항아리 ----
+#
+# 연구 노트 100% + 생명의 물 여섯 병을 모아 연화를 찾아가면,
+# 항아리에 물을 붓고 「기억의 물약」을 만들어 준다. 마시고 잠들면
+# 꿈속 엔딩 시퀀스(ending_ui)로 이어진다.
+
+func _start_elixir_dialog() -> void:
+	m.dialog.open_seq("연화", m.tex["npc_forest_mom_portrait_normal"], [
+		{"text": "「그 병들... 어디서 찾았니?\n...맙소사. 「생명의 물」이구나.」"},
+		{"text": "「할아버지께서 살아 계실 적에 말씀하셨어.\n여섯 병의 물이 다시 한자리에 모이면 —」"},
+		{"text": "「— 꿈속에서, 보고 싶은 사람을\n만날 수 있다고.」"},
+		{"text": "(연화가 낡은 항아리를 꺼내\n생명의 물을 한 병씩 천천히 부었다.)"},
+		{"text": "(항아리 속에서 은은한 빛이 피어오른다...)"},
+		{"text": "「자 — 「기억의 물약」이야.\n오늘 밤, 마시고 푹 자렴.」",
+			"portrait": m.tex["npc_forest_mom_portrait_happy"]},
+		{"text": "「좋은 꿈 꾸길. ...분명, 만나고 싶던 분이\n기다리고 계실 거야.」"},
+	], _end_elixir)
+
+
+func _end_elixir() -> void:
+	if int(GameData.items["water_life"]) < GameData.WATER_LIFE_SOURCES.size() \
+			or int(GameData.items["potion_dream"]) > 0 \
+			or GameData.dream_ready or GameData.dream_seen:
+		return
+	GameData.items["water_life"] = 0   # 여섯 병 모두 항아리로
+	GameData.items["potion_dream"] = 1
+	GameData.discover("potion_dream")
+	m.hud.event_toast("기억의 물약을 얻었다!")
+	m.hud.show_message("가방(I)에서 기억의 물약을 마시고, 침대에서 잠들자.", 6.0)
 	m.saveio.save_now()

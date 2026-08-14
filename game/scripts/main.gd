@@ -94,6 +94,7 @@ var alchemy_ui: CanvasLayer
 var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
+var ending: CanvasLayer
 var cave: CanvasLayer
 var shop_room: CanvasLayer
 var pet: Node2D
@@ -173,6 +174,7 @@ const TEXTURE_NAMES := [
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
 	# 연금술 물약 (조합대 결과물)
+	"water_life", "potion_dream",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
 	"potion_grow", "potion_guard", "potion_moon", "sludge",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
@@ -519,8 +521,16 @@ func _ready() -> void:
 	sleep_dialog.cancel_button_text = "안 잔다"
 	sleep_dialog.confirmed.connect(func() -> void:
 		Sound.play_sfx("sfx_sleep")
-		daycycle._fade_next_day(false))
+		# 기억의 물약을 마신 밤 — 보통 잠 대신 꿈속 엔딩 시퀀스로 들어간다
+		if GameData.dream_ready and not Net.is_guest():
+			ending.begin()
+		else:
+			daycycle._fade_next_day(false))
 	add_child(sleep_dialog)
+
+	ending = preload("res://scripts/ending_ui.gd").new()
+	ending.main = self
+	add_child(ending)
 
 	_shot_path = OS.get_environment("KYOJIN_SHOT")
 	if _shot_path != "":
@@ -1136,6 +1146,7 @@ var bugs: Array = []
 
 func _process(delta: float) -> void:
 	_bgm_tick(delta)
+	GameData.playtime_sec += delta   # 엔딩 통계 리포트용 실제 플레이 시간
 	story._story_update(delta)
 	story._fisher_update(delta)
 	story._move_update(delta)

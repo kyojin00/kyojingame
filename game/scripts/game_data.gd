@@ -1336,6 +1336,9 @@ func quest_npc_marks() -> Dictionary:
 			marks["merchant"] = "?"
 	if mom_quest_open() and mom_quest != "":
 		marks["forest_mom"] = "?"
+	# 엔딩 준비 완료 — 연화가 항아리를 꺼낼 차례다
+	if ending_ready():
+		marks["forest_mom"] = "!"
 	return marks
 
 
@@ -1880,6 +1883,9 @@ const ITEMS := {
 	"dish_butter_corn": {"name": "버터옥수수", "sell": 260},
 	# 채집물/곤충
 	"forage_berry": {"name": "산딸기", "sell": 40},
+	# 엔딩 유품·물약 — 팔 수 없다
+	"water_life": {"name": "생명의 물", "sell": 0},
+	"potion_dream": {"name": "기억의 물약", "sell": 0},
 	"weed": {"name": "잡초", "sell": 5},
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
@@ -1941,6 +1947,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
+	"water_life", "potion_dream",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
 	"housing_kit", "move_letter", "old_book", "trash_bin", "arrow", "dish_coral_tea",
@@ -2073,12 +2080,15 @@ func _check_collections() -> void:
 		collection_pending.append(col)
 
 
+func date_text(d: int) -> String:
+	return "%d년 %s %d일" % [(d - 1) / (DAYS_PER_SEASON * 4) + 1,
+		SEASON_NAMES[season_of_day(d)], (d - 1) % DAYS_PER_SEASON + 1]
+
+
 func discovered_on(id: String) -> String:
 	if not discovered.has(id):
 		return ""
-	var d := int(discovered[id])
-	return "%d년 %s %d일" % [(d - 1) / (DAYS_PER_SEASON * 4) + 1,
-		SEASON_NAMES[season_of_day(d)], (d - 1) % DAYS_PER_SEASON + 1]
+	return date_text(int(discovered[id]))
 
 # 최후의 연금술에 필요한 전설 재료 7종 (콘텐츠마다 하나씩)
 # [아이템 id, 어느 콘텐츠에서, 힌트]
@@ -2540,6 +2550,58 @@ func can_final_alchemy() -> bool:
 	return legends_owned() == LEGENDS.size() and not ending_seen
 
 
+# ---- 진짜 엔딩: 꿈속의 배웅 ----
+#
+# 해금 조건:
+#   1) 연구 노트 100% (note_progress().ratio >= 1.0)
+#   2) 「생명의 물」 6병 — 할아버지가 마을 곳곳에 남긴 유품.
+#      여섯 활동(벌목/채광/낚시/채집/동굴 상자/수확)에서 아주 드물게
+#      한 병씩만 발견된다 (출처당 1병, water_life_found)
+#   3) 연금술에 밝은 연화(숲속의 집)를 찾아가면 항아리에 물을 붓고
+#      「기억의 물약」을 만들어 준다
+#   4) 물약을 마시고(가방) 침대에서 잠들면 — 꿈속 엔딩 시퀀스
+# 엔딩(꿈)이 끝나면 dream_seen이 켜지고 자유 플레이로 이어진다.
+var water_life_found := {}    # 출처 -> true (tree/rock/fish/forage/cave/harvest)
+const WATER_LIFE_SOURCES := ["tree", "rock", "fish", "forage", "cave", "harvest"]
+const WATER_LIFE_CHANCE := 0.004   # 활동당 발견 확률 (동굴 상자는 20%)
+var water_pending := 0        # 방금 발견한 병 수 — hud가 꺼내 토스트를 띄운다
+var dream_ready := false      # 기억의 물약을 마셨다 — 오늘 밤 꿈속 엔딩
+var dream_seen := false       # 꿈속 엔딩을 봤다 (자유 플레이 계속)
+# 통계 리포트용 기록
+var arrive_day := 0           # 처음 마을에 발 디딘 날 (0 = 옛 세이브)
+var arrive_clock := ""        # 그 시각 ("오후 2:15")
+var playtime_sec := 0.0       # 실제 플레이 시간 (초)
+var rocks_mined := 0          # 깬 바위 수
+
+
+# 아주 드물게 「생명의 물」이 나온다. 출처당 한 병뿐이다.
+# roll에 0.0을 주면 무조건 성공 (검증 하네스용) — 평소엔 생략한다.
+func try_water_life(source: String, roll := -1.0) -> bool:
+	if water_life_found.has(source):
+		return false
+	var chance: float = 0.2 if source == "cave" else WATER_LIFE_CHANCE
+	var r := randf() if roll < 0.0 else roll
+	if r >= chance:
+		return false
+	water_life_found[source] = true
+	items["water_life"] += 1
+	discover("water_life")
+	water_pending += 1
+	return true
+
+
+# 꿈속 엔딩으로 갈 준비가 됐는가 — 연화가 항아리를 꺼내 주는 조건
+func ending_ready() -> bool:
+	return water_life_found.size() >= WATER_LIFE_SOURCES.size() \
+		and note_progress().ratio >= 1.0 and not dream_seen \
+		and int(items["potion_dream"]) == 0 and not dream_ready
+
+
+func playtime_text() -> String:
+	var mins := int(playtime_sec / 60.0)
+	return "%d시간 %d분" % [mins / 60, mins % 60]
+
+
 # 수확 품질 굴리기: 0=일반 1=은 2=금 (농사 숙련도가 높을수록 좋다)
 func roll_quality(luck := 0.0) -> int:
 	# luck 은 장비 능력치(행운)에서 오는 보정값 (%p)
@@ -2554,6 +2616,7 @@ func roll_quality(luck := 0.0) -> int:
 func add_produce(id: String, quality: int) -> void:
 	produce[id] += 1
 	discover(id)
+	try_water_life("harvest")   # 아주 드물게 밭고랑에서 유품 병이 나온다
 	if quality == 2:
 		produce_gold[id] = int(produce_gold.get(id, 0)) + 1
 	elif quality == 1:
@@ -3643,6 +3706,14 @@ func reset_all() -> void:
 	mob_kills = {}
 	recipes_cooked = {}
 	ending_seen = false
+	water_life_found = {}
+	water_pending = 0
+	dream_ready = false
+	dream_seen = false
+	arrive_day = 0
+	arrive_clock = ""
+	playtime_sec = 0.0
+	rocks_mined = 0
 	crops_harvested = {}
 	minerals_found = {}
 	memory_given = false
@@ -4066,6 +4137,10 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,
 		"ending_seen": ending_seen,
+		"water_life_found": water_life_found, "dream_ready": dream_ready,
+		"dream_seen": dream_seen, "arrive_day": arrive_day,
+		"arrive_clock": arrive_clock, "playtime_sec": playtime_sec,
+		"rocks_mined": rocks_mined,
 		"crops_harvested": crops_harvested,
 		"minerals_found": minerals_found,
 		"memory_given": memory_given,

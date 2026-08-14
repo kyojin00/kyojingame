@@ -695,6 +695,16 @@ func _process(delta: float) -> void:
 				if main != null else null,
 			"head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_catch")
+	# 방금 발견한 「생명의 물」 — 할아버지의 유품 병 (아주 드물다)
+	while GameData.water_pending > 0:
+		GameData.water_pending -= 1
+		_toast_queue.append({"head": "✨ 생명의 물을 발견했다!",
+			"body": "할아버지의 손길이 느껴지는 유리병이다 (%d/%d)" %
+				[int(GameData.items["water_life"]),
+				GameData.WATER_LIFE_SOURCES.size()],
+			"icon": main.tex.get("water_life") if main != null else null,
+			"head_col": Color(0.4, 0.65, 0.9)})
+		Sound.play_sfx("sfx_catch")
 	# 재료를 다 발견해서 방금 떠오른 기본 요리 레시피
 	while not GameData.recipe_pending.is_empty():
 		var rid: String = GameData.recipe_pending.pop_front()

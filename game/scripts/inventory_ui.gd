@@ -647,6 +647,14 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.story.open_move_letter())
+	# 기억의 물약 — 마시면 오늘 밤 꿈속 엔딩으로 이어진다
+	if bool(e.get("dream", false)):
+		b.pressed.connect(func() -> void:
+			main.dialog.open("기억의 물약",
+				"은은하게 빛나는 물약이다.\n마시면 오늘 밤, 특별한 꿈을 꿀 것 같다.", [
+				["마신다", _drink_dream],
+				["아직 아니다", null],
+			]))
 	# 씨앗 — 누르면 그 씨앗을 골라 들고, 드래그하면 씨앗 주머니를 슬롯에 건다
 	var seed_id := str(e.get("seed_pick", ""))
 	if seed_id != "":
@@ -805,6 +813,20 @@ func _swap_slots(from_i: int, to_i: int) -> void:
 	_rebuild()
 
 
+# 기억의 물약을 마신다 — 오늘 밤 침대에서 자면 꿈속 엔딩이 시작된다
+func _drink_dream() -> void:
+	main.dialog.close()
+	if int(GameData.items["potion_dream"]) <= 0:
+		return
+	GameData.items["potion_dream"] -= 1
+	GameData.dream_ready = true
+	Sound.play_sfx("sfx_harvest")
+	visible = false
+	main.hud.show_message("기억의 물약을 마셨다... 몸이 따뜻하고, 왠지 그리운 냄새가 난다.\n오늘 밤은 일찍 잠들고 싶다.", 6.0)
+	main.saveio.save_now()
+	_rebuild()
+
+
 func _item_entries() -> Array:
 	# 각 항목: tab(어느 탭에 들어가는지) · name · count · sell · icon · tip · desc
 	var out: Array = []
@@ -872,6 +894,15 @@ func _item_entries() -> Array:
 			e["color"] = Color(1.0, 0.75, 0.4)
 			e["desc"] = "요리 — 먹으면 체력 +%d" % int(GameData.RECIPES[id].energy)
 			e["eat"] = id
+		elif id == "water_life":
+			e["color"] = Color(0.55, 0.8, 1.0)
+			e["desc"] = "할아버지가 남긴 유품 병 — 맑게 빛나는 물이 담겨 있다 (%d/%d)" \
+				% [n2, GameData.WATER_LIFE_SOURCES.size()]
+		elif id == "potion_dream":
+			e["tab"] = "food"
+			e["color"] = Color(0.85, 0.75, 1.0)
+			e["desc"] = "연화가 항아리에서 길어 준 물약 — 마시면 오늘 밤\n특별한 꿈을 꿀 것 같다. 클릭해서 마신다"
+			e["dream"] = true
 		elif id.begins_with("potion_"):
 			e["tab"] = "food"
 			e["color"] = Color(0.75, 0.7, 1.0)

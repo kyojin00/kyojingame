@@ -280,6 +280,11 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return
+	# 엔딩 — 노트 100% + 생명의 물 여섯 병을 모으면, 연금술에 밝은
+	# 연화가 항아리를 꺼내 「기억의 물약」을 만들어 준다
+	if npc.id == "forest_mom" and GameData.ending_ready():
+		m.story._start_elixir_dialog()
+		return
 	var def: Dictionary = GameData.NPCS[npc.id]
 	# 봄 꽃놀이: 말을 건 사람을 하나씩 세어 둔다 (호감도 해금과 무관)
 	if GameData.festival_open() and str(GameData.festival_today().id) == "flower" \

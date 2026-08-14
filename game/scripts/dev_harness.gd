@@ -1485,6 +1485,82 @@ func _debug_tick() -> void:
 				" 부족차단=", s7_block, " 재점화=", s7_done, " 할인=", s7_disc,
 				" 목동방문=", s8_start and visitor, " 이장상의=", s8_ask,
 				" 목장게이트=", gated8, " 건설해금=", s8_build, " 정착=", s8_done)
+		267:
+			# #123: 꿈속 엔딩 — 생명의 물 수집·연화의 항아리·물약·꿈 시퀀스
+			var keep_found: Dictionary = GameData.water_life_found.duplicate()
+			var keep_wl := int(GameData.items["water_life"])
+			var keep_pd := int(GameData.items["potion_dream"])
+			var keep_dr := GameData.dream_ready
+			var keep_ds := GameData.dream_seen
+			m.dialog.close()
+			# ① 생명의 물 — 출처당 한 병뿐, 같은 출처는 두 번 안 나온다
+			GameData.water_life_found = {}
+			GameData.items["water_life"] = 0
+			GameData.items["potion_dream"] = 0
+			GameData.dream_ready = false
+			GameData.dream_seen = false
+			var first: bool = GameData.try_water_life("tree", 0.0)
+			var dup: bool = not GameData.try_water_life("tree", 0.0)
+			for src: String in ["rock", "fish", "forage", "cave", "harvest"]:
+				GameData.try_water_life(src, 0.0)
+			GameData.water_pending = 0
+			var six: bool = int(GameData.items["water_life"]) == 6 \
+				and GameData.water_life_found.size() == 6
+			# ② 노트가 100%가 아니면 연화는 항아리를 꺼내지 않는다
+			var gate_note: bool = not GameData.ending_ready() \
+				and GameData.note_progress().ratio < 1.0
+			# ③ 항아리 — 여섯 병을 붓고 기억의 물약을 받는다
+			m.story._end_elixir()
+			var elixir: bool = int(GameData.items["potion_dream"]) == 1 \
+				and int(GameData.items["water_life"]) == 0
+			# ④ 물약을 마시면 오늘 밤 꿈이 준비된다
+			m.inventory_ui._drink_dream()
+			var drank: bool = GameData.dream_ready \
+				and int(GameData.items["potion_dream"]) == 0
+			m.dialog.close()
+			# ⑤ 꿈속 시퀀스: 조부모 대사 -> 통계 리포트 -> 마을 사람들 배웅
+			m.ending.begin()
+			var dreamed: bool = m.ending.visible and m.ending.phase == "dream"
+			var grandpa_line := false
+			for dl: Array in m.ending._lines:
+				if str(dl[1]).contains("유품을 찾아줘서 고맙다"):
+					grandpa_line = true
+			for i2 in m.ending._lines.size():
+				m.ending._advance()
+			var stats_on: bool = m.ending.phase == "stats"
+			var stat_n0: int = m.ending._lines.size()
+			while m.ending._idx < m.ending._lines.size():
+				m.ending._reveal_next_stat()
+			m.ending._advance()
+			var credits_on: bool = m.ending.phase == "credits"
+			var has_postman := false
+			var has_all_line := false
+			for card: Dictionary in m.ending._cards:
+				if str(card.name) == "우체부 아저씨":
+					has_postman = true
+				if str(card.line).contains("우린 언제나 여기에 있으니까"):
+					has_all_line = true
+			while m.ending.phase == "credits":
+				m.ending._advance()
+			var outro_on: bool = m.ending.phase == "outro"
+			m.ending.wake(false)   # 날짜 전환 없이 상태만 (하네스 전용)
+			var woke: bool = not m.ending.visible and GameData.dream_seen \
+				and not GameData.dream_ready and m.hud.visible
+			m.hud._toast_queue.clear()
+			GameData.water_life_found = keep_found
+			GameData.items["water_life"] = keep_wl
+			GameData.items["potion_dream"] = keep_pd
+			GameData.dream_ready = keep_dr
+			GameData.dream_seen = keep_ds
+			print("ENDING_OK=", first and dup and six and gate_note and elixir
+				and drank and dreamed and grandpa_line and stats_on
+				and stat_n0 >= 10 and credits_on and has_postman
+				and has_all_line and outro_on and woke,
+				" 첫병=", first, " 중복차단=", dup, " 여섯병=", six,
+				" 노트게이트=", gate_note, " 항아리=", elixir, " 마심=", drank,
+				" 꿈=", dreamed and grandpa_line, " 통계=", stats_on,
+				"(", stat_n0, "줄) 배웅=", credits_on and has_postman
+				and has_all_line, " 기상=", outro_on and woke)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
