@@ -277,10 +277,61 @@ def legs_down(g, stride, dx=0, sq=0):
         g.px(x0 + 2 + bend, GROUND - 3 - lift, 'p')
 
 
+def _side_arm(g, c, y, sw, near):
+    """옆모습 팔 한 짝 — 어깨(c, y+1)에서 진자처럼 젓는다.
+    near=False 면 몸 저편의 팔: 전부 그늘색이고, 몸판을 그리기 전에
+    깔려 몸 가장자리 밖으로 나온 부분만 보인다.
+    손 올림은 진자 원호(√(L²-s²))로 계산해 팔 길이가 어느 위상에서든
+    같다 — 안 그러면 저을 때마다 팔이 늘었다 줄었다 한다."""
+    hy = y + 8 - round(10 - (100 - sw * sw) ** 0.5)
+    cells = {}
+    sleeve = ('B', 'b', 'b', 'b', 'b') if near else ('B',) * 5
+    for yy in range(y + 1, hy):
+        t = (yy - (y + 1)) / max(1, hy - 1 - (y + 1))
+        x = c - 2 + round(sw * t)
+        for j, cc in enumerate(sleeve):
+            col = cc
+            if near:
+                # 소매단도 손목 각도를 따라 기운다 — 크게 저으면 단이
+                # 두 줄에 걸쳐 비스듬히 잘린다.
+                if yy == hy - 1:
+                    if abs(sw) < 3 or (sw > 0 and j <= 2) or (sw < 0 and j >= 2):
+                        col = 'B'
+                elif yy == hy - 2 and abs(sw) >= 3 and \
+                        ((sw > 0 and j >= 3) or (sw < 0 and j <= 1)):
+                    col = 'B'
+            cells[(x + j, yy)] = col
+    # 손: 팔 기울기를 따라 줄마다 어긋나게(전단) 그린다 — 손목이 팔
+    # 방향으로 꺾여 보인다. 좌우 평행이동만 하면 손만 둥둥 떠다닌다.
+    hx = c - 1 + sw
+    hand = 's' if near else 'S'
+    for k in range(3):
+        ox = round(sw * k / 7)
+        for j in range(4):
+            cells[(hx + j + ox, hy + k)] = hand
+    if near:
+        ox2 = round(sw * 2 / 7)
+        cells[(hx + 2 + ox2, hy + 2)] = 'S'
+        cells[(hx + 3 + ox2, hy + 2)] = 'S'
+    for (x, yy) in cells:                      # 획 둘레 윤곽선
+        for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
+            if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
+                continue
+            if g.d[ny][nx] != '.':
+                g.d[ny][nx] = 'O'
+    for (x, yy), cc in cells.items():
+        g.px(x, yy, cc)
+
+
 def torso_side(g, bob, swing, lean=0, draw_arm=True):
     """옆모습 몸통+팔(오른쪽 보기). swing: 팔이 앞으로 나간 양 -3..+3"""
     y = SHIRT_Y + bob
     c = 15 + lean                              # 몸 중심 (반 칸 왼쪽)
+    # 팔은 같은 쪽 다리와 반대로(교차 보행), 다리 보폭보다 한 칸만 크게 —
+    # 손이 몸통 가장자리를 살짝 벗어나는 정도가 자연스럽다.
+    sw = -(swing + (1 if swing > 0 else -1 if swing < 0 else 0))
+    if draw_arm:
+        _side_arm(g, c, y, -sw, False)         # 저편 팔 — 반대 위상, 몸 뒤에
     g.rect(c - 1, y - 1, c + 2, y - 1, 's')    # 목
     g.rect(c - 4, y, c + 5, y + 11, 'b')
     g.hline(c - 4, c + 5, y + 11, 'B')
@@ -291,47 +342,8 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     for cx in (c - 4, c + 5):                  # 어깨·밑단 모서리 깎기
         g.px(cx, y, '.')
         g.px(cx, y + 11, '.')
-    if not draw_arm:
-        return
-    # 팔은 같은 쪽 다리와 반대로(교차 보행), 다리 보폭보다 한 칸만 크게 —
-    # 손이 몸통 가장자리를 살짝 벗어나는 정도가 자연스럽다 (두 배로
-    # 저었더니 팔만 허우적댔다). 크게 저을수록 진자 호를 따라 손이
-    # 위로 올라간다.
-    swing = -(swing + (1 if swing > 0 else -1 if swing < 0 else 0))
-    # 보이는 팔 하나 — 어깨에서 손까지 진자처럼 젓는다. 앞모습 팔과 같은
-    # 길이(어깨 y+1 ~ 손끝 y+10, 엉덩이 높이)로 내린다 — 짧으면 티가 난다.
-    # 몸판과 같은 파랑이라, 획을 통째로 모아 둘레를 윤곽선으로 한 번에
-    # 두른다 (픽셀마다 낱개로 두르면 대각선에서 조각조각 깨져 보인다).
-    hy = y + 8 - min(3, round(abs(swing) * 0.45))
-    # 폭은 다섯 칸 — 세 칸은 몸통(10칸)에 대면 젓가락처럼 얇았다. 대신
-    # 밝은 하이라이트 줄은 넣지 않는다. 전에 어색했던 건 두께가
-    # 아니라 밝은 줄 때문에 팔이 몸에서 튀어 보여서였다 — 몸판 색에
-    # 그늘 한 줄만 얹으면 두꺼워도 몸에 자연스럽게 붙는다.
-    # 손은 소매보다 한 칸 좁게(네 칸) — 소매에서 손으로 자연스럽게 좁아진다.
-    cells = {}
-    for yy in range(y + 1, hy):
-        t = (yy - (y + 1)) / max(1, hy - 1 - (y + 1))
-        x = c - 2 + round(swing * t)
-        for j, cc in enumerate(('B', 'b', 'b', 'b', 'b')):
-            cells[(x + j, yy)] = 'B' if yy == hy - 1 else cc     # 마지막 줄은 소매단
-    # 손: 팔 기울기를 따라 줄마다 어긋나게(전단) 그린다 — 손목이 팔
-    # 방향으로 꺾여 보인다. 좌우 평행이동만 하면 손만 둥둥 떠다닌다.
-    hx = c - 1 + swing
-    for k in range(3):
-        ox = round(swing * k / 7)
-        for j in range(4):
-            cells[(hx + j + ox, hy + k)] = 's'
-    ox2 = round(swing * 2 / 7)
-    cells[(hx + 2 + ox2, hy + 2)] = 'S'
-    cells[(hx + 3 + ox2, hy + 2)] = 'S'
-    for (x, yy) in cells:                                        # 획 둘레 윤곽선
-        for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
-            if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
-                continue
-            if g.d[ny][nx] != '.':
-                g.d[ny][nx] = 'O'
-    for (x, yy), cc in cells.items():
-        g.px(x, yy, cc)
+    if draw_arm:
+        _side_arm(g, c, y, sw, True)           # 가까운 팔 — 몸 위에
 
 
 def legs_side(g, stride, lean=0, dx=0, sq=0):
