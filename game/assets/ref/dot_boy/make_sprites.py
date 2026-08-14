@@ -553,13 +553,16 @@ def frame(direction, stride=None, bob=0):
     art, torso, legs = PARTS[direction]
     g = G()
     s = 0 if stride is None else stride
+    # 엉덩이도 몸통 바운스를 따라간다 (sq=bob) — 안 그러면 몸·다리는
+    # 움직이는데 허리 띠만 공중에 고정돼 상하체가 따로 논다.
+    # 발은 땅에 붙어 있으니 그만큼 무릎이 눌린다.
     if direction == 'side':
         lean = 0 if stride is None else 1      # 걸을 때 몸이 살짝 앞으로 쏠린다
-        legs(g, s, lean)
+        legs(g, s, lean, 0, bob)
         torso(g, bob, s, lean)
         head(g, art, bob, lean)
     else:
-        legs(g, s)
+        legs(g, s, 0, bob)
         torso(g, bob, s)
         head(g, art, bob)
     g.outline()
