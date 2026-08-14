@@ -770,6 +770,19 @@ func _on_buy_bait() -> void:
 
 # 노점 한정 요리 레시피 — 사면 집 조리대의 잠긴 칸이 열린다
 func _on_buy_dish_recipe(id: String, price: int) -> void:
+	# 조리대를 아직 못 찾았으면 팔지 않는다 — 돈도 레시피도 오가지 않고,
+	# 상인이 지나가듯 힌트만 준다 (조리대는 집 안 먼지더미 밑에 있다).
+	# 마커·화살표 없이 대사만으로 알아차리게 하는 자연스러운 튜토리얼이다.
+	if not GameData.kitchen_found:
+		main.dialog.open_seq("민지",
+			main.tex.get("npc_merchant_portrait_normal"), [
+			{"text": "「오, 요리 레시피에 관심이 있나 보네?」"},
+			{"text": "「그런데 지금은 사도 소용없을걸?\n아직 조리대가 없잖아.」"},
+			{"text": "「조리대는 원래 집 안에 하나쯤\n있기 마련인데...」"},
+			{"text": "「집 안을 한번 잘 찾아봐!」",
+				"portrait": main.tex.get("npc_merchant_portrait_happy")},
+		])
+		return
 	if GameData.money < price or not GameData.recipe_locked(id) \
 			or GameData.recipe_items.has(id):
 		return
