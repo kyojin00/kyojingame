@@ -207,8 +207,8 @@ const TEXTURE_NAMES := [
 	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
-	# 동굴 표본 (메인 스토리 10)
-	"crystal", "cave_moss", "glow_shroom",
+	# 동굴 표본 (메인 스토리 10) · 낡은 상자 (메인 스토리 13)
+	"crystal", "cave_moss", "glow_shroom", "old_box",
 	# 연금술 물약 (조합대 결과물)
 	"water_life", "potion_dream",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
@@ -333,6 +333,9 @@ const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
 const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
+# 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
+# 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
+const BRACELET_ROCK := Vector2i(8, 82)
 const FISH_SPOT := Rect2i(42, 26, 14, 12)   # 이 안이면 「낚시터에 있다」
 # 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
 const FISH_CLEAR := Rect2i(41, 24, 20, 14)
@@ -1221,6 +1224,7 @@ func _process(delta: float) -> void:
 	story._story10_update(delta)
 	story._story11_update(delta)
 	story._story12_update(delta)
+	story._story13_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

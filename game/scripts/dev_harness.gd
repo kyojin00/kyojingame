@@ -2058,6 +2058,94 @@ func _debug_tick() -> void:
 				" 숨은길=", s12_path, " 묘연숲=", s12_npc and s12_nocand,
 				" 첫만남=", s12_gather, " 재료차단=", s12_block,
 				" 재료표식=", s12_mark, " 해금완결=", s12_done)
+		278:
+			# #130: 메인 스토리 13 「할머니의 팔찌」 — 자유 생활 보장(임시 조건)
+			# -> 철수의 바다 소문 -> 주민 이야기 3 -> 두 사람의 바위 ->
+			# 특별한 입질(낡은 상자) -> 연금술사 개봉 -> 팔찌 + 기록 2장
+			m.dialog.close()
+			GameData.story12_phase = "done"
+			GameData.story13_phase = ""
+			GameData.story13_heard = []
+			GameData.items["relic_bracelet"] = 0
+			GameData.items["old_box"] = 0
+			GameData.sea_open = true
+			# ① 스토리 12 직후에는 시작되지 않는다 — 자유 생활 며칠 뒤에야
+			GameData.story12_done_day = GameData.day
+			m.story._story13_update(0.016)
+			var s13_wait: bool = GameData.story13_phase == "" \
+				and not GameData.story13_ready()
+			GameData.story12_done_day = GameData.day - GameData.STORY13_REST_DAYS
+			m.story._story13_update(0.016)
+			var s13_rumor: bool = GameData.story13_phase == "rumor" \
+				and GameData.quest_npc_marks().get("fisher", "") == "!"
+			m.story._start_sea_rumor_dialog()
+			m.dialog.skip_seq()
+			var s13_clue: bool = GameData.story13_phase == "clue"
+			# ② 주민 이야기 셋 — 철수·묘연은 안 세고, 같은 사람도 안 센다
+			m.story.story13_hear("fisher")
+			m.dialog.close()
+			var s13_nofish: bool = GameData.story13_heard.is_empty()
+			m.story.story13_hear("chief")
+			m.dialog.skip_seq()
+			m.story.story13_hear("chief")
+			m.dialog.close()
+			var s13_once: bool = GameData.story13_heard.size() == 1
+			m.story.story13_hear("merchant")
+			m.dialog.skip_seq()
+			m.story.story13_hear("librarian")
+			m.dialog.skip_seq()
+			var s13_spot: bool = GameData.story13_phase == "spot" \
+				and str(m.objects.get(m.BRACELET_ROCK,
+					{}).get("kind", "")) == "sign" \
+				and GameData.story13_objective_short() != ""
+			# ③ 특별한 입질 — 바위에서 멀면 평범한 낚시, 곁이면 낡은 상자
+			var keep13_pos: Vector2 = m.player.position
+			m.player.position = Vector2(60 * m.TILE, 30 * m.TILE)
+			var s13_far: bool = not m.story.story13_special_bite()
+			m.player.position = Vector2(m.BRACELET_ROCK.x * m.TILE + 16,
+				(m.BRACELET_ROCK.y - 1) * m.TILE + 16)
+			var s13_bite: bool = m.story.story13_special_bite() \
+				and GameData.story13_phase == "box" \
+				and int(GameData.items["old_box"]) == 1
+			m.player.position = keep13_pos
+			# ④ 연금술사 — 상담 -> 재료 준비 -> 개봉 (재료가 모자라면 안 열린다)
+			m.story._alch_house_door()
+			m.dialog.skip_seq()
+			var s13_ask: bool = GameData.story13_phase == "open"
+			GameData.items["glow_shroom"] = 0
+			m.story._alch_house_door()
+			var s13_block: bool = m.dialog.visible \
+				and GameData.story13_phase == "open" \
+				and int(GameData.items["relic_bracelet"]) == 0
+			m.dialog.close()
+			GameData.items["glow_shroom"] = int(GameData.STORY13_MATS["glow_shroom"])
+			GameData.items["forage_glass"] = maxi(
+				int(GameData.items["forage_glass"]),
+				int(GameData.STORY13_MATS["forage_glass"]))
+			var s13_mark: bool = GameData.quest_npc_marks().get("alchemist", "") == "?"
+			m.story._alch_house_door()
+			m.dialog.skip_seq()
+			var s13_relic: bool = GameData.story13_phase == "record" \
+				and int(GameData.items["relic_bracelet"]) == 1 \
+				and int(GameData.items["old_box"]) == 0 \
+				and GameData.relics_owned() >= 2
+			# ⑤ 도서관 — 팔찌 장(2장)이 함께 열리고, 읽으면 완결
+			m.story.open_grandma_records()
+			var s13_lib: bool = m.dialog.visible
+			m.dialog.close()
+			m.story._end_grandma_record()
+			var s13_done: bool = GameData.story13_phase == "done" \
+				and GameData.completed_quests().has("메인 스토리 13 — 할머니의 팔찌")
+			GameData.relic_pending = ""
+			m.hud._toast_queue.clear()
+			print("STORY13_OK=", s13_wait and s13_rumor and s13_clue and s13_nofish
+				and s13_once and s13_spot and s13_far and s13_bite and s13_ask
+				and s13_block and s13_mark and s13_relic and s13_lib and s13_done,
+				" 자유생활=", s13_wait, " 소문=", s13_rumor and s13_clue,
+				" 낚시꾼제외=", s13_nofish, " 중복없음=", s13_once,
+				" 바위=", s13_spot, " 원거리차단=", s13_far, " 특별입질=", s13_bite,
+				" 상담=", s13_ask, " 재료차단=", s13_block, " 재료표식=", s13_mark,
+				" 팔찌=", s13_relic, " 기록완결=", s13_lib and s13_done)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

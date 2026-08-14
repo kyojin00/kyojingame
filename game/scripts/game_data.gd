@@ -1390,14 +1390,22 @@ const STORY11_NOTE := 0.2          # 시작 조건 — 연구 노트 진행률
 const STORY11_FLOOR := 50          # 모자가 잠든 깊이 (RELICS[0]의 힌트 층)
 var grandma_read := 0              # 「할머니의 기록」 읽은 장 수 (점진 공개)
 
-# 할머니의 기록 — 유품 하나를 찾을 때마다 한 장씩 열린다 (RELICS 순서)
+# 할머니의 기록 — 유품 하나를 찾을 때마다 한 장씩 열린다 (RELICS 순서.
+# 가진 유품의 장만 보인다 — 한 번에 다 공개하지 않는다).
+# 장이 갈수록 두 분의 이야기가 조금씩 짙어진다 (모자 < 팔찌 < ...)
 const GRANDMA_RECORDS := [
 	"『교진 마을 부녀회 명부』 — 빛바랜 명단 맨 앞에 할머니의 이름이 있다.\n\n"
 	+ "「밭일 나갈 때도 늘 그 챙 넓은 모자를 쓰고 계셨지. 광부들 도시락을\n"
 	+ "싸 들고 굴까지 내려가시던 분은 마을에 그분뿐이었어.」 — 옛 주민의 메모.\n\n"
 	+ "할아버지의 글씨가 여백에 작게 남아 있다.\n「당신이 굴에 두고 온 모자, 내가 꼭 찾아다 주리다.」",
+	"『바닷가의 약속』 — 물때가 적힌 낡은 조석표 사이에 편지 한 장.\n\n"
+	+ "「그 사람은 바다를 참 좋아했다. 해 질 무렵이면 늘 서쪽 모래밭 끝\n"
+	+ "바위께로 나를 끌고 갔지. 첫 수확을 판 돈으로 팔찌를 사 주던 날,\n"
+	+ "파도가 유난히 잔잔했다.」 — 할아버지의 필체.\n\n"
+	+ "뒷장에는 서툰 그림 — 바위에 기대앉은 두 사람과, 물결 위의 노을.\n"
+	+ "「폭풍이 몰아치던 해, 바다는 많은 것을 가져갔다.\n"
+	+ "...하지만 언젠가 돌려주리라 믿는다. 바다도 약속은 지키니까.」",
 	"『두 사람의 시계』 — 다음 유품을 찾으면 열린다.",
-	"『바닷가의 약속』 — 다음 유품을 찾으면 열린다.",
 	"『금빛 밭의 계절』 — 다음 유품을 찾으면 열린다.",
 	"『숲이 지킨 마음』 — 다음 유품을 찾으면 열린다.",
 ]
@@ -1500,6 +1508,73 @@ func story12_objective_short() -> String:
 			if story12_mats_ok():
 				return "연금술사에게 재료를 가져다주자 (E)"
 			return "재료 시험 — " + story12_mats_text()
+	return ""
+
+
+# ---- 메인 스토리 13: 할머니의 팔찌 ----
+#
+# 두 번째 유품. 스토리 12 완결 뒤 곧장 이어지지 않는다 — 자유 생활을
+# 며칠 보낸 다음(임시 조건, 세부 시작 조건은 추후 확정) 철수가 「요즘
+# 그물에 물고기 대신 낡은 물건이 올라온다」는 이야기를 꺼낸다.
+# 주민들에게 할머니와 바다 이야기를 모으면 두 분이 자주 찾던 해변
+# 서쪽 끝 바위가 조사 지점으로 드러나고, 그 곁에서 낚시하면 스토리
+# 중에만 생기는 특별한 입질로 「낡은 작은 상자」가 올라온다. 상자는
+# 녹슬어 바로 못 연다 — 연금술사 묘연이 재료(임시값)를 받아 안전하게
+# 열어 준다 (스토리 12에서 해금한 연금술의 자연스러운 재활용).
+# 팔찌를 얻으면 도서관 「할머니의 기록」 2장(바닷가의 약속)이 열린다.
+#   "": 아직 / rumor: 철수의 이상한 이야기 / clue: 주민 단서 수집 /
+#   spot: 해변 바위·특별 낚시 / box: 낡은 상자 — 연금술사에게 /
+#   open: 개봉 재료 준비 / record: 도서관 기록 / done
+var story13_phase := ""
+var story13_heard: Array = []      # 바다 이야기를 들려준 주민 id
+var story12_done_day := 0          # 스토리 12를 끝낸 날 (자유 생활 보장)
+const STORY13_REST_DAYS := 3       # 임시 — 스토리 12 뒤 이만큼 지나야 시작
+const STORY13_TALES := 3           # 이야기를 들어야 하는 주민 수
+# 상자 개봉 재료 — 녹을 녹이는 간단한 것들 (종류·개수는 추후 확정, 임시값)
+const STORY13_MATS := {"glow_shroom": 2, "forage_glass": 3}
+
+
+# 시작 조건 (임시) — 스토리 12 완결 + 자유 생활 며칠 + 바다가 열려 있고
+# 팔찌를 아직 못 찾았을 때. 세부 조건은 추후 별도 확정 예정.
+func story13_ready() -> bool:
+	return story12_phase == "done" and sea_open \
+		and day >= story12_done_day + STORY13_REST_DAYS \
+		and int(items.get("relic_bracelet", 0)) == 0
+
+
+func story13_mats_ok() -> bool:
+	for mid in STORY13_MATS:
+		if int(items.get(mid, 0)) < int(STORY13_MATS[mid]):
+			return false
+	return true
+
+
+func story13_mats_text() -> String:
+	var parts: Array = []
+	for mid in STORY13_MATS:
+		parts.append("%s %d/%d" % [ITEMS[mid].name,
+			mini(int(items.get(mid, 0)), int(STORY13_MATS[mid])),
+			int(STORY13_MATS[mid])])
+	return " · ".join(parts)
+
+
+func story13_objective_short() -> String:
+	match story13_phase:
+		"rumor":
+			return "낚시꾼 철수의 이상한 이야기를 들어보자 (E)"
+		"clue":
+			return "주민들에게 할머니와 바다 이야기를 듣자 (%d/%d)" % [
+				story13_heard.size(), STORY13_TALES]
+		"spot":
+			return "해변 서쪽 끝 바위 곁 — 그 자리에서 낚시를 해 보자"
+		"box":
+			return "낡은 상자를 연금술사 묘연에게 가져가자"
+		"open":
+			if story13_mats_ok():
+				return "재료를 모았다 — 묘연에게 상자를 열어 달라 하자 (E)"
+			return "개봉 재료 — " + story13_mats_text()
+		"record":
+			return "도서관에서 「할머니의 기록」을 읽자"
 	return ""
 
 
@@ -1614,6 +1689,20 @@ func quest_catalog() -> Array:
 			"desc": "할아버지의 연구를 도왔다는 이름 모를 사람의 흔적.",
 			"cat": "main", "ep": "메인 스토리 12", "npc": s12npc,
 			"reward": "연금술 해금 — 집 조합대에서 물약을 만든다"})
+	o = story13_objective_short()
+	if o != "":
+		var s13npc := ""
+		match story13_phase:
+			"rumor":
+				s13npc = "fisher"
+			"box", "open":
+				s13npc = "alchemist"
+			"record":
+				s13npc = "librarian"
+		out.append({"id": "story13", "title": "할머니의 팔찌", "obj": o,
+			"desc": "바다가 간직해 온 두 번째 유품 — 낡은 상자의 비밀.",
+			"cat": "main", "ep": "메인 스토리 13", "npc": s13npc,
+			"reward": "할머니의 팔찌 + 「할머니의 기록」 2장"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1751,6 +1840,15 @@ func quest_npc_marks() -> Dictionary:
 		marks["librarian"] = "!"
 	elif story12_phase == "gather" and story12_mats_ok():
 		marks["alchemist"] = "?"
+	# 스토리 13 — 철수의 이상한 이야기 / 상자 개봉은 연금술사에게
+	match story13_phase:
+		"rumor":
+			marks["fisher"] = "!"
+		"box":
+			marks["alchemist"] = "!"
+		"open":
+			if story13_mats_ok():
+				marks["alchemist"] = "?"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -2260,6 +2358,8 @@ const ITEMS := {
 	"crystal": {"name": "수정", "sell": 160},
 	"cave_moss": {"name": "동굴 이끼", "sell": 45},
 	"glow_shroom": {"name": "발광 버섯", "sell": 120},
+	# 낡은 작은 상자 (메인 스토리 13) — 바다가 돌려준 것. 팔 수 없다
+	"old_box": {"name": "낡은 작은 상자", "sell": 0},
 	"bouquet": {"name": "꽃다발", "sell": 0},
 	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
 	"nail": {"name": "못", "sell": 15},
@@ -2373,7 +2473,7 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
 	"fish_king", "fish_dragon",
 	"ore", "gem", "star_shard", "crystal", "cave_moss", "glow_shroom",
-	"bouquet", "wedding_ring",
+	"old_box", "bouquet", "wedding_ring",
 	"nail", "cloth", "rope", "hinge", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
@@ -3058,10 +3158,11 @@ var rocks_mined := 0          # 깬 바위 수
 const RELICS := [
 	{"id": "relic_hat", "name": "할머니의 모자", "chance": 0.05,
 		"hint": "동굴 50층 아래, 광석을 깨다 보면 낡은 모자가 나온다더라..."},
+	# 팔찌는 둘째 유품 — 랜덤 드랍이 아니라 스토리 13(낡은 상자)으로 얻는다
+	{"id": "relic_bracelet", "name": "할머니의 팔찌", "chance": 1.0,
+		"hint": "두 분이 자주 걷던 해변 어딘가... 바다가 간직하고 있다더라."},
 	{"id": "relic_watch", "name": "할머니의 시계", "chance": 0.015,
 		"hint": "바다 물고기를 낚다 보면 낚싯줄에 시계가 걸려 온다더라..."},
-	{"id": "relic_bracelet", "name": "할머니의 팔찌", "chance": 0.015,
-		"hint": "해변의 모래를 뒤지다 보면 팔찌가 반짝인다더라..."},
 	{"id": "relic_ring", "name": "할머니의 반지", "chance": 0.04,
 		"hint": "금빛으로 여문 작물 속에 반지가 숨어 있다더라..."},
 	{"id": "relic_necklace", "name": "할머니의 목걸이", "chance": 0.25,
@@ -4211,6 +4312,8 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 11 — 할머니의 모자")
 	if story12_phase == "done":
 		out.append("메인 스토리 12 — 숲의 연금술사")
+	if story13_phase == "done":
+		out.append("메인 스토리 13 — 할머니의 팔찌")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -4546,6 +4649,9 @@ func reset_all() -> void:
 	grandma_read = 0
 	story12_phase = ""
 	story12_heard = []
+	story13_phase = ""
+	story13_heard = []
+	story12_done_day = 0
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -4913,6 +5019,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story11_phase": story11_phase, "story11_clues": story11_clues,
 		"grandma_read": grandma_read,
 		"story12_phase": story12_phase, "story12_heard": story12_heard,
+		"story13_phase": story13_phase, "story13_heard": story13_heard,
+		"story12_done_day": story12_done_day,
 		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,

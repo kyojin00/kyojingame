@@ -413,6 +413,10 @@ func _apply_save(d: Dictionary) -> void:
 	# 숨은 길·오두막 복원 (완성 기록이 있으면 다시 세운다)
 	if GameData.story12_phase in ["path", "gather", "done"]:
 		m.worldgen._spawn_alch_house()
+	# ---- 메인 스토리 13 (할머니의 팔찌) ----
+	GameData.story13_phase = str(d.get("story13_phase", ""))
+	GameData.story13_heard = Array(d.get("story13_heard", []))
+	GameData.story12_done_day = int(d.get("story12_done_day", 0))
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()

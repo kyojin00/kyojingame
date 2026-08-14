@@ -2871,28 +2871,37 @@ func _end_hat_clue(nid: String) -> void:
 	m.saveio.save_now()
 
 
-# 도서관 「할머니의 기록」 — 유품 하나에 한 장씩 열린다 (점진 공개)
+# 도서관 「할머니의 기록」 — 가진 유품의 장만 보인다 (점진 공개).
+# 유품이 늘수록 두 분의 이야기가 조금씩 짙어진다.
 func open_grandma_records() -> void:
 	var owned := GameData.relics_owned()
 	if owned <= 0:
 		return
-	var body := "서하가 부녀회 명부와 광산 일지를 모아\n할머니의 발자취를 정리해 두었다.\n\n"
-	body += str(GameData.GRANDMA_RECORDS[0]) if owned >= 1 else ""
+	var body := "서하가 명부·일지·편지를 모아\n할머니의 발자취를 정리해 두었다.\n\n"
+	for i in GameData.RELICS.size():
+		if int(GameData.items.get(str(GameData.RELICS[i].id), 0)) > 0:
+			body += str(GameData.GRANDMA_RECORDS[i]) + "\n\n"
 	if owned < GameData.RELICS.size():
-		body += "\n\n(남은 기록 %d장 — 다음 유품을 찾으면 열린다)" \
+		body += "(남은 기록 %d장 — 다음 유품을 찾으면 열린다)" \
 			% (GameData.RELICS.size() - owned)
-	GameData.grandma_read = maxi(GameData.grandma_read, 1)
+	GameData.grandma_read = maxi(GameData.grandma_read, owned)
 	m.dialog.open("할머니의 기록 (%d/%d)" % [owned, GameData.RELICS.size()],
 		body, [["소중히 읽었다", _end_grandma_record]])
 
 
 func _end_grandma_record() -> void:
-	if GameData.story11_phase != "record":
+	# 기록 읽기가 이야기의 끝맺음이 되는 장 — 스토리 11(모자)·13(팔찌)
+	if GameData.story11_phase == "record":
+		GameData.story11_phase = "done"
+		m.hud.story_banner("메인 스토리 11 완결", "할머니의 모자")
+		m.hud.show_message("첫 번째 유품을 찾았다. 할머니의 기록은 유품을\n찾을 때마다 한 장씩 열린다 — 이야기는 계속된다.", 7.0)
+		m.saveio.save_now()
 		return
-	GameData.story11_phase = "done"
-	m.hud.story_banner("메인 스토리 11 완결", "할머니의 모자")
-	m.hud.show_message("첫 번째 유품을 찾았다. 할머니의 기록은 유품을\n찾을 때마다 한 장씩 열린다 — 이야기는 계속된다.", 7.0)
-	m.saveio.save_now()
+	if GameData.story13_phase == "record":
+		GameData.story13_phase = "done"
+		m.hud.story_banner("메인 스토리 13 완결", "할머니의 팔찌")
+		m.hud.show_message("두 번째 유품을 찾았다. 바다도 약속은 지킨다 —\n남은 유품들이 어딘가에서 기다리고 있다.", 7.0)
+		m.saveio.save_now()
 
 
 # ---- 메인 스토리 12: 숲의 연금술사 ----
@@ -2984,12 +2993,21 @@ func _alch_house_door() -> void:
 	match GameData.story12_phase:
 		"path":
 			_start_alch_meet_dialog()
+			return
 		"gather":
 			_start_alch_gather_dialog()
-		_:
-			m.dialog.open("연금술사의 오두막",
-				"문틈으로 알싸한 약초 냄새와 함께\n보글보글 무언가 끓는 소리가 새어 나온다.\n(묘연은 오두막 곁을 서성이고 있다)",
-				[["닫기", null]])
+			return
+	# 스토리 13 — 낡은 상자 개봉은 연금술사의 몫이다
+	match GameData.story13_phase:
+		"box":
+			_start_box_help_dialog()
+			return
+		"open":
+			_start_box_open_dialog()
+			return
+	m.dialog.open("연금술사의 오두막",
+		"문틈으로 알싸한 약초 냄새와 함께\n보글보글 무언가 끓는 소리가 새어 나온다.\n(묘연은 오두막 곁을 서성이고 있다)",
+		[["닫기", null]])
 
 
 # 퀘스트 2 — 첫 만남: 낯선 이를 시험하는 연금술사
@@ -3038,8 +3056,173 @@ func _end_alch_demo() -> void:
 	for mid in GameData.STORY12_MATS:
 		GameData.items[mid] = int(GameData.items[mid]) - int(GameData.STORY12_MATS[mid])
 	GameData.story12_phase = "done"
+	GameData.story12_done_day = GameData.day   # 다음 이야기 전, 자유 생활 보장
 	m.hud.story_banner("메인 스토리 12 완결", "숲의 연금술사")
 	m.hud.show_message("연금술이 열렸다! 집 안의 조합대(E)에서 물약을\n만들 수 있다 — 조합법은 나무·바위·몬스터에게서 배운다.", 8.0)
+	m.saveio.save_now()
+
+
+# ---- 메인 스토리 13: 할머니의 팔찌 ----
+#
+# 스토리 12 뒤 자유 생활을 며칠 보내면(임시 조건 — 세부 시작 조건은
+# 추후 확정), 철수의 그물에 낡은 물건이 올라온다는 이야기로 시작한다.
+# 주민 단서 -> 해변 서쪽 끝 바위 -> 특별한 입질 -> 낡은 상자 ->
+# 연금술사의 개봉 -> 두 번째 유품 「할머니의 팔찌」 -> 도서관 기록 2장.
+
+func _story13_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.story13_phase == "" and GameData.story13_ready():
+		GameData.story13_phase = "rumor"
+		m.hud.quest_start_toast("낚시꾼 철수가 요즘 바다가 이상하다고 한다")
+		m.saveio.save_now()
+	# 조사 지점(두 분의 바위)이 세상에 놓여 있는지 살핀다 — 로드 직후 포함
+	if GameData.story13_phase in ["spot", "box", "open", "record", "done"] \
+			and GameData.sea_open:
+		story13_place_rock()
+
+
+# 해변 서쪽 끝, 두 분이 앉던 바위 — 조사 지점 표식 (뒀다 지우지 않는다)
+func story13_place_rock() -> void:
+	var t: Vector2i = m.BRACELET_ROCK
+	if str(m.objects.get(t, {}).get("kind", "")) == "sign":
+		return
+	m.objnode._remove_object(t)
+	m.objnode._place_object(t, "sign", 0)
+
+
+# 퀘스트 1 — 철수의 이상한 이야기: 그물에 올라오는 낡은 물건들
+func _start_sea_rumor_dialog() -> void:
+	m.dialog.open_seq("철수", m.tex["npc_fisher_portrait_normal"], [
+		{"text": "「어이, 마침 잘 왔네. 요즘 바다가 좀 이상해.」"},
+		{"text": "「물고기 대신에 말이야 — 오래된 금속 조각이며\n낡은 물건들이 자꾸 그물에 걸려 올라와.\n어제는 녹슨 숟가락이 나왔다니까?」"},
+		{"text": "「옛날 어른들 말로는, 큰 폭풍이 온 해에\n해안가 물건들이 죄다 바다로 쓸려 갔다더군.\n그게 이제야 하나씩 돌아오는 건가...」"},
+		{"text": "「...가만, 자네 할머님 유품을 찾고 있다 했지?\n혹시 모르지. 바다가 그중 하나쯤\n간직하고 있을지도.」",
+			"portrait": m.tex["npc_fisher_portrait_happy"]},
+		{"text": "「할머님이 바다랑 인연이 있으셨는지,\n마을 사람들한테 한번 물어보게.」"},
+	], _end_sea_rumor)
+
+
+func _end_sea_rumor() -> void:
+	if GameData.story13_phase == "rumor":
+		GameData.story13_phase = "clue"
+		GameData.story13_heard = []
+		m.hud.story_banner("메인 스토리 13 시작", "할머니의 팔찌")
+		m.hud.quest_start_toast("주민들에게 할머니와 바다 이야기를 듣자 (0/%d)"
+			% GameData.STORY13_TALES)
+	m.saveio.save_now()
+
+
+# 주민들의 바다 이야기 — 몇 명에게만 들으면 충분하다 (갈수록 짙어진다)
+const SEA_TALES := [
+	"「자네 할머님? 바다를 참 좋아하셨지.\n물때만 맞으면 모래밭을 맨발로 걸으셨어.\n할아버님이 늘 뒤를 따라다니셨고.」",
+	"「두 분이 늘 가시던 자리가 있었어.\n해 질 무렵이면 나란히 앉아 계셨는데...\n서쪽이었나, 그랬을 거야.」",
+	"「기억나! 해변 서쪽 끝의 그 바위!\n두 분이 늘 거기 앉아 노을을 보셨어.\n그 앞바다에 뭔가 있다면... 거기일 거야.」",
+]
+
+
+func story13_hear(nid: String) -> void:
+	if GameData.story13_phase != "clue" or nid in GameData.story13_heard \
+			or nid in ["fisher", "alchemist"]:
+		return
+	var idx := mini(GameData.story13_heard.size(), SEA_TALES.size() - 1)
+	GameData.story13_heard.append(nid)
+	var nm := str(GameData.NPCS[nid].name)
+	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid), [
+		{"text": str(SEA_TALES[idx])},
+	], _end_sea_tale)
+
+
+func _end_sea_tale() -> void:
+	if GameData.story13_phase != "clue":
+		return
+	var n := GameData.story13_heard.size()
+	if n >= GameData.STORY13_TALES:
+		GameData.story13_phase = "spot"
+		story13_place_rock()
+		m.hud.event_toast("조사 지점 발견!")
+		m.hud.quest_start_toast("해변 서쪽 끝 바위 곁 — 그 자리에서 낚시를 해 보자")
+	else:
+		m.hud.event_toast("이야기 %d/%d" % [n, GameData.STORY13_TALES])
+	m.saveio.save_now()
+
+
+# 두 분의 바위 (E) — 조사 지점의 표식
+func examine_bracelet_rock() -> void:
+	if GameData.story13_phase == "spot":
+		m.dialog.open("두 사람의 바위",
+			"파도에 닳은 바위에 작게 새겨진 글씨 —\n서로 기대선 두 글자의 이니셜.\n\n"
+			+ "두 분이 나란히 앉아 노을을 보던 자리다.\n이 앞바다에... 낚싯대를 던져 보자.",
+			[["낚싯대를 꺼낸다", null]])
+	else:
+		m.dialog.open("두 사람의 바위",
+			"서로 기대선 두 글자의 이니셜이 새겨진 바위.\n두 분이 나란히 앉아 노을을 보던 자리다.\n\n오늘도 파도가 잔잔하다.",
+			[["잠시 바다를 본다", null]])
+
+
+# 특별한 입질 — 스토리 진행 중, 바위 곁에서 낚아 올린 것 (fishing이 부른다)
+func story13_special_bite() -> bool:
+	if GameData.story13_phase != "spot":
+		return false
+	if m.player_tile().distance_to(Vector2i(m.BRACELET_ROCK)) > 6.0:
+		return false
+	GameData.story13_phase = "box"
+	GameData.items["old_box"] = 1
+	GameData.discover("old_box")
+	Sound.play_sfx("sfx_catch")
+	m.renderer.spawn_particles(m.player_tile(), "sparkle")
+	m.hud.show_message("묵직한 입질...! 물고기가 아니다 —\n바닷물에 오래 잠겨 있던 낡은 작은 상자다!", 6.0)
+	m.hud.quest_start_toast("낡은 상자 — 녹슬어 열 수 없다. 연금술사에게 가져가자")
+	m.saveio.save_now()
+	return true
+
+
+# 퀘스트 2 — 상자 개봉: 연금술사의 손을 빌린다 (오두막 문·묘연에게 E)
+func _start_box_help_dialog() -> void:
+	m.dialog.open_seq("묘연", m.tex["npc_alchemist_portrait_normal"], [
+		{"text": "「어서 와요. ...어머, 그 상자.\n바닷물을 오래 먹었네요. 이리 줘 봐요.」"},
+		{"text": "(묘연이 상자를 이리저리 돌려 보았다.\n경첩은 녹으로 굳었고, 자물쇠는 소금이\n하얗게 껴 있다.)"},
+		{"text": "「억지로 비틀면 안의 것까지 상해요.\n녹을 녹이는 약을 만들어서, 천천히\n열어야 해요.」"},
+		{"text": "「%s — 이만큼만 구해다 줘요.\n빛이 소금을 풀고, 유리가 녹을 걷어 내죠.\n연금술은 이럴 때 쓰는 거예요.」" % GameData.story13_mats_text(),
+			"portrait": m.tex["npc_alchemist_portrait_happy"]},
+	], _end_box_help)
+
+
+func _end_box_help() -> void:
+	if GameData.story13_phase == "box":
+		GameData.story13_phase = "open"
+		m.hud.quest_start_toast("개봉 재료 — " + GameData.story13_mats_text())
+	m.saveio.save_now()
+
+
+# 퀘스트 3 — 개봉: 두 번째 유품 「할머니의 팔찌」
+func _start_box_open_dialog() -> void:
+	if not GameData.story13_mats_ok():
+		m.dialog.open_seq("묘연", m.tex["npc_alchemist_portrait_normal"], [
+			{"text": "「재료는 어때요? — %s.」" % GameData.story13_mats_text()},
+			{"text": "「발광 버섯은 동굴 바닥에, 유리 조각은\n해변 모래밭에... 상자는 도망 안 가요.\n찬찬히 모아 와요.」"},
+		])
+		return
+	m.dialog.open_seq("묘연", m.tex["npc_alchemist_portrait_happy"], [
+		{"text": "「좋아요, 다 모였네요. 자, 시작할게요.」"},
+		{"text": "(묘연이 재료를 끓여 은은히 빛나는 약을\n만들더니, 상자의 경첩과 자물쇠에\n한 방울씩 조심스레 떨어뜨렸다.)"},
+		{"text": "(녹과 소금이 스르르 풀리고... 딸깍.\n상자가 조용히 열렸다.)"},
+		{"text": "「...팔찌네요. 바닷물에 그리 오래 잠겼는데,\n하나도 녹슬지 않았어요. 아껴 준 물건은\n쉽게 상하지 않는 법이죠.」",
+			"portrait": m.tex["npc_alchemist_portrait_normal"]},
+		{"text": "「그분 노트에 적어 둬요. 그리고...\n도서관의 사서 씨도 분명 반가워할 거예요.」",
+			"portrait": m.tex["npc_alchemist_portrait_happy"]},
+	], _end_box_open)
+
+
+func _end_box_open() -> void:
+	if GameData.story13_phase != "open" or not GameData.story13_mats_ok():
+		return
+	for mid in GameData.STORY13_MATS:
+		GameData.items[mid] = int(GameData.items[mid]) - int(GameData.STORY13_MATS[mid])
+	GameData.items["old_box"] = 0
+	GameData.try_relic(1, 0.0, true)   # 「할머니의 팔찌」 — 노트·수집 현황 반영
+	GameData.story13_phase = "record"
+	m.hud.quest_start_toast("도서관에서 「할머니의 기록」을 읽어 보자")
 	m.saveio.save_now()
 
 

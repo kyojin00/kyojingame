@@ -355,6 +355,18 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "alchemist" and GameData.story12_phase in ["path", "gather"]:
 		m.story._alch_house_door()
 		return
+	# 메인 스토리 13 — 할머니의 팔찌
+	if npc.id == "fisher" and GameData.story13_phase == "rumor":
+		m.story._start_sea_rumor_dialog()
+		return
+	if GameData.story13_phase == "clue" \
+			and npc.id not in ["fisher", "alchemist"] \
+			and npc.id not in GameData.story13_heard:
+		m.story.story13_hear(npc.id)
+		return
+	if npc.id == "alchemist" and GameData.story13_phase in ["box", "open"]:
+		m.story._alch_house_door()
+		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return

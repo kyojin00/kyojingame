@@ -67,13 +67,18 @@ func _on_fishing_finished(success: bool) -> void:
 	if m.pending_fish.is_empty():
 		return          # 무엇이 물었는지 모르는 채로 끝났다 (있어선 안 되는 경우)
 	if success:
+		# 특별한 입질 (메인 스토리 13) — 두 분의 바위 곁에서는 물고기 대신
+		# 바다가 간직해 온 「낡은 작은 상자」가 올라온다
+		if m.story.story13_special_bite():
+			m.toolwork.gain_skill("fish", 10.0)
+			return
 		var id: String = str(m.pending_fish.id)
 		var def: Dictionary = GameData.ITEMS[id]
 		GameData.items[id] += 1
 		GameData.discover(id)
 		GameData.fish_caught[id] = int(GameData.fish_caught.get(id, 0)) + 1
 		GameData.today_harvest += 1
-		if GameData.try_relic(1):   # 낚싯줄에 걸려 온 「할머니의 시계」
+		if GameData.try_relic(2):   # 낚싯줄에 걸려 온 「할머니의 시계」
 			pass
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")

@@ -264,8 +264,8 @@ func interact() -> void:
 			GameData.items[fid] += got
 			GameData.forage_caught[fid] = int(GameData.forage_caught.get(fid, 0)) + got
 			GameData.discover(fid)
-			if fid in m.BEACH_FORAGE:
-				GameData.try_relic(2)   # 모래 속의 「할머니의 팔찌」
+			# (팔찌는 모래밭 랜덤 드랍이 아니라 스토리 13의 낡은 상자에서 —
+			#  두 분의 바위 곁, 특별한 입질로 얻는다)
 			# 산호 조각·고대 조각: 처음 주우면 숨겨진 이야기/레시피가 열린다
 			if first_find and fid in ["forage_coral", "forage_relic"]:
 				m.story.hidden_beach_find(fid)
@@ -332,6 +332,9 @@ func interact() -> void:
 			return
 		if obj.kind == "sign" and t == m.GREENHOUSE_SIGN:
 			m.village._open_greenhouse_dialog()
+			return
+		if obj.kind == "sign" and t == m.BRACELET_ROCK:
+			m.story.examine_bracelet_rock()   # 메인 스토리 13 — 두 사람의 바위
 			return
 		if obj.kind == "sign" and t == m.FISH_SIGN:
 			m.dialog.open("낚시터", "교진 마을 낚시터.\n\n강가에 서서 물을 보고 낚싯대(E)를 던지면 된다.\n"
