@@ -42,6 +42,7 @@ PAL = {
     'L': (94, 126, 200),    # 셔츠 밝은 면
     'p': (134, 88, 46),     # 바지
     'P': (98, 62, 32),      # 바지 그늘
+    'q': (158, 108, 58),    # 바지 밝은 면
     'k': (82, 53, 33),      # 신발
     'K': (56, 37, 25),      # 신발 그늘
 }
@@ -130,13 +131,13 @@ HEAD_DOWN = [
     ".OsHHHHHHHHHHsO.",
     ".OsHHHHHHHHHHsO.",
     "OsssHHHHHHHHsssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "Oss" "eee" "ssss" "eee" "ssO",
-    "Osss" "ee" "ssss" "ee" "sssO",
-    "Osss" "ee" "ssss" "ee" "sssO",
-    "Osss" "ei" "ssss" "ie" "sssO",
+    "OsssssssssssssSO",
+    "OsssssssssssssSO",
+    "OsssssssssssssSO",
+    "Oss" "eee" "ssss" "eee" "sSO",
+    "Osss" "ew" "ssss" "we" "ssSO",
+    "Osss" "ee" "ssss" "ee" "ssSO",
+    "Osss" "ei" "ssss" "ie" "ssSO",
     "OrrssssssssssrrO",
     ".Osssss" "mm" "sssssO.",
     ".OssssssssssssO.",
@@ -155,7 +156,7 @@ HEAD_SIDE = [   # 오른쪽을 본다
     "OSsssssssssssssO",
     "OSsssssssssssssO",
     "OSsssssss" "eee" "sssO",
-    "OSsssssss" "ee" "ssssO",
+    "OSsssssss" "ew" "ssssO",
     "OSsssssss" "ee" "ssssO",
     "OSsssssss" "ei" "ssssO",
     "OSssssrrsssssssO",
@@ -210,6 +211,7 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.hline(15 + dx, 16 + dx, y + 2, 'B')        # 앞섶 단추 세 개
     g.hline(15 + dx, 16 + dx, y + 4, 'B')
     g.hline(15 + dx, 16 + dx, y + 6, 'B')
+    g.vline(20 + dx, y + 6, y + 10, 'B')         # 오른쪽 아래 그늘 (입체)
     # 팔: 소매 3픽셀 폭 + 세 칸 손. 손끝이 엉덩이 띠 바로 위(아랫단)까지
     # 온다. 앞으로 흔들면 소매가 늘어나며 내려가고 뒤로 가면 접히며
     # 올라간다 — 어깨는 늘 몸통에 붙어 있다.
@@ -248,6 +250,7 @@ def legs_down(g, stride, dx=0, sq=0):
         # 들린 다리는 무릎 아래가 안쪽으로 접힌다 (정면에서 본 무릎 굽힘)
         bend = (1 if x0 == 10 else -1) if lift >= 2 else 0
         knee_row = (top + GROUND - lift) // 2
+        outer = x0 if x0 == 10 else x0 + 4     # 빛 받는 바깥 열 (왼쪽 다리만)
         for yy in range(top, GROUND - 3 - lift):
             t = (yy - (HIP_Y + 2 + sq)) / (GROUND - HIP_Y - 2 - sq)
             off = round(dx * (1 - t))          # 엉덩이 쪽만 dx만큼 쏠린다
@@ -255,11 +258,15 @@ def legs_down(g, stride, dx=0, sq=0):
                 off += bend
             g.rect(x0 + off, yy, x0 + 4 + off, yy, pc)
             g.px(inner + off, yy, 'P')
-            if yy == top:
-                g.hline(x0 + off, x0 + 4 + off, yy, 'P')
+            if not lift and x0 == 10:
+                g.px(outer + off, yy, 'q')     # 왼쪽 다리 하이라이트
+            if yy in (top, GROUND - 4 - lift):
+                g.hline(x0 + off, x0 + 4 + off, yy, 'P')   # 허리·발목 접단
         g.rect(x0 + bend, GROUND - 3 - lift, x0 + 4 + bend, GROUND - 1 - lift, 'k')
         g.hline(x0 + 1 + bend, x0 + 3 + bend, GROUND - lift, 'K')  # 바닥은 좁게 (둥근 신발)
         g.px((x0 if x0 == 17 else x0 + 4) + bend, GROUND - 1 - lift, 'K')
+        g.px(x0 + 2 + bend, GROUND - 3 - lift, 'p')        # 신발 코 광
+        g.px(x0 + 3 + bend, GROUND - 3 - lift, 'p')
 
 
 def torso_side(g, bob, swing, lean=0, draw_arm=True):
@@ -352,6 +359,12 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
                 g.rect(x - 3, yy, x + 3, yy, cc)
             if not shade and yy <= bot - 4:
                 g.px(x - 3, yy, 'P')           # 가까운 다리 뒤쪽 그늘 선
+                if yy == bot - 4:
+                    g.rect(x - 2, yy, x + 3, yy, 'P')   # 발목 접단
+                else:
+                    g.px(x + 3, yy, 'q')       # 앞쪽 하이라이트
+            if not shade and yy == bot - 3:
+                g.px(x + 2, yy, 'p')           # 신발 코 광
         x = 15 + foot_off + lean
         if off > 0:
             g.px(x + 4, bot - 1, kc)           # 앞으로 디딘 발끝
