@@ -230,20 +230,31 @@ def scene_box(g, f):
     bx0, bx1 = 60, 104
     by0, by1 = 36, 61
     DEP, RISE = 14, 6
-    # 열린 뚜껑 — 뒷모서리에서 위로 젖혀져 비스듬히 서 있다
-    for i in range(17):
-        off = round(i * 4 / 17)
-        g.rect(70 + off, 13 + i, 114 + off, 13 + i, (96, 64, 38))
-    g.rect(72, 13, 116, 14, (116, 80, 46))          # 뚜껑 안쪽 테
-    off_b = round(16 * 4 / 17)
-    g.rect(70 + off_b, 28, 114 + off_b, 28, (134, 94, 52))   # 뚜껑 널 두께
-    g.rect(70 + off_b, 29, 114 + off_b, 29, (156, 112, 62))
-    for x in range(69, 116):
-        g.p(x, 12, OUTLINE)
-    for i in range(18):
-        off = round(i * 4 / 17)
-        g.p(69 + off, 12 + i, OUTLINE)
-        g.p(115 + off, 12 + i, OUTLINE)
+    # 분리형 뚜껑 — 벗겨서 상자 뒤 오른편에 비스듬히 기대 두었다.
+    # 상자보다 먼저 그려 아랫부분이 상자에 가려진다 (뒤에 기댄 것으로 읽힘)
+    def lid_top(x):
+        return 16 + (x - 102) * 38 // 46
+    for x in range(102, 148):
+        yt = lid_top(x)
+        yb = min(yt + 22, H - 2)
+        for y in range(yt, yb):
+            g.p(x, y, (108, 74, 42))
+        g.p(x, yt, (140, 98, 54))                   # 널 두께 (윗모서리 두 줄)
+        g.p(x, yt + 1, (128, 88, 48))
+        g.p(x, yt - 1, OUTLINE)
+        g.p(x, yb, OUTLINE)
+    for k in (8, 15):                               # 뚜껑 널 이음새
+        for x in range(102, 148):
+            y = lid_top(x) + k
+            if y < H - 2:
+                g.p(x, y, (90, 60, 34))
+    for y in range(lid_top(102) - 1, lid_top(102) + 23):    # 마구리 윤곽
+        g.p(101, y, OUTLINE)
+    for y in range(lid_top(147) - 1, min(lid_top(147) + 23, H - 1)):
+        g.p(148, y, OUTLINE)
+    g.rrect(103, 17, 107, 21, (128, 130, 138), 2)   # 뚜껑 쇠장식
+    g.p(105, 19, (176, 178, 186))
+    g.rect(134, 66, 152, 67, (94, 62, 34))          # 뚜껑 발치 그림자
     # 상자 속 — 비스듬히 열린 윗면. 둘레에 널 두께(테두리)가 보인다
     for t in range(DEP + 1):
         y = by0 - round(t * RISE / DEP)
