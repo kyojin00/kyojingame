@@ -29,6 +29,12 @@ var story_layer: CanvasLayer
 var _story_title: Label
 var _story_body: Label
 var _story_buttons: HBoxContainer
+var _story_art: TextureRect = null
+var _story_art_frame := 0
+# 오프닝 페이지마다 얹는 움직이는 일러스트 (prologue_<이름>_0..3).
+# 마지막 안내 페이지(목록 밖)는 농장 그림을 쓴다.
+const INTRO_ART := ["grandpa", "grandpa", "grandpa", "box", "letter",
+	"farm", "farm"]
 var _grandpa_timer := 0.0
 
 
@@ -1181,9 +1187,10 @@ func _build_story_ui() -> void:
 	story_layer.layer = 60
 	add_child(story_layer)
 
-	# 양피지 편지 패널 (밝은 배경 + 진한 글씨)
+	# 양피지 편지 패널 (밝은 배경 + 진한 글씨).
+	# 오프닝은 위에 일러스트가 얹혀 키가 크므로 화면 위쪽에 붙인다.
 	var panel := PanelContainer.new()
-	panel.position = Vector2(210, 90)
+	panel.position = Vector2(210, 26 if _story_mode == "intro" else 90)
 	panel.custom_minimum_size = Vector2(540, 315)
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.93, 0.88, 0.74)
@@ -1197,6 +1204,22 @@ func _build_story_ui() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
 	panel.add_child(v)
+
+	# 움직이는 프롤로그 일러스트 — 페이지에 그림이 있으면 위에 얹는다
+	_story_art = TextureRect.new()
+	_story_art.custom_minimum_size = Vector2(504, 216)
+	_story_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_story_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_story_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_story_art.visible = false
+	v.add_child(_story_art)
+	var art_timer := Timer.new()
+	art_timer.wait_time = 0.26
+	art_timer.autostart = true
+	art_timer.timeout.connect(func() -> void:
+		_story_art_frame = (_story_art_frame + 1) % 4
+		_update_story_art())
+	story_layer.add_child(art_timer)
 
 	_story_title = Label.new()
 	_story_title.add_theme_color_override("font_color", Color(0.5, 0.32, 0.12))
@@ -1215,7 +1238,29 @@ func _build_story_ui() -> void:
 	v.add_child(_story_buttons)
 
 
+# 지금 페이지의 일러스트 이름 ("" = 그림 없음)
+func _story_art_key() -> String:
+	if _story_mode != "intro":
+		return ""
+	if _story_idx < INTRO_ART.size():
+		return str(INTRO_ART[_story_idx])
+	return "farm"   # 마지막 안내 페이지
+
+
+func _update_story_art() -> void:
+	if _story_art == null or not is_instance_valid(_story_art):
+		return
+	var key := _story_art_key()
+	var tn := "prologue_%s_%d" % [key, _story_art_frame]
+	if key == "" or not m.tex.has(tn):
+		_story_art.visible = false
+		return
+	_story_art.visible = true
+	_story_art.texture = m.tex[tn]
+
+
 func _show_story_page() -> void:
+	_update_story_art()
 	for c in _story_buttons.get_children():
 		c.queue_free()
 

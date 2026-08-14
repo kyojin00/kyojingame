@@ -663,6 +663,13 @@ func _load_textures() -> void:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
 	for id: String in GameData.FORAGE_IDS:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
+	# 프롤로그 일러스트 — 오프닝 편지지 위에 얹는 움직이는 장면 (4프레임)
+	for pn: String in ["grandpa", "box", "letter", "farm"]:
+		for i in 4:
+			var an := "prologue_%s_%d" % [pn, i]
+			var ap := "res://assets/sprites/%s.png" % an
+			if ResourceLoader.exists(ap):
+				tex[an] = load(ap)
 	# 플레이어 도트 — 머리 스타일(외형 템플릿)마다 한 벌씩. ref/dot_boy/
 	# make_sprites.py가 표준 팔레트로 그려 둔다. 없는 프레임은 조용히
 	# 건너뛴다 (휘두르기 도트가 없으면 player.gd가 몸통을 굽혀 대신한다).
