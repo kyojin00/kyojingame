@@ -413,7 +413,7 @@ func _advance_tree_growth() -> void:
 
 
 # 자연물 상한 — 리젠이 맵을 가득 채우지 않게 종류별로 막는다
-const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 45}
+const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 70}
 # 자연물이 절대 나면 안 되는 곳 — 스토리 숲길(길목이 도로 막히면 안 된다)
 const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9)]
 
@@ -476,13 +476,15 @@ func _respawn_resources() -> void:
 			e["due"] = GameData.day + 1   # 오늘은 자리가 없다 — 내일 다시
 			keep.append(e)
 	GameData.respawn_queue = keep
-	# 잡초 자연 발생 — 하루 몇 포기씩, 같은 검사로
-	if _nature_count("weed") < int(NATURE_CAP["weed"]):
-		for attempt in 5:
-			var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
-			if _respawn_ok(pos2, "weed"):
-				m.objnode._place_object(pos2, "weed", 0)
-				break
+	# 잡초 자연 발생 — 아침마다 서너 포기씩 무성하게 돋는다 (같은 검사로)
+	var weed_sprouts := 0
+	for attempt in 18:
+		if weed_sprouts >= 3 or _nature_count("weed") >= int(NATURE_CAP["weed"]):
+			break
+		var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
+		if _respawn_ok(pos2, "weed"):
+			m.objnode._place_object(pos2, "weed", 0)
+			weed_sprouts += 1
 
 
 # 아침마다 열매/약초가 풀밭에 돋아난다 (최대 12개 유지)

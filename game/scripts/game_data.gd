@@ -959,8 +959,9 @@ var respawn_queue: Array = []   # [{"kind", "removed": 제거일, "due": 리젠 
 
 
 func queue_respawn(kind: String) -> void:
-	respawn_queue.append({"kind": kind, "removed": day,
-		"due": day + randi_range(3, 5)})
+	# 잡초는 금방 다시 돋는다 (1~2일) — 나무·돌은 3~5일 걸린다
+	var days := randi_range(1, 2) if kind == "weed" else randi_range(3, 5)
+	respawn_queue.append({"kind": kind, "removed": day, "due": day + days})
 
 
 func npc_open(nid: String) -> bool:

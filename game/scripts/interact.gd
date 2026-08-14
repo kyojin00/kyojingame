@@ -224,10 +224,13 @@ func interact() -> void:
 		var bid: String = bug.bug_id
 		GameData.items[bid] += 1
 		GameData.forage_caught[bid] = int(GameData.forage_caught.get(bid, 0)) + 1
+		var bug_first: bool = not GameData.discovered.has(bid)
 		GameData.discover(bid)
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
-		m.hud.show_message("%s를 잡았다! 연구 노트에 기록됐다." % GameData.ITEMS[bid].name)
+		# 「연구 노트에 기록」 안내는 처음 잡았을 때 한 번만
+		m.hud.show_message("%s를 잡았다!%s" % [GameData.ITEMS[bid].name,
+			" 연구 노트에 기록됐다." if bug_first else ""])
 		bug.respawn()
 		if Net.is_host():
 			m.netsync._broadcast_stats()
@@ -258,8 +261,10 @@ func interact() -> void:
 				m.story.hidden_beach_find(fid)
 			Sound.play_sfx("sfx_harvest")
 			m.renderer.spawn_particles(t, "sparkle")
-			m.hud.show_message("%s%s 채집! 연구 노트에 기록됐다."
-				% [GameData.ITEMS[fid].name, " x%d" % got if got > 1 else ""])
+			# 「연구 노트에 기록」 안내는 처음 얻었을 때 한 번만
+			m.hud.show_message("%s%s 채집!%s"
+				% [GameData.ITEMS[fid].name, " x%d" % got if got > 1 else "",
+				" 연구 노트에 기록됐다." if first_find else ""])
 			if Net.is_host():
 				m.netsync._broadcast_area(t)
 				m.netsync._broadcast_stats()

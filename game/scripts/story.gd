@@ -921,7 +921,7 @@ func _start_story2_dialog() -> void:
 		{"text": "「%s! 집은 좀 둘러봤는가?」" % nm, "portrait": chief_happy},
 		{"text": "「할아버지가 쓰시던 침대와 책상이 그대로 남아 있을 걸세.」"},
 		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
-		{"text": "「책상은 제작대일세. 재료만 있으면 가구도 손수 만들 수 있지.」"},
+		{"text": "「책상에서는 손수 가구를 만들 수 있네.\n물론 재료가 있어야만 만들 수 있지.」"},
 		{"text": "「그나저나... 보다시피 마을이 텅 비었네. 젊은 사람들이 다 떠났거든.」"},
 		{"text": "「자네가 와 준 김에 부탁 하나 함세. 우선 **상점**부터 세워 보지 않겠나?」",
 			"portrait": chief_happy},
@@ -940,7 +940,7 @@ func _end_home_greet() -> void:
 	if chief != null:
 		chief.scripted = false
 	# 검은 알림 바 대신 말풍선 연출만 — 자세한 재료는 트래커/Q창이 보여 준다
-	m.hud.quest_start_toast("메인 스토리 2 — 상점을 짓자")
+	m.hud.story_banner("메인 스토리 2 시작", "마을을 깨우다")
 	m.saveio.save_now()
 
 
@@ -1573,6 +1573,7 @@ func _forest_update(_delta: float) -> void:
 	# 정착한 다음 날 아침, 숲을 쏘다니던 무진이 뭔가를 발견했다.
 	if GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
 		GameData.forest_quest = "found"
+		m.hud.story_banner("메인 스토리 5 시작", "숲속에서 발견한 집")
 		m.hud.quest_start_toast("무진이 할 말이 있는 듯하다")
 
 
@@ -1715,7 +1716,7 @@ func _start_move_letter_dialog() -> void:
 func _end_move_letter() -> void:
 	if GameData.move_quest == "letter":
 		GameData.move_quest = "show"
-		m.hud.quest_start_toast("메인 스토리 3 — 새로운 주민의 이사")
+		m.hud.story_banner("메인 스토리 3 시작", "새로운 주민의 이사")
 		m.hud.quest_start_toast("마을 생활 안내가 열렸다! (Q에서 확인)")
 	m.saveio.save_now()
 
@@ -1890,7 +1891,8 @@ func examine_old_sign() -> void:
 
 func _begin_story4() -> void:
 	GameData.story4_phase = "ask"
-	m.hud.quest_toast("새 목표: 이장에게 물어보자")
+	m.hud.story_banner("메인 스토리 4 시작", "오래된 마을의 경계")
+	m.hud.quest_start_toast("낡은 표지판 — 이장에게 물어보자")
 	m.saveio.save_now()
 
 
@@ -2308,7 +2310,7 @@ func examine_old_book(t: Vector2i) -> void:
 
 
 func _end_book_found() -> void:
-	m.hud.quest_start_toast("메인 스토리 6 — 오래된 책과 사서")
+	m.hud.story_banner("메인 스토리 6 시작", "오래된 책과 사서")
 	m.saveio.save_now()
 
 

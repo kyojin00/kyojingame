@@ -294,13 +294,34 @@ func open_seq(speaker: String, portrait_tex: Texture2D, entries: Array,
 
 
 # 대사 한 페이지는 **두 줄까지**다 — 창이 불필요하게 커지지 않도록,
-# 세 줄이 넘는 대사는 두 줄씩 끊어 다음 페이지로 자연스럽게 이어진다.
+# 길면 두 줄씩 끊어 다음 페이지로 자연스럽게 이어진다.
+# \n으로 나눈 줄뿐 아니라 **자동 줄바꿈으로 생기는 줄까지 픽셀 폭으로
+# 계산**해서, 한 줄이 아무리 길어도 화면에는 절대 두 줄을 넘지 않는다.
 # 이벤트는 첫 조각에서, 선택지·이름 같은 나머지 성질은 마지막 조각에 남는다.
+const WRAP_W := 330.0   # 본문이 실제로 쓰는 폭 (패널 - 초상화 - 여백)
+
+
+func _wrap_lines(text: String) -> PackedStringArray:
+	var f: Font = body_label.get_theme_font("font")
+	var out: PackedStringArray = []
+	for raw in text.split("\n"):
+		var line := ""
+		for ch in raw:
+			if line != "" and f.get_string_size(line + ch,
+					HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_BODY).x > WRAP_W:
+				out.append(line)
+				line = ch
+			else:
+				line += ch
+		out.append(line)
+	return out
+
+
 func _paginate_seq(entries: Array) -> Array:
 	var paged: Array = []
 	for e_v in entries:
 		var e: Dictionary = e_v
-		var lines: PackedStringArray = str(e.get("text", "")).split("\n")
+		var lines := _wrap_lines(str(e.get("text", "")))
 		if lines.size() <= 2:
 			paged.append(e)
 			continue
