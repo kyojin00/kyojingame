@@ -160,6 +160,20 @@ func _sync_village_npcs() -> void:
 			_spawn_npc(nid,
 				m.door_tile(Vector2i(int(h[0]), int(h[1]))) + Vector2i(0, 1))
 
+	# 숲의 연금술사 묘연 — 숨은 길이 열린 뒤, 깊은 숲 오두막 곁에서 산다.
+	# 마을에 입주하지 않는다 (스토리 12) — 볼일이 있으면 직접 찾아간다.
+	if GameData.story12_phase in ["path", "gather", "done"]:
+		var have_alch := false
+		for n in m.npcs:
+			if n.id == "alchemist":
+				have_alch = true
+				break
+		if not have_alch:
+			_spawn_npc("alchemist",
+				m.door_tile(m.ALCH_HOUSE_ANCHOR) + Vector2i(0, 1))
+			m.npcs[m.npcs.size() - 1].region = Rect2i(
+				m.ALCH_HOUSE_ANCHOR.x - 3, m.ALCH_HOUSE_ANCHOR.y + 3, 12, 5)
+
 	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
 	if GameData.forest_quest in ["visit", "done"]:
 		for fid: String in ["forest_mom", "forest_girl"]:

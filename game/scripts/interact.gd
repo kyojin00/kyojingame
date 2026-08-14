@@ -18,6 +18,9 @@ func _door_kind_at(t: Vector2i) -> String:
 	if GameData.forest_quest in ["visit", "done"] \
 			and t == m.door_tile(m.FOREST_HOUSE_ANCHOR):
 		return "forest_house"
+	if GameData.story12_phase in ["path", "gather", "done"] \
+			and t == m.door_tile(m.ALCH_HOUSE_ANCHOR):
+		return "alch_house"
 	if GameData.move_house.x >= 0 and t == m.door_tile(GameData.move_house):
 		return "move_house"
 	for pid: String in GameData.village_built:
@@ -44,6 +47,10 @@ func _enter_building(kind: String) -> void:
 			m.dialog.open("숲속의 집",
 				"문틈으로 약초 달이는 향이 은은하게 흘러나온다.\n연화와 솔이는 집 근처를 산책하는 모양이다.",
 				[["닫기", null]])
+		return
+	if kind == "alch_house":
+		# 연금술사의 오두막 (스토리 12): 첫 만남 -> 재료 시험 -> 시연
+		m.story._alch_house_door()
 		return
 	if m.shop_room.has_room(kind):
 		# 주인이 아직 첫 인사를 안 했으면 이사 준비 중 — 문이 닫혀 있다

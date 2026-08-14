@@ -1426,6 +1426,83 @@ func story11_objective_short() -> String:
 	return ""
 
 
+# ---- 메인 스토리 12: 숲의 연금술사 ----
+#
+# 스토리 11 뒤 곧장 이어지지 않는다 — 자유 생활을 하다 **연구 노트 40%
+# + 서로 다른 주민 5명과 호감도 3단계(하트 3개, 30)**를 채우면, 노트에서
+# 할아버지의 낯선 기록(끝내 혼자 풀지 못해 누군가의 도움을 받은 연구)이
+# 발견된다. 서하의 옛 기록 -> 주민 소문 -> 깊은 숲의 숨은 길 ->
+# 연금술사의 오두막. 연금술사 묘연은 마을에 입주하지 않고 숲속 집에서
+# 계속 살며, 필요할 때 직접 찾아가야 한다. 재료 시험(여러 생활 콘텐츠)을
+# 통과하면 시연을 보여 주고 — 그때부터 집 조합대의 연금술이 열린다.
+# 연금술은 새 능력치 분야가 아니라 7대 분야를 보조하는 제작 시스템이다.
+#   "": 아직 / note: 노트의 낯선 기록 확인(N) / ask: 서하에게 보여주기 /
+#   gossip: 주민 소문 수집 / path: 숨은 길·오두막 발견 /
+#   gather: 재료 시험 / done: 연금술 해금
+var story12_phase := ""
+var story12_heard: Array = []      # 소문을 들려준 주민 id
+const STORY12_NOTE := 0.4          # 시작 조건 — 연구 노트 진행률
+const STORY12_FRIENDS := 5         # 시작 조건 — 호감도 3단계 주민 수
+const STORY12_AFF_LV := 30         # 호감도 3단계 = 하트 3개
+const STORY12_RUMORS := 3          # 소문을 들어야 하는 주민 수
+# 재료 시험 — 여러 생활 콘텐츠에서 하나씩 (동굴 수정·숲 약초·낚시 붕어.
+# 종류·개수는 추후 별도 확정 예정 — 지금은 임시값)
+const STORY12_MATS := {"crystal": 2, "forage_herb": 5, "fish_crucian": 3}
+
+
+func story12_friends() -> int:
+	var n := 0
+	for nid in affinity:
+		if int(affinity[nid]) >= STORY12_AFF_LV:
+			n += 1
+	return n
+
+
+# 시작 조건 — 스토리 11 뒤 자유 생활을 충분히 거친 다음에야 열린다
+func story12_ready() -> bool:
+	return story11_phase == "done" and note_progress().ratio >= STORY12_NOTE \
+		and story12_friends() >= STORY12_FRIENDS
+
+
+func story12_mats_ok() -> bool:
+	for mid in STORY12_MATS:
+		if int(items.get(mid, 0)) < int(STORY12_MATS[mid]):
+			return false
+	return true
+
+
+# 연금술(집 조합대)이 열렸는가 — 스토리 12를 끝내야 쓸 수 있다
+func alchemy_open() -> bool:
+	return story12_phase == "done"
+
+
+func story12_mats_text() -> String:
+	var parts: Array = []
+	for mid in STORY12_MATS:
+		parts.append("%s %d/%d" % [ITEMS[mid].name,
+			mini(int(items.get(mid, 0)), int(STORY12_MATS[mid])),
+			int(STORY12_MATS[mid])])
+	return " · ".join(parts)
+
+
+func story12_objective_short() -> String:
+	match story12_phase:
+		"note":
+			return "연구 노트의 낯선 기록을 확인하자 (N)"
+		"ask":
+			return "도서관의 서하에게 기록을 보여주자 (E)"
+		"gossip":
+			return "주민들에게 연금술사 이야기를 듣자 (%d/%d)" % [
+				story12_heard.size(), STORY12_RUMORS]
+		"path":
+			return "깊은 숲 연못 근처 — 숨은 길을 따라가 보자"
+		"gather":
+			if story12_mats_ok():
+				return "연금술사에게 재료를 가져다주자 (E)"
+			return "재료 시험 — " + story12_mats_text()
+	return ""
+
+
 # ---- 우측 상단 퀘스트 추적창 ----
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
@@ -1526,6 +1603,17 @@ func quest_catalog() -> Array:
 			"desc": "첫 번째 유품 — 깊은 굴 어딘가에 잠들어 있다.",
 			"cat": "main", "ep": "메인 스토리 11", "npc": s11npc,
 			"reward": "할머니의 모자 + 도서관 「할머니의 기록」"})
+	o = story12_objective_short()
+	if o != "":
+		var s12npc := ""
+		if story12_phase == "ask":
+			s12npc = "librarian"
+		elif story12_phase == "gather":
+			s12npc = "alchemist"
+		out.append({"id": "story12", "title": "숲의 연금술사", "obj": o,
+			"desc": "할아버지의 연구를 도왔다는 이름 모를 사람의 흔적.",
+			"cat": "main", "ep": "메인 스토리 12", "npc": s12npc,
+			"reward": "연금술 해금 — 집 조합대에서 물약을 만든다"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -1658,6 +1746,11 @@ func quest_npc_marks() -> Dictionary:
 		for cnid: String in STORY11_CLUE_NPCS:
 			if cnid not in story11_clues:
 				marks[cnid] = "!"
+	# 스토리 12 — 서하에게 기록을 보여주자 / 재료가 다 모였으면 연금술사에게
+	if story12_phase == "ask":
+		marks["librarian"] = "!"
+	elif story12_phase == "gather" and story12_mats_ok():
+		marks["alchemist"] = "?"
 	if merchant_errand == "doing":
 		# 노점 재료를 다 모았으면 민지에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
@@ -3083,13 +3176,12 @@ func settler_kind(nid: String) -> String:
 	return str(NPC_KIND.get(nid, "core"))
 
 
-# 다음 이사 신청 후보 — 특수 주민(조건 충족)이 먼저, 그다음 일반 랜덤.
-# 떠난 주민도 다시 올 수 있다 (마을은 계속 살아 움직인다)
+# 다음 이사 신청 후보 — 일반 주민 풀에서 랜덤.
+# 떠난 주민도 다시 올 수 있다 (마을은 계속 살아 움직인다).
+# 연금술사 묘연은 마을에 입주하지 않는다 — 깊은 숲의 오두막에서
+# 계속 살며, 스토리 12로 만난다 (특수 주민의 새 길).
 func settler_candidates() -> Array:
 	var out: Array = []
-	if note_progress().ratio >= ALCHEMIST_NOTE and "alchemist" not in settlers \
-			and settler_arrive != "alchemist":
-		out.append("alchemist")
 	for nid: String in SETTLER_POOL:
 		if nid not in settlers and settler_arrive != nid:
 			out.append(nid)
@@ -4117,6 +4209,8 @@ func completed_quests() -> Array:
 		out.append("메인 스토리 10 — 동굴과 탐험")
 	if story11_phase == "done":
 		out.append("메인 스토리 11 — 할머니의 모자")
+	if story12_phase == "done":
+		out.append("메인 스토리 12 — 숲의 연금술사")
 	for pair in TUTORIAL_ORDER:
 		if tutorial.get(pair[0], false):
 			out.append(str(pair[1]))
@@ -4450,6 +4544,8 @@ func reset_all() -> void:
 	story11_phase = ""
 	story11_clues = []
 	grandma_read = 0
+	story12_phase = ""
+	story12_heard = []
 	residents_now = 1
 	hall_stock = {}
 	hall_loot_day = 0
@@ -4816,6 +4912,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"story9_phase": story9_phase, "story10_phase": story10_phase,
 		"story11_phase": story11_phase, "story11_clues": story11_clues,
 		"grandma_read": grandma_read,
+		"story12_phase": story12_phase, "story12_heard": story12_heard,
 		"hall_stock": hall_stock,
 		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,

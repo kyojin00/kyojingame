@@ -344,6 +344,17 @@ func _talk_to(npc: Node2D) -> void:
 			and npc.id not in GameData.story11_clues:
 		m.story._start_hat_clue_dialog(npc.id)
 		return
+	# 메인 스토리 12 — 숲의 연금술사
+	if npc.id == "librarian" and GameData.story12_phase == "ask":
+		m.story._start_alch_ask_dialog()
+		return
+	if GameData.story12_phase == "gossip" and npc.id != "alchemist" \
+			and npc.id not in GameData.story12_heard:
+		m.story.story12_hear(npc.id)
+		return
+	if npc.id == "alchemist" and GameData.story12_phase in ["path", "gather"]:
+		m.story._alch_house_door()
+		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return

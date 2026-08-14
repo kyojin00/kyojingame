@@ -170,6 +170,8 @@ func _cell_tip(cell: Panel, e: Dictionary) -> void:
 func toggle() -> void:
 	visible = not visible
 	if visible:
+		# 스토리 12 — 노트를 펼치는 순간, 끼워져 있던 낯선 기록이 읽힌다
+		main.story.story12_note_read()
 		_rebuild()
 
 
@@ -234,6 +236,18 @@ func _rebuild_collect() -> void:
 			_line("  ???  — 노트 %d%%에서 힌트가 열린다" % int(20 * (i + 1)), DIM)
 
 	# 컬렉션 — 묶음을 다 모으면 레시피가 열린다
+	# 낯선 기록 (스토리 12) — 노트 40%에서 발견되는 할아버지의 고백
+	if GameData.story12_phase != "":
+		_line("")
+		_head("[낯선 기록]")
+		_line("  「이 재료만은 끝내 내 힘으로 풀지 못했다.", DIM)
+		_line("   그 사람의 손을 빌렸다. ...고마운 일이다.」", DIM)
+		if GameData.story12_phase == "done":
+			_line("  ★ 깊은 숲의 연금술사 묘연 — 그 사람을 찾았다!", GOLD)
+		else:
+			_line("  누구의 이야기일까... (%s)" %
+				GameData.story12_objective_short(), DIM)
+
 	_line("")
 	_head("[컬렉션]")
 	for col: Dictionary in GameData.COLLECTIONS:

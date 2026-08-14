@@ -1966,6 +1966,98 @@ func _debug_tick() -> void:
 				" 단서시작=", s11_clue0, " 단서2=", s11_mid, " 깊은굴=", s11_deep,
 				" 모자확정=", s11_drop, " 기록단계=", s11_rec,
 				" 서가=", s11_lib, " 첫장=", s11_read, " 완결=", s11_done)
+		277:
+			# #129: 메인 스토리 12 「숲의 연금술사」 — 노트 40%+호감 3단계
+			# 5명 -> 노트의 낯선 기록 -> 서하 -> 주민 소문 -> 숨은 길·오두막 ->
+			# 재료 시험(동굴·채집·낚시) -> 시연 -> 연금술 해금
+			m.dialog.close()
+			GameData.story11_phase = "done"
+			GameData.story12_phase = ""
+			GameData.story12_heard = []
+			var k12_aff: Dictionary = GameData.affinity.duplicate()
+			var k12_crops: Dictionary = GameData.crops_harvested.duplicate()
+			# ① 조건 게이트 — 호감도 3단계 주민 5명이 안 되면 시작되지 않는다
+			for a12: String in GameData.affinity:
+				GameData.affinity[a12] = 0
+			m.story._story12_update(0.016)
+			var s12_wait: bool = GameData.story12_phase == "" \
+				and not GameData.story12_ready()
+			# 노트 40%와 친구 5명을 채운다 (핵심 주민 호감도 + 수확 기록)
+			for a13: String in GameData.NPCS:
+				if GameData.settler_kind(a13) == "core":
+					GameData.affinity[a13] = 100
+			for c12: String in GameData.CROP_IDS:
+				GameData.crops_harvested[c12] = \
+					maxi(1, int(GameData.crops_harvested.get(c12, 0)))
+			GameData.minerals_found["ore"] = true
+			GameData.minerals_found["gem"] = true
+			var s12_ready: bool = GameData.story12_ready() \
+				and GameData.story12_friends() >= GameData.STORY12_FRIENDS
+			m.story._story12_update(0.016)
+			var s12_note: bool = GameData.story12_phase == "note" \
+				and not GameData.alchemy_open()
+			# ② 노트를 펼치면 낯선 기록이 읽힌다 -> 서하 ❗
+			m.story.story12_note_read()
+			var s12_ask: bool = GameData.story12_phase == "ask" \
+				and GameData.quest_npc_marks().get("librarian", "") == "!"
+			m.story._start_alch_ask_dialog()
+			m.dialog.skip_seq()
+			var s12_gossip: bool = GameData.story12_phase == "gossip"
+			# ③ 주민 소문 셋(같은 사람 중복 없음) -> 숨은 길 + 오두막
+			m.story.story12_hear("chief")
+			m.dialog.skip_seq()
+			m.story.story12_hear("chief")
+			m.dialog.close()
+			var s12_once: bool = GameData.story12_heard.size() == 1
+			m.story.story12_hear("merchant")
+			m.dialog.skip_seq()
+			m.story.story12_hear("blacksmith")
+			m.dialog.skip_seq()
+			var s12_path: bool = GameData.story12_phase == "path" \
+				and str(m.objects.get(m.ALCH_HOUSE_ANCHOR,
+					{}).get("kind", "")) == "house"
+			m.npcmgr._sync_village_npcs()
+			var s12_npc := false
+			for n12 in m.npcs:
+				if n12.id == "alchemist":
+					s12_npc = true
+			# 묘연은 이제 이사 후보에 오르지 않는다 — 숲에 산다
+			var s12_nocand: bool = "alchemist" not in GameData.settler_candidates()
+			# ④ 오두막 첫 만남 -> 재료 시험 (모자라면 시연은 없다)
+			m.story._alch_house_door()
+			m.dialog.skip_seq()
+			var s12_gather: bool = GameData.story12_phase == "gather"
+			GameData.items["crystal"] = 0
+			m.story._alch_house_door()
+			var s12_block: bool = m.dialog.visible \
+				and GameData.story12_phase == "gather" \
+				and not GameData.alchemy_open()
+			m.dialog.close()
+			# ⑤ 동굴·채집·낚시 재료를 다 모으면 시연 -> 연금술 해금 (완결)
+			GameData.items["crystal"] = int(GameData.STORY12_MATS["crystal"])
+			GameData.items["forage_herb"] = maxi(int(GameData.items["forage_herb"]),
+				int(GameData.STORY12_MATS["forage_herb"]))
+			GameData.items["fish_crucian"] = maxi(int(GameData.items["fish_crucian"]),
+				int(GameData.STORY12_MATS["fish_crucian"]))
+			var s12_mark: bool = GameData.quest_npc_marks().get("alchemist", "") == "?"
+			m.story._alch_house_door()
+			m.dialog.skip_seq()
+			var s12_done: bool = GameData.story12_phase == "done" \
+				and GameData.alchemy_open() \
+				and int(GameData.items["crystal"]) == 0 \
+				and GameData.completed_quests().has("메인 스토리 12 — 숲의 연금술사")
+			# 뒷정리
+			GameData.affinity = k12_aff
+			GameData.crops_harvested = k12_crops
+			m.hud._toast_queue.clear()
+			print("STORY12_OK=", s12_wait and s12_ready and s12_note and s12_ask
+				and s12_gossip and s12_once and s12_path and s12_npc and s12_nocand
+				and s12_gather and s12_block and s12_mark and s12_done,
+				" 조건게이트=", s12_wait, " 조건=", s12_ready, " 낯선기록=", s12_note,
+				" 사서=", s12_ask and s12_gossip, " 소문중복=", s12_once,
+				" 숨은길=", s12_path, " 묘연숲=", s12_npc and s12_nocand,
+				" 첫만남=", s12_gather, " 재료차단=", s12_block,
+				" 재료표식=", s12_mark, " 해금완결=", s12_done)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
@@ -3248,9 +3340,12 @@ func _mp_tick() -> void:
 				" 오브젝트=", m.objects.size() > 0)
 			print("MP_SNAPSHOT_OK=", m.objects.size() > 0 and m.grid.size() == m.MAP_H)
 		250:
-			# 게스트가 민 변경이 호스트를 거쳐 되돌아오는가
+			# 게스트가 민 변경이 호스트를 거쳐 되돌아오는가.
+			# 먼저 칸 곁으로 가서 위치 동기화(15/s)가 호스트에 닿기를 기다린다 —
+			# 호스트의 게스트 요청 검문(_near_sender)이 멀리서 온 요청을 버린다
 			m.player.position = Vector2(MP_TILE.x * m.TILE + 16, (MP_TILE.y + 1) * m.TILE + 16)
 			GameData.tool = "hoe"
+		290:
 			m.netsync._req_tool.rpc_id(1, MP_TILE.x, MP_TILE.y, "hoe", "",
 				int(m.player.position.x), int(m.player.position.y))
 		330:

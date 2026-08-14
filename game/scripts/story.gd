@@ -2895,6 +2895,154 @@ func _end_grandma_record() -> void:
 	m.saveio.save_now()
 
 
+# ---- 메인 스토리 12: 숲의 연금술사 ----
+#
+# 노트 40% + 호감도 3단계 주민 5명 -> 노트의 낯선 기록(누군가의 도움) ->
+# 서하의 옛 기록 -> 주민 소문 -> 깊은 숲의 숨은 길 -> 연금술사의 오두막 ->
+# 재료 시험(여러 생활 콘텐츠) -> 시연 -> 연금술 해금. 묘연은 마을에
+# 입주하지 않고 오두막에 산다 — 할아버지를 「일부만」 아는 사람이다.
+
+func _story12_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	# 시작: 자유 생활을 하다 조건이 차면, 노트에 낯선 기록이 눈에 띈다
+	if GameData.story12_phase == "" and GameData.story12_ready():
+		GameData.story12_phase = "note"
+		m.hud.quest_start_toast("연구 노트(N)에 못 보던 기록이 끼워져 있다")
+		m.saveio.save_now()
+
+
+# 노트(N)를 펼치면 낯선 기록을 읽는다 — note_ui가 부른다
+func story12_note_read() -> void:
+	if GameData.story12_phase != "note":
+		return
+	GameData.story12_phase = "ask"
+	m.hud.story_banner("메인 스토리 12 시작", "숲의 연금술사")
+	m.hud.quest_start_toast("이 기록... 도서관의 서하에게 보여주자")
+	m.saveio.save_now()
+
+
+# 퀘스트 1 — 서하의 옛 기록: 재료를 연구하던 사람이 있었다
+func _start_alch_ask_dialog() -> void:
+	m.dialog.open_seq("서하", m.tex["npc_librarian_portrait_normal"], [
+		{"text": "「할아버님 노트에 이런 장이...?\n『이 재료만은 끝내 내 힘으로 풀지 못했다.\n그 사람의 손을 빌렸다』...」"},
+		{"text": "「이름은 어디에도 없네요. 잠깐만요 —\n비슷한 이야기를 어디서 봤어요.」"},
+		{"text": "(서하가 서가 깊은 곳에서 곰팡내 나는\n장부 하나를 꺼내 왔다.)"},
+		{"text": "「여기요. 옛날 마을 근처에 온갖 재료를\n연구하던 사람이 살았대요. 마을 사람이\n아니라... 어디 사는지는 안 남아 있어요.」",
+			"portrait": m.tex["npc_librarian_portrait_happy"]},
+		{"text": "「나이 드신 분들 중에 이야기를 들어 본\n사람이 있을지도 몰라요. 주민들에게\n물어보는 게 좋겠어요.」"},
+	], _end_alch_ask)
+
+
+func _end_alch_ask() -> void:
+	if GameData.story12_phase == "ask":
+		GameData.story12_phase = "gossip"
+		GameData.story12_heard = []
+		m.hud.quest_start_toast("주민들에게 연금술사 이야기를 듣자 (0/%d)"
+			% GameData.STORY12_RUMORS)
+	m.saveio.save_now()
+
+
+# 주민 소문 — 몇 명에게만 들으면 충분하다 (순서대로 이야기가 짙어진다)
+const ALCH_RUMORS := [
+	"「재료 연구하던 사람? 아아... 어른들이 말하던\n그 약장수 양반? 마을엔 안 살아.\n숲 어딘가라고만 들었는데.」",
+	"「밤에 깊은 숲 쪽에서 보랏빛 연기가 피어오르는 걸\n봤다는 사람이 있어. 연못 있는 쪽 말이야.\n도깨비불이라고들 했지만... 글쎄.」",
+	"「깊은 숲 연못 근처에 혼자 사는 사람이 있대.\n덤불에 가려진 좁은 길이 있다던데,\n무서워서 아무도 안 가 봤지.」",
+]
+
+
+func story12_hear(nid: String) -> void:
+	if GameData.story12_phase != "gossip" or nid in GameData.story12_heard \
+			or nid == "alchemist":
+		return
+	var idx := mini(GameData.story12_heard.size(), ALCH_RUMORS.size() - 1)
+	GameData.story12_heard.append(nid)
+	var nm := str(GameData.NPCS[nid].name)
+	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid), [
+		{"text": str(ALCH_RUMORS[idx])},
+	], _end_alch_rumor)
+
+
+func _end_alch_rumor() -> void:
+	if GameData.story12_phase != "gossip":
+		return
+	var n := GameData.story12_heard.size()
+	if n >= GameData.STORY12_RUMORS:
+		GameData.story12_phase = "path"
+		# 소문이 가리키는 곳 — 깊은 숲의 덤불이 걷히고 숨은 길이 드러난다
+		m.worldgen._spawn_alch_house()
+		m.npcmgr._sync_village_npcs()
+		m.hud.event_toast("숨은 길 발견!")
+		m.hud.quest_start_toast("깊은 숲 연못 근처 — 숨은 길을 따라가 보자")
+	else:
+		m.hud.event_toast("소문 %d/%d" % [n, GameData.STORY12_RUMORS])
+	m.saveio.save_now()
+
+
+# 오두막 문 앞 E — 단계에 따라 다른 이야기가 이어진다
+func _alch_house_door() -> void:
+	match GameData.story12_phase:
+		"path":
+			_start_alch_meet_dialog()
+		"gather":
+			_start_alch_gather_dialog()
+		_:
+			m.dialog.open("연금술사의 오두막",
+				"문틈으로 알싸한 약초 냄새와 함께\n보글보글 무언가 끓는 소리가 새어 나온다.\n(묘연은 오두막 곁을 서성이고 있다)",
+				[["닫기", null]])
+
+
+# 퀘스트 2 — 첫 만남: 낯선 이를 시험하는 연금술사
+func _start_alch_meet_dialog() -> void:
+	m.dialog.open_seq("???", m.tex["npc_alchemist_portrait_normal"], [
+		{"text": "(덤불 너머, 굴뚝에서 보랏빛 연기가 오르는\n작은 오두막이 있었다. 문을 두드리자...)"},
+		{"text": "「...여기까지 찾아온 사람은 오랜만이네요.\n난 묘연 — 보다시피, 재료를 다루는 사람이에요.」"},
+		{"text": "「그 노트... 그리운 필체네요. 그래요,\n그분의 연구를 몇 번 도운 적이 있어요.\n전부는 아니고... 아주 일부만.」"},
+		{"text": "「하지만 처음 본 사람에게 연금술을 보여 줄\n수는 없어요. 재료를 다룰 줄 아는 사람인지\n먼저 확인해야겠어요.」"},
+		{"text": "「굴의 %s, 들의 %s, 물의 %s —\n가져와 보세요. 세 가지 삶을 다 아는\n사람이라면 어렵지 않을 거예요.」" % [
+			GameData.ITEMS["crystal"].name, GameData.ITEMS["forage_herb"].name,
+			GameData.ITEMS["fish_crucian"].name],
+			"portrait": m.tex["npc_alchemist_portrait_happy"]},
+	], _end_alch_meet)
+
+
+func _end_alch_meet() -> void:
+	if GameData.story12_phase == "path":
+		GameData.story12_phase = "gather"
+		m.hud.quest_start_toast("재료 시험 — " + GameData.story12_mats_text())
+	m.saveio.save_now()
+
+
+# 퀘스트 3 — 재료 시험과 첫 시연 (스토리 12 완결, 연금술 해금)
+func _start_alch_gather_dialog() -> void:
+	if not GameData.story12_mats_ok():
+		m.dialog.open_seq("묘연", m.tex["npc_alchemist_portrait_normal"], [
+			{"text": "「재료는 어때요? — %s.」" % GameData.story12_mats_text()},
+			{"text": "「수정은 깊은 굴 광맥에, 약초는 들과 숲에,\n붕어는 낚시터에... 서두르지 않아도 돼요.\n재료는 도망가지 않으니까.」"},
+		])
+		return
+	m.dialog.open_seq("묘연", m.tex["npc_alchemist_portrait_happy"], [
+		{"text": "「...전부 가져왔네요. 굴과 들과 물을\n다 아는 사람. 좋아요, 합격이에요.」"},
+		{"text": "(묘연이 재료를 받아 절구에 빻고, 끓는\n솥에 하나씩 넣었다. 솥이 은빛으로 —\n이윽고 별처럼 반짝였다!)"},
+		{"text": "「이게 연금술이에요. 재료의 목소리를 듣고,\n서로 만나게 해 주는 일.」"},
+		{"text": "「그분도 그랬어요. 밭을 갈고 고기를 잡으면서,\n풀지 못한 물음이 생기면 여길 찾아왔죠.\n...당신도 그러면 돼요.」",
+			"portrait": m.tex["npc_alchemist_portrait_normal"]},
+		{"text": "「집에 있는 그분의 조합대, 이제 쓸 수 있을\n거예요. 조합법은 세상 곳곳에 흩어져 있어요 —\n나무에, 바위에, 몬스터의 주머니에.」",
+			"portrait": m.tex["npc_alchemist_portrait_happy"]},
+	], _end_alch_demo)
+
+
+func _end_alch_demo() -> void:
+	if GameData.story12_phase != "gather" or not GameData.story12_mats_ok():
+		return
+	for mid in GameData.STORY12_MATS:
+		GameData.items[mid] = int(GameData.items[mid]) - int(GameData.STORY12_MATS[mid])
+	GameData.story12_phase = "done"
+	m.hud.story_banner("메인 스토리 12 완결", "숲의 연금술사")
+	m.hud.show_message("연금술이 열렸다! 집 안의 조합대(E)에서 물약을\n만들 수 있다 — 조합법은 나무·바위·몬스터에게서 배운다.", 8.0)
+	m.saveio.save_now()
+
+
 # ---- 엔딩: 연화의 항아리 ----
 #
 # 연구 노트 100% + 생명의 물 여섯 병을 모아 연화를 찾아가면,

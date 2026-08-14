@@ -219,7 +219,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("interact"):
 		if (ppos - ALCHEMY.get_center()).length() < 75.0:
-			main.alchemy_ui.open()
+			# 조합대는 스토리 12(숲의 연금술사)를 끝내야 쓸 수 있다
+			if GameData.alchemy_open():
+				main.alchemy_ui.open()
+			else:
+				main.hud.show_message(
+					"할아버지의 낡은 조합대다. 어떻게 쓰는 건지 도무지\n모르겠다... 이걸 아는 사람이 어딘가 있을 텐데.", 4.0)
 			get_viewport().set_input_as_handled()
 		elif (ppos - KITCHEN.get_center()).length() < 69.0:
 			# 조리대는 먼지와 잡동사니에 묻혀 있다 — 빗자루로 쓸어야 나타난다

@@ -412,7 +412,8 @@ const NPC_SCHEDULE := {
 	"farmer":     [[6, "home"], [10, "plaza"], [15, "home"]],
 	"foodie":     [[6, "home"], [11, "plaza"], [16, "home"]],
 	"angler":     [[6, "home"], [9, "pier"], [14, "plaza"], [17, "home"]],
-	"alchemist":  [[6, "home"], [12, "plaza"], [16, "home"]],
+	# 연금술사는 마을에 살지 않는다 — 깊은 숲 오두막 곁만 지킨다 (스토리 12)
+	"alchemist":  [[6, "home"]],
 	"miner":      [[6, "home"], [9, "plaza"], [13, "home"]],
 	"florist":    [[6, "home"], [10, "plaza"], [16, "home"]],
 	"carpenter":  [[6, "home"], [11, "plaza"], [15, "home"]],
@@ -438,7 +439,8 @@ const NPC_PLAZA := {
 const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
 	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28),
 	"librarian": Vector2i(76, 14),   # 방문객 시절 — 광장 분수 곁
-	"rancher": Vector2i(70, 20)}     # 방문객 시절 — 광장 남서쪽 풀밭
+	"rancher": Vector2i(70, 20),     # 방문객 시절 — 광장 남서쪽 풀밭
+	"alchemist": Vector2i(58, 50)}   # 깊은 숲 오두막 문 앞 (ALCH_HOUSE_ANCHOR 문+1)
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
@@ -1074,6 +1076,9 @@ const STORY_ROAD_X0 := 18
 const STORY_ROAD_X1 := 47
 # 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
 const FOREST_HOUSE_ANCHOR := Vector2i(30, 24)
+# 연금술사의 오두막 (메인 스토리 12) — 깊은 숲(deep_rect) 연못 서쪽.
+# 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
+const ALCH_HOUSE_ANCHOR := Vector2i(56, 46)
 const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
 const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 무진이 처음 서성이는 광장 언저리
 const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
@@ -1215,6 +1220,7 @@ func _process(delta: float) -> void:
 	story._story9_update(delta)
 	story._story10_update(delta)
 	story._story11_update(delta)
+	story._story12_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

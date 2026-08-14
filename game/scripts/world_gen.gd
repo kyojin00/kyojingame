@@ -334,6 +334,32 @@ func _spawn_forest_house() -> void:
 	m.queue_redraw()
 
 
+# 연금술사의 오두막 (메인 스토리 12) — 소문을 다 모은 순간 세상에 놓인다.
+# 깊은 숲 덤불을 걷어 내고 숨은 오솔길을 낸 뒤 오두막을 세운다.
+# (플레이어가 세운 집·집터는 건드리지 않는다)
+func _spawn_alch_house() -> void:
+	var a: Vector2i = m.ALCH_HOUSE_ANCHOR
+	if str(m.objects.get(a, {}).get("kind", "")) == "house":
+		return
+	for y in range(a.y - 2, a.y + 6):
+		for x in range(a.x - 3, a.x + 9):
+			var p := Vector2i(x, y)
+			if m.objects.has(p) \
+					and str(m.objects[p].get("kind", "")) in ["homeplot", "house"]:
+				continue
+			m.objnode._remove_object(p)
+	# 문 앞에서 남쪽으로 빠지는 좁은 숨은 길 — 덤불에 가려 있던 오솔길
+	var door := m.door_tile(a)
+	for y2 in range(a.y + 4, mini(a.y + 11, m.MAP_H - 1)):
+		for x2 in [door.x, door.x + 1]:
+			m.objnode._remove_object(Vector2i(x2, y2))
+			if m.grid[y2][x2].ground == "grass":
+				m.grid[y2][x2].ground = "path"
+	_fill_building(a)
+	m.objects.erase(m.door_tile(a))
+	m.queue_redraw()
+
+
 func _trim_paths_under_building(anchor: Vector2i) -> void:
 	var door := m.door_tile(anchor)
 	for y in range(anchor.y - 2, anchor.y + 4):
@@ -434,8 +460,9 @@ func _respawn_ok(pos: Vector2i, kind: String) -> bool:
 	for r: Rect2i in NO_SPAWN_RECTS:
 		if r.has_point(pos):
 			return false
-	# 마을 밖 집(무진의 집·숲속의 집) 문 앞도 비워 둔다
-	for anchor: Vector2i in [GameData.move_house, m.FOREST_HOUSE_ANCHOR]:
+	# 마을 밖 집(무진의 집·숲속의 집·연금술사의 오두막) 문 앞도 비워 둔다
+	for anchor: Vector2i in [GameData.move_house, m.FOREST_HOUSE_ANCHOR,
+			m.ALCH_HOUSE_ANCHOR]:
 		if anchor.x >= 0 and (pos - m.door_tile(anchor)).length() < 3.0:
 			return false
 	if (pos - m.player_tile()).length() < 4.0:

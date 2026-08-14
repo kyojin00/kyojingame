@@ -389,6 +389,30 @@ func _apply_save(d: Dictionary) -> void:
 		m.worldgen._migrate_farm_layout()
 	# 회관 공동 프로젝트의 가로등·벤치는 위에서 걷혔다 — 완성 기록대로 되살린다
 	m.village.restore_hall_project_deco()
+	# ---- 메인 스토리 12 (숲의 연금술사) ----
+	GameData.story12_phase = str(d.get("story12_phase", ""))
+	GameData.story12_heard = Array(d.get("story12_heard", []))
+	# 개편 전 구세이브: 마을에 입주해 있던 묘연은 깊은 숲 오두막으로
+	# 거처를 옮긴다 — 이미 만난 사이니 연금술도 열린 채로 이어진다
+	if "alchemist" in GameData.settlers:
+		GameData.settlers.erase("alchemist")
+		if GameData.settler_homes.has("alchemist"):
+			GameData.empty_houses.append(GameData.settler_homes["alchemist"])
+			GameData.settler_homes.erase("alchemist")
+		if GameData.story12_phase == "":
+			GameData.story12_phase = "done"
+	if GameData.settler_offer == "alchemist":
+		GameData.settler_offer = ""
+		GameData.items["settle_letter"] = 0
+	if GameData.settler_arrive == "alchemist":
+		GameData.settler_arrive = ""
+	# 연금술을 이미 써 본(조합법을 아는) 구세이브는 열린 것으로 본다
+	if GameData.story12_phase == "" and not d.has("story12_phase") \
+			and not GameData.alchemy_known.is_empty():
+		GameData.story12_phase = "done"
+	# 숨은 길·오두막 복원 (완성 기록이 있으면 다시 세운다)
+	if GameData.story12_phase in ["path", "gather", "done"]:
+		m.worldgen._spawn_alch_house()
 	# 남쪽 능선·바다·해변은 세이브 값이 아니라 sea_open을 보고 여기서 다시
 	# 깐다 (맵 생성은 로드 전에 끝나 있고, 물 타일은 위에서 건너뛰므로)
 	m.worldgen._build_sea()
