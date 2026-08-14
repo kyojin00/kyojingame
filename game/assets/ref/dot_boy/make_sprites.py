@@ -622,9 +622,7 @@ HEAD_DOWN_F = [
     ".hh" "ssssssssss" "hh.",
     ".hh" "OO" "ssssss" "OO" "hh.",
     ".hh" ".........." "hh.",
-    ".hh" ".........." "hh.",
     ".gg" ".........." "gg.",
-    "..g" ".........." "g..",
 ]
 
 HEAD_SIDE_F = [   # 오른쪽을 본다
@@ -647,9 +645,7 @@ HEAD_SIDE_F = [   # 오른쪽을 본다
     ".hhh" "ssssssssss" "O.",
     ".hhh" "O" "ssssssss" "O" "..",
     ".hhh" "............",
-    ".hhh" "............",
     ".ggg" "............",
-    "..gg" "............",
 ]
 
 HEAD_UP_F = [
@@ -672,15 +668,13 @@ HEAD_UP_F = [
     "..OhhhhhhhhhhO..",
     "...OhhhhhhhhO...",
     "..hhhhhhhhhhhh..",
-    "..hhhhhhhhhhhh..",
-    "..gghhhhhhhhgg..",
     "....gggggggg....",
 ]
 
-# 여자 머리는 어깨까지 내려온다 — 18행 얼굴 + 4행 머리채 = 22행.
-# 머리를 몸 위에 겹쳐 그리므로 늘어난 행이 어깨·등을 자연스럽게 덮는다.
+# 여자 머리는 어깨 위까지 — 18행 얼굴 + 2행 머리채 = 20행.
+# 머리를 몸 위에 겹쳐 그리므로 늘어난 행이 어깨를 자연스럽게 덮는다.
 for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
-    assert len(_art) == 22 and all(len(r) == 16 for r in _art), \
+    assert len(_art) == 20 and all(len(r) == 16 for r in _art), \
         [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
 
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
