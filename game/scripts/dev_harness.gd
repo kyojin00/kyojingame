@@ -4983,6 +4983,49 @@ func _debug_tick() -> void:
 			print("COOKGUIDE_OK=", cook_shown and cook_set and cleared and deliver_set,
 				" 목표뜸=", cook_shown, " 요리로체크=", cook_set,
 				" 목표사라짐=", cleared, " 전달로도닫힘=", deliver_set)
+		252:
+			# 집 꾸미기 — 깔려 있는 러그를 집어 옮길 수 있어야 한다.
+			# 예전에는 안내에 **집는 키가 적혀 있지 않아** 「깔려 있는데
+			# 못 옮기는 것」처럼 보였다. 이제 가리키고 누르면 집힌다.
+			var k_lv := GameData.house_lv
+			var k_furn: Array = GameData.furniture.duplicate(true)
+			GameData.house_lv = 2
+			m.interior._layout()
+			GameData.furniture = [{"id": "heart_rug", "x": 366.0, "y": 285.0}]
+			m.interior.deco_mode = true
+			m.interior.held = {}
+			var rug0: Dictionary = GameData.furniture[0]
+			# ① 러그를 가리키면 그것이 잡힌다
+			m.interior._mouse = m.interior._furn_rect(rug0).get_center()
+			var aimed: Dictionary = m.interior._furn_at(m.interior._aim_point())
+			var aim_ok: bool = str(aimed.get("id", "")) == "heart_rug"
+			# ② 집어서 옮기고 놓는다
+			m.interior._pick_up()
+			var held_ok: bool = not m.interior.held.is_empty()
+			m.interior._mouse = Vector2(-999, -999)
+			m.interior._move_cursor(Vector2(480, 300))
+			m.interior._place_held()
+			var moved_ok: bool = m.interior.held.is_empty() \
+				and GameData.furniture.size() == 1 \
+				and absf(float(GameData.furniture[0].x) - 366.0) > 4.0
+			# ③ 우클릭(취소)은 들고 있던 것을 제자리로 되돌린다
+			m.interior._mouse = m.interior._furn_rect(GameData.furniture[0]).get_center()
+			m.interior._pick_up()
+			var back_x := float(GameData.furniture[0].get("orig_x", -1.0))
+			m.interior._move_cursor(Vector2(300, 400))
+			m.interior._cancel_held()
+			var undo_ok: bool = back_x > 0.0 \
+				and absf(float(GameData.furniture[0].x) - back_x) < 0.01
+			m.interior.deco_mode = false
+			m.interior.held = {}
+			GameData.furniture = k_furn
+			GameData.house_lv = k_lv
+			m.interior._layout()
+			m.hud._toast_queue.clear()
+			m.hud.hide_bubble()
+			print("DECO_OK=", aim_ok and held_ok and moved_ok and undo_ok,
+				" 가리킴=", aim_ok, " 집힘=", held_ok, " 옮김=", moved_ok,
+				" 취소=", undo_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

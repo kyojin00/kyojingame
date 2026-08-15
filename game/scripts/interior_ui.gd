@@ -57,6 +57,8 @@ var deco_mode := false
 var cursor := Vector2(480, 300)
 var held: Dictionary = {}       # 들고 있는 가구 {id, x, y} (+ orig_x/orig_y = 원위치)
 var _cursor_cd := 0.0
+var _mouse := Vector2(-999, -999)   # 마지막 마우스 자리 (없으면 -999)
+var _cat_rows: Array = []           # 가구 카탈로그 줄 [{rect, id}] — 눌러서 산다
 
 
 func _ready() -> void:
@@ -66,10 +68,14 @@ func _ready() -> void:
 	var bg := ColorRect.new()
 	bg.color = Color(0.05, 0.04, 0.08)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# 마우스를 통과시킨다. Control의 기본값(STOP)이면 클릭이 여기서 먹혀
+	# _unhandled_input까지 오지 않는다 — 꾸미기를 마우스로 할 수 없었다
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
 	canvas = Control.new()
 	canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.draw.connect(_draw_room)
 	add_child(canvas)
 
@@ -170,12 +176,36 @@ func _process_deco(delta: float) -> void:
 	var v := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if v != Vector2.ZERO and _cursor_cd <= 0.0:
 		_cursor_cd = 0.06
-		cursor += Vector2(signf(v.x), signf(v.y)) * GRID
-		cursor.x = clampf(cursor.x, ROOM.position.x, ROOM.end.x - GRID)
-		cursor.y = clampf(cursor.y, ROOM.position.y + 8, ROOM.end.y - GRID)
-		if not held.is_empty():
-			held.x = cursor.x
-			held.y = cursor.y
+		_move_cursor(cursor + Vector2(signf(v.x), signf(v.y)) * GRID)
+		_mouse = Vector2(-999, -999)   # 방향키를 쓰면 마우스 겨눔은 놓는다
+
+
+# 커서를 옮긴다. 들고 있는 가구는 **커서 자리에 서 있도록** 따라온다 —
+# 그림의 아래 가운데(바닥에 닿은 자리)가 커서에 오게 잡는다. 동물의 숲처럼
+# 「가리킨 자리에 놓인다」가 눈에 보여야 한다.
+func _move_cursor(to: Vector2) -> void:
+	cursor.x = clampf(snappedf(to.x, GRID), ROOM.position.x, ROOM.end.x - GRID)
+	cursor.y = clampf(snappedf(to.y, GRID), ROOM.position.y + 8, ROOM.end.y - GRID)
+	if not held.is_empty():
+		var def: Dictionary = GameData.FURNITURE[held.id]
+		held.x = cursor.x + GRID / 2.0 - float(def.w) / 2.0
+		held.y = cursor.y + GRID / 2.0 - float(def.h)
+
+
+# 지금 겨누고 있는 점 (마우스가 있으면 그 자리, 아니면 커서 한가운데)
+func _aim_point() -> Vector2:
+	if _mouse.x > -900.0:
+		return _mouse
+	return cursor + Vector2(GRID / 2.0, GRID / 2.0)
+
+
+# 겨눈 자리에 있는 가구 (위에 보이는 것부터)
+func _furn_at(p: Vector2) -> Dictionary:
+	for i in range(GameData.furniture.size() - 1, -1, -1):
+		var f: Dictionary = GameData.furniture[i]
+		if _furn_rect(f).has_point(p):
+			return f
+	return {}
 
 
 # ---- 세간을 사람 크기에 맞춰 줄이기 ----
@@ -414,6 +444,33 @@ func _key_of(event: InputEventKey) -> int:
 
 
 func _deco_input(event: InputEvent) -> void:
+	# ---- 마우스 (동물의 숲처럼 가리키고 누른다) ----
+	if event is InputEventMouseMotion:
+		_mouse = (event as InputEventMouseMotion).position
+		_move_cursor(_mouse - Vector2(GRID / 2.0, GRID / 2.0))
+		return
+	if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var mb := event as InputEventMouseButton
+		_mouse = mb.position
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			# 카탈로그를 눌렀으면 그 가구를 산다
+			for row: Dictionary in _cat_rows:
+				if (row.rect as Rect2).has_point(_mouse):
+					_buy_furniture(str(row.id))
+					get_viewport().set_input_as_handled()
+					return
+			_move_cursor(_mouse - Vector2(GRID / 2.0, GRID / 2.0))
+			if held.is_empty():
+				_pick_up()
+			else:
+				_place_held()
+			get_viewport().set_input_as_handled()
+			return
+		if mb.button_index == MOUSE_BUTTON_RIGHT:
+			_cancel_held()     # 들고 있던 것을 제자리로 (아무것도 없으면 조용히)
+			get_viewport().set_input_as_handled()
+			return
+	# ---- 키보드 ----
 	if event.is_action_pressed("interact") or event.is_action_pressed("use_tool"):
 		if held.is_empty():
 			_pick_up()
@@ -432,18 +489,16 @@ func _deco_input(event: InputEvent) -> void:
 
 
 func _pick_up() -> void:
-	# 커서 아래 가구 집기 (나중에 그려진 = 위에 보이는 것부터)
-	for i in range(GameData.furniture.size() - 1, -1, -1):
-		var f: Dictionary = GameData.furniture[i]
-		if _furn_rect(f).has_point(cursor + Vector2(GRID / 2, GRID / 2)):
-			held = f
-			held["orig_x"] = float(f.x)
-			held["orig_y"] = float(f.y)
-			held.x = cursor.x
-			held.y = cursor.y
-			Sound.play_sfx("sfx_ui")
-			return
-	main.hud.show_message("빈 곳이다. 숫자키로 가구를 사거나 가구 위에서 집자.")
+	# 겨눈 자리의 가구를 집는다 (위에 보이는 것부터 — 러그 위의 식탁이 먼저)
+	var f := _furn_at(_aim_point())
+	if f.is_empty():
+		main.hud.show_message("빈 자리다. 가구를 가리키고 누르면 집힌다.")
+		return
+	held = f
+	held["orig_x"] = float(f.x)
+	held["orig_y"] = float(f.y)
+	_move_cursor(cursor)          # 집자마자 커서 자리로 따라온다
+	Sound.play_sfx("sfx_ui")
 
 
 func _place_held() -> void:
@@ -472,6 +527,7 @@ func _buy_furniture(id: String) -> void:
 	GameData.money -= int(def.price)
 	held = {"id": id, "x": cursor.x, "y": cursor.y, "new_cost": int(def.price)}
 	GameData.furniture.append(held)
+	_move_cursor(cursor)          # 커서 자리에 서 있도록 잡아 준다
 	Sound.play_sfx("sfx_buy")
 	main.hud.show_message("%s 구입! 자리를 골라 놓자." % def.name)
 
@@ -495,18 +551,25 @@ func _sell_held() -> void:
 	main.doing.sync_furniture(delta)
 
 
+# 들고 있던 가구를 제자리로 (새로 산 것은 물러 준다)
+func _cancel_held() -> void:
+	if held.is_empty():
+		return
+	if held.has("new_cost"):
+		GameData.furniture.erase(held)
+		GameData.money += int(held.new_cost)
+		main.hud.show_message("구입을 물렀다.")
+	else:
+		held.x = float(held.orig_x)
+		held.y = float(held.orig_y)
+		held.erase("orig_x")
+		held.erase("orig_y")
+	held = {}
+	Sound.play_sfx("sfx_ui")
+
+
 func _exit_deco() -> void:
-	if not held.is_empty():
-		# 들고 있던 가구 정리: 원위치로 되돌리거나, 새로 산 것은 환불
-		if held.has("new_cost"):
-			GameData.furniture.erase(held)
-			GameData.money += int(held.new_cost)
-		else:
-			held.x = float(held.orig_x)
-			held.y = float(held.orig_y)
-			held.erase("orig_x")
-			held.erase("orig_y")
-		held = {}
+	_cancel_held()
 	deco_mode = false
 	Sound.play_sfx("sfx_ui")
 	main.doing.sync_furniture(0)
@@ -753,15 +816,31 @@ func _draw_deco_ui() -> void:
 	# 커서 (들고 있으면 배치 가능 여부 색으로 표시)
 	if held.is_empty():
 		canvas.draw_rect(Rect2(cursor, Vector2(GRID, GRID)), Color(1, 1, 0.4, 0.9), false, 1.0)
+		# 겨누고 있는 가구를 테두리와 이름으로 알려 준다 — 무엇이 집힐지 보이게
+		var hov := _furn_at(_aim_point())
+		if not hov.is_empty():
+			var hr := _furn_rect(hov)
+			canvas.draw_rect(hr.grow(2.0), Color(1, 0.88, 0.4, 0.85), false, 2.0)
+			canvas.draw_rect(hr, Color(1, 0.95, 0.6, 0.16))
+			var nm := str(GameData.FURNITURE[hov.id].name)
+			var nw: float = main.UI_FONT.get_string_size(nm,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
+			var np := Vector2(hr.get_center().x - nw / 2.0, hr.position.y - 6.0)
+			canvas.draw_string_outline(main.UI_FONT, np, nm,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 3, Color(0.05, 0.04, 0.08))
+			canvas.draw_string(main.UI_FONT, np, nm,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 0.93, 0.72))
 	else:
 		var r := _furn_rect(held)
 		canvas.draw_rect(r, Color(0.4, 1, 0.5, 0.35) if _can_place(held)
 			else Color(1, 0.35, 0.3, 0.35))
 		canvas.draw_rect(r, Color(1, 1, 1, 0.8), false, 1.0)
 
-	_draw_center_text("꾸미기 모드 — 집기·놓기 · X: 판매 · F: 완료", 72)
+	_draw_center_text("꾸미기 — 클릭(또는 %s): 집기·놓기 · 우클릭: 제자리 · X: 판매 · F: 완료"
+		% GameData.key_label("interact"), 72)
 
-	# 가구 카탈로그 (숫자키 구입)
+	# 가구 카탈로그 (눌러서 사거나 숫자키)
+	_cat_rows.clear()
 	var px := 8.0
 	var py := 60.0
 	canvas.draw_rect(Rect2(px - 4, py - 14, 84, GameData.FURNITURE_IDS.size() * 18.0 + 20),
@@ -772,6 +851,10 @@ func _draw_deco_ui() -> void:
 		var id: String = GameData.FURNITURE_IDS[i]
 		var def: Dictionary = GameData.FURNITURE[id]
 		py += 18.0
+		var row := Rect2(px - 4, py - 15, 84, 18)
+		_cat_rows.append({"rect": row, "id": id})
+		if row.has_point(_aim_point()):
+			canvas.draw_rect(row, Color(1, 0.84, 0.37, 0.22))
 		canvas.draw_string(main.UI_FONT, Vector2(px, py),
 			"%d %s %dG" % [i + 1, def.name, int(def.price)],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.92, 0.9, 0.95))
