@@ -1954,17 +1954,38 @@ func _movein_npc_node(nid: String) -> Node2D:
 # 플레이어 곁의 「걸어서 설 수 있는」 칸 — 물·오브젝트·건물 위는 안 된다.
 # (예전엔 플레이어 아래 170px에 그냥 텔레포트해서, 호숫가·분수 곁에서는
 #  NPC가 물속에 서던 버그가 있었다)
-func _walk_tile_near_player(dist: int) -> Vector2i:
+# 플레이어 곁에서 걸어올 자리를 고른다.
+# from에 npc가 지금 서 있는 자리를 주면 **그쪽 방향**부터 살핀다 —
+# 누가 찾아오든 늘 남쪽에서 튀어나오던 버릇을 없애기 위해서다.
+func _walk_tile_near_player(dist: int, from := Vector2.ZERO) -> Vector2i:
 	var pt := m.player_tile()
+	var side := Vector2(0.0, 1.0)   # 알 수 없으면 예전처럼 남쪽
+	if from != Vector2.ZERO:
+		var d0 := from - m.player.position
+		if d0.length() > 1.0:
+			side = d0.normalized()
 	var cands: Array[Vector2i] = []
 	for d in range(dist, 0, -1):
-		cands += [Vector2i(0, d), Vector2i(-1, d), Vector2i(1, d),
-			Vector2i(-d, 0), Vector2i(d, 0), Vector2i(0, -d),
-			Vector2i(-d, d), Vector2i(d, d)]
+		var ring: Array[Vector2i] = [
+			Vector2i(0, d), Vector2i(0, -d), Vector2i(d, 0), Vector2i(-d, 0),
+			Vector2i(d, d), Vector2i(-d, d), Vector2i(d, -d), Vector2i(-d, -d)]
+		# npc가 있는 쪽과 방향이 가까운 칸부터 (내적이 큰 순서)
+		ring.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			return Vector2(a).normalized().dot(side) \
+				> Vector2(b).normalized().dot(side))
+		cands += ring
 	for off: Vector2i in cands:
 		if m.is_passable(pt + off):
 			return pt + off
 	return pt
+
+
+# 찾아오는 사람이 걸음을 멈출 자리 — **자기가 오던 쪽**에서 한 발 앞이다
+func _visit_stop_at(npc: Variant) -> Vector2:
+	var away: Vector2 = npc.position - m.player.position
+	if away.length() < 1.0:
+		away = Vector2(0.0, 40.0)
+	return m.player.position + away.normalized() * 40.0
 
 
 var _movein_route: Array = []
@@ -1986,7 +2007,8 @@ func _movein_update(delta: float) -> void:
 			return   # 밤에는 찾아오지 않는다
 		var nid := str(a.id)
 		var walker := _movein_npc_node(nid)
-		var start := _walk_tile_near_player(5)   # 물·장애물 없는 칸에서 등장
+		var start := _walk_tile_near_player(5,
+			walker.position if walker != null else Vector2.ZERO)
 		if walker == null:
 			m.npcmgr._spawn_npc(nid, start)
 			walker = m.npcs[m.npcs.size() - 1]
@@ -1994,10 +2016,14 @@ func _movein_update(delta: float) -> void:
 		m.story_cutscene = true
 		walker.scripted = true
 		walker.visible = true
-		walker.position = Vector2(start.x * m.TILE + 16, start.y * m.TILE + 16)
-		# 플레이어 바로 곁(통행 가능 칸)까지는 길찾기로 걸어온다 — 물을 건너지 않는다
-		var goal := _walk_tile_near_player(1)
-		_movein_route = m.npcmgr._tile_path(start, goal)
+		# 멀리 있을 때만 곁으로 옮긴다 — 가까우면 서 있던 자리에서 걸어온다
+		if walker.position.distance_to(m.player.position) > 420.0:
+			walker.position = Vector2(start.x * m.TILE + 16, start.y * m.TILE + 16)
+		# 플레이어 바로 곁(통행 가능 칸)까지는 길찾기로 걸어온다 — 물을 건너지 않는다.
+		# 서 있던 자리에서 그대로 걸어오는 경우도 있으므로 지금 칸에서 길을 잡는다
+		var here := Vector2i(int(walker.position.x / m.TILE), int(walker.position.y / m.TILE))
+		var goal := _walk_tile_near_player(1, walker.position)
+		_movein_route = m.npcmgr._tile_path(here, goal)
 		m.hud.show_message("누군가 이쪽으로 걸어온다...", 4.0)
 	elif not m.dialog.visible:
 		if not _movein_route.is_empty():
@@ -2098,16 +2124,18 @@ func _spear_update(delta: float) -> void:
 		GameData.spear_quest = "visit"
 		m.story_cutscene = true
 		chief.scripted = true
-		# 화면 밖에서 걸어오는 느낌 — 물·장애물 없는 곁 칸에서 다가온다
-		var st := _walk_tile_near_player(5)
-		chief.position = Vector2(st.x * m.TILE + 16, st.y * m.TILE + 16)
+		# 멀리 있으면 그 사람이 있던 **방향**의 곁 칸에서 걸어온다
+		# (가까이 있으면 서 있던 자리에서 그대로 다가온다)
+		if chief.position.distance_to(m.player.position) > 420.0:
+			var st := _walk_tile_near_player(5, chief.position)
+			chief.position = Vector2(st.x * m.TILE + 16, st.y * m.TILE + 16)
 		m.hud.show_message("이장님이 급히 걸어온다...", 4.0)
 	elif GameData.spear_quest == "visit" and not m.dialog.visible:
 		var chief2: Variant = _story_chief()
 		if chief2 == null:
 			_start_spear_dialog()   # 이장이 없으면 (있을 수 없는 상황) 바로 대화
 			return
-		var to: Vector2 = m.player.position + Vector2(0.0, 40.0) - chief2.position
+		var to: Vector2 = _visit_stop_at(chief2) - chief2.position
 		if to.length() > 10.0:
 			chief2.moving = true
 			chief2.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
@@ -2782,7 +2810,7 @@ func _story11_update(delta: float) -> void:
 			return
 		m.story_cutscene = true
 		chief2.scripted = true
-		var to: Vector2 = m.player.position + Vector2(0.0, 40.0) - chief2.position
+		var to: Vector2 = _visit_stop_at(chief2) - chief2.position
 		if to.length() > 10.0:
 			chief2.moving = true
 			chief2.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \

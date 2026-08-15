@@ -2340,6 +2340,11 @@ func quest_catalog() -> Array:
 				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자.",
 				"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
 				"reward": _tut_reward_text(flag)})
+		elif flag == "cook":
+			out.append({"id": "tutorial", "title": "부엌에 불을 지피자", "obj": o,
+				"desc": "거둔 것으로 첫 끼를 지어 보자. 집 안 조리대에서 E —\n먼지가 쌓여 있으면 빗자루로 쓸어 내면 된다.",
+				"cat": "guide", "npc": "chief",
+				"reward": _tut_reward_text(flag)})
 		else:
 			out.append({"id": "tutorial", "title": "마을 생활 안내", "obj": o,
 				"desc": "이장이 알려 주는 마을살이 요령. 안 해도 되지만,\n하면 살림이 수월해진다.",
@@ -3474,8 +3479,22 @@ const FORMULA_IDS := ["potion_energy", "potion_luck", "potion_swift", "potion_em
 const ALCHEMY_FAIL := "sludge"
 const POTION_ENERGY_HEAL := 60.0
 
-# 낡은 조합법이 나올 확률 (아직 모르는 것이 남아 있을 때만)
-const ALCHEMY_DROP := {"tree": 0.03, "rock": 0.03, "bigrock": 0.12, "mob": 0.06}
+# 낡은 조합법이 나올 확률 (아직 모르는 것이 남아 있을 때만).
+# 아주 드물게 나오는 것이라야 주웠을 때 기쁘다 — 초반 도구로는 거의 안 나오고,
+# 잘 벼린 도구를 들어도 눈에 띄게 잦아지지는 않는다 (alchemy_drop_chance).
+const ALCHEMY_DROP := {"tree": 0.004, "rock": 0.004, "bigrock": 0.015, "mob": 0.006}
+# 어느 도구의 등급을 보는가 (몬스터는 도구와 무관하다)
+const ALCHEMY_DROP_TOOL := {"tree": "axe", "rock": "pickaxe", "bigrock": "pickaxe"}
+
+
+# 실제 확률 — 도구 등급 1단계면 0.6배, 최고 등급이라야 1.2배쯤.
+# 좋은 도구를 든다고 「조합법 캐기」가 되어 버리지 않게 폭을 좁게 잡았다.
+func alchemy_drop_chance(source: String) -> float:
+	var base := float(ALCHEMY_DROP.get(source, 0.0))
+	if not ALCHEMY_DROP_TOOL.has(source):
+		return base
+	var lv: int = int(tool_level.get(str(ALCHEMY_DROP_TOOL[source]), 1))
+	return base * (0.4 + 0.2 * float(lv))
 
 var alchemy_known: Array = []   # 알아낸 조합법 id
 var alchemy_brews := {}         # 조합법 id -> 만든 횟수
@@ -4741,11 +4760,15 @@ var quest := {}
 #     진행되고, 도구도 안내에 묶여 잠기지 않는다.
 # 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
 const STORY2_FLAGS := ["till", "plant", "water", "harvest"]
+# 첫 살림을 배우는 줄기 — 스토리 3(마을 생활 안내)이 열리기 전에도
+# 이 다섯은 차례로 이어진다. 수확에서 끊기지 않고 요리까지 간다.
+const FARM_CHAIN_FLAGS := ["till", "plant", "water", "harvest", "cook"]
 const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
 	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
+	["cook", "집 안 조리대에서 요리를 해 보자"],
 	["board", "의뢰 게시판(E)에서 오늘의 의뢰를 살펴보자"],
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
@@ -4857,6 +4880,7 @@ const TUTORIAL_SHORT := {
 	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
 	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
 	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
+	"cook": "집 조리대에서 요리하기 (E)",
 	"slept": "침대에서 자기", "board": "의뢰 게시판 보기",
 	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)",
 	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
@@ -4889,8 +4913,8 @@ func tutorial_current_flag() -> String:
 	if not tutorial.get("active", false):
 		return ""
 	for pair in TUTORIAL_ORDER:
-		# 마을 생활 안내(스토리2 밖 목표)는 스토리 3이 열어 줘야 나온다
-		if pair[0] not in STORY2_FLAGS and not guide_active:
+		# 마을 생활 안내(첫 살림 줄기 밖 목표)는 스토리 3이 열어 줘야 나온다
+		if pair[0] not in FARM_CHAIN_FLAGS and not guide_active:
 			continue
 		if not tutorial.get(pair[0], false):
 			return pair[0]

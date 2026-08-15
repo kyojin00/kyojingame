@@ -259,6 +259,10 @@ func use_tool() -> void:
 					m.hud.show_message("물을 머금은 작물이 다시 자라기 시작했다!", 4.0)
 			elif m.grid[t.y][t.x].ground != "soil":
 				m.hud.show_message("물을 줄 곳이 아니다.")
+			elif m.grid[t.y][t.x].crop_id != "":
+				# 비가 와서 이미 흠뻑 젖은 밭 — 물은 안 들어가도 배움은 넘어간다
+				m.tutorial_notify("water")
+				m.hud.show_message("이미 촉촉하다. 오늘은 물을 안 줘도 되겠다.")
 		"seed":
 			var id := m.forced_seed if m.forced_seed != "" else GameData.current_seed_id()
 			if id == "":

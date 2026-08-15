@@ -2946,6 +2946,66 @@ func _debug_tick() -> void:
 				" 집터·건설=", fplaced and built_ok, " 완료보고=", report_ok and done_ok,
 				" 레시피목재8=", cost_ok, " 넣기=", put_ok, " 꺼내기=", take_ok and empty_ok,
 				" 제외품목=", block_ok, " 칸제한=", full_ok)
+		287:
+			# #139: 손본 여섯 가지 —
+			# 농사 줄기(수확 뒤 요리로 이어짐) · 안내 말풍선 · 붙박이 충돌 ·
+			# 찾아오는 사람의 방향 · 조합법 확률 · 대사 페이지(322에서 따로)
+			m.dialog.close()
+			var k_tut: Dictionary = GameData.tutorial.duplicate()
+			var k_s2 := GameData.story2_phase
+			var k_guide := GameData.guide_active
+			GameData.tutorial = GameData.fresh_tutorial()
+			GameData.story2_phase = "farm"
+			GameData.guide_active = false
+			# ① 밭 갈기 -> 씨앗 -> 물 -> 수확 -> 요리. 어느 걸음에서도 안 끊긴다
+			var chain: Array = []
+			var chain_ok := true
+			for step_flag: String in ["till", "plant", "water", "harvest", "cook"]:
+				var here := GameData.tutorial_current_flag()
+				if here != step_flag or GameData.tutorial_objective_short() == "":
+					chain_ok = false
+				# 퀘스트 목록에도 반드시 한 줄로 올라와 있어야 한다
+				var listed := false
+				for q: Dictionary in GameData.quest_catalog():
+					if str(q.id) == "tutorial":
+						listed = true
+				if not listed:
+					chain_ok = false
+				chain.append(here)
+				m.story.tutorial_notify(step_flag)
+				m.dialog.close()
+			GameData.tutorial = k_tut
+			GameData.story2_phase = k_s2
+			GameData.guide_active = k_guide
+			# ② 안내는 검은 띠가 아니라 주인공 머리 위 말풍선이다.
+			#    글자가 풍선 밖으로 삐져나오지 않는지도 함께 본다
+			m.hud.show_message("긴 안내도 말풍선 안에 다 들어가야 한다. 이렇게 길어도 마찬가지다.", 3.0)
+			var bub: Panel = m.hud._bub
+			var lbl: Label = m.hud._bub_label
+			var bubble_ok: bool = bub != null and bub.visible \
+				and lbl.size.x + 2.0 <= bub.size.x and lbl.size.y + 2.0 <= bub.size.y \
+				and bub.position.x >= 0.0 and bub.position.y >= 0.0 \
+				and bub.position.x + bub.size.x <= 960.0
+			var no_black_bar: bool = not m.hud.msg_label.visible
+			# ③ 집 안 붙박이(제작대·조리대)는 통과할 수 없다
+			m.interior._layout()
+			var desk_block: bool = m.interior._blocked(m.interior.DESK.get_center()) \
+				and m.interior._blocked(m.interior.KITCHEN.get_center()) \
+				and not m.interior._blocked(m.interior.ROOM.get_center())
+			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라)
+			var pt0 := m.player_tile()
+			var from_north := Vector2((pt0.x) * m.TILE + 16.0, (pt0.y - 8) * m.TILE + 16.0)
+			var spot_n := m.story._walk_tile_near_player(3, from_north)
+			var from_west := Vector2((pt0.x - 8) * m.TILE + 16.0, (pt0.y) * m.TILE + 16.0)
+			var spot_w := m.story._walk_tile_near_player(3, from_west)
+			var side_ok: bool = spot_n.y < pt0.y and spot_w.x < pt0.x
+			m.hud._toast_queue.clear()
+			print("SUBFIX_OK=", chain_ok and bubble_ok and no_black_bar
+				and desk_block and side_ok,
+				" 농사줄기=", chain_ok, chain, " 말풍선=", bubble_ok,
+				" 검은띠제거=", no_black_bar, " 붙박이충돌=", desk_block,
+				" 접근방향=", side_ok, "(북 ", spot_n - pt0, " · 서 ", spot_w - pt0, ")")
+			_save_shot("_bubble.png")
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
@@ -3242,12 +3302,24 @@ func _debug_tick() -> void:
 				" luck=", GameData.bonus_drop_chance("mine"))
 			GameData.reset_daily()
 			print("POTION_CLEAR_OK=", not GameData.has_potion("swift"))
-			# 조합법 드랍: 확률을 1로 올려 실제로 습득되는지 본다
+			# 조합법 드랍: 아주 드물게만 나온다.
+			# ① 낡은 도구(1단계)의 확률이 좋은 도구보다 확실히 낮고
+			# ② 초반 확률이 1%도 안 되며
+			# ③ 그래도 오래 캐다 보면 언젠가는 나온다
 			GameData.alchemy_known = ["potion_energy"]
+			var k_tl: Dictionary = GameData.tool_level.duplicate()
+			GameData.tool_level["pickaxe"] = 1
+			var low_p := GameData.alchemy_drop_chance("bigrock")
+			GameData.tool_level["pickaxe"] = 4
+			var high_p := GameData.alchemy_drop_chance("bigrock")
+			GameData.tool_level = k_tl
+			var rare_ok: bool = low_p < 0.01 and low_p < high_p and high_p < 0.03 \
+				and GameData.alchemy_drop_chance("tree") < 0.005
 			var before_n: int = GameData.alchemy_known.size()
-			for i in 40:
+			for i in 4000:
 				m.doing._maybe_drop_recipe("bigrock")
-			print("RECIPE_DROP_OK=", GameData.alchemy_known.size() > before_n,
+			print("RECIPE_DROP_OK=", GameData.alchemy_known.size() > before_n and rare_ok,
+				" 낮은확률=", rare_ok, "(%.3f->%.3f)" % [low_p, high_p],
 				" known=", GameData.alchemy_known.size(), "/", GameData.FORMULA_IDS.size())
 			for fid2: String in GameData.FORMULA_IDS:
 				GameData.learn_formula(fid2)
@@ -3736,8 +3808,9 @@ func _debug_tick() -> void:
 			for pair in GameData.TUTORIAL_ORDER:
 				if str(pair[0]) == "build":
 					no_build = false
-			# 안내가 잠겨 있으면 안내 목표는 나오지 않고, 알림도 무시된다
-			for f in GameData.STORY2_FLAGS:
+			# 안내가 잠겨 있으면 안내 목표는 나오지 않고, 알림도 무시된다.
+			# (첫 살림 줄기의 마지막 걸음 「요리」까지는 잠금 밖이다)
+			for f in GameData.FARM_CHAIN_FLAGS:
 				GameData.tutorial[f] = true
 			var none_flag := GameData.tutorial_current_flag() == ""
 			m.tutorial_notify("board")
@@ -4013,20 +4086,34 @@ func _debug_tick() -> void:
 				" 메인1개=", one_main, " 마을소식(도착후)=", info_town,
 				" 마을소식(도착전숨김)=", not info_field, " 말풍선=", bubbled)
 		322:
-			# #115: 대사 한 페이지 2줄 제한 — 긴 대사는 두 줄씩 다음 장으로
+			# #115/#139: 대사 한 페이지 2줄 제한 + **문장은 페이지를 넘지 않는다**
 			m.dialog.open_seq("검사", null, [
-				{"text": "하나\n둘\n셋\n넷\n다섯", "choices": [["끝", null]]},
+				{"text": "첫 번째 문장은 짧다.\n두 번째 문장은 제법 길어서 한 줄에 담기지 않고"
+					+ " 다음 줄까지 넘어가게 된다. 세 번째 문장도 이어서 붙는다.",
+					"choices": [["끝", null]]},
 			])
 			var pages: int = m.dialog._seq.size()
 			var two_lines := true
+			var sent_whole := true
 			for e2: Dictionary in m.dialog._seq:
-				if str(e2.get("text", "")).split("\n").size() > 2:
+				var body2 := str(e2.get("text", ""))
+				if body2.split("\n").size() > 2:
 					two_lines = false
+				# 페이지 끝은 문장 끝이어야 한다 (한두 글자만 다음 장으로 밀리지 않게)
+				if not body2.strip_edges().ends_with("."):
+					sent_whole = false
+				# 한 줄에 한두 글자만 덜렁 남지 않는다
+				for ln2 in body2.split("\n"):
+					if ln2.strip_edges().length() < 3:
+						two_lines = false
 			var choice_last: bool = m.dialog._seq[pages - 1].has("choices") \
 				and not m.dialog._seq[0].has("choices")
+			var small_font: bool = m.dialog.FONT_BODY <= 14
 			m.dialog.close()
-			print("DIALOG2LINE_OK=", pages == 3 and two_lines and choice_last,
-				" 페이지=", pages, "/3 두줄=", two_lines, " 선택지끝장=", choice_last)
+			print("DIALOG2LINE_OK=", pages >= 2 and two_lines and choice_last
+				and sent_whole and small_font,
+				" 페이지=", pages, " 두줄=", two_lines, " 선택지끝장=", choice_last,
+				" 문장안끊김=", sent_whole, " 작은글씨=", small_font)
 		325:
 			# #114: 잡화점 요리 레시피 — 물고기를 낚아 봐야 진열 + 상인 첫날 숨김
 			var keep_fc: Dictionary = GameData.fish_caught.duplicate()

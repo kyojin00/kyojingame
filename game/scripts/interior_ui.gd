@@ -187,6 +187,10 @@ func _blocked(p: Vector2) -> bool:
 	var feet := Rect2(p.x - 8, p.y - 6, 16, 8)
 	if feet.intersects(BED):
 		return true
+	# 붙박이 세간 — 제작대·조리대·조합대는 통과할 수 없다 (곁에 서서 E)
+	for fixed: Rect2 in [DESK, KITCHEN, ALCHEMY]:
+		if fixed.position.x > -500.0 and feet.intersects(fixed):
+			return true
 	if GameData.house_lv >= 2:   # 가구는 확장한 집에만 있다
 		for f in GameData.furniture:
 			if GameData.FURNITURE[f.id].solid and feet.intersects(_furn_rect(f)):
@@ -207,6 +211,10 @@ func _can_place(f: Dictionary) -> bool:
 	var solid: bool = GameData.FURNITURE[f.id].solid
 	if solid and r.intersects(BED.grow(2)):
 		return false
+	if solid:
+		for fixed: Rect2 in [DESK, KITCHEN, ALCHEMY]:
+			if fixed.position.x > -500.0 and r.intersects(fixed.grow(2)):
+				return false
 	if solid:
 		for other in GameData.furniture:
 			if other != f and GameData.FURNITURE[other.id].solid \

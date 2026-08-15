@@ -617,9 +617,8 @@ func refresh(force := false) -> void:
 		and main.quest_ui.visible
 	$TrackerPanel.visible = t_goal != "" and not qopen
 	hotbar_panel.visible = not qopen
-	if qopen and msg_label.visible:
-		msg_label.visible = false      # 하단 안내 바도 Q창 위로 비치지 않게
-		$MessageBg.visible = false
+	if qopen and _bub != null and _bub.visible:
+		_bub.visible = false           # 안내 말풍선도 Q창 위로 비치지 않게
 	_put(quest_title_label, t_title)
 	_put(goal_label, ("📍 " + t_goal) if t_goal != "" else "")
 	_watch_goal(str(tq.get("obj", "")))
@@ -641,12 +640,113 @@ func refresh(force := false) -> void:
 		_put(tool_name, label)
 
 
+# ---- 안내 말풍선 ----
+#
+# 화면 아래 검은 띠 대신, **주인공 머리 위에 뜨는 작은 말풍선**이다.
+# 글자는 미리 폭에 맞춰 잘라 두고, 풍선을 그 크기에 맞춰 키운다 —
+# 그래서 어떤 문장이 와도 풍선 밖으로 삐져나오지 않는다.
+const BUB_FONT := 11
+const BUB_W := 250.0        # 말풍선 안쪽 글 폭 (넘으면 줄바꿈)
+const BUB_LINE := 15.0
+const BUB_PAD := Vector2(10.0, 7.0)
+var _bub: Panel = null
+var _bub_label: Label = null
+var _bub_tail: Control = null
+
+
+func _make_bubble() -> void:
+	if _bub != null:
+		return
+	_bub = Panel.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.99, 0.96, 0.86, 0.97)
+	st.border_color = Color(0.45, 0.31, 0.16)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(9)
+	st.shadow_color = Color(0.12, 0.08, 0.03, 0.28)
+	st.shadow_size = 3
+	st.shadow_offset = Vector2(0, 2)
+	_bub.add_theme_stylebox_override("panel", st)
+	_bub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bub.visible = false
+	add_child(_bub)
+	# 아래로 뾰족한 꼬리 — 누가 하는 말인지 가리킨다
+	_bub_tail = Control.new()
+	_bub_tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bub_tail.draw.connect(func() -> void:
+		var pts := PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(0, 9)])
+		_bub_tail.draw_colored_polygon(pts, Color(0.99, 0.96, 0.86, 0.97))
+		_bub_tail.draw_line(Vector2(-7, 0), Vector2(0, 9), Color(0.45, 0.31, 0.16), 2.0)
+		_bub_tail.draw_line(Vector2(7, 0), Vector2(0, 9), Color(0.45, 0.31, 0.16), 2.0))
+	_bub.add_child(_bub_tail)
+	_bub_label = Label.new()
+	_bub_label.add_theme_font_override("font", FONT_SMALL)
+	_bub_label.add_theme_font_size_override("font_size", BUB_FONT)
+	_bub_label.add_theme_color_override("font_color", Color(0.22, 0.15, 0.07))
+	_bub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bub_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bub.add_child(_bub_label)
+
+
+# 폭에 맞춰 미리 줄을 나눈다 (풍선 크기를 정확히 잡기 위해)
+func _bub_wrap(text: String) -> Array:
+	var lines: Array = []
+	var w := 0.0
+	for raw in text.split("\n"):
+		var line := ""
+		for ch in raw:
+			var cw := FONT_SMALL.get_string_size(line + ch,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, BUB_FONT).x
+			if line != "" and cw > BUB_W:
+				lines.append(line)
+				w = maxf(w, FONT_SMALL.get_string_size(line,
+					HORIZONTAL_ALIGNMENT_LEFT, -1, BUB_FONT).x)
+				line = ch
+			else:
+				line += ch
+		lines.append(line)
+		w = maxf(w, FONT_SMALL.get_string_size(line,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, BUB_FONT).x)
+	return [lines, w]
+
+
+# 주인공 머리 위로 붙인다. 실내·동굴처럼 바깥 좌표가 없는 곳에서는
+# 화면 가운데 아래(핫바 위)에 띄운다 — 어디서든 가려지지 않게 화면 안으로 민다.
+func _place_bubble() -> void:
+	if _bub == null:
+		return
+	var anchor := Vector2(480.0, 330.0)
+	var outside: bool = main != null and main.player != null \
+		and not main.interior.visible and not main.cave.visible \
+		and not (main.shop_room != null and main.shop_room.visible)
+	if outside:
+		anchor = main.get_canvas_transform() * main.player.position
+		anchor.y -= 46.0        # 머리 위
+	var p := Vector2(anchor.x - _bub.size.x * 0.5, anchor.y - _bub.size.y - 9.0)
+	p.x = clampf(p.x, 6.0, 960.0 - _bub.size.x - 6.0)
+	p.y = clampf(p.y, 34.0, 540.0 - _bub.size.y - 60.0)
+	_bub.position = p
+	# 화면 밖으로 밀렸으면 꼬리도 주인공 쪽을 가리키게 옮긴다
+	_bub_tail.position = Vector2(
+		clampf(anchor.x - p.x, 12.0, _bub.size.x - 12.0), _bub.size.y - 1.0)
+
+
 func show_message(text: String, dur := 2.5) -> void:
 	if main != null and main.remote_acting:
 		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
-	msg_label.text = text
-	msg_label.visible = true
-	$MessageBg.visible = true
+	_make_bubble()
+	var wrapped: Array = _bub_wrap(text)
+	var lines: Array = wrapped[0]
+	var w: float = minf(float(wrapped[1]), BUB_W)
+	_bub_label.text = "\n".join(lines)
+	_bub.size = Vector2(w + BUB_PAD.x * 2.0,
+		float(lines.size()) * BUB_LINE + BUB_PAD.y * 2.0)
+	_bub_label.position = BUB_PAD
+	_bub_label.size = Vector2(w, float(lines.size()) * BUB_LINE)
+	_bub_tail.position = Vector2(_bub.size.x * 0.5, _bub.size.y - 1.0)
+	_bub_tail.queue_redraw()
+	_bub.visible = true
+	_place_bubble()
 	msg_timer = dur
 
 
@@ -728,8 +828,8 @@ func _process(delta: float) -> void:
 			or (main.shop_room != null and main.shop_room.visible))
 		if minimap_panel.visible:
 			minimap.queue_redraw()
-	if msg_label.visible:
+	if _bub != null and _bub.visible:
+		_place_bubble()
 		msg_timer -= delta
 		if msg_timer <= 0.0:
-			msg_label.visible = false
-			$MessageBg.visible = false
+			_bub.visible = false

@@ -61,6 +61,7 @@ func do_cook(id: String) -> void:
 	Sound.play_sfx("sfx_buy")
 	m.hud.show_message("'%s' 완성!" % GameData.ITEMS[id].name)
 	m.toolwork.gain_skill("cook", 8.0)
+	m.tutorial_notify("cook")   # 밭 갈기 -> ... -> 수확 -> 요리로 이어지는 줄기
 	if Net.is_guest():
 		m.netsync._req_cook.rpc_id(1, id)
 	elif Net.is_host():
@@ -136,7 +137,7 @@ func _maybe_drop_recipe(source: String) -> void:
 	var left: Array = GameData.unknown_formulas()
 	if left.is_empty():
 		return
-	if randf() >= float(GameData.ALCHEMY_DROP.get(source, 0.0)):
+	if randf() >= GameData.alchemy_drop_chance(source):
 		return
 	var fid: String = left[randi() % left.size()]
 	GameData.learn_formula(fid)

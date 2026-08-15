@@ -44,7 +44,7 @@ var _seq_has_choices := false
 const PANEL_W := 470               # 화면을 덜 가리게 조금 줄였다
 const BOTTOM_MARGIN := 56          # 아래 핫바를 가리지 않는 높이
 const FONT_TITLE := 16
-const FONT_BODY := 17
+const FONT_BODY := 14
 const FONT_BTN := 15
 const FONT_SKIP := 13
 const SKIP_W := 76
@@ -301,14 +301,14 @@ func open_seq(speaker: String, portrait_tex: Texture2D, entries: Array,
 const WRAP_W := 330.0   # 본문이 실제로 쓰는 폭 (패널 - 초상화 - 여백)
 
 
-func _wrap_lines(text: String) -> PackedStringArray:
+func _wrap_at(text: String, width: float) -> PackedStringArray:
 	var f: Font = body_label.get_theme_font("font")
 	var out: PackedStringArray = []
 	for raw in text.split("\n"):
 		var line := ""
 		for ch in raw:
 			if line != "" and f.get_string_size(line + ch,
-					HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_BODY).x > WRAP_W:
+					HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_BODY).x > width:
 				out.append(line)
 				line = ch
 			else:
@@ -317,28 +317,92 @@ func _wrap_lines(text: String) -> PackedStringArray:
 	return out
 
 
+func _wrap_lines(text: String) -> PackedStringArray:
+	return _wrap_at(text, WRAP_W)
+
+
+# 두 줄로 나뉠 때 **양쪽 길이를 고르게** 맞춘다.
+# 그냥 폭에 맞춰 자르면 둘째 줄에 한두 글자만 덜렁 남아 읽기 어렵다 —
+# 줄 수가 늘지 않는 선까지 폭을 좁혀서 자르면 자연스럽게 반씩 나뉜다.
+func _wrap_balanced(text: String) -> PackedStringArray:
+	var lines := _wrap_at(text, WRAP_W)
+	if lines.size() <= 1:
+		return lines
+	var lo := 60.0
+	var hi := WRAP_W
+	while hi - lo > 4.0:
+		var mid := (lo + hi) * 0.5
+		if _wrap_at(text, mid).size() <= lines.size():
+			hi = mid
+		else:
+			lo = mid
+	return _wrap_at(text, hi)
+
+
+# 한 문장 단위로 자른다 (문장 부호 뒤에서 끊는다).
+# 손으로 넣은 줄바꿈은 무시하고 다시 짠다 — 글자 크기가 달라져도
+# 「한 문장은 한 화면에」가 지켜지게 하기 위해서다.
+func _split_sentences(text: String) -> PackedStringArray:
+	var flat := text.replace("\n", " ").strip_edges()
+	while flat.contains("  "):
+		flat = flat.replace("  ", " ")
+	var out: PackedStringArray = []
+	var cur := ""
+	for i in flat.length():
+		var ch := flat[i]
+		cur += ch
+		if ch in [".", "!", "?", "…"]:
+			# 마침표 뒤에 닫는 따옴표가 붙으면 거기까지가 한 문장이다
+			while i + 1 < flat.length() and flat[i + 1] in ["」", "』", "\"", "'", ")"]:
+				i += 1
+				cur += flat[i]
+			out.append(cur.strip_edges())
+			cur = ""
+	if cur.strip_edges() != "":
+		out.append(cur.strip_edges())
+	return out
+
+
+# 대사 한 덩이를 화면 두 줄짜리 페이지들로 나눈다.
+# **문장이 페이지를 가로질러 끊기지 않는다** — 짧은 문장은 두 문장까지
+# 한 페이지에 모으고, 두 줄을 넘는 긴 문장만 어쩔 수 없이 나눈다.
 func _paginate_seq(entries: Array) -> Array:
 	var paged: Array = []
 	for e_v in entries:
 		var e: Dictionary = e_v
-		var lines := _wrap_lines(str(e.get("text", "")))
-		if lines.size() <= 2:
-			paged.append(e)
-			continue
-		var i := 0
-		while i < lines.size():
-			var last: bool = i + 2 >= lines.size()
-			var pg := {"text": "\n".join(lines.slice(i, mini(i + 2, lines.size())))}
+		var body := str(e.get("text", ""))
+		var pages: Array[String] = []
+		var buf: PackedStringArray = []
+		for sent: String in _split_sentences(body):
+			var lines := _wrap_balanced(sent)
+			if lines.size() > 2:
+				if not buf.is_empty():
+					pages.append("\n".join(buf))
+					buf = []
+				var i := 0
+				while i < lines.size():
+					pages.append("\n".join(lines.slice(i, mini(i + 2, lines.size()))))
+					i += 2
+				continue
+			if buf.size() + lines.size() > 2:
+				pages.append("\n".join(buf))
+				buf = []
+			buf += lines
+		if not buf.is_empty():
+			pages.append("\n".join(buf))
+		if pages.is_empty():
+			pages.append(body)
+		for pi in pages.size():
+			var pg := {"text": pages[pi]}
 			if e.has("portrait"):
 				pg["portrait"] = e.portrait
 			if e.has("name"):
 				pg["name"] = e.name
-			if i == 0 and e.has("event"):
+			if pi == 0 and e.has("event"):
 				pg["event"] = e.event
-			if last and e.has("choices"):
+			if pi == pages.size() - 1 and e.has("choices"):
 				pg["choices"] = e.choices
 			paged.append(pg)
-			i += 2
 	return paged
 
 
