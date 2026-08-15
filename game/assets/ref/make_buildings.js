@@ -215,7 +215,9 @@ function ditherFace(g, tones, y0, y1) {
 // 핵심은 **좌표를 묶는 것**이다. hash(x, y)는 점이 되고,
 // hash(x>>2, y>>1)은 덩어리가 된다.
 const ROUGH = parseFloat((process.argv.find(a => a.startsWith('--rough=')) || '').slice(8))
-  || 0.32;
+  || 0.45;
+// 0.20 -> 0.32 -> 0.45. 올릴수록 장마다 색이 벌어져 오래 쓴 티가 난다.
+// 0.5를 넘기면 벽돌이 「무늬」로 보이기 시작해서 이쯤이 끝이다.
 
 // 기와를 **한 장씩** 얹는다.
 //
