@@ -14,10 +14,21 @@
 #   ③ 캡슐 비율마다 배치를 달리 한다. 가로로 납작한 칸에 전신을 넣으면
 #      사람이 개미만 해진다 — 짧은 칸은 상반신만 크게 쓴다
 #
-# 실행:  python3 make_key_art.py      (Pillow 필요)
-#        게임 스크린샷이 있어야 한다: KYOJIN_SHOT=1 godot --path game
+# 실행 (리눅스·맥):   python3 make_key_art.py
+#      (윈도우):       python make_key_art.py
+#   윈도우의 `python3`은 **마이크로소프트 스토어 안내 스텁**이라 아무것도 안 하고
+#   끝난다. 파이썬이 깔려 있어도 그렇다 — `python`으로 불러야 한다.
+#
+# 준비물:  pip install Pillow
+#          게임 스크린샷 (아래 SHOT_HINT 참고)
+import glob
 import os
-from PIL import Image, ImageDraw, ImageFont
+import sys
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    sys.exit('Pillow가 없다.  설치:  python -m pip install Pillow')
 
 REF = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.normpath(os.path.join(REF, '..', 'game'))
@@ -27,9 +38,31 @@ os.makedirs(OUT, exist_ok=True)
 TITLE = 'Little Root'
 SUB = '리틀 루트'
 FONT = os.path.join(GAME, 'assets', 'fonts', 'Galmuri11.ttf')
-BG_SHOT = os.path.join(GAME, '1_clean.png')       # UI를 끄고 찍은 화면
 CHAR = os.path.join(GAME, 'assets', 'sprites', 'new_boy_down_idle.png')
 CAST = ['npc_merchant_down_0', 'npc_blacksmith_down_0', 'npc_forest_girl_down_0']
+
+# 바탕이 될 **UI 없는 화면**.
+#
+# 게임을 돌리면 game/ 에 새로 찍힌다 (KYOJIN_SHOT=1 이면 `1_clean.png` —
+# 앞에 붙는 값이 달라지므로 이름을 박지 않고 찾는다). 그게 있으면 그걸 쓰고,
+# 없으면 여기 넣어 둔 `bg_clean.png`로 돌린다 — **게임을 안 돌려도 캡슐이
+# 나오게** 하려는 것이다 (파이썬만 있으면 되는 편이 손이 덜 간다).
+# 화면이 바뀌었으면 게임을 한 번 돌려 새로 찍는 쪽이 낫다.
+_shots = sorted(glob.glob(os.path.join(GAME, '*_clean.png')))
+BG_SHOT = _shots[0] if _shots else os.path.join(REF, 'bg_clean.png')
+if not os.path.exists(BG_SHOT):
+    sys.exit("""바탕 그림이 없다 (brand/bg_clean.png 도, game/*_clean.png 도).
+게임을 한 번 돌려 찍는다:
+
+  윈도우 (PowerShell)
+    cd %s
+    $env:KYOJIN_SHOT = "1"
+    & "C:\\경로\\Godot_v4.4-stable_win64.exe" --path .
+
+  리눅스·맥
+    cd %s
+    KYOJIN_SHOT=1 godot --path .
+""" % (GAME, GAME))
 
 CREAM = (247, 238, 214)
 INK = (46, 34, 26)

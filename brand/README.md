@@ -4,14 +4,32 @@
 화면이 바뀔 때마다 다시 돌리면 되고, 17MB를 저장소에 넣을 이유가 없다.
 
 ```
-KYOJIN_SHOT=1 godot --path game        # 스크린샷 60여 장 (1_clean.png 포함)
 cd brand
-python3 make_key_art.py                # 제목 얹은 캡슐·배너 (이쪽을 쓴다)
-node make_brand.js                     # 제목 없이 화면만 오려 낸 것
+python -m pip install Pillow      # 처음 한 번
+python make_key_art.py            # -> brand/out/
 ```
 
-`make_key_art.py`가 **바탕 + 캐릭터 + 제목**을 조립한다. `make_brand.js`는
-화면을 오리기만 하는 옛 방식이라, 스크린샷 다섯 장 뽑을 때만 쓴다.
+**윈도우에서는 `python3`이 아니라 `python`이다.** 윈도우의 `python3`은
+마이크로소프트 스토어 안내 스텁이라, 파이썬이 깔려 있어도 아무것도 안 하고
+끝난다 (화면에 「Python」만 찍힌다). 리눅스·맥은 `python3`.
+
+바탕 그림(`bg_clean.png`)을 같이 넣어 뒀으니 **게임을 안 돌려도 나온다.**
+화면이 바뀌었으면 새로 찍는 쪽이 낫다:
+
+```
+# 윈도우 (PowerShell) — 환경변수 문법이 다르다
+cd ..\game
+$env:KYOJIN_SHOT = "1"
+& "C:\경로\Godot_v4.4-stable_win64.exe" --path .
+
+# 리눅스·맥
+cd ../game && KYOJIN_SHOT=1 godot --path .
+```
+
+`game/*_clean.png`이 있으면 그걸 먼저 쓴다.
+
+`make_brand.js`(node + pngjs)는 화면을 오리기만 하는 옛 방식이라,
+상점 스크린샷 다섯 장 뽑을 때만 쓴다.
 
 ## 키 아트를 어떻게 짜는가
 
