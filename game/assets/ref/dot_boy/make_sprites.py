@@ -62,6 +62,10 @@ BOB = [0, 2, 1, 1, 2]
 # 내려** 다리를 줄인다 — 머리·몸통 크기는 그대로 두고 다리만 14행에서
 # 11행이 된다. 머리가 커 보이는 쪽이 이 그림체에 맞는다.
 BODY_DROP = 3            # 예전 자리에서 내려온 칸 수 (다리가 그만큼 짧아진다)
+# 겨드랑이 — 팔과 몸이 갈라지는 줄 (셔츠 윗줄에서 몇 칸 아래인가).
+# 어깨 바로 밑에서 갈라지면 팔이 목에 붙은 것처럼 보인다. 두 칸쯤 더
+# 내려 어깨-윗팔을 한 덩어리로 두면 어깨가 넓어 보이고 자세가 편안해진다.
+ARMPIT = 4
 HEAD_Y = 2 + BODY_DROP   # 머리 꼭대기 (두상 16행)
 SHIRT_Y = 19 + BODY_DROP # 셔츠 위 (목은 그 한 행 위)
 HIP_Y = 31 + BODY_DROP   # 바지 위 (엉덩이 띠 3행)
@@ -282,8 +286,8 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.hline(10 + dx, 21 + dx, y + 11, 'B')       # 아랫단 그늘
     g.rect(11 + dx, y, 12 + dx, y + 4, 'L')      # 빛 받는 왼쪽 어깨
     g.vline(11 + dx, y + 5, y + 10, 'L')
-    g.vline(10 + dx, y + 2, y + 10, 'B')         # 팔과 몸 사이 솔기 —
-    g.vline(21 + dx, y + 2, y + 10, 'B')         # 어깨 아래부터만 (어깨는 한 덩어리)
+    g.vline(10 + dx, y + ARMPIT, y + 10, 'B')    # 팔과 몸 사이 솔기 —
+    g.vline(21 + dx, y + ARMPIT, y + 10, 'B')    # 겨드랑이부터만 (어깨는 한 덩어리)
     g.hline(13 + dx, 18 + dx, y, 'B')            # 옷깃 (목 아래 그늘)
     g.hline(8 + dx, 9 + dx, y, 'L')              # 어깨 캡 — 몸통 윗줄이 팔 위로
     g.hline(22 + dx, 23 + dx, y, 'b')            # 흘러내려 승모근 경사를 만든다
@@ -304,10 +308,10 @@ def torso_down(g, bob, swing, dx=0, skip=None):
             # 몸판(10~21)에서 캡(8~9)만 혹처럼 튀어나오고, 그 밑이 파였다가
             # 휘두르는 팔에서 다시 불거져 실루엣이 층진다.
             if side == 'left':
-                g.rect(8 + dx, y + 1, 9 + dx, y + 2, 'b')
+                g.rect(8 + dx, y + 1, 9 + dx, y + ARMPIT - 1, 'b')
                 g.px(8 + dx, y + 1, 'L')
             else:
-                g.rect(22 + dx, y + 1, 23 + dx, y + 2, 'b')
+                g.rect(22 + dx, y + 1, 23 + dx, y + ARMPIT - 1, 'b')
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
@@ -410,8 +414,8 @@ def _side_arm(g, c, y, sw, near):
         for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
                 continue
-            if ny < yy and yy == y + 1:
-                continue                       # 어깨에 닿는 윗변은 열어 둔다
+            if ny < yy and yy < y + ARMPIT:
+                continue                       # 겨드랑이 위는 어깨와 한 덩어리다
             if g.d[ny][nx] != '.':             # (팔이 몸에 이어 붙는다)
                 g.d[ny][nx] = 'O'
     for (x, yy), cc in cells.items():
@@ -514,8 +518,8 @@ def torso_up(g, bob, swing, dx=0, skip=None):
     g.hline(10 + dx, 21 + dx, y + 11, 'B')
     g.rect(11 + dx, y + 1, 12 + dx, y + 4, 'L')
     g.vline(11 + dx, y + 5, y + 10, 'L')
-    g.vline(10 + dx, y + 2, y + 10, 'B')         # 팔과 몸 사이 솔기 —
-    g.vline(21 + dx, y + 2, y + 10, 'B')         # 어깨 아래부터만
+    g.vline(10 + dx, y + ARMPIT, y + 10, 'B')    # 팔과 몸 사이 솔기 —
+    g.vline(21 + dx, y + ARMPIT, y + 10, 'B')    # 겨드랑이부터만
     g.hline(13 + dx, 18 + dx, y + 6, 'B')        # 등판 주름
     g.hline(8 + dx, 9 + dx, y, 'L')              # 어깨 캡 (승모근 경사)
     g.hline(22 + dx, 23 + dx, y, 'b')
