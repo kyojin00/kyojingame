@@ -3388,6 +3388,8 @@ const ITEMS := {
 	"arrow": {"name": "화살", "sell": 15},
 	"forage_coral": {"name": "산호 조각", "sell": 260},
 	"forage_herb": {"name": "약초", "sell": 60},
+	# 산자락 풀밭에 피는 노란 꽃 — 씨앗이 바람에 날린다
+	"forage_dandelion": {"name": "민들레", "sell": 45},
 	"bug_butterfly": {"name": "나비", "sell": 30},
 	"bug_dragonfly": {"name": "잠자리", "sell": 50},
 	"bug_firefly": {"name": "반딧불이", "sell": 90},
@@ -3433,7 +3435,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"water_life", "relic_hat", "relic_watch",
 	"relic_bracelet", "relic_ring", "relic_necklace", "grandpa_seed",
 	"settle_letter", "farewell_letter",
-	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
+	"forage_berry", "forage_herb", "forage_dandelion", "weed", "broom",
+	"forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
 	"housing_kit", "move_letter", "old_book", "trash_bin", "storage_box",
 	"arrow", "dish_coral_tea",
@@ -3449,7 +3452,7 @@ func weed_drop_id() -> String:
 	return "forage_herb" if randf() < 0.01 else "weed"
 
 
-const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
+const FORAGE_IDS := ["forage_berry", "forage_herb", "forage_dandelion", "weed",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
 	# 잡초는 화분 재료 · 조개/비닐봉지/유리/금속 고리는 해변(바다 해금 후)
@@ -3702,6 +3705,7 @@ const REAGENTS := {
 	# 채집물 · 곤충
 	"forage_berry": {"life": 1, "water": 1},
 	"forage_herb": {"life": 2, "earth": 1},
+	"forage_dandelion": {"life": 1, "light": 1},
 	"forage_shell": {"water": 2},
 	"forage_coral": {"water": 2, "life": 1},
 	"bug_butterfly": {"light": 1, "life": 1},
@@ -5882,6 +5886,8 @@ func reset_all() -> void:
 #   place  모이는 곳 ("plaza" / "pier") — NPC 일과가 이날은 여기로 덮인다
 #   goal   무엇을 하면 되는가 (참가 방식은 축제마다 다르다)
 # 새 축제를 넣을 때는 이 표에 한 줄만 더하면 된다.
+# 계절 축제는 **두 해째부터** 열린다 (첫 한 해는 조용히 지나간다)
+const FEST_FIRST_YEAR := 2
 const FEST_START := 9.0 * 60.0    # 9시 시작
 const FEST_END := 18.0 * 60.0     # 18시 종료
 const FESTIVALS := {
@@ -5915,7 +5921,23 @@ var fest_done := false       # 오늘 축제를 끝냈는가
 var fest_history: Array = [] # 지금까지 참가한 축제 id
 
 
+# 며칠째가 몇 년째인가 (1년 = 사계절)
+func year_of_day(d: int) -> int:
+	return (d - 1) / (DAYS_PER_SEASON * 4) + 1
+
+
+# 계절 축제가 열리는 해인가.
+#
+# **첫 한 해(사계절 한 바퀴)에는 축제가 하나도 열리지 않는다.**
+# 마을이 아직 축제를 치를 만큼 여물지 않았다는 설정이자, 첫 해를
+# 살림 꾸리기에만 집중하게 하려는 장치다. 두 해째 봄부터 정상으로 돌아온다.
+func fest_year_ok(d: int = -1) -> bool:
+	return year_of_day(day if d < 0 else d) >= FEST_FIRST_YEAR
+
+
 func festival_of_day(d: int) -> Dictionary:
+	if not fest_year_ok(d):
+		return {}          # 첫 해에는 어떤 축제도 열리지 않는다
 	var f: Dictionary = FESTIVALS.get(season_of_day(d), {})
 	if f.is_empty() or (d - 1) % DAYS_PER_SEASON + 1 != int(f.day):
 		return {}

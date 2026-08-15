@@ -866,7 +866,9 @@ func _item_entries() -> Array:
 		var e := {"tab": "res", "name": str(idef.name), "count": n2,
 			"sell": int(idef.get("sell", 0)),
 			"tip": "%s x%d" % [idef.name, n2]}
-		for cand in [id, id + "_0", "forage_" + id]:
+		# 가방 아이콘이 따로 있으면 그걸 먼저 쓴다 (필드 그림과 다를 수 있다 —
+		# 민들레는 들판에서는 한 포기, 가방에서는 꺾은 한 송이다)
+		for cand in ["icon_" + id, id, id + "_0", "forage_" + id]:
 			if main.tex.has(cand):
 				e["icon"] = cand
 				break

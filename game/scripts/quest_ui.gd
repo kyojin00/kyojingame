@@ -399,6 +399,11 @@ func _build_fest_detail() -> void:
 		else:
 			_line(detail_box, "  이장에게 「축제 이야기」로 진행한다.", COL_SUB)
 	_line(detail_box, "")
+	if not GameData.fest_year_ok():
+		_line(detail_box, "올해는 축제가 없다 — 마을이 아직 잔치를 벌일 형편이 아니다.",
+			COL_SUB)
+		_line(detail_box, "다음 해 봄부터 계절마다 한 번씩 열린다.", COL_DIM)
+		return
 	for sid in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
 		var f3: Dictionary = GameData.FESTIVALS[sid]
 		var seen: bool = GameData.fest_history.has(str(f3.id))

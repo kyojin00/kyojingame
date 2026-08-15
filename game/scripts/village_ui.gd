@@ -719,7 +719,10 @@ func _open_hall_notice_dialog() -> void:
 	var body := "— %s %d일, 주민 %d명 —\n\n" \
 		% [GameData.season_name(), GameData.day_in_season(), m.village_residents()]
 	# 축제·행사 일정은 마을이 첫 축제를 치러야 정식으로 걸린다 (메인 스토리 14)
-	if GameData.hall_calendar_open():
+	if not GameData.fest_year_ok():
+		# 첫 한 해는 축제를 열지 않는다 — 일정 대신 그 사정을 적어 둔다
+		body += "[축제·행사 일정]\n· 올해는 축제가 없다. 마을을 추스르는 해다.\n"
+	elif GameData.hall_calendar_open():
 		body += "[축제·행사 일정]\n"
 		for s in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
 			var f: Dictionary = GameData.FESTIVALS[s]

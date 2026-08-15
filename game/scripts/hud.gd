@@ -145,7 +145,9 @@ func _refresh_hunger() -> void:
 const MM_TX := 31          # 가로로 보이는 타일 수 (플레이어가 한가운데)
 const MM_TY := 21
 const MM_CELL := 5.0
-const MM_FOG := Color(0.05, 0.05, 0.08)
+const MM_FOG := Color(0.13, 0.14, 0.19)        # 먹구름 그늘 (M 지도와 같은 팔레트)
+const MM_CLOUD_MID := Color(0.21, 0.22, 0.28)
+const MM_CLOUD_TOP := Color(0.29, 0.30, 0.37)
 
 var minimap_panel: Panel
 var minimap: Control
@@ -184,18 +186,43 @@ func _minimap_color(x: int, y: int) -> Color:
 	return Color(0.32, 0.52, 0.27)
 
 
+# 미니맵의 먹구름 — 큰 지도와 같은 규칙(칸 좌표로 정해지는 덩어리)
+func _draw_mm_clouds(x0: int, y0: int) -> void:
+	for ty in MM_TY:
+		for tx in MM_TX:
+			var x: int = x0 + tx
+			var y: int = y0 + ty
+			var out: bool = x < 0 or y < 0 or x >= main.MAP_W or y >= main.MAP_H
+			if not out and main.map_ui._visible_tile(x, y):
+				continue
+			if tx % 2 != 0 or ty % 2 != 0:
+				continue
+			var rx: float = float(main.map_ui._cloud_rand(x, y, 1))
+			var ry: float = float(main.map_ui._cloud_rand(x, y, 2))
+			var rs: float = float(main.map_ui._cloud_rand(x, y, 3))
+			var c := Vector2((tx + 1.0 + (rx - 0.5)) * MM_CELL,
+				(ty + 1.0 + (ry - 0.5)) * MM_CELL)
+			var r1: float = MM_CELL * (1.5 + rs * 0.7)
+			minimap.draw_circle(c, r1, MM_FOG.lerp(MM_CLOUD_MID, 0.45 + rs * 0.55))
+			if rs > 0.35:
+				minimap.draw_circle(c - Vector2(0.0, MM_CELL * 0.5),
+					r1 * 0.4, MM_CLOUD_MID.lerp(MM_CLOUD_TOP, 0.5))
+
+
 func _draw_minimap() -> void:
 	var pt: Vector2i = main.player_tile()
 	var x0: int = pt.x - MM_TX / 2
 	var y0: int = pt.y - MM_TY / 2
 	minimap.draw_rect(Rect2(Vector2.ZERO, minimap.size), MM_FOG)
+	# 아직 가 보지 않은 곳은 먹구름이 덮는다 (M 지도와 같은 그림)
+	_draw_mm_clouds(x0, y0)
 
 	for ty in MM_TY:
 		for tx in MM_TX:
 			var x: int = x0 + tx
 			var y: int = y0 + ty
 			if x < 0 or y < 0 or x >= main.MAP_W or y >= main.MAP_H:
-				continue  # 맵 밖은 안개색 그대로
+				continue  # 맵 밖은 구름 그대로
 			if not main.map_ui._visible_tile(x, y):
 				continue
 			var r := Rect2(tx * MM_CELL, ty * MM_CELL, MM_CELL, MM_CELL)

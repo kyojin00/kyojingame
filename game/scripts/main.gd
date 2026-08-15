@@ -168,6 +168,9 @@ const TEXTURE_NAMES := [
 	"icon_letter", "old_book",
 	# 제작 재료·결과물 그림 — 제작대(책상) 창이 글자 대신 이 그림으로 말한다
 	"nail", "cloth", "broom",
+	# 민들레는 필드 그림(forage_dandelion, FORAGE_IDS로 자동 로드)과
+	# 가방 아이콘 그림이 서로 다르다
+	"icon_forage_dandelion",
 	"npc_librarian_down_0", "npc_librarian_down_1", "npc_librarian_up_0",
 	"npc_librarian_up_1", "npc_librarian_side_0", "npc_librarian_side_1",
 	"npc_librarian_portrait_normal", "npc_librarian_portrait_happy",
@@ -334,6 +337,8 @@ const FISH_YARD_X0 := 44
 const FISH_YARD_X1 := 54
 const FISH_SIGN := Vector2i(43, 35)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
+# 북쪽 산자락 — 이 줄 위쪽의 풀밭에는 민들레가 돋는다 (산에서 캐는 채집물)
+const MOUNTAIN_Y := 14
 const SEA_RIDGE_Y := 77            # 바위 능선 줄 — 바다로 가는 길을 막는다
 const BEACH_Y0 := 78               # 모래사장 (능선 아래 ~ 바다 위)
 const SEA_Y0 := 83                 # 여기부터 남쪽 끝까지 바다

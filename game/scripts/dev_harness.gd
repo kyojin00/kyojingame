@@ -24,6 +24,7 @@ var m: KyojinMain    # main.gd
 var _shot_frames := 0
 var _saved_pos := Vector2.ZERO   # 화면용으로 잠깐 옮겨 둔 플레이어 자리
 var _desk_keep: Array = []       # 제작대 화면을 찍는 동안 맡아 두는 레시피 목록
+var _fog_keep: Dictionary = {}   # 먹구름 화면을 찍는 동안 맡아 두는 탐사 기록
 
 
 # ---- 검증 시퀀스 ----
@@ -302,11 +303,19 @@ func _debug_tick() -> void:
 		307: _save_shot("_gear.png")
 		308: m.inventory_ui.close()
 		310:
-			# 계절 축제: 봄 꽃놀이 날로 옮겨 장식·모임·진행을 확인
+			# 계절 축제: 봄 꽃놀이 날로 옮겨 장식·모임·진행을 확인.
+			# **첫 해에는 축제가 열리지 않는다** — 그것부터 확인하고,
+			# 두 해째 같은 날로 넘어가 실제 축제를 본다.
 			GameData.day = 14
 			GameData.minutes = 11.0 * 60.0
 			GameData.reset_festival_state()
+			var year1_quiet: bool = GameData.festival_today().is_empty() \
+				and not GameData.festival_open() and not GameData.fest_year_ok()
+			GameData.day = GameData.DAYS_PER_SEASON * 4 + 14   # 두 해째 봄 14일
+			GameData.reset_festival_state()
 			var ft: Dictionary = GameData.festival_today()
+			print("FEST_YEAR1_OK=", year1_quiet,
+				" 첫해조용=", year1_quiet, " 두해째=", ft.get("name", "없음"))
 			print("FESTIVAL_TODAY=", ft.get("name", "없음"),
 				" open=", GameData.festival_open(),
 				" npc_place=", m.npcmgr.npc_place_now("merchant"))
@@ -3608,6 +3617,114 @@ func _debug_tick() -> void:
 				" 상점후보지=", spot_ok, " 다지으면사라짐=", spot_gone,
 				" 요리별배부름=", fill_all and fill_diff, " 먹기반영=", eat_ok,
 				"(밥 ", rice, " · 차 ", tea, ")")
+		294:
+			# #144: 첫 해 축제 없음 · 미탐사 먹구름 · 민들레(필드/가방)
+			m.dialog.close()
+			m.map_ui.close()
+
+			# ── ① 계절 축제는 첫 한 해 동안 하나도 열리지 않는다
+			var k_day4 := GameData.day
+			var year_days: int = GameData.DAYS_PER_SEASON * 4
+			var fest1 := 0
+			for d in range(1, year_days + 1):
+				if not GameData.festival_of_day(d).is_empty():
+					fest1 += 1
+			var fest2 := 0
+			for d2 in range(year_days + 1, year_days * 2 + 1):
+				if not GameData.festival_of_day(d2).is_empty():
+					fest2 += 1
+			GameData.day = 14                     # 첫 해 봄 14일 = 옛 꽃놀이 날
+			GameData.minutes = 11.0 * 60.0
+			GameData.reset_festival_state()
+			var quiet_ok: bool = GameData.festival_today().is_empty() \
+				and not GameData.festival_open() and GameData.festival_line() == "" \
+				and not GameData.fest_year_ok()
+			GameData.day = year_days + 14         # 두 해째 같은 날
+			GameData.reset_festival_state()
+			var year2_ok: bool = not GameData.festival_today().is_empty() \
+				and GameData.fest_year_ok()
+			GameData.day = k_day4
+			GameData.reset_festival_state()
+			var fest_ok: bool = fest1 == 0 and fest2 == 4 and quiet_ok and year2_ok
+
+			# ── ② 미탐사 지역은 먹구름이 덮는다 (검은 단색이 아니다)
+			_fog_keep = GameData.explored.duplicate()
+			GameData.explored = {}
+			var hidden: bool = not m.map_ui._visible_tile(2, 2)
+			var r_a: float = m.map_ui._cloud_rand(5, 7, 1)
+			var r_b: float = m.map_ui._cloud_rand(5, 7, 1)
+			var r_c: float = m.map_ui._cloud_rand(6, 7, 1)
+			var fogc: Color = m.map_ui.FOG
+			var cloud: Color = m.map_ui.CLOUD_MID
+			var cloud_ok: bool = hidden \
+				and is_equal_approx(r_a, r_b) and not is_equal_approx(r_a, r_c) \
+				and r_a >= 0.0 and r_a <= 1.0 \
+				and fogc.a >= 1.0 and cloud.a >= 1.0 \
+				and fogc.v > 0.08 and cloud.v > fogc.v      # 구름이 바탕보다 밝다
+			m.map_ui.open()                       # 화면은 다음 단계(295)에서 찍는다
+
+			# ── ③ 민들레 — 산자락에 피고, 가방 아이콘은 따로다
+			var fld: Texture2D = m.tex.get("forage_dandelion")
+			var ico: Texture2D = m.tex.get("icon_forage_dandelion")
+			var art_ok: bool = fld != null and ico != null and fld != ico \
+				and fld.get_width() == 64 and ico.get_width() == 32 \
+				and str(GameData.ITEMS["forage_dandelion"].name) == "민들레" \
+				and "forage_dandelion" in GameData.FORAGE_IDS \
+				and "forage_dandelion" in GameData.ITEM_IDS
+			# 산자락에서만 돋는다 — 몇 번 돌려 보고 자리를 확인한다
+			for pos0 in m.objects.keys():
+				if String(m.objects[pos0].kind) == "forage_dandelion":
+					m.objnode._remove_object(pos0)
+			var dan_seen := 0
+			var dan_low := 0
+			for i in 120:
+				# 다른 채집물이 상한을 채우면 새로 돋지 않는다 — 매번 비워 준다
+				for p0 in m.objects.keys():
+					var k0 := String(m.objects[p0].kind)
+					if k0.begins_with("forage_") and k0 != "forage_dandelion":
+						m.objnode._remove_object(p0)
+				m.worldgen._respawn_forage()
+			for pos1 in m.objects:
+				if String(m.objects[pos1].kind) == "forage_dandelion":
+					dan_seen += 1
+					if pos1.y > m.MOUNTAIN_Y:
+						dan_low += 1
+			var spawn_ok: bool = dan_seen > 0 and dan_low == 0
+			# 주우면 가방에 들어가고 도감에 오른다
+			var k_dan := int(GameData.items["forage_dandelion"])
+			var dpos := Vector2i(-1, -1)
+			for pos2 in m.objects:
+				if String(m.objects[pos2].kind) == "forage_dandelion":
+					dpos = pos2
+					break
+			var pick_ok := false
+			if dpos.x >= 0:
+				_saved_pos = m.player.position
+				m.player.position = Vector2(dpos.x * m.TILE + 16, (dpos.y + 1) * m.TILE + 16)
+				m._target_override = dpos
+				m.actions.interact()
+				m._target_override = Vector2i(-999, -999)
+				m.player.position = _saved_pos
+				pick_ok = int(GameData.items["forage_dandelion"]) > k_dan \
+					and GameData.discovered.has("forage_dandelion")
+			# 가방 아이콘은 「icon_」 그림을 쓴다 (필드 그림과 다르다)
+			var bag_icon := ""
+			for e: Dictionary in m.inventory_ui._item_entries():
+				if str(e.get("name", "")) == "민들레":
+					bag_icon = str(e.get("icon", ""))
+			GameData.items["forage_dandelion"] = k_dan
+			m.hud._toast_queue.clear()
+			print("SEASONFOG_OK=", fest_ok and cloud_ok and art_ok and spawn_ok
+				and pick_ok and bag_icon == "icon_forage_dandelion",
+				" 첫해축제0=", fest1 == 0, " 두해째4회=", fest2 == 4,
+				" 축제안열림=", quiet_ok, " 두해째열림=", year2_ok,
+				" 먹구름=", cloud_ok, " 민들레아트=", art_ok,
+				" 산자락스폰=", spawn_ok, "(", dan_seen, "포기)",
+				" 채집=", pick_ok, " 가방아이콘=", bag_icon)
+		295:
+			_save_shot("_mapfog.png")             # 먹구름이 덮인 지도
+			m.map_ui.close()
+			GameData.explored = _fog_keep
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

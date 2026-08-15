@@ -1,5 +1,6 @@
 # 지도 (M): 실제로 가 본 지역만 보여준다 (fog of war).
-# 미탐사/미해금 지역은 검은색으로 가려지고, 탐사할수록 하나씩 공개된다.
+# 아직 가 보지 않은 곳은 **먹구름**이 덮고 있고, 탐사할수록 걷힌다.
+# (예전에는 검은 단색이었다 — 「고장 난 화면」처럼 보여서 구름으로 바꿨다)
 #
 # 조작: 마우스 휠 = 확대/축소 (커서 기준) · 끌기 = 이동 · R = 처음 크기로
 extends CanvasLayer
@@ -7,7 +8,10 @@ extends CanvasLayer
 # 배율 1 = 맵 전체가 화면에 딱 들어오는 크기. 맵이 커져도 알아서 맞는다.
 func _base_cell() -> float:
 	return minf(920.0 / float(main.MAP_W), 496.0 / float(main.MAP_H))
-const FOG := Color(0.02, 0.02, 0.035)
+# 먹구름 — 바탕 한 겹 + 뭉게뭉게 두 겹. 전부 불투명이라 밑은 보이지 않는다.
+const FOG := Color(0.13, 0.14, 0.19)          # 구름 그늘 (바탕)
+const CLOUD_MID := Color(0.21, 0.22, 0.28)    # 구름 덩어리
+const CLOUD_TOP := Color(0.29, 0.30, 0.37)    # 구름의 밝은 쪽 (빛 받는 면)
 const ZOOM_MIN := 0.7
 const ZOOM_MAX := 5.0
 const ZOOM_STEP := 1.2
@@ -196,12 +200,14 @@ func _draw_map() -> void:
 	var y0: int = maxi(0, int(floor(-_oy / _cell)))
 	var y1: int = mini(main.MAP_H, int(ceil((540.0 - _oy) / _cell)) + 1)
 
-	# 지형 (미탐사/미해금은 검은색)
+	# 지형 (미탐사/미해금은 먹구름이 덮는다 — 아래 2단계에서 뭉게구름을 얹는다)
+	var fogged: Array = []
 	for y in range(y0, y1):
 		for x in range(x0, x1):
 			var r := Rect2(_ox + x * _cell, _oy + y * _cell, _cell + 0.5, _cell + 0.5)
 			if not _visible_tile(x, y):
 				canvas.draw_rect(r, FOG)
+				fogged.append(Vector2i(x, y))
 				continue
 			var cell: Dictionary = main.grid[y][x]
 			var c: Color
@@ -296,6 +302,9 @@ func _draw_map() -> void:
 			_label(Vector2(pr.get_center().x - 40.0, pr.get_center().y),
 				str(GameData.VILLAGE_ZONES[zid].name) + (" (잠김)" if locked else ""))
 
+	# 먹구름 뭉치 — 가려진 칸 위로 둥근 덩어리를 얹어 「구름에 덮인」 모양을 낸다
+	_draw_clouds(fogged)
+
 	# 건설 후보지 — 지금 세울 수 있는 건물 터를 먼저 찍는다 (퀘스트 마커 아래)
 	for g: Dictionary in build_spots():
 		_draw_guide(g)
@@ -388,6 +397,40 @@ func _quest_spot(qid: String) -> Vector2i:
 			if GameData.tutorial_current_flag() == "cook":
 				return main.HOME_ANCHOR + Vector2i(2, 3)
 	return Vector2i(-1, -1)
+
+
+# ---- 먹구름 (미탐사 지역) ----
+#
+# 검은 단색은 「아직 안 가 봤다」가 아니라 「화면이 깨졌다」처럼 보인다.
+# 그래서 가려진 칸 위에 둥근 구름 덩어리를 얹는다. 자리는 칸 좌표로
+# 정해지므로 다시 열어도 같은 모양이고(깜빡이지 않는다), 아주 느리게
+# 흘러가 살아 있는 하늘처럼 보인다. **전부 불투명이라 밑은 안 비친다.**
+func _cloud_rand(x: int, y: int, salt: int) -> float:
+	var h := float(sin(float(x) * 12.9898 + float(y) * 78.233 + float(salt) * 37.719) * 43758.5453)
+	return h - floor(h)
+
+
+func _draw_clouds(fogged: Array) -> void:
+	var drift := blink * 0.12          # 아주 느린 흐름
+	for t: Vector2i in fogged:
+		# 두 칸마다 한 덩어리 — 큼직하게 겹쳐 놓아야 「구름」으로 보인다
+		# (칸마다 하나씩 찍으면 크기가 고르게 나와 물방울무늬가 된다)
+		if t.x % 2 != 0 or t.y % 2 != 0:
+			continue
+		var rx := _cloud_rand(t.x, t.y, 1)
+		var ry := _cloud_rand(t.x, t.y, 2)
+		var rs := _cloud_rand(t.x, t.y, 3)
+		var c := Vector2(_ox + (float(t.x) + 1.0 + (rx - 0.5) * 1.1) * _cell,
+			_oy + (float(t.y) + 1.0 + (ry - 0.5) * 1.1) * _cell)
+		var wob := sin(drift + float(t.x) * 0.7 + float(t.y) * 0.4) * _cell * 0.25
+		# 덩어리마다 밝기가 조금씩 달라 층이 진 하늘처럼 보인다
+		var body := FOG.lerp(CLOUD_MID, 0.45 + rs * 0.55)
+		var r1 := _cell * (1.5 + rs * 0.75)
+		canvas.draw_circle(c + Vector2(wob, 0.0), r1, body)
+		# 빛을 받는 윗면 — 살짝 위로 올려 그린다
+		if rs > 0.35:
+			canvas.draw_circle(c + Vector2(wob * 0.6, -_cell * (0.5 + rx * 0.3)),
+				r1 * (0.34 + rx * 0.22), CLOUD_MID.lerp(CLOUD_TOP, 0.4 + ry * 0.6))
 
 
 # 지금 세울 수 있는 건물 터 — 「어디에 지어야 하지?」를 지도가 대신 말한다.

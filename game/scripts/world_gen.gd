@@ -645,10 +645,15 @@ func _respawn_forage() -> void:
 			continue
 		if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
 			continue
-		# 산딸기 절반 · 약초 셋 중 하나 · 잡초 나머지 (화분 재료라 흔하게)
+		# 산딸기 절반 · 약초 셋 중 하나 · 잡초 나머지 (화분 재료라 흔하게).
+		# 다만 **북쪽 산자락**(MOUNTAIN_Y 위)에서는 민들레가 절반쯤 돋는다 —
+		# 산에서만 볼 수 있는 노란 꽃이다.
 		var roll := randf()
 		var kind := "forage_berry" if roll < 0.5 \
 			else ("forage_herb" if roll < 0.8 else "weed")
+		if pos.y <= m.MOUNTAIN_Y:
+			kind = "forage_dandelion" if roll < 0.5 \
+				else ("forage_herb" if roll < 0.7 else "weed")
 		m.objnode._place_object(pos, kind, 0)
 		count += 1
 
