@@ -66,6 +66,11 @@ BODY_DROP = 3            # 예전 자리에서 내려온 칸 수 (다리가 그�
 # 어깨 바로 밑에서 갈라지면 팔이 목에 붙은 것처럼 보인다. 두 칸쯤 더
 # 내려 어깨-윗팔을 한 덩어리로 두면 어깨가 넓어 보이고 자세가 편안해진다.
 ARMPIT = 4
+# 목 길이 — 머리와 셔츠 사이에 몇 줄을 둘까.
+# 1이면 머리가 어깨에 바로 얹혀 목이 없는 인형처럼 보인다. 목이 보여야
+# 머리가 「몸 위에 얹힌 것」이 되고, 걸을 때 머리가 따로 흔들려 보인다.
+# 셔츠 자리는 그대로 두고 **머리를 그만큼 위로 올려** 자리를 낸다.
+NECK_H = 3
 HEAD_Y = 2 + BODY_DROP   # 머리 꼭대기 (두상 16행)
 SHIRT_Y = 19 + BODY_DROP # 셔츠 위 (목은 그 한 행 위)
 HIP_Y = 31 + BODY_DROP   # 바지 위 (엉덩이 띠 3행)
@@ -331,10 +336,12 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     """앞모습 몸통+팔. swing: 화면 왼쪽 팔이 앞으로 나간 양 -3..+3
     dx: 휘두르기용 좌우 쏠림. skip: 'left'/'right' 팔을 안 그린다 (휘두르는 팔)"""
     y = SHIRT_Y + bob
-    # 목 — 6칸에서 4칸으로. 턱(8칸)과 목이 두 칸밖에 차이가 안 나서
-    # 턱선이 안 보이고 「턱 없이 목이 굵은」 얼굴이 됐다.
-    # 게다가 목은 턱 밑 그늘에 들어가는 자리라 그늘색으로 둔다.
-    g.rect(14 + dx, y - 1, 17 + dx, y - 1, 'S')  # 목
+    # 목 — 4칸 폭에 NECK_H줄. 턱(8칸)보다 확실히 가늘어야 턱선이 산다.
+    # 턱 바로 밑은 그늘(S)이 짙게 앉고, 아래로 갈수록 살결(s)이 나온다 —
+    # 원통이 빛을 받는 모양이라, 이 두 단이 있어야 목이 기둥으로 보인다.
+    g.rect(14 + dx, y - NECK_H, 17 + dx, y - 1, 's')
+    g.hline(14 + dx, 17 + dx, y - NECK_H, 'S')   # 턱 밑 그림자
+    g.vline(17 + dx, y - NECK_H, y - 1, 'S')     # 오른쪽(빛 반대편) 그늘
     g.rect(10 + dx, y, 21 + dx, y + 11, 'b')     # 몸판
     g.hline(10 + dx, 21 + dx, y + 11, 'B')       # 아랫단 그늘
     g.rect(11 + dx, y, 12 + dx, y + 4, 'L')      # 빛 받는 왼쪽 어깨
@@ -488,7 +495,9 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
     sw = -(swing + (1 if swing > 0 else -1 if swing < 0 else 0))
     if draw_arm:
         _side_arm(g, c, y, -sw, False)         # 저편 팔 — 반대 위상, 몸 뒤에
-    g.rect(c - 1, y - 1, c + 2, y - 1, 's')    # 목
+    g.rect(c - 1, y - NECK_H, c + 2, y - 1, 's')   # 목
+    g.hline(c - 1, c + 2, y - NECK_H, 'S')         # 턱 밑 그림자
+    g.vline(c - 1, y - NECK_H, y - 1, 'S')         # 뒷목은 그늘
     g.rect(c - 4, y, c + 5, y + 11, 'b')
     g.hline(c - 4, c + 5, y + 11, 'B')
     g.vline(c + 5, y, y + 10, 'L')             # 앞면이 밝다
@@ -605,7 +614,7 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
 
 def torso_up(g, bob, swing, dx=0, skip=None):
     y = SHIRT_Y + bob
-    g.rect(14 + dx, y - 1, 17 + dx, y - 1, 'S')  # 목덜미 (앞모습과 같은 굵기)
+    g.rect(14 + dx, y - NECK_H, 17 + dx, y - 1, 'S')  # 목덜미 (앞모습과 같은 굵기)
     g.rect(10 + dx, y, 21 + dx, y + 11, 'b')
     g.hline(10 + dx, 21 + dx, y, 'B')            # 어깨 그늘
     g.hline(10 + dx, 21 + dx, y + 11, 'B')
@@ -788,20 +797,22 @@ for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
 
 
 def head(g, art, bob, lean=0):
-    # 한 줄 깎은 만큼 한 줄 내려 붙인다 — 턱이 제자리에 있어야 목과 안 벌어진다
-    g.blit(shrink_head(art), HEAD_X + lean, HEAD_Y + 1 + bob)
+    # 두상을 한 줄 깎은 만큼 한 줄 내리고, 목을 낸 만큼 다시 올린다.
+    # 턱이 목 바로 위에 놓여야 머리와 몸이 안 벌어진다.
+    top = HEAD_Y + 2 - NECK_H + bob
+    g.blit(shrink_head(art), HEAD_X + lean, top)
     # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
     if any(art is a for a in EARS_DOWN):             # 눈높이 양옆에 볼록 한 칸
         for ex in (HEAD_X - 1, HEAD_X + 14):
-            g.px(ex + lean, HEAD_Y + 9 + bob, 's')
-            g.px(ex + lean, HEAD_Y + 10 + bob, 'S')
+            g.px(ex + lean, top + 8, 's')
+            g.px(ex + lean, top + 9, 'S')
     elif any(art is a for a in EARS_SIDE):           # 옆모습은 귓바퀴 모양
-        g.px(12 + lean, HEAD_Y + 9 + bob, 'S')
-        g.px(13 + lean, HEAD_Y + 9 + bob, 'S')
-        g.px(12 + lean, HEAD_Y + 10 + bob, 'S')
-        g.px(13 + lean, HEAD_Y + 10 + bob, 's')
-        g.px(12 + lean, HEAD_Y + 11 + bob, 'S')
-        g.px(13 + lean, HEAD_Y + 11 + bob, 'S')
+        g.px(12 + lean, top + 8, 'S')
+        g.px(13 + lean, top + 8, 'S')
+        g.px(12 + lean, top + 9, 'S')
+        g.px(13 + lean, top + 9, 's')
+        g.px(12 + lean, top + 10, 'S')
+        g.px(13 + lean, top + 10, 'S')
 
 
 # ------------------------------------------------------------------- 결
