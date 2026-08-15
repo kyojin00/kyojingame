@@ -781,7 +781,7 @@ func _ready() -> void:
 				"fisher", "explorer"]
 			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
-			GameData.house_lv = 2         # 집/부엌/침대 캡처용
+			GameData.house_lv = 2         # 집/조리대/침대 캡처용
 			GameData.has_bed = true
 			GameData.furniture = GameData.default_furniture()  # 넓은 방 캡처용 세간
 			for cy in range(0, MAP_H / GameData.EXPLORE_CHUNK + 1):

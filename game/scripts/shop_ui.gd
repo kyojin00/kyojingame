@@ -800,14 +800,10 @@ func _on_buy_bait() -> void:
 
 # 노점 한정 요리 레시피 — 사면 집 조리대의 잠긴 칸이 열린다
 func _on_buy_dish_recipe(id: String, price: int) -> void:
-	# 요리 튜토리얼을 마치기 전에는 팔지 않는다 — 돈도 레시피도 오가지 않는다.
-	# 【분기 A】 요리 레시피를 먼저 사려 한 순간이 곧 퀘스트의 방아쇠다.
-	# 마커·화살표 없이 대사만으로 알아차리게 하는 자연스러운 튜토리얼이다.
+	# 조리대 이야기를 마치기 전에는 팔지 않는다 — 돈도 레시피도 오가지 않는다.
+	# (이야기의 시작은 오직 만수와의 대화다 — 여기서는 시작되지 않는다)
 	if not GameData.cook_shop_open():
-		if GameData.kitchen_quest_ready():
-			main.story.start_kitchen_quest("recipe")
-		else:
-			main.story.kitchen_block_line()
+		main.story.kitchen_block_line()
 		return
 	if GameData.money < price or not GameData.recipe_locked(id) \
 			or GameData.recipe_items.has(id):

@@ -1387,11 +1387,12 @@ func _skip_tutorial() -> void:
 
 
 func tutorial_notify(flag: String) -> void:
-	# 첫 수확 = 메인 스토리 2의 마지막 목표 (안내 체크리스트와는 무관하다)
+	# 첫 수확 — 여기서 2장이 끝나지 않는다. 만수가 밥 이야기를 꺼내고,
+	# 조리대를 찾아 첫 끼를 지어 그에게 가져가야 비로소 끝난다.
 	if flag == "harvest" and GameData.story2_phase == "farm":
-		GameData.story2_phase = "done"
-		GameData.move_day = GameData.day   # 다음 날 아침, 이주 희망 편지가 온다
-		m.hud.story_banner("메인 스토리 2 완결", "마을을 깨우다")
+		GameData.story2_phase = "cook"
+		m.hud.event_toast("첫 수확!")
+		m.hud.quest_start_toast("만수에게 첫 수확을 알리자")
 		m.saveio.save_now()
 	var tut: Dictionary = GameData.tutorial
 	if not tut.get("active", false) or tut.get(flag, true):
@@ -4400,16 +4401,15 @@ func _end_last_page() -> void:
 	m.saveio.save_now()
 
 
-# ---- 튜토리얼 퀘스트: 먼지 속의 조리대 ----
+# ---- 메인 스토리 2의 마지막 마디: 조리대에서 요리를 하자 ----
 #
-# 「요리를 하려면 조리대가 필요하다」를 안내문으로 알려 주지 않는다.
-# 잡화점에서 하는 행동이 그대로 방아쇠다 —
-#   A 요리 레시피를 사려 한다   -> 만수가 말린다
-#   B 다른 걸 사고 나가려 한다  -> 만수가 붙잡는다
-#   C 아무것도 안 사고 나간다   -> 만수가 말을 건다
-# 어느 갈래로 들어와도 「집이 오래 비어 있었으니 먼지 밑에 조리대가
-# 있을 것」이라는 같은 이야기로 모이고, 잡초 하나로 만드는 빗자루
-# 레시피를 권한다.
+# 시작점은 **하나뿐이다.** 첫 수확을 마치고(story2_phase == "cook")
+# 만수에게 말을 걸면, 그가 「밥은 먹고 다니나」 하고 묻는 데서 시작된다.
+# (예전에는 가게를 나서려 할 때·레시피를 사려 할 때 등 세 갈래로
+# 불쑥 시작돼 언제 시작됐는지 알기 어려웠다)
+#
+# 끝은 요리를 짓는 데서 끝나지 않는다 — **지은 요리를 만수에게 가져가면**
+# 그가 파는 법과 먹는 법을 알려 주고, 그것으로 2장이 마무리된다.
 
 func _kitchen_update(_delta: float) -> void:
 	if Net.is_guest():
@@ -4433,50 +4433,37 @@ func _kitchen_update(_delta: float) -> void:
 				m.saveio.save_now()
 		"jam":
 			if int(GameData.recipes_cooked.get(GameData.JAM_ID, 0)) > 0:
-				_end_kitchen_quest()
+				GameData.kitchen_quest = "deliver"
+				m.hud.event_toast("첫 요리를 지었다!")
+				m.hud.quest_start_toast("지은 요리를 만수에게 가져가자")
+				m.saveio.save_now()
 
 
-# 분기 A/B/C 공통 — 만수가 밥 이야기를 꺼내고 빗자루를 권한다.
-# 앞머리만 갈래마다 다르고, 뒤는 같은 이야기로 모인다.
-const KITCHEN_OPENERS := {
-	"recipe": [
-		{"text": "「어어, 잠깐! 그거 요리 레시피인데.」"},
-		{"text": "「사도 지금은 못 써. 조리대가 없잖아?」"},
-	],
-	"buy": [
-		{"text": "「그래, 살 건 다 샀고... 어이, 잠깐만.」"},
-		{"text": "「자네 요즘 밥은 제대로 챙겨 먹고 있나?」"},
-	],
-	"idle": [
-		{"text": "「뭘 살지 못 정했으면 그냥 가도 돼.\n...그런데 하나만 묻자.」"},
-		{"text": "「자네 요즘 밥은 제대로 챙겨 먹고 있나?」"},
-	],
-}
-const KITCHEN_COMMON := [
+# 첫 수확을 마친 뒤 만수에게 말을 걸면 — 밥 이야기에서 시작된다
+const KITCHEN_INTRO := [
+	{"text": "「오, 첫 수확 했다며? 축하해!」"},
+	{"text": "「...그런데 하나만 묻자.\n자네 요즘 밥은 제대로 챙겨 먹고 있나?」"},
 	{"text": "「사 먹을 데도 없는 마을에서 그러다 큰일 나.\n한 끼라도 직접 지어 먹어야지.」"},
 	{"text": "「그 집, 자네 오기 전까지 한참 비어 있었잖아.\n먼지랑 잡동사니가 산더미일 텐데.」"},
-	{"text": "「그런 집엔 말이야, 부엌 살림이 그 밑에\n그대로 묻혀 있는 경우가 많아. 조리대 같은 거.」"},
+	{"text": "「그런 집엔 말이야, 살림살이가 그 밑에\n그대로 묻혀 있는 경우가 많아. 조리대 같은 거.」"},
 	{"text": "「일단 쓸어 봐. 빗자루부터 있어야겠지?」"},
 	{"text": "「마침 빗자루 레시피가 있어. 잡초 하나면 만들어.\n풀숲 아무 데나 뽑으면 나오는 그 잡초 말이야.」"},
 	{"text": "「먼지 밑에서 뭐가 나오는지 보고 오라고.」"},
 ]
 
 
-func start_kitchen_quest(branch: String) -> void:
+func start_kitchen_quest() -> void:
 	if not GameData.kitchen_quest_ready():
 		return
 	GameData.kitchen_quest = "broom"
-	GameData.kitchen_branch = branch
-	var pages: Array = []
-	pages.append_array(KITCHEN_OPENERS.get(branch, KITCHEN_OPENERS["idle"]))
-	pages.append_array(KITCHEN_COMMON)
 	m.dialog.open_seq("잡화점 만수",
-		m.tex.get("npc_merchant_portrait_normal"), pages, _end_kitchen_intro)
+		m.tex.get("npc_merchant_portrait_normal"), KITCHEN_INTRO,
+		_end_kitchen_intro)
 	m.saveio.save_now()
 
 
 func _end_kitchen_intro() -> void:
-	m.hud.quest_start_toast("먼지 속의 조리대")
+	m.hud.quest_start_toast("조리대에서 요리를 하자")
 	m.hud.show_message("잡화점 선반에서 빗자루 레시피를 사자. (잡초 1로 제작)", 6.0)
 	m.saveio.save_now()
 
@@ -4486,7 +4473,7 @@ func kitchen_gift_dialog() -> void:
 	m.dialog.open_seq("잡화점 만수",
 		m.tex.get("npc_merchant_portrait_happy"), [
 		{"text": "「찾았어? 진짜 있었지?」"},
-		{"text": "「그 집 지은 사람이 부엌부터 들였을 거라니까.\n먼지만 걷어내면 되는 거였어.」"},
+		{"text": "「그 집 지은 사람이 조리대부터 들였을 거라니까.\n먼지만 걷어내면 되는 거였어.」"},
 		{"text": "「조리대도 찾았으니까 이것도 한번 만들어봐.\n산딸기잼이야.」"},
 		{"text": "「처음 해보기엔 어렵지 않을 거야.\n재료도 같이 줄게.」"},
 		{"text": "「직접 만들어보는 게 제일 빠르거든.」"},
@@ -4507,10 +4494,45 @@ func _end_kitchen_gift() -> void:
 	m.saveio.save_now()
 
 
-func _end_kitchen_quest() -> void:
+# 지은 요리를 들고 만수를 찾아왔다 — 칭찬과 함께 파는 법·먹는 법을 배운다.
+# 이 대화가 곧 **메인 스토리 2의 마지막 장면**이다.
+func kitchen_deliver_dialog() -> void:
+	if GameData.kitchen_quest != "deliver":
+		return
+	if int(GameData.items.get(GameData.JAM_ID, 0)) <= 0:
+		m.dialog.open("잡화점 만수",
+			"「지었다며? 어디 한번 보여 줘 봐.」\n\n지은 요리를 손에 들고 다시 오자.",
+			[["알겠다", null]], m.tex.get("npc_merchant_portrait_normal"))
+		return
+	var happy: Texture2D = m.tex.get("npc_merchant_portrait_happy")
+	var normal: Texture2D = m.tex.get("npc_merchant_portrait_normal")
+	m.dialog.open_seq("잡화점 만수", happy, [
+		{"text": "「어디 보자... 오, 제법인데?」"},
+		{"text": "「처음 지은 것치고 색이 곱게 나왔어.\n잘했어, 정말로.」"},
+		{"text": "「이제 중요한 걸 알려 줄게.\n요리는 두 가지로 쓴다.」", "portrait": normal},
+		{"text": "「하나, 여기 계산대에 가져오면 돈이 돼.\n재료 그대로 파는 것보다 값을 더 쳐 준다고.」"},
+		{"text": "「둘, 가방에서 바로 먹을 수 있어.\n배가 든든해야 하루가 길어지는 법이지.」"},
+		{"text": "「팔지 먹을지는 그때그때 자네가 정하면 돼.\n그게 이 마을에서 사는 요령이야.」", "portrait": happy},
+		{"text": "「자, 이제 진짜 이 마을 사람이 다 됐네.」"},
+	], _end_kitchen_deliver)
+
+
+func _end_kitchen_deliver() -> void:
+	if GameData.kitchen_quest == "done":
+		return
 	GameData.kitchen_quest = "done"
-	m.hud.quest_toast("먼지 속의 조리대")
-	m.hud.show_message("첫 요리를 지었다!\n이제 잡화점에서 요리 레시피를 살 수 있다.", 7.0)
+	m.hud.quest_toast("조리대에서 요리를 하자")
+	# 여기서 메인 스토리 2가 끝난다 — 상점 안에서 완결 창이 뜬다
+	if GameData.story2_phase != "done":
+		GameData.story2_phase = "done"
+		GameData.move_day = GameData.day   # 하룻밤 자면 이주 편지가 온다
+		m.hud.story_banner("메인 스토리 2 완결", "마을을 깨우다")
+		m.dialog.open("메인 스토리 2 — 마을을 깨우다",
+			"상점이 서고, 바닷길이 열리고, 첫 작물을 거두고,\n"
+			+ "그 작물로 첫 끼를 지어 먹었다.\n\n"
+			+ "잠든 마을에 다시 하루가 돌기 시작했다.\n\n"
+			+ "오늘은 마음껏 둘러보고, 밤이 되면 잠자리에 들자.",
+			[["좋다", null]])
 	m.saveio.save_now()
 
 

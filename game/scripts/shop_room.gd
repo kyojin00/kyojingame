@@ -212,14 +212,10 @@ var bought_this_visit: bool:
 	get: return GameData.today_spent > _visit_spent
 
 
-# 문턱을 밟았다 — 그냥 나갈 수 있는가.
-# 【분기 B·C】 잡화점을 나서려는 순간 아직 조리대를 못 찾았다면, 만수가
-# 밥 이야기를 꺼내며 붙잡는다 (뭘 사고 나가는지에 따라 첫마디가 다르다)
+# 문턱을 밟았다 — 언제든 그냥 나갈 수 있다.
+# (예전에는 조리대 이야기가 여기서 불쑥 시작돼 손님을 붙잡았다.
+#  지금 그 이야기는 계산대에서 만수와 말을 걸 때만 시작된다)
 func try_leave() -> bool:
-	if room_id == "general" and GameData.kitchen_quest_ready():
-		ppos.y = ROOM.end.y - 16.0   # 문턱에서 한 발 물러선다
-		main.story.start_kitchen_quest("buy" if bought_this_visit else "idle")
-		return false
 	close()
 	return true
 

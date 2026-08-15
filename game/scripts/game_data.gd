@@ -940,6 +940,9 @@ func story2_objective_short() -> String:
 			return "상점을 세우자."
 		"farm_talk":
 			return "이장과 대화하자."
+		"cook":
+			# 첫 수확을 마친 뒤 — 만수가 밥 이야기를 꺼낸다
+			return "만수와 대화하자."
 	return ""
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
@@ -2622,17 +2625,19 @@ func quest_catalog() -> Array:
 				+ "문은 그제야, 아주 천천히 열린다.",
 			"cat": "main", "ep": "메인 스토리 20", "npc": s20npc,
 			"reward": "할아버지가 남긴 씨앗 한 알과 마지막 편지"})
-	# 안내: 먼지 속의 조리대 (요리 튜토리얼)
+	# 메인 스토리 2의 마지막 마디 — 조리대에서 요리를 하자
 	o = kitchen_quest_objective_short()
 	if o != "":
-		out.append({"id": "kitchen", "title": "먼지 속의 조리대", "obj": o,
-			"desc": "오래 비어 있던 집에는 먼지가 이불처럼 쌓인다.\n\n"
-				+ "만수는 그 밑에 분명 부엌 살림이 묻혀 있을 거라 한다.\n"
-				+ "「사 먹을 데도 없는 마을에서 그러다 큰일 나.」\n\n"
-				+ "빗자루 한 자루면 되는 일이다.\n"
-				+ "먼지를 걷어내면, 첫 끼를 지을 자리가 나온다.",
-			"cat": "guide", "npc": "merchant",
-			"reward": "요리 해금 + 산딸기잼 레시피와 산딸기 %d개" % JAM_BERRIES})
+		out.append({"id": "kitchen", "title": "조리대에서 요리를 하자", "obj": o,
+			"desc": "첫 수확을 마치고 잡화점에 들렀더니\n"
+				+ "만수가 대뜸 이렇게 물었다.\n"
+				+ "「자네 요즘 밥은 제대로 챙겨 먹고 있나?」\n\n"
+				+ "오래 비어 있던 집에는 먼지가 이불처럼 쌓인다.\n"
+				+ "만수는 그 밑에 분명 살림살이가 묻혀 있을 거라 한다.\n\n"
+				+ "먼지를 걷어내면 첫 끼를 지을 자리가 나온다.\n"
+				+ "그렇게 지은 한 그릇을 들고 그에게 돌아가자.",
+			"cat": "main", "ep": "메인 스토리 2", "npc": "merchant",
+			"reward": "요리 해금 + 판매하는 법 · 메인 스토리 2 완결"})
 	# 서브: 용식의 집터 — 바닷길을 연 지 3일 뒤 분수대 앞에서 시작된다
 	o = fisher_home_objective_short()
 	if o != "":
@@ -2684,7 +2689,7 @@ func quest_catalog() -> Array:
 				"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
 				"reward": _tut_reward_text(flag)})
 		elif flag == "cook":
-			out.append({"id": "tutorial", "title": "부엌에 불을 지피자", "obj": o,
+			out.append({"id": "tutorial", "title": "조리대에서 요리를 하자", "obj": o,
 				"desc": "거둔 것을 손질해 불에 올리는 저녁.\n"
 					+ "혼자 사는 집에서 제일 먼저 익히게 되는 일이다.\n\n"
 					+ "집 안 조리대 앞에 서기만 하면 된다.\n"
@@ -2891,8 +2896,11 @@ func quest_npc_marks() -> Dictionary:
 		marks["librarian"] = "!"
 	elif story18_phase == "clue":
 		marks["librarian"] = "?"
-	# 조리대를 찾았다 — 만수가 궁금해한다
-	if kitchen_quest == "found":
+	# 첫 수확을 마쳤다 — 만수가 밥 이야기를 꺼내려 한다
+	if story2_phase == "cook" and kitchen_quest == "":
+		marks["merchant"] = "!"
+	# 조리대를 찾았다 · 요리를 지었다 — 만수가 기다린다
+	if kitchen_quest in ["found", "deliver"]:
 		marks["merchant"] = "?"
 	# 용식의 집터 — 분수대 앞에서 기다릴 때와 집이 다 됐을 때 말을 걸자
 	if fisher_home == "wait":
@@ -3098,19 +3106,17 @@ const DUST_TOTAL := 3
 var dust_swept := 0
 var kitchen_found := false
 
-# ---- 튜토리얼 퀘스트: 먼지 속의 조리대 ----
+# ---- 메인 스토리 2의 마지막 마디: 조리대에서 요리를 하자 ----
 #
-# 요리를 어떻게 시작하는지 **말로 알려 주지 않는다**. 잡화점에서 하는
-# 행동이 그대로 방아쇠가 된다 — 요리 레시피를 사려 하거나, 볼일을
-# 마치고 나가려 하면 만수가 붙잡고 밥 이야기를 꺼낸다.
+# 첫 수확을 마치면 만수가 「밥은 먹고 다니나」 하고 묻는다.
+# 거기서 시작해 조리대를 찾아내고, 첫 요리를 지어 만수에게 가져가면
+# 그가 파는 법과 먹는 법을 알려 준다 — 그것으로 2장이 끝난다.
 #   "": 아직 / broom: 빗자루 레시피 사기 / make: 잡초 모아 빗자루 만들기 /
 #   sweep: 집 안 먼지 쓸기 / found: 조리대 발견 — 만수에게 알리기 /
-#   jam: 받은 재료로 산딸기잼 만들기 / done: 요리 튜토리얼 끝
+#   jam: 받은 재료로 산딸기잼 만들기 /
+#   deliver: 지은 요리를 만수에게 가져가기 / done: 끝 (판매까지 배웠다)
 var kitchen_quest := ""
-# 어떤 계기로 시작됐는가 — 첫 대사 갈래가 갈린다
-#   recipe: 요리 레시피를 사려다가 / buy: 다른 걸 사고 나가려다가 /
-#   idle: 아무것도 안 사고 나가려다가
-var kitchen_branch := ""
+var kitchen_branch := ""    # (옛 세이브 호환 — 지금은 갈래가 없다)
 const JAM_ID := "dish_berry_jam"     # 첫 요리 — 산딸기잼
 const JAM_BERRIES := 3               # 만수가 함께 주는 산딸기
 
@@ -3121,9 +3127,13 @@ func can_fish() -> bool:
 	return is_tool_unlocked("rod")
 
 
+# 이 이야기가 시작될 수 있는가 —
+# **첫 수확을 마친 뒤**(story2_phase == "cook") 만수에게 말을 걸었을 때만.
+# 예전에는 잡화점에서 나가려 하거나 레시피를 사려 할 때 등 세 갈래로
+# 불쑥 시작됐다. 지금은 시작점이 하나뿐이다.
 func kitchen_quest_ready() -> bool:
 	return village_built.has("general") and not kitchen_found \
-		and kitchen_quest == "" and story_phase == "done"
+		and kitchen_quest == "" and story2_phase == "cook"
 
 
 # 요리 레시피를 정상적으로 사고팔 수 있는가 (튜토리얼을 마쳐야 열린다)
@@ -3147,7 +3157,9 @@ func kitchen_quest_objective_short() -> String:
 		"found":
 			return "만수에게 알리자."
 		"jam":
-			return "조리대에서 산딸기잼을 만들자."
+			return "조리대에서 요리를 하자."
+		"deliver":
+			return "요리를 만수에게 가져가자."
 	return ""
 var desk_queue: Array = []        # [{id, left(초)}]
 var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
@@ -5519,7 +5531,7 @@ func tutorial_objective() -> String:
 # (story2_phase: shop → fisher → farm_talk → farm), 앞선 퀘스트와
 # 나란히 떠서 헷갈리는 일이 없다.
 func farm_chain_open() -> bool:
-	return story2_phase in ["farm", "done"]
+	return story2_phase in ["farm", "cook", "done"]
 
 
 func tutorial_current_flag() -> String:
@@ -5565,7 +5577,7 @@ const GRANDPA_QUESTS := [
 		"letter": "\"동굴 깊은 곳의 것들은 사납지만,\n그 몸에서 나오는 것 또한 재료다.\n조심하되 물러서지는 말거라.\"",
 		"reward": {"money": 680, "wood": 20}},
 	{"id": "cook", "count": "recipe_kinds", "goal": 3,
-		"name": "부엌의 기록",
+		"name": "조리대의 기록",
 		"desc": "요리를 3종류 만들어 보자",
 		"letter": "\"불과 물과 시간을 다루는 일 —\n요리야말로 가장 오래된 연금술이란다.\n세 가지를 만들어 먹어 보렴.\"",
 		"reward": {"money": 900}},
@@ -5633,7 +5645,7 @@ func completed_quests() -> Array:
 	if fisher_home == "done":
 		out.append("용식의 부탁 — 살 집 한 채")
 	if kitchen_quest == "done":
-		out.append("먼지 속의 조리대 — 첫 요리를 지었다")
+		out.append("조리대에서 요리를 하자 — 첫 끼를 지어 나눴다")
 	if story2_phase == "done":
 		out.append("메인 스토리 2 — 마을을 깨우다")
 	if move_quest == "done":

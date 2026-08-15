@@ -201,7 +201,7 @@ func _apply_save(d: Dictionary) -> void:
 	elif GameData.story2_phase == "shop":
 		GameData.village_built.erase("general")   # 상점은 퀘스트로 지어야 한다
 	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
-	# 발견한 것으로 친다 — 쓰던 부엌이 갑자기 먼지에 묻히면 안 된다
+	# 발견한 것으로 친다 — 쓰던 조리대가 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",
 		int(d.get("house_lv", 0)) >= 2 or not d.get("recipes_cooked", {}).is_empty()))
 	# 「먼지 속의 조리대」 — 이 이야기가 생기기 전 세이브에서 이미 조리대를
@@ -209,6 +209,11 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.kitchen_quest = str(d.get("kitchen_quest",
 		"done" if GameData.kitchen_found else ""))
 	GameData.kitchen_branch = str(d.get("kitchen_branch", ""))
+	# 예전에는 첫 수확만으로 2장이 끝났다 — 그때 조리대를 못 찾았다면
+	# 마지막 마디(만수와의 밥 이야기)를 마저 걷게 되돌려 준다
+	if GameData.story2_phase == "done" and not GameData.kitchen_found \
+			and GameData.kitchen_quest == "":
+		GameData.story2_phase = "cook"
 	GameData.desk_queue = []
 	for job in d.get("desk_queue", []):
 		if GameData.DESK_RECIPES.has(str(job.get("id", ""))):

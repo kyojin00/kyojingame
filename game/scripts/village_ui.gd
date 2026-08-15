@@ -461,9 +461,17 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "forest_mom" and GameData.forest_trust == "invited":
 		m.story._start_forest_trust_dialog()
 		return
-	# 요리 튜토리얼 — 조리대를 찾은 뒤 만수를 만나면 축하와 선물
+	# 조리대 이야기 — 첫 수확 뒤 만수를 만나면 밥 이야기부터
+	if npc.id == "merchant" and GameData.kitchen_quest_ready():
+		m.story.start_kitchen_quest()
+		return
+	# 조리대를 찾은 뒤 만수를 만나면 축하와 선물
 	if npc.id == "merchant" and GameData.kitchen_quest == "found":
 		m.story.kitchen_gift_dialog()
+		return
+	# 지은 요리를 들고 만수를 만나면 — 칭찬과 판매 안내로 2장이 끝난다
+	if npc.id == "merchant" and GameData.kitchen_quest == "deliver":
+		m.story.kitchen_deliver_dialog()
 		return
 	# 서브 퀘스트 — 용식의 집터 (분수대 앞: 선택지 / 집 완공 뒤: 보고)
 	if npc.id == "fisher" and GameData.fisher_home == "wait":
@@ -1623,9 +1631,17 @@ const MERCHANT_TIPS := [
 
 
 func open_merchant_counter() -> void:
+	# 첫 수확을 마치고 찾아왔다 — 만수가 밥 이야기를 꺼낸다 (2장의 마지막 마디)
+	if GameData.kitchen_quest_ready():
+		m.story.start_kitchen_quest()
+		return
 	# 조리대를 찾아온 날 — 인사보다 이 이야기가 먼저다
 	if GameData.kitchen_quest == "found":
 		m.story.kitchen_gift_dialog()
+		return
+	# 지은 요리를 들고 왔다 — 칭찬과 판매 안내, 그리고 2장의 끝
+	if GameData.kitchen_quest == "deliver":
+		m.story.kitchen_deliver_dialog()
 		return
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	var btns: Array = [

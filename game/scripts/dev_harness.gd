@@ -3201,46 +3201,58 @@ func _debug_tick() -> void:
 			GameData.items["weed"] = 0
 			GameData.items["forage_berry"] = 0
 
-			# ── 분기 A: 요리 레시피를 사려 하면 팔지 않고 그 자리에서 시작
+			# ── 시작점은 하나뿐 — 첫 수확 뒤 만수와의 대화
+			var k_s2k := GameData.story2_phase
 			GameData.kitchen_quest = ""
 			GameData.money = 9999
+			GameData.story2_phase = "farm"
+			var not_yet: bool = not GameData.kitchen_quest_ready()
+			# 첫 수확이 2장을 끝내지 않는다 — 만수에게 가라고 한다
+			for f9 in GameData.STORY2_FLAGS:
+				GameData.tutorial[f9] = false
+			GameData.tutorial["active"] = true
+			m.tutorial_notify("harvest")
+			var to_merchant: bool = GameData.story2_phase == "cook" \
+				and GameData.kitchen_quest_ready() \
+				and GameData.quest_npc_marks().get("merchant", "") == "!"
+			# 가게를 나서도 붙잡지 않는다 (예전 분기 B·C가 사라졌다)
+			m.shop_room.open("general")
+			var free_exit: bool = m.shop_room.try_leave() \
+				and not m.shop_room.visible and GameData.kitchen_quest == ""
+			# 레시피를 사려 해도 여기서 시작되지 않는다 (분기 A도 사라졌다)
 			var money_a := GameData.money
 			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
-			var branch_a: bool = GameData.kitchen_quest == "broom" \
-				and GameData.kitchen_branch == "recipe" \
+			var branch_a: bool = GameData.kitchen_quest == "" \
 				and GameData.money == money_a \
-				and not GameData.recipe_items.has("dish_grilled_fish") \
-				and m.dialog.visible
+				and not GameData.recipe_items.has("dish_grilled_fish")
 			m.dialog.skip_seq()
 			m.dialog.close()
-
-			# ── 분기 B: 뭔가 사고 나가려 하면 붙잡는다
-			GameData.kitchen_quest = ""
-			GameData.kitchen_branch = ""
-			m.shop_room.open("general")
-			GameData.today_spent += 30            # 씨앗 한 봉지 산 셈
-			var bought_ok: bool = m.shop_room.bought_this_visit
-			var left_b: bool = m.shop_room.try_leave()   # 문턱을 밟는다
-			var branch_b: bool = GameData.kitchen_quest == "broom" \
-				and GameData.kitchen_branch == "buy" \
-				and not left_b and m.shop_room.visible      # 아직 못 나갔다
+			# 만수에게 말을 걸면 그제야 시작된다
+			m.village.open_merchant_counter()
+			var start_talk: bool = m.dialog.visible
+			var intro_txt := ""
+			for e8: Dictionary in m.dialog._seq:
+				intro_txt += str(e8.get("text", "")) + " "
+			# 「부엌」이라는 말은 게임 어디에도 없다 — 언제나 「조리대」다
+			var no_kitchen_word: bool = not intro_txt.contains("부엌")
+			for q8: Dictionary in GameData.quest_catalog():
+				for key8: String in ["title", "obj", "desc", "reward"]:
+					if str(q8.get(key8, "")).contains("부엌"):
+						no_kitchen_word = false
+			for nid8: String in GameData.NPCS:
+				var nd8: Dictionary = GameData.NPCS[nid8]
+				for key9: String in ["greet", "secret50", "secret100"]:
+					if str(nd8.get(key9, "")).contains("부엌"):
+						no_kitchen_word = false
+			for gq8: Dictionary in GameData.GRANDPA_QUESTS:
+				if str(gq8.get("name", "")).contains("부엌") \
+						or str(gq8.get("desc", "")).contains("부엌"):
+					no_kitchen_word = false
+			var branch_b: bool = intro_txt.contains("밥은") and no_kitchen_word
 			m.dialog.skip_seq()
 			m.dialog.close()
-			m.shop_room.close()
-
-			# ── 분기 C: 아무것도 안 사고 나가려 하면 말을 건다
-			GameData.kitchen_quest = ""
-			GameData.kitchen_branch = ""
-			m.shop_room.open("general")
-			var idle_ok: bool = not m.shop_room.bought_this_visit
-			var left_c: bool = m.shop_room.try_leave()
-			var branch_c: bool = GameData.kitchen_quest == "broom" \
-				and GameData.kitchen_branch == "idle" and idle_ok and not left_c
-			m.dialog.skip_seq()
-			m.dialog.close()
-			# 시작된 뒤에는 더 붙잡지 않는다 — 그냥 나갈 수 있다
-			var free_exit: bool = m.shop_room.try_leave() and not m.shop_room.visible
-			m.shop_room.close()
+			var bought_ok: bool = GameData.kitchen_quest == "broom"
+			var branch_c: bool = not_yet and to_merchant and start_talk
 
 			# ── 진행: 레시피 -> 잡초 -> 빗자루 -> 청소 -> 조리대
 			GameData.give_recipe("broom")
@@ -3278,13 +3290,39 @@ func _debug_tick() -> void:
 				and int(GameData.items["forage_berry"]) >= GameData.JAM_BERRIES
 			m.dialog.close()
 
-			# ── 첫 요리: 산딸기잼을 지으면 튜토리얼 종료 + 레시피 판매 해금
+			# ── 첫 요리: 지으면 「만수에게 가져가자」로 넘어간다
 			GameData.learn_recipe(GameData.JAM_ID)
 			var cooked: bool = GameData.cook(GameData.JAM_ID)
 			m.story._kitchen_update(0.0)
-			var done_ok: bool = cooked and GameData.kitchen_quest == "done" \
+			var deliver_step: bool = cooked and GameData.kitchen_quest == "deliver" \
+				and GameData.kitchen_quest_objective_short().contains("만수") \
+				and not GameData.cook_shop_open() \
+				and GameData.quest_npc_marks().get("merchant", "") == "?"
+			# 빈손으로 가면 보여 달라고만 한다
+			var k_jam2 := int(GameData.items[GameData.JAM_ID])
+			GameData.items[GameData.JAM_ID] = 0
+			m.village.open_merchant_counter()
+			var empty_hand: bool = m.dialog.visible \
+				and GameData.kitchen_quest == "deliver"
+			m.dialog.close()
+			# 요리를 들고 가면 칭찬 + 판매·먹기 안내 -> 2장 완결
+			GameData.items[GameData.JAM_ID] = maxi(k_jam2, 1)
+			m.village.open_merchant_counter()
+			var deliver_txt := ""
+			for e7: Dictionary in m.dialog._seq:
+				deliver_txt += str(e7.get("text", "")) + " "
+			var teach_ok: bool = deliver_txt.contains("돈") \
+				and deliver_txt.contains("먹") and m.dialog.visible
+			m.dialog.skip_seq()
+			var story2_end: bool = GameData.kitchen_quest == "done" \
+				and GameData.story2_phase == "done" \
 				and GameData.cook_shop_open() \
-				and GameData.completed_quests().has("먼지 속의 조리대 — 첫 요리를 지었다")
+				and GameData.move_day == GameData.day \
+				and m.dialog.visible \
+				and GameData.completed_quests().has("조리대에서 요리를 하자 — 첫 끼를 지어 나눴다")
+			m.dialog.close()
+			var done_ok: bool = deliver_step and empty_hand and teach_ok \
+				and story2_end
 			var money_c := GameData.money
 			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
 			var sell_ok: bool = GameData.money == money_c - 200 \
@@ -3308,15 +3346,17 @@ func _debug_tick() -> void:
 			GameData.items["forage_berry"] = k_berry
 			GameData.items[GameData.JAM_ID] = k_jam
 			m.hud._toast_queue.clear()
+			GameData.story2_phase = k_s2k
 			print("KITCHEN_OK=", branch_a and branch_b and bought_ok and branch_c
 				and free_exit and step_make and goal_weed and step_sweep
 				and step_found and still_block and gift_open and gift_ok
 				and done_ok and sell_ok,
-				" 분기A(레시피차단)=", branch_a, " 분기B(사고나감)=", branch_b,
-				" 분기C(그냥나감)=", branch_c, " 시작후자유퇴장=", free_exit,
+				" 상점에선안열림=", branch_a, " 만수대사(밥·부엌없음)=", branch_b,
+				" 수확→만수=", branch_c, " 대화로시작=", bought_ok,
+				" 자유퇴장=", free_exit,
 				" 레시피→제작=", step_make and goal_weed and step_sweep,
 				" 청소·조리대=", step_found, " 완료전차단=", still_block,
-				" 선물=", gift_open and gift_ok, " 첫요리·완료=", done_ok,
+				" 선물=", gift_open and gift_ok, " 가져가기·2장완결=", done_ok,
 				" 레시피판매해금=", sell_ok)
 		289:
 			# #141: 한 배치 — ① 바다 지형 고정 ② 돌문 숨김·자리 ③ 낚싯대 없이
@@ -5052,8 +5092,15 @@ func _debug_tick() -> void:
 			var farm: bool = GameData.story2_phase == "farm" \
 				and GameData.is_tool_unlocked("hoe")
 			GameData.tutorial["harvest"] = false
-			m.tutorial_notify("harvest")       # 첫 수확 = 2막 끝
-			var s2_done: bool = GameData.story2_phase == "done"
+			m.tutorial_notify("harvest")       # 첫 수확 -> 만수에게 (2막의 마지막 마디)
+			var k_kf2 := GameData.kitchen_found
+			var k_kq2 := GameData.kitchen_quest
+			GameData.kitchen_found = false
+			GameData.kitchen_quest = ""
+			var s2_done: bool = GameData.story2_phase == "cook" \
+				and GameData.kitchen_quest_ready()
+			GameData.kitchen_found = k_kf2
+			GameData.kitchen_quest = k_kq2
 			# 튜토리얼 분리: 밭 갈기 4개가 맨 앞, 집 짓기/침대 목표는 사라졌어야 한다
 			var order_ok := true
 			for i in 4:
@@ -5068,7 +5115,7 @@ func _debug_tick() -> void:
 				" 작별=", farewell, " 편지=", deliver_talk, " 집해금=", opened,
 				" 입장으로1막끝=", s1_done, " 오두막=", small, " 이장대화=", talk,
 				" 상점퀘=", shop_q, " 상점완성=", shop_built, " 호미대화=", farm_talk,
-				" 밭시작=", farm, " 수확으로2막끝=", s2_done, " 안내분리=", order_ok)
+				" 밭시작=", farm, " 수확→만수=", s2_done, " 안내분리=", order_ok)
 			GameData.house_lv = keep_house
 			GameData.has_bed = keep_bed
 			GameData.bed_lv = keep_bedlv
