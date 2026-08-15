@@ -95,8 +95,17 @@ func reset_view() -> void:
 # 도착한 뒤로는 실제 세계만이다 — 튜토리얼 공간은 세계 밖(y가 WORLD_H보다
 # 아래)에 있으므로 여기서 통째로 빠진다. 지나온 길도, 처음 서 있던 자리도
 # 지도에 남지 않는다.
+# 한 장을 굽는 동안에만 2만 7천 번 불린다 — 매번 새 Rect2i를 만들면 그것만으로
+# 몇 밀리초다. 튜토리얼에서 세계로 넘어갈 때만 달라지므로 그때만 다시 잰다.
+var _wr := Rect2i()
+var _wr_tut := true
+
+
 func _world() -> Rect2i:
-	return main.world_rect()
+	if _wr.size.x == 0 or _wr_tut != GameData.tutorial_space:
+		_wr_tut = GameData.tutorial_space
+		_wr = main.world_rect()
+	return _wr
 
 
 # 배율 1 = 이 땅이 화면에 딱 들어오는 칸 크기
@@ -217,18 +226,50 @@ func _visible_tile(x: int, y: int) -> bool:
 	# 보여 줄 땅 밖 — 튜토리얼 공간이든 세계든, 지금 지도가 아닌 곳은 없는 셈이다
 	if not _world().has_point(Vector2i(x, y)):
 		return false
+	return _seen_tile(x, y)
+
+
+# 「보여 줄 땅 안」이 이미 보장된 자리용 (구울 때는 그 사각만 훑으므로
+# 칸마다 사각을 다시 볼 이유가 없다 — 2만 7천 번이 그냥 없어진다)
+func _seen_tile(x: int, y: int) -> bool:
 	if not GameData.is_explored_tile(x, y):
 		return false
-	if GameData.is_tile_owned(x, y):
-		return true
-	return main.ROAD.has_point(Vector2i(x, y)) \
-		or main.VILLAGE_REGION.has_point(Vector2i(x, y))
+	_ensure_vis_index()
+	return _vis_idx[y * main.MAP_W + x] == 1
+
+
+# 「탐사만 했다면 보이는 칸인가」를 미리 구해 둔다.
+#
+# 칸마다 묻던 것이 세 가지였다 — 잠긴 확장 구역인가(`is_tile_owned`가 구역
+# 목록을 훑는다) · 공용 길인가 · 마을인가. 한 장 굽는 데 2만 7천 번이니
+# 그것만으로 백 밀리초가 넘게 들었다. 답이 달라지는 때는 **확장 구역이
+# 열릴 때뿐**이라, 그때만 다시 만든다.
+var _vis_idx := PackedByteArray()
+var _vis_zones := -1
+
+
+func _ensure_vis_index() -> void:
+	if _vis_idx.size() == main.MAP_W * main.MAP_H \
+			and _vis_zones == GameData.zones_open.size():
+		return
+	_vis_idx.resize(main.MAP_W * main.MAP_H)
+	_vis_zones = GameData.zones_open.size()
+	for y in main.MAP_H:
+		var base: int = y * main.MAP_W
+		for x in main.MAP_W:
+			var t := Vector2i(x, y)
+			_vis_idx[base + x] = 1 if (GameData.is_tile_owned(x, y) \
+				or main.ROAD.has_point(t) or main.VILLAGE_REGION.has_point(t)) else 0
 
 
 # 이 칸의 바닥 색. 같은 지형이라도 칸마다 밝기를 조금 흔들어 결을 낸다 —
 # 한 색으로 칠하면 초록 장판이 된다.
-func _ground_color(x: int, y: int, season: int) -> Color:
-	var g: String = main.grid[y][x].ground
+#
+# 칸 정보(cell)와 흔들 값(n)은 부르는 쪽이 넘긴다. 한 장에 2만 7천 번
+# 불리는 자리라, 여기서 격자를 다시 찾고 해시를 다시 돌리면 그것만으로
+# 수십 밀리초다 (`_bake`가 줄마다 격자 줄을 쥐고, 흔들 값은 미리 굽는다).
+func _ground_color(cell: Dictionary, x: int, y: int, season: int, n: float) -> Color:
+	var g: String = cell.ground
 	var base: Color
 	match g:
 		"water":
@@ -243,8 +284,7 @@ func _ground_color(x: int, y: int, season: int) -> Color:
 			base = Color(0.72, 0.62, 0.44)
 		"soil":
 			# 물을 준 밭은 짙다 — 지도만 봐도 어디에 물을 안 줬는지 보인다
-			base = Color(0.3, 0.21, 0.13) if main.grid[y][x].watered \
-				else Color(0.45, 0.33, 0.2)
+			base = Color(0.3, 0.21, 0.13) if cell.watered else Color(0.45, 0.33, 0.2)
 		_:
 			match season:
 				GameData.WINTER:
@@ -257,10 +297,23 @@ func _ground_color(x: int, y: int, season: int) -> Color:
 	var tint := _region_tint(x, y)
 	if tint.a > 0.0:
 		base = base.lerp(Color(tint.r, tint.g, tint.b), tint.a)
-	var n: float = main._hash01(x * 13 + 5, y * 29 + 7) - 0.5
 	return Color(clampf(base.r + n * 0.09, 0.0, 1.0),
 		clampf(base.g + n * 0.09, 0.0, 1.0),
 		clampf(base.b + n * 0.09, 0.0, 1.0))
+
+
+# 칸마다의 밝기 흔들림 — 지형이 아니라 **자리**가 정하는 값이라 한 번만 굽는다
+var _noise := PackedByteArray()
+
+
+func _ensure_noise() -> void:
+	if _noise.size() == main.MAP_W * main.MAP_H:
+		return
+	_noise.resize(main.MAP_W * main.MAP_H)
+	for y in main.MAP_H:
+		var b: int = y * main.MAP_W
+		for x in main.MAP_W:
+			_noise[b + x] = int(main._hash01(x * 13 + 5, y * 29 + 7) * 255.0)
 
 
 # 야생 지역마다 옅게 다른 풀빛 (a = 섞는 정도). 이름표가 없어도
@@ -281,6 +334,7 @@ const REGION_TINT := {
 # 그래서 「칸 -> 지역 번호」를 한 번 만들어 두고 쓴다 (0 = 지역 밖).
 var _reg_idx := PackedByteArray()
 var _reg_cols: Array[Color] = []
+var _reg_plain := PackedByteArray()   # 지역 번호별로 1 = 덧칠할 풀빛이 없다
 
 
 func _build_region_index() -> void:
@@ -294,6 +348,9 @@ func _build_region_index() -> void:
 		for y in range(maxi(0, r.position.y), mini(main.MAP_H, r.end.y)):
 			for x in range(maxi(0, r.position.x), mini(main.MAP_W, r.end.x)):
 				_reg_idx[y * main.MAP_W + x] = n
+	_reg_plain.resize(_reg_cols.size())
+	for i in _reg_cols.size():
+		_reg_plain[i] = 1 if _reg_cols[i].a == 0.0 else 0
 
 
 func _region_tint(x: int, y: int) -> Color:
@@ -316,14 +373,29 @@ func _shore(x: int, y: int) -> bool:
 #
 # 칸 하나가 픽셀 하나다. 지도를 보는 동안 지형은 거의 바뀌지 않으니
 # 매 프레임 2만 7천 칸을 다시 칠할 이유가 없다 — 한 번 구워 두고
-# 통째로 늘여 그린다. 밭에 물을 주거나 함께하는 사람이 나무를 베면
-# 달라지므로, 잠깐씩(BAKE_EVERY) 다시 굽는다.
+# 통째로 늘여 그린다.
+#
+# **혼자 할 때는 열 때 딱 한 번만 굽는다.** 지도를 보는 동안에는 밭에 물을
+# 줄 수도, 나무를 벨 수도 없으니 다시 구울 일이 없다. 예전에는 0.5초마다
+# 다시 구워, 끌고 있는 도중에 2만 7천 칸을 다시 칠하느라 한 프레임이
+# 통째로 튀었다. 함께하는 농장에서는 상대가 세상을 바꾸므로 그대로 둔다.
 const BAKE_EVERY := 0.5
 var _tex: ImageTexture = null
 var _bake_age := 999.0
+var bake_us := 0            # 마지막으로 한 장 굽는 데 걸린 시간 (하네스가 본다)
+
+
+# 지금 다시 구워야 하는가
+func _need_bake() -> bool:
+	if _tex == null:
+		return true
+	if not (Net.is_host() or Net.is_guest()):
+		return false        # 혼자 볼 때는 열 때 구운 그림 그대로
+	return _bake_age > BAKE_EVERY
 
 
 func _bake() -> void:
+	var bt0 := Time.get_ticks_usec()
 	_bake_age = 0.0
 	# 굽는 것은 **보여 줄 땅뿐이다.** 세계 밖의 튜토리얼 띠는 아예 들어가지 않는다.
 	var r := _world()
@@ -331,17 +403,65 @@ func _bake() -> void:
 	var oy: int = r.position.y
 	var w: int = r.size.x
 	var h: int = r.size.y
+	_ensure_vis_index()
+	_ensure_noise()
+	if _reg_idx.size() != main.MAP_W * main.MAP_H:
+		_build_region_index()
 	var buf := PackedByteArray()
 	buf.resize(w * h * 3)
 	var season := GameData.season()
+	# 안 가 본 곳은 어차피 한 색이다 — 통째로 깔아 두고 보이는 칸만 덧칠한다
+	var fr := int(FOG.r * 255.0)
+	var fg := int(FOG.g * 255.0)
+	var fb := int(FOG.b * 255.0)
+	# 계절 잔디 바탕 (아래 빠른 갈래가 쓴다)
+	var gbase := Color(0.3, 0.5, 0.26)
+	if season == GameData.WINTER:
+		gbase = Color(0.82, 0.85, 0.9)
+	elif season == GameData.FALL:
+		gbase = Color(0.62, 0.5, 0.3)
+	var gr := int(gbase.r * 255.0)
+	var gg := int(gbase.g * 255.0)
+	var gb := int(gbase.b * 255.0)
+	var ck: int = GameData.EXPLORE_CHUNK
 	var i := 0
+	# 탐사 여부는 **청크 단위**다 (4x4). 칸마다 묻지 않고 줄마다 한 번씩 모아 둔다
+	var cx0: int = ox / ck
+	var chunk_ok := PackedByteArray()
+	chunk_ok.resize((ox + w) / ck - cx0 + 2)
+	var last_cy := -999
 	for y in h:
+		var wy: int = oy + y
+		var cy: int = wy / ck
+		if cy != last_cy:
+			last_cy = cy
+			for cxi in chunk_ok.size():
+				chunk_ok[cxi] = 1 if GameData.explored.has(
+					Vector2i(cx0 + cxi, cy)) else 0
+		var base: int = wy * main.MAP_W
+		var grow: Array = main.grid[wy]
 		for x in w:
-			var c: Color = _ground_color(ox + x, oy + y, season) \
-				if _visible_tile(ox + x, oy + y) else FOG
-			buf[i] = int(c.r * 255.0)
-			buf[i + 1] = int(c.g * 255.0)
-			buf[i + 2] = int(c.b * 255.0)
+			var wx: int = ox + x
+			if chunk_ok[wx / ck - cx0] != 1 or _vis_idx[base + wx] != 1:
+				buf[i] = fr
+				buf[i + 1] = fg
+				buf[i + 2] = fb
+				i += 3
+				continue
+			var cell: Dictionary = grow[wx]
+			var nn: int = int(_noise[base + wx]) - 128
+			# 지역빛 없는 맨 잔디가 지도의 대부분이다 — 그 칸은 함수를 부르지 않고
+			# 계절 바탕에 흔들림만 더한다 (2만 7천 번의 함수 호출이 몇 백 번이 된다)
+			if cell.ground == "grass" and _reg_plain[_reg_idx[base + wx]] == 1:
+				buf[i] = clampi(gr + nn * 23 / 255, 0, 255)
+				buf[i + 1] = clampi(gg + nn * 23 / 255, 0, 255)
+				buf[i + 2] = clampi(gb + nn * 23 / 255, 0, 255)
+			else:
+				var c: Color = _ground_color(cell, wx, wy, season,
+					float(nn) / 255.0)
+				buf[i] = int(c.r * 255.0)
+				buf[i + 1] = int(c.g * 255.0)
+				buf[i + 2] = int(c.b * 255.0)
 			i += 3
 	# 지형지물은 그 칸 색을 덮어쓴다 (가까이 가면 위에 생김새를 얹는다)
 	for pos: Vector2i in main.objects:
@@ -360,6 +480,7 @@ func _bake() -> void:
 		_tex = ImageTexture.create_from_image(img)
 	else:
 		_tex.update(img)
+	bake_us = Time.get_ticks_usec() - bt0
 
 
 # 멀리서 볼 때 지형지물이 찍히는 색 (칸 하나 = 점 하나)
@@ -402,7 +523,7 @@ func _draw_map() -> void:
 	# 지형은 걸어다니는 동안에나 바뀌지 **지도를 보는 동안에는 거의 그대로**라,
 	# 칸 하나를 픽셀 하나로 구운 그림(_bake)을 한 번에 늘여 그린다.
 	# 드로우콜이 2만 7천 번에서 **한 번**이 된다 — 끌어도 안 버벅인다.
-	if _tex == null or _bake_age > BAKE_EVERY:
+	if _need_bake():
 		_bake()
 	canvas.draw_texture_rect(_tex, _world_screen_rect(), false)
 

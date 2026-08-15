@@ -42,7 +42,16 @@ var _bench_n := 0
 var _bench_t0 := 0
 
 
+# `_process`를 직접 여러 번 불러 시간을 재는 단계가 있다. 그런데 `_process`의
+# 마지막 줄이 이 함수라, 그대로 두면 **재는 동안 다음 단계들이 안에서 실행된다** —
+# 마을을 통째로 다시 세우는 단계가 걸리면 「한 프레임 10ms」로 잘못 읽힌다.
+# 재는 동안에는 시퀀스를 멈춘다.
+var _perf_probe := false
+
+
 func _debug_tick() -> void:
+	if _perf_probe:
+		return
 	if OS.get_environment("KYOJIN_MP") != "":
 		_mp_tick()
 		return
@@ -4916,10 +4925,12 @@ func _debug_tick() -> void:
 		389:
 			var calls := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 			var nodes := Performance.get_monitor(Performance.OBJECT_NODE_COUNT)
+			_perf_probe = true          # 재는 동안 시퀀스가 안에서 돌지 않게
 			var t0 := Time.get_ticks_usec()
 			for i in 20:
 				m._process(0.016)
 			var proc_us := (Time.get_ticks_usec() - t0) / 20.0
+			_perf_probe = false
 			print("PERF: 드로우콜=", int(calls), " 노드=", int(nodes),
 				" world자식=", m.world.get_child_count(),
 				" 오브젝트=", m.objects.size(),
@@ -5807,6 +5818,10 @@ func _debug_tick() -> void:
 			# 한 장으로 구워 통째로 늘여 그린다 (map_ui._bake).
 			m.map_ui.open()
 			m.map_ui.reset_view()
+			# 여는 순간의 한 번(굽기)은 따로 재고, 여기서부터는 **끄는 동안의
+			# 한 장**만 센다 — 벤치가 보려는 것이 그것이다
+			m.map_ui._bake()
+			m.map_ui.draw_us = 0
 			_bench_us = 0
 			_bench_n = 0
 		394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404:
@@ -5821,8 +5836,13 @@ func _debug_tick() -> void:
 			m.map_ui.close()
 			# 소프트웨어 렌더러(CI)에서도 8ms를 넘으면 안 된다 —
 			# 넘으면 그리는 것만으로 120fps가 무너진다는 뜻이다
-			print("MAPDRAW_OK=", _bench_n > 0 and per_draw < 8000,
-				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)")
+			# 굽기는 **여는 순간 한 번**이라 예산이 다르다. 소프트웨어 렌더러의
+			# 느린 CI 상자에서 2만 7천 칸에 65ms쯤 — 여유를 두고 90ms로 잡는다.
+			# (칸마다 구역을 훑던 시절에는 160ms였다. 이 선이 그때로 돌아가는 것을 막는다)
+			var bake: int = m.map_ui.bake_us
+			print("MAPDRAW_OK=", _bench_n > 0 and per_draw < 8000 and bake < 90000,
+				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)",
+				" 굽기=", bake, "us")
 		406:
 			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
 			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.
