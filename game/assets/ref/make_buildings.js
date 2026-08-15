@@ -1136,7 +1136,14 @@ function noticeboard(g, x, y) {
 // 알아보는 건 색이 아니라 **실루엣**이다. 그래서 몸통에 혹을 붙인다 —
 // 지붕창 · 곁채 · 탑 · 풍향계. 몸통 자체는 그대로 두니 같은 마을로 남는다.
 
-// 새로 붙인 지붕면도 기와 패스가 알아보게 표시해 준다
+// 덧붙인 지붕은 **본채와 같은 자로 재야 한다.**
+//
+// 처음엔 곁채·탑의 지붕 톤을 손으로 박아 뒀는데, 그 값은 본채 지붕이
+// 쓰는 사다리와 무관해서 이어지는 자리에서 색이 뚝 끊겼다. 붙는 자리가
+// 어디냐(본채 지붕의 몇 번째 톤 옆이냐)를 보고 폭을 정해야 한다.
+//
+// 그리고 본채는 옆에 붙은 것 위로 **그림자를 드리운다.** 낮은 곁채 지붕이
+// 높은 본채 옆에서 그늘 없이 밝으면, 두 채가 그냥 나란히 서 있어 보인다.
 function markRoof(x, y, t, base) {
   if (y < 0 || y >= GH || x < 0 || x >= GW) return;
   roofT[y][x] = t;
@@ -1149,7 +1156,7 @@ function dormer(g, cx, base) {
   const half = 10, top = base - 15;
   for (let i = 0; i <= 11; i++) {
     const w = Math.round(half * Math.pow(i / 11, 0.9));
-    for (let x = cx - w; x <= cx + w; x++) { g.px(x, top + i, 'r'); markRoof(x, top + i, 0.10, base); }
+    for (let x = cx - w; x <= cx + w; x++) { g.px(x, top + i, 'r'); markRoof(x, top + i, 0.30 - i / 11 * 0.20, base); }
   }
   g.rect(cx - half + 2, top + 12, cx + half - 2, base, WB);
   g.hline(cx - half, cx + half, top + 11, 'R');
@@ -1165,9 +1172,15 @@ function leanTo(g, xa, xb, top) {
   for (let x = xa; x <= xb; x++) {
     const t = Math.abs(x - inner) / Math.max(1, xb - xa);
     const y = top + Math.round(t * 8);
-    for (let k = 0; k < 6; k++) { g.px(x, y + k, 'r'); markRoof(x, y + k, 0.30 - k * 0.03, y + 5); }
+    // 본채가 드리우는 그림자 — 붙는 쪽이 제일 어둡고 멀어지며 옅어진다
+    const shade = Math.max(0, 0.30 - Math.abs(x - inner) * 0.035);
+    for (let k = 0; k < 6; k++) {
+      g.px(x, y + k, 'r');
+      markRoof(x, y + k, 0.46 - k * 0.04 + shade, y + 5);
+    }
     g.px(x, y + 6, SHADE);
   }
+  g.vline(inner + (xa < CX ? 1 : -1), top, GROUND - 3, SHADE);   // 본채와의 이음매
   archWin(g, Math.round((xa + xb) / 2) - 5, top + 15, 11, 14, false);
 }
 
@@ -1175,10 +1188,17 @@ function leanTo(g, xa, xb, top) {
 function tower(g, cx, wallTop) {
   const a = cx - 9, b = cx + 9, rt = wallTop - 28;
   wall(g, a, b, wallTop, GROUND, true);
+  // 탑 지붕은 본채의 **뒤로 누운 지붕 옆**에 선다. 0.45~0.10으로 잡았더니
+  // 사다리의 q1~q2밖에 못 써서, 뒤 지붕(q5~q7) 옆에서 혼자 쨍하게 밝았다.
+  // 위는 뒤 지붕만큼 어둡고 아래로 오면서 밝아져야 한 마을 지붕으로 보인다
   for (let i = 0; i <= 26; i++) {
     const w = Math.round(2 + 9 * Math.pow(i / 26, 0.9));
-    for (let x = cx - w; x <= cx + w; x++) { g.px(x, rt + i, 'r'); markRoof(x, rt + i, 0.45 - i / 26 * 0.35, wallTop); }
+    for (let x = cx - w; x <= cx + w; x++) {
+      g.px(x, rt + i, 'r');
+      markRoof(x, rt + i, 0.82 - i / 26 * 0.58, wallTop);
+    }
   }
+  g.vline(cx + (cx < CX ? 9 : -9), wallTop, GROUND - 3, SHADE);  // 본채와의 이음매
   g.hline(a - 2, b + 2, wallTop, 'R');
   g.hline(a - 1, b + 1, wallTop + 1, SHADE);
   // 창은 **바닥선 안쪽에서** 끝나야 한다. 두 층으로 넣었더니 아래 창이
