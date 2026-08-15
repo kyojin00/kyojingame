@@ -73,6 +73,12 @@ ARMPIT = 4
 # 3줄은 이 그림체에 비해 목이 길어 보였다 — 2줄이면 턱 밑 그늘 한 줄과
 # 살결 한 줄로, 「목이 있다」만 딱 읽힌다.
 NECK_H = 2
+# 팔이 붙는 열. 몸판이 10~21열(12칸)이고 팔이 3칸이라, 예전에는 7열과
+# 22열에 붙여 어깨 끝이 7~24열 = **18칸**이었다. 머리가 14칸인데 어깨가
+# 18칸이면 위가 좁고 아래가 벌어진 삼각형이 된다.
+# 한 칸씩 안으로 들여 16칸으로 — 어깨가 머리보다 조금 넓은 정도가 된다.
+ARM_L = 8
+ARM_R = 21
 HEAD_Y = 2 + BODY_DROP   # 머리 꼭대기 (두상 16행)
 SHIRT_Y = 19 + BODY_DROP # 셔츠 위 (목은 그 한 행 위)
 HIP_Y = 31 + BODY_DROP   # 바지 위 (엉덩이 띠 3행)
@@ -348,11 +354,11 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.hline(10 + dx, 21 + dx, y + 11, 'B')       # 아랫단 그늘
     g.rect(11 + dx, y, 12 + dx, y + 4, 'L')      # 빛 받는 왼쪽 어깨
     g.vline(11 + dx, y + 5, y + 10, 'L')
-    g.vline(10 + dx, y + ARMPIT, y + 10, 'B')    # 팔과 몸 사이 솔기 —
-    g.vline(21 + dx, y + ARMPIT, y + 10, 'B')    # 겨드랑이부터만 (어깨는 한 덩어리)
+    g.vline(ARM_L + 2 + dx, y + ARMPIT, y + 10, 'B')   # 팔과 몸 사이 솔기 —
+    g.vline(ARM_R + dx, y + ARMPIT, y + 10, 'B')       # 겨드랑이부터만
     g.hline(13 + dx, 18 + dx, y, 'B')            # 옷깃 (목 아래 그늘)
-    g.hline(8 + dx, 9 + dx, y, 'L')              # 어깨 캡 — 몸통 윗줄이 팔 위로
-    g.hline(22 + dx, 23 + dx, y, 'b')            # 흘러내려 승모근 경사를 만든다
+    g.hline(ARM_L + 1 + dx, ARM_L + 2 + dx, y, 'L')   # 어깨 캡 — 몸통 윗줄이 팔
+    g.hline(ARM_R + dx, ARM_R + 1 + dx, y, 'b')       # 위로 흘러 승모근 경사를 만든다
     for cx in (10 + dx, 21 + dx):                # 밑단 모서리를 깎는다
         g.px(cx, y + 11, '.')                    # (깎인 자리는 윤곽선이 채운다)
     g.hline(15 + dx, 16 + dx, y + 2, 'B')        # 앞섶 단추 세 개
@@ -364,16 +370,16 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     # 올라간다 — 어깨는 늘 몸통에 붙어 있다.
     # 위상은 같은 쪽 다리와 **반대** — 왼팔은 오른다리와 함께 나간다.
     # (4칸으로 키워 봤더니 정면 어깨가 벌어져 어색했다 — 옆모습만 4칸.)
-    for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
+    for sx, sw, side in ((ARM_L, -swing, 'left'), (ARM_R, swing, 'right')):
         if side == skip:
             # 휘두르는 팔 쪽: 어깨 캡 밑을 두 줄 이어 둔다 — 안 이으면
             # 몸판(10~21)에서 캡(8~9)만 혹처럼 튀어나오고, 그 밑이 파였다가
             # 휘두르는 팔에서 다시 불거져 실루엣이 층진다.
             if side == 'left':
-                g.rect(8 + dx, y + 1, 9 + dx, y + ARMPIT - 1, 'b')
-                g.px(8 + dx, y + 1, 'L')
+                g.rect(ARM_L + dx, y + 1, ARM_L + 1 + dx, y + ARMPIT - 1, 'b')
+                g.px(ARM_L + dx, y + 1, 'L')
             else:
-                g.rect(22 + dx, y + 1, 23 + dx, y + ARMPIT - 1, 'b')
+                g.rect(ARM_R + 1 + dx, y + 1, ARM_R + 2 + dx, y + ARMPIT - 1, 'b')
             continue
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
@@ -622,14 +628,14 @@ def torso_up(g, bob, swing, dx=0, skip=None):
     g.hline(10 + dx, 21 + dx, y + 11, 'B')
     g.rect(11 + dx, y + 1, 12 + dx, y + 4, 'L')
     g.vline(11 + dx, y + 5, y + 10, 'L')
-    g.vline(10 + dx, y + ARMPIT, y + 10, 'B')    # 팔과 몸 사이 솔기 —
-    g.vline(21 + dx, y + ARMPIT, y + 10, 'B')    # 겨드랑이부터만
+    g.vline(ARM_L + 2 + dx, y + ARMPIT, y + 10, 'B')   # 팔과 몸 사이 솔기 —
+    g.vline(ARM_R + dx, y + ARMPIT, y + 10, 'B')       # 겨드랑이부터만
     g.hline(13 + dx, 18 + dx, y + 6, 'B')        # 등판 주름
-    g.hline(8 + dx, 9 + dx, y, 'L')              # 어깨 캡 (승모근 경사)
-    g.hline(22 + dx, 23 + dx, y, 'b')
+    g.hline(ARM_L + 1 + dx, ARM_L + 2 + dx, y, 'L')   # 어깨 캡 (승모근 경사)
+    g.hline(ARM_R + dx, ARM_R + 1 + dx, y, 'b')
     for cx in (10 + dx, 21 + dx):                # 밑단 모서리 깎기
         g.px(cx, y + 11, '.')
-    for sx, sw, side in ((7, -swing, 'left'), (22, swing, 'right')):
+    for sx, sw, side in ((ARM_L, -swing, 'left'), (ARM_R, swing, 'right')):
         if side == skip:                         # 뒤모습이라 팔 위상이 좌우 반대
             continue
         sx += dx
@@ -675,7 +681,7 @@ SWING = {
     # 억지로 끌고 가면 팔이 고무줄처럼 늘어난다. 내리친 주먹은 어깨 바로
     # 앞이라 팔이 짧아 보이고(단축법), 도구가 화면 쪽으로 넘어온다.
     # 몸은 옆으로 밀지 않고 정중앙에서 쪼그린다.
-    'down': {'skip': 'left', 'shoulder': (9, 24),
+    'down': {'skip': 'left', 'shoulder': (10, 24),
              'poses': [((5, 19), (5, 22), -1, 0, False),
                        ((3, 10), (2, 17), -2, 0, False),
                        ((1, 19), (4, 22), -1, 0, False),
@@ -684,7 +690,7 @@ SWING = {
     # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽 — 어깨 옆으로 감아올려
     # 정수리 너머 저편으로 내리친다. 휘두름부터는 팔이 머리 저쪽(=캐릭터의
     # 앞)이라 머리가 가리고, 주먹만 정수리 위로 잠깐 보인다.
-    'up':   {'skip': 'right', 'shoulder': (22, 24),
+    'up':   {'skip': 'right', 'shoulder': (21, 24),
              'poses': [((24, 17), (26, 20), 1, 0, False),
                        ((24, 10), (27, 17), 2, 0, False),
                        ((19, 4), (24, 11), 0, 0, True),
