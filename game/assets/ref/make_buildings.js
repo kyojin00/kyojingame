@@ -93,6 +93,7 @@ const PAL = {
   // 칠하는 규칙이 다르니 색도 따로 둔다.
   'p0': [208, 144, 98], 'p1': [172, 108, 70], 'p2': [116, 68, 44],
   'p3': [216, 210, 198], 'p4': [150, 144, 136], 'p5': [88, 84, 80],
+  'p6': [84, 50, 32],       // 멀리 있는 굴뚝의 그늘 쪽 (한 단 더 어둡다)
 };
 
 // 결을 낼 때 쓰는 대응표 (기본 <-> 그늘 / 밝은 면)
@@ -710,8 +711,13 @@ function sign(g, cx) {
 //   몸통    3칸짜리 벽돌을 켜마다 반 장씩 어긋나게. 장마다 윗변은 밝고 아랫변은 턱
 //   옆면    왼쪽 한 줄은 빛, 오른쪽 두 줄은 그늘 — 둥근 관이 아니라 각진 기둥
 //   그림자  지붕에 드리운다. 없으면 굴뚝이 지붕에서 떠 보인다
-function chimney(g, x, top, base) {
-  const W = 7, x1 = x + W - 1, bodyY = top + 4;
+// far = 뒤로 물러난 지붕면 위에 선 굴뚝. **작고 어둡게** 그린다 —
+// 크기와 대비가 곧 거리다. 같은 크기·같은 밝기로 두면 아무리 위에 올려도
+// 그냥 「지붕 위쪽에 있는 굴뚝」이지 「뒤에 있는 굴뚝」이 아니다.
+function chimney(g, x, top, base, far) {
+  const W = far ? 5 : 7, x1 = x + W - 1, bodyY = top + 4;
+  const LIT = far ? 'p1' : 'p0', MID = far ? 'p2' : 'p1', DIM = far ? 'p6' : 'p2';
+  const CAP = far ? 'p4' : 'p3', CAPM = far ? 'p5' : 'p4';
   // 밑동은 **지붕 빗변과 같은 기울기로 잘린다.**
   //
   // 수평으로 자르면 굴뚝만 딴 평면에 서 있는 것처럼 보인다. 굴뚝은
@@ -726,7 +732,7 @@ function chimney(g, x, top, base) {
   // 격자로 쪼갰더니 굴뚝이 아니라 사다리가 됐다. 왼쪽 한 줄 빛 /
   // 가운데 / 오른쪽 두 줄 그늘이면 각진 기둥으로 선다
   for (let xx = x; xx <= x1; xx++) {
-    const tone = xx === x ? 'p0' : (xx >= x1 - 1 ? 'p2' : 'p1');
+    const tone = xx === x ? LIT : (xx >= x1 - 1 ? DIM : MID);
     for (let y = bodyY; y <= foot(xx); y++) g.px(xx, y, tone);
   }
   // 켜 — 여섯 줄마다 한 줄, 빛은 왼쪽 끝에만. 굴뚝은 서 있는 물건이라
@@ -734,18 +740,19 @@ function chimney(g, x, top, base) {
   for (let y = bodyY + 5; y <= foot(x1) - 1; y += 6)
     for (let xx = x; xx <= x1; xx++) {
       if (y > foot(xx)) continue;
-      g.px(xx, y, 'p2');
-      if (xx <= x + 2 && y + 1 <= foot(xx)) g.px(xx, y + 1, 'p0');
+      g.px(xx, y, DIM);
+      if (xx <= x + 1 && y + 1 <= foot(xx)) g.px(xx, y + 1, LIT);
     }
   // 갓돌 — 양옆으로 두 칸씩 나온다. 이 턱과 밑그늘이 「얹혀 있다」를 만든다
-  g.rect(x - 2, top + 1, x1 + 2, top + 3, 'p4');
-  g.hline(x - 2, x1 + 2, top + 1, 'p3');
-  g.hline(x - 2, x1 + 2, top + 3, 'p5');
-  g.px(x1 + 2, top + 2, 'p5'); g.px(x1 + 1, top + 2, 'p5');
+  const CO = far ? 1 : 2;                                   // 갓 내밀기
+  g.rect(x - CO, top + 1, x1 + CO, top + 3, CAPM);
+  g.hline(x - CO, x1 + CO, top + 1, CAP);
+  g.hline(x - CO, x1 + CO, top + 3, 'p5');
+  g.px(x1 + CO, top + 2, 'p5');
   // 연도 — 갓 위로 솟은 관. 구멍이 있어야 연기가 나올 데가 생긴다
-  g.rect(x + 1, top - 1, x + 5, top + 1, 'p4');
-  g.px(x + 1, top - 1, 'p3'); g.px(x + 1, top, 'p3');
-  g.rect(x + 2, top - 1, x + 4, top, 'O');
+  g.rect(x + 1, top - 1, x1 - 1, top + 1, CAPM);
+  g.px(x + 1, top - 1, CAP); g.px(x + 1, top, CAP);
+  g.rect(x + 2, top - 1, x1 - 2, top, 'O');
 
   // 밑동 — **물받이(납판).** 굴뚝이 지붕을 뚫고 나온 자리에는 빗물이 새지
   // 않게 납판을 둘러 댄다. 이 치마가 굴뚝을 지붕에 앉힌다.
@@ -754,10 +761,10 @@ function chimney(g, x, top, base) {
   // 치마는 **한 덩어리로** 그린다. 줄 몇 개를 겹쳐 놓았더니 굴뚝 옆에
   // 기대 놓은 막대처럼 흩어져 보였다. 양옆으로 두 칸씩 나온 네 줄짜리
   // 앞치마 하나면, 밑변만 지붕을 따라 기울어져도 형태가 안 흩어진다.
-  for (let xx = x - 2; xx <= x1 + 2; xx++) {
+  for (let xx = x - CO; xx <= x1 + CO; xx++) {
     const b = foot(xx);
     g.vline(xx, b - 3, b, 'p5');
-    g.px(xx, b - 3, 'p4');                                  // 윗변 한 줄만 빛
+    g.px(xx, b - 3, CAPM);                                  // 윗변 한 줄만 빛
     // 밑단은 톱니로 끊는다. 일자로 그으면 얹어 놓은 판이 되고,
     // 한 칸씩 물리면 기와 사이로 밀어 넣은 것처럼 보인다
     if ((xx + b) % 3 === 0) g.px(xx, b + 1, 'p5');
@@ -817,10 +824,13 @@ function build(spec) {
   // 굴뚝은 **뒤를 붙인 뒤에.** 앞 지붕면에 세우면 벽기둥처럼 보인다 —
   // 뒤로 누운 면에서 솟아야 굴뚝으로 읽힌다
   if (spec.chimney !== false)
-    // 자리는 **지붕 한가운데 언저리, 용마루 바로 밑.** 앞 지붕 아래쪽에
-    // 세우면 벽에 붙인 관으로 보이고, 가장자리에 세우면 지붕에서 흘러내린
-    // 것처럼 보인다. 용마루 가까이 가운데여야 「지붕에 난 굴뚝」이 된다
-    chimney(g, spec.chimneyX || CX + 3, RIDGE - 26, RIDGE + 4);
+    // 굴뚝은 **뒤로 물러난 지붕면 위**에 선다. 용마루보다 위쪽 = 깊이로
+    // 뒤쪽이다. 앞 지붕에 세우면 아무리 높이 올려도 「지붕 위쪽」일 뿐
+    // 「뒤쪽」이 아니다. 좌우 자리는 오른쪽 그대로 — 가운데로 옮기는 건
+    // 깊이가 아니라 화면 위치를 옮기는 것이다
+    // 뒤로 갈수록 지붕면이 **좁아진다**(원근). 앞쪽 기준으로 자리를 잡으면
+    // 뒤에서는 지붕 밖으로 삐져나간다 — 실제로 오른쪽 끝에 걸쳤었다
+    chimney(g, spec.chimneyX || CX + 6, RIDGE - 28, RIDGE - 6, true);
 
   // ---- 살림 (뒷면 뒤에 — 앞에 놓인 것들이라 묻히면 안 된다) ----
   lantern(g, CX - 13, MID + 8);
