@@ -467,7 +467,7 @@ func use_tool() -> void:
 				"bite":
 					m.fishing_state = ""
 					m.pending_fish = GameData.pick_fish()
-					# 철수 호감도 50+ 특전: 판정 구간 25% 확대
+					# 용식 호감도 50+ 특전: 판정 구간 25% 확대
 					var zone: float = float(m.pending_fish.zone)
 					if int(GameData.affinity["fisher"]) >= 50:
 						zone *= 1.25

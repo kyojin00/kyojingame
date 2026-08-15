@@ -63,6 +63,13 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.dust_swept = int(d.get("dust_swept", 0))
 	GameData.fisher_quest = str(d.get("fisher_quest", ""))
 	GameData.fisher_choice = int(d.get("fisher_choice", 0))
+	# 용식의 집터 부탁 (서브) + 수납 상자 안의 살림
+	GameData.fisher_home = str(d.get("fisher_home", ""))
+	GameData.sea_open_day = int(d.get("sea_open_day", 0))
+	GameData.storage_stock = Dictionary(d.get("storage_stock", {}))
+	if GameData.sea_open and GameData.sea_open_day <= 0:
+		# 이 이야기가 생기기 전의 세이브 — 오늘을 기준으로 3일 뒤에 나온다
+		GameData.sea_open_day = GameData.day
 	GameData.sea_open = bool(d.get("sea_open", false))
 	GameData.merchant_errand = str(d.get("merchant_errand", ""))
 	GameData.merchant_day = int(d.get("merchant_day", 0))

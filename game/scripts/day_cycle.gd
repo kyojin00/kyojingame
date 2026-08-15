@@ -188,7 +188,7 @@ func _next_day(passed_out: bool) -> void:
 	# 수락해 둔 의뢰는 다음 날까지 이어진다. 안 골랐으면 새로 세 건이 붙는다
 	if GameData.quest.is_empty():
 		GameData.make_daily_quest()
-	# 민지의 해변 노점: 오늘 나와 있을 시각(하루 3번, 1시간씩)을 새로 뽑는다
+	# 만수의 해변 노점: 오늘 나와 있을 시각(하루 3번, 1시간씩)을 새로 뽑는다
 	GameData.roll_stall_hours()
 
 	# 마을 성장: 주민이 늘면 어느 날 아침, 마을 사람들이 이장의 낡은 오두막을

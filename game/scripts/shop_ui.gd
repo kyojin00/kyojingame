@@ -346,7 +346,7 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("recipe", "%s 레시피" % rname,
 					"체력 +%d · 팔면 %dG" % [int(GameData.RECIPES[rid].energy),
 						int(GameData.ITEMS[rid].sell)], rb2, [["coin", rprice]]))
-			_note("민지가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
+			_note("만수가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
 		if buy_cat in ["", "seed"]:
 			# 진열되는 씨앗은 shop_seeds에 있는 것뿐 — 처음에는 밀·옥수수 둘이고,
 			# 게임을 진행하면서 하나씩 들어온다. 그중에서도 제철만 내놓는다.
@@ -364,7 +364,7 @@ func _rebuild() -> void:
 					[["coin", price]]))
 			_note("새 씨앗은 마을이 자라면 하나씩 들어온다.")
 			if GameData.merchant_discount():
-				_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
+				_note("만수와 친해져서 씨앗 10% 할인 중! ♥")
 		if buy_cat == "tool":
 			# 부품(못·경첩)은 잡화점이 아니라 대장간에서 판다
 			_note("도구·부품은 대장간에서 다룬다. 새 물건이 들어오면 이 선반에 놓인다.")
@@ -583,7 +583,7 @@ func _rebuild() -> void:
 			else:
 				items_box.add_child(_mk_row("", "???", "집 조리대에서 만들어보자"))
 		_note("낚싯대를 들고 물가에서 E! 입질(!)이 오면 다시 E!\n"
-			+ "철수와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
+			+ "용식와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
 	elif tab == "craft":
 		# 청혼 반지 — 대장간에서만 벼릴 수 있다
 		_note("— 특별 주문 —")
@@ -802,7 +802,7 @@ func _on_buy_dish_recipe(id: String, price: int) -> void:
 	# 상인이 지나가듯 힌트만 준다 (조리대는 집 안 먼지더미 밑에 있다).
 	# 마커·화살표 없이 대사만으로 알아차리게 하는 자연스러운 튜토리얼이다.
 	if not GameData.kitchen_found:
-		main.dialog.open_seq("민지",
+		main.dialog.open_seq("만수",
 			main.tex.get("npc_merchant_portrait_normal"), [
 			{"text": "「오, 요리 레시피에 관심이 있나 보네?」"},
 			{"text": "「그런데 지금은 사도 소용없을걸?\n아직 조리대가 없잖아.」"},

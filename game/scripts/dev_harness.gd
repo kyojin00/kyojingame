@@ -481,7 +481,7 @@ func _debug_tick() -> void:
 				" 수락=", doing, " 설치=", built, " 시각표=", sched_ok,
 				" 하트러그=", rug_ok, " ", GameData.stall_hours)
 		339:
-			# 노점 이용: 민지가 있을 때만 구매(미끼·한정 레시피), 판매는 상시
+			# 노점 이용: 만수가 있을 때만 구매(미끼·한정 레시피), 판매는 상시
 			var keep_min: float = GameData.minutes
 			GameData.minutes = float(GameData.stall_hours[0]) + 5.0
 			var here: bool = GameData.merchant_at_stall()
@@ -503,7 +503,7 @@ func _debug_tick() -> void:
 				and not GameData.recipe_locked("dish_smelt_fry") \
 				and not GameData.recipe_items.has("dish_smelt_fry")
 			m.shop.close()
-			GameData.minutes = 8.0 * 60.0        # 이른 아침 — 민지가 없다
+			GameData.minutes = 8.0 * 60.0        # 이른 아침 — 만수가 없다
 			var away: bool = not GameData.merchant_at_stall()
 			m.village.open_stall()
 			var sell_only: bool = m.shop.visible and m.shop.allowed == ["sell"]
@@ -695,7 +695,7 @@ func _debug_tick() -> void:
 					no_spawn = false
 			m.actions._enter_building("general")
 			var door_locked: bool = not m.shop_room.visible
-			# ② 완공 다음 날 — 민지가 직접 걸어와 인사한다
+			# ② 완공 다음 날 — 만수가 직접 걸어와 인사한다
 			GameData.arrivals = [{"id": "merchant", "day": GameData.day - 1}]
 			m.story._movein_update(0.016)
 			var came: bool = m.story_cutscene and m.story._movein_walker != null \
@@ -2054,7 +2054,7 @@ func _debug_tick() -> void:
 				" 재료표식=", s12_mark, " 해금완결=", s12_done)
 		278:
 			# #130: 메인 스토리 13 「할머니의 팔찌」 — 자유 생활 보장(임시 조건)
-			# -> 철수의 바다 소문 -> 주민 이야기 3 -> 두 사람의 바위 ->
+			# -> 용식의 바다 소문 -> 주민 이야기 3 -> 두 사람의 바위 ->
 			# 특별한 입질(낡은 상자) -> 연금술사 개봉 -> 팔찌 + 기록 2장
 			m.dialog.close()
 			GameData.story12_phase = "done"
@@ -2075,7 +2075,7 @@ func _debug_tick() -> void:
 			m.story._start_sea_rumor_dialog()
 			m.dialog.skip_seq()
 			var s13_clue: bool = GameData.story13_phase == "clue"
-			# ② 주민 이야기 셋 — 철수·묘연은 안 세고, 같은 사람도 안 센다
+			# ② 주민 이야기 셋 — 용식·묘연은 안 세고, 같은 사람도 안 센다
 			m.story.story13_hear("fisher")
 			m.dialog.close()
 			var s13_nofish: bool = GameData.story13_heard.is_empty()
@@ -2826,6 +2826,126 @@ func _debug_tick() -> void:
 				" 다음날심기=", s20_same and s20_plantday and s20_plant,
 				" 중복심기차단=", s20_replant, " 새싹=", s20_sprout,
 				" 마지막기록·엔딩=", s20_done, " 계속플레이=", s20_free)
+		286:
+			# #138: 서브 퀘스트 「용식의 집터」 + 수납 상자.
+			# 바닷길을 연 지 정확히 3일 뒤 -> 분수대 앞 -> [대화하기] 선택지 ->
+			# 집터에 집 짓기 -> 다시 말 걸기 -> 수납 상자 레시피
+			m.dialog.close()
+			# ① 이름 — 상점 상인 만수 · 낚시꾼 용식
+			var name_ok: bool = str(GameData.NPCS["merchant"].name) == "만수" \
+				and str(GameData.NPCS["fisher"].name) == "용식"
+			# ② 바닷길을 연 지 3일 — 그전에는 나오지 않는다
+			GameData.fisher_quest = "done"
+			GameData.sea_open = true
+			GameData.fisher_home = ""
+			GameData.settler_homes.erase("fisher")
+			GameData.recipes_unlocked.erase("storage_box")
+			var k_day := GameData.day
+			GameData.day = 30                      # 날짜 계산이 음수로 가지 않게
+			GameData.sea_open_day = GameData.day   # 바닷길을 연 바로 그날
+			m.story._fisher_home_update(0.016)
+			var wait_early: bool = GameData.fisher_home == ""
+			GameData.sea_open_day = GameData.day - GameData.FISHER_HOME_DAYS + 1
+			m.story._fisher_home_update(0.016)     # 이틀 뒤 — 아직 안 나온다
+			var wait_early2: bool = GameData.fisher_home == ""
+			GameData.sea_open_day = GameData.day - GameData.FISHER_HOME_DAYS
+			m.story._fisher_home_update(0.016)     # 정확히 사흘 뒤
+			var wait_ok: bool = GameData.fisher_home == "wait" \
+				and GameData.quest_npc_marks().get("fisher", "") == "!"
+			# ③ 분수대 앞에 서 있다
+			var place_ok: bool = m.npcmgr.npc_place_now("fisher") == "fountain"
+			var ft := m.npcmgr.npc_place_tile("fisher", "fountain")
+			var tile_ok: bool = absi(ft.x - (m.FOUNTAIN.position.x + 1)) <= 2 \
+				and ft.y >= m.FOUNTAIN.end.y and ft.y <= m.FOUNTAIN.end.y + 2
+			# ④ 말을 걸면 바로 시작되지 않고 「대화하기」 선택지가 먼저 뜬다
+			m.story.fisher_home_greet()
+			var flabels: Array = []
+			for c in m.dialog.buttons_box.get_children():
+				if c.is_queued_for_deletion() or not (c is Button):
+					continue   # 지워지길 기다리는 지난 선택지는 세지 않는다
+				flabels.append((c as Button).text.strip_edges())
+			var greet_ok: bool = m.dialog.visible and flabels.size() == 2 \
+				and flabels[0] == "대화하기" and GameData.fisher_home == "wait"
+			# ⑤ 「대화하기」를 골라야 부탁이 시작된다
+			m.story._start_fisher_home_dialog()
+			m.dialog.skip_seq()
+			var ask_ok: bool = GameData.fisher_home == "build" \
+				and GameData.quest_catalog().any(func(q: Dictionary) -> bool:
+					return str(q.id) == "fisher_home")
+			# ⑥ 마을 아무 곳에나 집터 -> 그 위에 집을 짓는다
+			var fdoor := Vector2i(88, 30)
+			for fy in range(24, 36):
+				for fx in range(82, 95):
+					m.objnode._remove_object(Vector2i(fx, fy))
+					m.grid[fy][fx].ground = "grass"
+					m.grid[fy][fx].crop_id = ""
+			GameData.items["housing_kit"] = int(GameData.items.get("housing_kit", 0)) + 1
+			var fplaced: bool = m.story.try_place_home_plot(fdoor)
+			var fanchor := fdoor - Vector2i(2, 3)
+			m.story.build_fisher_home(fdoor)
+			var built_ok: bool = fplaced and GameData.fisher_home == "built" \
+				and str(m.objects.get(fanchor, {}).get("kind", "")) == "house" \
+				and GameData.settler_homes.has("fisher") \
+				and GameData.quest_npc_marks().get("fisher", "") == "?"
+			# ⑦ 다시 말을 걸면 완료 대사 + 수납 상자 레시피
+			m.story.fisher_home_report()
+			var report_ok: bool = m.dialog.visible
+			m.dialog.skip_seq()
+			var done_ok: bool = GameData.fisher_home == "done" \
+				and "storage_box" in GameData.recipes_unlocked \
+				and not GameData.recipe_locked("storage_box") \
+				and GameData.completed_quests().has("용식의 부탁 — 살 집 한 채")
+			var cost_ok: bool = int(GameData.DESK_RECIPES["storage_box"].cost.wood) == 8
+			# ⑧ 수납 상자 — 넣기·꺼내기·칸 제한
+			GameData.storage_stock = {}
+			GameData.items["ore"] = 10
+			var put_n := GameData.storage_put("ore", 4)
+			var put_ok: bool = put_n == 4 and int(GameData.storage_stock["ore"]) == 4 \
+				and int(GameData.items["ore"]) == 6
+			var take_n := GameData.storage_take("ore", 3)
+			var take_ok: bool = take_n == 3 and int(GameData.storage_stock["ore"]) == 1 \
+				and int(GameData.items["ore"]) == 9
+			GameData.storage_take("ore", 99)
+			var empty_ok: bool = not GameData.storage_stock.has("ore")
+			# 도구·편지처럼 넣으면 안 되는 것은 목록에 오르지 않는다
+			GameData.items["housing_kit"] = 1
+			var block_ok: bool = not GameData.storage_can_store("housing_kit")
+			# 칸이 꽉 차면 새 종류는 더 못 넣는다 (이미 있는 종류는 계속 쌓인다)
+			GameData.storage_stock = {}
+			for si in GameData.STORAGE_SLOTS:
+				GameData.storage_stock["slot_%d" % si] = 1
+			GameData.items["gem"] = 5
+			var full_ok: bool = GameData.storage_full() \
+				and GameData.storage_put("gem", 1) == 0
+			GameData.storage_stock = {}
+			# 뒷정리 — 뒤 스텝을 오염시키지 않는다
+			m.objnode._remove_object(fanchor)
+			for fy2 in range(24, 36):
+				for fx2 in range(82, 95):
+					m.objnode._remove_object(Vector2i(fx2, fy2))
+			for i in range(GameData.home_plots.size() - 1, -1, -1):
+				var hp: Dictionary = GameData.home_plots[i]
+				if int(hp.x) == fanchor.x and int(hp.y) == fanchor.y:
+					GameData.home_plots.remove_at(i)
+			GameData.settler_homes.erase("fisher")
+			GameData.fisher_home = ""
+			GameData.sea_open_day = 0
+			GameData.day = k_day
+			GameData.items["housing_kit"] = 0
+			GameData.items["ore"] = 0
+			GameData.items["gem"] = 0
+			m.objnode._spawn_objects()
+			m.hud._toast_queue.clear()
+			print("SUBFISH_OK=", name_ok and wait_early and wait_early2 and wait_ok
+				and place_ok and tile_ok and greet_ok and ask_ok and fplaced
+				and built_ok and report_ok and done_ok and cost_ok and put_ok
+				and take_ok and empty_ok and block_ok and full_ok,
+				" 이름=", name_ok, " 3일전차단=", wait_early and wait_early2,
+				" 3일뒤등장=", wait_ok, " 분수대앞=", place_ok and tile_ok,
+				" 대화하기선택지=", greet_ok, " 부탁시작=", ask_ok,
+				" 집터·건설=", fplaced and built_ok, " 완료보고=", report_ok and done_ok,
+				" 레시피목재8=", cost_ok, " 넣기=", put_ok, " 꺼내기=", take_ok and empty_ok,
+				" 제외품목=", block_ok, " 칸제한=", full_ok)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는

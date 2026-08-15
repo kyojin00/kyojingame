@@ -91,6 +91,7 @@ var interior: CanvasLayer
 var cooking_ui: CanvasLayer
 var desk_ui: CanvasLayer
 var alchemy_ui: CanvasLayer
+var storage_ui: CanvasLayer   # 수납 상자 (집 안 상자 곁에서 E)
 var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
@@ -215,6 +216,8 @@ const TEXTURE_NAMES := [
 	"old_lookout", "old_bench", "carved_stone",
 	# 가장 오래된 자리 (메인 스토리 20)
 	"old_gate", "grandpa_seed",
+	# 수납 상자 (용식의 집터 부탁 보상)
+	"storage_box",
 	# 연금술 물약 (조합대 결과물)
 	"water_life",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
@@ -338,7 +341,7 @@ const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...
 # 산호 조각·고대 조각(매우 희귀 — 숨겨진 이야기·레시피와 이어진다)
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
-const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
+const STALL_TILE := Vector2i(72, 79)   # 만수의 해변 노점 (게이트 서남쪽 모래밭)
 # 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
 const ONSEN_POS := Vector2i(66, 6)
 # 옛 농지 (메인 스토리 16) — 마을 서쪽, 오래 묵어 수풀이 우거진 밭.
@@ -577,6 +580,9 @@ func _ready() -> void:
 	alchemy_ui = preload("res://scripts/alchemy_ui.gd").new()
 	alchemy_ui.main = self
 	add_child(alchemy_ui)
+	storage_ui = preload("res://scripts/storage_ui.gd").new()
+	storage_ui.main = self
+	add_child(storage_ui)
 
 	quest_ui = preload("res://scripts/quest_ui.gd").new()
 	quest_ui.main = self
@@ -1003,6 +1009,7 @@ func ui_open() -> bool:
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or (shop_room != null and shop_room.visible) \
 		or cooking_ui.visible or alchemy_ui.visible or quest_ui.visible or note_ui.visible \
+		or (storage_ui != null and storage_ui.visible) \
 		or stats_ui.visible or auction_ui.visible \
 		or _name_layer != null or village._gift_layer != null \
 		or (story.story_layer != null and story.story_layer.visible)
@@ -1254,6 +1261,7 @@ func _process(delta: float) -> void:
 	story._story18_update(delta)
 	story._story19_update(delta)
 	story._story20_update(delta)
+	story._fisher_home_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

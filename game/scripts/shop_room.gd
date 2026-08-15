@@ -14,7 +14,7 @@ const COUNTER := Rect2(276, 252, 408, 54)  # 주인이 뒤에 설 자리를 벽 
 const EXIT_X := Vector2(432, 528)        # 아랫벽 문 구간
 
 # 잡화점(마트)만의 배치: 물건은 한가운데 네 선반에서 산다.
-# 계산대는 오른쪽으로 밀려나고, 민지에게는 「판매」만 한다.
+# 계산대는 오른쪽으로 밀려나고, 만수에게는 「판매」만 한다.
 # [카테고리, 표시 이름, 선반 왼쪽 x]
 const SHELVES := [
 	["seed", "씨앗", 168.0],
@@ -138,7 +138,7 @@ func open(id: String) -> void:
 	moving = false
 	Sound.play_sfx("sfx_place")
 	if id == "general":
-		main.hud.show_message("선반 앞에서 E: 구매 · 계산대(민지)에서 E: 판매", 4.0)
+		main.hud.show_message("선반 앞에서 E: 구매 · 계산대(만수)에서 E: 판매", 4.0)
 	else:
 		main.hud.show_message("%s — 계산대 앞에서 E" % ROOMS[id].name, 3.0)
 	canvas.queue_redraw()
@@ -232,7 +232,7 @@ func _try_interact() -> bool:
 		if str(d.get("action", "")) != "":
 			main.room_action(str(d.action))   # 여관·연구소·도서관
 		elif room_id == "general":
-			# 민지에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
+			# 만수에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
 			main.village.open_merchant_counter()
 		elif str(d.tab) == "":
 			main.hud.show_message(str(d.hint), 4.0)
@@ -416,7 +416,7 @@ func _draw_room() -> void:
 		canvas.draw_string(f, Vector2(480 - shw / 2.0, SHELF_Y + SHELF_H + 66),
 			sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
 	elif _at_counter():
-		var ht := "E: %s" % ("판매 — 민지에게 판다" if room_id == "general" else str(d.hint))
+		var ht := "E: %s" % ("판매 — 만수에게 판다" if room_id == "general" else str(d.hint))
 		var hw: float = f.get_string_size(ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		canvas.draw_string(f, Vector2(480 - hw / 2.0, C.end.y + 40),
 			ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
