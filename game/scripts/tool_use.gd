@@ -291,6 +291,7 @@ func use_tool() -> void:
 			Sound.play_sfx("sfx_seed", 0.1)
 			m.renderer.spawn_particles(t, "seed")
 			m.tutorial_notify("plant")
+			GameData.move_seed_planted()   # 스토리 3-② 「씨앗 한 줌」
 			gain_skill("farm", 2.0)
 		"axe":
 			if obj == null:

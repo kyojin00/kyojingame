@@ -40,6 +40,8 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.minutes = float(d.minutes)
 	GameData.money = int(d.money)
 	GameData.energy = float(d.energy)
+	GameData.hunger = float(d.get("hunger", GameData.HUNGER_MAX))
+	GameData.hunger_open = bool(d.get("hunger_open", false))
 	GameData.gender = str(d.get("gender", "m"))
 	# 외형 — 외형 시스템 이전의 세이브는 성별에서 옛 기본 모습을 만든다
 	# (남자 = 민머리·파란 셔츠, 여자 = 긴 머리·분홍 셔츠)
@@ -78,13 +80,14 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.forest_quest = str(d.get("forest_quest", ""))
 	GameData.forest_day = int(d.get("forest_day", 0))
 	GameData.move_quest = str(d.get("move_quest", ""))
+	GameData.move_seeds = int(d.get("move_seeds", 0))
 	GameData.move_day = int(d.get("move_day", 0))
 	GameData.move_min = int(d.get("move_min", 0))
 	var mh: Array = d.get("move_house", [])
 	GameData.move_house = Vector2i(int(mh[0]), int(mh[1])) if mh.size() == 2 \
 		else Vector2i(-999, -999)
 	GameData.home_plots = (d.get("home_plots", []) as Array)
-	# 이사 편지(스토리 3)가 생기기 전 세이브: 무진이 이미 마을에 있으면
+	# 이사 편지(스토리 3)가 생기기 전 세이브: 재민이 이미 마을에 있으면
 	# (숲속의 집 이야기가 시작됐으면) 이사는 끝난 것으로 친다
 	if GameData.move_quest == "" and GameData.forest_quest != "":
 		GameData.move_quest = "done"
@@ -151,7 +154,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.tracked_pick = str(d.get("tracked_pick", ""))
 	GameData.respawn_queue = d.get("respawn_queue", [])
 	# 첫 인사 시스템이 생기기 전 세이브: 이미 지어져 영업하던 건물의
-	# 주인들은 인사를 마친 것으로 친다 (무진도 이사가 끝났으면 마찬가지)
+	# 주인들은 인사를 마친 것으로 친다 (재민도 이사가 끝났으면 마찬가지)
 	if not d.has("npc_greeted"):
 		for pid: String in GameData.village_built:
 			var owner := str(m.VILLAGE_NPC.get(pid, ""))
@@ -160,7 +163,7 @@ func _apply_save(d: Dictionary) -> void:
 		if GameData.move_quest == "done" \
 				and "explorer" not in GameData.npc_greeted:
 			GameData.npc_greeted.append("explorer")
-	# 인사만 남기고 저장한 세이브: 무진이 다시 찾아오도록 대기열에 태운다
+	# 인사만 남기고 저장한 세이브: 재민이 다시 찾아오도록 대기열에 태운다
 	if GameData.move_quest == "greet":
 		var has_ex := false
 		for a2 in GameData.arrivals:

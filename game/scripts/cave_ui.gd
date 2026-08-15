@@ -368,8 +368,8 @@ func _blocked_at(p: Vector2) -> bool:
 
 
 func _process(delta: float) -> void:
-	if not visible or main.dialog.visible or main.summary.visible \
-			or main.inventory_ui.visible:
+	# 겹쳐 뜬 창(가방·퀘스트·연구노트...)이 있으면 그 창이 먼저다
+	if not visible or main.room_overlay_open():
 		return
 	# 히트스톱 — 맞는 순간 아주 잠깐 모두 멈춘다 (타격이 몸에 박힌다)
 	if hitstop > 0.0:
@@ -484,8 +484,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or main.dialog.visible or main.summary.visible \
-			or main.inventory_ui.visible:
+	# 겹쳐 뜬 창(가방·퀘스트·연구노트...)이 있으면 그 창이 먼저다
+	if not visible or main.room_overlay_open():
 		return
 	if event.is_action_pressed("use_tool"):
 		_attack()

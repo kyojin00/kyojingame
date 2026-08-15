@@ -247,7 +247,7 @@ const TEXTURE_NAMES := [
 	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
 	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
 	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
-	# 메인 스토리 5: 모험가 무진 + 숲속의 모녀 (연화·솔이)
+	# 메인 스토리 5: 모험가 재민 + 숲속의 모녀 (연화·솔이)
 	"npc_explorer_down_0", "npc_explorer_down_1", "npc_explorer_up_0",
 	"npc_explorer_up_1", "npc_explorer_side_0", "npc_explorer_side_1",
 	"npc_explorer_portrait_normal", "npc_explorer_portrait_happy",
@@ -428,7 +428,8 @@ func village_residents() -> int:
 	return npcs.size() + 1
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
-	"ranch": "rancher", "fish": "fisher", "library": "librarian"}
+	"ranch": "rancher", "fish": "fisher", "library": "librarian",
+	"post": "postman"}
 # ---- NPC 하루 일과 ----
 #
 # 시간대마다 갈 곳이 바뀐다. 목적지까지는 길찾기로 걸어가고,
@@ -438,6 +439,8 @@ const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 const NPC_SCHEDULE := {
 	"chief":      [[6, "home"], [9, "board"], [12, "plaza"], [16, "board"]],
 	"merchant":   [[6, "home"], [9, "work"], [13, "plaza"], [15, "work"]],
+	# 우체부 — 아침 첫 배달을 돌고(광장) 낮부터 우체국을 지킨다
+	"postman":    [[6, "work"], [8, "plaza"], [10, "work"], [16, "plaza"]],
 	"blacksmith": [[6, "home"], [9, "work"], [14, "plaza"], [16, "work"]],
 	"rancher":    [[6, "home"], [8, "work"], [12, "plaza"], [15, "work"]],
 	# 사서 — 방문객일 때는 work가 광장(집이 없어서)으로, 도서관이 서면
@@ -1040,6 +1043,35 @@ func ui_open() -> bool:
 		or (story.story_layer != null and story.story_layer.visible)
 
 
+# 방(집·동굴·가게) **위에** 겹쳐 뜬 창이 있는가.
+#
+# 이런 창이 하나라도 열려 있으면 ESC·E는 그 창의 몫이다. 방이 먼저
+# 가로채면 가방을 닫으려고 누른 ESC에 게임 메뉴가 떠 버린다 —
+# 실제로 「집 안에서 가방 열고 ESC」가 그랬다.
+func room_overlay_open() -> bool:
+	return dialog.visible or inventory_ui.visible or quest_ui.visible \
+		or note_ui.visible or stats_ui.visible or map_ui.visible \
+		or shop.visible or cooking_ui.visible or alchemy_ui.visible \
+		or desk_ui.visible or sleep_dialog.visible or summary.visible \
+		or fishing_ui.visible or auction_ui.visible \
+		or (storage_ui != null and storage_ui.visible) \
+		or (settings_ui != null and settings_ui.visible)
+
+
+# 굶주림이 몸을 갉는다. 집 안(지붕 밑)은 안전지대라 체력이 일정선
+# 아래로 내려가지 않는다 — 밖에서 굶으면 그대로 쓰러진다.
+func _starve_process(delta: float) -> void:
+	if Net.is_guest() or not GameData.starving():
+		return
+	var indoors := interior.visible
+	var before := GameData.energy
+	GameData.starve_tick(delta, indoors)
+	if before > 0.0 and GameData.energy <= 0.0 and not indoors \
+			and not day_transitioning:
+		hud.show_message("배가 고파 눈앞이 캄캄하다... 정신을 잃었다.", 4.0)
+		daycycle._fade_next_day(true)
+
+
 func interior_only_open() -> bool:
 	# 집/동굴 안에 있을 때는 시간이 흐른다 (다른 창이 겹치면 정지)
 	return (interior.visible or cave.visible
@@ -1137,7 +1169,7 @@ const FOREST_HOUSE_ANCHOR := Vector2i(30, 24)
 # 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
 const ALCH_HOUSE_ANCHOR := Vector2i(56, 46)
 const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
-const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 무진이 처음 서성이는 광장 언저리
+const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 재민이 처음 서성이는 광장 언저리
 const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
@@ -1304,6 +1336,7 @@ func _process(delta: float) -> void:
 		if not Net.is_guest():
 			# 시간은 호스트/솔로만 진행 (게스트는 동기화 수신)
 			GameData.minutes += delta * MIN_PER_SEC
+			GameData.hunger_tick(delta * MIN_PER_SEC)   # 시간이 흐르면 배가 꺼진다
 			if GameData.minutes >= GameData.DAY_END and not day_transitioning:
 				daycycle._fade_next_day(true)
 		water_timer += delta
@@ -1336,9 +1369,11 @@ func _process(delta: float) -> void:
 		if player.walked > 40.0:
 			tutorial_notify("moved")
 	weather_time += delta
-	# 체력은 동굴 밖에서 천천히 회복된다 (요리를 먹으면 즉시 회복)
-	if not cave.visible:
+	# 체력은 동굴 밖에서 천천히 회복된다 (요리를 먹으면 즉시 회복).
+	# 다만 굶고 있으면 회복은커녕 계속 깎인다.
+	if not cave.visible and not GameData.starving():
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
+	_starve_process(delta)
 	renderer._update_particles(delta)
 	daycycle._update_night_mobs(delta)
 	objnode._update_tree_fade()
@@ -1426,18 +1461,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if ui_open():
 		if event.is_action_pressed("ui_cancel"):
-			# 설정 창이 떠 있으면 그것부터 닫는다 (뒤의 창은 그대로 둔다)
-			if settings_ui != null and settings_ui.visible:
-				settings_ui.close()
-				get_viewport().set_input_as_handled()
-				return
-			shop.close()
-			summary.close()
-			map_ui.close()
-			inventory_ui.close()
-			quest_ui.close()
-			note_ui.close()
-			stats_ui.close()
+			# 겹쳐 뜬 창은 **위에 있는 것부터 하나씩** 닫는다.
+			# 한 번에 다 닫아 버리면 가방을 닫으려던 ESC에 뒤에 있던
+			# 상점 창까지 같이 사라진다.
+			var stack: Array = [settings_ui, storage_ui, stats_ui, note_ui,
+				quest_ui, inventory_ui, map_ui, summary, shop]
+			for w: Variant in stack:
+				if w != null and bool(w.visible):
+					w.close()
+					get_viewport().set_input_as_handled()
+					return
 			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
 			if fade_rect == null or fade_rect.color.a < 0.5:
 				dialog.close()

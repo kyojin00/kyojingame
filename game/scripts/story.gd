@@ -1547,28 +1547,28 @@ func hidden_beach_find(fid: String) -> void:
 
 # ---- 메인 스토리 5: 숲속에서 발견한 집 ----
 #
-# 첫 수확(스토리 2 완료) 뒤 모험가 무진이 마을로 이사 온다.
-# 숲을 쏘다니던 무진이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
+# 첫 수확(스토리 2 완료) 뒤 모험가 재민이 마을로 이사 온다.
+# 숲을 쏘다니던 재민이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
 # 그 집에는 아픈 딸(솔이)을 돌보는 어머니(연화)가 조용히 살고 있었다.
 # 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
 
 func _forest_update(_delta: float) -> void:
 	if Net.is_guest():
 		return
-	# 무진의 이야기는 이사(메인 스토리 3)가 끝난 다음 날부터 이어진다 —
+	# 재민의 이야기는 이사(메인 스토리 3)가 끝난 다음 날부터 이어진다 —
 	# _end_move_greet가 forest_quest를 "settle"로 넘겨 준다.
-	# 정착한 다음 날 아침, 숲을 쏘다니던 무진이 뭔가를 발견했다.
+	# 정착한 다음 날 아침, 숲을 쏘다니던 재민이 뭔가를 발견했다.
 	if GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
 		GameData.forest_quest = "found"
 		m.hud.story_banner("메인 스토리 5 시작", "숲속에서 발견한 집")
-		m.hud.quest_start_toast("무진이 할 말이 있는 듯하다")
+		m.hud.quest_start_toast("재민이 할 말이 있는 듯하다")
 
 
-# 광장의 무진에게 말을 걸면 — 이사 인사 (모험을 좋아하는 성격)
+# 광장의 재민에게 말을 걸면 — 이사 인사 (모험을 좋아하는 성격)
 func _start_explorer_arrive_dialog() -> void:
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
-	m.dialog.open_seq("무진", m.tex["npc_explorer_portrait_happy"], [
-		{"text": "「어! 안녕? 나는 무진.\n오늘부로 이 마을 주민이 된 사람!」"},
+	m.dialog.open_seq("재민", m.tex["npc_explorer_portrait_happy"], [
+		{"text": "「어! 안녕? 나는 재민.\n오늘부로 이 마을 주민이 된 사람!」"},
 		{"text": "「한곳에 오래 못 붙어 있는 성격인데 말이야,\n이 동네는 숲도 강도 바다도 있다며?」",
 			"portrait": m.tex["npc_explorer_portrait_normal"]},
 		{"text": "「당분간 여기 살면서 구석구석 모험해 볼 참이야.\n%s(이)라고? 잘 부탁해!」" % nm,
@@ -1580,14 +1580,14 @@ func _end_explorer_arrive() -> void:
 	if GameData.forest_quest == "arrive":
 		GameData.forest_quest = "settle"
 		GameData.forest_day = GameData.day
-		m.hud.event_toast("새 주민: 모험가 무진")
-		m.hud.show_message("무진이 마을에 정착했다. 내일은 또 어딜 쏘다닐까?", 5.0)
+		m.hud.event_toast("새 주민: 모험가 재민")
+		m.hud.show_message("재민이 마을에 정착했다. 내일은 또 어딜 쏘다닐까?", 5.0)
 	m.saveio.save_now()
 
 
-# 다음 날 — 무진이 숲 깊은 곳에서 수상한 집을 봤다며 조사를 부탁한다
+# 다음 날 — 재민이 숲 깊은 곳에서 수상한 집을 봤다며 조사를 부탁한다
 func _start_explorer_found_dialog() -> void:
-	m.dialog.open_seq("무진", m.tex["npc_explorer_portrait_normal"], [
+	m.dialog.open_seq("재민", m.tex["npc_explorer_portrait_normal"], [
 		{"text": "「야, 마침 잘 왔어!\n어제 서쪽 숲을 온종일 헤집고 다녔거든?」"},
 		{"text": "「그런데 숲 '깊은 곳'에 말이야...\n집이 한 채 덩그러니 있는 거야.」"},
 		{"text": "「저 우거진 숲속에 누가 산다고?\n아무리 생각해도 이상하단 말이지.」"},
@@ -1662,9 +1662,9 @@ func _end_forest_quest() -> void:
 # ---- 메인 스토리 3: 새로운 주민의 이사 ----
 #
 # 첫 수확 다음 날, 처음으로 「이주 희망 편지」가 도착한다 (편지 이주 시스템의
-# 소개). 이장과 상의해 소년 무진을 받아주기로 하고, 이장은 앞으로의 이사
+# 소개). 이장과 상의해 소년 재민을 받아주기로 하고, 이장은 앞으로의 이사
 # 결정권을 플레이어에게 맡긴다. 집터(비싼 레시피 + 많은 재료)를 만들어
-# 해금된 땅의 풀밭에 집 자리를 직접 정하면 집이 서고, 다음 날 무진이
+# 해금된 땅의 풀밭에 집 자리를 직접 정하면 집이 서고, 다음 날 재민이
 # 이사 와 첫인사를 나눈다. 완료하면 이주 편지·집터 시스템이 해금된다.
 
 func _move_update(_delta: float) -> void:
@@ -1681,22 +1681,22 @@ func _move_update(_delta: float) -> void:
 		# 이때부터 안내 목표가 퀘스트 창(Q)에 나오고, 원하면 핀으로 고정한다
 		GameData.guide_active = true
 		_start_move_letter_dialog()
-	# 집을 지은 다음 날 — 무진이 정말로 이사 오고, 직접 인사하러 온다
+	# 집을 지은 다음 날 — 재민이 정말로 이사 오고, 직접 인사하러 온다
 	# (이주 NPC 공통 규칙: 확정일 다음 날, 본인이 플레이어를 찾아온다)
 	# 하룻밤을 통째로 기다리게 하지 않는다 — 두 시간쯤 뒤(또는 다음 날)면 온다
 	elif GameData.move_quest == "wait" and (GameData.day > GameData.move_day
 			or GameData.minutes >= GameData.move_min + GameData.MOVE_WAIT_MIN):
 		GameData.move_quest = "greet"
 		GameData.arrivals.append({"id": "explorer", "day": GameData.move_day})
-		m.hud.event_toast("무진이 이사 왔다!")
-		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다.\n무진이 곧 인사하러 올 것 같다.", 6.0)
+		m.hud.event_toast("재민이 이사 왔다!")
+		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다.\n재민이 곧 인사하러 올 것 같다.", 6.0)
 		GameData.arrivals[GameData.arrivals.size() - 1]["day"] = GameData.day - 1
 
 
 func _start_move_letter_dialog() -> void:
 	m.dialog.open_seq("이주 희망 편지", m.tex.get("icon_letter"), [
 		{"text": "(문 앞에 낯선 편지가 한 통 놓여 있었다.)"},
-		{"text": "『안녕하세요! 저는 무진이라고 해요.\n여기저기 떠돌며 모험하는 걸 좋아하는 소년이에요.』"},
+		{"text": "『안녕하세요! 저는 재민이라고 해요.\n여기저기 떠돌며 모험하는 걸 좋아하는 소년이에요.』"},
 		{"text": "『소문을 들었어요. 조용하던 교진 마을에\n다시 활기가 돌기 시작했다고요!』"},
 		{"text": "『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요?』"},
 		{"text": "(마을로 이사 오고 싶다는 편지다.\n이장님께 보여드리고 상의해 보자.)"},
@@ -1792,15 +1792,15 @@ func try_place_home_plot(door: Vector2i) -> bool:
 func open_move_letter() -> void:
 	if GameData.move_quest == "show":
 		m.dialog.open("이주 희망 편지",
-			"『...꼭 한번 살아 보고 싶어요. 받아 주실래요? — 무진』\n\n(먼저 이장님께 보여드리고 상의해 보자.)",
+			"『...꼭 한번 살아 보고 싶어요. 받아 주실래요? — 재민』\n\n(먼저 이장님께 보여드리고 상의해 보자.)",
 			[["닫기", null]], m.tex.get("icon_letter"))
 		return
 	if GameData.move_quest != "build":
-		m.dialog.open("이주 희망 편지", "이미 답장을 보낸 편지다.\n무진의 들뜬 글씨가 눈에 선하다.",
+		m.dialog.open("이주 희망 편지", "이미 답장을 보낸 편지다.\n재민의 들뜬 글씨가 눈에 선하다.",
 			[["닫기", null]], m.tex.get("icon_letter"))
 		return
 	m.dialog.open("이주 희망 편지",
-		"『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요? — 무진』",
+		"『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요? — 재민』",
 		[["수락하기", _try_accept_move], ["나중에", null]], m.tex.get("icon_letter"))
 
 
@@ -1831,7 +1831,7 @@ func _try_accept_move() -> void:
 	GameData.move_min = GameData.minutes
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("이사 수락 — 새 주민의 집 완공!")
-	m.hud.show_message("준비해 둔 집터에 집이 지어졌다.\n무진이 오늘 안에 짐을 들고 온다!", 5.0)
+	m.hud.show_message("준비해 둔 집터에 집이 지어졌다.\n재민이 오늘 안에 짐을 들고 온다!", 5.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -1916,12 +1916,12 @@ func _end_story4() -> void:
 	m.saveio.save_now()
 
 
-# 이사 온 무진과의 첫인사
+# 이사 온 재민과의 첫인사
 func _start_move_greet_dialog() -> void:
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
-	m.dialog.open_seq("무진", m.tex["npc_explorer_portrait_happy"], [
+	m.dialog.open_seq("재민", m.tex["npc_explorer_portrait_happy"], [
 		{"text": "「아! 혹시 네가 %s?\n편지 받아 줘서 정말 고마워!」" % nm},
-		{"text": "「나는 무진. 오늘부터 이 마을 주민이야.\n집도 네가 직접 골라 준 자리라며? 마음에 쏙 들어!」"},
+		{"text": "「나는 재민. 오늘부터 이 마을 주민이야.\n집도 네가 직접 골라 준 자리라며? 마음에 쏙 들어!」"},
 		{"text": "「나는 한곳에 가만히 못 있는 성격이라...\n내일부터 마을 구석구석 모험하고 다닐 거야.」",
 			"portrait": m.tex["npc_explorer_portrait_normal"]},
 		{"text": "「좋은 거 찾으면 제일 먼저 알려줄게.\n또 보자, 잘 부탁해!」",
@@ -1931,13 +1931,112 @@ func _start_move_greet_dialog() -> void:
 
 func _end_move_greet() -> void:
 	if GameData.move_quest in ["greet", "wait"]:
+		GameData.move_quest = "seed"
+		GameData.move_seeds = 0
+		# 이주 편지·집터 시스템은 여기서 이미 열린다 (집을 지어 봤으니까)
+		m.hud.show_message("이주 편지·집터 시스템 해금!\n앞으로 이주 희망 편지는 이장 허락 없이 네가 직접 결정한다.", 7.0)
+	_end_movein("explorer")   # 첫 인사 마무리 (공통 시스템과 같은 결)
+	# 이어서 재민이 배낭을 뒤진다 — 씨앗 한 줌과 「배고픔」 이야기
+	if GameData.move_quest == "seed":
+		_start_move_seed_dialog.call_deferred()
+
+
+# ---- 스토리 3-② 「씨앗 한 줌」 — 배고픔 시스템이 열린다 ----
+
+func _start_move_seed_dialog() -> void:
+	m.dialog.open_seq("재민", m.tex["npc_explorer_portrait_normal"], [
+		{"text": "「아 참, 이거. 짐 정리하다 나왔는데\n나한텐 쓸 데가 없어서.」"},
+		{"text": "(재민이 배낭에서 씨앗 한 줌을 꺼내 건넨다.)"},
+		{"text": "「떠돌아다니면서 제일 무서운 게 뭔지 알아?\n짐승도 밤도 아니야. 배고픔이야.」",
+			"portrait": m.tex["npc_explorer_portrait_happy"]},
+		{"text": "「배가 완전히 비면 몸이 먼저 알아.\n힘이 쭉 빠지고, 걸음이 반으로 느려지지.」"},
+		{"text": "「그러다 밖에서 쓰러지면 큰일 나.\n그래도 집 안이면 괜찮아. 지붕 밑은 안전하거든.」"},
+		{"text": "「그러니까 밭을 만들어 둬.\n네가 심은 걸 네가 먹는 게 제일 든든해.」"},
+		{"text": "「우선 이 씨앗 %d알만 심어 봐.\n다 심고 나서 알려 줘!」" % GameData.MOVE_SEEDS},
+	], _end_move_seed_start)
+
+
+func _end_move_seed_start() -> void:
+	if GameData.move_quest != "seed":
+		return
+	# 씨앗 지급 — 지금 계절에 심을 수 있는 것으로 골라 준다
+	var sid := "wheat"
+	for cid: String in GameData.CROP_IDS:
+		if GameData.season() in GameData.CROPS[cid].seasons:
+			sid = cid
+			break
+	GameData.seeds[sid] = int(GameData.seeds.get(sid, 0)) + GameData.MOVE_SEEDS
+	# 배고픔은 여기서 열린다 (그 전에는 게이지도 뜨지 않는다)
+	GameData.hunger_open = true
+	GameData.hunger = GameData.HUNGER_MAX
+	Sound.play_sfx("sfx_coin")
+	m.hud.reward_toast("%s 씨앗 x%d" % [GameData.CROPS[sid].name, GameData.MOVE_SEEDS],
+		m.tex.get("icon_seed"))
+	m.hud.quest_start_toast("씨앗 한 줌 — 밭에 %d알을 심자" % GameData.MOVE_SEEDS)
+	m.hud.show_message("배고픔이 생겼다! 배가 비면 체력이 깎이고 걸음이 느려진다.\n요리를 먹으면 다시 찬다. (집 안은 안전지대)", 8.0)
+	m.saveio.save_now()
+
+
+# 다 심고 재민에게 알린다 -> 3장의 마지막 퀘스트(우체국)로 넘어간다
+func _start_move_seedrep_dialog() -> void:
+	m.dialog.open_seq("재민", m.tex["npc_explorer_portrait_happy"], [
+		{"text": "「오, 벌써 다 심었어? 손 빠른데!」"},
+		{"text": "「밭이 있으면 이 마을에서 굶을 일은 없어.\n...아, 그리고 아까 이장님이 널 찾더라.」",
+			"portrait": m.tex["npc_explorer_portrait_normal"]},
+		{"text": "「내 편지가 여기까지 오는 데 열흘 걸렸다니까\n뭔가 골똘히 생각하시던데?」"},
+	], _end_move_seedrep)
+
+
+func _end_move_seedrep() -> void:
+	if GameData.move_quest != "seedrep":
+		return
+	GameData.move_quest = "post"
+	m.hud.show_message("이장이 할 말이 있는 듯하다.", 5.0)
+	m.saveio.save_now()
+
+
+# ---- 스토리 3-③ 「마을에 우체국을」 — 3장의 마지막 퀘스트 ----
+
+func _start_move_post_dialog() -> void:
+	m.dialog.open_seq("이장 덕수", m.tex["npc_chief_portrait_normal"], [
+		{"text": "「재민이 편지가 열흘이나 걸려 왔다더군.\n...부끄러운 일일세.」"},
+		{"text": "「예전엔 이 마을에도 우체국이 있었어.\n사람이 줄면서 문을 닫았지.」"},
+		{"text": "「편지가 닿지 않는 마을엔 아무도 못 오네.\n올 사람도 우리를 모르니까.」",
+			"portrait": m.tex["npc_chief_portrait_happy"]},
+		{"text": "「우체국을 다시 세우세. 자리는 광장 북쪽,\n예전 그 터가 아직 비어 있네.」"},
+		{"text": "「재료만 모아 오게. 나머지는 마을 사람들과\n내가 맡음세. — 「마을 발전」에서 고르면 되네.」"},
+	], _end_move_post_start)
+
+
+func _end_move_post_start() -> void:
+	if GameData.move_quest != "post":
+		return
+	GameData.move_quest = "postbuild"
+	m.hud.quest_start_toast("마을에 우체국을 — 이장과 함께 짓자")
+	m.saveio.save_now()
+
+
+# 우체국이 서면 우체부 아저씨가 돌아와 눌러앉는다 (첫 인사 -> 3장 완결)
+func _start_postman_settle_dialog() -> void:
+	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
+		{"text": "「허허, 이거 반갑구먼!\n숲에서 헤매던 그 친구가 맞나?」"},
+		{"text": "「자네가 마을에 온 뒤로 이 동네가 영 달라졌어.\n이제 우체국까지 섰으니 말 다 했지.」"},
+		{"text": "「나야 평생 길 위에서 살았네만...\n이 마을이라면 가방을 내려놓아도 되겠어.」",
+			"portrait": m.tex["npc_postman_portrait_normal"]},
+		{"text": "「오늘부터 여기 우체국 사람일세.\n이사 오고 싶다는 편지는 내가 다 자네한테 가져다줌세.」",
+			"portrait": m.tex["npc_postman_portrait_happy"]},
+	], _end_postman_settle)
+
+
+func _end_postman_settle() -> void:
+	if GameData.move_quest == "postgreet":
 		GameData.move_quest = "done"
 		m.hud.story_banner("메인 스토리 3 완결", "새로운 주민의 이사")
-		m.hud.show_message("이주 편지·집터 시스템 해금!\n앞으로 이주 희망 편지는 이장 허락 없이 네가 직접 결정한다.", 7.0)
-		# 정착 다음 날, 무진의 숲 모험이 시작된다 (숲속에서 발견한 집으로 이어진다)
+		m.hud.show_message("우체국이 문을 열었다! 우체부 아저씨가 마을에 자리 잡았다.", 6.0)
+		# 정착 다음 날, 재민의 숲 모험이 시작된다 (숲속에서 발견한 집으로 이어진다)
 		GameData.forest_quest = "settle"
 		GameData.forest_day = GameData.day
-	_end_movein("explorer")   # 첫 인사 마무리 (공통 시스템과 같은 결)
+	_end_movein("postman")
 
 
 # ---- 이주 NPC의 첫 인사 (공통 시스템) ----
@@ -2060,9 +2159,13 @@ func _movein_update(delta: float) -> void:
 
 
 func _start_movein_dialog(nid: String) -> void:
-	# 무진(스토리 3)은 자기만의 첫인사가 있다 — 끝나면 같은 마무리를 탄다
+	# 재민(스토리 3)은 자기만의 첫인사가 있다 — 끝나면 같은 마무리를 탄다
 	if nid == "explorer" and GameData.move_quest == "greet":
 		_start_move_greet_dialog()
+		return
+	# 우체부 아저씨는 재회다 — 3장의 마지막 장면
+	if nid == "postman" and GameData.move_quest == "postgreet":
+		_start_postman_settle_dialog()
 		return
 	var def: Dictionary = GameData.NPCS[nid]
 	var bname := "가게"
@@ -4629,7 +4732,7 @@ func _end_box_open() -> void:
 
 # ---- 주민 이사 시스템 — 일반/특수 주민의 입주와 이탈 ----
 #
-# 스토리 3(무진의 이사)을 겪은 뒤부터, 빈 집터(또는 떠난 주민이 남긴
+# 스토리 3(재민의 이사)을 겪은 뒤부터, 빈 집터(또는 떠난 주민이 남긴
 # 빈 집)가 있으면 아침마다 낮은 확률로 「이사 신청 편지」가 온다.
 # 가방에서 읽고 수락해야 입주한다. 연금술사 묘연(특수)은 연구 노트
 # 50%를 넘기면 소문을 듣고 확정적으로 편지를 보낸다.

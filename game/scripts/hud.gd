@@ -66,6 +66,75 @@ func _ready() -> void:
 	_build_tracker_scroll()
 	_build_minimap()
 	_build_hotbar()
+	_build_hunger()
+
+
+# ---- 배고픔 게이지 (체력 막대 위) ----
+#
+# 글자는 한 자도 없다 — 밥그릇 그림 하나와 막대뿐이다.
+# 배고픔이 열리기 전(스토리 3 전)에는 아예 보이지 않는다.
+var hunger_panel: Panel
+var hunger_bar: ProgressBar
+var hunger_icon: TextureRect
+
+
+func _build_hunger() -> void:
+	hunger_panel = Panel.new()
+	hunger_panel.add_theme_stylebox_override("panel", _wood_style())
+	hunger_panel.position = Vector2(6, 466)
+	hunger_panel.size = Vector2(194, 30)
+	hunger_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hunger_panel.visible = false
+	add_child(hunger_panel)
+
+	hunger_icon = TextureRect.new()
+	hunger_icon.position = Vector2(8, 5)
+	hunger_icon.size = Vector2(20, 20)
+	hunger_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hunger_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hunger_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for cand in ["dish_bread", "dish_baked_potato", "icon_seed"]:
+		if main.tex.has(cand):
+			hunger_icon.texture = main.tex[cand]
+			break
+	hunger_panel.add_child(hunger_icon)
+
+	hunger_bar = ProgressBar.new()
+	hunger_bar.position = Vector2(32, 8)
+	hunger_bar.size = Vector2(154, 13)
+	hunger_bar.max_value = GameData.HUNGER_MAX
+	hunger_bar.show_percentage = false
+	hunger_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.28, 0.19, 0.11)
+	bg.set_corner_radius_all(3)
+	hunger_bar.add_theme_stylebox_override("background", bg)
+	hunger_bar.add_theme_stylebox_override("fill", _hunger_fill(1.0))
+	hunger_panel.add_child(hunger_bar)
+
+
+# 배가 부를수록 노릇하고, 꺼질수록 붉어진다 (숫자 없이 색으로 읽는다)
+func _hunger_fill(ratio: float) -> StyleBoxFlat:
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.92, 0.72, 0.28) if ratio > 0.45 \
+		else (Color(0.9, 0.5, 0.2) if ratio > 0.15 else Color(0.86, 0.28, 0.24))
+	fill.set_corner_radius_all(3)
+	return fill
+
+
+func _refresh_hunger() -> void:
+	if hunger_panel == null:
+		return
+	hunger_panel.visible = GameData.hunger_open
+	if not GameData.hunger_open:
+		return
+	var ratio := GameData.hunger / GameData.HUNGER_MAX
+	hunger_bar.value = GameData.hunger
+	hunger_bar.add_theme_stylebox_override("fill", _hunger_fill(ratio))
+	# 굶으면 밥그릇이 깜빡인다 — 말 대신 그림이 재촉한다
+	var t := float(Time.get_ticks_msec()) / 1000.0
+	hunger_icon.modulate = Color(1, 1, 1) if ratio > 0.0 \
+		else Color(1, 0.6, 0.6, 0.55 + 0.45 * sin(t * 6.0))
 
 
 # ---- 미니맵 (좌측 상단) ----
@@ -583,6 +652,7 @@ var _refresh_t := 0.0
 
 func refresh(force := false) -> void:
 	energy_bar.value = GameData.energy
+	_refresh_hunger()
 	_refresh_t -= get_process_delta_time()
 	if _refresh_t > 0.0 and not force:
 		return

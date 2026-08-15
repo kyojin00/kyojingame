@@ -153,8 +153,13 @@ func do_eat(id: String) -> void:
 	GameData.items[id] -= 1
 	var e: float = float(GameData.RECIPES[id].energy) * GameData.cook_energy_mult()
 	GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + e)
+	GameData.feed(e)                       # 배도 그만큼 부르다
 	Sound.play_sfx("sfx_harvest")
-	m.hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
+	if GameData.hunger_open:
+		m.hud.show_message("%s를 먹었다! 체력 +%d · 배부름 +%d"
+			% [GameData.ITEMS[id].name, int(e), int(e)])
+	else:
+		m.hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
 	if Net.is_guest():
 		m.netsync._req_eat.rpc_id(1, id)
 	elif Net.is_host():

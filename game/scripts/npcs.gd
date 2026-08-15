@@ -135,7 +135,7 @@ func _sync_village_npcs() -> void:
 		if not have_fisher:
 			_spawn_npc("fisher", m.FISHER_ARRIVE)
 
-	# 모험가 무진 — 이주 편지(스토리 3)로 이사 온다. 자기 집(플레이어가
+	# 모험가 재민 — 이주 편지(스토리 3)로 이사 온다. 자기 집(플레이어가
 	# 지어 준 자리) 앞에서 스폰되고, 마을을 자유롭게 쏘다닌다.
 	if GameData.move_quest in ["greet", "done"] or GameData.forest_quest != "":
 		var have_ex := false

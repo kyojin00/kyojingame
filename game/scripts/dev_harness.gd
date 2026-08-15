@@ -868,14 +868,18 @@ func _debug_tick() -> void:
 		350:
 			# 메인 스토리 3 「새로운 주민의 이사」 -> 5 「숲속에서 발견한 집」 전체 체인:
 			# 이주 편지 -> 이장 상의(결정권 이양) -> 집터 레시피·제작 -> 집 자리
-			# 직접 선정 -> 다음 날 무진 이사·첫인사 -> (다음 날) 숲속 집 발견담
+			# 직접 선정 -> 다음 날 재민 이사·첫인사 -> (다음 날) 숲속 집 발견담
 			# -> 이장도 모름 -> 모녀 만남 -> 호감도 해금
 			GameData.move_quest = ""
 			GameData.forest_quest = ""
 			GameData.affinity_open = false
+			# 샌드박스는 마을 건물을 다 세워 두었다 — 우체국만 도로 헐고
+			# 이야기로 다시 짓는다 (3장의 마지막 퀘스트)
+			var k_built3: Array = GameData.village_built.duplicate()
+			GameData.village_built.erase("post")
 			GameData.move_house = Vector2i(-999, -999)
 			GameData.move_day = GameData.day - 1
-			for n0 in m.npcs.duplicate():          # 샌드박스가 미리 깔아 둔 무진 제거
+			for n0 in m.npcs.duplicate():          # 샌드박스가 미리 깔아 둔 재민 제거
 				if n0.id == "explorer":
 					m.npcs.erase(n0)
 					n0.queue_free()
@@ -935,9 +939,9 @@ func _debug_tick() -> void:
 				and str(m.objects.get(hdoor - Vector2i(2, 3), {}).get("kind", "")) == "house" \
 				and GameData.first_empty_plot().x < 0 \
 				and int(GameData.items["move_letter"]) == letters0 - 1
-			GameData.day += 1                      # 다음 날 — 무진이 이사 온다
+			GameData.day += 1                      # 다음 날 — 재민이 이사 온다
 			m.story._move_update(0.016)
-			# 공통 규칙: 무진이 직접 찾아온다 (도착 연출 시작 -> 걸어오는 중)
+			# 공통 규칙: 재민이 직접 찾아온다 (도착 연출 시작 -> 걸어오는 중)
 			m.story._movein_update(0.016)
 			var have_ex := false
 			for nx in m.npcs:
@@ -947,18 +951,70 @@ func _debug_tick() -> void:
 				and m.story_cutscene
 			m.story._start_move_greet_dialog()
 			var greet_talk: bool = m.dialog.visible
-			m.dialog.skip_seq()                    # 첫인사 끝 -> 이사 완료
+			m.dialog.skip_seq()                    # 첫인사 끝 -> 씨앗 퀘스트로
+			var seed_q: bool = GameData.move_quest == "seed"
+			m.dialog.close()
+
+			# ── 3-② 「씨앗 한 줌」 — 씨앗을 받고 배고픔이 열린다
+			var seed0 := GameData.seed_total()
+			m.story._start_move_seed_dialog()
+			m.dialog.skip_seq()
+			m.dialog.close()
+			var hunger_on: bool = GameData.hunger_open \
+				and GameData.seed_total() == seed0 + GameData.MOVE_SEEDS \
+				and GameData.move_objective_short().contains("0/%d" % GameData.MOVE_SEEDS)
+			for si in GameData.MOVE_SEEDS:
+				GameData.move_seed_planted()
+			var seed_done: bool = GameData.move_quest == "seedrep" \
+				and GameData.quest_npc_marks().get("explorer", "") == "?"
+			m.story._start_move_seedrep_dialog()
+			m.dialog.skip_seq()
+			m.dialog.close()
+			var post_q: bool = GameData.move_quest == "post" \
+				and GameData.quest_npc_marks().get("chief", "") == "!"
+
+			# ── 3-③ 「마을에 우체국을」 — 3장의 마지막 퀘스트
+			var post_gated: bool = m.village._next_village_build() != "post"
+			m.story._start_move_post_dialog()
+			m.dialog.skip_seq()
+			m.dialog.close()
+			var post_open: bool = GameData.move_quest == "postbuild" \
+				and m.village._next_village_build() == "post"
+			var pcost: Array = m.VILLAGE_BUILD_COST["post"]
+			GameData.wood += int(pcost[0])
+			GameData.stone += int(pcost[1])
+			m.village._build_village_building("post")
+			m.dialog.close()
+			var built_post: bool = GameData.village_built.has("post") \
+				and GameData.move_quest == "postgreet" \
+				and str(m.objects.get(m.VILLAGE_PLOTS["post"].anchor, {})
+					.get("kind", "")) == "house"
+			var post_arrival := false
+			for a2: Dictionary in GameData.arrivals:
+				if str(a2.id) == "postman":
+					post_arrival = true
+			m.story._start_postman_settle_dialog()
+			var post_talk: bool = m.dialog.visible
+			m.dialog.skip_seq()                    # 재회 인사 끝 -> 3장 완결
 			var move_done: bool = GameData.move_quest == "done" \
-				and GameData.forest_quest == "settle"
+				and GameData.forest_quest == "settle" \
+				and GameData.npc_greeted.has("postman")
 			m.dialog.close()
 			print("MOVE_OK=", letter_ok and show_q and chief_talk and build_q
 				and recipe_ok2 and kit_ok and no_plot_block and bad_ok and plot_ok
-				and house2_ok and greet_q and greet_talk and move_done,
+				and house2_ok and greet_q and greet_talk and seed_q and hunger_on
+				and seed_done and post_q and post_gated and post_open
+				and built_post and post_arrival and post_talk and move_done,
 				" 편지=", letter_ok, " 이장상의=", show_q and chief_talk,
 				" 결정권=", build_q, " 레시피=", recipe_ok2, " 제작=", kit_ok,
 				" 집터없이수락거부=", no_plot_block, " 물가거부=", bad_ok,
 				" 빈집터=", plot_ok, " 수락후집완공=", house2_ok, " 이사=", greet_q,
-				" 첫인사=", greet_talk, " 완료+숲이야기로=", move_done)
+				" 첫인사=", greet_talk and seed_q, " 씨앗·배고픔=", hunger_on,
+				" 씨앗심기=", seed_done, " 이장호출=", post_q,
+				" 우체국잠김=", post_gated, " 우체국해금=", post_open,
+				" 우체국완공=", built_post, " 우체부방문=", post_arrival,
+				" 우체부정착=", post_talk and move_done)
+			GameData.village_built = k_built3
 			GameData.day += 1                      # 하룻밤 자고 나면 발견담이 뜬다
 			m.story._forest_update(0.016)
 			var found_q: bool = GameData.forest_quest == "found" \
@@ -3363,6 +3419,106 @@ func _debug_tick() -> void:
 				" 표지판=", sign_placed, " 선택지=", sign_menu,
 				" 용식의집=", picked_home, " 지도마커=", guide_ok,
 				" 제작대탭=", cats_ok, " 그림수=", tab_ok, "(", pics, "장)")
+		292:
+			# #142: 배고픔(포만감) · ESC 레이어 · 재민/우체부 이름 · 돌 창 아이콘
+			m.dialog.close()
+			m.inventory_ui.close()
+
+			# ── ① 이름
+			var names_ok: bool = str(GameData.NPCS["explorer"].name) == "재민" \
+				and str(GameData.NPCS["postman"].name) == "우체부 아저씨" \
+				and str(GameData.NPC_KIND.get("postman", "")) == "core" \
+				and str(m.VILLAGE_NPC.get("post", "")) == "postman" \
+				and m.NPC_SCHEDULE.has("postman") \
+				and GameData.affinity.has("postman")
+
+			# ── ② 배고픔: 열리기 전에는 아무 일도 없다
+			var k_open := GameData.hunger_open
+			var k_hunger := GameData.hunger
+			var k_energy := GameData.energy
+			GameData.hunger_open = false
+			GameData.hunger = GameData.HUNGER_MAX
+			GameData.hunger_tick(9999.0)
+			var closed_ok: bool = GameData.hunger == GameData.HUNGER_MAX \
+				and not GameData.starving() \
+				and is_equal_approx(GameData.hunger_speed_mult(), 1.0)
+			# 열리면 시간이 지날수록 배가 꺼진다
+			GameData.hunger_open = true
+			GameData.hunger = GameData.HUNGER_MAX
+			GameData.hunger_tick(300.0)                 # 게임 5시간
+			var drain_ok: bool = GameData.hunger < GameData.HUNGER_MAX \
+				and GameData.hunger > 0.0
+			GameData.hunger_tick(99999.0)               # 하루를 통째로 굶으면
+			var empty_ok: bool = GameData.hunger == 0.0 and GameData.starving() \
+				and GameData.hunger_speed_mult() < 0.5   # 걸음이 눈에 띄게 느리다
+			# 밖에서 굶으면 체력이 계속 깎인다 (바닥까지)
+			GameData.energy = 50.0
+			GameData.starve_tick(5.0, false)
+			var out_drop: bool = GameData.energy < 50.0
+			GameData.starve_tick(999.0, false)
+			var out_zero: bool = GameData.energy <= 0.0
+			# 집 안(안전지대)에서는 30 아래로 내려가지 않는다
+			GameData.energy = GameData.ENERGY_MAX
+			GameData.starve_tick(999.0, true)
+			var safe_floor: bool = is_equal_approx(GameData.energy,
+				GameData.HUNGER_SAFE_FLOOR)
+			GameData.energy = 12.0                      # 이미 바닥이면 회복도 없다
+			GameData.starve_tick(999.0, true)
+			var no_heal: bool = is_equal_approx(GameData.energy, 12.0)
+			# 먹으면 배가 찬다
+			GameData.feed(60.0)
+			var feed_ok: bool = GameData.hunger == 60.0 and not GameData.starving()
+			# 게이지는 해금됐을 때만 뜬다
+			m.hud.refresh(true)
+			var gauge_on: bool = m.hud.hunger_panel != null and m.hud.hunger_panel.visible
+			GameData.hunger_open = false
+			m.hud.refresh(true)
+			var gauge_off: bool = not m.hud.hunger_panel.visible
+			GameData.hunger_open = k_open
+			GameData.hunger = k_hunger
+			GameData.energy = k_energy
+
+			# ── ③ ESC: 겹쳐 뜬 창이 먼저 닫힌다 (집 안에서도)
+			var esc := InputEventAction.new()
+			esc.action = "ui_cancel"
+			esc.pressed = true
+			var room_before: bool = not m.room_overlay_open()
+			m.inventory_ui.toggle()                      # 가방을 연다
+			var overlay_ok: bool = m.inventory_ui.visible and m.room_overlay_open()
+			m.interior.visible = true
+			m.interior._unhandled_input(esc)             # 집 안에서 ESC
+			var bag_first: bool = not m.dialog.visible   # 게임 메뉴가 뜨지 않았다
+			m.inventory_ui.close()
+			m.interior._unhandled_input(esc)             # 이제는 방이 받는다
+			var menu_ok: bool = m.dialog.visible
+			m.dialog.close()
+			m.interior.visible = false
+
+			# ── ④ 돌 창 아이콘 — 돌 검과 다른 그림이고, 비어 있지 않다
+			var spear_tex: Texture2D = m.hud.tool_icon("spear")
+			var sword_tex: Texture2D = m.hud.tool_icon("sword")
+			var spear_px := 0
+			if spear_tex != null:
+				var simg := spear_tex.get_image()
+				for py in simg.get_height():
+					for px in simg.get_width():
+						if simg.get_pixel(px, py).a > 0.5:
+							spear_px += 1
+			var art_ok: bool = spear_tex != null and sword_tex != null \
+				and spear_tex != sword_tex and spear_px > 80 \
+				and spear_tex.get_width() == 32
+			m.hud._toast_queue.clear()
+			print("HUNGER_UI_OK=", names_ok and closed_ok and drain_ok and empty_ok
+				and out_drop and out_zero and safe_floor and no_heal and feed_ok
+				and gauge_on and gauge_off and room_before and overlay_ok
+				and bag_first and menu_ok and art_ok,
+				" 이름·우체부=", names_ok, " 해금전무효=", closed_ok,
+				" 시간감소=", drain_ok, " 0=굶주림=", empty_ok,
+				" 밖체력감소=", out_drop and out_zero,
+				" 집안바닥30=", safe_floor and no_heal, " 먹기=", feed_ok,
+				" 게이지=", gauge_on and gauge_off,
+				" ESC가방먼저=", room_before and overlay_ok and bag_first,
+				" ESC방메뉴=", menu_ok, " 돌창아트=", art_ok, "(", spear_px, "px)")
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

@@ -99,6 +99,8 @@ func _next_day(passed_out: bool) -> void:
 	GameData.minutes = GameData.DAY_START
 	# 침대가 좋을수록 잘 잔다 — 낡은 침대 70% · 나무 100% · 푹신 100%(+쓰러짐 완화)
 	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out)
+	# 한숨 자고 나면 속이 조금은 든든하다 (완전히 차지는 않는다)
+	GameData.hunger = maxf(GameData.hunger, GameData.HUNGER_WAKE_MIN)
 	GameData.reset_daily()
 	m.worldgen._advance_tree_growth()
 

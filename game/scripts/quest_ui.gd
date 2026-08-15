@@ -421,4 +421,4 @@ func _portrait(npc: String) -> Texture2D:
 
 func _npc_name(npc: String) -> String:
 	return {"postman": "우체부 아저씨", "chief": "이장님", "fisher": "낚시꾼",
-		"explorer": "무진", "merchant": "만수"}.get(npc, npc)
+		"explorer": "재민", "merchant": "만수"}.get(npc, npc)

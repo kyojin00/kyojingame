@@ -570,7 +570,7 @@ func _respawn_ok(pos: Vector2i, kind: String) -> bool:
 	for r: Rect2i in NO_SPAWN_RECTS:
 		if r.has_point(pos):
 			return false
-	# 마을 밖 집(무진의 집·숲속의 집·연금술사의 오두막) 문 앞도 비워 둔다
+	# 마을 밖 집(재민의 집·숲속의 집·연금술사의 오두막) 문 앞도 비워 둔다
 	for anchor: Vector2i in [GameData.move_house, m.FOREST_HOUSE_ANCHOR,
 			m.ALCH_HOUSE_ANCHOR]:
 		if anchor.x >= 0 and (pos - m.door_tile(anchor)).length() < 3.0:

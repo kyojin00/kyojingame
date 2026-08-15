@@ -271,9 +271,9 @@ func _can_place(f: Dictionary) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or main.dialog.visible or main.sleep_dialog.visible \
-			or main.cooking_ui.visible or main.alchemy_ui.visible \
-			or main.desk_ui.visible:
+	# 겹쳐 뜬 창(가방·퀘스트·상자·제작대...)이 있으면 그 창이 먼저다 —
+	# 여기서 ESC를 가로채면 가방을 닫으려다 게임 메뉴가 뜬다
+	if not visible or main.room_overlay_open():
 		return
 	if deco_mode:
 		_deco_input(event)

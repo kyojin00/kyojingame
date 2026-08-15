@@ -96,6 +96,9 @@ func _next_village_build() -> String:
 		# 주민 10명을 모아야 지을 수 있다 (마을 성장의 정점)
 		if pid == "hall" and GameData.story9_phase != "build":
 			continue
+		# 우체국은 메인 스토리 3의 마지막 퀘스트 — 이장의 이야기를 들어야 한다
+		if pid == "post" and GameData.move_quest != "postbuild":
+			continue
 		# 도서관은 메인 스토리 6에서 사서와 이야기를 마쳐야 지을 수 있다
 		if pid == "library" and GameData.story6_phase != "build":
 			continue
@@ -198,6 +201,14 @@ func _build_village_building(pid: String) -> void:
 		# 목동도 이미 마을에 와 있다 (스토리 8 방문객) — 보라에게 말을 걸면
 		# 정착 이야기가 이어진다
 		greet_note = "\n목동 아가씨가 벌써 상회 앞에서 들떠 있구먼 — 말을 걸어 보게."
+	elif pid == "post":
+		# 우체부 아저씨가 돌아온다 — 스토리 3의 마지막 장면.
+		# 다른 건물과 달리 「오늘 안에」 온다 (기다리던 재회니까)
+		if GameData.move_quest == "postbuild":
+			GameData.move_quest = "postgreet"
+		if not GameData.npc_greeted.has("postman"):
+			GameData.arrivals.append({"id": "postman", "day": GameData.day - 1})
+		greet_note = "\n우체부 그 친구를 불렀네. 곧 인사하러 올 걸세."
 	elif pid == "hall":
 		# 마을회관 — 개관식은 접수대에서 이장과 (메인 스토리 9의 끝맺음)
 		greet_note = "\n내일부터 낮에는 내가 회관을 지키겠네.\n접수대로 와 주게 — 개관식을 해야지!"
@@ -277,6 +288,13 @@ func _talk_to(npc: Node2D) -> void:
 		return
 	if npc.id == "explorer" and GameData.move_quest == "greet":
 		m.story._start_move_greet_dialog()
+		return
+	# 스토리 3-② 씨앗 한 줌 / 3-③ 우체국
+	if npc.id == "explorer" and GameData.move_quest == "seedrep":
+		m.story._start_move_seedrep_dialog()
+		return
+	if npc.id == "chief" and GameData.move_quest == "post":
+		m.story._start_move_post_dialog()
 		return
 	if npc.id == "explorer" and GameData.forest_quest == "arrive":
 		m.story._start_explorer_arrive_dialog()

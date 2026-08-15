@@ -73,6 +73,23 @@ const STAMINA_NIGHT_MULT := 1.0
 const DAY_START := 6.0 * 60.0   # 오전 6시
 const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
+# ---- 배고픔(포만감) ----
+#
+# 메인 스토리 3의 두 번째 퀘스트에서 열린다 (재민이 알려 준다).
+# 시간이 흐르면 배가 꺼지고, 0이 되면 몸이 상한다 —
+#   · 체력이 계속 깎이고
+#   · 걸음이 눈에 띄게 느려진다
+# 다만 **집 안은 안전지대**다. 지붕 밑에 있는 동안에는 굶주림으로
+# 체력이 HUNGER_SAFE_FLOOR 아래로 내려가지 않는다 (자리를 비워 두어도
+# 죽지 않는다). 밖에서 굶다가 체력이 바닥나면 그대로 쓰러진다.
+const HUNGER_MAX := 100.0
+const HUNGER_PER_MIN := 0.1       # 게임 1분마다 — 가득 차면 1000분(≈하루)
+const HUNGER_STARVE_DPS := 1.5    # 굶을 때 초당 깎이는 체력
+const HUNGER_SAFE_FLOOR := 30.0   # 집 안에서는 여기까지만
+const HUNGER_SLOW_MULT := 0.35    # 굶으면 걸음이 이만큼으로
+const HUNGER_WAKE_MIN := 40.0     # 자고 일어나면 최소 이만큼은 차 있다
+const HUNGER_LOW := 25.0          # 이 아래면 배가 고프다는 신호
+
 const SAVE_PATH := "user://kyojin_farm_save.json"
 
 # ---- 개발/테스트용 치트 (출시 전에 DEV_MODE를 false로 되돌린다) ----
@@ -300,6 +317,8 @@ var minutes := DAY_START
 # 개발용 시작 자금 (출시 전 500으로 되돌릴 것!)
 var money := DEV_MONEY if DEV_MODE else START_MONEY
 var energy := ENERGY_MAX
+var hunger := HUNGER_MAX
+var hunger_open := false     # 배고픔 해금 (스토리 3의 씨앗 퀘스트에서 열린다)
 var tool := "hoe"
 var seed_index := 0
 var seeds := {}
@@ -1074,18 +1093,27 @@ func merchant_at_stall() -> bool:
 # ---- 메인 스토리 3: 새로운 주민의 이사 (편지 이주 + 집터 건설) ----
 #
 # 첫 수확 다음 날, 처음으로 「이주 희망 편지」가 도착한다. 보낸 사람은
-# 호기심 많고 모험을 좋아하는 소년 무진. 이장과 상의해 받아주기로 하고,
+# 호기심 많고 모험을 좋아하는 소년 재민. 이장과 상의해 받아주기로 하고,
 # 이장은 앞으로의 이사 결정권을 플레이어에게 맡긴다. 집터 레시피(비싸다)를
 # 사서 재료를 모아 집터를 만들고, 해금된 땅 중 원하는 풀밭에 집 자리를
-# 직접 정하면 집이 지어진다. 다음 날 무진이 이사 와 첫인사를 나눈다.
+# 직접 정하면 집이 지어진다. 다음 날 재민이 이사 와 첫인사를 나눈다.
+# 이사가 끝나면 3장은 두 걸음 더 간다:
+#   ② 재민이 배낭에서 씨앗을 꺼내 주며 **배고픔**을 알려 준다 (씨앗 심기)
+#   ③ 이장이 우체국 이야기를 꺼낸다 — 우체국을 세우면 우체부 아저씨가
+#      마을에 눌러앉는다 (3장의 마지막 퀘스트)
 #   "": 아직 / letter: 편지 읽는 중 / show: 이장에게 보여주기 /
 #   build: 집터 레시피 구매·제작·설치 / wait: 완공 — 내일 이사 온다 /
-#   greet: 무진 도착 — 인사하러 가기 / done: 완료 (이주·집터 시스템 해금)
+#   greet: 재민 도착 — 인사하러 가기 /
+#   seed: 받은 씨앗을 밭에 심기 / seedrep: 재민에게 알리기 /
+#   post: 이장에게 우체국 이야기 듣기 / postbuild: 우체국 짓기 /
+#   postgreet: 우체부의 첫 인사 / done: 완료 (이주·집터 시스템 해금)
 var move_quest := ""
+const MOVE_SEEDS := 3        # 재민이 나눠 주는 씨앗 (이만큼 심으면 된다)
+var move_seeds := 0          # 그중 심은 개수
 var move_day := 0
 var move_min := 0            # 집을 지은 시각 (분) — 여기서 조금 뒤에 이사 온다
 const MOVE_WAIT_MIN := 120   # 두 시간쯤 지나면 짐을 들고 나타난다            # 단계 전환 기준 날 (편지 도착·이사 대기)
-var move_house := Vector2i(-999, -999)   # 무진의 집 자리 (수락한 집터)
+var move_house := Vector2i(-999, -999)   # 재민의 집 자리 (수락한 집터)
 const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
 # 스프링클러는 퀘스트 보상이 아니라 잡화점 레시피가 됐다 —
 # 농사 실력이 이만큼 붙어야 선반에 올라온다
@@ -1114,10 +1142,29 @@ func move_objective_short() -> String:
 				return "빈 집터가 생겼다 — 이주 편지(가방)를 읽고 수락하자"
 			return "빈 집터를 마련하자 (집터 레시피는 잡화점)"
 		"wait":
-			return "집이 완성됐다 — 내일 무진이 이사 온다"
+			return "집이 완성됐다 — 내일 재민이 이사 온다"
 		"greet":
-			return "무진이 인사하러 오고 있다 — 야외에서 기다리자"
+			return "재민이 인사하러 오고 있다 — 야외에서 기다리자"
+		"seed":
+			return "밭을 갈고 받은 씨앗을 심자 (%d/%d)" % [move_seeds, MOVE_SEEDS]
+		"seedrep":
+			return "재민에게 씨앗을 다 심었다고 알리자 (E)"
+		"post":
+			return "이장에게 마을 소식을 들어 보자 (E)"
+		"postbuild":
+			return "이장과 함께 우체국을 짓자 (마을 발전)"
+		"postgreet":
+			return "우체부 아저씨가 인사하러 온다 — 야외에서 기다리자"
 	return ""
+
+
+# 밭에 씨앗을 한 알 심었다 (스토리 3의 두 번째 퀘스트를 진행하는 중이면 센다)
+func move_seed_planted() -> void:
+	if move_quest != "seed":
+		return
+	move_seeds += 1
+	if move_seeds >= MOVE_SEEDS:
+		move_quest = "seedrep"
 
 
 # ---- 이주 NPC의 첫 인사 (공통 시스템) ----
@@ -2187,14 +2234,19 @@ func quest_catalog() -> Array:
 			"reward": "바다·해변 해금 + 간이낚싯대"})
 	o = move_objective_short()
 	if o != "":
+		var mv_npc := "explorer"
+		if move_quest in ["show", "post", "postbuild"]:
+			mv_npc = "chief"
+		elif move_quest == "postgreet":
+			mv_npc = "postman"
 		out.append({"id": "move", "title": "새로운 주민의 이사", "obj": o,
-			"desc": "무진이 마을에 살고 싶다는 편지를 보내왔다.",
-			"cat": "main", "ep": "메인 스토리 3", "npc": "explorer",
-			"reward": "이주 편지·집터 시스템 해금"})
+			"desc": "재민이 마을에 살고 싶다는 편지를 보내왔다.\n집이 서고 나면 마을은 밭과 우체국까지 갖춘다.",
+			"cat": "main", "ep": "메인 스토리 3", "npc": mv_npc,
+			"reward": "이주 편지·집터 시스템 해금 + 우체국·우체부"})
 	o = forest_objective_short()
 	if o != "":
 		out.append({"id": "forest", "title": "숲속에서 발견한 집", "obj": o,
-			"desc": "무진이 숲 깊은 곳에서 수상한 집을 봤다고 한다.",
+			"desc": "재민이 숲 깊은 곳에서 수상한 집을 봤다고 한다.",
 			"cat": "main", "ep": "메인 스토리 5", "npc": "explorer",
 			"reward": "숲속 모녀와의 만남"})
 	o = story4_objective_short()
@@ -2430,6 +2482,10 @@ func quest_npc_marks() -> Dictionary:
 		marks["fisher"] = "!"
 	if move_quest == "show":
 		marks["chief"] = "!"
+	if move_quest == "seedrep":
+		marks["explorer"] = "?"
+	if move_quest == "post":
+		marks["chief"] = "!"
 	match forest_quest:
 		"arrive", "found":
 			marks["explorer"] = "!"
@@ -2552,15 +2608,15 @@ func quest_npc_marks() -> Dictionary:
 
 # ---- 메인 스토리 5: 숲속에서 발견한 집 ----
 #
-# 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 무진이 마을로 이사 온다.
-# 숲을 쏘다니던 무진이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
+# 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 재민이 마을로 이사 온다.
+# 숲을 쏘다니던 재민이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
 # 그 집에는 아픈 딸을 돌보는 모녀가 조용히 살고 있었다.
 # 이 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
-#   "": 아직 / arrive: 무진 등장 — 말 걸기 / settle: 정착 (다음 날 아침까지) /
-#   found: 숲속 집 발견담 — 무진에게 말 걸기 / ask: 이장에게 물어보기 /
+#   "": 아직 / arrive: 재민 등장 — 말 걸기 / settle: 정착 (다음 날 아침까지) /
+#   found: 숲속 집 발견담 — 재민에게 말 걸기 / ask: 이장에게 물어보기 /
 #   visit: 숲 깊은 곳의 집 방문 (문 앞 E) / done: 완료
 var forest_quest := ""
-var forest_day := 0          # 무진이 정착한 날 — 다음 날 아침 발견담이 뜬다
+var forest_day := 0          # 재민이 정착한 날 — 다음 날 아침 발견담이 뜬다
 var affinity_open := false   # 호감도 콘텐츠(하트·선물) 해금 여부
 
 
@@ -2610,7 +2666,7 @@ func forest_objective_short() -> String:
 		"arrive":
 			return "마을 광장에 낯선 사람이 왔다 — 말을 걸어 보자 (E)"
 		"found":
-			return "무진이 할 말이 있는 듯하다 — 말을 걸어 보자 (E)"
+			return "재민이 할 말이 있는 듯하다 — 말을 걸어 보자 (E)"
 		"ask":
 			return "숲속의 집에 대해 이장에게 물어보자 (E)"
 		"visit":
@@ -2863,6 +2919,40 @@ func desk_upgrade() -> bool:
 		return false
 	desk_lv += 1
 	return true
+
+
+# ---- 배고픔 ----
+
+# 시간이 흐른 만큼 배가 꺼진다 (게임 분 단위 — main._process가 부른다)
+func hunger_tick(game_min: float) -> void:
+	if not hunger_open:
+		return
+	hunger = clampf(hunger - game_min * HUNGER_PER_MIN, 0.0, HUNGER_MAX)
+
+
+func starving() -> bool:
+	return hunger_open and hunger <= 0.0
+
+
+# 굶주림으로 깎이는 체력. 집 안(안전지대)에서는 바닥이 있다 —
+# 지붕 밑에서 자리를 비워 두었다고 죽지는 않는다.
+func starve_tick(delta: float, indoors: bool) -> void:
+	if not starving():
+		return
+	var limit := HUNGER_SAFE_FLOOR if indoors else 0.0
+	if energy <= limit:
+		return          # 이미 바닥 — 굶주림으로는 더 깎이지 않는다
+	energy = maxf(limit, energy - delta * HUNGER_STARVE_DPS)
+
+
+# 굶으면 걸음이 눈에 띄게 무거워진다
+func hunger_speed_mult() -> float:
+	return HUNGER_SLOW_MULT if starving() else 1.0
+
+
+# 먹은 만큼 배가 찬다 (요리의 회복량과 같은 값을 쓴다)
+func feed(amount: float) -> void:
+	hunger = clampf(hunger + amount, 0.0, HUNGER_MAX)
 
 
 # 아침에 기력이 얼마나 차는가 — 침대가 좋을수록 잘 잔다
@@ -4009,7 +4099,7 @@ func playtime_text() -> String:
 #
 # 주민은 세 갈래다:
 #   core    필수 주민 — 메인 스토리로 확정 입주 (이장·만수·무쇠·보라·
-#           용식·서하·무진·연화·솔이). 절대 마을을 떠나지 않는다.
+#           용식·서하·재민·연화·솔이). 절대 마을을 떠나지 않는다.
 #   normal  일반 주민 — 빈 집터가 있으면 랜덤으로 「이사 신청 편지」를
 #           보내 오는 생활형 캐릭터 (농부 순돌·미식가 다미·낚시광 강태)
 #   special 특수 주민 — 조건을 채워야 해금 (연금술사 묘연 — 연구 노트 50%)
@@ -4019,6 +4109,7 @@ func playtime_text() -> String:
 # 편지 한 통만 남기고 떠난다. 호감도 SAFE_AFF 이상이면 절대 안 떠난다.
 const NPC_KIND := {
 	"chief": "core", "merchant": "core", "blacksmith": "core",
+	"postman": "core",
 	"rancher": "core", "fisher": "core", "librarian": "core",
 	"explorer": "core", "forest_mom": "core", "forest_girl": "core",
 	"farmer": "normal", "foodie": "normal", "angler": "normal",
@@ -4509,8 +4600,30 @@ const NPCS := {
 	"secret50": "자네 할아버지가 이 마을에 처음 왔을 때, 다들 미친 사람 취급했어.\n나만 빼고. 그 눈빛은... 미친 게 아니라 믿는 사람의 눈이었거든.",
 	"secret100": "그 양반이 마지막으로 한 말을 전해주지. '덕수, 내 손주가 오면\n일곱 가지를 모을 걸세. 그때 이 마을은 기적을 보게 될 거야.'",
 	},
+	# ---- 우체국이 서면 마을에 눌러앉는 사람 (메인 스토리 3의 마지막) ----
+	"postman": {"name": "우체부 아저씨", "birthday": [SUMMER, 3], "gender": "m",
+	"romance": false,
+	"lines": [
+		"자네 편지 덕에 이 마을에 눌러앉게 됐지 뭔가.",
+		"우체국이 생기니 이제 소문도 편지도 다 여기로 모여.",
+		"먼 길 걷는 건 이제 그만... 이라고 말은 하는데, 몸이 근질근질해.",
+		"이사 오고 싶다는 편지가 또 왔더군. 자네한테 갈 걸세.",
+		"편지 한 통이 사람 하나를 데려오는 걸 여러 번 봤네.",
+	],
+	"morning": ["첫 배달은 해 뜨기 전에 나가야 제맛이지."],
+	"night": ["이 시간에 오는 편지는 대개 급한 소식이야."],
+	"aff30": ["숲에서 처음 만났을 때가 엊그제 같구먼.",
+		"자네 앞으로 온 편지는 내가 제일 먼저 챙겨 두네."],
+	"aff70": ["이 마을에 정 붙인 건 순전히 자네 탓일세.",
+		"내 가방에서 제일 무거운 건 자네한테 갈 소식이야."],
+	"loves": ["dish_bread", "dish_berry_toast", "dish_egg_roll"],
+	"likes": ["dish_soup", "forage_berry", "milk"],
+	"hates": ["sludge"],
+	"secret50": "자네 할아버지 앞으로 온 편지는 늘 두꺼웠어.\n답장은 더 두꺼웠고. 어디로 부치는지는 끝내 안 알려주셨지.",
+	"secret100": "마지막으로 부친 편지, 수취인이 비어 있었네.\n「언젠가 이 집에 올 사람에게」 — 그게 자네였구먼.",
+	},
 	# ---- 메인 스토리 5에서 합류하는 사람들 ----
-	"explorer": {"name": "무진", "birthday": [FALL, 7], "gender": "m", "romance": false,
+	"explorer": {"name": "재민", "birthday": [FALL, 7], "gender": "m", "romance": false,
 	"lines": [
 		"이 마을, 걸어서 안 가 본 데가 없어. ...아마도?",
 		"지도 밖이 제일 재밌는 법이야.",
@@ -4738,6 +4851,7 @@ const NPCS := {
 }
 var affinity := {"librarian": 0,
 	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
+	"postman": 0,
 	"explorer": 0, "forest_mom": 0, "forest_girl": 0,
 	"farmer": 0, "foodie": 0, "angler": 0, "miner": 0, "florist": 0,
 	"carpenter": 0, "herbalist": 0, "painter": 0, "musician": 0,
@@ -5375,6 +5489,8 @@ func reset_all() -> void:
 	minutes = DAY_START
 	money = DEV_MONEY if DEV_MODE else START_MONEY
 	energy = ENERGY_MAX
+	hunger = HUNGER_MAX
+	hunger_open = false
 	tool = "hoe"
 	seed_index = 0
 	wood = 0
@@ -5456,6 +5572,7 @@ func reset_all() -> void:
 	forest_day = 0
 	affinity_open = false
 	move_quest = ""
+	move_seeds = 0
 	move_day = 0
 	move_house = Vector2i(-999, -999)
 	home_plots = []
@@ -5822,6 +5939,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"minutes": minutes,
 		"money": money,
 		"energy": energy,
+		"hunger": hunger, "hunger_open": hunger_open,
 		"seeds": seeds,
 		"produce": produce,
 		"items": items,
@@ -5872,6 +5990,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"forest_quest": forest_quest, "forest_day": forest_day,
 		"affinity_open": affinity_open,
 		"move_quest": move_quest, "move_day": move_day, "move_min": move_min,
+		"move_seeds": move_seeds,
 		"move_house": [move_house.x, move_house.y],
 		"home_plots": home_plots,
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,

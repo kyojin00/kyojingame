@@ -57,7 +57,7 @@ func _spawn_objects() -> void:
 		m.objects.erase(m.door_tile(m.FOREST_HOUSE_ANCHOR))
 		m.worldgen._spawn_house_node(m.FOREST_HOUSE_ANCHOR)
 	if GameData.move_house.x >= 0:
-		# 무진의 집 (스토리 3) — 플레이어가 정한 자리에 다시 세운다
+		# 재민의 집 (스토리 3) — 플레이어가 정한 자리에 다시 세운다
 		m.objects.erase(m.door_tile(GameData.move_house))
 		m.worldgen._spawn_house_node(GameData.move_house)
 	for pos: Vector2i in m.objects:

@@ -35,8 +35,8 @@ func _enter_building(kind: String) -> void:
 		m.interior.open()
 		return
 	if kind == "move_house":
-		m.dialog.open("무진의 집",
-			"새 주민 무진의 집이다. 문패에 나침반이 그려져 있다.\n(무진은 마을 어딘가를 쏘다니는 중이다)",
+		m.dialog.open("재민의 집",
+			"새 주민 재민의 집이다. 문패에 나침반이 그려져 있다.\n(재민은 마을 어딘가를 쏘다니는 중이다)",
 			[["닫기", null]])
 		return
 	if kind == "forest_house":
