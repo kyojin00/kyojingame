@@ -919,7 +919,7 @@ func _draw_cave() -> void:
 			Rect2(Vector2(OX + stairs_pos.x * TS, OY + stairs_pos.y * TS), Vector2(TS, TS)), false)
 	canvas.draw_texture_rect(main.tex["stairs"],
 		Rect2(Vector2(OX + entry_pos.x * TS, OY + entry_pos.y * TS), Vector2(TS, TS)), false)
-	_cave_label(Vector2(OX + (entry_pos.x + 0.5) * TS, OY + entry_pos.y * TS - 4), "E: 나가기")
+	_cave_label(Vector2(OX + (entry_pos.x + 0.5) * TS, OY + entry_pos.y * TS - 4), "나가기")
 
 	# 몬스터
 	for m in monsters:
@@ -951,9 +951,9 @@ func _draw_cave() -> void:
 		else ("세계수 동굴" if worldtree else "동굴")
 	var info := "%s %d층 · 몬스터 %d마리 · 체력 %d" % [cave_name, floor_num, monsters.size(), int(GameData.energy)]
 	if chest_pos.x >= 0:
-		info += " · 상자를 열자(E)!"
+		info += " · 상자를 열자!"
 	elif stairs_pos.x >= 0:
-		info += " · 계단을 찾아 내려가자(E)"
+		info += " · 계단을 찾아 내려가자"
 	_cave_label(Vector2(480, 30), info)
 	_cave_label(Vector2(480, 54), "%s · %d x %d칸" % [floor_title(), GW, GH])
 

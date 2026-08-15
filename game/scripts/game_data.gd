@@ -894,11 +894,11 @@ var story2_phase := ""
 func story2_objective_short() -> String:
 	match story2_phase:
 		"shop":
-			# 목표문에는 재료 수치를 적지 않는다 — 필요한 것은 상점 터
-			# 게시판이 알려 준다. 여기서는 「무엇을 위한 일인지」만 말한다.
-			return "잊혀진 기억을 더듬어, 따스한 온기가 가득한 첫 상점을 우리 손으로 지어보자! (상점 터 게시판에서 E)"
+			# 목표는 한 호흡에 읽히게 — 재료 수치도, 조작키도, 괄호도 없다.
+			# 「무엇을」만 남기고 나머지는 이야기와 게시판이 맡는다.
+			return "상점을 세우자."
 		"farm_talk":
-			return "이장이 할 말이 있는 눈치다 — 곁으로 가 보자 (E)"
+			return "이장과 대화하자."
 	return ""
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
@@ -935,11 +935,11 @@ func fisher_home_ready() -> bool:
 func fisher_home_objective_short() -> String:
 	match fisher_home:
 		"wait":
-			return "분수대 앞의 용식에게 말을 걸어 보자 (E)"
+			return "용식과 대화하자."
 		"build":
-			return "마을에 집을 한 채 짓고, 집 앞 표지판에서 확정하자"
+			return "집을 짓고 표지판에서 정하자."
 		"built":
-			return "용식에게 집이 다 됐다고 알리자"
+			return "용식에게 알리자."
 	return ""
 
 
@@ -1137,25 +1137,25 @@ const TRASH_SELL_MULT := 0.8
 func move_objective_short() -> String:
 	match move_quest:
 		"show":
-			return "이주 희망 편지를 이장에게 보여주자 (E)"
+			return "이장에게 편지를 보여주자."
 		"build":
 			if first_empty_plot().x >= 0:
-				return "빈 집터가 생겼다 — 이주 편지(가방)를 읽고 수락하자"
-			return "빈 집터를 마련하자 (집터 레시피는 잡화점)"
+				return "이주 편지를 읽고 수락하자."
+			return "빈 집터를 마련하자."
 		"wait":
-			return "집이 완성됐다 — 내일 재민이 이사 온다"
+			return "재민이 이사 오기를 기다리자."
 		"greet":
-			return "재민이 인사하러 오고 있다 — 야외에서 기다리자"
+			return "밖에서 재민을 기다리자."
 		"seed":
-			return "재민이 건넨 씨앗을 흙에 묻어 주자 (%d/%d)" % [move_seeds, MOVE_SEEDS]
+			return "씨앗을 심자 %d/%d" % [move_seeds, MOVE_SEEDS]
 		"seedrep":
-			return "재민에게 씨앗을 다 심었다고 알리자 (E)"
+			return "재민에게 알리자."
 		"post":
-			return "이장에게 마을 소식을 들어 보자 (E)"
+			return "이장과 대화하자."
 		"postbuild":
-			return "이장과 함께 우체국을 짓자 (마을 발전)"
+			return "우체국을 세우자."
 		"postgreet":
-			return "우체부 아저씨가 인사하러 온다 — 야외에서 기다리자"
+			return "밖에서 우체부를 기다리자."
 	return ""
 
 
@@ -1224,7 +1224,7 @@ func zone_at(x: int, y: int) -> String:
 
 func story4_objective_short() -> String:
 	if story4_phase == "ask":
-		return "낡은 표지판에 대해 이장에게 물어보자 (E)"
+		return "이장에게 표지판을 물어보자."
 	return ""
 
 
@@ -1245,19 +1245,19 @@ var old_book_stored := false
 func story6_objective_short() -> String:
 	match story6_phase:
 		"show_chief":
-			return "오래된 책을 이장에게 보여주자 (E)"
+			return "이장에게 책을 보여주자."
 		"ask_post":
-			return "우체부 아저씨를 찾아가 편지를 부탁하자"
+			return "우체부에게 편지를 부탁하자."
 		"wait":
-			return "사서의 답장을 기다리자 (며칠 걸린다)"
+			return "사서의 답장을 기다리자."
 		"visit":
-			return "마을에 찾아온 사서를 만나보자"
+			return "찾아온 사서를 만나자."
 		"told":
-			return "사서의 이야기를 이장에게 전하자 (E)"
+			return "이장에게 사서 이야기를 전하자."
 		"build":
 			if village_built.has("library"):
 				return "도서관이 완성됐다 — 사서에게 말을 걸자"
-			return "도서관을 짓자 — 이장 「마을 발전 이야기」 (목재 90·석재 50)"
+			return "도서관을 세우자."
 	return ""
 
 
@@ -1283,14 +1283,14 @@ func forge_price(base: int) -> int:
 func story7_objective_short() -> String:
 	match story7_phase:
 		"worry":
-			return "대장장이 무쇠의 이야기를 들어보자 (E)"
+			return "무쇠와 대화하자."
 		"lore":
-			return "도서관의 서하에게 옛 대장간 이야기를 물어보자"
+			return "서하에게 물어보자."
 		"gather":
 			if int(items.get("ore", 0)) >= STORY7_ORE \
 					and int(items.get("gem", 0)) >= STORY7_GEM:
-				return "다 모았다 — 무쇠의 화로 앞으로 가져다주자 (E)"
-			return "꺼져 가는 화로에 넣을 것을 굴에서 찾아오자 — 단단한 광석과 맑게 빛나는 보석"
+				return "무쇠에게 가져다주자."
+			return "광석과 보석을 모으자."
 	return ""
 
 
@@ -1308,13 +1308,13 @@ var story8_phase := ""
 func story8_objective_short() -> String:
 	match story8_phase:
 		"visit":
-			return "마을에 온 낯선 목동을 만나보자"
+			return "목동을 만나자."
 		"ask":
-			return "목장 이야기를 이장과 상의하자 (E)"
+			return "이장과 상의하자."
 		"build":
 			if village_built.has("ranch"):
-				return "목장 상회가 완성됐다 — 보라에게 말을 걸자"
-			return "목장 상회를 짓자 — 이장 「마을 발전 이야기」 (목재 80·석재 40)"
+				return "보라와 대화하자."
+			return "목장 상회를 세우자."
 	return ""
 
 
@@ -1366,14 +1366,14 @@ const HALL_DONATE_POOL := ["forage_berry", "forage_herb", "forage_shell",
 func story9_objective_short() -> String:
 	match story9_phase:
 		"ask":
-			return "이장의 이야기를 들어보자 (E)"
+			return "이장의 이야기를 듣자."
 		"invite":
-			return "주민 초대하기 — %d/%d명 (이사 편지·빈 집터)" % [
+			return "주민을 초대하자 %d/%d" % [
 				maxi(residents_now - 1, 0), HALL_RESIDENTS]
 		"build":
 			if village_built.has("hall"):
-				return "마을회관이 완성됐다 — 접수대의 이장에게 (E)"
-			return "마을회관을 짓자 — 이장 「마을 발전 이야기」 (목재 120·석재 80)"
+				return "접수대의 이장에게 가자."
+			return "마을회관을 세우자."
 	return ""
 
 
@@ -1395,13 +1395,13 @@ func hall_feature_open(feat: String) -> bool:
 # 다음에 열릴 기능 안내 한 줄 — 회관 공지판이 자연스럽게 예고한다
 func hall_next_feature_text() -> String:
 	if not hall_feature_open("store"):
-		return "주민이 %d명이 되면 마을 창고가 열린다. (지금 %d명)" \
+		return "주민 %d명이면 마을 창고가 열린다. 지금 %d명" \
 			% [HALL_STORE_RES, residents_now]
 	if not hall_feature_open("project"):
-		return "주민이 %d명이 되면 공동 프로젝트가 열린다. (지금 %d명)" \
+		return "주민 %d명이면 공동 프로젝트가 열린다. 지금 %d명" \
 			% [HALL_PROJECT_RES, residents_now]
 	if not hall_feature_open("meet"):
-		return "주민이 %d명이 되면 마을 회의가 열린다. (지금 %d명)" \
+		return "주민 %d명이면 마을 회의가 열린다. 지금 %d명" \
 			% [HALL_MEET_RES, residents_now]
 	return "마을의 모든 살림이 돌아가고 있다."
 
@@ -1500,11 +1500,11 @@ func story10_survey_done() -> bool:
 func story10_objective_short() -> String:
 	match story10_phase:
 		"note":
-			return "도서관의 서하가 찾고 있다 (E)"
+			return "서하와 대화하자."
 		"survey":
 			if story10_survey_done():
-				return "서하에게 동굴 조사 결과를 알리자 (E)"
-			return "동굴 조사 — 깊이 %d/%d층 · 새 표본 %d/%d종" % [
+				return "서하에게 알리자."
+			return "동굴 조사 %d/%d층 · 표본 %d/%d" % [
 				mini(mine_deepest, STORY10_DEPTH), STORY10_DEPTH,
 				mini(cave_finds_found(), STORY10_FINDS), STORY10_FINDS]
 	return ""
@@ -1579,14 +1579,14 @@ func story11_ready() -> bool:
 func story11_objective_short() -> String:
 	match story11_phase:
 		"visit":
-			return "이장이 무언가 할 말이 있는 듯 이쪽으로 온다"
+			return "이장이 찾아오고 있다."
 		"clue":
-			return "주민들에게 할머니의 모자 이야기를 듣자 (%d/%d)" % [
+			return "모자 이야기를 듣자 %d/%d" % [
 				story11_clues.size(), STORY11_CLUE_NPCS.size()]
 		"deep":
 			if int(items.get("relic_hat", 0)) > 0:
 				return "할머니의 모자를 찾았다!"
-			return "동굴 %d층의 광석을 캐자 (최고 기록 %d층)" % [
+			return "동굴 %d층까지 내려가자 · 지금 %d층" % [
 				STORY11_FLOOR, mine_deepest]
 		"record":
 			return "도서관에서 「할머니의 기록」을 읽자"
@@ -1655,18 +1655,18 @@ func story12_mats_text() -> String:
 func story12_objective_short() -> String:
 	match story12_phase:
 		"note":
-			return "연구 노트의 낯선 기록을 확인하자 (N)"
+			return "연구 노트를 확인하자."
 		"ask":
-			return "도서관의 서하에게 기록을 보여주자 (E)"
+			return "서하에게 기록을 보여주자."
 		"gossip":
-			return "주민들에게 연금술사 이야기를 듣자 (%d/%d)" % [
+			return "연금술사 이야기를 듣자 %d/%d" % [
 				story12_heard.size(), STORY12_RUMORS]
 		"path":
-			return "깊은 숲 연못 근처 — 숨은 길을 따라가 보자"
+			return "깊은 숲의 숨은 길을 찾자."
 		"gather":
 			if story12_mats_ok():
-				return "연금술사에게 재료를 가져다주자 (E)"
-			return "재료 시험 — " + story12_mats_text()
+				return "연금술사에게 가져다주자."
+			return "재료를 모으자 " + story12_mats_text()
 	return ""
 
 
@@ -1720,18 +1720,18 @@ func story13_mats_text() -> String:
 func story13_objective_short() -> String:
 	match story13_phase:
 		"rumor":
-			return "낚시꾼 용식의 이상한 이야기를 들어보자 (E)"
+			return "용식의 이야기를 듣자."
 		"clue":
-			return "주민들에게 할머니와 바다 이야기를 듣자 (%d/%d)" % [
+			return "바다 이야기를 듣자 %d/%d" % [
 				story13_heard.size(), STORY13_TALES]
 		"spot":
-			return "해변 서쪽 끝 바위 곁 — 그 자리에서 낚시를 해 보자"
+			return "해변 서쪽 바위 곁에서 낚시하자."
 		"box":
-			return "낡은 상자를 연금술사 묘연에게 가져가자"
+			return "묘연에게 상자를 가져가자."
 		"open":
 			if story13_mats_ok():
-				return "재료를 모았다 — 묘연에게 상자를 열어 달라 하자 (E)"
-			return "개봉 재료 — " + story13_mats_text()
+				return "묘연에게 상자를 열어 달라 하자."
+			return "재료를 모으자 " + story13_mats_text()
 		"record":
 			return "도서관에서 「할머니의 기록」을 읽자"
 	return ""
@@ -1859,14 +1859,14 @@ func hall_calendar_open() -> bool:
 func story14_objective_short() -> String:
 	match story14_phase:
 		"meet":
-			return "마을회관에서 이장의 회의를 듣자"
+			return "회관에서 회의를 듣자."
 		"prep":
-			return "축제 준비 — 여섯 가지 중 %d/%d 완료 (회관에서 내놓기)" % [
+			return "축제 준비 %d/%d" % [
 				story14_tasks.size(), STORY14_PICK]
 		"fest":
 			if day < story14_fest_day:
-				return "내일 광장에서 첫 축제가 열린다!"
-			return "광장의 축제를 즐기자 — 이장에게 말을 걸면 마무리한다"
+				return "내일 광장에서 축제가 열린다."
+			return "축제를 즐기고 이장과 대화하자."
 	return ""
 
 
@@ -1917,21 +1917,21 @@ func onsen_bathe() -> bool:
 func story15_objective_short() -> String:
 	match story15_phase:
 		"tale":
-			return "이장에게 옛 온천 이야기를 듣자 (E)"
+			return "이장에게 온천을 물어보자."
 		"book":
-			return "도서관에서 온천 기록을 찾아보자"
+			return "도서관에서 기록을 찾자."
 		"tool":
 			if int(items.get("rock_wedge", 0)) > 0:
-				return "착암 쐐기를 들고 동굴로 내려가자"
-			return "바위를 뚫을 쐐기를 무쇠에게 부탁하자 — 굴에서 캔 광석과 별빛 조각이 필요하다"
+				return "쐐기를 들고 동굴로 가자."
+			return "무쇠에게 쐐기를 부탁하자."
 		"dig":
 			if story15_dig_done():
-				return "수맥을 막던 바위를 쐐기로 뚫자 (동굴 %d층+)" % STORY15_DEPTH
-			return "동굴 %d층 아래 수맥 — 몬스터 %d/%d · 바위 %d/%d" % [
+				return "쐐기로 바위를 뚫자 · 동굴 %d층" % STORY15_DEPTH
+			return "동굴 %d층 · 몬스터 %d/%d · 바위 %d/%d" % [
 				STORY15_DEPTH, mini(story15_mobs, STORY15_MOBS), STORY15_MOBS,
 				mini(story15_ore, STORY15_ORE), STORY15_ORE]
 		"water":
-			return "솟아난 물을 묘연에게 보여주자"
+			return "묘연에게 물을 보여주자."
 	return ""
 
 
@@ -1970,12 +1970,12 @@ func story16_objective_short() -> String:
 		"record":
 			return "도서관에서 두 분의 오래된 기록을 읽자"
 		"clue":
-			return "주민들에게 옛 농지 이야기를 듣자 (%d/%d)" % [
+			return "농지 이야기를 듣자 %d/%d" % [
 				story16_heard.size(), STORY16_TALES]
 		"clear":
 			if story16_field_done():
-				return "옛 농지를 한 번 더 갈아 보자 — 흙 속에 무언가 있다"
-			return "옛 농지 되살리기 — 정리 %d/%d · 밭 갈기 %d/%d" % [
+				return "옛 농지를 한 번 더 갈자."
+			return "농지 정리 %d/%d · 밭 갈기 %d/%d" % [
 				mini(story16_clear, STORY16_CLEAR), STORY16_CLEAR,
 				mini(story16_till, STORY16_TILL), STORY16_TILL]
 		"tale":
@@ -2015,14 +2015,14 @@ func story17_barn_done() -> bool:
 func story17_objective_short() -> String:
 	match story17_phase:
 		"cloth":
-			return "보라가 무언가 찾아냈다고 한다 (E)"
+			return "보라와 대화하자."
 		"clue":
-			return "주민들에게 할머니와 목장 이야기를 듣자 (%d/%d)" % [
+			return "목장 이야기를 듣자 %d/%d" % [
 				story17_heard.size(), STORY17_TALES]
 		"barn":
 			if story17_barn_done():
-				return "옛 헛간의 낡은 사료통을 살펴보자 (E)"
-			return "옛 헛간 — 주변 정리 %d/%d · 동물 돌보기 %d/%d" % [
+				return "낡은 사료통을 살펴보자."
+			return "헛간 정리 %d/%d · 동물 돌보기 %d/%d" % [
 				mini(story17_clear, STORY17_CLEAR), STORY17_CLEAR,
 				mini(story17_care, STORY17_CARE), STORY17_CARE]
 		"tale":
@@ -2069,15 +2069,15 @@ func story18_ready() -> bool:
 func story18_objective_short() -> String:
 	match story18_phase:
 		"memo":
-			return "도서관에서 할아버지의 오래된 메모를 읽자"
+			return "도서관에서 메모를 읽자."
 		"clue":
-			return "사서와 주민들에게 그 언덕 이야기를 듣자 (%d/%d)" % [
+			return "언덕 이야기를 듣자 %d/%d" % [
 				story18_heard.size(), STORY18_TALES]
 		"hill":
-			return "옛 전망대의 흔적을 살펴보자 (%d/%d)" % [
+			return "전망대의 흔적을 살펴보자 %d/%d" % [
 				story18_traces.size(), HILL_TRACES.size()]
 		"box":
-			return "전망대의 숨겨진 보관함을 열어 보자 (E)"
+			return "숨겨진 보관함을 열어 보자."
 		"tale":
 			return "도서관에서 마지막 기록을 읽자"
 	return ""
@@ -2128,10 +2128,10 @@ const SKILL_WATER_LINE := {
 func story19_objective_short() -> String:
 	match story19_phase:
 		"seek":
-			return "일곱 갈래의 삶 — 생명의 물 %d/%d" % [
+			return "생명의 물 %d/%d" % [
 				water_count(), ENDING_SKILLS.size()]
 		"page":
-			return "연구 노트(N)의 마지막 페이지가 열렸다"
+			return "노트의 마지막 페이지가 열렸다."
 	return ""
 
 
@@ -2162,8 +2162,14 @@ const STORY20_TELL := ["librarian", "chief"]
 
 # 오래된 돌문이 세계에 서 있는가 — 노트의 마지막 페이지에서 「마을에서 가장
 # 오래된 자리」라는 단서를 얻은 뒤에야 그 자리가 눈에 들어온다
+# 오래된 돌문이 세상에 모습을 드러내는가.
+#
+# 예전에는 광장 북쪽(잡화점 곁)에 서 있어 상점과 겹쳐 보였다.
+# 이제 자리를 북쪽 숲으로 옮기고(main.GATE_POS), 등장 시점도
+# **메인 스토리 18이 시작될 무렵**으로 당겼다 — 할머니의 시계를 찾아
+# 언덕을 오르내리다 보면 못 보던 돌문이 눈에 들어오는 흐름이다.
 func gate_visible() -> bool:
-	return story19_phase == "done" or story20_phase != ""
+	return story18_phase != "" or story19_phase != "" or story20_phase != ""
 
 
 func story20_ready() -> bool:
@@ -2174,22 +2180,22 @@ func story20_ready() -> bool:
 func story20_objective_short() -> String:
 	match story20_phase:
 		"tell":
-			return "서하와 이장에게 마지막 페이지를 보여주자 (%d/%d)" % [
+			return "마지막 페이지를 보여주자 %d/%d" % [
 				story20_told.size(), STORY20_TELL.size()]
 		"gate":
 			if gate_open:
-				return "돌문 안으로 들어가자 (E)"
-			return "광장 북쪽의 오래된 돌문 — 생명의 물 일곱 병 (E)"
+				return "돌문 안으로 들어가자."
+			return "오래된 돌문을 찾아가자."
 		"inner":
-			return "돌문 안쪽 — 할아버지가 피해 다니던 것이 기다린다"
+			return "돌문 안쪽으로 나아가자."
 		"letter":
-			return "집으로 돌아가 하루를 마치자"
+			return "집으로 돌아가자."
 		"plant":
 			if seed_tile.x < 0:
-				return "농장의 땅을 갈고 할아버지의 씨앗을 심자"
+				return "밭을 갈고 씨앗을 심자."
 			if not seed_water:
-				return "심은 씨앗에 물을 주자"
-			return "새싹이 돋았다"
+				return "씨앗에 물을 주자."
+			return "새싹이 돋았다."
 	return ""
 
 
@@ -2775,13 +2781,13 @@ func mom_next_quest() -> Dictionary:
 func forest_objective_short() -> String:
 	match forest_quest:
 		"arrive":
-			return "마을 광장에 낯선 사람이 왔다 — 말을 걸어 보자 (E)"
+			return "낯선 사람과 대화하자."
 		"found":
-			return "재민이 할 말이 있는 듯하다 — 말을 걸어 보자 (E)"
+			return "재민과 대화하자."
 		"ask":
-			return "숲속의 집에 대해 이장에게 물어보자 (E)"
+			return "이장에게 물어보자."
 		"visit":
-			return "숲 깊은 곳의 집을 찾아가 보자 (문 앞에서 E)"
+			return "숲속의 집을 찾아가자."
 	return ""
 
 
@@ -2804,11 +2810,11 @@ func beach_rare_chance() -> float:
 func fisher_objective_short() -> String:
 	match fisher_quest:
 		"meet":
-			return "마을 광장의 낚시꾼에게 말을 걸어 보자 (E)"
+			return "낚시꾼과 대화하자."
 		"follow":
-			return "낚시꾼과 함께 바위 능선으로 가자"
+			return "함께 바위 능선으로 가자."
 		"open":
-			return "곡괭이로 길목의 커다란 바위를 캐서 바닷길을 열자"
+			return "길목의 큰 바위를 캐자."
 	return ""
 
 
@@ -2907,20 +2913,20 @@ func cook_shop_open() -> bool:
 func kitchen_quest_objective_short() -> String:
 	match kitchen_quest:
 		"broom":
-			return "잡화점에서 빗자루 레시피를 사자"
+			return "빗자루 레시피를 사자."
 		"make":
 			if recipe_items.has("broom"):
-				return "가방에서 빗자루 레시피를 배우자"
+				return "빗자루 레시피를 배우자."
 			if int(items.get("weed", 0)) < 1:
-				return "풀숲(E)에서 잡초를 1개 모으자"
-			return "집 안 책상에서 빗자루를 만들자 (잡초 1)"
+				return "풀숲에서 잡초를 모으자."
+			return "책상에서 빗자루를 만들자."
 		"sweep":
-			return "집 안의 먼지와 잡동사니를 쓸어 내자 (%d/%d)" % [
+			return "집 안 먼지를 쓸어 내자 %d/%d" % [
 				dust_swept, DUST_TOTAL]
 		"found":
-			return "만수에게 조리대를 찾았다고 알리자"
+			return "만수에게 알리자."
 		"jam":
-			return "만수가 나눠 준 산딸기로, 집 조리대에서 첫 요리를 지어 보자"
+			return "조리대에서 산딸기잼을 만들자."
 	return ""
 var desk_queue: Array = []        # [{id, left(초)}]
 var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
@@ -3092,7 +3098,13 @@ func is_deep_night() -> bool:
 
 # ---- 지도 탐사 (fog of war) ----
 # 실제로 가 본 지역만 지도에 표시된다. 청크(8타일) 단위로 기록.
-const EXPLORE_CHUNK := 8
+# 지도 안개 — 걸어 본 만큼만 걷힌다.
+#
+# 처음 지도를 열면 온 세상이 먹구름이고, 발이 닿은 자리부터 조금씩
+# 드러난다. 칸을 4로 잡고 둘레 한 겹까지만 밝히므로 한 번에 12x12칸,
+# 168x90짜리 맵의 1%가 채 안 된다 — 탐험할 거리가 남는다.
+# (예전에는 8칸 단위 3x3 = 24x24를 한꺼번에 밝혀, 몇 발짝에 지도가 다 열렸다)
+const EXPLORE_CHUNK := 4
 var explored := {}  # Vector2i(청크 좌표) -> true
 
 
@@ -3111,34 +3123,34 @@ func is_explored_tile(x: int, y: int) -> bool:
 # {이름, 해야 하는 일, 스토리} — Q 상세 창과 목록 모두 여기서 가져온다
 const STORY1_QUESTS := [
 	{"name": "숲 안으로 들어가보기",
-		"task": "숲 안으로 들어가 보자",
+		"task": "숲 안으로 들어가 보자.",
 		"story": "할아버지가 집으로 가는 길이 힘들 거라고 했던 이유를 이제야 알 것 같다. 그래도 집으로 가기 위해서는 이 숲을 지나가야 한다."},
 	{"name": "우체부 아저씨와의 만남",
-		"task": "다가오는 우체부 아저씨에게 말을 걸어 보자 (E)",
+		"task": "우체부와 대화하자.",
 		"story": "숲 속에서 우체부 아저씨가 다가와 말을 걸었다. 그도 마을로 가는 길이라고 한다."},
 	{"name": "나무도끼를 장착해보기",
-		"task": "받은 나무도끼를 가방(I)의 슬롯에 장착해 보자",
+		"task": "나무도끼를 장착하자.",
 		"story": "숲이 너무 험하고 나무가 많아 쉽게 들어갈 수 없던 중 우체부 아저씨를 만났다. 아저씨와 함께 마을까지 가기로 했고, 안전하게 지나가려면 나무를 베어 길을 만들어야 한다. 아저씨에게 받은 나무도끼로 숲을 지나갈 준비를 해보자."},
 	{"name": "나무를 베어보자",
-		"task": "도끼를 선택(숫자키)하고 나무를 클릭한 뒤 E 키로 베어보자",
+		"task": "길을 막은 나무를 베자.",
 		"story": "도끼를 장착했다. 길을 막는 나무를 베어 마을로 가는 길을 만들자."},
 	{"name": "숲길을 나아가자",
-		"task": "나무를 베며 숲길을 따라 나아가자",
+		"task": "숲길을 따라 나아가자.",
 		"story": "첫 나무를 베어 길이 열리기 시작했다. 아저씨와 함께 숲길을 따라 앞으로 나아가자."},
 	{"name": "지도를 확인해보자",
-		"task": "M 키를 눌러 지도를 열어 보자",
+		"task": "지도를 열어 보자.",
 		"story": "숲길이 여러 갈래로 갈라졌다. 어느 길로 가야 할까? 아저씨가 알려준 대로 지도에서 우리 위치와 가 본 곳을 확인해 보자."},
 	{"name": "마을로 가는 길을 열어보자",
-		"task": "우체부 아저씨에게 받은 곡괭이를 장착하고, 길을 막은 커다란 바위를 캐보자",
+		"task": "곡괭이로 바위를 캐자.",
 		"story": "마을로 향하던 중 커다란 바위가 길을 완전히 가로막고 있었다. 아저씨가 곡괭이로 캐는 모습을 보여주며 곡괭이를 건네주었다. 배운 대로 바위를 캐서 길을 열자."},
 	{"name": "마을로 이동",
-		"task": "우체부 아저씨와 함께 길을 따라 마을로 가자",
+		"task": "우체부와 함께 마을로 가자.",
 		"story": "바위를 치워 마침내 길이 열렸다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
-		"task": "우체부 아저씨를 따라 이장님께 가자",
+		"task": "이장에게 가 보자.",
 		"story": "드디어 마을에 도착했다. 우체부 아저씨가 이장님께 직접 편지를 전하러 간다. 함께 따라가 보자."},
 	{"name": "새 보금자리",
-		"task": "이장님이 내어 준 집에 들어가 보자 (문 앞 E)",
+		"task": "집에 들어가 보자.",
 		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
 ]
 # 단계 -> 지금 진행 중인 퀘스트 번호. home_open: 편지는 전했고, 집에 들어가면
@@ -3156,35 +3168,35 @@ func story_current_quest() -> Dictionary:
 func story_objective_short() -> String:
 	match story_phase:
 		"enter":
-			return "우거진 숲 안으로 들어가 보자"
+			return "숲 안으로 들어가 보자."
 		"approach":
-			return "우체부 아저씨에게 말 걸기 (E)"
+			return "우체부와 대화하자."
 		"equip":
-			return "나무도끼를 가방(I) 슬롯에 장착해 보자"
+			return "나무도끼를 장착하자."
 		"chop":
-			return "흙길을 막고 선 나무를 베어보자"
+			return "길을 막은 나무를 베자."
 		"path":
 			if story_gates_left > 0:
-				return "길을 막은 나무를 베며 나아가자 (남은 길목 %d곳)" % story_gates_left
-			return "열린 숲길을 따라 갈림길까지 가자"
+				return "길목의 나무를 베자 %d곳 남음" % story_gates_left
+			return "갈림길까지 가 보자."
 		"map":
-			return "M 키를 눌러 지도를 열어 보자"
+			return "지도를 열어 보자."
 		"rock":
 			match story_rock_state:
 				0:
-					return "열린 길을 따라 마을로 가보자"
+					return "마을로 가 보자."
 				1:
-					return "곡괭이를 장착하고 바위를 클릭한 뒤 E로 캐보자"
+					return "곡괭이로 바위를 캐자."
 				_:
-					return "우체부 아저씨에게 말을 걸어보자"
+					return "우체부와 대화하자."
 		"travel":
-			return "우체부 아저씨와 함께 길을 따라 마을로 가자"
+			return "우체부와 함께 마을로 가자."
 		"deliver":
-			return "우체부 아저씨를 따라 이장님께 가자"
+			return "이장에게 가 보자."
 		"home_open":
-			return "이장님이 내어 준 집에 들어가 보자"
+			return "집에 들어가 보자."
 		"greet":
-			return "집을 둘러보고 밖으로 나가 보자 (아랫문)"
+			return "집을 둘러보고 나가 보자."
 	return ""
 
 
@@ -5131,9 +5143,9 @@ const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
-	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
+	["harvest", "다 자란 작물을 거두자 — 도구 없이 바로 딸 수 있다"],
 	["cook", "집 안 조리대에서 요리를 해 보자"],
-	["board", "의뢰 게시판(E)에서 오늘의 의뢰를 살펴보자"],
+	["board", "의뢰 게시판에서 오늘의 의뢰를 살펴보자"],
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
@@ -5241,38 +5253,35 @@ func fresh_tutorial() -> Dictionary:
 
 # 우측 트래커용 짧은 목표 문구
 # %s 는 실제로 설정된 키로 바뀐다 (키 재설정을 따라간다)
-# 안내 목표 — 조작키는 괄호로 작게, 문장은 「무엇을 위한 일인지」로.
-# 재료 수치나 내부 이름은 여기에 적지 않는다.
+# 안내 목표 — 짧게 한 줄. 괄호도, 조작키 안내도 넣지 않는다
+# (키는 설정 창과 손에 든 도구가 알려 준다).
 const TUTORIAL_SHORT := {
-	"moved": "새 땅의 흙을 밟아 보자 (WASD)",
-	"map": "이 마을이 어떻게 생겼는지 펼쳐 보자 (%s)",
-	"quest": "지금 무엇을 하고 있었는지 들여다보자 (%s)",
-	"note": "할아버지가 남긴 노트를 펴 보자 (%s)",
-	"till": "굳은 땅을 호미로 부드럽게 깨우자 (1)",
-	"plant": "작은 씨앗을 흙 속에 재워 주자 (3)",
-	"water": "목마른 흙에 물을 흠뻑 적셔 주자 (2)",
-	"harvest": "다 자란 열매를 두 손으로 거두자 (E)",
-	"cook": "집 조리대에 불을 지피고 첫 끼를 짓자 (E)",
-	"slept": "긴 하루를 침대에 내려놓자",
-	"board": "마을 사람들이 붙여 둔 부탁을 읽어 보자",
-	"chop": "숲의 나무 한 그루를 정성껏 베어 보자 (5)",
-	"mine": "바위 속에 잠든 돌을 깨워 보자 (6)",
-	"fish": "물가에 앉아 조용히 찌를 드리우자 (9)",
-	"shop": "불이 켜진 잡화점 문을 밀고 들어가 보자",
+	"moved": "마을을 걸어 보자.",
+	"map": "지도를 열어 보자.",
+	"quest": "퀘스트 창을 열어 보자.",
+	"note": "연구 노트를 펴 보자.",
+	"till": "호미로 밭을 갈자.",
+	"plant": "씨앗을 심자.",
+	"water": "밭에 물을 주자.",
+	"harvest": "다 자란 작물을 거두자.",
+	"cook": "조리대에서 요리하자.",
+	"slept": "침대에서 자자.",
+	"board": "의뢰 게시판을 읽어 보자.",
+	"chop": "나무를 베자.",
+	"mine": "돌을 캐자.",
+	"fish": "물가에서 낚시하자.",
+	"shop": "잡화점에 들러 보자.",
 }
 
 
-const TUTORIAL_SHORT_KEY := {"map": "open_map", "quest": "open_quest", "note": "open_note"}
+# (조작키를 목표문에 끼워 넣던 표는 없앴다 — 괄호 표기를 전부 걷어냈다)
 
 
 func tutorial_objective_short() -> String:
 	var flag := tutorial_current_flag()
 	if flag == "":
 		return ""
-	var txt := String(TUTORIAL_SHORT.get(flag, ""))
-	if TUTORIAL_SHORT_KEY.has(flag):
-		txt = txt % key_label(TUTORIAL_SHORT_KEY[flag])
-	return txt
+	return String(TUTORIAL_SHORT.get(flag, ""))
 
 
 func tutorial_objective() -> String:

@@ -295,7 +295,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_sweep_kitchen()
 			else:
 				main.hud.show_message(
-					"먼지와 잡동사니가 쌓여 있다. 빗자루가 있으면 E키로 바로 쓸어 낼 수 있다.", 4.0)
+					"먼지와 잡동사니가 쌓여 있다. 빗자루가 있으면 바로 쓸어 낼 수 있다.", 4.0)
 			get_viewport().set_input_as_handled()
 		elif (ppos - _desk_rect().get_center()).length() < 78.0:
 			main.desk_ui.open()
@@ -321,7 +321,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					["닫기", null],
 				])
 		else:
-			main.hud.show_message("침대 E: 잠자기 · 책상 E: 제작 · 조리대 E: 요리 · 조합대 E: 연금술 · F: 꾸미기")
+			main.hud.show_message("침대: 잠자기 · 책상: 제작 · 조리대: 요리 · 조합대: 연금술 · F: 꾸미기")
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and _key_of(event) == KEY_F:
 		if GameData.house_lv < 2:
@@ -376,7 +376,7 @@ func _sweep_kitchen() -> void:
 	GameData.kitchen_found = true
 	main.dialog.open("낡은 조리대 발견!",
 		"먼지 밑에서 할아버지가 쓰시던 낡은 조리대가 나왔다!\n"
-		+ "화구도 냄비도 그대로다... 닦으면 쓸 수 있겠다.\n\n[요리 해금] 조리대 앞에서 E", [
+		+ "화구도 냄비도 그대로다... 닦으면 쓸 수 있겠다.\n\n[요리 해금] 이제 조리대를 쓸 수 있다.", [
 		["좋아!", null],
 	])
 	main.hud.event_toast("낡은 조리대 발견")
@@ -463,7 +463,7 @@ func _place_held() -> void:
 
 func _buy_furniture(id: String) -> void:
 	if not held.is_empty():
-		main.hud.show_message("들고 있는 가구를 먼저 놓자. (E: 놓기 / X: 판매)")
+		main.hud.show_message("들고 있는 가구를 먼저 놓자. X: 판매")
 		return
 	var def: Dictionary = GameData.FURNITURE[id]
 	if GameData.money < int(def.price):
@@ -473,7 +473,7 @@ func _buy_furniture(id: String) -> void:
 	held = {"id": id, "x": cursor.x, "y": cursor.y, "new_cost": int(def.price)}
 	GameData.furniture.append(held)
 	Sound.play_sfx("sfx_buy")
-	main.hud.show_message("%s 구입! 자리를 골라 E로 놓자." % def.name)
+	main.hud.show_message("%s 구입! 자리를 골라 놓자." % def.name)
 
 
 func _sell_held() -> void:
@@ -632,11 +632,11 @@ func _draw_room() -> void:
 	if deco_mode:
 		_draw_deco_ui()
 	else:
-		var guide := "E: 잠자기/요리/연금술 · F: 꾸미기 · 아랫문: 나가기"
+		var guide := "침대·조리대·조합대 · F: 꾸미기 · 아랫문: 나가기"
 		if not GameData.has_bed:
-			guide = "침대 자리 E: 침대 만들기 · 아랫문: 나가기"
+			guide = "침대 자리에서 침대 만들기 · 아랫문: 나가기"
 		elif GameData.house_lv < 2:
-			guide = "침대 E: 잠자기 · 책상 E: 제작 · F: 집 확장 · 아랫문: 나가기"
+			guide = "침대: 잠자기 · 책상: 제작 · F: 집 확장 · 아랫문: 나가기"
 		_draw_center_text(guide, 72)
 
 
@@ -759,7 +759,7 @@ func _draw_deco_ui() -> void:
 			else Color(1, 0.35, 0.3, 0.35))
 		canvas.draw_rect(r, Color(1, 1, 1, 0.8), false, 1.0)
 
-	_draw_center_text("꾸미기 모드 - E: 집기/놓기 · X: 판매 · F: 완료", 72)
+	_draw_center_text("꾸미기 모드 — 집기·놓기 · X: 판매 · F: 완료", 72)
 
 	# 가구 카탈로그 (숫자키 구입)
 	var px := 8.0

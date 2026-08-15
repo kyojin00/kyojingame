@@ -434,12 +434,12 @@ func _draw_room() -> void:
 
 	var si := _shelf_near()
 	if si >= 0:
-		var sht := "E: [%s] 선반 — 물건 보기" % str(SHELVES[si][1])
+		var sht := "[%s] 선반 — 물건 보기" % str(SHELVES[si][1])
 		var shw: float = f.get_string_size(sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		canvas.draw_string(f, Vector2(480 - shw / 2.0, SHELF_Y + SHELF_H + 66),
 			sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
 	elif _at_counter():
-		var ht := "E: %s" % ("판매 — 만수에게 판다" if room_id == "general" else str(d.hint))
+		var ht := "%s" % ("판매 — 만수에게 판다" if room_id == "general" else str(d.hint))
 		var hw: float = f.get_string_size(ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		canvas.draw_string(f, Vector2(480 - hw / 2.0, C.end.y + 40),
 			ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))

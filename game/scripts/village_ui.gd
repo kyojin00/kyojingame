@@ -1688,7 +1688,7 @@ func use_trash_bin() -> void:
 	GameData.items["trash_bin"] = int(GameData.items["trash_bin"]) - 1
 	m.objnode._place_object(t, "trash_bin", 0)
 	Sound.play_sfx("sfx_place")
-	m.hud.show_message("쓰레기통 설치! E로 열면 24시간 팔 수 있다 (제값의 80%).", 5.0)
+	m.hud.show_message("쓰레기통 설치! 열어서 24시간 팔 수 있다 — 제값의 80%.", 5.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 

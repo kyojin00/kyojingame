@@ -305,10 +305,7 @@ func _draw_map() -> void:
 	# 먹구름 뭉치 — 가려진 칸 위로 둥근 덩어리를 얹어 「구름에 덮인」 모양을 낸다
 	_draw_clouds(fogged)
 
-	# 건설 후보지 — 지금 세울 수 있는 건물 터를 먼저 찍는다 (퀘스트 마커 아래)
-	for g: Dictionary in build_spots():
-		_draw_guide(g)
-	# 퀘스트 길라잡이 — 지금 따라가는 목표가 어디인지 하트로 찍어 준다
+	# 퀘스트 길라잡이 — **딱 하나**만 찍는다 (미니창에 고정한 그 퀘스트)
 	for g: Dictionary in _quest_guides():
 		_draw_guide(g)
 
@@ -331,10 +328,12 @@ func _draw_map() -> void:
 # ---- 퀘스트 길라잡이 ----
 #
 # 「어디로 가야 하지?」를 글로 설명하는 대신 지도에 찍어 준다.
-# 지금 따라가는 퀘스트(트래커에 뜬 것) 하나만 짚는다 — 화면이 마커로
-# 뒤덮이면 오히려 어디가 어딘지 모르게 되므로.
-#   ① 그 퀘스트의 담당 NPC가 마을에 나와 있으면 그 사람 자리
-#   ② 아니면 이야기 단계마다 정해 둔 장소 (아래 표)
+#
+# **마커는 언제나 한 개다.** 미니창에 고정한 퀘스트(고정하지 않았다면
+# 미니창에 뜬 그 퀘스트) 하나만 짚는다 — 여러 개가 동시에 뜨면
+# 어디가 어딘지 모르게 되기 때문이다.
+#   ① 이야기 단계마다 정해 둔 장소가 있으면 그 자리 (아래 표)
+#   ② 없으면 그 퀘스트의 담당 NPC가 서 있는 자리
 func _quest_guides() -> Array:
 	var q: Dictionary = GameData.tracked_quest()
 	if q.is_empty():
@@ -359,6 +358,13 @@ func _quest_guides() -> Array:
 # 이야기 단계별 목적지 — 사람이 아니라 「장소」로 가야 하는 것들
 func _quest_spot(qid: String) -> Vector2i:
 	match qid:
+		"story2":
+			# 첫 상점을 세울 자리 — 「어디에 짓지?」를 지도가 대신 말한다
+			if GameData.story2_phase == "shop":
+				return _plot_center("general")
+		"move":
+			if GameData.move_quest == "postbuild":
+				return _plot_center("post")
 		"story10", "story11":
 			if GameData.story11_phase == "deep" or GameData.story10_phase == "dig":
 				return main.CAVE_POS
@@ -433,27 +439,7 @@ func _draw_clouds(fogged: Array) -> void:
 				r1 * (0.34 + rx * 0.22), CLOUD_MID.lerp(CLOUD_TOP, 0.4 + ry * 0.6))
 
 
-# 지금 세울 수 있는 건물 터 — 「어디에 지어야 하지?」를 지도가 대신 말한다.
-#
-# 첫 상점(잡화점)이 대표다. 이야기가 상점을 지으라고 할 때, 그 터가
-# 지도 어디쯤인지 몰라 마을을 헤매는 일이 없도록 집 모양 마커를 찍는다.
-# 이미 세운 터는 찍지 않는다.
-func build_spots() -> Array:
-	var out: Array = []
-	if GameData.story_phase != "done":
-		return out           # 마을에 닿기 전에는 아무것도 안 찍는다
-	# ① 첫 상점 — 이야기가 짓자고 하는 동안 계속 반짝인다
-	if not GameData.village_built.has("general"):
-		out.append({"tile": _plot_center("general"), "kind": "build",
-			"text": "여기에 첫 상점을"})
-	# ② 그다음 지을 수 있게 열린 건물 터 (이장과 이야기해 열린 것만)
-	var nxt: String = main.village._next_village_build()
-	if nxt != "" and nxt != "general":
-		out.append({"tile": _plot_center(nxt), "kind": "build",
-			"text": "%s를 세울 자리" % str(main.VILLAGE_PLOTS[nxt].name)})
-	return out
-
-
+# 건물 터의 한가운데 — 이야기가 「세우자」고 할 때 이 자리를 찍는다
 func _plot_center(pid: String) -> Vector2i:
 	var a: Vector2i = main.VILLAGE_PLOTS[pid].anchor
 	return a + Vector2i(2, 2)      # 건물 그림(5x4) 한가운데
@@ -466,28 +452,20 @@ func _draw_guide(g: Dictionary) -> void:
 	if c.x < -40.0 or c.x > 1000.0 or c.y < -40.0 or c.y > 560.0:
 		return
 	var beat := 1.0 + sin(blink * 4.0) * 0.12
-	var build := str(g.get("kind", "quest")) == "build"
-	var tint := Color(1.0, 0.78, 0.35) if build else Color(1.0, 0.42, 0.55)
-	var ring := Color(1.0, 0.85, 0.5) if build else Color(1.0, 0.55, 0.66)
+	var tint := Color(1.0, 0.42, 0.55)
+	var ring := Color(1.0, 0.55, 0.66)
 	# 퍼지는 고리 두 겹
 	canvas.draw_arc(c, 13.0 * beat, 0, TAU, 24, Color(ring, 0.85), 2.5)
 	canvas.draw_arc(c, 19.0 * beat, 0, TAU, 24, Color(ring, 0.35), 2.0)
-	var s := 5.0 * beat
-	if build:
-		# 집 — 네모 몸통 + 삼각 지붕 (여기에 「짓는다」는 뜻)
-		canvas.draw_rect(Rect2(c.x - s * 0.8, c.y - s * 0.1,
-			s * 1.6, s * 1.2), tint)
-		canvas.draw_colored_polygon(PackedVector2Array([
-			c + Vector2(-s * 1.15, -s * 0.1), c + Vector2(s * 1.15, -s * 0.1),
-			c + Vector2(0.0, -s * 1.25)]), tint)
-	else:
-		# 하트 (두 개의 둥근 봉우리 + 아래로 모이는 삼각형)
-		canvas.draw_circle(c + Vector2(-s * 0.5, -s * 0.35), s * 0.62, tint)
-		canvas.draw_circle(c + Vector2(s * 0.5, -s * 0.35), s * 0.62, tint)
-		canvas.draw_colored_polygon(PackedVector2Array([
-			c + Vector2(-s * 1.05, -s * 0.15), c + Vector2(s * 1.05, -s * 0.15),
-			c + Vector2(0.0, s * 1.15)]), tint)
-	_label(Vector2(c.x, c.y + 24.0), ("◈ " if build else "◆ ") + str(g.text))
+	# 하트 (두 개의 둥근 봉우리 + 아래로 모이는 삼각형)
+	var s := 5.5 * beat
+	canvas.draw_circle(c + Vector2(-s * 0.5, -s * 0.35), s * 0.62, tint)
+	canvas.draw_circle(c + Vector2(s * 0.5, -s * 0.35), s * 0.62, tint)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-s * 1.05, -s * 0.15), c + Vector2(s * 1.05, -s * 0.15),
+		c + Vector2(0.0, s * 1.15)]), tint)
+	# 이름만, 작게 (설명은 Q창의 몫이다)
+	_label(Vector2(c.x, c.y + 20.0), str(g.text), 15)
 
 
 func _dot(world_pos: Vector2, size: float, col: Color) -> void:
@@ -500,12 +478,13 @@ func _place_label(tx: int, ty: int, text: String) -> void:
 		_label(Vector2(_ox + tx * _cell, _oy + ty * _cell - 2), text)
 
 
-func _label(pos: Vector2, text: String) -> void:
+func _label(pos: Vector2, text: String, size := 22) -> void:
 	# 화면 밖 라벨은 그리지 않는다 (확대했을 때 글자가 가장자리에 몰리지 않게)
 	if pos.x < -60.0 or pos.x > 1020.0 or pos.y < 0.0 or pos.y > 520.0:
 		return
-	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var p := Vector2(pos.x - w / 2.0, pos.y)
-	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, 3,
+	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 3,
 		Color(0.05, 0.04, 0.08))
-	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.92, 0.7))
+	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
+		Color(1, 0.92, 0.7))

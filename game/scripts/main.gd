@@ -362,10 +362,11 @@ const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
 # 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
 const HILL_POS := Vector2i(31, 3)
 const HILL_AREA := Rect2i(26, 1, 11, 6)
-# 오래된 돌문 (메인 스토리 20) — 광장 북쪽, 잡화점과 연구소 사이의 빈 터.
-# 건물 마당과 겹치지 않는 자리다. 마지막 페이지의 단서를 얻기 전에는
-# 아예 보이지 않는다 (GameData.gate_visible)
-const GATE_POS := Vector2i(86, 4)
+# 오래된 돌문 (메인 스토리 20) — **마을 북쪽 숲**, 옛 전망대 언덕과
+# 동굴 입구 사이의 빈터. 마을 부지에서 멀찌감치 떨어뜨렸다:
+# 예전 자리(광장 북쪽)는 잡화점·연구소 마당과 겹쳐 그림이 포개졌다.
+# 메인 스토리 18이 시작될 무렵부터 모습을 드러낸다 (GameData.gate_visible)
+const GATE_POS := Vector2i(40, 2)
 const HILL_TRACE_TILES := {
 	"bench": Vector2i(28, 4),
 	"stone": Vector2i(34, 4),

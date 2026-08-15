@@ -17,9 +17,9 @@ func tool_icon(t: String) -> Texture2D:
 	return main.tex[TOOL_ICONS[t]]
 const TOOL_LABELS := {
 	"hoe": "호미", "water": "물뿌리개",
-	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리 (목재1)",
-	"sprinkler": "스프링클러 (목재2·석재2)", "rod": "낚싯대",
-	"spear": "돌 창 (느리고 강하게)", "sword": "돌 검 (빠르게 두 번)",
+	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리",
+	"sprinkler": "스프링클러", "rod": "낚싯대",
+	"spear": "돌 창", "sword": "돌 검",
 }
 # 도구 -> 관련 숙련도
 const TOOL_SKILL := {
@@ -274,7 +274,7 @@ func _build_tracker_scroll() -> void:
 	panel.add_theme_stylebox_override("panel", empty)
 	# 클릭하면 퀘스트 상세 창(Q)이 열린다
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.tooltip_text = "클릭: 퀘스트 상세 (%s)" % GameData.key_label("open_quest")
+	panel.tooltip_text = "클릭하면 퀘스트 상세가 열린다"
 	panel.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and ev.pressed \
 				and ev.button_index == MOUSE_BUTTON_LEFT:
@@ -286,19 +286,20 @@ func _build_tracker_scroll() -> void:
 	panel.offset_bottom = 128.0           # 작고 귀여운 메모 크기 (226x70)
 	quest_title_label = Label.new()
 	quest_title_label.position = Vector2(16, 10)
-	quest_title_label.size = Vector2(192, 15)
-	quest_title_label.add_theme_font_size_override("font_size", 12)
+	quest_title_label.size = Vector2(192, 14)
+	quest_title_label.add_theme_font_size_override("font_size", 11)
 	quest_title_label.add_theme_color_override("font_color", Color(0.32, 0.2, 0.08))
 	quest_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	quest_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(quest_title_label)
 	goal_label = Label.new()
-	goal_label.position = Vector2(16, 27)
-	goal_label.size = Vector2(192, 32)
-	goal_label.add_theme_font_size_override("font_size", 12)
+	goal_label.position = Vector2(16, 26)
+	goal_label.size = Vector2(192, 38)
+	goal_label.add_theme_font_size_override("font_size", 10)
 	goal_label.add_theme_color_override("font_color", Color(0.78, 0.42, 0.02))
 	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	goal_label.max_lines_visible = 2
+	# 글씨를 줄인 만큼 세 줄까지 들어간다 — 목표가 짧아 대개 한 줄이다
+	goal_label.max_lines_visible = 3
 	goal_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	goal_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(goal_label)
@@ -451,7 +452,7 @@ func _make_story_banner() -> void:
 	_sb_sub.offset_top = 330
 	_sb_sub.offset_bottom = 350
 	_sb_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sb_sub.text = "이야기는 계속된다  (클릭해서 닫기)"
+	_sb_sub.text = "이야기는 계속된다  ...클릭"
 	_sb_sub.add_theme_font_override("font", FONT_SMALL)
 	_sb_sub.add_theme_font_size_override("font_size", 12)
 	_sb_sub.add_theme_color_override("font_color", Color(0.85, 0.8, 0.7, 0.85))
@@ -897,7 +898,7 @@ func _process(delta: float) -> void:
 	while GameData.water_pending > 0:
 		GameData.water_pending -= 1
 		_toast_queue.append({"head": "✨ 생명의 물을 얻었다!",
-			"body": "한 분야를 끝까지 갈고닦은 증표다 (%d/%d)" %
+			"body": "한 분야를 끝까지 갈고닦은 증표다 %d/%d" %
 				[int(GameData.items["water_life"]),
 				GameData.ENDING_SKILLS.size()],
 			"icon": main.tex.get("water_life") if main != null else null,
@@ -906,7 +907,7 @@ func _process(delta: float) -> void:
 	# 방금 발견한 「할머니의 유품」 — 노트 힌트를 따라 찾아낸 희귀 수집품
 	if GameData.relic_pending != "":
 		_toast_queue.append({"head": "💍 %s 발견!" % GameData.relic_pending,
-			"body": "할머니의 유품이다... 소중히 간직하자 (%d/%d)" %
+			"body": "할머니의 유품이다... 소중히 간직하자 %d/%d" %
 				[GameData.relics_owned(), GameData.RELICS.size()],
 			"icon": null, "head_col": Color(0.85, 0.55, 0.75)})
 		GameData.relic_pending = ""

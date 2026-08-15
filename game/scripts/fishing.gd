@@ -36,7 +36,7 @@ func _start_fishing() -> void:
 		m.hud.show_message("마을 남쪽 강가의 낚시터로 가자! 물가에 서서 낚싯대를 던진다. (지도 M)", 4.0)
 		return
 	if not m.actions.can_use_tile(t):
-		m.hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
+		m.hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판에서 구입하자!")
 		return
 	m.fishing_state = "waiting"
 	m.fishing_timer = randf_range(1.5, 4.0) * GameData.fish_wait_mult()

@@ -708,7 +708,7 @@ func _pick_seed(sid: String) -> void:
 	main.toolwork.set_tool("seed")
 	if GameData.tool == "seed":
 		Sound.play_sfx("sfx_ui")
-		main.hud.show_message("%s 씨앗을 들었다 — 호미로 간 밭에서 클릭/E로 심는다."
+		main.hud.show_message("%s 씨앗을 들었다 — 호미로 간 밭에 심는다."
 			% GameData.CROPS[sid].name)
 	_rebuild()
 
@@ -975,7 +975,7 @@ func _item_entries() -> Array:
 		elif id == "old_box":
 			e["desc"] = "바닷물에 오래 잠겨 있던 낡은 작은 상자 — 녹슬어 열 수 없다.\n억지로 열면 안의 것까지 상한다... 연금술사라면 방법을 알 텐데"
 		elif id == "broom":
-			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서 E"
+			e["desc"] = "집 안의 먼지를 쓸어 낸다 — 집 조리대 자리에서"
 		elif id in ["nail", "cloth", "rope", "hinge"]:
 			e["desc"] = "가구 부품 — 집 제작대에서 쓴다"
 		elif id in ["bouquet", "wedding_ring"]:

@@ -235,11 +235,11 @@ func _context_hint() -> Array:
 	# 첫 만남: 걸어와서 기다리는 우체부 아저씨 머리 위에 안내를 띄운다
 	if m.story._postman != null and m.story._postman_state == "wait" \
 			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
-		return ["E: 말 걸기", m.story._postman.position + Vector2(0, -112)]
+		return ["말 걸기", m.story._postman.position + Vector2(0, -112)]
 	if m.actions.nearby_npc() != null:
-		return ["E: 대화", above_player]
+		return ["대화", above_player]
 	if m.actions.nearby_animal() != null:
-		return ["E: 쓰다듬기", above_player]
+		return ["쓰다듬기", above_player]
 	var t: Vector2i = m.actions.target_tile()
 	if not m.objects.has(t):
 		# 앞 칸은 비었는데 걸음을 막고 있는 오브젝트가 있으면 그것을 가리킨다
@@ -253,42 +253,42 @@ func _context_hint() -> Array:
 	if obj != null:
 		match obj.kind:
 			"board":
-				return ["E: 의뢰 게시판", above_tile]
+				return ["의뢰 게시판", above_tile]
 			"horse":
 				return ["F: 말 타기", above_tile]
 			"sign":
 				if t == m.FISH_SIGN:
-					return ["E: 낚시터 안내", above_tile]
+					return ["낚시터 안내", above_tile]
 				if t == m.GREENHOUSE_SIGN:
-					return ["E: 온실 짓기" if not GameData.greenhouse_built
-						else "E: 온실", above_tile]
+					return ["온실 짓기" if not GameData.greenhouse_built
+						else "온실", above_tile]
 			"cave":
-				return ["E: 동굴 탐험", above_tile]
+				return ["동굴 탐험", above_tile]
 			"worldtree":
-				return ["E: 세계수 동굴 (위험!)", above_tile]
+				return ["세계수 동굴 — 위험!", above_tile]
 			"forage_berry", "forage_herb":
-				return ["E: 채집", above_tile]
+				return ["채집", above_tile]
 			"old_book":
-				return ["E: 낡은 책을 살펴본다", above_tile]
+				return ["낡은 책을 살펴본다", above_tile]
 			"housesite":
-				return ["E: 집 짓기 (목재 %d)" % GameData.HOUSE_BUILD_WOOD, above_tile]
+				return ["집 짓기 — 목재 %d" % GameData.HOUSE_BUILD_WOOD, above_tile]
 			"tree":
 				if bool(obj.get("young", false)):
-					return ["어린 나무 (자라는 중)", above_tile]
-				return ["E: 벌목 (도끼)", above_tile]
+					return ["어린 나무 — 자라는 중", above_tile]
+				return ["벌목", above_tile]
 			"rock", "bigrock":
-				return ["E: 채광 (곡괭이)", above_tile]
+				return ["채광", above_tile]
 			"house":
 				var bk: String = m.actions._building_kind_at(t)
 				if bk == "home":
-					return ["E: 집에 들어가기", above_tile]
+					return ["집에 들어가기", above_tile]
 				if bk in ["general", "ranch", "smith", "fish"]:
-					return ["E: " + m.BUILDING_NAMES[bk], above_tile]
+					return [m.BUILDING_NAMES[bk], above_tile]
 		return []
 	var cell: Dictionary = m.grid[t.y][t.x]
 	if cell.crop_id != "":
 		if cell.dead:
-			return ["시듦 - 호미로 정리", above_tile]
+			return ["시듦 — 호미로 정리", above_tile]
 		var def: Dictionary = GameData.CROPS[cell.crop_id]
 		var pct := float(cell.crop_day) / m.farming._grow_total(def)
 		if pct >= 1.0:
@@ -300,7 +300,7 @@ func _context_hint() -> Array:
 			text += " · 물주기!"
 		return [text, above_tile]
 	if cell.ground == "water" and GameData.tool == "rod":
-		return ["E: 낚시", above_tile]
+		return ["낚시", above_tile]
 	return []
 
 

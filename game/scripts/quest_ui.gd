@@ -155,7 +155,7 @@ func _entries() -> Array:
 	# 게시판에 붙어 있는(아직 수락 전) 의뢰 — 정보로 보여 준다
 	if GameData.quest_line() == "" and not GameData.quest_offers.is_empty():
 		out.append({"id": "info_offers", "cat": "info", "title": "게시판의 의뢰",
-			"obj": "의뢰 게시판(E)에서 하나를 골라 수락하자", "npc": "",
+			"obj": "의뢰 게시판에서 하나를 고르자.", "npc": "",
 			"desc": "오늘 게시판에 의뢰 %d건이 붙어 있다. 하나만 고를 수 있다."
 				% GameData.quest_offers.size(), "reward": ""})
 	# 계절 축제 안내
@@ -329,7 +329,7 @@ func _build_detail(e: Dictionary) -> void:
 	# 미니창 고정 (핀) — 서브퀘 위주로 놀고 싶을 때
 	var pinned := GameData.tracked_pick == str(e.id)
 	var pin := Button.new()
-	pin.text = "📌 미니창 고정 해제 (자동으로)" if pinned \
+	pin.text = "📌 미니창 고정 해제" if pinned \
 		else "📌 이 퀘스트를 미니창에 고정"
 	pin.focus_mode = Control.FOCUS_NONE
 	pin.add_theme_font_size_override("font_size", 13)

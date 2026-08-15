@@ -348,7 +348,7 @@ func interact() -> void:
 			m.story.examine_bracelet_rock()   # 메인 스토리 13 — 두 사람의 바위
 			return
 		if obj.kind == "sign" and t == m.FISH_SIGN:
-			m.dialog.open("낚시터", "교진 마을 낚시터.\n\n강가에 서서 물을 보고 낚싯대(E)를 던지면 된다.\n"
+			m.dialog.open("낚시터", "교진 마을 낚시터.\n\n강가에 서서 물을 보고 낚싯대를 던지면 된다.\n"
 				+ "입질(!)이 오면 다시 E!\n\n붕어 · 잉어 · 메기... 그리고 아주 드물게\n황금잉어가 올라온다고 한다.",
 				[["알겠다", null]])
 			return

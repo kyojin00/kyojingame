@@ -1063,7 +1063,7 @@ func _fisher_arrive() -> void:
 		fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
 			m.FISHER_ARRIVE.y * m.TILE + 16)
 	m.hud.event_toast("낯선 낚시꾼이 마을에 왔다")
-	m.hud.show_message("항구 차림의 낯선 사람이 마을 광장에 서 있다. 말을 걸어 보자. (E)", 6.0)
+	m.hud.show_message("항구 차림의 낯선 사람이 마을 광장에 서 있다. 말을 걸어 보자.", 6.0)
 	m.saveio.save_now()
 
 
@@ -1172,7 +1172,7 @@ func _end_fisher_quest() -> void:
 	if fisher != null:
 		fisher.scripted = false   # 이제부터는 마을 일과(부두)대로 산다
 	m.hud.event_toast("바다 · 해변 해금!")
-	m.hud.show_message("남쪽 바다가 열렸다! 물가 어디서든 낚시할 수 있다. 이장님이 자네를 찾는다더군. (E)", 7.0)
+	m.hud.show_message("남쪽 바다가 열렸다! 물가 어디서든 낚시할 수 있다. 이장님이 자네를 찾는다더군.", 7.0)
 	m.saveio.save_now()
 
 
@@ -1442,7 +1442,7 @@ func tutorial_notify(flag: String) -> void:
 			return
 	tut["active"] = false
 	m.dialog.open("기본 안내 완료!",
-		"이제 진짜 농장 생활 시작이다!\n\n[기본 키]\nE: 상호작용 (대화/가게 들어가기/취침/쓰다듬기)\nF: 말 타기 / Tab: 씨앗 바꾸기 / F5: 저장 / Esc: 메뉴\n\n집 안 **조합대(E)** 에서는 연금술을 할 수 있다.\n사고 파는 일은 마을 가게 **안** 계산대에서 E.\n주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
+		"이제 진짜 농장 생활 시작이다!\n\n마을 사람과 이야기하고, 가게에 들르고,\n집 안 조합대에서 연금술도 해 보자.\n사고 파는 일은 가게 안 계산대에서.\n주민, 의뢰 게시판도 잊지 말자.\n계절이 바뀌기 전에 수확을 끝낼 것!",
 		[["좋아!", _open_grandpa_letter]])
 
 
@@ -3213,7 +3213,7 @@ func _end_alch_demo() -> void:
 	GameData.story12_phase = "done"
 	GameData.story12_done_day = GameData.day   # 다음 이야기 전, 자유 생활 보장
 	m.hud.story_banner("메인 스토리 12 완결", "숲의 연금술사")
-	m.hud.show_message("연금술이 열렸다! 집 안의 조합대(E)에서 물약을\n만들 수 있다 — 조합법은 나무·바위·몬스터에게서 배운다.", 8.0)
+	m.hud.show_message("연금술이 열렸다! 집 안의 조합대에서 물약을\n만들 수 있다 — 조합법은 나무·바위·몬스터에게서 배운다.", 8.0)
 	m.saveio.save_now()
 
 
@@ -3675,7 +3675,7 @@ func _end_onsen_water() -> void:
 	m.worldgen._spawn_onsen()
 	m.npcmgr._sync_village_npcs()
 	m.hud.story_banner("메인 스토리 15 완결", "마른 온천")
-	m.hud.show_message("마을 북쪽 온천에 다시 물이 찼다!\n하루 한 번 몸을 담그면 체력이 가득 찬다. (E)", 8.0)
+	m.hud.show_message("마을 북쪽 온천에 다시 물이 찼다!\n하루 한 번 몸을 담그면 체력이 가득 찬다.", 8.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -3878,7 +3878,7 @@ func story17_barn_work(kind: String, t := Vector2i(-999, -999)) -> void:
 	else:
 		return
 	if GameData.story17_barn_done():
-		m.hud.show_message("헛간이 말끔해졌다.\n구석의 낡은 사료통이 눈에 들어온다. (E)", 5.0)
+		m.hud.show_message("헛간이 말끔해졌다.\n구석의 낡은 사료통이 눈에 들어온다.", 5.0)
 
 
 # 옛 헛간 (E) — 다 치운 뒤 사료통 아래에서 목걸이가 나온다
@@ -4018,7 +4018,7 @@ func _end_hill_trace() -> void:
 		return
 	if GameData.story18_traces.size() >= GameData.HILL_TRACES.size():
 		GameData.story18_phase = "box"
-		m.hud.quest_start_toast("전망대 발판 밑을 살펴보자 (E)")
+		m.hud.quest_start_toast("전망대 발판 밑을 살펴보자")
 	else:
 		m.hud.event_toast("흔적 %d/%d" % [GameData.story18_traces.size(),
 			GameData.HILL_TRACES.size()])
@@ -4274,7 +4274,7 @@ func _end_kitchen_gift() -> void:
 	m.doing.gain_item("forage_berry", GameData.JAM_BERRIES)
 	Sound.play_sfx("sfx_coin")
 	m.hud.event_toast("산딸기잼 레시피와 산딸기 %d개" % GameData.JAM_BERRIES)
-	m.hud.show_message("가방에서 레시피를 배우고, 집 조리대(E)에서 산딸기잼을 지어 보자.", 7.0)
+	m.hud.show_message("가방에서 레시피를 배우고, 집 조리대에서 산딸기잼을 지어 보자.", 7.0)
 	m.saveio.save_now()
 
 
@@ -4395,7 +4395,7 @@ func build_fisher_home(door: Vector2i) -> void:
 	_place_home_sign(anchor, door)
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("집 한 채 완공!")
-	m.hud.show_message("아직 빈 집이다.\n집 앞 표지판(E)에서 누구 집으로 할지 정하자.", 7.0)
+	m.hud.show_message("아직 빈 집이다.\n집 앞 표지판에서 누구 집으로 할지 정하자.", 7.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -4590,7 +4590,7 @@ func _pour_water() -> void:
 
 func _after_gate_open() -> void:
 	m.hud.event_toast("돌문이 열렸다")
-	m.hud.quest_start_toast("돌문 안으로 들어가자 (E)")
+	m.hud.quest_start_toast("돌문 안으로 들어가자")
 	m.saveio.save_now()
 
 

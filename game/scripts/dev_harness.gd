@@ -3281,25 +3281,30 @@ func _debug_tick() -> void:
 			m.worldgen._build_sea()
 
 			# ── ② 오래된 돌문: 조건 전에는 아예 없고, 건물 마당과 겹치지 않는다
+			var k_s18b := GameData.story18_phase
 			var k_s19 := GameData.story19_phase
 			var k_s20 := GameData.story20_phase
+			GameData.story18_phase = ""
 			GameData.story19_phase = ""
 			GameData.story20_phase = ""
 			m.objnode._remove_object(m.GATE_POS)
 			m.worldgen.spawn_gate()
 			var gate_hidden: bool = not GameData.gate_visible() \
 				and not m.objects.has(m.GATE_POS)
-			GameData.story19_phase = "done"
+			GameData.story18_phase = "memo"      # 18장이 시작되면 모습을 드러낸다
 			m.worldgen.spawn_gate()
 			var gate_shown: bool = GameData.gate_visible() \
 				and str(m.objects.get(m.GATE_POS, {}).get("kind", "")) == "old_gate"
-			var gate_clear := true
+			# 마을 부지·길과 아예 떨어진 자리여야 한다 (상점과 겹치던 버그)
+			var gate_clear: bool = not m.VILLAGE_REGION.has_point(m.GATE_POS) \
+				and not m.ROAD.has_point(m.GATE_POS)
 			for pid2: String in m.VILLAGE_PLOTS:
 				var anc: Vector2i = m.VILLAGE_PLOTS[pid2].anchor
 				var yard := Rect2i(anc.x - m.YARD_PAD, anc.y - m.YARD_PAD,
 					5 + m.YARD_PAD * 2, 4 + m.YARD_PAD * 2)
 				if yard.has_point(m.GATE_POS):
 					gate_clear = false
+			GameData.story18_phase = k_s18b
 			GameData.story19_phase = k_s19
 			GameData.story20_phase = k_s20
 			if not GameData.gate_visible():
@@ -3546,9 +3551,10 @@ func _debug_tick() -> void:
 			var tale_ok: bool = not shop_entry.is_empty() \
 				and str(shop_entry.desc).length() >= 80 \
 				and str(shop_entry.desc).contains("\n")
-			var obj_soft: bool = str(shop_entry.get("obj", "")).contains("첫 상점") \
-				and not str(shop_entry.get("obj", "")).contains("목재") \
-				and not str(shop_entry.get("obj", "")).contains("돌 ")
+			# 목표는 짧고, 괄호도 조작키 안내도 없다
+			var shop_obj := str(shop_entry.get("obj", ""))
+			var obj_soft: bool = shop_obj == "상점을 세우자." \
+				and not shop_obj.contains("(") and not shop_obj.contains("E")
 			# 지금 떠 있는 모든 퀘스트의 목표에 내부 키(밑줄)와 재료 수치가 없다
 			var no_keys := true
 			var soft_all := true
@@ -3561,20 +3567,27 @@ func _debug_tick() -> void:
 				if str(q2.get("desc", "")).length() < 20 and str(q2.get("cat", "")) == "main":
 					soft_all = false
 
-			# ── ② 지도: 상점을 지을 자리를 집 모양 마커로 찍는다
-			var spots: Array = m.map_ui.build_spots()
-			var spot_ok := false
-			for g: Dictionary in spots:
-				var gt: Vector2i = g.tile
-				if gt == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2) \
-						and str(g.get("kind", "")) == "build" \
-						and str(g.text).contains("첫 상점"):
-					spot_ok = true
+			# ── ② 지도 마커: **하나뿐**이고, 고정한 퀘스트의 목적지를 짚는다
+			var k_pick2 := GameData.tracked_pick
+			GameData.tracked_pick = "story2"
+			var guides2: Array = m.map_ui._quest_guides()
+			var spot_ok: bool = guides2.size() == 1
+			if spot_ok:
+				var g0: Dictionary = guides2[0]
+				var gt: Vector2i = g0.tile
+				# 상점을 세울 자리를 가리키고, 라벨은 퀘스트 이름 하나뿐이다
+				spot_ok = gt == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2) \
+					and str(g0.text) == "마을을 깨우다" \
+					and not str(g0.text).contains("(")
+			# 다 지으면 그 자리는 더 이상 가리키지 않는다
 			GameData.village_built.append("general")
+			GameData.story2_phase = "farm_talk"
 			var spot_gone := true
-			for g2: Dictionary in m.map_ui.build_spots():
-				if str(g2.text).contains("첫 상점"):
+			for g2: Dictionary in m.map_ui._quest_guides():
+				var gt2: Vector2i = g2.tile
+				if gt2 == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2):
 					spot_gone = false
+			GameData.tracked_pick = k_pick2
 			GameData.village_built = k_built4
 			GameData.story2_phase = k_s2p
 			GameData.story_phase = k_story
@@ -3614,7 +3627,7 @@ func _debug_tick() -> void:
 				and spot_ok and spot_gone and fill_all and fill_diff and eat_ok,
 				" 동화이야기=", tale_ok, " 감성목표=", obj_soft,
 				" 키노출없음=", no_keys, " 재료수치없음=", soft_all,
-				" 상점후보지=", spot_ok, " 다지으면사라짐=", spot_gone,
+				" 마커하나=", spot_ok, " 다지으면사라짐=", spot_gone,
 				" 요리별배부름=", fill_all and fill_diff, " 먹기반영=", eat_ok,
 				"(밥 ", rice, " · 차 ", tea, ")")
 		294:
@@ -3725,6 +3738,143 @@ func _debug_tick() -> void:
 			_save_shot("_mapfog.png")             # 먹구름이 덮인 지도
 			m.map_ui.close()
 			GameData.explored = _fog_keep
+		296:
+			# #145: 지도 마커 하나 · 짧은 목표와 괄호 제거 · 안개 · 돌문 새 자리
+			m.dialog.close()
+			m.map_ui.close()
+
+			# ── ① 마커는 언제나 하나, 고정한 퀘스트를 가리킨다
+			var k_pick3 := GameData.tracked_pick
+			var k_s18c := GameData.story18_phase
+			GameData.story18_phase = "hill"
+			GameData.tracked_pick = "story18"
+			var gs: Array = m.map_ui._quest_guides()
+			var one_ok: bool = gs.size() == 1
+			if one_ok:
+				var g1: Dictionary = gs[0]
+				var t1: Vector2i = g1.tile
+				one_ok = t1 == m.HILL_POS and str(g1.text) == "할머니의 시계"
+			# 다른 퀘스트를 고정하면 그쪽 하나만 뜬다
+			var k_s2c := GameData.story2_phase
+			var k_builtc: Array = GameData.village_built.duplicate()
+			GameData.story2_phase = "shop"
+			GameData.village_built.erase("general")
+			GameData.tracked_pick = "story2"
+			var gs2: Array = m.map_ui._quest_guides()
+			var swap_ok: bool = gs2.size() == 1
+			if swap_ok:
+				var g2: Dictionary = gs2[0]
+				var t2: Vector2i = g2.tile
+				swap_ok = t2 == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2)
+			GameData.village_built = k_builtc
+			GameData.story2_phase = k_s2c
+			GameData.story18_phase = k_s18c
+			GameData.tracked_pick = k_pick3
+
+			# ── ② 목표는 짧고, 괄호도 조작키 안내도 없다
+			var checks: Array = [
+				["story2_phase", ["shop", "farm_talk"], "story2_objective_short"],
+				["fisher_home", ["wait", "build", "built"], "fisher_home_objective_short"],
+				["move_quest", ["show", "wait", "greet", "seed", "seedrep",
+					"post", "postbuild", "postgreet"], "move_objective_short"],
+				["kitchen_quest", ["broom", "make", "sweep", "found", "jam"],
+					"kitchen_quest_objective_short"],
+				["fisher_quest", ["meet", "follow", "open"], "fisher_objective_short"],
+				["forest_quest", ["arrive", "found", "ask", "visit"],
+					"forest_objective_short"],
+				["story6_phase", ["show_chief", "ask_post", "wait", "visit", "told",
+					"build"], "story6_objective_short"],
+				["story7_phase", ["worry", "lore", "gather"], "story7_objective_short"],
+				["story9_phase", ["ask", "invite", "build"], "story9_objective_short"],
+				["story18_phase", ["memo", "clue", "hill", "box", "tale"],
+					"story18_objective_short"],
+				["story20_phase", ["tell", "gate", "inner", "letter", "plant"],
+					"story20_objective_short"],
+			]
+			var clean := true
+			var longest := 0
+			var worst := ""
+			for row: Array in checks:
+				var prop := str(row[0])
+				var keep: Variant = GameData.get(prop)
+				for v: String in row[1]:
+					GameData.set(prop, v)
+					var txt := str(GameData.call(str(row[2])))
+					if txt == "" or txt.contains("(") or txt.contains(")") \
+							or txt.contains("E:") or txt.contains("(E)"):
+						clean = false
+					if txt.length() > longest:
+						longest = txt.length()
+						worst = txt
+				GameData.set(prop, keep)
+			var short_ok: bool = clean and longest <= 40
+			# 안내(튜토리얼) 목표도 같은 규칙
+			for k: String in GameData.TUTORIAL_SHORT:
+				var tv := str(GameData.TUTORIAL_SHORT[k])
+				if tv.contains("(") or tv.contains("%") or tv.length() > 20:
+					short_ok = false
+			# 세계에 뜨는 상호작용 안내에도 「E:」가 없다
+			var prompt_ok := true
+			_saved_pos = m.player.position
+			for pk: String in ["board", "cave", "tree", "rock"]:
+				var pt3 := Vector2i(30, 40)
+				m.objnode._remove_object(pt3)
+				m.objects[pt3] = {"kind": pk, "hp": 3}
+				m._target_override = pt3
+				var pr: Array = m.renderer._context_hint()
+				m._target_override = Vector2i(-999, -999)
+				m.objects.erase(pt3)
+				if pr.size() > 0 and (str(pr[0]).contains("E:") or str(pr[0]).contains("(")):
+					prompt_ok = false
+			m.player.position = _saved_pos
+
+			# ── ③ 안개: 처음에는 거의 다 가려져 있고, 걸을수록 넓어진다
+			_fog_keep = GameData.explored.duplicate()
+			GameData.explored = {}
+			GameData.mark_explored_at(m.START_TILE)
+			var seen1 := 0
+			for y1 in m.MAP_H:
+				for x1 in m.MAP_W:
+					if m.map_ui._visible_tile(x1, y1):
+						seen1 += 1
+			var ratio := float(seen1) / float(m.MAP_W * m.MAP_H)
+			GameData.mark_explored_at(m.START_TILE + Vector2i(24, 12))
+			var seen2 := 0
+			for y2 in m.MAP_H:
+				for x2 in m.MAP_W:
+					if m.map_ui._visible_tile(x2, y2):
+						seen2 += 1
+			var fog_ok: bool = GameData.EXPLORE_CHUNK == 4 \
+				and seen1 > 0 and ratio < 0.02 and seen2 > seen1
+			GameData.explored = _fog_keep
+
+			# ── ④ 오래된 돌문 — 마을에서 멀찍이, 스토리 18부터
+			var k_s18d := GameData.story18_phase
+			var k_s19d := GameData.story19_phase
+			var k_s20d := GameData.story20_phase
+			GameData.story18_phase = ""
+			GameData.story19_phase = ""
+			GameData.story20_phase = ""
+			var gate_hid: bool = not GameData.gate_visible()
+			GameData.story18_phase = "memo"
+			var gate_18: bool = GameData.gate_visible()
+			var far_ok: bool = not m.VILLAGE_REGION.has_point(m.GATE_POS) \
+				and not m.ROAD.has_point(m.GATE_POS) \
+				and m.GATE_POS != Vector2i(86, 4) \
+				and (m.GATE_POS - m.VILLAGE_PLOTS["general"].anchor).length() > 20.0
+			GameData.story18_phase = k_s18d
+			GameData.story19_phase = k_s19d
+			GameData.story20_phase = k_s20d
+			if not GameData.gate_visible():
+				m.objnode._remove_object(m.GATE_POS)
+			m.hud._toast_queue.clear()
+			print("QUESTUI_OK=", one_ok and swap_ok and short_ok and prompt_ok
+				and fog_ok and gate_hid and gate_18 and far_ok,
+				" 마커하나=", one_ok, " 고정따라감=", swap_ok,
+				" 짧은목표=", short_ok, "(최장 ", longest, "자: ", worst, ")",
+				" 상호작용안내=", prompt_ok,
+				" 안개=", fog_ok, "(처음 ", "%.1f" % (ratio * 100.0), "%)",
+				" 돌문숨김=", gate_hid, " 18장등장=", gate_18, " 마을밖=", far_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
