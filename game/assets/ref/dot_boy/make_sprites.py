@@ -58,10 +58,14 @@ BOB = [0, 2, 1, 1, 2]
 
 # 세로 배치 (bob 적용 전 기준 행). 몸통 12행 + 다리 14행 — 처음(10+12)보다
 # 1.2배쯤 길다. 몸통이 짧으면 거기 묶인 팔도 짧아져 머리만 큰 비율이 된다.
-HEAD_Y = 2               # 머리 꼭대기 (두상 16행 — 18행은 길쭉했다)
-SHIRT_Y = 19             # 셔츠 위 (목은 그 한 행 위)
-HIP_Y = 31               # 바지 위 (엉덩이 띠 3행)
-LEG_Y = 34               # 다리 기둥 시작
+# 발바닥(GROUND)은 게임이 잡은 자리라 못 움직인다. 그래서 **윗몸을 통째로
+# 내려** 다리를 줄인다 — 머리·몸통 크기는 그대로 두고 다리만 14행에서
+# 11행이 된다. 머리가 커 보이는 쪽이 이 그림체에 맞는다.
+BODY_DROP = 3            # 예전 자리에서 내려온 칸 수 (다리가 그만큼 짧아진다)
+HEAD_Y = 2 + BODY_DROP   # 머리 꼭대기 (두상 16행)
+SHIRT_Y = 19 + BODY_DROP # 셔츠 위 (목은 그 한 행 위)
+HIP_Y = 31 + BODY_DROP   # 바지 위 (엉덩이 띠 3행)
+LEG_Y = 34 + BODY_DROP   # 다리 기둥 시작
 GROUND = 47              # 디딘 발바닥 행
 
 
@@ -308,15 +312,17 @@ def torso_down(g, bob, swing, dx=0, skip=None):
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        g.rect(sx, y + 1, sx + 2, y + 6 + dy, 'b')
-        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 6 + dy,
+        # 팔 길이: 소매 5칸 + 단 + 손 3칸 (예전에는 소매가 6칸이었다).
+        # 손끝이 엉덩이 띠께에 오도록 한 칸 줄였다 — 팔이 길면 원숭이처럼 보인다.
+        g.rect(sx, y + 1, sx + 2, y + 5 + dy, 'b')
+        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 5 + dy,
                 'L' if side == 'left' else 'B')
-        g.hline(sx, sx + 2, y + 7 + dy, 'B')                     # 소매단
-        g.rect(sx, y + 8 + dy, sx + 2, y + 10 + dy, 's')         # 손
-        g.hline(sx + 1, sx + 2, y + 10 + dy, 'S')                # 손 그늘
+        g.hline(sx, sx + 2, y + 6 + dy, 'B')                     # 소매단
+        g.rect(sx, y + 7 + dy, sx + 2, y + 9 + dy, 's')          # 손
+        g.hline(sx + 1, sx + 2, y + 9 + dy, 'S')                 # 손 그늘
         out = sx if side == 'left' else sx + 2   # 바깥쪽 열
         g.px(out, y + 1, '.')                    # 어깨 소매 모서리 깎기
-        g.px(out, y + 10 + dy, '.')              # 주먹 끝 모서리 깎기
+        g.px(out, y + 9 + dy, '.')               # 주먹 끝 모서리 깎기
 
 
 def legs_down(g, stride, dx=0, sq=0):
@@ -370,7 +376,7 @@ def _side_arm(g, c, y, sw, near):
     깔려 몸 가장자리 밖으로 나온 부분만 보인다.
     손 올림은 진자 원호(√(L²-s²))로 계산해 팔 길이가 어느 위상에서든
     같다 — 안 그러면 저을 때마다 팔이 늘었다 줄었다 한다."""
-    hy = y + 8 - round(10 - (100 - sw * sw) ** 0.5)
+    hy = y + 7 - round(10 - (100 - sw * sw) ** 0.5)   # 팔 한 칸 줄임
     cells = {}
     sleeve = ('B', 'b', 'b', 'b', 'b') if near else ('B',) * 5
     for yy in range(y + 1, hy):
@@ -521,15 +527,15 @@ def torso_up(g, bob, swing, dx=0, skip=None):
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        g.rect(sx, y + 1, sx + 2, y + 6 + dy, 'b')
-        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 6 + dy,
+        g.rect(sx, y + 1, sx + 2, y + 5 + dy, 'b')
+        g.vline(sx if side == 'left' else sx + 2, y + 1, y + 5 + dy,
                 'L' if side == 'left' else 'B')
-        g.hline(sx, sx + 2, y + 7 + dy, 'B')
-        g.rect(sx, y + 8 + dy, sx + 2, y + 10 + dy, 's')
-        g.hline(sx + 1, sx + 2, y + 10 + dy, 'S')
+        g.hline(sx, sx + 2, y + 6 + dy, 'B')
+        g.rect(sx, y + 7 + dy, sx + 2, y + 9 + dy, 's')
+        g.hline(sx + 1, sx + 2, y + 9 + dy, 'S')
         out = sx if side == 'left' else sx + 2
         g.px(out, y + 1, '.')                    # 어깨 소매 모서리 깎기
-        g.px(out, y + 10 + dy, '.')              # 주먹 끝 모서리 깎기
+        g.px(out, y + 9 + dy, '.')               # 주먹 끝 모서리 깎기
 
 
 def legs_up(g, stride, dx=0, sq=0):
@@ -561,28 +567,28 @@ SWING = {
     # 억지로 끌고 가면 팔이 고무줄처럼 늘어난다. 내리친 주먹은 어깨 바로
     # 앞이라 팔이 짧아 보이고(단축법), 도구가 화면 쪽으로 넘어온다.
     # 몸은 옆으로 밀지 않고 정중앙에서 쪼그린다.
-    'down': {'skip': 'left', 'shoulder': (9, 21),
-             'poses': [((5, 16), (5, 19), -1, 0, False),
-                       ((3, 7), (2, 14), -2, 0, False),
-                       ((1, 16), (4, 19), -1, 0, False),
-                       ((8, 28), (8, 25), 0, 2, False),
-                       ((5, 18), (5, 20), 0, 0, False)]},
+    'down': {'skip': 'left', 'shoulder': (9, 24),
+             'poses': [((5, 19), (5, 22), -1, 0, False),
+                       ((3, 10), (2, 17), -2, 0, False),
+                       ((1, 19), (4, 22), -1, 0, False),
+                       ((8, 31), (8, 28), 0, 2, False),
+                       ((5, 21), (5, 23), 0, 0, False)]},
     # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽 — 어깨 옆으로 감아올려
     # 정수리 너머 저편으로 내리친다. 휘두름부터는 팔이 머리 저쪽(=캐릭터의
     # 앞)이라 머리가 가리고, 주먹만 정수리 위로 잠깐 보인다.
-    'up':   {'skip': 'right', 'shoulder': (22, 21),
-             'poses': [((24, 14), (26, 17), 1, 0, False),
-                       ((24, 7), (27, 14), 2, 0, False),
-                       ((19, 1), (24, 8), 0, 0, True),
-                       ((16, 6), (20, 11), 0, 2, True),
-                       ((24, 11), (26, 15), 0, 0, False)]},
+    'up':   {'skip': 'right', 'shoulder': (22, 24),
+             'poses': [((24, 17), (26, 20), 1, 0, False),
+                       ((24, 10), (27, 17), 2, 0, False),
+                       ((19, 4), (24, 11), 0, 0, True),
+                       ((16, 9), (20, 14), 0, 2, True),
+                       ((24, 14), (26, 18), 0, 0, False)]},
     # 옆모습(오른쪽 보기): 뒤로 감았다가 앞으로 내리친다
-    'side': {'skip': None, 'shoulder': (15, 21),
-             'poses': [((6, 14), (8, 18), -2, 0, False),
-                       ((6, 8), (6, 14), -3, 0, False),
-                       ((25, 12), (19, 18), 2, 1, False),
-                       ((24, 30), (23, 26), 3, 2, False),
-                       ((23, 24), (18, 24), 2, 0, False)]},
+    'side': {'skip': None, 'shoulder': (15, 24),
+             'poses': [((6, 17), (8, 21), -2, 0, False),
+                       ((6, 11), (6, 17), -3, 0, False),
+                       ((25, 15), (19, 21), 2, 1, False),
+                       ((24, 33), (23, 29), 3, 2, False),
+                       ((23, 27), (18, 27), 2, 0, False)]},
 }
 
 
@@ -657,6 +663,7 @@ def swing_frame(direction, phase):
     else:
         head(g, art, hb, dx)
         arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
+    roughen(g)
     g.outline()
     return g
 
@@ -688,15 +695,54 @@ def head(g, art, bob, lean=0):
     # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
     if any(art is a for a in EARS_DOWN):             # 눈높이 양옆에 볼록 한 칸
         for ex in (7, 24):
-            g.px(ex + lean, 11 + bob, 's')
-            g.px(ex + lean, 12 + bob, 'S')
+            g.px(ex + lean, HEAD_Y + 9 + bob, 's')
+            g.px(ex + lean, HEAD_Y + 10 + bob, 'S')
     elif any(art is a for a in EARS_SIDE):           # 옆모습은 귓바퀴 모양
-        g.px(12 + lean, 11 + bob, 'S')
-        g.px(13 + lean, 11 + bob, 'S')
-        g.px(12 + lean, 12 + bob, 'S')
-        g.px(13 + lean, 12 + bob, 's')
-        g.px(12 + lean, 13 + bob, 'S')
-        g.px(13 + lean, 13 + bob, 'S')
+        g.px(12 + lean, HEAD_Y + 9 + bob, 'S')
+        g.px(13 + lean, HEAD_Y + 9 + bob, 'S')
+        g.px(12 + lean, HEAD_Y + 10 + bob, 'S')
+        g.px(13 + lean, HEAD_Y + 10 + bob, 's')
+        g.px(12 + lean, HEAD_Y + 11 + bob, 'S')
+        g.px(13 + lean, HEAD_Y + 11 + bob, 'S')
+
+
+# ------------------------------------------------------------------- 결
+#
+# 한 색으로 넓게 채운 면은 도트가 아니라 비닐처럼 보인다. 옷·바지·신발에
+# 성근 얼룩을 흩어 **짜인 천의 결**을 낸다.
+#
+# 두 가지를 지킨다:
+#   ① 얼굴은 건드리지 않는다 (셔츠 윗줄 위) — 눈·입이 지저분해진다
+#   ② 얼룩 자리는 **칸 좌표로만** 정한다. 프레임마다 다시 뽑으면 걸을 때
+#      결이 지글지글 끓는다 (도트 게임에서 제일 눈에 띄는 실수다)
+ROUGH_DARK = {'b': 'B', 'p': 'P', 'k': 'K', 's': 'S', 'L': 'b', 'q': 'p'}
+ROUGH_LITE = {'b': 'L', 'p': 'q', 'B': 'b', 'P': 'p', 'S': 's'}
+
+
+def _rough_hash(x, y):
+    h = (x * 73856093) ^ (y * 19349663)
+    h = (h ^ (h >> 13)) & 0x7FFFFFFF
+    return ((h * 1274126177) & 0x7FFFFFFF) / 2147483647.0
+
+
+def roughen(g):
+    for y in range(SHIRT_Y, GH):
+        for x in range(GW):
+            c = g.d[y][x]
+            if c in ('.', 'O'):
+                continue
+            # **바둑판 위에만 얼룩을 둔다.** 아무 데나 흩으면 잡음(노이즈)이
+            # 되어 옷이 더러워 보인다. 한 칸 건너 한 칸으로 두면 도트를
+            # 찍는 사람이 쓰는 디더링이 되어 「짜인 천」으로 읽힌다.
+            if (x + y) % 2:
+                continue
+            # 아래로 갈수록 짙게 — 천은 접히는 쪽(아랫단·무릎)에 그늘이 앉는다
+            depth = (y - SHIRT_Y) / max(1, GH - SHIRT_Y)
+            r = _rough_hash(x, y)
+            if r < 0.16 + depth * 0.16 and c in ROUGH_DARK:
+                g.d[y][x] = ROUGH_DARK[c]
+            elif r < 0.30 and c in ROUGH_LITE:
+                g.d[y][x] = ROUGH_LITE[c]
 
 
 def frame(direction, stride=None, bob=0):
@@ -715,6 +761,7 @@ def frame(direction, stride=None, bob=0):
         legs(g, s, 0, bob)
         torso(g, bob, s)
         head(g, art, bob)
+    roughen(g)
     g.outline()
     return g
 
