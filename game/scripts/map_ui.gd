@@ -6,14 +6,20 @@
 extends CanvasLayer
 
 # 배율 1 = 맵 전체가 화면에 딱 들어오는 크기. 맵이 커져도 알아서 맞는다.
+# 화면을 최대한 넓게 쓴다 — 위 이름패(34)와 아래 안내줄(22)만 비켜 둔다.
+# (예전에는 920x496이라 좌우로 손가락 두 마디씩 빈 자리가 남았다)
+const VIEW_W := 952.0
+const VIEW_H := 512.0
+
+
 func _base_cell() -> float:
-	return minf(920.0 / float(main.MAP_W), 496.0 / float(main.MAP_H))
+	return minf(VIEW_W / float(main.MAP_W), VIEW_H / float(main.MAP_H))
 # 먹구름 — 바탕 한 겹 + 뭉게뭉게 두 겹. 전부 불투명이라 밑은 보이지 않는다.
 const FOG := Color(0.13, 0.14, 0.19)          # 구름 그늘 (바탕)
 const CLOUD_MID := Color(0.21, 0.22, 0.28)    # 구름 덩어리
 const CLOUD_TOP := Color(0.29, 0.30, 0.37)    # 구름의 밝은 쪽 (빛 받는 면)
 const ZOOM_MIN := 0.7
-const ZOOM_MAX := 5.0
+const ZOOM_MAX := 6.5
 const ZOOM_STEP := 1.2
 
 var main: Node2D
@@ -497,12 +503,75 @@ func _draw_map() -> void:
 	canvas.draw_string(main.UI_FONT, Vector2(480.0 - pw / 2.0, 27.0), plate,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(1, 0.86, 0.5))
 
+	_draw_trim()
+
 	# 안내
 	var guide := "휠: 확대·축소 · 끌기: 이동 · R: 처음 크기 · M/ESC: 닫기 (배율 %.1fx)" % zoom
 	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
-	canvas.draw_string(main.UI_FONT, Vector2(480 - w / 2.0, 526), guide,
+	canvas.draw_string(main.UI_FONT, Vector2(480 - w / 2.0, 530), guide,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.7, 0.68, 0.8))
 	draw_us = Time.get_ticks_usec() - t0
+
+
+# ---- 지도의 장식 ----
+#
+# 종이 지도처럼 보이게 하는 작은 것들 — 네 귀퉁이의 나뭇잎, 왼쪽 아래의
+# 나침반 장미, 오른쪽 아래의 작은 범례. 지형 위가 아니라 **화면 가장자리**에
+# 그려서 지도를 가리지 않는다.
+const COL_LEAF := Color(0.45, 0.62, 0.32)
+const COL_INK := Color(0.86, 0.78, 0.58)
+
+
+func _draw_trim() -> void:
+	# 네 귀퉁이 — 작은 나뭇잎 두 장씩
+	for c: Vector2 in [Vector2(14, 44), Vector2(946, 44),
+			Vector2(14, 500), Vector2(946, 500)]:
+		var s: float = -1.0 if c.x > 480.0 else 1.0
+		canvas.draw_rect(Rect2(c.x, c.y, 5.0 * s, 3.0), COL_LEAF)
+		canvas.draw_rect(Rect2(c.x + 4.0 * s, c.y - 3.0, 4.0 * s, 3.0),
+			COL_LEAF.lightened(0.25))
+
+	# 나침반 장미 — 십자 네 갈래 + 북쪽 눈금
+	var cc := Vector2(52.0, 460.0)
+	canvas.draw_arc(cc, 21.0, 0, TAU, 28, Color(0.62, 0.5, 0.32, 0.85), 2.0)
+	canvas.draw_arc(cc, 15.0, 0, TAU, 24, Color(0.62, 0.5, 0.32, 0.5), 1.0)
+	for d: Vector2 in [Vector2(0, -1), Vector2(0, 1), Vector2(-1, 0), Vector2(1, 0)]:
+		canvas.draw_line(cc + d * 5.0, cc + d * 19.0, COL_INK, 2.0)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		cc + Vector2(0, -24), cc + Vector2(-5, -8), cc + Vector2(5, -8)]),
+		Color(0.92, 0.5, 0.32))
+	canvas.draw_string(main.UI_FONT, cc + Vector2(-5, -26), "N",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(1, 0.86, 0.5))
+
+	# 범례 — 무엇이 무엇인지 그림으로
+	var lx := 800.0
+	var ly := 442.0
+	var lr := Rect2(lx - 12.0, ly - 20.0, 152.0, 74.0)
+	canvas.draw_rect(lr, Color(0.16, 0.12, 0.09, 0.82))
+	canvas.draw_rect(lr, Color(0.62, 0.5, 0.32, 0.8), false, 1.0)
+	# 내 위치
+	canvas.draw_rect(Rect2(lx, ly - 5, 7, 7), Color(1, 1, 1))
+	canvas.draw_rect(Rect2(lx + 1, ly - 4, 5, 5), Color(0.95, 0.3, 0.25))
+	canvas.draw_string(main.UI_FONT, Vector2(lx + 16, ly + 3), "내 위치",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_INK)
+	# 목표 (하트)
+	_heart(Vector2(lx + 3, ly + 20), 5.0, Color(0.95, 0.35, 0.45))
+	canvas.draw_string(main.UI_FONT, Vector2(lx + 16, ly + 25), "지금 목표",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_INK)
+	# 구름 (미탐사)
+	canvas.draw_circle(Vector2(lx + 2, ly + 40), 5.0, CLOUD_MID)
+	canvas.draw_circle(Vector2(lx + 7, ly + 38), 4.0, CLOUD_TOP)
+	canvas.draw_string(main.UI_FONT, Vector2(lx + 16, ly + 46), "아직 안 가 본 곳",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_INK)
+
+
+# 작은 하트 하나 (범례·길라잡이가 같이 쓴다)
+func _heart(c: Vector2, r: float, col: Color) -> void:
+	canvas.draw_circle(c + Vector2(-r * 0.5, -r * 0.35), r * 0.62, col)
+	canvas.draw_circle(c + Vector2(r * 0.5, -r * 0.35), r * 0.62, col)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-r * 1.05, -r * 0.2), c + Vector2(r * 1.05, -r * 0.2),
+		c + Vector2(0, r * 1.15)]), col)
 
 
 # ---- 퀘스트 길라잡이 ----

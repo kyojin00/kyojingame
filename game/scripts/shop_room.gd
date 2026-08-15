@@ -19,7 +19,7 @@ const EXIT_X := Vector2(432, 528)        # 아랫벽 문 구간
 const SHELVES := [
 	["seed", "씨앗", 168.0],
 	["life", "생활용품", 300.0],
-	["tool", "도구", 432.0],
+	["recipe", "레시피", 432.0],
 	["misc", "기타", 564.0],
 ]
 const SHELF_Y := 208.0                   # 선반 윗변
@@ -138,11 +138,71 @@ func open(id: String) -> void:
 	moving = false
 	Sound.play_sfx("sfx_place")
 	_visit_spent = GameData.today_spent   # 이번 방문의 구매 여부 기준점
-	if id == "general":
-		main.hud.show_message("선반 앞에서 E: 구매 · 계산대(만수)에서 E: 판매", 4.0)
-	else:
-		main.hud.show_message("%s — 계산대 앞에서 E" % ROOMS[id].name, 3.0)
+	_kicked = false
+	# 안내는 **방 안에 적는다.** 예전에는 머리 위 말풍선으로 띄웠는데,
+	# 가게 안에서는 주인공이 화면에 없어 말풍선이 한가운데 붙박이처럼
+	# 떠 있었다 (「사라지지 않는 말풍선」 버그의 정체)
+	main.hud.hide_bubble()
+	notice = "선반 앞에서 E: 구매 · 계산대에서 E: 판매" if id == "general" \
+		else "%s — 계산대 앞에서 E" % ROOMS[id].name
+	notice_t = 4.5
 	canvas.queue_redraw()
+
+
+# ---- 영업시간 ----
+#
+# 문 닫을 시각(저녁 6시)이 되면 주인이 손님을 내보낸다.
+# 가게 안에서 시간을 흘려보내도 반드시 밖으로 나가게 된다.
+var _kicked := false
+var notice := ""
+var notice_t := 0.0
+
+
+func closed_text(why: String) -> String:
+	match why:
+		"early":
+			return "아직 문을 열지 않았다.\n안에서 준비하는 기척만 들린다."
+		"lunch":
+			return "「점심 먹으러 갔습니다」\n문에 작은 팻말이 걸려 있다."
+		"late":
+			return "오늘 영업은 끝났다.\n창문의 불도 꺼져 있다."
+	return ""
+
+
+func _closing_tick(delta: float) -> void:
+	if notice_t > 0.0:
+		notice_t -= delta
+		if notice_t <= 0.0:
+			notice = ""
+			canvas.queue_redraw()
+	if not visible or _kicked or room_id == "":
+		return
+	if GameData.hour_now() < GameData.CLOSE_HOUR:
+		return
+	_kicked = true
+	_closing_kick()
+
+
+# 「이제 문 닫을 시간이니까 내일 다시 와~」 — 말하고 밖으로 내보낸다
+func _closing_kick() -> void:
+	var keeper := str(_def().get("keeper", ""))
+	var kname := "주인"
+	var portrait: Texture2D = null
+	if GameData.NPCS.has(keeper):
+		kname = str(GameData.NPCS[keeper].name)
+		portrait = main.tex.get("npc_%s_portrait_happy" % keeper)
+	main.dialog.open_seq(kname, portrait, [
+		{"text": "「아이고, 벌써 여섯 시네.」"},
+		{"text": "「이제 문 닫을 시간이니까 내일 다시 와~」"},
+	], _leave_after_close)
+
+
+func _leave_after_close() -> void:
+	close()
+	# 문밖으로 한 발 밀려난다 (문턱에 붙어 서서 다시 들어가지 않게)
+	if main.player != null:
+		main.player.position.y += float(main.TILE)
+	main.hud.event_toast("문을 닫았다 — 내일 다시 오자")
 
 
 # 이번 방문에 실제로 무언가를 샀는가 (분기 B와 C를 가른다).
@@ -196,6 +256,7 @@ func _shelf_near() -> int:
 
 
 func _process(delta: float) -> void:
+	_closing_tick(delta)          # 문 닫을 시각이면 손님을 내보낸다
 	if not visible or main.dialog.visible or main.shop.visible \
 			or main.inventory_ui.visible:
 		moving = false
@@ -431,6 +492,22 @@ func _draw_room() -> void:
 	var ew: float = f.get_string_size("나가기 ▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
 	canvas.draw_string(f, Vector2((EXIT_X.x + EXIT_X.y) / 2.0 - ew / 2.0, ROOM.end.y + 20),
 		"나가기 ▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.8, 0.74))
+
+	# 방에 들어선 직후의 안내 한 줄 (말풍선 대신 방 위쪽에 적는다)
+	if notice != "":
+		var nw: float = f.get_string_size(notice, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		var nr := Rect2(480.0 - nw / 2.0 - 12.0, 54.0, nw + 24.0, 26.0)
+		canvas.draw_rect(nr, Color(0.16, 0.12, 0.09, 0.88))
+		canvas.draw_rect(nr, Color(0.62, 0.5, 0.32), false, 2.0)
+		canvas.draw_string(f, Vector2(480.0 - nw / 2.0, 73.0), notice,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
+
+	# 영업시간 팻말 — 지금 몇 시고, 언제까지 여는지
+	var hline := "%s · 지금 %d시" % [GameData.shop_hours_line(),
+		int(GameData.hour_now())]
+	var hlw: float = f.get_string_size(hline, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	canvas.draw_string(f, Vector2(944.0 - hlw, 30.0), hline,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.78, 0.72, 0.6))
 
 	var si := _shelf_near()
 	if si >= 0:

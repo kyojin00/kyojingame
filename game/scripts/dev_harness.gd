@@ -4169,6 +4169,113 @@ func _debug_tick() -> void:
 				and home_ok,
 				" 바다전밭안내없음=", order_ok, " 동시노출없음=", not many,
 				" 호미후시작=", farm_on, " 첫만남=", meet_ok, " 집부탁분리=", home_ok)
+		299:
+			# #148: 영업시간·강제 퇴장 · 상점 레시피 선반 · 갇힘 구조 · 지도
+			m.dialog.close()
+			var k_min9 := GameData.minutes
+
+			# ── ① 영업시간 9~18시, 점심 12~13시
+			var hours_ok := true
+			for row: Array in [[8.0, false, "early"], [9.0, true, ""],
+					[11.5, true, ""], [12.0, false, "lunch"],
+					[12.9, false, "lunch"], [13.0, true, ""],
+					[17.9, true, ""], [18.0, false, "late"], [22.0, false, "late"]]:
+				GameData.minutes = float(row[0]) * 60.0
+				if GameData.shop_open_now() != bool(row[1]) \
+						or GameData.shop_closed_why() != str(row[2]):
+					hours_ok = false
+
+			# ── ② 문 닫을 시각이 되면 주인이 손님을 내보낸다
+			GameData.minutes = 10.0 * 60.0
+			m.shop_room.open("general")
+			var in_room: bool = m.shop_room.visible
+			# 안내는 방 안에 적히고, 말풍선은 걷힌다
+			m.hud.show_message("검사용 말풍선", 9.0)
+			m.hud._process(0.016)
+			var bub_gone: bool = m.hud._bub == null or not m.hud._bub.visible
+			var notice_ok: bool = m.shop_room.notice != ""
+			GameData.minutes = 18.0 * 60.0
+			m.shop_room._closing_tick(0.016)
+			var kick_talk: bool = m.dialog.visible
+			var kick_txt := ""
+			for e9: Dictionary in m.dialog._seq:
+				kick_txt += str(e9.get("text", "")) + " "
+			var kick_word: bool = kick_txt.contains("문 닫을 시간") \
+				and kick_txt.contains("내일 다시")
+			m.dialog.skip_seq()
+			m.dialog.close()
+			var kicked_out: bool = not m.shop_room.visible
+			# 영업시간 밖에는 아예 들어가지 못한다
+			var closed_msg: bool = m.shop_room.closed_text("lunch").contains("점심") \
+				and m.shop_room.closed_text("late") != "" \
+				and m.shop_room.closed_text("early") != ""
+			GameData.minutes = k_min9
+
+			# ── ③ 상점 선반: 「도구」는 없고 「레시피」가 그 자리에 있다
+			var shelf_ok := true
+			var has_recipe := false
+			for sh: Array in m.shop_room.SHELVES:
+				if str(sh[0]) == "tool":
+					shelf_ok = false
+				if str(sh[0]) == "recipe":
+					has_recipe = true
+			shelf_ok = shelf_ok and has_recipe \
+				and "dish_berry_jam" not in GameData.SHOP_FOOD_IDS \
+				and not GameData.SHOP_FOOD_RECIPES.has("dish_berry_jam")
+			# 산딸기잼 레시피는 용식의 집터 보상으로 들어온다
+			var k_fh9 := GameData.fisher_home
+			var k_ri9: Dictionary = GameData.recipe_items.duplicate()
+			var k_ru9: Array = GameData.recipes_unlocked.duplicate()
+			GameData.recipe_items.erase(GameData.JAM_ID)
+			GameData.recipes_unlocked.erase(GameData.JAM_ID)
+			GameData.fisher_home = "built"
+			m.story._end_fisher_home_reward()
+			var jam_reward: bool = not GameData.recipe_locked(GameData.JAM_ID) \
+				or GameData.recipe_items.has(GameData.JAM_ID)
+			GameData.fisher_home = k_fh9
+			GameData.recipe_items = k_ri9
+			GameData.recipes_unlocked = k_ru9
+
+			# ── ④ 갇힘 구조 — 잠긴 구역 한가운데 두면 성한 땅으로 나온다
+			var k_zones9: Array = GameData.zones_open.duplicate()
+			var k_pos9 := m.player.position
+			var zid9: String = str(GameData.ZONE_ORDER[0])
+			GameData.zones_open.erase(zid9)
+			var zr9: Rect2i = GameData.VILLAGE_ZONES[zid9].rect
+			var mid9: Vector2i = zr9.position + zr9.size / 2
+			m.player.position = Vector2(mid9.x * m.TILE + 16, mid9.y * m.TILE + 16)
+			var was_trapped: bool = not m.is_passable(m.player_tile())
+			m.rescue_trapped()
+			var rescued: bool = m.is_passable(m.player_tile())
+			GameData.zones_open = k_zones9
+			m.player.position = k_pos9
+			# 맵 밖으로 밀려나도 되돌아온다
+			m.player.position = Vector2(-400.0, -400.0)
+			m.rescue_trapped()
+			var back_in: bool = m.is_passable(m.player_tile())
+			m.player.position = k_pos9
+
+			# ── ⑤ 지도 — 더 넓게 쓰고, 미탐사 칸은 밑이 비치지 않는다
+			var map_big: bool = m.map_ui.VIEW_W >= 940.0 \
+				and m.map_ui.VIEW_H >= 505.0 and m.map_ui.ZOOM_MAX >= 6.0
+			var k_expl9: Dictionary = GameData.explored.duplicate()
+			GameData.explored = {}
+			GameData.mark_explored_at(m.START_TILE)
+			var far9 := Vector2i(m.MAP_W - 3, m.MAP_H - 3)
+			var fog_block: bool = not m.map_ui._visible_tile(far9.x, far9.y) \
+				and m.map_ui.FOG.a >= 1.0 and m.map_ui.CLOUD_MID.a >= 1.0
+			GameData.explored = k_expl9
+			m.hud._toast_queue.clear()
+			print("SHOPTIME_OK=", hours_ok and in_room and bub_gone and notice_ok
+				and kick_talk and kick_word and kicked_out and closed_msg
+				and shelf_ok and jam_reward and was_trapped and rescued
+				and back_in and map_big and fog_block,
+				" 영업시간=", hours_ok, " 말풍선치움=", bub_gone,
+				" 방안안내=", notice_ok, " 퇴장대사=", kick_talk and kick_word,
+				" 밖으로=", kicked_out, " 닫힘안내=", closed_msg,
+				" 레시피선반=", shelf_ok, " 잼=용식보상 ", jam_reward,
+				" 갇힘=", was_trapped, " 구조=", rescued, " 맵밖복귀=", back_in,
+				" 지도확장=", map_big, " 구름차단=", fog_block)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
@@ -5345,7 +5452,9 @@ func _debug_tick() -> void:
 				and not GameData.shop_food_on_sale("dish_berry_toast")
 			GameData.discovered["forage_berry"] = 1
 			GameData.discovered["wheat"] = 1
-			var st1: bool = GameData.shop_food_on_sale("dish_berry_jam") \
+			# 산딸기잼 레시피는 **상점에 아예 없다** (퀘스트로만 얻는다)
+			var st1: bool = not GameData.shop_food_on_sale("dish_berry_jam") \
+				and "dish_berry_jam" not in GameData.SHOP_FOOD_IDS \
 				and GameData.shop_food_on_sale("flour") \
 				and not GameData.shop_food_on_sale("dish_bread")
 			GameData.discovered["flour"] = 1
@@ -5380,7 +5489,7 @@ func _debug_tick() -> void:
 			GameData.collections_done = keep_cdone
 			print("FOODCOL_OK=", st0 and st1 and st2 and col_ok and sped
 				and fish_tab == "res" and pouch_gone,
-				" 진열0=", st0, " 잼밀가루=", st1, " 빵토스트=", st2,
+				" 진열0=", st0, " 잼는상점밖·밀가루=", st1, " 빵토스트=", st2,
 				" 컬렉션=", col_ok, " 이속=", sped,
 				" 물고기재료칸=", fish_tab == "res", " 씨앗숨김=", pouch_gone)
 		334:

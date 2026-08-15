@@ -65,6 +65,13 @@ func _enter_building(kind: String) -> void:
 		if owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
 			m.hud.show_message("이사 준비로 분주한 모양이다.\n내일 주인이 직접 인사하러 온다고 했다.", 4.0)
 			return
+		# 공공 건물은 영업시간에만 문을 연다 (개인 주거지는 해당 없음)
+		var why := GameData.shop_closed_why()
+		if why != "":
+			m.dialog.open(str(m.BUILDING_NAMES.get(kind, "건물")),
+				m.shop_room.closed_text(why) + "\n\n" + GameData.shop_hours_line(),
+				[["돌아선다", null]])
+			return
 		m.shop_room.open(kind)   # 가게마다 다른 방으로 들어간다
 		return
 	m.hud.show_message("%s다. 아직 안에서 할 수 있는 일은 없다." %

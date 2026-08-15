@@ -1342,9 +1342,65 @@ var bugs: Array = []
 
 # ---- 루프 ----
 
+# ---- 갇힘 구조대 ----
+#
+# 세계는 자란다 — 구역이 열리고 닫히고, 건물이 서고, 지형이 바뀐다.
+# 그 사이에 **못 지나가는 칸 위에 서 있게 되는** 일이 생기면
+# 사방이 막혀 영영 움직일 수 없다 (미해금 구역 안, 맵 밖, 물 위).
+# 그래서 1초에 한 번, 서 있는 자리가 성한지 훑어보고 가까운 땅으로 옮긴다.
+const RESCUE_EVERY := 1.0
+var _rescue_t := 0.0
+
+
+# t에서 가장 가까운 「설 수 있는 칸」 (없으면 -1,-1)
+func nearest_open_tile(t: Vector2i, max_r := 24) -> Vector2i:
+	if is_passable(t):
+		return t
+	for r in range(1, max_r + 1):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var n := t + Vector2i(dx, dy)
+				if is_passable(n):
+					return n
+	return Vector2i(-1, -1)
+
+
+func rescue_trapped() -> void:
+	if interior.visible or cave.visible or shop_room.visible:
+		return
+	# 주인공 — 맵 밖·미해금 구역·물 위에 서 있으면 가까운 땅으로
+	var pt := player_tile()
+	var stuck: bool = pt.x < 0 or pt.y < 0 or pt.x >= MAP_W or pt.y >= MAP_H \
+		or not _tile_accessible(pt) or grid[clampi(pt.y, 0, MAP_H - 1)][clampi(pt.x, 0, MAP_W - 1)].ground == "water"
+	if stuck:
+		var to := nearest_open_tile(Vector2i(clampi(pt.x, 1, MAP_W - 2),
+			clampi(pt.y, 1, MAP_H - 2)))
+		if to.x < 0:
+			to = START_TILE
+		player.position = Vector2(to.x * TILE + 16, to.y * TILE + 16)
+		hud.show_message("길이 없는 곳에 갇혀 있었다 — 가까운 땅으로 나왔다.", 4.0)
+	# 마을 사람 — 잠긴 구역이나 맵 밖으로 밀려났으면 제 자리로 돌려보낸다
+	for n in npcs:
+		var nt := Vector2i(int(n.position.x / TILE), int(n.position.y / TILE))
+		if nt.x >= 0 and nt.y >= 0 and nt.x < MAP_W and nt.y < MAP_H \
+				and _tile_accessible(nt):
+			continue
+		var home: Vector2i = NPC_HOME.get(n.id, START_TILE)
+		var ht := nearest_open_tile(home)
+		if ht.x < 0:
+			ht = home
+		n.position = Vector2(ht.x * TILE + 16, ht.y * TILE + 16)
+
+
 func _process(delta: float) -> void:
 	_bgm_tick(delta)
 	GameData.playtime_sec += delta   # 엔딩 통계 리포트용 실제 플레이 시간
+	_rescue_t += delta
+	if _rescue_t >= RESCUE_EVERY:
+		_rescue_t = 0.0
+		rescue_trapped()
 	story._story_update(delta)
 	story._fisher_update(delta)
 	story._move_update(delta)

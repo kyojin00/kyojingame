@@ -73,6 +73,47 @@ const STAMINA_NIGHT_MULT := 1.0
 const DAY_START := 6.0 * 60.0   # 오전 6시
 const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
+# ---- 공공 건물의 영업시간 ----
+#
+# 상점·도서관·대장간처럼 사람이 일하는 건물은 아침 9시에 문을 열고
+# 저녁 6시에 닫는다. 낮 12시부터 1시까지는 점심시간이라 잠시 쉰다.
+# (개인 주거지는 여기에 해당하지 않는다 — 집 문은 언제나 열린다)
+const OPEN_HOUR := 9.0
+const CLOSE_HOUR := 18.0
+const LUNCH_FROM := 12.0
+const LUNCH_TO := 13.0
+
+
+func hour_now() -> float:
+	return minutes / 60.0
+
+
+func shop_lunch_now() -> bool:
+	var h := hour_now()
+	return h >= LUNCH_FROM and h < LUNCH_TO
+
+
+func shop_open_now() -> bool:
+	var h := hour_now()
+	return h >= OPEN_HOUR and h < CLOSE_HOUR and not shop_lunch_now()
+
+
+# 왜 닫혀 있는가 — "" 열림 / "early" 아직 / "lunch" 점심 / "late" 마감
+func shop_closed_why() -> String:
+	var h := hour_now()
+	if h < OPEN_HOUR:
+		return "early"
+	if h >= CLOSE_HOUR:
+		return "late"
+	if shop_lunch_now():
+		return "lunch"
+	return ""
+
+
+func shop_hours_line() -> String:
+	return "영업 %d시~%d시 · 점심 %d시~%d시" % [int(OPEN_HOUR), int(CLOSE_HOUR),
+		int(LUNCH_FROM), int(LUNCH_TO)]
+
 # ---- 배고픔(포만감) ----
 #
 # 메인 스토리 3의 두 번째 퀘스트에서 열린다 (재민이 알려 준다).
@@ -1030,23 +1071,20 @@ func shop_dish_on_shelf(did: String) -> bool:
 
 
 # 초반 음식 레시피 — 잡화점에서 단계적으로 풀린다. id -> 가격
+# 산딸기잼 레시피는 **상점에서 팔지 않는다** — 퀘스트로만 얻는 첫 요리다
+# (조리대를 찾는 안내의 선물 · 용식의 집터 부탁 보상)
 const SHOP_FOOD_RECIPES := {
-	"dish_berry_jam": 150, "flour": 100, "dish_bread": 150,
-	"dish_berry_toast": 250,
+	"flour": 100, "dish_bread": 150, "dish_berry_toast": 250,
 }
-const SHOP_FOOD_IDS := ["dish_berry_jam", "flour", "dish_bread",
-	"dish_berry_toast"]
+const SHOP_FOOD_IDS := ["flour", "dish_bread", "dish_berry_toast"]
 
 
 # 초반 음식 레시피의 진열 조건 — 재료를 겪어 본 순서대로 하나씩 열린다.
-#   산딸기잼      산딸기를 주워 본 적이 있다
 #   밀가루        밀을 처음 수확했다 (수확이 곧 발견 기록)
 #   빵            밀가루를 얻어 봤다
 #   산딸기잼 토스트  밀가루나 산딸기잼 중 하나라도 만들어 봤다
 func shop_food_on_sale(rid: String) -> bool:
 	match rid:
-		"dish_berry_jam":
-			return discovered.has("forage_berry")
 		"flour":
 			return discovered.has("wheat")
 		"dish_bread":

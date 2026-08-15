@@ -4705,9 +4705,17 @@ func _end_fisher_home_reward() -> void:
 	GameData.fisher_home = "done"
 	if "storage_box" not in GameData.recipes_unlocked:
 		GameData.recipes_unlocked.append("storage_box")
+	# 산딸기잼 레시피는 **상점에서 팔지 않는다** — 여기가 그 자리다.
+	# (조리대 안내에서 이미 받았다면 조용히 건너뛴다)
+	var jam_new := GameData.recipe_locked(GameData.JAM_ID) \
+		and not GameData.recipe_items.has(GameData.JAM_ID)
+	if jam_new:
+		GameData.give_recipe(GameData.JAM_ID)
 	GameData.affinity["fisher"] = mini(100, int(GameData.affinity["fisher"]) + 15)
 	Sound.play_sfx("sfx_coin")
 	m.hud.event_toast("수납 상자 레시피를 배웠다!")
+	if jam_new:
+		m.hud.event_toast("산딸기잼 레시피도 함께!")
 	m.hud.show_message("집 안 책상(제작대)에서 목재 8개로 만들 수 있다.\n만든 상자는 가방에서 꺼내 집 안에 놓는다.", 7.0)
 	m.saveio.save_now()
 

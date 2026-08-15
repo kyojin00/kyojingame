@@ -318,7 +318,7 @@ func _rebuild() -> void:
 	# 구매 탭 이름은 열린 분류를 따른다 — 생활용품 선반을 열었는데
 	# 탭이 「씨앗」으로 적혀 있던 버그를 고쳤다.
 	$Panel/V/Tabs/BuyBtn.text = {"seed": "씨앗", "life": "생활용품",
-		"tool": "도구", "misc": "기타", "stall": "노점"}.get(buy_cat, "구매")
+		"recipe": "레시피", "misc": "기타", "stall": "노점"}.get(buy_cat, "구매")
 	if _head != null:
 		_head.text = "- %s -" % shop_title
 		_money.text = "%d" % GameData.money
@@ -365,10 +365,9 @@ func _rebuild() -> void:
 			_note("새 씨앗은 마을이 자라면 하나씩 들어온다.")
 			if GameData.merchant_discount():
 				_note("만수와 친해져서 씨앗 10% 할인 중! ♥")
-		if buy_cat == "tool":
-			# 부품(못·경첩)은 잡화점이 아니라 대장간에서 판다
-			_note("도구·부품은 대장간에서 다룬다. 새 물건이 들어오면 이 선반에 놓인다.")
-		if buy_cat in ["", "life"] and GameData.day > GameData.merchant_day:
+		# 「레시피」 선반 — 배워서 만들 수 있게 되는 것들만 모아 둔다
+		# (예전 「도구」 선반 자리다. 도구·부품은 대장간에서 다룬다)
+		if buy_cat in ["", "recipe"] and GameData.day > GameData.merchant_day:
 			# 초반 음식 레시피 — 재료를 겪어 본 순서대로 하나씩 진열된다
 			# (산딸기 주움→잼 · 밀 수확→밀가루 · 밀가루 얻음→빵 · 요리해 봄→토스트)
 			var food_rows := 0
@@ -446,6 +445,9 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("recipe", "집터 레시피",
 					"빈 집터를 미리 마련해 둔다 (이주 수락의 선행 조건) · 재료: 목재 60 · 석재 40 · 못 4",
 					hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
+		if buy_cat == "life":
+			# 생활에 쓰는 것은 「사는」 게 아니라 「만드는」 쪽으로 모았다
+			_note("생활에 쓰는 것들은 「레시피」 선반에서 만드는 법을 판다.")
 		if buy_cat in ["", "misc"]:
 			# 마음을 전하는 것들
 			_note("— 마음을 전하는 것 —")

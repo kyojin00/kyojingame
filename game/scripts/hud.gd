@@ -829,6 +829,13 @@ func _place_bubble() -> void:
 		clampf(anchor.x - p.x, 12.0, _bub.size.x - 12.0), _bub.size.y - 1.0)
 
 
+# 말풍선을 즉시 걷는다 (창이 열리거나 장면이 바뀔 때)
+func hide_bubble() -> void:
+	msg_timer = 0.0
+	if _bub != null:
+		_bub.visible = false
+
+
 func show_message(text: String, dur := 2.5) -> void:
 	if main != null and main.remote_acting:
 		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
@@ -927,7 +934,13 @@ func _process(delta: float) -> void:
 		if minimap_panel.visible:
 			minimap.queue_redraw()
 	if _bub != null and _bub.visible:
-		_place_bubble()
-		msg_timer -= delta
-		if msg_timer <= 0.0:
-			_bub.visible = false
+		# 가게 방·집 안·동굴·전체 창이 열리면 말풍선은 갈 곳이 없다 —
+		# 그대로 두면 화면 한가운데 붙박이처럼 남는다 (예전 버그)
+		if main != null and (main.shop_room.visible or main.interior.visible
+				or main.cave.visible or main.ui_open()):
+			hide_bubble()
+		else:
+			_place_bubble()
+			msg_timer -= delta
+			if msg_timer <= 0.0:
+				_bub.visible = false
