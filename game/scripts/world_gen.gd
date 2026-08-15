@@ -544,10 +544,16 @@ func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
 	var tname := "house_" + kind
 	if kind == "" or not m.tex.has(tname):
 		tname = "house"
-	# 그림은 512x410이고 0.5배로 그려 화면에서는 256 x 205(8 x 6.4칸)를 덮는다.
+	# 그림은 512 폭에 0.5배로 그려 화면에서는 256(8칸)을 덮는다.
 	# 다른 오브젝트와 같은 2:1 축소라 점이 흔들리지 않는다.
-	var hn: Node2D = m.objnode._make_object(m.tex[tname],
-		Vector2(anchor.x * m.TILE, (anchor.y + 4) * m.TILE), Vector2(0, -410))
+	#
+	# 세로 오프셋은 **그림 높이에서 가져온다.** 410으로 박아 뒀더니 지붕을
+	# 뒤로 더 눕히려고 그림을 키운 순간 집이 땅에 파묻혔다 — 밑변을 문 앞에
+	# 맞추는 값이라 그림이 자라면 같이 자라야 한다.
+	var htex: Texture2D = m.tex[tname]
+	var hn: Node2D = m.objnode._make_object(htex,
+		Vector2(anchor.x * m.TILE, (anchor.y + 4) * m.TILE),
+		Vector2(0, -float(htex.get_height())))
 	var hspr: Sprite2D = hn.get_child(0)
 	hspr.scale = Vector2(0.5, 0.5)
 	hspr.offset.x = -96.0

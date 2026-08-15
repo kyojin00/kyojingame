@@ -8,8 +8,9 @@
 //
 // 옛 그림을 4칸씩 묶어 굵게 만들어도 봤지만 **서까래·창틀이 뭉갰다** —
 // 얇은 선으로 그린 그림은 묶으면 선이 죽는다. 그래서 처음부터
-// **128x102 논리 격자**에 굵은 형태로 그리고 4배로 펴서 512x408로 낸다
-// (게임이 쓰는 크기 그대로라 코드는 안 건드린다).
+// **128x114 논리 격자**에 굵은 형태로 그리고 4배로 펴서 512x456으로 낸다.
+// 폭은 게임이 쓰던 512 그대로고, 세로만 뒤로 눕는 지붕 자리만큼 키웠다
+// (world_gen 이 그림 높이를 읽어 밑변을 맞추므로 좌표는 저절로 따라온다).
 //
 // 색은 **옛 집에서 실제로 뽑았다** — 주황 기와(252,100,27), 따뜻한 갈색
 // 목재(148,90,42), 회백색 회벽(194,180,169). 그래서 굵어져도 같은 마을로 보인다.
@@ -35,7 +36,9 @@ const OUT = INSTALL ? SPR : REF;
 const PRE = INSTALL ? '' : 'proposed_';
 
 const S = 4;                     // 논리 한 칸 = 원본 4px (화면에서 2px)
-const GW = 128, GH = 102;
+// 캔버스를 위로 열두 칸 키웠다. 앞모습은 그대로 아래로 내려앉고,
+// 새로 생긴 위쪽 자리를 **뒤로 물러나는 지붕**이 쓴다.
+const GW = 128, GH = 114;
 const FW = GW * S, FH = GH * S;
 
 // 옛 집에서 뽑은 색. 각 재료는 [기본, 그늘, 밝은 면] 세 톤.
@@ -68,6 +71,10 @@ const PAL = {
   // 가까운 쪽 -> 먼 쪽 세 단계. 한 색으로 두면 뒤가 슬래브처럼 평평해진다
   'm': [176, 158, 130], 'n2': [148, 132, 108], 'm3': [120, 106, 88],
   'M': [166, 52, 24], 'M2': [130, 38, 18], 'M3': [96, 28, 14],
+  // 뒤 지붕의 **가까운 쪽은 오히려 밝다.** 하늘을 마주 보는 면이라
+  // 빛을 정면 벽보다 많이 받는다. 여기서 한 번 밝아졌다가 멀어지며
+  // 어두워져야 「눕혀진 면」으로 보인다 — 처음부터 어두우면 그냥 그림자다
+  'Mn': [212, 74, 30],
 };
 
 // 결을 낼 때 쓰는 대응표 (기본 <-> 그늘 / 밝은 면)
@@ -314,11 +321,23 @@ function soften(g) {
 //
 // 색은 **한 가지씩만** (지붕 뒤 / 벽 뒤). 정면 그림을 그대로 밀면
 // 창문·문이 위로 죽 늘어나 얼룩이 된다.
-const DEPTH = 10;                // 뒤로 물러나는 칸 수 (「조금만 입체적으로」)
+// 열 칸으로는 **두께**밖에 안 나온다. 사진의 지붕이 「면」으로 보이는 건
+// 뒤로 흐르는 거리가 정면 벽만큼 길어서다. 열다섯 칸 = 화면에서 30px,
+// 정면 벽(37칸)의 절반쯤 — 이제 눈이 이걸 「지붕」으로 읽는다.
+const DEPTH = 15;
+
+// 그리고 **멀어질수록 좁아진다.**
+//
+// 일자로만 밀면 아무리 깊어도 벽이 위로 자란 것처럼 보인다. 진짜로 뒤로
+// 가는 것은 작아진다 — 그게 원근이다. 좌우로 비스듬히 미는 건 이미 해 봤고
+// 건물이 기울어 보여서 접었는데, **가운데로 모으는 것**은 다르다.
+// 양쪽이 똑같이 좁아지므로 정면은 마주 본 채로 뒤만 멀어진다.
+const TAPER = 0.16;              // 맨 뒤에서 16% 좁아진다
+const VPX = GW / 2;              // 소실점 x (건물 한가운데 위)
 
 // 뒤로 물러나는 면은 **멀어질수록 어두워진다.** 한 색으로 채우면 두께가
 // 아니라 슬래브가 된다 — 세 단계로 갈라야 「공간」으로 읽힌다.
-const BACK_ROOF = ['M', 'M2', 'M3'];      // 가까운 쪽 -> 먼 쪽
+const BACK_ROOF = ['Mn', 'M', 'M2'];      // 가까운 쪽 -> 먼 쪽
 const BACK_WALL = ['m', 'm2', 'm3'];
 
 // 뒤 색은 **처마 높이가 아니라 재료로** 고른다.
@@ -328,37 +347,58 @@ const BACK_WALL = ['m', 'm2', 'm3'];
 // 돌인데 뒤가 주황이 됐다. 밀려 올라가는 칸 **자기 색**을 보고 정하면
 // 덩어리가 몇이든 저절로 맞는다.
 const BACK_STONE = ['S', 'S', 'S'];
+const ROOF_SEAM = { Mn: 'M', M: 'M2', M2: 'M3' };   // 켜·이음매는 한 단 더 어둡게
 const BACK_OF = {
   l: BACK_ROOF, r: BACK_ROOF, R: BACK_ROOF,
   s: BACK_STONE, S: BACK_STONE,
 };
+// 기와 켜가 **뒤로 갈수록 촘촘해진다.** 같은 간격으로 그으면 지붕이
+// 누워 있지 않고 서 있는 것처럼 보인다 — 줄 간격이 곧 기울기다.
+const COURSE = (() => {
+  const out = new Set();
+  let i = 0, gap = 4.2;
+  while (i < DEPTH) { i += Math.max(1, Math.round(gap)); out.add(i); gap *= 0.70; }
+  return out;
+})();
+
 function extrude(g) {
   const back = new G();
+  const dep = Array.from({ length: GH }, () => new Array(GW).fill(0));
   // 가까운 쪽부터 채운다 — 먼저 칠한 쪽(가까운 쪽)이 이긴다
   for (let i = 1; i <= DEPTH; i++) {
     const k = Math.min(2, Math.floor((i - 1) * 3 / DEPTH));
+    const s = 1 - TAPER * (i / DEPTH);
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-      if (g.d[y][x] === '.') continue;
+      const c = g.d[y][x];
+      if (c === '.') continue;
       const ny = y - i;
-      if (ny < 0 || back.d[ny][x] !== '.') continue;
-      back.px(x, ny, (BACK_OF[g.d[y][x]] || BACK_WALL)[k]);
+      if (ny < 0) continue;
+      // 칸 하나를 **폭 s의 띠**로 옮긴다. 점 하나로 옮기면 좁아지는 만큼
+      // 사이가 벌어져 뒤가 빗살처럼 뚫린다
+      const a = Math.round(VPX + (x - VPX - 0.5) * s);
+      const b = Math.round(VPX + (x - VPX + 0.5) * s);
+      const tone = (BACK_OF[c] || BACK_WALL)[k];
+      for (let nx = a; nx <= b; nx++) {
+        if (nx < 0 || nx >= GW || back.d[ny][nx] !== '.') continue;
+        back.px(nx, ny, tone); dep[ny][nx] = i;
+      }
     }
   }
-  // 지붕 뒷면에도 기와 이음매 — 뒤로 갈수록 줄 간격이 좁아진다(원근)
-  for (let x = 0; x < GW; x++) {
-    let seen = 0;
-    for (let y = GH - 1; y >= 0; y--) {
-      if (!BACK_ROOF.includes(back.d[y][x])) continue;
-      seen++;
-      if (seen % 3 === 0 || seen > DEPTH * 0.6 && seen % 2 === 0)
-        back.px(x, y, BACK_ROOF[Math.min(2, BACK_ROOF.indexOf(back.d[y][x]) + 1)]);
-    }
+  // 뒷 지붕면에 기와를 깐다 — 켜(가로줄)와 이음매(세로줄)를 함께.
+  // 가로줄만 그으면 골판지, 이음매까지 있어야 한 장씩 얹은 기와가 된다
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = back.d[y][x];
+    if (!BACK_ROOF.includes(c)) continue;
+    const i = dep[y][x], deeper = ROOF_SEAM[c];
+    const row = [...COURSE].filter(v => v <= i).length;     // 몇 번째 켜인가
+    if (COURSE.has(i)) { back.px(x, y, deeper); continue; }
+    if ((x + row * 2) % 5 === 0) back.px(x, y, deeper);     // 켜마다 어긋난 이음매
   }
   // 뒤를 깔고 그 위에 정면을 얹는다
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
     if (g.d[y][x] === '.' && back.d[y][x] !== '.') g.px(x, y, back.d[y][x]);
-  // 맨 뒤 능선에 밝은 줄 — 하늘을 받는 모서리다. 지붕 뒷면에만 —
-  // 굴뚝 꼭대기까지 주황으로 칠하면 그것만 튄다
+  // 맨 뒤 용마루 — 하늘을 받는 모서리라 밝다. 지붕 뒷면에만 얹는다
+  // (굴뚝 꼭대기까지 주황으로 칠하면 그것만 튄다)
   for (let x = 0; x < GW; x++) for (let y = 0; y < GH - 1; y++)
     if (g.d[y][x] !== '.') { if (BACK_ROOF.includes(g.d[y][x])) g.px(x, y, 'l'); break; }
 }
@@ -374,17 +414,17 @@ function extrude(g) {
 //   오목부        그 사이에 한 단 더 물러난 자리. 여기서 **지붕면**이 보인다
 //
 // 정면 박공이 셋이면 실루엣에 산이 셋 생겨서, 멀리서 봐도 형태가 잡힌다.
-const GROUND = 95;               // 날개·오목부 바닥
-const GROUND_C = 97;             // 가운데 몸채 — 앞으로 나온 만큼 바닥이 내려온다
+const GROUND = 107;               // 날개·오목부 바닥
+const GROUND_C = 109;             // 가운데 몸채 — 앞으로 나온 만큼 바닥이 내려온다
 
 const C0 = 49, C1 = 78;          // 가운데 몸채 좌우
-const C_RIDGE = 10, C_EAVE = 50;
+const C_RIDGE = 22, C_EAVE = 62;
 
 const L0 = 4, L1 = 40;           // 왼 날개
 const R0 = 89, R1 = 123;         // 오른 날개 (몸채와의 틈을 왼쪽과 똑같이 아홉 칸)
-const W_RIDGE = 24, W_EAVE = 56;
+const W_RIDGE = 36, W_EAVE = 68;
 
-const CONN_EAVE = 64;            // 오목부 처마 — 제일 낮다
+const CONN_EAVE = 76;            // 오목부 처마 — 제일 낮다
 const CX = Math.round((C0 + C1) / 2);
 
 
