@@ -414,8 +414,12 @@ def _side_arm(g, c, y, sw, near):
         for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
                 continue
-            if ny < yy and yy < y + ARMPIT:
-                continue                       # 겨드랑이 위는 어깨와 한 덩어리다
+            # 겨드랑이 위로는 윤곽선을 **아예 긋지 않는다**. 옆으로만 열어
+            # 두면 팔 양옆의 검은 세로줄이 어깨 꼭대기까지 올라와, 어깨가
+            # 세 갈래로 갈린 것처럼 보인다 (팔을 목에 붙여 놓은 꼴이다).
+            # 여기가 트여 있어야 어깨-윗팔이 한 덩어리로 읽힌다.
+            if yy < y + ARMPIT:
+                continue
             if g.d[ny][nx] != '.':             # (팔이 몸에 이어 붙는다)
                 g.d[ny][nx] = 'O'
     for (x, yy), cc in cells.items():
