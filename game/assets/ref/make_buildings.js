@@ -215,7 +215,7 @@ function ditherFace(g, tones, y0, y1) {
 // 핵심은 **좌표를 묶는 것**이다. hash(x, y)는 점이 되고,
 // hash(x>>2, y>>1)은 덩어리가 된다.
 const ROUGH = parseFloat((process.argv.find(a => a.startsWith('--rough=')) || '').slice(8))
-  || 0.20;
+  || 0.32;
 
 // 기와를 **한 장씩** 얹는다.
 //
@@ -253,9 +253,14 @@ function shingles(g) {
     const row = roofRow[y][x];
     const u = x + ((row % 2) ? (TW >> 1) : 0);
     const col = Math.floor(u / TW);
-    // 몸통 톤 — 멀수록 어둡다. 장마다 한 단씩 흔들어 준다
-    const r = hash(col, row);
-    let i = Math.round(t * 5.4) + (r < 0.20 ? 1 : (r > 0.84 ? -1 : 0));
+    // 몸통 톤 — 멀수록 어둡다. **장마다 두 단까지** 흔든다.
+    // 한 단만 흔들었더니 지붕이 너무 성해 보였다. 오래 쓴 지붕은 장마다
+    // 색이 제법 다르고, 드문드문 이가 빠져 있다.
+    const r = hash(col, row), r2 = hash(row * 3 + 1, col * 5 + 2);
+    let i = Math.round(t * 5.4)
+      + (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
+    // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
+    if (r2 < 0.055 && at(x, y + 1) !== row) i += 3;
     if (at(x, y - 1) !== row) i -= 1;                    // 윗변 (빛)
     if (at(x, y + 1) !== row) i += 2;                    // 아랫변 (겹침 턱)
     if (u % TW === 0) i += 2;                            // 세로 이음매
@@ -290,10 +295,14 @@ function brickCourse(g) {
     const u = x + (course % 2) * (BW / 2);      // 한 켜 걸러 반 장 밀기
     const col = Math.floor(u / BW);
     // 장마다 색이 조금씩 다르다 — 구운 벽돌은 한 장도 같은 게 없다
-    const r = hash(col, course);
+    const r = hash(col, course), r2 = hash(course * 7 + 3, col * 11 + 5);
     let t = c;
-    if (r < ROUGH * 1.4) t = DARKEN[c] || c;
-    else if (r > 1.0 - ROUGH * 1.2) t = LIGHTEN[c] || c;
+    // 구운 벽돌은 한 장도 같은 게 없다. 두 단까지 벌린다
+    if (r < ROUGH * 0.45) t = 'K';
+    else if (r < ROUGH * 1.5) t = DARKEN[c] || c;
+    else if (r > 1.0 - ROUGH * 0.4) t = 'i';
+    else if (r > 1.0 - ROUGH * 1.3) t = LIGHTEN[c] || c;
+    if (r2 < 0.05) t = 'K';                    // 이 빠진 장
     // 줄눈 — 가로 한 줄 + 세로 이음매. 회반죽이 벽돌보다 어둡게 패인다
     if (y % BH === BH - 1 || u % BW === 0) t = 'K';
     g.px(x, y, t);
@@ -311,6 +320,48 @@ function woodGrain(g) {
 
 // 빛은 **건물 하나에 한 방향**이다. 덩어리마다 따로 밝기를 매기면
 // 세 채를 붙여 놓은 것처럼 보인다 — 그래서 캔버스 전체를 한 번에 훑는다.
+// 비바람 자국 — 재질을 아무리 잘 깔아도 **새것처럼** 보이는 이유는
+// 얼룩이 없어서다. 오래 선 집에는 세 가지가 반드시 있다:
+//
+//   흘러내린 줄  처마와 창턱에서 물이 흐른 자리가 세로로 남는다
+//   밑동 흙탕물  비가 땅에 튀어 벽 아래 한 뼘이 늘 지저분하다
+//   이끼         처마 가까운 기와 골, 해가 덜 드는 자리에 낀다
+function weather(g) {
+  // ① 흘러내린 줄 — 여섯 칸에 한 줄쯤. 시작한 자리부터 아래로 이어진다
+  for (let x = 0; x < GW; x++) {
+    if (hash(x, 77) > 0.17) continue;
+    let run = 0;
+    for (let y = 0; y < GH; y++) {
+      const c = g.d[y][x];
+      if (!'kKiwWx'.includes(c)) { run = 0; continue; }
+      if (++run > 2 && hash(x, y) < 0.72 && DARKEN[c]) g.px(x, y, DARKEN[c]);
+    }
+  }
+  // ② 밑동 — 땅에 가까울수록 짙게, 경계는 들쭉날쭉하게
+  for (let y = GROUND - 11; y <= GROUND; y++) for (let x = 0; x < GW; x++) {
+    const c = g.d[y][x];
+    if (!'kKiwWx'.includes(c)) continue;
+    const near = (y - (GROUND - 11)) / 11;                 // 0(위) ~ 1(바닥)
+    if (hash(x * 3 + 1, y) < near * 0.75 && DARKEN[c]) g.px(x, y, DARKEN[c]);
+  }
+}
+
+// 이끼 — 처마 가까운 기와에만. 지붕 전체에 뿌리면 초원이 된다
+function moss(g) {
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (roofT[y][x] < 0 || roofT[y][x] > 0.13) continue;
+    if (!ROOF_Q.has(g.d[y][x])) continue;
+    // **덩어리로** 낀다. 잔 확률로 뿌렸더니 처마를 따라 초록 띠가 생겨서
+    // 이끼가 아니라 페인트 줄로 보였다 — 큰 칸(4x3)으로 자리를 먼저 정하고
+    // 그 안에서만 잔 무늬를 준다
+    const spot = hash(x >> 2, y / 3 | 0);
+    if (spot > 0.16) continue;
+    const v = hash(x, y);
+    if (v < 0.45) g.px(x, y, 'N');
+    else if (v < 0.80) g.px(x, y, 'n');
+  }
+}
+
 function roughen(g) {
 
   ditherFace(g, ['i', 'k', 'K'], 0, GROUND);            // 벽돌
@@ -319,6 +370,8 @@ function roughen(g) {
   brickCourse(g);
   wallPatches(g, 0, GROUND);
   woodGrain(g);
+  weather(g);           // 흘러내린 줄 · 밑동 흙탕물
+  if (MOSSY) moss(g);   // 처마 가까운 기와의 이끼
 }
 
 
@@ -509,6 +562,7 @@ const CX = 64;   // 캔버스 한가운데 — 폭이 바뀌어도 중심은 안
 //   stucco  회벽 + 하프팀버 목재 띠         (옛 우리 집 쪽)
 const WALL_CLI = (process.argv.find(a => a.startsWith('--wall=')) || '').slice(7);
 let WALL = 'brick';
+let MOSSY = true;                              // 이끼가 끼는 지붕인가
 let WB = 'k', WD = 'K', FRAME = 'w';           // 벽 바탕 / 벽 그늘 / 창 테두리
 const SHADE = 'D';                             // 구조 그늘 (덮어쓰기 안 됨)
 function setWall(kind) {
@@ -1371,6 +1425,9 @@ function build(spec) {
   PAL.p0 = wp.i; PAL.p1 = wp.k; PAL.p2 = wp.K;
   PAL.p6 = wp.K.map(v => Math.round(v * 0.7));
   setWall(WALL_CLI || spec.wall || 'brick');
+  // 그을린 지붕(대장간)과 청동 지붕(연구소)에는 이끼가 안 낀다 —
+  // 하나는 늘 뜨겁고 하나는 늘 닦는 집이다
+  MOSSY = !['soot', 'copper'].includes(spec.roofPal || 'clay');
 
   const wide = spec.w || 0;
   X0 = 34 - wide; X1 = 94 + wide;
