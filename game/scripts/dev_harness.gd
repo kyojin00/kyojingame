@@ -25,6 +25,7 @@ var _shot_frames := 0
 var _saved_pos := Vector2.ZERO   # 화면용으로 잠깐 옮겨 둔 플레이어 자리
 var _desk_keep: Array = []       # 제작대 화면을 찍는 동안 맡아 두는 레시피 목록
 var _fog_keep: Dictionary = {}   # 먹구름 화면을 찍는 동안 맡아 두는 탐사 기록
+var _ui_saved: Array = []        # UI 없는 화면을 찍는 동안 꺼 둔 CanvasLayer들
 
 
 # ---- 검증 시퀀스 ----
@@ -1419,6 +1420,25 @@ func _debug_tick() -> void:
 					and not GameData.weather_wet(GameData.WEATHER_FOG)
 					and not GameData.weather_wet(GameData.WEATHER_STAR),
 				" harsh(안개)=", GameData.weather_harsh(GameData.WEATHER_FOG))
+		224:
+			# 캡슐·배너에 쓸 **UI 없는 화면**.
+			# 보통 스크린샷에는 미니맵·퀘스트창·대사줄·말풍선이 얹혀 있어서,
+			# 오려 쓸 수 있는 빈 띠가 100px대밖에 안 남는다. 그걸 늘려 캡슐을
+			# 만들면 흐릿해진다 (brand/make_brand.js가 이걸 재서 경고한다).
+			# 그래서 UI를 잠깐 다 끄고 한 장 찍어 둔다.
+			m.player.position = Vector2(74 * m.TILE + 16, 21 * m.TILE + 16)   # 광장
+			(m.player.get_node("Camera") as Camera2D).reset_smoothing()
+			m.player.dir = "down"
+			_ui_saved.clear()
+			for c: Node in m.find_children("", "CanvasLayer", true, false):
+				if (c as CanvasLayer).visible:
+					_ui_saved.append(c)
+					(c as CanvasLayer).visible = false
+		225:
+			_save_shot("_clean.png")
+			for c: Node in _ui_saved:
+				(c as CanvasLayer).visible = true
+			_ui_saved.clear()
 		240:
 			# 휘두르기 네 위상을 한 장씩 찍는다. 도구가 **주먹에 붙어** 따라가는지,
 			# 도트가 위상마다 제대로 바뀌는지는 수치로는 안 보이고 그림을 봐야 한다.
