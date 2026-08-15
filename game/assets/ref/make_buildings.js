@@ -729,13 +729,139 @@ function barrel(g, x, y) {
 }
 
 
-function sign(g, cx) {
-  const w = 24, x0 = cx - w / 2, y = EAVE + 5;
-  g.vline(x0 + 3, y - 4, y, 'T');
-  g.vline(x0 + w - 3, y - 4, y, 'T');
-  g.rect(x0, y, x0 + w, y + 7, 'B');
-  g.rect(x0 + 1, y + 1, x0 + w - 1, y + 6, 'b');
-  for (let i = 0; i < 3; i++) g.rect(x0 + 5 + i * 6, y + 3, x0 + 7 + i * 6, y + 5, 'B');
+// ---- 무슨 집인지 말하는 것들 ----
+//
+// 색과 실루엣을 갈라도 「저건 대장간이다」는 아직 안 보였다. 그건 재료가
+// 아니라 **간판 그림과 문 앞의 물건**이 말한다. 마을에서 길을 찾을 때
+// 사람이 실제로 보는 건 그 둘이다.
+//
+// 그림은 11x8칸 = 화면 22x16px. 이 크기에서 읽히려면 **덩어리 하나**로
+// 그려야 한다 — 선으로 그리면 다 뭉개진다.
+const ICON = {
+  hammer: ['..#######..', '..#######..', '..#######..', '....###....',
+           '....###....', '....###....', '...#####...', '..#######..'],
+  jar:    ['....###....', '...#####...', '..#######..', '..#ooooo#..',
+           '..#ooooo#..', '..#ooooo#..', '..#######..', '...#####...'],
+  cow:    ['.##.....##.', '.###...###.', '..#######..', '..#o###o#..',
+           '..#######..', '..#######..', '...##.##...', '...........'],
+  fish:   ['...........', '...####..#.', '..######.##', '.###o#####.',
+           '.#########.', '..######.##', '...####..#.', '...........'],
+  mug:    ['...........', '..#####.##.', '..#ooo#.#.#', '..#ooo##..#',
+           '..#ooo#...#', '..#ooo#..#.', '..#####.##.', '...........'],
+  book:   ['...........', '..#######..', '..#o###o#..', '..#o###o#..',
+           '..#o###o#..', '..#o###o#..', '..#######..', '...........'],
+  flask:  ['....###....', '....#.#....', '....#.#....', '...#ooo#...',
+           '..#ooooo#..', '..#ooooo#..', '..#ooooo#..', '...#####...'],
+  letter: ['...........', '.#########.', '.##.....##.', '.#.##.##.#.',
+           '.#..###..#.', '.#.......#.', '.#########.', '...........'],
+};
+
+function stampIcon(g, cx, cy, name, dark, lite) {
+  const a = ICON[name];
+  if (!a) return;
+  for (let y = 0; y < a.length; y++) for (let x = 0; x < a[y].length; x++) {
+    const c = a[y][x];
+    if (c === '.') continue;
+    g.px(cx - 5 + x, cy - 4 + y, c === 'o' ? lite : dark);
+  }
+}
+
+function sign(g, cx, icon) {
+  const w = 30, x0 = cx - w / 2, y = EAVE + 4;
+  g.vline(x0 + 4, y - 4, y, 'T');
+  g.vline(x0 + w - 4, y - 4, y, 'T');
+  g.rect(x0, y, x0 + w, y + 13, 'B');
+  g.rect(x0 + 1, y + 1, x0 + w - 1, y + 12, 'b');
+  g.hline(x0 + 1, x0 + w - 1, y + 1, 'x');                 // 판 윗변이 빛을 받는다
+  stampIcon(g, cx, y + 7, icon, 'T', 'u');
+}
+
+// 걸이 간판 — 벽에서 팔이 나와 판이 매달린다. 가게라는 표시로 이만한 게 없다
+function hangSign(g, x, y, icon) {
+  g.hline(x, x + 9, y, 'T');                               // 팔
+  g.px(x + 1, y + 1, 'T'); g.px(x + 2, y + 1, 'T');        // 버팀대
+  g.vline(x + 3, y + 1, y + 2, 'S'); g.vline(x + 9, y + 1, y + 2, 'S');
+  g.rect(x - 1, y + 3, x + 13, y + 15, 'B');
+  g.rect(x, y + 4, x + 12, y + 14, 'b');
+  stampIcon(g, x + 6, y + 9, icon, 'T', 'u');
+}
+
+// 연기 — 굴뚝에서 오르는 것. 대장간은 늘 불을 때고 있다
+function smoke(g, x, y) {
+  const puff = (px, py, r) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+      if (Math.hypot(dx, dy) <= r + 0.3)
+        g.px(px + dx, py + dy, Math.hypot(dx, dy) > r - 1 ? 'p5' : 'p4');
+  };
+  puff(x, y, 3); puff(x - 4, y - 6, 4); puff(x + 2, y - 13, 5);
+}
+
+// 담금질통 — 대장간 앞. 벌겋게 단 쇠를 식히는 물통
+function trough(g, x, y) {
+  g.rect(x, y - 7, x + 13, y, 't');
+  g.hline(x, x + 13, y - 7, 'u');
+  g.hline(x, x + 13, y, 'T');
+  g.rect(x + 1, y - 6, x + 12, y - 4, 'G');                // 물
+  g.hline(x + 2, x + 11, y - 6, 'e');
+  for (let i = x; i <= x + 13; i += 6) g.vline(i, y - 7, y, 'T');
+}
+
+// 울타리 — 목장 상회 앞. 가로 두 줄에 말뚝
+function fence(g, x0, x1, y) {
+  g.hline(x0, x1, y - 8, 't');
+  g.hline(x0, x1, y - 4, 't');
+  for (let x = x0; x <= x1; x += 6) { g.vline(x, y - 11, y, 'T'); g.px(x, y - 12, 'T'); }
+}
+
+// 널어 말리는 생선 — 수산시장. 이 한 줄이면 무슨 가게인지 끝난다
+function fishLine(g, x0, x1, y) {
+  g.hline(x0, x1, y, 'T');
+  for (let x = x0 + 3; x < x1; x += 7) {
+    g.vline(x, y + 1, y + 2, 'T');
+    g.rect(x - 2, y + 3, x + 2, y + 6, 's');
+    g.px(x - 3, y + 4, 'S'); g.px(x + 3, y + 5, 'S');      // 꼬리
+    g.px(x - 1, y + 4, 'S');                                // 눈
+  }
+}
+
+// 우체통 — 우체국 앞. 빨간 기둥에 투입구
+function mailbox(g, x, y) {
+  g.rect(x, y - 16, x + 8, y, 'A');
+  g.vline(x, y - 16, y, 'a');
+  g.rect(x - 1, y - 19, x + 9, y - 16, 'A');
+  g.hline(x - 1, x + 9, y - 19, 'a');
+  g.rect(x + 2, y - 14, x + 6, y - 13, 'O');               // 투입구
+  g.rect(x - 1, y - 1, x + 9, y, 'S');
+}
+
+// 가로등 — 도서관 앞. 밤에 책 읽는 집이라는 표시
+function lamppost(g, x, y) {
+  g.vline(x, y - 24, y, 'S');
+  g.rect(x - 1, y - 1, x + 1, y, 'S');
+  g.rect(x - 3, y - 30, x + 3, y - 25, 'T');
+  g.rect(x - 2, y - 29, x + 2, y - 26, 'y');
+  g.hline(x - 3, x + 3, y - 31, 'S');
+  g.px(x, y - 32, 'S');
+}
+
+// 긴 의자 — 여관 앞. 앉아 쉬는 집
+function bench(g, x, y) {
+  g.rect(x, y - 6, x + 15, y - 4, 't');
+  g.hline(x, x + 15, y - 6, 'u');
+  g.hline(x, x + 15, y - 4, 'T');
+  for (const i of [x + 1, x + 13]) g.vline(i, y - 3, y, 'T');
+  g.rect(x, y - 12, x + 15, y - 11, 't');                  // 등받이
+  for (const i of [x + 1, x + 13]) g.vline(i, y - 11, y - 6, 'T');
+}
+
+// 매달린 바구니 — 잡화점 차양 밑에 주렁주렁
+function baskets(g, x0, x1, y) {
+  for (let x = x0; x <= x1; x += 11) {
+    g.vline(x, y, y + 2, 'T');
+    g.rect(x - 3, y + 3, x + 3, y + 6, 'b');
+    g.hline(x - 3, x + 3, y + 3, 'B');
+    g.px(x - 1, y + 2, 'n'); g.px(x + 1, y + 2, 'n');      // 삐져나온 잎
+  }
 }
 
 
@@ -889,8 +1015,10 @@ function tower(g, cx, wallTop) {
   }
   g.hline(a - 2, b + 2, wallTop, 'R');
   g.hline(a - 1, b + 1, wallTop + 1, SHADE);
-  archWin(g, cx - 5, wallTop + 8, 11, 15, false);
-  archWin(g, cx - 5, wallTop + 32, 11, 15, false);
+  // 창은 **바닥선 안쪽에서** 끝나야 한다. 두 층으로 넣었더니 아래 창이
+  // 주춧돌을 뚫고 내려가 땅속에 반쯤 묻혔다
+  archWin(g, cx - 5, wallTop + 6, 11, 15, false);
+  louver(g, cx, rt + 15, 9, 9);                            // 종탑 살창
 }
 
 // 풍향계 — 용마루 위에 꽂는 것. 한 줄짜리지만 하늘로 삐죽 나와서
@@ -1111,17 +1239,27 @@ function build(spec) {
   }
 
   // ---- 실루엣을 가르는 덩어리 (extrude 앞에 — 뒤 지붕까지 같이 생긴다) ----
+  let footL = X0, footR = X1;                              // 발자국 좌우 끝
   if (spec.dormer) dormer(g, CX + 22, EAVE - 6);
   if (spec.lean) {
     const r = spec.lean === 'right';
-    leanTo(g, r ? X1 + JUT + 1 : X0 - JUT - 21, r ? X1 + JUT + 21 : X0 - JUT - 1,
-      MID - 16);
+    const a = r ? X1 + JUT + 1 : X0 - JUT - 21, b = r ? X1 + JUT + 21 : X0 - JUT - 1;
+    leanTo(g, a, b, MID - 16);
+    footL = Math.min(footL, a); footR = Math.max(footR, b);
   }
   if (spec.tower) {
     const r = spec.tower === 'right';
-    tower(g, r ? X1 + JUT + 11 : X0 - JUT - 11, EAVE + 10);
+    const c = r ? X1 + JUT + 11 : X0 - JUT - 11;
+    tower(g, c, EAVE + 10);
+    footL = Math.min(footL, c - 9); footR = Math.max(footR, c + 9);
   }
   if (spec.stall) stall(g, CX - 16, CX + 16, GROUND);
+  // 옆으로 늘어난 만큼 **주춧돌을 하나로 잇는다.** 덩어리마다 따로 두면
+  // 밑에 틈이 생겨서 두 채를 나란히 세워 놓은 것처럼 보인다 — 한 채의
+  // 집은 한 장의 땅 위에 선다
+  g.rect(footL, GROUND - 2, footR, GROUND, 'S');
+  g.rect(footL, GROUND - 2, footR, GROUND - 1, 's');
+  g.hline(footL - 1, footR + 1, GROUND, 'S');
 
   extrude(g);                                              // 뒤로 눕는 지붕
   if (spec.cupola) cupola(g, CX, RIDGE + 2);
@@ -1130,7 +1268,7 @@ function build(spec) {
   if (spec.chim !== 'none') {
     const big = spec.chim === 'big';
     chimney(g, spec.chimneyX !== undefined ? spec.chimneyX : CX + 14,
-      RIDGE - (big ? 40 : 30), RIDGE - (big ? 2 : 11), !big, big ? 11 : 5);
+      RIDGE - (big ? 33 : 30), RIDGE - (big ? 2 : 11), !big, big ? 11 : 5);
   }
 
   // ---- 살림 ----
@@ -1144,9 +1282,18 @@ function build(spec) {
     else if (kind === 'crate2') crate(g, px, GROUND - 8, 6);
     else if (kind === 'hay') hay(g, px, GROUND);
     else if (kind === 'anvil') anvil(g, px, GROUND);
+    else if (kind === 'trough') trough(g, px, GROUND);
+    else if (kind === 'mailbox') mailbox(g, px, GROUND);
+    else if (kind === 'lamppost') lamppost(g, px, GROUND);
+    else if (kind === 'bench') bench(g, px, GROUND);
+    else if (kind === 'fence') fence(g, px, px + 26, GROUND);
   }
   if (spec.flag) flag(g, X1 + JUT + 5, GROUND);
-  if (spec.sign) sign(g, CX);
+  if (spec.sign) sign(g, CX, spec.icon);
+  if (spec.hang) hangSign(g, X1 + JUT - 14, MID - 22, spec.icon);
+  if (spec.baskets) baskets(g, CX - 22, CX + 22, MID + 11);
+  if (spec.fishLine) fishLine(g, X0 + 4, X1 - 4, MID - 26);
+  if (spec.smoke) smoke(g, (spec.chimneyX || CX) + 5, RIDGE - 39);
   // 담쟁이는 **맨 마지막**에. 창틀·간판 위로 조금 넘어가야 자란 것처럼 보인다
   const iv = spec.ivy === undefined ? 2 : spec.ivy;
   if (iv >= 1) ivy(g, X0 - JUT + 2, GROUND - 3, EAVE + 3);
@@ -1172,44 +1319,47 @@ function build(spec) {
 //
 // props 의 숫자는 벽에서의 거리다. 음수면 왼쪽 벽 바깥, 양수면 오른쪽.
 const KINDS = {
-  // 우리집 — 기준. 담쟁이가 양쪽을 타고 오르고 창밑에 꽃상자.
-  // 아무 혹도 없는 게 우리집의 특징이다 (마을에서 제일 평범한 집)
+  // 우리집 — 간판이 없는 유일한 집. 담쟁이와 꽃상자
   house: { props: [['planter', -7], ['barrel', 2]] },
 
-  // 잡화점 — 넓은 줄무늬 차양에 진열창이 크다. 궤짝을 쌓아 뒀다
-  house_general: { sign: true, awning: 2, bigWin: true, ivy: 1, dormer: true,
+  // 잡화점 — 항아리 간판. 차양 밑에 바구니가 주렁주렁, 궤짝을 쌓아 뒀다
+  house_general: { sign: true, icon: 'jar', hang: true, awning: 2, bigWin: true,
+    baskets: true, dormer: true, ivy: 1,
     props: [['crate', -13], ['crate2', -13], ['barrel', 3]] },
 
-  // 목장 상회 — 널판 벽에 다락문. 헛간처럼 넓고 낮다. 옆에 건초더미
-  house_ranch: { sign: true, wall: 'plank', wallPal: 'warm', roofPal: 'moss',
-    w: 7, pitch: -8, gable: 'loft', ivy: 1, vane: true,
-    props: [['hay', -17], ['barrel', 3]] },
+  // 목장 상회 — 소 간판. 앞에 울타리와 건초더미. 널판 벽, 다락문, 풍향계
+  house_ranch: { sign: true, icon: 'cow', wall: 'plank', wallPal: 'warm',
+    roofPal: 'moss', w: 7, pitch: -8, gable: 'loft', vane: true, ivy: 1,
+    props: [['hay', -20], ['fence', 4]] },
 
-  // 대장간 — 굴뚝이 주인공이다. 그을린 지붕, 문 대신 화구, 앞에 모루
-  house_smith: { sign: true, roofPal: 'soot', wallPal: 'stone',
-    chim: 'big', chimneyX: 38, forge: true, ivy: 0, lean: 'right',
-    props: [['anvil', 3], ['barrel', 16]] },
+  // 대장간 — 망치 간판. 화구가 벌겋고 굴뚝에서 연기가 오른다.
+  // 앞에는 모루와 담금질통, 옆에는 작업 곁채
+  house_smith: { sign: true, icon: 'hammer', hang: true, roofPal: 'soot',
+    wallPal: 'stone', chim: 'big', chimneyX: 38, smoke: true, forge: true,
+    lean: 'right', ivy: 0,
+    props: [['anvil', 26], ['trough', -16]] },
 
-  // 수산시장 — 제일 낮고 넓다. 청회색 지붕에 큰 차양, 생선궤짝
-  house_fish: { sign: true, roofPal: 'slate', awning: 2, w: 9, pitch: -10,
-    bigWin: true, ivy: 0, stall: true,
+  // 수산시장 — 생선 간판. 처마 밑에 생선을 널어 말리고, 문 대신 판매대
+  house_fish: { sign: true, icon: 'fish', hang: true, roofPal: 'slate',
+    awning: 2, w: 9, pitch: -10, bigWin: true, stall: true, fishLine: true, ivy: 0,
     props: [['crate', -14], ['crate2', -14], ['crate', 3]] },
 
-  // 여관 — 제일 크다. 2층 창이 셋, 큰 간판, 담쟁이도 무성하다
-  house_inn: { sign: true, w: 6, pitch: 5, win3: true, dormer: true,
-    props: [['barrel', 3], ['planter', -8]] },
+  // 여관 — 맥주잔 간판. 문 앞에 긴 의자. 제일 크고 2층 창이 셋
+  house_inn: { sign: true, icon: 'mug', hang: true, w: 6, pitch: 5, win3: true,
+    dormer: true, props: [['bench', -20], ['barrel', 3]] },
 
-  // 도서관 — 회색 돌벽에 뾰족한 지붕. 박공에 장미창
-  house_library: { sign: true, wallPal: 'stone', pitch: 9, gable: 'rose', tower: 'left',
-    props: [['planter', -8], ['planter', 3]] },
+  // 도서관 — 책 간판. 앞에 가로등(밤에 책 읽는 집). 돌벽, 뾰족 지붕, 장미창
+  house_library: { sign: true, icon: 'book', wallPal: 'stone', pitch: 9,
+    gable: 'rose', tower: 'left', props: [['lamppost', 6], ['planter', 16]] },
 
-  // 연금 연구소 — 청동 지붕에 옥탑 채광창. 담쟁이는 없다(깔끔해야 한다)
-  house_lab: { sign: true, roofPal: 'copper', wallPal: 'pale', gable: 'vent',
-    cupola: true, chim: 'none', ivy: 0, vane: true, props: [['barrel', 3]] },
+  // 연금 연구소 — 플라스크 간판. 청동 지붕에 옥탑 채광창. 담쟁이는 없다
+  house_lab: { sign: true, icon: 'flask', roofPal: 'copper', wallPal: 'pale',
+    gable: 'vent', cupola: true, chim: 'none', vane: true, ivy: 0,
+    props: [['barrel', 3]] },
 
-  // 우체국 — 박공에 시계, 옆에 깃발
-  house_post: { sign: true, wallPal: 'warm', gable: 'clock', flag: true, ivy: 1,
-    props: [['planter', -8]] },
+  // 우체국 — 편지 간판에 박공 시계, 깃발, 문 앞에 우체통
+  house_post: { sign: true, icon: 'letter', wallPal: 'warm', gable: 'clock',
+    flag: true, ivy: 1, props: [['mailbox', -12]] },
 };
 
 let n = 0;
