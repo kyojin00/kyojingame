@@ -1577,6 +1577,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			and event.keycode == KEY_F10 and GameData.DEV_MODE:
 		_dev_fill_stock()
 		return
+	# 개발/테스트: F8 — 메인 스토리 건너뛰기
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F8 and GameData.DEV_MODE:
+		story.skip_main_story()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 함께하기 방 코드 + 저장 후 타이틀로.
 		# (방 코드를 화면에 늘 띄우면 눈에 거슬려서 여기서 꺼내 본다)
@@ -1597,8 +1602,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_guest():
 			body = "친구의 농장에서 함께 일하는 중이다.\n\n%s" % body
 		if GameData.DEV_MODE:
-			# 테스트용 — 출시 전에 DEV_MODE를 끄면 이 단추도 같이 사라진다
+			# 테스트용 — 출시 전에 DEV_MODE를 끄면 이 단추들도 같이 사라진다
 			btns.push_front(["[개발] 아이템 10000개 (F10)", _dev_fill_stock])
+			btns.push_front(["[개발] 메인 스토리 건너뛰기 (F8)", func() -> void:
+					dialog.close()
+					story.skip_main_story()])
 		dialog.open("게임 메뉴", body, btns)
 		return
 	for slot_i in 9:

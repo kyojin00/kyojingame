@@ -5453,7 +5453,43 @@ func _debug_tick() -> void:
 			# 넘으면 그리는 것만으로 120fps가 무너진다는 뜻이다
 			print("MAPDRAW_OK=", _bench_n > 0 and per_draw < 8000,
 				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)")
-		406: get_tree().quit()
+		406:
+			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
+			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.
+			var k_all := {
+				"phase": GameData.story_phase, "s2": GameData.story2_phase,
+				"tut": GameData.tutorial.duplicate(true),
+				"tools": GameData.unlocked_tools.duplicate(),
+				"built": GameData.village_built.duplicate(),
+				"house": GameData.house_lv, "sea": GameData.sea_open,
+				"fisher": GameData.fisher_quest,
+			}
+			GameData.story_phase = "enter"        # 오프닝 한복판인 척
+			GameData.story2_phase = ""
+			GameData.tutorial = GameData.fresh_tutorial()
+			m.story.skip_main_story()
+			var skip_ok: bool = GameData.story_phase == "done" \
+				and GameData.story2_phase == "done" \
+				and not bool(GameData.tutorial.get("active", true)) \
+				and GameData.is_tool_unlocked("hoe") and GameData.is_tool_unlocked("axe") \
+				and GameData.house_lv >= 1 and GameData.has_bed \
+				and GameData.sea_open \
+				and GameData.village_built.size() == GameData.ALL_VILLAGE_PLOTS.size() \
+				and not m.story_cutscene
+			# 두 번 눌러도 탈이 없다 (이미 건너뛴 상태면 알려 주고 만다)
+			m.story.skip_main_story()
+			var again_ok: bool = GameData.story_phase == "done"
+			GameData.story_phase = k_all.phase
+			GameData.story2_phase = k_all.s2
+			GameData.tutorial = k_all.tut
+			GameData.unlocked_tools = k_all.tools
+			GameData.village_built = k_all.built
+			GameData.house_lv = k_all.house
+			GameData.sea_open = k_all.sea
+			GameData.fisher_quest = k_all.fisher
+			print("STORYSKIP_OK=", skip_ok and again_ok,
+				" 샌드박스=", skip_ok, " 두번눌러도=", again_ok)
+		407: get_tree().quit()
 
 
 # ==== 검증 시퀀스 ====

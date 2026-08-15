@@ -1363,6 +1363,24 @@ func _end_forest_monologue() -> void:
 	m.hud.show_message("퀘스트 시작: 숲 안으로 들어가 보자", 6.0)
 
 
+# 메인 스토리 건너뛰기 (개발/테스트용 — DEV_MODE에서 F8 또는 ESC 메뉴).
+#
+# 오프닝부터 메인 스토리 2까지를 통째로 건너뛰고 **샌드박스 상태**로 세운다:
+# 도구 전부 · 할아버지의 집 · 마을 건물 전부 · 열린 바닷길 · 정착한 주민들.
+# 만드는 동안 뒷부분을 손볼 때마다 앞 이야기를 다시 볼 수는 없다.
+#
+# 3장부터는 손대지 않는다 — 날짜와 행동으로 열리는 이야기라, 여기서
+# 억지로 「끝난 것」으로 만들면 주민·유품·건물이 앞뒤가 안 맞는다.
+func skip_main_story() -> void:
+	if GameData.story_phase == "done" and GameData.story2_phase == "done":
+		m.hud.show_message("이미 메인 스토리를 건너뛴 상태다.")
+		return
+	m.dialog.close()
+	_skip_tutorial()
+	m.hud.show_message("[개발] 메인 스토리를 건너뛰었다 — 도구·집·마을·바닷길이 모두 열렸다.", 5.0)
+	m.saveio.save_now()
+
+
 func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
 	GameData.unlock_all_tools()
