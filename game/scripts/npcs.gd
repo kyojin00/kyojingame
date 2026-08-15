@@ -198,9 +198,16 @@ func _sync_village_npcs() -> void:
 			m.npcs[m.npcs.size() - 1].region = Rect2i(
 				m.ALCH_HOUSE_ANCHOR.x - 3, m.ALCH_HOUSE_ANCHOR.y + 3, 12, 5)
 
-	# 숲속의 모녀 — 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다
-	if GameData.forest_quest in ["visit", "done"]:
-		for fid: String in ["forest_mom", "forest_girl"]:
+	# 숲속의 모녀 — 연화는 집을 찾아간 뒤부터 집 앞 빈터에서 지낸다.
+	# 솔이는 몸이 약해 문밖으로 나오지 못한다 — 연화가 마음을 열고
+	# 안으로 들인 뒤(forest_trust == "done")에야 마당까지 나온다.
+	var forest_ids: Array = []
+	if GameData.forest_quest in ["go", "back", "done"]:
+		forest_ids.append("forest_mom")
+	if GameData.forest_trust == "done":
+		forest_ids.append("forest_girl")
+	if not forest_ids.is_empty():
+		for fid: String in forest_ids:
 			var have_f := false
 			for n in m.npcs:
 				if n.id == fid:

@@ -2359,15 +2359,31 @@ func quest_catalog() -> Array:
 			"reward": "이주 편지·집터 시스템 해금 + 우체국·우체부"})
 	o = forest_objective_short()
 	if o != "":
+		var f_npc := "explorer"
+		if forest_quest in ["ask", "back"]:
+			f_npc = "chief"
 		out.append({"id": "forest", "title": "숲속에서 발견한 집", "obj": o,
 			"desc": "숲을 쏘다니던 재민이 숨을 몰아쉬며 달려왔다.\n"
 				+ "「나무 사이에 집이 한 채 있었어. 정말이야!」\n\n"
 				+ "삼십 년 이장을 지낸 사람도 처음 듣는 집.\n"
-				+ "안개가 낮게 깔린 오솔길 끝에서\n"
+				+ "굴뚝에는 연기가 오르고, 마당에는 빨래가 널려 있다.\n"
 				+ "누가, 왜, 마을을 등지고 살고 있는 걸까.\n\n"
+				+ "이장과 재민을 앞세워 함께 가 보자.\n"
 				+ "문을 두드리기 전까지는 아무도 알 수 없다.",
-			"cat": "main", "ep": "메인 스토리 5", "npc": "explorer",
-			"reward": "숲속 모녀와의 만남"})
+			"cat": "main", "ep": "메인 스토리 5", "npc": f_npc,
+			"reward": "호감도 시스템 해금"})
+	# 후속: 연화가 문을 여는 날 (스토리 5 이후 · 호감도로 연다)
+	o = forest_trust_objective_short()
+	if o != "":
+		out.append({"id": "forest_trust", "title": "닫힌 문 앞에서", "obj": o,
+			"desc": "그날 연화는 끝내 문을 열어 주지 않았다.\n"
+				+ "당연한 일이다. 우리는 낯선 사람이었으니까.\n\n"
+				+ "이장의 말대로 자주 얼굴을 비추고,\n"
+				+ "말을 붙이고, 손이 필요할 때 거들었다.\n\n"
+				+ "오늘 그 집 앞을 지나는데,\n"
+				+ "연화가 먼저 이쪽을 보고 있었다.",
+			"cat": "sub", "npc": "forest_mom",
+			"reward": "집 안으로 — 솔이와의 첫 만남"})
 	o = story4_objective_short()
 	if o != "":
 		out.append({"id": "story4", "title": "오래된 마을의 경계", "obj": o,
@@ -2745,8 +2761,10 @@ func quest_npc_marks() -> Dictionary:
 			marks["explorer"] = "!"
 		"ask":
 			marks["chief"] = "!"
-		"visit":
-			marks["forest_mom"] = "!"
+		"back":
+			marks["chief"] = "?"
+	if forest_trust == "invited":
+		marks["forest_mom"] = "!"
 	if story4_phase == "ask":
 		marks["chief"] = "!"
 	match story6_phase:
@@ -2867,11 +2885,30 @@ func quest_npc_marks() -> Dictionary:
 # 그 집에는 아픈 딸을 돌보는 모녀가 조용히 살고 있었다.
 # 이 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
 #   "": 아직 / arrive: 재민 등장 — 말 걸기 / settle: 정착 (다음 날 아침까지) /
-#   found: 숲속 집 발견담 — 재민에게 말 걸기 / ask: 이장에게 물어보기 /
-#   visit: 숲 깊은 곳의 집 방문 (문 앞 E) / done: 완료
+#   found: 숲속 집 발견담 — 재민에게 말 걸기 /
+#   ask: 이장에게 보고 (재민과 함께) /
+#   go: 이장·재민과 함께 숲속의 집으로 (두 사람이 따라온다) /
+#   back: 돌아오는 길 — 이장의 조언 (여기서 호감도가 열린다) / done: 완료
 var forest_quest := ""
 var forest_day := 0          # 재민이 정착한 날 — 다음 날 아침 발견담이 뜬다
 var affinity_open := false   # 호감도 콘텐츠(하트·선물) 해금 여부
+
+# ---- 숲속 집의 문이 열리는 날 (메인 스토리 5 이후) ----
+#
+# 스토리 5에서 연화는 끝내 집 안으로 들이지 않는다 — 낯선 사람을 경계하는
+# 것은 당연한 일이고, 신뢰는 시간이 쌓아 주는 것이기 때문이다.
+# 꾸준히 말을 걸고 도우며 **연화의 호감도가 FOREST_TRUST_AFF 이상**이
+# 되면, 처음으로 문 안으로 들어오라는 말을 듣는다. 그날 솔이를 만난다.
+#   "": 아직 / invited: 마음을 열었다 — 연화에게 말 걸기(❗) /
+#   done: 집 안에서 솔이를 만났다 (이때부터 솔이가 집 앞에 나온다)
+const FOREST_TRUST_AFF := 5
+var forest_trust := ""
+
+
+# 연화가 마음을 열 만큼 친해졌는가
+func forest_trust_ready() -> bool:
+	return forest_quest == "done" \
+		and int(affinity.get("forest_mom", 0)) >= FOREST_TRUST_AFF
 
 
 # ---- 숲속 엄마(연화)의 서브 퀘스트 시스템 ----
@@ -2922,9 +2959,18 @@ func forest_objective_short() -> String:
 		"found":
 			return "재민과 대화하자."
 		"ask":
-			return "이장에게 물어보자."
-		"visit":
-			return "숲속의 집을 찾아가자."
+			return "이장에게 알리자."
+		"go":
+			return "숲속의 집으로 가자."
+		"back":
+			return "이장과 대화하자."
+	return ""
+
+
+# 후속 이야기 — 연화가 문을 열어 주는 날
+func forest_trust_objective_short() -> String:
+	if forest_trust == "invited":
+		return "연화와 대화하자."
 	return ""
 
 
@@ -5909,6 +5955,7 @@ func reset_all() -> void:
 	merchant_day = 0
 	stall_hours = []
 	forest_quest = ""
+	forest_trust = ""
 	forest_day = 0
 	affinity_open = false
 	move_quest = ""
@@ -6351,6 +6398,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
 		"stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,
+		"forest_trust": forest_trust,
 		"affinity_open": affinity_open,
 		"move_quest": move_quest, "move_day": move_day, "move_min": move_min,
 		"move_seeds": move_seeds,

@@ -1551,9 +1551,11 @@ func hidden_beach_find(fid: String) -> void:
 # 그 집에는 아픈 딸(솔이)을 돌보는 어머니(연화)가 조용히 살고 있었다.
 # 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
 
-func _forest_update(_delta: float) -> void:
+func _forest_update(delta: float) -> void:
 	if Net.is_guest():
 		return
+	_forest_party_update(delta)     # 셋이 함께 걷는 길 (go · back)
+	_forest_trust_update(delta)     # 스토리 5 이후 — 연화가 문을 여는 날
 	# 재민의 이야기는 이사(메인 스토리 3)가 끝난 다음 날부터 이어진다 —
 	# _end_move_greet가 forest_quest를 "settle"로 넘겨 준다.
 	# 정착한 다음 날 아침, 숲을 쏘다니던 재민이 뭔가를 발견했다.
@@ -1602,59 +1604,238 @@ func _end_explorer_found() -> void:
 	m.saveio.save_now()
 
 
-# 이장에게 물어본다 — 이장도 모르는 집
+# 이장에게 보고한다 — 이장도 모르는 집. 직접 가 보자고 한다
 func _start_forest_ask_dialog() -> void:
-	m.dialog.open_seq("이장 덕수", m.tex["npc_chief_portrait_normal"], [
+	var chief_n: Texture2D = m.tex["npc_chief_portrait_normal"]
+	m.dialog.open_seq("이장 덕수", chief_n, [
 		{"text": "「숲 깊은 곳에... 집이 있다고?」"},
 		{"text": "「내가 이 마을 이장을 삼십 년 했네만,\n그런 집이 있단 얘기는 처음 듣는구먼.」"},
-		{"text": "「빈집일 리는 없고... 영 마음에 걸리는군.\n미안하네만, 자네가 직접 가서 살펴봐 주겠나?」"},
+		{"text": "「빈집이라면 모를까, 사람이 살고 있다면\n그냥 두고 볼 일이 아니지.」"},
+		{"text": "「나도 같이 가겠네. 재민이도 앞장서고.\n셋이 함께라면 저쪽도 덜 놀랄 게야.」"},
 	], _end_forest_ask)
 
 
 func _end_forest_ask() -> void:
-	if GameData.forest_quest == "ask":
-		GameData.forest_quest = "visit"
-		m.worldgen._spawn_forest_house()
-		m.npcmgr._sync_village_npcs()   # 모녀가 집 앞에 있다
-		m.hud.quest_start_toast("숲 깊은 곳의 집을 찾아가 보자")
-		m.hud.show_message("숲길(서쪽) 남쪽으로 난 오솔길을 따라 내려가 보자.", 6.0)
+	if GameData.forest_quest != "ask":
+		m.saveio.save_now()
+		return
+	GameData.forest_quest = "go"
+	m.worldgen._spawn_forest_house()
+	m.npcmgr._sync_village_npcs()   # 연화가 집 앞에 있다 (솔이는 아직 나오지 않는다)
+	_forest_party_begin()
+	m.hud.quest_start_toast("이장·재민과 함께 숲속의 집으로")
+	m.hud.show_message("이장님과 재민이 뒤를 따른다.\n숲길 서쪽에서 남쪽으로 난 오솔길을 따라 내려가자.", 7.0)
 	m.saveio.save_now()
 
 
-# 숲속 집의 모녀 — 문을 두드리면(또는 연화·솔이에게 말을 걸면) 사정을 듣는다
+# ---- 셋이 함께 걷는 길 ----
+#
+# 「go」 동안 이장과 재민이 플레이어를 뒤따른다. 숲속 집 문 앞에 닿으면
+# 문을 두드리는 장면이 저절로 시작되고, 「back」에서는 돌아오는 길이니
+# 두 사람이 계속 곁에 붙어 있다 (이장에게 말을 걸면 조언을 듣는다).
+const FOREST_PARTY := ["chief", "explorer"]
+const PARTY_GAP := 46.0        # 뒤따르는 간격
+const PARTY_SPEED := 150.0
+var _forest_house_talked := false
+
+
+func _forest_party_begin() -> void:
+	_forest_house_talked = false
+	for nid: String in FOREST_PARTY:
+		var n: Variant = _npc_by_id(nid)
+		if n != null:
+			n.scripted = true
+			n.position = m.player.position + Vector2(-PARTY_GAP, 8.0)
+
+
+func _npc_by_id(nid: String) -> Variant:
+	for n in m.npcs:
+		if n.id == nid:
+			return n
+	return null
+
+
+func _forest_party_release() -> void:
+	for nid: String in FOREST_PARTY:
+		var n: Variant = _npc_by_id(nid)
+		if n != null:
+			n.scripted = false
+
+
+# 매 프레임 — 두 사람이 플레이어를 뒤따르고, 문 앞에 닿으면 대화가 열린다
+func _forest_party_update(delta: float) -> void:
+	if GameData.forest_quest not in ["go", "back"]:
+		return
+	var i := 0
+	for nid: String in FOREST_PARTY:
+		var n: Variant = _npc_by_id(nid)
+		i += 1
+		if n == null:
+			continue
+		n.scripted = true
+		var want: Vector2 = m.player.position \
+			+ Vector2(-PARTY_GAP * float(i), 6.0 * float(i))
+		var to: Vector2 = want - n.position
+		if to.length() > 18.0:
+			n.position += to.normalized() * minf(to.length() * 2.0, PARTY_SPEED) * delta
+			n.moving = true
+			n.anim_time += delta
+			if absf(to.x) > absf(to.y):
+				n.dir = "right" if to.x > 0.0 else "left"
+			else:
+				n.dir = "down" if to.y > 0.0 else "up"
+		else:
+			n.moving = false
+		n._update_sprite()
+	# 문 앞에 닿으면 저절로 문을 두드린다
+	if GameData.forest_quest != "go" or _forest_house_talked:
+		return
+	if m.dialog.visible or m.story_cutscene or m.ui_open():
+		return
+	var door: Vector2i = m.door_tile(m.FOREST_HOUSE_ANCHOR)
+	var dpos := Vector2(door.x * m.TILE + 16, door.y * m.TILE + 16)
+	if m.player.position.distance_to(dpos) < 110.0:
+		_start_forest_house_dialog()
+
+
+# 숲속 집의 문 앞 — 이장이 문을 두드린다. 연화는 경계하고, 딸은 나오지 않는다
 func _start_forest_house_dialog() -> void:
+	if _forest_house_talked:
+		return
+	_forest_house_talked = true
 	var mom_n: Texture2D = m.tex["npc_forest_mom_portrait_normal"]
-	var mom_h: Texture2D = m.tex["npc_forest_mom_portrait_happy"]
-	var girl_h: Texture2D = m.tex["npc_forest_girl_portrait_happy"]
+	var chief_n: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var exp_n: Texture2D = m.tex["npc_explorer_portrait_normal"]
 	m.story_cutscene = true
 	m.dialog.open_seq("숲속의 집", null, [
-		{"text": "(문을 두드리자, 한참 만에 조심스럽게 문이 열렸다.)"},
-		{"text": "「...누구세요? 이 깊은 숲까지 어떻게...」",
+		{"text": "(작은 집 한 채. 처마 밑에 마른 약초가 매달려 있고\n마당 한쪽에는 갓 널어 둔 빨래가 있다.)"},
+		{"text": "(사람이 살고 있다. 그것도 아주 오래.)"},
+		{"text": "「실례하겠습니다. 계십니까?」",
+			"name": "이장 덕수", "portrait": chief_n},
+		{"text": "(한참 만에 문이 손바닥만큼 열렸다.)"},
+		{"text": "「...누구세요.」",
 			"name": "연화", "portrait": mom_n},
-		{"text": "「엄마, 손님이에요? 우와, 진짜 손님이다!」",
-			"name": "솔이", "portrait": girl_h},
-		{"text": "「어머, 놀라게 해서 죄송해요. 저는 연화라고 해요.\n여기서 딸 솔이와 둘이 살고 있어요.」",
+		{"text": "「이런 데까지 사람이 올 일이 없는데요.\n무슨 일로 오셨죠.」",
+			"name": "연화"},
+		{"text": "「놀라게 해서 미안합니다.\n나는 교진 마을 이장 덕수라고 합니다.」",
+			"name": "이장 덕수", "portrait": chief_n},
+		{"text": "「이 아이가 숲에서 집을 봤다길래,\n혹시 도움이 필요한 분이 계신가 해서 왔습니다.」",
+			"name": "이장 덕수"},
+		{"text": "「...마을 분이셨군요.」",
 			"name": "연화", "portrait": mom_n},
-		{"text": "「마을에는 거의 내려가지 않아서...\n이장님께서도 저희를 모르셨을 거예요.」",
+		{"text": "「저희는 조용히 지내고 있어요.\n마을에 폐 끼친 적도, 왕래한 적도 없습니다.」",
 			"name": "연화"},
-		{"text": "「우리 솔이가... 몸이 약해요. 의원 말이,\n공기 좋고 조용한 곳에서 지내야 한다더군요.」",
+		{"text": "(집 안에서 작은 기침 소리가 났다.)"},
+		{"text": "「...아이가 있습니다. 몸이 약해서\n문밖으로는 나가지 못해요.」",
 			"name": "연화"},
-		{"text": "「그래서 이 숲에 자리를 잡았어요.\n숲 공기 덕분인지 요즘은 많이 좋아졌답니다.」",
-			"name": "연화", "portrait": mom_h},
-		{"text": "「저 이제 기침도 거의 안 해요!\n나중에 마을 축제에도 가 보고 싶어요.」",
-			"name": "솔이", "portrait": girl_h},
-		{"text": "「숨기려던 건 아니에요. 그저 조용히 지내고 싶었을 뿐...\n괜찮으시다면, 가끔 놀러 오세요.」",
-			"name": "연화", "portrait": mom_h},
+		{"text": "「그래서 여기 자리를 잡았습니다.\n공기 좋고 조용한 곳이어야 한다길래.」",
+			"name": "연화"},
+		{"text": "「그렇습니까... 혹시 필요한 것이 있으면\n언제든 말씀만 하십시오.」",
+			"name": "이장 덕수", "portrait": chief_n},
+		{"text": "「괜찮습니다. 오늘은 이만 돌아가 주세요.\n아이가 놀랍니다.」",
+			"name": "연화", "portrait": mom_n},
+		{"text": "(문이 조용히 닫혔다.)"},
+	], _end_forest_house)
+
+
+func _end_forest_house() -> void:
+	m.story_cutscene = false
+	if GameData.forest_quest == "go":
+		GameData.forest_quest = "back"
+		m.hud.quest_start_toast("돌아오는 길, 이장과 이야기하자")
+	m.saveio.save_now()
+
+
+# 돌아오는 길 — 재민의 걱정과 이장의 조언. 여기서 호감도가 열린다
+func _start_forest_back_dialog() -> void:
+	var chief_n: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_h: Texture2D = m.tex["npc_chief_portrait_happy"]
+	var exp_n: Texture2D = m.tex["npc_explorer_portrait_normal"]
+	m.dialog.open_seq("재민", exp_n, [
+		{"text": "「...나 괜히 그 집 찾았나 봐.\n그분 얼굴이 계속 마음에 걸려.」"},
+		{"text": "「우리가 불쑥 찾아가서 놀라게만 한 거잖아.」"},
+		{"text": "「아닐세. 잘한 일이야.」",
+			"name": "이장 덕수", "portrait": chief_n},
+		{"text": "「낯선 사람을 경계하는 건 당연한 거네.\n나라도 문을 다 열어 주진 않았을 걸세.」",
+			"name": "이장 덕수"},
+		{"text": "「사람의 마음은 문과 같아서 말이야.\n두드린다고 열리는 게 아니라, 두드리는 사람이\n누구인지 알아야 열리는 법이지.」",
+			"name": "이장 덕수"},
+		{"text": "「자주 얼굴을 비추고, 말을 붙이고,\n손이 필요할 때 거들어 주게. 천천히.」",
+			"name": "이장 덕수", "portrait": chief_h},
+		{"text": "「그러다 보면 어느 날 문이 열려 있을 걸세.\n...이 마을 사람들도 다 그렇게 이웃이 됐다네.」",
+			"name": "이장 덕수"},
 	], _end_forest_quest)
 
 
 func _end_forest_quest() -> void:
 	m.story_cutscene = false
-	if GameData.forest_quest != "done":
-		GameData.forest_quest = "done"
-		GameData.affinity_open = true
-		m.hud.story_banner("메인 스토리 5 완결", "숲속에서 발견한 집")
-		m.hud.show_message("호감도 해금! 퀘스트 너머, 사람들의 이야기가 열렸다.\n주민에게 말을 걸어 마음을 나누고 선물도 건네 보자.", 7.0)
+	if GameData.forest_quest == "done":
+		m.saveio.save_now()
+		return
+	GameData.forest_quest = "done"
+	GameData.affinity_open = true
+	_forest_party_release()
+	m.hud.story_banner("메인 스토리 5 완결", "숲속에서 발견한 집")
+	m.hud.event_toast("호감도 시스템이 해금되었습니다")
+	m.dialog.open("호감도 시스템이 해금되었습니다",
+		"주민에게 말을 걸고, 부탁을 들어주고, 선물을 건네면\n"
+		+ "그 사람만의 호감도가 조금씩 쌓입니다.\n\n"
+		+ "호감도가 오르면 하는 이야기가 달라지고,\n"
+		+ "그 사람만의 새로운 일이 열립니다.\n\n"
+		+ "숲속의 연화도 마찬가지입니다. 지금은 문을 닫아 두었지만,\n"
+		+ "마음이 열리면 그때는 안으로 들어오라고 할 것입니다.",
+		[["알겠다", null]])
+	m.saveio.save_now()
+
+
+# ---- 스토리 5 이후: 연화가 문을 열어 주는 날 ----
+#
+# 연화의 호감도가 FOREST_TRUST_AFF에 닿으면 「invited」가 되고,
+# 말을 걸면 처음으로 집 안에 들어가 솔이를 만난다.
+
+func _forest_trust_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.forest_trust == "" and GameData.forest_trust_ready():
+		GameData.forest_trust = "invited"
+		m.hud.event_toast("연화가 마음을 연 듯하다")
+		m.hud.quest_start_toast("연화가 할 말이 있는 듯하다")
+		m.saveio.save_now()
+
+
+func _start_forest_trust_dialog() -> void:
+	var mom_n: Texture2D = m.tex["npc_forest_mom_portrait_normal"]
+	var mom_h: Texture2D = m.tex["npc_forest_mom_portrait_happy"]
+	var girl_h: Texture2D = m.tex["npc_forest_girl_portrait_happy"]
+	m.story_cutscene = true
+	m.dialog.open_seq("연화", mom_n, [
+		{"text": "「...자주 오시네요. 매번 빈손도 아니고.」"},
+		{"text": "「처음엔 솔직히 무서웠어요.\n이런 데까지 찾아오는 사람이라니.」"},
+		{"text": "「그런데 이제는 발소리가 들리면\n아이가 먼저 문 쪽을 봐요.」",
+			"portrait": mom_h},
+		{"text": "「...들어오세요. 차라도 한잔 하시고 가요.」",
+			"portrait": mom_h},
+		{"text": "(문이 활짝 열렸다. 안에서 따뜻한 약초 향이 났다.)"},
+		{"text": "「우와... 진짜로 들어왔다!」",
+			"name": "솔이", "portrait": girl_h},
+		{"text": "「나는 솔이예요! 엄마가 맨날 얘기했어요,\n마을에서 오는 사람이 있다고.」",
+			"name": "솔이"},
+		{"text": "「저는 밖에 오래 못 있어요.\n그래도 창문으로 다 봤어요. 매번요.」",
+			"name": "솔이"},
+		{"text": "「이 애가 사람을 이렇게 반기는 건 처음이에요.」",
+			"name": "연화", "portrait": mom_h},
+		{"text": "「앞으로도 가끔 들러 주세요.\n...이제 문은 열어 둘 테니까요.」",
+			"name": "연화"},
+	], _end_forest_trust)
+
+
+func _end_forest_trust() -> void:
+	m.story_cutscene = false
+	if GameData.forest_trust != "done":
+		GameData.forest_trust = "done"
+		m.npcmgr._sync_village_npcs()   # 이제 솔이가 집 앞에 나온다
+		m.hud.event_toast("솔이와 처음 만났다")
+		m.hud.show_message("연화의 집 문이 열렸다.\n솔이도 이제 집 앞 마당까지는 나온다.", 6.0)
 	m.saveio.save_now()
 
 

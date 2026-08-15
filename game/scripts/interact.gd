@@ -40,12 +40,19 @@ func _enter_building(kind: String) -> void:
 			[["닫기", null]])
 		return
 	if kind == "forest_house":
-		# 숲속의 집 (스토리 5): 첫 방문이면 모녀와의 만남, 이후에는 짧은 인사
-		if GameData.forest_quest == "visit":
+		# 숲속의 집 (스토리 5): 이장과 함께 온 날이면 문 앞 장면,
+		# 연화가 마음을 연 날이면 처음으로 안에 들어간다
+		if GameData.forest_quest == "go":
 			m.story._start_forest_house_dialog()
+		elif GameData.forest_trust == "invited":
+			m.story._start_forest_trust_dialog()
+		elif GameData.forest_trust == "done":
+			m.dialog.open("숲속의 집",
+				"문이 반쯤 열려 있다.\n안에서 약초 달이는 향과 솔이의 웃음소리가 난다.",
+				[["닫기", null]])
 		else:
 			m.dialog.open("숲속의 집",
-				"문틈으로 약초 달이는 향이 은은하게 흘러나온다.\n연화와 솔이는 집 근처를 산책하는 모양이다.",
+				"문은 굳게 닫혀 있다.\n창문 너머로 인기척만 조용히 오간다.",
 				[["닫기", null]])
 		return
 	if kind == "alch_house":

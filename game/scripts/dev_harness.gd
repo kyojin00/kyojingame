@@ -1032,31 +1032,92 @@ func _debug_tick() -> void:
 			m.story._start_explorer_found_dialog()
 			m.dialog.close()
 			m.story._end_explorer_found()
-			var ask_q: bool = GameData.forest_quest == "ask"
+			var ask_q: bool = GameData.forest_quest == "ask" \
+				and GameData.quest_npc_marks().get("chief", "") == "!"
 			m.story._start_forest_ask_dialog()
+			m.dialog.skip_seq()                    # 「나도 같이 가겠네」 -> 동행 시작
 			m.dialog.close()
-			m.story._end_forest_ask()
-			var house_ok: bool = GameData.forest_quest == "visit" \
+			# 셋이 함께 간다 — 이장·재민이 뒤를 따르고, 집은 그때 세워진다
+			var house_ok: bool = GameData.forest_quest == "go" \
 				and str(m.objects.get(m.FOREST_HOUSE_ANCHOR, {}).get("kind", "")) == "house" \
 				and m.is_passable(m.door_tile(m.FOREST_HOUSE_ANCHOR))
 			var mom_ok := false
-			var girl_ok := false
+			var girl_ok := true                    # 솔이는 아직 나오지 않는다
 			for n5 in m.npcs:
 				if n5.id == "forest_mom":
 					mom_ok = true
 				elif n5.id == "forest_girl":
-					girl_ok = true
-			m.story._start_forest_house_dialog()
+					girl_ok = false
+			# 두 사람이 플레이어를 뒤따라 걷는다
+			var _keep_pos5 := m.player.position
+			var chief5: Variant = m.story._npc_by_id("chief")
+			var exp5: Variant = m.story._npc_by_id("explorer")
+			var party_ok := chief5 != null and exp5 != null
+			if party_ok:
+				chief5.position = m.player.position + Vector2(600.0, 0.0)
+				var far0: float = chief5.position.distance_to(m.player.position)
+				for _pi in 40:
+					m.story._forest_party_update(0.05)
+				party_ok = chief5.position.distance_to(m.player.position) < far0 \
+					and chief5.scripted
+			# 문 앞에 서면 저절로 문을 두드린다
+			m.player.position = Vector2(
+				m.door_tile(m.FOREST_HOUSE_ANCHOR).x * m.TILE + 16,
+				m.door_tile(m.FOREST_HOUSE_ANCHOR).y * m.TILE + 16)
+			m.story._forest_party_update(0.016)
 			var meet: bool = m.dialog.visible
-			m.dialog.skip_seq()                    # 남은 대사 접기 -> 완료 처리
-			var done_ok: bool = GameData.forest_quest == "done" and GameData.affinity_open
+			var meet_txt := ""
+			for e5: Dictionary in m.dialog._seq:
+				meet_txt += str(e5.get("text", "")) + " "
+			# 딸은 모습을 보이지 않고, 집 안으로도 들이지 않는다
+			var no_girl: bool = not meet_txt.contains("솔이") \
+				and meet_txt.contains("이장") and meet_txt.contains("돌아가")
+			m.dialog.skip_seq()
 			m.dialog.close()
+			var back_q: bool = GameData.forest_quest == "back" \
+				and not GameData.affinity_open \
+				and GameData.quest_npc_marks().get("chief", "") == "?"
+			# 돌아오는 길 — 이장의 조언에서 호감도가 열린다
+			m.story._start_forest_back_dialog()
+			m.dialog.skip_seq()
+			var done_ok: bool = GameData.forest_quest == "done" \
+				and GameData.affinity_open and m.dialog.visible
+			m.dialog.close()
+			m.player.position = _keep_pos5
+			# ---- 스토리 5 이후: 호감도 5에서 연화가 문을 연다 ----
+			var k_aff5 := int(GameData.affinity.get("forest_mom", 0))
+			GameData.forest_trust = ""
+			GameData.affinity["forest_mom"] = GameData.FOREST_TRUST_AFF - 1
+			m.story._forest_trust_update(0.016)
+			var trust_gate: bool = GameData.forest_trust == ""
+			GameData.affinity["forest_mom"] = GameData.FOREST_TRUST_AFF
+			m.story._forest_trust_update(0.016)
+			var trust_open: bool = GameData.forest_trust == "invited" \
+				and GameData.quest_npc_marks().get("forest_mom", "") == "!" \
+				and GameData.forest_trust_objective_short() != ""
+			m.story._start_forest_trust_dialog()
+			var trust_txt := ""
+			for e6: Dictionary in m.dialog._seq:
+				trust_txt += str(e6.get("text", "")) + " "
+			m.dialog.skip_seq()
+			m.dialog.close()
+			var girl_meet := false
+			for n6 in m.npcs:
+				if n6.id == "forest_girl":
+					girl_meet = true
+			var trust_done: bool = GameData.forest_trust == "done" \
+				and trust_txt.contains("솔이") and girl_meet
+			GameData.affinity["forest_mom"] = k_aff5
 			GameData.day -= 2
 			print("FOREST_OK=", found_q and ask_q and house_ok and mom_ok
-				and girl_ok and meet and done_ok,
-				" 발견담=", found_q, " 이장도모름=", ask_q,
-				" 숲속의집=", house_ok, " 연화=", mom_ok, " 솔이=", girl_ok,
-				" 만남=", meet, " 완료+호감도해금=", done_ok)
+				and girl_ok and party_ok and meet and no_girl and back_q
+				and done_ok and trust_gate and trust_open and trust_done,
+				" 발견담=", found_q, " 이장보고=", ask_q,
+				" 숲속의집=", house_ok, " 연화=", mom_ok, " 솔이숨김=", girl_ok,
+				" 동행=", party_ok, " 문앞장면=", meet, " 딸안나옴=", no_girl,
+				" 돌아오는길=", back_q, " 완료+호감도해금=", done_ok,
+				" 호감도게이트=", trust_gate, " 초대=", trust_open,
+				" 솔이첫만남=", trust_done)
 			# ---- 연화의 서브 퀘스트 시스템 (표 주도 — 임시 퀘스트로 흐름만 검증) ----
 			GameData.MOM_QUESTS = [{"id": "_test", "name": "솔이의 감자죽 재료",
 				"item": "weed", "qty": 3, "money": 120, "affinity": 4}]
@@ -3786,7 +3847,7 @@ func _debug_tick() -> void:
 				["kitchen_quest", ["broom", "make", "sweep", "found", "jam"],
 					"kitchen_quest_objective_short"],
 				["fisher_quest", ["meet", "follow", "open"], "fisher_objective_short"],
-				["forest_quest", ["arrive", "found", "ask", "visit"],
+				["forest_quest", ["arrive", "found", "ask", "go", "back"],
 					"forest_objective_short"],
 				["story6_phase", ["show_chief", "ask_post", "wait", "visit", "told",
 					"build"], "story6_objective_short"],

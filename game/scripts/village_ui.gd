@@ -305,6 +305,10 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id == "chief" and GameData.forest_quest == "ask":
 		m.story._start_forest_ask_dialog()
 		return
+	# 돌아오는 길 — 이장의 조언 (여기서 호감도가 열린다)
+	if npc.id == "chief" and GameData.forest_quest == "back":
+		m.story._start_forest_back_dialog()
+		return
 	if npc.id == "chief" and GameData.story4_phase == "ask":
 		m.story._start_story4_dialog()   # 낡은 표지판 이야기 (메인 스토리 4)
 		return
@@ -450,8 +454,12 @@ func _talk_to(npc: Node2D) -> void:
 	if GameData.onsen_open and m.npcmgr.npc_place_now(npc.id) == "onsen":
 		m.story.onsen_npc_line(npc.id)
 		return
-	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
+	if npc.id == "forest_mom" and GameData.forest_quest == "go":
 		m.story._start_forest_house_dialog()
+		return
+	# 스토리 5 이후 — 연화가 마음을 열고 처음으로 안으로 들인다
+	if npc.id == "forest_mom" and GameData.forest_trust == "invited":
+		m.story._start_forest_trust_dialog()
 		return
 	# 요리 튜토리얼 — 조리대를 찾은 뒤 만수를 만나면 축하와 선물
 	if npc.id == "merchant" and GameData.kitchen_quest == "found":

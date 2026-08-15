@@ -79,6 +79,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.stall_hours = (d.get("stall_hours", []) as Array)
 	GameData.forest_quest = str(d.get("forest_quest", ""))
 	GameData.forest_day = int(d.get("forest_day", 0))
+	GameData.forest_trust = str(d.get("forest_trust", ""))
+	# 옛 세이브: 「visit」 단계는 이제 없다 — 동행부터 다시 걷는다
+	if GameData.forest_quest == "visit":
+		GameData.forest_quest = "go"
 	GameData.move_quest = str(d.get("move_quest", ""))
 	GameData.move_seeds = int(d.get("move_seeds", 0))
 	GameData.move_day = int(d.get("move_day", 0))
