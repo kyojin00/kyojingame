@@ -202,22 +202,43 @@ HEAD_X = 9               # 머리를 한 둘레 깎은 만큼 한 칸 안으로 
 # 얹는데, 원본을 줄이면 그 번호가 전부 어긋난다.
 #
 # 어디를 깎나:
-#   가로 — 1열과 14열 (눈 바깥쪽 살결). 좌우 한 칸씩이라 얼굴은
+#   가로 — 2열과 13열 (눈 바로 바깥의 민 살결). 좌우 한 칸씩이라 얼굴은
 #          가운데에 그대로 남고, 눈 사이 간격도 안 변한다.
+#          **1열·14열은 건드리면 안 된다** — 거기에 얼굴 옆면의 그늘(S)이
+#          들어 있다. 처음에 그 두 열을 깎았더니 옆 그늘이 통째로 사라져
+#          두상이 납작한 판때기처럼 보였다.
 #   세로 — 5행 (눈 위 이마의 민 살결 한 줄). 6행과 똑같은 줄이라
 #          지워도 표 안 난다.
 # 턱은 제자리에 두어야 목과 안 벌어지므로, 그린 자리를 한 줄 내린다.
-HEAD_TRIM_COLS = (1, 14)
+HEAD_TRIM_COLS = (2, 13)
 HEAD_TRIM_ROW = 5
 _SHRUNK = {}
+
+
+# 깎고 난 두상(14x15)의 **둥근 테두리**. 줄마다 가운데(6.5)에서 몇 칸까지
+# 살결을 남길지 적어 둔다. 이 표 밖은 지운다 (윤곽선은 outline이 다시 두른다).
+#
+# 표가 없을 때는 정수리 바로 아래에서 폭이 8 -> 12 -> 14로 두 칸씩 뛰어
+# 이마 양옆에 각이 졌고, 턱도 12칸으로 뚝 끊겨 네모난 인상이었다.
+# 위아래를 한 칸씩 더 깎아 주면 같은 크기인데도 훨씬 둥글게 읽힌다.
+HEAD_ROUND = [3.5, 5.0, 6.0, 6.0, 7.0,
+              7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0,
+              6.0, 5.0, 4.0]
 
 
 def shrink_head(art):
     key = tuple(art)
     if key not in _SHRUNK:
         c0, c1 = HEAD_TRIM_COLS
-        _SHRUNK[key] = [r[:c0] + r[c0 + 1:c1] + r[c1 + 1:]
-                        for i, r in enumerate(art) if i != HEAD_TRIM_ROW]
+        rows = [r[:c0] + r[c0 + 1:c1] + r[c1 + 1:]
+                for i, r in enumerate(art) if i != HEAD_TRIM_ROW]
+        mid = (len(rows[0]) - 1) / 2.0
+        out = []
+        for i, r in enumerate(rows):
+            hw = HEAD_ROUND[i] if i < len(HEAD_ROUND) else 7.0
+            out.append(''.join(cc if abs(x - mid) <= hw else '.'
+                               for x, cc in enumerate(r)))
+        _SHRUNK[key] = out
     return _SHRUNK[key]
 
 
@@ -518,18 +539,42 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
             t = (yy - hip_row) / (GROUND - hip_row)
             x = 15 + round(o + dx * (1 - t)) + lean
             cc = pc if yy <= ankle_row else kc
+            # 굵기 — 허벅지는 굵고 발목으로 갈수록 가늘어진다.
+            # 모든 줄을 같은 폭으로 그으면 통나무 두 개를 세워 둔 꼴이다.
+            # 뒤(wb)는 종아리가 불룩하고, 앞(wf)은 정강이라 곧고 가늘다.
+            if yy <= knee_row:
+                wb, wf = 3, 3                      # 허벅지
+            elif yy < ankle_row:
+                q = (yy - knee_row) / max(1, ankle_row - knee_row)
+                wb = 3 if q < 0.5 else 2           # 무릎 밑 장딴지
+                wf = 2                             # 정강이
+            else:
+                wb, wf = 3, 3                      # 발목부터는 신발이라 통짜
             if yy == bot:
                 g.rect(x - 2, yy, x + 3, yy, cc)   # 뒤꿈치만 둥글게 (앞은 앞코로)
             else:
-                g.rect(x - 3, yy, x + 3, yy, cc)
+                g.rect(x - wb, yy, x + wf, yy, cc)
+            # 무릎 — 굽힌 다리에만 접힌 자국을 한 줄 넣는다.
+            # 이 한 줄이 있어야 다리가 「굽었다」로 보인다 (없으면 그냥 기운 막대)
+            if yy == knee_row and back:
+                g.rect(x, yy, x + wf, yy, 'P' if not shade else pc)
             if not shade and hip_row < yy <= bot - 4:  # 띠에 겹친 줄은 건드리지
-                g.px(x - 3, yy, 'P')           # 않는다 — 가랑이 그늘 위에 밝은
+                g.px(x - wb, yy, 'P')          # 않는다 — 가랑이 그늘 위에 밝은
                 if yy == bot - 4:              # 점이 찍히면 허리가 튀어 보인다
-                    g.rect(x - 2, yy, x + 3, yy, 'P')   # 발목 접단
+                    g.rect(x - wb + 1, yy, x + wf, yy, 'P')   # 발목 접단
                 else:
-                    g.px(x + 3, yy, 'q')       # 앞쪽 하이라이트
+                    g.px(x + wf, yy, 'q')      # 앞쪽 하이라이트
             if not shade and yy == bot - 3:
                 g.px(x + 2, yy, 'p')           # 신발 코 광
+            if yy == bot:
+                g.hline(x - 2, x + 3, yy, 'K') # 신발 밑창은 늘 그늘
+            # 가까운 다리의 **뒤쪽 모서리**를 어둡게 눌러 먼 다리와 뗀다.
+            # 둘 다 바지색이라 겹치면 한 덩어리로 보인다 — 이 한 줄이
+            # 있어야 「앞다리와 뒷다리」로 읽힌다.
+            if not shade:
+                bx = x - wb - 1
+                if 0 <= bx < GW and g.d[yy][bx] in ('p', 'P', 'q', 'k', 'K'):
+                    g.px(bx, yy, 'O')
         x = 15 + foot_off + lean
         # 앞코 — 신발이 진행 방향으로 두 칸 나온 둥근 코. 뒤로 찬 발도
         # 코는 앞을 본다 (뒤꿈치만 들린다).
@@ -750,7 +795,9 @@ def head(g, art, bob, lean=0):
 #   ① 얼굴은 건드리지 않는다 (셔츠 윗줄 위) — 눈·입이 지저분해진다
 #   ② 얼룩 자리는 **칸 좌표로만** 정한다. 프레임마다 다시 뽑으면 걸을 때
 #      결이 지글지글 끓는다 (도트 게임에서 제일 눈에 띄는 실수다)
-ROUGH_DARK = {'b': 'B', 'p': 'P', 'k': 'K', 's': 'S', 'L': 'b', 'q': 'p'}
+# 신발(k/K)은 뺀다 — 칸이 몇 개 안 되는 데다 어두워서, 얼룩이 앉으면
+# 결이 아니라 흙이 묻은 것처럼 보인다.
+ROUGH_DARK = {'b': 'B', 'p': 'P', 's': 'S', 'L': 'b', 'q': 'p'}
 ROUGH_LITE = {'b': 'L', 'p': 'q', 'B': 'b', 'P': 'p', 'S': 's'}
 
 
