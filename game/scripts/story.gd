@@ -607,7 +607,8 @@ func _story_rock_mined() -> void:
 		m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
 			{"text": "「잘했네. 이제 길이 열렸구먼.」"},
 		], func() -> void:
-			m.hud.show_message("우체부 아저씨에게 곡괭이를 돌려주자 (E: 대화)", 6.0)))
+			m.hud.show_message("우체부 아저씨에게 곡괭이를 돌려주자 (%s: 대화)"
+				% GameData.key_label("talk"), 6.0)))
 
 
 func _start_pickaxe_return_dialog() -> void:
@@ -4511,8 +4512,11 @@ func start_kitchen_quest() -> void:
 
 
 func _end_kitchen_intro() -> void:
-	m.hud.quest_start_toast("조리대에서 요리를 하자")
-	m.hud.show_message("잡화점 선반에서 빗자루 레시피를 사자. (잡초 1로 제작)", 6.0)
+	# 다음 할 일을 그대로 알린다 — 청소 마디를 건너뛴 경우도 있으므로
+	# 목표문을 직접 읽어 쓴다 (예전에는 늘 「조리대에서 요리를」이었다)
+	m.hud.quest_start_toast(GameData.kitchen_quest_objective_short())
+	if GameData.kitchen_quest == "broom":
+		m.hud.show_message("잡화점 선반에서 빗자루 레시피를 사자. (잡초 1로 제작)", 6.0)
 	m.saveio.save_now()
 
 

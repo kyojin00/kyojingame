@@ -176,6 +176,7 @@ var _hair_label: Label = null
 var _hair_row: HBoxContainer = null
 var _name_edit: LineEdit = null
 var _farm_edit: LineEdit = null
+var _village_edit: LineEdit = null
 var _gender_btns := {}
 var _swatch_btns := {}          # 부위 -> [Button, ...]
 var _blink_tex: Texture2D = null
@@ -363,6 +364,14 @@ func _build_gender_panel() -> void:
 	farm_row.add_child(_farm_edit)
 	right.add_child(farm_row)
 
+	# 마을 이름 — 비워 두면 「교진」. 대사·간판·지도에 전부 이 이름이 쓰인다
+	var vil_row := HBoxContainer.new()
+	vil_row.add_theme_constant_override("separation", 8)
+	vil_row.add_child(_mk_tag("마을"))
+	_village_edit = _mk_field("정착할 마을 이름 (기본: 교진)", 8)
+	vil_row.add_child(_village_edit)
+	right.add_child(vil_row)
+
 	# 머리 모양 — 이름이 있는 것이라 화살표로 넘긴다
 	_hair_row = HBoxContainer.new()
 	_hair_row.add_theme_constant_override("separation", 6)
@@ -452,6 +461,7 @@ func _start_selected() -> void:
 	GameData.appearance = _appear.duplicate()
 	GameData.player_name = _name_edit.text.strip_edges()
 	GameData.farm_name = _farm_edit.text.strip_edges()
+	GameData.village_name = _village_edit.text.strip_edges()
 	if GameData.player_name == "":
 		GameData.player_name = "친구"
 	if FileAccess.file_exists(GameData.SAVE_PATH):
@@ -501,7 +511,8 @@ func _creator_report() -> String:
 	var rows_ok: bool = sw_hair.size() == GameData.APPEAR_HAIR_COL.size() \
 		and sw_skin.size() == GameData.APPEAR_SKIN.size() \
 		and sw_shirt.size() == GameData.APPEAR_SHIRT.size()
-	var typed: bool = _name_edit.text != "" and _farm_edit.text != ""
+	var typed: bool = _name_edit.text != "" and _farm_edit.text != "" \
+		and _village_edit.text != ""
 	var ok: bool = hair_n > 0 and skin_n > 0 and stale == 0 and rows_ok and typed
 	return "%s 머리색=%d 피부=%d 옛색남음=%d 스와치=%s 이름·농장칸=%s" \
 		% [ok, hair_n, skin_n, stale, rows_ok, typed]
@@ -816,6 +827,7 @@ func _process(delta: float) -> void:
 		# 화면에 남길 한 장은 실제로 골라 본 모습으로 (빈 칸만 찍으면 소용없다)
 		_name_edit.text = "교진"
 		_farm_edit.text = "햇살 농장"
+		_village_edit.text = "교진"
 		_appear_gender = "f"
 		_appear = {"hair": 3, "shirt": 1, "pants": 1, "shoes": 2,
 			"skin": 2, "hair_col": 3}

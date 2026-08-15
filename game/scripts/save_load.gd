@@ -59,6 +59,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.tree_regrow = d.get("tree_regrow", [])
 	GameData.player_name = str(d.get("player_name", ""))
 	GameData.farm_name = str(d.get("farm_name", ""))
+	GameData.village_name = str(d.get("village_name", ""))
 	GameData.village_built = d.get("village_built", [])
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))

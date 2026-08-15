@@ -21,6 +21,20 @@ var sfx_index := 0
 var current_bgm := ""
 var _fade: Tween = null
 
+# ---- 브금 이음매 ----
+#
+# ogg 자체는 샘플 하나 어긋나지 않고 되감긴다. 그런데도 「뚝」 하고
+# 끊겨 들리는 것은, 곡의 **끝맺음과 첫 마디가 원래 이어 붙으라고 만든
+# 소리가 아니기** 때문이다. 그래서 끝나기를 기다리지 않고 **미리 겹쳐 튼다** —
+# 마지막 몇 초 동안 지금 곡은 서서히 줄이고, 두 번째 플레이어가 같은 곡을
+# 처음부터 서서히 키운다. 다 넘어가면 둘의 역할을 맞바꿔 다음 바퀴를 준비한다.
+# (스트림의 loop는 그대로 켜 둔다 — 겹치기가 어떤 이유로 어긋나도
+#  소리가 아예 멎지는 않게 하는 안전망이다)
+const LOOP_XFADE := 2.2
+var _bgm_b: AudioStreamPlayer = null
+var _xfade: Tween = null
+var _xfading := false
+
 # 설정 (0~100)
 var master_volume := 80.0
 var bgm_volume := 60.0
@@ -60,6 +74,10 @@ func _ready() -> void:
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.bus = "BGM"
 	add_child(bgm_player)
+	# 이음매용 두 번째 플레이어 (같은 곡을 겹쳐 트는 데 쓴다)
+	_bgm_b = AudioStreamPlayer.new()
+	_bgm_b.bus = "BGM"
+	add_child(_bgm_b)
 	for i in 8:
 		var p := AudioStreamPlayer.new()
 		p.bus = "SFX"
@@ -106,12 +124,13 @@ func play_track(name: String) -> void:
 	if name == current_bgm:
 		# 같은 곡인데 소리가 멎어 있으면(어떤 이유로든) 조용히 다시 건다 —
 		# 예전에는 여기서 그냥 돌아가서, 한 번 멎은 브금이 영영 안 돌아왔다
-		if not bgm_player.playing:
+		if not bgm_player.playing and not _xfading:
 			bgm_player.stream = streams[name]
 			bgm_player.volume_db = gain
 			bgm_player.play()
 		return
 	current_bgm = name
+	_cancel_xfade()
 	if _fade != null and _fade.is_valid():
 		_fade.kill()
 	if not bgm_player.playing:
@@ -129,7 +148,57 @@ func play_track(name: String) -> void:
 
 func stop_bgm() -> void:
 	current_bgm = ""
+	_cancel_xfade()
 	bgm_player.stop()
+
+
+# 이어 붙이던 것을 접는다 (곡을 바꾸거나 멈출 때)
+func _cancel_xfade() -> void:
+	if _xfade != null and _xfade.is_valid():
+		_xfade.kill()
+	_xfading = false
+	if _bgm_b != null:
+		_bgm_b.stop()
+
+
+func _process(_delta: float) -> void:
+	if current_bgm == "" or bgm_player == null or not bgm_player.playing:
+		return
+	if _xfading or (_fade != null and _fade.is_valid()):
+		return          # 곡을 갈아 끼우는 중이면 이음매는 신경 쓰지 않는다
+	var st: AudioStream = bgm_player.stream
+	if st == null:
+		return
+	var length := st.get_length()
+	if length <= LOOP_XFADE * 2.0:
+		return          # 너무 짧은 곡은 그냥 되감는다
+	if bgm_player.get_playback_position() < length - LOOP_XFADE:
+		return
+	_start_loop_xfade()
+
+
+func _start_loop_xfade() -> void:
+	var gain: float = float(TRACK_GAIN.get(current_bgm, 0.0))
+	_xfading = true
+	_bgm_b.stream = bgm_player.stream
+	_bgm_b.volume_db = gain - 40.0
+	_bgm_b.play()
+	_xfade = create_tween()
+	_xfade.set_parallel(true)
+	_xfade.tween_property(bgm_player, "volume_db", gain - 40.0, LOOP_XFADE)
+	_xfade.tween_property(_bgm_b, "volume_db", gain, LOOP_XFADE)
+	_xfade.chain().tween_callback(_finish_loop_xfade)
+
+
+func _finish_loop_xfade() -> void:
+	# 역할을 맞바꾼다 — 지금 울리고 있는 쪽이 bgm_player가 된다
+	var gain: float = float(TRACK_GAIN.get(current_bgm, 0.0))
+	var old := bgm_player
+	old.stop()
+	old.volume_db = gain
+	bgm_player = _bgm_b
+	_bgm_b = old
+	_xfading = false
 
 
 # ---- 설정 ----

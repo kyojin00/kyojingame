@@ -224,7 +224,7 @@ func _draw_deco() -> void:
 # buttons: [[라벨, Callable], ...] — 콜백이 null이면 닫기 동작
 func open(title_text: String, body_text: String, buttons: Array,
 		portrait_tex: Texture2D = null) -> void:
-	title_label.text = title_text
+	title_label.text = GameData.localize(title_text)
 	_name_plate.visible = title_text != ""   # 이름 없는 안내창엔 명패도 없다
 	body_label.text = clean_text(body_text)
 	# 일반 안내창에는 건너뛸 대사가 없다 — 시퀀스가 다시 켜 준다
@@ -259,7 +259,9 @@ func set_body(text: String) -> void:
 # NPC가 입으로 하는 말(「」로 묶인 대사)에서는 괄호로 적어 둔 지문까지
 # 떼어낸다 — 말풍선 안에 「...」와 (지문)이 섞이면 읽는 사람이 헷갈린다.
 func clean_text(text: String) -> String:
-	var out := text.replace("", "")
+	# 대사에 박혀 있는 기본 마을 이름을 플레이어가 지은 이름으로 바꾼다.
+	# 창에 나가는 글은 전부 이 함수를 지나므로 여기 한 군데면 된다.
+	var out := GameData.localize(text).replace("", "")
 	while out.contains("  "):
 		out = out.replace("  ", " ")
 	return out.strip_edges()
@@ -406,25 +408,72 @@ func _wrap_balanced(text: String) -> PackedStringArray:
 # 한 문장 단위로 자른다 (문장 부호 뒤에서 끊는다).
 # 손으로 넣은 줄바꿈은 무시하고 다시 짠다 — 글자 크기가 달라져도
 # 「한 문장은 한 화면에」가 지켜지게 하기 위해서다.
+#
+# 세 가지를 조심한다.
+#   ① **말줄임표는 한 덩이다.** "..."을 마침표 셋으로 세면 한 문장이
+#      세 조각으로 쪼개져, 화면에 점 하나만 덩그러니 남는 줄이 생긴다.
+#   ② **괄호·따옴표 안에서는 끊지 않는다.** "(가나다. 라마바.)"를 문장마다
+#      자르면 여는 괄호와 닫는 괄호가 서로 다른 화면으로 흩어진다.
+#   ③ 그래도 부호만 남은 조각이 생기면 **앞 문장에 도로 붙인다.**
+const SENT_END := [".", "!", "?", "…"]
+const SENT_CLOSE := ["」", "』", "\"", "'", ")", "）", "”", "’"]
+const SENT_OPEN := ["「", "『", "(", "（", "“", "‘"]
+
+
 func _split_sentences(text: String) -> PackedStringArray:
 	var flat := text.replace("\n", " ").strip_edges()
 	while flat.contains("  "):
 		flat = flat.replace("  ", " ")
 	var out: PackedStringArray = []
 	var cur := ""
-	for i in flat.length():
+	var depth := 0
+	var i := 0
+	while i < flat.length():
 		var ch := flat[i]
 		cur += ch
-		if ch in [".", "!", "?", "…"]:
-			# 마침표 뒤에 닫는 따옴표가 붙으면 거기까지가 한 문장이다
-			while i + 1 < flat.length() and flat[i + 1] in ["」", "』", "\"", "'", ")"]:
-				i += 1
-				cur += flat[i]
+		i += 1
+		if ch in SENT_OPEN:
+			depth += 1
+			continue
+		if ch in SENT_CLOSE:
+			depth = maxi(depth - 1, 0)
+			continue
+		if not (ch in SENT_END):
+			continue
+		# ① 잇달아 오는 문장 부호("...", "?!", "…")는 통째로 삼킨다
+		while i < flat.length() and flat[i] in SENT_END:
+			cur += flat[i]
+			i += 1
+		# 부호 뒤에 닫는 따옴표·괄호가 붙으면 거기까지가 한 문장이다
+		while i < flat.length() and flat[i] in SENT_CLOSE:
+			cur += flat[i]
+			i += 1
+			depth = maxi(depth - 1, 0)
+		# ② 괄호나 따옴표가 아직 안 닫혔으면 문장이 끝난 것이 아니다
+		if depth > 0:
+			continue
+		if cur.strip_edges() != "":
 			out.append(cur.strip_edges())
-			cur = ""
+		cur = ""
 	if cur.strip_edges() != "":
 		out.append(cur.strip_edges())
-	return out
+	# ③ 글자 없이 부호만 남은 조각은 앞 문장 꼬리에 붙인다
+	var merged: PackedStringArray = []
+	for s: String in out:
+		if not merged.is_empty() and _punct_only(s):
+			merged[merged.size() - 1] = merged[merged.size() - 1] + s
+		else:
+			merged.append(s)
+	return merged
+
+
+# 글자 없이 부호만 있는 조각인가 (혼자 서 있으면 읽을 수 없는 것)
+func _punct_only(s: String) -> bool:
+	for ch in s:
+		if not (ch in SENT_END or ch in SENT_CLOSE or ch in SENT_OPEN
+				or ch == " " or ch == ","):
+			return false
+	return true
 
 
 # 대사 한 덩이를 화면 두 줄짜리 페이지들로 나눈다.

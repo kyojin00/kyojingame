@@ -65,6 +65,7 @@ func open() -> void:
 	visible = true
 	_drag = false
 	_bake_age = 999.0        # 걸어다니는 동안 달라진 것을 반영해 새로 굽는다
+	_bake_dirty = true       # 열 때마다 한 장은 반드시 다시 굽는다
 	# 지도를 보는 동안에는 HUD를 감춘다.
 	# 미니맵·시계가 큰 지도 위에 겹쳐 보이는 것도 그렇지만, 무엇보다
 	# 하단 핫바가 **버튼**이라 그 위에서 마우스를 놓으면 버튼이 이벤트를 먹는다.
@@ -399,21 +400,33 @@ func _shore(x: int, y: int) -> bool:
 const BAKE_EVERY := 0.5
 var _tex: ImageTexture = null
 var _bake_age := 999.0
+var _bake_dirty := true     # 지도를 열 때마다 켜진다 (그 사이 세상이 달라졌다)
 var bake_us := 0            # 마지막으로 한 장 굽는 데 걸린 시간 (하네스가 본다)
 
 
-# 지금 다시 구워야 하는가
+# 지금 다시 구워야 하는가.
+#
+# 「혼자 할 때는 한 번만」을 `_bake_age`로 눌러 뒀더니, 혼자 하는 동안에는
+# `_tex`가 있는 한 **영영 다시 굽지 않았다.** 튜토리얼 숲길에서 한 번 구운
+# 62x38짜리 그림이 마을에 와서도 그대로 남아, 세계 크기(224x120)의 자리에
+# 늘여 그려졌다 — 지형은 한가운데 뭉쳐 있고 내 위치만 엉뚱한 데 찍히던
+# 그 화면이다. 이제 **열 때마다 한 번**은 반드시 다시 굽고, 그림 크기가
+# 보여 줄 땅과 다르면 무조건 다시 굽는다.
 func _need_bake() -> bool:
-	if _tex == null:
+	if _tex == null or _bake_dirty:
+		return true
+	var r := _world()
+	if _tex.get_size() != Vector2(r.size.x, r.size.y):
 		return true
 	if not (Net.is_host() or Net.is_guest()):
-		return false        # 혼자 볼 때는 열 때 구운 그림 그대로
+		return false        # 혼자 볼 때는 열어 둔 동안 그 그림 그대로
 	return _bake_age > BAKE_EVERY
 
 
 func _bake() -> void:
 	var bt0 := Time.get_ticks_usec()
 	_bake_age = 0.0
+	_bake_dirty = false
 	# 굽는 것은 **보여 줄 땅뿐이다.** 세계 밖의 튜토리얼 띠는 아예 들어가지 않는다.
 	var r := _world()
 	var ox: int = r.position.x
@@ -693,7 +706,7 @@ func _draw_map() -> void:
 func map_plate() -> String:
 	if GameData.tutorial_space:
 		return "마을로 가는 숲길"
-	return "교진 마을 · %s" % GameData.farm_title()
+	return "%s · %s" % [GameData.village_title(), GameData.farm_title()]
 
 
 # ---- 지도의 장식 ----

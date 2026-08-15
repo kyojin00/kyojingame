@@ -4774,6 +4774,84 @@ func _debug_tick() -> void:
 			print("TALKKEY_OK=", bind_ok and talk_ok and e_silent and far_ok,
 				" 키배치=", bind_ok, " F로대화=", talk_ok,
 				" E는조용=", e_silent, " 아무도없을때=", far_ok)
+		237:
+			# 지도: 튜토리얼에서 한 번 구운 그림이 마을에 와서도 그대로 남아,
+			# 세계 크기(224x120) 자리에 늘여 그려지던 버그.
+			# 지형은 화면 한가운데 뭉쳐 있고 내 위치만 엉뚱한 데 찍혔다.
+			var k_tut3 := GameData.tutorial_space
+			GameData.tutorial_space = true
+			m.map_ui._wr = Rect2i()            # 보여 줄 땅을 다시 재게 한다
+			m.map_ui.open()
+			m.map_ui._bake()
+			var tut_sz: Vector2 = m.map_ui._tex.get_size()
+			m.map_ui.close()
+			GameData.tutorial_space = false
+			m.map_ui.open()                    # 열면 반드시 다시 구워야 한다
+			var redo: bool = m.map_ui._need_bake()
+			if redo:
+				m.map_ui._bake()
+			var world_sz: Vector2 = m.map_ui._tex.get_size()
+			m.map_ui.close()
+			GameData.tutorial_space = k_tut3
+			m.map_ui._wr = Rect2i()
+			print("MAPBAKE_OK=", tut_sz == Vector2(m.TUTORIAL_REGION.size)
+				and redo and world_sz == Vector2(m.MAP_W, m.WORLD_H),
+				" 숲길=", tut_sz, " 다시굽기=", redo, " 세계=", world_sz)
+		238:
+			# 대화키를 쓰는 느낌 — 사거리 · 헛디딤 · 목표 갱신 · 말줄임표
+			m.dialog.close()
+			# ① 세 칸 떨어져도 말이 걸린다 (예전에는 한 칸 반이라 딱 붙어야 했다)
+			var far_npc: Node2D = null
+			for n_r in m.npcs:
+				if n_r.visible:
+					far_npc = n_r
+					break
+			var reach_ok := false
+			var p_keep2: Vector2 = m.player.position
+			if far_npc != null:
+				# 다른 사람은 잠시 치운다 — 「누가 걸렸나」가 아니라
+				# 「이만큼 떨어져도 걸리나」를 보는 검사다
+				for n_o in m.npcs:
+					if n_o != far_npc:
+						n_o.position += Vector2(0, 4000.0)
+				m.player.position = far_npc.position + Vector2(0, 84.0)
+				m.player.dir = "up"
+				reach_ok = m.actions.nearby_npc() == far_npc
+				for n_o2 in m.npcs:
+					if n_o2 != far_npc:
+						n_o2.position -= Vector2(0, 4000.0)
+			# ② 말이 없으면 F는 조용하다 (걷는 내내 「아직 말이 없다」가 뜨던 것)
+			var k_horse := GameData.has_horse
+			GameData.has_horse = false
+			var quiet_ok: bool = not m.riding.can_toggle()
+			GameData.has_horse = k_horse
+			# ③ 만수와 말을 튼 뒤에는 목표가 다음 마디로 넘어간다
+			var k_s2 := GameData.story2_phase
+			var k_kq := GameData.kitchen_quest
+			GameData.story2_phase = "cook"
+			GameData.kitchen_quest = ""
+			var obj_before := GameData.story2_objective_short()
+			GameData.kitchen_quest = "broom"
+			var obj_after := GameData.story2_objective_short()
+			GameData.story2_phase = k_s2
+			GameData.kitchen_quest = k_kq
+			var step_ok: bool = obj_before != obj_after and obj_after != "" \
+				and not obj_after.contains("말을 걸")
+			# ④ "..."이 세 조각으로 쪼개져 점 하나만 남는 줄이 생기지 않는다
+			var dots := "(눈앞에 우거진 숲이 펼쳐져 있다...)"
+			var sents: PackedStringArray = m.dialog._split_sentences(dots)
+			var pages2: Array = m.dialog._paginate_seq([{"text": dots}])
+			var lone := false
+			for pg2: Dictionary in pages2:
+				for ln: String in str(pg2.text).split("\n"):
+					if ln != "" and m.dialog._punct_only(ln):
+						lone = true
+			var sent_ok: bool = sents.size() == 1 and pages2.size() == 1 and not lone
+			m.player.position = p_keep2
+			m.hud._toast_queue.clear()
+			print("TALKUX_OK=", reach_ok and quiet_ok and step_ok and sent_ok,
+				" 세칸=", reach_ok, " 말없으면조용=", quiet_ok,
+				" 만수단계=", step_ok, "(", obj_after, ") 말줄임표=", sent_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

@@ -335,6 +335,31 @@ func farm_title() -> String:
 	return n.substr(0, 12) if n != "" else "%s의 농장" % seller_name()
 
 
+# ---- 마을 이름 ----
+#
+# 대사·안내·간판에 박혀 있는 기본 이름은 「교진」이다. 생성창에서 다른
+# 이름을 지으면, **화면에 나가는 글자를 내보내는 길목에서** 그 이름으로
+# 바꿔 준다(`localize`). 수백 줄의 대사마다 %s를 심는 대신 이렇게 한 이유는
+# 하나 — 한 군데라도 빠뜨리면 그 대사에서만 옛 이름이 튀어나오기 때문이다.
+const HOME_VILLAGE := "교진"
+
+
+func village_base() -> String:
+	var n := village_name.strip_edges()
+	return n.substr(0, 8) if n != "" else HOME_VILLAGE
+
+
+func village_title() -> String:
+	return "%s 마을" % village_base()
+
+
+func localize(text: String) -> String:
+	var n := village_base()
+	if n == HOME_VILLAGE or text == "":
+		return text
+	return text.replace(HOME_VILLAGE, n)
+
+
 func save_settings() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if f:
@@ -952,9 +977,10 @@ func recolor_player_image(img: Image, ap: Dictionary) -> void:
 var story_phase := "done"
 # 벤 나무 자리의 재성장 대기열: [x, y, 남은 일수]
 var tree_regrow: Array = []
-# 유저 닉네임 · 농장 이름: 둘 다 타이틀의 캐릭터 생성창에서 정한다
+# 유저 닉네임 · 농장 이름 · 마을 이름: 셋 다 타이틀의 캐릭터 생성창에서 정한다
 var player_name := ""
 var farm_name := ""
+var village_name := ""
 
 # 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
 # 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
@@ -1000,8 +1026,14 @@ func story2_objective_short() -> String:
 		"farm_talk":
 			return "이장과 대화하자."
 		"cook":
-			# 첫 수확을 마친 뒤 — 만수가 밥 이야기를 꺼낸다
-			return "만수와 대화하자."
+			# 첫 수확을 마친 뒤 — 만수가 밥 이야기를 꺼낸다.
+			# 말을 걸고 나면 **그 뒤의 잔 단계를 그대로 이어서** 보여 준다.
+			# (예전에는 이야기가 시작된 뒤에도 목표가 「만수와 대화하자」에
+			#  멈춰 있어, 말을 걸어도 아무것도 안 된 것처럼 보였다)
+			if kitchen_quest == "":
+				return "잡화점 만수에게 말을 걸자."
+			var step := kitchen_quest_objective_short()
+			return step if step != "" else "만수에게 말을 걸자."
 	return ""
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
@@ -6546,6 +6578,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tree_regrow": tree_regrow,
 		"player_name": player_name,
 		"farm_name": farm_name,
+		"village_name": village_name,
 		"village_built": village_built,
 		"house_lv": house_lv,
 		"has_bed": has_bed,

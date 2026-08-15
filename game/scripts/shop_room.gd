@@ -143,8 +143,9 @@ func open(id: String) -> void:
 	# 가게 안에서는 주인공이 화면에 없어 말풍선이 한가운데 붙박이처럼
 	# 떠 있었다 (「사라지지 않는 말풍선」 버그의 정체)
 	main.hud.hide_bubble()
-	notice = "선반 앞에서 E: 구매 · 계산대에서 E: 판매" if id == "general" \
-		else "%s — 계산대 앞에서 E" % ROOMS[id].name
+	var ek := GameData.key_label("interact")
+	notice = "선반 앞에서 %s: 구매 · 계산대에서 %s: 판매" % [ek, ek] if id == "general" \
+		else "%s — 계산대 앞에서 %s" % [ROOMS[id].name, ek]
 	notice_t = 4.5
 	canvas.queue_redraw()
 
@@ -321,14 +322,22 @@ func _try_interact() -> bool:
 	return false
 
 
+# 가게 안 안내 — 물건은 상호작용키(E), 사람은 대화키(F)
+func _room_hint() -> String:
+	return "선반 앞에서 %s: 구매 · 계산대(주인)에게 다가가 %s: 대화" % [
+		GameData.key_label("interact"), GameData.key_label("talk")]
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# 겹쳐 뜬 창(가방·퀘스트·상점...)이 있으면 그 창이 먼저다 —
 	# 여기서 ESC를 가로채면 가방을 닫으려다 게임 메뉴가 뜬다
 	if not visible or main.room_overlay_open():
 		return
-	if event.is_action_pressed("interact"):
+	# 가게 안에서는 대화키(F)도 같은 일을 한다 — 주인에게 말을 걸러 온 손님이
+	# 계산대 앞에서 F를 눌렀는데 아무 일도 없으면 안 된다
+	if event.is_action_pressed("interact") or event.is_action_pressed("talk"):
 		if not _try_interact():
-			main.hud.show_message("선반 앞에서 E: 구매 · 계산대(주인)에게 다가가 E: 대화", 3.0)
+			main.hud.show_message(_room_hint(), 3.0)
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
@@ -348,7 +357,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					if _shelf_near() == i:
 						_try_interact()
 					else:
-						main.hud.show_message("선반 앞으로 다가가서 E!", 3.0)
+						main.hud.show_message("선반 앞으로 다가가서 %s!"
+							% GameData.key_label("interact"), 3.0)
 					get_viewport().set_input_as_handled()
 					break
 	elif event.is_action_pressed("ui_cancel"):

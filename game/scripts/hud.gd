@@ -360,8 +360,8 @@ var _sb_dur := 4.6
 func story_banner(head: String, title: String) -> void:
 	if _sb_layer == null:
 		_make_story_banner()
-	_sb_head.text = "✦  %s  ✦" % head
-	_sb_title.text = title
+	_sb_head.text = "✦  %s  ✦" % GameData.localize(head)
+	_sb_title.text = GameData.localize(title)
 	_sb_time = 0.0
 	# 검증 하네스에서는 짧게 스치고 지나간다 (다음 스텝 입력을 막지 않게)
 	_sb_dur = 0.8 if OS.get_environment("KYOJIN_SHOT") != "" else 4.6
@@ -814,7 +814,7 @@ func show_message(text: String, dur := 2.5) -> void:
 	if main != null and main.remote_acting:
 		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
 	_make_bubble()
-	var wrapped: Array = _bub_wrap(text)
+	var wrapped: Array = _bub_wrap(GameData.localize(text))
 	var lines: Array = wrapped[0]
 	var w: float = minf(float(wrapped[1]), BUB_W)
 	_bub_label.text = "\n".join(lines)

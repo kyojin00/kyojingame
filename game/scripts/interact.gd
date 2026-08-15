@@ -208,7 +208,7 @@ func talk() -> bool:
 		m.story._start_postman_dialog()
 		return true
 	if m.story._postman != null and m.story._postman_state == "follow" \
-			and (m.player.position - m.story._postman.position).length() < 48.0:
+			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
 		m.story._talk_to_postman()
 		return true
 	# 가까운 NPC와 대화
@@ -474,9 +474,21 @@ func _tile_overlaps_player(t: Vector2i) -> bool:
 	return false
 
 
+# 말을 걸 수 있는 거리 (칸 = 32px).
+#
+# 예전에는 48px — 한 칸 반이라 **바로 옆에 딱 붙어야만** 말이 걸렸다.
+# 캐기와 말 걸기가 E 하나였을 때는 그래야 도끼질이 대화로 새지 않았지만,
+# 대화키를 F로 가른 지금은 좁을 이유가 없다. 세 칸까지 늘리고,
+# 바라보는 쪽을 재는 각도도 넉넉하게 열었다.
+const TALK_DIST := 96.0     # 세 칸
+const TALK_ANY := 40.0      # 이 안쪽이면 어느 쪽을 보고 있든 걸린다
+const TALK_DOT := 0.1       # 그 밖에서는 「대충 그쪽을 보고 있으면」 된다
+const PET_DIST := 76.0      # 가축 쓰다듬기
+
+
 func nearby_npc() -> Node2D:
-	# 말은 **바라보는 쪽**에 있는 사람에게만 걸린다.
-	# 옆이나 뒤에 서 있는 사람 때문에 E가 대화로 새면 캐기가 끊긴다.
+	# 말은 **바라보는 쪽**에 있는 사람부터 걸린다.
+	# 여럿이 걸리면 가장 가까운 사람이다.
 	var f: Vector2 = m.FACE_VECS[m.player.dir]
 	var best: Node2D = null
 	var best_d := 1e9
@@ -485,9 +497,9 @@ func nearby_npc() -> Node2D:
 			continue  # 집에 들어간 NPC와는 만날 수 없다
 		var v: Vector2 = n.position - m.player.position
 		var d := v.length()
-		if d >= 48.0:
+		if d >= TALK_DIST:
 			continue
-		if d > 14.0 and v.normalized().dot(f) < 0.35:
+		if d > TALK_ANY and v.normalized().dot(f) < TALK_DOT:
 			continue
 		if d < best_d:
 			best_d = d
@@ -497,7 +509,7 @@ func nearby_npc() -> Node2D:
 
 func nearby_animal() -> Node2D:
 	for a in m.animals:
-		if (a.position - m.player.position).length() < 44.0:
+		if (a.position - m.player.position).length() < PET_DIST:
 			return a
 	return null
 

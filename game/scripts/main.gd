@@ -1302,7 +1302,7 @@ const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 �
 var story_cutscene := false                # 컷신 중 조작 잠금
 var house_preview := false                 # 집터 자리 고르기 (동물의 숲식 범위 표시)
 const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)
-const POSTMAN_TALK_DIST := 60.0            # E로 말을 걸 수 있는 거리
+const POSTMAN_TALK_DIST := 96.0            # 대화키로 말을 걸 수 있는 거리 (세 칸)
 const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따라온다
 const VILLAGE_EXIT_X := 74                 # 우체부가 빠져나가는 마을 북쪽 길
 
@@ -1753,9 +1753,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("use_tool"):
 		toolwork.use_tool()
 	elif event.is_action_pressed("talk"):
-		# 대화키(F)는 말 걸기가 먼저다. 앞에 사람도 가축도 없으면
-		# 같은 키가 말 타기/내리기로 넘어간다 (둘 다 F라 서로 밟지 않게 여기서 가른다)
-		if not actions.talk():
+		# 대화키(F)는 말 걸기가 먼저다. 앞에 사람도 가축도 없고 **탈 말이
+		# 실제로 곁에 있을 때만** 같은 키가 말 타기/내리기로 넘어간다.
+		# (그냥 넘기면 말을 걸려고 F를 누르며 걷는 내내 「아직 말이 없다」가 뜬다)
+		if not actions.talk() and riding.can_toggle():
 			riding.toggle_ride()
 	elif event.is_action_pressed("mount"):
 		riding.toggle_ride()
