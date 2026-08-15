@@ -1446,8 +1446,14 @@ func tutorial_notify(flag: String) -> void:
 	var tut: Dictionary = GameData.tutorial
 	if not tut.get("active", false) or tut.get(flag, true):
 		return
-	# 마을 생활 안내(스토리2 밖 목표)는 스토리 3이 열어 줘야 진행된다
-	if flag not in GameData.STORY2_FLAGS and not GameData.guide_active:
+	# 마을 생활 안내(첫 살림 줄기 밖 목표)는 스토리 3이 열어 줘야 진행된다.
+	#
+	# **여기서 보는 목록은 목표를 띄우는 쪽(`tutorial_objective_short`)과
+	# 같아야 한다.** 예전에는 이쪽만 STORY2_FLAGS(till·plant·water·harvest)를
+	# 봤는데, 띄우는 쪽은 FARM_CHAIN_FLAGS(+cook)를 봤다. 그래서
+	# 「조리대에서 요리를 하자」는 **뜨기는 하는데 체크될 길이 없는** 목표가 됐다 —
+	# 요리를 짓고 만수에게 가져다줘 2장이 끝난 뒤에도 그대로 남아 있었다.
+	if flag not in GameData.FARM_CHAIN_FLAGS and not GameData.guide_active:
 		return
 	tut[flag] = true
 	Sound.play_sfx("sfx_catch")
@@ -4585,6 +4591,10 @@ func _end_kitchen_deliver() -> void:
 	if GameData.kitchen_quest == "done":
 		return
 	GameData.kitchen_quest = "done"
+	# 요리를 지어 가져왔으니 안내의 「조리대에서 요리를 하자」도 끝난 것이다.
+	# (그 사이 어떤 이유로 표시가 남아 있었더라도 여기서 확실히 닫는다)
+	if GameData.tutorial.get("active", false):
+		GameData.tutorial["cook"] = true
 	m.hud.quest_toast("조리대에서 요리를 하자")
 	# 여기서 메인 스토리 2가 끝난다 — 상점 안에서 완결 창이 뜬다
 	if GameData.story2_phase != "done":
