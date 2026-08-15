@@ -236,6 +236,13 @@ func _visible_tile(x: int, y: int) -> bool:
 # 「보여 줄 땅 안」이 이미 보장된 자리용 (구울 때는 그 사각만 훑으므로
 # 칸마다 사각을 다시 볼 이유가 없다 — 2만 7천 번이 그냥 없어진다)
 func _seen_tile(x: int, y: int) -> bool:
+	# 바다는 늘 보인다.
+	#
+	# 물 위는 걸어서 탐사할 수가 없으니, 탐사 기록만 보면 남쪽 바다는
+	# 영영 검은 구멍으로 남는다. 뭍에 서서도 바다는 보이는 법이라,
+	# 능선 아래 물줄은 처음부터 물로 그린다.
+	if y >= main.SEA_Y0 and y < main.WORLD_H:
+		return true
 	if not GameData.is_explored_tile(x, y):
 		return false
 	if _vis_idx.size() != main.MAP_W * main.MAP_H:

@@ -4007,12 +4007,13 @@ func _debug_tick() -> void:
 			_fog_keep = GameData.explored.duplicate()
 			GameData.explored = {}
 			GameData.mark_explored_at(m.START_TILE)
+			# 바다는 처음부터 물로 보이게 해 두었으므로 **뭍만** 센다
 			var seen1 := 0
-			for y1 in m.WORLD_H:
+			for y1 in m.SEA_Y0:
 				for x1 in m.MAP_W:
 					if m.map_ui._visible_tile(x1, y1):
 						seen1 += 1
-			var ratio := float(seen1) / float(m.MAP_W * m.WORLD_H)
+			var ratio := float(seen1) / float(m.MAP_W * m.SEA_Y0)
 			GameData.mark_explored_at(m.START_TILE + Vector2i(24, 12))
 			var seen2 := 0
 			for y2 in m.WORLD_H:
@@ -4366,7 +4367,8 @@ func _debug_tick() -> void:
 			var k_expl9: Dictionary = GameData.explored.duplicate()
 			GameData.explored = {}
 			GameData.mark_explored_at(m.START_TILE)
-			var far9 := Vector2i(m.MAP_W - 3, m.WORLD_H - 3)
+			# 뭍의 먼 구석으로 고른다 — 바다는 가 보지 않아도 물로 보인다
+			var far9 := Vector2i(m.MAP_W - 3, m.SEA_Y0 - 3)
 			var fog_block: bool = not m.map_ui._visible_tile(far9.x, far9.y) \
 				and m.map_ui.FOG.a >= 1.0 and m.map_ui.FOG.v <= 0.001
 			GameData.explored = k_expl9
@@ -4876,6 +4878,28 @@ func _debug_tick() -> void:
 			print("TALKUX_OK=", reach_ok and quiet_ok and step_ok and sent_ok,
 				" 세칸=", reach_ok, " 말없으면조용=", quiet_ok,
 				" 만수단계=", step_ok, "(", obj_after, ") 말줄임표=", sent_ok)
+		239:
+			# 바다는 가 본 적이 없어도 지도에 물로 뜬다 (검은 구멍 금지).
+			# 물 위는 걸어서 탐사할 수 없으니, 탐사 기록만 보면 영영 검다.
+			var k_expl4: Dictionary = GameData.explored.duplicate()
+			GameData.explored = {}                 # 아무 데도 안 가 본 셈 치고
+			m.map_ui._ensure_vis_index()
+			var sea_seen := true
+			var sea_water := true
+			for sx in [4, 60, 120, m.MAP_W - 3]:
+				for sy in [m.SEA_Y0, m.SEA_Y0 + 3, m.WORLD_H - 1]:
+					if not m.map_ui._visible_tile(sx, sy):
+						sea_seen = false
+					if str(m.grid[sy][sx].ground) != "water":
+						sea_water = false
+			# 뭍은 그대로 가려져 있어야 한다 (바다만 예외다)
+			var land_hidden: bool = not m.map_ui._visible_tile(30, 60) \
+				and not m.map_ui._visible_tile(120, 40)
+			GameData.explored = k_expl4
+			m.map_ui._ensure_vis_index()
+			print("SEAMAP_OK=", sea_seen and sea_water and land_hidden,
+				" 바다보임=", sea_seen, " 전부물=", sea_water,
+				" 뭍은가림=", land_hidden)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
