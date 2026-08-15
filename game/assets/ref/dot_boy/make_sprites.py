@@ -328,7 +328,10 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     """앞모습 몸통+팔. swing: 화면 왼쪽 팔이 앞으로 나간 양 -3..+3
     dx: 휘두르기용 좌우 쏠림. skip: 'left'/'right' 팔을 안 그린다 (휘두르는 팔)"""
     y = SHIRT_Y + bob
-    g.rect(13 + dx, y - 1, 18 + dx, y - 1, 's')  # 목
+    # 목 — 6칸에서 4칸으로. 턱(8칸)과 목이 두 칸밖에 차이가 안 나서
+    # 턱선이 안 보이고 「턱 없이 목이 굵은」 얼굴이 됐다.
+    # 게다가 목은 턱 밑 그늘에 들어가는 자리라 그늘색으로 둔다.
+    g.rect(14 + dx, y - 1, 17 + dx, y - 1, 'S')  # 목
     g.rect(10 + dx, y, 21 + dx, y + 11, 'b')     # 몸판
     g.hline(10 + dx, 21 + dx, y + 11, 'B')       # 아랫단 그늘
     g.rect(11 + dx, y, 12 + dx, y + 4, 'L')      # 빛 받는 왼쪽 어깨
@@ -518,9 +521,16 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     for off, shade in ((-stride, True), (stride, False)):
         back = off < 0
         lift = 2 if back else 0                # 뒤로 간 다리는 뒤꿈치가 들린다
-        # 허벅지도 엉덩이를 축으로 크게 흔든다 — 무릎이 보폭의 2/3까지
-        # 따라가야 다리 전체가 젓는다 (작으면 정강이만 까딱거린다).
-        knee_off = off * (0.65 if back else 0.75)
+        # 허벅지도 함께 젓는다.
+        #
+        # 예전에는 엉덩이 끝을 0으로 못 박고 무릎만 보폭의 2/3까지
+        # 보냈다. 그러면 **허벅지 윗쪽이 통째로 붙박이**라, 걸어도
+        # 무릎 아래만 까딱거리는 걸음이 된다.
+        #   hip_off  골반이 함께 도는 만큼 (조금)
+        #   knee_off 무릎이 나가는 만큼 — 앞다리는 거의 보폭만큼 나가고,
+        #            뒷다리는 무릎이 덜 가는 대신 발이 크게 차올라 접힌다
+        hip_off = off * 0.3
+        knee_off = off * (0.7 if back else 1.0)
         foot_off = round(off * 1.35) if back else off
         pc, kc = ('P', 'K') if shade else ('p', 'k')
         bot = GROUND - lift
@@ -530,7 +540,7 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
         for yy in range(LEG_Y - 1 + sq, bot + 1):   # 띠 아래 줄부터 겹쳐 잇는다
             if yy <= knee_row:                 # 허벅지
                 f = (yy - hip_row) / max(1, knee_row - hip_row)
-                o = knee_off * f
+                o = hip_off + (knee_off - hip_off) * f
             elif yy <= ankle_row:              # 정강이 (발목에서 발 위치에 닿는다)
                 f = (yy - knee_row) / max(1, ankle_row - knee_row)
                 o = knee_off + (foot_off - knee_off) * f
@@ -587,7 +597,7 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
 
 def torso_up(g, bob, swing, dx=0, skip=None):
     y = SHIRT_Y + bob
-    g.rect(13 + dx, y - 1, 18 + dx, y - 1, 'S')  # 목덜미
+    g.rect(14 + dx, y - 1, 17 + dx, y - 1, 'S')  # 목덜미 (앞모습과 같은 굵기)
     g.rect(10 + dx, y, 21 + dx, y + 11, 'b')
     g.hline(10 + dx, 21 + dx, y, 'B')            # 어깨 그늘
     g.hline(10 + dx, 21 + dx, y + 11, 'B')
