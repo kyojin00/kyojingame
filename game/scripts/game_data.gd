@@ -735,8 +735,10 @@ func skill_lv(id: String) -> int:
 	return int(skills[id].lv)
 
 
+# 레벨업은 아주 더디다 — 한 분야를 끝까지 갈고닦는 일이
+# 며칠이 아니라 여러 계절에 걸친 일이 되도록 곡선을 네 배 가까이 세웠다.
 func skill_xp_needed(lv: int) -> float:
-	return 30.0 + 20.0 * lv * lv
+	return 120.0 + 85.0 * lv * lv
 
 
 # 경험치 추가. 레벨업하면 도달한 레벨을, 아니면 0을 반환
@@ -750,9 +752,27 @@ func add_skill_xp(id: String, amount: float) -> int:
 		s.xp = float(s.xp) - skill_xp_needed(int(s.lv))
 		s.lv = int(s.lv) + 1
 		leveled = int(s.lv)
+	if leveled > 0:
+		# 그 자리에서 알리지 않는다 — 하루를 마치고 잠들 때 한꺼번에 전한다
+		levelup_pending.append([id, leveled])
 	if leveled >= SKILL_MAX_LV:
 		check_skill_water(id)   # 만렙 증표 — 생명의 물 한 병
 	return leveled
+
+
+# 오늘 오른 능력치들 — [[분야 id, 레벨], ...]. 잠들 때 결산에 실린다
+var levelup_pending: Array = []
+
+
+# 잠자리 결산에 실을 한 줄 (없으면 "")
+func levelup_report() -> String:
+	if levelup_pending.is_empty():
+		return ""
+	var parts: Array = []
+	for row: Array in levelup_pending:
+		parts.append("%s Lv.%d" % [str(SKILLS[str(row[0])].name), int(row[1])])
+	levelup_pending = []
+	return "오늘 실력이 늘었다 — " + " · ".join(parts)
 
 
 func farm_growth_mult() -> float:
@@ -1192,7 +1212,8 @@ var plot3_quest := ""
 var plot3_made := 0               # 부탁을 받은 뒤로 새로 놓은 집터 수
 const PLOT3_GOAL := 3
 const PLOT3_MONEY := 900          # 이장이 마을 살림에서 떼어 주는 사례
-const PLOT3_NAIL := 6             # 다음 집터를 위한 못
+const PLOT3_WOOD := 40            # 다음 집터에 보태라고 얹어 주는 목재
+const PLOT3_STONE := 30
 
 
 func plot3_objective_short() -> String:
@@ -2663,7 +2684,8 @@ func quest_catalog() -> Array:
 				+ "지붕이 설 자리를 미리 세 곳 골라 두자.\n"
 				+ "언젠가 그 문 앞에서 처음 인사를 나누게 될 것이다.",
 			"cat": "sub", "npc": "chief",
-			"reward": "이장의 사례 %dG + 못 %d개" % [PLOT3_MONEY, PLOT3_NAIL]})
+			"reward": "이장의 사례 %dG + 목재 %d · 석재 %d"
+				% [PLOT3_MONEY, PLOT3_WOOD, PLOT3_STONE]})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -3082,7 +3104,10 @@ const DESK_RECIPES := {
 		"kind": "item", "give": "storage_box", "locked": true, "shop": "용식의 부탁",
 		"desc": "집 안에 놓고 창고처럼 쓰는 작은 상자 — 가방이 넘칠 때 넣어 둔다"},
 	# 집터 — 새 주민의 집을 지을 자리 (메인 스토리 3에서 해금, 일부러 무겁다)
-	"housing_kit": {"name": "집터", "cost": {"wood": 60, "stone": 40, "nail": 4},
+	# 집터 — 양은 많지만 **초반에 구할 수 있는 것만** 쓴다.
+	# (예전에는 못 4개가 들어갔는데, 못은 대장간이 서야 살 수 있어서
+	#  이사 이야기가 나오는 시점에는 아예 만들 수 없었다)
+	"housing_kit": {"name": "집터", "cost": {"wood": 90, "stone": 70},
 		"kind": "item", "give": "housing_kit", "locked": true, "shop": "잡화점",
 		"desc": "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 가방에서 쓴다"},
 	# 초반 무기 — kind "tool": 완성되면 도구가 해금된다 (가방에서 슬롯에 장착)
@@ -5418,7 +5443,7 @@ const TUTORIAL_REWARDS := {
 	"chop": {"wood": 5},
 	"slept": {"money": 75},
 	"mine": {"stone": 5},
-	"fish": {"money": 100},
+	"fish": {},          # 낚시는 돈을 주지 않는다 — 물고기는 팔아서 값을 받는다
 	"shop": {"money": 150},
 }
 

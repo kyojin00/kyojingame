@@ -2123,7 +2123,7 @@ func open_plot3_dialog() -> void:
 			{"text": "「벌써 세 곳이나? 허허...\n자네는 늘 말보다 손이 빠르구먼.」"},
 			{"text": "「빈 집터라는 게 참 묘하네.\n아무도 안 사는데 마을이 벌써 넓어진 것 같아.」",
 				"portrait": chief_normal},
-			{"text": "「이건 마을 살림에서 떼어 둔 사례일세.\n못도 좀 챙기게 — 또 지을 일이 있을 테니.」",
+			{"text": "「이건 마을 살림에서 떼어 둔 사례일세.\n목재랑 석재도 좀 챙기게. 또 지을 일이 있을 테니.」",
 				"portrait": chief_happy},
 		], _end_plot3)
 		return
@@ -2139,11 +2139,12 @@ func _end_plot3() -> void:
 		return
 	GameData.plot3_quest = "done"
 	GameData.money += GameData.PLOT3_MONEY
-	GameData.items["nail"] = int(GameData.items.get("nail", 0)) + GameData.PLOT3_NAIL
+	GameData.wood += GameData.PLOT3_WOOD
+	GameData.stone += GameData.PLOT3_STONE
 	Sound.play_sfx("sfx_coin")
 	m.hud.event_toast("이장의 부탁 완료!")
-	m.hud.show_message("사례로 %dG와 못 %d개를 받았다.\n빈 집터에는 언젠가 새 이웃이 들어선다."
-		% [GameData.PLOT3_MONEY, GameData.PLOT3_NAIL], 6.0)
+	m.hud.show_message("사례로 %dG와 목재·석재를 받았다.\n빈 집터에는 언젠가 새 이웃이 들어선다."
+		% GameData.PLOT3_MONEY, 6.0)
 	m.saveio.save_now()
 
 

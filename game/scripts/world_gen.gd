@@ -181,7 +181,9 @@ func _build_sea() -> void:
 			continue
 		m.objects[p] = {"kind": "searock", "hp": 0}
 	for p: Vector2i in m.SEA_GATE:
-		if not GameData.sea_open and not m.objects.has(p):
+		if GameData.sea_open:
+			m.objects.erase(p)      # 한 번 연 길은 무엇으로도 다시 막히지 않는다
+		elif not m.objects.has(p):
 			m.objects[p] = {"kind": "bigrock", "hp": m.BIGROCK_HP, "fixed": true}
 	if GameData.sea_open:
 		var have := false
@@ -603,6 +605,8 @@ func _respawn_ok(pos: Vector2i, kind: String) -> bool:
 	if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos) \
 			or m.FISH_CLEAR.has_point(pos) or m.GREENHOUSE.has_point(pos):
 		return false  # 마을·큰길·낚시터 어귀·온실 터에는 나지 않는다
+	if pos in m.SEA_GATE or pos.y == m.SEA_RIDGE_Y:
+		return false  # 바다로 내려가는 길목은 어떤 것도 막지 않는다
 	for r: Rect2i in NO_SPAWN_RECTS:
 		if r.has_point(pos):
 			return false

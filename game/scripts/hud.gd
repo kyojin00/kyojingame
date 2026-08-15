@@ -883,7 +883,7 @@ func _process(delta: float) -> void:
 	# 제작대에서 방금 완성된 것 (game_data는 UI를 못 부른다)
 	while not GameData.desk_done_pending.is_empty():
 		var made: String = GameData.desk_done_pending.pop_front()
-		_toast_queue.append({"head": "🔨 완성!", "body": "%s — 낡은 것과 바꿨다" % made,
+		_toast_queue.append({"head": "🔨 완성!", "body": "%s를 만들었다!" % made,
 			"icon": null, "head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_place")
 	# 컬렉션이 방금 찼으면 배너로 알린다 (game_data는 UI를 못 부른다)

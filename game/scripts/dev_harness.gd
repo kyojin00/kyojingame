@@ -4035,17 +4035,20 @@ func _debug_tick() -> void:
 			var p3_mark: bool = GameData.quest_npc_marks().get("chief", "") == "?"
 			GameData.move_quest = k_mvq
 			var money_p3 := GameData.money
-			var nail_p3 := int(GameData.items.get("nail", 0))
+			var wood_p3 := GameData.wood
+			var stone_p3 := GameData.stone
 			m.story.open_plot3_dialog()
 			var p3_talk: bool = m.dialog.visible
 			m.dialog.skip_seq()
 			m.dialog.close()
 			var p3_done: bool = GameData.plot3_quest == "done" \
 				and GameData.money == money_p3 + GameData.PLOT3_MONEY \
-				and int(GameData.items["nail"]) == nail_p3 + GameData.PLOT3_NAIL \
+				and GameData.wood == wood_p3 + GameData.PLOT3_WOOD \
+				and GameData.stone == stone_p3 + GameData.PLOT3_STONE \
 				and GameData.plot3_objective_short() == ""
 			GameData.money = money_p3
-			GameData.items["nail"] = nail_p3
+			GameData.wood = wood_p3
+			GameData.stone = stone_p3
 			GameData.plot3_quest = k_p3q
 			GameData.plot3_made = k_p3n
 			GameData.story4_phase = k_s4e
@@ -4316,6 +4319,142 @@ func _debug_tick() -> void:
 				" 레시피선반=", shelf_ok, " 잼=용식보상 ", jam_reward,
 				" 갇힘=", was_trapped, " 구조=", rescued, " 맵밖복귀=", back_in,
 				" 지도확장=", map_big, " 구름차단=", fog_block)
+		394:
+			# #149: 집터 재료 · 더딘 성장과 잠자리 결산 · 채집 문구 · 대사 기호 ·
+			# 제작 문구 · 무지개송어 · 낚시 보상 · 바닷길 막힘
+			m.dialog.close()
+
+			# ── ① 집터는 초반 재료만으로 만든다 (못은 대장간이 서야 산다)
+			var kit_cost: Dictionary = GameData.DESK_RECIPES["housing_kit"].cost
+			var kit_ok := not kit_cost.has("nail")
+			for mk: String in kit_cost:
+				if mk not in ["wood", "stone"]:
+					kit_ok = false
+
+			# ── ② 성장은 더디고, 소식은 잠자리에서
+			var slow_ok: bool = GameData.skill_xp_needed(1) >= 190.0 \
+				and GameData.skill_xp_needed(3) >= 800.0
+			var k_sk: Dictionary = GameData.skills["forest"].duplicate()
+			GameData.levelup_pending = []
+			GameData.skills["forest"].lv = 1
+			GameData.skills["forest"].xp = 0.0
+			m.toolwork.gain_skill("forest", 3.0)
+			var no_lv_yet: bool = GameData.skills["forest"].lv == 1
+			m.toolwork.gain_skill("forest", GameData.skill_xp_needed(1) * 3.0)
+			var leveled: bool = GameData.skills["forest"].lv >= 2 \
+				and not GameData.levelup_pending.is_empty()
+			var report := GameData.levelup_report()
+			var report_ok: bool = report.contains("Lv.") \
+				and GameData.levelup_pending.is_empty()
+			GameData.skills["forest"] = k_sk
+
+			# ── ③ 채집 문구에는 개수가 없다
+			var k_pos0 := m.player.position
+			var ct := Vector2i(24, 40)
+			for cy in range(ct.y - 2, ct.y + 3):
+				for cx in range(ct.x - 2, ct.x + 3):
+					m.objnode._remove_object(Vector2i(cx, cy))
+			m.player.position = Vector2(ct.x * m.TILE + 16, ct.y * m.TILE + 16)
+			m.player.dir = "right"
+			var wt := ct + Vector2i(1, 0)
+			m.objects[wt] = {"kind": "tree", "hp": 1}
+			m.objnode._spawn_object_node(wt, "tree")
+			m.toolwork.set_tool("axe")
+			m._target_override = wt
+			m.toolwork.use_tool()
+			m._target_override = Vector2i(-999, -999)
+			var chop_msg: String = m.hud._bub_label.text if m.hud._bub_label != null else ""
+			var no_count: bool = chop_msg.contains("얻었다")
+			for dch in "0123456789":
+				if chop_msg.contains(dch):
+					no_count = false
+			m.objnode._remove_object(wt)
+			m.player.position = k_pos0
+			m.hud.hide_bubble()
+
+			# ── ④ 사람이 하는 말에는 부호가 넷뿐이다
+			m.dialog.open_seq("검사", null, [
+				{"text": "「이건 정말 대단하구먼 — 별표★도 하트♥도 다 지운다…」"},
+				{"text": "「그런데 말이야, 정말 그럴까? 물론이지!」"},
+			])
+			var punct_ok := true
+			var kept_ok := false
+			for e0: Dictionary in m.dialog._seq:
+				var b0 := str(e0.get("text", ""))
+				for bad: String in ["「", "」", "★", "♥", "—", "…", "·", "『"]:
+					if b0.contains(bad):
+						punct_ok = false
+				if b0.contains("?") and b0.contains("!") and b0.contains(","):
+					kept_ok = true
+			m.dialog.close()
+
+			# ── ⑤ 제작 문구 — 만든 것의 이름으로 알려 준다
+			GameData.desk_done_pending.append("빗자루")
+			m.hud._process(0.016)
+			var made_ok := false
+			for t0: Dictionary in m.hud._toast_queue:
+				if str(t0.get("body", "")).contains("빗자루를 만들었다"):
+					made_ok = true
+			m.hud._toast_queue.clear()
+
+			# ── ⑥ 무지개송어 그림
+			var rb: Texture2D = m.tex.get("fish_rainbow")
+			var art_ok: bool = rb != null and rb.get_width() == 32 \
+				and rb.get_height() == 32
+
+			# ── ⑦ 낚시는 돈을 주지 않는다
+			var fish_free: bool = not GameData.TUTORIAL_REWARDS["fish"].has("money")
+			var k_money0 := GameData.money
+			var k_fishcnt: Dictionary = GameData.fish_caught.duplicate()
+			GameData.items["fish_rainbow"] = int(GameData.items.get("fish_rainbow", 0))
+			m.pending_fish = {"id": "fish_rainbow"}
+			m.fishing._on_fishing_finished(true)
+			fish_free = fish_free and GameData.money == k_money0
+			var catch_msg: String = m.hud._bub_label.text if m.hud._bub_label != null else ""
+			fish_free = fish_free and not catch_msg.contains("G")
+			GameData.fish_caught = k_fishcnt
+			GameData.money = k_money0
+			m.hud.hide_bubble()
+
+			# ── ⑧ 한 번 연 바닷길은 다시 막히지 않는다
+			var k_sea := GameData.sea_open
+			var k_fq0 := GameData.fisher_quest
+			GameData.sea_open = true
+			GameData.fisher_quest = "done"
+			var gate0: Vector2i = m.SEA_GATE[0]
+			m.objects[gate0] = {"kind": "bigrock", "hp": m.BIGROCK_HP, "fixed": true}
+			m.worldgen._build_sea()
+			var gate_clear2: bool = not m.objects.has(gate0)
+			# 어쩌다 남아 있어도 곡괭이로 캘 수 있다
+			m.objects[gate0] = {"kind": "bigrock", "hp": 1, "fixed": true}
+			m.objnode._spawn_object_node(gate0, "bigrock")
+			m.player.position = Vector2(gate0.x * m.TILE + 16,
+				(gate0.y - 1) * m.TILE + 16)
+			m.player.dir = "down"
+			m.toolwork.set_tool("pickaxe")
+			m._target_override = gate0
+			m.toolwork.use_tool()
+			m._target_override = Vector2i(-999, -999)
+			var gate_mined: bool = not m.objects.has(gate0)
+			m.objnode._remove_object(gate0)
+			# 자연 리젠도 길목에는 놓이지 않는다
+			var no_regen: bool = not m.worldgen._respawn_ok(gate0, "rock") \
+				and not m.worldgen._respawn_ok(m.SEA_GATE[1], "tree")
+			GameData.sea_open = k_sea
+			GameData.fisher_quest = k_fq0
+			m.player.position = k_pos0
+			m.hud.hide_bubble()
+			m.hud._toast_queue.clear()
+			print("BALANCE_OK=", kit_ok and slow_ok and no_lv_yet and leveled
+				and report_ok and no_count and punct_ok and kept_ok and made_ok
+				and art_ok and fish_free and gate_clear2 and gate_mined and no_regen,
+				" 집터재료=", kit_ok, " 더딘성장=", slow_ok,
+				" 즉시알림없음=", no_lv_yet, " 잠자리결산=", leveled and report_ok,
+				" 채집문구=", no_count, "(", chop_msg, ")",
+				" 대사부호=", punct_ok and kept_ok, " 제작문구=", made_ok,
+				" 무지개송어=", art_ok, " 낚시무보수=", fish_free,
+				" 길목비움=", gate_clear2, " 곡괭이채굴=", gate_mined,
+				" 리젠제외=", no_regen)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

@@ -74,10 +74,8 @@ func gain_skill(id: String, amount: float) -> void:
 	m.float_texts.append({"text": "+%d %s" % [int(amount), GameData.SKILLS[id].name],
 		"pos": m.player.position + Vector2(0, -100), "t": 0.0})
 	var lv := GameData.add_skill_xp(id, amount)
-	if lv > 0:
-		Sound.play_sfx("sfx_catch")
-		m.hud.show_message("[능력치] %s Lv.%d 달성! (%s)" %
-			[GameData.SKILLS[id].name, lv, GameData.SKILLS[id].effect])
+	# 레벨업은 **그 자리에서 알리지 않는다.** 하루를 마치고 잠들 때
+	# 아침 결산에 「오늘 실력이 늘었다」로 한꺼번에 실린다 (game_data.levelup_report)
 	if lv > 0 and Net.is_host():
 		m.netsync._broadcast_stats()
 
@@ -332,7 +330,7 @@ func use_tool() -> void:
 					GameData.wood += wood_got
 					GameData.discover("wood")   # 도감 「기본 재료」 등록
 					GameData.trees_chopped += 1
-					m.hud.show_message("나무를 베었다! 목재 +%d" % wood_got)
+					m.hud.show_message("목재를 얻었다!")
 					m.doing._maybe_drop_recipe("tree")
 					# 길목을 뚫었다면 진행도를 갱신한다
 					if story_gate:
@@ -389,15 +387,19 @@ func use_tool() -> void:
 					GameData.stone += stone_got
 					GameData.discover("stone")   # 도감 「기본 재료」 등록
 					GameData.rocks_mined += 1
-					m.hud.show_message("돌을 캤다! 석재 +%d" % stone_got)
+					m.hud.show_message("석재를 얻었다!")
 					m.doing._maybe_drop_recipe("rock")
 					m.tutorial_notify("mine")
 					gain_skill("mine", 6.0)
 				else:
-					m.hud.show_message("돌을 내리쳤다. (%d/%d)" % [m.ROCK_HP - obj.hp, m.ROCK_HP])
+					m.hud.show_message("돌을 내리쳤다.")
 			elif obj.kind == "bigrock":
 				# 길목의 바위 (스토리 1 바위 / 바닷길 바위 — 여러 번 캐야 부서진다)
-				if bool(obj.get("fixed", false)) and GameData.fisher_quest != "open":
+				# 붙박이 바위는 이야기가 그 자리에 오기 전까지만 단단하다.
+				# **바닷길이 이미 열렸다면 언제든 캘 수 있다** — 열린 뒤에 다시
+				# 굴러든 바위가 길을 영영 막던 버그를 여기서 막는다.
+				if bool(obj.get("fixed", false)) and GameData.fisher_quest != "open" \
+						and not (GameData.sea_open and t in m.SEA_GATE):
 					m.hud.show_message("바위가 어찌나 단단한지 곡괭이가 튕겨 나온다. 지금은 캘 도리가 없다.")
 					return
 				obj.hp -= 1
@@ -407,14 +409,13 @@ func use_tool() -> void:
 					# 돌도 곡괭이 날이 닿는 순간에 맞춰 튄다 (main.HIT_AT)
 					m.objnode._remove_object(t, true, m.HIT_AT)
 					GameData.stone += m.BIGROCK_STONE
-					m.hud.show_message("커다란 바위를 캐냈다! 돌 +%d" % m.BIGROCK_STONE)
+					m.hud.show_message("석재를 얻었다!")
 					m.doing._maybe_drop_recipe("bigrock")
 					gain_skill("mine", 4.0)
 					m.story._story_rock_mined()
 					m.story._sea_gate_mined()
 				else:
-					m.hud.show_message("커다란 바위를 내리쳤다. (%d/%d)" %
-						[m.BIGROCK_HP - obj.hp, m.BIGROCK_HP])
+					m.hud.show_message("커다란 바위를 내리쳤다.")
 			elif obj.kind == "sprinkler":
 				m.objnode._remove_object(t)
 				GameData.wood += GameData.SPRINKLER_COST_WOOD

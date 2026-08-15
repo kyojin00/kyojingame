@@ -269,6 +269,35 @@ func _is_spoken(text: String) -> bool:
 	return text.contains("「") or text.contains("」")
 
 
+# ---- 사람이 하는 말에는 문장 부호가 넷뿐이다 ----
+#
+# 마침표 · 쉼표 · 물음표 · 느낌표. 그 밖의 것(따옴표 「」『』, 줄표 —,
+# 가운뎃점 ·, 말줄임표 …, ★♥ 같은 그림 기호)은 전부 걷어낸다.
+# 누가 하는 말인지는 창의 이름패가 알려 주므로 따옴표도 필요 없다.
+# (괄호로 적은 지문은 앞서 _strip_parens가 이미 떼어냈다)
+const KEEP_PUNCT := ".,?!"
+
+
+func _only_basic_punct(text: String) -> String:
+	var out := ""
+	for ch in text.replace("…", "...").replace("...", "..."):
+		if ch == "\n" or ch == " ":
+			out += ch
+			continue
+		if KEEP_PUNCT.contains(ch):
+			out += ch
+			continue
+		var c := ch.unicode_at(0)
+		# 한글 · 숫자 · 알파벳만 남긴다
+		if (c >= 0xAC00 and c <= 0xD7A3) or (c >= 0x1100 and c <= 0x11FF) \
+				or (c >= 0x30 and c <= 0x39) or (c >= 0x41 and c <= 0x5A) \
+				or (c >= 0x61 and c <= 0x7A):
+			out += ch
+		else:
+			out += " "     # 지운 자리에 낱말이 붙지 않게 한 칸 남긴다
+	return out
+
+
 # 괄호로 묶인 부분을 통째로 걷어낸다 (중첩은 없다고 본다)
 func _strip_parens(text: String) -> String:
 	var out := ""
@@ -408,7 +437,7 @@ func _paginate_seq(entries: Array) -> Array:
 		var body := clean_text(str(e.get("text", "")))
 		# NPC가 하는 말에서는 괄호 지문을 떼어낸다 (지문만 있는 페이지는 그대로)
 		if _is_spoken(body):
-			var spoken := clean_text(_strip_parens(body))
+			var spoken := clean_text(_only_basic_punct(_strip_parens(body)))
 			if spoken != "":
 				body = spoken
 		var pages: Array[String] = []

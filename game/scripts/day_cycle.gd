@@ -227,6 +227,10 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n%s %d개를 얻었다!" % [GameData.ITEMS[product].name, collected[product]]
 	if season_changed:
 		note += "\n%s이 시작됐다!" % GameData.season_name()
+	# 어제 하루 동안 오른 능력치 — 그 자리에서 알리지 않고 여기서 한꺼번에
+	var lv_line := GameData.levelup_report()
+	if lv_line != "":
+		note += "\n" + lv_line
 	if not replies.is_empty():
 		note += "\n우체국에 %s의 답장이 도착했다." \
 			% ", ".join(PackedStringArray(replies))

@@ -80,7 +80,9 @@ func _on_fishing_finished(success: bool) -> void:
 		GameData.today_harvest += 1
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
-		m.hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
+		# 낚시는 돈을 주지 않는다 — 값은 상점에 팔 때 받는다.
+		# (예전에는 판매가를 괄호로 같이 띄워 「돈이 들어왔다」로 읽혔다)
+		m.hud.show_message("%s를 낚았다!" % def.name)
 		m.tutorial_notify("fish")
 		# 여름 낚시대회: 대회 시간 안에 낚시터에서 낚은 것만 센다
 		if GameData.festival_open() and str(GameData.festival_today().id) == "fishing" \
