@@ -358,7 +358,8 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 				_postman_spr.flip_h = to_player.x < 0
 				if not story_shot:
 					m.hud.show_message(
-						"누군가 말을 걸고 싶어 한다. 가까이 가서 E를 눌러보자.", 6.0)
+						"누군가 말을 걸고 싶어 한다. 가까이 가서 %s를 눌러보자."
+						% GameData.key_label("talk"), 6.0)
 		"wait":
 			# 느낌표를 띄운 채 서서 기다린다 (많이 멀어지면 다시 따라간다)
 			var to_wait := m.player.position - _postman.position

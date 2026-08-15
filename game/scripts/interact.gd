@@ -1,9 +1,15 @@
-# 상호작용 — 무엇을 겨누고 있고, E를 누르면 무슨 일이 벌어지는가.
+# 상호작용 — 무엇을 겨누고 있고, 키를 누르면 무슨 일이 벌어지는가.
+#
+# 키는 둘로 갈라져 있다.
+#   F(`talk`)  — 말 걸기. 사람과 가축만 본다. 아무도 없으면 말 타기로 넘어간다.
+#   E(`interact`) — 그 밖의 전부. 벌목·채광·채집·문·계산대·표지판...
+# 예전에는 E 하나가 캐기와 말 걸기를 겸해서, 나무를 연타하다 옆 사람에게
+# 말이 걸리곤 했다. 키를 가른 뒤로는 그 새는 길이 아예 없다.
 #
 # 겨눔은 두 갈래다. 마우스가 움직이면 그 칸, 아니면 바라보는 쪽 한 칸
 # (`target_tile`). 클릭으로 고른 칸이 있으면 그것이 우선한다.
 #
-# `interact`는 가까운 것부터 훑는다 — 문 > NPC > 가축 > 곤충 > 오브젝트.
+# `interact`는 가까운 것부터 훑는다 — 곤충 > 채집물 > 오브젝트 > 문 > 도구.
 #
 # main의 것은 `m.`으로 부른다 (m = main.gd).
 class_name KyojinActions
@@ -183,6 +189,52 @@ func _blocking_object_tile() -> Vector2i:
 	return best
 
 
+# 대화키(F) — 앞에 있는 사람/가축에게 말을 건다.
+#
+# 말을 걸 상대를 찾아 실제로 무언가 했으면 true. 아무도 없으면 false를
+# 돌려주고, 그때는 main이 같은 키를 말 타기로 넘긴다.
+func talk() -> bool:
+	if GameData.riding:
+		return false          # 말 위에서는 F가 「내리기」다
+	# 스토리 6: 우체국 터 앞에서 기다리는 우체부에게 편지를 부탁한다
+	if m.story._book_post != null and m.story._book_post_mode == "stand" \
+			and (m.player.position - m.story._book_post.position).length() < m.POSTMAN_TALK_DIST:
+		m.story._start_book_post_dialog()
+		return true
+	# 우체부 아저씨에게 말 걸기 (첫 만남 / 동행 중 보조 대화)
+	if m.story._postman != null and m.story._postman_state == "wait" \
+			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
+		m.story._postman_state = "talk"
+		m.story._start_postman_dialog()
+		return true
+	if m.story._postman != null and m.story._postman_state == "follow" \
+			and (m.player.position - m.story._postman.position).length() < 48.0:
+		m.story._talk_to_postman()
+		return true
+	# 가까운 NPC와 대화
+	var npc := nearby_npc()
+	if npc != null:
+		m.village._talk_to(npc)
+		return true
+	# 가까운 동물 쓰다듬기(=먹이 주기)
+	var animal := nearby_animal()
+	if animal != null:
+		var def: Dictionary = GameData.ANIMALS[animal.type]
+		if animal.fed:
+			m.hud.show_message("%s는 이미 만족스러워 보인다." % def.name)
+		else:
+			animal.fed = true
+			Sound.play_sfx("sfx_heart")
+			m.toolwork.gain_skill("ranch", 6.0)   # 동물을 돌본 손길이 쌓인다
+			m.story.story17_barn_work("care")     # 옛 헛간 이야기 (스토리 17)
+			if Net.is_guest():
+				m.netsync._req_feed.rpc_id(1, m.animals.find(animal))
+			m.hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
+				[def.name, GameData.ITEMS[def.product].name])
+		return true
+	return false
+
+
 func interact() -> void:
 	# 말을 타고 있으면 E도 「내리기」로 친다 (기본은 F)
 	if GameData.riding:
@@ -218,50 +270,9 @@ func interact() -> void:
 		m.toolwork.use_tool()
 		m._target_override = prev
 		return
-	# 캐던 나무/돌이 마지막 한 방에 부서져도, 이어 누른 E가 대화로 새지 않는다
-	# (E는 캐기와 말 걸기를 겸하므로 연타 도중 말이 걸리면 곤란하다)
+	# 캐던 나무/돌이 마지막 한 방에 부서져도, 이어 누른 E가 엉뚱한 데로 새지 않는다
 	if m._work_lock > 0.0:
 		m.toolwork.use_tool()
-		return
-	# 나무·돌·채집물을 조준하고 있으면 대화보다 채집이 우선이다
-	# (옆에 사람이 서 있어도 E가 대화로 새지 않는다)
-	var aiming_object: bool = aim != null and m.AIM_KINDS.has(aim.kind)
-	# 스토리 6: 우체국 터 앞에서 기다리는 우체부에게 편지를 부탁한다
-	if not aiming_object and m.story._book_post != null \
-			and m.story._book_post_mode == "stand" \
-			and (m.player.position - m.story._book_post.position).length() < m.POSTMAN_TALK_DIST:
-		m.story._start_book_post_dialog()
-		return
-	# 우체부 아저씨에게 말 걸기 (첫 만남 / 동행 중 보조 대화)
-	if not aiming_object and m.story._postman != null and m.story._postman_state == "wait" \
-			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
-		m.story._postman_state = "talk"
-		m.story._start_postman_dialog()
-		return
-	if not aiming_object and m.story._postman != null and m.story._postman_state == "follow" \
-			and (m.player.position - m.story._postman.position).length() < 48.0:
-		m.story._talk_to_postman()
-		return
-	# 가까운 NPC와 대화
-	var npc := nearby_npc()
-	if npc != null and not aiming_object:
-		m.village._talk_to(npc)
-		return
-	# 가까운 동물 쓰다듬기(=먹이 주기)
-	var animal := nearby_animal()
-	if animal != null:
-		var def: Dictionary = GameData.ANIMALS[animal.type]
-		if animal.fed:
-			m.hud.show_message("%s는 이미 만족스러워 보인다." % def.name)
-		else:
-			animal.fed = true
-			Sound.play_sfx("sfx_heart")
-			m.toolwork.gain_skill("ranch", 6.0)   # 동물을 돌본 손길이 쌓인다
-			m.story.story17_barn_work("care")     # 옛 헛간 이야기 (스토리 17)
-			if Net.is_guest():
-				m.netsync._req_feed.rpc_id(1, m.animals.find(animal))
-			m.hud.show_message("%s를 쓰다듬었다! ♥ 내일 아침 %s을 준다." %
-				[def.name, GameData.ITEMS[def.product].name])
 		return
 	# 곤충 잡기
 	var bug := nearby_bug()
@@ -513,7 +524,7 @@ func nearby_bug() -> Node2D:
 
 
 func _click_at(pos: Vector2, dbl: bool) -> void:
-	# 좌클릭 1회: 대상 선택 / 더블클릭: 선택 + 즉시 상호작용 (E키와 동일)
+	# 좌클릭 1회: 대상 선택 / 더블클릭: 선택 + 즉시 상호작용 (E·F키와 동일)
 	var t := Vector2i(int(floor(pos.x / m.TILE)), int(floor(pos.y / m.TILE)))
 	var d := t - m.player_tile()
 	if not in_reach(d):
@@ -528,9 +539,11 @@ func _click_at(pos: Vector2, dbl: bool) -> void:
 	m._sel_target = t
 	m.queue_redraw()
 	if dbl:
-		# 마우스만으로 즉시 상호작용: 대상이 있으면 E와 동일, 빈 칸이면 도구 사용
-		if m.objects.has(t) or nearby_npc() != null or nearby_animal() != null \
-				or nearby_bug() != null:
+		# 마우스만으로 즉시 상호작용: 사람·가축이면 말 걸기(F), 물건이면 E,
+		# 빈 칸이면 손에 든 도구
+		if m.objects.has(t) or nearby_bug() != null:
 			interact()
+		elif talk():
+			return
 		else:
 			m.toolwork.use_tool()

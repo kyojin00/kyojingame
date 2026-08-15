@@ -1755,6 +1755,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		toolwork.set_tool("seed")
 	elif event.is_action_pressed("use_tool"):
 		toolwork.use_tool()
+	elif event.is_action_pressed("talk"):
+		# 대화키(F)는 말 걸기가 먼저다. 앞에 사람도 가축도 없으면
+		# 같은 키가 말 타기/내리기로 넘어간다 (둘 다 F라 서로 밟지 않게 여기서 가른다)
+		if not actions.talk():
+			riding.toggle_ride()
 	elif event.is_action_pressed("mount"):
 		riding.toggle_ride()
 	elif event.is_action_pressed("interact"):

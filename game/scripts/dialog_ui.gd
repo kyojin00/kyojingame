@@ -550,6 +550,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		skip_seq()
 		get_viewport().set_input_as_handled()
 	elif not _seq_has_choices \
-			and (event.is_action_pressed("interact") or event.is_action_pressed("use_tool")):
+			and (event.is_action_pressed("talk") or event.is_action_pressed("interact")
+			or event.is_action_pressed("use_tool")):
 		_advance_seq()
 		get_viewport().set_input_as_handled()

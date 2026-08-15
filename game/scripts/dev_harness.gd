@@ -4724,6 +4724,56 @@ func _debug_tick() -> void:
 			print("VILLAGE_ENTRY_OK=", arrive_ok and lock_ok and reach_ok,
 				" 마을도착=", arrive_ok, " 전환중잠금=", lock_ok,
 				" 길목까지=", reach_ok)
+		236:
+			# 대화키(F)와 상호작용키(E)가 갈라져 있는가.
+			# 예전에는 E 하나가 캐기와 말 걸기를 겸해서, 나무를 연타하다
+			# 옆 사람에게 말이 걸리곤 했다.
+			m.dialog.close()
+			# ① 키 배치: 대화는 F, 상호작용은 E
+			var f_ok := false
+			for ev_t in InputMap.action_get_events("talk"):
+				if ev_t is InputEventKey and ev_t.physical_keycode == KEY_F:
+					f_ok = true
+			var e_ok := false
+			for ev_e in InputMap.action_get_events("interact"):
+				if ev_e is InputEventKey and ev_e.physical_keycode == KEY_E:
+					e_ok = true
+			var bind_ok: bool = f_ok and e_ok \
+				and GameData.key_label("talk") == "F"
+			# ② 사람 앞에서: F는 말을 걸고, E는 말을 걸지 않는다
+			var talk_npc: Node2D = null
+			for n_t in m.npcs:
+				if n_t.visible:
+					talk_npc = n_t
+					break
+			var talk_ok := false
+			var e_silent := false
+			var t_pos: Vector2 = m.player.position
+			var t_tool: String = GameData.tool
+			if talk_npc != null:
+				m.player.position = talk_npc.position + Vector2(0, 20)
+				m.player.dir = "up"
+				m._sel_target = Vector2i(-999, -999)
+				m._work_lock = 0.0
+				GameData.tool = "axe"          # 도끼를 들고 있어도 말은 걸린다
+				talk_ok = m.actions.talk() and m.dialog.visible
+				m.dialog.close()
+				m.actions.interact()           # 같은 자리에서 E
+				e_silent = not m.dialog.visible
+			# ③ 아무도 없으면 F는 false를 돌려준다 (그래야 말 타기로 넘어간다)
+			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16,
+				(m.START_TILE.y + 3) * m.TILE + 16)
+			for n_f in m.npcs:
+				n_f.position += Vector2(0, 4000)
+			var far_ok: bool = not m.actions.talk()
+			for n_b in m.npcs:
+				n_b.position -= Vector2(0, 4000)
+			m.dialog.close()
+			GameData.tool = t_tool
+			m.player.position = t_pos
+			print("TALKKEY_OK=", bind_ok and talk_ok and e_silent and far_ok,
+				" 키배치=", bind_ok, " F로대화=", talk_ok,
+				" E는조용=", e_silent, " 아무도없을때=", far_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

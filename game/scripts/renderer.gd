@@ -235,11 +235,13 @@ func _context_hint() -> Array:
 	# 첫 만남: 걸어와서 기다리는 우체부 아저씨 머리 위에 안내를 띄운다
 	if m.story._postman != null and m.story._postman_state == "wait" \
 			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
-		return ["말 걸기", m.story._postman.position + Vector2(0, -112)]
+		return ["%s: 말 걸기" % GameData.key_label("talk"),
+			m.story._postman.position + Vector2(0, -112)]
+	# 대화는 대화키(F) 하나로 통일 — 어떤 키인지 머리 위에 같이 적어 준다
 	if m.actions.nearby_npc() != null:
-		return ["대화", above_player]
+		return ["%s: 대화" % GameData.key_label("talk"), above_player]
 	if m.actions.nearby_animal() != null:
-		return ["쓰다듬기", above_player]
+		return ["%s: 쓰다듬기" % GameData.key_label("talk"), above_player]
 	var t: Vector2i = m.actions.target_tile()
 	if not m.objects.has(t):
 		# 앞 칸은 비었는데 걸음을 막고 있는 오브젝트가 있으면 그것을 가리킨다
@@ -255,7 +257,7 @@ func _context_hint() -> Array:
 			"board":
 				return ["의뢰 게시판", above_tile]
 			"horse":
-				return ["F: 말 타기", above_tile]
+				return ["%s: 말 타기" % GameData.key_label("mount"), above_tile]
 			"sign":
 				if t == m.FISH_SIGN:
 					return ["낚시터 안내", above_tile]
