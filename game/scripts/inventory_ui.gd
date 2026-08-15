@@ -637,6 +637,11 @@ func _mk_item_slot(e: Dictionary) -> Button:
 		b.pressed.connect(func() -> void:
 			visible = false
 			main.story.request_place_house())
+	# 수납 상자 — 집 안에서만 놓을 수 있다
+	if bool(e.get("storage", false)):
+		b.pressed.connect(func() -> void:
+			visible = false
+			main.village.use_storage_box())
 	# 쓰레기통도 슬롯을 눌러 설치한다 (집 안=세간 · 바깥=바라보는 칸)
 	if bool(e.get("bin", false)):
 		b.pressed.connect(func() -> void:
@@ -943,6 +948,10 @@ func _item_entries() -> Array:
 			e["icon"] = "icon_letter"
 			e["desc"] = "떠난 주민이 남긴 짧은 편지 — 클릭해서 읽는다"
 			e["farewell"] = true
+		elif id == "storage_box":
+			e["tab"] = "place"
+			e["desc"] = "집 안에 놓는 작은 창고 — 집 안에서 클릭해 설치한다"
+			e["storage"] = true
 		elif id == "trash_bin":
 			e["tab"] = "place"
 			e["desc"] = "24시간 무인 판매함 (제값의 80%) — 놓을 곳을 바라보고 클릭"

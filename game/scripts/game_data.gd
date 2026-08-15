@@ -738,11 +738,12 @@ const FURNITURE := {
 	# 사는 게 아니라 제작대에서 만들거나 선물로 받는 세간
 	# (FURNITURE_IDS 밖 = 꾸미기 상점 미노출)
 	"trash_bin": {"name": "쓰레기통", "price": 0, "w": 24, "h": 33, "solid": true},
+	"storage_box": {"name": "수납 상자", "price": 0, "w": 33, "h": 27, "solid": true},
 	"heart_rug": {"name": "하트 러그", "price": 0, "w": 96, "h": 78, "solid": false},
 }
 const FURNITURE_IDS := ["table", "chair", "chest", "rug", "plant", "bookshelf", "lamp", "small_table"]
 # 제작·선물로 들여놓는 세간 — 집 확장 때 기본 세간에 밀려 지워지면 안 된다
-const CRAFT_FURN := ["plant", "trash_bin", "heart_rug"]
+const CRAFT_FURN := ["plant", "trash_bin", "heart_rug", "storage_box"]
 var furniture: Array = []  # [{id, x, y}]
 
 
@@ -883,16 +884,98 @@ func story2_objective_short() -> String:
 var fisher_quest := ""
 var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
 var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
+var sea_open_day := 0      # 바닷길이 열린 날 — 용식의 집터 부탁이 여기서 3일 뒤다
 
-# 민지(잡화점)의 서브 퀘스트 「해변 노점」 — 바다가 열린 뒤부터 계산대
+# ---- 서브 퀘스트: 용식의 집터 (낚시꾼) ----
+#
+# 바닷길을 연 지 **정확히 3일 뒤**, 용식이 광장 분수대 앞에 서 있다.
+# 말을 걸면 바로 퀘스트가 시작되지 않고 「대화하기」 선택지가 먼저 뜬다 —
+# 고르면 그제야 부탁을 꺼낸다. 이 마을이 마음에 들어 눌러앉고 싶으니
+# 자기가 살 집을 한 채 지어 달라는 이야기다.
+#   "": 아직 / wait: 분수대 앞에서 기다린다 (말 걸기) /
+#   build: 집터를 놓고 집을 짓는다 / built: 집 완성 — 용식에게 알리기 /
+#   done: 완료 (수납 상자 레시피)
+var fisher_home := ""
+const FISHER_HOME_DAYS := 3        # 바닷길을 연 날로부터 며칠 뒤에 서 있는가
+
+
+# 분수대 앞에 서 있을 조건 — 바닷길을 연 지 정확히 3일 뒤부터
+func fisher_home_ready() -> bool:
+	return fisher_quest == "done" and sea_open and sea_open_day > 0 \
+		and day >= sea_open_day + FISHER_HOME_DAYS
+
+
+func fisher_home_objective_short() -> String:
+	match fisher_home:
+		"wait":
+			return "분수대 앞의 용식에게 말을 걸어 보자 (E)"
+		"build":
+			return "마을 아무 곳에나 집터를 놓고 집을 짓자"
+		"built":
+			return "용식에게 집이 다 됐다고 알리자"
+	return ""
+
+
+# ---- 수납 상자 (용식의 부탁 보상) ----
+#
+# 목재 8개로 만드는 작은 상자. **집 안에** 놓으면 창고처럼 쓴다.
+# 여러 개를 놓아도 안은 하나로 이어져 있다 (같은 창고를 나눠 쓴다) —
+# 어느 상자를 열든 넣어 둔 것이 그대로 보이는 편이 헷갈리지 않는다.
+var storage_stock := {}            # 아이템 id -> 개수
+const STORAGE_SLOTS := 40          # 보관할 수 있는 아이템 「종류」 수
+
+
+func storage_used() -> int:
+	return storage_stock.size()
+
+
+func storage_full() -> bool:
+	return storage_used() >= STORAGE_SLOTS
+
+
+# 가방 -> 상자. 넣은 개수를 돌려준다 (0이면 못 넣었다)
+func storage_put(id: String, n: int) -> int:
+	if n <= 0 or not ITEMS.has(id):
+		return 0
+	var have := int(items.get(id, 0))
+	var move := mini(n, have)
+	if move <= 0:
+		return 0
+	if not storage_stock.has(id) and storage_full():
+		return 0
+	items[id] = have - move
+	storage_stock[id] = int(storage_stock.get(id, 0)) + move
+	return move
+
+
+# 상자 -> 가방
+func storage_take(id: String, n: int) -> int:
+	var have := int(storage_stock.get(id, 0))
+	var move := mini(n, have)
+	if move <= 0:
+		return 0
+	storage_stock[id] = have - move
+	if int(storage_stock[id]) <= 0:
+		storage_stock.erase(id)
+	items[id] = int(items.get(id, 0)) + move
+	return move
+
+
+# 가방에서 상자에 넣을 수 있는 것 — 도구·장비처럼 개수가 없는 것은 뺀다
+func storage_can_store(id: String) -> bool:
+	return ITEMS.has(id) and int(items.get(id, 0)) > 0 \
+		and id not in ["housing_kit", "settle_letter", "farewell_letter",
+			"move_letter", "grandpa_seed"]
+
+# 만수(잡화점)의 서브 퀘스트 「해변 노점」 — 바다가 열린 뒤부터 계산대
 # 대화 선택지에 ❗로 뜬다. 재료를 모아다 주면 해변에 노점이 선다.
 #   "": 아직 안 받음 / doing: 재료 모으는 중 / done: 노점 완성
 var merchant_errand := ""
-# 민지가 마을에 도착해 첫 인사를 나눈 날 (0 = 아직/구세이브).
+# 만수가 마을에 도착해 첫 인사를 나눈 날 (0 = 아직/구세이브).
 # 도착 첫날은 잡화점에 요리 레시피 선반이 아직 없다 — 다음 날부터 진열
 var merchant_day := 0
-# 오늘 민지가 노점에 나와 있는 시각들 (분 단위 시작점). 하루 3번, 1시간씩 —
-# 매일 아침 새로 뽑는다. 민지가 있어야 노점에서 「구매」할 수 있다 (판매는 상시).
+# 오늘 만수가 노점에 나와 있는 시각들 (분 단위 시작점). 하루 3번, 1시간씩 —
+# 매일 아침 새로 뽑는다. 만수가 있어야 노점에서 「구매」할 수 있다 (판매는 상시).
 var stall_hours: Array = []
 const STALL_WOOD := 15         # 노점 재료: 목재
 const STALL_SHELLS := 5        # 노점 재료: 조개 (장식 겸 진열대)
@@ -909,7 +992,7 @@ const SHOP_DISH_IDS := ["dish_grilled_fish", "dish_fish_soup", "dish_stew",
 
 
 # 잡화점 요리 레시피 진열 조건 — 그 요리에 드는 물고기를 한 번이라도
-# 직접 낚아 봤어야 선반에 오른다 (민지가 "이 생선 요리법 필요하지?" 하는 셈).
+# 직접 낚아 봤어야 선반에 오른다 (만수가 "이 생선 요리법 필요하지?" 하는 셈).
 # 물고기가 안 드는 요리라면 언제나 진열.
 func shop_dish_on_shelf(did: String) -> bool:
 	var needs: Dictionary = RECIPES.get(did, {}).get("needs", {})
@@ -953,7 +1036,7 @@ const STALL_RECIPE_IDS := ["dish_smelt_fry", "dish_eel_rice", "dish_salmon_steak
 const BAIT_PRICE := 8          # 미끼 한 개 값
 
 
-# 오늘 민지가 노점에 나올 시각 세 개를 뽑는다 (9시~19시 사이, 서로 겹치지 않게)
+# 오늘 만수가 노점에 나올 시각 세 개를 뽑는다 (9시~19시 사이, 서로 겹치지 않게)
 func roll_stall_hours() -> void:
 	stall_hours = []
 	if merchant_errand != "done":
@@ -1535,7 +1618,7 @@ func story12_objective_short() -> String:
 # ---- 메인 스토리 13: 할머니의 팔찌 ----
 #
 # 두 번째 유품. 스토리 12 완결 뒤 곧장 이어지지 않는다 — 자유 생활을
-# 며칠 보낸 다음(임시 조건, 세부 시작 조건은 추후 확정) 철수가 「요즘
+# 며칠 보낸 다음(임시 조건, 세부 시작 조건은 추후 확정) 용식가 「요즘
 # 그물에 물고기 대신 낡은 물건이 올라온다」는 이야기를 꺼낸다.
 # 주민들에게 할머니와 바다 이야기를 모으면 두 분이 자주 찾던 해변
 # 서쪽 끝 바위가 조사 지점으로 드러나고, 그 곁에서 낚시하면 스토리
@@ -1543,7 +1626,7 @@ func story12_objective_short() -> String:
 # 녹슬어 바로 못 연다 — 연금술사 묘연이 재료(임시값)를 받아 안전하게
 # 열어 준다 (스토리 12에서 해금한 연금술의 자연스러운 재활용).
 # 팔찌를 얻으면 도서관 「할머니의 기록」 2장(바닷가의 약속)이 열린다.
-#   "": 아직 / rumor: 철수의 이상한 이야기 / clue: 주민 단서 수집 /
+#   "": 아직 / rumor: 용식의 이상한 이야기 / clue: 주민 단서 수집 /
 #   spot: 해변 바위·특별 낚시 / box: 낡은 상자 — 연금술사에게 /
 #   open: 개봉 재료 준비 / record: 도서관 기록 / done
 var story13_phase := ""
@@ -1582,7 +1665,7 @@ func story13_mats_text() -> String:
 func story13_objective_short() -> String:
 	match story13_phase:
 		"rumor":
-			return "낚시꾼 철수의 이상한 이야기를 들어보자 (E)"
+			return "낚시꾼 용식의 이상한 이야기를 들어보자 (E)"
 		"clue":
 			return "주민들에게 할머니와 바다 이야기를 듣자 (%d/%d)" % [
 				story13_heard.size(), STORY13_TALES]
@@ -2231,14 +2314,22 @@ func quest_catalog() -> Array:
 			"desc": "마을보다 오래된 돌문 — 할아버지의 마지막 연구 공간.",
 			"cat": "main", "ep": "메인 스토리 20", "npc": s20npc,
 			"reward": "할아버지가 남긴 씨앗 한 알과 마지막 편지"})
+	# 서브: 용식의 집터 — 바닷길을 연 지 3일 뒤 분수대 앞에서 시작된다
+	o = fisher_home_objective_short()
+	if o != "":
+		out.append({"id": "fisher_home", "title": "용식의 부탁 — 살 집 한 채",
+			"obj": o,
+			"desc": "이 마을이 마음에 든 낚시꾼이 눌러앉을 자리를 찾는다.",
+			"cat": "sub", "npc": "fisher",
+			"reward": "수납 상자 레시피 (목재 8)"})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
 			and int(items.get("forage_shell", 0)) >= STALL_SHELLS
 		out.append({"id": "stall", "title": "상인의 부탁 — 해변 노점",
-			"obj": "민지에게 재료를 가져다주기" if ready
+			"obj": "만수에게 재료를 가져다주기" if ready
 				else "재료 모으기 — 목재 %d·조개 %d" % [STALL_WOOD, STALL_SHELLS],
-			"desc": "민지가 해변에서 장사할 노점을 내고 싶어 한다.",
+			"desc": "만수가 해변에서 장사할 노점을 내고 싶어 한다.",
 			"cat": "sub", "npc": "merchant",
 			"reward": "해변 노점 개장 + 하트 모양 러그"})
 	o = tutorial_objective_short()
@@ -2368,7 +2459,7 @@ func quest_npc_marks() -> Dictionary:
 		marks["librarian"] = "!"
 	elif story12_phase == "gather" and story12_mats_ok():
 		marks["alchemist"] = "?"
-	# 스토리 13 — 철수의 이상한 이야기 / 상자 개봉은 연금술사에게
+	# 스토리 13 — 용식의 이상한 이야기 / 상자 개봉은 연금술사에게
 	match story13_phase:
 		"rumor":
 			marks["fisher"] = "!"
@@ -2407,8 +2498,13 @@ func quest_npc_marks() -> Dictionary:
 		marks["librarian"] = "!"
 	elif story18_phase == "clue":
 		marks["librarian"] = "?"
+	# 용식의 집터 — 분수대 앞에서 기다릴 때와 집이 다 됐을 때 말을 걸자
+	if fisher_home == "wait":
+		marks["fisher"] = "!"
+	elif fisher_home == "built":
+		marks["fisher"] = "?"
 	if merchant_errand == "doing":
-		# 노점 재료를 다 모았으면 민지에게 가져다주자
+		# 노점 재료를 다 모았으면 만수에게 가져다주자
 		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
 			marks["merchant"] = "?"
 	if mom_quest_open() and mom_quest != "":
@@ -2549,6 +2645,10 @@ const DESK_RECIPES := {
 	"trash_bin": {"name": "쓰레기통", "cost": {"wood": 5, "forage_ring": 2},
 		"kind": "item", "give": "trash_bin", "locked": true, "shop": "잡화점",
 		"desc": "넣은 물건을 제값의 80%에 파는 무인 판매함 — 가방에서 꺼내 설치한다"},
+	# 수납 상자 — 집 안에 놓는 작은 창고 (용식의 집터 부탁 보상으로 열린다)
+	"storage_box": {"name": "수납 상자", "cost": {"wood": 8},
+		"kind": "item", "give": "storage_box", "locked": true, "shop": "용식의 부탁",
+		"desc": "집 안에 놓고 창고처럼 쓰는 작은 상자 — 가방이 넘칠 때 넣어 둔다"},
 	# 집터 — 새 주민의 집을 지을 자리 (메인 스토리 3에서 해금, 일부러 무겁다)
 	"housing_kit": {"name": "집터", "cost": {"wood": 60, "stone": 40, "nail": 4},
 		"kind": "item", "give": "housing_kit", "locked": true, "shop": "잡화점",
@@ -2998,6 +3098,7 @@ const ITEMS := {
 	# 메인 스토리 6의 핵심 물건 — 팔 수 없고, 완결 후 도서관에 보관된다
 	"old_book": {"name": "오래된 책", "sell": 0},
 	"trash_bin": {"name": "쓰레기통", "sell": 0},
+	"storage_box": {"name": "수납 상자", "sell": 0},
 	# 초반 무기 (도구라 개수는 없지만, 도감·컬렉션 표시용 이름이 필요하다)
 	"spear": {"name": "돌 창", "sell": 0},
 	"sword": {"name": "돌 검", "sell": 0},
@@ -3051,7 +3152,8 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"settle_letter", "farewell_letter",
 	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"housing_kit", "move_letter", "old_book", "trash_bin", "arrow", "dish_coral_tea",
+	"housing_kit", "move_letter", "old_book", "trash_bin", "storage_box",
+	"arrow", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
@@ -3230,7 +3332,7 @@ func discovered_on(id: String) -> String:
 # [아이템 id, 어느 콘텐츠에서, 힌트]
 const LEGENDS := [
 	["gold_crop", "농사", "달 밝은 날, 정성껏 키운 작물에서 아주 드물게..."],
-	["fish_golden", "낚시", "물가의 전설. 철수도 두 번밖에 못 봤다는 황금잉어."],
+	["fish_golden", "낚시", "물가의 전설. 용식도 두 번밖에 못 봤다는 황금잉어."],
 	["world_branch", "탐험", "깊은 숲 '세계수 동굴' 3층의 수호자가 지키고 있다."],
 	["star_ore", "채광", "동굴 깊은 곳(5층+)의 보상 상자에서 별처럼 빛나는 광석이."],
 	["ghost_essence", "전투", "유령은 아주 드물게 정수를 남긴다."],
@@ -3810,8 +3912,8 @@ func playtime_text() -> String:
 # ---- 주민 분류 · 이사 시스템 (입주/이탈) ----
 #
 # 주민은 세 갈래다:
-#   core    필수 주민 — 메인 스토리로 확정 입주 (이장·민지·무쇠·보라·
-#           철수·서하·무진·연화·솔이). 절대 마을을 떠나지 않는다.
+#   core    필수 주민 — 메인 스토리로 확정 입주 (이장·만수·무쇠·보라·
+#           용식·서하·무진·연화·솔이). 절대 마을을 떠나지 않는다.
 #   normal  일반 주민 — 빈 집터가 있으면 랜덤으로 「이사 신청 편지」를
 #           보내 오는 생활형 캐릭터 (농부 순돌·미식가 다미·낚시광 강태)
 #   special 특수 주민 — 조건을 채워야 해금 (연금술사 묘연 — 연구 노트 50%)
@@ -4120,7 +4222,7 @@ func is_tile_owned(x: int, y: int) -> bool:
 #   loves     아주 좋아함 +30 · likes 좋아함 +18 · hates 싫어함 -6
 #             (표에 없는 것은 +8)
 const NPCS := {
-	"merchant": {"name": "민지", "birthday": [SPRING, 12], "gender": "f", "romance": true,
+	"merchant": {"name": "만수", "birthday": [SPRING, 12], "gender": "f", "romance": true,
 	"lines": [
 		"어서 와! 오늘도 농사는 잘 되고 있어?",
 		"제철 씨앗이 제일 잘 자라. 가게 안으로 들어와!",
@@ -4163,7 +4265,7 @@ const NPCS := {
 	"secret50": "너희 할아버지... 우리 가게 단골이었어. 늘 이상한 걸 찾으셨지.\n'달빛을 먹고 자란 작물'이라던가... 밭에서도 기적이 자란다고 하셨어.",
 	"secret100": "떠나시기 전에 그러셨어. '내 연구는 이 마을 전부에 흩어져 있다'고.\n밭, 호수, 숲, 동굴... 그리고 사람들 속에도. 이제 그 말뜻을 알겠니?",
 	},
-	"fisher": {"name": "철수", "birthday": [SUMMER, 3], "gender": "m", "romance": true,
+	"fisher": {"name": "용식", "birthday": [SUMMER, 3], "gender": "m", "romance": true,
 	"lines": [
 		"입질이 오면 초록 구간에서 낚아채는 거야.",
 		"황금잉어는 정말 귀하지... 나도 두 번밖에 못 봤어.",
@@ -4420,7 +4522,7 @@ const NPCS := {
 		"이 마을 음식 소문 듣고 왔잖아~ 냄새부터 다르더라!",
 		"오늘은 뭐 맛있는 거 만들었어? 냄새가 나는데?",
 		"요리는 사랑이야. 진짜야. 먹어 보면 알아.",
-		"민지네 가게 신상 레시피 봤어? 못 참지.",
+		"만수네 가게 신상 레시피 봤어? 못 참지.",
 		"맛있는 걸 먹을 때만큼은 세상이 다 예뻐 보여.",
 	],
 	"loves": ["dish_feast", "dish_berry_toast", "dish_golden_roast"],
@@ -4432,7 +4534,7 @@ const NPCS := {
 		"물 좋다는 소문 듣고 낚싯대 하나 들고 왔지.",
 		"어제 이만~한 놈을 놓쳤다니까? 진짜라니까?",
 		"낚시는 기다림의 미학이야. 인생처럼.",
-		"철수 씨랑은 라이벌이야. 본인은 모르지만.",
+		"용식 씨랑은 라이벌이야. 본인은 모르지만.",
 		"입질 없는 날엔 그냥 물멍만 해도 좋아.",
 	],
 	"loves": ["fish_golden", "dish_sashimi", "fish_king"],
@@ -4888,6 +4990,8 @@ func completed_quests() -> Array:
 		out.append("마을의 첫 상점을 세웠다")
 	if fisher_quest == "done":
 		out.append("바닷길을 열었다 (낚시꾼과 바위 능선)")
+	if fisher_home == "done":
+		out.append("용식의 부탁 — 살 집 한 채")
 	if story2_phase == "done":
 		out.append("메인 스토리 2 — 마을을 깨우다")
 	if move_quest == "done":
@@ -5233,6 +5337,9 @@ func reset_all() -> void:
 	dust_swept = 0
 	kitchen_found = false
 	fisher_quest = ""
+	fisher_home = ""
+	sea_open_day = 0
+	storage_stock = {}
 	fisher_choice = 0
 	sea_open = false
 	merchant_errand = ""
@@ -5648,6 +5755,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
+		"fisher_home": fisher_home, "sea_open_day": sea_open_day,
+		"storage_stock": storage_stock,
 		"sea_open": sea_open, "story2_phase": story2_phase,
 		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
 		"stall_hours": stall_hours,

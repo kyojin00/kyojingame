@@ -245,6 +245,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif (ppos - DESK.get_center()).length() < 78.0:
 			main.desk_ui.open()
 			get_viewport().set_input_as_handled()
+		elif _near_storage_box():
+			# 집 안 수납 상자 — 가방과 상자 사이로 물건을 옮긴다
+			main.storage_ui.open()
+			get_viewport().set_input_as_handled()
 		elif _near_trash_bin():
 			# 집 안 쓰레기통 — 24시간 무인 판매 (제값의 80%)
 			main.shop.open("sell", ["sell"], "쓰레기통 — 무인 판매", "",
@@ -763,6 +767,15 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(cx - 8, cy + 11, 16, 5), hc)
 			canvas.draw_rect(Rect2(cx - 3, cy + 16, 6, 3), hc)      # 뾰족한 끝
 			canvas.draw_rect(Rect2(cx - 14, cy - 9, 6, 5), Color(0.98, 0.68, 0.74))
+		"storage_box":
+			# 용식의 도면으로 짠 수납 상자 — 나무 궤 + 쇠 띠 두 줄 + 걸쇠
+			canvas.draw_rect(Rect2(p.x, p.y + 5, w, h - 5), Color(0.57, 0.41, 0.24))
+			canvas.draw_rect(Rect2(p.x, p.y, w, 6), Color(0.69, 0.52, 0.33))
+			canvas.draw_rect(Rect2(p.x, p.y + 5, w, 2), Color(0.44, 0.31, 0.18))
+			canvas.draw_rect(Rect2(p.x + 4, p.y, 3, h), Color(0.5, 0.48, 0.45))
+			canvas.draw_rect(Rect2(p.x + w - 7, p.y, 3, h), Color(0.5, 0.48, 0.45))
+			canvas.draw_rect(Rect2(p.x + w / 2.0 - 3, p.y + 4, 6, 7), Color(0.58, 0.56, 0.52))
+			canvas.draw_rect(Rect2(p.x + w / 2.0 - 2, p.y + 6, 4, 3), Color(0.36, 0.34, 0.32))
 		"trash_bin":
 			# 제작대에서 만드는 쓰레기통 — 통(회청색) + 금속 고리 두 줄 + 뚜껑
 			canvas.draw_rect(Rect2(p.x + 2, p.y + 6, w - 4, h - 6), Color(0.44, 0.5, 0.54))
@@ -771,6 +784,16 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(p.x + 1, p.y + h - 9, w - 2, 3), Color(0.3, 0.34, 0.38))
 			canvas.draw_rect(Rect2(p.x, p.y + 3, w, 5), Color(0.36, 0.42, 0.46))
 			canvas.draw_rect(Rect2(p.x + w / 2.0 - 4, p.y, 8, 4), Color(0.3, 0.34, 0.38))
+
+
+# 세간으로 들여놓은 수납 상자 곁에 서 있는가 (E: 창고 열기)
+func _near_storage_box() -> bool:
+	for f in GameData.furniture:
+		if str(f.get("id", "")) != "storage_box":
+			continue
+		if (ppos - Vector2(float(f.x) + 16.0, float(f.y) + 13.0)).length() < 60.0:
+			return true
+	return false
 
 
 # 세간으로 들여놓은 쓰레기통 곁에 서 있는가 (E: 무인 판매)

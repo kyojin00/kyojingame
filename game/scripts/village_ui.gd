@@ -73,13 +73,13 @@ func _build_shop() -> void:
 	GameData.village_built.append("general")
 	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
 	m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
-	# 민지는 오늘 밤 이삿짐을 옮기고, **내일** 직접 인사하러 온다.
+	# 만수는 오늘 밤 이삿짐을 옮기고, **내일** 직접 인사하러 온다.
 	# 인사를 나눠야 상점 문이 열린다 (이주 NPC 공통 규칙)
 	if not GameData.npc_greeted.has("merchant"):
 		GameData.arrivals.append({"id": "merchant", "day": GameData.day})
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("상점 완성!")
-	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n주인 민지는 내일 이사 와서 인사하러 온다고 한다.")
+	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n주인 만수는 내일 이사 와서 인사하러 온다고 한다.")
 	m.dialog.set_buttons([["좋아!", null]])
 	if GameData.story2_phase == "shop":
 		GameData.story2_phase = "fisher"
@@ -434,6 +434,13 @@ func _talk_to(npc: Node2D) -> void:
 		return
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
+		return
+	# 서브 퀘스트 — 용식의 집터 (분수대 앞: 선택지 / 집 완공 뒤: 보고)
+	if npc.id == "fisher" and GameData.fisher_home == "wait":
+		m.story.fisher_home_greet()
+		return
+	if npc.id == "fisher" and GameData.fisher_home == "built":
+		m.story.fisher_home_report()
 		return
 	# 메인 스토리 20 — 노트의 마지막 페이지를 서하와 이장에게 보여준다
 	if GameData.story20_phase == "tell" and npc.id in GameData.STORY20_TELL \
@@ -1311,9 +1318,9 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 	var after := int(GameData.affinity[npc_id])
 	if before < 50 and after >= 50:
 		if npc_id == "merchant":
-			body += "\n\n[특전 해금] 민지의 씨앗 10% 할인!"
+			body += "\n\n[특전 해금] 만수의 씨앗 10% 할인!"
 		elif npc_id == "fisher":
-			body += "\n\n[특전 해금] 철수의 낚시 비법! 판정 구간 확대!"
+			body += "\n\n[특전 해금] 용식의 낚시 비법! 판정 구간 확대!"
 		else:
 			body += "\n\n[친밀] 이제 속 이야기를 들려준다."
 	if bool(GameData.NPCS[npc_id].get("romance", false)):
@@ -1434,7 +1441,7 @@ func _turn_in_quest() -> void:
 		m.netsync._broadcast_stats()
 
 
-# ---- 잡화점 계산대: 민지와의 대화 메뉴 ----
+# ---- 잡화점 계산대: 만수와의 대화 메뉴 ----
 #
 # 계산대에서 E를 눌러도 판매 창이 바로 열리지 않는다.
 # 먼저 인사말이 나오고, 선택지로 갈라진다:
@@ -1442,7 +1449,7 @@ func _turn_in_quest() -> void:
 # 퀘스트 선택지는 언제나 「대화 그만두기」 바로 위에 선다.
 #
 # 첫 서브 퀘스트 「해변에 노점 차리기」는 바다가 열린 뒤부터 받을 수 있다.
-# 재료(목재·조개)를 모아다 주면 해변에 민지의 노점이 선다.
+# 재료(목재·조개)를 모아다 주면 해변에 만수의 노점이 선다.
 
 const MERCHANT_QUEST_NAME := "해변에 노점 차리기"
 
@@ -1465,7 +1472,7 @@ func open_merchant_counter() -> void:
 	if not q.is_empty():
 		btns.append([str(q.label), q.cb])   # 「대화 그만두기」 바로 위
 	btns.append(["대화 그만두기", null])
-	m.dialog.open("잡화점 민지", "어어, %s! 무슨 일이야?" % nm,
+	m.dialog.open("잡화점 만수", "어어, %s! 무슨 일이야?" % nm,
 		btns, _npc_portrait("merchant"))
 	if not q.is_empty():
 		_attach_quest_bang(str(q.label))
@@ -1480,7 +1487,7 @@ func _merchant_chat() -> void:
 	var line := str(MERCHANT_TIPS[randi() % MERCHANT_TIPS.size()]) \
 		if randf() < 0.5 else GameData.npc_line("merchant")
 	# 대사가 끝나면 다시 선택지 메뉴로 돌아온다
-	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant"), [
+	m.dialog.open_seq("잡화점 만수", _npc_portrait("merchant"), [
 		{"text": line},
 	], open_merchant_counter)
 
@@ -1502,7 +1509,7 @@ func _merchant_quest_option() -> Dictionary:
 func _merchant_errand_start() -> void:
 	GameData.merchant_errand = "doing"
 	m.saveio.save_now()
-	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant"), [
+	m.dialog.open_seq("잡화점 만수", _npc_portrait("merchant"), [
 		{"text": "바다가 열렸다며? 실은 나, 해변에\n작은 노점을 내는 게 꿈이었어."},
 		{"text": "낚시용품이랑 바다 요리 레시피를 팔고,\n해변에서 주운 것들도 사 주는 가게!"},
 		{"text": "목재 %d개랑 조개 %d개만 구해다 줄래?\n진열대랑 장식으로 쓰게." \
@@ -1516,7 +1523,7 @@ func _merchant_errand_turnin() -> void:
 	var have_w: int = GameData.wood
 	var have_s := int(GameData.items.get("forage_shell", 0))
 	if have_w < GameData.STALL_WOOD or have_s < GameData.STALL_SHELLS:
-		m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant"), [
+		m.dialog.open_seq("잡화점 만수", _npc_portrait("merchant"), [
 			{"text": "재료는 좀 모였어?\n(목재 %d/%d · 조개 %d/%d)" \
 				% [have_w, GameData.STALL_WOOD, have_s, GameData.STALL_SHELLS]},
 		], open_merchant_counter)
@@ -1534,7 +1541,7 @@ func _merchant_errand_turnin() -> void:
 		m.netsync._broadcast_stats()
 	# 마무리 흐름: 노점 완성 → 하트 러그 지급 → 집 꾸미기 권유 →
 	# 상점 인테리어 레시피 안내 → (대화가 다 끝난 뒤) 퀘스트 완료 표시
-	m.dialog.open_seq("잡화점 민지", _npc_portrait("merchant", true), [
+	m.dialog.open_seq("잡화점 만수", _npc_portrait("merchant", true), [
 		{"text": "고마워! 바로 해변에 노점을 차렸어.\n능선 아래 모래밭에 있으니 놀러 와."},
 		{"text": "나는 하루에 세 번, 한 시간씩 나가 있을 거야.\n내가 있을 때만 물건을 살 수 있어.\n(물건을 파는 건 언제든 — 무인 판매!)"},
 		{"text": "그리고 이건 도와준 보답!\n\n[하트 모양 러그를 받았다]", "event": _give_heart_rug},
@@ -1558,14 +1565,14 @@ func _end_stall_quest() -> void:
 
 # ---- 해변 노점 ----
 #
-# 구매(미끼·노점 한정 레시피)는 민지가 나와 있는 시간에만,
-# 판매는 민지가 없어도 언제든 할 수 있다.
+# 구매(미끼·노점 한정 레시피)는 만수가 나와 있는 시간에만,
+# 판매는 만수가 없어도 언제든 할 수 있다.
 func open_stall() -> void:
 	if GameData.merchant_at_stall():
 		m.shop.open("buy", ["buy", "sell"], "해변 노점", "stall")
 	else:
-		m.hud.show_message("민지가 자리에 없다 — 판매만 할 수 있다.\n"
-			+ "(민지는 하루 세 번, 한 시간씩 노점에 나온다)", 4.0)
+		m.hud.show_message("만수가 자리에 없다 — 판매만 할 수 있다.\n"
+			+ "(만수는 하루 세 번, 한 시간씩 노점에 나온다)", 4.0)
 		m.shop.open("sell", ["sell"], "해변 노점 (무인 판매)")
 
 
@@ -1601,6 +1608,27 @@ func _attach_quest_bang(label: String) -> void:
 # 집 안이면 세간으로, 바깥이면 바라보는 칸에 놓인다.
 # E로 열어 아무 때나 팔 수 있는 대신 제값의 80%만 받는다 —
 # 밤에 몬스터를 뚫고 노점까지 가기 어려울 때를 위한 판매 수단이다.
+
+# 수납 상자 설치 — 집 안 세간으로만 들어간다 (창고는 하나로 이어져 있다)
+func use_storage_box() -> void:
+	if int(GameData.items.get("storage_box", 0)) <= 0:
+		return
+	if not m.interior.visible:
+		m.hud.show_message("수납 상자는 집 안에 놓는 물건이다.\n집에 들어가서 놓자.", 4.0)
+		return
+	if GameData.house_lv < 2:
+		m.hud.show_message("오두막은 너무 좁다 — 집을 확장하면 놓을 자리가 생긴다.", 5.0)
+		return
+	GameData.items["storage_box"] = int(GameData.items["storage_box"]) - 1
+	GameData.furniture.append({"id": "storage_box",
+		"x": 400.0 + float(GameData.furniture.size() % 4) * 44.0,
+		"y": 300.0 + float(GameData.furniture.size() / 4 % 3) * 32.0})
+	Sound.play_sfx("sfx_place")
+	m.hud.event_toast("수납 상자를 놓았다")
+	m.hud.show_message("가까이에서 E: 물건 넣고 빼기 · 꾸미기(F)로 옮길 수 있다", 5.0)
+	m.interior.canvas.queue_redraw()
+	m.saveio.save_now()
+
 
 func use_trash_bin() -> void:
 	if int(GameData.items.get("trash_bin", 0)) <= 0:

@@ -30,7 +30,10 @@ func npc_place_now(npc_id: String) -> String:
 	if not fest.is_empty() and GameData.minutes >= GameData.FEST_START \
 			and GameData.minutes < GameData.FEST_END:
 		return str(fest.place)
-	# 민지는 노점 시간이 되면 해변으로 내려간다 (하루 3번, 1시간씩)
+	# 용식은 집터 부탁을 꺼낼 때까지 하루 종일 분수대 앞에 서 있다
+	if npc_id == "fisher" and GameData.fisher_home in ["wait", "built"]:
+		return "fountain"
+	# 만수는 노점 시간이 되면 해변으로 내려간다 (하루 3번, 1시간씩)
 	if npc_id == "merchant" and GameData.merchant_at_stall():
 		return "stall"
 	# 온천이 되살아나면 저녁에 몸을 담그러 가는 사람들이 생긴다 (스토리 15)
@@ -65,6 +68,8 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			# 온천 앞 — 셋이 겹치지 않게 한 칸씩 벌려 선다
 			var oi: int = maxi(0, ONSEN_GOERS.find(npc_id))
 			t = m.ONSEN_POS + Vector2i(oi - 1, 2)
+		"fountain":
+			t = Vector2i(m.FOUNTAIN.position.x + 1, m.FOUNTAIN.end.y + 1)
 		"plaza":
 			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13))
 		"board":
@@ -74,6 +79,12 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			var i: int = maxi(0, m.NPC_PIER_ORDER.find(npc_id))
 			t = Vector2i(m.FISH_YARD_X0 + 2 + i * 2, m.DOCK_Y + 1)
 		_:
+			# 제 집을 얻은 사람은 「집」 시간대에 그 집으로 돌아간다 (용식의 집)
+			if place == "home" and GameData.settler_homes.has(npc_id):
+				var mh: Array = GameData.settler_homes[npc_id]
+				t = m.door_tile(Vector2i(int(mh[0]), int(mh[1]))) + Vector2i(0, 1)
+				if m.is_passable(t):
+					return t
 			# 자기 건물 문 앞 (집도 일터도 같은 건물이다)
 			for pid: String in m.VILLAGE_NPC:
 				if m.VILLAGE_NPC[pid] == npc_id and GameData.village_built.has(pid):

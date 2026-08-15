@@ -157,7 +157,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"forage_relic":
 			texture = m.tex["forage_relic"]
 		"stall":
-			# 민지의 해변 노점 — 차양 지붕이 위로 솟아 있어 밑변을 칸에 맞춘다
+			# 만수의 해변 노점 — 차양 지붕이 위로 솟아 있어 밑변을 칸에 맞춘다
 			texture = m.tex["stall"]
 			offset = Vector2(0, -texture.get_height())
 		"trash_bin":

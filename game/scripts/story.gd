@@ -931,7 +931,7 @@ func _start_story2_dialog() -> void:
 			"portrait": chief_happy},
 		{"text": "「목재 %d에 돌 %d... 나무를 베고 바위를 캐면 모일 걸세.」"
 			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]},
-		{"text": "「재료가 모이면 광장 북쪽 상점 터의 게시판에서 짓게. 상점이 서면 민지가 와서 씨앗이며 생필품을 팔 거야.」"},
+		{"text": "「재료가 모이면 광장 북쪽 상점 터의 게시판에서 짓게. 상점이 서면 만수가 와서 씨앗이며 생필품을 팔 거야.」"},
 	], _end_home_greet)
 
 
@@ -1069,8 +1069,8 @@ func _fisher_arrive() -> void:
 
 func _start_fisher_dialog() -> void:
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
-	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_normal"], [
-		{"text": "「오, 처음 보는 얼굴이군! 나는 낚시꾼 철수라고 하네.」",
+	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_normal"], [
+		{"text": "「오, 처음 보는 얼굴이군! 나는 낚시꾼 용식라고 하네.」",
 			"portrait": m.tex["npc_fisher_portrait_happy"]},
 		{"text": "「이 마을 물줄기에 **전설의 황금잉어**가 산다는 소문을 듣고 왔지.」"},
 		{"text": "「그놈을 낚을 때까지 이 마을에 눌러앉을 작정이야.」"},
@@ -1087,7 +1087,7 @@ func _fisher_choose(pick: int) -> void:
 	GameData.fisher_choice = pick
 	var first := "「하하, 좋은 눈빛이야! 그럼 우리는 경쟁자로군. 정정당당하게 겨뤄 보세!」" \
 		if pick == 1 else "「욕심이 없는 것도 낚시꾼의 덕목이지. 물은 조용한 사람을 좋아하거든.」"
-	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_happy"], [
+	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_happy"], [
 		{"text": first},
 		{"text": "「마침 잘됐군. 같이 남쪽으로 내려가 주지 않겠나?」",
 			"portrait": m.tex["npc_fisher_portrait_normal"]},
@@ -1104,7 +1104,7 @@ func _end_fisher_meet() -> void:
 
 
 func _start_fisher_gate_dialog() -> void:
-	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_normal"], [
+	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_normal"], [
 		{"text": "「여기군! 능선 너머에서 파도 소리가 들려.」"},
 		{"text": "「길목의 저 커다란 바위 두 개... 자네 곡괭이라면 캐낼 수 있겠지?」"},
 		{"text": "「부탁하네. 길이 열리면 보답은 톡톡히 하지!」",
@@ -1141,7 +1141,7 @@ func _start_fisher_reward_dialog() -> void:
 	var brag := "「황금잉어는 강에도 바다에도 나온다더군. 먼저 낚는 쪽이 임자야!」" \
 		if GameData.fisher_choice == 1 \
 		else "「서두를 것 없네. 바다는 어디 안 가니까, 천천히 즐기게.」"
-	m.dialog.open_seq("낚시꾼 철수", m.tex["npc_fisher_portrait_happy"], [
+	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_happy"], [
 		{"text": "「열렸다! 이 바람, 이 냄새... 바다야!」"},
 		{"text": "「고맙네, %s. 자네 덕에 길이 열렸어.」" % nm},
 		{"text": "「약속한 보답일세 — 내가 손수 깎은 **간이낚싯대**야.」",
@@ -1722,7 +1722,7 @@ func _start_move_chief_dialog() -> void:
 		{"text": "「단, 명심할 게 하나 있네 — 사람을 초대하려면\n**먼저 그 사람이 살 빈 집터**를 마련해 둬야 하네.」"},
 		{"text": "「빈 집터가 없으면 편지를 수락할 수 없어.\n앞으로 오는 편지도 전부 마찬가질세.」"},
 		{"text": "「집터 자리는 자네가 직접 골라 주게.\n아직 열리지 않은 땅만 아니면 어디든 좋네.」"},
-		{"text": "「집터는 민지네 잡화점에서 레시피를 판다네.\n값도 재료도 꽤 들지만... 마을 일이니 부탁함세.」",
+		{"text": "「집터는 만수네 잡화점에서 레시피를 판다네.\n값도 재료도 꽤 들지만... 마을 일이니 부탁함세.」",
 			"portrait": chief_happy},
 		{"text": "「집터를 마련했으면 **편지를 다시 읽고**\n수락해 주게. 앞으로도 우리 마을을 잘 부탁하네.」",
 			"portrait": chief_happy},
@@ -2043,7 +2043,7 @@ func _start_movein_dialog(nid: String) -> void:
 	var entries: Array = []
 	if nid == "merchant":
 		entries = [
-			{"text": "「안녕! 네가 이 마을을 살리고 있다는\n그 사람이지? 나는 민지야.」"},
+			{"text": "「안녕! 네가 이 마을을 살리고 있다는\n그 사람이지? 나는 만수야.」"},
 			{"text": "「어제 세워 준 잡화점, 정말 고마워!\n밤새 진열을 끝냈어. 오늘부터 영업 시작이야.」",
 				"portrait": m.tex["npc_merchant_portrait_happy"]},
 			{"text": "「씨앗이든 뭐든 필요하면 들러!\n좋은 물건 잔뜩 갖다 놨으니까. 잘 부탁해~」",
@@ -2067,7 +2067,7 @@ func _end_movein(nid: String) -> void:
 	_movein_walker = null
 	if not GameData.npc_greeted.has(nid):
 		GameData.npc_greeted.append(nid)
-	# 민지 도착 첫날 기억 — 잡화점 요리 레시피 선반은 다음 날부터 깔린다
+	# 만수 도착 첫날 기억 — 잡화점 요리 레시피 선반은 다음 날부터 깔린다
 	if nid == "merchant" and GameData.merchant_day == 0:
 		GameData.merchant_day = GameData.day
 	for i in GameData.arrivals.size():
@@ -3085,7 +3085,7 @@ func _end_alch_demo() -> void:
 # ---- 메인 스토리 13: 할머니의 팔찌 ----
 #
 # 스토리 12 뒤 자유 생활을 며칠 보내면(임시 조건 — 세부 시작 조건은
-# 추후 확정), 철수의 그물에 낡은 물건이 올라온다는 이야기로 시작한다.
+# 추후 확정), 용식의 그물에 낡은 물건이 올라온다는 이야기로 시작한다.
 # 주민 단서 -> 해변 서쪽 끝 바위 -> 특별한 입질 -> 낡은 상자 ->
 # 연금술사의 개봉 -> 두 번째 유품 「할머니의 팔찌」 -> 도서관 기록 2장.
 
@@ -3094,7 +3094,7 @@ func _story13_update(_delta: float) -> void:
 		return
 	if GameData.story13_phase == "" and GameData.story13_ready():
 		GameData.story13_phase = "rumor"
-		m.hud.quest_start_toast("낚시꾼 철수가 요즘 바다가 이상하다고 한다")
+		m.hud.quest_start_toast("낚시꾼 용식가 요즘 바다가 이상하다고 한다")
 		m.saveio.save_now()
 	# 조사 지점(두 분의 바위)이 세상에 놓여 있는지 살핀다 — 로드 직후 포함
 	if GameData.story13_phase in ["spot", "box", "open", "record", "done"] \
@@ -3111,9 +3111,9 @@ func story13_place_rock() -> void:
 	m.objnode._place_object(t, "sign", 0)
 
 
-# 퀘스트 1 — 철수의 이상한 이야기: 그물에 올라오는 낡은 물건들
+# 퀘스트 1 — 용식의 이상한 이야기: 그물에 올라오는 낡은 물건들
 func _start_sea_rumor_dialog() -> void:
-	m.dialog.open_seq("철수", m.tex["npc_fisher_portrait_normal"], [
+	m.dialog.open_seq("용식", m.tex["npc_fisher_portrait_normal"], [
 		{"text": "「어이, 마침 잘 왔네. 요즘 바다가 좀 이상해.」"},
 		{"text": "「물고기 대신에 말이야 — 오래된 금속 조각이며\n낡은 물건들이 자꾸 그물에 걸려 올라와.\n어제는 녹슨 숟가락이 나왔다니까?」"},
 		{"text": "「옛날 어른들 말로는, 큰 폭풍이 온 해에\n해안가 물건들이 죄다 바다로 쓸려 갔다더군.\n그게 이제야 하나씩 돌아오는 건가...」"},
@@ -3255,7 +3255,7 @@ func _start_fest_meet_dialog() -> void:
 		{"text": "「다들 모였는가! 오늘 회의는 좋은 이야길세.」"},
 		{"text": "「자네가 온 뒤로 주민이 이만큼 늘었네.\n빈집만 늘어가던 마을이 말이야...」"},
 		{"text": "「그래서 말인데 — 우리 손으로 축제를\n열어 보세! 옛날엔 계절마다 모이는 날이\n있었지만, 마을이 여는 첫 공식 축제일세.」"},
-		{"text": "「준비할 건 많네만, 다들 하나씩 맡기로 했네.\n나는 밭 것을, 민지는 음식을, 철수는 생선을,\n보라는 목장 것을, 무쇠는 장작을...」",
+		{"text": "「준비할 건 많네만, 다들 하나씩 맡기로 했네.\n나는 밭 것을, 만수는 음식을, 용식는 생선을,\n보라는 목장 것을, 무쇠는 장작을...」",
 			"portrait": m.tex["npc_chief_portrait_normal"]},
 		{"text": "「자네는 그중 %d가지만 거들어 주게.\n어느 걸 맡을지는 자네가 고르고 —\n회관 접수대에 내놓으면 되네.」" % GameData.STORY14_PICK,
 			"portrait": m.tex["npc_chief_portrait_happy"]},
@@ -4032,6 +4032,113 @@ func _end_last_page() -> void:
 	GameData.story19_phase = "done"
 	m.hud.story_banner("메인 스토리 19 완결", "일곱 갈래의 삶")
 	m.hud.show_message("일곱 병이 준비됐다.\n마지막 장소가 기다리고 있다.", 7.0)
+	m.saveio.save_now()
+
+
+# ---- 서브 퀘스트: 용식의 집터 ----
+#
+# 바닷길을 연 지 **정확히 3일 뒤**, 용식이 광장 분수대 앞에 나와 선다
+# (npcs.npc_place_now가 "fountain"을 돌려준다). 말을 걸면 곧바로 퀘스트가
+# 시작되지 않고 「대화하기」 선택지가 먼저 뜬다 — 고르면 그제야 부탁을
+# 꺼낸다. 마을 아무 데나 집터를 놓고 집을 한 채 지으면 그 순간 조건이
+# 채워지고, 용식에게 돌아가 말을 걸면 수납 상자 레시피를 준다.
+
+func _fisher_home_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	if GameData.fisher_home == "" and GameData.fisher_home_ready():
+		GameData.fisher_home = "wait"
+		m.hud.event_toast("용식이 분수대 앞에 서 있다")
+		m.saveio.save_now()
+
+
+# 분수대 앞에서 말을 걸었다 — 아직 퀘스트는 시작되지 않는다.
+# 「대화하기」를 골라야 부탁을 꺼낸다 (village_ui._talk_to에서 부른다)
+func fisher_home_greet() -> void:
+	m.dialog.open("용식",
+		"용식이 분수대 물끄러미 바라보며 서 있다.\n무슨 할 말이 있는 얼굴이다.", [
+		["대화하기", _start_fisher_home_dialog],
+		["나중에", null],
+	], m.tex.get("npc_fisher_portrait_normal"))
+
+
+func _start_fisher_home_dialog() -> void:
+	m.dialog.open_seq("용식", m.tex["npc_fisher_portrait_normal"], [
+		{"text": "「어, 마침 잘 왔네. 자네를 기다렸어.」"},
+		{"text": "「사흘 내리 이 마을 물에서 낚싯대를 담가 봤거든.\n...참 이상하지. 고기가 잘 물려서가 아니야.」"},
+		{"text": "「아침엔 물안개가 곱게 깔리고, 낮엔 애들이\n분수에서 첨벙거리고, 저녁이면 누가 꼭\n『밥은 먹었나』 하고 묻는다니까.」",
+			"portrait": m.tex["npc_fisher_portrait_happy"]},
+		{"text": "「나야 평생 물 따라 떠돌던 사람인데 말이야,\n여기서는 자꾸 짐을 풀고 싶어지더군.」"},
+		{"text": "「그래서 부탁이 하나 있네.\n내가 눌러앉을 집을 한 채 지어 줄 수 있겠나?」"},
+		{"text": "「자리는 자네가 정해 주게. 마을 안이면 어디든 좋아.\n빈 집터를 놓고, 그 위에 집을 올려 주면 되네.」",
+			"portrait": m.tex["npc_fisher_portrait_normal"]},
+		{"text": "「집이 다 되면 다시 찾아와 주게.\n...빈손으로 부탁만 하진 않을 테니.」"},
+	], _end_fisher_home_ask)
+
+
+func _end_fisher_home_ask() -> void:
+	if GameData.fisher_home != "wait":
+		return
+	GameData.fisher_home = "build"
+	m.hud.quest_start_toast("용식의 부탁 — 살 집 한 채")
+	m.hud.show_message("빈 집터(잡화점 레시피)를 마을 아무 곳에나 놓고,\n집터 앞에서 E를 눌러 집을 올리자.", 7.0)
+	m.saveio.save_now()
+
+
+# 빈 집터 위에 용식의 집을 올린다 (집터 팻말 E -> 「집을 짓는다」)
+func build_fisher_home(door: Vector2i) -> void:
+	m.dialog.close()
+	if GameData.fisher_home != "build":
+		return
+	var anchor := door - Vector2i(2, 3)
+	var found := false
+	for p: Dictionary in GameData.home_plots:
+		if int(p.x) == anchor.x and int(p.y) == anchor.y and not bool(p.used):
+			p.used = true
+			found = true
+			break
+	if not found:
+		return
+	# 집터 팻말을 걷어내고 그 자리에 집을 세운다 (이사 시스템과 같은 절차)
+	m.objnode._remove_object(door)
+	for y in range(anchor.y - 1, anchor.y + 5):
+		for x in range(anchor.x - 1, anchor.x + 6):
+			if m.objects.has(Vector2i(x, y)):
+				m.objnode._remove_object(Vector2i(x, y))
+	m.worldgen._fill_building(anchor)
+	m.objects.erase(door)
+	m.worldgen._spawn_house_node(anchor)
+	GameData.settler_homes["fisher"] = [anchor.x, anchor.y]
+	GameData.fisher_home = "built"
+	Sound.play_sfx("sfx_place")
+	m.hud.event_toast("용식의 집 완공!")
+	m.hud.quest_start_toast("용식에게 집이 다 됐다고 알리자")
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
+# 집을 다 짓고 다시 말을 걸었다 — 완료 대사와 수납 상자 레시피
+func fisher_home_report() -> void:
+	m.dialog.open_seq("용식", m.tex["npc_fisher_portrait_happy"], [
+		{"text": "「...허, 진짜로 지어 줬네.」"},
+		{"text": "(용식이 새 집 쪽을 한참 바라본다.)"},
+		{"text": "「떠돌이한테 『여기가 네 집이다』 하고 말해 주는 게\n어떤 건지, 자네는 모를 걸세.」"},
+		{"text": "「받게. 내가 배에서 쓰던 상자 도면이야.\n목재 여덟이면 하나 짤 수 있네.」"},
+		{"text": "「집 안에 놓고 뭐든 넣어 두게. 가방이 터질 것 같을 때\n한 짐 덜어 두면 그렇게 편할 수가 없어.」"},
+		{"text": "「이제 나도 이 마을 사람일세.\n...아침에 물가에 나오면 인사나 하자고.」"},
+	], _end_fisher_home_reward)
+
+
+func _end_fisher_home_reward() -> void:
+	if GameData.fisher_home != "built":
+		return
+	GameData.fisher_home = "done"
+	if "storage_box" not in GameData.recipes_unlocked:
+		GameData.recipes_unlocked.append("storage_box")
+	GameData.affinity["fisher"] = mini(100, int(GameData.affinity["fisher"]) + 15)
+	Sound.play_sfx("sfx_coin")
+	m.hud.event_toast("수납 상자 레시피를 배웠다!")
+	m.hud.show_message("집 안 책상(제작대)에서 목재 8개로 만들 수 있다.\n만든 상자는 가방에서 꺼내 집 안에 놓는다.", 7.0)
 	m.saveio.save_now()
 
 

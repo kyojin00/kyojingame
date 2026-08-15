@@ -154,6 +154,9 @@ func _build_sea() -> void:
 
 # 길이 열리는 순간 능선 너머가 드러난다 — 숲을 걷어내고 바다와 모래사장을 깐다
 func _reveal_sea() -> void:
+	if not GameData.sea_open:
+		# 바닷길이 열린 날 — 용식의 집터 부탁이 여기서 정확히 3일 뒤에 뜬다
+		GameData.sea_open_day = GameData.day
 	GameData.sea_open = true
 	for y in range(m.BEACH_Y0, m.MAP_H):
 		for x in m.MAP_W:
@@ -200,7 +203,7 @@ func _try_spawn_shell(with_node := true) -> bool:
 	return true
 
 
-# 민지의 해변 노점 — 서브 퀘스트를 끝냈으면 늘 이 자리에 서 있다.
+# 만수의 해변 노점 — 서브 퀘스트를 끝냈으면 늘 이 자리에 서 있다.
 # 바다를 다시 까는 코드(_build_sea/_reveal_sea)가 해변을 통째로 밀기 때문에
 # 그때마다 여기서 도로 세워 준다 (세이브 로드 후에도 이 경로로 복원된다).
 func _place_stall(with_node := true) -> void:

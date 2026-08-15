@@ -315,9 +315,16 @@ func interact() -> void:
 			return
 		if obj.kind == "homeplot":
 			# 빈 집터 팻말 — 회수하면 집터가 가방으로 돌아온다
-			m.dialog.open("빈 집터",
-				"새 주민을 위해 마련해 둔 빈 집터다.\n이주 희망 편지를 수락하면 여기에 집이 지어진다.",
-				[["회수하기", m.story._pickup_home_plot.bind(t)], ["닫기", null]])
+			var plot_btns: Array = []
+			var plot_body := "새 주민을 위해 마련해 둔 빈 집터다.\n이주 희망 편지를 수락하면 여기에 집이 지어진다."
+			if GameData.fisher_home == "build":
+				# 용식의 부탁 — 여기에 바로 집을 올릴 수 있다
+				plot_body = "새 주민을 위해 마련해 둔 빈 집터다.\n용식이 살 집을 여기에 지을까?"
+				plot_btns.append(["집을 짓는다 (용식의 집)",
+					m.story.build_fisher_home.bind(t)])
+			plot_btns.append(["회수하기", m.story._pickup_home_plot.bind(t)])
+			plot_btns.append(["닫기", null])
+			m.dialog.open("빈 집터", plot_body, plot_btns)
 			return
 		if obj.kind == "board":
 			m.village._open_quest_board()
