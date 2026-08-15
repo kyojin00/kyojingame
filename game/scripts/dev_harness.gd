@@ -1424,6 +1424,25 @@ func _debug_tick() -> void:
 					and not GameData.weather_wet(GameData.WEATHER_FOG)
 					and not GameData.weather_wet(GameData.WEATHER_STAR),
 				" harsh(안개)=", GameData.weather_harsh(GameData.WEATHER_FOG))
+		200:
+			# 자동 저장 — 15분(실제 시간)마다 알아서 담는다.
+			# 15분을 기다릴 수는 없으니 그만큼의 시간을 **한 번에 흘려** 본다.
+			var sp: String = GameData.SAVE_PATH
+			if FileAccess.file_exists(sp):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(sp))
+			# ① 이야기 연출 중에는 미룬다 (그 한복판을 담을 이유가 없다)
+			m.story_cutscene = true
+			m.saveio.autosave_tick(m.saveio.AUTO_EVERY)
+			var held: bool = not FileAccess.file_exists(sp)
+			m.story_cutscene = false
+			# ② 연출이 끝나면 미뤄 둔 만큼만 더 흘려도 담긴다
+			m.saveio.autosave_tick(m.saveio.AUTO_RETRY)
+			var saved: bool = FileAccess.file_exists(sp)
+			# ③ 담고 나면 15분을 다시 센다 (안 그러면 매 프레임 담는다)
+			var reset: bool = m.saveio._auto_t < 1.0
+			print("AUTOSAVE_OK=", held and saved and reset,
+				" 연출중엔미룸=", held, " 담김=", saved,
+				" 시계리셋=", reset, " 주기=", m.saveio.AUTO_EVERY)
 		224:
 			# 캡슐·배너에 쓸 **UI 없는 화면**.
 			# 보통 스크린샷에는 미니맵·퀘스트창·대사줄·말풍선이 얹혀 있어서,

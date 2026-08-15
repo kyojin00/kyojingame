@@ -11,7 +11,38 @@ extends Node
 var m: KyojinMain    # main.gd
 
 
+# ---- 자동 저장 ----
+#
+# 15분(실제 시간)마다 알아서 담는다. 원래는 잠들 때와 F5뿐이라, 하루를
+# 길게 놀다 껐다 켜면 그 하루가 통째로 날아갔다.
+#
+# 시계를 **여기** 둔다 — 저장을 맡은 쪽이 시계도 가져야, 잠들거나 F5로
+# 저장했을 때 15분이 저절로 다시 시작된다 (main에 두면 저장할 때마다
+# 그쪽 시계를 따로 만져 줘야 하고, 한 군데만 빠뜨려도 방금 담고 또 담는다).
+const AUTO_EVERY := 900.0        # 15분
+# 못 담고 미룰 때 다시 보는 간격. 이야기 한 장면이 끝나기를 기다리는
+# 것이라 짧게 잡는다 (다음 15분까지 기다리면 그 사이가 통째로 빈다).
+const AUTO_RETRY := 5.0
+var _auto_t := 0.0
+
+
+func autosave_tick(delta: float) -> void:
+	if Net.is_guest():
+		return                   # 저장은 호스트만 (게스트는 시계도 안 돈다)
+	_auto_t += delta
+	if _auto_t < AUTO_EVERY:
+		return
+	# 이야기 연출 중에는 미룬다. 그 한복판을 담으면 불러올 때 연출이
+	# 반쯤 진행된 자리에서 시작한다 — 담을 수야 있지만 굳이 그 순간일 이유가 없다.
+	if m.story_cutscene or m.ending.visible:
+		_auto_t = AUTO_EVERY - AUTO_RETRY
+		return
+	save_now()                   # 여기서 _auto_t가 0으로 돌아간다
+	m.hud.show_message("자동 저장했다.")
+
+
 func save_now() -> void:
+	_auto_t = 0.0                # 어떤 이유로 담았든 15분을 다시 센다
 	if Net.is_guest():
 		return  # 저장은 호스트만
 	var g := []

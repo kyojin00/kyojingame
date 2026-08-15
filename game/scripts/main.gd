@@ -1473,6 +1473,7 @@ func _process(delta: float) -> void:
 	if _rescue_t >= RESCUE_EVERY:
 		_rescue_t = 0.0
 		rescue_trapped()
+	saveio.autosave_tick(delta)   # 15분마다 알아서 담는다 (시계는 save_load.gd)
 	story._story_update(delta)
 	story._fisher_update(delta)
 	story._move_update(delta)
