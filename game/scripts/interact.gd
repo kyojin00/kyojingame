@@ -69,6 +69,28 @@ func _enter_building(kind: String) -> void:
 var mouse_screen := Vector2(-9999, -9999)
 
 
+# 씨앗만 멀리서도 뿌릴 수 있다.
+#
+# 갈아 둔 밭에 심으려고 한 칸씩 밟고 다니면, 넓은 밭일수록 심는 시간보다
+# 걸어다니는 시간이 길어진다. 씨앗은 던져 뿌리는 것이니 마우스로 가리킨
+# 자리에 바로 들어가게 한다 — 그래도 「갈아 둔 내 밭」이라는 조건은 그대로다.
+# (호미·물뿌리개·도끼처럼 몸을 쓰는 도구는 예전대로 바로 옆 한 칸뿐이다)
+const SEED_REACH := 10
+
+
+func reach_tiles() -> int:
+	return SEED_REACH if GameData.tool == "seed" else 1
+
+
+# 손이 닿는 자리인가. 한 칸일 때는 대각선까지 여덟 칸(예전 그대로),
+# 멀리 뿌릴 때는 반지름 안쪽이면 된다 (네모로 재면 구석이 14칸까지 간다)
+func in_reach(d: Vector2i) -> bool:
+	var r := reach_tiles()
+	if r <= 1:
+		return absi(d.x) <= 1 and absi(d.y) <= 1
+	return Vector2(d).length() <= float(r)
+
+
 func _update_mouse_target() -> void:
 	if m.player == null:
 		m._mouse_target = Vector2i(-999, -999)
@@ -77,7 +99,7 @@ func _update_mouse_target() -> void:
 	var mp: Vector2 = m.get_canvas_transform().affine_inverse() * mouse_screen
 	var t := Vector2i(int(floor(mp.x / m.TILE)), int(floor(mp.y / m.TILE)))
 	var d := t - m.player_tile()
-	if d != Vector2i.ZERO and absi(d.x) <= 1 and absi(d.y) <= 1:
+	if d != Vector2i.ZERO and in_reach(d):
 		m._mouse_target = t
 	else:
 		m._mouse_target = Vector2i(-999, -999)
@@ -88,7 +110,7 @@ func target_tile() -> Vector2i:
 		return m._target_override  # 원격 플레이어 행동 처리 중
 	if m._sel_target.x != -999:
 		var d := m._sel_target - m.player_tile()
-		if absi(d.x) <= 1 and absi(d.y) <= 1:
+		if in_reach(d):
 			return m._sel_target  # 좌클릭으로 고정한 선택
 		m._sel_target = Vector2i(-999, -999)  # 멀어지면 선택 해제
 	if m._mouse_target.x != -999:
@@ -479,7 +501,7 @@ func _click_at(pos: Vector2, dbl: bool) -> void:
 	# 좌클릭 1회: 대상 선택 / 더블클릭: 선택 + 즉시 상호작용 (E키와 동일)
 	var t := Vector2i(int(floor(pos.x / m.TILE)), int(floor(pos.y / m.TILE)))
 	var d := t - m.player_tile()
-	if absi(d.x) > 1 or absi(d.y) > 1:
+	if not in_reach(d):
 		m._sel_target = Vector2i(-999, -999)  # 먼 곳 클릭 = 선택 해제
 		return
 	if d != Vector2i.ZERO:

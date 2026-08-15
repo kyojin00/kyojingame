@@ -4304,6 +4304,14 @@ func _debug_tick() -> void:
 			var loop_bad: Array = []
 			for bn: String in Sound.BGM_NAMES:
 				var s0: AudioStream = Sound.streams.get(bn)
+				# 밤 곡만 일부러 루프를 끈다 — 끝까지 가야 다음 밤 곡으로
+				# 넘어간다 (Sound.NIGHT_TRACKS). 여기서는 그 반대를 본다.
+				if bn in Sound.NIGHT_TRACKS:
+					if s0 is AudioStreamOggVorbis and (s0 as AudioStreamOggVorbis).loop:
+						loop_bad.append(bn + "(밤 곡인데 루프 켜짐)")
+					elif s0 is AudioStreamMP3 and (s0 as AudioStreamMP3).loop:
+						loop_bad.append(bn + "(밤 곡인데 루프 켜짐)")
+					continue
 				if s0 is AudioStreamWAV:
 					var w: AudioStreamWAV = s0
 					var want := int(round(w.get_length() * float(w.mix_rate)))
@@ -5089,7 +5097,32 @@ func _debug_tick() -> void:
 				" 침대아트=", bedart)
 			GameData.tool_slots = keep_seed_slots
 			GameData.tool = keep_tool
-		392: get_tree().quit()
+		392:
+			# 씨앗만 멀리서도 뿌릴 수 있다 (interact.SEED_REACH).
+			# 다른 도구는 예전대로 바로 옆 한 칸 — 여기가 무너지면 도끼로
+			# 화면 건너편 나무를 벨 수 있게 된다.
+			var keep_reach_tool := GameData.tool
+			var here := m.player_tile()
+			GameData.tool = "seed"
+			var seed_far: bool = m.actions.in_reach(Vector2i(7, 5))     # 8.6칸
+			var seed_edge: bool = m.actions.in_reach(Vector2i(10, 0))   # 딱 10칸
+			var seed_over: bool = m.actions.in_reach(Vector2i(9, 9))    # 12.7칸 = 밖
+			GameData.tool = "axe"
+			var axe_near: bool = m.actions.in_reach(Vector2i(1, 1))     # 대각선 한 칸
+			var axe_far: bool = m.actions.in_reach(Vector2i(3, 0))
+			# 마우스가 가리킨 먼 칸이 실제로 목표가 되는가
+			GameData.tool = "seed"
+			m._sel_target = Vector2i(-999, -999)
+			m._mouse_target = here + Vector2i(6, 4)
+			var mouse_far: bool = m.actions.target_tile() == here + Vector2i(6, 4)
+			m._mouse_target = Vector2i(-999, -999)
+			GameData.tool = keep_reach_tool
+			print("SEEDREACH_OK=", seed_far and seed_edge and not seed_over
+				and axe_near and not axe_far and mouse_far,
+				" 씨앗8칸=", seed_far, " 씨앗10칸=", seed_edge,
+				" 씨앗밖=", not seed_over, " 도끼옆=", axe_near,
+				" 도끼멀리=", not axe_far, " 마우스목표=", mouse_far)
+		393: get_tree().quit()
 
 
 # ==== 검증 시퀀스 ====

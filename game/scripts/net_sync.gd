@@ -56,8 +56,9 @@ func _known_goods(cat: String, id: String) -> bool:
 			return GameData.ITEMS.has(id) or id == "wood" or id == "stone"
 
 
-# 요청한 게스트가 그 칸 가까이에 있는가 (맵 반대편을 건드리지 못하게)
-func _near_sender(t: Vector2i) -> bool:
+# 요청한 게스트가 그 칸 가까이에 있는가 (맵 반대편을 건드리지 못하게).
+# tiles는 몇 칸까지 봐 줄지 — 씨앗은 멀리서도 뿌리므로 그만큼 넓게 본다.
+func _near_sender(t: Vector2i, tiles := 3.0) -> bool:
 	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
 		return false
 	var pid := multiplayer.get_remote_sender_id()
@@ -65,7 +66,7 @@ func _near_sender(t: Vector2i) -> bool:
 		return true      # 아직 자리를 못 받았으면 통과시킨다 (첫 프레임)
 	var p: Vector2 = m.remote_players[pid].position
 	var d := Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16) - p
-	return d.length() < m.TILE * 3.0
+	return d.length() < m.TILE * tiles
 
 
 func _show_connecting() -> void:
@@ -394,7 +395,8 @@ func _req_tool(tx: int, ty: int, tool: String, seed_id: String, px: int, py: int
 		return
 	if not _known_goods("tool", tool) and tool != "":
 		return
-	if not _near_sender(Vector2i(tx, ty)):
+	# 씨앗은 손이 닿는 거리가 넓다 (interact.SEED_REACH) — 그만큼 봐 준다
+	if not _near_sender(Vector2i(tx, ty), 11.0 if tool == "seed" else 3.0):
 		return      # 맵 반대편 칸을 건드리려는 요청
 	var saved_tool: String = GameData.tool
 	var saved_energy: float = GameData.energy
