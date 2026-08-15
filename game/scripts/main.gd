@@ -1160,7 +1160,7 @@ func ui_open() -> bool:
 		or (storage_ui != null and storage_ui.visible) \
 		or stats_ui.visible or auction_ui.visible \
 		or (settings_ui != null and settings_ui.visible) \
-		or _name_layer != null or village._gift_layer != null \
+		or village._gift_layer != null \
 		or (story.story_layer != null and story.story_layer.visible)
 
 
@@ -1307,7 +1307,6 @@ const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따�
 const VILLAGE_EXIT_X := 74                 # 우체부가 빠져나가는 마을 북쪽 길
 
 
-var _name_layer: CanvasLayer = null
 
 
 var _cutscene_idle := 0.0
@@ -1601,8 +1600,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("ui_cancel"):
 			_back_to_title()
 		return
-	if _name_layer != null:
-		return  # 이름 입력 중에는 다른 조작을 받지 않는다
 	if story_cutscene and story._postman_state == "approach" and story._postman != null \
 			and event.is_action_pressed("ui_cancel"):
 		# 걸어오는 연출 스킵: 우체부가 바로 도착해 말을 건다

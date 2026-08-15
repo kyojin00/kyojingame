@@ -45,7 +45,7 @@ func _ready() -> void:
 
 	# 타이틀
 	var title := Label.new()
-	title.text = "교 진 팜"
+	title.text = "Little Root"
 	title.add_theme_font_size_override("font_size", 52)
 	title.add_theme_color_override("font_color", Color("ffe08a"))
 	title.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.04))
@@ -95,6 +95,8 @@ func _ready() -> void:
 	v.add_child(_mk_button("함께하기", _on_multiplayer))
 	v.add_child(_mk_button("설정", _on_settings))
 	v.add_child(_mk_button("종료", func() -> void: get_tree().quit()))
+	# 생성창을 열면 이 넷을 잠시 치운다 (나무판이 제목을 반쯤 가리면 지저분하다)
+	_menu_nodes = [title, subtitle, menu_bg, v]
 
 	_build_settings_panel()
 	_build_keys_panel()
@@ -123,6 +125,7 @@ func _mk_button(text: String, cb: Callable) -> Button:
 
 
 var gender_panel: PanelContainer = null
+var _menu_nodes: Array = []      # 생성창이 열려 있는 동안 치워 두는 타이틀 차림
 
 
 func _on_continue() -> void:
@@ -134,137 +137,374 @@ func _on_new_game() -> void:
 	mp_panel.visible = false
 	if gender_panel == null:
 		_build_gender_panel()
-	gender_panel.visible = not gender_panel.visible
+	_show_creator(not gender_panel.visible)
+
+
+# 생성창을 열고 닫는다. 여는 동안 타이틀 차림(제목·부제·메뉴)은 치워 둔다
+func _show_creator(on: bool) -> void:
+	gender_panel.visible = on
+	for n: Control in _menu_nodes:
+		n.visible = not on
 
 
 func _start_new(g: String) -> void:
 	# (개발 스크린샷 등 옛 경로) 성별만으로 옛 기본 외형을 만든다
 	GameData.gender = g
 	GameData.appearance = {"hair": 3 if g == "f" else 0,
-		"shirt": 1 if g == "f" else 0, "pants": 0, "shoes": 0}
+		"shirt": 1 if g == "f" else 0, "pants": 0, "shoes": 0,
+		"skin": 0, "hair_col": 0}
 	if FileAccess.file_exists(GameData.SAVE_PATH):
 		DirAccess.remove_absolute(GameData.SAVE_PATH)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
-# ---- 외형 만들기 (새로 시작) ----
-# 성별(호감도·결혼 이벤트용) + 머리/상의/바지/신발 템플릿 4종씩.
-# 미리보기는 표준 팔레트 도트를 골라 둔 색으로 바로 갈아입혀 보여 준다.
+# ---- 캐릭터 생성창 (「새로 시작」) ----
+#
+# 나무판 하나 위에 왼쪽은 액자, 오른쪽은 고르는 자리다. 고르는 것은
+# **전부 눈으로 본다** — 색은 색칠한 네모(스와치)를 직접 누르고,
+# 성별은 글자 대신 ♂♀ 표식을, 머리 모양만 이름이 있어 화살표로 넘긴다.
+# 무엇을 고르든 왼쪽 액자의 도트가 그 자리에서 갈아입는다.
+#
+# 이름과 농장 이름도 여기서 짓는다. 예전에는 숲에서 우체부 아저씨가
+# 이름을 물었지만, 이제는 처음부터 알고 있는 사이로 시작한다.
 
-var _appear := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0}
+var _appear := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0,
+	"skin": 0, "hair_col": 0}
 var _appear_gender := "m"
 var _appear_preview: TextureRect = null
-var _appear_labels := {}
-const APPEAR_ROWS := [["gender", "성별"], ["hair", "머리"],
-	["shirt", "상의"], ["pants", "바지"], ["shoes", "신발"]]
+var _hair_label: Label = null
+var _hair_row: HBoxContainer = null
+var _name_edit: LineEdit = null
+var _farm_edit: LineEdit = null
+var _gender_btns := {}
+var _swatch_btns := {}          # 부위 -> [Button, ...]
+var _blink_tex: Texture2D = null
+var _idle_tex: Texture2D = null
+var _blink_t := 0.0             # 눈을 깜빡이는 시늉 (액자가 살아 있게)
+
+const WOOD_BG := Color(0.71, 0.51, 0.30)
+const WOOD_DARK := Color(0.33, 0.20, 0.10)
+const WOOD_MID := Color(0.55, 0.37, 0.20)
+const WOOD_LIGHT := Color(0.86, 0.70, 0.46)
+const INK := Color(0.24, 0.14, 0.06)
+# [부위, 팻말, 색표] — 색은 각 벌의 「기본」 색을 그대로 스와치에 쓴다
+const SWATCH_ROWS := [
+	["hair_col", "머리색", "hair"],
+	["skin", "피부", "skin"],
+	["shirt", "상의", "shirt"],
+	["pants", "바지", "pants"],
+	["shoes", "신발", "shoes"],
+]
 
 
-func _appear_names(part: String) -> Array:
-	match part:
-		"gender":
-			return ["남자", "여자"]
+func _swatch_colors(kind: String) -> Array:
+	match kind:
 		"hair":
-			return GameData.HAIR_NAMES
+			return GameData.APPEAR_HAIR_COL
+		"skin":
+			return GameData.APPEAR_SKIN
 		"shirt":
-			return GameData.SHIRT_NAMES
+			return GameData.APPEAR_SHIRT
 		"pants":
-			return GameData.PANTS_NAMES
-	return GameData.SHOES_NAMES
+			return GameData.APPEAR_PANTS
+	return GameData.APPEAR_SHOES
+
+
+func _wood_style(bg: Color, border: Color, w := 2, r := 4) -> StyleBoxFlat:
+	var st := StyleBoxFlat.new()
+	st.bg_color = bg
+	st.border_color = border
+	st.set_border_width_all(w)
+	st.set_corner_radius_all(r)
+	st.set_content_margin_all(6)
+	return st
+
+
+func _wood_button(text: String, cb: Callable, w := 0) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(w, 26)
+	b.add_theme_color_override("font_color", Color(0.98, 0.94, 0.84))
+	b.add_theme_color_override("font_hover_color", Color(1, 1, 0.92))
+	b.add_theme_stylebox_override("normal", _wood_style(WOOD_MID, WOOD_DARK))
+	b.add_theme_stylebox_override("hover", _wood_style(WOOD_BG, WOOD_LIGHT))
+	b.add_theme_stylebox_override("pressed", _wood_style(WOOD_DARK, WOOD_DARK))
+	b.pressed.connect(func() -> void:
+		Sound.play_sfx("sfx_ui")
+		cb.call())
+	return b
+
+
+# 색칠한 네모 한 칸. 고른 칸은 테두리가 밝은 나무색으로 굵어진다
+func _mk_swatch(col: Color, cb: Callable) -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(26, 24)
+	b.set_meta("col", col)
+	b.pressed.connect(func() -> void:
+		Sound.play_sfx("sfx_ui")
+		cb.call())
+	return b
+
+
+func _paint_swatch(b: Button, on: bool) -> void:
+	var col: Color = b.get_meta("col")
+	var st := _wood_style(col, WOOD_LIGHT if on else WOOD_DARK, 3 if on else 1, 3)
+	b.add_theme_stylebox_override("normal", st)
+	b.add_theme_stylebox_override("pressed", st)
+	b.add_theme_stylebox_override("hover",
+		_wood_style(col.lightened(0.12), WOOD_LIGHT, 3, 3))
+
+
+func _mk_field(place: String, maxlen: int) -> LineEdit:
+	var e := LineEdit.new()
+	e.placeholder_text = place
+	e.max_length = maxlen
+	e.custom_minimum_size = Vector2(150, 28)
+	e.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	e.add_theme_color_override("font_color", INK)
+	e.add_theme_color_override("font_placeholder_color", Color(0.45, 0.32, 0.2, 0.8))
+	e.add_theme_color_override("caret_color", INK)
+	e.add_theme_stylebox_override("normal", _wood_style(Color(0.94, 0.85, 0.68), WOOD_DARK))
+	e.add_theme_stylebox_override("focus", _wood_style(Color(1, 0.94, 0.78), WOOD_LIGHT))
+	return e
+
+
+func _mk_tag(text: String, w := 54) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.custom_minimum_size = Vector2(w, 0)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.add_theme_color_override("font_color", INK)
+	return l
 
 
 func _build_gender_panel() -> void:
 	gender_panel = PanelContainer.new()
 	gender_panel.visible = false
-	gender_panel.position = Vector2(280, 140)
-	gender_panel.custom_minimum_size = Vector2(400, 0)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.17, 0.14, 0.22, 0.97)
-	style.border_color = Color(0.42, 0.36, 0.55)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(12)
+	gender_panel.position = Vector2(148, 58)
+	gender_panel.custom_minimum_size = Vector2(664, 0)
+	var style := _wood_style(WOOD_BG, WOOD_DARK, 4, 8)
+	style.set_content_margin_all(14)
+	style.shadow_color = Color(0, 0, 0, 0.45)
+	style.shadow_size = 8
 	gender_panel.add_theme_stylebox_override("panel", style)
 	add_child(gender_panel)
 
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
+	v.add_theme_constant_override("separation", 8)
 	gender_panel.add_child(v)
+
+	# 머리말 — 나무판에 박은 명패
+	var plate := PanelContainer.new()
+	plate.add_theme_stylebox_override("panel", _wood_style(WOOD_MID, WOOD_DARK, 2, 5))
+	v.add_child(plate)
 	var title := Label.new()
-	title.text = "우리 캐릭터 만들기"
+	title.text = "새 농부 만들기"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", Color("ffd75e"))
-	v.add_child(title)
+	title.add_theme_color_override("font_color", Color("ffe6a6"))
+	title.add_theme_color_override("font_outline_color", WOOD_DARK)
+	title.add_theme_constant_override("outline_size", 4)
+	plate.add_child(title)
 
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 14)
-	v.add_child(h)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 14)
+	v.add_child(body)
 
+	# ---- 왼쪽: 액자 ----
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 6)
+	body.add_child(left)
+	var frame := PanelContainer.new()
+	frame.add_theme_stylebox_override("panel",
+		_wood_style(Color(0.33, 0.42, 0.30), WOOD_DARK, 3, 5))
+	left.add_child(frame)
 	_appear_preview = TextureRect.new()
-	_appear_preview.custom_minimum_size = Vector2(128, 192)
+	_appear_preview.custom_minimum_size = Vector2(176, 236)
 	_appear_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_appear_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_appear_preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	h.add_child(_appear_preview)
+	frame.add_child(_appear_preview)
 
-	var rows := VBoxContainer.new()
-	rows.add_theme_constant_override("separation", 4)
-	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h.add_child(rows)
-	for pair in APPEAR_ROWS:
-		var part: String = pair[0]
+	# 성별 — 글자 대신 표식 둘
+	var grow := HBoxContainer.new()
+	grow.add_theme_constant_override("separation", 6)
+	grow.alignment = BoxContainer.ALIGNMENT_CENTER
+	left.add_child(grow)
+	for pair: Array in [["m", "♂"], ["f", "♀"]]:
+		var g: String = pair[0]
+		var b := _wood_button(pair[1], func() -> void:
+			_appear_gender = g
+			# 성별을 바꾸면 어울리는 기본 머리로 한 번 맞춰 준다
+			_appear.hair = 3 if g == "f" else 1
+			_appear_refresh(), 78)
+		b.add_theme_font_size_override("font_size", 26)
+		_gender_btns[g] = b
+		grow.add_child(b)
+
+	# ---- 오른쪽: 고르는 자리 ----
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 7)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(right)
+
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	name_row.add_child(_mk_tag("이름"))
+	_name_edit = _mk_field("마을에서 불릴 이름", 8)
+	name_row.add_child(_name_edit)
+	right.add_child(name_row)
+
+	var farm_row := HBoxContainer.new()
+	farm_row.add_theme_constant_override("separation", 8)
+	farm_row.add_child(_mk_tag("농장"))
+	_farm_edit = _mk_field("우리 농장 이름", 12)
+	farm_row.add_child(_farm_edit)
+	right.add_child(farm_row)
+
+	# 머리 모양 — 이름이 있는 것이라 화살표로 넘긴다
+	_hair_row = HBoxContainer.new()
+	_hair_row.add_theme_constant_override("separation", 6)
+	_hair_row.add_child(_mk_tag("머리"))
+	_hair_row.add_child(_wood_button("◀", func() -> void: _hair_cycle(-1), 30))
+	_hair_label = Label.new()
+	_hair_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hair_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hair_label.add_theme_color_override("font_color", INK)
+	_hair_row.add_child(_hair_label)
+	_hair_row.add_child(_wood_button("▶", func() -> void: _hair_cycle(1), 30))
+	right.add_child(_hair_row)
+
+	# 색 고르기 — 부위마다 색칠한 네모를 늘어놓는다
+	for row_def: Array in SWATCH_ROWS:
+		var part: String = row_def[0]
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		var name_l := Label.new()
-		name_l.text = pair[1]
-		name_l.custom_minimum_size = Vector2(44, 0)
-		row.add_child(name_l)
-		row.add_child(_mk_button("◀", func() -> void: _appear_cycle(part, -1)))
-		var val := Label.new()
-		val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		val.add_theme_color_override("font_color", Color(0.92, 0.9, 0.8))
-		_appear_labels[part] = val
-		row.add_child(val)
-		row.add_child(_mk_button("▶", func() -> void: _appear_cycle(part, 1)))
-		rows.add_child(row)
+		row.add_theme_constant_override("separation", 5)
+		row.add_child(_mk_tag(str(row_def[1])))
+		var btns: Array = []
+		var tbl: Array = _swatch_colors(str(row_def[2]))
+		for i in tbl.size():
+			var idx := i
+			var rgb: Array = tbl[i][0]
+			var b := _mk_swatch(Color8(rgb[0], rgb[1], rgb[2]), func() -> void:
+				_appear[part] = idx
+				_appear_refresh())
+			btns.append(b)
+			row.add_child(b)
+		_swatch_btns[part] = btns
+		right.add_child(row)
 
 	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 8)
+	bottom.add_theme_constant_override("separation", 10)
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(bottom)
-	bottom.add_child(_mk_button("이걸로 시작!", _start_selected))
-	bottom.add_child(_mk_button("닫기", func() -> void: gender_panel.visible = false))
+	bottom.add_child(_wood_button("이 사람으로 시작!", _start_selected, 190))
+	bottom.add_child(_wood_button("돌아가기",
+		func() -> void: _show_creator(false), 110))
 	_appear_refresh()
 
 
-func _appear_cycle(part: String, dir: int) -> void:
-	if part == "gender":
-		_appear_gender = "f" if _appear_gender == "m" else "m"
-	else:
-		_appear[part] = wrapi(int(_appear[part]) + dir, 0, _appear_names(part).size())
+# 머리 모양만 화살표로 넘긴다 (색과 달리 한눈에 늘어놓을 수 없어서)
+func _hair_cycle(dir: int) -> void:
+	_appear.hair = wrapi(int(_appear.hair) + dir, 0, GameData.HAIR_NAMES.size())
 	_appear_refresh()
 
 
 func _appear_refresh() -> void:
-	for part in _appear_labels:
-		var idx: int = 0 if part != "gender" else (0 if _appear_gender == "m" else 1)
-		if part != "gender":
-			idx = int(_appear[part])
-		_appear_labels[part].text = str(_appear_names(part)[idx])
-	# 미리보기: 고른 머리의 정면 서기 한 장을 고른 색으로 갈아입힌다
-	var t: Texture2D = load("res://assets/sprites/%s_down_idle.png"
-		% GameData.HAIR_PREFIX[int(_appear.hair)])
-	var img: Image = t.get_image()
+	_hair_label.text = str(GameData.HAIR_NAMES[int(_appear.hair)])
+	for g: String in _gender_btns:
+		var on: bool = g == _appear_gender
+		var b: Button = _gender_btns[g]
+		b.add_theme_stylebox_override("normal",
+			_wood_style(WOOD_BG if on else WOOD_MID,
+				WOOD_LIGHT if on else WOOD_DARK, 3 if on else 2))
+	for part: String in _swatch_btns:
+		var sel: int = int(_appear[part])
+		var btns: Array = _swatch_btns[part]
+		for i in btns.size():
+			var sw: Button = btns[i]
+			_paint_swatch(sw, i == sel)
+	# 민머리에는 머리카락 픽셀이 아예 없다 — 머리색 줄을 흐리게 해서
+	# 「지금은 눌러도 안 바뀐다」를 색으로 알려 준다
+	if _swatch_btns.has("hair_col"):
+		var lit: bool = int(_appear.hair) != 0
+		var hair_sw: Array = _swatch_btns["hair_col"]
+		for b2: Button in hair_sw:
+			b2.modulate = Color(1, 1, 1, 1.0 if lit else 0.4)
+	# 액자: 고른 머리의 정면 도트를 그 자리에서 갈아입힌다 (평소 + 눈 감은 것)
+	_idle_tex = _dress("%s_down_idle" % GameData.HAIR_PREFIX[int(_appear.hair)])
+	_blink_tex = _dress("%s_down_blink" % GameData.HAIR_PREFIX[int(_appear.hair)])
+	_appear_preview.texture = _idle_tex
+
+
+func _dress(sprite: String) -> Texture2D:
+	var path := "res://assets/sprites/%s.png" % sprite
+	if not ResourceLoader.exists(path):
+		return null
+	var img: Image = (load(path) as Texture2D).get_image()
 	GameData.recolor_player_image(img, _appear)
-	_appear_preview.texture = ImageTexture.create_from_image(img)
+	return ImageTexture.create_from_image(img)
 
 
 func _start_selected() -> void:
 	GameData.gender = _appear_gender
 	GameData.appearance = _appear.duplicate()
+	GameData.player_name = _name_edit.text.strip_edges()
+	GameData.farm_name = _farm_edit.text.strip_edges()
+	if GameData.player_name == "":
+		GameData.player_name = "친구"
 	if FileAccess.file_exists(GameData.SAVE_PATH):
 		DirAccess.remove_absolute(GameData.SAVE_PATH)
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+# 검증용 — 고른 색이 정말 액자 속 도트에 칠해졌는지 픽셀로 센다.
+# (스와치만 눌리고 그림은 그대로면 아무 소용이 없다)
+func _creator_report() -> String:
+	if _idle_tex == null:
+		return "false 미리보기없음"
+	var img: Image = _idle_tex.get_image()
+	var want := {
+		"hair": Color8(GameData.APPEAR_HAIR_COL[int(_appear.hair_col)][0][0],
+			GameData.APPEAR_HAIR_COL[int(_appear.hair_col)][0][1],
+			GameData.APPEAR_HAIR_COL[int(_appear.hair_col)][0][2]).to_rgba32(),
+		"skin": Color8(GameData.APPEAR_SKIN[int(_appear.skin)][0][0],
+			GameData.APPEAR_SKIN[int(_appear.skin)][0][1],
+			GameData.APPEAR_SKIN[int(_appear.skin)][0][2]).to_rgba32(),
+	}
+	var src := {
+		"hair": Color8(GameData.APPEAR_HAIR_COL[0][0][0],
+			GameData.APPEAR_HAIR_COL[0][0][1],
+			GameData.APPEAR_HAIR_COL[0][0][2]).to_rgba32(),
+		"skin": Color8(GameData.APPEAR_SKIN[0][0][0], GameData.APPEAR_SKIN[0][0][1],
+			GameData.APPEAR_SKIN[0][0][2]).to_rgba32(),
+	}
+	var hair_n := 0
+	var skin_n := 0
+	var stale := 0
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a == 0.0:
+				continue
+			var k := c.to_rgba32()
+			if k == want.hair:
+				hair_n += 1
+			elif k == want.skin:
+				skin_n += 1
+			elif k == src.hair or k == src.skin:
+				stale += 1
+	var sw_hair: Array = _swatch_btns["hair_col"]
+	var sw_skin: Array = _swatch_btns["skin"]
+	var sw_shirt: Array = _swatch_btns["shirt"]
+	var rows_ok: bool = sw_hair.size() == GameData.APPEAR_HAIR_COL.size() \
+		and sw_skin.size() == GameData.APPEAR_SKIN.size() \
+		and sw_shirt.size() == GameData.APPEAR_SHIRT.size()
+	var typed: bool = _name_edit.text != "" and _farm_edit.text != ""
+	var ok: bool = hair_n > 0 and skin_n > 0 and stale == 0 and rows_ok and typed
+	return "%s 머리색=%d 피부=%d 옛색남음=%d 스와치=%s 이름·농장칸=%s" \
+		% [ok, hair_n, skin_n, stale, rows_ok, typed]
 
 
 func _on_settings() -> void:
@@ -547,7 +787,14 @@ func _mk_slider(label_text: String, value: float, setter: Callable) -> HBoxConta
 	return row
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# 액자 속 농부가 이따금 눈을 깜빡인다 (가만히 있어도 살아 있어 보이게)
+	if gender_panel != null and gender_panel.visible and _idle_tex != null:
+		_blink_t += delta
+		if _blink_t >= 3.4:
+			_blink_t = 0.0
+		var shut: bool = _blink_t > 3.25 and _blink_tex != null
+		_appear_preview.texture = _blink_tex if shut else _idle_tex
 	# 개발/CI용 스크린샷
 	if OS.get_environment("KYOJIN_SHOT") == "" or OS.get_environment("KYOJIN_MP") != "":
 		return
@@ -565,6 +812,15 @@ func _process(_delta: float) -> void:
 		keys_panel.visible = false
 	elif _shot_frames == 40:
 		_on_new_game()
+	elif _shot_frames == 42:
+		# 화면에 남길 한 장은 실제로 골라 본 모습으로 (빈 칸만 찍으면 소용없다)
+		_name_edit.text = "교진"
+		_farm_edit.text = "햇살 농장"
+		_appear_gender = "f"
+		_appear = {"hair": 3, "shirt": 1, "pants": 1, "shoes": 2,
+			"skin": 2, "hair_col": 3}
+		_appear_refresh()
+		print("CREATOR_OK=", _creator_report())
 	elif _shot_frames == 44:
 		var img3 := get_viewport().get_texture().get_image()
 		img3.save_png(OS.get_environment("KYOJIN_SHOT") + "_gender.png")

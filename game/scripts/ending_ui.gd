@@ -215,6 +215,7 @@ func _build_stat_lines() -> Array:
 	var prog: Dictionary = g.note_progress()
 	var arrive := g.date_text(g.arrive_day) if g.arrive_day > 0 else "1년 봄 1일"
 	var out: Array = [
+		["우리 농장", "%s — 처음 이름을 지어 준 그날부터 그대로다" % g.farm_title()],
 		["처음 우리 마을에 온 날", "%s%s — 우체부 아저씨를 따라, 처음 마을에 발을 디뎠다"
 			% [arrive, (" " + g.arrive_clock) if g.arrive_clock != "" else ""]],
 		["함께한 날", "%d일 — 오늘까지, 하루도 같은 날이 없었다" % g.day],
@@ -371,7 +372,7 @@ func _start_outro() -> void:
 	for c in _root.get_children():
 		c.queue_free()
 	var t1 := Label.new()
-	t1.text = "— 교진 팜 —"
+	t1.text = "— Little Root —"
 	t1.position = Vector2(0, 200)
 	t1.size = Vector2(960, 44)
 	t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

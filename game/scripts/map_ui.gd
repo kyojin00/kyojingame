@@ -693,7 +693,7 @@ func _draw_map() -> void:
 func map_plate() -> String:
 	if GameData.tutorial_space:
 		return "마을로 가는 숲길"
-	return "교진 마을 · %s의 농장" % GameData.seller_name()
+	return "교진 마을 · %s" % GameData.farm_title()
 
 
 # ---- 지도의 장식 ----

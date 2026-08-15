@@ -328,6 +328,13 @@ func seller_name() -> String:
 	return n.substr(0, 24) if n != "" else "이름 없는 농부"
 
 
+# 지도 이름패·엔딩 통계에 쓰는 농장 이름.
+# 생성창에서 따로 짓지 않았으면 「<이름>의 농장」으로 대신한다.
+func farm_title() -> String:
+	var n := farm_name.strip_edges()
+	return n.substr(0, 12) if n != "" else "%s의 농장" % seller_name()
+
+
 func save_settings() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if f:
@@ -858,12 +865,16 @@ var gender := "m"  # 플레이어 성별 (m/f) — 옛 세이브 호환용 (외�
 # 표준 팔레트(파랑 셔츠·갈색 바지·밤색 신발)로 뽑은 도트의 색을
 # 실행 중에 갈아입힌다 (recolor_player_image). 게임 코드는 언제나
 # 조립 결과인 pc_* 텍스처만 본다 (main.apply_appearance가 굽는다).
-var appearance := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0}
+var appearance := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0,
+	"skin": 0, "hair_col": 0}
 const HAIR_PREFIX := ["new_boy", "hair_short", "hair_spiky", "player_f"]
 const HAIR_NAMES := ["민머리", "짧은 머리", "삐죽 머리", "긴 머리"]
 const SHIRT_NAMES := ["파랑", "분홍", "초록", "노랑"]
 const PANTS_NAMES := ["갈색", "남색", "잿빛", "카키"]
 const SHOES_NAMES := ["밤색", "검정", "빨강", "파랑"]
+const SKIN_NAMES := ["살구", "흰 살결", "볕에 그은", "구릿빛", "갈색", "짙은 갈색"]
+const HAIR_COL_NAMES := ["갈색", "검정", "짙은 갈색", "금발", "붉은 머리",
+	"잿빛", "분홍", "하늘빛"]
 # [기본, 그늘, 밝은 면] — 0번이 도트가 실제로 칠해진 표준 팔레트다
 const APPEAR_SHIRT := [
 	[[58, 88, 168], [38, 58, 120], [94, 126, 200]],
@@ -883,6 +894,30 @@ const APPEAR_SHOES := [
 	[[150, 58, 46], [106, 38, 30]],
 	[[60, 76, 140], [40, 52, 102]],
 ]
+# 피부 [기본, 밝은 면, 그늘, 볼, 입] — 도트에서 실제로 쓰이는 다섯 칸이다.
+# (민머리는 정수리가 「밝은 면」, 머리 있는 쪽은 앞머리 밑이 「그늘」)
+# 테두리(54,33,26)·눈(66,32,30)·눈썹(136,70,42)은 건드리지 않는다 —
+# 피부를 아무리 어둡게 해도 얼굴선이 뭉개지지 않게.
+const APPEAR_SKIN := [
+	[[243, 159, 138], [250, 192, 170], [213, 116, 98], [235, 128, 114], [170, 84, 66]],
+	[[252, 220, 203], [255, 240, 228], [232, 182, 166], [246, 196, 186], [205, 140, 126]],
+	[[226, 166, 120], [240, 196, 156], [190, 126, 84], [220, 140, 104], [156, 92, 58]],
+	[[198, 134, 92], [216, 166, 124], [158, 98, 62], [190, 112, 78], [128, 72, 44]],
+	[[158, 102, 68], [182, 130, 94], [120, 72, 46], [150, 86, 58], [96, 54, 34]],
+	[[116, 74, 50], [142, 98, 68], [84, 50, 32], [110, 62, 42], [68, 38, 24]],
+]
+# 머리카락 [기본, 밝은 면, 그늘] — 민머리(new_boy)에는 이 색이 아예 없어서
+# 아무리 바꿔도 그림이 그대로다 (그래서 생성창에서 머리색 줄이 흐려진다)
+const APPEAR_HAIR_COL := [
+	[[118, 72, 40], [152, 100, 56], [86, 52, 30]],
+	[[52, 46, 50], [78, 72, 78], [32, 28, 32]],
+	[[84, 52, 32], [112, 74, 46], [58, 34, 20]],
+	[[214, 170, 84], [240, 208, 132], [168, 124, 52]],
+	[[190, 96, 48], [220, 134, 74], [142, 64, 30]],
+	[[150, 148, 152], [186, 184, 188], [110, 108, 114]],
+	[[214, 120, 160], [238, 160, 192], [164, 80, 118]],
+	[[96, 140, 190], [132, 178, 220], [66, 100, 146]],
+]
 
 
 # 표준 팔레트로 뽑힌 플레이어 도트의 옷 색을 ap 선택에 맞춰 바꾼다.
@@ -890,7 +925,9 @@ const APPEAR_SHOES := [
 func recolor_player_image(img: Image, ap: Dictionary) -> void:
 	var mp := {}
 	for tbl_sel in [[APPEAR_SHIRT, int(ap.shirt)], [APPEAR_PANTS, int(ap.pants)],
-			[APPEAR_SHOES, int(ap.shoes)]]:
+			[APPEAR_SHOES, int(ap.shoes)],
+			[APPEAR_SKIN, int(ap.get("skin", 0))],
+			[APPEAR_HAIR_COL, int(ap.get("hair_col", 0))]]:
 		var tbl: Array = tbl_sel[0]
 		var sel: int = clampi(int(tbl_sel[1]), 0, tbl.size() - 1)
 		if sel == 0:
@@ -915,8 +952,9 @@ func recolor_player_image(img: Image, ap: Dictionary) -> void:
 var story_phase := "done"
 # 벤 나무 자리의 재성장 대기열: [x, y, 남은 일수]
 var tree_regrow: Array = []
-# 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
+# 유저 닉네임 · 농장 이름: 둘 다 타이틀의 캐릭터 생성창에서 정한다
 var player_name := ""
+var farm_name := ""
 
 # 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
 # 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
@@ -6507,6 +6545,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tool_slots": tool_slots,
 		"tree_regrow": tree_regrow,
 		"player_name": player_name,
+		"farm_name": farm_name,
 		"village_built": village_built,
 		"house_lv": house_lv,
 		"has_bed": has_bed,

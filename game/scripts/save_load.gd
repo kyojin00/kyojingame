@@ -52,10 +52,13 @@ func _apply_save(d: Dictionary) -> void:
 		"shirt": int(ap.get("shirt", 1 if was_f else 0)),
 		"pants": int(ap.get("pants", 0)),
 		"shoes": int(ap.get("shoes", 0)),
+		"skin": int(ap.get("skin", 0)),
+		"hair_col": int(ap.get("hair_col", 0)),
 	}
 	GameData.story_phase = str(d.get("main_story", "done"))
 	GameData.tree_regrow = d.get("tree_regrow", [])
 	GameData.player_name = str(d.get("player_name", ""))
+	GameData.farm_name = str(d.get("farm_name", ""))
 	GameData.village_built = d.get("village_built", [])
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))

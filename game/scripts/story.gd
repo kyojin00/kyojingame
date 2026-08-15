@@ -214,7 +214,7 @@ func _story_update(delta: float) -> void:
 	var story_shot := m._shot_path != "" and OS.get_environment("KYOJIN_STORY") != ""
 	# 안전장치: 어떤 이유로든 연출이 끊겨 조작이 잠긴 채 남으면 풀어 준다.
 	# (편지 전달 중에는 원래 잠겨 있어야 한다)
-	if m.story_cutscene and not m.dialog.visible and m._name_layer == null \
+	if m.story_cutscene and not m.dialog.visible \
 			and _postman_state != "deliver" and not _chief_greet \
 			and not _world_entry_running:
 		m._cutscene_idle += delta
@@ -440,7 +440,8 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 
 
 func _start_postman_dialog() -> void:
-	# 1부: 인사 -> 이름 질문. 이름 입력 후 2부로 이어진다.
+	# 1부: 인사 -> 통성명. 이름은 타이틀 생성창에서 이미 정했으니
+	# 여기서는 묻지 않고 「밝혔다」고만 적고 2부로 넘어간다.
 	if m._shot_path != "" and OS.get_environment("KYOJIN_STORY") != "":
 		get_tree().create_timer(0.25).timeout.connect(
 			func() -> void: _snap_story("story_dialog"))
@@ -453,61 +454,13 @@ func _start_postman_dialog() -> void:
 		{"text": "「그런데 보게나 — 마을로 드는 길은 이 숲\n하나뿐인데, 오래 사람이 안 다녔더니 나무가\n길을 통째로 삼켜 버렸지 뭔가.」"},
 		{"text": "「이 늙은 몸으로 혼자 뚫고 가자니 영 엄두가\n안 나던 참이었네. 자네를 만난 게 천운이구먼!」",
 			"portrait": m.tex["npc_postman_portrait_happy"]},
-		{"text": "「그러고 보니, 자네 이름이 어떻게 되나?」"},
-	], _show_name_input)
-
-
-func _show_name_input() -> void:
-	# 이름 입력: 여기서 정한 닉네임을 게임 전체에서 사용한다
-	m._name_layer = CanvasLayer.new()
-	m._name_layer.layer = 30
-	var panel := Panel.new()
-	var st := StyleBoxFlat.new()
-	st.bg_color = Color(0.91, 0.71, 0.42, 0.98)
-	st.border_color = Color(0.43, 0.24, 0.11)
-	st.set_border_width_all(2)
-	st.set_corner_radius_all(4)
-	panel.add_theme_stylebox_override("panel", st)
-	panel.position = Vector2(330, 200)
-	panel.size = Vector2(300, 120)
-	m._name_layer.add_child(panel)
-	var lab := Label.new()
-	lab.text = "이름을 알려주자"
-	lab.position = Vector2(0, 10)
-	lab.size = Vector2(300, 20)
-	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lab.add_theme_color_override("font_color", Color(0.29, 0.16, 0.06))
-	panel.add_child(lab)
-	var edit := LineEdit.new()
-	edit.position = Vector2(50, 40)
-	edit.size = Vector2(200, 30)
-	edit.max_length = 8
-	edit.placeholder_text = "이름 입력 (최대 8자)"
-	edit.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	panel.add_child(edit)
-	var btn := Button.new()
-	btn.text = "확인"
-	btn.position = Vector2(110, 80)
-	btn.size = Vector2(80, 28)
-	btn.focus_mode = Control.FOCUS_NONE
-	panel.add_child(btn)
-	var confirm := func() -> void:
-		var nm := edit.text.strip_edges()
-		if nm == "":
-			nm = "친구"
-		GameData.player_name = nm
-		m._name_layer.queue_free()
-		m._name_layer = null
-		Sound.play_sfx("sfx_ui")
-		_start_postman_dialog2()
-	btn.pressed.connect(confirm)
-	edit.text_submitted.connect(func(_t: String) -> void: confirm.call())
-	add_child(m._name_layer)
-	edit.grab_focus.call_deferred()
+		{"text": "「그러고 보니 통성명이 늦었구먼. 나는 이 길을\n삼십 년째 걷고 있는 우체부라네.」"},
+		{"text": "(나는 이름을 밝히고 짧게 인사했다.)"},
+	], _start_postman_dialog2)
 
 
 func _start_postman_dialog2() -> void:
-	# 2부: 닉네임으로 부르며 동행 제안 -> 숲을 바라보며 상황 설명 -> 도끼 전달 -> 퀘스트 안내
+	# 2부: 생성창에서 지은 이름으로 부르며 동행 제안 -> 숲을 바라보며 상황 설명 -> 도끼 전달 -> 퀘스트 안내
 	var nm := GameData.player_name
 	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_normal"], [
 		{"text": "「%s(이)라... 좋은 이름이구먼.」" % nm,
