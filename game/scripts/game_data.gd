@@ -4723,6 +4723,25 @@ func unlock_all_tools() -> void:
 	unlocked_tools = ALL_TOOLS.duplicate()
 
 
+# ---- 개발/테스트용: 가방을 통째로 채운다 (DEV_MODE에서 F10) ----
+# 장터·요리·조합처럼 「물건이 많아야 볼 수 있는 것」을 손으로 모으지 않고
+# 바로 확인하려고 쓴다. 도구도 전부 열고 품질별 수확물까지 채운다.
+func dev_fill_stock(n: int = DEV_STOCK) -> void:
+	money = maxi(money, DEV_MONEY)
+	wood = n
+	stone = n
+	for id: String in CROP_IDS:
+		seeds[id] = n
+		produce[id] = n
+		produce_silver[id] = int(n / 3.0)   # 은빛·금빛도 섞어 둔다 (품질별 확인용)
+		produce_gold[id] = int(n / 3.0)
+	for id: String in ITEM_IDS:
+		items[id] = n
+	unlock_all_tools()
+	# 도감(discover)은 일부러 건드리지 않는다 — 컬렉션 보상과 영구 버프가
+	# 한꺼번에 터져서 정작 보려던 것을 덮어 버린다.
+
+
 func fresh_tutorial() -> Dictionary:
 	var t := {"active": true}
 	for pair in TUTORIAL_ORDER:

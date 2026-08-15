@@ -27,9 +27,14 @@ var GH := CAVE_H_BASE
 var cam := Vector2.ZERO
 var seen := {}           # 미니맵에 드러난 칸
 
+# 휘두르기 도트·도구 자리·자세 값은 바깥 세상과 **똑같은 것**을 쓴다.
+# 여기서 따로 잡으면 동굴에서만 어깨가 어긋난다.
+const PlayerArt := preload("res://scripts/player.gd")
+
 var main: Node2D
 var canvas: Control
 var player_sprite: Sprite2D
+var tool_sprite: Sprite2D    # 휘두르는 동안만 보인다
 
 var floor_num := 1
 var walls := {}         # Vector2i -> true
@@ -46,7 +51,13 @@ var moving := false
 var anim_time := 0.0
 var attack_cd := 0.0
 var hurt_cd := 0.0
+# 휘두르기 — 바깥 세상과 같은 도트를 쓴다 (감기 -> 내리침 -> 되돌아옴).
+# swing_t는 남은 시간, swing_len은 이번 동작의 전체 길이,
+# swing_dir은 **시작할 때의 방향** (도중에 방향을 틀어도 그림이 안 튄다).
 var swing_t := 0.0
+var swing_len := 0.0
+var swing_dir := "right"
+var swing_fx := 0.0      # 히트박스 번쩍임 — 그림보다 짧게 스친다
 # ---- 피격 연출 ----
 # 맞는 순간: 하얀 번쩍 한 프레임 -> 붉은 기 + 눈 질끈, 히트스톱, 화면 흔들림,
 # 미끄러지는 넉백. 남은 무적시간에는 점멸해서 언제 다시 맞는지 보여 준다.
@@ -73,6 +84,11 @@ func _ready() -> void:
 	player_sprite.centered = false
 	player_sprite.scale = Vector2(0.5, 0.5)
 	add_child(player_sprite)
+	# 손에 든 도구. 쥐는 자리를 축으로 돌리니 가운데 맞춤을 끈다
+	tool_sprite = Sprite2D.new()
+	tool_sprite.centered = false
+	tool_sprite.visible = false
+	add_child(tool_sprite)
 
 
 var worldtree := false  # 세계수 동굴 모드 (강화 몬스터 + 3층 보스)
@@ -302,6 +318,10 @@ func _gen_floor() -> void:
 		else (st if st.x >= 0 else Vector2i(GW - 3, 2))
 	ppos = Vector2(OX + (entry_pos.x + 0.5) * TS, OY + (entry_pos.y + 0.5) * TS)
 	pdir = "right"
+	# 층을 내려오는 순간까지 휘두르던 동작은 여기서 끊는다
+	swing_t = 0.0
+	swing_fx = 0.0
+	tool_sprite.visible = false
 	cam = ppos
 	_mark_seen()
 
@@ -358,7 +378,8 @@ func _process(delta: float) -> void:
 		return
 	attack_cd -= delta
 	hurt_cd -= delta
-	swing_t -= delta
+	swing_t = maxf(0.0, swing_t - delta)
+	swing_fx = maxf(0.0, swing_fx - delta)
 	hurt_flash = maxf(0.0, hurt_flash - delta)
 	shake_t = maxf(0.0, shake_t - delta)
 	shake_off = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) \
@@ -485,15 +506,23 @@ func _attack() -> void:
 	# 그 밖(맨손)은 도끼 힘으로 기본 박자
 	var wpn: String = GameData.tool if GameData.tool in ["spear", "sword"] else ""
 	attack_cd = 1.1 if wpn == "spear" else (0.8 if wpn == "sword" else 0.35)
-	swing_t = 0.15
+	_start_swing()
 	Sound.play_sfx("sfx_chop", 0.2)
 	_attack_hit(wpn, true)
 	if wpn == "sword":
 		# 둘째 타 — 순수 무기 위력만 (보너스가 두 번 실리지 않게)
 		get_tree().create_timer(0.16).timeout.connect(func() -> void:
 			if visible:
-				swing_t = 0.15
+				_start_swing()
 				_attack_hit(wpn, false))
+
+
+# 휘두르기 시작 — 바깥 세상과 같은 길이·같은 도트를 쓴다
+func _start_swing() -> void:
+	swing_len = main.SWING_TIME
+	swing_t = swing_len
+	swing_dir = pdir
+	swing_fx = 0.15
 
 
 func _attack_hit(wpn: String, first: bool) -> void:
@@ -689,6 +718,20 @@ func _update_sprite() -> void:
 	# 맞은 직후엔 눈을 질끈 감는다 (깜빡임 그림 재활용 — 뒷모습은 눈이 없다)
 	if hurt_cd > 0.55 and pdir != "up":
 		tex_name = "pc_%s_blink" % ("side" if (pdir == "left" or pdir == "right") else "down")
+	# 휘두르는 중이면 그 도트가 걷기·서기·깜빡임을 다 덮는다.
+	# **바깥 세상과 같은 그림**이라 동굴에서만 자세가 달라 보이지 않는다.
+	var sw_key := ""
+	var sw_phase := 0
+	if swing_t > 0.0 and swing_len > 0.0:
+		var key: String = "side" if (swing_dir == "left" or swing_dir == "right") \
+			else swing_dir
+		sw_phase = _swing_phase()
+		var sw_name := "%s_%d" % [GameData.swing_tex_base(key), sw_phase]
+		if main.tex.has(sw_name):
+			sw_key = key
+			tex_name = sw_name
+			player_sprite.flip_h = swing_dir == "left"
+	_place_tool(sw_key, sw_phase)
 	player_sprite.texture = main.tex[tex_name]
 	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
 	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
@@ -702,6 +745,78 @@ func _update_sprite() -> void:
 		player_sprite.modulate = Color(1, 1, 1, 0.4 if fmod(hurt_cd, 0.14) < 0.07 else 1.0)
 	else:
 		player_sprite.modulate = Color(1, 1, 1)
+	# 손에 든 것도 같이 번쩍이고 같이 점멸한다 (도구만 멀쩡하면 따로 논다)
+	tool_sprite.modulate = player_sprite.modulate
+
+
+# 지금 위상 (0=감기 시작 / 1=다 감음 / 2=휘두름 / 3=내리침 / 4=되돌아옴).
+# player.gd의 swing_phase와 같은 식이다 — 한쪽만 고치면 동굴에서 박자가 어긋난다.
+func _swing_phase() -> int:
+	if swing_len <= 0.0:
+		return 0
+	var p: float = 1.0 - swing_t / swing_len
+	var hit: float = clampf(main.HIT_AT / maxf(0.01, main.SWING_TIME), 0.15, 0.8)
+	if p < hit * 0.34:
+		return 0
+	if p < hit * 0.74:
+		return 1
+	if p < hit:
+		return 2
+	return 3 if p < hit + (1.0 - hit) * 0.55 else 4
+
+
+# 휘두르기 진행도 -1(다 감음) ~ +1(다 내리침). player.gd의 _swing_curve와 같다.
+func _swing_c() -> float:
+	if swing_t <= 0.0 or swing_len <= 0.0:
+		return 0.0
+	var p: float = 1.0 - swing_t / swing_len
+	var hit: float = clampf(main.HIT_AT / maxf(0.01, main.SWING_TIME), 0.15, 0.8)
+	var wind: float = hit * 0.62
+	if p < wind:
+		return -sin(p / wind * PI * 0.5)
+	if p < hit:
+		var q: float = (p - wind) / maxf(0.01, hit - wind)
+		return -1.0 + 2.0 * q * q
+	if p < hit + PlayerArt.SWING_HOLD:
+		return 1.0
+	var r: float = (p - hit - PlayerArt.SWING_HOLD) \
+		/ maxf(0.02, 1.0 - hit - PlayerArt.SWING_HOLD)
+	return 1.0 - r * r * (3.0 - 2.0 * r)
+
+
+# 손에 든 도구를 주먹 자리에 얹는다. key가 비면 감춘다.
+# 자리 값(SWING_HAND_DOT)은 발밑이 원점인 **0.5배 그림 기준**이라
+# 여기서는 ZOOM만 더 곱하면 바깥 세상과 같은 자리에 온다.
+func _place_tool(key: String, phase: int) -> void:
+	var icon := ""
+	if key != "" and PlayerArt.SWING_HAND_DOT.has(key):
+		icon = str(PlayerArt.TOOL_ICONS.get(GameData.tool, ""))
+		if GameData.tool == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
+			icon = "icon_axe_stone"
+	if icon == "" or not main.tex.has(icon):
+		tool_sprite.visible = false
+		return
+	var tex: Texture2D = main.tex[icon]
+	var grip: Vector2 = PlayerArt.TOOL_GRIP.get(icon, Vector2(16, 30))
+	var pose: Dictionary = PlayerArt.SWING_POSE[key]
+	var sign_x := -1.0 if swing_dir == "left" else 1.0
+	var spin: float = sign_x * float(pose.spin)
+	var c := _swing_c()
+	tool_sprite.texture = tex
+	tool_sprite.visible = true
+	tool_sprite.scale = Vector2(1.15, 1.15) * ZOOM
+	tool_sprite.flip_h = (spin < 0.0) != PlayerArt.TOOL_MIRROR.has(GameData.tool)
+	var tw := float(tex.get_width())
+	tool_sprite.offset = Vector2(
+		-(tw - 1.0 - grip.x) if tool_sprite.flip_h else -grip.x, -grip.y)
+	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * spin
+	var hand: Vector2 = PlayerArt.SWING_HAND_DOT[key][clampi(phase, 0, 4)]
+	tool_sprite.position = _to_screen(ppos) + Vector2(hand.x * sign_x, hand.y) * ZOOM
+	# 감아올릴 때는 몸 뒤, 내리치기 시작하면 앞. 뒤를 보고 칠 때는 내내 뒤다.
+	if key == "up" or c < 0.0:
+		move_child(tool_sprite, player_sprite.get_index())
+	else:
+		move_child(tool_sprite, get_child_count() - 1)
 
 
 # 주인공 둘레를 미니맵에 드러낸다 (한 화면에 안 들어오니 길잡이가 필요하다)
@@ -813,8 +928,8 @@ func _draw_cave() -> void:
 		var moff := Vector2(-24, -32) if m.type == "treant" else Vector2(-16, -20)
 		canvas.draw_texture(main.tex["%s_%d" % [m.type, frame]], m.pos + moff, mod)
 
-	# 공격 스윙
-	if swing_t > 0.0:
+	# 공격 스윙 — 어디까지 닿는지 한 번 스친다 (그림보다 짧다)
+	if swing_fx > 0.0:
 		var reach := ppos + _dir_vec() * 28.0
 		canvas.draw_rect(Rect2(reach.x - 12, reach.y - 12, 24, 24), Color(1, 0.9, 0.5, 0.5))
 

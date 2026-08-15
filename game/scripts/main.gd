@@ -997,6 +997,21 @@ var _mouse_target := Vector2i(-999, -999)
 var _sel_target := Vector2i(-999, -999)
 
 
+# 개발/테스트용 — 가방을 통째로 채운다.
+# 장터에 올려 보거나 요리·조합을 훑어볼 때 손으로 모으고 있을 수 없다.
+func _dev_fill_stock() -> void:
+	if not GameData.DEV_MODE:
+		return
+	GameData.dev_fill_stock()
+	Sound.play_sfx("sfx_ui")
+	hud.show_message("[개발] 씨앗·수확물·물건을 %d개씩 채웠다. 도구도 전부 열었다."
+		% GameData.DEV_STOCK, 4.0)
+	saveio.save_now()
+	if Net.is_host():
+		netsync._broadcast_stats()
+	queue_redraw()
+
+
 func ui_open() -> bool:
 	return story_cutscene or shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
@@ -1452,6 +1467,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		Sound.play_sfx("sfx_ui")
 		stats_ui.toggle()
 		return
+	# 개발/테스트: F10 — 가방을 10000개씩 채운다 (DEV_MODE에서만)
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F10 and GameData.DEV_MODE:
+		_dev_fill_stock()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 함께하기 방 코드 + 저장 후 타이틀로.
 		# (방 코드를 화면에 늘 띄우면 눈에 거슬려서 여기서 꺼내 본다)
@@ -1467,6 +1487,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.show_message("방 코드 %s — 복사했다!" % rcode)])
 		elif Net.is_guest():
 			body = "친구의 농장에서 함께 일하는 중이다.\n\n%s" % body
+		if GameData.DEV_MODE:
+			# 테스트용 — 출시 전에 DEV_MODE를 끄면 이 단추도 같이 사라진다
+			btns.push_front(["[개발] 아이템 10000개 (F10)", _dev_fill_stock])
 		dialog.open("게임 메뉴", body, btns)
 		return
 	for slot_i in 9:

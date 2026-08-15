@@ -15,6 +15,11 @@ var ALCHEMY := Rect2(345, 117, 108, 39)
 var EXIT_X := Vector2(408, 552)       # 아랫벽 문 구간
 var WINDOWS: Array = [270.0, 690.0]   # 창문 x 자리
 const GRID := 12.0                      # 꾸미기 배치 격자
+# 사람을 그리는 배율 — **바깥 세상(main.CAMERA_ZOOM)과 똑같이** 맞춘다.
+# 예전에는 0.5로만 그려서 문 하나 지났을 뿐인데 캐릭터가 1.8배로 커졌다.
+# 방·세간은 처음부터 이 크기의 사람을 놓고 그린 것들이다 (침대 99px =
+# 누운 사람 길이 · 발밑 그림자 8x3). 사람만 어긋나 있었다.
+const ZOOM := 0.56
 
 
 # 집 단계에 맞춰 방 크기와 붙박이 자리를 정한다
@@ -70,7 +75,7 @@ func _ready() -> void:
 
 	player_sprite = Sprite2D.new()
 	player_sprite.centered = false
-	player_sprite.scale = Vector2(0.5, 0.5)
+	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
 	add_child(player_sprite)
 
 	# 집 안에서 바로 여는 창 버튼 — 연구노트(N) · 퀘스트(Q)
@@ -144,7 +149,8 @@ func _process(delta: float) -> void:
 			pdir = "right" if v.x > 0 else "left"  # 대각선 포함 옆모습
 		else:
 			pdir = "down" if v.y > 0 else "up"
-		var np := ppos + v * 150.0 * delta
+		# 걸음도 바깥과 같은 빠르기로 (사람이 작아졌으니 px 속도도 그만큼)
+		var np := ppos + v * 150.0 * ZOOM * delta
 		np.x = clampf(np.x, ROOM.position.x + 18, ROOM.end.x - 18)
 		np.y = clampf(np.y, FLOOR_TOP + 9, ROOM.end.y - 6)
 		if not _blocked(np):
@@ -471,7 +477,8 @@ func _update_sprite() -> void:
 	player_sprite.texture = main.tex[tex_name]
 	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
 	# (예전 값은 몸통을 ppos에 두어 발이 방 밖으로 삐져나왔다)
-	player_sprite.position = ppos + Vector2(-32, -95)
+	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
+	player_sprite.position = ppos + Vector2(-32, -95) * ZOOM
 	player_sprite.modulate.a = 0.4 if deco_mode else 1.0
 
 
