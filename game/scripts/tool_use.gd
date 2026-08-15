@@ -11,6 +11,25 @@ extends Node
 
 var m: KyojinMain    # main.gd
 
+# 이번 도구질에 들 기력. 「일이 실제로 일어났을 때」만 빠진다 (`_charge`).
+var _pending_cost := 0.0
+var _charged := false
+var _charge_night := false
+
+
+# 기력을 뺀다 — 도구질 한 번에 한 번만.
+# 휘두르는 동작이 나갔거나(swing_at) 밭이 갈렸거나 물이 들어갔을 때 부른다.
+# 「여기는 갈 수 없다」처럼 헛손질로 끝난 경우에는 부르지 않는다.
+func _charge() -> void:
+	if _charged:
+		return
+	_charged = true
+	if _pending_cost > 0.0:
+		GameData.energy = maxf(0.0, GameData.energy - _pending_cost)
+	_pending_cost = 0.0
+	if _charge_night and randf() < 0.15:
+		m.hud.show_message("어두워서 일이 손에 잡히지 않는다... 슬슬 돌아가서 쉬자.")
+
 
 func set_tool(t: String) -> void:
 	if not GameData.is_tool_unlocked(t):
@@ -146,6 +165,12 @@ func use_tool() -> void:
 		return
 	# 도구를 쓰면 장비의 「기력 소모」만큼 힘이 든다.
 	# 밤에는 그대로, 낮에는 가볍게. (수확은 맨손이라 들지 않는다)
+	#
+	# **여기서 바로 빼지 않는다.** 못 쓰는 자리에 헛손질하면 아무 일도 안
+	# 일어나는데 기력만 닳는다 — 실제로 일이 됐을 때 `_charge`가 뺀다.
+	_pending_cost = 0.0
+	_charged = false
+	_charge_night = false
 	if not m.remote_acting:
 		var night := GameData.is_night()
 		var cost := GameData.tool_stat(GameData.tool, "stamina") \
@@ -154,10 +179,8 @@ func use_tool() -> void:
 		# 컬렉션 「동굴의 광물」 완성 — 다 아는 자의 곡괭이는 가볍다
 		if GameData.tool == "pickaxe":
 			cost *= GameData.perk_pick_stamina_mult()
-		if cost > 0.0:
-			GameData.energy = maxf(0.0, GameData.energy - cost)
-		if night and randf() < 0.15:
-			m.hud.show_message("어두워서 일이 손에 잡히지 않는다... 슬슬 돌아가서 쉬자.")
+		_pending_cost = maxf(0.0, cost)
+		_charge_night = night
 	var t: Vector2i = m.actions.target_tile()
 	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
 		return
@@ -173,6 +196,8 @@ func use_tool() -> void:
 				cell.crop_day = 0
 				cell.dead = false
 				cell.half_fed = false
+				_charge()
+				swing_motion(t)
 				Sound.play_sfx("sfx_hoe", 0.1)
 				m.hud.show_message("시든 작물을 정리했다.")
 			elif obj != null:
@@ -182,6 +207,8 @@ func use_tool() -> void:
 				cell.ground = "grass"
 				cell.watered = false
 				cell.wet_min = 0.0
+				_charge()
+				swing_motion(t)
 				Sound.play_sfx("sfx_hoe", 0.1)
 			else:
 				var worked := false
@@ -202,8 +229,12 @@ func use_tool() -> void:
 					m.story.story16_field_work("till", pos)
 					m.story.story20_till(pos)
 				if worked:
+					_charge()
+					swing_motion(t)
 					Sound.play_sfx("sfx_hoe", 0.1)
 					m.tutorial_notify("till")
+				else:
+					m.hud.show_message("여기는 갈 곳이 아니다.")
 		"water":
 			var worked := false
 			var revived := false
@@ -220,6 +251,8 @@ func use_tool() -> void:
 					m.story.story20_water(pos)   # 할아버지의 씨앗에 주는 첫 물
 					revived = revived or was_thirsty
 			if worked:
+				_charge()
+				swing_motion(t)
 				Sound.play_sfx("sfx_water", 0.1)
 				m.tutorial_notify("water")
 				if revived:
@@ -250,6 +283,7 @@ func use_tool() -> void:
 			cell.half_fed = false
 			if GameData.weather_wet(m.weather_now()):
 				m.farming._wet(cell, m.WET_ALL_DAY)
+			_charge()
 			Sound.play_sfx("sfx_seed", 0.1)
 			m.renderer.spawn_particles(t, "seed")
 			m.tutorial_notify("plant")
@@ -326,6 +360,7 @@ func use_tool() -> void:
 				m.objnode._remove_object(t)
 				GameData.wood += GameData.FENCE_COST_WOOD
 				m.farming._recount_pasture()   # 울타리를 걷으면 목초지가 풀린다
+				_charge()
 				Sound.play_sfx("sfx_place")
 				m.hud.show_message("울타리를 회수했다.")
 			else:
@@ -379,6 +414,7 @@ func use_tool() -> void:
 				m.objnode._remove_object(t)
 				GameData.wood += GameData.SPRINKLER_COST_WOOD
 				GameData.stone += GameData.SPRINKLER_COST_STONE
+				_charge()
 				Sound.play_sfx("sfx_place")
 				m.hud.show_message("스프링클러를 회수했다.")
 			else:
@@ -393,6 +429,7 @@ func use_tool() -> void:
 				return
 			GameData.wood -= GameData.FENCE_COST_WOOD
 			m.objnode._place_object(t, "fence", 0)
+			_charge()
 			Sound.play_sfx("sfx_place")
 			var was: int = m.pasture.size()
 			m.farming._recount_pasture()
@@ -414,6 +451,7 @@ func use_tool() -> void:
 			GameData.stone -= GameData.SPRINKLER_COST_STONE
 			m.objnode._place_object(t, "sprinkler", 0)
 			m.farming._sprinkle(t)                      # 설치하자마자 바로 적신다
+			_charge()
 			Sound.play_sfx("sfx_place")
 			m.hud.show_message("스프링클러 설치! 주변 4칸에 계속 물을 준다.")
 		"spear", "sword":
@@ -421,6 +459,7 @@ func use_tool() -> void:
 		"rod":
 			match m.fishing_state:
 				"":
+					_charge()
 					m.fishing._start_fishing()
 				"waiting":
 					m.fishing_state = ""
@@ -498,13 +537,24 @@ func _fall_side(t: Vector2i) -> float:
 # 손상 단계 그림 교체처럼 「눈에 보이는 일」을 여기 실어 보낸다.
 func swing_at(t: Vector2i, particle: String, heavy: bool = false,
 		after: Callable = Callable()) -> void:
+	# 휘두르는 동작이 나갔다 = 일을 했다. 여기서 기력을 뺀다
+	# (헛손질로 끝나는 길에서는 아예 여기까지 오지 않는다)
+	_charge()
+	swing_motion(t)
+	m._pending_hits.append({"t": m.HIT_AT, "tile": t, "particle": particle,
+		"heavy": heavy, "after": after})
+
+
+# 판정 없이 **동작만**. 호미·물뿌리개처럼 「날이 닿는 순간」이 따로 없는
+# 도구도 팔은 휘둘러야 한다 — 안 그러면 기력만 닳고 가만히 서 있다.
+func swing_motion(t: Vector2i) -> void:
+	if m.player == null:
+		return
 	var here := m.player_tile()
 	var face := Vector2(t.x - here.x, t.y - here.y)
 	if face == Vector2.ZERO:
 		face = _dir_to_vec(m.player.dir)
 	m.player.start_swing(GameData.tool, face.normalized(), m.SWING_TIME)
-	m._pending_hits.append({"t": m.HIT_AT, "tile": t, "particle": particle,
-		"heavy": heavy, "after": after})
 
 
 func _dir_to_vec(d: String) -> Vector2:

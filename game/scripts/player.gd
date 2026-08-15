@@ -123,6 +123,7 @@ const SWING_HAND_DOT := {
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
 	"hoe": "icon_hoe", "water": "icon_water",
+	"sword": "icon_sword", "spear": "icon_spear",
 }
 # 도구 그림마다 자루가 놓인 방향이 다르다. 곡괭이·호미·물뿌리개는 자루가
 # **왼쪽 아래**에서 머리가 오른쪽 위로 가는데 **도끼만 반대**다
@@ -137,6 +138,8 @@ const TOOL_GRIP := {
 	"icon_axe": Vector2(25, 30), "icon_axe_stone": Vector2(26, 30),
 	"icon_pickaxe": Vector2(3, 30), "icon_hoe": Vector2(4, 23),
 	"icon_water": Vector2(13, 23),
+	# 돌창·돌검도 자루가 왼쪽 아래 (곡괭이와 같은 방향)
+	"icon_sword": Vector2(4, 29), "icon_spear": Vector2(5, 28),
 }
 
 var _was_riding := false        # 그림자 크기를 다시 그릴 때만 쓴다
@@ -183,16 +186,21 @@ func _ready() -> void:
 
 # 휘두르기 시작. face = 내리치는 방향, length = 동작 길이(초)
 func start_swing(tool_id: String, face: Vector2, length: float) -> void:
-	if not TOOL_ICONS.has(tool_id):
-		return
-	var icon: String = TOOL_ICONS[tool_id]
+	# 손에 쥘 그림을 고른다. **그림이 없어도 몸은 반드시 휘두른다** —
+	# 여기서 되돌아가 버리면 기력만 닳고 동작이 안 나온다.
+	var icon := str(TOOL_ICONS.get(tool_id, ""))
 	if tool_id == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
 		icon = "icon_axe_stone"
-	if not main.tex.has(icon):
-		return
-	tool_sprite.texture = main.tex[icon]
-	_tool_grip = TOOL_GRIP.get(icon, Vector2(16, 30))
-	_tool_mirror = TOOL_MIRROR.has(tool_id)
+	if icon != "" and main != null and main.tex.has(icon):
+		tool_sprite.texture = main.tex[icon]
+		_tool_grip = TOOL_GRIP.get(icon, Vector2(16, 30))
+		_tool_mirror = TOOL_MIRROR.has(tool_id)
+	else:
+		# 그림 없는 도구 — 맨손으로 휘두른다 (도구만 안 보인다)
+		tool_sprite.texture = null
+		tool_sprite.visible = false
+		_tool_grip = Vector2(16, 30)
+		_tool_mirror = false
 	swing_face = face if face != Vector2.ZERO else Vector2.DOWN
 	swing_len = maxf(0.14, length)
 	swing_t = swing_len
@@ -365,6 +373,13 @@ func _swing_visual() -> void:
 	# 도구: 손 높이에서 호를 그린다
 	var hand: Vector2 = pose.hand
 	var spin: float = sign_x * float(pose.spin)
+	if tool_sprite.texture == null:
+		# 맨손 휘두르기 — 몸짓만 남기고 도구·자취는 없다
+		tool_sprite.visible = false
+		if not _trail.is_empty():
+			_trail.clear()
+			queue_redraw()
+		return
 	tool_sprite.visible = true
 	tool_sprite.flip_h = (spin < 0.0) != _tool_mirror
 	# 쥐는 자리를 node 원점(=주먹)에 맞춘다. 좌우로 뒤집으면 그림 안의 x도

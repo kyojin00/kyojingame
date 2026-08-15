@@ -29,6 +29,7 @@ var _pick_price := 0
 # 금고 — 서버가 쥔 창고 (여기 있는 것만 장터에 올릴 수 있다)
 var _vault := {}          # {gold, items[], left_value, left_gold}
 var _vault_loaded := false
+var _gold_amt := 1000     # 금고에 넣고 뺄 돈 — 직접 쳐 넣을 수 있다
 
 
 func _ready() -> void:
@@ -468,35 +469,65 @@ func _build_vault() -> void:
 	_line("장터는 금고 안에서만 돈다 — 올릴 물건과 수수료·물건값을 여기 넣어 두자.",
 		Color(0.7, 0.68, 0.62))
 
-	# 돈 넣고 빼기
+	# 돈 넣고 빼기 — 얼마를 넣고 뺄지 **직접 쳐 넣는다**
 	var grow := HBoxContainer.new()
 	grow.add_theme_constant_override("separation", 6)
 	var gl := Label.new()
 	gl.text = "돈"
 	gl.custom_minimum_size = Vector2(40, 0)
 	grow.add_child(gl)
-	for amt in [1000, 10000]:
-		var bin := Button.new()
-		bin.text = "+%d 넣기" % amt
-		bin.focus_mode = Control.FOCUS_NONE
-		bin.disabled = GameData.money < amt
-		bin.pressed.connect(func() -> void:
+	grow.add_child(_num_edit(_gold_amt, 110,
+		func(n: int) -> void: _gold_amt = n))
+	var bin := Button.new()
+	bin.text = "넣기"
+	bin.focus_mode = Control.FOCUS_NONE
+	bin.pressed.connect(func() -> void:
+		var amt := _gold_amt
+		if amt <= 0:
+			_status = "넣을 돈을 적자."
+			_rebuild()
+			return
+		if GameData.money < amt:
+			_status = "가진 돈이 모자란다. (%dG 있다)" % GameData.money
+			_rebuild()
+			return
+		if amt > int(_vault.get("left_gold", 0)):
+			_status = "오늘 더 넣을 수 있는 돈은 %dG까지다." % int(_vault.get("left_gold", 0))
+			_rebuild()
+			return
+		Sound.play_sfx("sfx_ui")
+		GameData.money -= amt
+		_sync("", "", 0, 0, -amt)
+		api.vault_deposit("", "", 0, 0, amt))
+	grow.add_child(bin)
+	var bout := Button.new()
+	bout.text = "빼기"
+	bout.focus_mode = Control.FOCUS_NONE
+	bout.pressed.connect(func() -> void:
+		var amt := _gold_amt
+		if amt <= 0:
+			_status = "뺄 돈을 적자."
+			_rebuild()
+			return
+		if gold < amt:
+			_status = "금고에 든 돈이 모자란다. (%dG 있다)" % gold
+			_rebuild()
+			return
+		Sound.play_sfx("sfx_ui")
+		GameData.money += amt
+		_sync("", "", 0, 0, amt)
+		api.vault_withdraw("", "", 0, 0, amt))
+	grow.add_child(bout)
+	# 자주 쓰는 값은 눌러서 채운다
+	for amt3 in [1000, 10000, 100000]:
+		var bp := Button.new()
+		bp.text = str(amt3)
+		bp.focus_mode = Control.FOCUS_NONE
+		bp.pressed.connect(func() -> void:
 			Sound.play_sfx("sfx_ui")
-			GameData.money -= amt
-			_sync("", "", 0, 0, -amt)
-			api.vault_deposit("", "", 0, 0, amt))
-		grow.add_child(bin)
-	for amt2 in [1000, 10000]:
-		var bout := Button.new()
-		bout.text = "%d 빼기" % amt2
-		bout.focus_mode = Control.FOCUS_NONE
-		bout.disabled = gold < amt2
-		bout.pressed.connect(func() -> void:
-			Sound.play_sfx("sfx_ui")
-			GameData.money += amt2
-			_sync("", "", 0, 0, amt2)
-			api.vault_withdraw("", "", 0, 0, amt2))
-		grow.add_child(bout)
+			_gold_amt = amt3
+			_rebuild())
+		grow.add_child(bp)
 	_box.add_child(grow)
 
 	# 금고에 든 물건 — 눌러서 하나씩 뺀다
@@ -726,6 +757,34 @@ func _pick(cat: String, id: String, quality: int, have: int, base: int) -> void:
 	_rebuild()
 
 
+# 숫자를 직접 쳐 넣는 칸. 치는 대로 바로 값이 잡히고,
+# 엔터를 치면 화면을 다시 그려 안내 문구까지 맞춰 준다.
+# (숫자가 아닌 글자는 지운다 — 값에 엉뚱한 게 섞이면 안 된다)
+func _num_edit(value: int, width: float, on_change: Callable) -> LineEdit:
+	var e := LineEdit.new()
+	e.text = str(value)
+	e.custom_minimum_size = Vector2(width, 0)
+	e.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	e.max_length = 9
+	e.tooltip_text = "숫자를 직접 칠 수 있다"
+	e.text_changed.connect(func(s: String) -> void:
+		var digits := ""
+		for ch in s:
+			if ch >= "0" and ch <= "9":
+				digits += ch
+		if digits != s:
+			e.text = digits
+			e.caret_column = digits.length()
+		var n := 0
+		if digits != "":
+			n = int(digits)
+		on_change.call(n))
+	e.text_submitted.connect(func(_s: String) -> void:
+		Sound.play_sfx("sfx_ui")
+		_rebuild())
+	return e
+
+
 func _build_price_picker() -> void:
 	var have := _vault_qty(_pick_cat, _pick_id, _pick_quality)   # 금고에 든 만큼
 	_line("%s — 몇 개를 얼마에 올릴까? (가진 것 %d개)"
@@ -740,9 +799,11 @@ func _build_price_picker() -> void:
 	var qrow := HBoxContainer.new()
 	qrow.add_theme_constant_override("separation", 6)
 	var ql := Label.new()
-	ql.text = "개수 %d / %d" % [_pick_qty, have]
-	ql.custom_minimum_size = Vector2(150, 0)
+	ql.text = "개수 (%d까지)" % have
+	ql.custom_minimum_size = Vector2(110, 0)
 	qrow.add_child(ql)
+	qrow.add_child(_num_edit(_pick_qty, 80,
+		func(n: int) -> void: _pick_qty = clampi(n, 0, maxi(1, have))))
 	for step in [-10, -1, 1, 10]:
 		var b := Button.new()
 		b.text = ("%+d" % step)
@@ -757,9 +818,11 @@ func _build_price_picker() -> void:
 	var prow := HBoxContainer.new()
 	prow.add_theme_constant_override("separation", 6)
 	var pl := Label.new()
-	pl.text = "값 %dG" % _pick_price
-	pl.custom_minimum_size = Vector2(150, 0)
+	pl.text = "값 (G)"
+	pl.custom_minimum_size = Vector2(110, 0)
 	prow.add_child(pl)
+	prow.add_child(_num_edit(_pick_price, 120,
+		func(n: int) -> void: _pick_price = clampi(n, 0, 99999999)))
 	for step in [-1000, -100, -10, 10, 100, 1000]:
 		var b2 := Button.new()
 		b2.text = ("%+d" % step)
@@ -770,6 +833,12 @@ func _build_price_picker() -> void:
 			_rebuild())
 		prow.add_child(b2)
 	_box.add_child(prow)
+	# 매길 수 있는 값의 폭 — 잡화점 기준의 0.5배 ~ 10배
+	var base_all: int = maxi(1, _base_of(_pick_cat, _pick_id, _pick_quality)) * maxi(1, _pick_qty)
+	_line("%d개 기준 %dG ~ %dG 안에서 매길 수 있다. (지금 %dG · 수수료 %dG)"
+		% [maxi(1, _pick_qty), maxi(1, int(base_all * 0.5)), base_all * 10,
+			_pick_price, int(_pick_price * 0.05)],
+		Color(0.7, 0.68, 0.62))
 
 	var brow := HBoxContainer.new()
 	brow.add_theme_constant_override("separation", 8)
@@ -815,6 +884,15 @@ func _have_of(cat: String, id: String, quality: int) -> int:
 
 # 올리기 — 물건은 **금고에서** 빠진다 (서버가 판단한다). 게임 창고는 건드리지 않는다
 func _do_list() -> void:
+	# 직접 쳐 넣은 값이라 비었거나 0일 수 있다 — 여기서 걸러 준다
+	if _pick_qty < 1:
+		_status = "몇 개를 올릴지 적자."
+		_rebuild()
+		return
+	if _pick_price < 1:
+		_status = "값을 적자. (1G부터)"
+		_rebuild()
+		return
 	Sound.play_sfx("sfx_ui")
 	_status = "장터에 올리는 중..."
 	_rebuild()
