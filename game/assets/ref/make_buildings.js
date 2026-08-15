@@ -26,6 +26,11 @@ const fs = require('fs'), { PNG } = require('pngjs');
 const REF = __dirname + '/';
 const SPR = __dirname + '/../sprites/';
 const INSTALL = process.argv.includes('--install');
+// 그림체 — 넓은 면을 어떻게 칠할까
+//   soft  면 셋(밝은 면·기본·그늘) + 경계 두 줄만 바둑판  (기본)
+//   flat  면 셋, 디더 없이 칼같이 갈린다
+//   8bit  면 **둘**뿐 (밝은 면·그늘). 색이 적을수록 옛 기계 느낌이 난다
+const STYLE = (process.argv.find(a => a.startsWith('--style=')) || '').slice(8) || 'soft';
 const OUT = INSTALL ? SPR : REF;
 const PRE = INSTALL ? '' : 'proposed_';
 
@@ -119,13 +124,14 @@ const BAYER = [[0.0, 0.5], [0.75, 0.25]];
 // 처음엔 위아래 그러데이션 전체에 디더를 깔았는데 온 벽이 격자무늬가 되어
 // 기계처럼 보였다. 옛 게임 그림도 디더는 **아껴** 썼다 — 넓은 면은 한 색으로
 // 시원하게 두고, 두 색이 만나는 두어 줄만 섞어 단차를 부드럽게 했다.
-const BAND = 2;                  // 섞는 띠 두께 (칸)
+const BAND = STYLE === 'soft' ? 2 : 0;   // 섞는 띠 두께 (칸)
 
 function ditherFace(g, tones, y0, y1) {
-  const [lite, base, dark] = tones;
+  let [lite, base, dark] = tones;
+  if (STYLE === '8bit') base = lite;          // 가운데 톤을 버린다 (면이 둘)
   const h = Math.max(1, y1 - y0);
-  const b1 = y0 + Math.round(h * 0.34);      // 밝은 면 -> 기본
-  const b2 = y0 + Math.round(h * 0.74);      // 기본 -> 그늘
+  const b1 = y0 + Math.round(h * (STYLE === '8bit' ? 0.52 : 0.34));
+  const b2 = y0 + Math.round(h * (STYLE === '8bit' ? 0.53 : 0.74));
   for (let y = y0; y <= y1; y++) for (let x = 0; x < GW; x++) {
     if (!tones.includes(g.d[y][x])) continue;
     let c;
@@ -435,7 +441,8 @@ const KINDS = {
 
 let n = 0;
 for (const [name, spec] of Object.entries(KINDS)) {
-  fs.writeFileSync(OUT + PRE + name + '.png', PNG.sync.write(build(spec).render()));
+  const tag = STYLE === 'soft' ? '' : STYLE + '_';
+  fs.writeFileSync(OUT + PRE + tag + name + '.png', PNG.sync.write(build(spec).render()));
   n++;
 }
 console.log(`건물 ${n}채 — ${FW}x${FH} (논리 ${GW}x${GH} · 화면에서 도트 2px)`);
@@ -454,7 +461,7 @@ const half = (im, o, ox, oy, W, H) => {
   }
 };
 const oldH = PNG.sync.read(fs.readFileSync(SPR + 'house.png'));
-const newH = PNG.sync.read(fs.readFileSync(OUT + PRE + 'house.png'));
+const newH = PNG.sync.read(fs.readFileSync(OUT + PRE + (STYLE === 'soft' ? '' : STYLE + '_') + 'house.png'));
 const boy = PNG.sync.read(fs.readFileSync(SPR + 'new_boy_down_idle.png'));
 const W = 600, H = 230, cmp = new PNG({ width: W, height: H });
 for (let i = 0; i < W * H; i++) {
