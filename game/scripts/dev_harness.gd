@@ -5464,9 +5464,13 @@ func _debug_tick() -> void:
 				"house": GameData.house_lv, "sea": GameData.sea_open,
 				"fisher": GameData.fisher_quest,
 			}
+			# 새 게임 직후인 척 — 마을엔 건물이 없고 도구도 없다.
+			# (하네스가 앞에서 다 지어 놨으니 여기서 되돌려 놓고 잰다)
 			GameData.story_phase = "enter"        # 오프닝 한복판인 척
 			GameData.story2_phase = ""
 			GameData.tutorial = GameData.fresh_tutorial()
+			GameData.village_built = []
+			GameData.unlocked_tools = []
 			m.story.skip_main_story()
 			var skip_ok: bool = GameData.story_phase == "done" \
 				and GameData.story2_phase == "done" \
@@ -5474,8 +5478,16 @@ func _debug_tick() -> void:
 				and GameData.is_tool_unlocked("hoe") and GameData.is_tool_unlocked("axe") \
 				and GameData.house_lv >= 1 and GameData.has_bed \
 				and GameData.sea_open \
-				and GameData.village_built.size() == GameData.ALL_VILLAGE_PLOTS.size() \
 				and not m.story_cutscene
+			# **여기가 핵심이다.** 잡화점 한 채만 서고 나머지 부지는 비어 있어야
+			# 이장의 「마을 발전 이야기」와 도서관·회관·목장 이야기가 살아 있다.
+			# 예전에는 전부 세워 버려서 그 이야기들이 통째로 죽었다.
+			var built_after: Array = GameData.village_built.duplicate()
+			var only_shop: bool = built_after == ["general"]
+			# 만들거나 부탁을 받아야 하는 도구는 잠긴 채여야 한다
+			var later_locked: bool = not GameData.is_tool_unlocked("spear") \
+				and not GameData.is_tool_unlocked("sword") \
+				and not GameData.is_tool_unlocked("sprinkler")
 			# 두 번 눌러도 탈이 없다 (이미 건너뛴 상태면 알려 주고 만다)
 			m.story.skip_main_story()
 			var again_ok: bool = GameData.story_phase == "done"
@@ -5487,8 +5499,9 @@ func _debug_tick() -> void:
 			GameData.house_lv = k_all.house
 			GameData.sea_open = k_all.sea
 			GameData.fisher_quest = k_all.fisher
-			print("STORYSKIP_OK=", skip_ok and again_ok,
-				" 샌드박스=", skip_ok, " 두번눌러도=", again_ok)
+			print("STORYSKIP_OK=", skip_ok and again_ok and only_shop and later_locked,
+				" 기본상태=", skip_ok, " 잡화점만=", only_shop, "(", built_after, ")",
+				" 뒷도구잠김=", later_locked, " 두번눌러도=", again_ok)
 		407: get_tree().quit()
 
 

@@ -1381,21 +1381,39 @@ func skip_main_story() -> void:
 	m.saveio.save_now()
 
 
+# 건너뛰기가 실제로 하는 일. **1~2장이 내어 주는 것만** 세운다.
+#
+# 예전에는 마을 건물을 통째로 세웠는데, 그러면 이장의 「마을 발전 이야기」와
+# 도서관(6장)·회관(9장)·목장(8장)처럼 **직접 지어야 열리는 이야기가 통째로
+# 죽는다**. 건너뛰기는 앞 이야기를 넘기는 것이지 뒷 이야기를 없애는 게 아니다.
+#
+# 2장이 실제로 내어 주는 것: 잡화점 한 채 · 바닷길 · 호미. 그게 전부다.
+const SKIP_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "rod"]
+
+
 func _skip_tutorial() -> void:
 	GameData.tutorial = {"active": false}
-	GameData.unlock_all_tools()
+	# 1~2장이 쥐여 주는 도구만. 울타리·스프링클러·돌창·돌검은 만들거나
+	# 부탁을 받아야 열린다 — 미리 열어 두면 그 이야기가 싱거워진다
+	for t: String in SKIP_TOOLS:
+		if not GameData.is_tool_unlocked(t):
+			GameData.unlocked_tools.append(t)
 	GameData.story_phase = "done"
 	GameData.story2_phase = "done"
 	_story_open_home()   # 이장이 내어 주는 집도 바로 받는다
-	# 이야기를 건너뛰면 마을과 바다도 다 열린 채 시작한다 (샌드박스)
-	GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
-	for pid: String in GameData.village_built:
-		if m.VILLAGE_PLOTS.has(pid):
-			m.worldgen._fill_building(m.VILLAGE_PLOTS[pid].anchor, pid)
+	# 잡화점 한 채만 세운다 (2장의 「상점을 세우자」가 끝난 자리).
+	# 나머지 부지는 빈 채로 둔다 — 거기서부터가 이장의 이야기다.
+	if not GameData.village_built.has("general"):
+		GameData.village_built.append("general")
+		m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
 	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
+	# 바닷길도 2장에서 열린다 (낚시꾼과 함께 능선을 뚫는 대목)
 	m.worldgen._reveal_sea()
-	m.npcmgr._sync_village_npcs()
 	GameData.fisher_quest = "done"
+	m.npcmgr._sync_village_npcs()
+	# 3장(이주 희망 편지)은 **내일 아침에** 온다. 0으로 두면 건너뛴 그
+	# 자리에서 곧바로 편지가 날아와 두 이야기가 겹친다
+	GameData.move_day = GameData.day
 	_apply_story_camera()
 	if _postman != null:
 		_postman.queue_free()
