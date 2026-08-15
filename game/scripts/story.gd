@@ -44,19 +44,15 @@ func _apply_story_camera() -> void:
 	# 마을로 이동하는 travel 단계부터는 전체 맵 카메라로 풀린다.
 	var cam: Camera2D = m.player.get_node("Camera")
 	cam.zoom = Vector2(m.CAMERA_ZOOM, m.CAMERA_ZOOM)
-	if GameData.story_phase in ["enter", "approach", "equip", "chop", "path", "map", "rock"]:
-		cam.limit_left = 0
-		cam.limit_top = m.TILE
+	if GameData.tutorial_space and GameData.story_phase in ["enter", "approach",
+			"equip", "chop", "path", "map", "rock", "travel"]:
+		# 튜토리얼 공간 안 — 카메라도 이 한 장 밖으로 나가지 않는다.
+		# (세계는 격자 위쪽에 있지만, 여기서는 있는지조차 보이지 않아야 한다)
+		var r: Rect2i = m.TUTORIAL_REGION
+		cam.limit_left = r.position.x * m.TILE
+		cam.limit_top = r.position.y * m.TILE
 		cam.limit_right = m.STORY_FOREST_W * m.TILE
-		cam.limit_bottom = 23 * m.TILE
-		cam.position_smoothing_enabled = true
-	elif GameData.story_phase == "travel":
-		# 가리개 숲의 좁은 길을 지나는 동안 — 마을 전경은 아직 보여 주지 않는다.
-		# 마을 어귀(작별 인사)에서 제한이 풀리며 시야가 극적으로 넓어진다.
-		cam.limit_left = 0
-		cam.limit_top = 0
-		cam.limit_right = 60 * m.TILE
-		cam.limit_bottom = 23 * m.TILE
+		cam.limit_bottom = r.end.y * m.TILE
 		cam.position_smoothing_enabled = true
 	else:
 		m._free_camera_limits(cam)
@@ -76,62 +72,40 @@ func _apply_story_visibility() -> void:
 
 
 func _plant_story_forest() -> void:
-	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래 + 마을 큰길 연결로)
-	#    길을 내면서 그 자리에 미리 생성된 나무·돌은 치운다 (길이 막히면 안 된다)
+	# 튜토리얼 공간은 **세계 밖에 따로 붙여 둔 한 장의 숲길**이다.
+	# 아래의 y값은 전부 m.TUT_DY만큼 내려간 그 공간의 좌표다 —
+	# 마을이나 농장과는 한 칸도 이어져 있지 않다.
+	var dy: int = m.TUT_DY
+	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래)
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
 		for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 1):
 			_carve_road(Vector2i(x, y))
-	for y in range(10, m.STORY_ROAD_Y0):              # 북쪽 갈래 (막다른 길)
+	for y in range(10 + dy, m.STORY_ROAD_Y0):         # 북쪽 갈래 (막다른 길)
 		for x in range(m.STORY_FORK.x - 1, m.STORY_FORK.x + 3):
 			_carve_road(Vector2i(x, y))
-	for y in range(m.STORY_ROAD_Y1 + 1, 22):          # 남쪽 갈래 (막다른 길)
+	for y in range(m.STORY_ROAD_Y1 + 1, 22 + dy):     # 남쪽 갈래 (막다른 길)
 		for x in range(m.STORY_FORK.x - 1, m.STORY_FORK.x + 3):
-			_carve_road(Vector2i(x, y))
-	for y in range(9, m.STORY_ROAD_Y0):               # 마을 큰길로 오르는 연결로
-		for x in range(m.STORY_LINK_X, m.STORY_LINK_X + 4):
-			_carve_road(Vector2i(x, y))
-	for y in [8, 9]:                                # 숲을 빠져나와 마을 큰길로 이어지는 길
-		for x in range(m.STORY_LINK_X, 60):
 			_carve_road(Vector2i(x, y))
 
 	# ② 길 양옆은 울타리로 막는다 — 길을 벗어날 수 없다 (숲으로는 못 들어간다)
 	for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 2):
 		var at_fork: bool = x >= m.STORY_FORK.x - 1 and x <= m.STORY_FORK.x + 2
-		var at_link: bool = x >= m.STORY_LINK_X and x <= m.STORY_LINK_X + 3
-		if not at_fork and not at_link:
-			_story_fence(Vector2i(x, m.STORY_ROAD_Y0 - 1))   # 위쪽 (갈래·연결로는 열어 둔다)
 		if not at_fork:
+			_story_fence(Vector2i(x, m.STORY_ROAD_Y0 - 1))   # 위쪽 (갈래는 열어 둔다)
 			_story_fence(Vector2i(x, m.STORY_ROAD_Y1 + 1))   # 아래쪽
-	for y in range(9, m.STORY_ROAD_Y0):               # 북쪽 갈래 양옆 + 막다른 끝
+	for y in range(9 + dy, m.STORY_ROAD_Y0):          # 북쪽 갈래 양옆 + 막다른 끝
 		_story_fence(Vector2i(m.STORY_FORK.x - 2, y))
 		_story_fence(Vector2i(m.STORY_FORK.x + 3, y))
 	for x in range(m.STORY_FORK.x - 2, m.STORY_FORK.x + 4):
-		_story_fence(Vector2i(x, 9))
-	for y in range(m.STORY_ROAD_Y1 + 1, 22):          # 남쪽 갈래 양옆 + 막다른 끝
+		_story_fence(Vector2i(x, 9 + dy))
+	for y in range(m.STORY_ROAD_Y1 + 1, 22 + dy):     # 남쪽 갈래 양옆 + 막다른 끝
 		_story_fence(Vector2i(m.STORY_FORK.x - 2, y))
 		_story_fence(Vector2i(m.STORY_FORK.x + 3, y))
 	for x in range(m.STORY_FORK.x - 2, m.STORY_FORK.x + 4):
-		_story_fence(Vector2i(x, 22))
-	for y in range(9, m.STORY_ROAD_Y0):               # 연결로 양옆 — 우거진 나무 벽
-		_story_tree_wall(Vector2i(m.STORY_LINK_X - 1, y))
-		_story_tree_wall(Vector2i(m.STORY_LINK_X + 4, y))
+		_story_fence(Vector2i(x, 22 + dy))
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):   # 본길 양 끝
-		_story_fence(Vector2i(m.STORY_ROAD_X1 + 1, y))
+		# 동쪽 끝은 열어 둔다 — 거기 서면 마을로 넘어가는 연출이 시작된다
 		_story_fence(Vector2i(m.STORY_ROAD_X0 - 1, y))
-
-	# ⑥ 마을 초입 가리개 숲: 큰길(y8~10) 양옆을 벨 수 없는 나무로 빽빽하게
-	#    채워, 이 좁은 길을 다 지나기 전에는 마을 전경이 보이지 않는다.
-	#    마을로 드는 길은 이 큰길 하나뿐이다.
-	for x in range(40, 60):
-		_story_tree_wall(Vector2i(x, 7))
-		_story_tree_wall(Vector2i(x, 11))
-	for y in range(1, 15):
-		for x in range(40, 60):
-			var pos6 := Vector2i(x, y)
-			if m.grid[y][x].ground != "grass" or m.objects.has(pos6):
-				continue
-			if m._hash01(x * 13 + 3, y * 17 + 9) < 0.85 and m.worldgen._nature_clear(pos6, "tree"):
-				m.objects[pos6] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
 
 	# ③ 길을 가로막고 선 나무 — 베어야만 지나갈 수 있다.
 	#    길목에서는 길이 두 줄로 좁아지므로 나무 두 그루면 막힌다.
@@ -141,11 +115,15 @@ func _plant_story_forest() -> void:
 	# ④ 퀘스트 5: 커다란 바위 두 개가 좁아진 길을 막는다
 	_story_narrow(m.STORY_ROCK.x, "bigrock", m.BIGROCK_HP)
 
-	# ⑤ 길 바깥의 숲: 서로 겹치지 않게 간격을 지켜 세운다 (울타리 너머 풍경)
-	for y in range(1, 23):
-		for x in range(3, m.STORY_FOREST_W):
+	# ⑤ 길 바깥의 숲: 서로 겹치지 않게 간격을 지켜 세운다 (울타리 너머 풍경).
+	#    이 공간 밖으로는 한 그루도 나가지 않는다 — 나중에 통째로 닫을 것이므로.
+	var reg: Rect2i = m.TUTORIAL_REGION
+	for y in range(reg.position.y, reg.end.y):
+		for x in range(reg.position.x, reg.end.x):
 			var pos := Vector2i(x, y)
-			if m.grid[y][x].ground != "grass" or m.objects.has(pos):
+			if y < 0 or y >= m.MAP_H or m.objects.has(pos):
+				continue
+			if m.grid[y][x].ground != "grass":
 				continue
 			var h := m._hash01(x, y)
 			if h < 0.55:
@@ -164,6 +142,27 @@ func _plant_story_forest() -> void:
 	_refresh_story_gates()
 
 
+# ---- 튜토리얼 공간을 닫는다 ----
+#
+# 마을에 들어서는 순간 이 공간은 세계에서 사라진다 — 오브젝트를 전부
+# 걷어내고, 지나온 길의 기억(지도의 밝힌 자리)까지 지운다.
+# 다시는 그곳으로 가는 길도, 그곳을 비추는 지도도 없다.
+func _close_tutorial_space() -> void:
+	var r: Rect2i = m.TUTORIAL_REGION
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			var t := Vector2i(x, y)
+			if m.objects.has(t):
+				m.objnode._remove_object(t)
+			m.objects.erase(t)
+			if y >= 0 and y < m.MAP_H and x >= 0 and x < m.MAP_W:
+				m.grid[y][x].ground = "grass"
+			GameData.explored.erase(Vector2i(x / GameData.EXPLORE_CHUNK,
+				y / GameData.EXPLORE_CHUNK))
+	GameData.tutorial_space = false
+	m.queue_redraw()
+
+
 # 길을 낸다: 흙바닥으로 바꾸고, 그 자리에 있던 오브젝트는 치운다
 func _carve_road(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
@@ -177,15 +176,6 @@ func _story_fence(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
 		return
 	m.objects[pos] = {"kind": "fence", "hp": 0, "fixed": true}
-
-
-# 가리개 숲의 나무 벽: 벨 수 없는 나무 한 그루 (풀밭에만 세운다)
-func _story_tree_wall(pos: Vector2i) -> void:
-	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
-		return
-	if m.grid[pos.y][pos.x].ground != "grass":
-		return
-	m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
 
 
 # 아직 뚫지 못한 길목(나무 줄) 수를 센다 — 한 칸만 베어도 그 줄은 열린 것으로 본다
@@ -313,12 +303,12 @@ func _story_update(delta: float) -> void:
 				_start_rock_dialog()
 		"travel":
 			_update_postman(delta, story_shot)
-			# 마을 어귀에 다다르면 우체부가 함께 이장에게 가자고 한다
+			# 숲길 동쪽 끝에 다다르면 — 여기서 튜토리얼 공간이 끝나고
+			# 화면이 어두워졌다가 **마을 어귀**에서 다시 밝아진다
 			if _postman_state == "follow" and not m.dialog.visible \
-					and m.player_tile().x >= 58:
-				m.story_cutscene = true
-				_postman_state = "talk"
-				_start_arrival_dialog()
+					and not m.story_cutscene \
+					and m.player_tile().x >= m.STORY_ROAD_X1:
+				_begin_world_entry()
 		"deliver":
 			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
 		"home_open":
@@ -759,6 +749,47 @@ func _story_chief() -> Node2D:
 		if n.id == "chief":
 			return n
 	return null
+
+
+# ---- 튜토리얼 공간 → 실제 세계 ----
+#
+# 숲길 동쪽 끝에 닿으면 **걸어서 이어지지 않는다.** 화면이 어두워지고,
+# 그 사이에 튜토리얼 공간이 닫히고(오브젝트·지도 기억까지) 주인공과
+# 우체부가 마을 어귀에 선다. 다시 밝아지면 거기가 세계의 시작점이다.
+const WORLD_ENTRY := Vector2i(58, 9)     # 마을 어귀 — 세계의 첫 걸음
+
+
+func _begin_world_entry() -> void:
+	if not GameData.tutorial_space:
+		return
+	m.story_cutscene = true
+	_postman_state = "talk"
+	var tw := create_tween()
+	tw.tween_property(m.fade_rect, "color:a", 1.0, 0.6)
+	tw.tween_callback(_do_world_entry)
+	tw.tween_interval(0.3)
+	tw.tween_property(m.fade_rect, "color:a", 0.0, 0.8)
+	tw.tween_callback(_after_world_entry)
+
+
+func _do_world_entry() -> void:
+	_close_tutorial_space()            # 그 숲길은 이제 세상에 없다
+	var p := Vector2(WORLD_ENTRY.x * m.TILE + 16, WORLD_ENTRY.y * m.TILE + 16)
+	m.player.position = p
+	m.player.dir = "right"
+	if _postman != null:
+		_postman.position = p + Vector2(-40.0, 6.0)
+	var cam: Camera2D = m.player.get_node("Camera")
+	cam.reset_smoothing()
+	GameData.mark_explored_at(WORLD_ENTRY)
+	m.queue_redraw()
+
+
+func _after_world_entry() -> void:
+	m.hud.story_banner("교진 마을 도착", "여기서부터가 진짜 하루다")
+	_apply_story_camera()
+	_apply_story_visibility()
+	_start_arrival_dialog()
 
 
 # 마을 어귀: 우체부는 떠나지 않는다 — 함께 이장에게 편지를 전하러 간다
@@ -1386,6 +1417,15 @@ func _skip_tutorial() -> void:
 	GameData.unlock_all_tools()
 	GameData.story_phase = "done"
 	GameData.story2_phase = "done"
+	# 건너뛰기도 결국 「튜토리얼 공간을 떠난다」는 뜻이다 —
+	# 그 숲길을 닫고 마을 어귀에 세운다 (안 그러면 세계 밖에 갇힌다)
+	if GameData.tutorial_space:
+		_close_tutorial_space()
+		m.player.position = Vector2(WORLD_ENTRY.x * m.TILE + 16,
+			WORLD_ENTRY.y * m.TILE + 16)
+		var cam0: Camera2D = m.player.get_node("Camera")
+		cam0.reset_smoothing()
+		GameData.mark_explored_at(WORLD_ENTRY)
 	_story_open_home()   # 이장이 내어 주는 집도 바로 받는다
 	# 이야기를 건너뛰면 마을과 바다도 다 열린 채 시작한다 (샌드박스)
 	GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()

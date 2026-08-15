@@ -11,9 +11,6 @@ extends CanvasLayer
 const VIEW_W := 952.0
 const VIEW_H := 512.0
 
-
-func _base_cell() -> float:
-	return minf(VIEW_W / float(main.MAP_W), VIEW_H / float(main.MAP_H))
 # 먹구름 — 바탕 한 겹 + 뭉게뭉게 두 겹. 전부 불투명이라 밑은 보이지 않는다.
 const FOG := Color(0.13, 0.14, 0.19)          # 구름 그늘 (바탕)
 const CLOUD_MID := Color(0.21, 0.22, 0.28)    # 구름 덩어리
@@ -94,9 +91,36 @@ func reset_view() -> void:
 	pan = Vector2.ZERO
 
 
+# 이 지도가 보여 주는 땅. 튜토리얼 동안에는 그 작은 공간만, 마을에
+# 도착한 뒤로는 실제 세계만이다 — 튜토리얼 공간은 세계 밖(y가 WORLD_H보다
+# 아래)에 있으므로 여기서 통째로 빠진다. 지나온 길도, 처음 서 있던 자리도
+# 지도에 남지 않는다.
+func _world() -> Rect2i:
+	return main.world_rect()
+
+
+# 배율 1 = 이 땅이 화면에 딱 들어오는 칸 크기
+func _base_cell() -> float:
+	var r := _world()
+	return minf(VIEW_W / float(r.size.x), VIEW_H / float(r.size.y))
+
+
+# 칸 (0,0)이 놓이는 화면 자리 — 보여 줄 땅의 한가운데가 화면 한가운데에 오게
+func _origin_base(c: float) -> Vector2:
+	var r := _world()
+	return Vector2(480.0 - (float(r.position.x) + float(r.size.x) * 0.5) * c,
+		272.0 - (float(r.position.y) + float(r.size.y) * 0.5) * c)
+
+
 func _origin(c: float) -> Vector2:
-	return Vector2((960.0 - main.MAP_W * c) / 2.0,
-		(540.0 - main.MAP_H * c) / 2.0 + 2.0) + pan
+	return _origin_base(c) + pan
+
+
+# 보여 줄 땅이 화면에서 차지하는 네모 (구운 그림·테두리가 같이 쓴다)
+func _world_screen_rect() -> Rect2:
+	var r := _world()
+	return Rect2(_ox + float(r.position.x) * _cell, _oy + float(r.position.y) * _cell,
+		float(r.size.x) * _cell, float(r.size.y) * _cell)
 
 
 # 커서 아래의 지점이 그대로 있도록 확대/축소한다
@@ -105,8 +129,7 @@ func _zoom_at(m: Vector2, factor: float) -> void:
 	var t := (m - _origin(c0)) / c0            # 커서가 가리키는 타일 좌표
 	zoom = clampf(zoom * factor, ZOOM_MIN, ZOOM_MAX)
 	var c1 := _base_cell() * zoom
-	pan = m - t * c1 - Vector2((960.0 - main.MAP_W * c1) / 2.0,
-		(540.0 - main.MAP_H * c1) / 2.0 + 2.0)
+	pan = m - t * c1 - _origin_base(c1)
 	_clamp_pan()
 
 
@@ -118,8 +141,9 @@ func _zoom_at(m: Vector2, factor: float) -> void:
 # 화면보다 작으면 **화면 밖으로 나가지 않게** 묶는다. 두 경우가 같은 식이 된다.
 func _clamp_pan() -> void:
 	var c := _base_cell() * zoom
-	var lim_x: float = absf(float(main.MAP_W) * c - 960.0) / 2.0
-	var lim_y: float = absf(float(main.MAP_H) * c - 540.0) / 2.0
+	var r := _world()
+	var lim_x: float = absf(float(r.size.x) * c - 960.0) / 2.0
+	var lim_y: float = absf(float(r.size.y) * c - 540.0) / 2.0
 	pan.x = clampf(pan.x, -lim_x, lim_x)
 	pan.y = clampf(pan.y, -lim_y, lim_y)
 
@@ -190,6 +214,9 @@ func _process(delta: float) -> void:
 # 실제로 가 본 청크 + (내 부지이거나 공용 길/마을)만 표시한다.
 # 미해금 부지는 탐사 여부와 관계없이 가린다.
 func _visible_tile(x: int, y: int) -> bool:
+	# 보여 줄 땅 밖 — 튜토리얼 공간이든 세계든, 지금 지도가 아닌 곳은 없는 셈이다
+	if not _world().has_point(Vector2i(x, y)):
+		return false
 	if not GameData.is_explored_tile(x, y):
 		return false
 	if GameData.is_tile_owned(x, y):
@@ -298,32 +325,38 @@ var _bake_age := 999.0
 
 func _bake() -> void:
 	_bake_age = 0.0
-	var w: int = main.MAP_W
-	var h: int = main.MAP_H
+	# 굽는 것은 **보여 줄 땅뿐이다.** 세계 밖의 튜토리얼 띠는 아예 들어가지 않는다.
+	var r := _world()
+	var ox: int = r.position.x
+	var oy: int = r.position.y
+	var w: int = r.size.x
+	var h: int = r.size.y
 	var buf := PackedByteArray()
 	buf.resize(w * h * 3)
 	var season := GameData.season()
 	var i := 0
 	for y in h:
 		for x in w:
-			var c: Color = _ground_color(x, y, season) if _visible_tile(x, y) else FOG
+			var c: Color = _ground_color(ox + x, oy + y, season) \
+				if _visible_tile(ox + x, oy + y) else FOG
 			buf[i] = int(c.r * 255.0)
 			buf[i + 1] = int(c.g * 255.0)
 			buf[i + 2] = int(c.b * 255.0)
 			i += 3
 	# 지형지물은 그 칸 색을 덮어쓴다 (가까이 가면 위에 생김새를 얹는다)
 	for pos: Vector2i in main.objects:
-		if pos.x < 0 or pos.y < 0 or pos.x >= w or pos.y >= h:
+		if not r.has_point(pos):
 			continue
 		if not _visible_tile(pos.x, pos.y):
 			continue
 		var c2: Color = OBJ_COL.get(str(main.objects[pos].kind), OBJ_DEFAULT)
-		var j := (pos.y * w + pos.x) * 3
+		var j := ((pos.y - oy) * w + (pos.x - ox)) * 3
 		buf[j] = int(c2.r * 255.0)
 		buf[j + 1] = int(c2.g * 255.0)
 		buf[j + 2] = int(c2.b * 255.0)
 	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGB8, buf)
-	if _tex == null:
+	# 튜토리얼에서 세계로 넘어가면 그림의 크기가 통째로 달라진다 — 그때는 새로 만든다
+	if _tex == null or _tex.get_width() != w or _tex.get_height() != h:
 		_tex = ImageTexture.create_from_image(img)
 	else:
 		_tex.update(img)
@@ -356,11 +389,12 @@ func _draw_map() -> void:
 	_ox = o.x
 	_oy = o.y
 
-	# 확대하면 대부분이 화면 밖이므로, 보이는 칸만 그린다
-	var x0: int = maxi(0, int(floor(-_ox / _cell)))
-	var x1: int = mini(main.MAP_W, int(ceil((960.0 - _ox) / _cell)) + 1)
-	var y0: int = maxi(0, int(floor(-_oy / _cell)))
-	var y1: int = mini(main.MAP_H, int(ceil((540.0 - _oy) / _cell)) + 1)
+	# 확대하면 대부분이 화면 밖이므로, 보이는 칸만 그린다 (보여 줄 땅 안에서)
+	var wr := _world()
+	var x0: int = maxi(wr.position.x, int(floor(-_ox / _cell)))
+	var x1: int = mini(wr.end.x, int(ceil((960.0 - _ox) / _cell)) + 1)
+	var y0: int = maxi(wr.position.y, int(floor(-_oy / _cell)))
+	var y1: int = mini(wr.end.y, int(ceil((540.0 - _oy) / _cell)) + 1)
 
 	# ---- 지형 ----
 	#
@@ -370,8 +404,7 @@ func _draw_map() -> void:
 	# 드로우콜이 2만 7천 번에서 **한 번**이 된다 — 끌어도 안 버벅인다.
 	if _tex == null or _bake_age > BAKE_EVERY:
 		_bake()
-	canvas.draw_texture_rect(_tex,
-		Rect2(_ox, _oy, main.MAP_W * _cell, main.MAP_H * _cell), false)
+	canvas.draw_texture_rect(_tex, _world_screen_rect(), false)
 
 	# ---- 지형지물 ----
 	#
@@ -490,7 +523,7 @@ func _draw_map() -> void:
 
 	# 세계의 테두리 — 지도가 어디서 끝나는지 눈에 보이게 두른다.
 	# (테두리가 없으면 먹구름과 배경이 이어져 「여기가 끝인지」 알 수 없다)
-	var edge := Rect2(_ox, _oy, main.MAP_W * _cell, main.MAP_H * _cell)
+	var edge := _world_screen_rect()
 	canvas.draw_rect(edge.grow(3.0), Color(0.32, 0.26, 0.18), false, 3.0)
 	canvas.draw_rect(edge.grow(1.0), Color(0.58, 0.48, 0.32), false, 1.0)
 

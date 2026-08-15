@@ -80,6 +80,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.forest_quest = str(d.get("forest_quest", ""))
 	GameData.forest_day = int(d.get("forest_day", 0))
 	GameData.forest_trust = str(d.get("forest_trust", ""))
+	# 옛 세이브에는 이 값이 없다 — 마을에 이미 도착했으면 튜토리얼 공간은 닫힌 것
+	GameData.tutorial_space = bool(d.get("tutorial_space",
+		GameData.story_phase in ["enter", "approach", "equip", "chop",
+			"path", "map", "rock", "travel"]))
 	# 옛 세이브: 「visit」 단계는 이제 없다 — 동행부터 다시 걷는다
 	if GameData.forest_quest == "visit":
 		GameData.forest_quest = "go"
@@ -363,12 +367,17 @@ func _apply_save(d: Dictionary) -> void:
 	var pos_scale := float(m.TILE) / float(d.get("tile", 16))
 	m.player.position = Vector2(float(d.player[0]), float(d.player[1])) * pos_scale
 
-	# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다
+	# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다.
+	# 다만 **튜토리얼 공간이 격자 아래에 붙기 전(세계 높이만큼만 저장하던)** 것은
+	# 세계 부분이 한 칸도 어긋나지 않았다 — 그만큼만 읽어 밭을 그대로 살린다.
 	var g: Array = d.grid
-	if g.size() != m.MAP_H or (g.size() > 0 and g[0].size() != m.MAP_W):
+	var rows: int = m.MAP_H
+	if g.size() == m.WORLD_H and g.size() > 0 and g[0].size() == m.MAP_W:
+		rows = m.WORLD_H
+	elif g.size() != m.MAP_H or (g.size() > 0 and g[0].size() != m.MAP_W):
 		m.player.position = Vector2(m.START_TILE.x * m.TILE + 16, m.START_TILE.y * m.TILE + 16)
 		return
-	for y in m.MAP_H:
+	for y in rows:
 		for x in m.MAP_W:
 			var s: Array = g[y][x]
 			var cell: Dictionary = m.grid[y][x]
@@ -391,7 +400,8 @@ func _apply_save(d: Dictionary) -> void:
 			cell.half_fed = s.size() > 5 and int(s[5]) == 1
 	# 흙길·부두·다리가 전부 없어졌다 — 옛 세이브의 길/데크는 잔디로.
 	# (옛 강 물칸은 위의 물 규칙 덕에 새 지형(잔디)을 그대로 따른다)
-	for y in m.MAP_H:
+	# 세계에만 적용한다 — 튜토리얼 공간의 숲길은 이야기가 깐 진짜 길이다.
+	for y in m.WORLD_H:
 		for x in m.MAP_W:
 			var cell: Dictionary = m.grid[y][x]
 			if cell.ground in ["path", "dock"]:

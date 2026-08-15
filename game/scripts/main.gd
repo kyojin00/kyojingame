@@ -30,7 +30,18 @@ extends Node2D
 # 채석장은 자갈 바닥에 바위가 널렸고, 습지는 물웅덩이가 흩어져 있다.
 # 발을 들이는 순간 「다른 데 왔다」가 보여야 넓힌 값을 한다.
 const MAP_W := 224   # 동쪽: 확장 구역 너머의 과수원 · 채석장 · 솔숲
-const MAP_H := 120   # 남쪽: 습지 · 초원 (그 아래가 예전처럼 능선-해변-바다)
+# ---- 세계와 튜토리얼 공간 ----
+#
+# **튜토리얼은 실제 세계의 일부가 아니다.** 처음 눈을 뜨는 숲길은 세계
+# 바깥(WORLD_H 아래)에 따로 붙여 둔 일회성 공간이고, 마을과는 한 칸도
+# 이어져 있지 않다. 튜토리얼을 마치면 그 공간은 통째로 닫히고
+# (GameData.tutorial_space = false), 다시는 발을 들일 수 없다.
+const WORLD_H := 120   # 실제 세계의 높이 (남쪽: 습지 · 초원 · 능선-해변-바다)
+const TUT_Y0 := 134    # 튜토리얼 숲길이 놓이는 줄 (세계 밖으로 한참 내려간 자리)
+const TUT_DY := TUT_Y0 - 7          # 옛 숲길 좌표(y7~22)를 이 공간으로 옮기는 값
+# 숲길 위아래로 열 줄씩 더 둔다 — 화면이 온통 숲으로 차야 「한 장의 공간」으로 보인다
+const TUTORIAL_REGION := Rect2i(0, TUT_Y0 - 12, 62, 38)
+const MAP_H := TUTORIAL_REGION.end.y   # 세계 + 튜토리얼 공간을 담는 격자 전체 높이
 const TILE := 32
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
@@ -705,6 +716,7 @@ func _ready() -> void:
 		# 게스트: 로컬 저장 대신 호스트 스냅샷을 기다린다
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
+		GameData.tutorial_space = false   # 합동 농장은 세계에서 바로 시작한다
 		GameData.story_phase = "done"
 		GameData.story2_phase = "done"
 		GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
@@ -725,6 +737,14 @@ func _ready() -> void:
 	if loaded.size() > 0:
 		saveio._apply_save(loaded)
 		apply_appearance()   # 세이브에 담긴 외형으로 다시 굽는다
+		# 옛 세이브의 튜토리얼은 세계 안(y7~22)에 있었다. 그 자리는 이제 마을 곁의
+		# 평범한 들판이라, 그대로 두면 세계 밖으로 옮겨 온 숲길과 어긋난다 —
+		# 튜토리얼 도중에 저장한 것이라면 그 숲길을 새로 깔고 첫 자리에 세운다.
+		if GameData.tutorial_space and player_tile().y < WORLD_H:
+			story._plant_story_forest()
+			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
+			GameData.explored.clear()
+			GameData.mark_explored_at(STORY_SPAWN)
 		story._apply_story_camera.call_deferred()
 		# 스토리 도중 저장했다면 우체부 아저씨가 계속 동행한다
 		if GameData.story_phase == "approach":
@@ -765,6 +785,8 @@ func _ready() -> void:
 			if not story_shot:
 				story._show_intro.call_deferred()
 		else:
+			# 검증 샌드박스·합동 농장은 튜토리얼을 건너뛴 셈이다 — 처음부터 세계 안이다
+			GameData.tutorial_space = false
 			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
@@ -784,7 +806,7 @@ func _ready() -> void:
 			GameData.house_lv = 2         # 집/조리대/침대 캡처용
 			GameData.has_bed = true
 			GameData.furniture = GameData.default_furniture()  # 넓은 방 캡처용 세간
-			for cy in range(0, MAP_H / GameData.EXPLORE_CHUNK + 1):
+			for cy in range(0, WORLD_H / GameData.EXPLORE_CHUNK + 1):
 				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
 					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
 			for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
@@ -1015,8 +1037,32 @@ func is_passable(t: Vector2i) -> bool:
 
 
 func _tile_accessible(t: Vector2i) -> bool:
+	# 튜토리얼 중에는 그 공간이 세계의 전부다 (마을 쪽으로는 한 칸도 못 간다)
+	if GameData.tutorial_space:
+		return TUTORIAL_REGION.has_point(t)
+	# 마을에 들어선 뒤로 튜토리얼 공간은 사라진 곳이다 — 돌아갈 길이 없다
+	if t.y >= WORLD_H:
+		return false
+	if not region_open_at(t):
+		return false          # 아직 이야기가 닿지 않은 땅
 	return VILLAGE_REGION.has_point(t) or ROAD.has_point(t) \
 		or GameData.is_tile_owned(t.x, t.y)
+
+
+# 이 칸이 속한 지역이 이미 열렸는가 (마을을 중심으로 하나씩 이어진다)
+func region_open_at(t: Vector2i) -> bool:
+	for reg: Dictionary in REGIONS:
+		var r: Rect2i = reg.rect
+		if r.has_point(t):
+			return GameData.region_unlocked(str(reg.id))
+	return true
+
+
+# 지금 걸어 다닐 수 있는 세계의 테두리 (지도·미니맵이 이 안만 그린다)
+func world_rect() -> Rect2i:
+	if GameData.tutorial_space:
+		return TUTORIAL_REGION
+	return Rect2i(0, 0, MAP_W, WORLD_H)
 
 
 func is_passable_px(p: Vector2) -> bool:
@@ -1199,16 +1245,16 @@ const FEST_COLORS := {
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(18, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
-const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
-const STORY_FORK := Vector2i(34, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
-const STORY_ROCK := Vector2i(40, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
+const STORY_SPAWN := Vector2i(18, 16 + TUT_DY)   # 화면 왼쪽에서 시작
+const STORY_LANE_Y := 16 + TUT_DY          # 우체부가 왼쪽에서 걸어오는 길
+const STORY_FORK := Vector2i(34, 16 + TUT_DY)    # 숲길이 갈라지는 갈림길 (지도 퀘스트)
+const STORY_ROCK := Vector2i(40, 16 + TUT_DY)    # 길을 막는 커다란 바위 (퀘스트 5)
 # 스토리 숲의 가로 폭. 화면(37.5칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
 # 옆으로 움직인다. 숲길(x 4~33) 동쪽은 들어갈 수 없는 배경 숲이다.
 const STORY_FOREST_W := 58
 # 숲길은 4줄 폭의 흙길. 양옆은 울타리로 막혀 있어 길을 벗어날 수 없다.
-const STORY_ROAD_Y0 := 15
-const STORY_ROAD_Y1 := 18                  # 15·16·17·18 = 4줄
+const STORY_ROAD_Y0 := 15 + TUT_DY
+const STORY_ROAD_Y1 := 18 + TUT_DY         # 네 줄 폭의 숲길
 const STORY_ROAD_X0 := 18
 const STORY_ROAD_X1 := 47
 # 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
@@ -1218,13 +1264,12 @@ const FOREST_HOUSE_ANCHOR := Vector2i(30, 24)
 const ALCH_HOUSE_ANCHOR := Vector2i(56, 46)
 const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
 const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 재민이 처음 서성이는 광장 언저리
-const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
 # 길을 막은 길목. 예전에는 네 곳 x 네 줄 = 나무 16그루라 초반이 지루했다.
 # 지금은 두 곳이고, 길목마다 길이 두 줄로 좁아진다 → 나무 4그루.
 const STORY_GATE_XS := [27, 38]
-const STORY_GATE_ROWS := [16, 17]   # 막히는 줄 (나머지 줄은 울타리로 좁힌다)
+const STORY_GATE_ROWS := [16 + TUT_DY, 17 + TUT_DY]   # 막히는 줄
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금

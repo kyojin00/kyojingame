@@ -2961,6 +2961,47 @@ var forest_quest := ""
 var forest_day := 0          # 재민이 정착한 날 — 다음 날 아침 발견담이 뜬다
 var affinity_open := false   # 호감도 콘텐츠(하트·선물) 해금 여부
 
+# ---- 튜토리얼 공간과 세계 ----
+#
+# 게임을 켜면 세계 밖의 **일회성 숲길**에서 시작한다 (main.TUTORIAL_REGION).
+# 마을에 들어서는 순간 그 공간은 닫히고, 그때부터가 진짜 세계다.
+var tutorial_space := true
+
+
+# ---- 마을을 중심으로 하나씩 열리는 땅 ----
+#
+# 처음 마을에 도착하면 마을과 큰길, 그리고 바로 곁의 농장뿐이다.
+# 이야기가 나아갈 때마다 둘레의 땅이 하나씩 이어진다.
+#   조건: "story2"(마을을 깨우다) / "sea"(바닷길) / "forest"(숲속의 집) /
+#         "story8"(목장) / "story10"(동굴) / "story12"(연금술사) / "zone"(구역 해금)
+const REGION_UNLOCK := {
+	"deep": "forest",        # 깊은 숲 — 숲속의 집 이야기를 지나야 들어간다
+	"meadow": "story8",      # 너른 초원 — 목동이 자리를 잡은 뒤
+	"wetland": "story10",    # 남쪽 습지 — 동굴 이야기로 발이 넓어진 뒤
+	"pinewood": "story12",   # 솔숲 골짜기 — 연금술사를 만난 뒤
+	"bluff": "sea",          # 바닷가 벼랑길 — 바닷길이 열린 뒤
+}
+
+
+func region_unlocked(id: String) -> bool:
+	var key := str(REGION_UNLOCK.get(id, ""))
+	match key:
+		"":
+			return true
+		"story2":
+			return story2_phase == "done"
+		"sea":
+			return sea_open
+		"forest":
+			return forest_quest == "done"
+		"story8":
+			return story8_phase == "done"
+		"story10":
+			return story10_phase == "done"
+		"story12":
+			return story12_phase == "done"
+	return true
+
 # ---- 숲속 집의 문이 열리는 날 (메인 스토리 5 이후) ----
 #
 # 스토리 5에서 연화는 끝내 집 안으로 들이지 않는다 — 낯선 사람을 경계하는
@@ -6031,6 +6072,7 @@ func reset_all() -> void:
 	stall_hours = []
 	forest_quest = ""
 	forest_trust = ""
+	tutorial_space = true
 	forest_day = 0
 	affinity_open = false
 	move_quest = ""
@@ -6473,7 +6515,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
 		"stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,
-		"forest_trust": forest_trust,
+		"forest_trust": forest_trust, "tutorial_space": tutorial_space,
 		"affinity_open": affinity_open,
 		"move_quest": move_quest, "move_day": move_day, "move_min": move_min,
 		"move_seeds": move_seeds,

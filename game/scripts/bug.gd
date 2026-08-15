@@ -18,8 +18,10 @@ func _ready() -> void:
 
 
 func respawn() -> void:
-	position = Vector2(randi_range(2, main.MAP_W - 2) * main.TILE,
-		randi_range(2, main.MAP_H - 2) * main.TILE)
+	# 지금 사람이 있는 땅에만 날아다닌다 (튜토리얼 동안에는 그 숲길에만)
+	var r: Rect2i = main.world_rect()
+	position = Vector2(randi_range(r.position.x + 2, r.end.x - 2) * main.TILE,
+		randi_range(r.position.y + 2, r.end.y - 2) * main.TILE)
 	_target = position
 
 
@@ -34,8 +36,11 @@ func _process(delta: float) -> void:
 	if _think <= 0.0:
 		_think = randf_range(1.0, 2.5)
 		_target = position + Vector2(randf_range(-80, 80), randf_range(-60, 60))
-		_target.x = clampf(_target.x, main.TILE, (main.MAP_W - 1) * float(main.TILE))
-		_target.y = clampf(_target.y, main.TILE, (main.MAP_H - 1) * float(main.TILE))
+		var rr: Rect2i = main.world_rect()
+		_target.x = clampf(_target.x, (rr.position.x + 1) * float(main.TILE),
+			(rr.end.x - 1) * float(main.TILE))
+		_target.y = clampf(_target.y, (rr.position.y + 1) * float(main.TILE),
+			(rr.end.y - 1) * float(main.TILE))
 	position = position.move_toward(_target, 44.0 * delta)
 	position.y += sin(anim * 5.0) * 0.15
 	sprite.texture = main.tex["%s_%d" % [bug_id, int(anim * 6.0) % 2]]

@@ -18,6 +18,8 @@ var m: KyojinMain    # main.gd
 func _build_map() -> void:
 	m.grid = []
 	m.objects = {}
+	# 격자는 튜토리얼 공간(세계 밖에 붙인 띠)까지 담는다 — 다만 **세계를 짓는
+	# 일은 WORLD_H 위쪽에서만** 한다. 그 아래 띠는 story가 손수 깐다.
 	for y in m.MAP_H:
 		var row := []
 		for x in m.MAP_W:
@@ -50,8 +52,8 @@ func _build_map() -> void:
 		if x % 4 == 0 and not m.objects.has(Vector2i(x, 0)):
 			m.objects[Vector2i(x, 0)] = {"kind": "tree", "hp": m.TREE_HP}
 		if x % 4 == 0:
-			m.objects[Vector2i(x, m.MAP_H - 1)] = {"kind": "tree", "hp": m.TREE_HP}
-	for y in m.MAP_H:
+			m.objects[Vector2i(x, m.WORLD_H - 1)] = {"kind": "tree", "hp": m.TREE_HP}
+	for y in m.WORLD_H:
 		if y % 4 == 0 and not m.objects.has(Vector2i(0, y)):
 			m.objects[Vector2i(0, y)] = {"kind": "tree", "hp": m.TREE_HP}
 		if y % 4 == 0 and not m.objects.has(Vector2i(m.MAP_W - 1, y)):
@@ -61,7 +63,7 @@ func _build_map() -> void:
 	_paint_regions()
 
 	# 흩어진 나무/돌 (결정적 해시 배치 — 지역마다 밀도가 다르다)
-	for y in range(1, m.MAP_H - 1):
+	for y in range(1, m.WORLD_H - 1):
 		for x in range(1, m.MAP_W - 1):
 			var pos := Vector2i(x, y)
 			if m.objects.has(pos) or m.grid[y][x].ground == "water":
@@ -131,7 +133,7 @@ func _paint_regions() -> void:
 		var pond := float(reg.pond)
 		if g == "" and pond <= 0.0:
 			continue
-		for y in range(maxi(1, r.position.y), mini(m.MAP_H - 1, r.end.y)):
+		for y in range(maxi(1, r.position.y), mini(m.WORLD_H - 1, r.end.y)):
 			for x in range(maxi(1, r.position.x), mini(m.MAP_W - 1, r.end.x)):
 				var pos := Vector2i(x, y)
 				if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
@@ -166,7 +168,7 @@ func _build_sea() -> void:
 	# 숲으로 덮어 두었다가 길목 바위를 캐는 순간 물로 바꿨는데, 그러다 보니
 	# 「돌을 캤더니 숲이 바다가 되는」 광경이 그대로 보였다. 이제 지형은
 	# 고정이고, 능선의 큰 바위가 길을 막고 있을 뿐이다.
-	for y in range(m.SEA_Y0, m.MAP_H):
+	for y in range(m.SEA_Y0, m.WORLD_H):
 		for x in m.MAP_W:
 			m.grid[y][x].ground = "water"
 			m.objects.erase(Vector2i(x, y))
@@ -397,7 +399,7 @@ func _spawn_alch_house() -> void:
 			m.objnode._remove_object(p)
 	# 문 앞에서 남쪽으로 빠지는 좁은 숨은 길 — 덤불에 가려 있던 오솔길
 	var door := m.door_tile(a)
-	for y2 in range(a.y + 4, mini(a.y + 11, m.MAP_H - 1)):
+	for y2 in range(a.y + 4, mini(a.y + 11, m.WORLD_H - 1)):
 		for x2 in [door.x, door.x + 1]:
 			m.objnode._remove_object(Vector2i(x2, y2))
 			if m.grid[y2][x2].ground == "grass":
@@ -597,7 +599,7 @@ const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9), Rect2i(26, 1, 11, 6
 # 이 칸에 자연물이 나도 되는가 — 나무/돌/잡초가 전부 같은 검사를 쓴다.
 # 건물·문 앞·통행로·농작물·설치물·다른 자연물·물가를 전부 피한다.
 func _respawn_ok(pos: Vector2i, kind: String) -> bool:
-	if pos.x < 1 or pos.y < 1 or pos.x >= m.MAP_W - 1 or pos.y >= m.MAP_H - 1:
+	if pos.x < 1 or pos.y < 1 or pos.x >= m.MAP_W - 1 or pos.y >= m.WORLD_H - 1:
 		return false
 	var cell: Dictionary = m.grid[pos.y][pos.x]
 	if m.objects.has(pos) or cell.ground != "grass" or str(cell.crop_id) != "":
@@ -644,7 +646,7 @@ func _respawn_resources() -> void:
 			continue   # 이미 빽빽하다 — 이 리젠은 조용히 사라진다
 		var placed := false
 		for attempt in 30:
-			var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
+			var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
 			if not _respawn_ok(pos, kind):
 				continue   # 못 놓는 자리면 강제하지 않고 다른 자리를 다시 찾는다
 			m.objnode._place_object(pos, kind,
@@ -660,7 +662,7 @@ func _respawn_resources() -> void:
 	for attempt in 18:
 		if weed_sprouts >= 3 or _nature_count("weed") >= int(NATURE_CAP["weed"]):
 			break
-		var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
+		var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
 		if _respawn_ok(pos2, "weed"):
 			m.objnode._place_object(pos2, "weed", 0)
 			weed_sprouts += 1
@@ -679,7 +681,7 @@ func _respawn_forage() -> void:
 	for attempt in tries:
 		if count >= cap:
 			break
-		var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.MAP_H - 2))
+		var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
 		var cell: Dictionary = m.grid[pos.y][pos.x]
 		if m.objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
 			continue
@@ -729,7 +731,7 @@ func _spawn_bugs() -> void:
 			bnode.bug_id = bid
 			bnode.night_only = bool(cond.night)
 			bnode.position = Vector2(randi_range(2, m.MAP_W - 2) * m.TILE,
-				randi_range(2, m.MAP_H - 2) * m.TILE)
+				randi_range(2, m.WORLD_H - 2) * m.TILE)
 			m.bugs.append(bnode)
 			m.world.add_child(bnode)
 

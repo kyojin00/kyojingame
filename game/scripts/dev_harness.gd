@@ -55,15 +55,24 @@ func _debug_tick() -> void:
 		if not m.story._story_snapped and m.story._story_t >= 3.2:
 			m.story._story_snapped = true
 			_save_shot("_story.png")
-			# 마을 진입로: 큰길(y8~10) 위아래가 벨 수 없는 나무로 막혀 있고,
-			# 마을로 드는 길은 그 길 하나뿐이어야 한다
-			print("ENTRANCE_OK=", not m.is_passable(Vector2i(52, 7))
-				and not m.is_passable(Vector2i(52, 11))
-				and m.is_passable(Vector2i(52, 9))
-				and bool(m.objects.get(Vector2i(52, 7), {}).get("fixed", false)),
-				" 위막힘=", not m.is_passable(Vector2i(52, 7)),
-				" 아래막힘=", not m.is_passable(Vector2i(52, 11)),
-				" 길열림=", m.is_passable(Vector2i(52, 9)))
+			# 튜토리얼 전용 공간: 여기가 지금 세계의 전부다.
+			# 마을 쪽으로는 한 칸도 갈 수 없고, 지도에도 이 띠만 뜬다.
+			var tut_out: bool = GameData.tutorial_space \
+				and m.STORY_SPAWN.y >= m.WORLD_H     # 시작 자리가 세계 밖이다
+			var tut_walk: bool = m.is_passable(m.STORY_SPAWN + Vector2i(1, 0)) \
+				and m.is_passable(m.STORY_SPAWN + Vector2i(0, 1))
+			# 마을·광장·농장 어디로도 이어지지 않는다 (연결로가 아예 없다)
+			var no_village: bool = not m.is_passable(Vector2i(52, 9)) \
+				and not m.is_passable(Vector2i(78, 20)) \
+				and not m.is_passable(m.START_TILE) \
+				and not m.is_passable(Vector2i(m.STORY_SPAWN.x, m.WORLD_H - 1))
+			# 지도가 보여 주는 땅도 이 띠뿐 — 마을 칸은 구름조차 그리지 않는다
+			var map_tut: bool = m.world_rect() == m.TUTORIAL_REGION \
+				and not m.map_ui._visible_tile(52, 9) \
+				and m.map_ui._visible_tile(m.STORY_SPAWN.x, m.STORY_SPAWN.y)
+			print("TUTSPACE_OK=", tut_out and tut_walk and no_village and map_tut,
+				" 세계밖=", tut_out, " 숲길통행=", tut_walk,
+				" 마을차단=", no_village, " 지도격리=", map_tut)
 			# 새 게임 초기 마을: 건물 0채 + NPC는 이장뿐이어야 한다
 			var houses := 0
 			for hp in m.objects:
@@ -429,7 +438,9 @@ func _debug_tick() -> void:
 			m.map_ui._drag = false
 			var pc: float = m.map_ui._base_cell() * m.map_ui.zoom
 			var org: Vector2 = m.map_ui._origin(pc)
-			var mrect := Rect2(org, Vector2(m.MAP_W * pc, m.MAP_H * pc))
+			var wr8: Rect2i = m.world_rect()
+			var mrect := Rect2(org + Vector2(wr8.position) * pc,
+				Vector2(wr8.size) * pc)
 			print("MAP_PAN_LIMIT_OK=", mrect.has_point(Vector2(480, 270)),
 				" pan=", m.map_ui.pan.round(), " map=", mrect.size.round())
 			m.map_ui.reset_view()
@@ -3946,14 +3957,14 @@ func _debug_tick() -> void:
 			GameData.explored = {}
 			GameData.mark_explored_at(m.START_TILE)
 			var seen1 := 0
-			for y1 in m.MAP_H:
+			for y1 in m.WORLD_H:
 				for x1 in m.MAP_W:
 					if m.map_ui._visible_tile(x1, y1):
 						seen1 += 1
-			var ratio := float(seen1) / float(m.MAP_W * m.MAP_H)
+			var ratio := float(seen1) / float(m.MAP_W * m.WORLD_H)
 			GameData.mark_explored_at(m.START_TILE + Vector2i(24, 12))
 			var seen2 := 0
-			for y2 in m.MAP_H:
+			for y2 in m.WORLD_H:
 				for x2 in m.MAP_W:
 					if m.map_ui._visible_tile(x2, y2):
 						seen2 += 1
@@ -4304,7 +4315,7 @@ func _debug_tick() -> void:
 			var k_expl9: Dictionary = GameData.explored.duplicate()
 			GameData.explored = {}
 			GameData.mark_explored_at(m.START_TILE)
-			var far9 := Vector2i(m.MAP_W - 3, m.MAP_H - 3)
+			var far9 := Vector2i(m.MAP_W - 3, m.WORLD_H - 3)
 			var fog_block: bool = not m.map_ui._visible_tile(far9.x, far9.y) \
 				and m.map_ui.FOG.a >= 1.0 and m.map_ui.CLOUD_MID.a >= 1.0
 			GameData.explored = k_expl9
@@ -4319,7 +4330,7 @@ func _debug_tick() -> void:
 				" 레시피선반=", shelf_ok, " 잼=용식보상 ", jam_reward,
 				" 갇힘=", was_trapped, " 구조=", rescued, " 맵밖복귀=", back_in,
 				" 지도확장=", map_big, " 구름차단=", fog_block)
-		394:
+		232:
 			# #149: 집터 재료 · 더딘 성장과 잠자리 결산 · 채집 문구 · 대사 기호 ·
 			# 제작 문구 · 무지개송어 · 낚시 보상 · 바닷길 막힘
 			m.dialog.close()
@@ -4455,6 +4466,70 @@ func _debug_tick() -> void:
 				" 무지개송어=", art_ok, " 낚시무보수=", fish_free,
 				" 길목비움=", gate_clear2, " 곡괭이채굴=", gate_mined,
 				" 리젠제외=", no_regen)
+		233:
+			# #150: 튜토리얼 공간은 세계 밖에 따로 있다 · 마을이 세계의 시작점 ·
+			# 주변 지역은 이야기를 따라 하나씩 열린다
+			m.dialog.close()
+
+			# ── ① 세계와 튜토리얼 공간은 격자에서부터 갈라져 있다
+			var split_ok: bool = m.WORLD_H < m.TUT_Y0 \
+				and m.TUTORIAL_REGION.position.y >= m.WORLD_H \
+				and m.MAP_H >= m.TUTORIAL_REGION.end.y \
+				and m.grid.size() == m.MAP_H
+
+			# ── ② 마을에 도착한 뒤에는 그 공간으로 가는 길이 없다
+			var k_tut := GameData.tutorial_space
+			GameData.tutorial_space = false
+			var tut_gone: bool = m.world_rect() == Rect2i(0, 0, m.MAP_W, m.WORLD_H)
+			for ty2 in range(m.TUTORIAL_REGION.position.y, m.TUTORIAL_REGION.end.y):
+				if m.is_passable(Vector2i(m.STORY_SPAWN.x, ty2)) \
+						or m.map_ui._visible_tile(m.STORY_SPAWN.x, ty2):
+					tut_gone = false
+			# 지도도 세계만 굽는다 (튜토리얼 띠는 그림에 아예 없다)
+			m.map_ui._bake()
+			var bake_world: bool = m.map_ui._tex != null \
+				and m.map_ui._tex.get_height() == m.WORLD_H
+
+			# ── ③ 튜토리얼을 닫으면 그 자리의 오브젝트와 지도 기억도 사라진다
+			GameData.tutorial_space = true
+			var probe := Vector2i(m.STORY_SPAWN.x, m.STORY_SPAWN.y)
+			m.objects[probe] = {"kind": "rock", "hp": 1}
+			GameData.mark_explored_at(probe)
+			m.story._close_tutorial_space()
+			var closed_ok: bool = not GameData.tutorial_space \
+				and not m.objects.has(probe) \
+				and not GameData.is_explored_tile(probe.x, probe.y)
+
+			# ── ④ 마을은 처음부터 열려 있고, 주변 땅은 이야기를 따라 열린다
+			var k_forest := GameData.forest_quest
+			var k_sea2 := GameData.sea_open
+			var k_s8 := GameData.story8_phase
+			GameData.forest_quest = ""
+			GameData.sea_open = false
+			GameData.story8_phase = ""
+			var plaza9 := Vector2i(m.PLAZA.position.x + 3, m.PLAZA.position.y + 3)
+			var village_open: bool = m.region_open_at(plaza9) \
+				and m.is_passable(plaza9)
+			var locked_ok: bool = not m.region_open_at(Vector2i(60, 50)) \
+				and not m.region_open_at(Vector2i(120, 60)) \
+				and not m.region_open_at(Vector2i(100, 100))
+			GameData.forest_quest = "done"
+			GameData.story8_phase = "done"
+			GameData.sea_open = true
+			var opened_ok: bool = m.region_open_at(Vector2i(60, 50)) \
+				and m.region_open_at(Vector2i(120, 60)) \
+				and m.region_open_at(Vector2i(100, 100))
+			GameData.forest_quest = k_forest
+			GameData.sea_open = k_sea2
+			GameData.story8_phase = k_s8
+			GameData.tutorial_space = k_tut
+			m.map_ui._bake_age = 999.0
+			print("WORLDGATE_OK=", split_ok and tut_gone and bake_world
+				and closed_ok and village_open and locked_ok and opened_ok,
+				" 공간분리=", split_ok, " 복귀불가=", tut_gone,
+				" 지도세계만=", bake_world, " 닫힘정리=", closed_ok,
+				" 마을열림=", village_open, " 주변잠김=", locked_ok,
+				" 이야기로해금=", opened_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
@@ -5116,7 +5191,7 @@ func _debug_tick() -> void:
 			GameData.story2_phase = "fisher"       # 상점이 서면 낚시꾼이 온다
 			m.worldgen._build_sea()
 			# 바다는 처음부터 그 자리에 있다 — 막혀 있는 건 능선의 길목뿐이다
-			var hidden: bool = m.grid[m.MAP_H - 2][30].ground == "water" \
+			var hidden: bool = m.grid[m.WORLD_H - 2][30].ground == "water" \
 				and str(m.objects.get(m.SEA_GATE[0], {}).get("kind", "")) == "bigrock"
 			m.story._fisher_update(0.016)
 			var met: bool = GameData.fisher_quest == "meet" \
@@ -5143,7 +5218,7 @@ func _debug_tick() -> void:
 			var ridge: bool = str(m.objects.get(Vector2i(30, m.SEA_RIDGE_Y),
 				{}).get("kind", "")) == "searock"
 			var sand: bool = m.grid[m.BEACH_Y0][30].ground == "sand"
-			var water: bool = m.grid[m.MAP_H - 2][30].ground == "water"
+			var water: bool = m.grid[m.WORLD_H - 2][30].ground == "water"
 			var shells := 0
 			for pos in m.objects:
 				if String(m.objects[pos].kind) in m.BEACH_FORAGE:
