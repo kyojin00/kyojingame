@@ -166,6 +166,8 @@ const TEXTURE_NAMES := [
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
 	"icon_letter", "old_book",
+	# 제작 재료·결과물 그림 — 제작대(책상) 창이 글자 대신 이 그림으로 말한다
+	"nail", "cloth", "broom",
 	"npc_librarian_down_0", "npc_librarian_down_1", "npc_librarian_up_0",
 	"npc_librarian_up_1", "npc_librarian_side_0", "npc_librarian_side_1",
 	"npc_librarian_portrait_normal", "npc_librarian_portrait_happy",
@@ -355,9 +357,10 @@ const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
 # 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
 const HILL_POS := Vector2i(31, 3)
 const HILL_AREA := Rect2i(26, 1, 11, 6)
-# 오래된 돌문 (메인 스토리 20) — 광장 북쪽. 마을이 서기 전부터 있던 자리라
-# 처음부터 세계에 서 있다 (열리는 건 마지막 이야기에서다)
-const GATE_POS := Vector2i(78, 4)
+# 오래된 돌문 (메인 스토리 20) — 광장 북쪽, 잡화점과 연구소 사이의 빈 터.
+# 건물 마당과 겹치지 않는 자리다. 마지막 페이지의 단서를 얻기 전에는
+# 아예 보이지 않는다 (GameData.gate_visible)
+const GATE_POS := Vector2i(86, 4)
 const HILL_TRACE_TILES := {
 	"bench": Vector2i(28, 4),
 	"stone": Vector2i(34, 4),

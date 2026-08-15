@@ -296,6 +296,10 @@ func _draw_map() -> void:
 			_label(Vector2(pr.get_center().x - 40.0, pr.get_center().y),
 				str(GameData.VILLAGE_ZONES[zid].name) + (" (잠김)" if locked else ""))
 
+	# 퀘스트 길라잡이 — 지금 따라가는 목표가 어디인지 하트로 찍어 준다
+	for g: Dictionary in _quest_guides():
+		_draw_guide(g)
+
 	# 내 위치: 눈에 잘 띄는 마커 (고리 + 깜빡이는 점 + 라벨)
 	var pp := Vector2(_ox + main.player.position.x / 32.0 * _cell,
 		_oy + main.player.position.y / 32.0 * _cell)
@@ -310,6 +314,98 @@ func _draw_map() -> void:
 	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 	canvas.draw_string(main.UI_FONT, Vector2(480 - w / 2.0, 526), guide,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.7, 0.68, 0.8))
+
+
+# ---- 퀘스트 길라잡이 ----
+#
+# 「어디로 가야 하지?」를 글로 설명하는 대신 지도에 찍어 준다.
+# 지금 따라가는 퀘스트(트래커에 뜬 것) 하나만 짚는다 — 화면이 마커로
+# 뒤덮이면 오히려 어디가 어딘지 모르게 되므로.
+#   ① 그 퀘스트의 담당 NPC가 마을에 나와 있으면 그 사람 자리
+#   ② 아니면 이야기 단계마다 정해 둔 장소 (아래 표)
+func _quest_guides() -> Array:
+	var q: Dictionary = GameData.tracked_quest()
+	if q.is_empty():
+		return []
+	var out: Array = []
+	var title := str(q.get("title", "목표"))
+	var spot := _quest_spot(str(q.get("id", "")))
+	if spot.x >= 0:
+		out.append({"tile": spot, "text": title})
+		return out
+	# 담당하는 사람이 있으면 그 사람이 곧 목적지다
+	var nid := str(q.get("npc", ""))
+	if nid != "":
+		for n in main.npcs:
+			if n.id == nid and n.visible:
+				out.append({"tile": Vector2i(int(n.position.x / main.TILE),
+					int(n.position.y / main.TILE)), "text": title})
+				break
+	return out
+
+
+# 이야기 단계별 목적지 — 사람이 아니라 「장소」로 가야 하는 것들
+func _quest_spot(qid: String) -> Vector2i:
+	match qid:
+		"story10", "story11":
+			if GameData.story11_phase == "deep" or GameData.story10_phase == "dig":
+				return main.CAVE_POS
+		"story13":
+			if GameData.story13_phase in ["rock", "fish"]:
+				return main.BRACELET_ROCK
+		"story15":
+			if GameData.story15_phase == "dig":
+				return main.CAVE_POS
+			if GameData.story15_phase == "water":
+				return main.ONSEN_POS
+		"story16":
+			if GameData.story16_phase == "clear":
+				return main.OLD_FARM.position + Vector2i(5, 3)
+		"story17":
+			if GameData.story17_phase == "barn":
+				return main.OLD_BARN
+		"story18":
+			if GameData.story18_phase in ["hill", "box"]:
+				return main.HILL_POS
+		"story20":
+			if GameData.story20_phase in ["gate", "inner"]:
+				return main.GATE_POS
+			if GameData.story20_phase == "plant":
+				return main.HOME_ANCHOR + Vector2i(2, 5)
+		"fisher_home":
+			if GameData.fisher_home in ["wait", "built"]:
+				return Vector2i(main.FOUNTAIN.position.x + 1, main.FOUNTAIN.end.y + 1)
+		"kitchen":
+			if GameData.kitchen_quest in ["sweep", "jam"]:
+				return main.HOME_ANCHOR + Vector2i(2, 3)
+			if GameData.kitchen_quest in ["broom", "make"] \
+					and GameData.village_built.has("general"):
+				return main.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)
+		"tutorial":
+			if GameData.tutorial_current_flag() == "cook":
+				return main.HOME_ANCHOR + Vector2i(2, 3)
+	return Vector2i(-1, -1)
+
+
+# 하트 + 두근거리는 고리 — 멀리서도 눈에 띄게
+func _draw_guide(g: Dictionary) -> void:
+	var t: Vector2i = g.tile
+	var c := Vector2(_ox + (float(t.x) + 0.5) * _cell, _oy + (float(t.y) + 0.5) * _cell)
+	if c.x < -40.0 or c.x > 1000.0 or c.y < -40.0 or c.y > 560.0:
+		return
+	var beat := 1.0 + sin(blink * 4.0) * 0.12
+	var pink := Color(1.0, 0.42, 0.55)
+	# 퍼지는 고리 두 겹
+	canvas.draw_arc(c, 13.0 * beat, 0, TAU, 24, Color(1.0, 0.55, 0.66, 0.85), 2.5)
+	canvas.draw_arc(c, 19.0 * beat, 0, TAU, 24, Color(1.0, 0.55, 0.66, 0.35), 2.0)
+	# 하트 (두 개의 둥근 봉우리 + 아래로 모이는 삼각형)
+	var s := 5.0 * beat
+	canvas.draw_circle(c + Vector2(-s * 0.5, -s * 0.35), s * 0.62, pink)
+	canvas.draw_circle(c + Vector2(s * 0.5, -s * 0.35), s * 0.62, pink)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		c + Vector2(-s * 1.05, -s * 0.15), c + Vector2(s * 1.05, -s * 0.15),
+		c + Vector2(0.0, s * 1.15)]), pink)
+	_label(Vector2(c.x, c.y + 24.0), "◆ " + str(g.text))
 
 
 func _dot(world_pos: Vector2, size: float, col: Color) -> void:

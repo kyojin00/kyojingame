@@ -23,6 +23,7 @@ extends Node
 var m: KyojinMain    # main.gd
 var _shot_frames := 0
 var _saved_pos := Vector2.ZERO   # 화면용으로 잠깐 옮겨 둔 플레이어 자리
+var _desk_keep: Array = []       # 제작대 화면을 찍는 동안 맡아 두는 레시피 목록
 
 
 # ---- 검증 시퀀스 ----
@@ -2883,7 +2884,18 @@ func _debug_tick() -> void:
 			var fplaced: bool = m.story.try_place_home_plot(fdoor)
 			var fanchor := fdoor - Vector2i(2, 3)
 			m.story.build_fisher_home(fdoor)
-			var built_ok: bool = fplaced and GameData.fisher_home == "built" \
+			# 지은 직후에는 아직 「빈 집」이다 — 문 옆 표지판에서 주인을 정한다
+			var sign_ft := Vector2i(-999, -999)
+			for foff: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0),
+					Vector2i(-1, 1), Vector2i(1, 1)]:
+				if str(m.objects.get(fdoor + foff, {}).get("kind", "")) == "home_sign":
+					sign_ft = fdoor + foff
+					break
+			var empty_home: bool = GameData.fisher_home == "build" \
+				and sign_ft.x != -999 and not GameData.settler_homes.has("fisher")
+			m.story._pick_fisher_home(sign_ft)
+			var built_ok: bool = fplaced and empty_home \
+				and GameData.fisher_home == "built" \
 				and str(m.objects.get(fanchor, {}).get("kind", "")) == "house" \
 				and GameData.settler_homes.has("fisher") \
 				and GameData.quest_npc_marks().get("fisher", "") == "?"
@@ -2928,6 +2940,7 @@ func _debug_tick() -> void:
 				if int(hp.x) == fanchor.x and int(hp.y) == fanchor.y:
 					GameData.home_plots.remove_at(i)
 			GameData.settler_homes.erase("fisher")
+			GameData.home_signs.erase(str(sign_ft))
 			GameData.fisher_home = ""
 			GameData.sea_open_day = 0
 			GameData.day = k_day
@@ -2989,9 +3002,21 @@ func _debug_tick() -> void:
 			var no_black_bar: bool = not m.hud.msg_label.visible
 			# ③ 집 안 붙박이(제작대·조리대)는 통과할 수 없다
 			m.interior._layout()
-			var desk_block: bool = m.interior._blocked(m.interior.DESK.get_center()) \
-				and m.interior._blocked(m.interior.KITCHEN.get_center()) \
-				and not m.interior._blocked(m.interior.ROOM.get_center())
+			var desk_hit: bool = m.interior._blocked(m.interior.DESK.get_center())
+			var kit_hit: bool = m.interior._blocked(m.interior.KITCHEN.get_center())
+			# 붙박이가 아닌 빈 바닥은 지나갈 수 있어야 한다 (방 한가운데는 확장한
+			# 집에서 식탁이 차지할 수도 있으므로, 빈 자리가 있는지로 본다)
+			var free_spot := false
+			for sy in range(int(m.interior.ROOM.position.y) + 48,
+					int(m.interior.ROOM.end.y) - 24, 12):
+				for sx in range(int(m.interior.ROOM.position.x) + 24,
+						int(m.interior.ROOM.end.x) - 24, 12):
+					if not m.interior._blocked(Vector2(sx, sy)):
+						free_spot = true
+						break
+				if free_spot:
+					break
+			var desk_block: bool = desk_hit and kit_hit and free_spot
 			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라)
 			var pt0 := m.player_tile()
 			var from_north := Vector2((pt0.x) * m.TILE + 16.0, (pt0.y - 8) * m.TILE + 16.0)
@@ -3004,6 +3029,7 @@ func _debug_tick() -> void:
 				and desk_block and side_ok,
 				" 농사줄기=", chain_ok, chain, " 말풍선=", bubble_ok,
 				" 검은띠제거=", no_black_bar, " 붙박이충돌=", desk_block,
+				"(제작대 ", desk_hit, " 조리대 ", kit_hit, " 빈바닥 ", free_spot, ")",
 				" 접근방향=", side_ok, "(북 ", spot_n - pt0, " · 서 ", spot_w - pt0, ")")
 			_save_shot("_bubble.png")
 		288:
@@ -3157,6 +3183,191 @@ func _debug_tick() -> void:
 				" 청소·조리대=", step_found, " 완료전차단=", still_block,
 				" 선물=", gift_open and gift_ok, " 첫요리·완료=", done_ok,
 				" 레시피판매해금=", sell_ok)
+		289:
+			# #141: 한 배치 — ① 바다 지형 고정 ② 돌문 숨김·자리 ③ 낚싯대 없이
+			# 낚시 금지 ④ 집 표지판으로 주인 정하기 ⑤ 지도 퀘스트 마커
+			# ⑥ 제작대 그림·탭
+			m.dialog.close()
+			m.desk_ui.close()
+
+			# ── ① 바다는 처음부터 그 자리에 있다 (돌을 캐도 숲이 변하지 않는다)
+			var k_sea := GameData.sea_open
+			var k_seaday := GameData.sea_open_day
+			GameData.sea_open = false
+			m.worldgen._build_sea()
+			var sea_fixed: bool = str(m.grid[m.SEA_Y0 + 2][40].ground) == "water" \
+				and str(m.grid[m.BEACH_Y0 + 1][40].ground) == "sand" \
+				and str(m.objects.get(m.SEA_GATE[0], {}).get("kind", "")) == "bigrock"
+			var land_before: Array = []
+			for ly in range(m.SEA_RIDGE_Y - 6, m.SEA_RIDGE_Y):
+				for lx in range(20, 100, 7):
+					land_before.append(str(m.grid[ly][lx].ground))
+			m.worldgen._reveal_sea()          # 길목 바위를 캐는 순간
+			var land_after: Array = []
+			for ly2 in range(m.SEA_RIDGE_Y - 6, m.SEA_RIDGE_Y):
+				for lx2 in range(20, 100, 7):
+					land_after.append(str(m.grid[ly2][lx2].ground))
+			var no_morph: bool = land_before == land_after \
+				and str(m.grid[m.SEA_Y0 + 2][40].ground) == "water" \
+				and not m.objects.has(m.SEA_GATE[0]) \
+				and not m.objects.has(m.SEA_GATE[1])
+			GameData.sea_open = k_sea
+			GameData.sea_open_day = k_seaday
+			m.worldgen._build_sea()
+
+			# ── ② 오래된 돌문: 조건 전에는 아예 없고, 건물 마당과 겹치지 않는다
+			var k_s19 := GameData.story19_phase
+			var k_s20 := GameData.story20_phase
+			GameData.story19_phase = ""
+			GameData.story20_phase = ""
+			m.objnode._remove_object(m.GATE_POS)
+			m.worldgen.spawn_gate()
+			var gate_hidden: bool = not GameData.gate_visible() \
+				and not m.objects.has(m.GATE_POS)
+			GameData.story19_phase = "done"
+			m.worldgen.spawn_gate()
+			var gate_shown: bool = GameData.gate_visible() \
+				and str(m.objects.get(m.GATE_POS, {}).get("kind", "")) == "old_gate"
+			var gate_clear := true
+			for pid2: String in m.VILLAGE_PLOTS:
+				var anc: Vector2i = m.VILLAGE_PLOTS[pid2].anchor
+				var yard := Rect2i(anc.x - m.YARD_PAD, anc.y - m.YARD_PAD,
+					5 + m.YARD_PAD * 2, 4 + m.YARD_PAD * 2)
+				if yard.has_point(m.GATE_POS):
+					gate_clear = false
+			GameData.story19_phase = k_s19
+			GameData.story20_phase = k_s20
+			if not GameData.gate_visible():
+				m.objnode._remove_object(m.GATE_POS)
+
+			# ── ③ 낚싯대가 없으면 강이든 바다든 못 던진다 (말풍선으로 알린다)
+			var k_unlocked: Array = GameData.unlocked_tools.duplicate()
+			var k_slots: Array = GameData.tool_slots.duplicate()
+			var k_tool := GameData.tool
+			GameData.unlocked_tools.erase("rod")
+			var no_rod: bool = not GameData.can_fish() \
+				and "rod" not in GameData.TUTORIAL_UNLOCKS["harvest"]
+			GameData.tool_slots[0] = "rod"
+			GameData.tool = "rod"
+			m.hud.show_message("...")
+			m._target_override = Vector2i(40, m.SEA_Y0 + 2)
+			m.toolwork.use_tool()
+			m._target_override = Vector2i(-999, -999)
+			var rod_bubble: bool = m.hud._bub_label.text.contains("낚시대가 없다") \
+				and m.fishing_state == ""
+			if "rod" not in GameData.unlocked_tools:
+				GameData.unlocked_tools.append("rod")
+			var rod_ok: bool = GameData.can_fish()
+			GameData.unlocked_tools = k_unlocked
+			GameData.tool_slots = k_slots
+			GameData.tool = k_tool
+
+			# ── ④ 다 지은 집의 표지판에서 「용식의 집」으로 정한다
+			var k_fh := GameData.fisher_home
+			var k_signs: Dictionary = GameData.home_signs.duplicate()
+			var k_homes: Dictionary = GameData.settler_homes.duplicate()
+			var door := Vector2i(-1, -1)
+			for dy in range(44, 62):
+				for dx in range(28, 48):
+					var d0 := Vector2i(dx, dy)
+					if m.is_passable(d0 + Vector2i(1, 0)) \
+							and not m.objects.has(d0 + Vector2i(1, 0)):
+						door = d0
+						break
+				if door.x >= 0:
+					break
+			var anchor2 := door - Vector2i(2, 3)
+			GameData.fisher_home = "build"
+			m.story._place_home_sign(anchor2, door)
+			var sign_t := Vector2i(-999, -999)
+			for off2: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0),
+					Vector2i(-1, 1), Vector2i(1, 1)]:
+				if str(m.objects.get(door + off2, {}).get("kind", "")) == "home_sign":
+					sign_t = door + off2
+					break
+			var sign_placed: bool = sign_t.x != -999 \
+				and GameData.home_signs.has(str(sign_t))
+			m.story.home_sign_dialog(sign_t)
+			var sign_labels: Array = []
+			for c9 in m.dialog.buttons_box.get_children():
+				if c9.is_queued_for_deletion() or not (c9 is Button):
+					continue
+				sign_labels.append((c9 as Button).text.strip_edges())
+			var sign_menu: bool = m.dialog.visible and sign_labels.size() == 2 \
+				and str(sign_labels[0]).contains("용식의 집으로 결정")
+			m.story._pick_fisher_home(sign_t)
+			var picked_home: bool = GameData.fisher_home == "built" \
+				and Array(GameData.settler_homes.get("fisher", [])) \
+					== [anchor2.x, anchor2.y]
+			m.dialog.close()
+			if sign_t.x != -999:
+				m.objnode._remove_object(sign_t)
+			GameData.fisher_home = k_fh
+			GameData.home_signs = k_signs
+			GameData.settler_homes = k_homes
+
+			# ── ⑤ 지도(M)에 진행 중인 퀘스트 목적지가 찍힌다
+			var k_s18 := GameData.story18_phase
+			var k_pick := GameData.tracked_pick
+			GameData.story18_phase = "hill"
+			GameData.tracked_pick = "story18"
+			var guides: Array = m.map_ui._quest_guides()
+			var guide_ok := false
+			if guides.size() == 1:
+				var g0: Dictionary = guides[0]
+				var gt: Vector2i = g0.tile
+				guide_ok = gt == m.HILL_POS and str(g0.text).contains("시계")
+			GameData.story18_phase = k_s18
+			GameData.tracked_pick = k_pick
+
+			# ── ⑥ 제작대: 갈래별 탭 + 글자보다 그림
+			var k_ru2: Array = GameData.recipes_unlocked.duplicate()
+			for rid: String in ["broom", "spear", "flower_pot", "storage_box"]:
+				if rid not in GameData.recipes_unlocked:
+					GameData.recipes_unlocked.append(rid)
+			m.desk_ui.open()
+			var ids_all: Array = m.desk_ui.tab_ids("all")
+			var ids_tool: Array = m.desk_ui.tab_ids("tool")
+			var ids_furn: Array = m.desk_ui.tab_ids("furniture")
+			var ids_life: Array = m.desk_ui.tab_ids("life")
+			var cats_ok: bool = ids_all.size() \
+					== ids_tool.size() + ids_furn.size() + ids_life.size() \
+				and "spear" in ids_tool and "sword" not in ids_life \
+				and "bed_wood" in ids_furn and "flower_pot" in ids_furn \
+				and "broom" in ids_life and "storage_box" in ids_life
+			m.desk_ui.set_tab("tool")
+			var pics := 0
+			var stack: Array = [m.desk_ui._root]
+			while not stack.is_empty():
+				var nd: Node = stack.pop_back()
+				for ch in nd.get_children():
+					stack.append(ch)
+					if ch is TextureRect:
+						pics += 1
+			var tab_ok: bool = m.desk_ui._tab == "tool" \
+				and m.desk_ui.tab_ids("tool").size() == ids_tool.size() \
+				and pics >= ids_tool.size() * 2
+			m.desk_ui.set_tab("all")
+			# 창은 열어 둔 채 넘어간다 — 화면은 다음 단계(291)에서 찍는다
+			# (_save_shot은 「지난 프레임」을 뜬다)
+			_desk_keep = k_ru2
+			m.hud._toast_queue.clear()
+			print("TERRAIN_UI_OK=", sea_fixed and no_morph and gate_hidden
+				and gate_shown and gate_clear and no_rod and rod_bubble and rod_ok
+				and sign_placed and sign_menu and picked_home and guide_ok
+				and cats_ok and tab_ok,
+				" 바다고정=", sea_fixed, " 숲안변함=", no_morph,
+				" 돌문숨김=", gate_hidden, " 조건후등장=", gate_shown,
+				" 건물안겹침=", gate_clear, " 낚싯대전금지=", no_rod,
+				" 말풍선=", rod_bubble, " 낚싯대후해금=", rod_ok,
+				" 표지판=", sign_placed, " 선택지=", sign_menu,
+				" 용식의집=", picked_home, " 지도마커=", guide_ok,
+				" 제작대탭=", cats_ok, " 그림수=", tab_ok, "(", pics, "장)")
+		291:
+			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
+			_save_shot("_desk.png")
+			m.desk_ui.close()
+			GameData.recipes_unlocked = _desk_keep
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
@@ -3811,7 +4022,10 @@ func _debug_tick() -> void:
 			GameData.sea_open = false
 			GameData.unlocked_tools.erase("rod")
 			GameData.story2_phase = "fisher"       # 상점이 서면 낚시꾼이 온다
-			var hidden: bool = m.grid[m.MAP_H - 2][30].ground != "water"
+			m.worldgen._build_sea()
+			# 바다는 처음부터 그 자리에 있다 — 막혀 있는 건 능선의 길목뿐이다
+			var hidden: bool = m.grid[m.MAP_H - 2][30].ground == "water" \
+				and str(m.objects.get(m.SEA_GATE[0], {}).get("kind", "")) == "bigrock"
 			m.story._fisher_update(0.016)
 			var met: bool = GameData.fisher_quest == "meet" \
 				and m.story._fisher_node() != null
@@ -3848,7 +4062,7 @@ func _debug_tick() -> void:
 				and sea and ridge and sand and water and shell_ok and hidden,
 				" 등장=", met, " 선택지=", choice_shown, " 선택반영=", picked,
 				" 동행=", follow, " 보상대화=", reward, " 바다해금=", sea,
-				" 열기전숨김=", hidden, " 능선=", ridge, " 모래=", sand,
+				" 열기전길막힘=", hidden, " 능선=", ridge, " 모래=", sand,
 				" 바닷물=", water, " 조개=", shells)
 			GameData.story2_phase = "done"
 			# 해변 채집 능력치: 레벨이 오르면 리젠이 빨라지고 한 번에 더 줍는다.

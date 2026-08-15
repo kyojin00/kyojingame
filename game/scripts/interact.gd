@@ -313,14 +313,17 @@ func interact() -> void:
 					+ "마을이 살아나면 제대로 된 집을 지어 드리고 싶다...",
 					[["닫기", null]])
 			return
+		if obj.kind == "home_sign":
+			m.story.home_sign_dialog(t)   # 이 집을 누구 집으로 할까
+			return
 		if obj.kind == "homeplot":
 			# 빈 집터 팻말 — 회수하면 집터가 가방으로 돌아온다
 			var plot_btns: Array = []
 			var plot_body := "새 주민을 위해 마련해 둔 빈 집터다.\n이주 희망 편지를 수락하면 여기에 집이 지어진다."
 			if GameData.fisher_home == "build":
-				# 용식의 부탁 — 여기에 바로 집을 올릴 수 있다
-				plot_body = "새 주민을 위해 마련해 둔 빈 집터다.\n용식이 살 집을 여기에 지을까?"
-				plot_btns.append(["집을 짓는다 (용식의 집)",
+				# 용식의 부탁 — 여기에 집을 한 채 올린다 (주인은 표지판에서 정한다)
+				plot_body = "새 주민을 위해 마련해 둔 빈 집터다.\n여기에 집을 한 채 지을까?"
+				plot_btns.append(["집을 짓는다",
 					m.story.build_fisher_home.bind(t)])
 			plot_btns.append(["회수하기", m.story._pickup_home_plot.bind(t)])
 			plot_btns.append(["닫기", null])
@@ -402,8 +405,13 @@ func interact() -> void:
 	# 수확, 낚시까지 전부 E 하나로 된다 (좌클릭과 같은 동작).
 	# 앞에 아무것도 없으면 조용히 지나간다 (걸어다니며 E를 눌러도 메시지 없음)
 	var tt := target_tile()
-	var crop_ahead: bool = tt.x >= 0 and tt.y >= 0 and tt.x < m.MAP_W and tt.y < m.MAP_H \
-		and m.grid[tt.y][tt.x].crop_id != ""
+	var in_map: bool = tt.x >= 0 and tt.y >= 0 and tt.x < m.MAP_W and tt.y < m.MAP_H
+	# 물가 — 낚싯대가 없으면 던질 것이 없다 (용식과 바닷길을 열어야 받는다)
+	if in_map and str(m.grid[tt.y][tt.x].ground) == "water" \
+			and not GameData.can_fish():
+		m.hud.show_message("낚시대가 없다...")
+		return
+	var crop_ahead: bool = in_map and m.grid[tt.y][tt.x].crop_id != ""
 	if crop_ahead or GameData.tool_slots.has(GameData.tool):
 		m.toolwork.use_tool()
 

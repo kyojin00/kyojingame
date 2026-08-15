@@ -900,6 +900,9 @@ var sea_open_day := 0      # 바닷길이 열린 날 — 용식의 집터 부탁
 #   build: 집터를 놓고 집을 짓는다 / built: 집 완성 — 용식에게 알리기 /
 #   done: 완료 (수납 상자 레시피)
 var fisher_home := ""
+# 새로 지은 집 앞 표지판 — 표지판 칸 -> 그 집의 앵커 [x, y].
+# 「막 지은 이 건물이 누구 집인지」를 표지판을 눌러 정한다
+var home_signs := {}
 const FISHER_HOME_DAYS := 3        # 바닷길을 연 날로부터 며칠 뒤에 서 있는가
 
 
@@ -914,7 +917,7 @@ func fisher_home_objective_short() -> String:
 		"wait":
 			return "분수대 앞의 용식에게 말을 걸어 보자 (E)"
 		"build":
-			return "마을 아무 곳에나 집터를 놓고 집을 짓자"
+			return "마을에 집을 한 채 짓고, 집 앞 표지판에서 확정하자"
 		"built":
 			return "용식에게 집이 다 됐다고 알리자"
 	return ""
@@ -1079,7 +1082,9 @@ func merchant_at_stall() -> bool:
 #   build: 집터 레시피 구매·제작·설치 / wait: 완공 — 내일 이사 온다 /
 #   greet: 무진 도착 — 인사하러 가기 / done: 완료 (이주·집터 시스템 해금)
 var move_quest := ""
-var move_day := 0            # 단계 전환 기준 날 (편지 도착·이사 대기)
+var move_day := 0
+var move_min := 0            # 집을 지은 시각 (분) — 여기서 조금 뒤에 이사 온다
+const MOVE_WAIT_MIN := 120   # 두 시간쯤 지나면 짐을 들고 나타난다            # 단계 전환 기준 날 (편지 도착·이사 대기)
 var move_house := Vector2i(-999, -999)   # 무진의 집 자리 (수락한 집터)
 const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
 # 스프링클러는 퀘스트 보상이 아니라 잡화점 레시피가 됐다 —
@@ -2110,6 +2115,12 @@ var seed_water := false            # 심은 뒤 물을 주었는가
 const STORY20_TELL := ["librarian", "chief"]
 
 
+# 오래된 돌문이 세계에 서 있는가 — 노트의 마지막 페이지에서 「마을에서 가장
+# 오래된 자리」라는 단서를 얻은 뒤에야 그 자리가 눈에 들어온다
+func gate_visible() -> bool:
+	return story19_phase == "done" or story20_phase != ""
+
+
 func story20_ready() -> bool:
 	return story19_phase == "done" and relics_owned() >= RELICS.size() \
 		and note_progress().ratio >= 1.0
@@ -2711,6 +2722,11 @@ const JAM_BERRIES := 3               # 만수가 함께 주는 산딸기
 
 
 # 이 이야기가 시작될 수 있는가 — 잡화점이 서 있고, 아직 조리대가 없다
+# 낚시를 할 수 있는가 — 용식과 바닷길을 열고 낚싯대를 받아야 한다
+func can_fish() -> bool:
+	return is_tool_unlocked("rod")
+
+
 func kitchen_quest_ready() -> bool:
 	return village_built.has("general") and not kitchen_found \
 		and kitchen_quest == "" and story_phase == "done"
@@ -4848,7 +4864,8 @@ const TUTORIAL_ORDER := [
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"harvest": ["axe", "pickaxe", "fence", "rod"],
+	# 낚싯대는 여기서 주지 않는다 — 용식과 바닷길을 연 뒤에야 손에 들어온다
+	"harvest": ["axe", "pickaxe", "fence"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
 # 돌 창·돌 검은 제작대에서 만들어 해금하는 무기다 (레시피: 이장/추후 서브퀘)
@@ -5427,6 +5444,7 @@ func reset_all() -> void:
 	kitchen_branch = ""
 	fisher_quest = ""
 	fisher_home = ""
+	home_signs = {}
 	sea_open_day = 0
 	storage_stock = {}
 	fisher_choice = 0
@@ -5846,13 +5864,14 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"kitchen_quest": kitchen_quest, "kitchen_branch": kitchen_branch,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
 		"fisher_home": fisher_home, "sea_open_day": sea_open_day,
+		"home_signs": home_signs,
 		"storage_stock": storage_stock,
 		"sea_open": sea_open, "story2_phase": story2_phase,
 		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
 		"stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,
 		"affinity_open": affinity_open,
-		"move_quest": move_quest, "move_day": move_day,
+		"move_quest": move_quest, "move_day": move_day, "move_min": move_min,
 		"move_house": [move_house.x, move_house.y],
 		"home_plots": home_plots,
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,

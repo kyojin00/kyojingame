@@ -65,6 +65,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.fisher_choice = int(d.get("fisher_choice", 0))
 	# 용식의 집터 부탁 (서브) + 수납 상자 안의 살림
 	GameData.fisher_home = str(d.get("fisher_home", ""))
+	GameData.home_signs = Dictionary(d.get("home_signs", {}))
 	GameData.sea_open_day = int(d.get("sea_open_day", 0))
 	GameData.storage_stock = Dictionary(d.get("storage_stock", {}))
 	if GameData.sea_open and GameData.sea_open_day <= 0:
@@ -78,6 +79,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.forest_day = int(d.get("forest_day", 0))
 	GameData.move_quest = str(d.get("move_quest", ""))
 	GameData.move_day = int(d.get("move_day", 0))
+	GameData.move_min = int(d.get("move_min", 0))
 	var mh: Array = d.get("move_house", [])
 	GameData.move_house = Vector2i(int(mh[0]), int(mh[1])) if mh.size() == 2 \
 		else Vector2i(-999, -999)

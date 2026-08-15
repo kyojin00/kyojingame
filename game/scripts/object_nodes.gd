@@ -88,6 +88,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 상점 터 게시판 — 구역 해금 게시판과 같은 모습
 			texture = m.tex["board_unlock"]
 			offset = Vector2(0, -texture.get_height())
+		"home_sign":
+			# 새로 지은 집 앞 문패 — 누구 집인지 여기서 정한다
+			texture = m.tex["board_unlock"]
+			offset = Vector2(0, -texture.get_height())
 		"homeplot":
 			# 빈 집터 팻말 — 이주 편지를 수락하면 이 자리에 집이 선다
 			texture = m.tex["board_unlock"]

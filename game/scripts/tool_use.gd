@@ -461,6 +461,9 @@ func use_tool() -> void:
 		"spear", "sword":
 			_weapon_swing(t)
 		"rod":
+			if not GameData.can_fish():
+				m.hud.show_message("낚시대가 없다...")
+				return
 			match m.fishing_state:
 				"":
 					_charge()

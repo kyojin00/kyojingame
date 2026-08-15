@@ -44,8 +44,9 @@ func _build_map() -> void:
 	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
 	m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
 	m.objects[m.WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
-	# 오래된 돌문 (메인 스토리 20) — 마을보다 오래된 자리라 처음부터 있다
-	m.objects[m.GATE_POS] = {"kind": "old_gate", "hp": 0}
+	# 오래된 돌문 (메인 스토리 20) — 마지막 페이지의 단서를 얻어야 눈에 들어온다
+	if GameData.gate_visible():
+		m.objects[m.GATE_POS] = {"kind": "old_gate", "hp": 0}
 
 	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in m.MAP_W:
@@ -114,24 +115,18 @@ func _build_map() -> void:
 # 낚시꾼 퀘스트에서 길목(SEA_GATE) 바위를 캐는 순간 바다·해변이 드러난다.
 # 로드 후에도 다시 불러 남쪽 지형을 결정적으로 맞춘다 (구세이브 보정).
 func _build_sea() -> void:
-	if GameData.sea_open:
-		for y in range(m.SEA_Y0, m.MAP_H):
-			for x in m.MAP_W:
-				m.grid[y][x].ground = "water"
-				m.objects.erase(Vector2i(x, y))
-		for y in range(m.BEACH_Y0, m.SEA_Y0):
-			for x in m.MAP_W:
-				m.grid[y][x].ground = "sand"
-				m.objects.erase(Vector2i(x, y))
-	else:
-		# 아직 바다를 모른다 — 능선 너머는 빽빽한 숲으로 가려 둔다
-		for y in range(m.BEACH_Y0, m.MAP_H):
-			for x in range(1, m.MAP_W - 1):
-				var pos := Vector2i(x, y)
-				if m.objects.has(pos) or m.grid[y][x].ground != "grass":
-					continue
-				if m._hash01(x * 11 + 1, y * 7 + 5) < 0.5 and _nature_clear(pos, "tree"):
-					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
+	# 바다와 모래사장은 **언제나 이 자리에 있다**. 예전에는 바닷길을 열기 전까지
+	# 숲으로 덮어 두었다가 길목 바위를 캐는 순간 물로 바꿨는데, 그러다 보니
+	# 「돌을 캤더니 숲이 바다가 되는」 광경이 그대로 보였다. 이제 지형은
+	# 고정이고, 능선의 큰 바위가 길을 막고 있을 뿐이다.
+	for y in range(m.SEA_Y0, m.MAP_H):
+		for x in m.MAP_W:
+			m.grid[y][x].ground = "water"
+			m.objects.erase(Vector2i(x, y))
+	for y in range(m.BEACH_Y0, m.SEA_Y0):
+		for x in m.MAP_W:
+			m.grid[y][x].ground = "sand"
+			m.objects.erase(Vector2i(x, y))
 	for x in m.MAP_W:
 		var p := Vector2i(x, m.SEA_RIDGE_Y)
 		m.objects.erase(p)
@@ -158,11 +153,9 @@ func _reveal_sea() -> void:
 		# 바닷길이 열린 날 — 용식의 집터 부탁이 여기서 정확히 3일 뒤에 뜬다
 		GameData.sea_open_day = GameData.day
 	GameData.sea_open = true
-	for y in range(m.BEACH_Y0, m.MAP_H):
-		for x in m.MAP_W:
-			var pos := Vector2i(x, y)
-			m.objnode._remove_object(pos)
-			m.grid[y][x].ground = "water" if y >= m.SEA_Y0 else "sand"
+	# 지형은 그대로다 (처음부터 바다였다). 길목을 막고 있던 바위만 걷어낸다
+	for p: Vector2i in m.SEA_GATE:
+		m.objnode._remove_object(p)
 	_seed_beach_forage()
 	_place_stall()
 	m.queue_redraw()
@@ -414,6 +407,8 @@ func spawn_old_barn() -> void:
 # 오래된 돌문 (메인 스토리 20) — 마을이 서기 훨씬 전부터 그 자리에 있었다.
 # 처음부터 세워 두고, 열리기 전에는 그저 열리지 않는 돌일 뿐이다.
 func spawn_gate() -> void:
+	if not GameData.gate_visible():
+		return
 	var t: Vector2i = m.GATE_POS
 	if str(m.objects.get(t, {}).get("kind", "")) == "old_gate":
 		return

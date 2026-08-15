@@ -1683,11 +1683,14 @@ func _move_update(_delta: float) -> void:
 		_start_move_letter_dialog()
 	# 집을 지은 다음 날 — 무진이 정말로 이사 오고, 직접 인사하러 온다
 	# (이주 NPC 공통 규칙: 확정일 다음 날, 본인이 플레이어를 찾아온다)
-	elif GameData.move_quest == "wait" and GameData.day > GameData.move_day:
+	# 하룻밤을 통째로 기다리게 하지 않는다 — 두 시간쯤 뒤(또는 다음 날)면 온다
+	elif GameData.move_quest == "wait" and (GameData.day > GameData.move_day
+			or GameData.minutes >= GameData.move_min + GameData.MOVE_WAIT_MIN):
 		GameData.move_quest = "greet"
 		GameData.arrivals.append({"id": "explorer", "day": GameData.move_day})
 		m.hud.event_toast("무진이 이사 왔다!")
 		m.hud.show_message("새로 지은 집 앞에 이삿짐이 보인다.\n무진이 곧 인사하러 올 것 같다.", 6.0)
+		GameData.arrivals[GameData.arrivals.size() - 1]["day"] = GameData.day - 1
 
 
 func _start_move_letter_dialog() -> void:
@@ -1825,9 +1828,10 @@ func _try_accept_move() -> void:
 	m.objects.erase(m.door_tile(plot))
 	GameData.move_quest = "wait"
 	GameData.move_day = GameData.day
+	GameData.move_min = GameData.minutes
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("이사 수락 — 새 주민의 집 완공!")
-	m.hud.show_message("준비해 둔 집터에 집이 지어졌다. 내일이면 무진이 이사 온다!", 5.0)
+	m.hud.show_message("준비해 둔 집터에 집이 지어졌다.\n무진이 오늘 안에 짐을 들고 온다!", 5.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -4058,6 +4062,7 @@ func _end_last_page() -> void:
 	if GameData.story19_phase != "page":
 		return
 	GameData.story19_phase = "done"
+	m.worldgen.spawn_gate()   # 「가장 오래된 자리」가 눈에 들어온다
 	m.hud.story_banner("메인 스토리 19 완결", "일곱 갈래의 삶")
 	m.hud.show_message("일곱 병이 준비됐다.\n마지막 장소가 기다리고 있다.", 7.0)
 	m.saveio.save_now()
@@ -4262,11 +4267,10 @@ func _end_fisher_home_ask() -> void:
 	m.saveio.save_now()
 
 
-# 빈 집터 위에 용식의 집을 올린다 (집터 팻말 E -> 「집을 짓는다」)
+# 빈 집터 위에 집을 한 채 올린다. 이 시점에는 **아직 빈 집**이고,
+# 문 앞에 표지판이 선다 — 누구 집으로 할지는 표지판에서 정한다.
 func build_fisher_home(door: Vector2i) -> void:
 	m.dialog.close()
-	if GameData.fisher_home != "build":
-		return
 	var anchor := door - Vector2i(2, 3)
 	var found := false
 	for p: Dictionary in GameData.home_plots:
@@ -4285,12 +4289,69 @@ func build_fisher_home(door: Vector2i) -> void:
 	m.worldgen._fill_building(anchor)
 	m.objects.erase(door)
 	m.worldgen._spawn_house_node(anchor)
-	GameData.settler_homes["fisher"] = [anchor.x, anchor.y]
+	_place_home_sign(anchor, door)
+	Sound.play_sfx("sfx_place")
+	m.hud.event_toast("집 한 채 완공!")
+	m.hud.show_message("아직 빈 집이다.\n집 앞 표지판(E)에서 누구 집으로 할지 정하자.", 7.0)
+	m.queue_redraw()
+	m.saveio.save_now()
+
+
+# 집 앞 표지판 — 문 옆의 지나다닐 수 있는 칸에 세운다
+func _place_home_sign(anchor: Vector2i, door: Vector2i) -> void:
+	for off: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0),
+			Vector2i(-1, 1), Vector2i(1, 1)]:
+		var t := door + off
+		if m.objects.has(t) or not m.is_passable(t):
+			continue
+		m.objnode._place_object(t, "home_sign", 0)
+		GameData.home_signs[str(t)] = [anchor.x, anchor.y]
+		return
+
+
+# 표지판 (E) — 이 건물이 누구 집인지 여기서 정한다
+func home_sign_dialog(t: Vector2i) -> void:
+	var owner := _home_sign_owner(t)
+	if owner != "":
+		m.dialog.open("%s의 집" % str(GameData.NPCS[owner].name),
+			"문패에 이름이 걸려 있다.\n지금은 %s이(가) 사는 집이다."
+				% str(GameData.NPCS[owner].name), [["닫기", null]])
+		return
+	var btns: Array = []
+	if GameData.fisher_home == "build":
+		btns.append(["퀘스트용으로 용식의 집으로 결정한다!",
+			_pick_fisher_home.bind(t)])
+	btns.append(["그냥 둔다", null])
+	m.dialog.open("빈 집",
+		"막 지어 올린 집이다. 아직 아무도 살지 않는다.\n\n"
+		+ ("(용식이 살 집을 찾고 있다.)" if GameData.fisher_home == "build"
+			else "(누군가 이사 오면 이 집에 들어온다.)"), btns)
+
+
+# 이 표지판의 집에 이미 주인이 있는가
+func _home_sign_owner(t: Vector2i) -> String:
+	var a: Array = GameData.home_signs.get(str(t), [])
+	if a.size() != 2:
+		return ""
+	for nid: String in GameData.settler_homes:
+		var h: Array = GameData.settler_homes[nid]
+		if int(h[0]) == int(a[0]) and int(h[1]) == int(a[1]):
+			return nid
+	return ""
+
+
+func _pick_fisher_home(t: Vector2i) -> void:
+	m.dialog.close()
+	if GameData.fisher_home != "build":
+		return
+	var a: Array = GameData.home_signs.get(str(t), [])
+	if a.size() != 2:
+		return
+	GameData.settler_homes["fisher"] = [int(a[0]), int(a[1])]
 	GameData.fisher_home = "built"
 	Sound.play_sfx("sfx_place")
-	m.hud.event_toast("용식의 집 완공!")
+	m.hud.event_toast("용식의 집으로 정했다")
 	m.hud.quest_start_toast("용식에게 집이 다 됐다고 알리자")
-	m.queue_redraw()
 	m.saveio.save_now()
 
 
