@@ -382,6 +382,9 @@ func _apply_save(d: Dictionary) -> void:
 			var cell: Dictionary = m.grid[y][x]
 			if cell.ground in ["path", "dock"]:
 				cell.ground = "grass"
+	# 위에서 자갈 바닥까지 같이 걷혔다 — 지역 바닥(채석장 자갈·습지 웅덩이)은
+	# 지형이 정하는 것이지 저장에 딸린 게 아니니 여기서 다시 깐다
+	m.worldgen._paint_regions()
 	if d.has("objects"):
 		m.objects.clear()
 		for o in d.objects:

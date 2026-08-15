@@ -280,6 +280,16 @@ func _draw_map() -> void:
 	_place_label(74, 13, "중앙 광장")
 	_place_label(46, 31, "호수 낚시터")
 	_place_label(50, 1, "동굴")
+	# 야생 지역 이름 — 가 본 곳만. 그 땅 한가운데에 옅은 테두리와 함께 적는다.
+	# 이름이 붙어야 「빈 잔디밭」이 아니라 「가 볼 데」로 보인다.
+	for reg: Dictionary in main.REGIONS:
+		var rr: Rect2i = reg.rect
+		var mid := rr.position + rr.size / 2
+		if not _visible_tile(mid.x, mid.y):
+			continue
+		canvas.draw_rect(Rect2(_ox + rr.position.x * _cell, _oy + rr.position.y * _cell,
+			rr.size.x * _cell, rr.size.y * _cell), Color(0.85, 0.9, 0.7, 0.16), false, 1.0)
+		_label(Vector2(_ox + mid.x * _cell - 34.0, _oy + mid.y * _cell), str(reg.name))
 	# 지어진 마을 건물만 이름을 보여준다 (빈 부지는 표시하지 않는다)
 	for pid: String in GameData.village_built:
 		if not main.VILLAGE_PLOTS.has(pid):

@@ -10,7 +10,19 @@ const SFX_NAMES := [
 # 계절 넷 + 장소·상황 여섯. 예전에는 계절 넷뿐이었고 각 20초였다.
 const BGM_NAMES := ["bgm_spring", "bgm_summer", "bgm_fall", "bgm_winter",
 	"bgm_village", "bgm_cave", "bgm_shop", "bgm_night", "bgm_festival", "bgm_title",
-	"bgm_main"]      # bgm_main은 받은 곡(mp3) — 낮의 바깥 기본 배경음
+	"bgm_main", "bgm_night2", "bgm_night3"]   # 받은 곡(mp3)
+const MP3_NAMES := ["bgm_main", "bgm_night2", "bgm_night3"]
+# ---- 밤 브금은 한 곡이 아니라 세 곡이 이어진다 ----
+#
+# 밤은 길다. 한 곡을 계속 되감으면 두 바퀴째부터 「아까 그 소절」이 도드라져서
+# 오히려 조용한 밤이 지겨워진다. 그래서 밤에는 세 곡을 **이어** 튼다 —
+# 한 곡이 끝나면 다음 곡이 스르르 올라온다 (뚝 끊기지 않게 서서히 켠다).
+#
+# 밤 곡만 루프를 끈다. 루프가 걸려 있으면 끝나지 않아서 다음 곡으로 넘어갈
+# 때(`finished`)를 알 수가 없다.
+const NIGHT_TRACKS := ["bgm_night", "bgm_night2", "bgm_night3"]
+const NIGHT_FADE := 1.6          # 다음 곡이 올라오는 시간(초)
+var _night_i := 0
 
 var streams := {}
 var bgm_player: AudioStreamPlayer
@@ -38,13 +50,14 @@ func _ready() -> void:
 	for n in SFX_NAMES:
 		streams[n] = load("res://assets/audio/%s.wav" % n)
 	for n in BGM_NAMES:
-		var ext := "mp3" if n == "bgm_main" else "ogg"
+		var ext := "mp3" if n in MP3_NAMES else "ogg"
 		streams[n] = load("res://assets/audio/%s.%s" % [n, ext])
 	# BGM 루프 설정 (형마다 다르다)
 	for n in BGM_NAMES:
 		var st: AudioStream = streams[n]
 		if st is AudioStreamOggVorbis or st is AudioStreamMP3:
-			st.loop = true
+			# 밤 곡만 루프를 끈다 — 끝까지 가야 다음 밤 곡으로 넘어간다
+			st.loop = n not in NIGHT_TRACKS
 		elif st is AudioStreamWAV:
 			# 혹시 wav를 도로 넣었을 때를 위해 남겨 둔다.
 			# 끝은 **길이(초) x 초당 프레임**으로 잡아야 한다. 예전엔
@@ -58,6 +71,7 @@ func _ready() -> void:
 
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.bus = "BGM"
+	bgm_player.finished.connect(_on_bgm_finished)
 	add_child(bgm_player)
 	for i in 8:
 		var p := AudioStreamPlayer.new()
@@ -92,11 +106,41 @@ const TRACK_GAIN := {
 	"bgm_cave": 3.6, "bgm_fall": 1.6, "bgm_festival": 0.5, "bgm_night": 0.0,
 	"bgm_shop": 1.4, "bgm_spring": 2.1, "bgm_summer": 1.1, "bgm_title": 0.2,
 	"bgm_village": 2.5, "bgm_winter": -0.4, "bgm_main": 0.0,
+	# 받은 밤 곡 두 개 — 기존 밤 곡과 같은 크기로 들리게 맞춘다
+	"bgm_night2": 0.0, "bgm_night3": 0.0,
 }
+
+
+# 밤 곡이 끝났다 — 다음 밤 곡으로 이어 간다.
+# (밤 곡 말고는 전부 루프라 여기까지 오지 않는다)
+func _on_bgm_finished() -> void:
+	if current_bgm not in NIGHT_TRACKS:
+		return
+	_night_i = (_night_i + 1) % NIGHT_TRACKS.size()
+	var nxt: String = NIGHT_TRACKS[_night_i]
+	current_bgm = nxt
+	if _fade != null and _fade.is_valid():
+		_fade.kill()
+	# 앞 곡은 이미 끝나 조용하다 — 겹칠 것이 없으니 다음 곡을 서서히 켠다.
+	# 갑자기 제 크기로 튀어나오면 「곡이 바뀌었다」가 먼저 들린다.
+	var gain: float = float(TRACK_GAIN.get(nxt, 0.0))
+	bgm_player.stream = streams[nxt]
+	bgm_player.volume_db = gain - 24.0
+	bgm_player.play()
+	_fade = create_tween()
+	_fade.tween_property(bgm_player, "volume_db", gain, NIGHT_FADE)
 
 
 # 곡을 바꾼다. 뚝 끊으면 귀에 거슬려서 0.6초에 걸쳐 갈아 끼운다.
 func play_track(name: String) -> void:
+	# 「밤 브금」은 한 곡이 아니라 세 곡짜리 묶음이다. 밤마다 다른 곡으로
+	# 시작하고, 이미 밤 곡이 돌고 있으면 건드리지 않는다 (한 곡 끝날 때마다
+	# `_on_bgm_finished`가 다음 곡으로 넘긴다).
+	if name == "bgm_night":
+		if current_bgm in NIGHT_TRACKS and bgm_player.playing:
+			return
+		_night_i = randi() % NIGHT_TRACKS.size()
+		name = NIGHT_TRACKS[_night_i]
 	if not streams.has(name):
 		return
 	var gain: float = float(TRACK_GAIN.get(name, 0.0))

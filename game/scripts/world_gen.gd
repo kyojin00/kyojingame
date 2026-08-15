@@ -60,12 +60,14 @@ func _build_map() -> void:
 		if y % 4 == 0 and not m.objects.has(Vector2i(m.MAP_W - 1, y)):
 			m.objects[Vector2i(m.MAP_W - 1, y)] = {"kind": "tree", "hp": m.TREE_HP}
 
-	# 흩어진 나무/돌 (결정적 해시 배치, 남동쪽 깊은 숲은 더 빽빽하게)
-	var deep_rect := Rect2i(45, 40, 45, 20)
+	# 지역 바닥 먼저 (자갈밭·물웅덩이). 자연물은 그 위에 얹는다
+	_paint_regions()
+
+	# 흩어진 나무/돌 (결정적 해시 배치 — 지역마다 밀도가 다르다)
 	for y in range(1, m.MAP_H - 1):
 		for x in range(1, m.MAP_W - 1):
 			var pos := Vector2i(x, y)
-			if m.objects.has(pos) or m.grid[y][x].ground != "grass":
+			if m.objects.has(pos) or m.grid[y][x].ground == "water":
 				continue
 			if x >= 1 and x <= 10 and y >= 0 and y <= 6:
 				continue  # 축사 주변은 비워둔다
@@ -73,19 +75,23 @@ func _build_map() -> void:
 				continue  # 시작 지점 주변도 비워둔다
 			if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
 				continue  # 마을/길은 비워둔다
+			var reg := _region_at(pos)
 			var h := m._hash01(x * 3 + 7, y * 5 + 11)
-			if deep_rect.has_point(pos):
-				# 깊은 숲은 나무를 많이 두되, 그림이 겹치지 않는 선까지만 채운다
-				if h < 0.30:
-					if _nature_clear(pos, "tree"):
-						m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
-				elif h < 0.40:
-					if _nature_clear(pos, "rock"):
-						m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
-			elif h < 0.06:
+			var tree_p := 0.06
+			var rock_p := 0.12          # 나무 확률 위에 이어 붙는 문턱값
+			if not reg.is_empty():
+				# 줄지어 심은 땅(과수원)은 격자 위에만 선다 — 그 사이는 훤히 비운다
+				var g := int(reg.grid)
+				if g > 0 and (x % g != 0 or y % g != 0):
+					continue
+				tree_p = float(reg.tree)
+				rock_p = tree_p + float(reg.rock)
+			elif m.grid[y][x].ground != "grass":
+				continue                # 지역 밖의 흙·모래 위에는 아무것도 안 둔다
+			if h < tree_p:
 				if _nature_clear(pos, "tree"):
 					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
-			elif h < 0.12:
+			elif h < rock_p:
 				if _nature_clear(pos, "rock"):
 					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
 
@@ -109,6 +115,50 @@ func _build_map() -> void:
 	# (낚시터의 가로등·벤치도 없앴다)
 
 	_build_sea()
+
+
+# 이 칸이 어느 야생 지역인가 (없으면 빈 사전)
+func _region_at(pos: Vector2i) -> Dictionary:
+	for reg: Dictionary in m.REGIONS:
+		if (reg.rect as Rect2i).has_point(pos):
+			return reg
+	return {}
+
+
+# 지역 바닥을 깐다 — 채석장 자갈, 습지 물웅덩이.
+# 마을·길·낚시터처럼 이미 쓰임이 정해진 칸은 건드리지 않는다.
+func _paint_regions() -> void:
+	for reg: Dictionary in m.REGIONS:
+		var r: Rect2i = reg.rect
+		var g := str(reg.ground)
+		var pond := float(reg.pond)
+		if g == "" and pond <= 0.0:
+			continue
+		for y in range(maxi(1, r.position.y), mini(m.MAP_H - 1, r.end.y)):
+			for x in range(maxi(1, r.position.x), mini(m.MAP_W - 1, r.end.x)):
+				var pos := Vector2i(x, y)
+				if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
+					continue
+				if m.grid[y][x].ground != "grass":
+					continue
+				if pond > 0.0:
+					# 물웅덩이는 뭉쳐야 웅덩이로 보인다 — 세 칸씩 묶어 본다
+					if m._hash01(x / 3 * 13 + 5, y / 3 * 17 + 3) < pond:
+						m.grid[y][x].ground = "water"
+						continue
+				if g != "":
+					# 가장자리로 갈수록 듬성듬성 — 네모 반듯하게 깔면
+					# 「자로 그어 놓은 땅」처럼 보인다
+					if m._hash01(x * 9 + 3, y * 7 + 1) < _edge_fade(pos, r):
+						m.grid[y][x].ground = g
+
+
+# 지역 가장자리에서 0, 세 칸쯤 안으로 들어오면 1에 가까워지는 값.
+# 바닥을 깔지 말지를 이 값으로 흔들어 경계를 너덜너덜하게 만든다.
+func _edge_fade(pos: Vector2i, r: Rect2i) -> float:
+	var d: int = mini(mini(pos.x - r.position.x, r.end.x - 1 - pos.x),
+		mini(pos.y - r.position.y, r.end.y - 1 - pos.y))
+	return clampf(float(d) / 3.0, 0.0, 1.0) * 0.9 + 0.05
 
 
 # 남쪽 끝: 바위 능선 너머의 땅. 바다를 열기 전에는 울창한 숲처럼 보이고,
