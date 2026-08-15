@@ -54,13 +54,16 @@ const PAL = {
   'g': [72, 148, 200], 'G': [36, 84, 140], 'e': [168, 216, 248],
   // 잎·꽃
   'n': [84, 156, 60], 'N': [44, 96, 40], 'f': [248, 244, 224],
+  'm2': [148, 132, 108],
   // 간판
   'b': [206, 176, 122], 'B': [150, 122, 78],
   // 등불
   'y': [252, 214, 120], 'Y': [200, 150, 60],
   // 옆면 (3/4로 돌아간 면). 그늘색보다 **한 단계 더** 어둡다 —
   // 같은 색이면 결에 묻혀 정면과 안 갈린다
-  'm': [166, 148, 122], 'M': [148, 44, 20],
+  // 가까운 쪽 -> 먼 쪽 세 단계. 한 색으로 두면 뒤가 슬래브처럼 평평해진다
+  'm': [176, 158, 130], 'n2': [148, 132, 108], 'm3': [120, 106, 88],
+  'M': [166, 52, 24], 'M2': [130, 38, 18], 'M3': [96, 28, 14],
 };
 
 // 결을 낼 때 쓰는 대응표 (기본 <-> 그늘 / 밝은 면)
@@ -279,18 +282,37 @@ function soften(g) {
 // 창문·문이 위로 죽 늘어나 얼룩이 된다.
 const DEPTH = 10;                // 뒤로 물러나는 칸 수 (「조금만 입체적으로」)
 
+// 뒤로 물러나는 면은 **멀어질수록 어두워진다.** 한 색으로 채우면 두께가
+// 아니라 슬래브가 된다 — 세 단계로 갈라야 「공간」으로 읽힌다.
+const BACK_ROOF = ['M', 'M2', 'M3'];      // 가까운 쪽 -> 먼 쪽
+const BACK_WALL = ['m', 'm2', 'm3'];
+
 function extrude(g, eaveY) {
   const back = new G();
-  for (let i = DEPTH; i >= 1; i--) {
+  // 가까운 쪽부터 채운다 — 먼저 칠한 쪽(가까운 쪽)이 이긴다
+  for (let i = 1; i <= DEPTH; i++) {
+    const k = Math.min(2, Math.floor((i - 1) * 3 / DEPTH));
     for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
       if (g.d[y][x] === '.') continue;
-      back.px(x, y - i, y < eaveY ? 'M' : 'm');
+      const ny = y - i;
+      if (ny < 0 || back.d[ny][x] !== '.') continue;
+      back.px(x, ny, y < eaveY ? BACK_ROOF[k] : BACK_WALL[k]);
     }
   }
-  // 뒤를 먼저 깔고 그 위에 정면을 얹는다
+  // 지붕 뒷면에도 기와 이음매 — 뒤로 갈수록 줄 간격이 좁아진다(원근)
+  for (let x = 0; x < GW; x++) {
+    let seen = 0;
+    for (let y = GH - 1; y >= 0; y--) {
+      if (!BACK_ROOF.includes(back.d[y][x])) continue;
+      seen++;
+      if (seen % 3 === 0 || seen > DEPTH * 0.6 && seen % 2 === 0)
+        back.px(x, y, BACK_ROOF[Math.min(2, BACK_ROOF.indexOf(back.d[y][x]) + 1)]);
+    }
+  }
+  // 뒤를 깔고 그 위에 정면을 얹는다
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
     if (g.d[y][x] === '.' && back.d[y][x] !== '.') g.px(x, y, back.d[y][x]);
-  // 맨 뒤 능선에 밝은 줄 — 여기가 있어야 「두께」로 읽힌다
+  // 맨 뒤 능선에 밝은 줄 — 하늘을 받는 모서리다
   for (let x = 0; x < GW; x++) for (let y = 0; y < GH - 1; y++)
     if (g.d[y][x] !== '.') { g.px(x, y, 'l'); break; }
 }
