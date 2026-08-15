@@ -311,6 +311,12 @@ func _apply_save(d: Dictionary) -> void:
 				GameData.tutorial[pair[0]] = false
 		if GameData.tutorial.get("active", true) == false:
 			GameData.tutorial["active"] = true   # 리셋한 안내를 다시 진행할 수 있게
+	# 예전 세이브 고치기: 「조리대에서 요리를 하자」가 체크될 길이 없던 시절의
+	# 세이브는 2장을 끝내고도 그 목표가 남아 있다. 만수에게 요리를 가져다줬으면
+	# 요리는 이미 지어 본 것이니 여기서 닫아 준다.
+	if str(d.get("kitchen_quest", "")) == "done" \
+			and GameData.tutorial.get("active", false):
+		GameData.tutorial["cook"] = true
 	GameData.grandpa_step = int(d.get("grandpa_step", 0))
 	GameData.grandpa_seen = bool(d.get("grandpa_seen", false))
 	GameData.alchemy_known = d.get("alchemy_known", [])

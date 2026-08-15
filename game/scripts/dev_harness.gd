@@ -4444,7 +4444,15 @@ func _debug_tick() -> void:
 			m.objnode._spawn_object_node(wt, "tree")
 			m.toolwork.set_tool("axe")
 			m._target_override = wt
+			# 벌목 문구만 읽는다. 아주 낮은 확률로 낡은 조합법이 떨어지면
+			# 그 안내가 말풍선을 덮어써 검사가 헛돈다 — 이 한 번만
+			# 「조합법은 이미 다 안다」로 두어 주사위를 없앤다
+			var k_form: Array = GameData.alchemy_known.duplicate()
+			for fid0: String in GameData.FORMULAS:
+				if fid0 not in GameData.alchemy_known:
+					GameData.alchemy_known.append(fid0)
 			m.toolwork.use_tool()
+			GameData.alchemy_known = k_form
 			m._target_override = Vector2i(-999, -999)
 			var chop_msg: String = m.hud._bub_label.text if m.hud._bub_label != null else ""
 			var no_count: bool = chop_msg.contains("얻었다")
@@ -4940,6 +4948,41 @@ func _debug_tick() -> void:
 				" 바다보임=", sea_seen, " 전부물=", sea_water,
 				" 끝까지물=", below_ok, " 숲길살아있을때=", tut_keep,
 				" 닫으면바다=", tut_gone, " 뭍은가림=", land_hidden)
+		251:
+			# 「조리대에서 요리를 하자」가 영영 안 지워지던 버그.
+			#
+			# 목표를 띄우는 쪽은 FARM_CHAIN_FLAGS(+cook)를 보는데 목표를
+			# 체크하는 쪽은 STORY2_FLAGS(cook 없음)를 봐서, 요리를 지어
+			# 만수에게 가져다줘 2장이 끝난 뒤에도 안내 목표만 남아 있었다.
+			var k_tut6: Dictionary = GameData.tutorial.duplicate()
+			var k_guide := GameData.guide_active
+			var k_s2b := GameData.story2_phase
+			var k_kq2 := GameData.kitchen_quest
+			GameData.tutorial = GameData.fresh_tutorial()
+			for f6: String in ["till", "plant", "water", "harvest"]:
+				GameData.tutorial[f6] = true
+			GameData.guide_active = false          # 안내는 아직 안 열렸다
+			GameData.story2_phase = "cook"
+			# ① 지금 뜨는 안내 목표는 「요리」다
+			var cook_shown: bool = GameData.tutorial_current_flag() == "cook"
+			# ② 요리를 지으면 그 자리에서 체크된다 (예전에는 여기서 막혔다)
+			m.story.tutorial_notify("cook")
+			var cook_set: bool = bool(GameData.tutorial.get("cook", false))
+			var cleared: bool = GameData.tutorial_current_flag() != "cook"
+			# ③ 만수에게 가져다주는 마무리도 이 목표를 확실히 닫는다
+			GameData.tutorial["cook"] = false
+			GameData.kitchen_quest = "deliver"
+			m.story._end_kitchen_deliver()
+			var deliver_set: bool = bool(GameData.tutorial.get("cook", false))
+			GameData.tutorial = k_tut6
+			GameData.guide_active = k_guide
+			GameData.story2_phase = k_s2b
+			GameData.kitchen_quest = k_kq2
+			m.hud._toast_queue.clear()
+			m.dialog.close()
+			print("COOKGUIDE_OK=", cook_shown and cook_set and cleared and deliver_set,
+				" 목표뜸=", cook_shown, " 요리로체크=", cook_set,
+				" 목표사라짐=", cleared, " 전달로도닫힘=", deliver_set)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
