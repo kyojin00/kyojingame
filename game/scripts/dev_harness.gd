@@ -6326,7 +6326,7 @@ const MP_TILE := Vector2i(20, 20)   # 게스트가 갈아 볼 칸 (농장 빈 �
 # `--fixed-fps`가 붙으면 Godot이 **실제 시간과 무관하게** 한 프레임씩 그려
 # 저장한다. 그래서 아래 프레임 번호가 그대로 초가 된다 (60 = 1초).
 # 이게 없으면 헤드리스에서 프레임이 들쭉날쭉해 동작이 튄다.
-const REEL_END := 1200          # 20초
+const REEL_END := 1290          # 21.5초
 var _reel_walk := KEY_NONE      # 지금 누르고 있는 이동 키
 
 
@@ -6404,18 +6404,19 @@ func _reel_tick() -> void:
 		690: _send_key(KEY_SPACE)
 
 		# ---- 마을 ----
+		# ---- 마을 (주민들이 보이는 대목 — 여기가 제일 길다) ----
 		760:
 			GameData.minutes = 13.0 * 60.0
-			_reel_go(Vector2i(74, 24), "up", 0)
+			_reel_go(Vector2i(74, 26), "up", 0)
 		800: _reel_walk_key(KEY_W)
-		920: _reel_stop()
+		1000: _reel_stop()
 
 		# ---- 밤 ----
-		960:
+		1050:
 			GameData.minutes = 21.0 * 60.0
 			m._weather_override = GameData.WEATHER_STAR
-		1000: _reel_walk_key(KEY_A)
-		1110: _reel_stop()
+		1090: _reel_walk_key(KEY_A)
+		1210: _reel_stop()
 
 		REEL_END:
 			print("REEL_DONE: %d프레임 (%.1f초)" % [REEL_END, REEL_END / 60.0])
