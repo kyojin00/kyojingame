@@ -53,10 +53,14 @@ const PAL = {
   'b': [206, 176, 122], 'B': [150, 122, 78],
   // 등불
   'y': [252, 214, 120], 'Y': [200, 150, 60],
+  // 옆면 (3/4로 돌아간 면). 그늘색보다 **한 단계 더** 어둡다 —
+  // 같은 색이면 결에 묻혀 정면과 안 갈린다
+  'm': [152, 140, 132], 'M': [148, 56, 28],
 };
 
 // 결을 낼 때 쓰는 대응표 (기본 <-> 그늘 / 밝은 면)
 const DARKEN = { r: 'R', w: 'W', t: 'T', s: 'S', n: 'N', l: 'r', x: 'w', u: 't' };
+// m/M(옆면)은 일부러 뺐다 — 결이 앉으면 정면과 경계가 흐려진다
 const LIGHTEN = { r: 'l', w: 'x', t: 'u', R: 'r', W: 'w', T: 't', S: 's' };
 
 class G {
@@ -168,14 +172,46 @@ function soften(g) {
 }
 
 
+// 옆면을 붙여 상자로 만든다 (3/4 시점).
+//
+// 정면만 그리면 종이를 오려 세운 것처럼 평평하다. 실루엣을 **오른쪽 뒤로**
+// 한 칸씩 밀며 어두운 색으로 깔면 옆벽·지붕면이 저절로 생긴다.
+//
+// 두 가지를 지킨다:
+//   ① 밀면서 **위로도** 올린다. 위에서 내려다보는 시점이라 뒤쪽이 화면에서 높다
+//   ② 옆면은 **한 색씩만** (벽은 벽그늘, 지붕은 지붕그늘). 정면 그림을 그대로
+//      밀면 창문·문이 옆으로 죽 늘어나 얼룩이 된다
+const DEPTH = 11;                // 뒤로 밀리는 칸 수 (「조금만 입체적으로」)
+const RISE = 0.5;                // 한 칸 밀 때 올라가는 높이
+
+function extrude(g, eaveY) {
+  const side = new G();
+  for (let i = DEPTH; i >= 1; i--) {
+    const up = Math.round(i * RISE);
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+      if (g.d[y][x] === '.') continue;
+      // 지붕이냐 벽이냐만 보고 한 색으로 (창·문이 늘어나지 않게)
+      side.px(x + i, y - up, y < eaveY ? 'M' : 'm');
+    }
+  }
+  // 옆면을 먼저 깔고 그 위에 정면을 얹는다
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
+    if (g.d[y][x] === '.' && side.d[y][x] !== '.') g.px(x, y, side.d[y][x]);
+  // 옆면 맨 뒤 모서리에 빛 한 줄 — 여기가 있어야 「모서리」로 읽힌다
+  for (let y = 0; y < GH; y++) for (let x = GW - 1; x >= 1; x--)
+    if (g.d[y][x] !== '.' && g.d[y][x - 1] === '.') { g.px(x, y, 'S'); break; }
+}
+
+
 // ---- 뼈대 ----
-const X0 = 16, X1 = 111;         // 1층 벽 좌우
+const X0 = 10, X1 = 100;         // 1층 벽 좌우 (오른쪽에 옆면 자리를 비워 둔다)
 const JUT = 3;                   // 2층이 앞으로 나온 턱 (제티)
 const GROUND = 96;               // 바닥선
 const MID = 74;                  // 1층·2층 경계 (2층을 낮춰 지붕에 자리를 준다)
 const EAVE = 52;                 // 처마. 낮게 내릴수록 지붕이 커진다 —
                                  // 옛 집이 아늑해 보이는 건 지붕이 몸통보다 크기 때문이다
-const RIDGE = 6;                 // 용마루
+const RIDGE = 12;                // 용마루. 옆면이 위로 DEPTH*RISE만큼 올라가므로
+                                 // 너무 높이 두면 지붕 뒤가 캔버스 밖으로 잘린다
 const CX = Math.round((X0 + X1) / 2);
 
 
@@ -342,15 +378,16 @@ function build(spec) {
   // ---- 살림 ----
   lantern(g, CX - 14, MID + 8);
   lantern(g, CX + 10, MID + 8);
+  // 귀퉁이는 **옆면을 붙이기 전에** 깎는다 — 깎은 실루엣이 그대로 밀려야
+  // 옆면 모서리도 같이 둥글어진다.
+  roundCorners(g, X0 - JUT, EAVE, X1 + JUT, MID - 1, 4);
+  roundCorners(g, X0, MID, X1, GROUND - 3, 3);
+  extrude(g, EAVE);
+  // 살림은 옆면 뒤에 — 앞에 놓인 것들이라 옆면에 묻히면 안 된다
   planter(g, X0 + 2, GROUND - 1);
   planter(g, X1 - 6, GROUND - 1);
   barrel(g, X1 - 16, GROUND);
   if (spec.sign) sign(g, CX);
-  // 벽 귀퉁이 — 아래쪽은 주춧돌이 받치고 있으니 위쪽만 깎는다
-  // 벽 귀퉁이를 크게 깎는다. 한두 칸으로는 티가 안 나 상자로 보인다 —
-  // 위(처마 밑)는 크게, 아래(주춧돌 쪽)는 작게 깎아야 얹혀 있는 것처럼 보인다.
-  roundCorners(g, X0 - JUT, EAVE, X1 + JUT, MID - 1, 4);
-  roundCorners(g, X0, MID, X1, GROUND - 3, 3);
   roughen(g);
   soften(g);            // 남은 90도 귀퉁이를 전부 깎는다
   g.outline();
