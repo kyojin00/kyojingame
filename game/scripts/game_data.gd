@@ -3132,6 +3132,12 @@ const DESK_RECIPES := {
 	"broom": {"name": "빗자루", "cost": {"weed": 1},
 		"kind": "item", "give": "broom", "locked": true, "shop": "잡화점",
 		"desc": "집 안의 먼지를 쓸어 낸다 (레시피는 잡화점에서)"},
+	# 울타리 — 배우는 순간 도구가 열린다 (kind "tool"). 재료는 목재 한 개이고,
+	# 세울 때마다 또 한 개씩 든다. 잡화점은 **가방에 목재가 있어야** 이 레시피를
+	# 꺼내 놓는다 — 나무를 베어 본 사람에게만 쓸모가 있는 물건이기 때문이다.
+	"fence": {"name": "울타리", "cost": {"wood": 1},
+		"kind": "tool", "tool": "fence", "locked": true, "shop": "잡화점",
+		"desc": "빈틈없이 둘러싸면 목초지가 된다 — 그 안 동물은 알아서 배부르다"},
 	# kind "furniture": 완성되면 집에 세간으로 들어온다 (꾸미기 F로 옮긴다)
 	"flower_pot": {"name": "화분", "cost": {"weed": 5},
 		"kind": "furniture", "furn": "plant", "locked": true, "shop": "잡화점",
@@ -5463,7 +5469,9 @@ const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
 	# 낚싯대는 여기서 주지 않는다 — 용식과 바닷길을 연 뒤에야 손에 들어온다
-	"harvest": ["axe", "pickaxe", "fence"],
+	# 울타리는 여기서 빠졌다 — **목재를 손에 넣으면** 잡화점이 레시피를 들여놓는다
+	# (나무 한 그루 베어 본 적 없는 사람에게 울타리부터 쥐여 줄 이유가 없다)
+	"harvest": ["axe", "pickaxe"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
 # 돌 창·돌 검은 제작대에서 만들어 해금하는 무기다 (레시피: 이장/추후 서브퀘)

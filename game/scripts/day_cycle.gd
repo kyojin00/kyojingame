@@ -36,9 +36,19 @@ func _update_night_mobs(delta: float) -> void:
 	m._mob_spawn_cd -= delta
 	if m.night_mobs.size() < 2 and m._mob_spawn_cd <= 0.0:
 		m._mob_spawn_cd = 6.0
-		var ang := randf() * TAU
+		# 밤 몬스터도 **걸어 다닐 수 있는 땅에서만** 기어 나온다.
+		# 잠긴 구역 너머에서 나오면 벽에 붙어 영영 오지 못한다.
+		var spawn := Vector2.ZERO
+		for tryn in 12:
+			var ang0 := randf() * TAU
+			var p0: Vector2 = m.player.position + Vector2.from_angle(ang0) * 380.0
+			if m.is_passable(Vector2i(int(p0.x / m.TILE), int(p0.y / m.TILE))):
+				spawn = p0
+				break
+		if spawn == Vector2.ZERO:
+			return   # 오늘 밤 이 자리에서는 나올 데가 없다
 		var node := Node2D.new()
-		node.position = m.player.position + Vector2.from_angle(ang) * 380.0
+		node.position = spawn
 		var spr := Sprite2D.new()
 		spr.texture = m.tex["mob_centipede_0"]
 		spr.scale = Vector2(1.4, 1.4)

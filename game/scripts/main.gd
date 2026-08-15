@@ -58,8 +58,17 @@ const WET_ALL_DAY := 1200.0
 const STORM_CROP_HURT := 0.25      # 폭풍이 지나간 아침, 작물 한 칸이 주저앉을 확률
 const STORM_WOOD_MIN := 12         # 부러진 가지 (목재)
 const STORM_WOOD_MAX := 30
-const FORAGE_CAP := 12             # 들판에 동시에 있는 채집물 수
-const FORAGE_CAP_FOG := 26         # 안개 낀 날
+# 들판에 동시에 있는 채집물 수.
+#
+# 예전에는 12개였다 — 224x120칸짜리 세계에서 열두 개는 **없는 것과 같다.**
+# 반나절을 걸어도 산딸기 한 포기 못 보는 게 정상이었다. 넉넉히 올렸다.
+# **비가 오는 날은 그 두 배**다. 젖은 땅에서 풀과 열매가 쑥쑥 돋는 날이라,
+# 비만 오면 나가서 줍고 싶어져야 한다.
+const FORAGE_CAP := 90             # 여느 날
+const FORAGE_CAP_FOG := 130        # 안개 낀 날 (발밑이 잘 보인다)
+const FORAGE_CAP_RAIN := 190       # 비·폭풍 (젖은 땅에서 마구 돋는다)
+# 비 오는 동안에는 아침만이 아니라 **하루 내내** 조금씩 더 돋는다
+const RAIN_FORAGE_MINUTES := 25.0  # 게임 분 — 이 주기로 몇 포기씩
 const STAR_FIREFLY_COUNT := 9      # 별밤의 반딧불이 (평소 3)
 
 
@@ -1294,6 +1303,7 @@ var _last_explore_tile := Vector2i(-999, -999)
 # 밤늦게까지 밖에서 채집하는 것이 위험해지도록 만드는 요소.
 
 var _shell_cd := 0.0        # 다음 조개가 밀려올 때까지 남은 게임 분
+var _rain_forage_cd := 0.0  # 빗속에서 다음 채집물이 돋을 때까지 남은 게임 분
 var night_mobs: Array = []  # [{node, spr, anim}]
 var _mob_hit_cd := 0.0
 var _mob_spawn_cd := 0.0
@@ -1503,6 +1513,13 @@ func _process(delta: float) -> void:
 			if _shell_cd <= 0.0:
 				_shell_cd = GameData.shell_respawn_minutes()
 				worldgen._tick_beach()
+		# 비 오는 날은 걷는 동안에도 풀과 열매가 계속 돋는다
+		if not Net.is_guest() and weather_now() in [GameData.WEATHER_RAIN,
+				GameData.WEATHER_STORM]:
+			_rain_forage_cd -= delta * MIN_PER_SEC
+			if _rain_forage_cd <= 0.0:
+				_rain_forage_cd = RAIN_FORAGE_MINUTES
+				worldgen._tick_rain_forage()
 		actions._update_mouse_target()
 		fishing._update_fishing(delta)
 		if player_tile() != _last_explore_tile:

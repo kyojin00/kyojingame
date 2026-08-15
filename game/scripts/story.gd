@@ -916,8 +916,12 @@ func start_home_greet() -> void:
 	m.story_cutscene = true
 	chief.scripted = true      # 일과·배회를 멈추고 연출이 직접 움직인다
 	chief.visible = true
-	# 문 앞 큰길 쪽에서 걸어온다
-	chief.position = m.player.position + Vector2(-24.0, 150.0)
+	# **서 있던 자리에서 그대로 걸어온다.** 아주 멀리 있을 때만 그 사람이
+	# 있던 쪽의 곁 칸으로 당겨 온다 — 예전에는 무조건 플레이어의 남쪽
+	# 150px로 옮겨 놓아, 이장이 어디 있었든 늘 아래에서 위로 올라왔다.
+	if chief.position.distance_to(m.player.position) > 420.0:
+		var st := _walk_tile_near_player(5, chief.position)
+		chief.position = Vector2(st.x * m.TILE + 16, st.y * m.TILE + 16)
 	_chief_greet = true
 
 
@@ -929,20 +933,8 @@ func _update_home_greet(delta: float) -> void:
 		_chief_greet = false
 		_start_story2_dialog()
 		return
-	var to: Vector2 = m.player.position + Vector2(0.0, 30.0) - chief.position
-	if to.length() > 8.0:
-		chief.position += to.normalized() * minf(to.length() * 2.5, 130.0) * delta
-		chief.moving = true
-		chief.anim_time += delta
-		if absf(to.x) > absf(to.y):
-			chief.dir = "right" if to.x > 0 else "left"
-		else:
-			chief.dir = "down" if to.y > 0 else "up"
-		chief._update_sprite()
-	else:
-		chief.moving = false
-		chief.dir = "up"          # 플레이어를 올려다본다
-		chief._update_sprite()
+	# 자기가 오던 쪽에서 한 발 앞에 멈춰 서서 플레이어를 마주 본다
+	if _step_toward(chief, _visit_stop_at(chief), delta, 130.0, 8.0):
 		_chief_greet = false
 		_start_story2_dialog()
 
@@ -1047,18 +1039,17 @@ func _fisher_update(delta: float) -> void:
 			if fisher == null:
 				return
 			# 주인공을 따라 걷는다 (우체부 동행과 같은 느낌)
-			var to: Vector2 = m.player.position + Vector2(44.0, -4.0) - fisher.position
+			var want: Vector2 = m.player.position + Vector2(44.0, -4.0)
+			var to: Vector2 = want - fisher.position
 			if to.length() > 16.0:
 				fisher.position += to.normalized() * minf(to.length() * 2.2, 150.0) * delta
 				fisher.moving = true
 				fisher.anim_time += delta
-				if absf(to.x) > absf(to.y):
-					fisher.dir = "right" if to.x > 0 else "left"
-				else:
-					fisher.dir = "down" if to.y > 0 else "up"
+				fisher.dir = _face_dir(fisher.position, want)
 				fisher._update_sprite()
 			else:
 				fisher.moving = false
+				fisher.dir = _face_dir(fisher.position, m.player.position)
 				fisher._update_sprite()
 			# 능선 길목에 다다르면 바위 앞 대화
 			if not _fisher_gate_talked \
@@ -1757,12 +1748,10 @@ func _forest_party_update(delta: float) -> void:
 			n.position += to.normalized() * minf(to.length() * 2.0, PARTY_SPEED) * delta
 			n.moving = true
 			n.anim_time += delta
-			if absf(to.x) > absf(to.y):
-				n.dir = "right" if to.x > 0.0 else "left"
-			else:
-				n.dir = "down" if to.y > 0.0 else "up"
+			n.dir = _face_dir(n.position, want)
 		else:
 			n.moving = false
+			n.dir = _face_dir(n.position, m.player.position)   # 걸음을 멈추면 마주 본다
 		n._update_sprite()
 	# 문 앞에 닿으면 저절로 문을 두드린다
 	if GameData.forest_quest != "go" or _forest_house_talked:
@@ -2391,6 +2380,38 @@ func _walk_tile_near_player(dist: int, from := Vector2.ZERO) -> Vector2i:
 	return pt
 
 
+# ---- 찾아오는 사람의 걸음과 시선 ----
+#
+# 규칙은 하나다: **서 있던 자리에서 곧장 플레이어 쪽으로 걸어오고,
+# 걷는 내내 가는 쪽을 바라본다.** 예전에는 몇몇 연출이 그 사람을 먼저
+# 플레이어의 남쪽으로 옮겨 놓아, 누가 찾아오든 늘 아래에서 위로
+# 올라왔다 — 마을 북쪽에 있던 사람도 갑자기 남쪽에서 나타났다.
+
+# 이 자리에서 저 자리를 볼 때의 방향
+func _face_dir(from: Vector2, to: Vector2) -> String:
+	var d := to - from
+	if absf(d.x) > absf(d.y):
+		return "right" if d.x > 0.0 else "left"
+	return "down" if d.y > 0.0 else "up"
+
+
+# 한 걸음 다가간다. 목적지에 닿았으면 true (걸음을 멈추고 플레이어를 본다)
+func _step_toward(npc: Variant, goal: Vector2, delta: float,
+		speed := 110.0, reach := 10.0) -> bool:
+	var to: Vector2 = goal - npc.position
+	if to.length() <= reach:
+		npc.moving = false
+		npc.dir = _face_dir(npc.position, m.player.position)   # 마주 본다
+		npc._update_sprite()
+		return true
+	npc.moving = true
+	npc.dir = _face_dir(npc.position, goal)
+	npc.position += to.normalized() * minf(speed, to.length() / maxf(delta, 0.001)) * delta
+	npc.anim_time += delta
+	npc._update_sprite()
+	return false
+
+
 # 찾아오는 사람이 걸음을 멈출 자리 — **자기가 오던 쪽**에서 한 발 앞이다
 func _visit_stop_at(npc: Variant) -> Vector2:
 	var away: Vector2 = npc.position - m.player.position
@@ -2439,16 +2460,15 @@ func _movein_update(delta: float) -> void:
 	elif not m.dialog.visible:
 		if not _movein_route.is_empty():
 			var wp: Vector2 = _movein_route[0]
-			var to: Vector2 = wp - _movein_walker.position
-			if to.length() < 6.0:
+			if _movein_walker.position.distance_to(wp) < 6.0:
 				_movein_walker.position = wp
 				_movein_route.pop_front()
 			else:
+				# 길목 하나하나를 바라보며 걷는다 (마지막 칸에서 플레이어를 마주 본다)
 				_movein_walker.moving = true
-				_movein_walker.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
-					else ("down" if absf(to.y) >= absf(to.x)
-					else ("right" if to.x > 0.0 else "left"))
-				_movein_walker.position += to.normalized() * 110.0 * delta
+				_movein_walker.dir = _face_dir(_movein_walker.position, wp)
+				_movein_walker.position += (wp - _movein_walker.position).normalized() \
+					* 110.0 * delta
 				_movein_walker.anim_time += delta
 				_movein_walker._update_sprite()
 			return
@@ -2550,18 +2570,7 @@ func _spear_update(delta: float) -> void:
 		if chief2 == null:
 			_start_spear_dialog()   # 이장이 없으면 (있을 수 없는 상황) 바로 대화
 			return
-		var to: Vector2 = _visit_stop_at(chief2) - chief2.position
-		if to.length() > 10.0:
-			chief2.moving = true
-			chief2.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
-				else ("down" if absf(to.y) >= absf(to.x)
-				else ("right" if to.x > 0.0 else "left"))
-			chief2.position += to.normalized() * 110.0 * delta
-			chief2.anim_time += delta
-			chief2._update_sprite()
-		else:
-			chief2.moving = false
-			chief2._update_sprite()
+		if _step_toward(chief2, _visit_stop_at(chief2), delta):
 			_start_spear_dialog()
 
 
@@ -3225,18 +3234,7 @@ func _story11_update(delta: float) -> void:
 			return
 		m.story_cutscene = true
 		chief2.scripted = true
-		var to: Vector2 = _visit_stop_at(chief2) - chief2.position
-		if to.length() > 10.0:
-			chief2.moving = true
-			chief2.dir = "up" if absf(to.y) >= absf(to.x) and to.y < 0.0 \
-				else ("down" if absf(to.y) >= absf(to.x)
-				else ("right" if to.x > 0.0 else "left"))
-			chief2.position += to.normalized() * 110.0 * delta
-			chief2.anim_time += delta
-			chief2._update_sprite()
-		else:
-			chief2.moving = false
-			chief2._update_sprite()
+		if _step_toward(chief2, _visit_stop_at(chief2), delta):
 			_start_hat_visit_dialog()
 		return
 	# 동굴 50층에서 모자를 찾았다 — 도서관의 기록으로 이어진다

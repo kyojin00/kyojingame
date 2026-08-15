@@ -114,6 +114,10 @@ func _build_map() -> void:
 	# (낚시터의 가로등·벤치도 없앴다)
 
 	_build_sea()
+	# 채집물은 첫날부터 들판에 흩어져 있다. 예전에는 세계를 지을 때
+	# 한 포기도 두지 않아, 새 농장의 첫날은 산딸기 한 알 없는 빈 들판이었다.
+	# (아직 화면도 주인공도 없는 시점이라 노드는 만들지 않는다)
+	_respawn_forage(false)
 
 
 # 이 칸이 어느 야생 지역인가 (없으면 빈 사전)
@@ -590,7 +594,8 @@ func _advance_tree_growth() -> void:
 
 
 # 자연물 상한 — 리젠이 맵을 가득 채우지 않게 종류별로 막는다
-const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 70}
+# 잡초는 화분·빗자루의 재료라 흔해야 한다 — 70포기로는 온 들판을 뒤져야 했다
+const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 220}
 # 자연물이 절대 나면 안 되는 곳 — 스토리 숲길(길목이 도로 막히면 안 된다)
 # 자연물이 다시 나면 안 되는 자리 — 농장 앞마당, 옛 전망대 언덕(m.HILL_AREA)
 const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9), Rect2i(26, 1, 11, 6)]
@@ -598,7 +603,7 @@ const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9), Rect2i(26, 1, 11, 6
 
 # 이 칸에 자연물이 나도 되는가 — 나무/돌/잡초가 전부 같은 검사를 쓴다.
 # 건물·문 앞·통행로·농작물·설치물·다른 자연물·물가를 전부 피한다.
-func _respawn_ok(pos: Vector2i, kind: String) -> bool:
+func _respawn_ok(pos: Vector2i, kind: String, clear_dist := -1) -> bool:
 	if pos.x < 1 or pos.y < 1 or pos.x >= m.MAP_W - 1 or pos.y >= m.WORLD_H - 1:
 		return false
 	var cell: Dictionary = m.grid[pos.y][pos.x]
@@ -617,9 +622,10 @@ func _respawn_ok(pos: Vector2i, kind: String) -> bool:
 			m.ALCH_HOUSE_ANCHOR]:
 		if anchor.x >= 0 and (pos - m.door_tile(anchor)).length() < 3.0:
 			return false
-	if (pos - m.player_tile()).length() < 4.0:
+	# 눈앞에서 불쑥 돋지 않게 (세계를 처음 지을 때는 아직 주인공이 없다)
+	if m.player != null and (pos - m.player_tile()).length() < 4.0:
 		return false
-	if not _nature_clear(pos, kind if kind != "weed" else "rock"):
+	if not _nature_clear(pos, kind if kind != "weed" else "rock", clear_dist):
 		return false  # 이웃 자연물과의 간격 — 통로가 통째로 막히지 않는다
 	return true
 
@@ -657,10 +663,13 @@ func _respawn_resources() -> void:
 			e["due"] = GameData.day + 1   # 오늘은 자리가 없다 — 내일 다시
 			keep.append(e)
 	GameData.respawn_queue = keep
-	# 잡초 자연 발생 — 아침마다 서너 포기씩 무성하게 돋는다 (같은 검사로)
+	# 잡초 자연 발생 — 아침마다 한 움큼씩 무성하게 돋는다 (같은 검사로).
+	# 비 오는 날은 그 두 배로 돋는다 — 젖은 땅이 풀을 부른다.
+	var wet: bool = m.weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]
+	var weed_want := 18 if wet else 9
 	var weed_sprouts := 0
-	for attempt in 18:
-		if weed_sprouts >= 3 or _nature_count("weed") >= int(NATURE_CAP["weed"]):
+	for attempt in weed_want * 6:
+		if weed_sprouts >= weed_want or _nature_count("weed") >= int(NATURE_CAP["weed"]):
 			break
 		var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
 		if _respawn_ok(pos2, "weed"):
@@ -668,36 +677,102 @@ func _respawn_resources() -> void:
 			weed_sprouts += 1
 
 
-# 아침마다 열매/약초가 풀밭에 돋아난다 (최대 12개 유지)
-func _respawn_forage() -> void:
-	# 안개 낀 날은 발밑이 잘 보인다 — 채집물이 훨씬 많이 돋는다
-	var fog: bool = m.weather_now() == GameData.WEATHER_FOG
-	var cap := m.FORAGE_CAP_FOG if fog else m.FORAGE_CAP
-	var tries := 20 if fog else 8
-	var count := 0
+# 지금 날씨가 받쳐 주는 채집물 상한
+func forage_cap_now() -> int:
+	var w := m.weather_now()
+	if w == GameData.WEATHER_RAIN or w == GameData.WEATHER_STORM:
+		return m.FORAGE_CAP_RAIN
+	if w == GameData.WEATHER_FOG:
+		return m.FORAGE_CAP_FOG
+	return m.FORAGE_CAP
+
+
+func forage_count() -> int:
+	var n := 0
 	for pos in m.objects:
 		if String(m.objects[pos].kind).begins_with("forage_"):
-			count += 1
+			n += 1
+	return n
+
+
+# 채집물이 돋을 자리 하나. **절반은 사람이 다니는 데 가까이** 뽑는다 —
+# 세계 전체에 고루 뿌리면 정작 지나다니는 길에서는 아무것도 못 본다.
+func _forage_spot() -> Vector2i:
+	if randf() < 0.55:
+		# 세계를 처음 지을 때는 아직 주인공이 없다 — 그때는 농장 자리를 기준으로
+		var c: Vector2i = m.player_tile() if m.player != null else m.START_TILE
+		return Vector2i(clampi(c.x + randi_range(-26, 26), 1, m.MAP_W - 2),
+			clampi(c.y + randi_range(-20, 20), 1, m.WORLD_H - 2))
+	return Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
+
+
+# 이 자리에 채집물이 돋아도 되는가.
+#
+# 나무·돌과 **같은 검사**를 쓴다 (`_respawn_ok`) — 낚시터 어귀·온실 터·
+# 문 앞·바닷길 길목처럼 비워 둬야 하는 자리를 한 군데서 관리한다.
+# 예전에는 여기만 따로 「마을과 큰길만 피한다」였는데, 상한을 올리자마자
+# 낚시터로 내려가는 길이 산딸기로 막혔다.
+func _forage_ok(pos: Vector2i) -> bool:
+	# 간격은 **한 칸**이면 된다. 풀 한 포기와 열매 한 알은 나무·바위처럼
+	# 길을 막지 않는다 — 나무 간격(네 칸)을 그대로 쓰면 온 들판이 「자리 없음」이 된다.
+	if not _respawn_ok(pos, "weed", 1):
+		return false
+	# 아직 이야기가 닿지 않은 땅에는 돋지 않는다 — 가지도 못하는 곳에
+	# 상한을 채워 버리면 정작 다닐 수 있는 들판이 텅 빈다
+	return m.region_open_at(pos) and GameData.is_tile_owned(pos.x, pos.y)
+
+
+# 채집물 한 포기를 놓는다 (자리 검사는 부르는 쪽이 이미 했다)
+func _place_forage(pos: Vector2i, with_node := true) -> void:
+	# 산딸기 절반 · 약초 셋 중 하나 · 잡초 나머지 (화분 재료라 흔하게).
+	# 다만 **북쪽 산자락**(MOUNTAIN_Y 위)에서는 민들레가 절반쯤 돋는다 —
+	# 산에서만 볼 수 있는 노란 꽃이다.
+	var roll := randf()
+	var kind := "forage_berry" if roll < 0.5 \
+		else ("forage_herb" if roll < 0.8 else "weed")
+	if pos.y <= m.MOUNTAIN_Y:
+		kind = "forage_dandelion" if roll < 0.5 \
+			else ("forage_herb" if roll < 0.7 else "weed")
+	if with_node:
+		m.objnode._place_object(pos, kind, 0)
+	else:
+		m.objects[pos] = {"kind": kind, "hp": 0}   # 노드는 뒤이어 _spawn_objects가 만든다
+
+
+# 아침마다 열매/약초가 풀밭에 돋아난다 — 상한까지 한 번에 채운다.
+# (예전에는 하루 여덟 번만 자리를 찔러 봐서, 상한을 올려도 며칠이 걸렸다)
+func _respawn_forage(with_node := true) -> void:
+	var cap := forage_cap_now()
+	var count := forage_count()
+	# 나무·돌이 빽빽한 세계에서는 열 번에 한 번쯤만 자리가 난다 —
+	# 시도를 넉넉히 잡아야 아침마다 상한을 실제로 채운다
+	var tries: int = maxi(200, (cap - count) * 25)
 	for attempt in tries:
 		if count >= cap:
 			break
-		var pos := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
-		var cell: Dictionary = m.grid[pos.y][pos.x]
-		if m.objects.has(pos) or cell.ground != "grass" or cell.crop_id != "":
+		var pos := _forage_spot()
+		if not _forage_ok(pos):
 			continue
-		if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
-			continue
-		# 산딸기 절반 · 약초 셋 중 하나 · 잡초 나머지 (화분 재료라 흔하게).
-		# 다만 **북쪽 산자락**(MOUNTAIN_Y 위)에서는 민들레가 절반쯤 돋는다 —
-		# 산에서만 볼 수 있는 노란 꽃이다.
-		var roll := randf()
-		var kind := "forage_berry" if roll < 0.5 \
-			else ("forage_herb" if roll < 0.8 else "weed")
-		if pos.y <= m.MOUNTAIN_Y:
-			kind = "forage_dandelion" if roll < 0.5 \
-				else ("forage_herb" if roll < 0.7 else "weed")
-		m.objnode._place_object(pos, kind, 0)
+		_place_forage(pos, with_node)
 		count += 1
+
+
+# 비가 오는 동안에는 하루 내내 조금씩 더 돋는다 (main이 게임 시간
+# RAIN_FORAGE_MINUTES마다 부른다). 비를 맞으며 걷다 보면 방금 지나온
+# 풀밭에도 새로 돋아 있는 — 「비 오는 날은 나가서 줍는 날」이 된다.
+func _tick_rain_forage() -> void:
+	var cap := forage_cap_now()
+	var count := forage_count()
+	var grown := 0
+	for attempt in 200:
+		if count >= cap or grown >= 6:
+			break
+		var pos := _forage_spot()
+		if not _forage_ok(pos):
+			continue
+		_place_forage(pos)
+		count += 1
+		grown += 1
 
 
 # 조개 리젠 한 번 (main이 게임 시간 10~15분마다 부른다 — 해변 채집 레벨을

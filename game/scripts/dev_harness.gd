@@ -3793,20 +3793,13 @@ func _debug_tick() -> void:
 			GameData.reset_festival_state()
 			var fest_ok: bool = fest1 == 0 and fest2 == 4 and quiet_ok and year2_ok
 
-			# ── ② 미탐사 지역은 먹구름이 덮는다 (검은 단색이 아니다)
+			# ── ② 아직 못 가는 땅은 **검정 무지**로 덮인다 (구름 덩어리는 없앴다)
 			_fog_keep = GameData.explored.duplicate()
 			GameData.explored = {}
 			var hidden: bool = not m.map_ui._visible_tile(2, 2)
-			var r_a: float = m.map_ui._cloud_rand(5, 7, 1)
-			var r_b: float = m.map_ui._cloud_rand(5, 7, 1)
-			var r_c: float = m.map_ui._cloud_rand(6, 7, 1)
 			var fogc: Color = m.map_ui.FOG
-			var cloud: Color = m.map_ui.CLOUD_MID
-			var cloud_ok: bool = hidden \
-				and is_equal_approx(r_a, r_b) and not is_equal_approx(r_a, r_c) \
-				and r_a >= 0.0 and r_a <= 1.0 \
-				and fogc.a >= 1.0 and cloud.a >= 1.0 \
-				and fogc.v > 0.08 and cloud.v > fogc.v      # 구름이 바탕보다 밝다
+			var cloud_ok: bool = hidden and fogc.a >= 1.0 and fogc.v <= 0.001 \
+				and Color(m.hud.MM_FOG).v <= 0.001
 			m.map_ui.open()                       # 화면은 다음 단계(295)에서 찍는다
 
 			# ── ③ 민들레 — 산자락에 피고, 가방 아이콘은 따로다
@@ -4326,7 +4319,7 @@ func _debug_tick() -> void:
 			GameData.mark_explored_at(m.START_TILE)
 			var far9 := Vector2i(m.MAP_W - 3, m.WORLD_H - 3)
 			var fog_block: bool = not m.map_ui._visible_tile(far9.x, far9.y) \
-				and m.map_ui.FOG.a >= 1.0 and m.map_ui.CLOUD_MID.a >= 1.0
+				and m.map_ui.FOG.a >= 1.0 and m.map_ui.FOG.v <= 0.001
 			GameData.explored = k_expl9
 			m.hud._toast_queue.clear()
 			print("SHOPTIME_OK=", hours_ok and in_room and bub_gone and notice_ok
@@ -4539,6 +4532,102 @@ func _debug_tick() -> void:
 				" 지도세계만=", bake_world, " 닫힘정리=", closed_ok,
 				" 마을열림=", village_open, " 주변잠김=", locked_ok,
 				" 이야기로해금=", opened_ok)
+		234:
+			# #151: 생선구이 그림 · 다가오는 걸음과 시선 · 채집 스폰과 비 ·
+			# 울타리 레시피 · 검정 무지와 통행 차단 · Q창 축제 삭제
+			m.dialog.close()
+
+			# ── ① 생선구이는 유저 그림으로 (32x32)
+			var grill: Texture2D = m.tex.get("dish_grilled_fish")
+			var grill_ok: bool = grill != null and grill.get_width() == 32 \
+				and grill.get_height() == 32
+
+			# ── ② 다가오는 사람은 **서 있던 자리에서** 걸어오고, 오는 내내 마주 본다
+			var face_ok: bool = m.story._face_dir(Vector2(100, 100), Vector2(100, 40)) == "up" \
+				and m.story._face_dir(Vector2(100, 100), Vector2(100, 160)) == "down" \
+				and m.story._face_dir(Vector2(100, 100), Vector2(200, 100)) == "right" \
+				and m.story._face_dir(Vector2(100, 100), Vector2(20, 100)) == "left"
+			var chief_n: Variant = m.story._story_chief()
+			var walk_ok := false
+			if chief_n != null:
+				var k_cpos: Vector2 = chief_n.position
+				var k_scr: bool = chief_n.scripted
+				var k_ph := GameData.story_phase
+				# 이장을 플레이어의 **북쪽**에 세워 둔다 — 예전에는 이 자리에서도
+				# 남쪽으로 옮겨 놓아 무조건 아래에서 위로 올라왔다
+				chief_n.position = m.player.position + Vector2(0.0, -160.0)
+				GameData.story_phase = "greet"      # 이 연출이 도는 단계
+				m.story.start_home_greet()
+				walk_ok = chief_n.position.y < m.player.position.y   # 북쪽 그대로다
+				m.story._update_home_greet(0.05)
+				walk_ok = walk_ok and chief_n.dir == "down"          # 내려다보며 온다
+				m.story._chief_greet = false
+				m.story_cutscene = false
+				m.dialog.close()
+				chief_n.position = k_cpos
+				chief_n.scripted = k_scr
+				GameData.story_phase = k_ph
+
+			# ── ③ 채집물은 흔하고, 비 오는 날은 더 흔하다
+			var k_wx: int = m._weather_override
+			m._weather_override = GameData.WEATHER_SUN
+			var cap_clear: int = m.worldgen.forage_cap_now()
+			m._weather_override = GameData.WEATHER_RAIN
+			var cap_rain: int = m.worldgen.forage_cap_now()
+			var grown0: int = m.worldgen.forage_count()
+			m.worldgen._tick_rain_forage()          # 빗속 한 틱
+			var rain_grow: bool = m.worldgen.forage_count() > grown0
+			m._weather_override = k_wx
+			var forage_ok: bool = cap_clear >= 60 and cap_rain > cap_clear \
+				and m.worldgen.forage_count() >= 30 and rain_grow
+
+			# ── ④ 울타리 레시피 — 목재를 가진 손님에게만
+			var k_tools := GameData.unlocked_tools.duplicate()
+			var k_ru := GameData.recipes_unlocked.duplicate()
+			var k_ri := GameData.recipe_items.duplicate()
+			GameData.unlocked_tools.erase("fence")
+			GameData.recipes_unlocked.erase("fence")
+			GameData.recipe_items.erase("fence")
+			var fence_data: bool = "fence" not in GameData.TUTORIAL_UNLOCKS["harvest"] \
+				and GameData.DESK_RECIPES.has("fence")
+			GameData.give_recipe("fence")
+			var learned: bool = GameData.learn_recipe("fence") \
+				and GameData.is_tool_unlocked("fence")   # 배우면 도구가 열린다
+			GameData.unlocked_tools = k_tools
+			GameData.recipes_unlocked = k_ru
+			GameData.recipe_items = k_ri
+			var fence_ok: bool = fence_data and learned
+
+			# ── ⑤ 못 가는 땅은 검정 무지 · 사람도 짐승도 지나갈 수 없다
+			var black_ok: bool = m.map_ui.FOG.v <= 0.001 and m.map_ui.FOG.a >= 1.0 \
+				and Color(m.hud.MM_FOG).v <= 0.001
+			var k_forest := GameData.forest_quest
+			GameData.forest_quest = ""              # 깊은 숲을 다시 잠근다
+			m.map_ui._vis_key = ""                  # 표를 다시 만들게 한다
+			m.map_ui._ensure_vis_index()            # 잠금이 바뀌었으니 표를 다시
+			var deep := Vector2i(60, 50)
+			var locked_ok: bool = not m.is_passable(deep) \
+				and not m.map_ui._visible_tile(deep.x, deep.y)
+			# NPC도 같은 문을 지난다 — 길찾기가 잠긴 땅을 지나가지 않는다
+			var path_in: Array = m.npcmgr._tile_path(m.player_tile(), deep)
+			locked_ok = locked_ok and path_in.is_empty()
+			GameData.forest_quest = k_forest
+			m.map_ui._vis_key = ""
+			m.map_ui._ensure_vis_index()
+
+			# ── ⑥ Q창에 계절 축제 항목이 없다
+			var fest_gone := true
+			for e: Dictionary in m.quest_ui._entries():
+				if str(e.get("id", "")) == "info_fest" or str(e.get("title", "")) == "계절 축제":
+					fest_gone = false
+			m.hud._toast_queue.clear()
+			print("LIVELY_OK=", grill_ok and face_ok and walk_ok and forage_ok
+				and fence_ok and black_ok and locked_ok and fest_gone,
+				" 생선구이=", grill_ok, " 시선=", face_ok, " 제자리에서=", walk_ok,
+				" 채집=", forage_ok, "(맑음 ", cap_clear, " 비 ", cap_rain,
+				" 지금 ", m.worldgen.forage_count(), ")",
+				" 울타리레시피=", fence_ok, " 검정무지=", black_ok,
+				" 잠긴땅차단=", locked_ok, " 축제삭제=", fest_gone)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

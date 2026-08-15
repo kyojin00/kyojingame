@@ -5,6 +5,8 @@ const TAB_BUTTONS := {
 	"buy": "BuyBtn", "sell": "SellBtn", "animal": "AnimalBtn",
 	"upgrade": "UpgradeBtn", "craft": "CraftBtn", "codex": "CodexBtn",
 }
+# 울타리 레시피 — 초반에 손이 닿는 값 (목재를 들고 온 손님에게만 보인다)
+const FENCE_RECIPE_PRICE := 250
 
 var main: Node2D
 var tab := "buy"
@@ -414,6 +416,16 @@ func _rebuild() -> void:
 				rcp.disabled = GameData.money < 300
 				items_box.add_child(_mk_row("recipe", "빗자루 레시피",
 					"집 안의 먼지를 쓸어 낸다 · 재료: 잡초 1", rcp, [["coin", 300]]))
+			# 울타리 — **가방에 목재가 있을 때만** 선반에 오른다.
+			# 나무를 베어 본 사람에게만 쓸모가 있는 물건이라, 목재를 들고
+			# 들어서는 날 처음으로 눈에 띈다.
+			if _recipe_on_sale("fence") and not GameData.is_tool_unlocked("fence") \
+					and int(GameData.items.get("wood", 0)) > 0:
+				var fcp := _mk_button("구매", _on_buy_recipe.bind("fence", FENCE_RECIPE_PRICE))
+				fcp.disabled = GameData.money < FENCE_RECIPE_PRICE
+				items_box.add_child(_mk_row("recipe", "울타리 레시피",
+					"빈틈없이 둘러싸면 목초지가 된다 · 재료: 목재 1 (목재를 가진 손님에게만)",
+					fcp, [["coin", FENCE_RECIPE_PRICE]]))
 			if _recipe_on_sale("flower_pot"):
 				var pcp := _mk_button("구매", _on_buy_recipe.bind("flower_pot", 200))
 				pcp.disabled = GameData.money < 200
@@ -443,7 +455,7 @@ func _rebuild() -> void:
 					_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
 				hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
 				items_box.add_child(_mk_row("recipe", "집터 레시피",
-					"빈 집터를 미리 마련해 둔다 (이주 수락의 선행 조건) · 재료: 목재 60 · 석재 40 · 못 4",
+					"빈 집터를 미리 마련해 둔다 (이주 수락의 선행 조건) · 재료: 목재 90 · 석재 70",
 					hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
 		if buy_cat == "life":
 			# 생활에 쓰는 것은 「사는」 게 아니라 「만드는」 쪽으로 모았다

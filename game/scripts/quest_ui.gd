@@ -134,7 +134,7 @@ func _process(delta: float) -> void:
 # ---- 목록 만들기 ----------------------------------------------------------
 
 
-# 카탈로그 + 정보 항목(아직 수락 안 한 의뢰, 계절 축제)을 한 줄로 편다
+# 카탈로그 + 정보 항목(아직 수락 안 한 의뢰)을 한 줄로 편다
 func _entries() -> Array:
 	# 목록은 GameData.quest_list()가 만든다 — **우측 미니창과 같은 목록**이다.
 	# (메인 스토리는 지금 진행 중인 하나만, 서브퀘는 전부)
@@ -148,9 +148,7 @@ func _entries() -> Array:
 			"obj": "의뢰 게시판에서 하나를 고르자.", "npc": "",
 			"desc": "오늘 게시판에 의뢰 %d건이 붙어 있다. 하나만 고를 수 있다."
 				% GameData.quest_offers.size(), "reward": ""})
-	# 계절 축제 안내
-	out.append({"id": "info_fest", "cat": "info", "title": "계절 축제",
-		"obj": "", "npc": "chief", "desc": "", "reward": ""})
+	# (계절 축제 항목은 없앴다 — Q창은 「지금 할 일」만 담는다)
 	return out
 
 
@@ -284,9 +282,6 @@ func _build_detail(e: Dictionary) -> void:
 		Color(0.75, 0.63, 0.42))
 
 	# 정보 항목은 자기 본문을 그린다
-	if str(e.id) == "info_fest":
-		_build_fest_detail()
-		return
 	if str(e.id) == "info_offers":
 		_line(detail_box, str(e.desc), COL_SUB)
 		_line(detail_box, "")
@@ -363,43 +358,6 @@ func _extra_progress(id: String) -> void:
 		_line(detail_box, "    보유 %d / %d%s" % [mini(have, int(q.qty)),
 			int(q.qty), "  ✓ 게시판에서 납품하자!" if ok else ""],
 			COL_DONE if ok else COL_SUB)
-
-
-# 계절 축제 상세 (옛 Q창의 축제 절을 그대로 옮겨 왔다)
-func _build_fest_detail() -> void:
-	var ft: Dictionary = GameData.festival_today()
-	if ft.is_empty():
-		var next_name := ""
-		var next_in := 0
-		for i in range(1, GameData.DAYS_PER_SEASON * 4 + 1):
-			var f2: Dictionary = GameData.festival_of_day(GameData.day + i)
-			if not f2.is_empty():
-				next_name = str(f2.name)
-				next_in = i
-				break
-		if next_name != "":
-			_line(detail_box, "다음 축제: %s — %d일 뒤" % [next_name, next_in],
-				COL_SUB)
-	else:
-		_line(detail_box, "오늘은 %s! (9시~18시, %s)" % [ft.name,
-			"낚시터" if str(ft.place) == "pier" else "마을 광장"], COL_NOW)
-		_line(detail_box, "  %s" % ft.goal, COL_SUB)
-		if GameData.fest_done:
-			_line(detail_box, "  참가 완료!", COL_DONE)
-		else:
-			_line(detail_box, "  이장에게 「축제 이야기」로 진행한다.", COL_SUB)
-	_line(detail_box, "")
-	if not GameData.fest_year_ok():
-		_line(detail_box, "올해는 축제가 없다 — 마을이 아직 잔치를 벌일 형편이 아니다.",
-			COL_SUB)
-		_line(detail_box, "다음 해 봄부터 계절마다 한 번씩 열린다.", COL_DIM)
-		return
-	for sid in [GameData.SPRING, GameData.SUMMER, GameData.FALL, GameData.WINTER]:
-		var f3: Dictionary = GameData.FESTIVALS[sid]
-		var seen: bool = GameData.fest_history.has(str(f3.id))
-		_line(detail_box, "%s %s %d일 — %s" % ["V" if seen else "-",
-			GameData.SEASON_NAMES[sid], int(f3.day), f3.name],
-			COL_DONE if seen else COL_DIM)
 
 
 # ---- 도우미 ----------------------------------------------------------------

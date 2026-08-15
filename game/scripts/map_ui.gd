@@ -1,6 +1,6 @@
 # 지도 (M): 실제로 가 본 지역만 보여준다 (fog of war).
-# 아직 가 보지 않은 곳은 **먹구름**이 덮고 있고, 탐사할수록 걷힌다.
-# (예전에는 검은 단색이었다 — 「고장 난 화면」처럼 보여서 구름으로 바꿨다)
+# 아직 가 보지 않은 곳과 아직 열리지 않은 땅은 **검정 무지**로 덮여 있고,
+# 걸어서 탐사하고 이야기가 닿을 때마다 한 조각씩 드러난다.
 #
 # 조작: 마우스 휠 = 확대/축소 (커서 기준) · 끌기 = 이동 · R = 처음 크기로
 extends CanvasLayer
@@ -11,10 +11,13 @@ extends CanvasLayer
 const VIEW_W := 952.0
 const VIEW_H := 512.0
 
-# 먹구름 — 바탕 한 겹 + 뭉게뭉게 두 겹. 전부 불투명이라 밑은 보이지 않는다.
-const FOG := Color(0.13, 0.14, 0.19)          # 구름 그늘 (바탕)
-const CLOUD_MID := Color(0.21, 0.22, 0.28)    # 구름 덩어리
-const CLOUD_TOP := Color(0.29, 0.30, 0.37)    # 구름의 밝은 쪽 (빛 받는 면)
+# 아직 열리지 않은 땅은 **검정 무지**다.
+#
+# 예전에는 뭉게뭉게한 먹구름을 얹었다. 그런데 배율을 바꾸면 동그라미가
+# 커졌다 작아졌다 하며 겉돌아, 가려진 것이 아니라 「위에 뭘 얹어 놓은」
+# 것처럼 보였다. 지금은 한 점 비치지 않는 검정 한 색이다 — 무엇이 있는지가
+# 아니라 **여기는 아직 내 세계가 아니다**만 말한다.
+const FOG := Color(0, 0, 0)
 const ZOOM_MIN := 0.7
 const ZOOM_MAX := 6.5
 const ZOOM_STEP := 1.2
@@ -234,7 +237,8 @@ func _visible_tile(x: int, y: int) -> bool:
 func _seen_tile(x: int, y: int) -> bool:
 	if not GameData.is_explored_tile(x, y):
 		return false
-	_ensure_vis_index()
+	if _vis_idx.size() != main.MAP_W * main.MAP_H:
+		_ensure_vis_index()      # 낡았는지는 그리기 진입점에서 한 번만 본다
 	return _vis_idx[y * main.MAP_W + x] == 1
 
 
@@ -245,21 +249,34 @@ func _seen_tile(x: int, y: int) -> bool:
 # 그것만으로 백 밀리초가 넘게 들었다. 답이 달라지는 때는 **확장 구역이
 # 열릴 때뿐**이라, 그때만 다시 만든다.
 var _vis_idx := PackedByteArray()
-var _vis_zones := -1
+var _vis_key := ""
 
 
+# 이 표가 낡았는지 가리는 열쇠 — 확장 구역이 열리거나 야생 지역이 열리면 다시 만든다
+func _unlock_key() -> String:
+	var open_regions := 0
+	for reg: Dictionary in main.REGIONS:
+		if GameData.region_unlocked(str(reg.id)):
+			open_regions += 1
+	return "%d/%d" % [GameData.zones_open.size(), open_regions]
+
+
+# 표가 낡았는지 확인하고 필요하면 다시 만든다.
+# **칸마다 부르면 안 된다** — 열쇠를 만드는 것만으로 지역 목록을 훑는다.
 func _ensure_vis_index() -> void:
-	if _vis_idx.size() == main.MAP_W * main.MAP_H \
-			and _vis_zones == GameData.zones_open.size():
+	if _vis_idx.size() == main.MAP_W * main.MAP_H and _vis_key == _unlock_key():
 		return
 	_vis_idx.resize(main.MAP_W * main.MAP_H)
-	_vis_zones = GameData.zones_open.size()
+	_vis_key = _unlock_key()
 	for y in main.MAP_H:
 		var base: int = y * main.MAP_W
 		for x in main.MAP_W:
 			var t := Vector2i(x, y)
-			_vis_idx[base + x] = 1 if (GameData.is_tile_owned(x, y) \
-				or main.ROAD.has_point(t) or main.VILLAGE_REGION.has_point(t)) else 0
+			# 못 가는 땅은 지도에도 없다 — 잠긴 확장 구역이든,
+			# 아직 이야기가 닿지 않은 야생 지역이든 똑같이 검정이다
+			var open: bool = (GameData.is_tile_owned(x, y) or main.ROAD.has_point(t)
+				or main.VILLAGE_REGION.has_point(t)) and main.region_open_at(t)
+			_vis_idx[base + x] = 1 if open else 0
 
 
 # 이 칸의 바닥 색. 같은 지형이라도 칸마다 밝기를 조금 흔들어 결을 낸다 —
@@ -467,7 +484,8 @@ func _bake() -> void:
 	for pos: Vector2i in main.objects:
 		if not r.has_point(pos):
 			continue
-		if not _visible_tile(pos.x, pos.y):
+		if _vis_idx[pos.y * main.MAP_W + pos.x] != 1 \
+				or not GameData.is_explored_tile(pos.x, pos.y):
 			continue
 		var c2: Color = OBJ_COL.get(str(main.objects[pos].kind), OBJ_DEFAULT)
 		var j := ((pos.y - oy) * w + (pos.x - ox)) * 3
@@ -505,6 +523,7 @@ func _draw_map() -> void:
 	_taken.clear()
 	if _reg_idx.size() != main.MAP_W * main.MAP_H:
 		_build_region_index()
+	_ensure_vis_index()          # 한 장 그리기 전에 한 번 — 칸마다 보지 않는다
 	_cell = _base_cell() * zoom
 	var o := _origin(_cell)
 	_ox = o.x
@@ -626,8 +645,8 @@ func _draw_map() -> void:
 			_label(Vector2(pr.get_center().x - 40.0, pr.get_center().y),
 				str(GameData.VILLAGE_ZONES[zid].name) + (" (잠김)" if locked else ""))
 
-	# 먹구름 뭉치 — 가려진 칸 위로 둥근 덩어리를 얹어 「구름에 덮인」 모양을 낸다
-	_draw_clouds(x0, y0, x1, y1)
+	# 아직 열리지 않은 칸은 구운 그림에서 이미 검정으로 칠해져 있다 —
+	# 위에 따로 얹을 것이 없다 (예전의 구름 덩어리는 없앴다)
 
 	# 퀘스트 길라잡이 — **딱 하나**만 찍는다 (미니창에 고정한 그 퀘스트)
 	for g: Dictionary in _quest_guides():
@@ -712,10 +731,10 @@ func _draw_trim() -> void:
 	_heart(Vector2(lx + 3, ly + 20), 5.0, Color(0.95, 0.35, 0.45))
 	canvas.draw_string(main.UI_FONT, Vector2(lx + 16, ly + 25), "지금 목표",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_INK)
-	# 구름 (미탐사)
-	canvas.draw_circle(Vector2(lx + 2, ly + 40), 5.0, CLOUD_MID)
-	canvas.draw_circle(Vector2(lx + 7, ly + 38), 4.0, CLOUD_TOP)
-	canvas.draw_string(main.UI_FONT, Vector2(lx + 16, ly + 46), "아직 안 가 본 곳",
+	# 검정 (아직 열리지 않은 땅)
+	canvas.draw_rect(Rect2(lx - 2, ly + 34, 12, 10), FOG)
+	canvas.draw_rect(Rect2(lx - 2, ly + 34, 12, 10), Color(0.4, 0.36, 0.3), false, 1.0)
+	canvas.draw_string(main.UI_FONT, Vector2(lx + 16, ly + 46), "아직 못 가는 곳",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, COL_INK)
 
 
@@ -806,51 +825,6 @@ func _quest_spot(qid: String) -> Vector2i:
 			if GameData.tutorial_current_flag() == "cook":
 				return main.HOME_ANCHOR + Vector2i(2, 3)
 	return Vector2i(-1, -1)
-
-
-# ---- 먹구름 (미탐사 지역) ----
-#
-# 검은 단색은 「아직 안 가 봤다」가 아니라 「화면이 깨졌다」처럼 보인다.
-# 그래서 가려진 칸 위에 둥근 구름 덩어리를 얹는다. 자리는 칸 좌표로
-# 정해지므로 다시 열어도 같은 모양이고(깜빡이지 않는다), 아주 느리게
-# 흘러가 살아 있는 하늘처럼 보인다. **전부 불투명이라 밑은 안 비친다.**
-func _cloud_rand(x: int, y: int, salt: int) -> float:
-	var h := float(sin(float(x) * 12.9898 + float(y) * 78.233 + float(salt) * 37.719) * 43758.5453)
-	return h - floor(h)
-
-
-# 구름 덩어리는 **화면 넓이에 맞춰 성글게** 찍는다.
-#
-# 예전에는 가려진 칸 두 개마다 하나씩이라, 배율 1에서 원을 6700개나
-# 그렸다 (원 하나가 폴리곤 하나다). 지도를 끌면 그대로 뚝뚝 끊겼다.
-# 지금은 화면에 들어오는 칸 수를 보고 간격을 벌린다 — 멀리서 보면
-# 큼직한 구름 덩어리, 가까이 가면 잘게 나뉜 구름. 개수는 늘 400개 안쪽이다.
-func _draw_clouds(x0: int, y0: int, x1: int, y1: int) -> void:
-	var span := maxi(1, (x1 - x0) * (y1 - y0))
-	var step := 2
-	while span / (step * step) > 400:
-		step *= 2
-	var scale := float(step) * 0.75          # 성글수록 덩어리도 커진다
-	var drift := blink * 0.12                # 아주 느린 흐름
-	for ty in range(y0 - (y0 % step), y1, step):
-		for tx in range(x0 - (x0 % step), x1, step):
-			if tx < 0 or ty < 0 or _visible_tile(tx, ty):
-				continue
-			var rx := _cloud_rand(tx, ty, 1)
-			var ry := _cloud_rand(tx, ty, 2)
-			var rs := _cloud_rand(tx, ty, 3)
-			var c := Vector2(
-				_ox + (float(tx) + float(step) * 0.5 + (rx - 0.5) * 1.1 * step) * _cell,
-				_oy + (float(ty) + float(step) * 0.5 + (ry - 0.5) * 1.1 * step) * _cell)
-			var wob := sin(drift + float(tx) * 0.7 + float(ty) * 0.4) * _cell * 0.25
-			# 덩어리마다 밝기가 조금씩 달라 층이 진 하늘처럼 보인다
-			var body := FOG.lerp(CLOUD_MID, 0.45 + rs * 0.55)
-			var r1 := _cell * (1.5 + rs * 0.75) * scale
-			canvas.draw_circle(c + Vector2(wob, 0.0), r1, body)
-			# 빛을 받는 윗면 — 살짝 위로 올려 그린다
-			if rs > 0.35:
-				canvas.draw_circle(c + Vector2(wob * 0.6, -_cell * (0.5 + rx * 0.3) * scale),
-					r1 * (0.34 + rx * 0.22), CLOUD_MID.lerp(CLOUD_TOP, 0.4 + ry * 0.6))
 
 
 # 건물 터의 한가운데 — 이야기가 「세우자」고 할 때 이 자리를 찍는다
