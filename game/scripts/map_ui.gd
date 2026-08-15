@@ -296,6 +296,9 @@ func _draw_map() -> void:
 			_label(Vector2(pr.get_center().x - 40.0, pr.get_center().y),
 				str(GameData.VILLAGE_ZONES[zid].name) + (" (잠김)" if locked else ""))
 
+	# 건설 후보지 — 지금 세울 수 있는 건물 터를 먼저 찍는다 (퀘스트 마커 아래)
+	for g: Dictionary in build_spots():
+		_draw_guide(g)
 	# 퀘스트 길라잡이 — 지금 따라가는 목표가 어디인지 하트로 찍어 준다
 	for g: Dictionary in _quest_guides():
 		_draw_guide(g)
@@ -387,25 +390,61 @@ func _quest_spot(qid: String) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-# 하트 + 두근거리는 고리 — 멀리서도 눈에 띄게
+# 지금 세울 수 있는 건물 터 — 「어디에 지어야 하지?」를 지도가 대신 말한다.
+#
+# 첫 상점(잡화점)이 대표다. 이야기가 상점을 지으라고 할 때, 그 터가
+# 지도 어디쯤인지 몰라 마을을 헤매는 일이 없도록 집 모양 마커를 찍는다.
+# 이미 세운 터는 찍지 않는다.
+func build_spots() -> Array:
+	var out: Array = []
+	if GameData.story_phase != "done":
+		return out           # 마을에 닿기 전에는 아무것도 안 찍는다
+	# ① 첫 상점 — 이야기가 짓자고 하는 동안 계속 반짝인다
+	if not GameData.village_built.has("general"):
+		out.append({"tile": _plot_center("general"), "kind": "build",
+			"text": "여기에 첫 상점을"})
+	# ② 그다음 지을 수 있게 열린 건물 터 (이장과 이야기해 열린 것만)
+	var nxt: String = main.village._next_village_build()
+	if nxt != "" and nxt != "general":
+		out.append({"tile": _plot_center(nxt), "kind": "build",
+			"text": "%s를 세울 자리" % str(main.VILLAGE_PLOTS[nxt].name)})
+	return out
+
+
+func _plot_center(pid: String) -> Vector2i:
+	var a: Vector2i = main.VILLAGE_PLOTS[pid].anchor
+	return a + Vector2i(2, 2)      # 건물 그림(5x4) 한가운데
+
+
+# 하트(퀘스트) 또는 집(건설 터) + 두근거리는 고리 — 멀리서도 눈에 띄게
 func _draw_guide(g: Dictionary) -> void:
 	var t: Vector2i = g.tile
 	var c := Vector2(_ox + (float(t.x) + 0.5) * _cell, _oy + (float(t.y) + 0.5) * _cell)
 	if c.x < -40.0 or c.x > 1000.0 or c.y < -40.0 or c.y > 560.0:
 		return
 	var beat := 1.0 + sin(blink * 4.0) * 0.12
-	var pink := Color(1.0, 0.42, 0.55)
+	var build := str(g.get("kind", "quest")) == "build"
+	var tint := Color(1.0, 0.78, 0.35) if build else Color(1.0, 0.42, 0.55)
+	var ring := Color(1.0, 0.85, 0.5) if build else Color(1.0, 0.55, 0.66)
 	# 퍼지는 고리 두 겹
-	canvas.draw_arc(c, 13.0 * beat, 0, TAU, 24, Color(1.0, 0.55, 0.66, 0.85), 2.5)
-	canvas.draw_arc(c, 19.0 * beat, 0, TAU, 24, Color(1.0, 0.55, 0.66, 0.35), 2.0)
-	# 하트 (두 개의 둥근 봉우리 + 아래로 모이는 삼각형)
+	canvas.draw_arc(c, 13.0 * beat, 0, TAU, 24, Color(ring, 0.85), 2.5)
+	canvas.draw_arc(c, 19.0 * beat, 0, TAU, 24, Color(ring, 0.35), 2.0)
 	var s := 5.0 * beat
-	canvas.draw_circle(c + Vector2(-s * 0.5, -s * 0.35), s * 0.62, pink)
-	canvas.draw_circle(c + Vector2(s * 0.5, -s * 0.35), s * 0.62, pink)
-	canvas.draw_colored_polygon(PackedVector2Array([
-		c + Vector2(-s * 1.05, -s * 0.15), c + Vector2(s * 1.05, -s * 0.15),
-		c + Vector2(0.0, s * 1.15)]), pink)
-	_label(Vector2(c.x, c.y + 24.0), "◆ " + str(g.text))
+	if build:
+		# 집 — 네모 몸통 + 삼각 지붕 (여기에 「짓는다」는 뜻)
+		canvas.draw_rect(Rect2(c.x - s * 0.8, c.y - s * 0.1,
+			s * 1.6, s * 1.2), tint)
+		canvas.draw_colored_polygon(PackedVector2Array([
+			c + Vector2(-s * 1.15, -s * 0.1), c + Vector2(s * 1.15, -s * 0.1),
+			c + Vector2(0.0, -s * 1.25)]), tint)
+	else:
+		# 하트 (두 개의 둥근 봉우리 + 아래로 모이는 삼각형)
+		canvas.draw_circle(c + Vector2(-s * 0.5, -s * 0.35), s * 0.62, tint)
+		canvas.draw_circle(c + Vector2(s * 0.5, -s * 0.35), s * 0.62, tint)
+		canvas.draw_colored_polygon(PackedVector2Array([
+			c + Vector2(-s * 1.05, -s * 0.15), c + Vector2(s * 1.05, -s * 0.15),
+			c + Vector2(0.0, s * 1.15)]), tint)
+	_label(Vector2(c.x, c.y + 24.0), ("◈ " if build else "◆ ") + str(g.text))
 
 
 func _dot(world_pos: Vector2, size: float, col: Color) -> void:

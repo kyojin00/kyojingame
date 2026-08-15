@@ -884,6 +884,8 @@ func _item_entries() -> Array:
 			e["tab"] = "food"
 			e["color"] = Color(1.0, 0.75, 0.4)
 			e["desc"] = "요리 — 먹으면 체력 +%d" % int(GameData.RECIPES[id].energy)
+			if GameData.hunger_open:
+				e["desc"] += " · 배부름 %s" % GameData.fill_word(id)
 			e["eat"] = id
 		elif id == "water_life":
 			e["color"] = Color(0.55, 0.8, 1.0)

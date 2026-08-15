@@ -3519,6 +3519,95 @@ func _debug_tick() -> void:
 				" 게이지=", gauge_on and gauge_off,
 				" ESC가방먼저=", room_before and overlay_ok and bag_first,
 				" ESC방메뉴=", menu_ok, " 돌창아트=", art_ok, "(", spear_px, "px)")
+		293:
+			# #143: Q창 동화 이야기·감성 목표 · 지도 건설 후보지 · 요리별 배부름
+			m.dialog.close()
+
+			# ── ① Q창: 이야기는 길고 서정적으로, 목표엔 재료 수치·키가 없다
+			var k_s2p := GameData.story2_phase
+			var k_built4: Array = GameData.village_built.duplicate()
+			var k_story := GameData.story_phase
+			GameData.story_phase = "done"
+			GameData.village_built.erase("general")
+			GameData.story2_phase = "shop"
+			var shop_entry: Dictionary = {}
+			for q: Dictionary in GameData.quest_catalog():
+				if str(q.id) == "story2":
+					shop_entry = q
+			var tale_ok: bool = not shop_entry.is_empty() \
+				and str(shop_entry.desc).length() >= 80 \
+				and str(shop_entry.desc).contains("\n")
+			var obj_soft: bool = str(shop_entry.get("obj", "")).contains("첫 상점") \
+				and not str(shop_entry.get("obj", "")).contains("목재") \
+				and not str(shop_entry.get("obj", "")).contains("돌 ")
+			# 지금 떠 있는 모든 퀘스트의 목표에 내부 키(밑줄)와 재료 수치가 없다
+			var no_keys := true
+			var soft_all := true
+			for q2: Dictionary in GameData.quest_catalog():
+				var ob := str(q2.get("obj", ""))
+				if ob.contains("_"):
+					no_keys = false
+				if ob.contains("목재 ") or ob.contains("석재 ") or ob.contains("보석 "):
+					soft_all = false
+				if str(q2.get("desc", "")).length() < 20 and str(q2.get("cat", "")) == "main":
+					soft_all = false
+
+			# ── ② 지도: 상점을 지을 자리를 집 모양 마커로 찍는다
+			var spots: Array = m.map_ui.build_spots()
+			var spot_ok := false
+			for g: Dictionary in spots:
+				var gt: Vector2i = g.tile
+				if gt == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2) \
+						and str(g.get("kind", "")) == "build" \
+						and str(g.text).contains("첫 상점"):
+					spot_ok = true
+			GameData.village_built.append("general")
+			var spot_gone := true
+			for g2: Dictionary in m.map_ui.build_spots():
+				if str(g2.text).contains("첫 상점"):
+					spot_gone = false
+			GameData.village_built = k_built4
+			GameData.story2_phase = k_s2p
+			GameData.story_phase = k_story
+
+			# ── ③ 요리마다 배부름이 다르다
+			var fill_all := true
+			for rid: String in GameData.RECIPE_IDS:
+				if GameData.recipe_fill(rid) <= 0.0:
+					fill_all = false
+			# 국밥은 든든하고 차는 기운만 돈다 — 체력 순서와 뒤집힌다
+			var rice: float = GameData.recipe_fill("dish_bean_rice")
+			var tea: float = GameData.recipe_fill("dish_moon_tea")
+			var fill_diff: bool = rice > tea \
+				and float(GameData.RECIPES["dish_bean_rice"].energy) \
+					< float(GameData.RECIPES["dish_moon_tea"].energy) \
+				and GameData.fill_word("dish_bean_rice") != GameData.fill_word("dish_moon_tea")
+			# 실제로 먹어 본다 — 배부름은 요리표의 값만큼 오른다
+			var k_open2 := GameData.hunger_open
+			var k_hunger2 := GameData.hunger
+			var k_energy2 := GameData.energy
+			var k_potato := int(GameData.items["dish_baked_potato"])
+			GameData.hunger_open = true
+			GameData.hunger = 0.0
+			GameData.energy = 10.0
+			GameData.items["dish_baked_potato"] = 1
+			var mult := GameData.cook_energy_mult()
+			m.doing.do_eat("dish_baked_potato")
+			var eat_ok: bool = is_equal_approx(GameData.hunger,
+					GameData.recipe_fill("dish_baked_potato") * mult) \
+				and GameData.energy > 10.0 and not GameData.starving()
+			GameData.items["dish_baked_potato"] = k_potato
+			GameData.hunger_open = k_open2
+			GameData.hunger = k_hunger2
+			GameData.energy = k_energy2
+			m.hud._toast_queue.clear()
+			print("QUESTTALE_OK=", tale_ok and obj_soft and no_keys and soft_all
+				and spot_ok and spot_gone and fill_all and fill_diff and eat_ok,
+				" 동화이야기=", tale_ok, " 감성목표=", obj_soft,
+				" 키노출없음=", no_keys, " 재료수치없음=", soft_all,
+				" 상점후보지=", spot_ok, " 다지으면사라짐=", spot_gone,
+				" 요리별배부름=", fill_all and fill_diff, " 먹기반영=", eat_ok,
+				"(밥 ", rice, " · 차 ", tea, ")")
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

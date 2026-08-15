@@ -153,11 +153,13 @@ func do_eat(id: String) -> void:
 	GameData.items[id] -= 1
 	var e: float = float(GameData.RECIPES[id].energy) * GameData.cook_energy_mult()
 	GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + e)
-	GameData.feed(e)                       # 배도 그만큼 부르다
+	# 배부름은 요리마다 다르다 — 국밥은 든든하고, 차는 기운만 돈다
+	var fill: float = GameData.recipe_fill(id) * GameData.cook_energy_mult()
+	GameData.feed(fill)
 	Sound.play_sfx("sfx_harvest")
 	if GameData.hunger_open:
-		m.hud.show_message("%s를 먹었다! 체력 +%d · 배부름 +%d"
-			% [GameData.ITEMS[id].name, int(e), int(e)])
+		m.hud.show_message("%s를 먹었다 — %s! 체력 +%d"
+			% [GameData.ITEMS[id].name, GameData.fill_word(id), int(e)])
 	else:
 		m.hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
 	if Net.is_guest():

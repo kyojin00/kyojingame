@@ -280,8 +280,11 @@ func _rebuild_detail() -> void:
 	nm.add_theme_color_override("font_color", Color("ffd75e"))
 	hv.add_child(nm)
 	var sub := Label.new()
-	sub.text = "회복 +%d · 판매 %dG · 보유 %d · 만든 횟수 %d" % [
-		int(rec.energy), int(def.sell), int(GameData.items[id]), made]
+	# 체력 회복과 「배부름」은 따로다 — 무엇을 지을지 여기서 고른다
+	var fill_txt := (" · 배부름 %s" % GameData.fill_word(id)) \
+		if GameData.hunger_open else ""
+	sub.text = "회복 +%d%s · 판매 %dG · 보유 %d · 만든 횟수 %d" % [
+		int(rec.energy), fill_txt, int(def.sell), int(GameData.items[id]), made]
 	sub.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
 	hv.add_child(sub)
 	head.add_child(hv)

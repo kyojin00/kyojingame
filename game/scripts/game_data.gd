@@ -894,10 +894,11 @@ var story2_phase := ""
 func story2_objective_short() -> String:
 	match story2_phase:
 		"shop":
-			return "재료를 모아 상점을 짓자 (목재 %d·돌 %d) — 상점 터 게시판에서 E" \
-				% [SHOP_BUILD_WOOD, SHOP_BUILD_STONE]
+			# 목표문에는 재료 수치를 적지 않는다 — 필요한 것은 상점 터
+			# 게시판이 알려 준다. 여기서는 「무엇을 위한 일인지」만 말한다.
+			return "잊혀진 기억을 더듬어, 따스한 온기가 가득한 첫 상점을 우리 손으로 지어보자! (상점 터 게시판에서 E)"
 		"farm_talk":
-			return "이장에게 가 보자 (E)"
+			return "이장이 할 말이 있는 눈치다 — 곁으로 가 보자 (E)"
 	return ""
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
@@ -1146,7 +1147,7 @@ func move_objective_short() -> String:
 		"greet":
 			return "재민이 인사하러 오고 있다 — 야외에서 기다리자"
 		"seed":
-			return "밭을 갈고 받은 씨앗을 심자 (%d/%d)" % [move_seeds, MOVE_SEEDS]
+			return "재민이 건넨 씨앗을 흙에 묻어 주자 (%d/%d)" % [move_seeds, MOVE_SEEDS]
 		"seedrep":
 			return "재민에게 씨앗을 다 심었다고 알리자 (E)"
 		"post":
@@ -1288,10 +1289,8 @@ func story7_objective_short() -> String:
 		"gather":
 			if int(items.get("ore", 0)) >= STORY7_ORE \
 					and int(items.get("gem", 0)) >= STORY7_GEM:
-				return "무쇠에게 재료를 가져다주자 (E)"
-			return "재료 모으기 — 광석 %d·보석 %d (보유 %d·%d)" % [
-				STORY7_ORE, STORY7_GEM,
-				int(items.get("ore", 0)), int(items.get("gem", 0))]
+				return "다 모았다 — 무쇠의 화로 앞으로 가져다주자 (E)"
+			return "꺼져 가는 화로에 넣을 것을 굴에서 찾아오자 — 단단한 광석과 맑게 빛나는 보석"
 	return ""
 
 
@@ -1924,8 +1923,7 @@ func story15_objective_short() -> String:
 		"tool":
 			if int(items.get("rock_wedge", 0)) > 0:
 				return "착암 쐐기를 들고 동굴로 내려가자"
-			return "무쇠에게 착암 쐐기를 부탁하자 — 광석 %d·별빛 조각 %d" % [
-				STORY15_TOOL_ORE, STORY15_TOOL_SHARD]
+			return "바위를 뚫을 쐐기를 무쇠에게 부탁하자 — 굴에서 캔 광석과 별빛 조각이 필요하다"
 		"dig":
 			if story15_dig_done():
 				return "수맥을 막던 바위를 쐐기로 뚫자 (동굴 %d층+)" % STORY15_DEPTH
@@ -2199,11 +2197,17 @@ func story20_objective_short() -> String:
 #
 # 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
 # hud가 매 프레임 이걸 읽어 그리므로, 단계가 바뀌면 즉시 갱신된다.
-func _quest_brief(s: String) -> String:
-	var t := s.split("\n")[0]
-	if t.length() > 36:
-		t = t.substr(0, 35) + "…"
-	return t
+# 메인 스토리 1의 서두 — Q창에서 이야기 위에 얹는다.
+# (단계별 「story」 문장은 그 뒤에 이어 붙인다)
+const STORY1_TALE := """낯선 숲의 아침이었다.
+손에는 할아버지가 남긴 열쇠 하나,
+주머니에는 아직 부치지 못한 편지 한 장.
+
+길을 잃고 서 있던 너에게 우체부 아저씨가 말을 걸었다.
+「같이 갈까? 나도 그 마을로 가는 길이거든.」
+
+나란히 찍히던 두 사람의 발자국에서
+이 이야기는 시작된다."""
 
 
 # 지금 진행 중인 퀘스트 전부 — 미니창 고정(핀) 선택지가 된다.
@@ -2217,19 +2221,30 @@ func quest_catalog() -> Array:
 	if o != "":
 		var cur := story_current_quest()
 		out.append({"id": "story1", "title": str(cur.get("name", "처음 온 마을")),
-			"obj": o, "desc": _quest_brief(str(cur.get("story", ""))),
+			"obj": o, "desc": STORY1_TALE + "\n\n" + str(cur.get("story", "")),
 			"cat": "main", "ep": "메인 스토리 1", "npc": "postman",
 			"reward": "새 도구와 나만의 집"})
 	o = story2_objective_short()
 	if o != "":
 		out.append({"id": "story2", "title": "마을을 깨우다", "obj": o,
-			"desc": "이장의 부탁 — 마을에 다시 활기를 불어넣자.",
+			"desc": "할아버지가 떠난 뒤, 교진 마을은 조용히 잠들었다.\n"
+				+ "가게도 뱃길도 밭도 하나씩 문을 닫았고, 남은 사람들은\n"
+				+ "서로의 안부만 물으며 긴 겨울을 났다.\n\n"
+				+ "이장은 마디 굵은 두 손을 마주 잡고 이렇게 말한다.\n"
+				+ "「자네가 온 뒤로 아침 공기가 달라졌어. ...정말일세.」\n\n"
+				+ "누군가 다시 문을 열고, 누군가 다시 그물을 던지고,\n"
+				+ "누군가 다시 흙을 갈면 — 마을은 그렇게 깨어난다.",
 			"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
 			"reward": "상점·바다·밭 — 마을의 기틀"})
 	o = fisher_objective_short()
 	if o != "":
 		out.append({"id": "fisher", "title": "낚시꾼과 바닷길", "obj": o,
-			"desc": "낯선 낚시꾼이 황금잉어 소문을 듣고 왔다.",
+			"desc": "어떤 사람은 평생 한 마리의 물고기를 쫓는다.\n\n"
+				+ "황금빛 비늘 이야기를 품고 온 낚시꾼이\n"
+				+ "남쪽 바위 능선 앞에 서서, 넘어가지 못한 바다를 본다.\n"
+				+ "능선 너머에는 아무도 오래 보지 못한 파도가 있다.\n\n"
+				+ "돌 하나를 걷어내는 일이지만, 그 하나로\n"
+				+ "이 마을은 잃어버렸던 바다를 되찾는다.",
 			"cat": "main", "ep": "메인 스토리 2", "npc": "fisher",
 			"reward": "바다·해변 해금 + 간이낚싯대"})
 	o = move_objective_short()
@@ -2240,19 +2255,34 @@ func quest_catalog() -> Array:
 		elif move_quest == "postgreet":
 			mv_npc = "postman"
 		out.append({"id": "move", "title": "새로운 주민의 이사", "obj": o,
-			"desc": "재민이 마을에 살고 싶다는 편지를 보내왔다.\n집이 서고 나면 마을은 밭과 우체국까지 갖춘다.",
+			"desc": "먼 길 위에서 쓴 편지 한 통이 문 앞에 놓였다.\n"
+				+ "「저는 재민이에요. 이 마을에서 살고 싶어요.」\n\n"
+				+ "지붕이 없으면 아무도 머무를 수 없는 법이다.\n"
+				+ "누군가의 첫 집이 될 자리를 네 손으로 고르고,\n"
+				+ "그 아이가 나눠 줄 씨앗을 흙에 묻고,\n"
+				+ "편지가 오갈 우체국까지 세우고 나면 —\n\n"
+				+ "이 마을은 비로소 「사람이 찾아오는 곳」이 된다.",
 			"cat": "main", "ep": "메인 스토리 3", "npc": mv_npc,
 			"reward": "이주 편지·집터 시스템 해금 + 우체국·우체부"})
 	o = forest_objective_short()
 	if o != "":
 		out.append({"id": "forest", "title": "숲속에서 발견한 집", "obj": o,
-			"desc": "재민이 숲 깊은 곳에서 수상한 집을 봤다고 한다.",
+			"desc": "숲을 쏘다니던 재민이 숨을 몰아쉬며 달려왔다.\n"
+				+ "「나무 사이에 집이 한 채 있었어. 정말이야!」\n\n"
+				+ "삼십 년 이장을 지낸 사람도 처음 듣는 집.\n"
+				+ "안개가 낮게 깔린 오솔길 끝에서\n"
+				+ "누가, 왜, 마을을 등지고 살고 있는 걸까.\n\n"
+				+ "문을 두드리기 전까지는 아무도 알 수 없다.",
 			"cat": "main", "ep": "메인 스토리 5", "npc": "explorer",
 			"reward": "숲속 모녀와의 만남"})
 	o = story4_objective_short()
 	if o != "":
 		out.append({"id": "story4", "title": "오래된 마을의 경계", "obj": o,
-			"desc": "동쪽 다리 너머에 낡은 표지판이 서 있었다.",
+			"desc": "동쪽 다리 너머, 이끼에 덮인 낡은 표지판 하나.\n"
+				+ "지워진 글씨를 손으로 훑으면 옛 마을 이름이 드러난다.\n\n"
+				+ "지금보다 훨씬 넓었던, 사람들이 살던 자리.\n"
+				+ "덤불에 잠긴 그 길을 다시 여는 일은\n"
+				+ "떠난 이웃들에게 「돌아와도 된다」고 말하는 일과 같다.",
 			"cat": "main", "ep": "메인 스토리 4", "npc": "chief",
 			"reward": "마을 확장 해금"})
 	o = story6_objective_short()
@@ -2262,33 +2292,56 @@ func quest_catalog() -> Array:
 			"build": "librarian"}
 		var s6npc: String = str(s6map.get(story6_phase, "chief"))
 		out.append({"id": "story6", "title": "오래된 책과 사서", "obj": o,
-			"desc": "풀숲에서 파낸 오래된 책 — 마을의 기록일지도 모른다.",
+			"desc": "풀을 뽑다가 흙 속에서 두꺼운 책 한 권이 나왔다.\n"
+				+ "표지는 삭았지만 글씨는 아직 살아 있다.\n\n"
+				+ "이장도 끝까지 읽어 내지 못하는 오래된 문장들.\n"
+				+ "이런 책은 읽어 줄 사람이 있어야 비로소 이야기가 된다.\n\n"
+				+ "먼 도시로 편지 한 통을 부치는 것부터 시작하자.",
 			"cat": "main", "ep": "메인 스토리 6", "npc": s6npc,
 			"reward": "도서관 해금 + 사서 정착"})
 	o = story7_objective_short()
 	if o != "":
 		var s7npc := "librarian" if story7_phase == "lore" else "blacksmith"
 		out.append({"id": "story7", "title": "식지 않는 화로", "obj": o,
-			"desc": "무쇠의 화로가 식어 간다 — 옛 대장간의 비밀을 찾자.",
+			"desc": "며칠째 대장간의 망치 소리가 뜸하다.\n"
+				+ "「불이 예전만큼 오래 붙어 있질 않아.」\n\n"
+				+ "옛 대장장이들은 불씨를 재우지 않는 법을 알았고,\n"
+				+ "그 방법은 아무도 펼쳐 보지 않은 책 속에 잠들어 있다.\n\n"
+				+ "다시 붉게 달아오를 화로를 위해,\n"
+				+ "땅속에서 잠자던 것들을 몇 가지 꺼내 오자.",
 			"cat": "main", "ep": "메인 스토리 7", "npc": s7npc,
 			"reward": "도구 강화 골드 비용 20% 할인"})
 	o = story8_objective_short()
 	if o != "":
 		var s8npc := "chief" if story8_phase == "ask" else "rancher"
 		out.append({"id": "story8", "title": "초원에서 온 목동", "obj": o,
-			"desc": "동물들과 초원을 찾아 떠도는 목동이 마을에 왔다.",
+			"desc": "바람 냄새를 맡으며 걷는 사람이 마을에 들어왔다.\n"
+				+ "뒤에는 소 한 마리와 닭 두 마리.\n\n"
+				+ "「좋은 풀밭을 찾고 있어요. 여긴... 냄새가 좋네요.」\n\n"
+				+ "평생 초원을 찾아 떠돌던 사람이\n"
+				+ "여기서 걸음을 멈출 수 있도록,\n"
+				+ "울타리와 지붕을 마련해 주자.",
 			"cat": "main", "ep": "메인 스토리 8", "npc": s8npc,
 			"reward": "목장 상회 해금 — 동물을 키울 수 있다"})
 	o = story9_objective_short()
 	if o != "":
 		out.append({"id": "story9", "title": "마을의 심장, 마을회관", "obj": o,
-			"desc": "이장의 꿈 — 주민을 모아 마을회관을 되살리자.",
+			"desc": "이장은 종종 광장 한가운데를 오래 바라본다.\n"
+				+ "예전엔 그 자리에 마을회관이 서 있었다고 한다.\n\n"
+				+ "비 오는 날엔 처마 밑에 모여 떡을 나눠 먹고,\n"
+				+ "겨울엔 난로 하나로 온 마을이 따뜻했다는 이야기.\n\n"
+				+ "사람이 모이면 건물이 서고,\n"
+				+ "건물이 서면 또 사람이 온다.",
 			"cat": "main", "ep": "메인 스토리 9", "npc": "chief",
 			"reward": "마을회관 — 명부·창고·프로젝트가 차례로 열린다"})
 	o = story10_objective_short()
 	if o != "":
 		out.append({"id": "story10", "title": "동굴과 탐험", "obj": o,
-			"desc": "오래된 책 마지막 장 — 할아버지의 동굴 표본 조사.",
+			"desc": "오래된 책의 마지막 장에는 그림이 그려져 있었다.\n"
+				+ "땅속 깊은 곳에서만 자란다는 이끼와 버섯,\n"
+				+ "별빛을 머금었다는 돌 하나.\n\n"
+				+ "할아버지는 그것들을 「아직 기록되지 않은 이웃」이라 불렀다.\n\n"
+				+ "등불을 들고, 아무도 세어 보지 않은 층으로 내려가자.",
 			"cat": "main", "ep": "메인 스토리 10", "npc": "librarian",
 			"reward": "동굴 컬렉션 — 채우면 영구 채광·탐험 보상"})
 	o = story11_objective_short()
@@ -2297,7 +2350,11 @@ func quest_catalog() -> Array:
 		if story11_phase == "record":
 			s11npc = "librarian"
 		out.append({"id": "story11", "title": "할머니의 모자", "obj": o,
-			"desc": "첫 번째 유품 — 깊은 굴 어딘가에 잠들어 있다.",
+			"desc": "할머니는 밭에 나갈 때 늘 밀짚모자를 썼다.\n"
+				+ "챙이 넓어 그늘이 꼭 두 사람 몫이었다고 한다.\n\n"
+				+ "그 모자가 어쩌다 굴속까지 갔는지는 아무도 모른다.\n"
+				+ "다만 마을 사람들은 저마다 다른 조각을 기억한다.\n\n"
+				+ "하나씩 이어 붙이면 길이 되는, 그런 이야기들을.",
 			"cat": "main", "ep": "메인 스토리 11", "npc": s11npc,
 			"reward": "할머니의 모자 + 도서관 「할머니의 기록」"})
 	o = story12_objective_short()
@@ -2308,7 +2365,12 @@ func quest_catalog() -> Array:
 		elif story12_phase == "gather":
 			s12npc = "alchemist"
 		out.append({"id": "story12", "title": "숲의 연금술사", "obj": o,
-			"desc": "할아버지의 연구를 도왔다는 이름 모를 사람의 흔적.",
+			"desc": "노트에는 늘 두 사람의 필체가 번갈아 나온다.\n"
+				+ "하나는 할아버지, 다른 하나는 이름이 없다.\n\n"
+				+ "숲 안쪽에 사는 사람이라는 소문만 떠돌 뿐,\n"
+				+ "누구도 그 얼굴을 본 적이 없다고 한다.\n\n"
+				+ "안개가 걷히는 날에만 드러난다는 오솔길 끝에서\n"
+				+ "그 사람은 여태 무언가를 끓이고 있을지도 모른다.",
 			"cat": "main", "ep": "메인 스토리 12", "npc": s12npc,
 			"reward": "연금술 해금 — 집 조합대에서 물약을 만든다"})
 	o = story13_objective_short()
@@ -2322,13 +2384,21 @@ func quest_catalog() -> Array:
 			"record":
 				s13npc = "librarian"
 		out.append({"id": "story13", "title": "할머니의 팔찌", "obj": o,
-			"desc": "바다가 간직해 온 두 번째 유품 — 낡은 상자의 비밀.",
+			"desc": "바다는 무엇이든 오래 간직한다.\n\n"
+				+ "파도에 밀려온 낡은 상자 하나를 두고\n"
+				+ "마을 사람들이 저마다 옛이야기를 꺼내 놓는다.\n\n"
+				+ "소금기에 굳어 열리지 않는 뚜껑 안에는\n"
+				+ "할머니가 여름마다 차고 다녔다는 팔찌가 들어 있을까.",
 			"cat": "main", "ep": "메인 스토리 13", "npc": s13npc,
 			"reward": "할머니의 팔찌 + 「할머니의 기록」 2장"})
 	o = story14_objective_short()
 	if o != "":
 		out.append({"id": "story14", "title": "마을의 첫 축제", "obj": o,
-			"desc": "주민이 늘었다 — 우리 손으로 첫 축제를 열자.",
+			"desc": "주민이 하나둘 늘면서 광장이 붐비기 시작했다.\n\n"
+				+ "이장이 색 바랜 종이 한 장을 꺼내 놓는다.\n"
+				+ "예전 축제의 차례가 적힌 목록이다.\n\n"
+				+ "음식과 등불과 노래 — 하나씩 채워 넣으면\n"
+				+ "이 마을에도 다시 축제의 밤이 온다.",
 			"cat": "main", "ep": "메인 스토리 14", "npc": "chief",
 			"reward": "마을회관 「축제·행사 일정」 해금"})
 	o = story15_objective_short()
@@ -2342,34 +2412,54 @@ func quest_catalog() -> Array:
 			"water":
 				s15npc = "alchemist"
 		out.append({"id": "story15", "title": "마른 온천", "obj": o,
-			"desc": "언젠가부터 물이 끊긴 마을의 옛 온천.",
+			"desc": "북쪽 바위 밑에는 김이 오르던 자리가 있었다.\n"
+				+ "지금은 마른 돌 틈에 낙엽만 쌓여 있다.\n\n"
+				+ "물길이 끊긴 건 땅속 어딘가가 막혔기 때문이라고 한다.\n\n"
+				+ "뜨거운 물에 어깨를 담그던 저녁을 되찾으려면\n"
+				+ "아주 깊은 곳까지 한 번 내려가 보아야 한다.",
 			"cat": "main", "ep": "메인 스토리 15", "npc": s15npc,
 			"reward": "온천 해금 — 몸을 담그면 체력이 가득 찬다"})
 	o = story16_objective_short()
 	if o != "":
 		out.append({"id": "story16", "title": "할머니의 반지", "obj": o,
-			"desc": "혼인하던 해 봄, 흙 속에 묻힌 세 번째 유품.",
+			"desc": "혼인하던 해 봄, 할머니는 반지를 잃어버렸다.\n"
+				+ "밭일을 하다 흙 속에 떨어뜨렸다고 했다.\n\n"
+				+ "할아버지는 그 밭을 평생 갈지 않았다.\n"
+				+ "「언젠가 나올 거야」 하고 웃으면서.\n\n"
+				+ "이제는 수풀에 덮인 그 땅을, 다시 일으켜 보자.",
 			"cat": "main", "ep": "메인 스토리 16",
 			"npc": "librarian" if story16_phase in ["record", "tale"] else "",
 			"reward": "할머니의 반지 + 「할머니의 기록」 3장"})
 	o = story17_objective_short()
 	if o != "":
 		out.append({"id": "story17", "title": "할머니의 목걸이", "obj": o,
-			"desc": "짐승들의 어머니라 불리던 사람 — 네 번째 유품.",
+			"desc": "짐승들은 할머니 곁에서만 순해졌다고 한다.\n"
+				+ "아픈 송아지가 밤새 그 무릎을 베고 잤다는 이야기도.\n\n"
+				+ "목에 걸고 다니던 나무 목걸이는\n"
+				+ "헛간이 무너지던 날 이후로 아무도 보지 못했다.\n\n"
+				+ "낡은 헛간을 조용히 치우는 일부터 시작하자.",
 			"cat": "main", "ep": "메인 스토리 17",
 			"npc": "librarian" if story17_phase == "tale" else "rancher",
 			"reward": "할머니의 목걸이 + 「할머니의 기록」 4장"})
 	o = story18_objective_short()
 	if o != "":
 		out.append({"id": "story18", "title": "할머니의 시계", "obj": o,
-			"desc": "두 분이 마지막으로 함께 오른 언덕 — 마지막 유품.",
+			"desc": "마을 북서쪽 언덕에는 무너져 가는 전망대가 있다.\n"
+				+ "두 분이 마지막으로 함께 오른 자리다.\n\n"
+				+ "해가 지는 쪽으로 나란히 앉아 있었다는 이야기,\n"
+				+ "그리고 그날 이후 멈춰 버린 시계 하나.\n\n"
+				+ "남은 온기를 더듬어, 마지막 유품을 찾아오자.",
 			"cat": "main", "ep": "메인 스토리 18",
 			"npc": "librarian" if story18_phase in ["memo", "tale"] else "",
 			"reward": "할머니의 시계 — 유품 다섯이 모두 모인다"})
 	o = story19_objective_short()
 	if o != "":
 		out.append({"id": "story19", "title": "일곱 갈래의 삶", "obj": o,
-			"desc": "일곱 분야를 끝까지 익힌 사람에게 남겨지는 것.",
+			"desc": "할아버지는 일곱 가지 일을 두루 익힌 사람이었다.\n"
+				+ "흙과 물, 굴과 숲, 짐승과 손끝과 발걸음.\n\n"
+				+ "하나를 끝까지 갈고닦을 때마다\n"
+				+ "맑은 물 한 병이 조용히 남겨진다고 했다.\n\n"
+				+ "일곱 병이 모이는 날, 노트의 마지막 장이 열린다.",
 			"cat": "main", "ep": "메인 스토리 19", "npc": "",
 			"reward": "생명의 물 7종 + 연구 노트 마지막 페이지"})
 	o = story20_objective_short()
@@ -2378,14 +2468,22 @@ func quest_catalog() -> Array:
 		if story20_phase == "tell":
 			s20npc = "librarian" if "librarian" not in story20_told else "chief"
 		out.append({"id": "story20", "title": "가장 오래된 자리", "obj": o,
-			"desc": "마을보다 오래된 돌문 — 할아버지의 마지막 연구 공간.",
+			"desc": "마을보다 오래된 돌문이 조용히 서 있다.\n"
+				+ "할아버지가 마지막 몇 해를 보낸 자리라고 한다.\n\n"
+				+ "일곱 병의 물과 다섯 개의 유품,\n"
+				+ "그리고 끝까지 채운 노트를 들고 앞에 서면\n\n"
+				+ "문은 그제야, 아주 천천히 열린다.",
 			"cat": "main", "ep": "메인 스토리 20", "npc": s20npc,
 			"reward": "할아버지가 남긴 씨앗 한 알과 마지막 편지"})
 	# 안내: 먼지 속의 조리대 (요리 튜토리얼)
 	o = kitchen_quest_objective_short()
 	if o != "":
 		out.append({"id": "kitchen", "title": "먼지 속의 조리대", "obj": o,
-			"desc": "만수의 참견 — 오래 비어 있던 집 어딘가에 조리대가 묻혀 있다.",
+			"desc": "오래 비어 있던 집에는 먼지가 이불처럼 쌓인다.\n\n"
+				+ "만수는 그 밑에 분명 부엌 살림이 묻혀 있을 거라 한다.\n"
+				+ "「사 먹을 데도 없는 마을에서 그러다 큰일 나.」\n\n"
+				+ "빗자루 한 자루면 되는 일이다.\n"
+				+ "먼지를 걷어내면, 첫 끼를 지을 자리가 나온다.",
 			"cat": "guide", "npc": "merchant",
 			"reward": "요리 해금 + 산딸기잼 레시피와 산딸기 %d개" % JAM_BERRIES})
 	# 서브: 용식의 집터 — 바닷길을 연 지 3일 뒤 분수대 앞에서 시작된다
@@ -2393,7 +2491,11 @@ func quest_catalog() -> Array:
 	if o != "":
 		out.append({"id": "fisher_home", "title": "용식의 부탁 — 살 집 한 채",
 			"obj": o,
-			"desc": "이 마을이 마음에 든 낚시꾼이 눌러앉을 자리를 찾는다.",
+			"desc": "평생 배 위에서 잠들던 사람이 뭍을 오래 바라본다.\n\n"
+				+ "「떠돌이한테 『여기가 네 집이다』 하고 말해 주는 게\n"
+				+ "어떤 건지, 자네는 모를 걸세.」\n\n"
+				+ "지붕과 문이 있는 자리를 한 채 지어 주면\n"
+				+ "용식은 그때부터 이 마을 사람이 된다.",
 			"cat": "sub", "npc": "fisher",
 			"reward": "수납 상자 레시피 (목재 8)"})
 	# 서브: 상인의 노점 심부름
@@ -2401,9 +2503,12 @@ func quest_catalog() -> Array:
 		var ready := wood >= STALL_WOOD \
 			and int(items.get("forage_shell", 0)) >= STALL_SHELLS
 		out.append({"id": "stall", "title": "상인의 부탁 — 해변 노점",
-			"obj": "만수에게 재료를 가져다주기" if ready
-				else "재료 모으기 — 목재 %d·조개 %d" % [STALL_WOOD, STALL_SHELLS],
-			"desc": "만수가 해변에서 장사할 노점을 내고 싶어 한다.",
+			"obj": "다 모았다 — 만수에게 가져다주자" if ready
+				else "바닷바람 좋은 자리에 노점을 세울 나무와 조개를 모으자",
+			"desc": "만수가 눈여겨봐 둔, 바닷바람 좋은 자리가 있다.\n\n"
+				+ "나무 몇 짐과 조개껍데기 몇 줌이면\n"
+				+ "작은 노점 하나쯤은 세울 수 있다고 한다.\n\n"
+				+ "장사꾼의 꿈은 언제나 「목 좋은 자리」에서 시작된다.",
 			"cat": "sub", "npc": "merchant",
 			"reward": "해변 노점 개장 + 하트 모양 러그"})
 	o = tutorial_objective_short()
@@ -2411,12 +2516,18 @@ func quest_catalog() -> Array:
 		var flag := tutorial_current_flag()
 		if flag in STORY2_FLAGS:
 			out.append({"id": "tutorial", "title": "마을을 깨우다", "obj": o,
-				"desc": "이장에게 받은 호미와 씨앗으로 밭을 일구자.",
+				"desc": "이장이 건넨 호미는 손잡이가 반들반들했다.\n"
+					+ "오래 쓰던 사람의 손자국이 그대로 남은 물건.\n\n"
+					+ "흙을 갈고, 씨앗을 놓고, 물을 주고 기다리는 일 —\n"
+					+ "이 마을의 하루는 언제나 거기서부터 시작된다.",
 				"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
 				"reward": _tut_reward_text(flag)})
 		elif flag == "cook":
 			out.append({"id": "tutorial", "title": "부엌에 불을 지피자", "obj": o,
-				"desc": "거둔 것으로 첫 끼를 지어 보자. 집 안 조리대에서 E —\n먼지가 쌓여 있으면 빗자루로 쓸어 내면 된다.",
+				"desc": "거둔 것을 손질해 불에 올리는 저녁.\n"
+					+ "혼자 사는 집에서 제일 먼저 익히게 되는 일이다.\n\n"
+					+ "집 안 조리대 앞에 서기만 하면 된다.\n"
+					+ "(먼지가 쌓여 있으면 빗자루로 쓸어 내자)",
 				"cat": "guide", "npc": "chief",
 				"reward": _tut_reward_text(flag)})
 		else:
@@ -2809,7 +2920,7 @@ func kitchen_quest_objective_short() -> String:
 		"found":
 			return "만수에게 조리대를 찾았다고 알리자"
 		"jam":
-			return "집 조리대에서 산딸기잼을 만들자 (산딸기 %d)" % JAM_BERRIES
+			return "만수가 나눠 준 산딸기로, 집 조리대에서 첫 요리를 지어 보자"
 	return ""
 var desk_queue: Array = []        # [{id, left(초)}]
 var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
@@ -3891,6 +4002,64 @@ const RECIPES := {
 	"dish_omurice": {"needs": {"egg": 1, "rice": 2}, "energy": 90, "locked": true},
 	"dish_butter_corn": {"needs": {"butter": 1, "corn": 1}, "energy": 60, "locked": true},
 }
+
+# ---- 요리별 배부름 (배고픔 회복량) ----
+#
+# 체력(energy)과 **따로 논다**. 달인의 차 한 잔은 몸에 기운이 돌지만
+# 배는 안 부르고, 감자 한 알은 기운은 덜해도 속이 든든하다.
+# 그래서 회복량을 요리마다 따로 적는다 — 무엇을 먹을지 고민하게 만드는
+# 것이 이 표의 목적이다.
+#
+#   국·밥·덮밥  : 든든하다 (체력보다 배부름이 크다)
+#   빵·구이·전  : 무난하다
+#   잼·간식·튀김: 입은 즐겁지만 금방 꺼진다
+#   차·음료·얼음: 기운은 나도 배는 안 찬다
+#   재료(밀가루·버터): 그대로 먹을 것이 못 된다
+const RECIPE_FILL := {
+	# 밭에서 나오는 것
+	"dish_baked_potato": 45, "dish_soup": 55, "dish_jam": 20,
+	"dish_cornbread": 60, "dish_berry_jam": 18, "flour": 3,
+	"dish_bread": 60, "dish_berry_toast": 75,
+	"dish_eggplant": 45, "dish_salad": 40, "dish_punch": 20,
+	"dish_pie": 85, "dish_pickle": 30, "dish_ratatouille": 95,
+	"dish_pumpkin_soup": 85, "dish_corn_salad": 55, "dish_sweet_potato": 70,
+	"dish_bean_rice": 100, "dish_rice_cake": 90, "dish_melon_ice": 25,
+	"dish_onion_soup": 65, "dish_garlic_bread": 55, "dish_spinach_saute": 45,
+	# 물에서 나오는 것
+	"dish_grilled_fish": 45, "dish_stew": 80, "dish_sashimi": 55,
+	"dish_eel_rice": 110, "dish_crab_soup": 90, "dish_salmon_steak": 100,
+	"dish_smelt_fry": 50, "dish_fish_soup": 70,
+	# 귀한 것
+	"dish_golden_roast": 130, "dish_moon_tea": 35, "dish_coral_tea": 35,
+	"dish_feast": 200,
+	# 마음이 담긴 요리
+	"butter": 8, "dish_fried_egg": 30, "dish_egg_roll": 50,
+	"dish_omurice": 105, "dish_butter_corn": 65,
+}
+const RECIPE_FILL_DEFAULT := 0.8   # 표에 없으면 체력의 8할쯤 찬다
+
+
+# 이 요리를 먹으면 배가 얼마나 부른가
+func recipe_fill(id: String) -> float:
+	if RECIPE_FILL.has(id):
+		return float(RECIPE_FILL[id])
+	if RECIPES.has(id):
+		return float(RECIPES[id].energy) * RECIPE_FILL_DEFAULT
+	return 0.0
+
+
+# 「든든함」 한마디 — 숫자 대신 감으로 읽는다 (가방·요리 창에서 쓴다)
+func fill_word(id: String) -> String:
+	var f := recipe_fill(id)
+	if f >= 100.0:
+		return "아주 든든하다"
+	if f >= 60.0:
+		return "든든하다"
+	if f >= 35.0:
+		return "적당하다"
+	if f >= 15.0:
+		return "가볍다"
+	return "요기가 안 된다"
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
 	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_eggplant", "dish_salad", "dish_punch", "dish_pie", "dish_pickle",
@@ -5068,14 +5237,24 @@ func fresh_tutorial() -> Dictionary:
 
 # 우측 트래커용 짧은 목표 문구
 # %s 는 실제로 설정된 키로 바뀐다 (키 재설정을 따라간다)
+# 안내 목표 — 조작키는 괄호로 작게, 문장은 「무엇을 위한 일인지」로.
+# 재료 수치나 내부 이름은 여기에 적지 않는다.
 const TUTORIAL_SHORT := {
-	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
-	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
-	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
-	"cook": "집 조리대에서 요리하기 (E)",
-	"slept": "침대에서 자기", "board": "의뢰 게시판 보기",
-	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)",
-	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
+	"moved": "새 땅의 흙을 밟아 보자 (WASD)",
+	"map": "이 마을이 어떻게 생겼는지 펼쳐 보자 (%s)",
+	"quest": "지금 무엇을 하고 있었는지 들여다보자 (%s)",
+	"note": "할아버지가 남긴 노트를 펴 보자 (%s)",
+	"till": "굳은 땅을 호미로 부드럽게 깨우자 (1)",
+	"plant": "작은 씨앗을 흙 속에 재워 주자 (3)",
+	"water": "목마른 흙에 물을 흠뻑 적셔 주자 (2)",
+	"harvest": "다 자란 열매를 두 손으로 거두자 (E)",
+	"cook": "집 조리대에 불을 지피고 첫 끼를 짓자 (E)",
+	"slept": "긴 하루를 침대에 내려놓자",
+	"board": "마을 사람들이 붙여 둔 부탁을 읽어 보자",
+	"chop": "숲의 나무 한 그루를 정성껏 베어 보자 (5)",
+	"mine": "바위 속에 잠든 돌을 깨워 보자 (6)",
+	"fish": "물가에 앉아 조용히 찌를 드리우자 (9)",
+	"shop": "불이 켜진 잡화점 문을 밀고 들어가 보자",
 }
 
 
