@@ -1046,9 +1046,9 @@ func is_passable(t: Vector2i) -> bool:
 
 
 func _tile_accessible(t: Vector2i) -> bool:
-	# 튜토리얼 중에는 그 공간이 세계의 전부다 (마을 쪽으로는 한 칸도 못 간다)
+	# 튜토리얼 중에는 **울타리 안의 숲길**이 세계의 전부다
 	if GameData.tutorial_space:
-		return TUTORIAL_REGION.has_point(t)
+		return tutorial_walkable(t)
 	# 마을에 들어선 뒤로 튜토리얼 공간은 사라진 곳이다 — 돌아갈 길이 없다
 	if t.y >= WORLD_H:
 		return false
@@ -1058,7 +1058,25 @@ func _tile_accessible(t: Vector2i) -> bool:
 		or GameData.is_tile_owned(t.x, t.y)
 
 
-# 이 칸이 속한 지역이 이미 열렸는가 (마을을 중심으로 하나씩 이어진다)
+# 튜토리얼 숲길 — **울타리 안**만 걸을 수 있다.
+#
+# 예전에는 튜토리얼 공간(TUTORIAL_REGION) 전체를 열어 두었다. 울타리는
+# 세워 두었지만 그 너머도 통행 가능한 땅이라, 나무 사이 틈으로 빠져나가면
+# 숲 바깥 풀밭을 마음대로 걸어 다닐 수 있었다 — 우체부와 말도 섞기 전에
+# 길 밖으로 나가 버리는 일이 그래서 생겼다. 길과 두 갈래만 남긴다.
+func tutorial_walkable(t: Vector2i) -> bool:
+	# 본길 (동쪽 끝 X1에 닿으면 마을로 넘어가는 연출이 시작된다)
+	if t.x >= STORY_ROAD_X0 and t.x <= STORY_ROAD_X1 \
+			and t.y >= STORY_ROAD_Y0 and t.y <= STORY_ROAD_Y1:
+		return true
+	# 갈림길의 북·남 갈래 (둘 다 막다른 길 — 지도 퀘스트가 여기서 헤맨다)
+	if t.x >= STORY_FORK.x - 1 and t.x <= STORY_FORK.x + 2 \
+			and t.y >= 10 + TUT_DY and t.y <= 21 + TUT_DY:
+		return true
+	return false
+
+
+# 이 칸이 속한 지역이 이미 열렸는가 (지금은 언제나 열려 있다 — 아래 주석 참고)
 func region_open_at(t: Vector2i) -> bool:
 	for reg: Dictionary in REGIONS:
 		var r: Rect2i = reg.rect

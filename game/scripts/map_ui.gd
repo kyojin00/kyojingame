@@ -668,7 +668,7 @@ func _draw_map() -> void:
 	canvas.draw_rect(edge.grow(1.0), Color(0.58, 0.48, 0.32), false, 1.0)
 
 	# 이름패 — 지도 맨 위, 이 땅의 이름
-	var plate := "교진 마을 · %s의 농장" % GameData.seller_name()
+	var plate := map_plate()
 	var pw: float = main.UI_FONT.get_string_size(plate, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
 	var pr2 := Rect2(480.0 - pw / 2.0 - 14.0, 4.0, pw + 28.0, 30.0)
 	canvas.draw_rect(pr2, Color(0.16, 0.12, 0.09, 0.92))
@@ -684,6 +684,16 @@ func _draw_map() -> void:
 	canvas.draw_string(main.UI_FONT, Vector2(480 - w / 2.0, 530), guide,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.7, 0.68, 0.8))
 	draw_us = Time.get_ticks_usec() - t0
+
+
+# 지도 맨 위 이름패.
+#
+# 튜토리얼 동안에는 **마을 이름을 쓰지 않는다** — 주인공은 아직 교진 마을을
+# 본 적도 들은 적도 없다. 지나가는 숲길일 뿐이다.
+func map_plate() -> String:
+	if GameData.tutorial_space:
+		return "마을로 가는 숲길"
+	return "교진 마을 · %s의 농장" % GameData.seller_name()
 
 
 # ---- 지도의 장식 ----

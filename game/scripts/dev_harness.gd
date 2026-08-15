@@ -37,6 +37,8 @@ var _fog_keep: Dictionary = {}   # 먹구름 화면을 찍는 동안 맡아 두�
 #    새 단계를 넣기 전에: grep -n "^\t\t[0-9]\+:" 로 빈 번호를 확인할 것.
 
 # 지도 끌기 성능 재기 (393~405단계)
+var _tut_map_snapped := false
+var _tut_map_done := false
 var _bench_us := 0
 var _bench_n := 0
 var _bench_t0 := 0
@@ -100,7 +102,30 @@ func _debug_tick() -> void:
 				and houses == 0 and nids == ["chief"] and hut0 and zone0,
 				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids,
 				" 이장오두막=", hut0, " 동쪽구역잠김=", zone0)
-		elif m.story._story_snapped and m.story._story_t >= 3.8:
+		elif m.story._story_snapped and not _tut_map_snapped and m.story._story_t >= 3.6:
+			_tut_map_snapped = true
+			m.map_ui.open()
+			m.map_ui.reset_view()
+		elif _tut_map_snapped and not _tut_map_done and m.story._story_t >= 4.0:
+			_tut_map_done = true
+			_save_shot("story_map.png")
+			# 튜토리얼 지도: 「내 위치」가 실제로 지나온 숲길 위에 찍혀야 한다
+			# 서 있는 칸이 지도에 드러나 있어야 한다 (마커만 검은 벌판에 뜨면 안 된다)
+			var pt9: Vector2i = m.player_tile()
+			var here_lit: bool = m.map_ui._visible_tile(pt9.x, pt9.y)
+			# 지나온 길도 드러나 있다
+			var road_lit := 0
+			for rx9 in range(m.STORY_ROAD_X0, pt9.x + 1):
+				if m.map_ui._visible_tile(rx9, m.STORY_LANE_Y):
+					road_lit += 1
+			# 이름패에 아직 마을 이름은 없다 (본 적도 들은 적도 없는 곳이다)
+			var plate9: String = m.map_ui.map_plate()
+			print("TUTMAP_OK=", here_lit and road_lit >= 1
+				and not plate9.contains("교진"),
+				" 선 자리 밝음=", here_lit, " 지나온 길=", road_lit, "칸",
+				" 이름패=", plate9)
+			m.map_ui.close()
+		elif _tut_map_done and m.story._story_t >= 4.3:
 			get_tree().quit()
 		return
 	match _shot_frames:
@@ -4502,7 +4527,8 @@ func _debug_tick() -> void:
 				and not m.objects.has(probe) \
 				and not GameData.is_explored_tile(probe.x, probe.y)
 
-			# ── ④ 마을은 처음부터 열려 있고, 주변 땅은 이야기를 따라 열린다
+			# ── ④ 마을도, 세계도 **처음부터 다 걸을 수 있다.**
+			#     이야기 진도로 야생 지역을 잠그던 자물쇠는 없앴다
 			var k_forest := GameData.forest_quest
 			var k_sea2 := GameData.sea_open
 			var k_s8 := GameData.story8_phase
@@ -4512,26 +4538,22 @@ func _debug_tick() -> void:
 			var plaza9 := Vector2i(m.PLAZA.position.x + 3, m.PLAZA.position.y + 3)
 			var village_open: bool = m.region_open_at(plaza9) \
 				and m.is_passable(plaza9)
-			var locked_ok: bool = not m.region_open_at(Vector2i(60, 50)) \
-				and not m.region_open_at(Vector2i(120, 60)) \
-				and not m.region_open_at(Vector2i(100, 100))
-			GameData.forest_quest = "done"
-			GameData.story8_phase = "done"
-			GameData.sea_open = true
-			var opened_ok: bool = m.region_open_at(Vector2i(60, 50)) \
-				and m.region_open_at(Vector2i(120, 60)) \
-				and m.region_open_at(Vector2i(100, 100))
+			# 이야기를 하나도 진행하지 않아도 세계는 다 열려 있다
+			var open_ok := true
+			for w9: Vector2i in [Vector2i(60, 50), Vector2i(120, 60),
+					Vector2i(40, 80), Vector2i(180, 80), Vector2i(100, 100)]:
+				if not m.region_open_at(w9):
+					open_ok = false
 			GameData.forest_quest = k_forest
 			GameData.sea_open = k_sea2
 			GameData.story8_phase = k_s8
 			GameData.tutorial_space = k_tut
 			m.map_ui._bake_age = 999.0
 			print("WORLDGATE_OK=", split_ok and tut_gone and bake_world
-				and closed_ok and village_open and locked_ok and opened_ok,
+				and closed_ok and village_open and open_ok,
 				" 공간분리=", split_ok, " 복귀불가=", tut_gone,
 				" 지도세계만=", bake_world, " 닫힘정리=", closed_ok,
-				" 마을열림=", village_open, " 주변잠김=", locked_ok,
-				" 이야기로해금=", opened_ok)
+				" 마을열림=", village_open, " 세계전역통행=", open_ok)
 		234:
 			# #151: 생선구이 그림 · 다가오는 걸음과 시선 · 채집 스폰과 비 ·
 			# 울타리 레시피 · 검정 무지와 통행 차단 · Q창 축제 삭제
@@ -4601,19 +4623,15 @@ func _debug_tick() -> void:
 			# ── ⑤ 못 가는 땅은 검정 무지 · 사람도 짐승도 지나갈 수 없다
 			var black_ok: bool = m.map_ui.FOG.v <= 0.001 and m.map_ui.FOG.a >= 1.0 \
 				and Color(m.hud.MM_FOG).v <= 0.001
-			var k_forest := GameData.forest_quest
-			GameData.forest_quest = ""              # 깊은 숲을 다시 잠근다
-			m.map_ui._vis_key = ""                  # 표를 다시 만들게 한다
-			m.map_ui._ensure_vis_index()            # 잠금이 바뀌었으니 표를 다시
-			var deep := Vector2i(60, 50)
-			var locked_ok: bool = not m.is_passable(deep) \
-				and not m.map_ui._visible_tile(deep.x, deep.y)
-			# NPC도 같은 문을 지난다 — 길찾기가 잠긴 땅을 지나가지 않는다
-			var path_in: Array = m.npcmgr._tile_path(m.player_tile(), deep)
-			locked_ok = locked_ok and path_in.is_empty()
-			GameData.forest_quest = k_forest
-			m.map_ui._vis_key = ""
-			m.map_ui._ensure_vis_index()
+			# 세계는 다 걸을 수 있다. 그래도 **사라진 튜토리얼 공간**만은
+			# 사람도 짐승도 지나갈 수 없다 (NPC 길찾기까지 같은 문을 쓴다)
+			var gone := Vector2i(m.STORY_SPAWN.x, m.STORY_SPAWN.y)
+			var locked_ok: bool = not m.is_passable(gone) \
+				and not m.map_ui._visible_tile(gone.x, gone.y) \
+				and m.npcmgr._tile_path(m.player_tile(), gone).is_empty()
+			for w8: Vector2i in [Vector2i(60, 50), Vector2i(100, 100)]:
+				if not m.region_open_at(w8):
+					locked_ok = false
 
 			# ── ⑥ Q창에 계절 축제 항목이 없다
 			var fest_gone := true
@@ -4627,7 +4645,7 @@ func _debug_tick() -> void:
 				" 채집=", forage_ok, "(맑음 ", cap_clear, " 비 ", cap_rain,
 				" 지금 ", m.worldgen.forage_count(), ")",
 				" 울타리레시피=", fence_ok, " 검정무지=", black_ok,
-				" 잠긴땅차단=", locked_ok, " 축제삭제=", fest_gone)
+				" 사라진공간차단=", locked_ok, " 축제삭제=", fest_gone)
 		235:
 			# #152: 마을에 도착하는 순간 · 바닷길 길목으로 내려가는 길
 			m.dialog.close()

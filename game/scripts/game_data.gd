@@ -2974,40 +2974,23 @@ var tutorial_space := true
 # 이야기가 나아갈 때마다 둘레의 땅이 하나씩 이어진다.
 #   조건: "story2"(마을을 깨우다) / "sea"(바닷길) / "forest"(숲속의 집) /
 #         "story8"(목장) / "story10"(동굴) / "story12"(연금술사) / "zone"(구역 해금)
-const REGION_UNLOCK := {
-	"deep": "forest",        # 깊은 숲 — 숲속의 집 이야기를 지나야 들어간다
-	"meadow": "story8",      # 너른 초원 — 목동이 자리를 잡은 뒤
-	"wetland": "story10",    # 남쪽 습지 — 동굴 이야기로 발이 넓어진 뒤
-	"pinewood": "story12",   # 솔숲 골짜기 — 연금술사를 만난 뒤
-	# 바닷가 벼랑길 — **용식과 함께 내려가기 시작하면** 열린다.
-	# 예전에는 `sea_open`이었는데, 길목 바위(y107)에 닿으려면 이 벼랑길
-	# (y96~105)을 지나야 하고 그 바위를 캐야 sea_open이 된다 — 못 가서
-	# 못 캐고 못 캐서 못 가는 자물쇠였다.
-	"bluff": "fisher",
-}
+# ---- 야생 지역은 전부 열려 있다 ----
+#
+# 한때는 마을을 중심으로 숲·초원·습지·솔숲·벼랑길을 이야기에 따라 하나씩
+# 열었다. 그런데 걸어서 갈 수 있는 곳이 이야기 진도에 묶이자 **가고 싶은 데를
+# 못 가는 게임**이 됐다 — 특히 바닷가 벼랑길은 자기 자신을 잠갔다(길을 여는
+# 바위가 그 벼랑길 아래에 있었다). 지금은 **세계를 처음부터 다 걸을 수 있다.**
+# 「아직 이르다」는 느낌은 지형과 몬스터와 이야기가 만들지, 보이지 않는 벽이
+# 만들지 않는다.
+#
+# (메인 스토리 4의 마을 확장 구역은 별개다 — 그건 게시판에서 재료를 들여
+#  직접 여는 마을의 몸통이라 그대로 둔다: `is_tile_owned`)
+const REGION_UNLOCK := {}
 
 
-func region_unlocked(id: String) -> bool:
-	var key := str(REGION_UNLOCK.get(id, ""))
-	match key:
-		"":
-			return true
-		"story2":
-			return story2_phase == "done"
-		"sea":
-			return sea_open
-		"fisher":
-			# 낚시꾼이 앞장서는 순간부터 벼랑길이 열린다 (길을 연 뒤로는 늘 열려 있다)
-			return sea_open or fisher_quest in ["follow", "open", "done"]
-		"forest":
-			return forest_quest == "done"
-		"story8":
-			return story8_phase == "done"
-		"story10":
-			return story10_phase == "done"
-		"story12":
-			return story12_phase == "done"
+func region_unlocked(_id: String) -> bool:
 	return true
+
 
 # ---- 숲속 집의 문이 열리는 날 (메인 스토리 5 이후) ----
 #
@@ -3210,9 +3193,16 @@ func can_fish() -> bool:
 # **첫 수확을 마친 뒤**(story2_phase == "cook") 만수에게 말을 걸었을 때만.
 # 예전에는 잡화점에서 나가려 하거나 레시피를 사려 할 때 등 세 갈래로
 # 불쑥 시작됐다. 지금은 시작점이 하나뿐이다.
+# 만수가 밥 이야기를 꺼낼 때인가.
+#
+# **조건은 둘뿐이다** — 첫 수확을 마쳤고(story2_phase == "cook"),
+# 아직 이 이야기를 시작하지 않았다(kitchen_quest == ""). 예전에는
+# 「상점이 서 있을 것」과 「조리대를 아직 못 찾았을 것」이 더 붙어 있었는데,
+# 넷 중 하나만 어긋나도 **목표는 「만수와 대화하자」인데 말을 걸어도 아무
+# 일이 없는** 막다른 길이 됐다. 조리대를 이미 찾았다면 그 마디만
+# 건너뛰면 될 일이지, 이야기 전체가 멈출 이유가 없다.
 func kitchen_quest_ready() -> bool:
-	return village_built.has("general") and not kitchen_found \
-		and kitchen_quest == "" and story2_phase == "cook"
+	return kitchen_quest == "" and story2_phase == "cook"
 
 
 # 요리 레시피를 정상적으로 사고팔 수 있는가 (튜토리얼을 마쳐야 열린다)

@@ -4545,7 +4545,11 @@ const KITCHEN_INTRO := [
 func start_kitchen_quest() -> void:
 	if not GameData.kitchen_quest_ready():
 		return
-	GameData.kitchen_quest = "broom"
+	# 조리대를 이미 찾아 뒀다면 청소 마디는 건너뛰고 바로 요리로 간다
+	GameData.kitchen_quest = "jam" if GameData.kitchen_found else "broom"
+	if GameData.kitchen_found:
+		GameData.give_recipe(GameData.JAM_ID)
+		m.doing.gain_item("forage_berry", GameData.JAM_BERRIES)
 	m.dialog.open_seq("잡화점 만수",
 		m.tex.get("npc_merchant_portrait_normal"), KITCHEN_INTRO,
 		_end_kitchen_intro)
