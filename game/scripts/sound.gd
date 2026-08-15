@@ -10,8 +10,8 @@ const SFX_NAMES := [
 # 계절 넷 + 장소·상황 여섯. 예전에는 계절 넷뿐이었고 각 20초였다.
 const BGM_NAMES := ["bgm_spring", "bgm_summer", "bgm_fall", "bgm_winter",
 	"bgm_village", "bgm_cave", "bgm_shop", "bgm_night", "bgm_festival", "bgm_title",
-	"bgm_main", "bgm_night2", "bgm_night3"]   # 받은 곡(mp3)
-const MP3_NAMES := ["bgm_main", "bgm_night2", "bgm_night3"]
+	"bgm_main", "bgm_night2", "bgm_night3"]
+const MP3_NAMES := ["bgm_main"]      # 나머지는 전부 ogg
 # ---- 밤 브금은 한 곡이 아니라 세 곡이 이어진다 ----
 #
 # 밤은 길다. 한 곡을 계속 되감으면 두 바퀴째부터 「아까 그 소절」이 도드라져서
@@ -22,12 +22,12 @@ const MP3_NAMES := ["bgm_main", "bgm_night2", "bgm_night3"]
 # 때(`finished`)를 알 수가 없다.
 const NIGHT_TRACKS := ["bgm_night", "bgm_night2", "bgm_night3"]
 const NIGHT_FADE := 1.6          # 다음 곡이 올라오는 시간(초)
-# 곡과 곡 사이에 두는 고요. 받은 밤 곡이 31초짜리라 쉬지 않고 이어 붙이면
-# 1분 30초마다 같은 곡이 돌아온다 — 「짧은 루프」로 들린다.
-# 사이를 조금 비우면 한 바퀴가 2분 반으로 늘고, 무엇보다 밤이 고요해진다.
-# (곡 자체를 길게 뽑아 오면 이 값은 줄여도 된다)
-const NIGHT_GAP_MIN := 6.0
-const NIGHT_GAP_MAX := 14.0
+# 곡과 곡 사이에 두는 고요. 세 곡이 2분 21초 · 2분 57초 · 2분 57초이니
+# 여기에 쉼을 더하면 한 바퀴가 8분을 넘는다 — 밤 내내 틀어도 「아까 그
+# 소절」이 돌아오지 않는다. 쉼 자체도 밤을 고요하게 만든다.
+# (긴 곡은 assets/ref/make_night_bgm.py가 받은 31초짜리로 짜 준다)
+const NIGHT_GAP_MIN := 5.0
+const NIGHT_GAP_MAX := 12.0
 var _night_i := 0
 var _night_gap := 0.0            # 남은 고요 (0이면 곡이 흐르는 중)
 
@@ -113,7 +113,8 @@ const TRACK_GAIN := {
 	"bgm_cave": 3.6, "bgm_fall": 1.6, "bgm_festival": 0.5, "bgm_night": 0.0,
 	"bgm_shop": 1.4, "bgm_spring": 2.1, "bgm_summer": 1.1, "bgm_title": 0.2,
 	"bgm_village": 2.5, "bgm_winter": -0.4, "bgm_main": 0.0,
-	# 받은 밤 곡 두 개 — 기존 밤 곡과 같은 크기로 들리게 맞춘다
+	# 긴 밤 곡 두 개 — 실측 RMS가 기존 밤 곡과 0.5dB 안쪽이라 그대로 둔다
+	# (bgm_night -17.6 · night2 -18.0 · night3 -17.5 dBFS)
 	"bgm_night2": 0.0, "bgm_night3": 0.0,
 }
 
