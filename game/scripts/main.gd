@@ -97,6 +97,7 @@ var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
 var ending: CanvasLayer
 var auction_ui: CanvasLayer   # 경매장 (광장 경매 게시판 — 바깥 서버와 통신)
+var settings_ui: CanvasLayer  # 설정 (ESC 메뉴 — 소리·화면·키)
 var cave: CanvasLayer
 var shop_room: CanvasLayer
 var pet: Node2D
@@ -600,6 +601,10 @@ func _ready() -> void:
 	auction_ui.main = self
 	add_child(auction_ui)
 
+	settings_ui = preload("res://scripts/settings_ui.gd").new()
+	settings_ui.main = self
+	add_child(settings_ui)
+
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
 	add_child(cave)
@@ -1008,6 +1013,7 @@ var _sel_target := Vector2i(-999, -999)
 func _dev_fill_stock() -> void:
 	if not GameData.DEV_MODE:
 		return
+	dialog.close()          # ESC 메뉴에서 눌렀으면 창을 치우고 결과를 보여 준다
 	GameData.dev_fill_stock()
 	Sound.play_sfx("sfx_ui")
 	hud.show_message("[개발] 씨앗·수확물·물건을 %d개씩 채웠다. 도구도 전부 열었다."
@@ -1026,6 +1032,7 @@ func ui_open() -> bool:
 		or cooking_ui.visible or alchemy_ui.visible or quest_ui.visible or note_ui.visible \
 		or (storage_ui != null and storage_ui.visible) \
 		or stats_ui.visible or auction_ui.visible \
+		or (settings_ui != null and settings_ui.visible) \
 		or _name_layer != null or village._gift_layer != null \
 		or (story.story_layer != null and story.story_layer.visible)
 
@@ -1415,6 +1422,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 	if ui_open():
 		if event.is_action_pressed("ui_cancel"):
+			# 설정 창이 떠 있으면 그것부터 닫는다 (뒤의 창은 그대로 둔다)
+			if settings_ui != null and settings_ui.visible:
+				settings_ui.close()
+				get_viewport().set_input_as_handled()
+				return
 			shop.close()
 			summary.close()
 			map_ui.close()
@@ -1485,7 +1497,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		# (방 코드를 화면에 늘 띄우면 눈에 거슬려서 여기서 꺼내 본다)
 		Sound.play_sfx("sfx_ui")
 		var body := "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)"
-		var btns := [["저장 후 타이틀로", _back_to_title], ["계속하기", null]]
+		# 설정은 여기서 바로 연다 — 소리 하나 줄이자고 농장을 나갔다 올 수 없다
+		var btns := [["설정", func() -> void:
+				dialog.close()
+				settings_ui.open()],
+			["저장 후 타이틀로", _back_to_title], ["계속하기", null]]
 		var rcode := str(Net.rooms.code) if Net.is_host() and Net.rooms != null else ""
 		if rcode != "":
 			body = "방 코드   %s\n친구에게 알려 주면 이 농장으로 들어온다.\n\n%s" \
