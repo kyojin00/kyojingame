@@ -178,14 +178,61 @@ func _process_deco(delta: float) -> void:
 			held.y = cursor.y
 
 
+# ---- 세간을 사람 크기에 맞춰 줄이기 ----
+#
+# 침대·조리대·가구는 「조리대 왼쪽에서 6px에 26x28」처럼 잔 값이 잔뜩 박힌
+# 그림들이다. 칸 크기만 줄이면 그 잔 값이 그대로 남아 그림이 다 어그러진다.
+# 그래서 **그리는 동안 캔버스를 통째로 줄인다** — 기준점(anchor)은 제자리에
+# 있고 나머지가 딸려 줄어드니, 안의 값을 하나도 손대지 않아도 된다.
+#
+# 기준점은 「바닥에 닿아 있는 자리」로 잡는다. 침대는 구석(왼쪽 위),
+# 붙박이는 왼쪽 아래, 가구는 아래 가운데 — 줄여도 그 자리에 그대로 서 있다.
+func _obj_xform(anchor: Vector2) -> void:
+	canvas.draw_set_transform(anchor - anchor * ZOOM, 0.0, Vector2(ZOOM, ZOOM))
+
+
+func _obj_xform_off() -> void:
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+# 줄여 그린 뒤 **눈에 보이는** 칸. 부딪힘 판정도 이쪽을 쓴다 —
+# 안 그러면 아무것도 없는 자리에서 몸이 걸린다.
+func _shrunk(r: Rect2, anchor: Vector2) -> Rect2:
+	return Rect2(anchor + (r.position - anchor) * ZOOM, r.size * ZOOM)
+
+
+func _bed_rect() -> Rect2:
+	return _shrunk(BED, BED.position)
+
+
+func _desk_rect() -> Rect2:
+	return _shrunk(DESK, Vector2(DESK.position.x, DESK.end.y))
+
+
+func _kitchen_rect() -> Rect2:
+	return _shrunk(KITCHEN, Vector2(KITCHEN.position.x, KITCHEN.end.y))
+
+
+func _alchemy_rect() -> Rect2:
+	return _shrunk(ALCHEMY, Vector2(ALCHEMY.position.x, ALCHEMY.end.y))
+
+
+# 가구 하나의 기준점 — 아래 가운데 (바닥에 닿은 자리)
+func _furn_anchor(f: Dictionary) -> Vector2:
+	var def: Dictionary = GameData.FURNITURE[f.id]
+	return Vector2(float(f.x) + float(def.w) / 2.0, float(f.y) + float(def.h))
+
+
 func _furn_rect(f: Dictionary) -> Rect2:
 	var def: Dictionary = GameData.FURNITURE[f.id]
-	return Rect2(float(f.x), float(f.y), float(def.w), float(def.h))
+	return _shrunk(Rect2(float(f.x), float(f.y), float(def.w), float(def.h)),
+		_furn_anchor(f))
 
 
 func _blocked(p: Vector2) -> bool:
-	var feet := Rect2(p.x - 8, p.y - 6, 16, 8)
-	if feet.intersects(BED):
+	# 발 밑 칸도 사람이 작아진 만큼 줄인다 (몸보다 넓으면 헛걸림이 난다)
+	var feet := Rect2(p.x - 8.0 * ZOOM, p.y - 6.0 * ZOOM, 16.0 * ZOOM, 8.0 * ZOOM)
+	if feet.intersects(_bed_rect()):
 		return true
 	# 붙박이 세간 — 제작대·조리대·조합대는 통과할 수 없다 (곁에 서서 E)
 	for fixed: Rect2 in [DESK, KITCHEN, ALCHEMY]:
@@ -209,7 +256,7 @@ func _can_place(f: Dictionary) -> bool:
 	if r.end.y > ROOM.end.y - 14 and r.end.x > EXIT_X.x and r.position.x < EXIT_X.y:
 		return false
 	var solid: bool = GameData.FURNITURE[f.id].solid
-	if solid and r.intersects(BED.grow(2)):
+	if solid and r.intersects(_bed_rect().grow(2)):
 		return false
 	if solid:
 		for fixed: Rect2 in [DESK, KITCHEN, ALCHEMY]:
@@ -232,7 +279,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_deco_input(event)
 		return
 	if event.is_action_pressed("interact"):
-		if (ppos - ALCHEMY.get_center()).length() < 75.0:
+		if (ppos - _alchemy_rect().get_center()).length() < 75.0:
 			# 조합대는 스토리 12(숲의 연금술사)를 끝내야 쓸 수 있다
 			if GameData.alchemy_open():
 				main.alchemy_ui.open()
@@ -240,7 +287,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				main.hud.show_message(
 					"할아버지의 낡은 조합대다. 어떻게 쓰는 건지 도무지\n모르겠다... 이걸 아는 사람이 어딘가 있을 텐데.", 4.0)
 			get_viewport().set_input_as_handled()
-		elif (ppos - KITCHEN.get_center()).length() < 69.0:
+		elif (ppos - _kitchen_rect().get_center()).length() < 69.0:
 			# 조리대는 먼지와 잡동사니에 묻혀 있다 — 빗자루로 쓸어야 나타난다
 			if GameData.kitchen_found:
 				main.cooking_ui.open()
@@ -250,7 +297,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				main.hud.show_message(
 					"먼지와 잡동사니가 쌓여 있다. 빗자루가 있으면 E키로 바로 쓸어 낼 수 있다.", 4.0)
 			get_viewport().set_input_as_handled()
-		elif (ppos - DESK.get_center()).length() < 78.0:
+		elif (ppos - _desk_rect().get_center()).length() < 78.0:
 			main.desk_ui.open()
 			get_viewport().set_input_as_handled()
 		elif _near_storage_box():
@@ -262,7 +309,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			main.shop.open("sell", ["sell"], "쓰레기통 — 무인 판매", "",
 				GameData.TRASH_SELL_MULT)
 			get_viewport().set_input_as_handled()
-		elif (ppos - BED.get_center()).length() < 82.0:
+		elif (ppos - _bed_rect().get_center()).length() < 82.0:
 			if GameData.has_bed:
 				main.daycycle.request_sleep()
 			else:
@@ -521,7 +568,9 @@ func _draw_room() -> void:
 		y += h
 		row += 1
 
-	# 제작대 — 유저가 그린 책상 도트(desk.png). 밑변을 DESK 칸 바닥선에 맞춘다
+	# 제작대 — 유저가 그린 책상 도트(desk.png). 밑변을 DESK 칸 바닥선에 맞춘다.
+	# 여기서부터 세간은 사람 크기에 맞춰 줄여 그린다 (아래 왼쪽을 축으로).
+	_obj_xform(Vector2(DESK.position.x, DESK.end.y))
 	var desk_tex: Texture2D = main.tex["desk"]
 	var desk_h := DESK.size.x * desk_tex.get_height() / float(desk_tex.get_width())
 	var desk_y := DESK.end.y - desk_h
@@ -543,13 +592,20 @@ func _draw_room() -> void:
 			Color(0.2, 0.16, 0.1))
 		canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y - 10, DESK.size.x * clampf(frac, 0.0, 1.0), 6),
 			Color(0.55, 0.85, 0.45))
+	_obj_xform_off()
 
 	# 연금술 조합대 — 확장한 집에만 있다
 	if GameData.house_lv >= 2:
+		_obj_xform(Vector2(ALCHEMY.position.x, ALCHEMY.end.y))
 		_draw_alchemy()
+		_obj_xform_off()
 
+	_obj_xform(Vector2(KITCHEN.position.x, KITCHEN.end.y))
 	_draw_kitchen()
+	_obj_xform_off()
+	_obj_xform(BED.position)
 	_draw_bed()
+	_obj_xform_off()
 
 	# 배치된 가구 (확장한 집에만 — 러그 같은 비충돌 가구 먼저, 그 위에 솔리드)
 	if GameData.house_lv >= 2:
@@ -726,6 +782,8 @@ func _draw_furniture(f: Dictionary) -> void:
 	var def: Dictionary = GameData.FURNITURE[f.id]
 	var w := float(def.w)
 	var h := float(def.h)
+	# 사람 크기에 맞춰 줄여 그린다 — 아래 가운데(바닥에 닿은 자리)는 그대로 있는다
+	_obj_xform(_furn_anchor(f))
 	match String(f.id):
 		"rug":
 			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.45, 0.6, 0.42))
@@ -792,6 +850,7 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(p.x + 1, p.y + h - 9, w - 2, 3), Color(0.3, 0.34, 0.38))
 			canvas.draw_rect(Rect2(p.x, p.y + 3, w, 5), Color(0.36, 0.42, 0.46))
 			canvas.draw_rect(Rect2(p.x + w / 2.0 - 4, p.y, 8, 4), Color(0.3, 0.34, 0.38))
+	_obj_xform_off()
 
 
 # 세간으로 들여놓은 수납 상자 곁에 서 있는가 (E: 창고 열기)
@@ -799,7 +858,7 @@ func _near_storage_box() -> bool:
 	for f in GameData.furniture:
 		if str(f.get("id", "")) != "storage_box":
 			continue
-		if (ppos - Vector2(float(f.x) + 16.0, float(f.y) + 13.0)).length() < 60.0:
+		if (ppos - _furn_rect(f).get_center()).length() < 60.0:
 			return true
 	return false
 
@@ -809,6 +868,6 @@ func _near_trash_bin() -> bool:
 	for f in GameData.furniture:
 		if str(f.get("id", "")) != "trash_bin":
 			continue
-		if (ppos - Vector2(float(f.x) + 12.0, float(f.y) + 16.0)).length() < 60.0:
+		if (ppos - _furn_rect(f).get_center()).length() < 60.0:
 			return true
 	return false
