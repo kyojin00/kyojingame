@@ -8,28 +8,11 @@ const SFX_NAMES := [
 	"sfx_coin", "sfx_heart", "sfx_sleep", "sfx_step0", "sfx_step1",
 ]
 # 계절 넷 + 장소·상황 여섯. 예전에는 계절 넷뿐이었고 각 20초였다.
+# 브금은 전부 ogg다. 낮(bgm_main)과 밤(bgm_night)은 받은 곡으로,
+# 각각 2분 53초짜리 한 곡을 되감아 쓴다.
 const BGM_NAMES := ["bgm_spring", "bgm_summer", "bgm_fall", "bgm_winter",
 	"bgm_village", "bgm_cave", "bgm_shop", "bgm_night", "bgm_festival", "bgm_title",
-	"bgm_main", "bgm_night2", "bgm_night3"]
-const MP3_NAMES := ["bgm_main"]      # 나머지는 전부 ogg
-# ---- 밤 브금은 한 곡이 아니라 세 곡이 이어진다 ----
-#
-# 밤은 길다. 한 곡을 계속 되감으면 두 바퀴째부터 「아까 그 소절」이 도드라져서
-# 오히려 조용한 밤이 지겨워진다. 그래서 밤에는 세 곡을 **이어** 튼다 —
-# 한 곡이 끝나면 다음 곡이 스르르 올라온다 (뚝 끊기지 않게 서서히 켠다).
-#
-# 밤 곡만 루프를 끈다. 루프가 걸려 있으면 끝나지 않아서 다음 곡으로 넘어갈
-# 때(`finished`)를 알 수가 없다.
-const NIGHT_TRACKS := ["bgm_night", "bgm_night2", "bgm_night3"]
-const NIGHT_FADE := 1.6          # 다음 곡이 올라오는 시간(초)
-# 곡과 곡 사이에 두는 고요. 세 곡이 2분 21초 · 2분 57초 · 2분 57초이니
-# 여기에 쉼을 더하면 한 바퀴가 8분을 넘는다 — 밤 내내 틀어도 「아까 그
-# 소절」이 돌아오지 않는다. 쉼 자체도 밤을 고요하게 만든다.
-# (긴 곡은 assets/ref/make_night_bgm.py가 받은 31초짜리로 짜 준다)
-const NIGHT_GAP_MIN := 5.0
-const NIGHT_GAP_MAX := 12.0
-var _night_i := 0
-var _night_gap := 0.0            # 남은 고요 (0이면 곡이 흐르는 중)
+	"bgm_main"]
 
 var streams := {}
 var bgm_player: AudioStreamPlayer
@@ -57,14 +40,12 @@ func _ready() -> void:
 	for n in SFX_NAMES:
 		streams[n] = load("res://assets/audio/%s.wav" % n)
 	for n in BGM_NAMES:
-		var ext := "mp3" if n in MP3_NAMES else "ogg"
-		streams[n] = load("res://assets/audio/%s.%s" % [n, ext])
+		streams[n] = load("res://assets/audio/%s.ogg" % n)
 	# BGM 루프 설정 (형마다 다르다)
 	for n in BGM_NAMES:
 		var st: AudioStream = streams[n]
 		if st is AudioStreamOggVorbis or st is AudioStreamMP3:
-			# 밤 곡만 루프를 끈다 — 끝까지 가야 다음 밤 곡으로 넘어간다
-			st.loop = n not in NIGHT_TRACKS
+			st.loop = true
 		elif st is AudioStreamWAV:
 			# 혹시 wav를 도로 넣었을 때를 위해 남겨 둔다.
 			# 끝은 **길이(초) x 초당 프레임**으로 잡아야 한다. 예전엔
@@ -78,7 +59,6 @@ func _ready() -> void:
 
 	bgm_player = AudioStreamPlayer.new()
 	bgm_player.bus = "BGM"
-	bgm_player.finished.connect(_on_bgm_finished)
 	add_child(bgm_player)
 	for i in 8:
 		var p := AudioStreamPlayer.new()
@@ -110,59 +90,16 @@ func play_bgm(season_key: String) -> void:
 # 작아지거나 커지게 들렸다 — 동굴 곡이 기본 곡보다 3.6dB나 작았다.
 # 실측 RMS 기준으로 기본 곡(bgm_main, -14.6dB)에 맞춰 보정한다.
 const TRACK_GAIN := {
-	"bgm_cave": 3.6, "bgm_fall": 1.6, "bgm_festival": 0.5, "bgm_night": 0.0,
+	"bgm_cave": 3.6, "bgm_fall": 1.6, "bgm_festival": 0.5, "bgm_night": -2.5,
 	"bgm_shop": 1.4, "bgm_spring": 2.1, "bgm_summer": 1.1, "bgm_title": 0.2,
 	"bgm_village": 2.5, "bgm_winter": -0.4, "bgm_main": 0.0,
-	# 긴 밤 곡 두 개 — 실측 RMS가 기존 밤 곡과 0.5dB 안쪽이라 그대로 둔다
-	# (bgm_night -17.6 · night2 -18.0 · night3 -17.5 dBFS)
-	"bgm_night2": 0.0, "bgm_night3": 0.0,
 }
-
-
-# 밤 곡이 끝났다 — 다음 밤 곡으로 이어 간다.
-# (밤 곡 말고는 전부 루프라 여기까지 오지 않는다)
-func _on_bgm_finished() -> void:
-	if current_bgm not in NIGHT_TRACKS:
-		return
-	# 바로 다음 곡을 걸지 않는다 — 잠깐 풀벌레 소리만 남는 고요를 둔다
-	_night_gap = randf_range(NIGHT_GAP_MIN, NIGHT_GAP_MAX)
-
-
-func _process(delta: float) -> void:
-	if _night_gap <= 0.0:
-		return
-	_night_gap -= delta
-	if _night_gap > 0.0:
-		return
-	# 고요가 끝났다 — 다음 밤 곡을 서서히 켠다.
-	# 갑자기 제 크기로 튀어나오면 「곡이 바뀌었다」가 먼저 들린다.
-	_night_i = (_night_i + 1) % NIGHT_TRACKS.size()
-	var nxt: String = NIGHT_TRACKS[_night_i]
-	current_bgm = nxt
-	if _fade != null and _fade.is_valid():
-		_fade.kill()
-	var gain: float = float(TRACK_GAIN.get(nxt, 0.0))
-	bgm_player.stream = streams[nxt]
-	bgm_player.volume_db = gain - 24.0
-	bgm_player.play()
-	_fade = create_tween()
-	_fade.tween_property(bgm_player, "volume_db", gain, NIGHT_FADE)
+# 밤 곡만 이 표를 벗어난다. 낮 곡과 실측 크기가 같아서(둘 다 -14.3dBFS)
+# 0으로 두면 해가 져도 소리가 그대로다 — 밤은 조금 더 낮게 깔려야 한다.
 
 
 # 곡을 바꾼다. 뚝 끊으면 귀에 거슬려서 0.6초에 걸쳐 갈아 끼운다.
 func play_track(name: String) -> void:
-	# 「밤 브금」은 한 곡이 아니라 세 곡짜리 묶음이다. 밤마다 다른 곡으로
-	# 시작하고, 이미 밤 곡이 돌고 있으면 건드리지 않는다 (한 곡 끝날 때마다
-	# `_on_bgm_finished`가 다음 곡으로 넘긴다).
-	if name == "bgm_night":
-		# 고요를 두는 동안(_night_gap)에도 「밤 곡이 도는 중」이다 —
-		# 안 그러면 0.4초마다 오는 이 호출이 고요를 곧바로 덮어 버린다
-		if current_bgm in NIGHT_TRACKS and (bgm_player.playing or _night_gap > 0.0):
-			return
-		_night_i = randi() % NIGHT_TRACKS.size()
-		name = NIGHT_TRACKS[_night_i]
-	else:
-		_night_gap = 0.0        # 밤이 끝났다 — 남은 고요는 버린다
 	if not streams.has(name):
 		return
 	var gain: float = float(TRACK_GAIN.get(name, 0.0))
@@ -192,7 +129,6 @@ func play_track(name: String) -> void:
 
 func stop_bgm() -> void:
 	current_bgm = ""
-	_night_gap = 0.0
 	bgm_player.stop()
 
 

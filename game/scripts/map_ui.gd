@@ -48,6 +48,8 @@ func _ready() -> void:
 	canvas = Control.new()
 	canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 구운 지형 그림은 칸 하나가 픽셀 하나다 — 늘여 그릴 때 뭉개지면 안 된다
+	canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	canvas.draw.connect(_draw_map)
 	add_child(canvas)
 
@@ -56,6 +58,7 @@ func open() -> void:
 	# 배율과 위치는 닫아도 그대로 둔다 (R로 처음 크기로 되돌린다)
 	visible = true
 	_drag = false
+	_bake_age = 999.0        # 걸어다니는 동안 달라진 것을 반영해 새로 굽는다
 	# 지도를 보는 동안에는 HUD를 감춘다.
 	# 미니맵·시계가 큰 지도 위에 겹쳐 보이는 것도 그렇지만, 무엇보다
 	# 하단 핫바가 **버튼**이라 그 위에서 마우스를 놓으면 버튼이 이벤트를 먹는다.
@@ -172,6 +175,7 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	if visible:
 		blink += delta
+		_bake_age += delta
 		_stop_drag_if_released()
 		canvas.queue_redraw()
 
@@ -195,7 +199,9 @@ func _ground_color(x: int, y: int, season: int) -> Color:
 	var base: Color
 	match g:
 		"water":
-			base = Color(0.22, 0.42, 0.66)
+			# 뭍과 닿는 물칸은 밝게 — 이 한 줄이 호수와 바다에 해안선을 낸다.
+			# (없으면 「퍼진 파란 얼룩」으로 보인다)
+			base = Color(0.44, 0.63, 0.78) if _shore(x, y) else Color(0.22, 0.42, 0.66)
 		"sand":
 			base = Color(0.85, 0.77, 0.55)
 		"dock":
@@ -273,7 +279,69 @@ func _shore(x: int, y: int) -> bool:
 	return false
 
 
+# ---- 구운 지형 그림 ----
+#
+# 칸 하나가 픽셀 하나다. 지도를 보는 동안 지형은 거의 바뀌지 않으니
+# 매 프레임 2만 7천 칸을 다시 칠할 이유가 없다 — 한 번 구워 두고
+# 통째로 늘여 그린다. 밭에 물을 주거나 함께하는 사람이 나무를 베면
+# 달라지므로, 잠깐씩(BAKE_EVERY) 다시 굽는다.
+const BAKE_EVERY := 0.5
+var _tex: ImageTexture = null
+var _bake_age := 999.0
+
+
+func _bake() -> void:
+	_bake_age = 0.0
+	var w: int = main.MAP_W
+	var h: int = main.MAP_H
+	var buf := PackedByteArray()
+	buf.resize(w * h * 3)
+	var season := GameData.season()
+	var i := 0
+	for y in h:
+		for x in w:
+			var c: Color = _ground_color(x, y, season) if _visible_tile(x, y) else FOG
+			buf[i] = int(c.r * 255.0)
+			buf[i + 1] = int(c.g * 255.0)
+			buf[i + 2] = int(c.b * 255.0)
+			i += 3
+	# 지형지물은 그 칸 색을 덮어쓴다 (가까이 가면 위에 생김새를 얹는다)
+	for pos: Vector2i in main.objects:
+		if pos.x < 0 or pos.y < 0 or pos.x >= w or pos.y >= h:
+			continue
+		if not _visible_tile(pos.x, pos.y):
+			continue
+		var c2: Color = OBJ_COL.get(str(main.objects[pos].kind), OBJ_DEFAULT)
+		var j := (pos.y * w + pos.x) * 3
+		buf[j] = int(c2.r * 255.0)
+		buf[j + 1] = int(c2.g * 255.0)
+		buf[j + 2] = int(c2.b * 255.0)
+	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGB8, buf)
+	if _tex == null:
+		_tex = ImageTexture.create_from_image(img)
+	else:
+		_tex.update(img)
+
+
+# 멀리서 볼 때 지형지물이 찍히는 색 (칸 하나 = 점 하나)
+const OBJ_DEFAULT := Color(0.5, 0.4, 0.3)
+const OBJ_COL := {
+	"tree": Color(0.15, 0.35, 0.14), "rock": Color(0.5, 0.5, 0.56),
+	"bigrock": Color(0.44, 0.44, 0.5), "searock": Color(0.38, 0.38, 0.44),
+	"house": Color(0.66, 0.3, 0.23), "art_block": Color(0.66, 0.3, 0.23),
+	"board": Color(0.95, 0.8, 0.35), "sign": Color(0.95, 0.8, 0.35),
+	"auction": Color(0.95, 0.8, 0.35), "plotsite": Color(0.9, 0.75, 0.4),
+	"homeplot": Color(0.9, 0.75, 0.4), "fence": Color(0.6, 0.45, 0.28),
+}
+
+
+# 마지막으로 한 장 그리는 데 걸린 시간(us). 하네스가 이 값으로
+# 「지도를 끌 때 프레임이 떨어지지 않는가」를 지킨다.
+var draw_us := 0
+
+
 func _draw_map() -> void:
+	var t0 := Time.get_ticks_usec()
 	_taken.clear()
 	if _reg_idx.size() != main.MAP_W * main.MAP_H:
 		_build_region_index()
@@ -290,70 +358,54 @@ func _draw_map() -> void:
 
 	# ---- 지형 ----
 	#
-	# 한 칸을 한 색으로 칠하면 초록 장판이 된다. 같은 잔디라도 칸마다
-	# 밝기를 조금씩 흔들어 「그려 놓은 지도」처럼 결이 생기게 한다.
-	# (흔드는 값은 칸 좌표 해시라 볼 때마다 달라지지 않는다)
-	var fogged: Array = []
-	var season := GameData.season()
-	for y in range(y0, y1):
-		for x in range(x0, x1):
-			var r := Rect2(_ox + x * _cell, _oy + y * _cell, _cell + 0.5, _cell + 0.5)
-			if not _visible_tile(x, y):
-				canvas.draw_rect(r, FOG)
-				fogged.append(Vector2i(x, y))
-				continue
-			canvas.draw_rect(r, _ground_color(x, y, season))
-			# 물가: 뭍과 닿는 쪽에 옅은 띠를 둘러 해안선을 낸다.
-			# 이 선 하나로 호수와 바다가 「퍼진 파란 얼룩」에서 벗어난다.
-			if main.grid[y][x].ground == "water" and _shore(x, y):
-				canvas.draw_rect(Rect2(r.position, Vector2(r.size.x, maxf(1.0, _cell * 0.3))),
-					Color(0.58, 0.78, 0.88, 0.55))
+	# 칸마다 draw_rect를 부르면 배율 1에서 한 프레임에 2만 7천 번이다.
+	# 지형은 걸어다니는 동안에나 바뀌지 **지도를 보는 동안에는 거의 그대로**라,
+	# 칸 하나를 픽셀 하나로 구운 그림(_bake)을 한 번에 늘여 그린다.
+	# 드로우콜이 2만 7천 번에서 **한 번**이 된다 — 끌어도 안 버벅인다.
+	if _tex == null or _bake_age > BAKE_EVERY:
+		_bake()
+	canvas.draw_texture_rect(_tex,
+		Rect2(_ox, _oy, main.MAP_W * _cell, main.MAP_H * _cell), false)
 
 	# ---- 지형지물 ----
 	#
-	# 네모 한 칸으로 찍으면 나무도 바위도 건물도 그냥 「점」이다.
-	# 작아도 생김새를 흉내 내면 한눈에 무엇인지 읽힌다 —
-	# 나무는 밑동 위에 얹힌 둥근 잎, 바위는 위가 밝은 덩어리,
-	# 건물은 몸통 위에 얹힌 지붕.
+	# 구운 그림에는 칸 하나가 점 하나로만 들어가 있다. 가까이 들여다볼 때는
+	# 생김새를 얹어 준다 — 나무는 잎 두 겹, 바위는 위가 밝은 덩어리,
+	# 건물은 몸통 위에 얹힌 지붕. 멀리서 볼 때(칸이 7px 미만)는 어차피
+	# 점만 하니 굽힌 색으로 충분하다.
 	var cs := _cell
-	for pos: Vector2i in main.objects:
-		if pos.x < x0 or pos.x >= x1 or pos.y < y0 or pos.y >= y1:
-			continue
-		if not _visible_tile(pos.x, pos.y):
-			continue
-		var kind: String = main.objects[pos].kind
-		var at := Vector2(_ox + pos.x * cs, _oy + pos.y * cs)
-		match kind:
-			"tree":
-				# 잎 두 겹 — 아래는 짙게, 위쪽 절반은 볕이 든 것처럼 밝게
-				canvas.draw_rect(Rect2(at.x, at.y + cs * 0.15, cs + 0.5, cs * 0.85),
-					Color(0.13, 0.31, 0.13))
-				canvas.draw_rect(Rect2(at.x + cs * 0.15, at.y + cs * 0.1,
-					cs * 0.6, cs * 0.45), Color(0.24, 0.47, 0.2))
-			"rock", "bigrock":
-				var big: float = 1.0 if kind == "bigrock" else 0.82
-				canvas.draw_rect(Rect2(at.x + cs * (1.0 - big) * 0.5,
-					at.y + cs * (1.0 - big) * 0.5, cs * big, cs * big),
-					Color(0.46, 0.46, 0.52))
-				canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.15,
-					cs * 0.45, cs * 0.3), Color(0.68, 0.68, 0.74))
-			"house", "art_block":
-				canvas.draw_rect(Rect2(at, Vector2(cs + 0.5, cs + 0.5)),
-					Color(0.76, 0.68, 0.56))                     # 벽
-				canvas.draw_rect(Rect2(at.x, at.y, cs + 0.5, maxf(1.0, cs * 0.45)),
-					Color(0.66, 0.27, 0.21))                     # 지붕
-			"board", "sign", "auction", "plotsite", "homeplot":
-				canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.2,
-					cs * 0.6, cs * 0.6), Color(0.95, 0.8, 0.35))
-			"searock":
-				canvas.draw_rect(Rect2(at, Vector2(cs + 0.5, cs + 0.5)),
-					Color(0.38, 0.38, 0.44))
-			"fence":
-				canvas.draw_rect(Rect2(at.x, at.y + cs * 0.3, cs + 0.5,
-					maxf(1.0, cs * 0.4)), Color(0.6, 0.45, 0.28))
-			_:
-				canvas.draw_rect(Rect2(at.x + cs * 0.15, at.y + cs * 0.15,
-					cs * 0.7, cs * 0.7), Color(0.5, 0.4, 0.3))
+	if cs >= 7.0:
+		for pos: Vector2i in main.objects:
+			if pos.x < x0 or pos.x >= x1 or pos.y < y0 or pos.y >= y1:
+				continue
+			if not _visible_tile(pos.x, pos.y):
+				continue
+			var kind: String = main.objects[pos].kind
+			var at := Vector2(_ox + pos.x * cs, _oy + pos.y * cs)
+			match kind:
+				"tree":
+					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.15, cs + 0.5, cs * 0.85),
+						Color(0.13, 0.31, 0.13))
+					canvas.draw_rect(Rect2(at.x + cs * 0.15, at.y + cs * 0.1,
+						cs * 0.6, cs * 0.45), Color(0.24, 0.47, 0.2))
+				"rock", "bigrock":
+					var big: float = 1.0 if kind == "bigrock" else 0.82
+					canvas.draw_rect(Rect2(at.x + cs * (1.0 - big) * 0.5,
+						at.y + cs * (1.0 - big) * 0.5, cs * big, cs * big),
+						Color(0.46, 0.46, 0.52))
+					canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.15,
+						cs * 0.45, cs * 0.3), Color(0.68, 0.68, 0.74))
+				"house", "art_block":
+					canvas.draw_rect(Rect2(at, Vector2(cs + 0.5, cs + 0.5)),
+						Color(0.76, 0.68, 0.56))
+					canvas.draw_rect(Rect2(at.x, at.y, cs + 0.5, maxf(1.0, cs * 0.45)),
+						Color(0.66, 0.27, 0.21))
+				"board", "sign", "auction", "plotsite", "homeplot":
+					canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.2,
+						cs * 0.6, cs * 0.6), Color(0.95, 0.8, 0.35))
+				"fence":
+					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.3, cs + 0.5,
+						maxf(1.0, cs * 0.4)), Color(0.6, 0.45, 0.28))
 
 	# 동물/NPC (보이는 지역만)
 	var dot: float = maxf(3.0, _cell * 0.5)
@@ -415,7 +467,7 @@ func _draw_map() -> void:
 				str(GameData.VILLAGE_ZONES[zid].name) + (" (잠김)" if locked else ""))
 
 	# 먹구름 뭉치 — 가려진 칸 위로 둥근 덩어리를 얹어 「구름에 덮인」 모양을 낸다
-	_draw_clouds(fogged)
+	_draw_clouds(x0, y0, x1, y1)
 
 	# 퀘스트 길라잡이 — **딱 하나**만 찍는다 (미니창에 고정한 그 퀘스트)
 	for g: Dictionary in _quest_guides():
@@ -450,6 +502,7 @@ func _draw_map() -> void:
 	var w: float = main.UI_FONT.get_string_size(guide, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
 	canvas.draw_string(main.UI_FONT, Vector2(480 - w / 2.0, 526), guide,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.7, 0.68, 0.8))
+	draw_us = Time.get_ticks_usec() - t0
 
 
 # ---- 퀘스트 길라잡이 ----
@@ -543,27 +596,38 @@ func _cloud_rand(x: int, y: int, salt: int) -> float:
 	return h - floor(h)
 
 
-func _draw_clouds(fogged: Array) -> void:
-	var drift := blink * 0.12          # 아주 느린 흐름
-	for t: Vector2i in fogged:
-		# 두 칸마다 한 덩어리 — 큼직하게 겹쳐 놓아야 「구름」으로 보인다
-		# (칸마다 하나씩 찍으면 크기가 고르게 나와 물방울무늬가 된다)
-		if t.x % 2 != 0 or t.y % 2 != 0:
-			continue
-		var rx := _cloud_rand(t.x, t.y, 1)
-		var ry := _cloud_rand(t.x, t.y, 2)
-		var rs := _cloud_rand(t.x, t.y, 3)
-		var c := Vector2(_ox + (float(t.x) + 1.0 + (rx - 0.5) * 1.1) * _cell,
-			_oy + (float(t.y) + 1.0 + (ry - 0.5) * 1.1) * _cell)
-		var wob := sin(drift + float(t.x) * 0.7 + float(t.y) * 0.4) * _cell * 0.25
-		# 덩어리마다 밝기가 조금씩 달라 층이 진 하늘처럼 보인다
-		var body := FOG.lerp(CLOUD_MID, 0.45 + rs * 0.55)
-		var r1 := _cell * (1.5 + rs * 0.75)
-		canvas.draw_circle(c + Vector2(wob, 0.0), r1, body)
-		# 빛을 받는 윗면 — 살짝 위로 올려 그린다
-		if rs > 0.35:
-			canvas.draw_circle(c + Vector2(wob * 0.6, -_cell * (0.5 + rx * 0.3)),
-				r1 * (0.34 + rx * 0.22), CLOUD_MID.lerp(CLOUD_TOP, 0.4 + ry * 0.6))
+# 구름 덩어리는 **화면 넓이에 맞춰 성글게** 찍는다.
+#
+# 예전에는 가려진 칸 두 개마다 하나씩이라, 배율 1에서 원을 6700개나
+# 그렸다 (원 하나가 폴리곤 하나다). 지도를 끌면 그대로 뚝뚝 끊겼다.
+# 지금은 화면에 들어오는 칸 수를 보고 간격을 벌린다 — 멀리서 보면
+# 큼직한 구름 덩어리, 가까이 가면 잘게 나뉜 구름. 개수는 늘 400개 안쪽이다.
+func _draw_clouds(x0: int, y0: int, x1: int, y1: int) -> void:
+	var span := maxi(1, (x1 - x0) * (y1 - y0))
+	var step := 2
+	while span / (step * step) > 400:
+		step *= 2
+	var scale := float(step) * 0.75          # 성글수록 덩어리도 커진다
+	var drift := blink * 0.12                # 아주 느린 흐름
+	for ty in range(y0 - (y0 % step), y1, step):
+		for tx in range(x0 - (x0 % step), x1, step):
+			if tx < 0 or ty < 0 or _visible_tile(tx, ty):
+				continue
+			var rx := _cloud_rand(tx, ty, 1)
+			var ry := _cloud_rand(tx, ty, 2)
+			var rs := _cloud_rand(tx, ty, 3)
+			var c := Vector2(
+				_ox + (float(tx) + float(step) * 0.5 + (rx - 0.5) * 1.1 * step) * _cell,
+				_oy + (float(ty) + float(step) * 0.5 + (ry - 0.5) * 1.1 * step) * _cell)
+			var wob := sin(drift + float(tx) * 0.7 + float(ty) * 0.4) * _cell * 0.25
+			# 덩어리마다 밝기가 조금씩 달라 층이 진 하늘처럼 보인다
+			var body := FOG.lerp(CLOUD_MID, 0.45 + rs * 0.55)
+			var r1 := _cell * (1.5 + rs * 0.75) * scale
+			canvas.draw_circle(c + Vector2(wob, 0.0), r1, body)
+			# 빛을 받는 윗면 — 살짝 위로 올려 그린다
+			if rs > 0.35:
+				canvas.draw_circle(c + Vector2(wob * 0.6, -_cell * (0.5 + rx * 0.3) * scale),
+					r1 * (0.34 + rx * 0.22), CLOUD_MID.lerp(CLOUD_TOP, 0.4 + ry * 0.6))
 
 
 # 건물 터의 한가운데 — 이야기가 「세우자」고 할 때 이 자리를 찍는다

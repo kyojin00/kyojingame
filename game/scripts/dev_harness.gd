@@ -36,6 +36,12 @@ var _fog_keep: Dictionary = {}   # 먹구름 화면을 찍는 동안 맡아 두�
 #    검사가 조용히 사라진다 (실제로 세 번 당했다).
 #    새 단계를 넣기 전에: grep -n "^\t\t[0-9]\+:" 로 빈 번호를 확인할 것.
 
+# 지도 끌기 성능 재기 (393~405단계)
+var _bench_us := 0
+var _bench_n := 0
+var _bench_t0 := 0
+
+
 func _debug_tick() -> void:
 	if OS.get_environment("KYOJIN_MP") != "":
 		_mp_tick()
@@ -4592,14 +4598,6 @@ func _debug_tick() -> void:
 			var loop_bad: Array = []
 			for bn: String in Sound.BGM_NAMES:
 				var s0: AudioStream = Sound.streams.get(bn)
-				# 밤 곡만 일부러 루프를 끈다 — 끝까지 가야 다음 밤 곡으로
-				# 넘어간다 (Sound.NIGHT_TRACKS). 여기서는 그 반대를 본다.
-				if bn in Sound.NIGHT_TRACKS:
-					if s0 is AudioStreamOggVorbis and (s0 as AudioStreamOggVorbis).loop:
-						loop_bad.append(bn + "(밤 곡인데 루프 켜짐)")
-					elif s0 is AudioStreamMP3 and (s0 as AudioStreamMP3).loop:
-						loop_bad.append(bn + "(밤 곡인데 루프 켜짐)")
-					continue
 				if s0 is AudioStreamWAV:
 					var w: AudioStreamWAV = s0
 					var want := int(round(w.get_length() * float(w.mix_rate)))
@@ -5431,7 +5429,31 @@ func _debug_tick() -> void:
 				" 씨앗8칸=", seed_far, " 씨앗10칸=", seed_edge,
 				" 씨앗밖=", not seed_over, " 도끼옆=", axe_near,
 				" 도끼멀리=", not axe_far, " 마우스목표=", mouse_far)
-		393: get_tree().quit()
+		393:
+			# 지도를 끌 때 한 장 그리는 데 얼마나 걸리나.
+			#
+			# 예전에는 칸마다 draw_rect + 구름 원이라 배율 1에서 한 장에
+			# 3만 번 넘게 그렸다 — 끌면 그대로 뚝뚝 끊겼다. 지금은 지형을
+			# 한 장으로 구워 통째로 늘여 그린다 (map_ui._bake).
+			m.map_ui.open()
+			m.map_ui.reset_view()
+			_bench_us = 0
+			_bench_n = 0
+		394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404:
+			m.map_ui.pan += Vector2(4.0, 3.0)      # 끄는 흉내
+			m.map_ui._clamp_pan()
+			m.map_ui.canvas.queue_redraw()
+			if m.map_ui.draw_us > 0:
+				_bench_us += m.map_ui.draw_us
+				_bench_n += 1
+		405:
+			var per_draw: int = _bench_us / maxi(1, _bench_n)
+			m.map_ui.close()
+			# 소프트웨어 렌더러(CI)에서도 8ms를 넘으면 안 된다 —
+			# 넘으면 그리는 것만으로 120fps가 무너진다는 뜻이다
+			print("MAPDRAW_OK=", _bench_n > 0 and per_draw < 8000,
+				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)")
+		406: get_tree().quit()
 
 
 # ==== 검증 시퀀스 ====
