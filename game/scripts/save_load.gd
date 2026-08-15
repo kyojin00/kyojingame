@@ -190,6 +190,11 @@ func _apply_save(d: Dictionary) -> void:
 	# 발견한 것으로 친다 — 쓰던 부엌이 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",
 		int(d.get("house_lv", 0)) >= 2 or not d.get("recipes_cooked", {}).is_empty()))
+	# 「먼지 속의 조리대」 — 이 이야기가 생기기 전 세이브에서 이미 조리대를
+	# 찾아 놨다면 튜토리얼은 끝난 것으로 친다 (레시피를 못 사면 곤란하다)
+	GameData.kitchen_quest = str(d.get("kitchen_quest",
+		"done" if GameData.kitchen_found else ""))
+	GameData.kitchen_branch = str(d.get("kitchen_branch", ""))
 	GameData.desk_queue = []
 	for job in d.get("desk_queue", []):
 		if GameData.DESK_RECIPES.has(str(job.get("id", ""))):

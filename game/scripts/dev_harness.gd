@@ -3006,6 +3006,157 @@ func _debug_tick() -> void:
 				" 검은띠제거=", no_black_bar, " 붙박이충돌=", desk_block,
 				" 접근방향=", side_ok, "(북 ", spot_n - pt0, " · 서 ", spot_w - pt0, ")")
 			_save_shot("_bubble.png")
+		288:
+			# #140: 튜토리얼 퀘스트 「먼지 속의 조리대」 —
+			# 세 갈래 방아쇠(A 레시피 / B 사고 나감 / C 그냥 나감) ->
+			# 빗자루 -> 청소 -> 조리대 -> 만수의 선물 -> 첫 요리
+			m.dialog.close()
+			m.shop.close()
+			m.shop_room.close()
+			var k_kf := GameData.kitchen_found
+			var k_kq := GameData.kitchen_quest
+			var k_dust := GameData.dust_swept
+			var k_ri: Dictionary = GameData.recipe_items.duplicate()
+			var k_ru: Array = GameData.recipes_unlocked.duplicate()
+			var k_rc: Dictionary = GameData.recipes_cooked.duplicate()
+			var k_money := GameData.money
+			var k_spent := GameData.today_spent
+
+			# 준비 — 잡화점은 서 있고, 조리대는 아직 먼지 밑이다
+			var had_general: bool = GameData.village_built.has("general")
+			if not had_general:
+				GameData.village_built.append("general")
+			GameData.kitchen_found = false
+			GameData.dust_swept = 0
+			GameData.recipes_cooked.erase(GameData.JAM_ID)
+			GameData.recipe_items.erase("broom")
+			GameData.recipes_unlocked.erase("broom")
+			GameData.recipes_unlocked.erase(GameData.JAM_ID)
+			var k_broom := int(GameData.items["broom"])
+			var k_weed := int(GameData.items["weed"])
+			var k_berry := int(GameData.items["forage_berry"])
+			var k_jam := int(GameData.items[GameData.JAM_ID])
+			GameData.items["broom"] = 0
+			GameData.items["weed"] = 0
+			GameData.items["forage_berry"] = 0
+
+			# ── 분기 A: 요리 레시피를 사려 하면 팔지 않고 그 자리에서 시작
+			GameData.kitchen_quest = ""
+			GameData.money = 9999
+			var money_a := GameData.money
+			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
+			var branch_a: bool = GameData.kitchen_quest == "broom" \
+				and GameData.kitchen_branch == "recipe" \
+				and GameData.money == money_a \
+				and not GameData.recipe_items.has("dish_grilled_fish") \
+				and m.dialog.visible
+			m.dialog.skip_seq()
+			m.dialog.close()
+
+			# ── 분기 B: 뭔가 사고 나가려 하면 붙잡는다
+			GameData.kitchen_quest = ""
+			GameData.kitchen_branch = ""
+			m.shop_room.open("general")
+			GameData.today_spent += 30            # 씨앗 한 봉지 산 셈
+			var bought_ok: bool = m.shop_room.bought_this_visit
+			var left_b: bool = m.shop_room.try_leave()   # 문턱을 밟는다
+			var branch_b: bool = GameData.kitchen_quest == "broom" \
+				and GameData.kitchen_branch == "buy" \
+				and not left_b and m.shop_room.visible      # 아직 못 나갔다
+			m.dialog.skip_seq()
+			m.dialog.close()
+			m.shop_room.close()
+
+			# ── 분기 C: 아무것도 안 사고 나가려 하면 말을 건다
+			GameData.kitchen_quest = ""
+			GameData.kitchen_branch = ""
+			m.shop_room.open("general")
+			var idle_ok: bool = not m.shop_room.bought_this_visit
+			var left_c: bool = m.shop_room.try_leave()
+			var branch_c: bool = GameData.kitchen_quest == "broom" \
+				and GameData.kitchen_branch == "idle" and idle_ok and not left_c
+			m.dialog.skip_seq()
+			m.dialog.close()
+			# 시작된 뒤에는 더 붙잡지 않는다 — 그냥 나갈 수 있다
+			var free_exit: bool = m.shop_room.try_leave() and not m.shop_room.visible
+			m.shop_room.close()
+
+			# ── 진행: 레시피 -> 잡초 -> 빗자루 -> 청소 -> 조리대
+			GameData.give_recipe("broom")
+			m.story._kitchen_update(0.0)
+			var step_make: bool = GameData.kitchen_quest == "make"
+			GameData.learn_recipe("broom")
+			m.doing.gain_item("weed", 1)
+			var goal_weed: bool = GameData.kitchen_quest_objective_short().contains("빗자루를 만들자")
+			GameData.items["weed"] = 0
+			GameData.items["broom"] = 1
+			m.story._kitchen_update(0.0)
+			var step_sweep: bool = GameData.kitchen_quest == "sweep"
+			m.interior._layout()
+			for i in GameData.DUST_TOTAL:
+				m.interior._sweep_kitchen()
+			m.dialog.close()
+			m.story._kitchen_update(0.0)
+			var step_found: bool = GameData.kitchen_found \
+				and GameData.kitchen_quest == "found" \
+				and GameData.quest_npc_marks().get("merchant", "") == "?"
+			# 아직 요리 레시피는 못 산다 (튜토리얼이 안 끝났다)
+			var money_b := GameData.money
+			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
+			var still_block: bool = GameData.money == money_b \
+				and not GameData.cook_shop_open()
+			m.dialog.skip_seq()
+			m.dialog.close()
+
+			# ── 선물: 산딸기잼 레시피 1 + 산딸기 3
+			m.village.open_merchant_counter()
+			var gift_open: bool = m.dialog.visible
+			m.dialog.skip_seq()
+			var gift_ok: bool = GameData.kitchen_quest == "jam" \
+				and int(GameData.recipe_items.get(GameData.JAM_ID, 0)) >= 1 \
+				and int(GameData.items["forage_berry"]) >= GameData.JAM_BERRIES
+			m.dialog.close()
+
+			# ── 첫 요리: 산딸기잼을 지으면 튜토리얼 종료 + 레시피 판매 해금
+			GameData.learn_recipe(GameData.JAM_ID)
+			var cooked: bool = GameData.cook(GameData.JAM_ID)
+			m.story._kitchen_update(0.0)
+			var done_ok: bool = cooked and GameData.kitchen_quest == "done" \
+				and GameData.cook_shop_open() \
+				and GameData.completed_quests().has("먼지 속의 조리대 — 첫 요리를 지었다")
+			var money_c := GameData.money
+			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
+			var sell_ok: bool = GameData.money == money_c - 200 \
+				and GameData.recipe_items.has("dish_grilled_fish")
+			m.dialog.close()
+
+			# 뒷정리
+			if not had_general:
+				GameData.village_built.erase("general")
+			GameData.kitchen_found = k_kf
+			GameData.kitchen_quest = k_kq
+			GameData.kitchen_branch = ""
+			GameData.dust_swept = k_dust
+			GameData.recipe_items = k_ri
+			GameData.recipes_unlocked = k_ru
+			GameData.recipes_cooked = k_rc
+			GameData.money = k_money
+			GameData.today_spent = k_spent
+			GameData.items["broom"] = k_broom
+			GameData.items["weed"] = k_weed
+			GameData.items["forage_berry"] = k_berry
+			GameData.items[GameData.JAM_ID] = k_jam
+			m.hud._toast_queue.clear()
+			print("KITCHEN_OK=", branch_a and branch_b and bought_ok and branch_c
+				and free_exit and step_make and goal_weed and step_sweep
+				and step_found and still_block and gift_open and gift_ok
+				and done_ok and sell_ok,
+				" 분기A(레시피차단)=", branch_a, " 분기B(사고나감)=", branch_b,
+				" 분기C(그냥나감)=", branch_c, " 시작후자유퇴장=", free_exit,
+				" 레시피→제작=", step_make and goal_weed and step_sweep,
+				" 청소·조리대=", step_found, " 완료전차단=", still_block,
+				" 선물=", gift_open and gift_ok, " 첫요리·완료=", done_ok,
+				" 레시피판매해금=", sell_ok)
 		270:
 			# 나무 쓰러지는 모션.
 			# 판정(목재·경험치)은 도끼를 휘두르는 **즉시**, 그림은 날이 닿는
@@ -4029,8 +4180,10 @@ func _debug_tick() -> void:
 		315:
 			# #112: 조리대를 못 찾았으면 요리 레시피를 팔지 않는다 (힌트만)
 			var keep_kf := GameData.kitchen_found
+			var keep_kq := GameData.kitchen_quest
 			var keep_money3 := GameData.money
 			GameData.kitchen_found = false
+			GameData.kitchen_quest = "done"   # 이야기는 따로(288) 본다
 			GameData.recipe_items.erase("dish_grilled_fish")
 			GameData.recipes_unlocked.erase("dish_grilled_fish")
 			m.shop._on_buy_dish_recipe("dish_grilled_fish", 200)
@@ -4043,6 +4196,7 @@ func _debug_tick() -> void:
 			var bought: bool = GameData.money == keep_money3 - 200 \
 				and GameData.recipe_items.has("dish_grilled_fish")
 			GameData.kitchen_found = keep_kf
+			GameData.kitchen_quest = keep_kq
 			GameData.money = keep_money3
 			GameData.recipe_items.erase("dish_grilled_fish")
 			print("KITCHENGATE_OK=", blocked and bought,

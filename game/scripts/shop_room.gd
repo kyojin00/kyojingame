@@ -137,11 +137,31 @@ func open(id: String) -> void:
 	pdir = "up"
 	moving = false
 	Sound.play_sfx("sfx_place")
+	_visit_spent = GameData.today_spent   # 이번 방문의 구매 여부 기준점
 	if id == "general":
 		main.hud.show_message("선반 앞에서 E: 구매 · 계산대(만수)에서 E: 판매", 4.0)
 	else:
 		main.hud.show_message("%s — 계산대 앞에서 E" % ROOMS[id].name, 3.0)
 	canvas.queue_redraw()
+
+
+# 이번 방문에 실제로 무언가를 샀는가 (분기 B와 C를 가른다).
+# 판매는 세지 않는다 — today_spent는 구매에서만 오른다.
+var _visit_spent := 0
+var bought_this_visit: bool:
+	get: return GameData.today_spent > _visit_spent
+
+
+# 문턱을 밟았다 — 그냥 나갈 수 있는가.
+# 【분기 B·C】 잡화점을 나서려는 순간 아직 조리대를 못 찾았다면, 만수가
+# 밥 이야기를 꺼내며 붙잡는다 (뭘 사고 나가는지에 따라 첫마디가 다르다)
+func try_leave() -> bool:
+	if room_id == "general" and GameData.kitchen_quest_ready():
+		ppos.y = ROOM.end.y - 16.0   # 문턱에서 한 발 물러선다
+		main.story.start_kitchen_quest("buy" if bought_this_visit else "idle")
+		return false
+	close()
+	return true
 
 
 func close() -> void:
@@ -201,9 +221,11 @@ func _process(delta: float) -> void:
 		if not blocked:
 			ppos = np
 		anim_time += delta
-		# 아랫문으로 나가기
+		# 아랫문으로 나가기.
+		# 【분기 B·C】 잡화점을 나서려는 순간, 아직 조리대를 못 찾았다면
+		# 만수가 밥 이야기를 꺼내며 붙잡는다 (뭘 샀는지에 따라 첫마디가 다르다)
 		if ppos.y >= ROOM.end.y - 9 and ppos.x > EXIT_X.x and ppos.x < EXIT_X.y and v.y > 0:
-			close()
+			try_leave()
 	_update_sprite()
 	canvas.queue_redraw()
 

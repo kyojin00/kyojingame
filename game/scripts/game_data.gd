@@ -2318,6 +2318,13 @@ func quest_catalog() -> Array:
 			"desc": "마을보다 오래된 돌문 — 할아버지의 마지막 연구 공간.",
 			"cat": "main", "ep": "메인 스토리 20", "npc": s20npc,
 			"reward": "할아버지가 남긴 씨앗 한 알과 마지막 편지"})
+	# 안내: 먼지 속의 조리대 (요리 튜토리얼)
+	o = kitchen_quest_objective_short()
+	if o != "":
+		out.append({"id": "kitchen", "title": "먼지 속의 조리대", "obj": o,
+			"desc": "만수의 참견 — 오래 비어 있던 집 어딘가에 조리대가 묻혀 있다.",
+			"cat": "guide", "npc": "merchant",
+			"reward": "요리 해금 + 산딸기잼 레시피와 산딸기 %d개" % JAM_BERRIES})
 	# 서브: 용식의 집터 — 바닷길을 연 지 3일 뒤 분수대 앞에서 시작된다
 	o = fisher_home_objective_short()
 	if o != "":
@@ -2507,6 +2514,9 @@ func quest_npc_marks() -> Dictionary:
 		marks["librarian"] = "!"
 	elif story18_phase == "clue":
 		marks["librarian"] = "?"
+	# 조리대를 찾았다 — 만수가 궁금해한다
+	if kitchen_quest == "found":
+		marks["merchant"] = "?"
 	# 용식의 집터 — 분수대 앞에서 기다릴 때와 집이 다 됐을 때 말을 걸자
 	if fisher_home == "wait":
 		marks["fisher"] = "!"
@@ -2682,6 +2692,53 @@ var bed_lv := 0
 const DUST_TOTAL := 3
 var dust_swept := 0
 var kitchen_found := false
+
+# ---- 튜토리얼 퀘스트: 먼지 속의 조리대 ----
+#
+# 요리를 어떻게 시작하는지 **말로 알려 주지 않는다**. 잡화점에서 하는
+# 행동이 그대로 방아쇠가 된다 — 요리 레시피를 사려 하거나, 볼일을
+# 마치고 나가려 하면 만수가 붙잡고 밥 이야기를 꺼낸다.
+#   "": 아직 / broom: 빗자루 레시피 사기 / make: 잡초 모아 빗자루 만들기 /
+#   sweep: 집 안 먼지 쓸기 / found: 조리대 발견 — 만수에게 알리기 /
+#   jam: 받은 재료로 산딸기잼 만들기 / done: 요리 튜토리얼 끝
+var kitchen_quest := ""
+# 어떤 계기로 시작됐는가 — 첫 대사 갈래가 갈린다
+#   recipe: 요리 레시피를 사려다가 / buy: 다른 걸 사고 나가려다가 /
+#   idle: 아무것도 안 사고 나가려다가
+var kitchen_branch := ""
+const JAM_ID := "dish_berry_jam"     # 첫 요리 — 산딸기잼
+const JAM_BERRIES := 3               # 만수가 함께 주는 산딸기
+
+
+# 이 이야기가 시작될 수 있는가 — 잡화점이 서 있고, 아직 조리대가 없다
+func kitchen_quest_ready() -> bool:
+	return village_built.has("general") and not kitchen_found \
+		and kitchen_quest == "" and story_phase == "done"
+
+
+# 요리 레시피를 정상적으로 사고팔 수 있는가 (튜토리얼을 마쳐야 열린다)
+func cook_shop_open() -> bool:
+	return kitchen_found and kitchen_quest in ["", "done"]
+
+
+func kitchen_quest_objective_short() -> String:
+	match kitchen_quest:
+		"broom":
+			return "잡화점에서 빗자루 레시피를 사자"
+		"make":
+			if recipe_items.has("broom"):
+				return "가방에서 빗자루 레시피를 배우자"
+			if int(items.get("weed", 0)) < 1:
+				return "풀숲(E)에서 잡초를 1개 모으자"
+			return "집 안 책상에서 빗자루를 만들자 (잡초 1)"
+		"sweep":
+			return "집 안의 먼지와 잡동사니를 쓸어 내자 (%d/%d)" % [
+				dust_swept, DUST_TOTAL]
+		"found":
+			return "만수에게 조리대를 찾았다고 알리자"
+		"jam":
+			return "집 조리대에서 산딸기잼을 만들자 (산딸기 %d)" % JAM_BERRIES
+	return ""
 var desk_queue: Array = []        # [{id, left(초)}]
 var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
 
@@ -5020,6 +5077,8 @@ func completed_quests() -> Array:
 		out.append("바닷길을 열었다 (낚시꾼과 바위 능선)")
 	if fisher_home == "done":
 		out.append("용식의 부탁 — 살 집 한 채")
+	if kitchen_quest == "done":
+		out.append("먼지 속의 조리대 — 첫 요리를 지었다")
 	if story2_phase == "done":
 		out.append("메인 스토리 2 — 마을을 깨우다")
 	if move_quest == "done":
@@ -5364,6 +5423,8 @@ func reset_all() -> void:
 	desk_done_pending.clear()
 	dust_swept = 0
 	kitchen_found = false
+	kitchen_quest = ""
+	kitchen_branch = ""
 	fisher_quest = ""
 	fisher_home = ""
 	sea_open_day = 0
@@ -5782,6 +5843,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"has_bed": has_bed,
 		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
+		"kitchen_quest": kitchen_quest, "kitchen_branch": kitchen_branch,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
 		"fisher_home": fisher_home, "sea_open_day": sea_open_day,
 		"storage_stock": storage_stock,

@@ -1284,6 +1284,7 @@ func _process(delta: float) -> void:
 	story._story19_update(delta)
 	story._story20_update(delta)
 	story._fisher_home_update(delta)
+	story._kitchen_update(delta)
 	story._settler_update(delta)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다

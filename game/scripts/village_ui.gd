@@ -435,6 +435,10 @@ func _talk_to(npc: Node2D) -> void:
 	if npc.id in ["forest_mom", "forest_girl"] and GameData.forest_quest == "visit":
 		m.story._start_forest_house_dialog()
 		return
+	# 요리 튜토리얼 — 조리대를 찾은 뒤 만수를 만나면 축하와 선물
+	if npc.id == "merchant" and GameData.kitchen_quest == "found":
+		m.story.kitchen_gift_dialog()
+		return
 	# 서브 퀘스트 — 용식의 집터 (분수대 앞: 선택지 / 집 완공 뒤: 보고)
 	if npc.id == "fisher" and GameData.fisher_home == "wait":
 		m.story.fisher_home_greet()
@@ -1463,6 +1467,10 @@ const MERCHANT_TIPS := [
 
 
 func open_merchant_counter() -> void:
+	# 조리대를 찾아온 날 — 인사보다 이 이야기가 먼저다
+	if GameData.kitchen_quest == "found":
+		m.story.kitchen_gift_dialog()
+		return
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	var btns: Array = [
 		["판매하기", _merchant_sell],

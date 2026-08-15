@@ -4063,6 +4063,155 @@ func _end_last_page() -> void:
 	m.saveio.save_now()
 
 
+# ---- 튜토리얼 퀘스트: 먼지 속의 조리대 ----
+#
+# 「요리를 하려면 조리대가 필요하다」를 안내문으로 알려 주지 않는다.
+# 잡화점에서 하는 행동이 그대로 방아쇠다 —
+#   A 요리 레시피를 사려 한다   -> 만수가 말린다
+#   B 다른 걸 사고 나가려 한다  -> 만수가 붙잡는다
+#   C 아무것도 안 사고 나간다   -> 만수가 말을 건다
+# 어느 갈래로 들어와도 「집이 오래 비어 있었으니 먼지 밑에 조리대가
+# 있을 것」이라는 같은 이야기로 모이고, 잡초 하나로 만드는 빗자루
+# 레시피를 권한다.
+
+func _kitchen_update(_delta: float) -> void:
+	if Net.is_guest():
+		return
+	match GameData.kitchen_quest:
+		"broom":
+			# 레시피를 사 왔거나(가방) 배웠으면 다음 걸음으로
+			if GameData.recipe_items.has("broom") \
+					or "broom" in GameData.recipes_unlocked:
+				GameData.kitchen_quest = "make"
+				m.saveio.save_now()
+		"make":
+			if int(GameData.items.get("broom", 0)) > 0:
+				GameData.kitchen_quest = "sweep"
+				m.hud.show_message("빗자루가 생겼다.\n집 안 먼지더미 앞에서 E를 눌러 쓸어 내자.", 6.0)
+				m.saveio.save_now()
+		"sweep":
+			if GameData.kitchen_found:
+				GameData.kitchen_quest = "found"
+				m.hud.quest_start_toast("만수에게 조리대를 찾았다고 알리자")
+				m.saveio.save_now()
+		"jam":
+			if int(GameData.recipes_cooked.get(GameData.JAM_ID, 0)) > 0:
+				_end_kitchen_quest()
+
+
+# 분기 A/B/C 공통 — 만수가 밥 이야기를 꺼내고 빗자루를 권한다.
+# 앞머리만 갈래마다 다르고, 뒤는 같은 이야기로 모인다.
+const KITCHEN_OPENERS := {
+	"recipe": [
+		{"text": "「어어, 잠깐! 그거 요리 레시피인데.」"},
+		{"text": "「사도 지금은 못 써. 조리대가 없잖아?」"},
+	],
+	"buy": [
+		{"text": "「그래, 살 건 다 샀고... 어이, 잠깐만.」"},
+		{"text": "「자네 요즘 밥은 제대로 챙겨 먹고 있나?」"},
+	],
+	"idle": [
+		{"text": "「뭘 살지 못 정했으면 그냥 가도 돼.\n...그런데 하나만 묻자.」"},
+		{"text": "「자네 요즘 밥은 제대로 챙겨 먹고 있나?」"},
+	],
+}
+const KITCHEN_COMMON := [
+	{"text": "「사 먹을 데도 없는 마을에서 그러다 큰일 나.\n한 끼라도 직접 지어 먹어야지.」"},
+	{"text": "「그 집, 자네 오기 전까지 한참 비어 있었잖아.\n먼지랑 잡동사니가 산더미일 텐데.」"},
+	{"text": "「그런 집엔 말이야, 부엌 살림이 그 밑에\n그대로 묻혀 있는 경우가 많아. 조리대 같은 거.」"},
+	{"text": "「일단 쓸어 봐. 빗자루부터 있어야겠지?」"},
+	{"text": "「마침 빗자루 레시피가 있어. 잡초 하나면 만들어.\n풀숲 아무 데나 뽑으면 나오는 그 잡초 말이야.」"},
+	{"text": "「먼지 밑에서 뭐가 나오는지 보고 오라고.」"},
+]
+
+
+func start_kitchen_quest(branch: String) -> void:
+	if not GameData.kitchen_quest_ready():
+		return
+	GameData.kitchen_quest = "broom"
+	GameData.kitchen_branch = branch
+	var pages: Array = []
+	pages.append_array(KITCHEN_OPENERS.get(branch, KITCHEN_OPENERS["idle"]))
+	pages.append_array(KITCHEN_COMMON)
+	m.dialog.open_seq("잡화점 만수",
+		m.tex.get("npc_merchant_portrait_normal"), pages, _end_kitchen_intro)
+	m.saveio.save_now()
+
+
+func _end_kitchen_intro() -> void:
+	m.hud.quest_start_toast("먼지 속의 조리대")
+	m.hud.show_message("잡화점 선반에서 빗자루 레시피를 사자. (잡초 1로 제작)", 6.0)
+	m.saveio.save_now()
+
+
+# 조리대를 찾은 뒤 다시 찾아왔다 — 축하와 첫 요리 선물
+func kitchen_gift_dialog() -> void:
+	m.dialog.open_seq("잡화점 만수",
+		m.tex.get("npc_merchant_portrait_happy"), [
+		{"text": "「찾았어? 진짜 있었지?」"},
+		{"text": "「그 집 지은 사람이 부엌부터 들였을 거라니까.\n먼지만 걷어내면 되는 거였어.」"},
+		{"text": "「조리대도 찾았으니까 이것도 한번 만들어봐.\n산딸기잼이야.」"},
+		{"text": "「처음 해보기엔 어렵지 않을 거야.\n재료도 같이 줄게.」"},
+		{"text": "「직접 만들어보는 게 제일 빠르거든.」"},
+		{"text": "★ 산딸기잼 레시피 x1 · 산딸기 x%d 를 받았다!"
+			% GameData.JAM_BERRIES},
+	], _end_kitchen_gift)
+
+
+func _end_kitchen_gift() -> void:
+	if GameData.kitchen_quest != "found":
+		return
+	GameData.kitchen_quest = "jam"
+	GameData.give_recipe(GameData.JAM_ID)   # 가방에서 「배우기」로 익힌다
+	m.doing.gain_item("forage_berry", GameData.JAM_BERRIES)
+	Sound.play_sfx("sfx_coin")
+	m.hud.event_toast("산딸기잼 레시피와 산딸기 %d개" % GameData.JAM_BERRIES)
+	m.hud.show_message("가방에서 레시피를 배우고, 집 조리대(E)에서 산딸기잼을 지어 보자.", 7.0)
+	m.saveio.save_now()
+
+
+func _end_kitchen_quest() -> void:
+	GameData.kitchen_quest = "done"
+	m.hud.quest_toast("먼지 속의 조리대")
+	m.hud.show_message("첫 요리를 지었다!\n이제 잡화점에서 요리 레시피를 살 수 있다.", 7.0)
+	m.saveio.save_now()
+
+
+# 아직 요리 레시피를 팔 수 없을 때 만수가 하는 말 (단계별로 다르다)
+func kitchen_block_line() -> void:
+	var pages: Array = []
+	match GameData.kitchen_quest:
+		"broom", "make":
+			pages = [
+				{"text": "「그건 조리대를 찾고 나서 사도 늦지 않아.」"},
+				{"text": "「빗자루부터 만들어서 집을 한번 쓸어 보라니까?\n잡초 하나면 된다고 했잖아.」"},
+			]
+		"sweep":
+			pages = [
+				{"text": "「빗자루는 챙겼네? 그럼 집으로 가야지.」"},
+				{"text": "「먼지더미 앞에서 쓸다 보면 뭐가 나올 거야.」"},
+			]
+		"found":
+			pages = [
+				{"text": "「조리대 찾았다며! 그 얘기부터 좀 해 봐.」",
+					"portrait": m.tex.get("npc_merchant_portrait_happy")},
+			]
+		"jam":
+			pages = [
+				{"text": "「레시피는 아직 안 팔아. 준 거부터 만들어 봐.」"},
+				{"text": "「산딸기잼. 직접 한 번 지어 보면\n다음부터는 뭘 사야 할지 자네가 먼저 알걸?」"},
+			]
+		_:
+			pages = [
+				{"text": "「오, 요리 레시피에 관심이 있나 보네?」"},
+				{"text": "「그런데 지금은 사도 소용없을걸?\n아직 조리대가 없잖아.」"},
+				{"text": "「집 안을 한번 잘 찾아봐!」",
+					"portrait": m.tex.get("npc_merchant_portrait_happy")},
+			]
+	m.dialog.open_seq("잡화점 만수",
+		m.tex.get("npc_merchant_portrait_normal"), pages)
+
+
 # ---- 서브 퀘스트: 용식의 집터 ----
 #
 # 바닷길을 연 지 **정확히 3일 뒤**, 용식이 광장 분수대 앞에 나와 선다
