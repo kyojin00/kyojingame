@@ -114,6 +114,60 @@ function roughen(g, amount = 0.13) {
 }
 
 
+// 모서리를 깎는다 — 도트에서 「둥글다」는 **귀퉁이 한두 칸을 지우는 것**이다.
+// 90도 각이 그대로 남아 있으면 아무리 색을 잘 써도 상자로 보인다.
+function roundCorners(g, x0, y0, x1, y1, r) {
+  for (let i = 0; i < r; i++) {
+    const n = r - i;                       // 위에서부터 n칸씩 깎는다
+    for (let k = 0; k < n; k++) {
+      g.px(x0 + k, y0 + i, '.');
+      g.px(x1 - k, y0 + i, '.');
+      g.px(x0 + k, y1 - i, '.');
+      g.px(x1 - k, y1 - i, '.');
+    }
+  }
+}
+
+
+// 실루엣의 **바깥 90도 귀퉁이를 한 칸씩 깎는다.**
+//
+// 모서리를 손으로 하나하나 깎는 것보다 이 한 번이 낫다 — 벽·지붕·굴뚝·
+// 꽃상자까지 전부 같은 규칙으로 둥글어져서 결이 고르게 맞는다.
+// 「비어 있는 이웃이 둘인데 그 둘이 붙어 있고 사이 대각도 비었다」면
+// 그 칸은 바깥으로 튀어나온 귀퉁이다.
+function soften(g) {
+  const cut = [];
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (g.d[y][x] === '.') continue;
+    const e = (dx, dy) => g.get(x + dx, y + dy) === '.';
+    for (const [ax, ay, bx, by] of [[-1, 0, 0, -1], [1, 0, 0, -1],
+                                    [-1, 0, 0, 1], [1, 0, 0, 1]])
+      if (e(ax, ay) && e(bx, by) && e(ax + bx, ay + by)) { cut.push([x, y]); break; }
+  }
+  for (const [x, y] of cut) g.px(x, y, '.');
+  // 귀퉁이를 깎다 보면 한두 칸이 몸에서 떨어져 티끌로 남는다. 걷어 낸다.
+  const lab = new Int32Array(GW * GH).fill(-1), sizes = [];
+  for (let i = 0; i < GW * GH; i++) {
+    if (lab[i] >= 0 || g.d[(i / GW) | 0][i % GW] === '.') continue;
+    const id = sizes.length, st = [i]; lab[i] = id; let n = 0;
+    while (st.length) {
+      const q = st.pop(); n++;
+      const qx = q % GW, qy = (q / GW) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = qx + dx, ny = qy + dy;
+        if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+        const r = ny * GW + nx;
+        if (lab[r] >= 0 || g.d[ny][nx] === '.') continue;
+        lab[r] = id; st.push(r);
+      }
+    }
+    sizes.push(n);
+  }
+  for (let i = 0; i < GW * GH; i++)
+    if (lab[i] >= 0 && sizes[lab[i]] < 12) g.d[(i / GW) | 0][i % GW] = '.';
+}
+
+
 // ---- 뼈대 ----
 const X0 = 16, X1 = 111;         // 1층 벽 좌우
 const JUT = 3;                   // 2층이 앞으로 나온 턱 (제티)
@@ -126,9 +180,15 @@ const CX = Math.round((X0 + X1) / 2);
 
 
 function roof(g, x0, x1, top, base) {
+  // **곧은 빗변은 상자로 보인다.** 위에서 빨리 벌어지고 아래로 갈수록
+  // 완만해지게(지수 0.72) 부풀리면 종 모양이 되어 초가·동화집 느낌이 난다.
+  // 마지막 세 줄은 처마가 바깥으로 들리는 것 — 이게 있어야 지붕이 「얹힌」다.
   const h = base - top, half = (x1 - x0) / 2, cx = (x0 + x1) / 2;
   for (let i = 0; i <= h; i++) {
-    const w = Math.round(half * (i / h));
+    const t = i / h;
+    let w = half * Math.pow(t, 0.58);   // 지수가 낮을수록 종 모양이 세진다
+    if (i > h - 4) w += (i - (h - 4)) * 1.6;          // 처마 들림 (초가처럼 바깥으로)
+    w = Math.round(w);
     g.rect(Math.round(cx - w), top + i, Math.round(cx + w), top + i, 'r');
   }
   // 기와 골 — 세 줄마다 한 줄. 굵은 격자에서는 이 정도가 「기와」로 읽힌다
@@ -168,6 +228,7 @@ function windowBox(g, x, y, w, h, flowers) {
   g.px(x + 1, y + h - 2, 'e'); g.px(x + 2, y + h - 2, 'e');// 아래 반사
   g.vline(x + Math.floor(w / 2), y + 1, y + h - 2, 'T');   // 창살
   g.hline(x + 1, x + w - 2, y + Math.floor(h / 2), 'T');
+  roundCorners(g, x, y, x + w - 1, y + h - 1, 1);          // 창틀 귀퉁이
   if (flowers) {                                            // 창 밑 꽃상자
     const by = y + h;
     g.rect(x - 1, by, x + w, by + 2, 't');
@@ -285,7 +346,13 @@ function build(spec) {
   planter(g, X1 - 6, GROUND - 1);
   barrel(g, X1 - 16, GROUND);
   if (spec.sign) sign(g, CX);
+  // 벽 귀퉁이 — 아래쪽은 주춧돌이 받치고 있으니 위쪽만 깎는다
+  // 벽 귀퉁이를 크게 깎는다. 한두 칸으로는 티가 안 나 상자로 보인다 —
+  // 위(처마 밑)는 크게, 아래(주춧돌 쪽)는 작게 깎아야 얹혀 있는 것처럼 보인다.
+  roundCorners(g, X0 - JUT, EAVE, X1 + JUT, MID - 1, 4);
+  roundCorners(g, X0, MID, X1, GROUND - 3, 3);
   roughen(g);
+  soften(g);            // 남은 90도 귀퉁이를 전부 깎는다
   g.outline();
   return g;
 }
