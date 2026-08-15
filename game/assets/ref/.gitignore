@@ -1,2 +1,4 @@
 proposed_*.png
-node_modules/
+# 스크래치패드로 걸어 둔 심볼릭 링크다. 끝에 / 를 붙이면
+# 디렉터리만 매치돼서 링크는 안 걸린다
+node_modules
