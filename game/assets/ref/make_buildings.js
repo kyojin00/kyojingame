@@ -888,8 +888,15 @@ function chimney(g, x, top, base, far, w) {
   // 빗변 기울기(약 1:1)를 그대로 쓰면 일곱 칸에 여섯 줄이 떨어져서 밑동이
   // **잘려 나간 것처럼** 보인다. 절반이면 「지붕을 따라간다」는 읽히면서
   // 굴뚝은 여전히 곧게 서 있다.
+  // **어느 쪽 지붕에 섰느냐에 따라 기울기가 뒤집힌다.** 오른쪽 지붕은
+  // 오른쪽으로 내려가고 왼쪽 지붕은 왼쪽으로 내려간다. 한 방향으로 박아
+  // 두면 왼쪽에 세운 굴뚝 발이 지붕과 **반대로** 기울어 어긋나 보인다.
   const SLOPE = 0.5;
-  const foot = xx => base + Math.round((Math.max(x, Math.min(x1, xx)) - x) * SLOPE);
+  const down = (x + W / 2 < CX) ? -1 : 1;                  // 내려가는 쪽
+  const foot = xx => {
+    const c = Math.max(x, Math.min(x1, xx));
+    return base + Math.round((down > 0 ? c - x : x1 - c) * SLOPE);
+  };
 
   // 몸통 — 세로 세 톤. 폭이 일곱 칸(화면 14px)뿐이라 벽돌 한 장은 안 읽힌다.
   // 격자로 쪼갰더니 굴뚝이 아니라 사다리가 됐다. 왼쪽 한 줄 빛 /
@@ -950,10 +957,12 @@ function chimney(g, x, top, base, far, w) {
       if (onRoof(xx, yy)) roofT[yy][xx] = Math.min(1, roofT[yy][xx] + 0.38);
   // 지붕에 드리운 그림자 — 기와 **톤 사다리를 몇 단 아래로 밀어** 준다.
   // 색을 직접 칠하면 나중에 도는 기와 패스가 그대로 덮어쓴다
-  for (let y = top + 3; y <= foot(x1); y++)
-    for (let d = 1; d <= 4; d++)
-      if (roofT[y + 2] && roofT[y + 2][x1 + d] >= 0)
-        roofT[y + 2][x1 + d] = Math.min(1, roofT[y + 2][x1 + d] + (d < 3 ? 0.30 : 0.15));
+  for (let y = top + 3; y <= Math.max(foot(x), foot(x1)); y++)
+    for (let d = 1; d <= 4; d++) {
+      const xx = x1 + d;                                   // 빛은 늘 왼쪽 위에서 온다
+      if (roofT[y + 2] && roofT[y + 2][xx] >= 0)
+        roofT[y + 2][xx] = Math.min(1, roofT[y + 2][xx] + (d < 3 ? 0.30 : 0.15));
+    }
   // 납판 밑에도 — **발과 같이 비스듬히** 내려간다
   for (let xx = x - 2; xx <= x1 + 5; xx++)
     for (let d = 0; d < 6; d++) {
