@@ -241,17 +241,29 @@ HEAD_ROUND = [3.5, 5.0, 6.0, 6.0, 7.0,
               7.0, 7.0, 7.0, 7.0, 7.0, 7.0,
               6.0, 5.0, 4.0, 3.0]
 
+# 긴머리(여자) 두상은 **표를 따로 쓴다**. 위 표는 민머리 턱선에 맞춘 것이라
+# 마지막 네 줄을 12 -> 10 -> 8 -> 6으로 확 좁히는데, 긴머리는 그 자리에
+# 턱이 아니라 **귀 옆으로 내려오는 머리채**가 있다. 같은 표를 쓰면 머리채가
+# 턱 옆에서 잘려 나가고, 그 아래 어깨 머리채만 남아 **허공에 뜬 덩어리**로
+# 보였다 (뒷모습은 뒤통수가 잘록해졌다가 다시 벌어져 호리병 모양이 됐다).
+# 그래서 여기서는 폭을 거의 안 줄이고, 턱 모양은 그림 자체에 그려 넣는다.
+HEAD_ROUND_F = [3.5, 5.0, 6.0, 6.0, 7.0,
+                7.0, 7.0, 7.0, 7.0, 7.0, 7.0,
+                6.0, 6.0, 6.0, 6.0]
+
 
 def shrink_head(art):
     key = tuple(art)
     if key not in _SHRUNK:
+        # 16행짜리는 민머리·짧은머리, 그보다 긴 것은 머리채가 달린 긴머리다.
+        table = HEAD_ROUND_F if len(art) > 16 else HEAD_ROUND
         c0, c1 = HEAD_TRIM_COLS
         rows = [r[:c0] + r[c0 + 1:c1] + r[c1 + 1:]
                 for i, r in enumerate(art) if i != HEAD_TRIM_ROW]
         mid = (len(rows[0]) - 1) / 2.0
         out = []
         for i, r in enumerate(rows):
-            hw = HEAD_ROUND[i] if i < len(HEAD_ROUND) else 7.0
+            hw = table[i] if i < len(table) else 7.0
             out.append(''.join(cc if abs(x - mid) <= hw else '.'
                                for x, cc in enumerate(r)))
         _SHRUNK[key] = out
@@ -909,10 +921,15 @@ HEAD_DOWN_F = [
     "Oh" "r" "ssssssssss" "r" "h" "O",
     ".hh" "ssss" "mm" "ssss" "hh.",
     ".hh" "ssssssssss" "hh.",
-    ".hh" "ssssssssss" "hh.",
-    ".hh" "OO" "ssssss" "OO" "hh.",
-    ".hh" ".........." "hh.",
-    ".gg" ".........." "gg.",
+    # 턱이 좁아지는 만큼 머리채가 두꺼워지며 턱선을 감싼다
+    "." "hhh" "ssssssss" "hhh" ".",
+    "..." "hh" "ssssss" "hh" "...",
+    # ---- 턱 아래: 어깨까지 내려오는 머리채 ----
+    "..." "hh" "......" "hh" "...",
+    "." "hhhh" "......" "hhhh" ".",
+    "." "hhhh" "......" "hhhh" ".",
+    "." "ghh" "........" "hhg" ".",
+    "..." "g" "........" "g" "...",
 ]
 
 HEAD_SIDE_F = [   # 오른쪽을 본다
@@ -930,10 +947,15 @@ HEAD_SIDE_F = [   # 오른쪽을 본다
     "Ohh" "sss" "rr" "sssssss" "S",
     ".hhh" "ssssss" "mm" "ss" "O.",
     ".hhh" "ssssssssss" "O.",
-    ".hhh" "ssssssssss" "O.",
-    ".hhh" "O" "ssssssss" "O" "..",
-    ".hhh" "............",
-    ".ggg" "............",
+    # 턱 끝으로 갈수록 얼굴은 뒤로 물러나고 뒷머리는 두꺼워진다
+    "." "hhh" "ssssssss" "O" "...",
+    "." "hhhh" "ssssss" "O" "....",
+    # ---- 턱 아래: 등까지 흘러내리는 뒷머리 ----
+    "." "hhhh" "...........",
+    "." "hhhh" "...........",
+    "." "hhhh" "...........",
+    "." "ghh" "............",
+    "..." "g" "............",
 ]
 
 HEAD_UP_F = [
@@ -953,14 +975,19 @@ HEAD_UP_F = [
     ".hhhjhhhhhhjhhh.",
     ".hhhjhhhhhhjhhh.",
     ".hghhhhhhhhhhgh.",
-    ".gghhhhhhhhhhgg.",
-    "..gggggggggggg..",
+    # ---- 목덜미 아래: 등을 덮는 머리채 ----
+    ".hhhhhhhhhhhhhh.",
+    ".hhhjhhhhhhjhhh.",
+    ".hhhjhhhhhhjhhh.",
+    "..." "ghhhhhhhhg" "...",
+    "...." "gggggggg" "....",
 ]
 
-# 여자 머리는 어깨 위까지 — 16행 얼굴 + 2행 머리채 = 18행.
-# 머리를 몸 위에 겹쳐 그리므로 늘어난 행이 어깨를 자연스럽게 덮는다.
+# 긴머리는 16행 얼굴 + 5행 머리채 = 21행. 머리를 몸 위에 겹쳐 그리므로
+# 늘어난 다섯 줄이 어깨와 가슴 위쪽을 덮어 「길게 늘어뜨린 머리」가 된다.
+# (예전에는 두 줄뿐이라 셔츠에 닿지도 못하고 귀밑에서 뚝 끊겼다.)
 for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
-    assert len(_art) == 18 and all(len(r) == 16 for r in _art), \
+    assert len(_art) == 21 and all(len(r) == 16 for r in _art), \
         [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
 
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
