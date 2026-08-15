@@ -124,7 +124,9 @@ const BAYER = [[0.0, 0.5], [0.75, 0.25]];
 // 처음엔 위아래 그러데이션 전체에 디더를 깔았는데 온 벽이 격자무늬가 되어
 // 기계처럼 보였다. 옛 게임 그림도 디더는 **아껴** 썼다 — 넓은 면은 한 색으로
 // 시원하게 두고, 두 색이 만나는 두어 줄만 섞어 단차를 부드럽게 했다.
-const BAND = STYLE === 'soft' ? 2 : 0;   // 섞는 띠 두께 (칸)
+// 톤 경계의 바둑판 띠는 안 쓴다. 재질 얼룩(wallPatches)이 경계를 알아서
+// 흐려 주는데 그 위에 규칙적인 격자까지 얹으면 그것만 눈에 띈다.
+const BAND = 0;
 
 function ditherFace(g, tones, y0, y1) {
   let [lite, base, dark] = tones;
@@ -144,9 +146,69 @@ function ditherFace(g, tones, y0, y1) {
   }
 }
 
+// 면을 갈라 놓은 위에 **재질**을 얹는다.
+//
+// 픽셀 하나씩 무작위로 찍었더니 TV 노이즈처럼 보였다 — 「딱딱 도트 찍은 느낌」.
+// 진짜 재질은 **덩어리와 결**이 있다. 그래서 재료마다 구조를 준다:
+//
+//   기와  한 장씩 벽돌처럼 엇갈려 쌓고, 장마다 색을 조금씩 달리한다
+//   회벽  두세 칸짜리 뭉텅이로 얼룩진다 (미장 자국)
+//   목재  세로로 긴 결이 지나간다
+//
+// 핵심은 **좌표를 묶는 것**이다. hash(x, y)는 점이 되고,
+// hash(x>>2, y>>1)은 덩어리가 된다.
+const ROUGH = parseFloat((process.argv.find(a => a.startsWith('--rough=')) || '').slice(8))
+  || 0.20;
+
+// 기와 — 4x2 한 장씩, 한 줄 걸러 반 장씩 밀어 쌓는다
+function roofTiles(g, top, base) {
+  const TW = 5, TH = 3;
+  for (let y = top; y <= base; y++) {
+    const row = Math.floor((y - top) / TH);
+    const shift = (row % 2) ? TW / 2 : 0;
+    for (let x = 0; x < GW; x++) {
+      const c = g.d[y][x];
+      if (!'lrR'.includes(c)) continue;
+      const col = Math.floor((x + shift) / TW);
+      const r = hash(col, row);
+      if (r < ROUGH && DARKEN[c]) g.px(x, y, DARKEN[c]);
+      else if (r < ROUGH * 1.8 && LIGHTEN[c]) g.px(x, y, LIGHTEN[c]);
+      // 장 아랫줄에 이음매 — **한 칸 걸러** 찍는다. 통줄로 그으면
+      // 가로줄무늬가 지붕을 지배해서 기와가 아니라 골판지처럼 보인다.
+      if ((y - top) % TH === TH - 1 && (x + row) % 2 === 0 && DARKEN[c])
+        g.px(x, y, DARKEN[c]);
+    }
+  }
+}
+
+// 회벽 — 두세 칸짜리 뭉텅이. 큰 얼룩 위에 작은 얼룩을 겹쳐 자연스럽게.
+function wallPatches(g, y0, y1) {
+  for (let y = y0; y <= y1; y++) for (let x = 0; x < GW; x++) {
+    const c = g.d[y][x];
+    if (!'xwW'.includes(c)) continue;
+    const big = hash(x >> 2, y >> 2);          // 4x4 뭉텅이
+    const small = hash(x >> 1, y >> 1);        // 2x2 얼룩
+    const v = big * 0.65 + small * 0.35;
+    if (v < ROUGH && DARKEN[c]) g.px(x, y, DARKEN[c]);
+    else if (v > 1.0 - ROUGH * 0.8 && LIGHTEN[c]) g.px(x, y, LIGHTEN[c]);
+  }
+}
+
+// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
+function woodGrain(g) {
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = g.d[y][x];
+    if (!'utT'.includes(c)) continue;
+    if (hash(x, 0) < 0.30 && DARKEN[c]) g.px(x, y, DARKEN[c]);
+  }
+}
+
 function roughen(g) {
   ditherFace(g, ['l', 'r', 'R'], RIDGE, EAVE);          // 지붕
   ditherFace(g, ['x', 'w', 'W'], EAVE, GROUND);         // 벽
+  roofTiles(g, RIDGE, EAVE);
+  wallPatches(g, EAVE, GROUND);
+  woodGrain(g);
 }
 
 
