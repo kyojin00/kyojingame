@@ -52,6 +52,14 @@ func _spawn_objects() -> void:
 		m.objects.erase(m.door_tile(m.HOME_ANCHOR))
 		m.worldgen._spawn_house_node(m.HOME_ANCHOR)
 		m.worldgen._trim_paths_under_building(m.HOME_ANCHOR)
+	if GameData.forest_quest in ["visit", "done"]:
+		# 숲속의 집 (스토리 5) — 저장된 발자취 그대로 그림만 다시 세운다
+		m.objects.erase(m.door_tile(m.FOREST_HOUSE_ANCHOR))
+		m.worldgen._spawn_house_node(m.FOREST_HOUSE_ANCHOR)
+	if GameData.move_house.x >= 0:
+		# 재민의 집 (스토리 3) — 플레이어가 정한 자리에 다시 세운다
+		m.objects.erase(m.door_tile(GameData.move_house))
+		m.worldgen._spawn_house_node(GameData.move_house)
 	for pos: Vector2i in m.objects:
 		if m.objects[pos].kind != "house":
 			_spawn_object_node(pos, m.objects[pos].kind)
@@ -80,8 +88,26 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 상점 터 게시판 — 구역 해금 게시판과 같은 모습
 			texture = m.tex["board_unlock"]
 			offset = Vector2(0, -texture.get_height())
+		"home_sign":
+			# 새로 지은 집 앞 문패 — 누구 집인지 여기서 정한다
+			texture = m.tex["board_unlock"]
+			offset = Vector2(0, -texture.get_height())
+		"homeplot":
+			# 빈 집터 팻말 — 이주 편지를 수락하면 이 자리에 집이 선다
+			texture = m.tex["board_unlock"]
+			offset = Vector2(0, -texture.get_height())
+		"chief_hut":
+			# 이장의 거처 — 낡은 오두막에서 시작해, 마을이 크면 새 집이 된다
+			texture = m.tex["chief_house"] if GameData.chief_house_lv >= 1 \
+				else m.tex["chief_hut"]
+			offset = Vector2(0, -texture.get_height())
 		"board":
 			# 의뢰 게시판 — 다리 둘 달린 큰 코르크 게시판
+			texture = m.tex["board_quest"]
+			offset = Vector2(0, -texture.get_height())
+		"auction":
+			# 경매 게시판 — 같은 판에 금빛을 입혀 의뢰 게시판과 구별한다
+			# (색은 아래에서 스프라이트가 생긴 뒤에 입힌다)
 			texture = m.tex["board_quest"]
 			offset = Vector2(0, -texture.get_height())
 		"sign":
@@ -93,6 +119,24 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"cave":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
+		"onsen":
+			texture = m.tex["onsen"]   # 마을 온천 (메인 스토리 15)
+			offset = Vector2(0, -100)
+		"old_barn":
+			texture = m.tex["barn"]    # 방치된 옛 헛간 (메인 스토리 17)
+			offset = Vector2(0, -160)
+		"old_lookout":
+			texture = m.tex["old_lookout"]   # 옛 전망대 (메인 스토리 18)
+			offset = Vector2(0, -100)
+		"old_bench":
+			texture = m.tex["old_bench"]     # 무너진 나무 의자
+		"carved_stone":
+			texture = m.tex["carved_stone"]  # 글씨가 새겨진 돌
+		"seed_sprout":
+			texture = m.tex["crop_sprout"]   # 할아버지의 씨앗에서 돋은 새싹
+		"bent_tree":
+			texture = m.tex["tree_bare"]     # 마을 쪽으로 굽은 나무
+			offset = Vector2(0, -100)
 		"fence":
 			texture = m.tex["fence"]
 		"sprinkler":
@@ -101,6 +145,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["forage_berry"]
 		"forage_herb":
 			texture = m.tex["forage_herb"]
+		"forage_dandelion":
+			texture = m.tex["forage_dandelion"]
 		"forage_shell":
 			texture = m.tex["forage_shell"]
 		"forage_coral":
@@ -114,12 +160,19 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"forage_relic":
 			texture = m.tex["forage_relic"]
 		"stall":
-			# 민지의 해변 노점 — 차양 지붕이 위로 솟아 있어 밑변을 칸에 맞춘다
+			# 만수의 해변 노점 — 차양 지붕이 위로 솟아 있어 밑변을 칸에 맞춘다
 			texture = m.tex["stall"]
+			offset = Vector2(0, -texture.get_height())
+		"trash_bin":
+			# 바깥에 설치한 무인 판매함 (E로 연다)
+			texture = m.tex["trash_bin"]
 			offset = Vector2(0, -texture.get_height())
 		"weed":
 			# 서 있을 때는 풀숲, 주우면 묶음(weed)이 인벤토리에 들어간다
 			texture = m.tex["weed_plant"]
+		"old_book":
+			# 풀숲에 반쯤 묻힌 오래된 책 — 메인 스토리 6의 시작점
+			texture = m.tex["old_book"]
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
@@ -161,6 +214,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
 		if kind == "deco_fountain":
 			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
+		elif kind == "auction":
+			spr.modulate = Color(1.15, 1.0, 0.62)  # 경매 게시판은 금빛
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
@@ -188,6 +243,11 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 
 
 func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> void:
+	# 묵은 땅을 걷어내는 일 — 옛 농지(스토리 16)·옛 헛간(스토리 17)에서만 센다
+	var gone := str(m.objects.get(pos, {}).get("kind", ""))
+	if gone in ["weed", "rock", "tree"]:
+		m.story.story16_field_work("clear", pos)
+		m.story.story17_barn_work("clear", pos)
 	m.objects.erase(pos)
 	if m.obj_nodes.has(pos):
 		var node: Node2D = m.obj_nodes[pos]

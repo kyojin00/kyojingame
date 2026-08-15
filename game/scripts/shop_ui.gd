@@ -5,6 +5,8 @@ const TAB_BUTTONS := {
 	"buy": "BuyBtn", "sell": "SellBtn", "animal": "AnimalBtn",
 	"upgrade": "UpgradeBtn", "craft": "CraftBtn", "codex": "CodexBtn",
 }
+# 울타리 레시피 — 초반에 손이 닿는 값 (목재를 들고 온 손님에게만 보인다)
+const FENCE_RECIPE_PRICE := 250
 
 var main: Node2D
 var tab := "buy"
@@ -13,6 +15,7 @@ var shop_title := "상점"
 # 선반 구매: 잡화점 선반에서 열면 그 카테고리만 보인다
 #   "" = 전부 / seed 씨앗 / life 생활용품 / tool 도구·부품 / misc 기타
 var buy_cat := ""
+var sell_mult := 1.0       # 판매 배율 (쓰레기통 무인 판매 = 0.8)
 var last_sell_cells := 0   # 검증용 — 판매 격자에 깔린 칸 수
 var _head: Label
 var _money: Label
@@ -235,7 +238,7 @@ func _mk_sell_cell(icon_name: String, title: String, count: int,
 	b.add_theme_stylebox_override("normal", st)
 	b.add_theme_stylebox_override("hover", st2)
 	b.add_theme_stylebox_override("pressed", st2)
-	b.tooltip_text = "%s x%d\n개당 %dG · 전부 %dG%s\n(클릭: 전부 판매)" \
+	b.tooltip_text = "%s x%d\n개당 %dG · 전부 %dG%s\n(클릭: 수량 골라 판매)" \
 		% [title, count, unit, total, ("\n" + sub) if sub != "" else ""]
 	if main != null and main.tex.has(icon_name):
 		var ic := TextureRect.new()
@@ -276,9 +279,12 @@ func _on_tab(t: String) -> void:
 
 # allowed_tabs: 이 가게에서 쓸 수 있는 탭 (비우면 t 하나만)
 # cat: 선반에서 열었을 때의 구매 카테고리 ("" = 전부)
-func open(t: String, allowed_tabs: Array = [], title := "", cat := "") -> void:
+# mult: 판매 배율 — 쓰레기통(무인 판매함)은 0.8로 연다
+func open(t: String, allowed_tabs: Array = [], title := "", cat := "",
+		mult := 1.0) -> void:
 	tab = t
 	buy_cat = cat
+	sell_mult = mult
 	shop_title = title if title != "" else "상점"
 	allowed = allowed_tabs if not allowed_tabs.is_empty() else [t]
 	for key in TAB_BUTTONS:
@@ -293,6 +299,12 @@ func close() -> void:
 	visible = false
 
 
+# 아직 안 산(안 배운) 레시피만 선반에 놓는다 — 사는 순간 목록에서 사라진다
+func _recipe_on_sale(rid: String) -> bool:
+	return not GameData.recipe_items.has(rid) \
+		and rid not in GameData.recipes_unlocked
+
+
 func _mk_button(text: String, on_pressed: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -305,6 +317,10 @@ func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
 	_style_tabs()
+	# 구매 탭 이름은 열린 분류를 따른다 — 생활용품 선반을 열었는데
+	# 탭이 「씨앗」으로 적혀 있던 버그를 고쳤다.
+	$Panel/V/Tabs/BuyBtn.text = {"seed": "씨앗", "life": "생활용품",
+		"recipe": "레시피", "misc": "기타", "stall": "노점"}.get(buy_cat, "구매")
 	if _head != null:
 		_head.text = "- %s -" % shop_title
 		_money.text = "%d" % GameData.money
@@ -323,29 +339,22 @@ func _rebuild() -> void:
 			_note("— 노점 한정 레시피 (집 조리대에서 만든다) —")
 			for rid: String in GameData.STALL_RECIPE_IDS:
 				var rname := str(GameData.ITEMS[rid].name)
-				if not GameData.recipe_locked(rid):
-					items_box.add_child(_mk_row(rid, "%s 레시피 (배움)" % rname,
-						"재료를 모아 집 조리대에서 만들자"))
+				# 이미 산(또는 배운) 레시피는 목록에서 바로 사라진다
+				if not GameData.recipe_locked(rid) or GameData.recipe_items.has(rid):
 					continue
 				var rprice := int(GameData.STALL_RECIPES[rid])
 				var rb2 := _mk_button("구매", _on_buy_dish_recipe.bind(rid, rprice))
 				rb2.disabled = GameData.money < rprice
-				items_box.add_child(_mk_row(rid, "%s 레시피" % rname,
+				items_box.add_child(_mk_row("recipe", "%s 레시피" % rname,
 					"체력 +%d · 팔면 %dG" % [int(GameData.RECIPES[rid].energy),
 						int(GameData.ITEMS[rid].sell)], rb2, [["coin", rprice]]))
-			_note("— 노점 한정 생활용품 레시피 —")
-			if "trash_bin" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피 (배움)",
-					"집 책상에서 만든다 — 목재 5 · 금속 고리 2"))
-			else:
-				var tcp := _mk_button("구매", _on_buy_recipe.bind("trash_bin", 400))
-				tcp.disabled = GameData.money < 400
-				items_box.add_child(_mk_row("trash_bin", "쓰레기통 레시피",
-					"집에 놓는 튼튼한 쓰레기통 · 재료: 목재 5 · 금속 고리 2",
-					tcp, [["coin", 400]]))
-			_note("민지가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
+			_note("만수가 노점에 있을 때만 살 수 있다. 판매는 언제든!")
 		if buy_cat in ["", "seed"]:
+			# 진열되는 씨앗은 shop_seeds에 있는 것뿐 — 처음에는 밀·옥수수 둘이고,
+			# 게임을 진행하면서 하나씩 들어온다. 그중에서도 제철만 내놓는다.
 			for id in GameData.CROP_IDS:
+				if id not in GameData.shop_seeds:
+					continue
 				var def: Dictionary = GameData.CROPS[id]
 				if GameData.season() not in def.seasons:
 					continue  # 제철 씨앗만 판매
@@ -355,37 +364,102 @@ func _rebuild() -> void:
 				items_box.add_child(_mk_row("icon_seed", "%s 씨앗" % def.name,
 					"보유 %d개 · 수확까지 %d시간" % [GameData.seeds[id], def.grow_days], b,
 					[["coin", price]]))
+			_note("새 씨앗은 마을이 자라면 하나씩 들어온다.")
 			if GameData.merchant_discount():
-				_note("민지와 친해져서 씨앗 10% 할인 중! ♥")
-		if buy_cat in ["", "tool"]:
-			# 부품 — 제작대(집 책상)에서 가구를 만들 때 쓴다
-			_note("— 도구 부품 (제작대 재료) —")
-			for pid: String in ["nail", "cloth", "rope"]:
-				var pdef: Dictionary = GameData.ITEMS[pid]
-				var pprice := int(pdef.sell) * 2
-				var pb2 := _mk_button("구매", _on_buy_part.bind(pid, pprice))
-				pb2.disabled = GameData.money < pprice
-				items_box.add_child(_mk_row(pid, str(pdef.name),
-					"보유 %d개" % GameData.items[pid], pb2, [["coin", pprice]]))
-		if buy_cat in ["", "life"]:
-			# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다
+				_note("만수와 친해져서 씨앗 10% 할인 중! ♥")
+		# 「레시피」 선반 — 배워서 만들 수 있게 되는 것들만 모아 둔다
+		# (예전 「도구」 선반 자리다. 도구·부품은 대장간에서 다룬다)
+		if buy_cat in ["", "recipe"] and GameData.day > GameData.merchant_day:
+			# 초반 음식 레시피 — 재료를 겪어 본 순서대로 하나씩 진열된다
+			# (산딸기 주움→잼 · 밀 수확→밀가루 · 밀가루 얻음→빵 · 요리해 봄→토스트)
+			var food_rows := 0
+			for fid: String in GameData.SHOP_FOOD_IDS:
+				if not GameData.recipe_locked(fid) or GameData.recipe_items.has(fid):
+					continue
+				if not GameData.shop_food_on_sale(fid):
+					continue
+				if food_rows == 0:
+					_note("— 요리 레시피 (초반 음식) —")
+				food_rows += 1
+				var fprice := int(GameData.SHOP_FOOD_RECIPES[fid])
+				var fb := _mk_button("구매", _on_buy_dish_recipe.bind(fid, fprice))
+				fb.disabled = GameData.money < fprice
+				items_box.add_child(_mk_row("recipe",
+					"%s 레시피" % str(GameData.ITEMS[fid].name),
+					"체력 +%d" % int(GameData.RECIPES[fid].energy),
+					fb, [["coin", fprice]]))
+			# 요리 레시피 — 물고기를 잡았다고 저절로 떠오르지 않는다.
+			# 여기서 사서 가방(제작·배치)의 두루마리로 배운다.
+			# 도착 첫날은 진열 전이고, 그 요리에 드는 물고기를 낚아 봐야 선반에 오른다
+			var dish_rows := 0
+			for did: String in GameData.SHOP_DISH_IDS:
+				var dname := str(GameData.ITEMS[did].name)
+				# 이미 산(또는 배운) 레시피는 목록에서 바로 사라진다
+				if not GameData.recipe_locked(did) or GameData.recipe_items.has(did):
+					continue
+				if not GameData.shop_dish_on_shelf(did):
+					continue
+				if dish_rows == 0:
+					_note("— 요리 레시피 (생선 요리) —")
+				dish_rows += 1
+				var dprice := int(GameData.SHOP_DISH_RECIPES[did])
+				var db := _mk_button("구매", _on_buy_dish_recipe.bind(did, dprice))
+				db.disabled = GameData.money < dprice
+				items_box.add_child(_mk_row("recipe", "%s 레시피" % dname,
+					"체력 +%d" % int(GameData.RECIPES[did].energy),
+					db, [["coin", dprice]]))
+			# 레시피 — 사면 집 책상(제작대)에서 만들 수 있게 된다.
+			# 산(또는 배운) 레시피는 목록에서 바로 사라진다 — 재구매 없음.
 			_note("— 생활용품 레시피 —")
-			if "broom" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("broom", "빗자루 레시피 (배움)",
-					"집 책상에서 만든다 — 잡초 1"))
-			else:
+			if _recipe_on_sale("broom"):
 				var rcp := _mk_button("구매", _on_buy_recipe.bind("broom", 300))
 				rcp.disabled = GameData.money < 300
-				items_box.add_child(_mk_row("broom", "빗자루 레시피",
+				items_box.add_child(_mk_row("recipe", "빗자루 레시피",
 					"집 안의 먼지를 쓸어 낸다 · 재료: 잡초 1", rcp, [["coin", 300]]))
-			if "flower_pot" in GameData.recipes_unlocked:
-				items_box.add_child(_mk_row("flower_pot", "화분 레시피 (배움)",
-					"집 책상에서 만든다 — 잡초 5"))
-			else:
+			# 울타리 — **가방에 목재가 있을 때만** 선반에 오른다.
+			# 나무를 베어 본 사람에게만 쓸모가 있는 물건이라, 목재를 들고
+			# 들어서는 날 처음으로 눈에 띈다.
+			if _recipe_on_sale("fence") and not GameData.is_tool_unlocked("fence") \
+					and int(GameData.items.get("wood", 0)) > 0:
+				var fcp := _mk_button("구매", _on_buy_recipe.bind("fence", FENCE_RECIPE_PRICE))
+				fcp.disabled = GameData.money < FENCE_RECIPE_PRICE
+				items_box.add_child(_mk_row("recipe", "울타리 레시피",
+					"빈틈없이 둘러싸면 목초지가 된다 · 재료: 목재 1 (목재를 가진 손님에게만)",
+					fcp, [["coin", FENCE_RECIPE_PRICE]]))
+			if _recipe_on_sale("flower_pot"):
 				var pcp := _mk_button("구매", _on_buy_recipe.bind("flower_pot", 200))
 				pcp.disabled = GameData.money < 200
-				items_box.add_child(_mk_row("flower_pot", "화분 레시피",
+				items_box.add_child(_mk_row("recipe", "화분 레시피",
 					"집을 꾸미는 화분 · 재료: 잡초 5", pcp, [["coin", 200]]))
+			# 쓰레기통 — 24시간 무인 판매함 (제값의 80%). 원하는 곳에 설치한다.
+			if _recipe_on_sale("trash_bin"):
+				var tcp := _mk_button("구매", _on_buy_recipe.bind("trash_bin", 400))
+				tcp.disabled = GameData.money < 400
+				items_box.add_child(_mk_row("recipe", "쓰레기통 레시피",
+					"24시간 무인 판매함 (제값의 80%) · 재료: 목재 5 · 금속 고리 2",
+					tcp, [["coin", 400]]))
+			# 스프링클러 — 농사 실력이 붙어야(Lv3) 이장이 잡화점에 들여놓는다
+			if GameData.skill_lv("farm") >= GameData.SPRINKLER_FARM_LV \
+					and _recipe_on_sale("sprinkler") \
+					and not GameData.is_tool_unlocked("sprinkler"):
+				var scp := _mk_button("구매",
+					_on_buy_recipe.bind("sprinkler", GameData.SPRINKLER_RECIPE_PRICE))
+				scp.disabled = GameData.money < GameData.SPRINKLER_RECIPE_PRICE
+				items_box.add_child(_mk_row("recipe", "스프링클러 레시피",
+					"주변 4칸에 계속 물을 주는 설치물 (농사 Lv3 달성 기념 입고)",
+					scp, [["coin", GameData.SPRINKLER_RECIPE_PRICE]]))
+			# 집터 — 원할 때 언제든 미리 지어 둘 수 있는 큰 공사.
+			# (이주 편지는 빈 집터가 이미 있어야만 수락할 수 있다)
+			if _recipe_on_sale("housing_kit"):
+				var hcp := _mk_button("구매",
+					_on_buy_recipe.bind("housing_kit", GameData.HOUSING_KIT_PRICE))
+				hcp.disabled = GameData.money < GameData.HOUSING_KIT_PRICE
+				items_box.add_child(_mk_row("recipe", "집터 레시피",
+					"빈 집터를 미리 마련해 둔다 (이주 수락의 선행 조건) · 재료: 목재 90 · 석재 70",
+					hcp, [["coin", GameData.HOUSING_KIT_PRICE]]))
+		if buy_cat == "life":
+			# 생활에 쓰는 것은 「사는」 게 아니라 「만드는」 쪽으로 모았다
+			_note("생활에 쓰는 것들은 「레시피」 선반에서 만드는 법을 판다.")
 		if buy_cat in ["", "misc"]:
 			# 마음을 전하는 것들
 			_note("— 마음을 전하는 것 —")
@@ -400,6 +474,9 @@ func _rebuild() -> void:
 		# 판매: 가방과 같은 격자 — 일러스트만 보이고, 마우스를 올리면
 		# 이름·판매 가격이 툴팁으로 뜬다. 클릭하면 그 묶음을 전부 판다.
 		last_sell_cells = 0
+		if sell_mult < 1.0:
+			_note("무인 판매함 — 24시간 아무 때나, 대신 제값의 %d%%로 팔린다."
+				% int(sell_mult * 100.0))
 		_note("가방과 같은 격자다. 마우스를 올리면 이름·가격 · 클릭: 전부 판매")
 		var grid := GridContainer.new()
 		grid.columns = 9
@@ -418,8 +495,9 @@ func _rebuild() -> void:
 			if gold > 0:
 				qtxt += " · 금 %d" % gold
 			grid.add_child(_mk_sell_cell("mature_" + id, str(def.name), count,
-				int(def.sell_price), GameData.produce_sell_value(id),
-				qtxt, _on_sell.bind(id)))
+				int(def.sell_price * sell_mult),
+				int(GameData.produce_sell_value(id) * sell_mult),
+				qtxt, _open_sell_picker.bind("crop", id, str(def.name))))
 			last_sell_cells += 1
 		for id in GameData.ITEM_IDS:
 			var count: int = GameData.items[id]
@@ -429,7 +507,8 @@ func _rebuild() -> void:
 			if int(def.sell) <= 0:
 				continue  # 값이 없는 것(빗자루·꽃다발 등)은 팔지 않는다
 			grid.add_child(_mk_sell_cell(id, str(def.name), count,
-				int(def.sell), int(def.sell) * count, "", _on_sell_item.bind(id)))
+				int(def.sell * sell_mult), int(def.sell * sell_mult) * count,
+				"", _open_sell_picker.bind("item", id, str(def.name))))
 			last_sell_cells += 1
 		items_box.add_child(grid)
 		if last_sell_cells == 0:
@@ -518,7 +597,7 @@ func _rebuild() -> void:
 			else:
 				items_box.add_child(_mk_row("", "???", "집 조리대에서 만들어보자"))
 		_note("낚싯대를 들고 물가에서 E! 입질(!)이 오면 다시 E!\n"
-			+ "철수와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
+			+ "용식와 친해지면(호감도 50+) 판정 구간이 넓어진다.")
 	elif tab == "craft":
 		# 청혼 반지 — 대장간에서만 벼릴 수 있다
 		_note("— 특별 주문 —")
@@ -527,14 +606,15 @@ func _rebuild() -> void:
 		items_box.add_child(_mk_row("wedding_ring", "청혼 반지",
 			"보유 %d개 · 연인에게 (호감도 100)" % GameData.items["wedding_ring"],
 			rb, [["coin", GameData.RING_PRICE]]))
-		# 부품 — 경첩은 대장간에서만 (제작대 손보기 재료)
-		var hdef: Dictionary = GameData.ITEMS["hinge"]
-		var hprice := int(hdef.sell) * 2
-		var hb2 := _mk_button("구매", _on_buy_part.bind("hinge", hprice))
-		hb2.disabled = GameData.money < hprice
-		items_box.add_child(_mk_row("hinge", str(hdef.name),
-			"보유 %d개 · 제작대 손보기에 쓴다" % GameData.items["hinge"], hb2,
-			[["coin", hprice]]))
+		# 부품 — 못·경첩은 대장간에서만 (집터·침대·제작대 손보기 재료)
+		for pid: String in ["nail", "hinge"]:
+			var pdef: Dictionary = GameData.ITEMS[pid]
+			var pprice := int(pdef.sell) * 2
+			var pb2 := _mk_button("구매", _on_buy_part.bind(pid, pprice))
+			pb2.disabled = GameData.money < pprice
+			items_box.add_child(_mk_row(pid, str(pdef.name),
+				"보유 %d개 · 제작대 재료" % GameData.items[pid], pb2,
+				[["coin", pprice]]))
 		# 대장간 제작: 부위별로 묶어 보여 준다
 		for slot: String in GameData.GEAR_SLOTS:
 			var eq: String = str(GameData.equipped.get(slot, ""))
@@ -577,8 +657,10 @@ func _rebuild() -> void:
 					stat_line))
 				continue
 			var next: Dictionary = levels[level - 1]
+			# 화로가 되살아나면(스토리 7 완결) 골드 비용이 20% 싸진다
+			var gold_cost := GameData.forge_price(int(next.money))
 			var b := _mk_button("강화", _on_upgrade.bind(id))
-			b.disabled = GameData.money < next.money or GameData.wood < next.wood \
+			b.disabled = GameData.money < gold_cost or GameData.wood < next.wood \
 				or GameData.items["ore"] < next.ore
 			var gain := GameData.tool_stat_gain_text(id)
 			var sub := "%s → %s" % [stat_line, next.desc]
@@ -586,8 +668,10 @@ func _rebuild() -> void:
 				sub = "%s   (%s)" % [next.desc, gain]
 			items_box.add_child(_mk_row(icon,
 				"%s Lv.%d → %d" % [up.name, level, level + 1], sub, b,
-				[["coin", int(next.money)], ["wood", int(next.wood)],
+				[["coin", gold_cost], ["wood", int(next.wood)],
 				["ore", int(next.ore)]]))
+		if GameData.story7_phase == "done":
+			_note("되살아난 화로가 힘차게 타오른다 — 강화 골드 비용 20% 할인 중!")
 		_note("광석은 동굴(마을 북쪽)에서! 울타리: 목재 %d · 스프링클러: 목재 %d+석재 %d" % [
 			GameData.FENCE_COST_WOOD, GameData.SPRINKLER_COST_WOOD,
 			GameData.SPRINKLER_COST_STONE])
@@ -631,33 +715,47 @@ func _on_buy(id: String) -> void:
 	GameData.money -= price
 	GameData.seeds[id] += 1
 	GameData.today_spent += price
-	if main != null and not main._remote_acting:
+	if main != null and not main.remote_acting:
 		main.doing.net_shop("buy_seed", id)
 	_rebuild()
 
 
-func _on_sell(id: String) -> void:
-	var amount: int = GameData.produce_sell_value(id)  # 은/금 품질은 더 비싸게
+# qty -1 = 전량 (옛 호출·멀티 호환). 부분 판매는 일반 -> 은 -> 금 순으로
+# 내놓는다 — 값비싼 품질이 마지막까지 가방에 남는다.
+func _on_sell(id: String, qty := -1) -> void:
+	var def: Dictionary = GameData.CROPS[id]
+	var left: int = qty if qty >= 0 else 999999
+	var amount := 0
+	var take_n: int = mini(int(GameData.produce[id]), left)
+	amount += take_n * int(def.sell_price * sell_mult)
+	GameData.produce[id] = int(GameData.produce[id]) - take_n
+	left -= take_n
+	var take_s: int = mini(int(GameData.produce_silver.get(id, 0)), left)
+	amount += take_s * int(def.sell_price * 1.25 * sell_mult)
+	GameData.produce_silver[id] = int(GameData.produce_silver.get(id, 0)) - take_s
+	left -= take_s
+	var take_g: int = mini(int(GameData.produce_gold.get(id, 0)), left)
+	amount += take_g * int(def.sell_price * 1.5 * sell_mult)
+	GameData.produce_gold[id] = int(GameData.produce_gold.get(id, 0)) - take_g
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
-	GameData.produce[id] = 0
-	GameData.produce_silver[id] = 0
-	GameData.produce_gold[id] = 0
-	if main != null and not main._remote_acting:
-		main.doing.net_shop("sell_crop", id)
+	if main != null and not main.remote_acting:
+		main.doing.net_shop("sell_crop", id, qty)
 	_rebuild()
 
 
-func _on_sell_item(id: String) -> void:
+func _on_sell_item(id: String, qty := -1) -> void:
 	var def: Dictionary = GameData.ITEMS[id]
-	var amount: int = def.sell * GameData.items[id]
+	var n: int = int(GameData.items[id]) if qty < 0 \
+		else mini(qty, int(GameData.items[id]))
+	var amount: int = int(def.sell * sell_mult) * n
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
-	GameData.items[id] = 0
-	if main != null and not main._remote_acting:
-		main.doing.net_shop("sell_item", id)
+	GameData.items[id] = int(GameData.items[id]) - n
+	if main != null and not main.remote_acting:
+		main.doing.net_shop("sell_item", id, qty)
 	_rebuild()
 
 
@@ -670,9 +768,9 @@ func _on_buy_animal(id: String) -> void:
 	GameData.today_spent += def.price
 	main.farming.spawn_animal(id)
 	# 가게는 마을에 있지만 동물은 농장으로 간다 — 어디로 갔는지 알려 준다
-	main.hud.show_message("%s를 들였다! **농장(맵 서쪽)** 에서 기다린다. (지도 M)"
+	main.hud.show_message("%s를 들였다! 농장(맵 서쪽) 에서 기다린다. (지도 M)"
 		% def.name, 5.0)
-	if main != null and not main._remote_acting:
+	if main != null and not main.remote_acting:
 		main.doing.net_shop("buy_animal", id)
 	_rebuild()
 
@@ -714,25 +812,34 @@ func _on_buy_bait() -> void:
 
 # 노점 한정 요리 레시피 — 사면 집 조리대의 잠긴 칸이 열린다
 func _on_buy_dish_recipe(id: String, price: int) -> void:
-	if GameData.money < price or not GameData.recipe_locked(id):
+	# 조리대 이야기를 마치기 전에는 팔지 않는다 — 돈도 레시피도 오가지 않는다.
+	# (이야기의 시작은 오직 만수와의 대화다 — 여기서는 시작되지 않는다)
+	if not GameData.cook_shop_open():
+		main.story.kitchen_block_line()
+		return
+	if GameData.money < price or not GameData.recipe_locked(id) \
+			or GameData.recipe_items.has(id):
 		return
 	GameData.money -= price
 	GameData.today_spent += price
-	GameData.recipes_unlocked.append(id)
+	GameData.give_recipe(id)   # 바로 배워지지 않는다 — 가방에서 「배우기」
 	Sound.play_sfx("sfx_coin")
-	main.hud.quest_toast("%s 레시피를 배웠다" % GameData.ITEMS[id].name)
+	main.hud.show_message("%s 레시피를(을) 얻었다 — 가방(제작·배치)에서 배우자" % GameData.ITEMS[id].name)
 	_rebuild()
 
 
 # 레시피 구매 — 집 책상의 잠긴 칸이 열린다
 func _on_buy_recipe(id: String, price: int) -> void:
-	if GameData.money < price or id in GameData.recipes_unlocked:
+	if GameData.money < price or id in GameData.recipes_unlocked \
+			or GameData.recipe_items.has(id):
 		return
+	if id == "broom" and main != null:
+		main.story._kitchen_update(0.0)   # 빗자루 레시피 = 「먼지 속의 조리대」 첫 걸음
 	GameData.money -= price
 	GameData.today_spent += price
-	GameData.recipes_unlocked.append(id)
+	GameData.give_recipe(id)   # 바로 배워지지 않는다 — 가방에서 「배우기」
 	Sound.play_sfx("sfx_coin")
-	main.hud.quest_toast("%s 레시피를 배웠다" % GameData.DESK_RECIPES[id].name)
+	main.hud.show_message("%s 레시피를(을) 얻었다 — 가방(제작·배치)에서 배우자" % GameData.DESK_RECIPES[id].name)
 	_rebuild()
 
 
@@ -746,8 +853,8 @@ func _on_buy_horse() -> void:
 	if main != null:
 		main.riding.place_horse()
 		main.hud.show_message(
-			"말을 샀다! **농장(맵 서쪽) 축사 앞** 에 세워 두었다.\n"
-			+ "가까이 가서 **F** 를 누르면 탄다. (지도 M에 「말」로 표시된다)", 6.0)
+			"말을 샀다! 농장(맵 서쪽) 축사 앞 에 세워 두었다.\n"
+			+ "가까이 가서 F 를 누르면 탄다. (지도 M에 「말」로 표시된다)", 6.0)
 	_rebuild()
 
 
@@ -760,7 +867,7 @@ func _on_buy_pet(id: String) -> void:
 	GameData.today_spent += int(def.price)
 	GameData.owned_pets.append(id)
 	GameData.active_pet = id
-	if main != null and not main._remote_acting:
+	if main != null and not main.remote_acting:
 		main.doing.net_shop("buy_pet", id)
 	_rebuild()
 
@@ -768,7 +875,7 @@ func _on_buy_pet(id: String) -> void:
 func _on_select_pet(id: String) -> void:
 	GameData.active_pet = id
 	Sound.play_sfx("sfx_ui")
-	if main != null and not main._remote_acting:
+	if main != null and not main.remote_acting:
 		main.doing.net_shop("select_pet", id)
 	_rebuild()
 
@@ -779,14 +886,163 @@ func _on_upgrade(id: String) -> void:
 	if level - 1 >= levels.size():
 		return
 	var next: Dictionary = levels[level - 1]
-	if GameData.money < next.money or GameData.wood < next.wood \
+	var gold_cost := GameData.forge_price(int(next.money))
+	if GameData.money < gold_cost or GameData.wood < next.wood \
 			or GameData.items["ore"] < next.ore:
 		return
 	Sound.play_sfx("sfx_coin")
-	GameData.money -= next.money
+	GameData.money -= gold_cost
 	GameData.wood -= int(next.wood)
 	GameData.items["ore"] -= int(next.ore)
 	GameData.tool_level[id] = level + 1
-	if main != null and not main._remote_acting:
+	if main != null and not main.remote_acting:
 		main.doing.net_shop("upgrade", id)
 	_rebuild()
+
+
+# ---- 판매 수량 선택 ----
+#
+# 셀을 클릭하면 이 패널이 뜬다. -10/-1/+1/+10(Shift = x10)으로 수량을
+# 맞추고, **「팔기」 버튼을 눌러야만** 거래가 된다 — 실수로 전량이
+# 팔려 나가는 일을 막는다. 기본값은 전량이다.
+var _qty_layer: PanelContainer = null
+var _qty_kind := ""
+var _qty_id := ""
+var _qty := 0
+var _qty_max := 0
+var _qty_label: Label = null
+var _qty_total: Label = null
+var _qty_title: Label = null
+
+
+func _sell_qty_max(kind: String, id: String) -> int:
+	if kind == "crop":
+		return int(GameData.produce[id]) + int(GameData.produce_silver.get(id, 0)) \
+			+ int(GameData.produce_gold.get(id, 0))
+	return int(GameData.items[id])
+
+
+# 일반 -> 은 -> 금 순서 그대로 미리 계산한 판매 금액 (패널의 실시간 합계)
+func _sell_qty_value(kind: String, id: String, qty: int) -> int:
+	if kind == "item":
+		return int(GameData.ITEMS[id].sell * sell_mult) * qty
+	var def: Dictionary = GameData.CROPS[id]
+	var left := qty
+	var amount := 0
+	var take_n: int = mini(int(GameData.produce[id]), left)
+	amount += take_n * int(def.sell_price * sell_mult)
+	left -= take_n
+	var take_s: int = mini(int(GameData.produce_silver.get(id, 0)), left)
+	amount += take_s * int(def.sell_price * 1.25 * sell_mult)
+	left -= take_s
+	amount += mini(int(GameData.produce_gold.get(id, 0)), left) \
+		* int(def.sell_price * 1.5 * sell_mult)
+	return amount
+
+
+func _open_sell_picker(kind: String, id: String, disp: String) -> void:
+	_qty_kind = kind
+	_qty_id = id
+	_qty_max = _sell_qty_max(kind, id)
+	_qty = _qty_max          # 기본은 전량 — 그래도 「팔기」를 눌러야 팔린다
+	if _qty_max <= 0:
+		return
+	if _qty_layer == null:
+		_qty_layer = PanelContainer.new()
+		var st := StyleBoxFlat.new()
+		st.bg_color = Color(0.97, 0.93, 0.83, 0.98)
+		st.border_color = Color(0.45, 0.3, 0.16)
+		st.set_border_width_all(3)
+		st.set_corner_radius_all(9)
+		st.set_content_margin_all(10)
+		_qty_layer.add_theme_stylebox_override("panel", st)
+		_qty_layer.anchor_left = 0.5
+		_qty_layer.anchor_right = 0.5
+		_qty_layer.anchor_top = 0.5
+		_qty_layer.anchor_bottom = 0.5
+		_qty_layer.grow_horizontal = Control.GROW_DIRECTION_BOTH
+		_qty_layer.grow_vertical = Control.GROW_DIRECTION_BOTH
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 6)
+		_qty_layer.add_child(v)
+		_qty_title = Label.new()
+		_qty_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_qty_title.add_theme_font_size_override("font_size", 16)
+		_qty_title.add_theme_color_override("font_color", Color(0.32, 0.2, 0.1))
+		v.add_child(_qty_title)
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 4)
+		v.add_child(row)
+		for step: int in [-10, -1]:
+			row.add_child(_mk_qty_btn(step))
+		_qty_label = Label.new()
+		_qty_label.custom_minimum_size = Vector2(72, 0)
+		_qty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_qty_label.add_theme_font_size_override("font_size", 19)
+		_qty_label.add_theme_color_override("font_color", Color(0.32, 0.2, 0.1))
+		row.add_child(_qty_label)
+		for step2: int in [1, 10]:
+			row.add_child(_mk_qty_btn(step2))
+		var row2 := HBoxContainer.new()
+		row2.alignment = BoxContainer.ALIGNMENT_CENTER
+		row2.add_theme_constant_override("separation", 6)
+		v.add_child(row2)
+		var half := _mk_button("절반", func() -> void: _set_qty(_qty_max / 2))
+		var all := _mk_button("전량", func() -> void: _set_qty(_qty_max))
+		row2.add_child(half)
+		row2.add_child(all)
+		_qty_total = Label.new()
+		_qty_total.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_qty_total.add_theme_font_size_override("font_size", 15)
+		_qty_total.add_theme_color_override("font_color", Color(0.62, 0.44, 0.26))
+		v.add_child(_qty_total)
+		var row3 := HBoxContainer.new()
+		row3.alignment = BoxContainer.ALIGNMENT_CENTER
+		row3.add_theme_constant_override("separation", 10)
+		v.add_child(row3)
+		var sellb := _mk_button("팔기", _confirm_sell)
+		sellb.custom_minimum_size = Vector2(96, 32)
+		row3.add_child(sellb)
+		var cancelb := _mk_button("취소", func() -> void: _qty_layer.visible = false)
+		cancelb.custom_minimum_size = Vector2(72, 32)
+		row3.add_child(cancelb)
+		var hint := Label.new()
+		hint.text = "Shift + 버튼: 10배씩"
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.add_theme_font_size_override("font_size", 11)
+		hint.add_theme_color_override("font_color", Color(0.6, 0.52, 0.4))
+		v.add_child(hint)
+		$Panel.add_child(_qty_layer)
+	_qty_title.text = disp
+	_qty_layer.visible = true
+	_refresh_qty()
+
+
+func _mk_qty_btn(step: int) -> Button:
+	var b := _mk_button(("+%d" % step) if step > 0 else str(step),
+		func() -> void:
+			var mul := 10 if Input.is_key_pressed(KEY_SHIFT) else 1
+			_set_qty(_qty + step * mul))
+	b.custom_minimum_size = Vector2(44, 30)
+	return b
+
+
+func _set_qty(q: int) -> void:
+	_qty = clampi(q, 1, _qty_max)
+	_refresh_qty()
+
+
+func _refresh_qty() -> void:
+	_qty_label.text = "%d / %d" % [_qty, _qty_max]
+	_qty_total.text = "판매 금액: %dG" % _sell_qty_value(_qty_kind, _qty_id, _qty)
+
+
+func _confirm_sell() -> void:
+	_qty_layer.visible = false
+	if _sell_qty_max(_qty_kind, _qty_id) <= 0:
+		return
+	if _qty_kind == "crop":
+		_on_sell(_qty_id, _qty)
+	else:
+		_on_sell_item(_qty_id, _qty)

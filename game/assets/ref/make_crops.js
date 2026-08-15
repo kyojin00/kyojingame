@@ -156,6 +156,7 @@ const CROPS = {
   beet: () => root(C.red2, C.purple2),
   leek: () => stalk(C.white, C.leaf),
   rice: () => grain(C.gold),
+  wheat: () => grain(C.cream),   // 밀 — 벼보다 옅은 밀짚색 이삭
   snow_cabbage: () => head(C.ice, C.pale),
 };
 

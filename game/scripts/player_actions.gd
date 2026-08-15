@@ -10,11 +10,23 @@ extends Node
 var m: KyojinMain    # main.gd
 
 
-func net_shop(op: String, id: String) -> void:
+func net_shop(op: String, id: String, qty := -1) -> void:
 	if Net.is_host():
 		m.netsync._broadcast_stats()
 	elif Net.is_guest():
-		m.netsync._req_shop.rpc_id(1, op, id)
+		m.netsync._req_shop.rpc_id(1, op, id, qty)
+
+
+# 경매장(바깥 장터)에서 물건·돈이 오간 결과를 함께하기 세계에 반영한다.
+# 지갑과 창고가 공용이라 게스트가 사고팔면 호스트 쪽도 같이 움직여야 한다.
+# qty > 0 이면 창고로 들어오고, < 0 이면 나간다. 부른 쪽은 이미 제 화면에
+# 반영해 둔 상태이고 (낙관적), 호스트의 통계 방송이 정답으로 덮는다.
+func net_auction(cat: String, id: String, qty: int, quality: int,
+		money_delta: int) -> void:
+	if Net.is_guest():
+		m.netsync._req_auction.rpc_id(1, cat, id, qty, quality, money_delta)
+	elif Net.is_host():
+		m.netsync._broadcast_stats()
 
 
 func record_kill(mob: String) -> void:
@@ -49,6 +61,7 @@ func do_cook(id: String) -> void:
 	Sound.play_sfx("sfx_buy")
 	m.hud.show_message("'%s' 완성!" % GameData.ITEMS[id].name)
 	m.toolwork.gain_skill("cook", 8.0)
+	m.tutorial_notify("cook")   # 밭 갈기 -> ... -> 수확 -> 요리로 이어지는 줄기
 	if Net.is_guest():
 		m.netsync._req_cook.rpc_id(1, id)
 	elif Net.is_host():
@@ -82,9 +95,9 @@ func do_brew(ids: Array) -> Dictionary:
 	var first := GameData.learn_formula(fid)
 	if first:
 		# 처음 맞힌 순간이 이 시스템의 알맹이다 — 크게 알린다
-		m.hud.quest_toast("새 조합법 발견!")
+		m.hud.event_toast("새 조합법 발견!")
 		m.dialog.open("연금술 — 새 조합법",
-			"**%s** 을(를) 만들어냈다!\n\n%s\n\n필요한 속성: %s\n조합법이 연구 노트(N)에 적혔다."
+			"%s 을(를) 만들어냈다!\n\n%s\n\n필요한 속성: %s\n조합법이 연구 노트(N)에 적혔다."
 				% [GameData.FORMULAS[fid].name, GameData.FORMULAS[fid].effect,
 				GameData.formula_need_text(fid)],
 			[["좋아", null]])
@@ -124,12 +137,12 @@ func _maybe_drop_recipe(source: String) -> void:
 	var left: Array = GameData.unknown_formulas()
 	if left.is_empty():
 		return
-	if randf() >= float(GameData.ALCHEMY_DROP.get(source, 0.0)):
+	if randf() >= GameData.alchemy_drop_chance(source):
 		return
 	var fid: String = left[randi() % left.size()]
 	GameData.learn_formula(fid)
 	Sound.play_sfx("sfx_ui")
-	m.hud.quest_toast("낡은 조합법을 주웠다")
+	m.hud.event_toast("낡은 조합법을 주웠다")
 	m.hud.show_message("「%s」 조합법을 알아냈다! (%s) — 집 조합대에서 만들 수 있다"
 		% [GameData.FORMULAS[fid].name, GameData.formula_need_text(fid)], 5.0)
 
@@ -140,8 +153,15 @@ func do_eat(id: String) -> void:
 	GameData.items[id] -= 1
 	var e: float = float(GameData.RECIPES[id].energy) * GameData.cook_energy_mult()
 	GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + e)
+	# 배부름은 요리마다 다르다 — 국밥은 든든하고, 차는 기운만 돈다
+	var fill: float = GameData.recipe_fill(id) * GameData.cook_energy_mult()
+	GameData.feed(fill)
 	Sound.play_sfx("sfx_harvest")
-	m.hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
+	if GameData.hunger_open:
+		m.hud.show_message("%s를 먹었다 — %s! 체력 +%d"
+			% [GameData.ITEMS[id].name, GameData.fill_word(id), int(e)])
+	else:
+		m.hud.show_message("%s를 먹었다! 체력 +%d" % [GameData.ITEMS[id].name, int(e)])
 	if Net.is_guest():
 		m.netsync._req_eat.rpc_id(1, id)
 	elif Net.is_host():

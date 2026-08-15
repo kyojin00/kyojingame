@@ -24,7 +24,7 @@ var bumped := false  # 이동하려 했지만 완전히 막혔는가 (스토리 
 #   2. 걷기 프레임을 쓰지 않는다. 안 그러면 말 위에서 걸어다닌다.
 #      대신 말 걸음에 맞춰 몸이 오르내린다.
 #
-# 캐릭터 도트: 128x192, 내용은 4~189행, 0.5배로 그린다 (발이 원점).
+# 캐릭터 도트: 128x192, 내용은 12~191행, 0.5배로 그린다 (발이 원점).
 # 그래서 텍스처 r행은 발밑 기준 (r - 188) * 0.5 만큼 위에 온다.
 const HORSE_SCALE := 1.15
 const RIDER_ROWS := 192.0      # 캐릭터 텍스처 세로
@@ -66,10 +66,10 @@ var horse_sprite: Sprite2D
 #
 # ---- 휘두르기 도트 ----
 #
-# 남자 캐릭터는 `assets/ref/new_boy3/`에서 방향당 네 장을 뽑아 두었다
-# (`new_boy_<방향>_swing_0..3` = 감기 시작 · 다 감음 · 내리침 · 되돌아옴).
-# 여자 캐릭터는 아직 없어서 `_swing_frame`이 ""를 돌려주고, 그때는 아래
-# 몸통 회전으로 대신한다. 도트를 뽑아 이름만 맞추면 그날부터 켜진다.
+# 남녀 모두 `assets/ref/dot_boy/make_sprites.py`가 방향당 다섯 장을 그린다
+# (`new_boy_/player_f_<방향>_swing_0..4` = 감기 시작·다 감음·휘두름·내리침·되돌아옴).
+# 골격이 같아 SWING_HAND_DOT도 공용이다. 도트가 없으면 `_swing_frame`이
+# ""를 돌려주고, 그때는 아래 몸통 회전으로 대신한다.
 #
 # 도트가 있으면 **몸을 가르지 않는다**. 그림이 이미 굽힌 자세라 거기에
 # 상체 회전을 또 얹으면 두 번 굽는다.
@@ -81,7 +81,7 @@ const SWING_SHIFT := 5.0        # 내리치는 쪽으로 몸이 쏠리는 거리
 const SWING_SQUASH := 0.06      # 닿는 순간 몸이 눌리는 정도
 const SWING_HOLD := 0.10        # 히트스톱: 정점에서 머무는 구간 (진행도 0~1 기준)
 const SWING_TRAIL := 6          # 도구 잔상으로 남기는 자취 수
-const SWING_FRAMES := 4         # 방향당 휘두르기 도트 장수
+const SWING_FRAMES := 5         # 방향당 휘두르기 도트 장수
 
 # 방향마다 손이 있는 자리와 휘두르는 폭이 다르다.
 #   hand   손잡이 끝이 오는 자리 (발밑 기준 node 좌표. x는 sign_x로 뒤집힌다)
@@ -108,18 +108,22 @@ const SWING_POSE := {
 #   도트에서 읽은 값 (발밑 가운데가 원점) -> 여기 적는 값
 #   node.x = 도트.x / 2 ,  node.y = (도트.y + 2) / 2      (offset -64,-188 · 0.5배)
 #
-# 값은 `assets/ref/new_boy3/`의 도트에 눈금을 얹어 놓고 주먹 한가운데를 읽었다.
-# **그림을 다시 뽑으면 여기도 다시 읽어야 한다** — 안 맞으면 도구가 손에서 뜬다.
-# 도트가 없는 방향은 여기에도 없고, SWING_POSE의 이어지는 식을 쓴다.
+# 값은 `assets/ref/dot_boy/make_sprites.py`가 주먹을 그린 자리에서 계산해
+# 실행 끝에 찍어 준다 — **그림을 다시 뽑으면 찍힌 값을 여기 그대로 옮긴다.**
+# 안 맞으면 도구가 손에서 뜬다. 도트가 없는 방향은 SWING_POSE의 식을 쓴다.
 const SWING_HAND_DOT := {
-	# 감기 시작 · 다 감음(머리 위) · 내리침 · 되돌아옴
-	"side": [Vector2(-18, -57), Vector2(-9, -86), Vector2(16, -16), Vector2(19, -37)],
-	"down": [Vector2(-18, -57), Vector2(-9, -86), Vector2(16, -34), Vector2(16, -35)],
-	"up": [Vector2(19, -56), Vector2(10, -87), Vector2(-19, -17), Vector2(-16, -34)],
+	# 감기 시작 · 다 감음(머리 옆) · 휘두름 · 내리침 · 되돌아옴
+	# 앞·뒷모습은 옆으로 쓸지 않고 **앞으로** 내리친다(원근). 앞모습은 팔이
+	# 닿는 왼쪽 옆에서 그대로 내리 긋고(가운데까지 억지로 안 끌고 간다),
+	# 뒷모습은 정수리 너머 저편으로 넘어가 주먹이 머리에 가려진다.
+	"side": [Vector2(-17, -57), Vector2(-17, -69), Vector2(21, -61), Vector2(19, -25), Vector2(17, -37)],
+	"down": [Vector2(-19, -53), Vector2(-23, -71), Vector2(-27, -53), Vector2(-13, -29), Vector2(-19, -49)],
+	"up": [Vector2(19, -57), Vector2(19, -71), Vector2(9, -83), Vector2(3, -73), Vector2(19, -63)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
 	"hoe": "icon_hoe", "water": "icon_water",
+	"sword": "icon_sword", "spear": "icon_spear",
 }
 # 도구 그림마다 자루가 놓인 방향이 다르다. 곡괭이·호미·물뿌리개는 자루가
 # **왼쪽 아래**에서 머리가 오른쪽 위로 가는데 **도끼만 반대**다
@@ -134,6 +138,8 @@ const TOOL_GRIP := {
 	"icon_axe": Vector2(25, 30), "icon_axe_stone": Vector2(26, 30),
 	"icon_pickaxe": Vector2(3, 30), "icon_hoe": Vector2(4, 23),
 	"icon_water": Vector2(13, 23),
+	# 돌창·돌검도 자루가 왼쪽 아래 (곡괭이와 같은 방향)
+	"icon_sword": Vector2(4, 29), "icon_spear": Vector2(5, 28),
 }
 
 var _was_riding := false        # 그림자 크기를 다시 그릴 때만 쓴다
@@ -180,16 +186,21 @@ func _ready() -> void:
 
 # 휘두르기 시작. face = 내리치는 방향, length = 동작 길이(초)
 func start_swing(tool_id: String, face: Vector2, length: float) -> void:
-	if not TOOL_ICONS.has(tool_id):
-		return
-	var icon: String = TOOL_ICONS[tool_id]
+	# 손에 쥘 그림을 고른다. **그림이 없어도 몸은 반드시 휘두른다** —
+	# 여기서 되돌아가 버리면 기력만 닳고 동작이 안 나온다.
+	var icon := str(TOOL_ICONS.get(tool_id, ""))
 	if tool_id == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
 		icon = "icon_axe_stone"
-	if not main.tex.has(icon):
-		return
-	tool_sprite.texture = main.tex[icon]
-	_tool_grip = TOOL_GRIP.get(icon, Vector2(16, 30))
-	_tool_mirror = TOOL_MIRROR.has(tool_id)
+	if icon != "" and main != null and main.tex.has(icon):
+		tool_sprite.texture = main.tex[icon]
+		_tool_grip = TOOL_GRIP.get(icon, Vector2(16, 30))
+		_tool_mirror = TOOL_MIRROR.has(tool_id)
+	else:
+		# 그림 없는 도구 — 맨손으로 휘두른다 (도구만 안 보인다)
+		tool_sprite.texture = null
+		tool_sprite.visible = false
+		_tool_grip = Vector2(16, 30)
+		_tool_mirror = false
 	swing_face = face if face != Vector2.ZERO else Vector2.DOWN
 	swing_len = maxf(0.14, length)
 	swing_t = swing_len
@@ -248,12 +259,15 @@ func _swing_frame(key: String) -> String:
 	return "%s_%d" % [base, swing_phase()]
 
 
-# 지금 위상 (0=감기 시작 / 1=다 감음 / 2=내리침 / 3=되돌아옴).
+# 지금 위상 (0=감기 시작 / 1=다 감음 / 2=휘두름 / 3=내리침 / 4=되돌아옴).
 #
 # 시간(진행도)으로 가른다. `swing_c`로 가르면 감을 때와 되돌아올 때가 같은
 # 값을 지나서 한 위상이 두 번 나온다 — 팔이 갔다가 되짚어 오는 것처럼 보인다.
 #
-# 내리치는 그림(2)은 **판정 순간부터 남은 시간의 절반 넘게** 붙들어 둔다.
+# 휘두름(2)은 가속 구간 끝자락에만 잠깐 스친다 — 머리 위를 지나는 호가
+# 한 번 보이면 충분하고, 오래 붙들면 내리침이 늦어 보인다.
+#
+# 내리치는 그림(3)은 **판정 순간부터 남은 시간의 절반 넘게** 붙들어 둔다.
 # 히트스톱(0.03초)만큼만 보이면 두 프레임 만에 지나가서, 정작 제일 중요한
 # 「맞은 자세」가 눈에 안 남는다.
 func swing_phase() -> int:
@@ -263,9 +277,11 @@ func swing_phase() -> int:
 	var hit := _hit_p()
 	if p < hit * 0.34:
 		return 0
-	if p < hit:
+	if p < hit * 0.74:
 		return 1
-	return 2 if p < hit + (1.0 - hit) * 0.55 else 3
+	if p < hit:
+		return 2
+	return 3 if p < hit + (1.0 - hit) * 0.55 else 4
 
 
 # 휘두르는 동안 쓰는 방향 딱지 ("down"/"up"/"side")
@@ -357,6 +373,13 @@ func _swing_visual() -> void:
 	# 도구: 손 높이에서 호를 그린다
 	var hand: Vector2 = pose.hand
 	var spin: float = sign_x * float(pose.spin)
+	if tool_sprite.texture == null:
+		# 맨손 휘두르기 — 몸짓만 남기고 도구·자취는 없다
+		tool_sprite.visible = false
+		if not _trail.is_empty():
+			_trail.clear()
+			queue_redraw()
+		return
 	tool_sprite.visible = true
 	tool_sprite.flip_h = (spin < 0.0) != _tool_mirror
 	# 쥐는 자리를 node 원점(=주먹)에 맞춘다. 좌우로 뒤집으면 그림 안의 x도
@@ -422,8 +445,9 @@ func _process(delta: float) -> void:
 			dir = "right" if v.x > 0 else "left"
 		elif v.y != 0:
 			dir = "down" if v.y > 0 else "up"
-		# 강아지 펫 + 장신구 + 탈 것이 이동 속도를 올린다
-		var mult := GameData.pet_speed_mult() * GameData.gear_speed_mult()
+		# 강아지 펫 + 장신구 + 탈 것 + 도감 「초반 음식」 보상이 이동 속도를 올린다
+		var mult := GameData.pet_speed_mult() * GameData.gear_speed_mult() \
+			* GameData.perk_speed_mult() * GameData.hunger_speed_mult()
 		if GameData.riding:
 			mult *= GameData.HORSE_SPEED_MULT
 		v = v * SPEED * mult * delta
@@ -501,6 +525,12 @@ func _update_sprite() -> void:
 		if swing_name != "":
 			tex_name = swing_name
 			sprite.flip_h = swing_face.x < -0.3
+	# 가만히 서 있을 때 가끔 눈을 깜빡인다. anim_time은 걸을 때만 흐르므로
+	# 실시간 시계를 쓴다 (뒷모습은 눈이 안 보여서 제외)
+	if not walking and not swinging and not riding and dir != "up":
+		if fmod(Time.get_ticks_msec() / 1000.0, 3.7) < 0.13:
+			var v := "side" if (dir == "left" or dir == "right") else "down"
+			tex_name = "pc_%s_blink" % v
 	sprite.texture = main.tex[tex_name]
 	# 서 있을 때 숨쉬기: 프레임 대신 세로 스케일을 살짝 키웠다 줄인다
 	# (스프라이트 offset이 발 기준이라 발은 그대로, 머리만 오르내린다)

@@ -10,6 +10,28 @@ extends Node
 var m: KyojinMain    # main.gd
 
 
+# 가까이 세워 둔 말의 칸 (없으면 x가 -999)
+func horse_tile_near() -> Vector2i:
+	var here := m.player_tile()
+	for r in range(0, 3):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var t: Vector2i = here + Vector2i(dx, dy)
+				var o: Variant = m.objects.get(t)
+				if o != null and o.kind == "horse":
+					return t
+	return Vector2i(-999, -999)
+
+
+# 지금 이 키가 「탈 것」으로 쓸모가 있는가.
+#
+# 대화키(F)와 같은 키라, 말을 걸 사람이 없을 때마다 이 함수가 물어보는
+# 셈이다. **여기서 false면 아무 일도 일어나지 않는다** — 걸어다니며 F를
+# 누르는 동안 「아직 말이 없다」가 화면에 계속 뜨던 것을 막는다.
+func can_toggle() -> bool:
+	return GameData.riding or (GameData.has_horse and horse_tile_near().x != -999)
+
+
 func toggle_ride() -> void:
 	if GameData.riding:
 		dismount_horse()
@@ -18,15 +40,10 @@ func toggle_ride() -> void:
 		m.hud.show_message("아직 말이 없다. 목장 상회에서 살 수 있다.")
 		return
 	# 가까이 있는 말에 올라탄다 (정확히 그 칸에 서 있지 않아도 된다)
-	var here := m.player_tile()
-	for r in range(0, 3):
-		for dy in range(-r, r + 1):
-			for dx in range(-r, r + 1):
-				var t: Vector2i = here + Vector2i(dx, dy)
-				var o: Variant = m.objects.get(t)
-				if o != null and o.kind == "horse":
-					_mount_horse(t)
-					return
+	var t := horse_tile_near()
+	if t.x != -999:
+		_mount_horse(t)
+		return
 	m.hud.show_message("말이 근처에 없다. 말을 세워 둔 곳으로 가자.")
 
 

@@ -169,6 +169,14 @@ func _rebuild() -> void:
 	for id: String in ready_ids + rest_ids:
 		grid.add_child(_mk_cell(id))
 
+	# 아직 아무 레시피도 모르면 — 조리대는 비어 있다
+	if ready_ids.is_empty() and rest_ids.is_empty():
+		var empty := Label.new()
+		empty.text = "아는 레시피가 없다.\n재료를 모으고 발견하다 보면 요리가 떠오른다."
+		empty.add_theme_font_size_override("font_size", 15)
+		empty.add_theme_color_override("font_color", Color(0.55, 0.45, 0.35))
+		grid.add_child(empty)
+
 	if _detail_id != "":
 		_rebuild_detail()        # 열려 있는 상세 창도 수급 현황을 따라간다
 
@@ -272,8 +280,11 @@ func _rebuild_detail() -> void:
 	nm.add_theme_color_override("font_color", Color("ffd75e"))
 	hv.add_child(nm)
 	var sub := Label.new()
-	sub.text = "회복 +%d · 판매 %dG · 보유 %d · 만든 횟수 %d" % [
-		int(rec.energy), int(def.sell), int(GameData.items[id]), made]
+	# 체력 회복과 「배부름」은 따로다 — 무엇을 지을지 여기서 고른다
+	var fill_txt := (" · 배부름 %s" % GameData.fill_word(id)) \
+		if GameData.hunger_open else ""
+	sub.text = "회복 +%d%s · 판매 %dG · 보유 %d · 만든 횟수 %d" % [
+		int(rec.energy), fill_txt, int(def.sell), int(GameData.items[id]), made]
 	sub.add_theme_color_override("font_color", Color(0.75, 0.72, 0.85))
 	hv.add_child(sub)
 	head.add_child(hv)

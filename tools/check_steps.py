@@ -23,8 +23,12 @@ def main():
     bad = False
     for i in range(1, len(parts), 2):
         name, body = parts[i], parts[i + 1]
-        c = collections.Counter(int(m.group(1))
-                                for m in re.finditer(r"^\t\t(\d+):", body, re.M))
+        # `394:` 한 갈래도, `394, 395, 396:`처럼 여러 번호를 묶은 갈래도 센다.
+        # (묶은 쪽을 빼먹었더니 394가 두 번 쓰인 것을 오래도록 놓쳤다)
+        nums = []
+        for m in re.finditer(r"^\t\t(\d+(?:\s*,\s*\d+)*):", body, re.M):
+            nums += [int(n) for n in m.group(1).split(",")]
+        c = collections.Counter(nums)
         dup = sorted(n for n, k in c.items() if k > 1)
         if dup:
             bad = True

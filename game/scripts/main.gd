@@ -24,8 +24,24 @@ class_name KyojinMain
 extends Node2D
 
 # 월드를 넓혔다. 마을·농장 좌표는 그대로 두고 남쪽·동쪽에 야생을 붙인다.
-const MAP_W := 120
-const MAP_H := 90
+#
+# 넓히기만 하면 그냥 「빈 잔디밭이 늘어난 것」이라 걸어도 걸어도 같은 풍경이다.
+# 그래서 **지역(REGIONS)** 으로 갈라 놓는다 — 과수원은 나무가 줄지어 서고,
+# 채석장은 자갈 바닥에 바위가 널렸고, 습지는 물웅덩이가 흩어져 있다.
+# 발을 들이는 순간 「다른 데 왔다」가 보여야 넓힌 값을 한다.
+const MAP_W := 224   # 동쪽: 확장 구역 너머의 과수원 · 채석장 · 솔숲
+# ---- 세계와 튜토리얼 공간 ----
+#
+# **튜토리얼은 실제 세계의 일부가 아니다.** 처음 눈을 뜨는 숲길은 세계
+# 바깥(WORLD_H 아래)에 따로 붙여 둔 일회성 공간이고, 마을과는 한 칸도
+# 이어져 있지 않다. 튜토리얼을 마치면 그 공간은 통째로 닫히고
+# (GameData.tutorial_space = false), 다시는 발을 들일 수 없다.
+const WORLD_H := 120   # 실제 세계의 높이 (남쪽: 습지 · 초원 · 능선-해변-바다)
+const TUT_Y0 := 134    # 튜토리얼 숲길이 놓이는 줄 (세계 밖으로 한참 내려간 자리)
+const TUT_DY := TUT_Y0 - 7          # 옛 숲길 좌표(y7~22)를 이 공간으로 옮기는 값
+# 숲길 위아래로 열 줄씩 더 둔다 — 화면이 온통 숲으로 차야 「한 장의 공간」으로 보인다
+const TUTORIAL_REGION := Rect2i(0, TUT_Y0 - 12, 62, 38)
+const MAP_H := TUTORIAL_REGION.end.y   # 세계 + 튜토리얼 공간을 담는 격자 전체 높이
 const TILE := 32
 
 const MIN_PER_SEC := 10.0 / 7.0  # 실제 7초 = 게임 10분
@@ -42,8 +58,17 @@ const WET_ALL_DAY := 1200.0
 const STORM_CROP_HURT := 0.25      # 폭풍이 지나간 아침, 작물 한 칸이 주저앉을 확률
 const STORM_WOOD_MIN := 12         # 부러진 가지 (목재)
 const STORM_WOOD_MAX := 30
-const FORAGE_CAP := 12             # 들판에 동시에 있는 채집물 수
-const FORAGE_CAP_FOG := 26         # 안개 낀 날
+# 들판에 동시에 있는 채집물 수.
+#
+# 예전에는 12개였다 — 224x120칸짜리 세계에서 열두 개는 **없는 것과 같다.**
+# 반나절을 걸어도 산딸기 한 포기 못 보는 게 정상이었다. 넉넉히 올렸다.
+# **비가 오는 날은 그 두 배**다. 젖은 땅에서 풀과 열매가 쑥쑥 돋는 날이라,
+# 비만 오면 나가서 줍고 싶어져야 한다.
+const FORAGE_CAP := 90             # 여느 날
+const FORAGE_CAP_FOG := 130        # 안개 낀 날 (발밑이 잘 보인다)
+const FORAGE_CAP_RAIN := 190       # 비·폭풍 (젖은 땅에서 마구 돋는다)
+# 비 오는 동안에는 아침만이 아니라 **하루 내내** 조금씩 더 돋는다
+const RAIN_FORAGE_MINUTES := 25.0  # 게임 분 — 이 주기로 몇 포기씩
 const STAR_FIREFLY_COUNT := 9      # 별밤의 반딧불이 (평소 3)
 
 
@@ -91,9 +116,13 @@ var interior: CanvasLayer
 var cooking_ui: CanvasLayer
 var desk_ui: CanvasLayer
 var alchemy_ui: CanvasLayer
+var storage_ui: CanvasLayer   # 수납 상자 (집 안 상자 곁에서 E)
 var quest_ui: CanvasLayer
 var note_ui: CanvasLayer
 var stats_ui: CanvasLayer
+var ending: CanvasLayer
+var auction_ui: CanvasLayer   # 경매장 (광장 경매 게시판 — 바깥 서버와 통신)
+var settings_ui: CanvasLayer  # 설정 (ESC 메뉴 — 소리·화면·키)
 var cave: CanvasLayer
 var shop_room: CanvasLayer
 var pet: Node2D
@@ -151,16 +180,6 @@ var doing: KyojinDoing = null
 var _weather_override := -1
 
 const TEXTURE_NAMES := [
-	"player_f_down_0", "player_f_down_1", "player_f_up_0", "player_f_up_1",
-	"player_f_side_0", "player_f_side_1",
-	"player_f_down_idle", "player_f_up_idle", "player_f_side_idle",
-	"new_boy_down_idle", "new_boy_side_idle", "new_boy_up_idle",
-	"new_boy_down_walk_0", "new_boy_down_walk_1",
-	"new_boy_down_walk_2", "new_boy_down_walk_3", "new_boy_down_walk_4",
-	"new_boy_side_walk_0", "new_boy_side_walk_1",
-	"new_boy_side_walk_2", "new_boy_side_walk_3", "new_boy_side_walk_4",
-	"new_boy_up_walk_0", "new_boy_up_walk_1",
-	"new_boy_up_walk_2", "new_boy_up_walk_3", "new_boy_up_walk_4",
 	"egg", "golden_egg", "milk", "ore", "star_ore", "gem", "memory_piece",
 	"ghost_essence", "gold_crop", "world_branch",
 	# 물고기 · 요리 · 다 자란 작물은 _load_textures가 GameData의 표를 보고
@@ -170,15 +189,68 @@ const TEXTURE_NAMES := [
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
-	"board_quest", "board_unlock", "bed_old", "kitchen_counter",
-	"stall", "bait", "flower_pot", "trash_bin",
+	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
+	"icon_letter", "old_book",
+	# 제작 재료·결과물 그림 — 제작대(책상) 창이 글자 대신 이 그림으로 말한다
+	"nail", "cloth", "broom",
+	# 민들레는 필드 그림(forage_dandelion, FORAGE_IDS로 자동 로드)과
+	# 가방 아이콘 그림이 서로 다르다
+	"icon_forage_dandelion",
+	"npc_librarian_down_0", "npc_librarian_down_1", "npc_librarian_up_0",
+	"npc_librarian_up_1", "npc_librarian_side_0", "npc_librarian_side_1",
+	"npc_librarian_portrait_normal", "npc_librarian_portrait_happy",
+	"npc_farmer_down_0", "npc_farmer_down_1", "npc_farmer_up_0",
+	"npc_farmer_up_1", "npc_farmer_side_0", "npc_farmer_side_1",
+	"npc_farmer_portrait_normal", "npc_farmer_portrait_happy",
+	"npc_foodie_down_0", "npc_foodie_down_1", "npc_foodie_up_0",
+	"npc_foodie_up_1", "npc_foodie_side_0", "npc_foodie_side_1",
+	"npc_foodie_portrait_normal", "npc_foodie_portrait_happy",
+	"npc_angler_down_0", "npc_angler_down_1", "npc_angler_up_0",
+	"npc_angler_up_1", "npc_angler_side_0", "npc_angler_side_1",
+	"npc_angler_portrait_normal", "npc_angler_portrait_happy",
+	"npc_alchemist_down_0", "npc_alchemist_down_1", "npc_alchemist_up_0",
+	"npc_alchemist_up_1", "npc_alchemist_side_0", "npc_alchemist_side_1",
+	"npc_alchemist_portrait_normal", "npc_alchemist_portrait_happy",
+	"npc_miner_down_0", "npc_miner_down_1", "npc_miner_up_0",
+	"npc_miner_up_1", "npc_miner_side_0", "npc_miner_side_1",
+	"npc_miner_portrait_normal", "npc_miner_portrait_happy",
+	"npc_florist_down_0", "npc_florist_down_1", "npc_florist_up_0",
+	"npc_florist_up_1", "npc_florist_side_0", "npc_florist_side_1",
+	"npc_florist_portrait_normal", "npc_florist_portrait_happy",
+	"npc_carpenter_down_0", "npc_carpenter_down_1", "npc_carpenter_up_0",
+	"npc_carpenter_up_1", "npc_carpenter_side_0", "npc_carpenter_side_1",
+	"npc_carpenter_portrait_normal", "npc_carpenter_portrait_happy",
+	"npc_herbalist_down_0", "npc_herbalist_down_1", "npc_herbalist_up_0",
+	"npc_herbalist_up_1", "npc_herbalist_side_0", "npc_herbalist_side_1",
+	"npc_herbalist_portrait_normal", "npc_herbalist_portrait_happy",
+	"npc_painter_down_0", "npc_painter_down_1", "npc_painter_up_0",
+	"npc_painter_up_1", "npc_painter_side_0", "npc_painter_side_1",
+	"npc_painter_portrait_normal", "npc_painter_portrait_happy",
+	"npc_musician_down_0", "npc_musician_down_1", "npc_musician_up_0",
+	"npc_musician_up_1", "npc_musician_side_0", "npc_musician_side_1",
+	"npc_musician_portrait_normal", "npc_musician_portrait_happy",
+	"npc_weaver_down_0", "npc_weaver_down_1", "npc_weaver_up_0",
+	"npc_weaver_up_1", "npc_weaver_side_0", "npc_weaver_side_1",
+	"npc_weaver_portrait_normal", "npc_weaver_portrait_happy",
+	"stall", "bait", "flower_pot", "trash_bin", "chief_hut", "chief_house",
 	# 마을 건물: 지붕색·덧문·차양·간판이 종류마다 다르다
 	"house_post", "house_general", "house_smith", "house_lab", "house_inn",
 	"house_library", "house_ranch", "house_fish",
 	"deco_fountain", "deco_lamp", "deco_bench",
 	"cave", "slime_0", "slime_1", "bat_0", "bat_1", "ghost_0", "ghost_1",
 	"ore_node", "chest", "stairs",
+	# 동굴 표본 (메인 스토리 10) · 낡은 상자 (메인 스토리 13)
+	"crystal", "cave_moss", "glow_shroom", "old_box",
+	# 온천 복구 (메인 스토리 15)
+	"onsen", "rock_wedge", "spring_water",
+	# 옛 전망대 (메인 스토리 18) — 굽은 나무는 tree_bare를 쓴다
+	"old_lookout", "old_bench", "carved_stone",
+	# 가장 오래된 자리 (메인 스토리 20)
+	"grandpa_seed",
+	# 수납 상자 (용식의 집터 부탁 보상)
+	"storage_box",
 	# 연금술 물약 (조합대 결과물)
+	"water_life",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember",
 	"potion_grow", "potion_guard", "potion_moon", "sludge",
 	"chicken_0", "chicken_1", "cow_0", "cow_1",
@@ -203,12 +275,23 @@ const TEXTURE_NAMES := [
 	"npc_chief_down_0", "npc_chief_down_1", "npc_chief_up_0",
 	"npc_chief_up_1", "npc_chief_side_0", "npc_chief_side_1",
 	"npc_chief_portrait_normal", "npc_chief_portrait_happy",
+	# 메인 스토리 5: 모험가 재민 + 숲속의 모녀 (연화·솔이)
+	"npc_explorer_down_0", "npc_explorer_down_1", "npc_explorer_up_0",
+	"npc_explorer_up_1", "npc_explorer_side_0", "npc_explorer_side_1",
+	"npc_explorer_portrait_normal", "npc_explorer_portrait_happy",
+	"npc_forest_mom_down_0", "npc_forest_mom_down_1", "npc_forest_mom_up_0",
+	"npc_forest_mom_up_1", "npc_forest_mom_side_0", "npc_forest_mom_side_1",
+	"npc_forest_mom_portrait_normal", "npc_forest_mom_portrait_happy",
+	"npc_forest_girl_down_0", "npc_forest_girl_down_1", "npc_forest_girl_up_0",
+	"npc_forest_girl_up_1", "npc_forest_girl_side_0", "npc_forest_girl_side_1",
+	"npc_forest_girl_portrait_normal", "npc_forest_girl_portrait_happy",
 	"weed_plant",
 	"bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
+	"icon_spear", "icon_sword", "arrow", "desk", "recipe",
 	# 대장간 장비 (무기·방어구·장신구)
 	"gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
@@ -270,40 +353,99 @@ const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 �
 const PLAZA := Rect2i(70, 14, 16, 12)      # 중앙 광장 (아주 넓은 평지)
 const FOUNTAIN := Rect2i(76, 18, 4, 4)     # 광장 중앙 분수
 const FOUNTAIN_DECO := Vector2i(77, 20)    # 분수 조형물 (분수 한가운데)
-const VILLAGE_RIVER_Y := 40
-const EAST_RIVER_X := 97                   # 마을 동쪽 바깥을 흐르는 강 (2칸)
-const RIVER_ROWS := 4                      # 강 폭 (낚시터를 깊게 하려고 넓혔다)                # 마을 남쪽 외곽을 흐르는 강 (2칸)
-const DOCK_Y := 39                         # 강가 낚시터(부두)
-# ---- 낚시터 (마을 남쪽 강가, 맵에 하나뿐) ----
-# 강을 따라 길게 깔린 나무 데크 + 물 쪽으로 내민 부두 두 개 +
-# 강가 마당(표지판·가로등·벤치). 「낚시」 목표는 여기서 진행한다.
-const FISH_YARD_X0 := 70
-const FISH_YARD_X1 := 95
-const FISH_DECK_X0 := 71                   # 강 첫 줄(y=27)에 깔리는 데크
-const FISH_DECK_X1 := 94
-const FISH_PIERS := [Vector2i(72, 73), Vector2i(80, 81), Vector2i(88, 89)]  # 물로 내민 부두 (x 구간)
-const FISH_SIGN := Vector2i(70, 38)
+# (마을을 가르던 남쪽 강과 동쪽 세로 강은 없앴다 — 맵은 하나로 이어진
+#  큰 육지다. 물은 서쪽 호수·깊은 숲 연못·남쪽 바다만 남는다)
+# ---- 낚시터 (마을 서쪽 호수, 맵에 하나뿐) ----
+# 호숫가 잔디밭에서 물을 보고 낚싯대를 던진다. 「낚시」 목표는 여기.
+const DOCK_Y := 35                         # 호수 남쪽 물가 (물은 y 28~34)
+const FISH_YARD_X0 := 44
+const FISH_YARD_X1 := 54
+const FISH_SIGN := Vector2i(43, 35)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
-const SEA_RIDGE_Y := 77            # 바위 능선 줄 — 바다로 가는 길을 막는다
-const BEACH_Y0 := 78               # 모래사장 (능선 아래 ~ 바다 위)
-const SEA_Y0 := 83                 # 여기부터 남쪽 끝까지 바다
-const SEA_GATE := [Vector2i(63, 77), Vector2i(64, 77)]  # 곡괭이로 캐서 여는 길목
+# 북쪽 산자락 — 이 줄 위쪽의 풀밭에는 민들레가 돋는다 (산에서 캐는 채집물)
+const MOUNTAIN_Y := 14
+const SEA_RIDGE_Y := 107           # 바위 능선 줄 — 바다로 가는 길을 막는다
+const BEACH_Y0 := 108              # 모래사장 (능선 아래 ~ 바다 위)
+const SEA_Y0 := 113                # 여기부터 남쪽 끝까지 바다
+const SEA_GATE := [Vector2i(63, 107), Vector2i(64, 107)]  # 곡괭이로 캐서 여는 길목
 const FISHER_ARRIVE := Vector2i(78, 23)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
 const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...) 최대 수
 # 해변 모래밭에만 밀려오는 것들 — 조개·비닐봉지·유리 조각·금속 고리(기본),
 # 산호 조각·고대 조각(매우 희귀 — 숨겨진 이야기·레시피와 이어진다)
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
-const STALL_TILE := Vector2i(72, 79)   # 민지의 해변 노점 (게이트 서남쪽 모래밭)
-const FISH_LAMPS := [Vector2i(72, 37), Vector2i(79, 37), Vector2i(86, 37), Vector2i(93, 37)]
-const FISH_BENCHES := [Vector2i(75, 38), Vector2i(83, 38), Vector2i(91, 38)]
-const FISH_SPOT := Rect2i(69, 35, 28, 11)   # 이 안이면 「낚시터에 있다」
-const FISH_CLEAR := Rect2i(69, 34, 30, 13) # 이 안에는 나무/돌을 두지 않는다
+const STALL_TILE := Vector2i(72, 109)  # 만수의 해변 노점 (게이트 서남쪽 모래밭)
+# 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
+const ONSEN_POS := Vector2i(66, 6)
+# 옛 농지 (메인 스토리 16) — 마을 서쪽, 오래 묵어 수풀이 우거진 밭.
+# 단서를 다 모으면 잡초·돌·나무가 우거진 채로 드러난다
+const OLD_FARM := Rect2i(20, 44, 10, 7)
+# 옛 헛간 (메인 스토리 17) — 목장 남쪽에 방치된 헛간과 그 둘레
+const OLD_BARN := Vector2i(14, 30)
+const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
+# 옛 전망대 (메인 스토리 18) — 마을 북서쪽 외곽, 길 위쪽 언덕.
+# 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
+const HILL_POS := Vector2i(31, 3)
+const HILL_AREA := Rect2i(26, 1, 11, 6)
+const HILL_TRACE_TILES := {
+	"bench": Vector2i(28, 4),
+	"stone": Vector2i(34, 4),
+	"tree": Vector2i(27, 1),
+}
+# 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
+# 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
+const BRACELET_ROCK := Vector2i(8, 112)
+const FISH_SPOT := Rect2i(42, 26, 14, 12)   # 이 안이면 「낚시터에 있다」
+# 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
+const FISH_CLEAR := Rect2i(41, 24, 20, 14)
 const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
-const PLAZA_LAMPS := [Vector2i(71, 15), Vector2i(84, 15),
-	Vector2i(71, 24), Vector2i(84, 24)]
-const PLAZA_BENCHES := [Vector2i(73, 19), Vector2i(73, 21),
-	Vector2i(83, 19), Vector2i(83, 21)]
+const AUCTION_POS := Vector2i(85, 14)      # 경매 게시판 (온 세상 농부들의 장터)
+# (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
+# 메인 스토리 4 — 동쪽 다리 건너, 옛 마을의 경계를 알리는 낡은 표지판.
+# 너머(GameData.VILLAGE_ZONES)는 구역을 해금해야 들어갈 수 있다.
+const OLD_SIGN := Vector2i(99, 9)
+
+# ---- 야생 지역 ----
+#
+# 마을과 농장 바깥은 그냥 넓은 잔디밭이 아니라 **결이 다른 땅**이 이어진다.
+# 여기 한 줄이 그 땅의 성격을 통째로 정한다 — 세계를 넓힐 때는 이 표에
+# 한 줄을 더하면 되고, 지도(M)에도 이름이 저절로 뜬다.
+#
+#   rect    차지하는 칸
+#   tree    그 칸에 나무가 설 확률 (0이면 나무가 없는 땅)
+#   rock    나무가 안 선 자리에 바위가 놓일 확률
+#   ground  바닥 ("" = 잔디 그대로 · "path" = 자갈 · "sand" = 모래)
+#   grid    0보다 크면 **줄지어** 심는다 (과수원처럼 사람 손이 간 땅)
+#   pond    0보다 크면 그만큼의 확률로 물웅덩이가 생긴다 (습지)
+#
+# 지역끼리는 일부러 사이를 벌려 둔다. 맞붙여 놓으면 경계가 자로 그은 듯해서
+# 「지도를 칸으로 나눠 놨구나」가 먼저 보인다.
+const REGIONS := [
+	# 예전부터 있던 남동쪽 깊은 숲 — 넓어진 만큼 남쪽으로 늘렸다
+	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40, 52, 26),
+		"tree": 0.30, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
+	# 옛 표지판 너머 첫 땅. 줄 맞춰 심긴 사과나무 — 사람 손이 닿았던 자리다
+	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8, 48, 26),
+		"tree": 0.9, "rock": 0.0, "ground": "", "grid": 4, "pond": 0.0},
+	# 자갈이 깔린 채석장. 나무는 거의 없고 바위가 지천이다
+	{"id": "quarry", "name": "동쪽 채석장", "rect": Rect2i(172, 40, 48, 26),
+		"tree": 0.02, "rock": 0.34, "ground": "path", "grid": 0, "pond": 0.0},
+	# 탁 트인 초원 — 아무것도 없다. 넓은 하늘과 풀뿐
+	{"id": "meadow", "name": "너른 초원", "rect": Rect2i(102, 46, 44, 26),
+		"tree": 0.02, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
+	# 남쪽 습지 — 발밑이 질척하고 물웅덩이가 흩어져 있다
+	{"id": "wetland", "name": "남쪽 습지", "rect": Rect2i(16, 64, 54, 30),
+		"tree": 0.07, "rock": 0.02, "ground": "", "grid": 0, "pond": 0.12},
+	# 동남쪽 솔숲 — 깊은 숲보다 더 깊다. 여기까지 오면 꽤 멀리 온 것이다.
+	# 나무는 NATURE_CLEAR(가로 4칸)에 걸려 아무리 올려도 6%쯤에서 포화된다 —
+	# 그래서 「더 깊다」는 바위로 낸다 (바위는 두 칸 간격이라 훨씬 촘촘하다)
+	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70, 62, 24),
+		"tree": 0.34, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
+	# 능선 위 벼랑길 — 바다로 내려가기 전 마지막 땅. 돌투성이다
+	{"id": "bluff", "name": "바닷가 벼랑길", "rect": Rect2i(20, 96, 180, 10),
+		"tree": 0.04, "rock": 0.16, "ground": "", "grid": 0, "pond": 0.0},
+]
+
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
@@ -328,20 +470,34 @@ const VILLAGE_PLOTS := {
 	# 동쪽 줄 (동쪽 세로 길가)
 	"library": {"anchor": Vector2i(91, 12), "name": "도서관"},
 	"fish":    {"anchor": Vector2i(91, 26), "name": "수산시장"},
+	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
+	"hall":    {"anchor": Vector2i(80, 28), "name": "마을회관"},
 }
+# 이장의 거처 — 처음부터 마을에 있는 작고 낡은 오두막 (광장 북서쪽).
+# 주민이 늘면 제대로 된 집으로 다시 지어진다 (GameData.chief_house_lv)
+const CHIEF_HUT := Vector2i(71, 11)
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
-const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "ranch", "fish"]
+const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "library", "ranch",
+	"fish", "hall"]
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
 	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
 	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
-	"ranch": [80, 40], "fish": [100, 60],
+	"ranch": [80, 40], "fish": [100, 60], "hall": [120, 80],
+	# 도서관은 메인 스토리 6(오래된 책과 사서)에서만 열리는 건설이다
+	"library": [90, 50],
 }
+
+
+# 마을 주민 수 (플레이어 포함) — 이장 새 집·마을회관 해금 기준
+func village_residents() -> int:
+	return npcs.size() + 1
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
-	"ranch": "rancher", "fish": "fisher"}
+	"ranch": "rancher", "fish": "fisher", "library": "librarian",
+	"post": "postman"}
 # ---- NPC 하루 일과 ----
 #
 # 시간대마다 갈 곳이 바뀐다. 목적지까지는 길찾기로 걸어가고,
@@ -351,18 +507,47 @@ const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 const NPC_SCHEDULE := {
 	"chief":      [[6, "home"], [9, "board"], [12, "plaza"], [16, "board"]],
 	"merchant":   [[6, "home"], [9, "work"], [13, "plaza"], [15, "work"]],
+	# 우체부 — 아침 첫 배달을 돌고(광장) 낮부터 우체국을 지킨다
+	"postman":    [[6, "work"], [8, "plaza"], [10, "work"], [16, "plaza"]],
 	"blacksmith": [[6, "home"], [9, "work"], [14, "plaza"], [16, "work"]],
 	"rancher":    [[6, "home"], [8, "work"], [12, "plaza"], [15, "work"]],
+	# 사서 — 방문객일 때는 work가 광장(집이 없어서)으로, 도서관이 서면
+	# 도서관 앞으로 저절로 풀린다 (npc_place_tile의 기본 규칙)
+	"librarian":  [[6, "plaza"], [9, "work"], [13, "plaza"], [15, "work"]],
 	"fisher":     [[6, "home"], [8, "pier"], [13, "plaza"], [15, "pier"]],
+	# 이사 온 일반/특수 주민 — 오전엔 집 곁, 낮엔 광장에서 어울린다
+	"farmer":     [[6, "home"], [10, "plaza"], [15, "home"]],
+	"foodie":     [[6, "home"], [11, "plaza"], [16, "home"]],
+	"angler":     [[6, "home"], [9, "pier"], [14, "plaza"], [17, "home"]],
+	# 연금술사는 마을에 살지 않는다 — 깊은 숲 오두막 곁만 지킨다 (스토리 12)
+	"alchemist":  [[6, "home"]],
+	"miner":      [[6, "home"], [9, "plaza"], [13, "home"]],
+	"florist":    [[6, "home"], [10, "plaza"], [16, "home"]],
+	"carpenter":  [[6, "home"], [11, "plaza"], [15, "home"]],
+	"herbalist":  [[6, "home"], [9, "plaza"], [14, "home"]],
+	"painter":    [[6, "home"], [12, "plaza"], [17, "home"]],
+	"musician":   [[6, "home"], [13, "plaza"], [17, "home"]],
+	"weaver":     [[6, "home"], [10, "plaza"], [14, "home"]],
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
 const NPC_PLAZA := {
 	"chief": Vector2i(74, 13), "merchant": Vector2i(70, 15),
 	"blacksmith": Vector2i(80, 15), "rancher": Vector2i(70, 19),
 	"fisher": Vector2i(80, 19),
+	# 이사 온 주민들 — 광장 남쪽에 삼삼오오 모여 수다를 떤다
+	"farmer": Vector2i(72, 17), "foodie": Vector2i(74, 17),
+	"angler": Vector2i(78, 17), "alchemist": Vector2i(76, 15),
+	"miner": Vector2i(76, 19), "florist": Vector2i(72, 15),
+	"carpenter": Vector2i(78, 15), "herbalist": Vector2i(74, 19),
+	"painter": Vector2i(82, 17), "musician": Vector2i(76, 17),
+	"weaver": Vector2i(82, 15),
 }
 # 건물이 없는 NPC(이장)의 집 자리
-const NPC_HOME := {"chief": Vector2i(72, 20)}
+const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
+	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28),
+	"librarian": Vector2i(76, 14),   # 방문객 시절 — 광장 분수 곁
+	"rancher": Vector2i(70, 20),     # 방문객 시절 — 광장 남서쪽 풀밭
+	"alchemist": Vector2i(58, 50)}   # 깊은 숲 오두막 문 앞 (ALCH_HOUSE_ANCHOR 문+1)
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
@@ -370,11 +555,12 @@ const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타�
 const BUILDING_NAMES := {
 	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
 	"lab": "연구소", "inn": "여관", "library": "도서관",
-	"ranch": "목장 상회", "fish": "수산시장",
+	"ranch": "목장 상회", "fish": "수산시장", "hall": "마을회관",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 # 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
-const CAMERA_ZOOM := 0.8                   # 1200 x 675 월드 픽셀 = 37.5 x 21 타일
+const CAMERA_ZOOM := 0.56                  # 1714 x 964 월드 픽셀 = 53.6 x 30 타일
+# (0.8에서 0.7배 더 줌 아웃 — 화면에 담기는 세상이 한층 넓다)
 const UI_FONT := preload("res://assets/fonts/Galmuri11.ttf")
 const UI_FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
 
@@ -401,6 +587,7 @@ func _ready() -> void:
 	doing = _mount("player_actions", "PlayerActions")
 
 	_load_textures()
+	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
 	worldgen._build_map()
 	farming.rebuild()
 
@@ -468,6 +655,9 @@ func _ready() -> void:
 	alchemy_ui = preload("res://scripts/alchemy_ui.gd").new()
 	alchemy_ui.main = self
 	add_child(alchemy_ui)
+	storage_ui = preload("res://scripts/storage_ui.gd").new()
+	storage_ui.main = self
+	add_child(storage_ui)
 
 	quest_ui = preload("res://scripts/quest_ui.gd").new()
 	quest_ui.main = self
@@ -480,6 +670,14 @@ func _ready() -> void:
 	stats_ui = preload("res://scripts/stats_ui.gd").new()
 	stats_ui.main = self
 	add_child(stats_ui)
+
+	auction_ui = preload("res://scripts/auction_ui.gd").new()
+	auction_ui.main = self
+	add_child(auction_ui)
+
+	settings_ui = preload("res://scripts/settings_ui.gd").new()
+	settings_ui.main = self
+	add_child(settings_ui)
 
 	cave = preload("res://scripts/cave_ui.gd").new()
 	cave.main = self
@@ -502,6 +700,10 @@ func _ready() -> void:
 		daycycle._fade_next_day(false))
 	add_child(sleep_dialog)
 
+	ending = preload("res://scripts/ending_ui.gd").new()
+	ending.main = self
+	add_child(ending)
+
 	_shot_path = OS.get_environment("KYOJIN_SHOT")
 	if _shot_path != "":
 		harness = load("res://scripts/dev_harness.gd").new()
@@ -518,9 +720,12 @@ func _ready() -> void:
 		multiplayer.peer_disconnected.connect(netsync._on_peer_disconnected)
 	if Net.is_guest():
 		multiplayer.server_disconnected.connect(netsync._on_server_disconnected)
+		# 접속 실패 — 이 신호를 안 받으면 「접속하는 중...」에서 하염없이 멈춘다
+		multiplayer.connection_failed.connect(netsync._on_connection_failed)
 		# 게스트: 로컬 저장 대신 호스트 스냅샷을 기다린다
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
+		GameData.tutorial_space = false   # 합동 농장은 세계에서 바로 시작한다
 		GameData.story_phase = "done"
 		GameData.story2_phase = "done"
 		GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
@@ -540,6 +745,15 @@ func _ready() -> void:
 	var loaded := GameData.load_game()
 	if loaded.size() > 0:
 		saveio._apply_save(loaded)
+		apply_appearance()   # 세이브에 담긴 외형으로 다시 굽는다
+		# 옛 세이브의 튜토리얼은 세계 안(y7~22)에 있었다. 그 자리는 이제 마을 곁의
+		# 평범한 들판이라, 그대로 두면 세계 밖으로 옮겨 온 숲길과 어긋난다 —
+		# 튜토리얼 도중에 저장한 것이라면 그 숲길을 새로 깔고 첫 자리에 세운다.
+		if GameData.tutorial_space and player_tile().y < WORLD_H:
+			story._plant_story_forest()
+			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
+			GameData.explored.clear()
+			GameData.mark_explored_at(STORY_SPAWN)
 		story._apply_story_camera.call_deferred()
 		# 스토리 도중 저장했다면 우체부 아저씨가 계속 동행한다
 		if GameData.story_phase == "approach":
@@ -580,16 +794,28 @@ func _ready() -> void:
 			if not story_shot:
 				story._show_intro.call_deferred()
 		else:
+			# 검증 샌드박스·합동 농장은 튜토리얼을 건너뛴 셈이다 — 처음부터 세계 안이다
+			GameData.tutorial_space = false
 			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
 			GameData.story2_phase = "done"
+			# 스토리 3·5는 끝난 샌드박스로 시작한다 (검증은 350이 처음부터 돌린다)
+			GameData.move_quest = "done"
+			GameData.forest_quest = "done"
+			GameData.affinity_open = true
+			# 스토리 4(마을 확장)도 끝난 샌드박스 — 검증은 263이 처음부터 돌린다
+			GameData.story4_phase = "done"
+			GameData.zones_open = GameData.ZONE_ORDER.duplicate()
+			# 이주 인사도 전부 끝난 샌드박스 — 도착 연출 검증은 265가 돌린다
+			GameData.npc_greeted = ["merchant", "blacksmith", "rancher",
+				"fisher", "explorer"]
 			GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
 			GameData.seeds["potato"] = 5  # 씨앗 심기 캡처용
-			GameData.house_lv = 2         # 집/부엌/침대 캡처용
+			GameData.house_lv = 2         # 집/조리대/침대 캡처용
 			GameData.has_bed = true
 			GameData.furniture = GameData.default_furniture()  # 넓은 방 캡처용 세간
-			for cy in range(0, MAP_H / GameData.EXPLORE_CHUNK + 1):
+			for cy in range(0, WORLD_H / GameData.EXPLORE_CHUNK + 1):
 				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
 					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
 			for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
@@ -644,18 +870,53 @@ func _load_textures() -> void:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
 	for id: String in GameData.FORAGE_IDS:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
-	# 휘두르기 도트는 **있으면 쓴다**. 남자는 new_boy3/에서 뽑아 뒀고 여자는
-	# 아직 없다 — 없는 쪽은 player.gd가 몸통을 굽혀 대신한다. TEXTURE_NAMES에
-	# 넣으면 없을 때 터지므로 여기서만 따로 챙긴다. 그림을 sprites/에
-	# 떨어뜨리면 그날부터 켜진다.
-	# (뽑는 법은 assets/ref/new_boy3/make_sprites.js 위쪽 주석)
-	for g: String in ["new_boy", "player_f"]:
-		for d: String in ["down", "up", "side"]:
-			for i in 4:   # player.gd의 SWING_FRAMES와 같은 수
-				var sn := "%s_%s_swing_%d" % [g, d, i]
-				var sp := "res://assets/sprites/%s.png" % sn
-				if ResourceLoader.exists(sp):
-					tex[sn] = load(sp)
+	# 프롤로그 일러스트 — 오프닝 편지지 위에 얹는 움직이는 장면 (4프레임)
+	for pn: String in ["grandpa", "box", "letter", "farm"]:
+		for i in 4:
+			var an := "prologue_%s_%d" % [pn, i]
+			var ap := "res://assets/sprites/%s.png" % an
+			if ResourceLoader.exists(ap):
+				tex[an] = load(ap)
+	# 플레이어 도트 — 머리 스타일(외형 템플릿)마다 한 벌씩. ref/dot_boy/
+	# make_sprites.py가 표준 팔레트로 그려 둔다. 없는 프레임은 조용히
+	# 건너뛴다 (휘두르기 도트가 없으면 player.gd가 몸통을 굽혀 대신한다).
+	for g: String in GameData.HAIR_PREFIX:
+		for sfx: String in _player_suffixes():
+			var sn := "%s_%s" % [g, sfx]
+			var sp := "res://assets/sprites/%s.png" % sn
+			if ResourceLoader.exists(sp):
+				tex[sn] = load(sp)
+
+
+# 플레이어 한 벌을 이루는 프레임 이름들 (idle 3 + walk 15 + blink 2 + swing 15)
+func _player_suffixes() -> Array[String]:
+	var out: Array[String] = ["down_idle", "up_idle", "side_idle",
+		"down_blink", "side_blink"]
+	for d: String in ["down", "up", "side"]:
+		for i in 5:
+			out.append("%s_walk_%d" % [d, i])
+		for i in 5:   # player.gd의 SWING_FRAMES와 같은 수
+			out.append("%s_swing_%d" % [d, i])
+	return out
+
+
+# 고른 외형을 플레이어 텍스처로 굽는다 — 게임은 언제나 pc_* 이름만 본다.
+# 머리 스타일이 원본 한 벌을 정하고, 옷·바지·신발 색은 표준 팔레트를
+# 골라 둔 색으로 바꿔 만든다 (GameData.recolor_player_image).
+func apply_appearance() -> void:
+	var ap: Dictionary = GameData.appearance
+	var src: String = GameData.HAIR_PREFIX[clampi(int(ap.hair), 0, GameData.HAIR_PREFIX.size() - 1)]
+	var plain: bool = int(ap.shirt) == 0 and int(ap.pants) == 0 and int(ap.shoes) == 0
+	for sfx: String in _player_suffixes():
+		var t: Texture2D = tex.get("%s_%s" % [src, sfx])
+		if t == null:
+			continue
+		if plain:
+			tex["pc_" + sfx] = t
+		else:
+			var img: Image = t.get_image()
+			GameData.recolor_player_image(img, ap)
+			tex["pc_" + sfx] = ImageTexture.create_from_image(img)
 
 
 # 맵 밖 배경 색조 (어두운 숲처럼 보이게)
@@ -713,7 +974,7 @@ const OBJECT_SCALES := {
 	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
-	"forage_ring": 1.1, "forage_relic": 1.2,
+	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4, "chief_hut": 2.0,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
@@ -785,8 +1046,50 @@ func is_passable(t: Vector2i) -> bool:
 
 
 func _tile_accessible(t: Vector2i) -> bool:
+	# 튜토리얼 중에는 **울타리 안의 숲길**이 세계의 전부다
+	if GameData.tutorial_space:
+		return tutorial_walkable(t)
+	# 마을에 들어선 뒤로 튜토리얼 공간은 사라진 곳이다 — 돌아갈 길이 없다
+	if t.y >= WORLD_H:
+		return false
+	if not region_open_at(t):
+		return false          # 아직 이야기가 닿지 않은 땅
 	return VILLAGE_REGION.has_point(t) or ROAD.has_point(t) \
 		or GameData.is_tile_owned(t.x, t.y)
+
+
+# 튜토리얼 숲길 — **울타리 안**만 걸을 수 있다.
+#
+# 예전에는 튜토리얼 공간(TUTORIAL_REGION) 전체를 열어 두었다. 울타리는
+# 세워 두었지만 그 너머도 통행 가능한 땅이라, 나무 사이 틈으로 빠져나가면
+# 숲 바깥 풀밭을 마음대로 걸어 다닐 수 있었다 — 우체부와 말도 섞기 전에
+# 길 밖으로 나가 버리는 일이 그래서 생겼다. 길과 두 갈래만 남긴다.
+func tutorial_walkable(t: Vector2i) -> bool:
+	# 본길 (동쪽 끝 X1에 닿으면 마을로 넘어가는 연출이 시작된다)
+	if t.x >= STORY_ROAD_X0 and t.x <= STORY_ROAD_X1 \
+			and t.y >= STORY_ROAD_Y0 and t.y <= STORY_ROAD_Y1:
+		return true
+	# 갈림길의 북·남 갈래 (둘 다 막다른 길 — 지도 퀘스트가 여기서 헤맨다)
+	if t.x >= STORY_FORK.x - 1 and t.x <= STORY_FORK.x + 2 \
+			and t.y >= 10 + TUT_DY and t.y <= 21 + TUT_DY:
+		return true
+	return false
+
+
+# 이 칸이 속한 지역이 이미 열렸는가 (지금은 언제나 열려 있다 — 아래 주석 참고)
+func region_open_at(t: Vector2i) -> bool:
+	for reg: Dictionary in REGIONS:
+		var r: Rect2i = reg.rect
+		if r.has_point(t):
+			return GameData.region_unlocked(str(reg.id))
+	return true
+
+
+# 지금 걸어 다닐 수 있는 세계의 테두리 (지도·미니맵이 이 안만 그린다)
+func world_rect() -> Rect2i:
+	if GameData.tutorial_space:
+		return TUTORIAL_REGION
+	return Rect2i(0, 0, MAP_W, WORLD_H)
 
 
 func is_passable_px(p: Vector2) -> bool:
@@ -832,14 +1135,62 @@ var _mouse_target := Vector2i(-999, -999)
 var _sel_target := Vector2i(-999, -999)
 
 
+# 개발/테스트용 — 가방을 통째로 채운다.
+# 장터에 올려 보거나 요리·조합을 훑어볼 때 손으로 모으고 있을 수 없다.
+func _dev_fill_stock() -> void:
+	if not GameData.DEV_MODE:
+		return
+	dialog.close()          # ESC 메뉴에서 눌렀으면 창을 치우고 결과를 보여 준다
+	GameData.dev_fill_stock()
+	Sound.play_sfx("sfx_ui")
+	hud.show_message("[개발] 씨앗·수확물·물건을 %d개씩 채웠다. 도구도 전부 열었다."
+		% GameData.DEV_STOCK, 4.0)
+	saveio.save_now()
+	if Net.is_host():
+		netsync._broadcast_stats()
+	queue_redraw()
+
+
 func ui_open() -> bool:
 	return story_cutscene or shop.visible or summary.visible or sleep_dialog.visible \
 		or fishing_ui.visible or dialog.visible or map_ui.visible \
 		or inventory_ui.visible or interior.visible or cave.visible \
 		or (shop_room != null and shop_room.visible) \
 		or cooking_ui.visible or alchemy_ui.visible or quest_ui.visible or note_ui.visible \
-		or stats_ui.visible or _name_layer != null or village._gift_layer != null \
+		or (storage_ui != null and storage_ui.visible) \
+		or stats_ui.visible or auction_ui.visible \
+		or (settings_ui != null and settings_ui.visible) \
+		or village._gift_layer != null \
 		or (story.story_layer != null and story.story_layer.visible)
+
+
+# 방(집·동굴·가게) **위에** 겹쳐 뜬 창이 있는가.
+#
+# 이런 창이 하나라도 열려 있으면 ESC·E는 그 창의 몫이다. 방이 먼저
+# 가로채면 가방을 닫으려고 누른 ESC에 게임 메뉴가 떠 버린다 —
+# 실제로 「집 안에서 가방 열고 ESC」가 그랬다.
+func room_overlay_open() -> bool:
+	return dialog.visible or inventory_ui.visible or quest_ui.visible \
+		or note_ui.visible or stats_ui.visible or map_ui.visible \
+		or shop.visible or cooking_ui.visible or alchemy_ui.visible \
+		or desk_ui.visible or sleep_dialog.visible or summary.visible \
+		or fishing_ui.visible or auction_ui.visible \
+		or (storage_ui != null and storage_ui.visible) \
+		or (settings_ui != null and settings_ui.visible)
+
+
+# 굶주림이 몸을 갉는다. 집 안(지붕 밑)은 안전지대라 체력이 일정선
+# 아래로 내려가지 않는다 — 밖에서 굶으면 그대로 쓰러진다.
+func _starve_process(delta: float) -> void:
+	if Net.is_guest() or not GameData.starving():
+		return
+	var indoors := interior.visible
+	var before := GameData.energy
+	GameData.starve_tick(delta, indoors)
+	if before > 0.0 and GameData.energy <= 0.0 and not indoors \
+			and not day_transitioning:
+		hud.show_message("배가 고파 눈앞이 캄캄하다... 정신을 잃었다.", 4.0)
+		daycycle._fade_next_day(true)
 
 
 func interior_only_open() -> bool:
@@ -876,7 +1227,7 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 # 채집·벌목·채광 대상이 되는 것들
 const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
-	"forage_ring", "forage_relic"]
+	"forage_ring", "forage_relic", "old_book"]
 
 # E는 캐기와 말 걸기를 겸한다. 캐기 시작 후 이 시간 동안은 무조건 도구로 간다.
 const WORK_LOCK_TIME := 0.9
@@ -921,35 +1272,41 @@ const FEST_COLORS := {
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(18, 16)       # 화면 왼쪽에서 시작 (집은 화면 밖)
-const STORY_LANE_Y := 16                   # 우체부가 왼쪽에서 걸어오는 길
-const STORY_FORK := Vector2i(34, 16)       # 숲길이 갈라지는 갈림길 (지도 퀘스트)
-const STORY_ROCK := Vector2i(40, 16)       # 마을 가는 길을 막는 커다란 바위 (퀘스트 5)
+const STORY_SPAWN := Vector2i(18, 16 + TUT_DY)   # 화면 왼쪽에서 시작
+const STORY_LANE_Y := 16 + TUT_DY          # 우체부가 왼쪽에서 걸어오는 길
+const STORY_FORK := Vector2i(34, 16 + TUT_DY)    # 숲길이 갈라지는 갈림길 (지도 퀘스트)
+const STORY_ROCK := Vector2i(40, 16 + TUT_DY)    # 길을 막는 커다란 바위 (퀘스트 5)
 # 스토리 숲의 가로 폭. 화면(37.5칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
 # 옆으로 움직인다. 숲길(x 4~33) 동쪽은 들어갈 수 없는 배경 숲이다.
 const STORY_FOREST_W := 58
 # 숲길은 4줄 폭의 흙길. 양옆은 울타리로 막혀 있어 길을 벗어날 수 없다.
-const STORY_ROAD_Y0 := 15
-const STORY_ROAD_Y1 := 18                  # 15·16·17·18 = 4줄
+const STORY_ROAD_Y0 := 15 + TUT_DY
+const STORY_ROAD_Y1 := 18 + TUT_DY         # 네 줄 폭의 숲길
 const STORY_ROAD_X0 := 18
 const STORY_ROAD_X1 := 47
-const STORY_LINK_X := 44                   # 마을 큰길로 오르는 4줄 연결로 (30~33)
+# 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
+const FOREST_HOUSE_ANCHOR := Vector2i(30, 24)
+# 연금술사의 오두막 (메인 스토리 12) — 깊은 숲(deep_rect) 연못 서쪽.
+# 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
+const ALCH_HOUSE_ANCHOR := Vector2i(56, 46)
+const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
+const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 재민이 처음 서성이는 광장 언저리
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
 # 길을 막은 길목. 예전에는 네 곳 x 네 줄 = 나무 16그루라 초반이 지루했다.
 # 지금은 두 곳이고, 길목마다 길이 두 줄로 좁아진다 → 나무 4그루.
 const STORY_GATE_XS := [27, 38]
-const STORY_GATE_ROWS := [16, 17]   # 막히는 줄 (나머지 줄은 울타리로 좁힌다)
+const STORY_GATE_ROWS := [16 + TUT_DY, 17 + TUT_DY]   # 막히는 줄
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
 var story_cutscene := false                # 컷신 중 조작 잠금
+var house_preview := false                 # 집터 자리 고르기 (동물의 숲식 범위 표시)
 const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)
-const POSTMAN_TALK_DIST := 60.0            # E로 말을 걸 수 있는 거리
+const POSTMAN_TALK_DIST := 96.0            # 대화키로 말을 걸 수 있는 거리 (세 칸)
 const POSTMAN_REFOLLOW_DIST := 420.0       # 이만큼 멀어지면 다시 따라온다
 const VILLAGE_EXIT_X := 74                 # 우체부가 빠져나가는 마을 북쪽 길
 
 
-var _name_layer: CanvasLayer = null
 
 
 var _cutscene_idle := 0.0
@@ -963,6 +1320,7 @@ var _last_explore_tile := Vector2i(-999, -999)
 # 밤늦게까지 밖에서 채집하는 것이 위험해지도록 만드는 요소.
 
 var _shell_cd := 0.0        # 다음 조개가 밀려올 때까지 남은 게임 분
+var _rain_forage_cd := 0.0  # 빗속에서 다음 채집물이 돋을 때까지 남은 게임 분
 var night_mobs: Array = []  # [{node, spr, anim}]
 var _mob_hit_cd := 0.0
 var _mob_spawn_cd := 0.0
@@ -990,14 +1348,7 @@ const STORY_PAGES := [
 	["물려받은 농장", "마을 어귀, 할아버지가 머물던 작은 농장.\n오래 방치되어 잡초가 무성하고\n시설은 낡아 있었다.\n\n당분간은... 여기서 살아가 보자.\n농사도 짓고, 이웃도 사귀면서."],
 ]
 
-# 진 엔딩: 전설 재료 7종을 모아 최후의 연금술로 '유니콘의 뿔'을 완성한다.
-# (최종 목표는 게임 내에서 이 순간까지 절대 공개되지 않는다)
-const ENDING_PAGES := [
-	["마지막 연금술", "연구실 책상 위에 일곱 재료를 늘어놓았다.\n\n달빛 작물, 황금잉어, 세계수 가지,\n별빛 광석, 유령의 정수, 황금 달걀,\n그리고... 할아버지의 기억 조각."],
-	["완성되는 노트", "재료를 노트의 마지막 장에 겹쳐 놓자,\n빈 페이지에 글씨가 스며들 듯 떠올랐다.\n\n할아버지가 평생 찾아 헤매던 것.\n그것은 자연 어디에도 없는 재료 —\n일곱 개의 정성이 모여야만 태어나는 것."],
-	["유니콘의 뿔", "빛이 잦아들자, 책상 위에는\n나선형으로 빛나는 뿔 하나가 놓여 있었다.\n\n세상에 단 하나뿐인, 유니콘의 뿔.\n\n사람들이 비웃던 할아버지의 연구는\n허황된 꿈이 아니었다."],
-	["이어진 꿈", "'내가 이루지 못한 꿈을\n네가 이어주었으면 좋겠다.'\n\n...할아버지, 보이시나요.\n농사를 짓고, 물고기를 잡고,\n사람들과 웃고 지내던 그 모든 날들이\n전부 할아버지의 연구였어요.\n\n그리고 오늘, 그 꿈이 완성됐어요."],
-]
+# (유니콘의 뿔 엔딩은 걷어냈다 — 엔딩은 꿈속의 배웅(ending_ui) 하나다)
 
 
 # ---- 할아버지의 부탁 ----
@@ -1063,10 +1414,91 @@ var bugs: Array = []
 
 # ---- 루프 ----
 
+# ---- 갇힘 구조대 ----
+#
+# 세계는 자란다 — 구역이 열리고 닫히고, 건물이 서고, 지형이 바뀐다.
+# 그 사이에 **못 지나가는 칸 위에 서 있게 되는** 일이 생기면
+# 사방이 막혀 영영 움직일 수 없다 (미해금 구역 안, 맵 밖, 물 위).
+# 그래서 1초에 한 번, 서 있는 자리가 성한지 훑어보고 가까운 땅으로 옮긴다.
+const RESCUE_EVERY := 1.0
+var _rescue_t := 0.0
+
+
+# t에서 가장 가까운 「설 수 있는 칸」 (없으면 -1,-1)
+func nearest_open_tile(t: Vector2i, max_r := 24) -> Vector2i:
+	if is_passable(t):
+		return t
+	for r in range(1, max_r + 1):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var n := t + Vector2i(dx, dy)
+				if is_passable(n):
+					return n
+	return Vector2i(-1, -1)
+
+
+func rescue_trapped() -> void:
+	if interior.visible or cave.visible or shop_room.visible:
+		return
+	# 주인공 — 맵 밖·미해금 구역·물 위에 서 있으면 가까운 땅으로
+	var pt := player_tile()
+	var stuck: bool = pt.x < 0 or pt.y < 0 or pt.x >= MAP_W or pt.y >= MAP_H \
+		or not _tile_accessible(pt) or grid[clampi(pt.y, 0, MAP_H - 1)][clampi(pt.x, 0, MAP_W - 1)].ground == "water"
+	if stuck:
+		var to := nearest_open_tile(Vector2i(clampi(pt.x, 1, MAP_W - 2),
+			clampi(pt.y, 1, MAP_H - 2)))
+		if to.x < 0:
+			to = START_TILE
+		player.position = Vector2(to.x * TILE + 16, to.y * TILE + 16)
+		hud.show_message("길이 없는 곳에 갇혀 있었다 — 가까운 땅으로 나왔다.", 4.0)
+	# 마을 사람 — 잠긴 구역이나 맵 밖으로 밀려났으면 제 자리로 돌려보낸다
+	for n in npcs:
+		var nt := Vector2i(int(n.position.x / TILE), int(n.position.y / TILE))
+		if nt.x >= 0 and nt.y >= 0 and nt.x < MAP_W and nt.y < MAP_H \
+				and _tile_accessible(nt):
+			continue
+		var home: Vector2i = NPC_HOME.get(n.id, START_TILE)
+		var ht := nearest_open_tile(home)
+		if ht.x < 0:
+			ht = home
+		n.position = Vector2(ht.x * TILE + 16, ht.y * TILE + 16)
+
+
 func _process(delta: float) -> void:
 	_bgm_tick(delta)
+	GameData.playtime_sec += delta   # 엔딩 통계 리포트용 실제 플레이 시간
+	_rescue_t += delta
+	if _rescue_t >= RESCUE_EVERY:
+		_rescue_t = 0.0
+		rescue_trapped()
 	story._story_update(delta)
 	story._fisher_update(delta)
+	story._move_update(delta)
+	story._forest_update(delta)
+	story._spear_update(delta)
+	story._movein_update(delta)
+	story._story6_update(delta)
+	story._story7_update(delta)
+	story._story8_update(delta)
+	story._story9_update(delta)
+	story._story10_update(delta)
+	story._story11_update(delta)
+	story._story12_update(delta)
+	story._story13_update(delta)
+	story._story14_update(delta)
+	story._story15_update(delta)
+	story._story16_update(delta)
+	story._story17_update(delta)
+	story._story18_update(delta)
+	story._story19_update(delta)
+	story._story20_update(delta)
+	story._fisher_home_update(delta)
+	story._kitchen_update(delta)
+	story._settler_update(delta)
+	if house_preview:
+		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_tree_fall(delta)
@@ -1080,6 +1512,7 @@ func _process(delta: float) -> void:
 		if not Net.is_guest():
 			# 시간은 호스트/솔로만 진행 (게스트는 동기화 수신)
 			GameData.minutes += delta * MIN_PER_SEC
+			GameData.hunger_tick(delta * MIN_PER_SEC)   # 시간이 흐르면 배가 꺼진다
 			if GameData.minutes >= GameData.DAY_END and not day_transitioning:
 				daycycle._fade_next_day(true)
 		water_timer += delta
@@ -1092,10 +1525,18 @@ func _process(delta: float) -> void:
 			_growth_timer = 0.0
 		# 해변: 게임 시간 10~15분마다 조개가 하나씩 밀려온다 (상한에서 멈춘다)
 		if GameData.sea_open and not Net.is_guest():
+			toolwork._weapon_cd = maxf(0.0, toolwork._weapon_cd - delta)
 			_shell_cd -= delta * MIN_PER_SEC
 			if _shell_cd <= 0.0:
 				_shell_cd = GameData.shell_respawn_minutes()
 				worldgen._tick_beach()
+		# 비 오는 날은 걷는 동안에도 풀과 열매가 계속 돋는다
+		if not Net.is_guest() and weather_now() in [GameData.WEATHER_RAIN,
+				GameData.WEATHER_STORM]:
+			_rain_forage_cd -= delta * MIN_PER_SEC
+			if _rain_forage_cd <= 0.0:
+				_rain_forage_cd = RAIN_FORAGE_MINUTES
+				worldgen._tick_rain_forage()
 		actions._update_mouse_target()
 		fishing._update_fishing(delta)
 		if player_tile() != _last_explore_tile:
@@ -1111,9 +1552,11 @@ func _process(delta: float) -> void:
 		if player.walked > 40.0:
 			tutorial_notify("moved")
 	weather_time += delta
-	# 체력은 동굴 밖에서 천천히 회복된다 (요리를 먹으면 즉시 회복)
-	if not cave.visible:
+	# 체력은 동굴 밖에서 천천히 회복된다 (요리를 먹으면 즉시 회복).
+	# 다만 굶고 있으면 회복은커녕 계속 깎인다.
+	if not cave.visible and not GameData.starving():
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
+	_starve_process(delta)
 	renderer._update_particles(delta)
 	daycycle._update_night_mobs(delta)
 	objnode._update_tree_fade()
@@ -1153,9 +1596,10 @@ const PASTURE_GOLDEN_EGG := 0.09       # 목초지 닭의 황금 달걀 확률 (
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Net.is_guest() and not _net_ready:
-		return  # 접속 완료 전에는 조작 금지
-	if _name_layer != null:
-		return  # 이름 입력 중에는 다른 조작을 받지 않는다
+		# 접속 완료 전에는 조작 금지 — 다만 기다리다 그만둘 수는 있어야 한다
+		if event.is_action_pressed("ui_cancel"):
+			_back_to_title()
+		return
 	if story_cutscene and story._postman_state == "approach" and story._postman != null \
 			and event.is_action_pressed("ui_cancel"):
 		# 걸어오는 연출 스킵: 우체부가 바로 도착해 말을 건다
@@ -1176,15 +1620,38 @@ func _unhandled_input(event: InputEvent) -> void:
 				story._close_story()  # 부지/엔딩: 정상 종료 루틴 (HUD 복구 등)
 			get_viewport().set_input_as_handled()
 		return
+	if house_preview:
+		# 집터 자리 고르기 — 좌클릭: 설치 / 우클릭·ESC: 취소
+		if event.is_action_pressed("ui_cancel") \
+				or (event is InputEventMouseButton and event.pressed
+					and event.button_index == MOUSE_BUTTON_RIGHT):
+			house_preview = false
+			hud.show_message("집터 설치를 그만뒀다.")
+			overlay.queue_redraw()
+			get_viewport().set_input_as_handled()
+			return
+		if event is InputEventMouseMotion:
+			actions.mouse_screen = event.position
+			return
+		if event is InputEventMouseButton and event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT:
+			actions.mouse_screen = event.position
+			story.confirm_house_preview()
+			overlay.queue_redraw()
+			get_viewport().set_input_as_handled()
+			return
 	if ui_open():
 		if event.is_action_pressed("ui_cancel"):
-			shop.close()
-			summary.close()
-			map_ui.close()
-			inventory_ui.close()
-			quest_ui.close()
-			note_ui.close()
-			stats_ui.close()
+			# 겹쳐 뜬 창은 **위에 있는 것부터 하나씩** 닫는다.
+			# 한 번에 다 닫아 버리면 가방을 닫으려던 ESC에 뒤에 있던
+			# 상점 창까지 같이 사라진다.
+			var stack: Array = [settings_ui, storage_ui, stats_ui, note_ui,
+				quest_ui, inventory_ui, map_ui, summary, shop]
+			for w: Variant in stack:
+				if w != null and bool(w.visible):
+					w.close()
+					get_viewport().set_input_as_handled()
+					return
 			# 오프닝 스토리 중(화면이 어두울 때)에는 ESC로 대화창을 닫지 않는다
 			if fade_rect == null or fade_rect.color.a < 0.5:
 				dialog.close()
@@ -1238,13 +1705,42 @@ func _unhandled_input(event: InputEvent) -> void:
 		Sound.play_sfx("sfx_ui")
 		stats_ui.toggle()
 		return
+	# 개발/테스트: F10 — 가방을 10000개씩 채운다 (DEV_MODE에서만)
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F10 and GameData.DEV_MODE:
+		_dev_fill_stock()
+		return
+	# 개발/테스트: F8 — 메인 스토리 건너뛰기
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F8 and GameData.DEV_MODE:
+		story.skip_main_story()
+		return
 	if event.is_action_pressed("ui_cancel"):
-		# 게임 메뉴: 저장 후 타이틀로
+		# 게임 메뉴: 함께하기 방 코드 + 저장 후 타이틀로.
+		# (방 코드를 화면에 늘 띄우면 눈에 거슬려서 여기서 꺼내 본다)
 		Sound.play_sfx("sfx_ui")
-		dialog.open("게임 메뉴", "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)", [
-			["저장 후 타이틀로", _back_to_title],
-			["계속하기", null],
-		])
+		var body := "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)"
+		# 설정은 여기서 바로 연다 — 소리 하나 줄이자고 농장을 나갔다 올 수 없다
+		var btns := [["설정", func() -> void:
+				dialog.close()
+				settings_ui.open()],
+			["저장 후 타이틀로", _back_to_title], ["계속하기", null]]
+		var rcode := str(Net.rooms.code) if Net.is_host() and Net.rooms != null else ""
+		if rcode != "":
+			body = "방 코드   %s\n친구에게 알려 주면 이 농장으로 들어온다.\n\n%s" \
+				% [rcode, body]
+			btns.push_front(["코드 복사", func() -> void:
+				DisplayServer.clipboard_set(rcode)
+				hud.show_message("방 코드 %s — 복사했다!" % rcode)])
+		elif Net.is_guest():
+			body = "친구의 농장에서 함께 일하는 중이다.\n\n%s" % body
+		if GameData.DEV_MODE:
+			# 테스트용 — 출시 전에 DEV_MODE를 끄면 이 단추들도 같이 사라진다
+			btns.push_front(["[개발] 아이템 10000개 (F10)", _dev_fill_stock])
+			btns.push_front(["[개발] 메인 스토리 건너뛰기 (F8)", func() -> void:
+					dialog.close()
+					story.skip_main_story()])
+		dialog.open("게임 메뉴", body, btns)
 		return
 	for slot_i in 9:
 		if event.is_action_pressed("tool_%d" % (slot_i + 1)):
@@ -1256,6 +1752,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		toolwork.set_tool("seed")
 	elif event.is_action_pressed("use_tool"):
 		toolwork.use_tool()
+	elif event.is_action_pressed("talk"):
+		# 대화키(F)는 말 걸기가 먼저다. 앞에 사람도 가축도 없고 **탈 말이
+		# 실제로 곁에 있을 때만** 같은 키가 말 타기/내리기로 넘어간다.
+		# (그냥 넘기면 말을 걸려고 F를 누르며 걷는 내내 「아직 말이 없다」가 뜬다)
+		if not actions.talk() and riding.can_toggle():
+			riding.toggle_ride()
 	elif event.is_action_pressed("mount"):
 		riding.toggle_ride()
 	elif event.is_action_pressed("interact"):
@@ -1531,8 +2033,11 @@ var _snapshot_retry := 0.0
 # 게스트 행동 요청: 호스트가 같은 로직을 실행하고 결과를 전파한다
 var _target_override := Vector2i(-999, -999)
 var _perp_override := Vector2i.ZERO
-var _forced_seed := ""
-var _remote_acting := false
+# 이 둘은 다른 스크립트(net_sync·tool_use·shop_ui·hud)가 읽는 공용 상태다.
+# 언더스코어를 붙이면 「이 클래스 안에서만 쓰는 값」으로 보여 안 쓰인다는
+# 경고가 뜬다 — 밖에서 쓰는 값이니 이름에도 그렇게 적는다.
+var forced_seed := ""
+var remote_acting := false
 
 
 # 게스트가 상점 조작 후 호출 (호스트면 즉시 전파)
@@ -1572,10 +2077,6 @@ func tutorial_notify(flag: String) -> void:
 	story.tutorial_notify(flag)
 
 
-func show_ending() -> void:
-	story.show_ending()
-
-
 # 상점 안(shop_room.gd)에서 부르는 창구 — 본체는 scripts/village_ui.gd
 func room_action(kind: String) -> void:
 	village.room_action(kind)
@@ -1601,8 +2102,8 @@ func _bgm_tick(delta: float) -> void:
 func _want_bgm() -> String:
 	if cave.visible:
 		return "bgm_cave"
-	if shop_room.visible or shop.visible:
-		return "bgm_shop"
+	# 집이나 가게에 들어가도 배경음은 그대로 흐른다 —
+	# 곡이 바뀌는 별세계는 동굴뿐이다 (bgm_shop 전환은 없앴다)
 	if GameData.festival_open():
 		return "bgm_festival"
 	var h := GameData.minutes / 60.0

@@ -24,6 +24,10 @@ var buttons_box: HBoxContainer
 var portrait: TextureRect
 var skip_btn: Button
 
+var _deco: Control = null          # 스티치·나뭇잎·진행 화살표를 그리는 겹
+var _name_plate: PanelContainer = null
+var _deco_t := 0.0
+
 var _seq: Array = []
 var _seq_idx := -1
 var _seq_name := ""
@@ -34,14 +38,22 @@ var _seq_has_choices := false
 
 # 대화창은 화면 아래 가운데에 고정하고, 내용 높이만큼만 커진다.
 # (예전에는 645x210으로 고정이라 짧은 대사에서도 빈 공간이 크게 남았다)
-const PANEL_W := 520
+#
+# 따뜻한 우드톤 팔레트 — 밝은 크림 속지 + 진한 브라운 테두리 +
+# 나무 명패식 이름 탭. 퀘스트 추적창도 같은 톤을 쓴다.
+const PANEL_W := 470               # 화면을 덜 가리게 조금 줄였다
 const BOTTOM_MARGIN := 56          # 아래 핫바를 가리지 않는 높이
-const FONT_TITLE := 17
-const FONT_BODY := 17
+const FONT_TITLE := 16
+const FONT_BODY := 14
 const FONT_BTN := 15
 const FONT_SKIP := 13
 const SKIP_W := 76
-const PORTRAIT := 64
+const PORTRAIT := 58
+const COL_CREAM := Color(0.97, 0.93, 0.83, 0.97)   # 속지 (밝은 크림)
+const COL_WOOD := Color(0.62, 0.44, 0.26)          # 명패·장식 (우드 브라운)
+const COL_WOOD_DK := Color(0.45, 0.3, 0.16)        # 테두리 (진한 브라운)
+const COL_INK := Color(0.32, 0.2, 0.1)             # 본문 글자 (잉크 브라운)
+const COL_LEAF := Color(0.45, 0.62, 0.32)          # 나뭇잎 장식
 
 
 func _ready() -> void:
@@ -67,13 +79,21 @@ func _ready() -> void:
 	panel.offset_bottom = -BOTTOM_MARGIN
 	panel.custom_minimum_size = Vector2(PANEL_W, 0)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.17, 0.14, 0.22, 0.96)
-	style.border_color = Color(0.42, 0.36, 0.55)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(4)
-	style.set_content_margin_all(9)
+	style.bg_color = COL_CREAM
+	style.border_color = COL_WOOD_DK
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(9)          # 모서리를 살짝 둥글게
+	style.set_content_margin_all(8)
 	panel.add_theme_stylebox_override("panel", style)
 	root.add_child(panel)
+
+	# 아기자기한 디테일 — 네 귀퉁이 스티치 점 + 왼쪽 위 나뭇잎 한 장 +
+	# 대화가 이어질 때 오른쪽 아래에서 콩콩 뛰는 진행 화살표(▼)
+	_deco = Control.new()
+	_deco.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_deco.draw.connect(_draw_deco)
+	panel.add_child(_deco)
 
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 9)
@@ -98,24 +118,35 @@ func _ready() -> void:
 	top.add_theme_constant_override("separation", 4)
 	v.add_child(top)
 
-	var lpad := Control.new()
-	lpad.custom_minimum_size = Vector2(SKIP_W, 0)
-	top.add_child(lpad)
-
+	# 이름은 작은 나무 명패 탭에 얹는다 (왼쪽 정렬)
+	_name_plate = PanelContainer.new()
+	var pstyle := StyleBoxFlat.new()
+	pstyle.bg_color = COL_WOOD
+	pstyle.border_color = COL_WOOD_DK
+	pstyle.set_border_width_all(2)
+	pstyle.set_corner_radius_all(6)
+	pstyle.content_margin_left = 10.0
+	pstyle.content_margin_right = 10.0
+	pstyle.content_margin_top = 1.0
+	pstyle.content_margin_bottom = 1.0
+	_name_plate.add_theme_stylebox_override("panel", pstyle)
+	_name_plate.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	top.add_child(_name_plate)
 	title_label = Label.new()
-	title_label.add_theme_color_override("font_color", Color("ffd75e"))
+	title_label.add_theme_color_override("font_color", Color(0.99, 0.95, 0.86))
 	title_label.add_theme_font_size_override("font_size", FONT_TITLE)
-	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(title_label)
+	_name_plate.add_child(title_label)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(spacer)
 
 	# 대사가 여러 줄 남았을 때만 보인다 (ESC와 같은 동작)
 	skip_btn = Button.new()
 	skip_btn.text = "건너뛰기 >>"
 	skip_btn.tooltip_text = "이 대화를 건너뛴다 (ESC)"
 	skip_btn.add_theme_font_size_override("font_size", FONT_SKIP)
-	skip_btn.add_theme_color_override("font_color", Color(0.72, 0.68, 0.82))
+	skip_btn.add_theme_color_override("font_color", COL_WOOD)
 	skip_btn.custom_minimum_size = Vector2(SKIP_W, 0)
 	skip_btn.focus_mode = Control.FOCUS_NONE
 	skip_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -125,11 +156,13 @@ func _ready() -> void:
 
 	body_label = Label.new()
 	body_label.add_theme_font_size_override("font_size", FONT_BODY)
+	body_label.add_theme_color_override("font_color", COL_INK)
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# 글자는 상자 한가운데에 놓는다 (가로·세로 모두)
+	# 글자는 상자 한가운데에 놓는다 (가로·세로 모두).
+	# 세로 최소 높이를 줄여 대사에 필요한 만큼만 차지한다
 	body_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	body_label.custom_minimum_size = Vector2(0, 44)
+	body_label.custom_minimum_size = Vector2(0, 34)
 	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body_label)
@@ -140,11 +173,60 @@ func _ready() -> void:
 	v.add_child(buttons_box)
 
 
+# 선택지 버튼도 같은 우드톤 — 크림 바탕에 진한 브라운 테두리
+func _style_btn(btn: Button) -> void:
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.9, 0.82, 0.66)
+	st.border_color = COL_WOOD_DK
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(6)
+	st.content_margin_left = 10.0
+	st.content_margin_right = 10.0
+	st.content_margin_top = 3.0
+	st.content_margin_bottom = 3.0
+	btn.add_theme_stylebox_override("normal", st)
+	var hv: StyleBoxFlat = st.duplicate()
+	hv.bg_color = Color(0.96, 0.9, 0.75)
+	btn.add_theme_stylebox_override("hover", hv)
+	btn.add_theme_stylebox_override("pressed", st)
+	btn.add_theme_color_override("font_color", COL_INK)
+	btn.add_theme_color_override("font_hover_color", COL_INK)
+	btn.add_theme_color_override("font_pressed_color", COL_INK)
+
+
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	_deco_t += delta
+	if _deco != null:
+		_deco.queue_redraw()   # 진행 화살표가 콩콩 뛰도록
+
+
+# 귀퉁이 스티치 점 4개 + 명패 옆 나뭇잎 + 진행 화살표.
+# 장식은 글자 영역 밖(테두리 근처)에만 둔다 — 가독성이 먼저다.
+func _draw_deco() -> void:
+	var sz: Vector2 = _deco.size
+	var dot := COL_WOOD
+	for c: Vector2 in [Vector2(5, 5), Vector2(sz.x - 8, 5),
+			Vector2(5, sz.y - 8), Vector2(sz.x - 8, sz.y - 8)]:
+		_deco.draw_rect(Rect2(c, Vector2(3, 3)), dot)
+	# 왼쪽 위 작은 나뭇잎 (픽셀 두 장)
+	_deco.draw_rect(Rect2(12, 4, 4, 3), COL_LEAF)
+	_deco.draw_rect(Rect2(15, 2, 3, 3), COL_LEAF.lightened(0.2))
+	# 대화가 더 남았으면 오른쪽 아래에서 ▼가 콩콩 뛴다
+	if in_seq() and not _seq_has_choices:
+		var bob := absf(sin(_deco_t * 4.0)) * 3.0
+		var p := Vector2(sz.x - 18, sz.y - 12 + bob - 3.0)
+		_deco.draw_colored_polygon(PackedVector2Array([
+			p, p + Vector2(8, 0), p + Vector2(4, 5)]), COL_WOOD_DK)
+
+
 # buttons: [[라벨, Callable], ...] — 콜백이 null이면 닫기 동작
 func open(title_text: String, body_text: String, buttons: Array,
 		portrait_tex: Texture2D = null) -> void:
-	title_label.text = title_text
-	body_label.text = body_text
+	title_label.text = GameData.localize(title_text)
+	_name_plate.visible = title_text != ""   # 이름 없는 안내창엔 명패도 없다
+	body_label.text = clean_text(body_text)
 	# 일반 안내창에는 건너뛸 대사가 없다 — 시퀀스가 다시 켜 준다
 	skip_btn.visible = false
 	portrait.texture = portrait_tex
@@ -156,6 +238,7 @@ func open(title_text: String, body_text: String, buttons: Array,
 		btn.text = b[0]
 		btn.add_theme_font_size_override("font_size", FONT_BTN)
 		btn.focus_mode = Control.FOCUS_NONE
+		_style_btn(btn)
 		if b[1] != null:
 			btn.pressed.connect(b[1])
 		else:
@@ -165,7 +248,72 @@ func open(title_text: String, body_text: String, buttons: Array,
 
 
 func set_body(text: String) -> void:
-	body_label.text = text
+	body_label.text = clean_text(text)
+
+
+# ---- 대사 다듬기 ----
+#
+# 창에 나가는 글에서 **눈에 띄어선 안 되는 것**을 걷어낸다.
+#   · 강조 기호(**) 같은 편집용 표시 — 게임 안에서는 아무 뜻이 없다
+#   · 이어진 공백
+# NPC가 입으로 하는 말(「」로 묶인 대사)에서는 괄호로 적어 둔 지문까지
+# 떼어낸다 — 말풍선 안에 「...」와 (지문)이 섞이면 읽는 사람이 헷갈린다.
+func clean_text(text: String) -> String:
+	# 대사에 박혀 있는 기본 마을 이름을 플레이어가 지은 이름으로 바꾼다.
+	# 창에 나가는 글은 전부 이 함수를 지나므로 여기 한 군데면 된다.
+	var out := GameData.localize(text).replace("", "")
+	while out.contains("  "):
+		out = out.replace("  ", " ")
+	return out.strip_edges()
+
+
+func _is_spoken(text: String) -> bool:
+	return text.contains("「") or text.contains("」")
+
+
+# ---- 사람이 하는 말에는 문장 부호가 넷뿐이다 ----
+#
+# 마침표 · 쉼표 · 물음표 · 느낌표. 그 밖의 것(따옴표 「」『』, 줄표 —,
+# 가운뎃점 ·, 말줄임표 …, ★♥ 같은 그림 기호)은 전부 걷어낸다.
+# 누가 하는 말인지는 창의 이름패가 알려 주므로 따옴표도 필요 없다.
+# (괄호로 적은 지문은 앞서 _strip_parens가 이미 떼어냈다)
+const KEEP_PUNCT := ".,?!"
+
+
+func _only_basic_punct(text: String) -> String:
+	var out := ""
+	for ch in text.replace("…", "...").replace("...", "..."):
+		if ch == "\n" or ch == " ":
+			out += ch
+			continue
+		if KEEP_PUNCT.contains(ch):
+			out += ch
+			continue
+		var c := ch.unicode_at(0)
+		# 한글 · 숫자 · 알파벳만 남긴다
+		if (c >= 0xAC00 and c <= 0xD7A3) or (c >= 0x1100 and c <= 0x11FF) \
+				or (c >= 0x30 and c <= 0x39) or (c >= 0x41 and c <= 0x5A) \
+				or (c >= 0x61 and c <= 0x7A):
+			out += ch
+		else:
+			out += " "     # 지운 자리에 낱말이 붙지 않게 한 칸 남긴다
+	return out
+
+
+# 괄호로 묶인 부분을 통째로 걷어낸다 (중첩은 없다고 본다)
+func _strip_parens(text: String) -> String:
+	var out := ""
+	var depth := 0
+	for ch in text:
+		if ch == "(" or ch == "（":
+			depth += 1
+			continue
+		if ch == ")" or ch == "）":
+			depth = maxi(depth - 1, 0)
+			continue
+		if depth == 0:
+			out += ch
+	return out
 
 
 # 본문은 그대로 두고 버튼만 갈아 끼운다
@@ -178,6 +326,7 @@ func set_buttons(buttons: Array) -> void:
 		btn.text = b[0]
 		btn.add_theme_font_size_override("font_size", FONT_BTN)
 		btn.focus_mode = Control.FOCUS_NONE
+		_style_btn(btn)
 		if b[1] != null:
 			btn.pressed.connect(b[1])
 		else:
@@ -201,12 +350,180 @@ func close() -> void:
 
 func open_seq(speaker: String, portrait_tex: Texture2D, entries: Array,
 		on_end := Callable()) -> void:
-	_seq = entries
+	_seq = _paginate_seq(entries)
 	_seq_idx = -1
 	_seq_name = speaker
 	_seq_portrait = portrait_tex
 	_seq_on_end = on_end
 	_advance_seq()
+
+
+# 대사 한 페이지는 세 줄까지다 — 창이 지나치게 커지지 않으면서도,
+# **한 문장이 두 화면에 걸쳐 끊기는 일이 없도록** 넉넉히 잡은 값이다.
+# \n으로 나눈 줄뿐 아니라 자동 줄바꿈으로 생기는 줄까지 픽셀 폭으로
+# 계산해서, 한 줄이 아무리 길어도 화면 밖으로 넘치지 않는다.
+# 이벤트는 첫 조각에서, 선택지·이름 같은 나머지 성질은 마지막 조각에 남는다.
+const WRAP_W := 330.0   # 본문이 실제로 쓰는 폭 (패널 - 초상화 - 여백)
+const PAGE_LINES := 3   # 한 페이지에 담는 줄 수
+
+
+func _wrap_at(text: String, width: float) -> PackedStringArray:
+	var f: Font = body_label.get_theme_font("font")
+	var out: PackedStringArray = []
+	for raw in text.split("\n"):
+		var line := ""
+		for ch in raw:
+			if line != "" and f.get_string_size(line + ch,
+					HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_BODY).x > width:
+				out.append(line)
+				line = ch
+			else:
+				line += ch
+		out.append(line)
+	return out
+
+
+func _wrap_lines(text: String) -> PackedStringArray:
+	return _wrap_at(text, WRAP_W)
+
+
+# 두 줄로 나뉠 때 **양쪽 길이를 고르게** 맞춘다.
+# 그냥 폭에 맞춰 자르면 둘째 줄에 한두 글자만 덜렁 남아 읽기 어렵다 —
+# 줄 수가 늘지 않는 선까지 폭을 좁혀서 자르면 자연스럽게 반씩 나뉜다.
+func _wrap_balanced(text: String) -> PackedStringArray:
+	var lines := _wrap_at(text, WRAP_W)
+	if lines.size() <= 1:
+		return lines
+	var lo := 60.0
+	var hi := WRAP_W
+	while hi - lo > 4.0:
+		var mid := (lo + hi) * 0.5
+		if _wrap_at(text, mid).size() <= lines.size():
+			hi = mid
+		else:
+			lo = mid
+	return _wrap_at(text, hi)
+
+
+# 한 문장 단위로 자른다 (문장 부호 뒤에서 끊는다).
+# 손으로 넣은 줄바꿈은 무시하고 다시 짠다 — 글자 크기가 달라져도
+# 「한 문장은 한 화면에」가 지켜지게 하기 위해서다.
+#
+# 세 가지를 조심한다.
+#   ① **말줄임표는 한 덩이다.** "..."을 마침표 셋으로 세면 한 문장이
+#      세 조각으로 쪼개져, 화면에 점 하나만 덩그러니 남는 줄이 생긴다.
+#   ② **괄호·따옴표 안에서는 끊지 않는다.** "(가나다. 라마바.)"를 문장마다
+#      자르면 여는 괄호와 닫는 괄호가 서로 다른 화면으로 흩어진다.
+#   ③ 그래도 부호만 남은 조각이 생기면 **앞 문장에 도로 붙인다.**
+const SENT_END := [".", "!", "?", "…"]
+const SENT_CLOSE := ["」", "』", "\"", "'", ")", "）", "”", "’"]
+const SENT_OPEN := ["「", "『", "(", "（", "“", "‘"]
+
+
+func _split_sentences(text: String) -> PackedStringArray:
+	var flat := text.replace("\n", " ").strip_edges()
+	while flat.contains("  "):
+		flat = flat.replace("  ", " ")
+	var out: PackedStringArray = []
+	var cur := ""
+	var depth := 0
+	var i := 0
+	while i < flat.length():
+		var ch := flat[i]
+		cur += ch
+		i += 1
+		if ch in SENT_OPEN:
+			depth += 1
+			continue
+		if ch in SENT_CLOSE:
+			depth = maxi(depth - 1, 0)
+			continue
+		if not (ch in SENT_END):
+			continue
+		# ① 잇달아 오는 문장 부호("...", "?!", "…")는 통째로 삼킨다
+		while i < flat.length() and flat[i] in SENT_END:
+			cur += flat[i]
+			i += 1
+		# 부호 뒤에 닫는 따옴표·괄호가 붙으면 거기까지가 한 문장이다
+		while i < flat.length() and flat[i] in SENT_CLOSE:
+			cur += flat[i]
+			i += 1
+			depth = maxi(depth - 1, 0)
+		# ② 괄호나 따옴표가 아직 안 닫혔으면 문장이 끝난 것이 아니다
+		if depth > 0:
+			continue
+		if cur.strip_edges() != "":
+			out.append(cur.strip_edges())
+		cur = ""
+	if cur.strip_edges() != "":
+		out.append(cur.strip_edges())
+	# ③ 글자 없이 부호만 남은 조각은 앞 문장 꼬리에 붙인다
+	var merged: PackedStringArray = []
+	for s: String in out:
+		if not merged.is_empty() and _punct_only(s):
+			merged[merged.size() - 1] = merged[merged.size() - 1] + s
+		else:
+			merged.append(s)
+	return merged
+
+
+# 글자 없이 부호만 있는 조각인가 (혼자 서 있으면 읽을 수 없는 것)
+func _punct_only(s: String) -> bool:
+	for ch in s:
+		if not (ch in SENT_END or ch in SENT_CLOSE or ch in SENT_OPEN
+				or ch == " " or ch == ","):
+			return false
+	return true
+
+
+# 대사 한 덩이를 화면 두 줄짜리 페이지들로 나눈다.
+# **문장이 페이지를 가로질러 끊기지 않는다** — 짧은 문장은 두 문장까지
+# 한 페이지에 모으고, 두 줄을 넘는 긴 문장만 어쩔 수 없이 나눈다.
+func _paginate_seq(entries: Array) -> Array:
+	var paged: Array = []
+	for e_v in entries:
+		var e: Dictionary = e_v
+		var body := clean_text(str(e.get("text", "")))
+		# NPC가 하는 말에서는 괄호 지문을 떼어낸다 (지문만 있는 페이지는 그대로)
+		if _is_spoken(body):
+			var spoken := clean_text(_only_basic_punct(_strip_parens(body)))
+			if spoken != "":
+				body = spoken
+		var pages: Array[String] = []
+		var buf: PackedStringArray = []
+		for sent: String in _split_sentences(body):
+			var lines := _wrap_balanced(sent)
+			if lines.size() > PAGE_LINES:
+				# 세 줄로도 안 담기는 아주 긴 문장만 어쩔 수 없이 나눈다
+				if not buf.is_empty():
+					pages.append("\n".join(buf))
+					buf = []
+				var i := 0
+				while i < lines.size():
+					pages.append("\n".join(lines.slice(i,
+						mini(i + PAGE_LINES, lines.size()))))
+					i += PAGE_LINES
+				continue
+			if buf.size() + lines.size() > PAGE_LINES:
+				pages.append("\n".join(buf))
+				buf = []
+			buf += lines
+		if not buf.is_empty():
+			pages.append("\n".join(buf))
+		if pages.is_empty():
+			pages.append(body)
+		for pi in pages.size():
+			var pg := {"text": pages[pi]}
+			if e.has("portrait"):
+				pg["portrait"] = e.portrait
+			if e.has("name"):
+				pg["name"] = e.name
+			if pi == 0 and e.has("event"):
+				pg["event"] = e.event
+			if pi == pages.size() - 1 and e.has("choices"):
+				pg["choices"] = e.choices
+			paged.append(pg)
+	return paged
 
 
 func in_seq() -> bool:
@@ -282,6 +599,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		skip_seq()
 		get_viewport().set_input_as_handled()
 	elif not _seq_has_choices \
-			and (event.is_action_pressed("interact") or event.is_action_pressed("use_tool")):
+			and (event.is_action_pressed("talk") or event.is_action_pressed("interact")
+			or event.is_action_pressed("use_tool")):
 		_advance_seq()
 		get_viewport().set_input_as_handled()

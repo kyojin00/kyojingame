@@ -1,10 +1,18 @@
-# 능력치 창 (U): 숙련도 6종 + 데리고 다니는 펫.
+# 능력치 창 (U): 그룹별 카드(숙련도/장비/착용 장비/약효/펫)로 정돈했다.
+# 글줄을 잔뜩 늘어놓는 대신 아이콘 + 짧은 숫자, 자세한 효과는 툴팁으로.
 extends CanvasLayer
 
 var main: Node2D
 var items_box: VBoxContainer
 var scroll: ScrollContainer
 var _refresh_timer := 0.0
+
+# 숙련도별 아이콘 (main.tex 키 — 없으면 글자로 대신한다)
+const SKILL_ICONS := {
+	"farm": "icon_hoe", "fish": "icon_rod", "forest": "icon_axe",
+	"mine": "icon_pickaxe", "combat": "icon_sword", "cook": "recipe",
+	"beach": "forage_shell", "ranch": "egg",
+}
 
 
 func _ready() -> void:
@@ -40,7 +48,7 @@ func _ready() -> void:
 
 	items_box = VBoxContainer.new()
 	items_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	items_box.add_theme_constant_override("separation", 3)
+	items_box.add_theme_constant_override("separation", 6)
 	scroll.add_child(items_box)
 
 
@@ -80,86 +88,150 @@ func is_tool_unlocked_safe(tid: String) -> bool:
 	return GameData.unlocked_tools.has(tid)
 
 
+# ---- 카드/행 도우미 --------------------------------------------------------
+
+
+# 둥근 카드 한 장 — 제목 줄 + 내용 VBox를 돌려준다
+func _card(title: String, tip := "") -> VBoxContainer:
+	var pc := PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.21, 0.18, 0.28)
+	st.border_color = Color(0.36, 0.31, 0.48)
+	st.set_border_width_all(1)
+	st.set_corner_radius_all(6)
+	st.set_content_margin_all(8)
+	st.content_margin_top = 6.0
+	pc.add_theme_stylebox_override("panel", st)
+	items_box.add_child(pc)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 3)
+	pc.add_child(v)
+	var head := Label.new()
+	head.text = title
+	head.add_theme_color_override("font_color", Color("ffd75e"))
+	head.add_theme_font_size_override("font_size", 14)
+	if tip != "":
+		head.tooltip_text = tip
+		head.mouse_filter = Control.MOUSE_FILTER_STOP
+	v.add_child(head)
+	return v
+
+
+# 아이콘 + 글줄 한 행 (아이콘이 없으면 글자만)
+func _row(box: VBoxContainer, icon: String, text: String,
+		color := Color(0.9, 0.88, 0.95), tip := "") -> HBoxContainer:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 6)
+	if tip != "":
+		h.tooltip_text = tip
+		h.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.add_child(h)
+	if icon != "" and main != null and main.tex.has(icon):
+		var tr := TextureRect.new()
+		tr.texture = main.tex[icon]
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		h.add_child(tr)
+	var l := Label.new()
+	l.text = text
+	l.add_theme_color_override("font_color", color)
+	l.add_theme_font_size_override("font_size", 13)
+	h.add_child(l)
+	return h
+
+
 func _rebuild() -> void:
 	for c in items_box.get_children():
 		c.queue_free()
 
-	_line("하다 보면 는다 — 반복할수록 레벨이 오른다.", Color(0.62, 0.58, 0.75))
+	# ① 숙련도 — 아이콘 + 레벨 + 게이지. 효과는 행 툴팁으로
+	var sk := _card("숙련도", "하다 보면 는다 — 반복할수록 레벨이 오른다")
 	for sid in GameData.SKILL_IDS:
 		var lv := GameData.skill_lv(sid)
 		var s: Dictionary = GameData.skills[sid]
-		var prog := "MAX" if lv >= GameData.SKILL_MAX_LV else \
-			"%d/%d" % [int(s.xp), int(GameData.skill_xp_needed(lv))]
-		_line("%s Lv.%d  (%s)" % [GameData.SKILLS[sid].name, lv, prog], Color("ffd75e"))
+		var maxed := lv >= GameData.SKILL_MAX_LV
+		var row := _row(sk, SKILL_ICONS.get(sid, ""),
+			"%s Lv.%d" % [GameData.SKILLS[sid].name, lv],
+			Color("ffd75e") if maxed else Color(0.92, 0.9, 0.96),
+			"%s\n경험치 %s" % [GameData.SKILLS[sid].effect,
+				"MAX" if maxed else "%d/%d" % [int(s.xp),
+					int(GameData.skill_xp_needed(lv))]])
+		# 이름 칸을 고정 폭으로 — 게이지가 한 줄에 나란히 선다
+		(row.get_child(row.get_child_count() - 1) as Label) \
+			.custom_minimum_size = Vector2(128, 0)
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size = Vector2(350, 10)
+		bar.custom_minimum_size = Vector2(170, 10)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.show_percentage = false
-		if lv >= GameData.SKILL_MAX_LV:
-			bar.max_value = 1.0
-			bar.value = 1.0
-		else:
-			bar.max_value = GameData.skill_xp_needed(lv)
-			bar.value = float(s.xp)
+		bar.max_value = 1.0 if maxed else GameData.skill_xp_needed(lv)
+		bar.value = 1.0 if maxed else float(s.xp)
 		var bg := StyleBoxFlat.new()
 		bg.bg_color = Color(0.1, 0.08, 0.15)
 		bg.border_color = Color(0.32, 0.27, 0.43)
 		bg.set_border_width_all(1)
+		bg.set_corner_radius_all(3)
 		var fill := StyleBoxFlat.new()
-		fill.bg_color = Color(0.48, 0.83, 0.35) if lv < GameData.SKILL_MAX_LV \
-			else Color(1.0, 0.84, 0.37)
+		fill.bg_color = Color(1.0, 0.84, 0.37) if maxed else Color(0.48, 0.83, 0.35)
+		fill.set_corner_radius_all(3)
 		bar.add_theme_stylebox_override("background", bg)
 		bar.add_theme_stylebox_override("fill", fill)
-		items_box.add_child(bar)
-		_line("  %s" % GameData.SKILLS[sid].effect)
+		bar.tooltip_text = "MAX" if maxed \
+			else "%d/%d" % [int(s.xp), int(GameData.skill_xp_needed(lv))]
+		bar.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.add_child(bar)
 
-	# 장비 능력치 (대장간에서 강화하면 여기 숫자가 오른다)
-	_line("")
-	_line("[장비] 강화할수록 능력치가 오른다 — 대장간에서", Color(0.62, 0.58, 0.75))
+	# ② 도구 강화 — 대장간에서 올린 수치. 자세한 항목은 툴팁으로
+	var tools := _card("도구 강화 — 대장간에서",
+		"\n".join(GameData.STAT_HELP))
 	for tid in GameData.TOOL_STATS:
 		if not is_tool_unlocked_safe(tid):
 			continue
 		var st: Dictionary = GameData.tool_stats(tid)
-		var lv: int = int(GameData.tool_level.get(tid, 1))
+		var lv2: int = int(GameData.tool_level.get(tid, 1))
 		var parts: Array[String] = []
 		for k in ["power", "reach", "stamina", "luck"]:
 			parts.append("%s %s" % [GameData.STAT_NAMES[k], GameData.fmt_stat(st[k])])
-		_line("%s Lv.%d — %s" % [GameData.TOOL_KOR.get(tid, tid), lv, " · ".join(parts)],
-			Color("ffd75e"))
-	_line("  행운 합계 %s (도구 + 장비)" % GameData.fmt_stat(GameData.total_luck()))
-	for h in GameData.STAT_HELP:
-		_line("  %s" % h, Color(0.62, 0.58, 0.75))
+		_row(tools, main.hud.TOOL_ICONS.get(tid, "") if main != null else "",
+			"%s Lv.%d" % [GameData.TOOL_KOR.get(tid, tid), lv2],
+			Color(0.92, 0.9, 0.96), " · ".join(parts))
+	_row(tools, "icon_coin", "행운 합계 %s (도구+장비)"
+		% GameData.fmt_stat(GameData.total_luck()), Color(0.75, 0.72, 0.85),
+		"행운은 품질·추가 수확에 붙는다")
 
-	# 대장간에서 만든 장비 (도구 강화와 별개로 붙는 능력치)
-	_line("")
-	_line("[착용 장비] 대장간에서 만들어 가방(I)의 장비 탭에서 바꾼다",
-		Color(0.62, 0.58, 0.75))
+	# ③ 착용 장비 — 대장간 제작, 가방(I) 장비 탭에서 교체
+	var gear := _card("착용 장비 — 가방(I) 장비 탭에서 교체",
+		"위력=동굴 공격력 · 방어=받는 피해 · 기력 절약=도구 소모\n행운=품질·추가 수확 · 이동 속도=걷는 속도")
 	for slot: String in GameData.GEAR_SLOTS:
 		var gid: String = str(GameData.equipped.get(slot, ""))
-		var nm: String = GameData.GEAR[gid].name if gid != "" else "없음"
+		var nm: String = GameData.GEAR[gid].name if gid != "" else "비어 있음"
 		var st2: String = GameData.gear_stat_text(gid) if gid != "" else ""
-		_line("%s — %s%s" % [GameData.GEAR_SLOT_NAMES[slot], nm,
-			("  (%s)" % st2) if st2 != "" else ""], Color("ffd75e"))
-	_line("  위력은 동굴 공격력, 방어는 받는 피해, 기력 절약은 도구 소모,",
-		Color(0.62, 0.58, 0.75))
-	_line("  행운은 품질·추가 수확, 이동 속도는 걷는 속도에 그대로 적용된다.",
-		Color(0.62, 0.58, 0.75))
+		_row(gear, gid if gid != "" else "",
+			"%s — %s" % [GameData.GEAR_SLOT_NAMES[slot], nm],
+			Color(0.92, 0.9, 0.96) if gid != "" else Color(0.6, 0.56, 0.7), st2)
+	var set_txt: String = GameData.gear_set_text()
+	if set_txt != "":
+		_row(gear, "", "세트 효과: %s" % set_txt, Color(0.65, 0.85, 0.6))
 
-	# 오늘 마신 물약 — 하루 종일 가는 효과라 어딘가에 보여야 한다
-	_line("")
+	# ④ 오늘의 약효
 	var buff: String = GameData.potion_text()
+	var pot := _card("오늘의 약효")
 	if buff != "":
-		_line("[오늘의 약효] %s" % buff, Color(0.7, 0.9, 0.75))
+		_row(pot, "potion_luck", buff, Color(0.7, 0.9, 0.75))
 		for fid: String in GameData.FORMULA_IDS:
 			var key: String = str(GameData.FORMULAS[fid].get("today", ""))
 			if key != "" and GameData.has_potion(key):
-				_line("  %s" % GameData.FORMULAS[fid].effect, Color(0.62, 0.58, 0.75))
+				_row(pot, fid, str(GameData.FORMULAS[fid].effect),
+					Color(0.75, 0.72, 0.85))
 	else:
-		_line("[오늘의 약효] 없음 — 집 조합대에서 물약을 만들어 마셔 보자",
-			Color(0.62, 0.58, 0.75))
+		_row(pot, "", "없음 — 집 조합대에서 물약을 만들어 마셔 보자",
+			Color(0.6, 0.56, 0.7))
 
-	_line("")
+	# ⑤ 펫
+	var pet := _card("펫")
 	if GameData.active_pet != "":
 		var pdef: Dictionary = GameData.PETS[GameData.active_pet]
-		_line("[펫] %s — %s" % [pdef.name, pdef.passive], Color(0.65, 0.85, 0.6))
+		_row(pet, "", "%s — %s" % [pdef.name, pdef.passive], Color(0.65, 0.85, 0.6))
 	else:
-		_line("[펫] 없음 — 목장 상회에서 입양할 수 있다", Color(0.62, 0.58, 0.75))
+		_row(pet, "", "없음 — 목장 상회에서 입양할 수 있다", Color(0.6, 0.56, 0.7))

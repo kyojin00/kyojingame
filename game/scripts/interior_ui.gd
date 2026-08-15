@@ -15,6 +15,11 @@ var ALCHEMY := Rect2(345, 117, 108, 39)
 var EXIT_X := Vector2(408, 552)       # 아랫벽 문 구간
 var WINDOWS: Array = [270.0, 690.0]   # 창문 x 자리
 const GRID := 12.0                      # 꾸미기 배치 격자
+# 사람을 그리는 배율 — **바깥 세상(main.CAMERA_ZOOM)과 똑같이** 맞춘다.
+# 예전에는 0.5로만 그려서 문 하나 지났을 뿐인데 캐릭터가 1.8배로 커졌다.
+# 방·세간은 처음부터 이 크기의 사람을 놓고 그린 것들이다 (침대 99px =
+# 누운 사람 길이 · 발밑 그림자 8x3). 사람만 어긋나 있었다.
+const ZOOM := 0.56
 
 
 # 집 단계에 맞춰 방 크기와 붙박이 자리를 정한다
@@ -70,7 +75,7 @@ func _ready() -> void:
 
 	player_sprite = Sprite2D.new()
 	player_sprite.centered = false
-	player_sprite.scale = Vector2(0.5, 0.5)
+	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
 	add_child(player_sprite)
 
 	# 집 안에서 바로 여는 창 버튼 — 연구노트(N) · 퀘스트(Q)
@@ -144,7 +149,8 @@ func _process(delta: float) -> void:
 			pdir = "right" if v.x > 0 else "left"  # 대각선 포함 옆모습
 		else:
 			pdir = "down" if v.y > 0 else "up"
-		var np := ppos + v * 150.0 * delta
+		# 걸음도 바깥과 같은 빠르기로 (사람이 작아졌으니 px 속도도 그만큼)
+		var np := ppos + v * 150.0 * ZOOM * delta
 		np.x = clampf(np.x, ROOM.position.x + 18, ROOM.end.x - 18)
 		np.y = clampf(np.y, FLOOR_TOP + 9, ROOM.end.y - 6)
 		if not _blocked(np):
@@ -172,15 +178,66 @@ func _process_deco(delta: float) -> void:
 			held.y = cursor.y
 
 
+# ---- 세간을 사람 크기에 맞춰 줄이기 ----
+#
+# 침대·조리대·가구는 「조리대 왼쪽에서 6px에 26x28」처럼 잔 값이 잔뜩 박힌
+# 그림들이다. 칸 크기만 줄이면 그 잔 값이 그대로 남아 그림이 다 어그러진다.
+# 그래서 **그리는 동안 캔버스를 통째로 줄인다** — 기준점(anchor)은 제자리에
+# 있고 나머지가 딸려 줄어드니, 안의 값을 하나도 손대지 않아도 된다.
+#
+# 기준점은 「바닥에 닿아 있는 자리」로 잡는다. 침대는 구석(왼쪽 위),
+# 붙박이는 왼쪽 아래, 가구는 아래 가운데 — 줄여도 그 자리에 그대로 서 있다.
+func _obj_xform(anchor: Vector2) -> void:
+	canvas.draw_set_transform(anchor - anchor * ZOOM, 0.0, Vector2(ZOOM, ZOOM))
+
+
+func _obj_xform_off() -> void:
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+# 줄여 그린 뒤 **눈에 보이는** 칸. 부딪힘 판정도 이쪽을 쓴다 —
+# 안 그러면 아무것도 없는 자리에서 몸이 걸린다.
+func _shrunk(r: Rect2, anchor: Vector2) -> Rect2:
+	return Rect2(anchor + (r.position - anchor) * ZOOM, r.size * ZOOM)
+
+
+func _bed_rect() -> Rect2:
+	return _shrunk(BED, BED.position)
+
+
+func _desk_rect() -> Rect2:
+	return _shrunk(DESK, Vector2(DESK.position.x, DESK.end.y))
+
+
+func _kitchen_rect() -> Rect2:
+	return _shrunk(KITCHEN, Vector2(KITCHEN.position.x, KITCHEN.end.y))
+
+
+func _alchemy_rect() -> Rect2:
+	return _shrunk(ALCHEMY, Vector2(ALCHEMY.position.x, ALCHEMY.end.y))
+
+
+# 가구 하나의 기준점 — 아래 가운데 (바닥에 닿은 자리)
+func _furn_anchor(f: Dictionary) -> Vector2:
+	var def: Dictionary = GameData.FURNITURE[f.id]
+	return Vector2(float(f.x) + float(def.w) / 2.0, float(f.y) + float(def.h))
+
+
 func _furn_rect(f: Dictionary) -> Rect2:
 	var def: Dictionary = GameData.FURNITURE[f.id]
-	return Rect2(float(f.x), float(f.y), float(def.w), float(def.h))
+	return _shrunk(Rect2(float(f.x), float(f.y), float(def.w), float(def.h)),
+		_furn_anchor(f))
 
 
 func _blocked(p: Vector2) -> bool:
-	var feet := Rect2(p.x - 8, p.y - 6, 16, 8)
-	if feet.intersects(BED):
+	# 발 밑 칸도 사람이 작아진 만큼 줄인다 (몸보다 넓으면 헛걸림이 난다)
+	var feet := Rect2(p.x - 8.0 * ZOOM, p.y - 6.0 * ZOOM, 16.0 * ZOOM, 8.0 * ZOOM)
+	if feet.intersects(_bed_rect()):
 		return true
+	# 붙박이 세간 — 제작대·조리대·조합대는 통과할 수 없다 (곁에 서서 E)
+	for fixed: Rect2 in [DESK, KITCHEN, ALCHEMY]:
+		if fixed.position.x > -500.0 and feet.intersects(fixed):
+			return true
 	if GameData.house_lv >= 2:   # 가구는 확장한 집에만 있다
 		for f in GameData.furniture:
 			if GameData.FURNITURE[f.id].solid and feet.intersects(_furn_rect(f)):
@@ -199,8 +256,12 @@ func _can_place(f: Dictionary) -> bool:
 	if r.end.y > ROOM.end.y - 14 and r.end.x > EXIT_X.x and r.position.x < EXIT_X.y:
 		return false
 	var solid: bool = GameData.FURNITURE[f.id].solid
-	if solid and r.intersects(BED.grow(2)):
+	if solid and r.intersects(_bed_rect().grow(2)):
 		return false
+	if solid:
+		for fixed: Rect2 in [DESK, KITCHEN, ALCHEMY]:
+			if fixed.position.x > -500.0 and r.intersects(fixed.grow(2)):
+				return false
 	if solid:
 		for other in GameData.furniture:
 			if other != f and GameData.FURNITURE[other.id].solid \
@@ -210,18 +271,23 @@ func _can_place(f: Dictionary) -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or main.dialog.visible or main.sleep_dialog.visible \
-			or main.cooking_ui.visible or main.alchemy_ui.visible \
-			or main.desk_ui.visible:
+	# 겹쳐 뜬 창(가방·퀘스트·상자·제작대...)이 있으면 그 창이 먼저다 —
+	# 여기서 ESC를 가로채면 가방을 닫으려다 게임 메뉴가 뜬다
+	if not visible or main.room_overlay_open():
 		return
 	if deco_mode:
 		_deco_input(event)
 		return
 	if event.is_action_pressed("interact"):
-		if (ppos - ALCHEMY.get_center()).length() < 75.0:
-			main.alchemy_ui.open()
+		if (ppos - _alchemy_rect().get_center()).length() < 75.0:
+			# 조합대는 스토리 12(숲의 연금술사)를 끝내야 쓸 수 있다
+			if GameData.alchemy_open():
+				main.alchemy_ui.open()
+			else:
+				main.hud.show_message(
+					"할아버지의 낡은 조합대다. 어떻게 쓰는 건지 도무지\n모르겠다... 이걸 아는 사람이 어딘가 있을 텐데.", 4.0)
 			get_viewport().set_input_as_handled()
-		elif (ppos - KITCHEN.get_center()).length() < 69.0:
+		elif (ppos - _kitchen_rect().get_center()).length() < 69.0:
 			# 조리대는 먼지와 잡동사니에 묻혀 있다 — 빗자루로 쓸어야 나타난다
 			if GameData.kitchen_found:
 				main.cooking_ui.open()
@@ -229,12 +295,21 @@ func _unhandled_input(event: InputEvent) -> void:
 				_sweep_kitchen()
 			else:
 				main.hud.show_message(
-					"먼지와 잡동사니에 뭔가 묻혀 있다... 빗자루가 있으면 치울 수 있을 텐데. (잡화점에 레시피)", 4.0)
+					"먼지와 잡동사니가 쌓여 있다. 빗자루가 있으면 바로 쓸어 낼 수 있다.", 4.0)
 			get_viewport().set_input_as_handled()
-		elif (ppos - DESK.get_center()).length() < 78.0:
+		elif (ppos - _desk_rect().get_center()).length() < 78.0:
 			main.desk_ui.open()
 			get_viewport().set_input_as_handled()
-		elif (ppos - BED.get_center()).length() < 82.0:
+		elif _near_storage_box():
+			# 집 안 수납 상자 — 가방과 상자 사이로 물건을 옮긴다
+			main.storage_ui.open()
+			get_viewport().set_input_as_handled()
+		elif _near_trash_bin():
+			# 집 안 쓰레기통 — 24시간 무인 판매 (제값의 80%)
+			main.shop.open("sell", ["sell"], "쓰레기통 — 무인 판매", "",
+				GameData.TRASH_SELL_MULT)
+			get_viewport().set_input_as_handled()
+		elif (ppos - _bed_rect().get_center()).length() < 82.0:
 			if GameData.has_bed:
 				main.daycycle.request_sleep()
 			else:
@@ -246,7 +321,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					["닫기", null],
 				])
 		else:
-			main.hud.show_message("침대 E: 잠자기 · 책상 E: 제작 · 조리대 E: 요리 · 조합대 E: 연금술 · F: 꾸미기")
+			main.hud.show_message("침대: 잠자기 · 책상: 제작 · 조리대: 요리 · 조합대: 연금술 · F: 꾸미기")
 	elif event is InputEventKey and event.pressed and not event.echo \
 			and _key_of(event) == KEY_F:
 		if GameData.house_lv < 2:
@@ -262,7 +337,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		cursor = (ppos / GRID).floor() * GRID
 		Sound.play_sfx("sfx_ui")
 	elif event.is_action_pressed("ui_cancel"):
-		close()
+		# ESC로 집 밖으로 튕겨 나가던 버그 수정 — 바깥과 같은 게임 메뉴를
+		# 띄운다. 밖으로 나가는 길은 아랫문뿐이다.
+		Sound.play_sfx("sfx_ui")
+		main.dialog.open("게임 메뉴", "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)", [
+			["저장 후 타이틀로", main._back_to_title],
+			["계속하기", null],
+		])
+		get_viewport().set_input_as_handled()
 
 
 func _craft_bed() -> void:
@@ -278,7 +360,7 @@ func _craft_bed() -> void:
 	Sound.play_sfx("sfx_place")
 	main.dialog.set_body("낡은 침대나마 완성!\n이제 밤이 되면 잘 수 있다.\n책상(제작대)에서 더 좋은 침대를 만들 수 있다.")
 	main.dialog.set_buttons([["좋아!", null]])
-	main.hud.quest_toast("침대 만들기")
+	main.hud.event_toast("침대 만들기")
 	main.saveio.save_now()
 
 
@@ -294,10 +376,10 @@ func _sweep_kitchen() -> void:
 	GameData.kitchen_found = true
 	main.dialog.open("낡은 조리대 발견!",
 		"먼지 밑에서 할아버지가 쓰시던 낡은 조리대가 나왔다!\n"
-		+ "화구도 냄비도 그대로다... 닦으면 쓸 수 있겠다.\n\n[요리 해금] 조리대 앞에서 E", [
+		+ "화구도 냄비도 그대로다... 닦으면 쓸 수 있겠다.\n\n[요리 해금] 이제 조리대를 쓸 수 있다.", [
 		["좋아!", null],
 	])
-	main.hud.quest_toast("낡은 조리대 발견")
+	main.hud.event_toast("낡은 조리대 발견")
 	main.saveio.save_now()
 
 
@@ -322,7 +404,7 @@ func _upgrade_house() -> void:
 	Sound.play_sfx("sfx_place")
 	main.dialog.set_body("집 확장 완료!\n방이 넓어지고, 연금술 조합대와 가구 꾸미기(F)가 생겼다.")
 	main.dialog.set_buttons([["좋아!", null]])
-	main.hud.quest_toast("집 확장")
+	main.hud.event_toast("집 확장")
 	main.saveio.save_now()
 
 
@@ -381,7 +463,7 @@ func _place_held() -> void:
 
 func _buy_furniture(id: String) -> void:
 	if not held.is_empty():
-		main.hud.show_message("들고 있는 가구를 먼저 놓자. (E: 놓기 / X: 판매)")
+		main.hud.show_message("들고 있는 가구를 먼저 놓자. X: 판매")
 		return
 	var def: Dictionary = GameData.FURNITURE[id]
 	if GameData.money < int(def.price):
@@ -391,7 +473,7 @@ func _buy_furniture(id: String) -> void:
 	held = {"id": id, "x": cursor.x, "y": cursor.y, "new_cost": int(def.price)}
 	GameData.furniture.append(held)
 	Sound.play_sfx("sfx_buy")
-	main.hud.show_message("%s 구입! 자리를 골라 E로 놓자." % def.name)
+	main.hud.show_message("%s 구입! 자리를 골라 놓자." % def.name)
 
 
 func _sell_held() -> void:
@@ -454,7 +536,8 @@ func _update_sprite() -> void:
 	player_sprite.texture = main.tex[tex_name]
 	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
 	# (예전 값은 몸통을 ppos에 두어 발이 방 밖으로 삐져나왔다)
-	player_sprite.position = ppos + Vector2(-32, -95)
+	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
+	player_sprite.position = ppos + Vector2(-32, -95) * ZOOM
 	player_sprite.modulate.a = 0.4 if deco_mode else 1.0
 
 
@@ -485,24 +568,22 @@ func _draw_room() -> void:
 		y += h
 		row += 1
 
-	# 제작대 — 단계가 오를수록 결이 곱고 공구가 는다
-	var desk_top := Color(0.52, 0.36, 0.2) if GameData.desk_lv == 0 \
-		else (Color(0.6, 0.43, 0.24) if GameData.desk_lv == 1 else Color(0.66, 0.5, 0.3))
-	canvas.draw_rect(Rect2(DESK.position.x + 6, DESK.position.y + 30, 8, DESK.size.y - 30),
-		Color(0.4, 0.27, 0.15))
-	canvas.draw_rect(Rect2(DESK.end.x - 14, DESK.position.y + 30, 8, DESK.size.y - 30),
-		Color(0.4, 0.27, 0.15))
-	canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y + 18, DESK.size.x, 14), desk_top)
-	canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y + 18, DESK.size.x, 3),
-		desk_top.lightened(0.25))
+	# 제작대 — 유저가 그린 책상 도트(desk.png). 밑변을 DESK 칸 바닥선에 맞춘다.
+	# 여기서부터 세간은 사람 크기에 맞춰 줄여 그린다 (아래 왼쪽을 축으로).
+	_obj_xform(Vector2(DESK.position.x, DESK.end.y))
+	var desk_tex: Texture2D = main.tex["desk"]
+	var desk_h := DESK.size.x * desk_tex.get_height() / float(desk_tex.get_width())
+	var desk_y := DESK.end.y - desk_h
+	canvas.draw_texture_rect(desk_tex,
+		Rect2(DESK.position.x, desk_y, DESK.size.x, desk_h), false)
 	# 위에 놓인 것들: 망치는 늘, 톱은 1단계부터, 등불은 2단계부터
-	canvas.draw_rect(Rect2(DESK.position.x + 14, DESK.position.y + 6, 6, 14), Color(0.35, 0.35, 0.4))
-	canvas.draw_rect(Rect2(DESK.position.x + 10, DESK.position.y + 4, 14, 6), Color(0.5, 0.5, 0.56))
+	canvas.draw_rect(Rect2(DESK.position.x + 22, desk_y + 6, 6, 14), Color(0.35, 0.35, 0.4))
+	canvas.draw_rect(Rect2(DESK.position.x + 18, desk_y + 4, 14, 6), Color(0.5, 0.5, 0.56))
 	if GameData.desk_lv >= 1:
-		canvas.draw_rect(Rect2(DESK.position.x + 44, DESK.position.y + 8, 26, 4), Color(0.72, 0.72, 0.78))
-		canvas.draw_rect(Rect2(DESK.position.x + 40, DESK.position.y + 6, 6, 10), Color(0.45, 0.3, 0.18))
+		canvas.draw_rect(Rect2(DESK.position.x + 48, desk_y + 12, 26, 4), Color(0.72, 0.72, 0.78))
+		canvas.draw_rect(Rect2(DESK.position.x + 44, desk_y + 10, 6, 10), Color(0.45, 0.3, 0.18))
 	if GameData.desk_lv >= 2:
-		canvas.draw_rect(Rect2(DESK.end.x - 26, DESK.position.y + 2, 10, 16), Color(0.9, 0.75, 0.4))
+		canvas.draw_rect(Rect2(DESK.end.x - 30, desk_y + 4, 10, 16), Color(0.9, 0.75, 0.4))
 	# 만드는 중이면 위에 진행 막대가 뜬다
 	if not GameData.desk_queue.is_empty():
 		var j: Dictionary = GameData.desk_queue[0]
@@ -511,13 +592,20 @@ func _draw_room() -> void:
 			Color(0.2, 0.16, 0.1))
 		canvas.draw_rect(Rect2(DESK.position.x, DESK.position.y - 10, DESK.size.x * clampf(frac, 0.0, 1.0), 6),
 			Color(0.55, 0.85, 0.45))
+	_obj_xform_off()
 
 	# 연금술 조합대 — 확장한 집에만 있다
 	if GameData.house_lv >= 2:
+		_obj_xform(Vector2(ALCHEMY.position.x, ALCHEMY.end.y))
 		_draw_alchemy()
+		_obj_xform_off()
 
+	_obj_xform(Vector2(KITCHEN.position.x, KITCHEN.end.y))
 	_draw_kitchen()
+	_obj_xform_off()
+	_obj_xform(BED.position)
 	_draw_bed()
+	_obj_xform_off()
 
 	# 배치된 가구 (확장한 집에만 — 러그 같은 비충돌 가구 먼저, 그 위에 솔리드)
 	if GameData.house_lv >= 2:
@@ -534,14 +622,21 @@ func _draw_room() -> void:
 
 	# 그림자 + 안내
 	canvas.draw_rect(Rect2(ppos.x - 4, ppos.y - 2, 8, 3), Color(0, 0, 0, 0.22))
+
+	# 밤에는 집 안도 대체로 어둡다 — 바깥과 같은 시각 곡선으로 어두워진다
+	var night_a := clampf((GameData.minutes - 18.0 * 60.0) / (6.0 * 60.0), 0.0, 1.0)
+	if night_a > 0.0:
+		canvas.draw_rect(Rect2(ROOM.position.x, ROOM.position.y - 60,
+			ROOM.size.x, ROOM.size.y + 60), Color(0.04, 0.04, 0.09, night_a * 0.62))
+
 	if deco_mode:
 		_draw_deco_ui()
 	else:
-		var guide := "E: 잠자기/요리/연금술 · F: 꾸미기 · 아랫문: 나가기"
+		var guide := "침대·조리대·조합대 · F: 꾸미기 · 아랫문: 나가기"
 		if not GameData.has_bed:
-			guide = "침대 자리 E: 침대 만들기 · 아랫문: 나가기"
+			guide = "침대 자리에서 침대 만들기 · 아랫문: 나가기"
 		elif GameData.house_lv < 2:
-			guide = "침대 E: 잠자기 · 책상 E: 제작 · F: 집 확장 · 아랫문: 나가기"
+			guide = "침대: 잠자기 · 책상: 제작 · F: 집 확장 · 아랫문: 나가기"
 		_draw_center_text(guide, 72)
 
 
@@ -627,6 +722,13 @@ func _draw_bed() -> void:
 		var s := minf(r.size.x / t.get_width(), r.size.y / t.get_height())
 		var sz := Vector2(t.get_width(), t.get_height()) * s
 		canvas.draw_texture_rect(t, Rect2(r.get_center() - sz / 2.0, sz), false)
+	elif GameData.has_bed and GameData.bed_lv == 1 and main.tex.has("bed_wood"):
+		# 직접 만든 나무 침대 — 올려 준 손그림
+		var tw: Texture2D = main.tex["bed_wood"]
+		var rw := BED.grow(10)
+		var sw := minf(rw.size.x / tw.get_width(), rw.size.y / tw.get_height())
+		var szw := Vector2(tw.get_width(), tw.get_height()) * sw
+		canvas.draw_texture_rect(tw, Rect2(rw.get_center() - szw / 2.0, szw), false)
 	elif GameData.has_bed:
 		canvas.draw_rect(BED.grow(2), Color(0.35, 0.23, 0.14))
 		canvas.draw_rect(BED, Color(0.75, 0.3, 0.28))
@@ -657,7 +759,7 @@ func _draw_deco_ui() -> void:
 			else Color(1, 0.35, 0.3, 0.35))
 		canvas.draw_rect(r, Color(1, 1, 1, 0.8), false, 1.0)
 
-	_draw_center_text("꾸미기 모드 - E: 집기/놓기 · X: 판매 · F: 완료", 72)
+	_draw_center_text("꾸미기 모드 — 집기·놓기 · X: 판매 · F: 완료", 72)
 
 	# 가구 카탈로그 (숫자키 구입)
 	var px := 8.0
@@ -680,6 +782,8 @@ func _draw_furniture(f: Dictionary) -> void:
 	var def: Dictionary = GameData.FURNITURE[f.id]
 	var w := float(def.w)
 	var h := float(def.h)
+	# 사람 크기에 맞춰 줄여 그린다 — 아래 가운데(바닥에 닿은 자리)는 그대로 있는다
+	_obj_xform(_furn_anchor(f))
 	match String(f.id):
 		"rug":
 			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.45, 0.6, 0.42))
@@ -729,6 +833,15 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(cx - 8, cy + 11, 16, 5), hc)
 			canvas.draw_rect(Rect2(cx - 3, cy + 16, 6, 3), hc)      # 뾰족한 끝
 			canvas.draw_rect(Rect2(cx - 14, cy - 9, 6, 5), Color(0.98, 0.68, 0.74))
+		"storage_box":
+			# 용식의 도면으로 짠 수납 상자 — 나무 궤 + 쇠 띠 두 줄 + 걸쇠
+			canvas.draw_rect(Rect2(p.x, p.y + 5, w, h - 5), Color(0.57, 0.41, 0.24))
+			canvas.draw_rect(Rect2(p.x, p.y, w, 6), Color(0.69, 0.52, 0.33))
+			canvas.draw_rect(Rect2(p.x, p.y + 5, w, 2), Color(0.44, 0.31, 0.18))
+			canvas.draw_rect(Rect2(p.x + 4, p.y, 3, h), Color(0.5, 0.48, 0.45))
+			canvas.draw_rect(Rect2(p.x + w - 7, p.y, 3, h), Color(0.5, 0.48, 0.45))
+			canvas.draw_rect(Rect2(p.x + w / 2.0 - 3, p.y + 4, 6, 7), Color(0.58, 0.56, 0.52))
+			canvas.draw_rect(Rect2(p.x + w / 2.0 - 2, p.y + 6, 4, 3), Color(0.36, 0.34, 0.32))
 		"trash_bin":
 			# 제작대에서 만드는 쓰레기통 — 통(회청색) + 금속 고리 두 줄 + 뚜껑
 			canvas.draw_rect(Rect2(p.x + 2, p.y + 6, w - 4, h - 6), Color(0.44, 0.5, 0.54))
@@ -737,3 +850,24 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(p.x + 1, p.y + h - 9, w - 2, 3), Color(0.3, 0.34, 0.38))
 			canvas.draw_rect(Rect2(p.x, p.y + 3, w, 5), Color(0.36, 0.42, 0.46))
 			canvas.draw_rect(Rect2(p.x + w / 2.0 - 4, p.y, 8, 4), Color(0.3, 0.34, 0.38))
+	_obj_xform_off()
+
+
+# 세간으로 들여놓은 수납 상자 곁에 서 있는가 (E: 창고 열기)
+func _near_storage_box() -> bool:
+	for f in GameData.furniture:
+		if str(f.get("id", "")) != "storage_box":
+			continue
+		if (ppos - _furn_rect(f).get_center()).length() < 60.0:
+			return true
+	return false
+
+
+# 세간으로 들여놓은 쓰레기통 곁에 서 있는가 (E: 무인 판매)
+func _near_trash_bin() -> bool:
+	for f in GameData.furniture:
+		if str(f.get("id", "")) != "trash_bin":
+			continue
+		if (ppos - _furn_rect(f).get_center()).length() < 60.0:
+			return true
+	return false

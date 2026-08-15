@@ -14,12 +14,12 @@ const COUNTER := Rect2(276, 252, 408, 54)  # 주인이 뒤에 설 자리를 벽 
 const EXIT_X := Vector2(432, 528)        # 아랫벽 문 구간
 
 # 잡화점(마트)만의 배치: 물건은 한가운데 네 선반에서 산다.
-# 계산대는 오른쪽으로 밀려나고, 민지에게는 「판매」만 한다.
+# 계산대는 오른쪽으로 밀려나고, 만수에게는 「판매」만 한다.
 # [카테고리, 표시 이름, 선반 왼쪽 x]
 const SHELVES := [
 	["seed", "씨앗", 168.0],
 	["life", "생활용품", 300.0],
-	["tool", "도구", 432.0],
+	["recipe", "레시피", 432.0],
 	["misc", "기타", 564.0],
 ]
 const SHELF_Y := 208.0                   # 선반 윗변
@@ -60,7 +60,7 @@ const ROOMS := {
 		"name": "우체국", "keeper": "postman",
 		"wall": Color(0.36, 0.33, 0.46), "floor": Color(0.55, 0.5, 0.62),
 		"counter": Color(0.4, 0.34, 0.5), "deco": "mail",
-		"tab": "", "tabs": [],
+		"tab": "", "tabs": [], "action": "mail",
 		"hint": "우체부 아저씨가 편지를 정리하고 있다.",
 	},
 	# ---- 거래 창 대신 제 나름의 기능을 가진 방들 ----
@@ -79,11 +79,18 @@ const ROOMS := {
 		"hint": "씨앗을 개량한다 (작물이 더 빨리·비싸게)",
 	},
 	"library": {
-		"name": "도서관", "keeper": "blacksmith",
+		"name": "도서관", "keeper": "librarian",
 		"wall": Color(0.4, 0.34, 0.24), "floor": Color(0.58, 0.5, 0.36),
 		"counter": Color(0.44, 0.34, 0.22), "deco": "books",
 		"tab": "", "tabs": [], "action": "read",
 		"hint": "할아버지의 연구를 뒤쫓는다 (다음 전설 재료 힌트)",
+	},
+	"hall": {
+		"name": "마을회관", "keeper": "chief",
+		"wall": Color(0.42, 0.35, 0.26), "floor": Color(0.62, 0.54, 0.42),
+		"counter": Color(0.46, 0.36, 0.26), "deco": "town",
+		"tab": "", "tabs": [], "action": "hall",
+		"hint": "주민 명부와 마을 살림을 본다",
 	},
 }
 
@@ -130,11 +137,88 @@ func open(id: String) -> void:
 	pdir = "up"
 	moving = false
 	Sound.play_sfx("sfx_place")
-	if id == "general":
-		main.hud.show_message("선반 앞에서 E: 구매 · 계산대(민지)에서 E: 판매", 4.0)
-	else:
-		main.hud.show_message("%s — 계산대 앞에서 E" % ROOMS[id].name, 3.0)
+	_visit_spent = GameData.today_spent   # 이번 방문의 구매 여부 기준점
+	_kicked = false
+	# 안내는 **방 안에 적는다.** 예전에는 머리 위 말풍선으로 띄웠는데,
+	# 가게 안에서는 주인공이 화면에 없어 말풍선이 한가운데 붙박이처럼
+	# 떠 있었다 (「사라지지 않는 말풍선」 버그의 정체)
+	main.hud.hide_bubble()
+	var ek := GameData.key_label("interact")
+	notice = "선반 앞에서 %s: 구매 · 계산대에서 %s: 판매" % [ek, ek] if id == "general" \
+		else "%s — 계산대 앞에서 %s" % [ROOMS[id].name, ek]
+	notice_t = 4.5
 	canvas.queue_redraw()
+
+
+# ---- 영업시간 ----
+#
+# 문 닫을 시각(저녁 6시)이 되면 주인이 손님을 내보낸다.
+# 가게 안에서 시간을 흘려보내도 반드시 밖으로 나가게 된다.
+var _kicked := false
+var notice := ""
+var notice_t := 0.0
+
+
+func closed_text(why: String) -> String:
+	match why:
+		"early":
+			return "아직 문을 열지 않았다.\n안에서 준비하는 기척만 들린다."
+		"lunch":
+			return "「점심 먹으러 갔습니다」\n문에 작은 팻말이 걸려 있다."
+		"late":
+			return "오늘 영업은 끝났다.\n창문의 불도 꺼져 있다."
+	return ""
+
+
+func _closing_tick(delta: float) -> void:
+	if notice_t > 0.0:
+		notice_t -= delta
+		if notice_t <= 0.0:
+			notice = ""
+			canvas.queue_redraw()
+	if not visible or _kicked or room_id == "":
+		return
+	if GameData.hour_now() < GameData.CLOSE_HOUR:
+		return
+	_kicked = true
+	_closing_kick()
+
+
+# 「이제 문 닫을 시간이니까 내일 다시 와~」 — 말하고 밖으로 내보낸다
+func _closing_kick() -> void:
+	var keeper := str(_def().get("keeper", ""))
+	var kname := "주인"
+	var portrait: Texture2D = null
+	if GameData.NPCS.has(keeper):
+		kname = str(GameData.NPCS[keeper].name)
+		portrait = main.tex.get("npc_%s_portrait_happy" % keeper)
+	main.dialog.open_seq(kname, portrait, [
+		{"text": "「아이고, 벌써 여섯 시네.」"},
+		{"text": "「이제 문 닫을 시간이니까 내일 다시 와~」"},
+	], _leave_after_close)
+
+
+func _leave_after_close() -> void:
+	close()
+	# 문밖으로 한 발 밀려난다 (문턱에 붙어 서서 다시 들어가지 않게)
+	if main.player != null:
+		main.player.position.y += float(main.TILE)
+	main.hud.event_toast("문을 닫았다 — 내일 다시 오자")
+
+
+# 이번 방문에 실제로 무언가를 샀는가 (분기 B와 C를 가른다).
+# 판매는 세지 않는다 — today_spent는 구매에서만 오른다.
+var _visit_spent := 0
+var bought_this_visit: bool:
+	get: return GameData.today_spent > _visit_spent
+
+
+# 문턱을 밟았다 — 언제든 그냥 나갈 수 있다.
+# (예전에는 조리대 이야기가 여기서 불쑥 시작돼 손님을 붙잡았다.
+#  지금 그 이야기는 계산대에서 만수와 말을 걸 때만 시작된다)
+func try_leave() -> bool:
+	close()
+	return true
 
 
 func close() -> void:
@@ -169,6 +253,7 @@ func _shelf_near() -> int:
 
 
 func _process(delta: float) -> void:
+	_closing_tick(delta)          # 문 닫을 시각이면 손님을 내보낸다
 	if not visible or main.dialog.visible or main.shop.visible \
 			or main.inventory_ui.visible:
 		moving = false
@@ -194,43 +279,96 @@ func _process(delta: float) -> void:
 		if not blocked:
 			ppos = np
 		anim_time += delta
-		# 아랫문으로 나가기
+		# 아랫문으로 나가기.
+		# 【분기 B·C】 잡화점을 나서려는 순간, 아직 조리대를 못 찾았다면
+		# 만수가 밥 이야기를 꺼내며 붙잡는다 (뭘 샀는지에 따라 첫마디가 다르다)
 		if ppos.y >= ROOM.end.y - 9 and ppos.x > EXIT_X.x and ppos.x < EXIT_X.y and v.y > 0:
-			close()
+			try_leave()
 	_update_sprite()
 	canvas.queue_redraw()
 
 
 func _at_counter() -> bool:
 	var c := _counter()
-	return absf(ppos.y - c.end.y) < 46.0 \
-		and ppos.x > c.position.x - 20.0 and ppos.x < c.end.x + 20.0
+	if absf(ppos.y - c.end.y) < 46.0 \
+			and ppos.x > c.position.x - 20.0 and ppos.x < c.end.x + 20.0:
+		return true
+	# 주인(계산대 뒤에 서 있는 사람) 곁이어도 말이 걸린다 —
+	# 계산대 띠에서 살짝 벗어나 서면 E가 조용히 씹히던 버그 수정
+	var keeper := Vector2(c.get_center().x, c.position.y)
+	return (ppos - keeper).length() < 110.0
+
+
+# 계산대/주인/선반과의 상호작용 한 줄 — E와 마우스 클릭이 같이 쓴다
+func _try_interact() -> bool:
+	var si := _shelf_near()
+	if si >= 0:
+		# 선반에서 산다 — 그 카테고리의 물건만 진열된다
+		main.shop.open("buy", ["buy"],
+			"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
+		return true
+	if _at_counter():
+		var d := _def()
+		if str(d.get("action", "")) != "":
+			main.room_action(str(d.action))   # 여관·연구소·도서관
+		elif room_id == "general":
+			# 만수에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
+			main.village.open_merchant_counter()
+		elif str(d.tab) == "":
+			main.hud.show_message(str(d.hint), 4.0)
+		else:
+			main.shop.open(str(d.tab), d.tabs, str(d.name))
+		return true
+	return false
+
+
+# 가게 안 안내 — 물건은 상호작용키(E), 사람은 대화키(F)
+func _room_hint() -> String:
+	return "선반 앞에서 %s: 구매 · 계산대(주인)에게 다가가 %s: 대화" % [
+		GameData.key_label("interact"), GameData.key_label("talk")]
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or main.dialog.visible or main.shop.visible \
-			or main.inventory_ui.visible:
+	# 겹쳐 뜬 창(가방·퀘스트·상점...)이 있으면 그 창이 먼저다 —
+	# 여기서 ESC를 가로채면 가방을 닫으려다 게임 메뉴가 뜬다
+	if not visible or main.room_overlay_open():
 		return
-	if event.is_action_pressed("interact"):
-		var si := _shelf_near()
-		if si >= 0:
-			# 선반에서 산다 — 그 카테고리의 물건만 진열된다
-			main.shop.open("buy", ["buy"],
-				"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
-		elif _at_counter():
-			var d := _def()
-			if str(d.get("action", "")) != "":
-				main.room_action(str(d.action))   # 여관·연구소·도서관
-			elif room_id == "general":
-				# 민지에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
-				main.village.open_merchant_counter()
-			elif str(d.tab) == "":
-				main.hud.show_message(str(d.hint), 4.0)
-			else:
-				main.shop.open(str(d.tab), d.tabs, str(d.name))
+	# 가게 안에서는 대화키(F)도 같은 일을 한다 — 주인에게 말을 걸러 온 손님이
+	# 계산대 앞에서 F를 눌렀는데 아무 일도 없으면 안 된다
+	if event.is_action_pressed("interact") or event.is_action_pressed("talk"):
+		if not _try_interact():
+			main.hud.show_message(_room_hint(), 3.0)
 		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		# 주인이나 계산대·선반을 클릭해도 말이 걸린다
+		var mp: Vector2 = event.position
+		var c := _counter()
+		var keeper_r := Rect2(c.get_center().x - 40, c.position.y - 108, 80, 110)
+		if keeper_r.has_point(mp) or c.grow(24).has_point(mp):
+			if (ppos - Vector2(c.get_center().x, c.end.y)).length() < 190.0:
+				_try_interact()
+			else:
+				main.hud.show_message("좀 더 가까이 가서 말을 걸자.", 3.0)
+			get_viewport().set_input_as_handled()
+		else:
+			for i in SHELVES.size():
+				if _shelf_rect(i).grow(14).has_point(mp):
+					if _shelf_near() == i:
+						_try_interact()
+					else:
+						main.hud.show_message("선반 앞으로 다가가서 %s!"
+							% GameData.key_label("interact"), 3.0)
+					get_viewport().set_input_as_handled()
+					break
 	elif event.is_action_pressed("ui_cancel"):
-		close()
+		# ESC로 가게 밖으로 튕겨 나가지 않게 — 게임 메뉴만 띄운다.
+		# 밖으로 나가는 길은 아랫문뿐이다.
+		Sound.play_sfx("sfx_ui")
+		main.dialog.open("게임 메뉴", "타이틀 화면으로 돌아갈까?\n(진행 상황은 자동 저장된다)", [
+			["저장 후 타이틀로", main._back_to_title],
+			["계속하기", null],
+		])
 		get_viewport().set_input_as_handled()
 
 
@@ -361,14 +499,30 @@ func _draw_room() -> void:
 	canvas.draw_string(f, Vector2((EXIT_X.x + EXIT_X.y) / 2.0 - ew / 2.0, ROOM.end.y + 20),
 		"나가기 ▼", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.85, 0.8, 0.74))
 
+	# 방에 들어선 직후의 안내 한 줄 (말풍선 대신 방 위쪽에 적는다)
+	if notice != "":
+		var nw: float = f.get_string_size(notice, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		var nr := Rect2(480.0 - nw / 2.0 - 12.0, 54.0, nw + 24.0, 26.0)
+		canvas.draw_rect(nr, Color(0.16, 0.12, 0.09, 0.88))
+		canvas.draw_rect(nr, Color(0.62, 0.5, 0.32), false, 2.0)
+		canvas.draw_string(f, Vector2(480.0 - nw / 2.0, 73.0), notice,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
+
+	# 영업시간 팻말 — 지금 몇 시고, 언제까지 여는지
+	var hline := "%s · 지금 %d시" % [GameData.shop_hours_line(),
+		int(GameData.hour_now())]
+	var hlw: float = f.get_string_size(hline, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	canvas.draw_string(f, Vector2(944.0 - hlw, 30.0), hline,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.78, 0.72, 0.6))
+
 	var si := _shelf_near()
 	if si >= 0:
-		var sht := "E: [%s] 선반 — 물건 보기" % str(SHELVES[si][1])
+		var sht := "[%s] 선반 — 물건 보기" % str(SHELVES[si][1])
 		var shw: float = f.get_string_size(sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		canvas.draw_string(f, Vector2(480 - shw / 2.0, SHELF_Y + SHELF_H + 66),
 			sht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
 	elif _at_counter():
-		var ht := "E: %s" % ("판매 — 민지에게 판다" if room_id == "general" else str(d.hint))
+		var ht := "%s" % ("판매 — 만수에게 판다" if room_id == "general" else str(d.hint))
 		var hw: float = f.get_string_size(ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		canvas.draw_string(f, Vector2(480 - hw / 2.0, C.end.y + 40),
 			ht, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color(1, 0.9, 0.6))
@@ -477,6 +631,23 @@ func _draw_deco(kind: String, wall: Color) -> void:
 			canvas.draw_rect(Rect2(716, 340, 92, 12), Color(0.34, 0.4, 0.44))
 			for i in 3:
 				canvas.draw_rect(Rect2(722 + i * 28, 284, 20, 16), Color(0.7, 0.6, 0.35))
+		"town":
+			# 마을회관: 마을 게시판 + 교진 마을 깃발 + 서류장
+			canvas.draw_rect(Rect2(148, 176, 124, 74), Color(0.3, 0.21, 0.13))   # 게시판 틀
+			canvas.draw_rect(Rect2(154, 182, 112, 62), Color(0.78, 0.68, 0.48))
+			for i in 3:
+				canvas.draw_rect(Rect2(161 + i * 36, 190, 28, 20),
+					Color(0.95, 0.92, 0.84))                                     # 붙은 공지들
+				canvas.draw_rect(Rect2(161 + i * 36, 216, 28, 20),
+					Color(0.9, 0.86, 0.76))
+			canvas.draw_rect(Rect2(788, 176, 8, 96), Color(0.45, 0.32, 0.18))    # 깃대
+			canvas.draw_rect(Rect2(724, 182, 64, 36), Color(0.72, 0.3, 0.28))    # 마을 깃발
+			canvas.draw_rect(Rect2(724, 194, 64, 5), Color(0.9, 0.82, 0.55))
+			for i in 2:                                                          # 서류장
+				canvas.draw_rect(Rect2(700 + i * 54, 300, 46, 58), Color(0.42, 0.31, 0.2))
+				for j in 3:
+					canvas.draw_rect(Rect2(704 + i * 54, 306 + j * 18, 38, 12),
+						Color(0.58, 0.46, 0.3))
 		"books":
 			# 도서관: 책장 두 벌 (책등 색을 섞는다)
 			var spine := [Color(0.7, 0.3, 0.28), Color(0.32, 0.44, 0.62),

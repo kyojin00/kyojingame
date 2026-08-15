@@ -6,6 +6,7 @@ const TOOL_ICONS := {
 	"hoe": "icon_hoe", "water": "icon_water", "seed": "icon_seed",
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe", "fence": "fence",
 	"sprinkler": "sprinkler", "rod": "icon_rod",
+	"spear": "icon_spear", "sword": "icon_sword",
 }
 
 
@@ -16,13 +17,15 @@ func tool_icon(t: String) -> Texture2D:
 	return main.tex[TOOL_ICONS[t]]
 const TOOL_LABELS := {
 	"hoe": "호미", "water": "물뿌리개",
-	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리 (목재1)",
-	"sprinkler": "스프링클러 (목재2·석재2)", "rod": "낚싯대",
+	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리",
+	"sprinkler": "스프링클러", "rod": "낚싯대",
+	"spear": "돌 창", "sword": "돌 검",
 }
 # 도구 -> 관련 숙련도
 const TOOL_SKILL := {
 	"hoe": "farm", "water": "farm", "seed": "farm",
 	"axe": "forest", "pickaxe": "mine", "rod": "fish",
+	"spear": "combat", "sword": "combat",
 }
 # 나무 프레임 팔레트
 const WOOD_TEXT := Color(0.29, 0.16, 0.06)
@@ -63,6 +66,75 @@ func _ready() -> void:
 	_build_tracker_scroll()
 	_build_minimap()
 	_build_hotbar()
+	_build_hunger()
+
+
+# ---- 배고픔 게이지 (체력 막대 위) ----
+#
+# 글자는 한 자도 없다 — 밥그릇 그림 하나와 막대뿐이다.
+# 배고픔이 열리기 전(스토리 3 전)에는 아예 보이지 않는다.
+var hunger_panel: Panel
+var hunger_bar: ProgressBar
+var hunger_icon: TextureRect
+
+
+func _build_hunger() -> void:
+	hunger_panel = Panel.new()
+	hunger_panel.add_theme_stylebox_override("panel", _wood_style())
+	hunger_panel.position = Vector2(6, 466)
+	hunger_panel.size = Vector2(194, 30)
+	hunger_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hunger_panel.visible = false
+	add_child(hunger_panel)
+
+	hunger_icon = TextureRect.new()
+	hunger_icon.position = Vector2(8, 5)
+	hunger_icon.size = Vector2(20, 20)
+	hunger_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hunger_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hunger_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for cand in ["dish_bread", "dish_baked_potato", "icon_seed"]:
+		if main.tex.has(cand):
+			hunger_icon.texture = main.tex[cand]
+			break
+	hunger_panel.add_child(hunger_icon)
+
+	hunger_bar = ProgressBar.new()
+	hunger_bar.position = Vector2(32, 8)
+	hunger_bar.size = Vector2(154, 13)
+	hunger_bar.max_value = GameData.HUNGER_MAX
+	hunger_bar.show_percentage = false
+	hunger_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.28, 0.19, 0.11)
+	bg.set_corner_radius_all(3)
+	hunger_bar.add_theme_stylebox_override("background", bg)
+	hunger_bar.add_theme_stylebox_override("fill", _hunger_fill(1.0))
+	hunger_panel.add_child(hunger_bar)
+
+
+# 배가 부를수록 노릇하고, 꺼질수록 붉어진다 (숫자 없이 색으로 읽는다)
+func _hunger_fill(ratio: float) -> StyleBoxFlat:
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = Color(0.92, 0.72, 0.28) if ratio > 0.45 \
+		else (Color(0.9, 0.5, 0.2) if ratio > 0.15 else Color(0.86, 0.28, 0.24))
+	fill.set_corner_radius_all(3)
+	return fill
+
+
+func _refresh_hunger() -> void:
+	if hunger_panel == null:
+		return
+	hunger_panel.visible = GameData.hunger_open
+	if not GameData.hunger_open:
+		return
+	var ratio := GameData.hunger / GameData.HUNGER_MAX
+	hunger_bar.value = GameData.hunger
+	hunger_bar.add_theme_stylebox_override("fill", _hunger_fill(ratio))
+	# 굶으면 밥그릇이 깜빡인다 — 말 대신 그림이 재촉한다
+	var t := float(Time.get_ticks_msec()) / 1000.0
+	hunger_icon.modulate = Color(1, 1, 1) if ratio > 0.0 \
+		else Color(1, 0.6, 0.6, 0.55 + 0.45 * sin(t * 6.0))
 
 
 # ---- 미니맵 (좌측 상단) ----
@@ -73,7 +145,8 @@ func _ready() -> void:
 const MM_TX := 31          # 가로로 보이는 타일 수 (플레이어가 한가운데)
 const MM_TY := 21
 const MM_CELL := 5.0
-const MM_FOG := Color(0.05, 0.05, 0.08)
+# 아직 가 보지 않은 곳·못 가는 곳은 검정 무지 (M 지도와 같은 규칙)
+const MM_FOG := Color(0, 0, 0)
 
 var minimap_panel: Panel
 var minimap: Control
@@ -116,6 +189,8 @@ func _draw_minimap() -> void:
 	var pt: Vector2i = main.player_tile()
 	var x0: int = pt.x - MM_TX / 2
 	var y0: int = pt.y - MM_TY / 2
+	# 바탕을 검정으로 깔고, 드러난 칸만 그 위에 칠한다 —
+	# 못 가는 땅은 아무것도 비치지 않는 검정으로 남는다
 	minimap.draw_rect(Rect2(Vector2.ZERO, minimap.size), MM_FOG)
 
 	for ty in MM_TY:
@@ -123,7 +198,7 @@ func _draw_minimap() -> void:
 			var x: int = x0 + tx
 			var y: int = y0 + ty
 			if x < 0 or y < 0 or x >= main.MAP_W or y >= main.MAP_H:
-				continue  # 맵 밖은 안개색 그대로
+				continue  # 맵 밖은 검정 그대로
 			if not main.map_ui._visible_tile(x, y):
 				continue
 			var r := Rect2(tx * MM_CELL, ty * MM_CELL, MM_CELL, MM_CELL)
@@ -165,10 +240,47 @@ func _mm_dot(pos: Vector2, x0: int, y0: int, col: Color) -> void:
 
 # ---- 퀘스트 트래커: 픽셀아트 두루마리 ----
 
+var quest_title_label: Label = null   # 퀘스트 제목 (진한 브라운)
+var goal_label: Label = null          # 📍 현재 목표 (강조색 — 제일 눈에 띈다)
+
+
 func _build_tracker_scroll() -> void:
 	var panel: Panel = $TrackerPanel
 	var empty := StyleBoxEmpty.new()
 	panel.add_theme_stylebox_override("panel", empty)
+	# 클릭하면 퀘스트 상세 창(Q)이 열린다
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.tooltip_text = "클릭하면 퀘스트 상세가 열린다"
+	panel.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed \
+				and ev.button_index == MOUSE_BUTTON_LEFT:
+			Sound.play_sfx("sfx_ui")
+			main.quest_ui.toggle())
+	# 두루마리 안은 딱 두 줄 — 퀘스트 이름(1줄) / 지금 할 행동(최대 2줄).
+	# 설명·재료·진행 상황은 전부 Q 상세 창의 몫이다 (클릭하면 열린다).
+	# 모든 글자는 말줄임(…)과 줄 수 제한으로 두루마리 밖으로 못 나간다.
+	panel.offset_bottom = 128.0           # 작고 귀여운 메모 크기 (226x70)
+	quest_title_label = Label.new()
+	quest_title_label.position = Vector2(16, 10)
+	quest_title_label.size = Vector2(192, 14)
+	quest_title_label.add_theme_font_size_override("font_size", 11)
+	quest_title_label.add_theme_color_override("font_color", Color(0.32, 0.2, 0.08))
+	quest_title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	quest_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(quest_title_label)
+	goal_label = Label.new()
+	goal_label.position = Vector2(16, 26)
+	goal_label.size = Vector2(192, 38)
+	goal_label.add_theme_font_size_override("font_size", 10)
+	goal_label.add_theme_color_override("font_color", Color(0.78, 0.42, 0.02))
+	goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# 글씨를 줄인 만큼 세 줄까지 들어간다 — 목표가 짧아 대개 한 줄이다
+	goal_label.max_lines_visible = 3
+	goal_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	goal_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(goal_label)
+	# 「Q 상세보기」 안내 줄은 없앴다 — 트래커 클릭·툴팁이 그 역할을 한다
+	objective_label.visible = false
 	var deco := Control.new()
 	deco.set_anchors_preset(Control.PRESET_FULL_RECT)
 	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -216,32 +328,170 @@ func quest_toast(title: String) -> void:
 	Sound.play_sfx("sfx_catch")
 
 
+# 퀘스트가 아닌 사건 알림 — 완공·해금·발견처럼 축하할 일.
+# 「퀘스트 완료!」 머리말을 아무 데나 붙이던 버릇을 여기로 분리했다.
+func event_toast(title: String) -> void:
+	_toast_queue.append({"head": "✨ 알림", "body": title, "icon": null,
+		"head_col": Color(0.55, 0.45, 0.72)})
+	Sound.play_sfx("sfx_catch")
+
+
+# 퀘스트 시작 — 딱딱한 검은 알림 대신, 통통 튀며 내려오는 말풍선으로
+func quest_start_toast(title: String) -> void:
+	_toast_queue.append({"head": "📜 새로운 퀘스트!", "body": title, "icon": null,
+		"head_col": Color(0.85, 0.5, 0.12), "bounce": true})
+	Sound.play_sfx("sfx_ui")
+
+
+# ---- 메인 스토리 완결 연출 (전체 화면) ----
+#
+# 상단 구석에 스치던 작은 토스트 대신, 화면을 잠깐 어둡게 하고
+# 한가운데에 큼직하게 「메인 스토리 N 완결」을 띄운다. 클릭하면 닫힌다.
+var _sb_layer: CanvasLayer = null
+var _sb_dim: ColorRect
+var _sb_box: Control
+var _sb_head: Label
+var _sb_title: Label
+var _sb_sub: Label
+var _sb_time := 0.0
+var _sb_dur := 4.6
+
+
+func story_banner(head: String, title: String) -> void:
+	if _sb_layer == null:
+		_make_story_banner()
+	_sb_head.text = "✦  %s  ✦" % GameData.localize(head)
+	_sb_title.text = GameData.localize(title)
+	_sb_time = 0.0
+	# 검증 하네스에서는 짧게 스치고 지나간다 (다음 스텝 입력을 막지 않게)
+	_sb_dur = 0.8 if OS.get_environment("KYOJIN_SHOT") != "" else 4.6
+	_sb_layer.visible = true
+	Sound.play_sfx("sfx_catch")
+
+
+func _make_story_banner() -> void:
+	_sb_layer = CanvasLayer.new()
+	_sb_layer.layer = 40
+	_sb_layer.visible = false
+	add_child(_sb_layer)
+
+	_sb_dim = ColorRect.new()
+	_sb_dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sb_dim.color = Color(0, 0, 0, 0.55)
+	_sb_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_sb_dim.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed:
+			_sb_time = maxf(_sb_time, _sb_dur - 0.35))
+	_sb_layer.add_child(_sb_dim)
+
+	_sb_box = Control.new()
+	_sb_box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_sb_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_sb_box.pivot_offset = Vector2(480, 250)
+	_sb_layer.add_child(_sb_box)
+
+	# 위아래 가는 금줄 — 두루마리를 펼친 듯한 띠
+	for y in [196.0, 316.0]:
+		var rule := ColorRect.new()
+		rule.position = Vector2(270, y)
+		rule.size = Vector2(420, 2)
+		rule.color = Color(1.0, 0.84, 0.37, 0.8)
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_sb_box.add_child(rule)
+
+	_sb_head = Label.new()
+	_sb_head.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_sb_head.offset_top = 210
+	_sb_head.offset_bottom = 240
+	_sb_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sb_head.add_theme_font_override("font", FONT_SMALL)
+	_sb_head.add_theme_font_size_override("font_size", 20)
+	_sb_head.add_theme_color_override("font_color", Color(1.0, 0.84, 0.37))
+	_sb_head.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	_sb_head.add_theme_constant_override("outline_size", 5)
+	_sb_box.add_child(_sb_head)
+
+	_sb_title = Label.new()
+	_sb_title.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_sb_title.offset_top = 244
+	_sb_title.offset_bottom = 296
+	_sb_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sb_title.add_theme_font_override("font", FONT_SMALL)
+	_sb_title.add_theme_font_size_override("font_size", 34)
+	_sb_title.add_theme_color_override("font_color", Color(0.98, 0.94, 0.84))
+	_sb_title.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	_sb_title.add_theme_constant_override("outline_size", 6)
+	_sb_box.add_child(_sb_title)
+
+	_sb_sub = Label.new()
+	_sb_sub.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_sb_sub.offset_top = 330
+	_sb_sub.offset_bottom = 350
+	_sb_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sb_sub.text = "이야기는 계속된다  ...클릭"
+	_sb_sub.add_theme_font_override("font", FONT_SMALL)
+	_sb_sub.add_theme_font_size_override("font_size", 12)
+	_sb_sub.add_theme_color_override("font_color", Color(0.85, 0.8, 0.7, 0.85))
+	_sb_sub.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02))
+	_sb_sub.add_theme_constant_override("outline_size", 3)
+	_sb_box.add_child(_sb_sub)
+
+
+func _update_story_banner(delta: float) -> void:
+	if _sb_layer == null or not _sb_layer.visible:
+		return
+	_sb_time += delta
+	var a := clampf(_sb_time / 0.35, 0.0, 1.0)               # 스르륵 나타나고
+	if _sb_time > _sb_dur - 0.5:
+		a = minf(a, clampf((_sb_dur - _sb_time) / 0.5, 0.0, 1.0))  # 스르륵 사라진다
+	_sb_dim.color.a = 0.55 * a
+	_sb_box.modulate.a = a
+	var pop := 1.0 + 0.06 * (1.0 - minf(_sb_time / 0.35, 1.0))    # 살짝 커졌다 앉는다
+	_sb_box.scale = Vector2(pop, pop)
+	if _sb_time >= _sb_dur:
+		_sb_layer.visible = false
+
+
 func reward_toast(item_name: String, icon: Texture2D) -> void:
 	_toast_queue.append({"head": "보상 획득!", "body": item_name, "icon": icon,
 		"head_col": Color(0.85, 0.6, 0.15)})
 	Sound.play_sfx("sfx_catch")
 
 
+var _toast_bounce := false
+
+
 func _show_next_toast() -> void:
 	var d: Dictionary = _toast_queue.pop_front()
 	_toast = Panel.new()
-	_toast.add_theme_stylebox_override("panel", _wood_style())
+	# 둥근 크림색 말풍선 — 딱딱한 나무판 대신 아기자기하게
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.99, 0.95, 0.83, 0.98)
+	st.border_color = Color(0.62, 0.4, 0.18)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(14)
+	st.shadow_color = Color(0.15, 0.09, 0.03, 0.25)
+	st.shadow_size = 4
+	st.shadow_offset = Vector2(0, 3)
+	_toast.add_theme_stylebox_override("panel", st)
 	var has_icon: bool = d.icon != null
 	var tw := 250
-	_toast.position = Vector2((960 - tw) / 2.0, -50)
-	_toast.size = Vector2(tw, 44)
+	_toast.position = Vector2((960 - tw) / 2.0, -54)
+	_toast.size = Vector2(tw, 46)
+	_toast.pivot_offset = Vector2(tw / 2.0, 23.0)
+	_toast_bounce = bool(d.get("bounce", false))
 	var head := Label.new()
 	head.text = str(d.head)
-	head.position = Vector2(44 if has_icon else 12, 4)
-	head.size = Vector2(tw - 50, 16)
+	head.position = Vector2(44 if has_icon else 14, 5)
+	head.size = Vector2(tw - 52, 16)
 	head.add_theme_font_override("font", FONT_SMALL)
 	head.add_theme_font_size_override("font_size", 12)
 	head.add_theme_color_override("font_color", d.head_col)
 	_toast.add_child(head)
 	var body := Label.new()
 	body.text = str(d.body)
-	body.position = Vector2(44 if has_icon else 12, 21)
-	body.size = Vector2(tw - 50, 18)
+	body.position = Vector2(44 if has_icon else 14, 22)
+	body.size = Vector2(tw - 52, 18)
 	body.add_theme_font_override("font", FONT_SMALL)
 	body.add_theme_font_size_override("font_size", 13)
 	body.add_theme_color_override("font_color", WOOD_TEXT)
@@ -249,7 +499,7 @@ func _show_next_toast() -> void:
 	if has_icon:
 		var ic := TextureRect.new()
 		ic.texture = d.icon
-		ic.position = Vector2(8, 8)
+		ic.position = Vector2(10, 9)
 		ic.size = Vector2(28, 28)
 		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ic.stretch_mode = TextureRect.STRETCH_SCALE
@@ -264,9 +514,24 @@ func _update_toast(delta: float) -> void:
 			_show_next_toast()
 		return
 	_toast_t += delta
-	# 슬라이드 인 (0~0.25초) -> 유지 -> 페이드 아웃 (마지막 0.4초)
+	# 톡 떨어져서 한 번 튕기고 자리 잡는다 -> 유지 -> 페이드 아웃
 	var slide := clampf(_toast_t / 0.25, 0.0, 1.0)
-	_toast.position.y = -50.0 + (58.0 + 50.0) * (1.0 - (1.0 - slide) * (1.0 - slide))
+	var y := -54.0 + (58.0 + 54.0) * (1.0 - (1.0 - slide) * (1.0 - slide))
+	if _toast_t > 0.25 and _toast_t < 0.85:
+		# 감쇠하는 바운스 — 말풍선이 통통 튀는 느낌
+		var bt := _toast_t - 0.25
+		y += -absf(sin(bt * 10.5)) * 9.0 * maxf(0.0, 1.0 - bt / 0.6)
+	_toast.position.y = y
+	# 시작 알림(bounce)은 살짝 커졌다 앉으며 갸웃갸웃한다
+	if _toast_bounce and _toast_t < 1.0:
+		var pop := 1.0 + 0.14 * maxf(0.0, 1.0 - _toast_t / 0.3) \
+			* sin(_toast_t * 16.0 + 1.2)
+		_toast.scale = Vector2(pop, pop)
+		_toast.rotation_degrees = sin(_toast_t * 9.0) * 2.2 \
+			* maxf(0.0, 1.0 - _toast_t / 1.0)
+	else:
+		_toast.scale = Vector2.ONE
+		_toast.rotation_degrees = 0.0
 	var fade := clampf((TOAST_TIME - _toast_t) / 0.4, 0.0, 1.0)
 	_toast.modulate.a = fade
 	if _toast_t >= TOAST_TIME:
@@ -391,6 +656,7 @@ var _refresh_t := 0.0
 
 func refresh(force := false) -> void:
 	energy_bar.value = GameData.energy
+	_refresh_hunger()
 	_refresh_t -= get_process_delta_time()
 	if _refresh_t > 0.0 and not force:
 		return
@@ -403,39 +669,31 @@ func refresh(force := false) -> void:
 		GameData.day_in_season(), GameData.clock_text()])
 	_put(money_label, "%dG" % GameData.money)
 
-	# 두루마리 퀘스트 트래커 (최소 문구)
-	var track := []
-	var story_obj := GameData.story_objective_short()
-	var obj := GameData.tutorial_objective_short()
-	var story2_obj := GameData.story2_objective_short()
-	var fisher_obj := GameData.fisher_objective_short()
-	if story_obj != "":
-		track.append("목표: " + story_obj)
-	elif story2_obj != "":
-		track.append("목표: " + story2_obj)
-	elif fisher_obj != "":
-		track.append("목표: " + fisher_obj)
-	elif obj != "":
-		# 밭 갈기(메인 스토리 2)는 「목표」, 마을 생활 안내는 「안내(선택)」
-		var flag := GameData.tutorial_current_flag()
-		track.append(("목표: " if flag in GameData.STORY2_FLAGS
-			else "안내(선택): ") + obj)
-	else:
-		# 기본 안내가 끝나면 할아버지의 부탁이 그 자리를 잇는다
-		var gl := GameData.grandpa_line()
-		if gl != "":
-			track.append(gl)
-	# 축제날은 그날 할 일을 맨 위로 올린다
-	var fl := GameData.festival_line()
-	if fl != "":
-		track.push_front("★ " + fl)
-	if GameData.u_intro_state == 1:
-		track.append("목표: U 키로 능력치를 확인해 보자")
-	var qline: String = GameData.quest_line()
-	if qline != "":
-		track.append("의뢰: " + qline)
-	track.append("%s: 퀘스트 창" % GameData.key_label("open_quest"))
-	_put(objective_label, "\n".join(track))
+
+	# 미니 퀘스트창: 「지금 어떤 퀘스트를, 지금 뭘 하면 되는지」 두 가지만.
+	# 설명·재료·진행 상황·보상은 전부 Q 상세 창에서 본다.
+	# tracked_quest()가 스토리 단계를 따라가므로 단계가 바뀌면 즉시 갱신된다
+	var tq := GameData.tracked_quest()
+	var t_title := str(tq.get("title", ""))
+	var t_goal := str(tq.get("obj", ""))
+	if t_goal == "":
+		# 메인 퀘스트가 없을 때만 오늘의 의뢰가 자리를 잇는다.
+		# (계절 축제 줄은 없앴다 — Q창에서 항목을 뺐으니 미니창에서
+		#  「계절 축제」를 보고 Q를 열면 그 자리가 비어 헛걸음이 된다)
+		var qline: String = GameData.quest_line()
+		if qline != "":
+			t_title = "오늘의 의뢰"
+			t_goal = qline
+	# Q창(상세)이 열려 있는 동안에는 미니 트래커·핫바가 그 위로 비치지 않게
+	var qopen: bool = main != null and main.quest_ui != null \
+		and main.quest_ui.visible
+	$TrackerPanel.visible = t_goal != "" and not qopen
+	hotbar_panel.visible = not qopen
+	if qopen and _bub != null and _bub.visible:
+		_bub.visible = false           # 안내 말풍선도 Q창 위로 비치지 않게
+	_put(quest_title_label, t_title)
+	_put(goal_label, ("📍 " + t_goal) if t_goal != "" else "")
+	_watch_goal(str(tq.get("obj", "")))
 
 	_refresh_hotbar()
 
@@ -454,30 +712,193 @@ func refresh(force := false) -> void:
 		_put(tool_name, label)
 
 
+# ---- 안내 말풍선 ----
+#
+# 화면 아래 검은 띠 대신, **주인공 머리 위에 뜨는 작은 말풍선**이다.
+# 글자는 미리 폭에 맞춰 잘라 두고, 풍선을 그 크기에 맞춰 키운다 —
+# 그래서 어떤 문장이 와도 풍선 밖으로 삐져나오지 않는다.
+const BUB_FONT := 11
+const BUB_W := 250.0        # 말풍선 안쪽 글 폭 (넘으면 줄바꿈)
+const BUB_LINE := 15.0
+const BUB_PAD := Vector2(10.0, 7.0)
+var _bub: Panel = null
+var _bub_label: Label = null
+var _bub_tail: Control = null
+
+
+func _make_bubble() -> void:
+	if _bub != null:
+		return
+	_bub = Panel.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.99, 0.96, 0.86, 0.97)
+	st.border_color = Color(0.45, 0.31, 0.16)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(9)
+	st.shadow_color = Color(0.12, 0.08, 0.03, 0.28)
+	st.shadow_size = 3
+	st.shadow_offset = Vector2(0, 2)
+	_bub.add_theme_stylebox_override("panel", st)
+	_bub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bub.visible = false
+	add_child(_bub)
+	# 아래로 뾰족한 꼬리 — 누가 하는 말인지 가리킨다
+	_bub_tail = Control.new()
+	_bub_tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bub_tail.draw.connect(func() -> void:
+		var pts := PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(0, 9)])
+		_bub_tail.draw_colored_polygon(pts, Color(0.99, 0.96, 0.86, 0.97))
+		_bub_tail.draw_line(Vector2(-7, 0), Vector2(0, 9), Color(0.45, 0.31, 0.16), 2.0)
+		_bub_tail.draw_line(Vector2(7, 0), Vector2(0, 9), Color(0.45, 0.31, 0.16), 2.0))
+	_bub.add_child(_bub_tail)
+	_bub_label = Label.new()
+	_bub_label.add_theme_font_override("font", FONT_SMALL)
+	_bub_label.add_theme_font_size_override("font_size", BUB_FONT)
+	_bub_label.add_theme_color_override("font_color", Color(0.22, 0.15, 0.07))
+	_bub_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bub_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bub.add_child(_bub_label)
+
+
+# 폭에 맞춰 미리 줄을 나눈다 (풍선 크기를 정확히 잡기 위해)
+func _bub_wrap(text: String) -> Array:
+	var lines: Array = []
+	var w := 0.0
+	for raw in text.split("\n"):
+		var line := ""
+		for ch in raw:
+			var cw := FONT_SMALL.get_string_size(line + ch,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, BUB_FONT).x
+			if line != "" and cw > BUB_W:
+				lines.append(line)
+				w = maxf(w, FONT_SMALL.get_string_size(line,
+					HORIZONTAL_ALIGNMENT_LEFT, -1, BUB_FONT).x)
+				line = ch
+			else:
+				line += ch
+		lines.append(line)
+		w = maxf(w, FONT_SMALL.get_string_size(line,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, BUB_FONT).x)
+	return [lines, w]
+
+
+# 주인공 머리 위로 붙인다. 실내·동굴처럼 바깥 좌표가 없는 곳에서는
+# 화면 가운데 아래(핫바 위)에 띄운다 — 어디서든 가려지지 않게 화면 안으로 민다.
+func _place_bubble() -> void:
+	if _bub == null:
+		return
+	var anchor := Vector2(480.0, 330.0)
+	var outside: bool = main != null and main.player != null \
+		and not main.interior.visible and not main.cave.visible \
+		and not (main.shop_room != null and main.shop_room.visible)
+	if outside:
+		anchor = main.get_canvas_transform() * main.player.position
+		anchor.y -= 46.0        # 머리 위
+	var p := Vector2(anchor.x - _bub.size.x * 0.5, anchor.y - _bub.size.y - 9.0)
+	p.x = clampf(p.x, 6.0, 960.0 - _bub.size.x - 6.0)
+	p.y = clampf(p.y, 34.0, 540.0 - _bub.size.y - 60.0)
+	_bub.position = p
+	# 화면 밖으로 밀렸으면 꼬리도 주인공 쪽을 가리키게 옮긴다
+	_bub_tail.position = Vector2(
+		clampf(anchor.x - p.x, 12.0, _bub.size.x - 12.0), _bub.size.y - 1.0)
+
+
+# 말풍선을 즉시 걷는다 (창이 열리거나 장면이 바뀔 때)
+func hide_bubble() -> void:
+	msg_timer = 0.0
+	if _bub != null:
+		_bub.visible = false
+
+
 func show_message(text: String, dur := 2.5) -> void:
-	if main != null and main._remote_acting:
+	if main != null and main.remote_acting:
 		return  # 다른 플레이어의 행동 메시지는 표시하지 않는다
-	msg_label.text = text
-	msg_label.visible = true
-	$MessageBg.visible = true
+	_make_bubble()
+	var wrapped: Array = _bub_wrap(GameData.localize(text))
+	var lines: Array = wrapped[0]
+	var w: float = minf(float(wrapped[1]), BUB_W)
+	_bub_label.text = "\n".join(lines)
+	_bub.size = Vector2(w + BUB_PAD.x * 2.0,
+		float(lines.size()) * BUB_LINE + BUB_PAD.y * 2.0)
+	_bub_label.position = BUB_PAD
+	_bub_label.size = Vector2(w, float(lines.size()) * BUB_LINE)
+	_bub_tail.position = Vector2(_bub.size.x * 0.5, _bub.size.y - 1.0)
+	_bub_tail.queue_redraw()
+	_bub.visible = true
+	_place_bubble()
 	msg_timer = dur
+
+
+# ---- 새 목표 알림 ----
+# 목표가 바뀌는 순간 알려 준다. 보상/완료 토스트와 같은 자리에 겹쳐
+# 뜨지 않도록, 별도 배너 대신 **같은 토스트 대기열**에 태운다 —
+# 화면 위에는 언제나 알림이 하나만 보인다.
+var _goal_seen := "<init>"
+
+
+func _watch_goal(goal: String) -> void:
+	if goal == _goal_seen:
+		return
+	var first := _goal_seen == "<init>"
+	_goal_seen = goal
+	if first or goal == "":
+		return   # 게임을 막 켰을 때·목표가 사라질 때는 조용히
+	for t in _toast_queue:
+		if str(t.get("body", "")) == goal:
+			return   # 같은 목표가 이미 대기 중이면 또 쌓지 않는다
+	_toast_queue.append({"head": "새로운 목표", "body": goal, "icon": null,
+		"head_col": Color(0.78, 0.42, 0.02)})
+	Sound.play_sfx("sfx_ui")
 
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	_update_story_banner(delta)
 	# 제작대에서 방금 완성된 것 (game_data는 UI를 못 부른다)
 	while not GameData.desk_done_pending.is_empty():
 		var made: String = GameData.desk_done_pending.pop_front()
-		_toast_queue.append({"head": "🔨 완성!", "body": "%s — 낡은 것과 바꿨다" % made,
+		_toast_queue.append({"head": "🔨 완성!", "body": "%s를 만들었다!" % made,
 			"icon": null, "head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_place")
 	# 컬렉션이 방금 찼으면 배너로 알린다 (game_data는 UI를 못 부른다)
 	while not GameData.collection_pending.is_empty():
 		var col: Dictionary = GameData.collection_pending.pop_front()
-		var rname: String = GameData.ITEMS[col.reward].name
+		# 보상 없는 컬렉션(무기 도감 등)은 완성 배너만
+		var body := "묶음을 전부 모았다!"
+		if str(col.reward) != "":
+			body = "%s 레시피가 열렸다!" % GameData.ITEMS[col.reward].name
+		elif str(col.get("perk", "")) == "speed":
+			body = "이동 속도가 영구히 조금 빨라졌다!"
 		_toast_queue.append({"head": "★ 도감 완성 — %s!" % col.name,
-			"body": "%s 레시피가 열렸다!" % rname,
-			"icon": main.tex.get(col.reward) if main != null else null,
+			"body": body,
+			"icon": (main.tex.get(col.reward) if str(col.reward) != "" else null) \
+				if main != null else null,
+			"head_col": Color(0.85, 0.6, 0.15)})
+		Sound.play_sfx("sfx_catch")
+	# 만렙 증표 「생명의 물」 — 일곱 분야를 끝까지 갈고닦으면 한 병씩
+	while GameData.water_pending > 0:
+		GameData.water_pending -= 1
+		_toast_queue.append({"head": "✨ 생명의 물을 얻었다!",
+			"body": "한 분야를 끝까지 갈고닦은 증표다 %d/%d" %
+				[int(GameData.items["water_life"]),
+				GameData.ENDING_SKILLS.size()],
+			"icon": main.tex.get("water_life") if main != null else null,
+			"head_col": Color(0.4, 0.65, 0.9)})
+		Sound.play_sfx("sfx_catch")
+	# 방금 발견한 「할머니의 유품」 — 노트 힌트를 따라 찾아낸 희귀 수집품
+	if GameData.relic_pending != "":
+		_toast_queue.append({"head": "💍 %s 발견!" % GameData.relic_pending,
+			"body": "할머니의 유품이다... 소중히 간직하자 %d/%d" %
+				[GameData.relics_owned(), GameData.RELICS.size()],
+			"icon": null, "head_col": Color(0.85, 0.55, 0.75)})
+		GameData.relic_pending = ""
+		Sound.play_sfx("sfx_catch")
+	# 재료를 다 발견해서 방금 떠오른 기본 요리 레시피
+	while not GameData.recipe_pending.is_empty():
+		var rid: String = GameData.recipe_pending.pop_front()
+		_toast_queue.append({"head": "요리 레시피가 떠올랐다!",
+			"body": "%s — 집 조리대에서 만들 수 있다" % GameData.ITEMS[rid].name,
+			"icon": main.tex.get(rid) if main != null else null,
 			"head_col": Color(0.85, 0.6, 0.15)})
 		Sound.play_sfx("sfx_catch")
 	if minimap_panel != null and main != null:
@@ -486,8 +907,14 @@ func _process(delta: float) -> void:
 			or (main.shop_room != null and main.shop_room.visible))
 		if minimap_panel.visible:
 			minimap.queue_redraw()
-	if msg_label.visible:
-		msg_timer -= delta
-		if msg_timer <= 0.0:
-			msg_label.visible = false
-			$MessageBg.visible = false
+	if _bub != null and _bub.visible:
+		# 가게 방·집 안·동굴·전체 창이 열리면 말풍선은 갈 곳이 없다 —
+		# 그대로 두면 화면 한가운데 붙박이처럼 남는다 (예전 버그)
+		if main != null and (main.shop_room.visible or main.interior.visible
+				or main.cave.visible or main.ui_open()):
+			hide_bubble()
+		else:
+			_place_bubble()
+			msg_timer -= delta
+			if msg_timer <= 0.0:
+				_bub.visible = false

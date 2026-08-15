@@ -22,36 +22,42 @@ const WEATHER_STAR := 5
 # ---- 작물 ----
 # grow_days = 성장에 필요한 게임 시간(시). 초반 작물은 빨리, 비쌀수록 오래.
 const CROPS := {
-	"potato": {"name": "감자", "seed_price": 30, "sell_price": 80, "grow_days": 2, "seasons": [SPRING]},
-	"carrot": {"name": "당근", "seed_price": 40, "sell_price": 110, "grow_days": 3, "seasons": [SPRING]},
-	"strawberry": {"name": "딸기", "seed_price": 60, "sell_price": 170, "grow_days": 4, "seasons": [SPRING]},
-	"tomato": {"name": "토마토", "seed_price": 50, "sell_price": 130, "grow_days": 3, "seasons": [SUMMER]},
-	"corn": {"name": "옥수수", "seed_price": 75, "sell_price": 150, "grow_days": 4, "seasons": [SUMMER, FALL]},
-	"watermelon": {"name": "수박", "seed_price": 120, "sell_price": 380, "grow_days": 7, "seasons": [SUMMER]},
-	"pumpkin": {"name": "호박", "seed_price": 100, "sell_price": 320, "grow_days": 7, "seasons": [FALL]},
-	"eggplant": {"name": "가지", "seed_price": 45, "sell_price": 120, "grow_days": 3, "seasons": [FALL]},
-	"cabbage": {"name": "배추", "seed_price": 70, "sell_price": 200, "grow_days": 5, "seasons": [FALL]},
-	"winter_radish": {"name": "겨울무", "seed_price": 60, "sell_price": 180, "grow_days": 4, "seasons": [WINTER]},
+	# 밀 — 잡화점이 처음부터 파는 두 씨앗 중 하나. 사철 자라는 주식이다.
+	"wheat": {"name": "밀", "seed_price": 20, "sell_price": 35, "grow_days": 3,
+		"seasons": [SPRING, SUMMER, FALL, WINTER]},
+	"potato": {"name": "감자", "seed_price": 20, "sell_price": 35, "grow_days": 2, "seasons": [SPRING]},
+	"carrot": {"name": "당근", "seed_price": 30, "sell_price": 50, "grow_days": 3, "seasons": [SPRING]},
+	"strawberry": {"name": "딸기", "seed_price": 40, "sell_price": 75, "grow_days": 4, "seasons": [SPRING]},
+	"tomato": {"name": "토마토", "seed_price": 35, "sell_price": 60, "grow_days": 3, "seasons": [SUMMER]},
+	# 옥수수 — 처음부터 파는 두 번째 씨앗 (그래서 봄에도 심을 수 있다)
+	"corn": {"name": "옥수수", "seed_price": 40, "sell_price": 70, "grow_days": 4,
+		"seasons": [SPRING, SUMMER, FALL]},
+	"watermelon": {"name": "수박", "seed_price": 95, "sell_price": 170, "grow_days": 7, "seasons": [SUMMER]},
+	"pumpkin": {"name": "호박", "seed_price": 80, "sell_price": 145, "grow_days": 7, "seasons": [FALL]},
+	"eggplant": {"name": "가지", "seed_price": 30, "sell_price": 55, "grow_days": 3, "seasons": [FALL]},
+	"cabbage": {"name": "배추", "seed_price": 50, "sell_price": 90, "grow_days": 5, "seasons": [FALL]},
+	"winter_radish": {"name": "겨울무", "seed_price": 45, "sell_price": 80, "grow_days": 4, "seasons": [WINTER]},
 	# 봄
-	"spinach": {"name": "시금치", "seed_price": 35, "sell_price": 95, "grow_days": 2, "seasons": [SPRING]},
-	"onion": {"name": "양파", "seed_price": 55, "sell_price": 150, "grow_days": 4, "seasons": [SPRING]},
-	"pea": {"name": "완두", "seed_price": 45, "sell_price": 130, "grow_days": 3, "seasons": [SPRING, SUMMER]},
+	"spinach": {"name": "시금치", "seed_price": 25, "sell_price": 45, "grow_days": 2, "seasons": [SPRING]},
+	"onion": {"name": "양파", "seed_price": 40, "sell_price": 70, "grow_days": 4, "seasons": [SPRING]},
+	"pea": {"name": "완두", "seed_price": 35, "sell_price": 60, "grow_days": 3, "seasons": [SPRING, SUMMER]},
 	# 여름
-	"pepper": {"name": "고추", "seed_price": 65, "sell_price": 175, "grow_days": 4, "seasons": [SUMMER]},
-	"melon": {"name": "참외", "seed_price": 110, "sell_price": 330, "grow_days": 6, "seasons": [SUMMER]},
-	"garlic": {"name": "마늘", "seed_price": 50, "sell_price": 140, "grow_days": 3, "seasons": [SUMMER]},
+	"pepper": {"name": "고추", "seed_price": 45, "sell_price": 80, "grow_days": 4, "seasons": [SUMMER]},
+	"melon": {"name": "참외", "seed_price": 80, "sell_price": 150, "grow_days": 6, "seasons": [SUMMER]},
+	"garlic": {"name": "마늘", "seed_price": 35, "sell_price": 65, "grow_days": 3, "seasons": [SUMMER]},
 	# 가을
-	"sweet_potato": {"name": "고구마", "seed_price": 80, "sell_price": 230, "grow_days": 5, "seasons": [FALL]},
-	"bean": {"name": "콩", "seed_price": 55, "sell_price": 155, "grow_days": 4, "seasons": [FALL]},
-	"rice": {"name": "벼", "seed_price": 90, "sell_price": 260, "grow_days": 6, "seasons": [FALL]},
+	"sweet_potato": {"name": "고구마", "seed_price": 60, "sell_price": 105, "grow_days": 5, "seasons": [FALL]},
+	"bean": {"name": "콩", "seed_price": 40, "sell_price": 70, "grow_days": 4, "seasons": [FALL]},
+	"rice": {"name": "벼", "seed_price": 65, "sell_price": 115, "grow_days": 6, "seasons": [FALL]},
 	# 겨울 — 추운 계절은 종류가 적은 대신 값이 좋다
-	"leek": {"name": "대파", "seed_price": 55, "sell_price": 165, "grow_days": 3, "seasons": [WINTER]},
-	"beet": {"name": "비트", "seed_price": 85, "sell_price": 250, "grow_days": 5, "seasons": [WINTER]},
-	"snow_cabbage": {"name": "눈배추", "seed_price": 130, "sell_price": 400, "grow_days": 7, "seasons": [WINTER]},
+	"leek": {"name": "대파", "seed_price": 40, "sell_price": 75, "grow_days": 3, "seasons": [WINTER]},
+	"beet": {"name": "비트", "seed_price": 60, "sell_price": 110, "grow_days": 5, "seasons": [WINTER]},
+	"snow_cabbage": {"name": "눈배추", "seed_price": 100, "sell_price": 180, "grow_days": 7, "seasons": [WINTER]},
 	# 사계절 — 값은 싸지만 언제든 심을 수 있다
-	"herb_leaf": {"name": "약초잎", "seed_price": 40, "sell_price": 105, "grow_days": 3, "seasons": [SPRING, SUMMER, FALL, WINTER]},
+	"herb_leaf": {"name": "약초잎", "seed_price": 25, "sell_price": 45, "grow_days": 3, "seasons": [SPRING, SUMMER, FALL, WINTER]},
 }
 const CROP_IDS := [
+	"wheat",
 	"potato", "carrot", "strawberry", "spinach", "onion", "pea",
 	"tomato", "corn", "watermelon", "pepper", "melon", "garlic",
 	"pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice",
@@ -67,6 +73,64 @@ const STAMINA_NIGHT_MULT := 1.0
 const DAY_START := 6.0 * 60.0   # 오전 6시
 const DAY_END := 26.0 * 60.0    # 새벽 2시 강제 취침
 
+# ---- 공공 건물의 영업시간 ----
+#
+# 상점·도서관·대장간처럼 사람이 일하는 건물은 아침 9시에 문을 열고
+# 저녁 6시에 닫는다. 낮 12시부터 1시까지는 점심시간이라 잠시 쉰다.
+# (개인 주거지는 여기에 해당하지 않는다 — 집 문은 언제나 열린다)
+const OPEN_HOUR := 9.0
+const CLOSE_HOUR := 18.0
+const LUNCH_FROM := 12.0
+const LUNCH_TO := 13.0
+
+
+func hour_now() -> float:
+	return minutes / 60.0
+
+
+func shop_lunch_now() -> bool:
+	var h := hour_now()
+	return h >= LUNCH_FROM and h < LUNCH_TO
+
+
+func shop_open_now() -> bool:
+	var h := hour_now()
+	return h >= OPEN_HOUR and h < CLOSE_HOUR and not shop_lunch_now()
+
+
+# 왜 닫혀 있는가 — "" 열림 / "early" 아직 / "lunch" 점심 / "late" 마감
+func shop_closed_why() -> String:
+	var h := hour_now()
+	if h < OPEN_HOUR:
+		return "early"
+	if h >= CLOSE_HOUR:
+		return "late"
+	if shop_lunch_now():
+		return "lunch"
+	return ""
+
+
+func shop_hours_line() -> String:
+	return "영업 %d시~%d시 · 점심 %d시~%d시" % [int(OPEN_HOUR), int(CLOSE_HOUR),
+		int(LUNCH_FROM), int(LUNCH_TO)]
+
+# ---- 배고픔(포만감) ----
+#
+# 메인 스토리 3의 두 번째 퀘스트에서 열린다 (재민이 알려 준다).
+# 시간이 흐르면 배가 꺼지고, 0이 되면 몸이 상한다 —
+#   · 체력이 계속 깎이고
+#   · 걸음이 눈에 띄게 느려진다
+# 다만 **집 안은 안전지대**다. 지붕 밑에 있는 동안에는 굶주림으로
+# 체력이 HUNGER_SAFE_FLOOR 아래로 내려가지 않는다 (자리를 비워 두어도
+# 죽지 않는다). 밖에서 굶다가 체력이 바닥나면 그대로 쓰러진다.
+const HUNGER_MAX := 100.0
+const HUNGER_PER_MIN := 0.1       # 게임 1분마다 — 가득 차면 1000분(≈하루)
+const HUNGER_STARVE_DPS := 1.5    # 굶을 때 초당 깎이는 체력
+const HUNGER_SAFE_FLOOR := 30.0   # 집 안에서는 여기까지만
+const HUNGER_SLOW_MULT := 0.35    # 굶으면 걸음이 이만큼으로
+const HUNGER_WAKE_MIN := 40.0     # 자고 일어나면 최소 이만큼은 차 있다
+const HUNGER_LOW := 25.0          # 이 아래면 배가 고프다는 신호
+
 const SAVE_PATH := "user://kyojin_farm_save.json"
 
 # ---- 개발/테스트용 치트 (출시 전에 DEV_MODE를 false로 되돌린다) ----
@@ -74,7 +138,7 @@ const SAVE_PATH := "user://kyojin_farm_save.json"
 const DEV_MODE := true
 const DEV_MONEY := 100000000
 const DEV_STOCK := 10000        # 목재·석재·씨앗·아이템 개수
-const START_MONEY := 500        # 출시용 시작 소지금
+const START_MONEY := 200        # 출시용 시작 소지금 — 씨앗 몇 줌이 전부다
 
 # ---- 키 설정 (사람마다 다르게 바꿀 수 있다) ----
 const KEYBIND_PATH := "user://keybinds.json"
@@ -85,8 +149,9 @@ const BINDABLE_ACTIONS := [
 	["move_left", "왼쪽으로 이동"],
 	["move_right", "오른쪽으로 이동"],
 	["use_tool", "도구 사용 / 낚시 / 공격"],
-	["interact", "상호작용 (대화/입장/줍기)"],
-	["mount", "말 타기 / 내리기"],
+	["talk", "대화 (사람·가축)"],
+	["interact", "상호작용 (줍기/캐기/입장)"],
+	["mount", "말 타기 / 내리기 (대화키와 같은 키)"],
 	["cycle_seed", "씨앗 바꾸기"],
 	["open_inventory", "가방 (도구/능력치)"],
 	["open_map", "지도"],
@@ -227,19 +292,92 @@ func window_mode_label() -> String:
 	return "전체 화면" if window_mode == "fullscreen" else "창 " + window_mode
 
 
+# ---- 경매장 신원 ----
+#
+# 장터(바깥 서버)에는 로그인이 없다. 대신 이 컴퓨터가 처음 켤 때 무작위
+# 문자열을 하나 만들어 설정 파일에 두고, 그것으로 「내 농장」을 가른다.
+# 이 값이 있어야 내가 올린 글을 거두고 대금을 받을 수 있으므로 지우지 않는다.
+var farm_id := ""
+
+
+# 장터에서 「내 농장」을 가리키는 값. 로그인했으면 **서버가 발급한 계정 id**를
+# 쓰고(그 편이 안전하다), 아니면 이 컴퓨터가 만든 farm_id로 버틴다.
+func farm_key() -> String:
+	# 오토로드를 이름으로 부르면 등록 순서에 걸려 파싱이 깨질 수 있어
+	# 실행할 때 노드로 집는다 (없으면 예전 방식 그대로)
+	var a := get_node_or_null("/root/Auth")
+	if a != null and a.signed_in():
+		return str(a.uid)
+	return farm_id
+
+
+func _ensure_farm_id() -> void:
+	if farm_id != "":
+		return
+	var chars := "abcdefghijklmnopqrstuvwxyz0123456789"
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for i in 24:
+		farm_id += chars[rng.randi() % chars.length()]
+	save_settings()
+
+
+# 장터에 보이는 내 이름 (이름을 안 지었으면 기본값)
+func seller_name() -> String:
+	var n := player_name.strip_edges()
+	return n.substr(0, 24) if n != "" else "이름 없는 농부"
+
+
+# 지도 이름패·엔딩 통계에 쓰는 농장 이름.
+# 생성창에서 따로 짓지 않았으면 「<이름>의 농장」으로 대신한다.
+func farm_title() -> String:
+	var n := farm_name.strip_edges()
+	return n.substr(0, 12) if n != "" else "%s의 농장" % seller_name()
+
+
+# ---- 마을 이름 ----
+#
+# 대사·안내·간판에 박혀 있는 기본 이름은 「교진」이다. 생성창에서 다른
+# 이름을 지으면, **화면에 나가는 글자를 내보내는 길목에서** 그 이름으로
+# 바꿔 준다(`localize`). 수백 줄의 대사마다 %s를 심는 대신 이렇게 한 이유는
+# 하나 — 한 군데라도 빠뜨리면 그 대사에서만 옛 이름이 튀어나오기 때문이다.
+const HOME_VILLAGE := "교진"
+
+
+func village_base() -> String:
+	var n := village_name.strip_edges()
+	return n.substr(0, 8) if n != "" else HOME_VILLAGE
+
+
+func village_title() -> String:
+	return "%s 마을" % village_base()
+
+
+func localize(text: String) -> String:
+	var n := village_base()
+	if n == HOME_VILLAGE or text == "":
+		return text
+	return text.replace(HOME_VILLAGE, n)
+
+
 func save_settings() -> void:
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"window": window_mode}))
+		f.store_string(JSON.stringify({"window": window_mode, "farm_id": farm_id}))
 
 
 func load_settings() -> void:
 	if not FileAccess.file_exists(SETTINGS_PATH):
+		_ensure_farm_id()
 		return
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.READ)
 	if f == null:
+		_ensure_farm_id()
 		return
 	var d: Variant = JSON.parse_string(f.get_as_text())
+	if typeof(d) == TYPE_DICTIONARY:
+		farm_id = str(d.get("farm_id", ""))
+	_ensure_farm_id()
 	if typeof(d) == TYPE_DICTIONARY and d.has("window"):
 		window_mode = str(d.window)
 		# 구버전 해상도 설정은 현재 기본값으로 교체
@@ -253,6 +391,8 @@ var minutes := DAY_START
 # 개발용 시작 자금 (출시 전 500으로 되돌릴 것!)
 var money := DEV_MONEY if DEV_MODE else START_MONEY
 var energy := ENERGY_MAX
+var hunger := HUNGER_MAX
+var hunger_open := false     # 배고픔 해금 (스토리 3의 씨앗 퀘스트에서 열린다)
 var tool := "hoe"
 var seed_index := 0
 var seeds := {}
@@ -300,6 +440,12 @@ const TOOL_STATS := {
 	"pickaxe": {"base": {"power": 1, "reach": 1, "stamina": 4, "luck": 0},
 		"grow": {"power": 1, "stamina": -0.5, "luck": 1}},
 	"rod":     {"base": {"power": 1, "reach": 1, "stamina": 2, "luck": 1},
+		"grow": {}},
+	# 초반 무기 — 창은 느리지만 한 방이 강하고, 검은 빠르게 두 번 벤다.
+	# (전체 화력은 비슷하게 — 성향 따라 고르는 무기)
+	"spear":   {"base": {"power": 4, "reach": 1, "stamina": 5, "luck": 0},
+		"grow": {}},
+	"sword":   {"base": {"power": 1.5, "reach": 1, "stamina": 3, "luck": 0},
 		"grow": {}},
 }
 
@@ -401,15 +547,61 @@ const GEAR_IDS := ["gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 var owned_gear: Array = []
 var equipped := {"weapon": "", "armor": "", "charm": ""}
 
+# ---- 세트 장비 시너지 (메이플식) ----
+# 같은 테마의 장비를 여러 부위 장착하면 개수 구간마다 보너스가 얹힌다.
+# 새 세트는 표에 한 줄이면 된다 — pieces에 든 장비 중 장착 수를 세고,
+# bonus의 「그 개수 이하 구간」 보너스를 전부 더한다.
+const GEAR_SETS := [
+	{"id": "iron", "name": "무쇠 세트",
+		"pieces": ["gear_sword_iron", "gear_vest_iron", "gear_charm_ember"],
+		"bonus": {2: {"defense": 5.0}, 3: {"power": 2.0, "defense": 8.0}}},
+	{"id": "star", "name": "별빛 세트",
+		"pieces": ["gear_sword_star", "gear_vest_star", "gear_charm_wind"],
+		"bonus": {2: {"luck": 2.0}, 3: {"power": 3.0, "luck": 3.0, "speed": 6.0}}},
+]
 
-# 장착 중인 장비의 능력치 합
+
+# 이 세트에서 몇 부위를 차고 있나
+func gear_set_count(gset: Dictionary) -> int:
+	var n := 0
+	for gid: String in gset.pieces:
+		if gid in equipped.values():
+			n += 1
+	return n
+
+
+# 장착 중인 장비의 능력치 합 (+ 세트 보너스)
 func gear_stat(key: String) -> float:
 	var sum := 0.0
 	for slot: String in GEAR_SLOTS:
 		var gid: String = str(equipped.get(slot, ""))
 		if gid != "" and GEAR.has(gid):
 			sum += float(GEAR[gid].stats.get(key, 0.0))
+	for gset: Dictionary in GEAR_SETS:
+		var n := gear_set_count(gset)
+		for need in gset.bonus:
+			if n >= int(need):
+				sum += float((gset.bonus[need] as Dictionary).get(key, 0.0))
 	return sum
+
+
+# 지금 발동 중인 세트 효과 설명 (가방 장비 탭·능력치 창에서 보여준다)
+func gear_set_text() -> String:
+	var parts: Array[String] = []
+	for gset: Dictionary in GEAR_SETS:
+		var n := gear_set_count(gset)
+		var best := 0
+		for need in gset.bonus:
+			if n >= int(need) and int(need) > best:
+				best = int(need)
+		if best > 0:
+			var stat_bits: Array[String] = []
+			for need in gset.bonus:
+				if n >= int(need):
+					for k: String in gset.bonus[need]:
+						stat_bits.append("%s +%s" % [k, str(gset.bonus[need][k])])
+			parts.append("%s %d부위 (%s)" % [gset.name, n, " · ".join(stat_bits)])
+	return " / ".join(parts)
 
 
 func gear_speed_mult() -> float:
@@ -558,9 +750,11 @@ const SKILLS := {
 	"mine": {"name": "채광", "effect": "석재·광석 추가 +6%/Lv"},
 	"combat": {"name": "전투", "effect": "동굴 공격력 +0.5/Lv"},
 	"cook": {"name": "요리", "effect": "요리 회복량 +5%/Lv"},
-	"beach": {"name": "해변 채집", "effect": "조개 리젠 +8%/Lv · 3Lv마다 채집량 +1"},
+	# 숲 채집과 해변 채집을 합친 하나의 「채집」 숙련이다
+	"beach": {"name": "채집", "effect": "숲·해변 채집량 3Lv마다 +1 · 조개 리젠 +8%/Lv"},
+	"ranch": {"name": "목장", "effect": "쓰다듬은 동물이 생산물을 더 줄 확률 +3%/Lv"},
 }
-const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach"]
+const SKILL_IDS := ["farm", "fish", "forest", "mine", "combat", "cook", "beach", "ranch"]
 const SKILL_MAX_LV := 10
 var skills := {}
 
@@ -574,8 +768,10 @@ func skill_lv(id: String) -> int:
 	return int(skills[id].lv)
 
 
+# 레벨업은 아주 더디다 — 한 분야를 끝까지 갈고닦는 일이
+# 며칠이 아니라 여러 계절에 걸친 일이 되도록 곡선을 네 배 가까이 세웠다.
 func skill_xp_needed(lv: int) -> float:
-	return 30.0 + 20.0 * lv * lv
+	return 120.0 + 85.0 * lv * lv
 
 
 # 경험치 추가. 레벨업하면 도달한 레벨을, 아니면 0을 반환
@@ -589,7 +785,27 @@ func add_skill_xp(id: String, amount: float) -> int:
 		s.xp = float(s.xp) - skill_xp_needed(int(s.lv))
 		s.lv = int(s.lv) + 1
 		leveled = int(s.lv)
+	if leveled > 0:
+		# 그 자리에서 알리지 않는다 — 하루를 마치고 잠들 때 한꺼번에 전한다
+		levelup_pending.append([id, leveled])
+	if leveled >= SKILL_MAX_LV:
+		check_skill_water(id)   # 만렙 증표 — 생명의 물 한 병
 	return leveled
+
+
+# 오늘 오른 능력치들 — [[분야 id, 레벨], ...]. 잠들 때 결산에 실린다
+var levelup_pending: Array = []
+
+
+# 잠자리 결산에 실을 한 줄 (없으면 "")
+func levelup_report() -> String:
+	if levelup_pending.is_empty():
+		return ""
+	var parts: Array = []
+	for row: Array in levelup_pending:
+		parts.append("%s Lv.%d" % [str(SKILLS[str(row[0])].name), int(row[1])])
+	levelup_pending = []
+	return "오늘 실력이 늘었다 — " + " · ".join(parts)
 
 
 func farm_growth_mult() -> float:
@@ -635,21 +851,26 @@ const FURNITURE := {
 	# 사는 게 아니라 제작대에서 만들거나 선물로 받는 세간
 	# (FURNITURE_IDS 밖 = 꾸미기 상점 미노출)
 	"trash_bin": {"name": "쓰레기통", "price": 0, "w": 24, "h": 33, "solid": true},
+	"storage_box": {"name": "수납 상자", "price": 0, "w": 33, "h": 27, "solid": true},
 	"heart_rug": {"name": "하트 러그", "price": 0, "w": 96, "h": 78, "solid": false},
 }
 const FURNITURE_IDS := ["table", "chair", "chest", "rug", "plant", "bookshelf", "lamp", "small_table"]
 # 제작·선물로 들여놓는 세간 — 집 확장 때 기본 세간에 밀려 지워지면 안 된다
-const CRAFT_FURN := ["plant", "trash_bin", "heart_rug"]
+const CRAFT_FURN := ["plant", "trash_bin", "heart_rug", "storage_box"]
 var furniture: Array = []  # [{id, x, y}]
 
 
 func default_furniture() -> Array:
+	# 세간은 사람 크기에 맞춰 줄여 그린다 (interior_ui의 ZOOM). 자리 값은
+	# 「줄이기 전」 왼쪽 위라, 예전 배치를 그대로 두면 식탁과 의자가 벌어진다.
+	# 그래서 예전 배치를 통째로 같은 배율로 줄인 자리를 적어 둔다 —
+	# 눈에 보이는 모양은 예전과 똑같고 크기만 작아진다.
 	return [
-		{"id": "rug", "x": 294.0, "y": 309.0},
-		{"id": "table", "x": 339.0, "y": 228.0},
-		{"id": "chair", "x": 312.0, "y": 243.0},
-		{"id": "chair", "x": 435.0, "y": 243.0},
-		{"id": "chest", "x": 516.0, "y": 165.0},
+		{"id": "rug", "x": 312.0, "y": 305.0},
+		{"id": "table", "x": 346.0, "y": 258.0},
+		{"id": "chair", "x": 346.0, "y": 284.0},
+		{"id": "chair", "x": 415.0, "y": 284.0},
+		{"id": "chest", "x": 455.0, "y": 234.0},
 	]
 
 # ---- 펫: 한 마리만 데리고 다니며 고유 패시브를 준다 ----
@@ -662,22 +883,129 @@ const PETS := {
 const PET_IDS := ["dog", "cat", "owl", "rabbit"]
 var owned_pets: Array = []
 var active_pet := ""
-var gender := "m"  # 플레이어 성별 (m/f) — 새 게임에서 선택
+var gender := "m"  # 플레이어 성별 (m/f) — 옛 세이브 호환용 (외형은 appearance가 쥔다)
+
+# ---- 플레이어 외형 (타이틀 「새로 시작」에서 고른다) ----
+# 머리는 스타일별로 도트 한 벌씩 있고(HAIR_PREFIX), 옷·바지·신발은
+# 표준 팔레트(파랑 셔츠·갈색 바지·밤색 신발)로 뽑은 도트의 색을
+# 실행 중에 갈아입힌다 (recolor_player_image). 게임 코드는 언제나
+# 조립 결과인 pc_* 텍스처만 본다 (main.apply_appearance가 굽는다).
+var appearance := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0,
+	"skin": 0, "hair_col": 0}
+const HAIR_PREFIX := ["new_boy", "hair_short", "hair_spiky", "player_f"]
+const HAIR_NAMES := ["민머리", "짧은 머리", "삐죽 머리", "긴 머리"]
+const SHIRT_NAMES := ["파랑", "분홍", "초록", "노랑"]
+const PANTS_NAMES := ["갈색", "남색", "잿빛", "카키"]
+const SHOES_NAMES := ["밤색", "검정", "빨강", "파랑"]
+const SKIN_NAMES := ["살구", "흰 살결", "볕에 그은", "구릿빛", "갈색", "짙은 갈색"]
+const HAIR_COL_NAMES := ["갈색", "검정", "짙은 갈색", "금발", "붉은 머리",
+	"잿빛", "분홍", "하늘빛"]
+# [기본, 그늘, 밝은 면] — 0번이 도트가 실제로 칠해진 표준 팔레트다
+const APPEAR_SHIRT := [
+	[[58, 88, 168], [38, 58, 120], [94, 126, 200]],
+	[[214, 96, 116], [158, 60, 82], [232, 138, 152]],
+	[[74, 138, 84], [48, 98, 60], [112, 176, 118]],
+	[[206, 160, 60], [158, 114, 38], [232, 196, 102]],
+]
+const APPEAR_PANTS := [
+	[[134, 88, 46], [98, 62, 32], [158, 108, 58]],
+	[[64, 76, 116], [44, 54, 86], [88, 102, 144]],
+	[[110, 110, 118], [80, 80, 88], [140, 140, 148]],
+	[[126, 122, 72], [92, 88, 50], [154, 150, 96]],
+]
+const APPEAR_SHOES := [
+	[[82, 53, 33], [56, 37, 25]],
+	[[50, 48, 52], [32, 31, 35]],
+	[[150, 58, 46], [106, 38, 30]],
+	[[60, 76, 140], [40, 52, 102]],
+]
+# 피부 [기본, 밝은 면, 그늘, 볼, 입] — 도트에서 실제로 쓰이는 다섯 칸이다.
+# (민머리는 정수리가 「밝은 면」, 머리 있는 쪽은 앞머리 밑이 「그늘」)
+# 테두리(54,33,26)·눈(66,32,30)·눈썹(136,70,42)은 건드리지 않는다 —
+# 피부를 아무리 어둡게 해도 얼굴선이 뭉개지지 않게.
+const APPEAR_SKIN := [
+	[[243, 159, 138], [250, 192, 170], [213, 116, 98], [235, 128, 114], [170, 84, 66]],
+	[[252, 220, 203], [255, 240, 228], [232, 182, 166], [246, 196, 186], [205, 140, 126]],
+	[[226, 166, 120], [240, 196, 156], [190, 126, 84], [220, 140, 104], [156, 92, 58]],
+	[[198, 134, 92], [216, 166, 124], [158, 98, 62], [190, 112, 78], [128, 72, 44]],
+	[[158, 102, 68], [182, 130, 94], [120, 72, 46], [150, 86, 58], [96, 54, 34]],
+	[[116, 74, 50], [142, 98, 68], [84, 50, 32], [110, 62, 42], [68, 38, 24]],
+]
+# 머리카락 [기본, 밝은 면, 그늘] — 민머리(new_boy)에는 이 색이 아예 없어서
+# 아무리 바꿔도 그림이 그대로다 (그래서 생성창에서 머리색 줄이 흐려진다)
+const APPEAR_HAIR_COL := [
+	[[118, 72, 40], [152, 100, 56], [86, 52, 30]],
+	[[52, 46, 50], [78, 72, 78], [32, 28, 32]],
+	[[84, 52, 32], [112, 74, 46], [58, 34, 20]],
+	[[214, 170, 84], [240, 208, 132], [168, 124, 52]],
+	[[190, 96, 48], [220, 134, 74], [142, 64, 30]],
+	[[150, 148, 152], [186, 184, 188], [110, 108, 114]],
+	[[214, 120, 160], [238, 160, 192], [164, 80, 118]],
+	[[96, 140, 190], [132, 178, 220], [66, 100, 146]],
+]
+
+
+# 표준 팔레트로 뽑힌 플레이어 도트의 옷 색을 ap 선택에 맞춰 바꾼다.
+# 색은 생성기(make_sprites.py PAL)와 정확히 같은 값이라 픽셀 단위로 맞는다.
+func recolor_player_image(img: Image, ap: Dictionary) -> void:
+	var mp := {}
+	for tbl_sel in [[APPEAR_SHIRT, int(ap.shirt)], [APPEAR_PANTS, int(ap.pants)],
+			[APPEAR_SHOES, int(ap.shoes)],
+			[APPEAR_SKIN, int(ap.get("skin", 0))],
+			[APPEAR_HAIR_COL, int(ap.get("hair_col", 0))]]:
+		var tbl: Array = tbl_sel[0]
+		var sel: int = clampi(int(tbl_sel[1]), 0, tbl.size() - 1)
+		if sel == 0:
+			continue
+		for i in (tbl[0] as Array).size():
+			var s: Array = tbl[0][i]
+			var dst: Array = tbl[sel][i]
+			mp[Color8(s[0], s[1], s[2]).to_rgba32()] = Color8(dst[0], dst[1], dst[2])
+	if mp.is_empty():
+		return
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a == 0.0:
+				continue
+			var key := c.to_rgba32()
+			if mp.has(key):
+				img.set_pixel(x, y, mp[key])
 # 메인 스토리 1 「우체부 아저씨와의 첫 만남」 진행 단계
 # enter: 숲 안으로 들어가보기 / approach: 우체부 접근·대화 /
 # equip: 나무도끼를 가방 슬롯에 장착 / chop: 나무를 베어보자 / done: 완료
 var story_phase := "done"
 # 벤 나무 자리의 재성장 대기열: [x, y, 남은 일수]
 var tree_regrow: Array = []
-# 유저 닉네임: 스토리 1에서 우체부 아저씨가 물어봐 입력받는다
+# 유저 닉네임 · 농장 이름 · 마을 이름: 셋 다 타이틀의 캐릭터 생성창에서 정한다
 var player_name := ""
+var farm_name := ""
+var village_name := ""
 
 # 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
 # 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
 # 재료를 모아 하나씩 세운다. (건물 id는 main.gd의 VILLAGE_PLOTS 키)
 const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
-	"library", "fish"]
+	"library", "fish", "hall"]
 var village_built: Array = []
+
+# ---- 이장 거처 · 마을 성장 ----
+#
+# 이장은 처음부터 마을의 작고 낡은 오두막에서 산다 (제대로 된 집·회관 없음).
+# 주민이 늘면(대략 4~6명 기준 — 아직 미확정, 전체 NPC 수가 정해지면 조정)
+# 어느 날 아침 마을 사람들이 이장의 새 집을 지어 준다.
+# 총 주민 수(플레이어 포함)가 10명을 넘어가면 마을회관이 해금된다 — 강제로
+# 숫자를 맞추는 게 아니라, 게임을 진행하며 주민이 이사 올 때마다 조건을
+# 재확인하는 트리거다. 완공되면 이장은 낮에 회관에서 업무를 보고,
+# 집은 그대로 유지된다.
+var chief_house_lv := 0            # 0=낡은 오두막 / 1=제대로 된 이장 집
+const CHIEF_HOUSE_RESIDENTS := 5   # 새 집 기준 주민 수 (4~6 사이 — 추후 조정)
+const HALL_RESIDENTS := 10         # 이 수를 「넘어가면」 마을회관 해금 (플레이어 포함)
+var hall_noticed := false          # 해금 순간의 아침 안내를 한 번만 띄운다
+
+# 잡화점 씨앗 선반에 진열되는 씨앗 — 처음에는 밀·옥수수 두 종뿐이고,
+# 게임을 진행하면서 하나씩 늘어난다.
+var shop_seeds: Array = ["wheat", "corn"]
 
 # 메인 스토리 2에서 짓는 첫 상점의 재료 (main.VILLAGE_BUILD_COST.general과 같게)
 const SHOP_BUILD_WOOD := 30
@@ -692,10 +1020,20 @@ var story2_phase := ""
 func story2_objective_short() -> String:
 	match story2_phase:
 		"shop":
-			return "재료를 모아 상점을 짓자 (목재 %d·돌 %d) — 광장 북쪽 상점 터 게시판 E" \
-				% [SHOP_BUILD_WOOD, SHOP_BUILD_STONE]
+			# 목표는 한 호흡에 읽히게 — 재료 수치도, 조작키도, 괄호도 없다.
+			# 「무엇을」만 남기고 나머지는 이야기와 게시판이 맡는다.
+			return "상점을 세우자."
 		"farm_talk":
-			return "이장에게 가 보자 (E)"
+			return "이장과 대화하자."
+		"cook":
+			# 첫 수확을 마친 뒤 — 만수가 밥 이야기를 꺼낸다.
+			# 말을 걸고 나면 **그 뒤의 잔 단계를 그대로 이어서** 보여 준다.
+			# (예전에는 이야기가 시작된 뒤에도 목표가 「만수와 대화하자」에
+			#  멈춰 있어, 말을 걸어도 아무것도 안 된 것처럼 보였다)
+			if kitchen_quest == "":
+				return "잡화점 만수에게 말을 걸자."
+			var step := kitchen_quest_objective_short()
+			return step if step != "" else "만수에게 말을 걸자."
 	return ""
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
@@ -705,19 +1043,151 @@ func story2_objective_short() -> String:
 var fisher_quest := ""
 var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
 var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
+var sea_open_day := 0      # 바닷길이 열린 날 — 용식의 집터 부탁이 여기서 3일 뒤다
 
-# 민지(잡화점)의 서브 퀘스트 「해변 노점」 — 바다가 열린 뒤부터 계산대
+# ---- 서브 퀘스트: 용식의 집터 (낚시꾼) ----
+#
+# 바닷길을 연 지 **정확히 3일 뒤**, 용식이 광장 분수대 앞에 서 있다.
+# 말을 걸면 바로 퀘스트가 시작되지 않고 「대화하기」 선택지가 먼저 뜬다 —
+# 고르면 그제야 부탁을 꺼낸다. 이 마을이 마음에 들어 눌러앉고 싶으니
+# 자기가 살 집을 한 채 지어 달라는 이야기다.
+#   "": 아직 / wait: 분수대 앞에서 기다린다 (말 걸기) /
+#   build: 집터를 놓고 집을 짓는다 / built: 집 완성 — 용식에게 알리기 /
+#   done: 완료 (수납 상자 레시피)
+var fisher_home := ""
+# 새로 지은 집 앞 표지판 — 표지판 칸 -> 그 집의 앵커 [x, y].
+# 「막 지은 이 건물이 누구 집인지」를 표지판을 눌러 정한다
+var home_signs := {}
+const FISHER_HOME_DAYS := 3        # 바닷길을 연 날로부터 며칠 뒤에 서 있는가
+
+
+# 분수대 앞에 서 있을 조건 — 바닷길을 연 지 정확히 3일 뒤부터
+func fisher_home_ready() -> bool:
+	return fisher_quest == "done" and sea_open and sea_open_day > 0 \
+		and day >= sea_open_day + FISHER_HOME_DAYS
+
+
+func fisher_home_objective_short() -> String:
+	match fisher_home:
+		"wait":
+			return "용식과 대화하자."
+		"build":
+			return "집을 짓고 표지판에서 정하자."
+		"built":
+			return "용식에게 알리자."
+	return ""
+
+
+# ---- 수납 상자 (용식의 부탁 보상) ----
+#
+# 목재 8개로 만드는 작은 상자. **집 안에** 놓으면 창고처럼 쓴다.
+# 여러 개를 놓아도 안은 하나로 이어져 있다 (같은 창고를 나눠 쓴다) —
+# 어느 상자를 열든 넣어 둔 것이 그대로 보이는 편이 헷갈리지 않는다.
+var storage_stock := {}            # 아이템 id -> 개수
+const STORAGE_SLOTS := 40          # 보관할 수 있는 아이템 「종류」 수
+
+
+func storage_used() -> int:
+	return storage_stock.size()
+
+
+func storage_full() -> bool:
+	return storage_used() >= STORAGE_SLOTS
+
+
+# 가방 -> 상자. 넣은 개수를 돌려준다 (0이면 못 넣었다)
+func storage_put(id: String, n: int) -> int:
+	if n <= 0 or not ITEMS.has(id):
+		return 0
+	var have := int(items.get(id, 0))
+	var move := mini(n, have)
+	if move <= 0:
+		return 0
+	if not storage_stock.has(id) and storage_full():
+		return 0
+	items[id] = have - move
+	storage_stock[id] = int(storage_stock.get(id, 0)) + move
+	return move
+
+
+# 상자 -> 가방
+func storage_take(id: String, n: int) -> int:
+	var have := int(storage_stock.get(id, 0))
+	var move := mini(n, have)
+	if move <= 0:
+		return 0
+	storage_stock[id] = have - move
+	if int(storage_stock[id]) <= 0:
+		storage_stock.erase(id)
+	items[id] = int(items.get(id, 0)) + move
+	return move
+
+
+# 가방에서 상자에 넣을 수 있는 것 — 도구·장비처럼 개수가 없는 것은 뺀다
+func storage_can_store(id: String) -> bool:
+	return ITEMS.has(id) and int(items.get(id, 0)) > 0 \
+		and id not in ["housing_kit", "settle_letter", "farewell_letter",
+			"move_letter", "grandpa_seed"]
+
+# 만수(잡화점)의 서브 퀘스트 「해변 노점」 — 바다가 열린 뒤부터 계산대
 # 대화 선택지에 ❗로 뜬다. 재료를 모아다 주면 해변에 노점이 선다.
 #   "": 아직 안 받음 / doing: 재료 모으는 중 / done: 노점 완성
 var merchant_errand := ""
-# 오늘 민지가 노점에 나와 있는 시각들 (분 단위 시작점). 하루 3번, 1시간씩 —
-# 매일 아침 새로 뽑는다. 민지가 있어야 노점에서 「구매」할 수 있다 (판매는 상시).
+# 만수가 마을에 도착해 첫 인사를 나눈 날 (0 = 아직/구세이브).
+# 도착 첫날은 잡화점에 요리 레시피 선반이 아직 없다 — 다음 날부터 진열
+var merchant_day := 0
+# 오늘 만수가 노점에 나와 있는 시각들 (분 단위 시작점). 하루 3번, 1시간씩 —
+# 매일 아침 새로 뽑는다. 만수가 있어야 노점에서 「구매」할 수 있다 (판매는 상시).
 var stall_hours: Array = []
 const STALL_WOOD := 15         # 노점 재료: 목재
 const STALL_SHELLS := 5        # 노점 재료: 조개 (장식 겸 진열대)
 const STALL_VISITS := 3        # 하루 방문 횟수
 const STALL_VISIT_MIN := 60    # 1회 방문 시간 (게임 분)
 # 노점 한정 레시피 — 잡화점 선반에는 없는 낚시 요리들. id -> 가격
+# 잡화점 생활용품 선반의 요리 레시피 (생선 요리 — 사서 「배우기」)
+const SHOP_DISH_RECIPES := {
+	"dish_grilled_fish": 200, "dish_fish_soup": 300, "dish_stew": 400,
+	"dish_crab_soup": 500, "dish_sashimi": 600, "dish_golden_roast": 800,
+}
+const SHOP_DISH_IDS := ["dish_grilled_fish", "dish_fish_soup", "dish_stew",
+	"dish_crab_soup", "dish_sashimi", "dish_golden_roast"]
+
+
+# 잡화점 요리 레시피 진열 조건 — 그 요리에 드는 물고기를 한 번이라도
+# 직접 낚아 봤어야 선반에 오른다 (만수가 "이 생선 요리법 필요하지?" 하는 셈).
+# 물고기가 안 드는 요리라면 언제나 진열.
+func shop_dish_on_shelf(did: String) -> bool:
+	var needs: Dictionary = RECIPES.get(did, {}).get("needs", {})
+	for mid: String in needs:
+		if str(mid).begins_with("fish_") and int(fish_caught.get(mid, 0)) <= 0:
+			return false
+	return true
+
+
+# 초반 음식 레시피 — 잡화점에서 단계적으로 풀린다. id -> 가격
+# 산딸기잼 레시피는 **상점에서 팔지 않는다** — 퀘스트로만 얻는 첫 요리다
+# (조리대를 찾는 안내의 선물 · 용식의 집터 부탁 보상)
+const SHOP_FOOD_RECIPES := {
+	"flour": 100, "dish_bread": 150, "dish_berry_toast": 250,
+}
+const SHOP_FOOD_IDS := ["flour", "dish_bread", "dish_berry_toast"]
+
+
+# 초반 음식 레시피의 진열 조건 — 재료를 겪어 본 순서대로 하나씩 열린다.
+#   밀가루        밀을 처음 수확했다 (수확이 곧 발견 기록)
+#   빵            밀가루를 얻어 봤다
+#   산딸기잼 토스트  밀가루나 산딸기잼 중 하나라도 만들어 봤다
+func shop_food_on_sale(rid: String) -> bool:
+	match rid:
+		"flour":
+			return discovered.has("wheat")
+		"dish_bread":
+			return discovered.has("flour")
+		"dish_berry_toast":
+			return int(recipes_cooked.get("flour", 0)) > 0 \
+				or int(recipes_cooked.get("dish_berry_jam", 0)) > 0
+	return false
+
 const STALL_RECIPES := {
 	"dish_smelt_fry": 800, "dish_eel_rice": 1500, "dish_salmon_steak": 1600,
 }
@@ -725,7 +1195,7 @@ const STALL_RECIPE_IDS := ["dish_smelt_fry", "dish_eel_rice", "dish_salmon_steak
 const BAIT_PRICE := 8          # 미끼 한 개 값
 
 
-# 오늘 민지가 노점에 나올 시각 세 개를 뽑는다 (9시~19시 사이, 서로 겹치지 않게)
+# 오늘 만수가 노점에 나올 시각 세 개를 뽑는다 (9시~19시 사이, 서로 겹치지 않게)
 func roll_stall_hours() -> void:
 	stall_hours = []
 	if merchant_errand != "done":
@@ -753,6 +1223,1927 @@ func merchant_at_stall() -> bool:
 	return false
 
 
+# ---- 메인 스토리 3: 새로운 주민의 이사 (편지 이주 + 집터 건설) ----
+#
+# 첫 수확 다음 날, 처음으로 「이주 희망 편지」가 도착한다. 보낸 사람은
+# 호기심 많고 모험을 좋아하는 소년 재민. 이장과 상의해 받아주기로 하고,
+# 이장은 앞으로의 이사 결정권을 플레이어에게 맡긴다. 집터 레시피(비싸다)를
+# 사서 재료를 모아 집터를 만들고, 해금된 땅 중 원하는 풀밭에 집 자리를
+# 직접 정하면 집이 지어진다. 다음 날 재민이 이사 와 첫인사를 나눈다.
+# 이사가 끝나면 3장은 두 걸음 더 간다:
+#   ② 재민이 배낭에서 씨앗을 꺼내 주며 **배고픔**을 알려 준다 (씨앗 심기)
+#   ③ 이장이 우체국 이야기를 꺼낸다 — 우체국을 세우면 우체부 아저씨가
+#      마을에 눌러앉는다 (3장의 마지막 퀘스트)
+#   "": 아직 / letter: 편지 읽는 중 / show: 이장에게 보여주기 /
+#   build: 집터 레시피 구매·제작·설치 / wait: 완공 — 내일 이사 온다 /
+#   greet: 재민 도착 — 인사하러 가기 /
+#   seed: 받은 씨앗을 밭에 심기 / seedrep: 재민에게 알리기 /
+#   post: 이장에게 우체국 이야기 듣기 / postbuild: 우체국 짓기 /
+#   postgreet: 우체부의 첫 인사 / done: 완료 (이주·집터 시스템 해금)
+var move_quest := ""
+const MOVE_SEEDS := 3        # 재민이 나눠 주는 씨앗 (이만큼 심으면 된다)
+var move_seeds := 0          # 그중 심은 개수
+var move_day := 0
+var move_min := 0            # 집을 지은 시각 (분) — 여기서 조금 뒤에 이사 온다
+const MOVE_WAIT_MIN := 120   # 두 시간쯤 지나면 짐을 들고 나타난다            # 단계 전환 기준 날 (편지 도착·이사 대기)
+var move_house := Vector2i(-999, -999)   # 재민의 집 자리 (수락한 집터)
+const HOUSING_KIT_PRICE := 2500          # 집터 레시피 값 — 일부러 비싸다
+# 스프링클러는 퀘스트 보상이 아니라 잡화점 레시피가 됐다 —
+# 농사 실력이 이만큼 붙어야 선반에 올라온다
+const SPRINKLER_FARM_LV := 3
+const SPRINKLER_RECIPE_PRICE := 500
+# 미리 마련해 둔 빈 집터들 — [{x, y, used}]. **빈 집터가 있어야만**
+# 이주 희망 편지를 수락할 수 있다 (수락하면 첫 빈 집터에 집이 지어진다)
+var home_plots: Array = []
+
+
+func first_empty_plot() -> Vector2i:
+	for p: Dictionary in home_plots:
+		if not bool(p.get("used", false)):
+			return Vector2i(int(p.x), int(p.y))
+	return Vector2i(-999, -999)
+
+
+func empty_plot_count() -> int:
+	var n := 0
+	for p: Dictionary in home_plots:
+		if not bool(p.get("used", false)):
+			n += 1
+	return n
+
+
+# ---- 제4장 서브 퀘스트: 새 이웃을 위한 빈 집터 셋 ----
+#
+# 옛 마을의 경계를 되찾자마자(스토리 4 완결) 이장이 덧붙이는 부탁이다.
+# 땅이 넓어졌으니 이제 사람이 들어올 자리를 미리 마련해 두자는 이야기 —
+# 빈 집터를 **PLOT3_GOAL개** 더 놓으면 이장에게 알리고 사례를 받는다.
+#   "": 아직 / make: 집터를 놓는 중 / report: 다 놓았다 — 이장에게 /
+#   done: 완료
+var plot3_quest := ""
+var plot3_made := 0               # 부탁을 받은 뒤로 새로 놓은 집터 수
+const PLOT3_GOAL := 3
+const PLOT3_MONEY := 900          # 이장이 마을 살림에서 떼어 주는 사례
+const PLOT3_WOOD := 40            # 다음 집터에 보태라고 얹어 주는 목재
+const PLOT3_STONE := 30
+
+
+func plot3_objective_short() -> String:
+	match plot3_quest:
+		"make":
+			return "빈 집터를 놓자 %d/%d" % [plot3_made, PLOT3_GOAL]
+		"report":
+			return "이장에게 알리자."
+	return ""
+
+
+# 빈 집터를 하나 놓을 때마다 story.try_place_home_plot이 불러 준다
+func plot3_add() -> void:
+	if plot3_quest != "make":
+		return
+	plot3_made += 1
+	if plot3_made >= PLOT3_GOAL:
+		plot3_quest = "report"
+
+
+# ---- 우체국 — 편지 부치기와 보관함 ----
+#
+# 우체부가 자리를 잡으면(스토리 3 완결) 우체국이 두 가지 일을 맡는다.
+#   · 부치기 — 마을 사람에게 편지 한 통. 값을 치르는 대신 마음이 오간다.
+#     다음 날 아침 답장이 보관함에 도착하고 호감도가 조금 오른다.
+#   · 보관함 — 가방에서 **수락한 편지**가 자동으로 여기로 옮겨져 남는다.
+#     가방을 비워도 지난 편지는 우체국에 그대로 있다.
+const MAIL_SEND_COST := 150       # 편지 한 통을 부치는 값
+const MAIL_BOX_MAX := 40          # 보관함이 담아 두는 편지 수
+const MAIL_REPLY_AFF := 3         # 답장이 오면 오르는 호감도
+var mail_box: Array = []          # [{title, body, day}] — 오래된 것이 앞
+var mail_out: Array = []          # 부치고 답장을 기다리는 편지 [{npc, day}]
+var mail_sent_day := 0            # 하루 한 통 — 마지막으로 부친 날
+
+
+# 보관함에 한 통 넣는다 (수락한 편지·도착한 답장 모두 이 문을 지난다)
+func mail_store(title: String, body: String) -> void:
+	mail_box.append({"title": title, "body": body, "day": day})
+	while mail_box.size() > MAIL_BOX_MAX:
+		mail_box.pop_front()
+
+
+func mail_open() -> bool:
+	return village_built.has("post")
+
+
+func mail_sent_today() -> bool:
+	return mail_sent_day == day and day > 0
+
+
+# 아침에 도착한 답장들 — 보낸 사람 이름을 돌려준다 (day_cycle이 알린다)
+func mail_new_day() -> Array:
+	var came: Array = []
+	for i in range(mail_out.size() - 1, -1, -1):
+		var mo: Dictionary = mail_out[i]
+		if day <= int(mo.get("day", 0)):
+			continue
+		var nid := str(mo.get("npc", ""))
+		mail_out.remove_at(i)
+		if not NPCS.has(nid):
+			continue
+		var nm := str(NPCS[nid].name)
+		mail_store("%s의 답장" % nm, str(NPCS[nid].get("reply_letter",
+			"『편지 잘 받았어요.\n덕분에 하루가 환했습니다. 또 써 주세요.』")))
+		affinity[nid] = mini(int(affinity.get(nid, 0)) + MAIL_REPLY_AFF, 100)
+		came.append(nm)
+	return came
+# 쓰레기통(무인 판매함) 판매 배율 — 24시간 아무 때나 파는 대신 제값의 80%
+const TRASH_SELL_MULT := 0.8
+
+
+func move_objective_short() -> String:
+	match move_quest:
+		"show":
+			return "이장에게 편지를 보여주자."
+		"build":
+			if first_empty_plot().x >= 0:
+				return "이주 편지를 읽고 수락하자."
+			return "빈 집터를 마련하자."
+		"wait":
+			return "재민이 이사 오기를 기다리자."
+		"greet":
+			return "밖에서 재민을 기다리자."
+		"seed":
+			return "씨앗을 심자 %d/%d" % [move_seeds, MOVE_SEEDS]
+		"seedrep":
+			return "재민에게 알리자."
+		"post":
+			return "이장과 대화하자."
+		"postbuild":
+			return "우체국을 세우자."
+		"postgreet":
+			return "밖에서 우체부를 기다리자."
+	return ""
+
+
+# 밭에 씨앗을 한 알 심었다 (스토리 3의 두 번째 퀘스트를 진행하는 중이면 센다)
+func move_seed_planted() -> void:
+	if move_quest != "seed":
+		return
+	move_seeds += 1
+	if move_seeds >= MOVE_SEEDS:
+		move_quest = "seedrep"
+
+
+# ---- 이주 NPC의 첫 인사 (공통 시스템) ----
+#
+# 건물이 완공되거나 이사가 확정된 「그날」에는 아직 영업도 일과도 없다.
+# **다음 날** 아침, 그 NPC가 직접 플레이어를 찾아와 첫 인사를 나눈 뒤부터
+# 정상적으로 장사(생활)를 시작한다. 앞으로 이주해 오는 모든 NPC 공통.
+# (낚시꾼은 자기 퀘스트로 이미 인사를 나누는 특수 경로 — 여기 안 탄다)
+var arrivals: Array = []      # [{"id": npc_id, "day": 확정된 날}] — 방문 대기열
+var npc_greeted: Array = []   # 첫 인사를 마친 NPC id — 이때부터 영업/일과
+
+# ---- 자연물 리젠 ----
+# 나무/돌/잡초를 캐서 없애면 그 자리가 아니라, 3~5일 뒤(자원마다 랜덤)
+# 맵의 「빈자리 검사」를 통과한 랜덤 위치에서 새로 자란다.
+# (world_gen._respawn_resources가 아침마다 처리 — 세이브에 그대로 남는다)
+var respawn_queue: Array = []   # [{"kind", "removed": 제거일, "due": 리젠 예정일}]
+
+
+func queue_respawn(kind: String) -> void:
+	# 잡초는 금방 다시 돋는다 (1~2일) — 나무·돌은 3~5일 걸린다
+	var days := randi_range(1, 2) if kind == "weed" else randi_range(3, 5)
+	respawn_queue.append({"kind": kind, "removed": day, "due": day + days})
+
+
+func npc_open(nid: String) -> bool:
+	return nid in npc_greeted
+
+
+# ---- 메인 스토리 4: 오래된 마을의 경계 ----
+#
+# 마을 동쪽 다리 건너, 낡은 표지판이 옛 마을의 경계를 알린다.
+# 표지판을 확인하고(→"ask") 이장에게 물어보면 오래된 마을 지도를 보여
+# 준다 — 지금 쓰는 땅은 옛 교진 마을의 일부일 뿐이다. 이야기 끝에 첫
+# 구역이 열리고(→"done"), 남은 구역은 이장의 「마을 확장 이야기」에서
+# 재료를 들여 하나씩 되살린다.
+#
+# 규칙: 해금 전 구역은 들어갈 수 없고(집터·설치물도 불가), 해금하면
+# 보통 땅과 똑같이 쓴다.
+var story4_phase := ""             # "" -> "ask"(이장에게 묻기) -> "done"
+var zones_open: Array = []         # 열린 구역 id 목록
+const VILLAGE_ZONES := {
+	"east_north": {"rect": Rect2i(100, 1, 68, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(100, 21, 68, 23), "name": "옛 마을 남동쪽 터"},
+}
+const ZONE_ORDER := ["east_north", "east_south"]
+const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
+
+
+# 이 칸이 속한 (아직 잠긴/열린) 확장 구역 id — 구역 밖이면 ""
+func zone_at(x: int, y: int) -> String:
+	for zid: String in VILLAGE_ZONES:
+		if (VILLAGE_ZONES[zid].rect as Rect2i).has_point(Vector2i(x, y)):
+			return zid
+	return ""
+
+
+func story4_objective_short() -> String:
+	if story4_phase == "ask":
+		return "이장에게 표지판을 물어보자."
+	return ""
+
+
+# ---- 메인 스토리 6: 오래된 책과 사서 ----
+#
+# 스토리 5(숲속에서 발견한 집)를 끝내면 마을 어딘가 풀숲에 오래된 책이
+# 놓인다. 책 -> 이장(모름) -> 우체부 편지 -> 며칠 뒤 사서 방문 ->
+# 도서관 필요성 -> 이장 상의 -> 도서관 건설 -> 사서 정착 순서.
+# 사서 서하는 도서관이 완성되고 정착 대화를 마쳐야 정식 주민이 된다.
+var story6_phase := ""   # ""→find(책 놓임)→show_chief→ask_post→wait→visit→told→build→done
+var story6_day := 0      # 편지를 부친 날 — 이틀 뒤 답장이 온다
+const STORY6_REPLY_DAYS := 2
+# 오래된 책 보관 여부 — 완결 후 도서관 서가로 옮겨진다 (판매·삭제 금지,
+# 다음 메인 스토리에서 다시 꺼내 쓴다)
+var old_book_stored := false
+
+
+func story6_objective_short() -> String:
+	match story6_phase:
+		"show_chief":
+			return "이장에게 책을 보여주자."
+		"ask_post":
+			return "우체부에게 편지를 부탁하자."
+		"wait":
+			return "사서의 답장을 기다리자."
+		"visit":
+			return "찾아온 사서를 만나자."
+		"told":
+			return "이장에게 사서 이야기를 전하자."
+		"build":
+			if village_built.has("library"):
+				return "도서관이 완성됐다 — 사서에게 말을 걸자"
+			return "도서관을 세우자."
+	return ""
+
+
+# ---- 메인 스토리 7: 식지 않는 화로 ----
+#
+# 스토리 6(오래된 책과 사서)을 끝내면, 대장장이 무쇠의 화로가 식어 간다.
+# 무쇠의 고민 -> 서하가 복원 중인 오래된 책에서 옛 대장간 구절을 찾음 ->
+# 동굴 깊은 곳의 광석·보석을 모아 화로를 되살린다.
+# 완결하면 화로가 뜨거워져 도구 강화 골드 비용이 20% 싸진다.
+#   "": 아직 / worry: 무쇠의 고민 듣기 / lore: 서하에게 물어보기 /
+#   gather: 광석·보석 모아 무쇠에게 / done: 완료
+var story7_phase := ""
+const STORY7_ORE := 15    # 화로 재점화 재료: 광석
+const STORY7_GEM := 2     # 화로 재점화 재료: 보석 (동굴 3층부터 나온다)
+const FORGE_DISCOUNT := 0.8   # 완결 보상 — 강화 골드 비용 배수
+
+
+# 화로가 되살아나면 도구 강화의 골드 비용이 싸진다 (재료는 그대로)
+func forge_price(base: int) -> int:
+	return int(base * FORGE_DISCOUNT) if story7_phase == "done" else base
+
+
+func story7_objective_short() -> String:
+	match story7_phase:
+		"worry":
+			return "무쇠와 대화하자."
+		"lore":
+			return "서하에게 물어보자."
+		"gather":
+			if int(items.get("ore", 0)) >= STORY7_ORE \
+					and int(items.get("gem", 0)) >= STORY7_GEM:
+				return "무쇠에게 가져다주자."
+			return "광석과 보석을 모으자."
+	return ""
+
+
+# ---- 메인 스토리 8: 초원에서 온 목동 ----
+#
+# 스토리 7(식지 않는 화로)을 끝내면, 동물들과 초원을 찾아 떠도는 목동
+# 보라가 마을을 찾아온다. 보라의 사정 -> 이장 상의 -> 목장 상회 건설
+# (스토리 게이트) -> 보라 정착. 완결하면 목장 상회에서 동물·축사·말·펫을
+# 들일 수 있다 — 동물 사육의 정식 개방이다.
+#   "": 아직 / visit: 낯선 목동 만나기 / ask: 이장과 상의 /
+#   build: 목장 상회 짓기(완공 후 보라에게) / done: 완료
+var story8_phase := ""
+
+
+func story8_objective_short() -> String:
+	match story8_phase:
+		"visit":
+			return "목동을 만나자."
+		"ask":
+			return "이장과 상의하자."
+		"build":
+			if village_built.has("ranch"):
+				return "보라와 대화하자."
+			return "목장 상회를 세우자."
+	return ""
+
+
+# ---- 메인 스토리 9: 마을의 심장, 마을회관 ----
+#
+# 스토리 8(목동 정착)을 끝내면, 이장이 옛 교진 마을의 회관을 떠올리며
+# 「주민을 초대해 마을을 키워 달라」고 부탁한다. 주민(플레이어 제외)이
+# 10명이 되면 회관 건설이 열리고, 완공 후 접수대의 이장과 개관식을
+# 하면 완결. 회관 기능은 한꺼번에 주어지지 않는다 — 마을이 클수록
+# 하나씩 열린다 (개관: 명부·캘린더 / 12명: 창고 / 15명: 공동 프로젝트 /
+# 20명: 마을 회의).
+#   "": 아직 / ask: 이장의 부탁 듣기 / invite: 주민 초대하기 /
+#   build: 회관 짓기(완공 후 개관식) / done: 완료
+var story9_phase := ""
+var residents_now := 1             # 지금 마을 주민 수 (플레이어 포함, main이 갱신)
+const HALL_STORE_RES := 12         # 마을 창고 해금 (플레이어 포함 주민 수)
+const HALL_PROJECT_RES := 15       # 공동 프로젝트 해금
+const HALL_MEET_RES := 20          # 마을 회의 해금
+const HALL_STOCK_MAX := 30         # 창고에 쌓이는 기부품 상한
+const HALL_TRASH_G := 5            # 쓰레기 수거 미화 지원금 (개당)
+const HALL_MEET_COOLDOWN := 7      # 마을 회의 간격 (일)
+
+# 회관 창고 — 주민들이 아침마다 이따금 놓고 가는 물건 (id -> 수)
+var hall_stock := {}
+var hall_loot_day := 0             # 마지막으로 창고를 뒤적인 날 (하루 한 번)
+var hall_trash_total := 0          # 지금까지 수거한 쓰레기 (마을 미화 기록)
+var hall_projects: Array = []      # 완성한 공동 프로젝트 id
+var hall_meet_day := 0             # 마지막 마을 회의 날
+var hall_feat_noticed: Array = []  # 해금 안내를 띄운 기능 (한 번 열리면 닫히지 않는다)
+
+# 공동 프로젝트 — 광장 둘레를 다 함께 가꾼다 (순서대로 하나씩)
+#   tiles: 완성 시 세워지는 장식물 자리 (막힌 칸은 건너뛴다)
+const HALL_PROJECTS := [
+	{"id": "lamps", "name": "광장 가로등", "wood": 40, "stone": 20, "money": 2000,
+		"desc": "광장 네 귀퉁이에 가로등을 세운다.\n밤 산책이 한결 든든해진다.",
+		"tiles": [[71, 13], [83, 13], [71, 18], [83, 18]], "kind": "deco_lamp"},
+	{"id": "benches", "name": "쉼터 벤치", "wood": 60, "stone": 0, "money": 3000,
+		"desc": "광장 곁에 나무 벤치를 놓는다.\n주민들이 앉아 쉬며 수다를 떤다.",
+		"tiles": [[73, 13], [81, 13]], "kind": "deco_bench"},
+	{"id": "fountain", "name": "분수 새 단장", "wood": 0, "stone": 80, "money": 5000,
+		"desc": "낡은 분수를 반짝반짝 손본다.\n마을의 자랑거리가 된다.",
+		"tiles": [], "kind": ""},
+]
+# 아침 기부 풀 — 주민들이 창고에 놓고 가는 소박한 물건들 (보석은 귀하다)
+const HALL_DONATE_POOL := ["forage_berry", "forage_herb", "forage_shell",
+	"ore", "bait", "dish_bread", "gem"]
+
+
+func story9_objective_short() -> String:
+	match story9_phase:
+		"ask":
+			return "이장의 이야기를 듣자."
+		"invite":
+			return "주민을 초대하자 %d/%d" % [
+				maxi(residents_now - 1, 0), HALL_RESIDENTS]
+		"build":
+			if village_built.has("hall"):
+				return "접수대의 이장에게 가자."
+			return "마을회관을 세우자."
+	return ""
+
+
+# 회관 기능의 점진 해금 — 주민이 늘 때마다 하나씩 열린다.
+# 한 번 열린 기능은 주민이 줄어도 닫히지 않는다 (hall_feat_noticed).
+func hall_feature_open(feat: String) -> bool:
+	if story9_phase != "done":
+		return false
+	match feat:
+		"store":
+			return feat in hall_feat_noticed or residents_now >= HALL_STORE_RES
+		"project":
+			return feat in hall_feat_noticed or residents_now >= HALL_PROJECT_RES
+		"meet":
+			return feat in hall_feat_noticed or residents_now >= HALL_MEET_RES
+	return true
+
+
+# 다음에 열릴 기능 안내 한 줄 — 회관 공지판이 자연스럽게 예고한다
+func hall_next_feature_text() -> String:
+	if not hall_feature_open("store"):
+		return "주민 %d명이면 마을 창고가 열린다. 지금 %d명" \
+			% [HALL_STORE_RES, residents_now]
+	if not hall_feature_open("project"):
+		return "주민 %d명이면 공동 프로젝트가 열린다. 지금 %d명" \
+			% [HALL_PROJECT_RES, residents_now]
+	if not hall_feature_open("meet"):
+		return "주민 %d명이면 마을 회의가 열린다. 지금 %d명" \
+			% [HALL_MEET_RES, residents_now]
+	return "마을의 모든 살림이 돌아가고 있다."
+
+
+func hall_stock_total() -> int:
+	var n := 0
+	for iid in hall_stock:
+		n += int(hall_stock[iid])
+	return n
+
+
+# 아침 기부 — 주민마다 낮은 확률로 창고에 물건을 놓고 간다.
+# residents: 굴릴 주민 수 (플레이어 제외). 돌아오는 값은 쌓인 개수.
+func hall_donate_morning(residents: int) -> int:
+	if not hall_feature_open("store"):
+		return 0
+	var added := 0
+	for _i in residents:
+		if hall_stock_total() >= HALL_STOCK_MAX:
+			break
+		if randf() < 0.12:
+			var iid := str(HALL_DONATE_POOL[randi() % HALL_DONATE_POOL.size()])
+			if iid == "gem" and randf() > 0.2:
+				iid = "forage_berry"   # 보석은 웬만해선 안 나온다
+			hall_stock[iid] = int(hall_stock.get(iid, 0)) + 1
+			added += 1
+	return added
+
+
+# 창고 뒤적이기 — 하루 한 번, 행운이 좋으면 보관품 하나를 얻는다.
+# roll: 테스트용 강제 굴림(0~1). 음수면 랜덤. 돌아오는 값:
+#   "" = 오늘 이미 뒤적였거나 창고가 비었다 / "miss" = 허탕 / 아이템 id = 획득
+func hall_loot(roll := -1.0) -> String:
+	if hall_loot_day == day or hall_stock.is_empty():
+		return ""
+	hall_loot_day = day
+	var r := roll if roll >= 0.0 else randf()
+	if r >= 0.35 + total_luck() * 0.03:   # 행운이 높을수록 손맛이 좋다
+		return "miss"
+	var ids: Array = hall_stock.keys()
+	var iid := str(ids[randi() % ids.size()])
+	hall_stock[iid] = int(hall_stock[iid]) - 1
+	if int(hall_stock[iid]) <= 0:
+		hall_stock.erase(iid)
+	items[iid] = int(items.get(iid, 0)) + 1
+	discover(iid)
+	return iid
+
+
+# 쓰레기 비우기 — 가방의 쓰레기를 회관 수거함에 몽땅 넣는다.
+# 마을 미화 지원금(개당 5G)을 받는다. 돌아오는 값은 넣은 개수.
+func hall_dump_trash() -> int:
+	var n := int(items.get("forage_trash", 0))
+	if n <= 0:
+		return 0
+	items["forage_trash"] = 0
+	hall_trash_total += n
+	money += HALL_TRASH_G * n
+	return n
+
+
+# ---- 메인 스토리 10: 동굴과 탐험 ----
+#
+# 스토리 9(마을회관)로 마을의 기반이 완성되면, 서하가 복원을 끝낸
+# 오래된 책 마지막 장에서 할아버지의 「동굴 표본 조사」 기록을 찾아낸다.
+# 연구 노트에 동굴 컬렉션 두 쪽이 열리고, 조사가 시작되면 동굴에
+# 새 표본(수정·동굴 이끼·발광 버섯)이 모습을 드러낸다.
+# 컬렉션을 다 채우면 **플레이에 실질적으로 도움이 되는 영구 보상**이
+# 처음으로 강하게 체감되도록 설계했다 (아래 CAVE_COL_* 참고).
+#   "": 아직 / note: 서하의 발견 듣기 / survey: 동굴 조사
+#   (깊이 15층 + 표본 2종 발견 -> 서하에게 보고) / done: 완료
+var story10_phase := ""
+const STORY10_DEPTH := 15          # 조사 목표 깊이 (승강기 세 칸)
+const CAVE_FINDS := ["crystal", "cave_moss", "glow_shroom"]   # 새 표본 3종
+const STORY10_FINDS := 2           # 보고에 필요한 표본 종 수 (이끼방은 운이라 2종)
+
+
+# 동굴 조사가 시작됐는가 — 새 표본은 이때부터 동굴에 나타난다
+func story10_open() -> bool:
+	return story10_phase in ["survey", "done"]
+
+
+func cave_finds_found() -> int:
+	var n := 0
+	for id: String in CAVE_FINDS:
+		if discovered.has(id):
+			n += 1
+	return n
+
+
+# 조사 목표를 다 채웠는가 (서하에게 보고할 수 있는가)
+func story10_survey_done() -> bool:
+	return mine_deepest >= STORY10_DEPTH and cave_finds_found() >= STORY10_FINDS
+
+
+func story10_objective_short() -> String:
+	match story10_phase:
+		"note":
+			return "서하와 대화하자."
+		"survey":
+			if story10_survey_done():
+				return "서하에게 알리자."
+			return "동굴 조사 %d/%d층 · 표본 %d/%d" % [
+				mini(mine_deepest, STORY10_DEPTH), STORY10_DEPTH,
+				mini(cave_finds_found(), STORY10_FINDS), STORY10_FINDS]
+	return ""
+
+
+# ---- 메인 스토리 11: 할머니의 모자 ----
+#
+# 스토리 10 완결 + 마을 회의를 한 번 진행 + 연구 노트 20% —
+# 조건이 차면 이장이 직접 플레이어를 찾아와 첫 유품 이야기를 꺼낸다.
+# 주민들에게 단서를 모으고(그동안 농사·낚시·강화 등 자유 생활 그대로),
+# 동굴 50층 광석을 캐다 「할머니의 모자」를 발견한다 (이야기 중에는
+# 확정 드랍 — try_relic(0)의 굴림을 cave_ui가 확정으로 넘긴다).
+# 모자를 얻으면 도서관에 「할머니의 기록」 첫 장이 열린다 — 기록은
+# 유품 하나에 한 장씩, 한 번에 다 공개하지 않는다.
+#   "": 아직 / visit: 이장이 찾아온다(연출) / clue: 단서 수집 /
+#   deep: 동굴 50층 — 광석에서 모자 발견 / record: 도서관 기록 / done
+var story11_phase := ""
+var story11_clues: Array = []      # 단서를 들려준 주민 id
+const STORY11_CLUE_NPCS := ["blacksmith", "librarian", "forest_mom"]
+const STORY11_NOTE := 0.2          # 시작 조건 — 연구 노트 진행률
+const STORY11_FLOOR := 50          # 모자가 잠든 깊이 (RELICS[0]의 힌트 층)
+var grandma_read := 0              # 「할머니의 기록」 읽은 장 수 (점진 공개)
+
+# 할머니의 기록 — 유품 하나를 찾을 때마다 한 장씩 열린다 (RELICS 순서.
+# 가진 유품의 장만 보인다 — 한 번에 다 공개하지 않는다).
+# 장이 갈수록 두 분의 이야기가 조금씩 짙어진다 (모자 < 팔찌 < ...)
+const GRANDMA_RECORDS := [
+	"『교진 마을 부녀회 명부』 — 빛바랜 명단 맨 앞에 할머니의 이름이 있다.\n\n"
+	+ "「밭일 나갈 때도 늘 그 챙 넓은 모자를 쓰고 계셨지. 광부들 도시락을\n"
+	+ "싸 들고 굴까지 내려가시던 분은 마을에 그분뿐이었어.」 — 옛 주민의 메모.\n\n"
+	+ "할아버지의 글씨가 여백에 작게 남아 있다.\n「당신이 굴에 두고 온 모자, 내가 꼭 찾아다 주리다.」",
+	"『바닷가의 약속』 — 물때가 적힌 낡은 조석표 사이에 편지 한 장.\n\n"
+	+ "「그 사람은 바다를 참 좋아했다. 해 질 무렵이면 늘 서쪽 모래밭 끝\n"
+	+ "바위께로 나를 끌고 갔지. 첫 수확을 판 돈으로 팔찌를 사 주던 날,\n"
+	+ "파도가 유난히 잔잔했다.」 — 할아버지의 필체.\n\n"
+	+ "뒷장에는 서툰 그림 — 바위에 기대앉은 두 사람과, 물결 위의 노을.\n"
+	+ "「폭풍이 몰아치던 해, 바다는 많은 것을 가져갔다.\n"
+	+ "...하지만 언젠가 돌려주리라 믿는다. 바다도 약속은 지키니까.」",
+	"『두 사람의 시작』 — 빛바랜 혼인 기록과, 그 사이에 끼워진 사진 한 장.\n\n"
+	+ "「그 사람은 마을 밖 옛 농지에서 일하던 처녀였다. 나는 밭 가는 법을\n"
+	+ "가르쳐 달라는 핑계로 매일 그 밭을 찾아갔지. ...핑계인 걸\n"
+	+ "그 사람도 알고 있었을 거다.」\n\n"
+	+ "「혼인하던 해 봄, 나는 반지 하나를 겨우 마련했다. 그 사람은 그걸\n"
+	+ "끼고도 밭일을 했고, 어느 날 흙 속에 잃어버렸다며 한참을 울었다.\n"
+	+ "괜찮다고, 내가 언젠가 꼭 찾아 주겠다고 했었는데.」",
+	"『동물과 함께한 나날』 — 낡은 사료 장부 뒤에 적힌 글.\n\n"
+	+ "「그 사람은 짐승을 참 잘 다뤘다. 아픈 송아지가 있으면 밤을 새워\n"
+	+ "곁을 지켰고, 목장 사람들은 그 사람을 『짐승들의 어머니』라 불렀지.」\n\n"
+	+ "「목에 걸던 목걸이를 아이들이 자꾸 잡아당겨서, 일할 땐 늘 어딘가에\n"
+	+ "벗어 두곤 했다. 그날도 그랬을 거다. ...그 사람이 떠난 뒤로,\n"
+	+ "나는 그 헛간 근처를 지나가지 못했다.」",
+	"『마지막 언덕』 — 여기서부터는 기록이 아니라 편지다.\n"
+	+ "서하가 흩어진 종이들을 날짜 순으로 이어 붙여 두었다.\n\n"
+	+ "「그 사람이 걷기 힘들어진 뒤로, 우리는 한 달에 한 번\n"
+	+ "언덕에 올랐다. 한나절이 걸려도 꼭 가자고 했다.\n"
+	+ "『우리 밭이 저기 있네』 — 늘 그렇게 손가락으로 짚었지.」\n\n"
+	+ "「마지막으로 오른 날, 그 사람은 차고 있던 시계를 풀어\n"
+	+ "내 손에 쥐여 주었다. 『먼저 가서 기다릴 테니, 늦게 와요.』\n"
+	+ "...나는 그 시계를 언덕에 묻었다. 차마 볼 수가 없어서.」\n\n"
+	+ "「이제 와 적어 둔다. 언젠가 이 노트를 이어받을 누군가가\n"
+	+ "이 언덕을 찾아 준다면, 그때는 시계를 꺼내 주기를.\n"
+	+ "멈춘 시계라도, 다시 누군가의 손목 위에서 돌기를.」",
+]
+
+
+# 시작 조건 — 마을 기반 완성(스토리 10) + 회의 경험 + 노트 20%
+func story11_ready() -> bool:
+	return story10_phase == "done" and hall_meet_day > 0 \
+		and note_progress().ratio >= STORY11_NOTE
+
+
+func story11_objective_short() -> String:
+	match story11_phase:
+		"visit":
+			return "이장이 찾아오고 있다."
+		"clue":
+			return "모자 이야기를 듣자 %d/%d" % [
+				story11_clues.size(), STORY11_CLUE_NPCS.size()]
+		"deep":
+			if int(items.get("relic_hat", 0)) > 0:
+				return "할머니의 모자를 찾았다!"
+			return "동굴 %d층까지 내려가자 · 지금 %d층" % [
+				STORY11_FLOOR, mine_deepest]
+		"record":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
+# ---- 메인 스토리 12: 숲의 연금술사 ----
+#
+# 스토리 11 뒤 곧장 이어지지 않는다 — 자유 생활을 하다 **연구 노트 40%
+# + 서로 다른 주민 5명과 호감도 3단계(하트 3개, 30)**를 채우면, 노트에서
+# 할아버지의 낯선 기록(끝내 혼자 풀지 못해 누군가의 도움을 받은 연구)이
+# 발견된다. 서하의 옛 기록 -> 주민 소문 -> 깊은 숲의 숨은 길 ->
+# 연금술사의 오두막. 연금술사 묘연은 마을에 입주하지 않고 숲속 집에서
+# 계속 살며, 필요할 때 직접 찾아가야 한다. 재료 시험(여러 생활 콘텐츠)을
+# 통과하면 시연을 보여 주고 — 그때부터 집 조합대의 연금술이 열린다.
+# 연금술은 새 능력치 분야가 아니라 7대 분야를 보조하는 제작 시스템이다.
+#   "": 아직 / note: 노트의 낯선 기록 확인(N) / ask: 서하에게 보여주기 /
+#   gossip: 주민 소문 수집 / path: 숨은 길·오두막 발견 /
+#   gather: 재료 시험 / done: 연금술 해금
+var story12_phase := ""
+var story12_heard: Array = []      # 소문을 들려준 주민 id
+const STORY12_NOTE := 0.4          # 시작 조건 — 연구 노트 진행률
+const STORY12_FRIENDS := 5         # 시작 조건 — 호감도 3단계 주민 수
+const STORY12_AFF_LV := 30         # 호감도 3단계 = 하트 3개
+const STORY12_RUMORS := 3          # 소문을 들어야 하는 주민 수
+# 재료 시험 — 여러 생활 콘텐츠에서 하나씩 (동굴 수정·숲 약초·낚시 붕어.
+# 종류·개수는 추후 별도 확정 예정 — 지금은 임시값)
+const STORY12_MATS := {"crystal": 2, "forage_herb": 5, "fish_crucian": 3}
+
+
+func story12_friends() -> int:
+	var n := 0
+	for nid in affinity:
+		if int(affinity[nid]) >= STORY12_AFF_LV:
+			n += 1
+	return n
+
+
+# 시작 조건 — 스토리 11 뒤 자유 생활을 충분히 거친 다음에야 열린다
+func story12_ready() -> bool:
+	return story11_phase == "done" and note_progress().ratio >= STORY12_NOTE \
+		and story12_friends() >= STORY12_FRIENDS
+
+
+func story12_mats_ok() -> bool:
+	for mid in STORY12_MATS:
+		if int(items.get(mid, 0)) < int(STORY12_MATS[mid]):
+			return false
+	return true
+
+
+# 연금술(집 조합대)이 열렸는가 — 스토리 12를 끝내야 쓸 수 있다
+func alchemy_open() -> bool:
+	return story12_phase == "done"
+
+
+func story12_mats_text() -> String:
+	var parts: Array = []
+	for mid in STORY12_MATS:
+		parts.append("%s %d/%d" % [ITEMS[mid].name,
+			mini(int(items.get(mid, 0)), int(STORY12_MATS[mid])),
+			int(STORY12_MATS[mid])])
+	return " · ".join(parts)
+
+
+func story12_objective_short() -> String:
+	match story12_phase:
+		"note":
+			return "연구 노트를 확인하자."
+		"ask":
+			return "서하에게 기록을 보여주자."
+		"gossip":
+			return "연금술사 이야기를 듣자 %d/%d" % [
+				story12_heard.size(), STORY12_RUMORS]
+		"path":
+			return "깊은 숲의 숨은 길을 찾자."
+		"gather":
+			if story12_mats_ok():
+				return "연금술사에게 가져다주자."
+			return "재료를 모으자 " + story12_mats_text()
+	return ""
+
+
+# ---- 메인 스토리 13: 할머니의 팔찌 ----
+#
+# 두 번째 유품. 스토리 12 완결 뒤 곧장 이어지지 않는다 — 자유 생활을
+# 며칠 보낸 다음(임시 조건, 세부 시작 조건은 추후 확정) 용식가 「요즘
+# 그물에 물고기 대신 낡은 물건이 올라온다」는 이야기를 꺼낸다.
+# 주민들에게 할머니와 바다 이야기를 모으면 두 분이 자주 찾던 해변
+# 서쪽 끝 바위가 조사 지점으로 드러나고, 그 곁에서 낚시하면 스토리
+# 중에만 생기는 특별한 입질로 「낡은 작은 상자」가 올라온다. 상자는
+# 녹슬어 바로 못 연다 — 연금술사 묘연이 재료(임시값)를 받아 안전하게
+# 열어 준다 (스토리 12에서 해금한 연금술의 자연스러운 재활용).
+# 팔찌를 얻으면 도서관 「할머니의 기록」 2장(바닷가의 약속)이 열린다.
+#   "": 아직 / rumor: 용식의 이상한 이야기 / clue: 주민 단서 수집 /
+#   spot: 해변 바위·특별 낚시 / box: 낡은 상자 — 연금술사에게 /
+#   open: 개봉 재료 준비 / record: 도서관 기록 / done
+var story13_phase := ""
+var story13_heard: Array = []      # 바다 이야기를 들려준 주민 id
+var story12_done_day := 0          # 스토리 12를 끝낸 날 (자유 생활 보장)
+const STORY13_REST_DAYS := 3       # 임시 — 스토리 12 뒤 이만큼 지나야 시작
+const STORY13_TALES := 3           # 이야기를 들어야 하는 주민 수
+# 상자 개봉 재료 — 녹을 녹이는 간단한 것들 (종류·개수는 추후 확정, 임시값)
+const STORY13_MATS := {"glow_shroom": 2, "forage_glass": 3}
+
+
+# 시작 조건 (임시) — 스토리 12 완결 + 자유 생활 며칠 + 바다가 열려 있고
+# 팔찌를 아직 못 찾았을 때. 세부 조건은 추후 별도 확정 예정.
+func story13_ready() -> bool:
+	return story12_phase == "done" and sea_open \
+		and day >= story12_done_day + STORY13_REST_DAYS \
+		and int(items.get("relic_bracelet", 0)) == 0
+
+
+func story13_mats_ok() -> bool:
+	for mid in STORY13_MATS:
+		if int(items.get(mid, 0)) < int(STORY13_MATS[mid]):
+			return false
+	return true
+
+
+func story13_mats_text() -> String:
+	var parts: Array = []
+	for mid in STORY13_MATS:
+		parts.append("%s %d/%d" % [ITEMS[mid].name,
+			mini(int(items.get(mid, 0)), int(STORY13_MATS[mid])),
+			int(STORY13_MATS[mid])])
+	return " · ".join(parts)
+
+
+func story13_objective_short() -> String:
+	match story13_phase:
+		"rumor":
+			return "용식의 이야기를 듣자."
+		"clue":
+			return "바다 이야기를 듣자 %d/%d" % [
+				story13_heard.size(), STORY13_TALES]
+		"spot":
+			return "해변 서쪽 바위 곁에서 낚시하자."
+		"box":
+			return "묘연에게 상자를 가져가자."
+		"open":
+			if story13_mats_ok():
+				return "묘연에게 상자를 열어 달라 하자."
+			return "재료를 모으자 " + story13_mats_text()
+		"record":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
+# ---- 메인 스토리 14: 마을의 첫 축제 ----
+#
+# 스토리 13 뒤 자유 생활을 며칠 보내면, 이장이 마을회관에서 회의를 열어
+# 「주민이 이만큼 늘었으니 우리 손으로 첫 축제를 열자」고 제안한다.
+# 준비는 여섯 가지 중 **셋만 고르면 된다** — 지금까지 연 생활 콘텐츠
+# (농사·요리·낚시·목장·벌목·제작)에서 하나씩 가져왔다. 주민들도 저마다
+# 맡은 몫을 준비하니 혼자 차리는 축제가 아니다.
+# 준비가 끝나면 이튿날 광장에서 축제가 열리고(전용 대사 + 투호 미니게임),
+# 이장의 마무리 인사와 함께 회관의 「축제·행사 일정」이 정식 해금된다.
+#   "": 아직 / meet: 회관 회의 / prep: 준비(3/6) /
+#   fest: 축제 당일 — 광장 / done: 완료
+var story14_phase := ""
+var story13_done_day := 0          # 스토리 13을 끝낸 날 (자유 생활 보장)
+var story14_tasks: Array = []      # 끝낸 준비 항목 id
+var story14_greet: Array = []      # 준비 이야기를 들려준 주민
+var story14_fest_day := 0          # 축제가 열리는 날
+var story14_toss := false          # 투호 미니게임을 해 봤는가
+const STORY14_REST_DAYS := 3       # 스토리 13 뒤 이만큼 지나야 시작 (임시)
+const STORY14_PICK := 3            # 여섯 항목 중 몇 개만 하면 되는가
+
+# 축제 준비 항목 — kind로 「무엇을 세는가」가 갈린다. 맡은 주민은 저마다
+# 제 몫을 준비하고 있고, 플레이어는 그중 셋만 거들면 된다.
+const FEST_TASKS := [
+	{"id": "crop", "name": "잔치상 채소", "kind": "produce", "need": 10,
+		"npc": "chief", "desc": "광장 상에 올릴 밭 것들 (아무 작물)"},
+	{"id": "dish", "name": "나눔 음식", "kind": "dish", "need": 3,
+		"npc": "merchant", "desc": "다 같이 나눠 먹을 요리 (아무 요리)"},
+	{"id": "fish", "name": "구이용 물고기", "kind": "fish", "need": 3,
+		"npc": "fisher", "desc": "숯불에 구울 생선 (아무 물고기)"},
+	{"id": "ranch", "name": "목장 잔치상", "kind": "ranch", "need": 6,
+		"npc": "rancher", "desc": "달걀과 우유"},
+	{"id": "wood", "name": "모닥불 장작", "kind": "wood", "need": 30,
+		"npc": "blacksmith", "desc": "광장 한복판에 지필 장작"},
+	{"id": "flower", "name": "광장 꽃 장식", "kind": "flower", "need": 2,
+		"npc": "librarian", "desc": "화분 (제작대에서 만든다)"},
+]
+
+
+# 준비 항목의 지금 보유량 — 종류를 가리지 않고 뭉쳐 센다
+func fest_have(kind: String) -> int:
+	var n := 0
+	if kind == "produce":
+		for cid in produce:
+			n += int(produce[cid])
+	elif kind == "dish":
+		for rid: String in RECIPE_IDS:
+			n += int(items.get(rid, 0))
+	elif kind == "fish":
+		for fid: String in FISH_IDS:
+			n += int(items.get(fid, 0))
+	elif kind == "ranch":
+		n = int(items.get("egg", 0)) + int(items.get("milk", 0))
+	elif kind == "wood":
+		n = wood
+	elif kind == "flower":
+		n = int(items.get("flower_pot", 0))
+	return n
+
+
+func _fest_consume(kind: String, need: int) -> void:
+	var left := need
+	if kind == "produce":
+		for cid in produce:
+			if left <= 0:
+				break
+			var take: int = mini(left, int(produce[cid]))
+			if take > 0:
+				consume_produce(cid, take)
+				left -= take
+		return
+	if kind == "wood":
+		wood = maxi(0, wood - need)
+		return
+	var ids: Array = ["flower_pot"]
+	if kind == "dish":
+		ids = RECIPE_IDS
+	elif kind == "fish":
+		ids = FISH_IDS
+	elif kind == "ranch":
+		ids = ["egg", "milk"]
+	for iid: String in ids:
+		if left <= 0:
+			break
+		var t2: int = mini(left, int(items.get(iid, 0)))
+		if t2 > 0:
+			items[iid] = int(items[iid]) - t2
+			left -= t2
+
+
+# 준비 항목 내놓기 — 재료를 내면 그 몫이 끝난다
+func fest_deliver(tid: String) -> bool:
+	if tid in story14_tasks:
+		return false
+	for t: Dictionary in FEST_TASKS:
+		if str(t.id) != tid:
+			continue
+		if fest_have(str(t.kind)) < int(t.need):
+			return false
+		_fest_consume(str(t.kind), int(t.need))
+		story14_tasks.append(tid)
+		return true
+	return false
+
+
+func fest_prep_done() -> bool:
+	return story14_tasks.size() >= STORY14_PICK
+
+
+# 시작 조건 (임시) — 스토리 13 완결 + 자유 생활 며칠 + 회관이 서 있을 것
+func story14_ready() -> bool:
+	return story13_phase == "done" and village_built.has("hall") \
+		and day >= story13_done_day + STORY14_REST_DAYS
+
+
+# 회관의 「축제·행사 일정」 — 첫 축제를 치러야 정식으로 열린다
+func hall_calendar_open() -> bool:
+	return story14_phase == "done"
+
+
+func story14_objective_short() -> String:
+	match story14_phase:
+		"meet":
+			return "회관에서 회의를 듣자."
+		"prep":
+			return "축제 준비 %d/%d" % [
+				story14_tasks.size(), STORY14_PICK]
+		"fest":
+			if day < story14_fest_day:
+				return "내일 광장에서 축제가 열린다."
+			return "축제를 즐기고 이장과 대화하자."
+	return ""
+
+
+# ---- 메인 스토리 15: 마른 온천 ----
+#
+# 스토리 14 뒤 자유 생활을 며칠 보내면, 이장이 옛 온천 이야기를 꺼낸다.
+# 서하의 옛 기록으로 온천수가 동굴 지하 수맥과 이어져 있었음을 알고,
+# 무쇠에게 수맥을 뚫을 「착암 쐐기」를 벼려 받아 동굴 깊은 곳(20층+)에서
+# 무너진 바위와 몬스터를 헤치며 수맥을 되살린다. 솟은 물은 묘연이
+# 살펴 준 뒤에야 마을 온천으로 흐른다 — 복구하면 온천 시설이 열린다.
+#   "": 아직 / tale: 이장의 옛 온천 이야기 / book: 도서관 기록 /
+#   tool: 대장간 착암 쐐기 / dig: 동굴 수맥 뚫기 /
+#   water: 묘연의 물 확인 / done: 온천 부활
+var story15_phase := ""
+var story14_done_day := 0
+var story15_mobs := 0              # 수맥 둘레에서 처치한 몬스터
+var story15_ore := 0               # 무너져 쌓인 바위·광석을 걷어낸 수
+var onsen_open := false            # 온천 시설 해금
+var onsen_day := 0                 # 마지막으로 입욕한 날 (하루 한 번)
+const STORY15_REST_DAYS := 3
+const STORY15_DEPTH := 20          # 수맥이 막힌 깊이
+const STORY15_MOBS := 8            # 수맥 둘레를 지키던 것들
+const STORY15_ORE := 12            # 무너져 쌓인 바위·광석
+const STORY15_TOOL_ORE := 20       # 착암 쐐기 재료
+const STORY15_TOOL_SHARD := 2
+const ONSEN_HOURS := 2.0           # 입욕에 흐르는 시간
+
+
+func story15_ready() -> bool:
+	return story14_phase == "done" \
+		and day >= story14_done_day + STORY15_REST_DAYS
+
+
+func story15_dig_done() -> bool:
+	return story15_mobs >= STORY15_MOBS and story15_ore >= STORY15_ORE
+
+
+# 온천에 몸을 담근다 — 하루 한 번, 시간이 흐르고 체력이 가득 찬다
+func onsen_bathe() -> bool:
+	if not onsen_open or onsen_day == day:
+		return false
+	onsen_day = day
+	energy = ENERGY_MAX
+	minutes = minf(minutes + ONSEN_HOURS * 60.0, DAY_END - 60.0)
+	return true
+
+
+func story15_objective_short() -> String:
+	match story15_phase:
+		"tale":
+			return "이장에게 온천을 물어보자."
+		"book":
+			return "도서관에서 기록을 찾자."
+		"tool":
+			if int(items.get("rock_wedge", 0)) > 0:
+				return "쐐기를 들고 동굴로 가자."
+			return "무쇠에게 쐐기를 부탁하자."
+		"dig":
+			if story15_dig_done():
+				return "쐐기로 바위를 뚫자 · 동굴 %d층" % STORY15_DEPTH
+			return "동굴 %d층 · 몬스터 %d/%d · 바위 %d/%d" % [
+				STORY15_DEPTH, mini(story15_mobs, STORY15_MOBS), STORY15_MOBS,
+				mini(story15_ore, STORY15_ORE), STORY15_ORE]
+		"water":
+			return "묘연에게 물을 보여주자."
+	return ""
+
+
+# ---- 메인 스토리 16: 할머니의 반지 ----
+#
+# 세 번째 유품. 스토리 15 뒤 자유 생활을 며칠 보내고 연구 노트가
+# 어느 정도 차면, 도서관에서 두 분의 혼인 기록이 열린다 — 반지는
+# 마을 밖 「옛 농지」에서 흙 속에 잃어버렸다. 전투가 아니라 **농사·
+# 벌목·채집**으로 푸는 장이다: 우거진 옛 농지를 걷어내고(잡초·돌·나무),
+# 땅을 다시 갈다 보면 흙 속에서 낡은 상자가 나온다.
+#   "": 아직 / record: 도서관 혼인 기록 / clue: 주민 단서 /
+#   clear: 옛 농지 정리 + 밭 갈기 / tale: 도서관 새 기록 / done
+var story16_phase := ""
+var story15_done_day := 0
+var story16_heard: Array = []
+var story16_clear := 0             # 걷어낸 잡초·돌·나무
+var story16_till := 0              # 갈아엎은 밭
+const STORY16_REST_DAYS := 3
+const STORY16_NOTE := 0.6          # 도서관 혼인 기록이 열리는 노트 진행률
+const STORY16_TALES := 3
+const STORY16_CLEAR := 8           # 옛 농지에서 걷어낼 자연물
+const STORY16_TILL := 6            # 다시 갈 밭 칸
+
+
+func story16_ready() -> bool:
+	return story15_phase == "done" and note_progress().ratio >= STORY16_NOTE \
+		and day >= story15_done_day + STORY16_REST_DAYS
+
+
+func story16_field_done() -> bool:
+	return story16_clear >= STORY16_CLEAR and story16_till >= STORY16_TILL
+
+
+func story16_objective_short() -> String:
+	match story16_phase:
+		"record":
+			return "도서관에서 두 분의 오래된 기록을 읽자"
+		"clue":
+			return "농지 이야기를 듣자 %d/%d" % [
+				story16_heard.size(), STORY16_TALES]
+		"clear":
+			if story16_field_done():
+				return "옛 농지를 한 번 더 갈자."
+			return "농지 정리 %d/%d · 밭 갈기 %d/%d" % [
+				mini(story16_clear, STORY16_CLEAR), STORY16_CLEAR,
+				mini(story16_till, STORY16_TILL), STORY16_TILL]
+		"tale":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
+# ---- 메인 스토리 17: 할머니의 목걸이 ----
+#
+# 네 번째 유품. 보라가 낡은 마구간 창고를 치우다 할머니 이름이 적힌
+# 천 조각을 찾아내며 시작한다. **목장·동물 돌보기·탐색**의 장이다:
+# 방치된 옛 헛간 둘레를 치우고 동물들을 돌보다 보면, 낡은 사료통
+# 아래에서 목걸이가 나온다.
+#   "": 아직 / cloth: 보라의 천 조각 / clue: 주민 단서 /
+#   barn: 옛 헛간 정리 + 동물 돌보기 / tale: 도서관 기록 / done
+var story17_phase := ""
+var story16_done_day := 0
+var story17_heard: Array = []
+var story17_done_day := 0          # 스토리 17을 끝낸 날 (다음 이야기의 자유 생활)
+var story17_clear := 0             # 헛간 둘레에서 걷어낸 것
+var story17_care := 0              # 동물을 돌본 횟수
+const STORY17_REST_DAYS := 3
+const STORY17_TALES := 3
+const STORY17_CLEAR := 6
+const STORY17_CARE := 5
+
+
+func story17_ready() -> bool:
+	return story16_phase == "done" \
+		and day >= story16_done_day + STORY17_REST_DAYS
+
+
+func story17_barn_done() -> bool:
+	return story17_clear >= STORY17_CLEAR and story17_care >= STORY17_CARE
+
+
+func story17_objective_short() -> String:
+	match story17_phase:
+		"cloth":
+			return "보라와 대화하자."
+		"clue":
+			return "목장 이야기를 듣자 %d/%d" % [
+				story17_heard.size(), STORY17_TALES]
+		"barn":
+			if story17_barn_done():
+				return "낡은 사료통을 살펴보자."
+			return "헛간 정리 %d/%d · 동물 돌보기 %d/%d" % [
+				mini(story17_clear, STORY17_CLEAR), STORY17_CLEAR,
+				mini(story17_care, STORY17_CARE), STORY17_CARE]
+		"tale":
+			return "도서관에서 「할머니의 기록」을 읽자"
+	return ""
+
+
+# ---- 메인 스토리 18: 할머니의 시계 ----
+#
+# 마지막 유품. 스토리 17 뒤 자유 생활 + 연구 노트가 후반까지 차면,
+# 도서관에서 할아버지의 오래된 메모가 열린다 — 늘 차고 다니던 시계와
+# 두 분이 자주 오르던 언덕. 단서를 좇아 마을 밖 옛 전망대에 오르면
+# 흔적을 하나씩 살피며 두 분의 마지막 추억을 알게 되고, 마지막에
+# 숨겨진 보관함에서 시계가 나온다. 유품 다섯이 모두 모이는 장이라
+# 연출과 대화가 앞선 유품보다 길다.
+#   "": 아직 / memo: 도서관의 오래된 메모 / clue: 사서·주민 단서 /
+#   hill: 전망대 흔적 조사(세 곳) / box: 숨겨진 보관함 /
+#   tale: 도서관 마지막 기록 / done
+var story18_phase := ""
+var story18_traces: Array = []     # 살펴본 흔적
+const STORY18_REST_DAYS := 3
+const STORY18_NOTE := 0.8          # 후반부까지 찬 연구 노트
+const STORY18_TALES := 3
+
+# 전망대의 흔적 세 곳 — 살필 때마다 두 분의 마지막이 조금씩 드러난다
+const HILL_TRACES := [
+	{"id": "bench", "name": "무너진 나무 의자",
+		"text": "비바람에 삭은 의자 하나가 언덕 끝을 보고 놓여 있다.\n등받이에 두 사람이 나란히 기댔던 자국이 남았다.\n\n"
+			+ "「걷기 힘들어진 뒤로, 그 사람은 여기까지 오는 데\n한나절이 걸렸다. 그래도 매번 오자고 했다.」"},
+	{"id": "stone", "name": "글씨가 새겨진 돌",
+		"text": "납작한 돌에 두 글자가 나란히 새겨져 있다.\n한쪽 글씨는 삐뚤빼뚤, 다른 쪽은 반듯하다.\n\n"
+			+ "「그 사람이 먼저 새기고, 내 것은 내가 새겼다.\n손이 떨려 반듯하지 못했다고 한참을 웃었지.」"},
+	{"id": "tree", "name": "굽은 나무",
+		"text": "바람을 오래 맞아 마을 쪽으로 굽은 나무 한 그루.\n밑동에 낡은 끈이 감겨 있다.\n\n"
+			+ "「여기서 보면 마을이 다 보인다. 그 사람은 늘\n『우리 밭이 저기 있네』 하고 손가락으로 짚었다.\n마지막 날에도 그랬다.」"},
+]
+
+
+func story18_ready() -> bool:
+	return story17_phase == "done" and note_progress().ratio >= STORY18_NOTE \
+		and day >= story17_done_day + STORY18_REST_DAYS
+
+
+func story18_objective_short() -> String:
+	match story18_phase:
+		"memo":
+			return "도서관에서 메모를 읽자."
+		"clue":
+			return "언덕 이야기를 듣자 %d/%d" % [
+				story18_heard.size(), STORY18_TALES]
+		"hill":
+			return "전망대의 흔적을 살펴보자 %d/%d" % [
+				story18_traces.size(), HILL_TRACES.size()]
+		"box":
+			return "숨겨진 보관함을 열어 보자."
+		"tale":
+			return "도서관에서 마지막 기록을 읽자"
+	return ""
+
+
+var story18_heard: Array = []
+var story18_done_day := 0          # 시계를 찾은 날 — 스토리 19가 여기서 이어진다
+
+
+# ---- 메인 스토리 19: 일곱 갈래의 삶 (생명의 물) ----
+#
+# 마지막 유품을 찾으면, 할아버지의 기록에서 「일곱 가지 분야를 끝까지
+# 익힌 사람에게 남겨지는 것」이라는 구절이 드러난다. 채광·벌목·농사·
+# 요리·전투·낚시·목장을 만렙까지 올릴 때마다 그 분야의 증표로 생명의
+# 물이 한 병씩 주어지고(이미 만렙인 분야는 소급 지급), 일곱 병이 다
+# 모이면 노트의 마지막 페이지가 열린다 — 스토리 20으로 이어진다.
+#   "": 아직 / seek: 일곱 분야 만렙 도전(자유 생활) / page: 마지막 페이지 /
+#   done: 마지막 장소의 단서를 얻음
+var story19_phase := ""
+var story19_shown: Array = []      # 전용 연출을 이미 본 분야 id
+
+
+func story19_ready() -> bool:
+	return story18_phase == "done"
+
+
+func water_count() -> int:
+	return water_life_found.size()
+
+
+# 분야 이름 — 만렙 연출과 노트의 생명의 물 칸에 쓴다
+const SKILL_WATER_NAME := {
+	"mine": "채광", "forest": "벌목", "farm": "농사", "cook": "요리",
+	"combat": "전투", "fish": "낚시", "ranch": "목장",
+}
+# 만렙 연출의 한 줄 — 그 분야를 끝까지 익혔다는 것이 어떤 의미인지
+const SKILL_WATER_LINE := {
+	"mine": "「굴의 어둠이 더는 무섭지 않다.\n어느 돌을 때려야 하는지, 손이 먼저 안다.」",
+	"forest": "「나무가 어느 쪽으로 넘어갈지 보인다.\n베어 낸 자리마다 다시 심을 줄도 알게 됐다.」",
+	"farm": "「흙을 쥐면 목이 마른지 아닌지 알 수 있다.\n할아버지가 늘 하시던 그 말이, 이제야.」",
+	"cook": "「불의 세기를, 간을, 뜸 들이는 시간을 — 이제는\n누구에게 물어보지 않아도 된다.」",
+	"combat": "「겁이 사라진 건 아니다. 다만 겁을 안고도\n한 발 더 나아갈 수 있게 됐을 뿐이다.」",
+	"fish": "「물낯만 봐도 무엇이 있는지 알겠다.\n기다릴 줄 알게 된 것이, 아마 제일 큰 변화다.」",
+	"ranch": "「짐승들이 먼저 다가온다.\n『짐승들의 어머니』라 불리던 분도 이랬을까.」",
+}
+
+
+func story19_objective_short() -> String:
+	match story19_phase:
+		"seek":
+			return "생명의 물 %d/%d" % [
+				water_count(), ENDING_SKILLS.size()]
+		"page":
+			return "노트의 마지막 페이지가 열렸다."
+	return ""
+
+
+# 노트의 마지막 페이지 — 생명의 물 일곱 병이 다 모이면 읽을 수 있다
+func note_last_page_open() -> bool:
+	return water_count() >= ENDING_SKILLS.size() and story19_phase != ""
+
+
+# ---- 메인 스토리 20: 가장 오래된 자리 (최종 엔딩) ----
+#
+# 세 가지가 다 갖춰져야 시작한다 — 연구 노트 100% · 유품 다섯 · 생명의 물
+# 일곱. 노트의 마지막 페이지가 가리키는 곳은 동굴 가장 깊은 곳,
+# 마을이 서기 훨씬 전부터 그 아래에 잠겨 있던 오래된 돌문이다.
+# 아무도 열지 못했고, 그래서 아무도 내려가 보지 않던 자리.
+# 일곱 병을 홈에 부으면 문이 열리고, 그 안쪽이 할아버지의 마지막
+# 연구 공간이다.
+#   "": 아직 / tell: 사서·이장에게 보여주기 / gate: 동굴 입구로 /
+#   inner: 문 안쪽 — 봉인된 것과의 마지막 / letter: 씨앗과 편지 /
+#   plant: 다음 날 농장에 씨앗 심기 / done: 엔딩을 보았다 (자유 생활 계속)
+var story20_phase := ""
+var note_last_line := false        # 노트 마지막 장에 플레이어가 남긴 한 줄
+var story20_told: Array = []       # 단서를 보여 준 사람 (서하·이장)
+var gate_open := false             # 돌문이 열렸다 (로드 후에도 열린 채)
+var seed_day := 0                  # 씨앗을 손에 넣은 날 — 다음 날 심는다
+var seed_tile := Vector2i(-1, -1)  # 씨앗을 심은 칸 (엔딩 후 자라난다)
+var seed_water := false            # 심은 뒤 물을 주었는가
+const STORY20_TELL := ["librarian", "chief"]
+
+
+# 오래된 돌문은 **세계에 놓인 오브젝트가 아니다.**
+#
+# 한때는 마을 북쪽에 세워 두었지만, 어느 자리에 두어도 상점 마당·길과
+# 겹쳐 통행을 막는 일이 생겼다. 그래서 오브젝트를 통째로 없애고,
+# 그 문을 **동굴 가장 깊은 곳**으로 옮겼다 — 스토리 20에서 동굴 입구에
+# 서면 이야기가 이어지고, 일곱 병을 부으면 가장 깊은 곳이 열린다.
+# (gate_open은 그대로 「그 문이 열렸는가」를 기억한다)
+
+
+func story20_ready() -> bool:
+	return story19_phase == "done" and relics_owned() >= RELICS.size() \
+		and note_progress().ratio >= 1.0
+
+
+func story20_objective_short() -> String:
+	match story20_phase:
+		"tell":
+			return "마지막 페이지를 보여주자 %d/%d" % [
+				story20_told.size(), STORY20_TELL.size()]
+		"gate":
+			if gate_open:
+				return "가장 깊은 곳으로 내려가자."
+			return "동굴 입구로 가자."
+		"inner":
+			return "가장 깊은 곳으로 나아가자."
+		"letter":
+			return "집으로 돌아가자."
+		"plant":
+			if seed_tile.x < 0:
+				return "밭을 갈고 씨앗을 심자."
+			if not seed_water:
+				return "씨앗에 물을 주자."
+			return "새싹이 돋았다."
+	return ""
+
+
+# ---- 우측 상단 퀘스트 추적창 ----
+#
+# 「지금 따라가는 퀘스트」 하나를 제목/현재 목표/한두 줄 설명으로 돌려준다.
+# hud가 매 프레임 이걸 읽어 그리므로, 단계가 바뀌면 즉시 갱신된다.
+# 메인 스토리 1의 서두 — Q창에서 이야기 위에 얹는다.
+# (단계별 「story」 문장은 그 뒤에 이어 붙인다)
+const STORY1_TALE := """낯선 숲의 아침이었다.
+손에는 할아버지가 남긴 열쇠 하나,
+주머니에는 아직 부치지 못한 편지 한 장.
+
+길을 잃고 서 있던 너에게 우체부 아저씨가 말을 걸었다.
+「같이 갈까? 나도 그 마을로 가는 길이거든.」
+
+나란히 찍히던 두 사람의 발자국에서
+이 이야기는 시작된다."""
+
+
+# 지금 진행 중인 퀘스트 전부 — 미니창 고정(핀) 선택지가 된다.
+# 앞쪽일수록 「자동」일 때 우선순위가 높다 (메인 스토리 먼저).
+# 진행 중 퀘스트 카탈로그 — Q창(좌측 목록/우측 상세)과 미니 트래커가 함께 쓴다.
+# 항목: id/title/obj/desc + cat("main"/"sub"/"guide"/"daily") + ep(메인 회차 라벨)
+#       + npc(퀘스트를 준 인물 — 초상화 키의 가운데 토막) + reward(보상 안내문)
+func quest_catalog() -> Array:
+	var out: Array = []
+	var o := story_objective_short()
+	if o != "":
+		var cur := story_current_quest()
+		out.append({"id": "story1", "title": str(cur.get("name", "처음 온 마을")),
+			"obj": o, "desc": STORY1_TALE + "\n\n" + str(cur.get("story", "")),
+			"cat": "main", "ep": "메인 스토리 1", "npc": "postman",
+			"reward": "새 도구와 나만의 집"})
+	o = story2_objective_short()
+	if o != "":
+		out.append({"id": "story2", "title": "마을을 깨우다", "obj": o,
+			"desc": "할아버지가 떠난 뒤, 교진 마을은 조용히 잠들었다.\n"
+				+ "가게도 뱃길도 밭도 하나씩 문을 닫았고, 남은 사람들은\n"
+				+ "서로의 안부만 물으며 긴 겨울을 났다.\n\n"
+				+ "이장은 마디 굵은 두 손을 마주 잡고 이렇게 말한다.\n"
+				+ "「자네가 온 뒤로 아침 공기가 달라졌어. ...정말일세.」\n\n"
+				+ "누군가 다시 문을 열고, 누군가 다시 그물을 던지고,\n"
+				+ "누군가 다시 흙을 갈면 — 마을은 그렇게 깨어난다.",
+			"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
+			"reward": "상점·바다·밭 — 마을의 기틀"})
+	o = fisher_objective_short()
+	if o != "":
+		out.append({"id": "fisher", "title": "낚시꾼과 바닷길", "obj": o,
+			"desc": "어떤 사람은 평생 한 마리의 물고기를 쫓는다.\n\n"
+				+ "황금빛 비늘 이야기를 품고 온 낚시꾼이\n"
+				+ "남쪽 바위 능선 앞에 서서, 넘어가지 못한 바다를 본다.\n"
+				+ "능선 너머에는 아무도 오래 보지 못한 파도가 있다.\n\n"
+				+ "돌 하나를 걷어내는 일이지만, 그 하나로\n"
+				+ "이 마을은 잃어버렸던 바다를 되찾는다.",
+			"cat": "main", "ep": "메인 스토리 2", "npc": "fisher",
+			"reward": "바다·해변 해금 + 간이낚싯대"})
+	o = move_objective_short()
+	if o != "":
+		var mv_npc := "explorer"
+		if move_quest in ["show", "post", "postbuild"]:
+			mv_npc = "chief"
+		elif move_quest == "postgreet":
+			mv_npc = "postman"
+		out.append({"id": "move", "title": "새로운 주민의 이사", "obj": o,
+			"desc": "먼 길 위에서 쓴 편지 한 통이 문 앞에 놓였다.\n"
+				+ "「저는 재민이에요. 이 마을에서 살고 싶어요.」\n\n"
+				+ "지붕이 없으면 아무도 머무를 수 없는 법이다.\n"
+				+ "누군가의 첫 집이 될 자리를 네 손으로 고르고,\n"
+				+ "그 아이가 나눠 줄 씨앗을 흙에 묻고,\n"
+				+ "편지가 오갈 우체국까지 세우고 나면 —\n\n"
+				+ "이 마을은 비로소 「사람이 찾아오는 곳」이 된다.",
+			"cat": "main", "ep": "메인 스토리 3", "npc": mv_npc,
+			"reward": "이주 편지·집터 시스템 해금 + 우체국·우체부"})
+	o = forest_objective_short()
+	if o != "":
+		var f_npc := "explorer"
+		if forest_quest in ["ask", "back"]:
+			f_npc = "chief"
+		out.append({"id": "forest", "title": "숲속에서 발견한 집", "obj": o,
+			"desc": "숲을 쏘다니던 재민이 숨을 몰아쉬며 달려왔다.\n"
+				+ "「나무 사이에 집이 한 채 있었어. 정말이야!」\n\n"
+				+ "삼십 년 이장을 지낸 사람도 처음 듣는 집.\n"
+				+ "굴뚝에는 연기가 오르고, 마당에는 빨래가 널려 있다.\n"
+				+ "누가, 왜, 마을을 등지고 살고 있는 걸까.\n\n"
+				+ "이장과 재민을 앞세워 함께 가 보자.\n"
+				+ "문을 두드리기 전까지는 아무도 알 수 없다.",
+			"cat": "main", "ep": "메인 스토리 5", "npc": f_npc,
+			"reward": "호감도 시스템 해금"})
+	# 후속: 연화가 문을 여는 날 (스토리 5 이후 · 호감도로 연다)
+	o = forest_trust_objective_short()
+	if o != "":
+		out.append({"id": "forest_trust", "title": "닫힌 문 앞에서", "obj": o,
+			"desc": "그날 연화는 끝내 문을 열어 주지 않았다.\n"
+				+ "당연한 일이다. 우리는 낯선 사람이었으니까.\n\n"
+				+ "이장의 말대로 자주 얼굴을 비추고,\n"
+				+ "말을 붙이고, 손이 필요할 때 거들었다.\n\n"
+				+ "오늘 그 집 앞을 지나는데,\n"
+				+ "연화가 먼저 이쪽을 보고 있었다.",
+			"cat": "sub", "npc": "forest_mom",
+			"reward": "집 안으로 — 솔이와의 첫 만남"})
+	o = story4_objective_short()
+	if o != "":
+		out.append({"id": "story4", "title": "오래된 마을의 경계", "obj": o,
+			"desc": "동쪽 다리 너머, 이끼에 덮인 낡은 표지판 하나.\n"
+				+ "지워진 글씨를 손으로 훑으면 옛 마을 이름이 드러난다.\n\n"
+				+ "지금보다 훨씬 넓었던, 사람들이 살던 자리.\n"
+				+ "덤불에 잠긴 그 길을 다시 여는 일은\n"
+				+ "떠난 이웃들에게 「돌아와도 된다」고 말하는 일과 같다.",
+			"cat": "main", "ep": "메인 스토리 4", "npc": "chief",
+			"reward": "마을 확장 해금"})
+	o = story6_objective_short()
+	if o != "":
+		var s6map := {"show_chief": "chief", "ask_post": "postman",
+			"wait": "postman", "visit": "librarian", "told": "chief",
+			"build": "librarian"}
+		var s6npc: String = str(s6map.get(story6_phase, "chief"))
+		out.append({"id": "story6", "title": "오래된 책과 사서", "obj": o,
+			"desc": "풀을 뽑다가 흙 속에서 두꺼운 책 한 권이 나왔다.\n"
+				+ "표지는 삭았지만 글씨는 아직 살아 있다.\n\n"
+				+ "이장도 끝까지 읽어 내지 못하는 오래된 문장들.\n"
+				+ "이런 책은 읽어 줄 사람이 있어야 비로소 이야기가 된다.\n\n"
+				+ "먼 도시로 편지 한 통을 부치는 것부터 시작하자.",
+			"cat": "main", "ep": "메인 스토리 6", "npc": s6npc,
+			"reward": "도서관 해금 + 사서 정착"})
+	o = story7_objective_short()
+	if o != "":
+		var s7npc := "librarian" if story7_phase == "lore" else "blacksmith"
+		out.append({"id": "story7", "title": "식지 않는 화로", "obj": o,
+			"desc": "며칠째 대장간의 망치 소리가 뜸하다.\n"
+				+ "「불이 예전만큼 오래 붙어 있질 않아.」\n\n"
+				+ "옛 대장장이들은 불씨를 재우지 않는 법을 알았고,\n"
+				+ "그 방법은 아무도 펼쳐 보지 않은 책 속에 잠들어 있다.\n\n"
+				+ "다시 붉게 달아오를 화로를 위해,\n"
+				+ "땅속에서 잠자던 것들을 몇 가지 꺼내 오자.",
+			"cat": "main", "ep": "메인 스토리 7", "npc": s7npc,
+			"reward": "도구 강화 골드 비용 20% 할인"})
+	o = story8_objective_short()
+	if o != "":
+		var s8npc := "chief" if story8_phase == "ask" else "rancher"
+		out.append({"id": "story8", "title": "초원에서 온 목동", "obj": o,
+			"desc": "바람 냄새를 맡으며 걷는 사람이 마을에 들어왔다.\n"
+				+ "뒤에는 소 한 마리와 닭 두 마리.\n\n"
+				+ "「좋은 풀밭을 찾고 있어요. 여긴... 냄새가 좋네요.」\n\n"
+				+ "평생 초원을 찾아 떠돌던 사람이\n"
+				+ "여기서 걸음을 멈출 수 있도록,\n"
+				+ "울타리와 지붕을 마련해 주자.",
+			"cat": "main", "ep": "메인 스토리 8", "npc": s8npc,
+			"reward": "목장 상회 해금 — 동물을 키울 수 있다"})
+	o = story9_objective_short()
+	if o != "":
+		out.append({"id": "story9", "title": "마을의 심장, 마을회관", "obj": o,
+			"desc": "이장은 종종 광장 한가운데를 오래 바라본다.\n"
+				+ "예전엔 그 자리에 마을회관이 서 있었다고 한다.\n\n"
+				+ "비 오는 날엔 처마 밑에 모여 떡을 나눠 먹고,\n"
+				+ "겨울엔 난로 하나로 온 마을이 따뜻했다는 이야기.\n\n"
+				+ "사람이 모이면 건물이 서고,\n"
+				+ "건물이 서면 또 사람이 온다.",
+			"cat": "main", "ep": "메인 스토리 9", "npc": "chief",
+			"reward": "마을회관 — 명부·창고·프로젝트가 차례로 열린다"})
+	o = story10_objective_short()
+	if o != "":
+		out.append({"id": "story10", "title": "동굴과 탐험", "obj": o,
+			"desc": "오래된 책의 마지막 장에는 그림이 그려져 있었다.\n"
+				+ "땅속 깊은 곳에서만 자란다는 이끼와 버섯,\n"
+				+ "별빛을 머금었다는 돌 하나.\n\n"
+				+ "할아버지는 그것들을 「아직 기록되지 않은 이웃」이라 불렀다.\n\n"
+				+ "등불을 들고, 아무도 세어 보지 않은 층으로 내려가자.",
+			"cat": "main", "ep": "메인 스토리 10", "npc": "librarian",
+			"reward": "동굴 컬렉션 — 채우면 영구 채광·탐험 보상"})
+	o = story11_objective_short()
+	if o != "":
+		var s11npc := "chief"
+		if story11_phase == "record":
+			s11npc = "librarian"
+		out.append({"id": "story11", "title": "할머니의 모자", "obj": o,
+			"desc": "할머니는 밭에 나갈 때 늘 밀짚모자를 썼다.\n"
+				+ "챙이 넓어 그늘이 꼭 두 사람 몫이었다고 한다.\n\n"
+				+ "그 모자가 어쩌다 굴속까지 갔는지는 아무도 모른다.\n"
+				+ "다만 마을 사람들은 저마다 다른 조각을 기억한다.\n\n"
+				+ "하나씩 이어 붙이면 길이 되는, 그런 이야기들을.",
+			"cat": "main", "ep": "메인 스토리 11", "npc": s11npc,
+			"reward": "할머니의 모자 + 도서관 「할머니의 기록」"})
+	o = story12_objective_short()
+	if o != "":
+		var s12npc := ""
+		if story12_phase == "ask":
+			s12npc = "librarian"
+		elif story12_phase == "gather":
+			s12npc = "alchemist"
+		out.append({"id": "story12", "title": "숲의 연금술사", "obj": o,
+			"desc": "노트에는 늘 두 사람의 필체가 번갈아 나온다.\n"
+				+ "하나는 할아버지, 다른 하나는 이름이 없다.\n\n"
+				+ "숲 안쪽에 사는 사람이라는 소문만 떠돌 뿐,\n"
+				+ "누구도 그 얼굴을 본 적이 없다고 한다.\n\n"
+				+ "안개가 걷히는 날에만 드러난다는 오솔길 끝에서\n"
+				+ "그 사람은 여태 무언가를 끓이고 있을지도 모른다.",
+			"cat": "main", "ep": "메인 스토리 12", "npc": s12npc,
+			"reward": "연금술 해금 — 집 조합대에서 물약을 만든다"})
+	o = story13_objective_short()
+	if o != "":
+		var s13npc := ""
+		match story13_phase:
+			"rumor":
+				s13npc = "fisher"
+			"box", "open":
+				s13npc = "alchemist"
+			"record":
+				s13npc = "librarian"
+		out.append({"id": "story13", "title": "할머니의 팔찌", "obj": o,
+			"desc": "바다는 무엇이든 오래 간직한다.\n\n"
+				+ "파도에 밀려온 낡은 상자 하나를 두고\n"
+				+ "마을 사람들이 저마다 옛이야기를 꺼내 놓는다.\n\n"
+				+ "소금기에 굳어 열리지 않는 뚜껑 안에는\n"
+				+ "할머니가 여름마다 차고 다녔다는 팔찌가 들어 있을까.",
+			"cat": "main", "ep": "메인 스토리 13", "npc": s13npc,
+			"reward": "할머니의 팔찌 + 「할머니의 기록」 2장"})
+	o = story14_objective_short()
+	if o != "":
+		out.append({"id": "story14", "title": "마을의 첫 축제", "obj": o,
+			"desc": "주민이 하나둘 늘면서 광장이 붐비기 시작했다.\n\n"
+				+ "이장이 색 바랜 종이 한 장을 꺼내 놓는다.\n"
+				+ "예전 축제의 차례가 적힌 목록이다.\n\n"
+				+ "음식과 등불과 노래 — 하나씩 채워 넣으면\n"
+				+ "이 마을에도 다시 축제의 밤이 온다.",
+			"cat": "main", "ep": "메인 스토리 14", "npc": "chief",
+			"reward": "마을회관 「축제·행사 일정」 해금"})
+	o = story15_objective_short()
+	if o != "":
+		var s15npc := "chief"
+		match story15_phase:
+			"book":
+				s15npc = "librarian"
+			"tool":
+				s15npc = "blacksmith"
+			"water":
+				s15npc = "alchemist"
+		out.append({"id": "story15", "title": "마른 온천", "obj": o,
+			"desc": "북쪽 바위 밑에는 김이 오르던 자리가 있었다.\n"
+				+ "지금은 마른 돌 틈에 낙엽만 쌓여 있다.\n\n"
+				+ "물길이 끊긴 건 땅속 어딘가가 막혔기 때문이라고 한다.\n\n"
+				+ "뜨거운 물에 어깨를 담그던 저녁을 되찾으려면\n"
+				+ "아주 깊은 곳까지 한 번 내려가 보아야 한다.",
+			"cat": "main", "ep": "메인 스토리 15", "npc": s15npc,
+			"reward": "온천 해금 — 몸을 담그면 체력이 가득 찬다"})
+	o = story16_objective_short()
+	if o != "":
+		out.append({"id": "story16", "title": "할머니의 반지", "obj": o,
+			"desc": "혼인하던 해 봄, 할머니는 반지를 잃어버렸다.\n"
+				+ "밭일을 하다 흙 속에 떨어뜨렸다고 했다.\n\n"
+				+ "할아버지는 그 밭을 평생 갈지 않았다.\n"
+				+ "「언젠가 나올 거야」 하고 웃으면서.\n\n"
+				+ "이제는 수풀에 덮인 그 땅을, 다시 일으켜 보자.",
+			"cat": "main", "ep": "메인 스토리 16",
+			"npc": "librarian" if story16_phase in ["record", "tale"] else "",
+			"reward": "할머니의 반지 + 「할머니의 기록」 3장"})
+	o = story17_objective_short()
+	if o != "":
+		out.append({"id": "story17", "title": "할머니의 목걸이", "obj": o,
+			"desc": "짐승들은 할머니 곁에서만 순해졌다고 한다.\n"
+				+ "아픈 송아지가 밤새 그 무릎을 베고 잤다는 이야기도.\n\n"
+				+ "목에 걸고 다니던 나무 목걸이는\n"
+				+ "헛간이 무너지던 날 이후로 아무도 보지 못했다.\n\n"
+				+ "낡은 헛간을 조용히 치우는 일부터 시작하자.",
+			"cat": "main", "ep": "메인 스토리 17",
+			"npc": "librarian" if story17_phase == "tale" else "rancher",
+			"reward": "할머니의 목걸이 + 「할머니의 기록」 4장"})
+	o = story18_objective_short()
+	if o != "":
+		out.append({"id": "story18", "title": "할머니의 시계", "obj": o,
+			"desc": "마을 북서쪽 언덕에는 무너져 가는 전망대가 있다.\n"
+				+ "두 분이 마지막으로 함께 오른 자리다.\n\n"
+				+ "해가 지는 쪽으로 나란히 앉아 있었다는 이야기,\n"
+				+ "그리고 그날 이후 멈춰 버린 시계 하나.\n\n"
+				+ "남은 온기를 더듬어, 마지막 유품을 찾아오자.",
+			"cat": "main", "ep": "메인 스토리 18",
+			"npc": "librarian" if story18_phase in ["memo", "tale"] else "",
+			"reward": "할머니의 시계 — 유품 다섯이 모두 모인다"})
+	o = story19_objective_short()
+	if o != "":
+		out.append({"id": "story19", "title": "일곱 갈래의 삶", "obj": o,
+			"desc": "할아버지는 일곱 가지 일을 두루 익힌 사람이었다.\n"
+				+ "흙과 물, 굴과 숲, 짐승과 손끝과 발걸음.\n\n"
+				+ "하나를 끝까지 갈고닦을 때마다\n"
+				+ "맑은 물 한 병이 조용히 남겨진다고 했다.\n\n"
+				+ "일곱 병이 모이는 날, 노트의 마지막 장이 열린다.",
+			"cat": "main", "ep": "메인 스토리 19", "npc": "",
+			"reward": "생명의 물 7종 + 연구 노트 마지막 페이지"})
+	o = story20_objective_short()
+	if o != "":
+		var s20npc := ""
+		if story20_phase == "tell":
+			s20npc = "librarian" if "librarian" not in story20_told else "chief"
+		out.append({"id": "story20", "title": "가장 오래된 자리", "obj": o,
+			"desc": "동굴 가장 깊은 곳에 마을보다 오래된 돌문이 잠겨 있다.\n"
+				+ "할아버지가 마지막 몇 해를 보낸 자리라고 한다.\n\n"
+				+ "일곱 병의 물과 다섯 개의 유품,\n"
+				+ "그리고 끝까지 채운 노트를 들고 앞에 서면\n\n"
+				+ "문은 그제야, 아주 천천히 열린다.",
+			"cat": "main", "ep": "메인 스토리 20", "npc": s20npc,
+			"reward": "할아버지가 남긴 씨앗 한 알과 마지막 편지"})
+	# 메인 스토리 2의 마지막 마디 — 조리대에서 요리를 하자
+	o = kitchen_quest_objective_short()
+	if o != "":
+		out.append({"id": "kitchen", "title": "조리대에서 요리를 하자", "obj": o,
+			"desc": "첫 수확을 마치고 잡화점에 들렀더니\n"
+				+ "만수가 대뜸 이렇게 물었다.\n"
+				+ "「자네 요즘 밥은 제대로 챙겨 먹고 있나?」\n\n"
+				+ "오래 비어 있던 집에는 먼지가 이불처럼 쌓인다.\n"
+				+ "만수는 그 밑에 분명 살림살이가 묻혀 있을 거라 한다.\n\n"
+				+ "먼지를 걷어내면 첫 끼를 지을 자리가 나온다.\n"
+				+ "그렇게 지은 한 그릇을 들고 그에게 돌아가자.",
+			"cat": "main", "ep": "메인 스토리 2", "npc": "merchant",
+			"reward": "요리 해금 + 판매하는 법 · 메인 스토리 2 완결"})
+	# 서브: 용식의 집터 — 바닷길을 연 지 3일 뒤 분수대 앞에서 시작된다
+	o = fisher_home_objective_short()
+	if o != "":
+		out.append({"id": "fisher_home", "title": "용식의 부탁 — 살 집 한 채",
+			"obj": o,
+			"desc": "평생 배 위에서 잠들던 사람이 뭍을 오래 바라본다.\n\n"
+				+ "「떠돌이한테 『여기가 네 집이다』 하고 말해 주는 게\n"
+				+ "어떤 건지, 자네는 모를 걸세.」\n\n"
+				+ "지붕과 문이 있는 자리를 한 채 지어 주면\n"
+				+ "용식은 그때부터 이 마을 사람이 된다.",
+			"cat": "sub", "npc": "fisher",
+			"reward": "수납 상자 레시피 (목재 8)"})
+	# 서브: 새 이웃을 위한 빈 집터 셋 — 옛 경계를 되찾은 뒤 이장의 부탁
+	o = plot3_objective_short()
+	if o != "":
+		out.append({"id": "plot3", "title": "이장의 부탁 — 새 이웃의 자리",
+			"obj": o,
+			"desc": "덤불에 잠겼던 옛 마을 땅이 다시 열렸다.\n"
+				+ "이장은 그 넓어진 땅을 오래 바라보다 이렇게 말한다.\n\n"
+				+ "「사람은 부른다고 오는 게 아닐세.\n"
+				+ "빈자리가 먼저 있어야, 그 자리를 보고 오는 게지.」\n\n"
+				+ "아직 이름도 얼굴도 모르는 누군가를 위해\n"
+				+ "지붕이 설 자리를 미리 세 곳 골라 두자.\n"
+				+ "언젠가 그 문 앞에서 처음 인사를 나누게 될 것이다.",
+			"cat": "sub", "npc": "chief",
+			"reward": "이장의 사례 %dG + 목재 %d · 석재 %d"
+				% [PLOT3_MONEY, PLOT3_WOOD, PLOT3_STONE]})
+	# 서브: 상인의 노점 심부름
+	if merchant_errand == "doing":
+		var ready := wood >= STALL_WOOD \
+			and int(items.get("forage_shell", 0)) >= STALL_SHELLS
+		out.append({"id": "stall", "title": "상인의 부탁 — 해변 노점",
+			"obj": "다 모았다 — 만수에게 가져다주자" if ready
+				else "바닷바람 좋은 자리에 노점을 세울 나무와 조개를 모으자",
+			"desc": "만수가 눈여겨봐 둔, 바닷바람 좋은 자리가 있다.\n\n"
+				+ "나무 몇 짐과 조개껍데기 몇 줌이면\n"
+				+ "작은 노점 하나쯤은 세울 수 있다고 한다.\n\n"
+				+ "장사꾼의 꿈은 언제나 「목 좋은 자리」에서 시작된다.",
+			"cat": "sub", "npc": "merchant",
+			"reward": "해변 노점 개장 + 하트 모양 러그"})
+	o = tutorial_objective_short()
+	if o != "":
+		var flag := tutorial_current_flag()
+		if flag in STORY2_FLAGS:
+			out.append({"id": "tutorial", "title": "마을을 깨우다", "obj": o,
+				"desc": "이장이 건넨 호미는 손잡이가 반들반들했다.\n"
+					+ "오래 쓰던 사람의 손자국이 그대로 남은 물건.\n\n"
+					+ "흙을 갈고, 씨앗을 놓고, 물을 주고 기다리는 일 —\n"
+					+ "이 마을의 하루는 언제나 거기서부터 시작된다.",
+				"cat": "main", "ep": "메인 스토리 2", "npc": "chief",
+				"reward": _tut_reward_text(flag)})
+		elif flag == "cook":
+			out.append({"id": "tutorial", "title": "조리대에서 요리를 하자", "obj": o,
+				"desc": "거둔 것을 손질해 불에 올리는 저녁.\n"
+					+ "혼자 사는 집에서 제일 먼저 익히게 되는 일이다.\n\n"
+					+ "집 안 조리대 앞에 서기만 하면 된다.\n"
+					+ "(먼지가 쌓여 있으면 빗자루로 쓸어 내자)",
+				"cat": "guide", "npc": "chief",
+				"reward": _tut_reward_text(flag)})
+		else:
+			out.append({"id": "tutorial", "title": "마을 생활 안내", "obj": o,
+				"desc": "이장이 알려 주는 마을살이 요령. 안 해도 되지만,\n하면 살림이 수월해진다.",
+				"cat": "guide", "npc": "chief",
+				"reward": _tut_reward_text(flag)})
+	# 오늘의 의뢰 (게시판에서 수락한 것)
+	var ql := quest_line()
+	if ql != "":
+		out.append({"id": "errand", "title": "오늘의 의뢰", "obj": ql,
+			"desc": "마을 광장 게시판의 납품 의뢰다.",
+			"cat": "daily", "npc": "",
+			"reward": "%dG" % int(quest.get("reward", 0))})
+	var gl := grandpa_line()
+	if gl != "":
+		out.append({"id": "grandpa", "title": "할아버지의 부탁",
+			"obj": gl.replace("목표: ", ""),
+			"desc": "연구 노트에 남은 할아버지의 흔적을 따라가자.",
+			"cat": "sub", "npc": "", "reward": "연구 노트의 빈 장이 채워진다"})
+	return out
+
+
+# 안내 목표의 보상 안내문 ("100G" / "목재 5" 식)
+func _tut_reward_text(flag: String) -> String:
+	var r: Dictionary = TUTORIAL_REWARDS.get(flag, {})
+	var parts := []
+	if r.has("money"):
+		parts.append("%dG" % int(r.money))
+	if r.has("wood"):
+		parts.append("목재 %d" % int(r.wood))
+	if r.has("stone"):
+		parts.append("석재 %d" % int(r.stone))
+	var unlocked: Array = TUTORIAL_UNLOCKS.get(flag, [])
+	for tid in unlocked:
+		parts.append("%s 해금" % TOOL_KOR.get(tid, tid))
+	return " · ".join(parts)
+
+
+# 미니창 고정 — ""=자동(맨 앞 퀘스트), 아니면 quest_catalog의 id.
+# 고정한 퀘스트가 끝나면(목록에서 사라지면) 자동으로 되돌아간다.
+var tracked_pick := ""
+
+
+# **Q창과 우측 미니창이 보는 단 하나의 목록.**
+#
+# 예전에는 Q창이 quest_catalog()를 한 번 더 걸러서(메인 이야기는 하나만)
+# 보여 주고, 미니창은 걸러지지 않은 목록의 맨 앞을 집었다. 그래서 둘이
+# 서로 다른 퀘스트를 가리키는 일이 생겼다. 이제 거르는 자리는 여기
+# 한 곳뿐이고, 두 창이 같은 목록을 읽는다.
+func quest_list() -> Array:
+	var cat := quest_catalog()
+	# 목록에 남길 메인 이야기 하나를 먼저 정한다 — 보통은 맨 앞이지만,
+	# 고정한 퀘스트가 메인이면 **그쪽이 언제나 이긴다.**
+	var keep_main := ""
+	for q: Dictionary in cat:
+		if str(q.get("cat", "sub")) != "main":
+			continue
+		if keep_main == "":
+			keep_main = str(q.id)
+		if str(q.id) == tracked_pick:
+			keep_main = tracked_pick
+	var out: Array = []
+	for q: Dictionary in cat:
+		var e: Dictionary = q.duplicate()
+		if not e.has("cat"):
+			e["cat"] = "sub"
+		if str(e.cat) == "main" and str(e.id) != keep_main:
+			continue          # 진행 중인 메인 이야기는 언제나 하나
+		out.append(e)
+	return out
+
+
+# 지금 따라가는 퀘스트 하나 — 고정한 것이 있으면 무조건 그것이다.
+# 고정한 퀘스트가 목록에서 사라지면 자동으로 맨 앞으로 돌아간다.
+func tracked_quest() -> Dictionary:
+	var cat := quest_list()
+	if cat.is_empty():
+		tracked_pick = ""
+		return {}
+	if tracked_pick != "":
+		for q: Dictionary in cat:
+			if str(q.id) == tracked_pick:
+				return q
+		tracked_pick = ""     # 끝난 퀘스트를 계속 붙들고 있지 않는다
+	return cat[0]
+
+
+# 지금 말을 걸어야 하는 퀘스트 NPC 머리 위 표시.
+#   "!" 아직 대화하지 않은 대상 / "?" 납품(보고)할 수 있는 대상
+func quest_npc_marks() -> Dictionary:
+	var marks := {}
+	# 서브 퀘스트 표시는 맨 먼저 — 메인 이야기의 ❗가 있으면 그쪽이 이긴다
+	if plot3_quest == "report":
+		marks["chief"] = "?"
+	if story2_phase == "farm_talk":
+		marks["chief"] = "!"
+	if fisher_quest == "meet":
+		marks["fisher"] = "!"
+	if move_quest == "show":
+		marks["chief"] = "!"
+	if move_quest == "seedrep":
+		marks["explorer"] = "?"
+	if move_quest == "post":
+		marks["chief"] = "!"
+	match forest_quest:
+		"arrive", "found":
+			marks["explorer"] = "!"
+		"ask":
+			marks["chief"] = "!"
+		"back":
+			marks["chief"] = "?"
+	if forest_trust == "invited":
+		marks["forest_mom"] = "!"
+	if story4_phase == "ask":
+		marks["chief"] = "!"
+	match story6_phase:
+		"show_chief", "told":
+			marks["chief"] = "!"
+		"visit":
+			marks["librarian"] = "!"
+		"build":
+			if village_built.has("library"):
+				marks["librarian"] = "!"
+	match story7_phase:
+		"worry":
+			marks["blacksmith"] = "!"
+		"lore":
+			marks["librarian"] = "!"
+		"gather":
+			if int(items.get("ore", 0)) >= STORY7_ORE \
+					and int(items.get("gem", 0)) >= STORY7_GEM:
+				marks["blacksmith"] = "!"
+	match story8_phase:
+		"visit":
+			marks["rancher"] = "!"
+		"ask":
+			marks["chief"] = "!"
+		"build":
+			if village_built.has("ranch"):
+				marks["rancher"] = "!"
+	match story9_phase:
+		"ask":
+			marks["chief"] = "!"
+		"build":
+			if village_built.has("hall"):
+				marks["chief"] = "!"   # 회관 접수대에서 개관식을 하자
+	match story10_phase:
+		"note":
+			marks["librarian"] = "!"
+		"survey":
+			if story10_survey_done():
+				marks["librarian"] = "?"   # 조사 결과를 보고하자
+	# 스토리 11 — 단서를 아직 안 들려준 주민에게 ❗
+	if story11_phase == "clue":
+		for cnid: String in STORY11_CLUE_NPCS:
+			if cnid not in story11_clues:
+				marks[cnid] = "!"
+	# 스토리 12 — 서하에게 기록을 보여주자 / 재료가 다 모였으면 연금술사에게
+	if story12_phase == "ask":
+		marks["librarian"] = "!"
+	elif story12_phase == "gather" and story12_mats_ok():
+		marks["alchemist"] = "?"
+	# 스토리 13 — 용식의 이상한 이야기 / 상자 개봉은 연금술사에게
+	match story13_phase:
+		"rumor":
+			marks["fisher"] = "!"
+		"box":
+			marks["alchemist"] = "!"
+		"open":
+			if story13_mats_ok():
+				marks["alchemist"] = "?"
+	# 스토리 14 — 회의·축제는 이장이 이끈다
+	if story14_phase == "meet":
+		marks["chief"] = "!"
+	elif story14_phase == "prep" and fest_prep_done():
+		marks["chief"] = "?"
+	elif story14_phase == "fest" and day >= story14_fest_day:
+		marks["chief"] = "?"
+	# 스토리 15 — 온천: 이장 → 서하 → 무쇠 → 동굴 → 묘연
+	match story15_phase:
+		"tale":
+			marks["chief"] = "!"
+		"book":
+			marks["librarian"] = "!"
+		"tool":
+			if int(items.get("rock_wedge", 0)) == 0:
+				marks["blacksmith"] = "!"
+		"water":
+			marks["alchemist"] = "?"
+	# 스토리 16·17 — 유품 이야기의 시작과 끝은 도서관·목장에서
+	if story16_phase in ["record", "tale"]:
+		marks["librarian"] = "!"
+	if story17_phase == "cloth":
+		marks["rancher"] = "!"
+	elif story17_phase == "tale":
+		marks["librarian"] = "!"
+	# 스토리 18 — 마지막 유품. 도서관에서 열리고 도서관에서 닫힌다
+	if story18_phase in ["memo", "tale"]:
+		marks["librarian"] = "!"
+	elif story18_phase == "clue":
+		marks["librarian"] = "?"
+	# 첫 수확을 마쳤다 — 만수가 밥 이야기를 꺼내려 한다
+	if story2_phase == "cook" and kitchen_quest == "":
+		marks["merchant"] = "!"
+	# 조리대를 찾았다 · 요리를 지었다 — 만수가 기다린다
+	if kitchen_quest in ["found", "deliver"]:
+		marks["merchant"] = "?"
+	# 용식의 집터 — 분수대 앞에서 기다릴 때와 집이 다 됐을 때 말을 걸자
+	if fisher_home == "wait":
+		marks["fisher"] = "!"
+	elif fisher_home == "built":
+		marks["fisher"] = "?"
+	if merchant_errand == "doing":
+		# 노점 재료를 다 모았으면 만수에게 가져다주자
+		if wood >= STALL_WOOD and int(items.get("forage_shell", 0)) >= STALL_SHELLS:
+			marks["merchant"] = "?"
+	if mom_quest_open() and mom_quest != "":
+		marks["forest_mom"] = "?"
+	# 마지막 페이지를 보여줄 사람 — 서하와 이장 (메인 스토리 20)
+	if story20_phase == "tell":
+		for tid: String in STORY20_TELL:
+			if tid not in story20_told:
+				marks[tid] = "!"
+	# 떠나려는 주민 — 하고 싶은 말이 있다
+	if settler_leaving != "":
+		marks[settler_leaving] = "!"
+	return marks
+
+
+# ---- 메인 스토리 5: 숲속에서 발견한 집 ----
+#
+# 첫 수확(스토리 2 완료) 뒤, 모험을 좋아하는 재민이 마을로 이사 온다.
+# 숲을 쏘다니던 재민이 깊은 숲의 수상한 집을 발견하고, 이장도 모르는
+# 그 집에는 아픈 딸을 돌보는 모녀가 조용히 살고 있었다.
+# 이 이야기를 끝내면 호감도 콘텐츠(하트·선물)가 해금된다.
+#   "": 아직 / arrive: 재민 등장 — 말 걸기 / settle: 정착 (다음 날 아침까지) /
+#   found: 숲속 집 발견담 — 재민에게 말 걸기 /
+#   ask: 이장에게 보고 (재민과 함께) /
+#   go: 이장·재민과 함께 숲속의 집으로 (두 사람이 따라온다) /
+#   back: 돌아오는 길 — 이장의 조언 (여기서 호감도가 열린다) / done: 완료
+var forest_quest := ""
+var forest_day := 0          # 재민이 정착한 날 — 다음 날 아침 발견담이 뜬다
+var affinity_open := false   # 호감도 콘텐츠(하트·선물) 해금 여부
+
+# ---- 튜토리얼 공간과 세계 ----
+#
+# 게임을 켜면 세계 밖의 **일회성 숲길**에서 시작한다 (main.TUTORIAL_REGION).
+# 마을에 들어서는 순간 그 공간은 닫히고, 그때부터가 진짜 세계다.
+var tutorial_space := true
+
+
+# ---- 마을을 중심으로 하나씩 열리는 땅 ----
+#
+# 처음 마을에 도착하면 마을과 큰길, 그리고 바로 곁의 농장뿐이다.
+# 이야기가 나아갈 때마다 둘레의 땅이 하나씩 이어진다.
+#   조건: "story2"(마을을 깨우다) / "sea"(바닷길) / "forest"(숲속의 집) /
+#         "story8"(목장) / "story10"(동굴) / "story12"(연금술사) / "zone"(구역 해금)
+# ---- 야생 지역은 전부 열려 있다 ----
+#
+# 한때는 마을을 중심으로 숲·초원·습지·솔숲·벼랑길을 이야기에 따라 하나씩
+# 열었다. 그런데 걸어서 갈 수 있는 곳이 이야기 진도에 묶이자 **가고 싶은 데를
+# 못 가는 게임**이 됐다 — 특히 바닷가 벼랑길은 자기 자신을 잠갔다(길을 여는
+# 바위가 그 벼랑길 아래에 있었다). 지금은 **세계를 처음부터 다 걸을 수 있다.**
+# 「아직 이르다」는 느낌은 지형과 몬스터와 이야기가 만들지, 보이지 않는 벽이
+# 만들지 않는다.
+#
+# (메인 스토리 4의 마을 확장 구역은 별개다 — 그건 게시판에서 재료를 들여
+#  직접 여는 마을의 몸통이라 그대로 둔다: `is_tile_owned`)
+const REGION_UNLOCK := {}
+
+
+func region_unlocked(_id: String) -> bool:
+	return true
+
+
+# ---- 숲속 집의 문이 열리는 날 (메인 스토리 5 이후) ----
+#
+# 스토리 5에서 연화는 끝내 집 안으로 들이지 않는다 — 낯선 사람을 경계하는
+# 것은 당연한 일이고, 신뢰는 시간이 쌓아 주는 것이기 때문이다.
+# 꾸준히 말을 걸고 도우며 **연화의 호감도가 FOREST_TRUST_AFF 이상**이
+# 되면, 처음으로 문 안으로 들어오라는 말을 듣는다. 그날 솔이를 만난다.
+#   "": 아직 / invited: 마음을 열었다 — 연화에게 말 걸기(❗) /
+#   done: 집 안에서 솔이를 만났다 (이때부터 솔이가 집 앞에 나온다)
+const FOREST_TRUST_AFF := 5
+var forest_trust := ""
+
+
+# 연화가 마음을 열 만큼 친해졌는가
+func forest_trust_ready() -> bool:
+	return forest_quest == "done" \
+		and int(affinity.get("forest_mom", 0)) >= FOREST_TRUST_AFF
+
+
+# ---- 숲속 엄마(연화)의 서브 퀘스트 시스템 ----
+#
+# 스토리 5(숲속에서 발견한 집)를 끝내야 받을 수 있다.
+# 방향: 연화가 솔이에게 줄 요리·음식·재료를 부탁하는 심부름.
+#
+# 세부 퀘스트는 아직 정하지 않았다 — 정해지면 MOM_QUESTS에 한 줄씩 넣는다:
+#   {"id": "porridge", "name": "솔이의 죽 재료",       # 선택지에 뜨는 실제 이름
+#    "item": "potato", "qty": 3,                       # 필요한 것 (작물/아이템 id)
+#    "money": 300, "affinity": 5,                      # 보상 (돈·연화 호감도)
+#    "ask": "요즘 솔이가 죽이 먹고 싶다네요.",           # (선택) 부탁 대사 한 줄
+#    "thanks": "이걸로 푹 끓여 줘야겠어요."}             # (선택) 감사 대사 한 줄
+# 표가 비어 있으면 선택지가 아예 뜨지 않는다. 앞에서부터 순서대로 하나씩 열린다.
+var MOM_QUESTS: Array = []
+var mom_quest := ""                # 진행 중인 퀘스트 id ("" = 없음)
+var mom_quests_done: Array = []    # 끝낸 퀘스트 id들
+
+# ---- 밤 기절 조건부 서브 퀘스트 (이장의 걱정) ----
+# 밤에 몬스터에게 당해 기절하면, 다음 날 아침 이장이 직접 찾아와
+# 돌 창 레시피를 준다 (상점 구매가 아니라 이 서브퀘로만 얻는다).
+#   "": 아직 / pending: 간밤에 기절했다 — 아침에 이장이 온다 /
+#   visit: 이장이 걸어오는 중 / done: 완료 (돌 창 레시피 획득)
+var spear_quest := ""
+
+
+func mom_quest_open() -> bool:
+	return forest_quest == "done"
+
+
+# 지금 연화가 보여 줄 퀘스트 (진행 중이면 그것, 아니면 다음 것. 없으면 {})
+func mom_next_quest() -> Dictionary:
+	if not mom_quest_open():
+		return {}
+	for q: Dictionary in MOM_QUESTS:
+		if mom_quest != "":
+			if str(q.id) == mom_quest:
+				return q
+		elif str(q.id) not in mom_quests_done:
+			return q
+	return {}
+
+
+func forest_objective_short() -> String:
+	match forest_quest:
+		"arrive":
+			return "낯선 사람과 대화하자."
+		"found":
+			return "재민과 대화하자."
+		"ask":
+			return "이장에게 알리자."
+		"go":
+			return "숲속의 집으로 가자."
+		"back":
+			return "이장과 대화하자."
+	return ""
+
+
+# 후속 이야기 — 연화가 문을 열어 주는 날
+func forest_trust_objective_short() -> String:
+	if forest_trust == "invited":
+		return "연화와 대화하자."
+	return ""
+
+
 # 해변 채집 능력치 — 조개가 다시 밀려오는 간격(게임 분)과 한 번에 줍는 양.
 # 기본은 10~15분에 하나. 레벨이 오르면 리젠이 빨라지고, 3레벨마다 +1개.
 func shell_respawn_minutes() -> float:
@@ -772,11 +3163,11 @@ func beach_rare_chance() -> float:
 func fisher_objective_short() -> String:
 	match fisher_quest:
 		"meet":
-			return "마을 광장의 낚시꾼에게 말을 걸어 보자 (E)"
+			return "낚시꾼과 대화하자."
 		"follow":
-			return "낚시꾼과 함께 남쪽 바위 능선으로 가자 (화살표 방향)"
+			return "함께 바위 능선으로 가자."
 		"open":
-			return "곡괭이로 길목의 커다란 바위를 캐서 바닷길을 열자"
+			return "길목의 큰 바위를 캐자."
 	return ""
 
 
@@ -802,13 +3193,38 @@ const DESK_RECIPES := {
 	"broom": {"name": "빗자루", "cost": {"weed": 1},
 		"kind": "item", "give": "broom", "locked": true, "shop": "잡화점",
 		"desc": "집 안의 먼지를 쓸어 낸다 (레시피는 잡화점에서)"},
+	# 울타리 — 배우는 순간 도구가 열린다 (kind "tool"). 재료는 목재 한 개이고,
+	# 세울 때마다 또 한 개씩 든다. 잡화점은 **가방에 목재가 있어야** 이 레시피를
+	# 꺼내 놓는다 — 나무를 베어 본 사람에게만 쓸모가 있는 물건이기 때문이다.
+	"fence": {"name": "울타리", "cost": {"wood": 1},
+		"kind": "tool", "tool": "fence", "locked": true, "shop": "잡화점",
+		"desc": "빈틈없이 둘러싸면 목초지가 된다 — 그 안 동물은 알아서 배부르다"},
 	# kind "furniture": 완성되면 집에 세간으로 들어온다 (꾸미기 F로 옮긴다)
 	"flower_pot": {"name": "화분", "cost": {"weed": 5},
 		"kind": "furniture", "furn": "plant", "locked": true, "shop": "잡화점",
 		"desc": "집을 꾸미는 화분 — 완성되면 방에 놓인다 (레시피는 잡화점에서)"},
+	# 쓰레기통 — 24시간 무인 판매함. 만들어서 원하는 곳(집 안/바깥)에 설치한다.
 	"trash_bin": {"name": "쓰레기통", "cost": {"wood": 5, "forage_ring": 2},
-		"kind": "furniture", "furn": "trash_bin", "locked": true, "shop": "해변 노점",
-		"desc": "튼튼한 쓰레기통 — 완성되면 방에 놓인다 (레시피는 해변 노점에서)"},
+		"kind": "item", "give": "trash_bin", "locked": true, "shop": "잡화점",
+		"desc": "넣은 물건을 제값의 80%에 파는 무인 판매함 — 가방에서 꺼내 설치한다"},
+	# 수납 상자 — 집 안에 놓는 작은 창고 (용식의 집터 부탁 보상으로 열린다)
+	"storage_box": {"name": "수납 상자", "cost": {"wood": 8},
+		"kind": "item", "give": "storage_box", "locked": true, "shop": "용식의 부탁",
+		"desc": "집 안에 놓고 창고처럼 쓰는 작은 상자 — 가방이 넘칠 때 넣어 둔다"},
+	# 집터 — 새 주민의 집을 지을 자리 (메인 스토리 3에서 해금, 일부러 무겁다)
+	# 집터 — 양은 많지만 **초반에 구할 수 있는 것만** 쓴다.
+	# (예전에는 못 4개가 들어갔는데, 못은 대장간이 서야 살 수 있어서
+	#  이사 이야기가 나오는 시점에는 아예 만들 수 없었다)
+	"housing_kit": {"name": "집터", "cost": {"wood": 90, "stone": 70},
+		"kind": "item", "give": "housing_kit", "locked": true, "shop": "잡화점",
+		"desc": "새 주민이 살 집의 터 — 지을 풀밭을 바라보고 가방에서 쓴다"},
+	# 초반 무기 — kind "tool": 완성되면 도구가 해금된다 (가방에서 슬롯에 장착)
+	"spear": {"name": "돌 창", "cost": {"wood": 3, "stone": 2},
+		"kind": "tool", "tool": "spear", "locked": true, "shop": "이장",
+		"desc": "느리지만 한 방이 묵직한 창 — 밤 몬스터를 상대한다 (레시피는 이장에게)"},
+	"sword": {"name": "돌 검", "cost": {"wood": 2, "stone": 3},
+		"kind": "tool", "tool": "sword", "locked": true, "shop": "훗날의 부탁",
+		"desc": "빠르게 두 번 베는 검 — 화력은 창과 비슷하다 (레시피는 어느 부탁의 보상)"},
 	"bed_wood": {"name": "나무 침대", "cost": {"wood": 25, "nail": 2},
 		"kind": "bed", "lv": 1, "desc": "아침 기력이 가득 찬다"},
 	"bed_soft": {"name": "푹신한 침대", "cost": {"wood": 30, "cloth": 5, "milk": 3},
@@ -822,6 +3238,69 @@ var bed_lv := 0
 const DUST_TOTAL := 3
 var dust_swept := 0
 var kitchen_found := false
+
+# ---- 메인 스토리 2의 마지막 마디: 조리대에서 요리를 하자 ----
+#
+# 첫 수확을 마치면 만수가 「밥은 먹고 다니나」 하고 묻는다.
+# 거기서 시작해 조리대를 찾아내고, 첫 요리를 지어 만수에게 가져가면
+# 그가 파는 법과 먹는 법을 알려 준다 — 그것으로 2장이 끝난다.
+#   "": 아직 / broom: 빗자루 레시피 사기 / make: 잡초 모아 빗자루 만들기 /
+#   sweep: 집 안 먼지 쓸기 / found: 조리대 발견 — 만수에게 알리기 /
+#   jam: 받은 재료로 산딸기잼 만들기 /
+#   deliver: 지은 요리를 만수에게 가져가기 / done: 끝 (판매까지 배웠다)
+var kitchen_quest := ""
+var kitchen_branch := ""    # (옛 세이브 호환 — 지금은 갈래가 없다)
+const JAM_ID := "dish_berry_jam"     # 첫 요리 — 산딸기잼
+const JAM_BERRIES := 3               # 만수가 함께 주는 산딸기
+
+
+# 이 이야기가 시작될 수 있는가 — 잡화점이 서 있고, 아직 조리대가 없다
+# 낚시를 할 수 있는가 — 용식과 바닷길을 열고 낚싯대를 받아야 한다
+func can_fish() -> bool:
+	return is_tool_unlocked("rod")
+
+
+# 이 이야기가 시작될 수 있는가 —
+# **첫 수확을 마친 뒤**(story2_phase == "cook") 만수에게 말을 걸었을 때만.
+# 예전에는 잡화점에서 나가려 하거나 레시피를 사려 할 때 등 세 갈래로
+# 불쑥 시작됐다. 지금은 시작점이 하나뿐이다.
+# 만수가 밥 이야기를 꺼낼 때인가.
+#
+# **조건은 둘뿐이다** — 첫 수확을 마쳤고(story2_phase == "cook"),
+# 아직 이 이야기를 시작하지 않았다(kitchen_quest == ""). 예전에는
+# 「상점이 서 있을 것」과 「조리대를 아직 못 찾았을 것」이 더 붙어 있었는데,
+# 넷 중 하나만 어긋나도 **목표는 「만수와 대화하자」인데 말을 걸어도 아무
+# 일이 없는** 막다른 길이 됐다. 조리대를 이미 찾았다면 그 마디만
+# 건너뛰면 될 일이지, 이야기 전체가 멈출 이유가 없다.
+func kitchen_quest_ready() -> bool:
+	return kitchen_quest == "" and story2_phase == "cook"
+
+
+# 요리 레시피를 정상적으로 사고팔 수 있는가 (튜토리얼을 마쳐야 열린다)
+func cook_shop_open() -> bool:
+	return kitchen_found and kitchen_quest in ["", "done"]
+
+
+func kitchen_quest_objective_short() -> String:
+	match kitchen_quest:
+		"broom":
+			return "빗자루 레시피를 사자."
+		"make":
+			if recipe_items.has("broom"):
+				return "빗자루 레시피를 배우자."
+			if int(items.get("weed", 0)) < 1:
+				return "풀숲에서 잡초를 모으자."
+			return "책상에서 빗자루를 만들자."
+		"sweep":
+			return "집 안 먼지를 쓸어 내자 %d/%d" % [
+				dust_swept, DUST_TOTAL]
+		"found":
+			return "만수에게 알리자."
+		"jam":
+			return "조리대에서 요리를 하자."
+		"deliver":
+			return "요리를 만수에게 가져가자."
+	return ""
 var desk_queue: Array = []        # [{id, left(초)}]
 var desk_done_pending: Array = [] # 방금 완성된 것 — hud가 꺼내 배너를 띄운다
 
@@ -907,6 +3386,12 @@ func desk_tick(delta: float) -> void:
 			furniture.append({"id": str(def.furn),
 				"x": 430.0 + float(furniture.size() % 4) * 40.0,
 				"y": 255.0 + float(furniture.size() / 4 % 3) * 30.0})
+		elif str(def.kind) == "tool":
+			# 무기·도구 — 완성되는 순간 도구가 해금된다 (가방에서 슬롯에 장착)
+			var tid := str(def.tool)
+			if tid not in unlocked_tools:
+				unlocked_tools.append(tid)
+			discover(tid)
 		discover(str(job.id))
 		desk_done_pending.append(str(def.name))
 	desk_queue = still
@@ -924,6 +3409,40 @@ func desk_upgrade() -> bool:
 		return false
 	desk_lv += 1
 	return true
+
+
+# ---- 배고픔 ----
+
+# 시간이 흐른 만큼 배가 꺼진다 (게임 분 단위 — main._process가 부른다)
+func hunger_tick(game_min: float) -> void:
+	if not hunger_open:
+		return
+	hunger = clampf(hunger - game_min * HUNGER_PER_MIN, 0.0, HUNGER_MAX)
+
+
+func starving() -> bool:
+	return hunger_open and hunger <= 0.0
+
+
+# 굶주림으로 깎이는 체력. 집 안(안전지대)에서는 바닥이 있다 —
+# 지붕 밑에서 자리를 비워 두었다고 죽지는 않는다.
+func starve_tick(delta: float, indoors: bool) -> void:
+	if not starving():
+		return
+	var limit := HUNGER_SAFE_FLOOR if indoors else 0.0
+	if energy <= limit:
+		return          # 이미 바닥 — 굶주림으로는 더 깎이지 않는다
+	energy = maxf(limit, energy - delta * HUNGER_STARVE_DPS)
+
+
+# 굶으면 걸음이 눈에 띄게 무거워진다
+func hunger_speed_mult() -> float:
+	return HUNGER_SLOW_MULT if starving() else 1.0
+
+
+# 먹은 만큼 배가 찬다 (요리의 회복량과 같은 값을 쓴다)
+func feed(amount: float) -> void:
+	hunger = clampf(hunger + amount, 0.0, HUNGER_MAX)
 
 
 # 아침에 기력이 얼마나 차는가 — 침대가 좋을수록 잘 잔다
@@ -952,7 +3471,13 @@ func is_deep_night() -> bool:
 
 # ---- 지도 탐사 (fog of war) ----
 # 실제로 가 본 지역만 지도에 표시된다. 청크(8타일) 단위로 기록.
-const EXPLORE_CHUNK := 8
+# 지도 안개 — 걸어 본 만큼만 걷힌다.
+#
+# 처음 지도를 열면 온 세상이 먹구름이고, 발이 닿은 자리부터 조금씩
+# 드러난다. 칸을 4로 잡고 둘레 한 겹까지만 밝히므로 한 번에 12x12칸,
+# 168x90짜리 맵의 1%가 채 안 된다 — 탐험할 거리가 남는다.
+# (예전에는 8칸 단위 3x3 = 24x24를 한꺼번에 밝혀, 몇 발짝에 지도가 다 열렸다)
+const EXPLORE_CHUNK := 4
 var explored := {}  # Vector2i(청크 좌표) -> true
 
 
@@ -971,34 +3496,34 @@ func is_explored_tile(x: int, y: int) -> bool:
 # {이름, 해야 하는 일, 스토리} — Q 상세 창과 목록 모두 여기서 가져온다
 const STORY1_QUESTS := [
 	{"name": "숲 안으로 들어가보기",
-		"task": "숲 안으로 들어가 보자",
+		"task": "숲 안으로 들어가 보자.",
 		"story": "할아버지가 집으로 가는 길이 힘들 거라고 했던 이유를 이제야 알 것 같다. 그래도 집으로 가기 위해서는 이 숲을 지나가야 한다."},
 	{"name": "우체부 아저씨와의 만남",
-		"task": "다가오는 우체부 아저씨에게 말을 걸어 보자 (E)",
+		"task": "우체부와 대화하자.",
 		"story": "숲 속에서 우체부 아저씨가 다가와 말을 걸었다. 그도 마을로 가는 길이라고 한다."},
 	{"name": "나무도끼를 장착해보기",
-		"task": "받은 나무도끼를 가방(I)의 슬롯에 장착해 보자",
+		"task": "나무도끼를 장착하자.",
 		"story": "숲이 너무 험하고 나무가 많아 쉽게 들어갈 수 없던 중 우체부 아저씨를 만났다. 아저씨와 함께 마을까지 가기로 했고, 안전하게 지나가려면 나무를 베어 길을 만들어야 한다. 아저씨에게 받은 나무도끼로 숲을 지나갈 준비를 해보자."},
 	{"name": "나무를 베어보자",
-		"task": "도끼를 선택(숫자키)하고 나무를 클릭한 뒤 E 키로 베어보자",
+		"task": "길을 막은 나무를 베자.",
 		"story": "도끼를 장착했다. 길을 막는 나무를 베어 마을로 가는 길을 만들자."},
 	{"name": "숲길을 나아가자",
-		"task": "나무를 베며 숲길을 따라 나아가자 (화살표 방향)",
+		"task": "숲길을 따라 나아가자.",
 		"story": "첫 나무를 베어 길이 열리기 시작했다. 아저씨와 함께 숲길을 따라 앞으로 나아가자."},
 	{"name": "지도를 확인해보자",
-		"task": "M 키를 눌러 지도를 열어 보자",
+		"task": "지도를 열어 보자.",
 		"story": "숲길이 여러 갈래로 갈라졌다. 어느 길로 가야 할까? 아저씨가 알려준 대로 지도에서 우리 위치와 가 본 곳을 확인해 보자."},
 	{"name": "마을로 가는 길을 열어보자",
-		"task": "우체부 아저씨에게 받은 곡괭이를 장착하고, 길을 막은 커다란 바위를 캐보자",
+		"task": "곡괭이로 바위를 캐자.",
 		"story": "마을로 향하던 중 커다란 바위가 길을 완전히 가로막고 있었다. 아저씨가 곡괭이로 캐는 모습을 보여주며 곡괭이를 건네주었다. 배운 대로 바위를 캐서 길을 열자."},
 	{"name": "마을로 이동",
-		"task": "우체부 아저씨와 함께 마을 방향으로 가자 (화살표 방향)",
+		"task": "우체부와 함께 마을로 가자.",
 		"story": "바위를 치워 마침내 길이 열렸다. 아저씨와 함께 숲을 빠져나가 마을로 향하자."},
 	{"name": "이장에게 편지 전달",
-		"task": "우체부 아저씨를 따라 이장님께 가자 (화살표 방향)",
+		"task": "이장에게 가 보자.",
 		"story": "드디어 마을에 도착했다. 우체부 아저씨가 이장님께 직접 편지를 전하러 간다. 함께 따라가 보자."},
 	{"name": "새 보금자리",
-		"task": "이장님이 내어 준 집(마을 서쪽)에 들어가 보자 (문 앞 E)",
+		"task": "집에 들어가 보자.",
 		"story": "이장님이 할아버지가 지내던 집을 내어 주셨다. 오랫동안 비어 있었다는 마을 서쪽의 그 집... 들어가 보자."},
 ]
 # 단계 -> 지금 진행 중인 퀘스트 번호. home_open: 편지는 전했고, 집에 들어가면
@@ -1016,87 +3541,70 @@ func story_current_quest() -> Dictionary:
 func story_objective_short() -> String:
 	match story_phase:
 		"enter":
-			return "우거진 숲 안으로 들어가 보자"
+			return "숲 안으로 들어가 보자."
 		"approach":
-			return "우체부 아저씨에게 말 걸기 (E)"
+			return "우체부와 대화하자."
 		"equip":
-			return "나무도끼를 가방(I) 슬롯에 장착해 보자"
+			return "나무도끼를 장착하자."
 		"chop":
-			return "흙길을 막고 선 나무를 베어보자"
+			return "길을 막은 나무를 베자."
 		"path":
 			if story_gates_left > 0:
-				return "길을 막은 나무를 베며 나아가자 (남은 길목 %d곳)" % story_gates_left
-			return "열린 숲길을 따라 갈림길까지 가자"
+				return "길목의 나무를 베자 %d곳 남음" % story_gates_left
+			return "갈림길까지 가 보자."
 		"map":
-			return "M 키를 눌러 지도를 열어 보자"
+			return "지도를 열어 보자."
 		"rock":
 			match story_rock_state:
 				0:
-					return "길을 따라 마을 방향으로 가보자 (화살표 방향)"
+					return "마을로 가 보자."
 				1:
-					return "곡괭이를 장착하고 바위를 클릭한 뒤 E로 캐보자"
+					return "곡괭이로 바위를 캐자."
 				_:
-					return "우체부 아저씨에게 말을 걸어보자"
+					return "우체부와 대화하자."
 		"travel":
-			return "우체부 아저씨와 함께 마을로 가자 (화살표 방향)"
+			return "우체부와 함께 마을로 가자."
 		"deliver":
-			return "우체부 아저씨를 따라 이장님께 가자 (화살표 방향)"
+			return "이장에게 가 보자."
 		"home_open":
-			return "이장님이 내어 준 집에 들어가 보자 (마을 서쪽, 화살표 방향)"
+			return "집에 들어가 보자."
 		"greet":
-			return "집을 둘러보고 밖으로 나가 보자 (아랫문)"
+			return "집을 둘러보고 나가 보자."
 	return ""
 
 
 func player_tex(part: String) -> String:
-	# 여자 캐릭터 텍스처 이름 (남자는 new_boy_* 를 그대로 쓴다)
-	return "player_f_" + part
+	# 플레이어 텍스처 이름 — 고른 외형으로 구워 둔 pc_* 를 본다
+	# (main.apply_appearance가 머리 스타일 + 옷 색으로 만들어 둔다)
+	return "pc_" + part
 
 
 # 휘두르기 도트 이름의 앞부분 (key = "down"/"up"/"side").
-# 실제 그림 이름은 여기에 _0(다 감음) · _1(내리치는 중) · _2(다 내리침)가 붙는다.
-#
-# **아직 그 도트가 없다.** main.TEXTURE_NAMES에 이름을 넣지 않은 동안에는
-# main.tex에도 없어서, player.gd가 알아서 몸통을 굽히는 쪽으로 대신한다.
-# 도트를 뽑아 이름만 넣으면 그날부터 켜진다 (player.gd 위쪽 주석 참고).
+# 모든 머리 스타일이 같은 골격이라 주먹 자리(player.gd SWING_HAND_DOT)도 공용이다.
 func swing_tex_base(key: String) -> String:
-	if gender == "m":
-		return "new_boy_%s_swing" % key
-	return "player_f_%s_swing" % key
+	return "pc_%s_swing" % key
 
 
-func player_side_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 옆모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+func player_side_tex(is_moving: bool, _suffix: String, t: float) -> String:
+	# 옆모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
 	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
-	if gender == "m":
-		if not is_moving:
-			return "new_boy_side_idle"
-		return "new_boy_side_walk_%d" % (int(t * 8.0) % 5)
-	if suffix == "idle":
-		return player_tex("side_idle")
-	return player_tex("side_" + suffix)
+	if not is_moving:
+		return "pc_side_idle"
+	return "pc_side_walk_%d" % (int(t * 8.0) % 5)
 
 
-func player_down_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 앞모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	if gender == "m":
-		if not is_moving:
-			return "new_boy_down_idle"
-		return "new_boy_down_walk_%d" % (int(t * 8.0) % 5)
-	if suffix == "idle":
-		return player_tex("down_idle")
-	return player_tex("down_" + suffix)
+func player_down_tex(is_moving: bool, _suffix: String, t: float) -> String:
+	# 앞모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	if not is_moving:
+		return "pc_down_idle"
+	return "pc_down_walk_%d" % (int(t * 8.0) % 5)
 
 
-func player_up_tex(is_moving: bool, suffix: String, t: float) -> String:
-	# 뒷모습. 남자: 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	if gender == "m":
-		if not is_moving:
-			return "new_boy_up_idle"
-		return "new_boy_up_walk_%d" % (int(t * 8.0) % 5)
-	if suffix == "idle":
-		return player_tex("up_idle")
-	return player_tex("up_" + suffix)
+func player_up_tex(is_moving: bool, _suffix: String, t: float) -> String:
+	# 뒷모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	if not is_moving:
+		return "pc_up_idle"
+	return "pc_up_walk_%d" % (int(t * 8.0) % 5)
 
 
 # 벌목 누적 횟수 (스토리 중 15그루째에 우체부가 능력치 창을 알려준다)
@@ -1112,9 +3620,7 @@ var story_rock_state := 0
 
 func player_idle_tex(dirn: String) -> String:
 	# 대기: 단일 서기 프레임. 숨쉬기는 스프라이트 세로 스케일로 연출한다 (player.gd)
-	if gender == "m":
-		return "new_boy_%s_idle" % dirn
-	return player_tex(dirn + "_idle")
+	return "pc_%s_idle" % dirn
 
 
 # 이동 속도 보정 (펫 + 바람 물약)
@@ -1136,7 +3642,7 @@ const ANIMALS := {
 }
 const MAX_ANIMALS := 8          # 기본 동물 상한
 const BARN_MAX_ANIMALS := 16    # 축사 건설 후
-const BARN_COST_MONEY := 5000
+const BARN_COST_MONEY := 2500
 const BARN_COST_WOOD := 20
 var barn_built := false
 
@@ -1146,96 +3652,132 @@ func max_animals() -> int:
 
 # ---- 기타 판매 아이템 (동물 생산물, 물고기) ----
 const ITEMS := {
-	"egg": {"name": "달걀", "sell": 60},
-	"milk": {"name": "우유", "sell": 120},
-	"fish_crucian": {"name": "붕어", "sell": 40},
-	"fish_minnow": {"name": "피라미", "sell": 30},
-	"fish_loach": {"name": "미꾸라지", "sell": 55},
-	"fish_bitterling": {"name": "납자루", "sell": 45},
-	"fish_carp": {"name": "잉어", "sell": 60},
-	"fish_sweetfish": {"name": "은어", "sell": 110},
-	"fish_trout": {"name": "산천어", "sell": 140},
-	"fish_mandarin": {"name": "쏘가리", "sell": 160},
-	"fish_catfish": {"name": "메기", "sell": 90},
-	"fish_eel": {"name": "뱀장어", "sell": 180},
-	"fish_snakehead": {"name": "가물치", "sell": 200},
-	"fish_crab": {"name": "참게", "sell": 130},
-	"fish_salmon": {"name": "연어", "sell": 220},
-	"fish_rainbow": {"name": "무지개송어", "sell": 190},
-	"fish_smelt": {"name": "빙어", "sell": 70},
-	"fish_icecarp": {"name": "얼음잉어", "sell": 150},
-	"fish_lenok": {"name": "열목어", "sell": 240},
-	"fish_mistfish": {"name": "안개무늬", "sell": 170},
-	"fish_stormjack": {"name": "폭풍전갱이", "sell": 260},
-	"fish_moonfish": {"name": "달빛어", "sell": 320},
-	"fish_starcarp": {"name": "별잉어", "sell": 380},
-	"fish_ghost": {"name": "유령물고기", "sell": 420},
-	"fish_golden": {"name": "황금잉어", "sell": 300},
-	"fish_king": {"name": "무지개 왕송어", "sell": 500},
-	"fish_dragon": {"name": "이무기", "sell": 800},
-	"ore": {"name": "광석", "sell": 50},
-	"gem": {"name": "보석", "sell": 220},
-	"star_shard": {"name": "별빛 조각", "sell": 300},
+	"egg": {"name": "달걀", "sell": 25},
+	"milk": {"name": "우유", "sell": 55},
+	"fish_crucian": {"name": "붕어", "sell": 20},
+	"fish_minnow": {"name": "피라미", "sell": 15},
+	"fish_loach": {"name": "미꾸라지", "sell": 25},
+	"fish_bitterling": {"name": "납자루", "sell": 20},
+	"fish_carp": {"name": "잉어", "sell": 25},
+	"fish_sweetfish": {"name": "은어", "sell": 50},
+	"fish_trout": {"name": "산천어", "sell": 65},
+	"fish_mandarin": {"name": "쏘가리", "sell": 70},
+	"fish_catfish": {"name": "메기", "sell": 40},
+	"fish_eel": {"name": "뱀장어", "sell": 80},
+	"fish_snakehead": {"name": "가물치", "sell": 90},
+	"fish_crab": {"name": "참게", "sell": 60},
+	"fish_salmon": {"name": "연어", "sell": 100},
+	"fish_rainbow": {"name": "무지개송어", "sell": 85},
+	"fish_smelt": {"name": "빙어", "sell": 30},
+	"fish_icecarp": {"name": "얼음잉어", "sell": 70},
+	"fish_lenok": {"name": "열목어", "sell": 110},
+	"fish_mistfish": {"name": "안개무늬", "sell": 75},
+	"fish_stormjack": {"name": "폭풍전갱이", "sell": 115},
+	"fish_moonfish": {"name": "달빛어", "sell": 145},
+	"fish_starcarp": {"name": "별잉어", "sell": 170},
+	"fish_ghost": {"name": "유령물고기", "sell": 190},
+	"fish_golden": {"name": "황금잉어", "sell": 135},
+	"fish_king": {"name": "무지개 왕송어", "sell": 225},
+	"fish_dragon": {"name": "이무기", "sell": 360},
+	"ore": {"name": "광석", "sell": 20},
+	"gem": {"name": "보석", "sell": 100},
+	"star_shard": {"name": "별빛 조각", "sell": 135},
+	# 동굴 표본 (메인 스토리 10) — 조사가 시작돼야 동굴에 모습을 드러낸다
+	"crystal": {"name": "수정", "sell": 70},
+	"cave_moss": {"name": "동굴 이끼", "sell": 20},
+	"glow_shroom": {"name": "발광 버섯", "sell": 55},
+	# 낡은 작은 상자 (메인 스토리 13) — 바다가 돌려준 것. 팔 수 없다
+	"old_box": {"name": "낡은 작은 상자", "sell": 0},
+	# 온천 복구 (메인 스토리 15) — 수맥을 뚫는 쐐기와 솟아난 물의 표본
+	"rock_wedge": {"name": "착암 쐐기", "sell": 0},
+	"spring_water": {"name": "샘물 표본", "sell": 0},
 	"bouquet": {"name": "꽃다발", "sell": 0},
 	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
-	"nail": {"name": "못", "sell": 15},
-	"cloth": {"name": "천", "sell": 45},
-	"rope": {"name": "밧줄", "sell": 25},
-	"hinge": {"name": "경첩", "sell": 110},
+	"nail": {"name": "못", "sell": 5},
+	"cloth": {"name": "천", "sell": 20},
+	"rope": {"name": "밧줄", "sell": 10},
+	"hinge": {"name": "경첩", "sell": 50},
 	"wedding_ring": {"name": "청혼 반지", "sell": 0},
-	"dish_baked_potato": {"name": "구운 감자", "sell": 70},
-	"dish_soup": {"name": "야채 수프", "sell": 110},
-	"dish_jam": {"name": "딸기잼", "sell": 150},
-	"dish_cornbread": {"name": "옥수수빵", "sell": 130},
-	"dish_grilled_fish": {"name": "생선구이", "sell": 90},
-	"dish_stew": {"name": "매운탕", "sell": 200},
-	"dish_pie": {"name": "호박파이", "sell": 280},
-	"dish_salad": {"name": "치즈 샐러드", "sell": 170},
-	"dish_punch": {"name": "수박화채", "sell": 240},
-	"dish_eggplant": {"name": "가지볶음", "sell": 120},
-	"dish_pickle": {"name": "무김치", "sell": 140},
-	"dish_ratatouille": {"name": "야채볶음", "sell": 260},
-	"dish_pumpkin_soup": {"name": "호박죽", "sell": 230},
-	"dish_corn_salad": {"name": "옥수수 샐러드", "sell": 210},
-	"dish_sweet_potato": {"name": "군고구마", "sell": 160},
-	"dish_bean_rice": {"name": "콩밥", "sell": 200},
-	"dish_rice_cake": {"name": "인절미", "sell": 290},
-	"dish_melon_ice": {"name": "참외 빙수", "sell": 270},
-	"dish_onion_soup": {"name": "양파 수프", "sell": 190},
-	"dish_garlic_bread": {"name": "마늘빵", "sell": 150},
-	"dish_spinach_saute": {"name": "시금치 볶음", "sell": 155},
-	"dish_sashimi": {"name": "회", "sell": 300},
-	"dish_eel_rice": {"name": "장어덮밥", "sell": 420},
-	"dish_crab_soup": {"name": "게탕", "sell": 340},
-	"dish_salmon_steak": {"name": "연어 스테이크", "sell": 460},
-	"dish_smelt_fry": {"name": "빙어 튀김", "sell": 240},
-	"dish_fish_soup": {"name": "생선 맑은국", "sell": 180},
-	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 700},
-	"dish_moon_tea": {"name": "달빛차", "sell": 640},
-	"dish_coral_tea": {"name": "산호빛 차", "sell": 560},
-	"dish_feast": {"name": "한상차림", "sell": 1100},
+	"dish_baked_potato": {"name": "구운 감자", "sell": 30},
+	"dish_soup": {"name": "야채 수프", "sell": 50},
+	"dish_jam": {"name": "딸기잼", "sell": 70},
+	"dish_cornbread": {"name": "옥수수빵", "sell": 60},
+	# 초반 음식 사슬 — 산딸기잼 → 밀가루 → 빵 → 산딸기잼 토스트
+	"dish_berry_jam": {"name": "산딸기잼", "sell": 25},
+	"flour": {"name": "밀가루", "sell": 10},
+	"dish_bread": {"name": "빵", "sell": 30},
+	"dish_berry_toast": {"name": "산딸기잼 토스트", "sell": 70},
+	"dish_grilled_fish": {"name": "생선구이", "sell": 40},
+	"dish_stew": {"name": "매운탕", "sell": 90},
+	"dish_pie": {"name": "호박파이", "sell": 125},
+	"dish_salad": {"name": "치즈 샐러드", "sell": 75},
+	"dish_punch": {"name": "수박화채", "sell": 110},
+	"dish_eggplant": {"name": "가지볶음", "sell": 55},
+	"dish_pickle": {"name": "무김치", "sell": 65},
+	"dish_ratatouille": {"name": "야채볶음", "sell": 115},
+	"dish_pumpkin_soup": {"name": "호박죽", "sell": 105},
+	"dish_corn_salad": {"name": "옥수수 샐러드", "sell": 95},
+	"dish_sweet_potato": {"name": "군고구마", "sell": 70},
+	"dish_bean_rice": {"name": "콩밥", "sell": 90},
+	"dish_rice_cake": {"name": "인절미", "sell": 130},
+	"dish_melon_ice": {"name": "참외 빙수", "sell": 120},
+	"dish_onion_soup": {"name": "양파 수프", "sell": 85},
+	"dish_garlic_bread": {"name": "마늘빵", "sell": 70},
+	"dish_spinach_saute": {"name": "시금치 볶음", "sell": 70},
+	"dish_sashimi": {"name": "회", "sell": 135},
+	"dish_eel_rice": {"name": "장어덮밥", "sell": 190},
+	"dish_crab_soup": {"name": "게탕", "sell": 155},
+	"dish_salmon_steak": {"name": "연어 스테이크", "sell": 205},
+	"dish_smelt_fry": {"name": "빙어 튀김", "sell": 110},
+	"dish_fish_soup": {"name": "생선 맑은국", "sell": 80},
+	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 315},
+	"dish_moon_tea": {"name": "달빛차", "sell": 290},
+	"dish_coral_tea": {"name": "산호빛 차", "sell": 250},
+	"dish_feast": {"name": "한상차림", "sell": 495},
 	# 컬렉션 보상으로 열리는 요리 레시피
-	"butter": {"name": "버터", "sell": 180},
-	"dish_fried_egg": {"name": "계란후라이", "sell": 90},
-	"dish_egg_roll": {"name": "계란말이", "sell": 200},
-	"dish_omurice": {"name": "오므라이스", "sell": 380},
-	"dish_butter_corn": {"name": "버터옥수수", "sell": 260},
+	"butter": {"name": "버터", "sell": 80},
+	"dish_fried_egg": {"name": "계란후라이", "sell": 40},
+	"dish_egg_roll": {"name": "계란말이", "sell": 90},
+	"dish_omurice": {"name": "오므라이스", "sell": 170},
+	"dish_butter_corn": {"name": "버터옥수수", "sell": 115},
 	# 채집물/곤충
-	"forage_berry": {"name": "산딸기", "sell": 40},
+	"forage_berry": {"name": "산딸기", "sell": 20},
+	# 엔딩 유품·물약 — 팔 수 없다
+	"water_life": {"name": "생명의 물", "sell": 0},
+	"settle_letter": {"name": "이사 신청 편지", "sell": 0},
+	"farewell_letter": {"name": "짧은 작별 편지", "sell": 0},
+	"relic_hat": {"name": "할머니의 모자", "sell": 0},
+	"relic_watch": {"name": "할머니의 시계", "sell": 0},
+	"relic_bracelet": {"name": "할머니의 팔찌", "sell": 0},
+	"relic_ring": {"name": "할머니의 반지", "sell": 0},
+	"relic_necklace": {"name": "할머니의 목걸이", "sell": 0},
+	"grandpa_seed": {"name": "할아버지의 씨앗", "sell": 0},
 	"weed": {"name": "잡초", "sell": 5},
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
-	"forage_shell": {"name": "조개", "sell": 35},
-	"forage_trash": {"name": "젖은 비닐봉지", "sell": 12},
-	"forage_glass": {"name": "유리 조각", "sell": 34},
-	"forage_ring": {"name": "금속 고리", "sell": 28},
-	"forage_relic": {"name": "고대 조각", "sell": 480},
-	"bait": {"name": "미끼", "sell": 2},
-	"forage_coral": {"name": "산호 조각", "sell": 260},
-	"forage_herb": {"name": "약초", "sell": 60},
-	"bug_butterfly": {"name": "나비", "sell": 30},
-	"bug_dragonfly": {"name": "잠자리", "sell": 50},
-	"bug_firefly": {"name": "반딧불이", "sell": 90},
+	"forage_shell": {"name": "조개", "sell": 15},
+	"forage_trash": {"name": "젖은 비닐봉지", "sell": 5},
+	"forage_glass": {"name": "유리 조각", "sell": 15},
+	"forage_ring": {"name": "금속 고리", "sell": 15},
+	"forage_relic": {"name": "고대 조각", "sell": 215},
+	"bait": {"name": "미끼", "sell": 5},
+	"housing_kit": {"name": "집터", "sell": 0},
+	"move_letter": {"name": "이주 희망 편지", "sell": 0},
+	# 메인 스토리 6의 핵심 물건 — 팔 수 없고, 완결 후 도서관에 보관된다
+	"old_book": {"name": "오래된 책", "sell": 0},
+	"trash_bin": {"name": "쓰레기통", "sell": 0},
+	"storage_box": {"name": "수납 상자", "sell": 0},
+	# 초반 무기 (도구라 개수는 없지만, 도감·컬렉션 표시용 이름이 필요하다)
+	"spear": {"name": "돌 창", "sell": 0},
+	"sword": {"name": "돌 검", "sell": 0},
+	"arrow": {"name": "화살", "sell": 5},
+	"forage_coral": {"name": "산호 조각", "sell": 115},
+	"forage_herb": {"name": "약초", "sell": 25},
+	# 산자락 풀밭에 피는 노란 꽃 — 씨앗이 바람에 날린다
+	"forage_dandelion": {"name": "민들레", "sell": 20},
+	"bug_butterfly": {"name": "나비", "sell": 15},
+	"bug_dragonfly": {"name": "잠자리", "sell": 20},
+	"bug_firefly": {"name": "반딧불이", "sell": 40},
 	# 전설 재료 (판매 불가, 최후의 연금술 재료)
 	"gold_crop": {"name": "달빛 작물", "sell": 0, "legend": true},
 	"world_branch": {"name": "세계수 가지", "sell": 0, "legend": true},
@@ -1244,13 +3786,13 @@ const ITEMS := {
 	"golden_egg": {"name": "황금 달걀", "sell": 0, "legend": true},
 	"memory_piece": {"name": "할아버지의 기억 조각", "sell": 0, "legend": true},
 	# 연금술 결과물 (조합대에서 만든다)
-	"potion_energy": {"name": "원기 물약", "sell": 180},
-	"potion_luck": {"name": "행운의 물", "sell": 220},
-	"potion_swift": {"name": "바람 물약", "sell": 200},
-	"potion_ember": {"name": "불꽃 물약", "sell": 240},
-	"potion_grow": {"name": "성장 물약", "sell": 260},
-	"potion_guard": {"name": "수호 물약", "sell": 260},
-	"potion_moon": {"name": "달빛의 물", "sell": 400},
+	"potion_energy": {"name": "원기 물약", "sell": 80},
+	"potion_luck": {"name": "행운의 물", "sell": 100},
+	"potion_swift": {"name": "바람 물약", "sell": 90},
+	"potion_ember": {"name": "불꽃 물약", "sell": 110},
+	"potion_grow": {"name": "성장 물약", "sell": 115},
+	"potion_guard": {"name": "수호 물약", "sell": 115},
+	"potion_moon": {"name": "달빛의 물", "sell": 180},
 	"sludge": {"name": "탁한 앙금", "sell": 5},
 }
 const FISH_IDS := ["fish_crucian", "fish_minnow", "fish_loach", "fish_bitterling",
@@ -1264,8 +3806,10 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_rainbow", "fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish",
 	"fish_stormjack", "fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden",
 	"fish_king", "fish_dragon",
-	"ore", "gem", "star_shard", "bouquet", "wedding_ring",
+	"ore", "gem", "star_shard", "crystal", "cave_moss", "glow_shroom",
+	"old_box", "rock_wedge", "spring_water", "bouquet", "wedding_ring",
 	"nail", "cloth", "rope", "hinge", "dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_grilled_fish", "dish_stew", "dish_pie", "dish_salad", "dish_punch", "dish_eggplant",
 	"dish_pickle", "dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad",
 	"dish_sweet_potato", "dish_bean_rice", "dish_rice_cake", "dish_melon_ice",
@@ -1273,16 +3817,27 @@ const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"dish_eel_rice", "dish_crab_soup", "dish_salmon_steak", "dish_smelt_fry",
 	"dish_fish_soup", "dish_golden_roast", "dish_moon_tea", "dish_feast",
 	"butter", "dish_fried_egg", "dish_egg_roll", "dish_omurice", "dish_butter_corn",
-	"forage_berry", "forage_herb", "weed", "broom", "forage_shell", "forage_coral",
+	"water_life", "relic_hat", "relic_watch",
+	"relic_bracelet", "relic_ring", "relic_necklace", "grandpa_seed",
+	"settle_letter", "farewell_letter",
+	"forage_berry", "forage_herb", "forage_dandelion", "weed", "broom",
+	"forage_shell", "forage_coral",
 	"forage_trash", "forage_glass", "forage_ring", "forage_relic", "bait",
-	"dish_coral_tea",
+	"housing_kit", "move_letter", "old_book", "trash_bin", "storage_box",
+	"arrow", "dish_coral_tea",
 	"bug_butterfly", "bug_dragonfly", "bug_firefly",
 	"gold_crop", "world_branch", "star_ore", "ghost_essence", "golden_egg", "memory_piece",
 	"potion_energy", "potion_luck", "potion_swift", "potion_ember", "potion_grow",
 	"potion_guard", "potion_moon", "sludge"]
 
 # 채집물/곤충 도감 (팔아도 기록은 남는다)
-const FORAGE_IDS := ["forage_berry", "forage_herb", "weed",
+# 초록 풀숲(잡초·약초 자리)을 뽑았을 때 실제로 나오는 것 —
+# 기본은 잡초, 아주 드물게(1%) 약초가 섞여 나온다
+func weed_drop_id() -> String:
+	return "forage_herb" if randf() < 0.01 else "weed"
+
+
+const FORAGE_IDS := ["forage_berry", "forage_herb", "forage_dandelion", "weed",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
 	# 잡초는 화분 재료 · 조개/비닐봉지/유리/금속 고리는 해변(바다 해금 후)
@@ -1311,35 +3866,105 @@ func discover(id: String) -> bool:
 		return false
 	discovered[id] = day
 	_check_collections()
+	_check_recipe_unlocks()
 	return true
 
 
 # ---- 컬렉션 ----
 #
-# 묶음을 다 모으면 잠긴 레시피가 열린다 (메이플 몬스터컬렉션식).
-# 앞은 쉽고 갈수록 귀해진다. 보상은 전부 요리 레시피다.
+# 묶음을 다 모으면 보상이 열린다 (메이플 몬스터컬렉션식).
+# 따로 지정해 주는 컬렉션만 이 표에 한 줄씩 등록한다.
+#   형식: id/name/reward(레시피 id 또는 "")/ids
+#   perk  "" 아니면 완성 시 영구 버프 — "speed"는 이동 속도 소폭 증가
+#   gate  "" 아니면 이 이야기가 열려야 노트에 나타난다 ("story10" 등)
 const COLLECTIONS := [
-	{"id": "spring_field", "name": "봄의 밭", "reward": "dish_fried_egg",
-		"ids": ["potato", "carrot", "strawberry", "spinach", "onion", "pea"]},
-	{"id": "summer_field", "name": "여름의 밭", "reward": "butter",
-		"ids": ["tomato", "corn", "watermelon", "pepper", "melon", "garlic"]},
-	{"id": "fall_field", "name": "가을의 밭", "reward": "dish_egg_roll",
-		"ids": ["pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice"]},
-	{"id": "winter_field", "name": "겨울의 밭", "reward": "dish_omurice",
-		"ids": ["winter_radish", "leek", "beet", "snow_cabbage"]},
-	{"id": "everyday_fish", "name": "흔한 물고기", "reward": "dish_butter_corn",
-		"ids": ["fish_crucian", "fish_minnow", "fish_loach", "fish_carp", "fish_smelt"]},
-	{"id": "weather_fish", "name": "궂은 날의 물고기", "reward": "dish_moon_tea",
-		"ids": ["fish_eel", "fish_rainbow", "fish_lenok", "fish_mistfish", "fish_stormjack"]},
-	{"id": "night_legends", "name": "밤의 전설", "reward": "dish_golden_roast",
-		"ids": ["fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden"]},
-	{"id": "cave_watch", "name": "동굴 관찰자", "reward": "dish_feast",
-		"ids": ["slime", "bat", "ghost", "treant"]},
+	{"id": "col_food_starter", "name": "초반 음식", "reward": "",
+		"perk": "speed", "perk_text": "이동 속도 소폭 증가 (영구)",
+		"ids": ["dish_berry_jam", "flour", "dish_bread", "dish_berry_toast"]},
+	# 동굴 컬렉션 (메인 스토리 10) — 채우면 채광·탐험에 실질적인 영구 보상.
+	# 단순 진행률이 아니라 「모으니 몸이 달라진다」를 처음 강하게 체감시킨다.
+	{"id": "col_cave_mineral", "name": "동굴의 광물", "reward": "",
+		"perk": "mining", "perk_text": "곡괭이 기력 소모 -25% · 동굴 광석 +1 (영구)",
+		"gate": "story10",
+		"ids": ["ore", "gem", "star_shard", "crystal"]},
+	{"id": "col_cave_life", "name": "동굴의 생명", "reward": "",
+		"perk": "cave_speed", "perk_text": "동굴 이동 속도 +10% (영구)",
+		"gate": "story10",
+		"ids": ["cave_moss", "glow_shroom", "slime", "bat", "ghost"]},
 ]
+
+# 「초반 음식」 완성 보상 — 걸음이 영구히 조금 빨라진다
+const FOOD_COL_SPEED := 1.05
+# 동굴 컬렉션 완성 보상 — 채광·탐험이 몸에 밴다 (할아버지의 요령)
+const CAVE_COL_STAMINA := 0.75    # 곡괭이 기력 소모 배수
+const CAVE_COL_SPEED := 1.1       # 동굴 이동 속도 배수
+
+
+func perk_speed_mult() -> float:
+	return FOOD_COL_SPEED if "col_food_starter" in collections_done else 1.0
+
+
+# 「동굴의 광물」 — 곡괭이질이 가벼워지고, 동굴 광석이 하나 더 나온다
+func perk_pick_stamina_mult() -> float:
+	return CAVE_COL_STAMINA if "col_cave_mineral" in collections_done else 1.0
+
+
+func perk_cave_ore_bonus() -> int:
+	return 1 if "col_cave_mineral" in collections_done else 0
+
+
+# 「동굴의 생명」 — 동굴 지리가 눈에 익어 발걸음이 빨라진다
+func perk_cave_speed_mult() -> float:
+	return CAVE_COL_SPEED if "col_cave_life" in collections_done else 1.0
+
+
+# 이야기로 잠긴 컬렉션은 노트에도 없고, 완성 판정도 하지 않는다
+func collection_open(col: Dictionary) -> bool:
+	if str(col.get("gate", "")) == "story10":
+		return story10_open()
+	return true
+# ---- 레시피 아이템 ----
+#
+# 사거나 받은 레시피는 곧바로 배워지지 않는다 — 가방의 「제작·배치」
+# 칸에 두루마리(아이템)로 들어오고, 클릭해 「배우기」를 눌러야 습득된다.
+var recipe_items := {}   # recipe id -> 보유 개수
+
+
+func give_recipe(rid: String) -> void:
+	recipe_items[rid] = int(recipe_items.get(rid, 0)) + 1
+
+
+func recipe_display_name(rid: String) -> String:
+	if ITEMS.has(rid):
+		return str(ITEMS[rid].name)
+	if DESK_RECIPES.has(rid):
+		return str(DESK_RECIPES[rid].name)
+	if TOOL_KOR.has(rid):
+		return str(TOOL_KOR[rid])
+	return rid
+
+
+# 두루마리를 읽어 레시피를 익힌다 — 이때부터 조리대/제작대에 칸이 생긴다
+func learn_recipe(rid: String) -> bool:
+	if int(recipe_items.get(rid, 0)) <= 0:
+		return false
+	recipe_items[rid] = int(recipe_items[rid]) - 1
+	if int(recipe_items[rid]) <= 0:
+		recipe_items.erase(rid)
+	if rid not in recipes_unlocked:
+		recipes_unlocked.append(rid)
+	# 도구 레시피(스프링클러 등)는 배우는 순간 도구 자체가 열린다
+	if rid in ALL_TOOLS and not unlocked_tools.has(rid):
+		unlocked_tools.append(rid)
+	return true
+
+
 var recipes_unlocked: Array = []
 var collections_done: Array = []
 # 방금 열린 것 — hud가 꺼내 배너를 띄운다 (여기서는 UI를 못 부른다)
 var collection_pending: Array = []
+# 방금 떠오른 기본 요리 레시피 — hud가 꺼내 토스트를 띄운다
+var recipe_pending: Array = []
 
 
 # 이 묶음에서 몇 개를 모았나 (몬스터는 처치 기록을 본다)
@@ -1353,28 +3978,32 @@ func collection_have(col: Dictionary) -> int:
 
 func _check_collections() -> void:
 	for col: Dictionary in COLLECTIONS:
-		if col.id in collections_done:
+		if col.id in collections_done or not collection_open(col):
 			continue
 		if collection_have(col) < (col.ids as Array).size():
 			continue
 		collections_done.append(col.id)
-		if not (col.reward in recipes_unlocked):
+		# 보상이 없는 컬렉션(무기 도감 등)은 완성 배너만 띄운다
+		if str(col.reward) != "" and not (col.reward in recipes_unlocked):
 			recipes_unlocked.append(col.reward)
 		collection_pending.append(col)
+
+
+func date_text(d: int) -> String:
+	return "%d년 %s %d일" % [(d - 1) / (DAYS_PER_SEASON * 4) + 1,
+		SEASON_NAMES[season_of_day(d)], (d - 1) % DAYS_PER_SEASON + 1]
 
 
 func discovered_on(id: String) -> String:
 	if not discovered.has(id):
 		return ""
-	var d := int(discovered[id])
-	return "%d년 %s %d일" % [(d - 1) / (DAYS_PER_SEASON * 4) + 1,
-		SEASON_NAMES[season_of_day(d)], (d - 1) % DAYS_PER_SEASON + 1]
+	return date_text(int(discovered[id]))
 
 # 최후의 연금술에 필요한 전설 재료 7종 (콘텐츠마다 하나씩)
 # [아이템 id, 어느 콘텐츠에서, 힌트]
 const LEGENDS := [
 	["gold_crop", "농사", "달 밝은 날, 정성껏 키운 작물에서 아주 드물게..."],
-	["fish_golden", "낚시", "물가의 전설. 철수도 두 번밖에 못 봤다는 황금잉어."],
+	["fish_golden", "낚시", "물가의 전설. 용식도 두 번밖에 못 봤다는 황금잉어."],
 	["world_branch", "탐험", "깊은 숲 '세계수 동굴' 3층의 수호자가 지키고 있다."],
 	["star_ore", "채광", "동굴 깊은 곳(5층+)의 보상 상자에서 별처럼 빛나는 광석이."],
 	["ghost_essence", "전투", "유령은 아주 드물게 정수를 남긴다."],
@@ -1407,6 +4036,7 @@ const REAGENTS := {
 	"carrot": {"earth": 1, "life": 1},
 	"strawberry": {"life": 2, "water": 1},
 	"tomato": {"fire": 2, "life": 1},
+	"wheat": {"earth": 1, "light": 1},
 	"corn": {"light": 1, "earth": 1},
 	"watermelon": {"water": 3},
 	"pumpkin": {"earth": 2, "fire": 1},
@@ -1460,6 +4090,7 @@ const REAGENTS := {
 	# 채집물 · 곤충
 	"forage_berry": {"life": 1, "water": 1},
 	"forage_herb": {"life": 2, "earth": 1},
+	"forage_dandelion": {"life": 1, "light": 1},
 	"forage_shell": {"water": 2},
 	"forage_coral": {"water": 2, "life": 1},
 	"bug_butterfly": {"light": 1, "life": 1},
@@ -1515,8 +4146,22 @@ const FORMULA_IDS := ["potion_energy", "potion_luck", "potion_swift", "potion_em
 const ALCHEMY_FAIL := "sludge"
 const POTION_ENERGY_HEAL := 60.0
 
-# 낡은 조합법이 나올 확률 (아직 모르는 것이 남아 있을 때만)
-const ALCHEMY_DROP := {"tree": 0.03, "rock": 0.03, "bigrock": 0.12, "mob": 0.06}
+# 낡은 조합법이 나올 확률 (아직 모르는 것이 남아 있을 때만).
+# 아주 드물게 나오는 것이라야 주웠을 때 기쁘다 — 초반 도구로는 거의 안 나오고,
+# 잘 벼린 도구를 들어도 눈에 띄게 잦아지지는 않는다 (alchemy_drop_chance).
+const ALCHEMY_DROP := {"tree": 0.004, "rock": 0.004, "bigrock": 0.015, "mob": 0.006}
+# 어느 도구의 등급을 보는가 (몬스터는 도구와 무관하다)
+const ALCHEMY_DROP_TOOL := {"tree": "axe", "rock": "pickaxe", "bigrock": "pickaxe"}
+
+
+# 실제 확률 — 도구 등급 1단계면 0.6배, 최고 등급이라야 1.2배쯤.
+# 좋은 도구를 든다고 「조합법 캐기」가 되어 버리지 않게 폭을 좁게 잡았다.
+func alchemy_drop_chance(source: String) -> float:
+	var base := float(ALCHEMY_DROP.get(source, 0.0))
+	if not ALCHEMY_DROP_TOOL.has(source):
+		return base
+	var lv: int = int(tool_level.get(str(ALCHEMY_DROP_TOOL[source]), 1))
+	return base * (0.4 + 0.2 * float(lv))
 
 var alchemy_known: Array = []   # 알아낸 조합법 id
 var alchemy_brews := {}         # 조합법 id -> 만든 횟수
@@ -1697,6 +4342,14 @@ const RECIPES := {
 	"dish_soup": {"needs": {"potato": 1, "carrot": 2}, "energy": 45},
 	"dish_jam": {"needs": {"strawberry": 3}, "energy": 35},
 	"dish_cornbread": {"needs": {"corn": 2}, "energy": 50},
+	# ---- 초반 음식 사슬 (레시피는 잡화점에서 조건부로 판다) ----
+	# 산딸기를 주워 봐야 잼이, 밀을 거둬 봐야 밀가루가 선반에 오른다.
+	# 넷을 전부 만들면 도감 「초반 음식」 컬렉션이 차고 이동 속도가 오른다
+	"dish_berry_jam": {"needs": {"forage_berry": 3}, "energy": 30, "locked": true},
+	"flour": {"needs": {"wheat": 1}, "energy": 5, "locked": true},
+	"dish_bread": {"needs": {"flour": 1}, "energy": 45, "locked": true},
+	"dish_berry_toast": {"needs": {"dish_berry_jam": 1, "dish_bread": 1},
+		"energy": 80, "locked": true},
 	"dish_eggplant": {"needs": {"eggplant": 2}, "energy": 40},
 	"dish_salad": {"needs": {"cabbage": 1, "milk": 1}, "energy": 55},
 	"dish_punch": {"needs": {"watermelon": 1, "strawberry": 1}, "energy": 60},
@@ -1713,16 +4366,19 @@ const RECIPES := {
 	"dish_garlic_bread": {"needs": {"garlic": 1, "corn": 1}, "energy": 50},
 	"dish_spinach_saute": {"needs": {"spinach": 2, "garlic": 1}, "energy": 55},
 	# ---- 물에서 나오는 것 ----
-	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40},
-	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65},
-	"dish_sashimi": {"needs": {"fish_trout": 1, "winter_radish": 1}, "energy": 85},
+	# 생선 요리는 물고기를 잡았다고 저절로 떠오르지 않는다 —
+	# 잡화점에서 레시피(SHOP_DISH_RECIPES)를 사서 배운다
+	"dish_grilled_fish": {"needs": {"fish_crucian": 1}, "energy": 40, "locked": true},
+	"dish_stew": {"needs": {"fish_catfish": 1, "tomato": 1}, "energy": 65, "locked": true},
+	"dish_sashimi": {"needs": {"fish_trout": 1, "winter_radish": 1}, "energy": 85, "locked": true},
 	# 장어덮밥·연어 스테이크·빙어 튀김은 해변 노점에서 레시피를 사야 배운다
 	"dish_eel_rice": {"needs": {"fish_eel": 1, "rice": 1}, "energy": 110, "locked": true},
-	"dish_crab_soup": {"needs": {"fish_crab": 1, "onion": 1}, "energy": 95},
+	"dish_crab_soup": {"needs": {"fish_crab": 1, "onion": 1}, "energy": 95, "locked": true},
 	"dish_salmon_steak": {"needs": {"fish_salmon": 1, "garlic": 1}, "energy": 120, "locked": true},
 	"dish_smelt_fry": {"needs": {"fish_smelt": 3}, "energy": 70, "locked": true},
-	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60},
-	# ---- 귀한 것 (컬렉션 보상으로 열린다) ----
+	"dish_fish_soup": {"needs": {"fish_minnow": 2, "spinach": 1}, "energy": 60, "locked": true},
+	# ---- 귀한 것 ----
+	# 황금잉어 구이는 잡화점 선반(황금잉어를 낚아 본 뒤)에서 레시피를 판다
 	"dish_golden_roast": {"needs": {"fish_golden": 1, "sweet_potato": 1}, "energy": 160, "locked": true},
 	"dish_moon_tea": {"needs": {"fish_moonfish": 1, "forage_herb": 2}, "energy": 150, "locked": true},
 	# 숨겨진 레시피 — 해변에서 산호 조각을 처음 주우면 떠오른다
@@ -1735,7 +4391,66 @@ const RECIPES := {
 	"dish_omurice": {"needs": {"egg": 1, "rice": 2}, "energy": 90, "locked": true},
 	"dish_butter_corn": {"needs": {"butter": 1, "corn": 1}, "energy": 60, "locked": true},
 }
+
+# ---- 요리별 배부름 (배고픔 회복량) ----
+#
+# 체력(energy)과 **따로 논다**. 달인의 차 한 잔은 몸에 기운이 돌지만
+# 배는 안 부르고, 감자 한 알은 기운은 덜해도 속이 든든하다.
+# 그래서 회복량을 요리마다 따로 적는다 — 무엇을 먹을지 고민하게 만드는
+# 것이 이 표의 목적이다.
+#
+#   국·밥·덮밥  : 든든하다 (체력보다 배부름이 크다)
+#   빵·구이·전  : 무난하다
+#   잼·간식·튀김: 입은 즐겁지만 금방 꺼진다
+#   차·음료·얼음: 기운은 나도 배는 안 찬다
+#   재료(밀가루·버터): 그대로 먹을 것이 못 된다
+const RECIPE_FILL := {
+	# 밭에서 나오는 것
+	"dish_baked_potato": 45, "dish_soup": 55, "dish_jam": 20,
+	"dish_cornbread": 60, "dish_berry_jam": 18, "flour": 3,
+	"dish_bread": 60, "dish_berry_toast": 75,
+	"dish_eggplant": 45, "dish_salad": 40, "dish_punch": 20,
+	"dish_pie": 85, "dish_pickle": 30, "dish_ratatouille": 95,
+	"dish_pumpkin_soup": 85, "dish_corn_salad": 55, "dish_sweet_potato": 70,
+	"dish_bean_rice": 100, "dish_rice_cake": 90, "dish_melon_ice": 25,
+	"dish_onion_soup": 65, "dish_garlic_bread": 55, "dish_spinach_saute": 45,
+	# 물에서 나오는 것
+	"dish_grilled_fish": 45, "dish_stew": 80, "dish_sashimi": 55,
+	"dish_eel_rice": 110, "dish_crab_soup": 90, "dish_salmon_steak": 100,
+	"dish_smelt_fry": 50, "dish_fish_soup": 70,
+	# 귀한 것
+	"dish_golden_roast": 130, "dish_moon_tea": 35, "dish_coral_tea": 35,
+	"dish_feast": 200,
+	# 마음이 담긴 요리
+	"butter": 8, "dish_fried_egg": 30, "dish_egg_roll": 50,
+	"dish_omurice": 105, "dish_butter_corn": 65,
+}
+const RECIPE_FILL_DEFAULT := 0.8   # 표에 없으면 체력의 8할쯤 찬다
+
+
+# 이 요리를 먹으면 배가 얼마나 부른가
+func recipe_fill(id: String) -> float:
+	if RECIPE_FILL.has(id):
+		return float(RECIPE_FILL[id])
+	if RECIPES.has(id):
+		return float(RECIPES[id].energy) * RECIPE_FILL_DEFAULT
+	return 0.0
+
+
+# 「든든함」 한마디 — 숫자 대신 감으로 읽는다 (가방·요리 창에서 쓴다)
+func fill_word(id: String) -> String:
+	var f := recipe_fill(id)
+	if f >= 100.0:
+		return "아주 든든하다"
+	if f >= 60.0:
+		return "든든하다"
+	if f >= 35.0:
+		return "적당하다"
+	if f >= 15.0:
+		return "가볍다"
+	return "요기가 안 된다"
 const RECIPE_IDS := ["dish_baked_potato", "dish_soup", "dish_jam", "dish_cornbread",
+	"dish_berry_jam", "flour", "dish_bread", "dish_berry_toast",
 	"dish_eggplant", "dish_salad", "dish_punch", "dish_pie", "dish_pickle",
 	"dish_ratatouille", "dish_pumpkin_soup", "dish_corn_salad", "dish_sweet_potato",
 	"dish_bean_rice", "dish_rice_cake", "dish_melon_ice", "dish_onion_soup",
@@ -1789,6 +4504,10 @@ func note_progress() -> Dictionary:
 		if minerals_found.get(mineral, false):
 			filled += 1
 	for npc_id in NPCS:
+		# 이사 오고 가는 일반/특수 주민은 노트 페이지에 넣지 않는다 —
+		# 떠날 수 있는 사람으로 100%가 막히면 안 된다 (필수 주민만 센다)
+		if str(NPC_KIND.get(npc_id, "core")) != "core":
+			continue
 		total += 2  # 호감도 50 / 100 이야기
 		if int(affinity[npc_id]) >= 50:
 			filled += 1
@@ -1815,6 +4534,211 @@ func legends_owned() -> int:
 
 func can_final_alchemy() -> bool:
 	return legends_owned() == LEGENDS.size() and not ending_seen
+
+
+# ---- 진짜 엔딩: 꿈속의 배웅 ----
+#
+# 게임의 핵심 목표는 **할아버지의 연구 노트를 100% 채우는 것**이다.
+# 해금 조건:
+#   1) 연구 노트 100% (note_progress().ratio >= 1.0)
+#   2) 「할머니의 유품」 5종 — 시계·모자·팔찌·반지·목걸이.
+#      노트가 20% 차오를 때마다 유품 하나의 힌트가 순서대로 열리고,
+#      힌트가 열린 유품만 그 장소에서 아주 드물게 발견된다 (RELICS)
+#   3) 일곱 분야(채광/벌목/농사/요리/전투/낚시/목장) **만렙** —
+#      만렙을 찍을 때마다 「생명의 물」 한 병 (총 7병, water_life_found)
+#   4) 연화(숲속의 집)를 찾아가 항아리에 일곱 병을 붓고
+#      「기억의 물약」을 받아, 마시고 침대에서 잠들면 — 꿈속 엔딩
+# 엔딩(꿈)이 끝나면 dream_seen이 켜지고 자유 플레이로 이어진다.
+
+# 생명의 물 — 일곱 분야를 만렙까지 갈고닦은 증표
+const ENDING_SKILLS := ["mine", "forest", "farm", "cook", "combat", "fish", "ranch"]
+var water_life_found := {}    # 만렙 분야 id -> true
+var water_pending := 0        # 방금 받은 병 수 — hud가 꺼내 토스트를 띄운다
+var dream_ready := false      # 기억의 물약을 마셨다 — 오늘 밤 꿈속 엔딩
+var dream_seen := false       # 꿈속 엔딩을 봤다 (자유 플레이 계속)
+# 통계 리포트용 기록
+var arrive_day := 0           # 처음 마을에 발 디딘 날 (0 = 옛 세이브)
+var arrive_clock := ""        # 그 시각 ("오후 2:15")
+var playtime_sec := 0.0       # 실제 플레이 시간 (초)
+var rocks_mined := 0          # 깬 바위 수
+
+# 할머니의 유품 5종 — 순서 = 힌트 해금 순서 (노트 20%마다 하나씩).
+# 힌트가 열린 유품만 그 자리에서 발견된다. 확률·수치는 추후 조정 (임시값)
+# 유품은 이야기 순서대로 놓는다 — 노트 20%마다 힌트가 하나씩 열리고,
+# 각 유품은 제 이야기(스토리 11·13·16·17·18)에서 확정으로 손에 들어온다.
+const RELICS := [
+	{"id": "relic_hat", "name": "할머니의 모자", "chance": 0.05,
+		"hint": "동굴 50층 아래, 광석을 깨다 보면 낡은 모자가 나온다더라..."},
+	{"id": "relic_bracelet", "name": "할머니의 팔찌", "chance": 1.0,
+		"hint": "두 분이 자주 걷던 해변 어딘가... 바다가 간직하고 있다더라."},
+	{"id": "relic_ring", "name": "할머니의 반지", "chance": 1.0,
+		"hint": "마을 밖 옛 농지 — 흙을 갈아엎다 보면 무언가 나온다더라."},
+	{"id": "relic_necklace", "name": "할머니의 목걸이", "chance": 1.0,
+		"hint": "동물들이 오가던 옛 목장 언저리에 잠들어 있다더라."},
+	{"id": "relic_watch", "name": "할머니의 시계", "chance": 1.0,
+		"hint": "두 분이 마지막으로 함께 오르던 언덕 위, 그 자리에..."},
+]
+var relic_pending := ""       # 방금 발견한 유품 이름 — hud가 꺼내 토스트
+
+
+# i번째 유품의 힌트가 열렸는가 — 노트 20%마다 하나씩 (0번=20% ... 4번=100%)
+func relic_hint_open(i: int) -> bool:
+	return note_progress().ratio >= 0.2 * float(i + 1) - 0.0001
+
+
+func relics_owned() -> int:
+	var n := 0
+	for r: Dictionary in RELICS:
+		if int(items[r.id]) > 0:
+			n += 1
+	return n
+
+
+# 유품 발견 굴림 — 힌트가 열려 있고 아직 없을 때만.
+# roll에 0.0을 주면 무조건 성공, force_hint는 검증 하네스 전용이다.
+func try_relic(i: int, roll := -1.0, force_hint := false) -> bool:
+	var def: Dictionary = RELICS[i]
+	if int(items[def.id]) > 0:
+		return false
+	if not force_hint and not relic_hint_open(i):
+		return false
+	var r := randf() if roll < 0.0 else roll
+	if r >= float(def.chance):
+		return false
+	items[def.id] = 1
+	discover(str(def.id))
+	relic_pending = str(def.name)
+	return true
+
+
+# 분야가 만렙에 닿으면 생명의 물 한 병 — 분야당 한 번뿐이다.
+# 스토리 19(일곱 갈래의 삶)가 시작된 뒤에만 병이 생긴다. 그 전에 이미
+# 만렙을 찍어 둔 분야는 스토리가 열릴 때 소급해서 한꺼번에 채워진다.
+func check_skill_water(id: String) -> void:
+	if story19_phase == "":
+		return
+	if id not in ENDING_SKILLS or water_life_found.has(id):
+		return
+	if skill_lv(id) < SKILL_MAX_LV:
+		return
+	water_life_found[id] = true
+	items["water_life"] += 1
+	discover("water_life")
+	water_pending += 1
+
+
+# 이미 만렙인 분야를 소급해서 채운다 — 채운 분야 id 목록을 돌려준다
+func water_backfill() -> Array:
+	var got: Array = []
+	for id: String in ENDING_SKILLS:
+		if water_life_found.has(id) or skill_lv(id) < SKILL_MAX_LV:
+			continue
+		water_life_found[id] = true
+		items["water_life"] += 1
+		discover("water_life")
+		got.append(id)
+	return got
+
+
+# 마지막 이야기(스토리 20)의 세 가지 조건이 다 갖춰졌는가 —
+# 연구 노트 100% · 유품 다섯 · 생명의 물 일곱
+func ending_ready() -> bool:
+	return water_life_found.size() >= ENDING_SKILLS.size() \
+		and relics_owned() >= RELICS.size() \
+		and note_progress().ratio >= 1.0
+
+
+func playtime_text() -> String:
+	var mins := int(playtime_sec / 60.0)
+	return "%d시간 %d분" % [mins / 60, mins % 60]
+
+
+# ---- 주민 분류 · 이사 시스템 (입주/이탈) ----
+#
+# 주민은 세 갈래다:
+#   core    필수 주민 — 메인 스토리로 확정 입주 (이장·만수·무쇠·보라·
+#           용식·서하·재민·연화·솔이). 절대 마을을 떠나지 않는다.
+#   normal  일반 주민 — 빈 집터가 있으면 랜덤으로 「이사 신청 편지」를
+#           보내 오는 생활형 캐릭터 (농부 순돌·미식가 다미·낚시광 강태)
+#   special 특수 주민 — 조건을 채워야 해금 (연금술사 묘연 — 연구 노트 50%)
+# 편지를 수락해야 입주하고, 호감도가 낮거나(LEAVE_AFF 미만) 오래
+# 말을 걸지 않으면(NEGLECT_DAYS) 떠날 마음이 생긴다 — 대개는 직접
+# 「이사 가고 싶다」고 말하지만(붙잡을 수 있다), 드물게는 말없이
+# 편지 한 통만 남기고 떠난다. 호감도 SAFE_AFF 이상이면 절대 안 떠난다.
+const NPC_KIND := {
+	"chief": "core", "merchant": "core", "blacksmith": "core",
+	"postman": "core",
+	"rancher": "core", "fisher": "core", "librarian": "core",
+	"explorer": "core", "forest_mom": "core", "forest_girl": "core",
+	"farmer": "normal", "foodie": "normal", "angler": "normal",
+	"miner": "normal", "florist": "normal", "carpenter": "normal",
+	"herbalist": "normal", "painter": "normal", "musician": "normal",
+	"weaver": "normal",
+	"alchemist": "special",
+}
+# 일반 주민 후보 — 앞쪽일수록 먼저 편지를 보내기 쉽다 (랜덤이지만 풀 순서대로
+# 소문이 도는 셈). 전부 정착하면 최대 주민 21명 (핵심 9 + 일반 10 +
+# 특수 1 + 플레이어) — 마을 회의(20명)는 마을을 알뜰히 키워야 열린다.
+const SETTLER_POOL := ["farmer", "foodie", "angler", "miner", "florist",
+	"carpenter", "herbalist", "painter", "musician", "weaver"]
+const ALCHEMIST_NOTE := 0.5        # 연금술사 해금 — 연구 노트 50%
+const SETTLER_OFFER_CHANCE := 0.25 # 아침마다 편지가 올 확률
+const LEAVE_AFF := 20              # 이 밑이면 떠날 마음이 생긴다
+const SAFE_AFF := 40               # 이 위면 절대 떠나지 않는다
+const NEGLECT_DAYS := 7            # 이만큼 말을 안 걸면 서운해한다
+const LEAVE_CHANCE := 0.25         # 조건이 찼을 때 아침마다 떠날 확률
+const SILENT_LEAVE := 0.2          # 그중 말없이 떠나는 비율
+var settlers: Array = []           # 정착한 일반/특수 주민 id
+var settler_homes := {}            # nid -> [x, y] (집 앵커)
+var empty_houses: Array = []       # 떠난 주민이 남긴 빈 집 — 재입주 우선
+var settler_offer := ""            # 읽지 않은 이사 신청 편지의 주인
+var settler_offer_day := 0         # 마지막으로 편지를 굴린 날
+var settler_arrive := ""           # 내일 아침 이사 올 주민
+var settler_arrive_day := 0
+var settler_leaving := ""          # 「이사 가고 싶다」 말하려는 주민 (❗)
+var settler_leave_day := 0         # 마지막으로 이탈을 굴린 날
+var npc_last_talk := {}            # nid -> 마지막으로 대화한 날
+var last_farewell := ""            # 마지막으로 말없이 떠난 주민 이름 (편지용)
+
+
+func settler_kind(nid: String) -> String:
+	return str(NPC_KIND.get(nid, "core"))
+
+
+# 다음 이사 신청 후보 — 일반 주민 풀에서 랜덤.
+# 떠난 주민도 다시 올 수 있다 (마을은 계속 살아 움직인다).
+# 연금술사 묘연은 마을에 입주하지 않는다 — 깊은 숲의 오두막에서
+# 계속 살며, 스토리 12로 만난다 (특수 주민의 새 길).
+func settler_candidates() -> Array:
+	var out: Array = []
+	for nid: String in SETTLER_POOL:
+		if nid not in settlers and settler_arrive != nid:
+			out.append(nid)
+	return out
+
+
+# ---- 주민 삼자 대화 — 모여서 떠드는 이야깃거리 ----
+# %A = 말을 거는 쪽 / %B = 상대 / 선택지마다 호감도가 오르는 쪽이 다르다
+const TRIO_TOPICS := [
+	{"q": "「어어, 마침 잘 왔어! %B는 축구보다 야구가\n좋다는데, 넌 어떻게 생각해?」",
+		"a1": "나도 야구가 좋아!", "w1": "b",
+		"a2": "역시 공은 발로 차야지!", "w2": "a"},
+	{"q": "「%B가 그러는데 바다는 노을 질 때가 최고래.\n난 아침 바다가 좋은데 — 넌?」",
+		"a1": "노을 지는 바다지!", "w1": "b",
+		"a2": "아침 바다가 최고야!", "w2": "a"},
+	{"q": "「%B랑 내기했거든 — 밥에는 국이냐, 반찬이냐.\n%B는 국파야. 네 생각은?」",
+		"a1": "당연히 국이지!", "w1": "b",
+		"a2": "반찬이 본체지!", "w2": "a"},
+	{"q": "「비 오는 날 말이야, %B는 집이 최고라는데\n난 빗속 산책도 좋거든. 넌 어때?」",
+		"a1": "집에서 뒹굴뒹굴!", "w1": "b",
+		"a2": "우산 쓰고 산책!", "w2": "a"},
+	{"q": "「%B는 겨울이 제일 좋대. 눈 때문이라나.\n난 봄이 좋은데 — 너는?」",
+		"a1": "겨울 눈이 낭만이지!", "w1": "b",
+		"a2": "역시 꽃 피는 봄!", "w2": "a"},
+	{"q": "「%B랑 얘기 중이었어 — 든든한 아침이냐,\n느긋한 늦잠이냐! 너라면?」",
+		"a1": "아침밥은 못 참지!", "w1": "b",
+		"a2": "늦잠이 보약이야!", "w2": "a"},
+]
 
 
 # 수확 품질 굴리기: 0=일반 1=은 2=금 (농사 숙련도가 높을수록 좋다)
@@ -1865,9 +4789,28 @@ func ingredient_count(id: String) -> int:
 	return int(produce[id]) if CROPS.has(id) else int(items[id])
 
 
-# 잠긴 레시피인가 (컬렉션 보상으로 열린다)
+# 잠긴 레시피인가 — 모든 요리는 배워야 만들 수 있다.
+# 조리대는 빈 채로 시작하고, 인게임 플레이로만 하나씩 열린다:
+#   기본 요리  재료를 전부 발견하면 저절로 떠오른다 (_check_recipe_unlocks)
+#   locked 표시 퀘스트·컬렉션·상점(노점) 같은 정해진 길로만 열린다
 func recipe_locked(id: String) -> bool:
-	return bool(RECIPES[id].get("locked", false)) and id not in recipes_unlocked
+	return id not in recipes_unlocked
+
+
+# 재료를 새로 발견할 때마다 — 재료를 다 아는 기본 요리가 떠오른다.
+# (locked 표시가 붙은 요리는 여기서 열리지 않는다)
+func _check_recipe_unlocks() -> void:
+	for rid: String in RECIPE_IDS:
+		if bool(RECIPES[rid].get("locked", false)) or rid in recipes_unlocked:
+			continue
+		var know_all := true
+		for k in RECIPES[rid].needs:
+			if not discovered.has(k):
+				know_all = false
+				break
+		if know_all:
+			recipes_unlocked.append(rid)
+			recipe_pending.append(rid)   # hud가 꺼내 토스트를 띄운다
 
 
 func can_cook(id: String) -> bool:
@@ -1906,38 +4849,40 @@ func cook(id: String) -> bool:
 #   zone  초록 구간의 폭(작을수록 어렵다) · stages 몇 번 맞춰야 하는가
 #   speed 찌가 움직이는 빠르기 · w 같은 조건 안에서의 흔한 정도
 const FISH := [
-	# 사계절 — 아무 때나 무는 것들
+	# 계절 로스터는 완전히 갈린다 — 일반 물고기는 저마다 한 계절에만
+	# 문다 (안개·폭풍·별밤 같은 날씨 어종과 전설급만 계절 무관).
+	# 흔한 것들
 	{"id": "fish_crucian", "w": 1.00, "zone": 96.0, "stages": 1, "speed": 1.00,
-		"seasons": [], "time": "", "weather": [], "hint": "가볍게 톡 —"},
+		"seasons": [SPRING], "time": "", "weather": [], "hint": "가볍게 톡 —"},
 	{"id": "fish_minnow", "w": 0.90, "zone": 100.0, "stages": 1, "speed": 0.95,
-		"seasons": [], "time": "", "weather": [], "hint": "톡, 톡 —"},
+		"seasons": [SUMMER], "time": "", "weather": [], "hint": "톡, 톡 —"},
 	{"id": "fish_loach", "w": 0.70, "zone": 88.0, "stages": 1, "speed": 1.15,
-		"seasons": [SPRING, SUMMER, FALL], "time": "", "weather": [], "hint": "꿈틀거린다"},
+		"seasons": [FALL], "time": "", "weather": [], "hint": "꿈틀거린다"},
 	# 봄
 	{"id": "fish_bitterling", "w": 0.65, "zone": 92.0, "stages": 1, "speed": 1.00,
 		"seasons": [SPRING], "time": "", "weather": [], "hint": "가볍게 톡 —"},
 	{"id": "fish_carp", "w": 0.55, "zone": 84.0, "stages": 2, "speed": 1.12,
-		"seasons": [SPRING, SUMMER], "time": "", "weather": [], "hint": "제법 당긴다!"},
+		"seasons": [SUMMER], "time": "", "weather": [], "hint": "제법 당긴다!"},
 	{"id": "fish_sweetfish", "w": 0.40, "zone": 70.0, "stages": 2, "speed": 1.30,
 		"seasons": [SPRING], "time": "morning", "weather": [], "hint": "빠르다!"},
 	{"id": "fish_trout", "w": 0.35, "zone": 66.0, "stages": 2, "speed": 1.35,
-		"seasons": [SPRING, WINTER], "time": "morning", "weather": [], "hint": "빠르다!"},
+		"seasons": [WINTER], "time": "morning", "weather": [], "hint": "빠르다!"},
 	# 여름
 	{"id": "fish_mandarin", "w": 0.32, "zone": 58.0, "stages": 2, "speed": 1.45,
 		"seasons": [SUMMER], "time": "day", "weather": [], "hint": "홱 채간다!"},
 	{"id": "fish_catfish", "w": 0.45, "zone": 54.0, "stages": 2, "speed": 1.30,
-		"seasons": [SUMMER, FALL], "time": "night", "weather": [], "hint": "묵직하다!!"},
+		"seasons": [SUMMER], "time": "night", "weather": [], "hint": "묵직하다!!"},
 	{"id": "fish_eel", "w": 0.30, "zone": 50.0, "stages": 3, "speed": 1.40,
 		"seasons": [SUMMER], "time": "night", "weather": [WEATHER_RAIN], "hint": "미끄럽게 빠져나간다!!"},
 	{"id": "fish_snakehead", "w": 0.25, "zone": 48.0, "stages": 3, "speed": 1.50,
-		"seasons": [SUMMER, FALL], "time": "night", "weather": [], "hint": "낚싯대가 휜다!!!"},
+		"seasons": [FALL], "time": "night", "weather": [], "hint": "낚싯대가 휜다!!!"},
 	# 가을
 	{"id": "fish_crab", "w": 0.45, "zone": 78.0, "stages": 1, "speed": 0.85,
 		"seasons": [FALL], "time": "", "weather": [], "hint": "게걸음처럼 옆으로 —"},
 	{"id": "fish_salmon", "w": 0.30, "zone": 52.0, "stages": 3, "speed": 1.50,
 		"seasons": [FALL], "time": "morning", "weather": [], "hint": "거슬러 오른다!!"},
 	{"id": "fish_rainbow", "w": 0.30, "zone": 56.0, "stages": 2, "speed": 1.40,
-		"seasons": [SPRING, FALL], "time": "", "weather": [WEATHER_RAIN], "hint": "무지개빛이 스친다!"},
+		"seasons": [SPRING], "time": "", "weather": [WEATHER_RAIN], "hint": "무지개빛이 스친다!"},
 	# 겨울
 	{"id": "fish_smelt", "w": 0.75, "zone": 90.0, "stages": 1, "speed": 1.05,
 		"seasons": [WINTER], "time": "", "weather": [], "hint": "가볍게 톡 —"},
@@ -2002,8 +4947,10 @@ var fish_caught := {}  # 도감용 누적 기록
 # 부지 구입 시스템은 삭제했다. 맵은 처음부터 전부 오갈 수 있고,
 # 다음 마을은 이후 이야기(스토리)로 열린다.
 
-func is_tile_owned(_x: int, _y: int) -> bool:
-	return true
+func is_tile_owned(x: int, y: int) -> bool:
+	# 메인 스토리 4의 확장 구역만 잠긴다 — 그 밖의 땅은 전부 오갈 수 있다
+	var zid := zone_at(x, y)
+	return zid == "" or zid in zones_open
 
 
 # ---- NPC / 퀘스트 ----
@@ -2015,11 +4962,12 @@ func is_tile_owned(_x: int, _y: int) -> bool:
 # 지금 맞는 갈래를 모아 그 안에서 하나를 뽑는다.
 #
 #   birthday  [계절, 날] — 그날 선물은 세 배로 오른다
+#   gender    성별 (m/f) — 호감도·결혼 이벤트가 참고한다
 #   romance   연애할 수 있는가 (마을 어른 둘은 아니다)
 #   loves     아주 좋아함 +30 · likes 좋아함 +18 · hates 싫어함 -6
 #             (표에 없는 것은 +8)
 const NPCS := {
-	"merchant": {"name": "민지", "birthday": [SPRING, 12], "romance": true,
+	"merchant": {"name": "만수", "birthday": [SPRING, 12], "gender": "f", "romance": true,
 	"lines": [
 		"어서 와! 오늘도 농사는 잘 되고 있어?",
 		"제철 씨앗이 제일 잘 자라. 가게 안으로 들어와!",
@@ -2062,7 +5010,7 @@ const NPCS := {
 	"secret50": "너희 할아버지... 우리 가게 단골이었어. 늘 이상한 걸 찾으셨지.\n'달빛을 먹고 자란 작물'이라던가... 밭에서도 기적이 자란다고 하셨어.",
 	"secret100": "떠나시기 전에 그러셨어. '내 연구는 이 마을 전부에 흩어져 있다'고.\n밭, 호수, 숲, 동굴... 그리고 사람들 속에도. 이제 그 말뜻을 알겠니?",
 	},
-	"fisher": {"name": "철수", "birthday": [SUMMER, 3], "romance": true,
+	"fisher": {"name": "용식", "birthday": [SUMMER, 3], "gender": "m", "romance": true,
 	"lines": [
 		"입질이 오면 초록 구간에서 낚아채는 거야.",
 		"황금잉어는 정말 귀하지... 나도 두 번밖에 못 봤어.",
@@ -2103,7 +5051,7 @@ const NPCS := {
 	"secret50": "네 할아버지랑 밤새 낚시하던 게 엊그제 같은데...\n그분은 물고기를 잡으면 놓아주면서 뭔가를 계속 적으셨어. 연구라고 하셨지.",
 	"secret100": "할아버지가 마지막으로 남긴 말이 있어. '전설은 잡는 게 아니라\n기록하는 것'이라고. 이 기억 조각... 네가 가져야 할 것 같구나.",
 	},
-	"rancher": {"name": "보라", "birthday": [FALL, 20], "romance": true,
+	"rancher": {"name": "보라", "birthday": [FALL, 20], "gender": "f", "romance": true,
 	"lines": [
 		"동물은 사랑을 먹고 자라. 매일 쓰다듬어 줘!",
 		"닭이 낳은 달걀은 아침에 거둬야 신선해.",
@@ -2144,7 +5092,7 @@ const NPCS := {
 	"secret50": "너희 할아버지, 동물들이 유난히 따랐어.\n'동물이 주는 건 생산물이 아니라 마음'이라고 입버릇처럼 말씀하셨지.",
 	"secret100": "언젠가 금빛으로 빛나는 달걀을 보여주신 적이 있어.\n'사랑받은 닭만이 낳을 수 있다'며... 나는 아직도 그게 꿈같아.",
 	},
-	"blacksmith": {"name": "무쇠", "birthday": [WINTER, 8], "romance": false,
+	"blacksmith": {"name": "무쇠", "birthday": [WINTER, 8], "gender": "m", "romance": false,
 	"lines": [
 		"광석을 가져오면 도구를 벼려주지. 대장간으로 와.",
 		"동굴 깊은 곳 광석일수록 좋은 쇠가 된다.",
@@ -2177,7 +5125,7 @@ const NPCS := {
 	"secret50": "자네 할아버지? 별난 양반이었지. 광석을 사 가면서\n'이건 녹이려는 게 아니라 별을 담으려는 거야'라고 하더군.",
 	"secret100": "떠나기 전에 화로를 빌려 갔어. 뭘 만들었는지는 끝내 안 보여줬지만...\n그날 밤 대장간 굴뚝에서 무지개색 연기가 올라왔다네.",
 	},
-	"chief": {"name": "덕수", "birthday": [FALL, 5], "romance": false,
+	"chief": {"name": "덕수", "birthday": [FALL, 5], "gender": "m", "romance": false,
 	"lines": [
 		"우리 마을에 젊은 사람이 오니 좋구먼.",
 		"부지 문서는 내가 관리하고 있네. 표지판에서 사면 돼.",
@@ -2210,8 +5158,262 @@ const NPCS := {
 	"secret50": "자네 할아버지가 이 마을에 처음 왔을 때, 다들 미친 사람 취급했어.\n나만 빼고. 그 눈빛은... 미친 게 아니라 믿는 사람의 눈이었거든.",
 	"secret100": "그 양반이 마지막으로 한 말을 전해주지. '덕수, 내 손주가 오면\n일곱 가지를 모을 걸세. 그때 이 마을은 기적을 보게 될 거야.'",
 	},
+	# ---- 우체국이 서면 마을에 눌러앉는 사람 (메인 스토리 3의 마지막) ----
+	"postman": {"name": "우체부 아저씨", "birthday": [SUMMER, 3], "gender": "m",
+	"romance": false,
+	"lines": [
+		"자네 편지 덕에 이 마을에 눌러앉게 됐지 뭔가.",
+		"우체국이 생기니 이제 소문도 편지도 다 여기로 모여.",
+		"먼 길 걷는 건 이제 그만... 이라고 말은 하는데, 몸이 근질근질해.",
+		"이사 오고 싶다는 편지가 또 왔더군. 자네한테 갈 걸세.",
+		"편지 한 통이 사람 하나를 데려오는 걸 여러 번 봤네.",
+	],
+	"morning": ["첫 배달은 해 뜨기 전에 나가야 제맛이지."],
+	"night": ["이 시간에 오는 편지는 대개 급한 소식이야."],
+	"aff30": ["숲에서 처음 만났을 때가 엊그제 같구먼.",
+		"자네 앞으로 온 편지는 내가 제일 먼저 챙겨 두네."],
+	"aff70": ["이 마을에 정 붙인 건 순전히 자네 탓일세.",
+		"내 가방에서 제일 무거운 건 자네한테 갈 소식이야."],
+	"loves": ["dish_bread", "dish_berry_toast", "dish_egg_roll"],
+	"likes": ["dish_soup", "forage_berry", "milk"],
+	"hates": ["sludge"],
+	"secret50": "자네 할아버지 앞으로 온 편지는 늘 두꺼웠어.\n답장은 더 두꺼웠고. 어디로 부치는지는 끝내 안 알려주셨지.",
+	"secret100": "마지막으로 부친 편지, 수취인이 비어 있었네.\n「언젠가 이 집에 올 사람에게」 — 그게 자네였구먼.",
+	},
+	# ---- 메인 스토리 5에서 합류하는 사람들 ----
+	"explorer": {"name": "재민", "birthday": [FALL, 7], "gender": "m", "romance": false,
+	"lines": [
+		"이 마을, 걸어서 안 가 본 데가 없어. ...아마도?",
+		"지도 밖이 제일 재밌는 법이야.",
+		"동굴 가 봤어? 밑으로 내려갈수록 심장이 뛰지!",
+		"가만히 있으면 몸이 근질근질해서 말이야.",
+		"오늘은 어느 쪽으로 가 볼까... 같이 갈래?",
+	],
+	"morning": ["아침 공기 좋다! 이런 날은 멀리 가야지."],
+	"night": ["별 보면서 걷는 것도 모험이라면 모험이지."],
+	"aff30": ["너도 꽤 모험가 기질이 있단 말이지.",
+		"다음에 좋은 데 찾으면 너한테 제일 먼저 알려줄게."],
+	"aff70": ["혼자 다니는 게 좋았는데... 요즘은 둘이 다니는 게 더 좋아.",
+		"내 지도에 네 이름으로 표시해 둔 곳이 있어. 언젠가 같이 가자."],
+	"loves": ["dish_stew", "forage_relic", "fish_stormjack"],
+	"likes": ["forage_berry", "forage_glass", "dish_baked_potato"],
+	"hates": ["sludge"],
+	},
+	"forest_mom": {"name": "연화", "birthday": [SPRING, 20], "gender": "f", "romance": false,
+	"lines": [
+		"숲의 아침 공기는 약이 돼요. 그래서 여기 살아요.",
+		"솔이가 요즘은 얼굴빛이 많이 좋아졌어요.",
+		"조용한 게 좋아서... 마을엔 잘 안 내려가요.",
+		"약초를 달여 두었는데, 향이 참 좋죠?",
+	],
+	"morning": ["이슬 마르기 전 숲이 제일 예뻐요."],
+	"night": ["밤 숲은 차요. 감기 조심하세요."],
+	"aff30": ["당신이 오는 날은 솔이가 문 앞을 서성여요.",
+		"따뜻한 차 한 잔 하고 가요."],
+	"aff70": ["사람이 그리웠나 봐요, 우리 둘 다.\n와 줘서 고마워요.",
+		"이 숲에 온 게 잘한 일이었다고, 요즘 처음 생각해요."],
+	"loves": ["forage_herb", "dish_moon_tea", "dish_coral_tea"],
+	"likes": ["forage_berry", "dish_soup", "dish_onion_soup"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"forest_girl": {"name": "솔이", "birthday": [SUMMER, 14], "gender": "f", "romance": false,
+	"lines": [
+		"기침이 많이 나아졌어요. 숲 공기 덕분이래요!",
+		"창문으로 다람쥐가 보여요. 이름도 지어 줬어요.",
+		"언젠가 마을 축제에 가 보고 싶어요.",
+		"오늘은 엄마랑 산딸기잼을 만들었어요!",
+	],
+	"morning": ["아침엔 새소리 세기 놀이를 해요. 오늘은 일곱!"],
+	"night": ["이 시간엔 자야 하는데... 쉿, 비밀이에요."],
+	"aff30": ["오늘도 와 줬네요! 헤헤.",
+		"나중에 내가 제일 좋아하는 나무 보여줄게요."],
+	"aff70": ["있잖아요, 다 나으면요...\n제일 먼저 같이 바다에 가고 싶어요.",
+		"엄마가 그러는데, 좋은 사람이 오면 병도 빨리 낫는대요."],
+	"loves": ["dish_jam", "forage_berry", "dish_melon_ice"],
+	"likes": ["forage_shell", "bug_butterfly", "dish_punch"],
+	"hates": ["sludge", "potion_ember"],
+	},
+	# 사서 서하 — 메인 스토리 6에서 오래된 책을 보러 왔다가 정착한다
+	"librarian": {"name": "서하", "birthday": [WINTER, 15], "romance": false,
+	"lines": [
+		"책장 넘기는 소리가 세상에서 제일 좋아요.",
+		"기록은 거짓말을 하지 않아요. 사람이 잊을 뿐이죠.",
+		"오래된 책은 함부로 펼치면 안 돼요. 종이가 바스러지거든요.",
+		"읽고 싶은 책이 있으면 언제든 도서관으로 오세요.",
+		"이 마을, 기록할 이야기가 많은 곳이에요.",
+	],
+	"season": {
+		SPRING: ["봄볕에 책을 말리기 좋은 계절이에요.",
+			"꽃가루가 책에 앉으면 얼룩이 져요. 조심조심."],
+		SUMMER: ["습기가 책의 적이에요. 요즘은 매일 서가를 살펴요.",
+			"여름엔 시원한 도서관이 최고죠?"],
+		FALL: ["독서의 계절이라고들 하죠. 저는 사계절 다지만요.",
+			"낙엽을 책갈피로 쓰면 근사해요."],
+		WINTER: ["겨울밤엔 난로 곁에서 책 한 권. 그게 전부예요.",
+			"눈 오는 소리를 들으며 책을 정리하고 있었어요."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["빗소리를 들으며 읽는 책이 제일 잘 읽혀요."],
+		WEATHER_SNOW: ["눈이 오네요. 책 배달은 못 오겠어요."],
+		WEATHER_STORM: ["폭풍이에요! 창문 틈으로 물이 새면 큰일인데..."],
+		WEATHER_FOG: ["안개 낀 날엔 옛이야기가 잘 어울려요."],
+		WEATHER_STAR: ["별이 쏟아지는 밤이에요. 천문 서적을 꺼내 볼까요."],
+	},
+	"morning": ["아침 공기 속에서 책 정리를 하면 하루가 개운해요."],
+	"night": ["밤 독서는 좋지만... 눈 버려요. 일찍 쉬세요."],
+	"aff30": ["당신이 오는 날은 책 정리가 빨리 끝나요. 이상하죠?",
+		"좋아할 만한 책을 골라 뒀어요. 다음에 보여 드릴게요."],
+	"aff70": ["오래된 책 복원이 끝나면... 제일 먼저 당신에게 읽어 줄게요.",
+		"기록보다 오래 남는 건 사람의 마음인 것 같아요. 요즘 들어서요."],
+	"loves": ["forage_relic", "dish_moon_tea", "bug_firefly"],
+	"likes": ["forage_herb", "dish_garlic_bread", "flower_pot"],
+	"hates": ["sludge", "forage_trash"],
+	"secret50": "그 오래된 책 말이에요... 표지 안쪽에 글씨가 한 줄 숨어 있었어요.\n「기록은 남기는 자의 것」 — 당신 할아버지 필체와 닮았더라고요.",
+	"secret100": "복원하다 알았어요. 그 책, 이 마을의 옛 기록이 맞아요.\n그리고 마지막 장은... 아직 쓰이지 않은 채 비어 있어요. 당신 몫인가 봐요.",
+	},
+	# ---- 일반 주민 (이사 신청 편지로 들어오는 생활형 캐릭터) ----
+	"farmer": {"name": "순돌", "birthday": [SPRING, 22], "gender": "m", "romance": false,
+	"lines": [
+		"흙냄새가 좋아서 이 마을로 왔어. 자네 밭 구경해도 되나?",
+		"작물은 주인 발소리를 듣고 자란다니까!",
+		"올해는 뭘 심을 건가? 난 감자에 한 표.",
+		"거름이야말로 농사의 반이지. 아무렴.",
+		"해 뜨면 밭으로, 해 지면 집으로 — 이만한 삶이 없어.",
+	],
+	"loves": ["pumpkin", "dish_baked_potato", "gold_crop"],
+	"likes": ["potato", "corn", "dish_soup"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"foodie": {"name": "다미", "birthday": [SUMMER, 5], "gender": "f", "romance": false,
+	"lines": [
+		"이 마을 음식 소문 듣고 왔잖아~ 냄새부터 다르더라!",
+		"오늘은 뭐 맛있는 거 만들었어? 냄새가 나는데?",
+		"요리는 사랑이야. 진짜야. 먹어 보면 알아.",
+		"만수네 가게 신상 레시피 봤어? 못 참지.",
+		"맛있는 걸 먹을 때만큼은 세상이 다 예뻐 보여.",
+	],
+	"loves": ["dish_feast", "dish_berry_toast", "dish_golden_roast"],
+	"likes": ["dish_bread", "dish_jam", "dish_punch"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"angler": {"name": "강태", "birthday": [FALL, 9], "gender": "m", "romance": false,
+	"lines": [
+		"물 좋다는 소문 듣고 낚싯대 하나 들고 왔지.",
+		"어제 이만~한 놈을 놓쳤다니까? 진짜라니까?",
+		"낚시는 기다림의 미학이야. 인생처럼.",
+		"용식 씨랑은 라이벌이야. 본인은 모르지만.",
+		"입질 없는 날엔 그냥 물멍만 해도 좋아.",
+	],
+	"loves": ["fish_golden", "dish_sashimi", "fish_king"],
+	"likes": ["fish_crucian", "bait", "dish_grilled_fish"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"miner": {"name": "바우", "birthday": [SPRING, 8], "gender": "m", "romance": false,
+	"lines": [
+		"이 마을 굴, 돌이 살아 있다며? 곡괭이가 근질근질해.",
+		"돌은 거짓말을 안 해. 두드린 만큼 내준다니까.",
+		"동굴 깊은 데는 조심해. 반짝이는 건 다 이유가 있어.",
+		"광석 냄새 맡는 데는 내 코가 제일이지. 킁킁.",
+		"오늘도 한 짐 캐고 왔더니 어깨가 뻐근하구먼.",
+	],
+	"loves": ["gem", "forage_relic", "star_ore"],
+	"likes": ["ore", "dish_baked_potato"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"florist": {"name": "봄이", "birthday": [SPRING, 3], "gender": "f", "romance": false,
+	"lines": [
+		"이 마을은 바람에서 꽃냄새가 나요. 그래서 왔어요.",
+		"창가에 화분 하나만 놓아도 집이 웃는답니다.",
+		"나비가 앉는 꽃은 좋은 꽃이에요. 진짜예요.",
+		"봄 꽃놀이 날엔 광장을 꽃으로 가득 채울 거예요!",
+		"시든 꽃도 씨앗을 남겨요. 끝이 아니라는 거죠.",
+	],
+	"loves": ["flower_pot", "bug_butterfly"],
+	"likes": ["forage_berry", "forage_herb"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"carpenter": {"name": "덕구", "birthday": [SUMMER, 19], "gender": "m", "romance": false,
+	"lines": [
+		"좋은 나무가 많은 마을이라 들었네. 대패질할 맛 나겠어.",
+		"못 하나도 제자리에 박혀야 집이 백 년을 가지.",
+		"삐걱대는 마루는 나한테 맡기게. 금방일세.",
+		"나무는 베인 뒤에도 산다네 — 집이 되고, 의자가 되고.",
+		"자네 집 문지방, 지나가다 보니 손 좀 봐야겠던데?",
+	],
+	"loves": ["dish_feast", "forage_relic"],
+	"likes": ["nail", "hinge"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"herbalist": {"name": "향이", "birthday": [SUMMER, 27], "gender": "f", "romance": false,
+	"lines": [
+		"산비탈 약초 냄새가 여기까지 나서 따라왔지 뭐예요.",
+		"쓴맛 나는 풀일수록 몸에는 약이 된답니다.",
+		"이슬 마르기 전에 캔 약초가 제일 좋아요.",
+		"어디 결리는 데는 없어요? 안색이 좀...",
+		"차 한 잔 우려 드릴까요? 마음이 가라앉아요.",
+	],
+	"loves": ["forage_herb", "dish_moon_tea"],
+	"likes": ["forage_berry", "potion_energy"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"painter": {"name": "청람", "birthday": [FALL, 21], "gender": "m", "romance": false,
+	"lines": [
+		"이 마을의 노을빛... 물감으로는 도저히 못 만들겠더군요.",
+		"바다 산호 색을 아세요? 세상에 그런 빨강은 또 없어요.",
+		"오늘은 광장을 그렸어요. 사람 웃는 소리까지 담고 싶은데.",
+		"그림은 눈으로 그리는 게 아니라 발로 그리는 거예요. 많이 걷죠.",
+		"언젠가 이 마을 전부를 한 폭에 담을 겁니다.",
+	],
+	"loves": ["forage_coral", "gem"],
+	"likes": ["forage_shell", "forage_glass"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"musician": {"name": "한별", "birthday": [WINTER, 7], "gender": "f", "romance": false,
+	"lines": [
+		"파도 소리, 새소리, 망치 소리... 이 마을은 통째로 노래예요.",
+		"달밤에 광장에서 한 곡 연주해도 될까요?",
+		"반딧불이 나는 밤엔 느린 곡이 어울려요.",
+		"축제 때는 제가 흥을 맡을게요. 기대해요!",
+		"슬픈 날엔 노래가 약이에요. 언제든 불러 줘요.",
+	],
+	"loves": ["bug_firefly", "dish_punch"],
+	"likes": ["forage_shell", "dish_bread"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"weaver": {"name": "솜이", "birthday": [WINTER, 16], "gender": "f", "romance": false,
+	"lines": [
+		"베틀 놓을 조용한 방 한 칸이면 저는 충분해요.",
+		"실 한 올 한 올이 모여 천이 되죠. 마을도 그래요.",
+		"겨울이 오기 전에 다들 목도리 하나씩 떠 드릴게요.",
+		"고운 천을 짜는 날엔 콧노래가 절로 나와요.",
+		"당신 옷소매, 뜯어진 데 이리 줘 봐요. 금방 기워요.",
+	],
+	"loves": ["cloth", "dish_pie"],
+	"likes": ["rope", "forage_berry"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	# ---- 특수 주민 (연구 노트 50%에서 해금 — 소문을 듣고 찾아온다) ----
+	"alchemist": {"name": "묘연", "birthday": [WINTER, 24], "gender": "f", "romance": false,
+	"lines": [
+		"이 마을, 오래된 연구의 기운이 흐르고 있어요.",
+		"당신의 노트... 그분의 연구를 잇고 있군요. 흥미로워요.",
+		"재료 셋이 만나면 하나의 답이 나오죠. 연금술은 정직해요.",
+		"달이 밝은 밤엔 좋은 물약이 나와요. 정말이에요.",
+		"별의 가루, 유령의 숨결... 세상엔 아직 신비가 남아 있어요.",
+	],
+	"loves": ["potion_moon", "ghost_essence", "star_ore"],
+	"likes": ["forage_herb", "gem", "potion_energy"],
+	"hates": ["sludge", "forage_trash"],
+	},
+
 }
-var affinity := {"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0}
+var affinity := {"librarian": 0,
+	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
+	"postman": 0,
+	"explorer": 0, "forest_mom": 0, "forest_girl": 0,
+	"farmer": 0, "foodie": 0, "angler": 0, "miner": 0, "florist": 0,
+	"carpenter": 0, "herbalist": 0, "painter": 0, "musician": 0,
+	"weaver": 0, "alchemist": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
 const RING_PRICE := 12000
@@ -2258,6 +5460,11 @@ func gift_value(npc_id: String, item_id: String) -> int:
 	return base
 
 
+# NPC 성별 (m/f) — 호감도·결혼 이벤트가 참고한다
+func npc_gender(npc_id: String) -> String:
+	return str((NPCS.get(npc_id, {}) as Dictionary).get("gender", "m"))
+
+
 # 지금 상황에 맞는 대사를 하나 고른다.
 #
 # 좁은 갈래(연애 > 호감도 > 생일 > 날씨 > 시간대 > 계절)일수록 먼저 보고,
@@ -2302,11 +5509,16 @@ var quest := {}
 #     진행되고, 도구도 안내에 묶여 잠기지 않는다.
 # 순서: [플래그, 목표 문구]. 순서를 어겨도 막히지 않는 체크리스트 방식.
 const STORY2_FLAGS := ["till", "plant", "water", "harvest"]
+# 첫 살림을 배우는 줄기 — 스토리 3(마을 생활 안내)이 열리기 전에도
+# 이 다섯은 차례로 이어진다. 수확에서 끊기지 않고 요리까지 간다.
+const FARM_CHAIN_FLAGS := ["till", "plant", "water", "harvest", "cook"]
 const TUTORIAL_ORDER := [
 	["till", "호미를 슬롯에 장착해 풀밭을 갈자"],
 	["plant", "밭에 씨앗을 심자"],
 	["water", "물뿌리개로 물을 주자"],
-	["harvest", "다 자란 작물에 E — 도구 없이 바로 딸 수 있다"],
+	["harvest", "다 자란 작물을 거두자 — 도구 없이 바로 딸 수 있다"],
+	["cook", "집 안 조리대에서 요리를 해 보자"],
+	["board", "의뢰 게시판에서 오늘의 의뢰를 살펴보자"],
 	["moved", "방향키/WASD로 움직여보자"],
 	["map", "지도(M)를 열어 집과 마을 위치를 확인하자"],
 	["quest", "퀘스트 창(Q)을 열어 할 일을 확인하자"],
@@ -2314,37 +5526,42 @@ const TUTORIAL_ORDER := [
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
-	["build", "울타리나 스프링클러를 설치해보자"],
-	["fish", "마을 남쪽 낚시터(부두)에서 물고기를 낚자"],
+	["fish", "낚시터에서 물고기를 낚자"],
 	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
 ]
 # 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
-# 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 전부 열린다
+# 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 열린다.
+# 스프링클러는 여기서 빠졌다 — 농사 Lv3부터 잡화점에서 레시피를 판다.
 # (마을 생활 안내는 선택이므로 도구를 잠그지 않는다)
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	"harvest": ["axe", "pickaxe", "fence", "sprinkler", "rod"],
+	# 낚싯대는 여기서 주지 않는다 — 용식과 바닷길을 연 뒤에야 손에 들어온다
+	# 울타리는 여기서 빠졌다 — **목재를 손에 넣으면** 잡화점이 레시피를 들여놓는다
+	# (나무 한 그루 베어 본 적 없는 사람에게 울타리부터 쥐여 줄 이유가 없다)
+	"harvest": ["axe", "pickaxe"],
 }
 # 수확은 도구 없이 되므로 「바구니(hand)」 도구는 없앴다
-const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler", "rod"]
+# 돌 창·돌 검은 제작대에서 만들어 해금하는 무기다 (레시피: 이장/추후 서브퀘)
+const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkler",
+	"rod", "spear", "sword"]
 
 # 튜토리얼 목표 달성 보상 (도구 해금과 별개)
 const TUTORIAL_REWARDS := {
-	"moved": {"money": 50},
-	"map": {"money": 50},
-	"quest": {"money": 50},
-	"note": {"seeds": {"potato": 2}},
-	"till": {"money": 30},
-	"plant": {"money": 50},
-	"water": {"money": 100},
-	"harvest": {"money": 100},
+	"moved": {"money": 25},
+	"map": {"money": 25},
+	"quest": {"money": 25},
+	"note": {"money": 25},   # 씨앗을 그냥 주지 않는다 — 상점에서 사는 게 시작이다
+	"till": {"money": 15},
+	"plant": {"money": 25},
+	"water": {"money": 50},
+	"harvest": {"money": 50},
+	"board": {"money": 50},
 	"chop": {"wood": 5},
-	"slept": {"money": 150},
+	"slept": {"money": 75},
 	"mine": {"stone": 5},
-	"build": {"money": 150},
-	"fish": {"money": 200},
-	"shop": {"money": 300},
+	"fish": {},          # 낚시는 돈을 주지 않는다 — 물고기는 팔아서 값을 받는다
+	"shop": {"money": 150},
 }
 
 # 도구 슬롯(빠른 사용 슬롯) 9칸: 1~9 숫자키로 선택 — 가방에서 자유 배치
@@ -2353,8 +5570,10 @@ const TOOL_SLOT_COUNT := 9
 
 static func default_tool_slots() -> Array:
 	var slots: Array = ALL_TOOLS.duplicate()
-	while slots.size() < TOOL_SLOT_COUNT:
-		slots.append("")
+	slots.resize(TOOL_SLOT_COUNT)   # 도구가 슬롯보다 많으면 뒤(무기)는 직접 장착한다
+	for i in slots.size():
+		if slots[i] == null:
+			slots[i] = ""
 	return slots
 
 
@@ -2364,8 +5583,12 @@ const TOOL_KOR := {
 	"hoe": "호미", "water": "물뿌리개", "seed": "씨앗",
 	"axe": "도끼", "pickaxe": "곡괭이", "fence": "울타리",
 	"sprinkler": "스프링클러", "rod": "낚싯대",
+	"spear": "돌 창", "sword": "돌 검",
 }
 var tutorial := {"active": false}
+# 마을 생활 안내 시작 여부 — 메인 스토리 3(이주 편지)이 시작될 때 함께 열린다.
+# 그 전에는 안내 목표가 퀘스트 창에도, 트래커에도 나오지 않는다.
+var guide_active := false
 var unlocked_tools: Array = ALL_TOOLS.duplicate()
 
 
@@ -2377,6 +5600,25 @@ func unlock_all_tools() -> void:
 	unlocked_tools = ALL_TOOLS.duplicate()
 
 
+# ---- 개발/테스트용: 가방을 통째로 채운다 (DEV_MODE에서 F10) ----
+# 장터·요리·조합처럼 「물건이 많아야 볼 수 있는 것」을 손으로 모으지 않고
+# 바로 확인하려고 쓴다. 도구도 전부 열고 품질별 수확물까지 채운다.
+func dev_fill_stock(n: int = DEV_STOCK) -> void:
+	money = maxi(money, DEV_MONEY)
+	wood = n
+	stone = n
+	for id: String in CROP_IDS:
+		seeds[id] = n
+		produce[id] = n
+		produce_silver[id] = int(n / 3.0)   # 은빛·금빛도 섞어 둔다 (품질별 확인용)
+		produce_gold[id] = int(n / 3.0)
+	for id: String in ITEM_IDS:
+		items[id] = n
+	unlock_all_tools()
+	# 도감(discover)은 일부러 건드리지 않는다 — 컬렉션 보상과 영구 버프가
+	# 한꺼번에 터져서 정작 보려던 것을 덮어 버린다.
+
+
 func fresh_tutorial() -> Dictionary:
 	var t := {"active": true}
 	for pair in TUTORIAL_ORDER:
@@ -2386,27 +5628,35 @@ func fresh_tutorial() -> Dictionary:
 
 # 우측 트래커용 짧은 목표 문구
 # %s 는 실제로 설정된 키로 바뀐다 (키 재설정을 따라간다)
+# 안내 목표 — 짧게 한 줄. 괄호도, 조작키 안내도 넣지 않는다
+# (키는 설정 창과 손에 든 도구가 알려 준다).
 const TUTORIAL_SHORT := {
-	"moved": "움직여보기 (WASD)", "map": "지도 열기 (%s)", "quest": "퀘스트 창 (%s)",
-	"note": "연구 노트 (%s)", "till": "밭 갈기 (1)", "plant": "씨앗 심기 (3)",
-	"water": "물 주기 (2)", "harvest": "다 자란 작물에 E",
-	"slept": "침대에서 자기",
-	"chop": "나무 베기 (5)", "mine": "돌 캐기 (6)", "build": "설치하기 (7/8)",
-	"fish": "낚시터에서 낚시 (9)", "shop": "잡화점 가보기",
+	"moved": "마을을 걸어 보자.",
+	"map": "지도를 열어 보자.",
+	"quest": "퀘스트 창을 열어 보자.",
+	"note": "연구 노트를 펴 보자.",
+	"till": "호미로 밭을 갈자.",
+	"plant": "씨앗을 심자.",
+	"water": "밭에 물을 주자.",
+	"harvest": "다 자란 작물을 거두자.",
+	"cook": "조리대에서 요리하자.",
+	"slept": "침대에서 자자.",
+	"board": "의뢰 게시판을 읽어 보자.",
+	"chop": "나무를 베자.",
+	"mine": "돌을 캐자.",
+	"fish": "물가에서 낚시하자.",
+	"shop": "잡화점에 들러 보자.",
 }
 
 
-const TUTORIAL_SHORT_KEY := {"map": "open_map", "quest": "open_quest", "note": "open_note"}
+# (조작키를 목표문에 끼워 넣던 표는 없앴다 — 괄호 표기를 전부 걷어냈다)
 
 
 func tutorial_objective_short() -> String:
 	var flag := tutorial_current_flag()
 	if flag == "":
 		return ""
-	var txt := String(TUTORIAL_SHORT.get(flag, ""))
-	if TUTORIAL_SHORT_KEY.has(flag):
-		txt = txt % key_label(TUTORIAL_SHORT_KEY[flag])
-	return txt
+	return String(TUTORIAL_SHORT.get(flag, ""))
 
 
 func tutorial_objective() -> String:
@@ -2418,10 +5668,24 @@ func tutorial_objective() -> String:
 	return ""
 
 
+# 밭 갈기 줄기(호미→씨앗→물→수확→요리)는 **이장에게 호미를 받은 뒤**에만
+# 안내로 뜬다. 호미는 상점이 서고 용식과 바닷길을 연 다음에 받으므로
+# (story2_phase: shop → fisher → farm_talk → farm), 앞선 퀘스트와
+# 나란히 떠서 헷갈리는 일이 없다.
+func farm_chain_open() -> bool:
+	return story2_phase in ["farm", "cook", "done"]
+
+
 func tutorial_current_flag() -> String:
 	if not tutorial.get("active", false):
 		return ""
 	for pair in TUTORIAL_ORDER:
+		# 밭 갈기 줄기는 호미를 받은 뒤부터
+		if pair[0] in FARM_CHAIN_FLAGS and not farm_chain_open():
+			continue
+		# 마을 생활 안내(첫 살림 줄기 밖 목표)는 스토리 3이 열어 줘야 나온다
+		if pair[0] not in FARM_CHAIN_FLAGS and not guide_active:
+			continue
 		if not tutorial.get(pair[0], false):
 			return pair[0]
 	return ""
@@ -2438,37 +5702,37 @@ const GRANDPA_QUESTS := [
 		"name": "밭에서 시작한다",
 		"desc": "작물 3종류를 수확해 노트에 기록하자",
 		"letter": "\"농사는 땅과 나누는 대화란다.\n무엇을 심어도 좋으니, 서로 다른 작물 셋을\n네 손으로 거둬 노트에 적어 두렴.\"",
-		"reward": {"money": 500, "seeds": {"tomato": 3}}},
+		"reward": {"money": 230, "seeds": {"tomato": 3}}},
 	{"id": "fish", "count": "fish_kinds", "goal": 3,
 		"name": "강가의 기록",
 		"desc": "물고기 3종류를 낚아 노트에 기록하자",
 		"letter": "\"물속에도 답이 있다.\n마을 남쪽 낚시터에서 서로 다른 물고기 셋을\n낚아 보렴. 기다림도 연구의 일부란다.\"",
-		"reward": {"money": 800}},
+		"reward": {"money": 360}},
 	{"id": "forage", "count": "forage_kinds", "goal": 3,
 		"name": "숲의 기록",
 		"desc": "채집물·곤충 3종류를 모아 노트에 기록하자",
 		"letter": "\"숲은 아무것도 팔지 않지만 모든 것을 준단다.\n열매든 풀이든 벌레든, 서로 다른 셋을 찾아\n노트에 붙여 두렴.\"",
-		"reward": {"money": 1000, "stone": 10}},
+		"reward": {"money": 450, "stone": 10}},
 	{"id": "mine", "count": "mob_kills", "goal": 10,
 		"name": "땅속의 기록",
 		"desc": "동굴에서 몬스터를 10마리 물리치자",
 		"letter": "\"동굴 깊은 곳의 것들은 사납지만,\n그 몸에서 나오는 것 또한 재료다.\n조심하되 물러서지는 말거라.\"",
-		"reward": {"money": 1500, "wood": 20}},
+		"reward": {"money": 680, "wood": 20}},
 	{"id": "cook", "count": "recipe_kinds", "goal": 3,
-		"name": "부엌의 기록",
+		"name": "조리대의 기록",
 		"desc": "요리를 3종류 만들어 보자",
 		"letter": "\"불과 물과 시간을 다루는 일 —\n요리야말로 가장 오래된 연금술이란다.\n세 가지를 만들어 먹어 보렴.\"",
-		"reward": {"money": 2000}},
+		"reward": {"money": 900}},
 	{"id": "friend", "count": "best_affinity", "goal": 50,
 		"name": "사람의 기록",
 		"desc": "마을 사람과 친해지자 (호감도 50)",
 		"letter": "\"내가 끝내 못 채운 장이 사람이었다.\n마을 사람 하나와 진하게 친해져 보렴.\n선물도 좋고, 매일 인사도 좋다.\"",
-		"reward": {"money": 2500}},
+		"reward": {"money": 1130}},
 	{"id": "note", "count": "note_percent", "goal": 50,
 		"name": "절반의 노트",
 		"desc": "연구 노트를 절반(50%)까지 채우자",
 		"letter": "\"여기까지 왔다면 이제 알 게다.\n노트의 절반을 채우면, 남은 장이 무엇을 원하는지\n스스로 보이기 시작할 거야.\"",
-		"reward": {"money": 3000}},
+		"reward": {"money": 1350}},
 ]
 
 var grandpa_step := 0        # 지금 받은 부탁 번호 (GRANDPA_QUESTS의 인덱스)
@@ -2506,6 +5770,68 @@ func grandpa_count(kind: String) -> int:
 
 func grandpa_all_done() -> bool:
 	return grandpa_step >= GRANDPA_QUESTS.size()
+
+
+# 완료한 퀘스트의 기록 — 퀘스트 창(Q)은 완료 항목을 숨기고, 이 목록은
+# 나중에 도서관 콘텐츠(지난 이야기 돌아보기)에서 보여줄 밑재료다.
+func completed_quests() -> Array:
+	var out: Array = []
+	var s1_idx: int = STORY1_QUESTS.size() if story_phase == "done" \
+		else int(STORY1_PHASE_IDX.get(story_phase, 0))
+	for i in mini(s1_idx, STORY1_QUESTS.size()):
+		out.append(str(STORY1_QUESTS[i].name))
+	if village_built.has("general"):
+		out.append("마을의 첫 상점을 세웠다")
+	if fisher_quest == "done":
+		out.append("바닷길을 열었다 (낚시꾼과 바위 능선)")
+	if fisher_home == "done":
+		out.append("용식의 부탁 — 살 집 한 채")
+	if kitchen_quest == "done":
+		out.append("조리대에서 요리를 하자 — 첫 끼를 지어 나눴다")
+	if story2_phase == "done":
+		out.append("메인 스토리 2 — 마을을 깨우다")
+	if move_quest == "done":
+		out.append("메인 스토리 3 — 새로운 주민의 이사")
+	if story4_phase == "done":
+		out.append("메인 스토리 4 — 오래된 마을의 경계")
+	if forest_quest == "done":
+		out.append("메인 스토리 5 — 숲속에서 발견한 집")
+	if story6_phase == "done":
+		out.append("메인 스토리 6 — 오래된 책과 사서")
+	if story7_phase == "done":
+		out.append("메인 스토리 7 — 식지 않는 화로")
+	if story8_phase == "done":
+		out.append("메인 스토리 8 — 초원에서 온 목동")
+	if story9_phase == "done":
+		out.append("메인 스토리 9 — 마을의 심장, 마을회관")
+	if story10_phase == "done":
+		out.append("메인 스토리 10 — 동굴과 탐험")
+	if story11_phase == "done":
+		out.append("메인 스토리 11 — 할머니의 모자")
+	if story12_phase == "done":
+		out.append("메인 스토리 12 — 숲의 연금술사")
+	if story13_phase == "done":
+		out.append("메인 스토리 13 — 할머니의 팔찌")
+	if story14_phase == "done":
+		out.append("메인 스토리 14 — 마을의 첫 축제")
+	if story15_phase == "done":
+		out.append("메인 스토리 15 — 마른 온천")
+	if story16_phase == "done":
+		out.append("메인 스토리 16 — 할머니의 반지")
+	if story17_phase == "done":
+		out.append("메인 스토리 17 — 할머니의 목걸이")
+	if story18_phase == "done":
+		out.append("메인 스토리 18 — 할머니의 시계")
+	if story19_phase == "done":
+		out.append("메인 스토리 19 — 일곱 갈래의 삶")
+	if story20_phase == "done":
+		out.append("메인 스토리 20 — 가장 오래된 자리")
+	for pair in TUTORIAL_ORDER:
+		if tutorial.get(pair[0], false):
+			out.append(str(pair[1]))
+	for i in mini(grandpa_step, GRANDPA_QUESTS.size()):
+		out.append(str(GRANDPA_QUESTS[i].name))
+	return out
 
 
 func grandpa_current() -> Dictionary:
@@ -2589,29 +5915,51 @@ func quest_pool(kind: String) -> Array:
 	var out: Array = []
 	match kind:
 		"crop":
+			# 지금 구할 수 있는 씨앗(상점 판매 중이거나 이미 갖고 있는 것)만
 			for id: String in CROP_IDS:
-				if season() in CROPS[id].seasons:
+				if season() not in CROPS[id].seasons:
+					continue
+				if id in shop_seeds or int(seeds.get(id, 0)) > 0 \
+						or int(produce.get(id, 0)) > 0:
 					out.append(id)
 		"fish":
+			# 낚싯대가 없으면 물고기 의뢰 자체가 나오지 않는다
+			if not is_tool_unlocked("rod"):
+				return []
 			# 전설급은 의뢰로 내지 않는다 — 못 잡아서 표가 막힌다
 			var legendary := ["fish_golden", "fish_king", "fish_dragon",
 				"fish_ghost", "fish_starcarp", "fish_moonfish"]
 			for f: Dictionary in FISH:
 				var fid := str(f.id)
-				if fid not in legendary:
-					out.append(fid)
+				if fid in legendary:
+					continue
+				# 이번 계절에 물지 않거나 특정 날씨에만 무는 놈도 뺀다 —
+				# 지금 당장 잡을 수 있는 물고기로만 의뢰가 붙는다
+				if not (f.weather as Array).is_empty():
+					continue
+				if not (f.seasons as Array).is_empty() \
+						and season() not in f.seasons:
+					continue
+				out.append(fid)
 		"forage":
 			out = FORAGE_IDS + BUG_IDS
 			# 산호 조각·고대 조각은 0.1%짜리 희귀 채집물 — 의뢰로 내면 표가 막힌다
 			out.erase("forage_coral")
 			out.erase("forage_relic")
+			out.erase("forage_herb")   # 약초도 1% 희귀 드랍이 됐다 — 의뢰 금지
 			if not sea_open:
 				# 아직 바다를 모른다 — 해변 채집물은 의뢰로 내지 않는다
 				for bid: String in ["forage_shell", "forage_trash",
 						"forage_glass", "forage_ring"]:
 					out.erase(bid)
 		"mineral":
-			out = ["ore", "gem"]
+			# 곡괭이가 없으면 광물 의뢰가 나오지 않고, 보석은 동굴을
+			# 3층까지 내려가 본 뒤에야 의뢰에 붙는다
+			if not is_tool_unlocked("pickaxe"):
+				return []
+			out = ["ore"]
+			if mine_deepest >= 3:
+				out.append("gem")
 		"dish":
 			# 한 번이라도 만들어 본 요리만 의뢰로 나온다
 			for rid: String in RECIPE_IDS:
@@ -2701,7 +6049,7 @@ func _init() -> void:
 		produce[id] = 0
 	for id in ITEM_IDS:
 		items[id] = 0
-	seeds["potato"] = 5
+	# 시작 가방은 완전히 비어 있다 — 씨앗 하나까지 전부 인게임에서 얻는다
 	_reset_skills()
 	furniture = []   # 처음 집엔 세간이 없다 — 집을 확장하면 기본 가구가 생긴다
 
@@ -2719,6 +6067,8 @@ func reset_all() -> void:
 	minutes = DAY_START
 	money = DEV_MONEY if DEV_MODE else START_MONEY
 	energy = ENERGY_MAX
+	hunger = HUNGER_MAX
+	hunger_open = false
 	tool = "hoe"
 	seed_index = 0
 	wood = 0
@@ -2730,6 +6080,26 @@ func reset_all() -> void:
 	mob_kills = {}
 	recipes_cooked = {}
 	ending_seen = false
+	water_life_found = {}
+	water_pending = 0
+	relic_pending = ""
+	dream_ready = false
+	dream_seen = false
+	settlers = []
+	settler_homes = {}
+	empty_houses = []
+	settler_offer = ""
+	settler_offer_day = 0
+	settler_arrive = ""
+	settler_arrive_day = 0
+	settler_leaving = ""
+	settler_leave_day = 0
+	npc_last_talk = {}
+	last_farewell = ""
+	arrive_day = 0
+	arrive_clock = ""
+	playtime_sec = 0.0
+	rocks_mined = 0
 	crops_harvested = {}
 	minerals_found = {}
 	memory_given = false
@@ -2764,15 +6134,111 @@ func reset_all() -> void:
 	desk_done_pending.clear()
 	dust_swept = 0
 	kitchen_found = false
+	kitchen_quest = ""
+	kitchen_branch = ""
 	fisher_quest = ""
+	fisher_home = ""
+	home_signs = {}
+	sea_open_day = 0
+	storage_stock = {}
 	fisher_choice = 0
 	sea_open = false
 	merchant_errand = ""
+	merchant_day = 0
 	stall_hours = []
+	forest_quest = ""
+	forest_trust = ""
+	tutorial_space = true
+	forest_day = 0
+	affinity_open = false
+	move_quest = ""
+	move_seeds = 0
+	move_day = 0
+	move_house = Vector2i(-999, -999)
+	home_plots = []
+	plot3_quest = ""
+	plot3_made = 0
+	mail_box = []
+	mail_out = []
+	mail_sent_day = 0
+	mom_quest = ""
+	mom_quests_done = []
+	spear_quest = ""
+	story4_phase = ""
+	story6_phase = ""
+	story6_day = 0
+	old_book_stored = false
+	story7_phase = ""
+	story8_phase = ""
+	story9_phase = ""
+	story10_phase = ""
+	story11_phase = ""
+	story11_clues = []
+	grandma_read = 0
+	story12_phase = ""
+	story12_heard = []
+	story13_phase = ""
+	story13_heard = []
+	story12_done_day = 0
+	story14_phase = ""
+	story13_done_day = 0
+	story14_tasks = []
+	story14_greet = []
+	story14_fest_day = 0
+	story14_toss = false
+	story15_phase = ""
+	story14_done_day = 0
+	story15_mobs = 0
+	story15_ore = 0
+	onsen_open = false
+	onsen_day = 0
+	story16_phase = ""
+	story15_done_day = 0
+	story16_heard = []
+	story16_clear = 0
+	story16_till = 0
+	story17_phase = ""
+	story16_done_day = 0
+	story17_heard = []
+	story17_clear = 0
+	story17_care = 0
+	story17_done_day = 0
+	story18_phase = ""
+	story18_heard = []
+	story18_traces = []
+	story18_done_day = 0
+	story19_phase = ""
+	story19_shown = []
+	story20_phase = ""
+	story20_told = []
+	note_last_line = false
+	gate_open = false
+	seed_day = 0
+	seed_tile = Vector2i(-1, -1)
+	seed_water = false
+	residents_now = 1
+	hall_stock = {}
+	hall_loot_day = 0
+	hall_trash_total = 0
+	hall_projects = []
+	hall_meet_day = 0
+	hall_feat_noticed = []
+	zones_open = []
+	arrivals = []
+	npc_greeted = []
+	recipe_items = {}
+	tracked_pick = ""
+	respawn_queue = []
+	chief_house_lv = 0
+	hall_noticed = false
+	shop_seeds = ["wheat", "corn"]
+	recipe_pending = []
 	story2_phase = ""
 	village_built = []
-	if DEV_MODE:
-		# 테스트용: 기본 아이템을 잔뜩 들고 시작한다
+	if DEV_MODE and OS.get_environment("KYOJIN_SHOT") != "":
+		# 검증 하네스 전용: 기본 아이템을 잔뜩 들고 시작한다.
+		# 보통 새 게임은 (DEV_MODE라도) 가방이 완전히 비어 있다 —
+		# 재료는 전부 게임을 진행하며 직접 얻는다.
 		wood = DEV_STOCK
 		stone = DEV_STOCK
 		for id in CROP_IDS:
@@ -2822,6 +6288,8 @@ func reset_all() -> void:
 #   place  모이는 곳 ("plaza" / "pier") — NPC 일과가 이날은 여기로 덮인다
 #   goal   무엇을 하면 되는가 (참가 방식은 축제마다 다르다)
 # 새 축제를 넣을 때는 이 표에 한 줄만 더하면 된다.
+# 계절 축제는 **두 해째부터** 열린다 (첫 한 해는 조용히 지나간다)
+const FEST_FIRST_YEAR := 2
 const FEST_START := 9.0 * 60.0    # 9시 시작
 const FEST_END := 18.0 * 60.0     # 18시 종료
 const FESTIVALS := {
@@ -2829,22 +6297,22 @@ const FESTIVALS := {
 		"goal": "마을 사람 모두와 인사하기",
 		"desc": "광장에 봄꽃을 늘어놓고 다 같이 모이는 날.\n"
 			+ "마을 사람 모두에게 말을 걸어 인사하자.",
-		"reward": {"money": 1200}},
+		"reward": {"money": 540}},
 	SUMMER: {"id": "fishing", "name": "여름 낚시대회", "day": 14, "place": "pier",
 		"goal": "낚시터에서 물고기 5마리 낚기",
 		"desc": "낚시터에서 열리는 마을 대회.\n"
 			+ "해가 지기 전까지 물고기를 많이 낚는 사람이 이긴다.",
-		"reward": {"money": 1500}},
+		"reward": {"money": 680}},
 	FALL: {"id": "harvest", "name": "가을 수확제", "day": 14, "place": "plaza",
 		"goal": "가장 좋은 작물 하나 출품하기",
 		"desc": "한 해 농사를 겨루는 날.\n"
 			+ "가장 자신 있는 작물 하나를 광장에 출품하자.",
-		"reward": {"money": 1000}},
+		"reward": {"money": 450}},
 	WINTER: {"id": "star", "name": "겨울 별빛제", "day": 14, "place": "plaza",
 		"goal": "요리 하나 나눠 주기",
 		"desc": "가장 긴 밤을 함께 넘기는 날.\n"
 			+ "직접 만든 요리를 하나 가져와 나누자.",
-		"reward": {"money": 1300}},
+		"reward": {"money": 590}},
 }
 
 # 오늘의 축제 진행 상태 (날이 바뀌면 초기화된다)
@@ -2855,7 +6323,23 @@ var fest_done := false       # 오늘 축제를 끝냈는가
 var fest_history: Array = [] # 지금까지 참가한 축제 id
 
 
+# 며칠째가 몇 년째인가 (1년 = 사계절)
+func year_of_day(d: int) -> int:
+	return (d - 1) / (DAYS_PER_SEASON * 4) + 1
+
+
+# 계절 축제가 열리는 해인가.
+#
+# **첫 한 해(사계절 한 바퀴)에는 축제가 하나도 열리지 않는다.**
+# 마을이 아직 축제를 치를 만큼 여물지 않았다는 설정이자, 첫 해를
+# 살림 꾸리기에만 집중하게 하려는 장치다. 두 해째 봄부터 정상으로 돌아온다.
+func fest_year_ok(d: int = -1) -> bool:
+	return year_of_day(day if d < 0 else d) >= FEST_FIRST_YEAR
+
+
 func festival_of_day(d: int) -> Dictionary:
+	if not fest_year_ok(d):
+		return {}          # 첫 해에는 어떤 축제도 열리지 않는다
 	var f: Dictionary = FESTIVALS.get(season_of_day(d), {})
 	if f.is_empty() or (d - 1) % DAYS_PER_SEASON + 1 != int(f.day):
 		return {}
@@ -3022,6 +6506,14 @@ func current_seed_id() -> String:
 	return owned[seed_index]
 
 
+# 가진 씨앗 총 수 — 0이면 가방의 씨앗 주머니 항목 자체를 숨긴다
+func seed_total() -> int:
+	var n := 0
+	for id: String in CROP_IDS:
+		n += int(seeds[id])
+	return n
+
+
 func cycle_seed() -> void:
 	var owned := owned_seed_ids()
 	if owned.is_empty():
@@ -3050,6 +6542,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"minutes": minutes,
 		"money": money,
 		"energy": energy,
+		"hunger": hunger, "hunger_open": hunger_open,
 		"seeds": seeds,
 		"produce": produce,
 		"items": items,
@@ -3062,6 +6555,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"quest": quest,
 		"quest_offers": quest_offers,
 		"tutorial": tutorial,
+		"guide_active": guide_active,
 		"alchemy_known": alchemy_known,
 		"alchemy_brews": alchemy_brews,
 		"alchemy_fails": alchemy_fails,
@@ -3083,14 +6577,69 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"tool_slots": tool_slots,
 		"tree_regrow": tree_regrow,
 		"player_name": player_name,
+		"farm_name": farm_name,
+		"village_name": village_name,
 		"village_built": village_built,
 		"house_lv": house_lv,
 		"has_bed": has_bed,
 		"desk_lv": desk_lv, "bed_lv": bed_lv, "desk_queue": desk_queue,
 		"dust_swept": dust_swept, "kitchen_found": kitchen_found,
+		"kitchen_quest": kitchen_quest, "kitchen_branch": kitchen_branch,
 		"fisher_quest": fisher_quest, "fisher_choice": fisher_choice,
+		"fisher_home": fisher_home, "sea_open_day": sea_open_day,
+		"home_signs": home_signs,
+		"storage_stock": storage_stock,
 		"sea_open": sea_open, "story2_phase": story2_phase,
-		"merchant_errand": merchant_errand, "stall_hours": stall_hours,
+		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
+		"stall_hours": stall_hours,
+		"forest_quest": forest_quest, "forest_day": forest_day,
+		"forest_trust": forest_trust, "tutorial_space": tutorial_space,
+		"affinity_open": affinity_open,
+		"move_quest": move_quest, "move_day": move_day, "move_min": move_min,
+		"move_seeds": move_seeds,
+		"move_house": [move_house.x, move_house.y],
+		"home_plots": home_plots,
+		"plot3_quest": plot3_quest, "plot3_made": plot3_made,
+		"mail_box": mail_box, "mail_out": mail_out,
+		"mail_sent_day": mail_sent_day,
+		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
+		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
+		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,
+		"story4_phase": story4_phase, "zones_open": zones_open,
+		"story6_phase": story6_phase, "story6_day": story6_day,
+		"old_book_stored": old_book_stored,
+		"story7_phase": story7_phase, "story8_phase": story8_phase,
+		"story9_phase": story9_phase, "story10_phase": story10_phase,
+		"story11_phase": story11_phase, "story11_clues": story11_clues,
+		"grandma_read": grandma_read,
+		"story12_phase": story12_phase, "story12_heard": story12_heard,
+		"story13_phase": story13_phase, "story13_heard": story13_heard,
+		"story12_done_day": story12_done_day,
+		"story14_phase": story14_phase, "story13_done_day": story13_done_day,
+		"story14_tasks": story14_tasks, "story14_greet": story14_greet,
+		"story14_fest_day": story14_fest_day, "story14_toss": story14_toss,
+		"story15_phase": story15_phase, "story14_done_day": story14_done_day,
+		"story15_mobs": story15_mobs, "story15_ore": story15_ore,
+		"onsen_open": onsen_open, "onsen_day": onsen_day,
+		"story16_phase": story16_phase, "story15_done_day": story15_done_day,
+		"story16_heard": story16_heard, "story16_clear": story16_clear,
+		"story16_till": story16_till,
+		"story17_phase": story17_phase, "story16_done_day": story16_done_day,
+		"story17_heard": story17_heard, "story17_clear": story17_clear,
+		"story17_care": story17_care, "story17_done_day": story17_done_day,
+		"story18_phase": story18_phase, "story18_heard": story18_heard,
+		"story18_traces": story18_traces, "story18_done_day": story18_done_day,
+		"story19_phase": story19_phase, "story19_shown": story19_shown,
+		"story20_phase": story20_phase, "story20_told": story20_told,
+		"note_last_line": note_last_line, "gate_open": gate_open,
+		"seed_day": seed_day, "seed_water": seed_water,
+		"seed_tile": [seed_tile.x, seed_tile.y],
+		"hall_stock": hall_stock,
+		"hall_loot_day": hall_loot_day, "hall_trash_total": hall_trash_total,
+		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,
+		"hall_feat_noticed": hall_feat_noticed,
+		"arrivals": arrivals, "npc_greeted": npc_greeted,
+		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
 		"u_intro": u_intro_state,
@@ -3100,6 +6649,18 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"furniture": furniture,
 		"recipes_cooked": recipes_cooked,
 		"ending_seen": ending_seen,
+		"water_life_found": water_life_found, "dream_ready": dream_ready,
+		"dream_seen": dream_seen, "arrive_day": arrive_day,
+		"arrive_clock": arrive_clock, "playtime_sec": playtime_sec,
+		"rocks_mined": rocks_mined,
+		"settlers": settlers, "settler_homes": settler_homes,
+		"empty_houses": empty_houses, "settler_offer": settler_offer,
+		"settler_offer_day": settler_offer_day,
+		"settler_arrive": settler_arrive,
+		"settler_arrive_day": settler_arrive_day,
+		"settler_leaving": settler_leaving,
+		"settler_leave_day": settler_leave_day,
+		"npc_last_talk": npc_last_talk, "last_farewell": last_farewell,
 		"crops_harvested": crops_harvested,
 		"minerals_found": minerals_found,
 		"memory_given": memory_given,
@@ -3110,6 +6671,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"owned_pets": owned_pets,
 		"active_pet": active_pet,
 		"gender": gender,
+		"appearance": appearance,
 		"main_story": story_phase,
 		"tile": 32,
 		"player": [player_pos.x, player_pos.y],
@@ -3134,6 +6696,7 @@ func build_stats() -> Dictionary:
 		"seeds": seeds, "produce": produce, "items": items,
 		"fish_caught": fish_caught, "mob_kills": mob_kills, "affinity": affinity,
 		"quest": quest, "tool_level": tool_level,
+		"unlocked_tools": unlocked_tools,   # 장터에서 도구가 오가면 이것도 맞춰야 한다
 		"skills": skills, "furniture": furniture,
 		"recipes_cooked": recipes_cooked, "ending_seen": ending_seen,
 		"crops_harvested": crops_harvested, "minerals_found": minerals_found,
@@ -3171,6 +6734,10 @@ func apply_stats(d: Dictionary) -> void:
 	spouse_gift_day = int(d.get("spouse_gift_day", 0))
 	for k in d.get("tool_level", {}):
 		tool_level[k] = int(d.tool_level[k])
+	if d.has("unlocked_tools"):
+		unlocked_tools = []
+		for t in d.unlocked_tools:
+			unlocked_tools.append(str(t))
 	apply_skills_data(d.get("skills", {}))
 	if d.has("furniture"):
 		apply_furniture_data(d.furniture)

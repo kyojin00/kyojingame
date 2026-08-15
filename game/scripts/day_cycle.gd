@@ -18,6 +18,7 @@ func request_sleep() -> void:
 	if Net.is_guest():
 		m.hud.show_message("하루는 호스트가 잠자리에 들어야 넘어간다.")
 	else:
+		m.sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
 		m.sleep_dialog.popup_centered()
 
 
@@ -35,15 +36,26 @@ func _update_night_mobs(delta: float) -> void:
 	m._mob_spawn_cd -= delta
 	if m.night_mobs.size() < 2 and m._mob_spawn_cd <= 0.0:
 		m._mob_spawn_cd = 6.0
-		var ang := randf() * TAU
+		# 밤 몬스터도 **걸어 다닐 수 있는 땅에서만** 기어 나온다.
+		# 잠긴 구역 너머에서 나오면 벽에 붙어 영영 오지 못한다.
+		var spawn := Vector2.ZERO
+		for tryn in 12:
+			var ang0 := randf() * TAU
+			var p0: Vector2 = m.player.position + Vector2.from_angle(ang0) * 380.0
+			if m.is_passable(Vector2i(int(p0.x / m.TILE), int(p0.y / m.TILE))):
+				spawn = p0
+				break
+		if spawn == Vector2.ZERO:
+			return   # 오늘 밤 이 자리에서는 나올 데가 없다
 		var node := Node2D.new()
-		node.position = m.player.position + Vector2.from_angle(ang) * 380.0
+		node.position = spawn
 		var spr := Sprite2D.new()
 		spr.texture = m.tex["mob_centipede_0"]
 		spr.scale = Vector2(1.4, 1.4)
 		node.add_child(spr)
 		m.world.add_child(node)
-		m.night_mobs.append({"node": node, "spr": spr, "anim": 0.0})
+		# hp: 돌 창(강타)은 한 방, 돌 검(연격)은 두 번 휘둘러야 잡는다
+		m.night_mobs.append({"node": node, "spr": spr, "anim": 0.0, "hp": 4.0})
 		m.hud.show_message("어둠 속에서 무언가 기어오는 소리가 들린다...", 4.0)
 	# 루프 변수 이름을 mob으로 둔다. 예전에는 이것도 `m`이었는데, 모듈에서는
 	# `m`이 main이라 안쪽에서 main을 통째로 가려 버린다.
@@ -64,6 +76,9 @@ func _update_night_mobs(delta: float) -> void:
 			m.player.position += (m.player.position - mob.node.position).normalized() * 36.0
 			if GameData.energy <= 0.0 and not m.day_transitioning:
 				m.hud.show_message("정신을 잃고 쓰러졌다...")
+				# 밤 몬스터에게 당해 기절 — 다음 날 아침 이장이 찾아온다 (서브퀘)
+				if GameData.spear_quest == "":
+					GameData.spear_quest = "pending"
 				_fade_next_day(true)
 
 
@@ -94,6 +109,8 @@ func _next_day(passed_out: bool) -> void:
 	GameData.minutes = GameData.DAY_START
 	# 침대가 좋을수록 잘 잔다 — 낡은 침대 70% · 나무 100% · 푹신 100%(+쓰러짐 완화)
 	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out)
+	# 한숨 자고 나면 속이 조금은 든든하다 (완전히 차지는 않는다)
+	GameData.hunger = maxf(GameData.hunger, GameData.HUNGER_WAKE_MIN)
 	GameData.reset_daily()
 	m.worldgen._advance_tree_growth()
 
@@ -154,6 +171,9 @@ func _next_day(passed_out: bool) -> void:
 				int(a.position.y / m.TILE)))
 			var product: String = GameData.ANIMALS[a.type].product
 			var n_out := 2 if (in_pen and randf() < m.PASTURE_BONUS) else 1
+			# 목장 숙련 — 정성이 쌓이면 생산물이 하나 더 (3%/Lv)
+			if randf() < 0.03 * (GameData.skill_lv("ranch") - 1):
+				n_out += 1
 			GameData.items[product] += n_out
 			collected[product] = int(collected.get(product, 0)) + n_out
 			GameData.discover(product)
@@ -180,8 +200,35 @@ func _next_day(passed_out: bool) -> void:
 	# 수락해 둔 의뢰는 다음 날까지 이어진다. 안 골랐으면 새로 세 건이 붙는다
 	if GameData.quest.is_empty():
 		GameData.make_daily_quest()
-	# 민지의 해변 노점: 오늘 나와 있을 시각(하루 3번, 1시간씩)을 새로 뽑는다
+	# 만수의 해변 노점: 오늘 나와 있을 시각(하루 3번, 1시간씩)을 새로 뽑는다
 	GameData.roll_stall_hours()
+
+	# 어제 부친 편지의 답장이 우체국 보관함에 도착한다
+	var replies: Array = GameData.mail_new_day()
+
+	# 마을 성장: 주민이 늘면 어느 날 아침, 마을 사람들이 이장의 낡은 오두막을
+	# 제대로 된 집으로 다시 지어 드린다
+	if GameData.chief_house_lv == 0 \
+			and m.village_residents() >= GameData.CHIEF_HOUSE_RESIDENTS:
+		GameData.chief_house_lv = 1
+		m.objnode._remove_object(m.CHIEF_HUT)
+		m.objnode._place_object(m.CHIEF_HUT, "chief_hut", 0)
+		m.hud.event_toast("이장님의 새 집 완공!")
+		m.hud.show_message("마을 사람들이 힘을 모아 이장님의 낡은 오두막을\n제대로 된 집으로 다시 지어 드렸다!", 6.0)
+
+	# 마을회관 (메인 스토리 9) — 해금 알림은 story._story9_update가 맡고,
+	# 여기서는 개관 후의 살림을 돌본다: 회관 기능의 점진 해금 안내와
+	# 주민들의 아침 창고 기부. 한 번 열린 기능은 닫히지 않는다.
+	if GameData.story9_phase == "done":
+		for feat: Array in [["store", GameData.HALL_STORE_RES, "마을 창고"],
+				["project", GameData.HALL_PROJECT_RES, "공동 프로젝트"],
+				["meet", GameData.HALL_MEET_RES, "마을 회의"]]:
+			if str(feat[0]) not in GameData.hall_feat_noticed \
+					and m.village_residents() >= int(feat[1]):
+				GameData.hall_feat_noticed.append(str(feat[0]))
+				m.hud.event_toast("%s 해금!" % str(feat[2]))
+				m.hud.show_message("주민이 %d명이 됐다! 마을회관에서\n「%s」이(가) 열렸다." % [int(feat[1]), str(feat[2])], 6.0)
+		GameData.hall_donate_morning(m.npcs.size())
 
 	m.saveio.save_now()
 
@@ -190,6 +237,13 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n%s %d개를 얻었다!" % [GameData.ITEMS[product].name, collected[product]]
 	if season_changed:
 		note += "\n%s이 시작됐다!" % GameData.season_name()
+	# 어제 하루 동안 오른 능력치 — 그 자리에서 알리지 않고 여기서 한꺼번에
+	var lv_line := GameData.levelup_report()
+	if lv_line != "":
+		note += "\n" + lv_line
+	if not replies.is_empty():
+		note += "\n우체국에 %s의 답장이 도착했다." \
+			% ", ".join(PackedStringArray(replies))
 	# 오늘 축제가 있으면 아침에 알려 준다 (하루 계획을 세울 수 있게)
 	GameData.reset_festival_state()
 	var fest: Dictionary = GameData.festival_today()
@@ -217,16 +271,17 @@ func _next_day(passed_out: bool) -> void:
 		% [stats[0], stats[1], stats[2], GameData.money, note]
 	m.summary.open(s_title, s_body)
 	if Net.is_host():
-		m.netsync._net_new_day.rpc(m.netsync._make_snapshot_json(), s_title, s_body)
+		m.netsync.send_new_day(m.netsync._make_snapshot_json(), s_title, s_body)
 	m.queue_redraw()
 	# 밤새 물기가 마르고 작물이 자랐다 — 「돌아가는 칸」 목록을 다시 만든다.
 	# 어딘가에서 touch를 빠뜨려도 여기서 하루 안에 저절로 맞춰진다.
 	m.farming.rebuild()
 
 func _update_night() -> void:
+	# 가로등이 없는 마을 — 해가 지면 정말로 캄캄해진다
 	var start := 18.0 * 60.0
 	var a := clampf((GameData.minutes - start) / (6.0 * 60.0), 0.0, 1.0)
-	var c := Color(1, 1, 1).lerp(Color(0.5, 0.48, 0.72), a)
+	var c := Color(1, 1, 1).lerp(Color(0.16, 0.15, 0.26), a)
 	if m.weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]:
 		c *= Color(0.78, 0.8, 0.88)  # 비 오는 날은 어둑하게
 	elif m.weather_now() == GameData.WEATHER_FOG:

@@ -19,8 +19,9 @@ func at_fishing_spot() -> bool:
 
 
 func fishing_spot_center() -> Vector2:
-	var p: Vector2i = m.FISH_PIERS[0]
-	return Vector2(p.x * m.TILE + 16, (m.VILLAGE_RIVER_Y + m.RIVER_ROWS - 2) * m.TILE + 16)
+	# 강가 잔디밭 한가운데 (부두는 없어졌다 — 물가에 서서 던진다)
+	var cx := (m.FISH_YARD_X0 + m.FISH_YARD_X1) / 2
+	return Vector2(cx * m.TILE + 16, m.DOCK_Y * m.TILE + 16)
 
 
 func _start_fishing() -> void:
@@ -32,10 +33,10 @@ func _start_fishing() -> void:
 	# 「낚시」 목표를 받은 동안에는 마을 남쪽 낚시터에서 배운다.
 	# (목표를 끝낸 뒤에는 어느 물가에서든 낚을 수 있다)
 	if GameData.tutorial_current_flag() == "fish" and not at_fishing_spot():
-		m.hud.show_message("마을 남쪽 강가의 낚시터로 가자! 부두에서 낚싯대를 던진다. (지도 M)", 4.0)
+		m.hud.show_message("마을 남쪽 강가의 낚시터로 가자! 물가에 서서 낚싯대를 던진다. (지도 M)", 4.0)
 		return
 	if not m.actions.can_use_tile(t):
-		m.hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판(E)에서 구입하자!")
+		m.hud.show_message("아직 구입하지 않은 부지의 물이다. 표지판에서 구입하자!")
 		return
 	m.fishing_state = "waiting"
 	m.fishing_timer = randf_range(1.5, 4.0) * GameData.fish_wait_mult()
@@ -66,6 +67,11 @@ func _on_fishing_finished(success: bool) -> void:
 	if m.pending_fish.is_empty():
 		return          # 무엇이 물었는지 모르는 채로 끝났다 (있어선 안 되는 경우)
 	if success:
+		# 특별한 입질 (메인 스토리 13) — 두 분의 바위 곁에서는 물고기 대신
+		# 바다가 간직해 온 「낡은 작은 상자」가 올라온다
+		if m.story.story13_special_bite():
+			m.toolwork.gain_skill("fish", 10.0)
+			return
 		var id: String = str(m.pending_fish.id)
 		var def: Dictionary = GameData.ITEMS[id]
 		GameData.items[id] += 1
@@ -74,7 +80,9 @@ func _on_fishing_finished(success: bool) -> void:
 		GameData.today_harvest += 1
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
-		m.hud.show_message("%s를 낚았다! (%dG)" % [def.name, def.sell])
+		# 낚시는 돈을 주지 않는다 — 값은 상점에 팔 때 받는다.
+		# (예전에는 판매가를 괄호로 같이 띄워 「돈이 들어왔다」로 읽혔다)
+		m.hud.show_message("%s를 낚았다!" % def.name)
 		m.tutorial_notify("fish")
 		# 여름 낚시대회: 대회 시간 안에 낚시터에서 낚은 것만 센다
 		if GameData.festival_open() and str(GameData.festival_today().id) == "fishing" \

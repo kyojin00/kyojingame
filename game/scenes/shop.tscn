@@ -40,7 +40,7 @@ theme_override_constants/separation = 8
 [node name="BuyBtn" type="Button" parent="Panel/V/Tabs"]
 layout_mode = 2
 focus_mode = 0
-text = "씨앗"
+text = "구매"
 
 [node name="SellBtn" type="Button" parent="Panel/V/Tabs"]
 layout_mode = 2
