@@ -4892,13 +4892,25 @@ func _debug_tick() -> void:
 						sea_seen = false
 					if str(m.grid[sy][sx].ground) != "water":
 						sea_water = false
+			# 격자 끝까지 물이다 — 모래사장에 서면 파란 띠 밑으로 화면 몇 줄이
+			# 더 보인다. 예전에는 거기서 풀밭이 도로 나와 「바다 건너 초원」이 됐다
+			var below_ok := true
+			for sx2 in [70, 120, m.MAP_W - 3]:
+				for sy2 in [m.WORLD_H, m.WORLD_H + 6, m.MAP_H - 1]:
+					if str(m.grid[sy2][sx2].ground) != "water":
+						below_ok = false
+			# 튜토리얼 숲길은 그 밑에서도 제 땅 그대로다 (물로 덮이면 안 된다)
+			var tut_keep: bool = str(m.grid[m.STORY_SPAWN.y][m.STORY_SPAWN.x].ground) \
+				!= "water"
 			# 뭍은 그대로 가려져 있어야 한다 (바다만 예외다)
 			var land_hidden: bool = not m.map_ui._visible_tile(30, 60) \
 				and not m.map_ui._visible_tile(120, 40)
 			GameData.explored = k_expl4
 			m.map_ui._ensure_vis_index()
-			print("SEAMAP_OK=", sea_seen and sea_water and land_hidden,
+			print("SEAMAP_OK=", sea_seen and sea_water and land_hidden
+				and below_ok and tut_keep,
 				" 바다보임=", sea_seen, " 전부물=", sea_water,
+				" 끝까지물=", below_ok, " 숲길보존=", tut_keep,
 				" 뭍은가림=", land_hidden)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)

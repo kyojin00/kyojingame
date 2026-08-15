@@ -172,8 +172,18 @@ func _build_sea() -> void:
 	# 숲으로 덮어 두었다가 길목 바위를 캐는 순간 물로 바꿨는데, 그러다 보니
 	# 「돌을 캤더니 숲이 바다가 되는」 광경이 그대로 보였다. 이제 지형은
 	# 고정이고, 능선의 큰 바위가 길을 막고 있을 뿐이다.
-	for y in range(m.SEA_Y0, m.WORLD_H):
+	# 바다는 **화면에 보일 수 있는 끝까지** 물이다.
+	#
+	# 예전에는 세계의 높이(WORLD_H)까지만 물을 깔았다. 그런데 격자는 그
+	# 아래로도 튜토리얼 공간까지 이어져 있어서, 모래사장에 서면 파란 띠가
+	# 끊기고 **그 밑에 풀밭이 도로 보였다** — 바다 건너에 초원이 있는 꼴이다.
+	# 이제 격자 끝(MAP_H)까지 물로 채운다. 세계 밖에 따로 붙여 둔
+	# 튜토리얼 숲길만 비켜 간다 (거기는 그 공간의 땅이다).
+	var tut := m.TUTORIAL_REGION
+	for y in range(m.SEA_Y0, m.MAP_H):
 		for x in m.MAP_W:
+			if tut.has_point(Vector2i(x, y)):
+				continue
 			m.grid[y][x].ground = "water"
 			m.objects.erase(Vector2i(x, y))
 	for y in range(m.BEACH_Y0, m.SEA_Y0):
