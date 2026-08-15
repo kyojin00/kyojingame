@@ -378,6 +378,10 @@ func interact() -> void:
 			m.riding._mount_horse(t)   # 말 칸에서 E를 눌러도 탄다 (F가 기본)
 			return
 		if obj.kind == "cave":
+			# 스토리 20 — 가장 깊은 곳의 돌문 이야기가 먼저다
+			if GameData.story20_phase == "gate":
+				m.story.gate_examine()
+				return
 			m.village._open_mine_dialog()
 			return
 		if obj.kind == "onsen":
@@ -385,9 +389,6 @@ func interact() -> void:
 			return
 		if obj.kind == "old_barn":
 			m.story.old_barn_examine()   # 옛 헛간 (메인 스토리 17)
-			return
-		if obj.kind == "old_gate":
-			m.story.gate_examine()   # 오래된 돌문 (메인 스토리 20)
 			return
 		if obj.kind == "seed_sprout":
 			m.dialog.open("작은 새싹",

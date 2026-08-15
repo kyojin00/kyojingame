@@ -44,9 +44,6 @@ func _build_map() -> void:
 	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
 	m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
 	m.objects[m.WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
-	# 오래된 돌문 (메인 스토리 20) — 마지막 페이지의 단서를 얻어야 눈에 들어온다
-	if GameData.gate_visible():
-		m.objects[m.GATE_POS] = {"kind": "old_gate", "hp": 0}
 
 	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in m.MAP_W:
@@ -454,28 +451,17 @@ func spawn_old_barn() -> void:
 	m.queue_redraw()
 
 
-# 오래된 돌문 (메인 스토리 20) — 마을이 서기 훨씬 전부터 그 자리에 있었다.
-# 처음부터 세워 두고, 열리기 전에는 그저 열리지 않는 돌일 뿐이다.
-func spawn_gate() -> void:
-	if not GameData.gate_visible():
-		return
-	var t: Vector2i = m.GATE_POS
-	if str(m.objects.get(t, {}).get("kind", "")) == "old_gate":
-		return
-	for y in range(t.y - 1, t.y + 2):
-		for x in range(t.x - 1, t.x + 2):
-			m.objnode._remove_object(Vector2i(x, y))
-	m.objects[t] = {"kind": "old_gate", "hp": 0}
-	m.objnode._spawn_objects()
-	m.queue_redraw()
-
-
-# 문이 열린 표시 — 돌문 그림을 밝게 띄운다 (칸은 그대로 막혀 있다)
-func open_gate() -> void:
-	spawn_gate()
-	if m.obj_nodes.has(m.GATE_POS):
-		var spr: Sprite2D = m.obj_nodes[m.GATE_POS].get_child(0)
-		spr.modulate = Color(1.25, 1.2, 1.0)
+# 옛 세이브에 남아 있는 「오래된 돌문」을 걷어낸다.
+#
+# 돌문은 한때 마을 북쪽에 서 있는 오브젝트였지만, 상점 마당과 겹쳐
+# 길을 막는 일이 잦아 **세계에서 완전히 없앴다**. 스토리 20의 그 문은
+# 이제 동굴 가장 깊은 곳에 있고, 동굴 입구에서 이야기가 이어진다.
+# 예전 세이브를 불러오면 이 함수가 남은 돌문을 지운다.
+func purge_old_gate() -> void:
+	for t: Vector2i in m.objects.keys():
+		if str(m.objects[t].get("kind", "")) == "old_gate":
+			m.objnode._remove_object(t)
+			m.objects.erase(t)
 
 
 # 할아버지의 씨앗에서 돋은 새싹 (메인 스토리 20) — 엔딩 뒤에도 남는다

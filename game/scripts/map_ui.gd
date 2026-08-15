@@ -514,7 +514,7 @@ func _quest_spot(qid: String) -> Vector2i:
 				return main.HILL_POS
 		"story20":
 			if GameData.story20_phase in ["gate", "inner"]:
-				return main.GATE_POS
+				return main.CAVE_POS
 			if GameData.story20_phase == "plant":
 				return main.HOME_ANCHOR + Vector2i(2, 5)
 		"fisher_home":

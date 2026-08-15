@@ -2784,9 +2784,11 @@ func _debug_tick() -> void:
 			m.story.story20_show_page("chief")
 			m.dialog.skip_seq()
 			var s20_told: bool = GameData.story20_phase == "gate"
-			# ③ 돌문은 처음부터 세계에 서 있다 — 병이 모자라면 열리지 않는다
-			var s20_stone: bool = str(m.objects.get(m.GATE_POS, {}).get(
-				"kind", "")) == "old_gate"
+			# ③ 돌문은 세계에 놓인 오브젝트가 아니다 — 동굴 입구에서 이어진다
+			var s20_stone := true
+			for gt: Vector2i in m.objects:
+				if str(m.objects[gt].get("kind", "")) == "old_gate":
+					s20_stone = false
 			GameData.items["water_life"] = 3
 			m.story.gate_examine()
 			var s20_lack: bool = m.dialog.visible and not GameData.gate_open
@@ -2886,7 +2888,7 @@ func _debug_tick() -> void:
 				and s20_free,
 				" 조건3종=", s20_gate3 and s20_note100, " 시작=", s20_start,
 				" 중복없음=", s20_once, " 두사람=", s20_told,
-				" 돌문상시=", s20_stone, " 병부족차단=", s20_lack,
+				" 돌문오브젝트없음=", s20_stone, " 병부족차단=", s20_lack,
 				" 일곱병개방=", s20_open, " 마지막방=", s20_room,
 				" 최종보스=", s20_boss, " 보관함=", s20_chest,
 				" 씨앗·편지=", s20_seed and letter_ok,
@@ -3281,35 +3283,38 @@ func _debug_tick() -> void:
 			GameData.sea_open_day = k_seaday
 			m.worldgen._build_sea()
 
-			# ── ② 오래된 돌문: 조건 전에는 아예 없고, 건물 마당과 겹치지 않는다
+			# ── ② 오래된 돌문: 세계 어디에도 없다 (상점과 겹치던 버그의 뿌리)
 			var k_s18b := GameData.story18_phase
 			var k_s19 := GameData.story19_phase
 			var k_s20 := GameData.story20_phase
-			GameData.story18_phase = ""
-			GameData.story19_phase = ""
-			GameData.story20_phase = ""
-			m.objnode._remove_object(m.GATE_POS)
-			m.worldgen.spawn_gate()
-			var gate_hidden: bool = not GameData.gate_visible() \
-				and not m.objects.has(m.GATE_POS)
-			GameData.story18_phase = "memo"      # 18장이 시작되면 모습을 드러낸다
-			m.worldgen.spawn_gate()
-			var gate_shown: bool = GameData.gate_visible() \
-				and str(m.objects.get(m.GATE_POS, {}).get("kind", "")) == "old_gate"
-			# 마을 부지·길과 아예 떨어진 자리여야 한다 (상점과 겹치던 버그)
-			var gate_clear: bool = not m.VILLAGE_REGION.has_point(m.GATE_POS) \
-				and not m.ROAD.has_point(m.GATE_POS)
+			var gate_hidden := true
+			for ph: String in ["", "memo", "hill", "tale"]:
+				GameData.story18_phase = ph
+				GameData.story19_phase = ph
+				GameData.story20_phase = ph
+				m.worldgen._build_map()
+				for gt: Vector2i in m.objects:
+					if str(m.objects[gt].get("kind", "")) == "old_gate":
+						gate_hidden = false
+			GameData.story18_phase = k_s18b
+			GameData.story19_phase = k_s19
+			GameData.story20_phase = k_s20
+			# 옛 세이브에 남아 있어도 걷어낸다
+			var gate_ghost := Vector2i(40, 2)
+			m.objects[gate_ghost] = {"kind": "old_gate", "hp": 0}
+			m.worldgen.purge_old_gate()
+			var gate_shown: bool = not m.objects.has(gate_ghost)
+			# 상점 마당에는 어떤 붙박이도 남지 않는다
+			var gate_clear := true
 			for pid2: String in m.VILLAGE_PLOTS:
 				var anc: Vector2i = m.VILLAGE_PLOTS[pid2].anchor
 				var yard := Rect2i(anc.x - m.YARD_PAD, anc.y - m.YARD_PAD,
 					5 + m.YARD_PAD * 2, 4 + m.YARD_PAD * 2)
-				if yard.has_point(m.GATE_POS):
-					gate_clear = false
-			GameData.story18_phase = k_s18b
-			GameData.story19_phase = k_s19
-			GameData.story20_phase = k_s20
-			if not GameData.gate_visible():
-				m.objnode._remove_object(m.GATE_POS)
+				for yy in range(yard.position.y, yard.end.y):
+					for xx in range(yard.position.x, yard.end.x):
+						var ot := Vector2i(xx, yy)
+						if str(m.objects.get(ot, {}).get("kind", "")) == "old_gate":
+							gate_clear = false
 
 			# ── ③ 낚싯대가 없으면 강이든 바다든 못 던진다 (말풍선으로 알린다)
 			var k_unlocked: Array = GameData.unlocked_tools.duplicate()
@@ -3428,8 +3433,8 @@ func _debug_tick() -> void:
 				and sign_placed and sign_menu and picked_home and guide_ok
 				and cats_ok and tab_ok,
 				" 바다고정=", sea_fixed, " 숲안변함=", no_morph,
-				" 돌문숨김=", gate_hidden, " 조건후등장=", gate_shown,
-				" 건물안겹침=", gate_clear, " 낚싯대전금지=", no_rod,
+				" 돌문없음=", gate_hidden, " 옛세이브청소=", gate_shown,
+				" 상점마당깨끗=", gate_clear, " 낚싯대전금지=", no_rod,
 				" 말풍선=", rod_bubble, " 낚싯대후해금=", rod_ok,
 				" 표지판=", sign_placed, " 선택지=", sign_menu,
 				" 용식의집=", picked_home, " 지도마커=", guide_ok,
@@ -3849,25 +3854,37 @@ func _debug_tick() -> void:
 				and seen1 > 0 and ratio < 0.02 and seen2 > seen1
 			GameData.explored = _fog_keep
 
-			# ── ④ 오래된 돌문 — 마을에서 멀찍이, 스토리 18부터
-			var k_s18d := GameData.story18_phase
-			var k_s19d := GameData.story19_phase
+			# ── ④ 스토리 20의 문은 이제 동굴 입구가 가리킨다 (돌문 오브젝트 없음)
 			var k_s20d := GameData.story20_phase
-			GameData.story18_phase = ""
-			GameData.story19_phase = ""
-			GameData.story20_phase = ""
-			var gate_hid: bool = not GameData.gate_visible()
-			GameData.story18_phase = "memo"
-			var gate_18: bool = GameData.gate_visible()
-			var far_ok: bool = not m.VILLAGE_REGION.has_point(m.GATE_POS) \
-				and not m.ROAD.has_point(m.GATE_POS) \
-				and m.GATE_POS != Vector2i(86, 4) \
-				and (m.GATE_POS - m.VILLAGE_PLOTS["general"].anchor).length() > 20.0
-			GameData.story18_phase = k_s18d
-			GameData.story19_phase = k_s19d
+			var k_pick20 := GameData.tracked_pick
+			GameData.story20_phase = "gate"
+			GameData.tracked_pick = "story20"
+			var gs20: Array = m.map_ui._quest_guides()
+			var gate_hid: bool = gs20.size() == 1
+			if gate_hid:
+				var g20: Dictionary = gs20[0]
+				var t20: Vector2i = g20.tile
+				gate_hid = t20 == m.CAVE_POS
+			var gate_18 := true
+			for gt2: Vector2i in m.objects:
+				if str(m.objects[gt2].get("kind", "")) == "old_gate":
+					gate_18 = false
 			GameData.story20_phase = k_s20d
-			if not GameData.gate_visible():
-				m.objnode._remove_object(m.GATE_POS)
+			GameData.tracked_pick = k_pick20
+			# 미니 트래커와 Q창이 같은 퀘스트를 본다
+			var far_ok := true
+			for pk: String in ["", "story2", "plot3"]:
+				var k_pk := GameData.tracked_pick
+				GameData.tracked_pick = pk
+				var tq_h: Dictionary = GameData.tracked_quest()
+				var lst: Array = GameData.quest_list()
+				var found := false
+				for q_h: Dictionary in lst:
+					if str(q_h.get("id", "")) == str(tq_h.get("id", "")):
+						found = true
+				if not tq_h.is_empty() and not found:
+					far_ok = false
+				GameData.tracked_pick = k_pk
 			m.hud._toast_queue.clear()
 			print("QUESTUI_OK=", one_ok and swap_ok and short_ok and prompt_ok
 				and fog_ok and gate_hid and gate_18 and far_ok,
@@ -3875,7 +3892,8 @@ func _debug_tick() -> void:
 				" 짧은목표=", short_ok, "(최장 ", longest, "자: ", worst, ")",
 				" 상호작용안내=", prompt_ok,
 				" 안개=", fog_ok, "(처음 ", "%.1f" % (ratio * 100.0), "%)",
-				" 돌문숨김=", gate_hid, " 18장등장=", gate_18, " 마을밖=", far_ok)
+				" 20장마커=동굴 ", gate_hid, " 돌문없음=", gate_18,
+				" 트래커일치=", far_ok)
 		297:
 			# #146: 제4장 집터 서브퀘 · 우체국 편지·보관함 · 고가치 경제
 			m.dialog.close()
@@ -4022,6 +4040,68 @@ func _debug_tick() -> void:
 				" 하루한통=", once_ok, " 답장=", reply_ok,
 				" 수락편지보관=", keep_ok, " 보관함열람=", box_ui and read_ui,
 				" 경제=", econ_ok)
+		298:
+			# #147: 밭 갈기 안내는 바다 해금 뒤 · 용식 첫 만남 대사 분리
+			m.dialog.close()
+
+			# ── ① 호미 안내는 이장이 호미를 준 뒤에만 뜬다
+			var k_s2f := GameData.story2_phase
+			var k_tut: Dictionary = GameData.tutorial.duplicate()
+			var k_guide := GameData.guide_active
+			GameData.tutorial = GameData.fresh_tutorial()
+			GameData.tutorial["active"] = true
+			GameData.guide_active = false
+			var order_ok := true
+			var many := false
+			for ph2: String in ["shop", "fisher", "farm_talk"]:
+				GameData.story2_phase = ph2
+				if GameData.tutorial_current_flag() != "":
+					order_ok = false          # 앞선 퀘스트와 나란히 뜨면 안 된다
+				# 그 사이 목록에 뜨는 퀘스트는 많아야 하나(메인 이야기)다
+				var lst2: Array = GameData.quest_list()
+				var mains := 0
+				for q2: Dictionary in lst2:
+					if str(q2.get("cat", "")) == "main":
+						mains += 1
+				if mains > 1:
+					many = true
+			GameData.story2_phase = "farm"
+			var farm_on: bool = GameData.farm_chain_open() \
+				and GameData.tutorial_current_flag() == "till"
+			GameData.story2_phase = k_s2f
+			GameData.tutorial = k_tut
+			GameData.guide_active = k_guide
+
+			# ── ② 용식 첫 만남 — 황금잉어와 바다 이야기만
+			var k_fq := GameData.fisher_quest
+			var k_fh := GameData.fisher_home
+			GameData.fisher_quest = "meet"
+			m.story._start_fisher_dialog()
+			var meet_txt := ""
+			for e4: Dictionary in m.dialog._seq:
+				meet_txt += str(e4.get("text", "")) + " "
+			var meet_ok: bool = meet_txt.contains("황금잉어") \
+				and meet_txt.contains("바다") \
+				and not meet_txt.contains("눌러앉") \
+				and not meet_txt.contains("집을") \
+				and not meet_txt.contains("*")
+			m.dialog.close()
+			# 「눌러앉을 집」 이야기는 사흘 뒤 분수대 앞 서브퀘에서만
+			GameData.fisher_home = "wait"
+			m.story._start_fisher_home_dialog()
+			var home_txt := ""
+			for e5: Dictionary in m.dialog._seq:
+				home_txt += str(e5.get("text", "")) + " "
+			var home_ok: bool = home_txt.contains("눌러앉") \
+				and home_txt.contains("집")
+			m.dialog.close()
+			GameData.fisher_quest = k_fq
+			GameData.fisher_home = k_fh
+			m.hud._toast_queue.clear()
+			print("ORDER_OK=", order_ok and not many and farm_on and meet_ok
+				and home_ok,
+				" 바다전밭안내없음=", order_ok, " 동시노출없음=", not many,
+				" 호미후시작=", farm_on, " 첫만남=", meet_ok, " 집부탁분리=", home_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
@@ -5122,10 +5202,13 @@ func _debug_tick() -> void:
 				" 메인1개=", one_main, " 마을소식(도착후)=", info_town,
 				" 마을소식(도착전숨김)=", not info_field, " 말풍선=", bubbled)
 		322:
-			# #115/#139: 대사 한 페이지 2줄 제한 + **문장은 페이지를 넘지 않는다**
+			# #115/#139/#147: 한 페이지 세 줄까지 · 문장은 페이지를 넘지 않는다 ·
+			# NPC 대사에는 괄호 지문도 편집 기호도 남지 않는다
 			m.dialog.open_seq("검사", null, [
 				{"text": "첫 번째 문장은 짧다.\n두 번째 문장은 제법 길어서 한 줄에 담기지 않고"
-					+ " 다음 줄까지 넘어가게 된다. 세 번째 문장도 이어서 붙는다.",
+					+ " 다음 줄까지 넘어가게 된다. 세 번째 문장도 이어서 붙는다."
+					+ " 네 번째 문장까지 붙이면 한 화면에는 도저히 담기지 않는다."
+					+ " 다섯 번째 문장으로 확실히 넘긴다.",
 					"choices": [["끝", null]]},
 			])
 			var pages: int = m.dialog._seq.size()
@@ -5133,7 +5216,7 @@ func _debug_tick() -> void:
 			var sent_whole := true
 			for e2: Dictionary in m.dialog._seq:
 				var body2 := str(e2.get("text", ""))
-				if body2.split("\n").size() > 2:
+				if body2.split("\n").size() > m.dialog.PAGE_LINES:
 					two_lines = false
 				# 페이지 끝은 문장 끝이어야 한다 (한두 글자만 다음 장으로 밀리지 않게)
 				if not body2.strip_edges().ends_with("."):
@@ -5146,10 +5229,27 @@ func _debug_tick() -> void:
 				and not m.dialog._seq[0].has("choices")
 			var small_font: bool = m.dialog.FONT_BODY <= 14
 			m.dialog.close()
+			# NPC가 하는 말에서는 괄호 지문과 편집 기호가 사라진다
+			m.dialog.open_seq("검사", null, [
+				{"text": "「이건 전설의 물고기라네.」 (그가 웃었다)"},
+				{"text": "(문이 삐걱이며 열렸다.)"},
+			])
+			var spoken_clean := true
+			var narration_kept := false
+			for e3: Dictionary in m.dialog._seq:
+				var b3 := str(e3.get("text", ""))
+				if b3.contains("*"):
+					spoken_clean = false
+				if b3.contains("「") and (b3.contains("(") or b3.contains(")")):
+					spoken_clean = false
+				if b3.begins_with("(") and b3.contains(")"):
+					narration_kept = true    # 지문만 있는 페이지는 그대로 둔다
+			m.dialog.close()
 			print("DIALOG2LINE_OK=", pages >= 2 and two_lines and choice_last
-				and sent_whole and small_font,
-				" 페이지=", pages, " 두줄=", two_lines, " 선택지끝장=", choice_last,
-				" 문장안끊김=", sent_whole, " 작은글씨=", small_font)
+				and sent_whole and small_font and spoken_clean and narration_kept,
+				" 페이지=", pages, " 세줄이하=", two_lines, " 선택지끝장=", choice_last,
+				" 문장안끊김=", sent_whole, " 작은글씨=", small_font,
+				" 대사정리=", spoken_clean, " 지문유지=", narration_kept)
 		325:
 			# #114: 잡화점 요리 레시피 — 물고기를 낚아 봐야 진열 + 상인 첫날 숨김
 			var keep_fc: Dictionary = GameData.fish_caught.duplicate()

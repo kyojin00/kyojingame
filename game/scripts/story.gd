@@ -927,7 +927,7 @@ func _start_story2_dialog() -> void:
 		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
 		{"text": "「책상에서는 손수 가구를 만들 수 있네.\n물론 재료가 있어야만 만들 수 있지.」"},
 		{"text": "「그나저나... 보다시피 마을이 텅 비었네. 젊은 사람들이 다 떠났거든.」"},
-		{"text": "「자네가 와 준 김에 부탁 하나 함세. 우선 **상점**부터 세워 보지 않겠나?」",
+		{"text": "「자네가 와 준 김에 부탁 하나 함세. 우선 상점부터 세워 보지 않겠나?」",
 			"portrait": chief_happy},
 		{"text": "「목재 %d에 돌 %d... 나무를 베고 바위를 캐면 모일 걸세.」"
 			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]},
@@ -1070,11 +1070,10 @@ func _fisher_arrive() -> void:
 func _start_fisher_dialog() -> void:
 	var nm := GameData.player_name if GameData.player_name != "" else "친구"
 	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_normal"], [
-		{"text": "「오, 처음 보는 얼굴이군! 나는 낚시꾼 용식라고 하네.」",
+		{"text": "「오, 처음 보는 얼굴이군! 나는 낚시꾼 용식이라고 하네.」",
 			"portrait": m.tex["npc_fisher_portrait_happy"]},
-		{"text": "「이 마을 물줄기에 **전설의 황금잉어**가 산다는 소문을 듣고 왔지.」"},
-		{"text": "「그놈을 낚을 때까지 이 마을에 눌러앉을 작정이야.」"},
-		{"text": "「그런데 말이지... 큰 놈은 바다를 오간다네. 남쪽 능선 너머가 바다인데, 바위가 길을 막고 있더군.」"},
+		{"text": "「이 마을 물줄기에 전설의 황금잉어가 산다는 소문을 듣고 왔지.」"},
+		{"text": "「큰 놈은 바다를 오간다네. 남쪽 능선 너머가 바다인데 바위가 길을 막고 있더군.」"},
 		{"text": "「%s, 자네도 황금잉어에 관심이 있나?」" % nm,
 			"choices": [
 				["당연하다. 꼭 잡고 말 거다.", _fisher_choose.bind(1)],
@@ -1144,7 +1143,7 @@ func _start_fisher_reward_dialog() -> void:
 	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_happy"], [
 		{"text": "「열렸다! 이 바람, 이 냄새... 바다야!」"},
 		{"text": "「고맙네, %s. 자네 덕에 길이 열렸어.」" % nm},
-		{"text": "「약속한 보답일세 — 내가 손수 깎은 **간이낚싯대**야.」",
+		{"text": "「약속한 보답일세 — 내가 손수 깎은 간이낚싯대야.」",
 			"event": _story_give_rod},
 		{"text": "「물가 어디서든 던져 보게. 입질(!)이 오면 다시 E일세.」",
 			"portrait": m.tex["npc_fisher_portrait_normal"]},
@@ -1722,12 +1721,12 @@ func _start_move_chief_dialog() -> void:
 		{"text": "「그리고 말인데... 앞으로 이런 편지는\n굳이 나한테 가져올 필요 없네.」",
 			"portrait": chief_normal},
 		{"text": "「자네 덕에 상점도 생기고, 마을에 조금씩\n활기가 돌고 있잖나. 새 주민을 받을지는\n이제 자네가 정하게.」"},
-		{"text": "「단, 명심할 게 하나 있네 — 사람을 초대하려면\n**먼저 그 사람이 살 빈 집터**를 마련해 둬야 하네.」"},
+		{"text": "「단, 명심할 게 하나 있네 — 사람을 초대하려면\n먼저 그 사람이 살 빈 집터를 마련해 둬야 하네.」"},
 		{"text": "「빈 집터가 없으면 편지를 수락할 수 없어.\n앞으로 오는 편지도 전부 마찬가질세.」"},
 		{"text": "「집터 자리는 자네가 직접 골라 주게.\n아직 열리지 않은 땅만 아니면 어디든 좋네.」"},
 		{"text": "「집터는 만수네 잡화점에서 레시피를 판다네.\n값도 재료도 꽤 들지만... 마을 일이니 부탁함세.」",
 			"portrait": chief_happy},
-		{"text": "「집터를 마련했으면 **편지를 다시 읽고**\n수락해 주게. 앞으로도 우리 마을을 잘 부탁하네.」",
+		{"text": "「집터를 마련했으면 편지를 다시 읽고\n수락해 주게. 앞으로도 우리 마을을 잘 부탁하네.」",
 			"portrait": chief_happy},
 	], _end_move_chief)
 
@@ -1900,7 +1899,7 @@ func _start_story4_dialog() -> void:
 	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
 	m.dialog.open_seq("이장 덕수", chief_normal, [
 		{"text": "「동쪽 다리 건너 낡은 표지판 말인가?\n허허... 그걸 다 찾아냈구먼.」"},
-		{"text": "「그건 예전에 쓰던 **마을의 경계 표지판**일세.\n잠깐 기다려 보게 — 보여줄 게 있네.」"},
+		{"text": "「그건 예전에 쓰던 마을의 경계 표지판일세.\n잠깐 기다려 보게 — 보여줄 게 있네.」"},
 		{"text": "(이장님이 장롱 깊숙한 곳에서 누렇게 바랜\n두루마리를 꺼내 조심스럽게 펼친다)\n\n— 오래된 교진 마을의 지도다."},
 		{"text": "「보게나. 지금 우리가 쓰는 땅은 옛 교진 마을의\n일부일 뿐이야. 동쪽 강 너머까지, 예전엔 전부\n마을이었다네.」"},
 		{"text": "「사람이 하나둘 떠나면서 바깥 구역부터 차례로\n버려졌지. 지금은 수풀만 무성하네만...」"},
@@ -4215,7 +4214,6 @@ func _end_last_page() -> void:
 	if GameData.story19_phase != "page":
 		return
 	GameData.story19_phase = "done"
-	m.worldgen.spawn_gate()   # 「가장 오래된 자리」가 눈에 들어온다
 	m.hud.story_banner("메인 스토리 19 완결", "일곱 갈래의 삶")
 	m.hud.show_message("일곱 병이 준비됐다.\n마지막 장소가 기다리고 있다.", 7.0)
 	m.saveio.save_now()
@@ -4536,9 +4534,9 @@ func _end_fisher_home_reward() -> void:
 # ---- 메인 스토리 20: 가장 오래된 자리 (최종 엔딩) ----
 #
 # 노트 100% · 유품 다섯 · 생명의 물 일곱이 다 갖춰지면 시작한다.
-# 마지막 페이지가 가리키는 곳은 광장 북쪽의 **오래된 돌문** — 마을이
-# 서기 훨씬 전부터 그 자리에 있었고, 아무도 열지 못해 아무도 신경
-# 쓰지 않던 자리다. 일곱 병을 홈에 부으면 문이 열린다.
+# 마지막 페이지가 가리키는 곳은 동굴 가장 깊은 곳의 오래된 돌문이다 —
+# 마을이 서기 훨씬 전부터 그 아래에 잠겨 있었고, 아무도 열지 못해
+# 아무도 내려가 보지 않던 자리다. 일곱 병을 홈에 부으면 문이 열린다.
 
 func _story20_update(_delta: float) -> void:
 	if Net.is_guest():
@@ -4562,11 +4560,11 @@ func _story20_update(_delta: float) -> void:
 const LAST_PAGE_LINES := {
 	"librarian": [
 		{"text": "「...이 글씨, 할아버님 것이 맞아요.\n마지막까지 손이 떨리지 않으셨네요.」"},
-		{"text": "「마을에서 가장 오래된 자리... 광장 북쪽 돌문이에요.\n마을이 생기기 훨씬 전부터 있었다고 기록에 나와요.」"},
+		{"text": "「마을에서 가장 오래된 자리... 동굴 가장 깊은 곳이에요.\n그 아래에 돌문이 하나 잠겨 있다고 기록에 나와요.」"},
 		{"text": "「아무도 못 열었어요. 그래서 다들 잊었죠.\n...할아버님만 빼고요.」"},
 	],
 	"chief": [
-		{"text": "「돌문 말인가. 내가 어릴 적에도 그 자리에 있었네.\n밀어도 보고 두드려도 봤지만, 꿈쩍도 안 했지.」"},
+		{"text": "「그 돌문 말인가. 내가 어릴 적에도 그 아래에 있었네.\n밀어도 보고 두드려도 봤지만, 꿈쩍도 안 했지.」"},
 		{"text": "「자네 할아버지는 거길 자주 들여다보셨네.\n무섭지 않으시냐고 물었더니 웃기만 하시더군.」"},
 		{"text": "「...가려거든 가게. 다만 하나만 약속해 주게.\n반드시 돌아오게. 마을이 기다릴 테니.」"},
 	],
@@ -4589,38 +4587,28 @@ func _end_last_page_talk() -> void:
 		return
 	if GameData.story20_told.size() >= GameData.STORY20_TELL.size():
 		GameData.story20_phase = "gate"
-		m.hud.quest_start_toast("광장 북쪽의 오래된 돌문으로 가자")
+		m.hud.quest_start_toast("동굴 입구로 가자")
 	else:
 		m.hud.event_toast("%d/%d" % [GameData.story20_told.size(),
 			GameData.STORY20_TELL.size()])
 	m.saveio.save_now()
 
 
-# 오래된 돌문 (E) — 언제나 그 자리에 있었지만, 열리는 건 오늘뿐이다
+# 동굴 가장 깊은 곳의 오래된 돌문 (동굴 입구에서 E) —
+# 늘 그 아래에 있었지만, 열리는 건 오늘뿐이다
 func gate_examine() -> void:
 	if GameData.gate_open:
-		if GameData.story20_phase == "gate":
-			_enter_gate()
-			return
-		m.dialog.open("오래된 돌문",
-			"열린 채로 있다.\n안쪽에서 서늘하고 마른 바람이 불어온다.",
-			[["들어간다", _enter_gate], ["돌아선다", null]])
-		return
-	if GameData.story20_phase != "gate":
-		m.dialog.open("오래된 돌문",
-			"이끼 낀 돌기둥 둘과, 그 사이를 메운 검은 돌.\n밀어도 두드려도 꿈쩍하지 않는다.\n\n"
-			+ "(문 한가운데에 작은 홈이 일곱 개.\n무엇을 넣는 자리인지는 알 수 없다.)",
-			[["돌아선다", null]])
+		_enter_gate()
 		return
 	if int(GameData.items["water_life"]) < GameData.ENDING_SKILLS.size():
-		m.dialog.open("오래된 돌문",
-			"홈이 일곱 개. 생명의 물이 들어갈 자리다.\n\n지금 가진 병: %d/%d" % [
+		m.dialog.open("동굴 입구",
+			"노트의 마지막 페이지가 가리킨 곳은 이 아래다.\n가장 깊은 곳에 홈이 일곱 개인 돌문이 있다고 한다.\n\n지금 가진 생명의 물: %d/%d" % [
 				int(GameData.items["water_life"]), GameData.ENDING_SKILLS.size()],
 			[["돌아선다", null]])
 		return
-	m.dialog.open("오래된 돌문",
-		"홈이 일곱 개. 병도 일곱 개.\n\n(생명의 물을 전부 부으면 되돌릴 수 없다.)",
-		[["일곱 병을 붓는다", _pour_water], ["아직 아니다", null]])
+	m.dialog.open("동굴 입구",
+		"가장 깊은 곳의 돌문에는 홈이 일곱 개.\n병도 일곱 개다.\n\n생명의 물을 전부 부으면 되돌릴 수 없다.",
+		[["가장 깊은 곳으로 내려간다", _pour_water], ["아직 아니다", null]])
 
 
 func _pour_water() -> void:
@@ -4630,9 +4618,8 @@ func _pour_water() -> void:
 	GameData.items["water_life"] = 0
 	GameData.gate_open = true
 	Sound.play_sfx("sfx_catch")
-	m.worldgen.open_gate()
 	m.dialog.open_seq("", null, [
-		{"text": "(병을 하나씩 기울였다.\n맑은 물이 홈을 따라 흘러 들어간다.)"},
+		{"text": "(가장 깊은 곳까지 내려가 병을 하나씩 기울였다.\n맑은 물이 홈을 따라 흘러 들어간다.)"},
 		{"text": "(일곱 번째 병을 비운 순간 —\n돌 안쪽에서 오래 멈춰 있던 무언가가 움직였다.)"},
 		{"text": "(검은 돌이 좌우로 갈라진다.\n서늘하고 마른 바람. 그리고 아래로 뻗은 계단.)"},
 	], _after_gate_open)
@@ -4640,7 +4627,7 @@ func _pour_water() -> void:
 
 func _after_gate_open() -> void:
 	m.hud.event_toast("돌문이 열렸다")
-	m.hud.quest_start_toast("돌문 안으로 들어가자")
+	m.hud.quest_start_toast("가장 깊은 곳으로 들어가자")
 	m.saveio.save_now()
 
 
@@ -4679,7 +4666,7 @@ func final_chest() -> void:
 func _end_final_letter() -> void:
 	m.cave.close()
 	m.hud.quest_start_toast("마을로 돌아가 하루를 마치자")
-	m.hud.show_message("돌문 밖으로 나왔다. 해가 기울고 있다.\n...내일 아침, 밭으로 나가자.", 7.0)
+	m.hud.show_message("동굴 밖으로 나왔다. 해가 기울고 있다.\n...내일 아침, 밭으로 나가자.", 7.0)
 	m.saveio.save_now()
 
 

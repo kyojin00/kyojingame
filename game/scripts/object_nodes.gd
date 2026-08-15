@@ -132,9 +132,6 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["old_bench"]     # 무너진 나무 의자
 		"carved_stone":
 			texture = m.tex["carved_stone"]  # 글씨가 새겨진 돌
-		"old_gate":
-			texture = m.tex["old_gate"]      # 오래된 돌문 (메인 스토리 20)
-			offset = Vector2(0, -100)
 		"seed_sprout":
 			texture = m.tex["crop_sprout"]   # 할아버지의 씨앗에서 돋은 새싹
 		"bent_tree":

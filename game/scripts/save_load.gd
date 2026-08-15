@@ -393,8 +393,8 @@ func _apply_save(d: Dictionary) -> void:
 	if d.has("objects"):
 		m.objects.clear()
 		for o in d.objects:
-			if str(o[2]) in ["deco_lamp", "deco_bench"]:
-				continue   # 가로등·벤치는 없앴다 — 옛 세이브에서 걷어 낸다
+			if str(o[2]) in ["deco_lamp", "deco_bench", "old_gate"]:
+				continue   # 가로등·벤치·돌문은 없앴다 — 옛 세이브에서 걷어 낸다
 			if str(o[2]) == "fence" and o.size() > 7 and int(o[7]) == 1 \
 					and int(o[0]) >= 54:
 				continue   # 건물 마당을 감싸던 고정 울타리도 없앴다
@@ -490,9 +490,7 @@ func _apply_save(d: Dictionary) -> void:
 	var st20: Array = Array(d.get("seed_tile", [-1, -1]))
 	GameData.seed_tile = Vector2i(int(st20[0]), int(st20[1])) if st20.size() == 2 \
 		else Vector2i(-1, -1)
-	m.worldgen.spawn_gate()          # 돌문은 언제나 그 자리에 있다
-	if GameData.gate_open:
-		m.worldgen.open_gate()
+	m.worldgen.purge_old_gate()      # 옛 세이브의 돌문 오브젝트를 걷어낸다
 	if GameData.seed_tile.x >= 0 and GameData.seed_water:
 		m.worldgen.spawn_seed_sprout()   # 돋아난 새싹은 엔딩 뒤에도 남는다
 	# 옛 세이브 보정 — 스토리 19가 열리기 전에 받아 둔 생명의 물이 있으면

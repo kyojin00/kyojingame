@@ -226,7 +226,7 @@ const TEXTURE_NAMES := [
 	# 옛 전망대 (메인 스토리 18) — 굽은 나무는 tree_bare를 쓴다
 	"old_lookout", "old_bench", "carved_stone",
 	# 가장 오래된 자리 (메인 스토리 20)
-	"old_gate", "grandpa_seed",
+	"grandpa_seed",
 	# 수납 상자 (용식의 집터 부탁 보상)
 	"storage_box",
 	# 연금술 물약 (조합대 결과물)
@@ -367,11 +367,6 @@ const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
 # 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
 const HILL_POS := Vector2i(31, 3)
 const HILL_AREA := Rect2i(26, 1, 11, 6)
-# 오래된 돌문 (메인 스토리 20) — **마을 북쪽 숲**, 옛 전망대 언덕과
-# 동굴 입구 사이의 빈터. 마을 부지에서 멀찌감치 떨어뜨렸다:
-# 예전 자리(광장 북쪽)는 잡화점·연구소 마당과 겹쳐 그림이 포개졌다.
-# 메인 스토리 18이 시작될 무렵부터 모습을 드러낸다 (GameData.gate_visible)
-const GATE_POS := Vector2i(40, 2)
 const HILL_TRACE_TILES := {
 	"bench": Vector2i(28, 4),
 	"stone": Vector2i(34, 4),

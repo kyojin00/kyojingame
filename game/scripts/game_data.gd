@@ -2232,12 +2232,13 @@ func note_last_page_open() -> bool:
 # ---- 메인 스토리 20: 가장 오래된 자리 (최종 엔딩) ----
 #
 # 세 가지가 다 갖춰져야 시작한다 — 연구 노트 100% · 유품 다섯 · 생명의 물
-# 일곱. 노트의 마지막 페이지가 가리키는 곳은 마을이 서기 훨씬 전부터
-# 광장 북쪽에 서 있던 **오래된 돌문**이다. 아무도 열지 못했고, 그래서
-# 아무도 신경 쓰지 않던 자리. 일곱 병을 홈에 부으면 문이 열리고, 그
-# 안쪽이 할아버지의 마지막 연구 공간이다.
-#   "": 아직 / tell: 사서·이장에게 보여주기 / gate: 돌문 앞으로 /
-#   inner: 돌문 안쪽 — 봉인된 것과의 마지막 / letter: 씨앗과 편지 /
+# 일곱. 노트의 마지막 페이지가 가리키는 곳은 동굴 가장 깊은 곳,
+# 마을이 서기 훨씬 전부터 그 아래에 잠겨 있던 오래된 돌문이다.
+# 아무도 열지 못했고, 그래서 아무도 내려가 보지 않던 자리.
+# 일곱 병을 홈에 부으면 문이 열리고, 그 안쪽이 할아버지의 마지막
+# 연구 공간이다.
+#   "": 아직 / tell: 사서·이장에게 보여주기 / gate: 동굴 입구로 /
+#   inner: 문 안쪽 — 봉인된 것과의 마지막 / letter: 씨앗과 편지 /
 #   plant: 다음 날 농장에 씨앗 심기 / done: 엔딩을 보았다 (자유 생활 계속)
 var story20_phase := ""
 var note_last_line := false        # 노트 마지막 장에 플레이어가 남긴 한 줄
@@ -2249,16 +2250,13 @@ var seed_water := false            # 심은 뒤 물을 주었는가
 const STORY20_TELL := ["librarian", "chief"]
 
 
-# 오래된 돌문이 세계에 서 있는가 — 노트의 마지막 페이지에서 「마을에서 가장
-# 오래된 자리」라는 단서를 얻은 뒤에야 그 자리가 눈에 들어온다
-# 오래된 돌문이 세상에 모습을 드러내는가.
+# 오래된 돌문은 **세계에 놓인 오브젝트가 아니다.**
 #
-# 예전에는 광장 북쪽(잡화점 곁)에 서 있어 상점과 겹쳐 보였다.
-# 이제 자리를 북쪽 숲으로 옮기고(main.GATE_POS), 등장 시점도
-# **메인 스토리 18이 시작될 무렵**으로 당겼다 — 할머니의 시계를 찾아
-# 언덕을 오르내리다 보면 못 보던 돌문이 눈에 들어오는 흐름이다.
-func gate_visible() -> bool:
-	return story18_phase != "" or story19_phase != "" or story20_phase != ""
+# 한때는 마을 북쪽에 세워 두었지만, 어느 자리에 두어도 상점 마당·길과
+# 겹쳐 통행을 막는 일이 생겼다. 그래서 오브젝트를 통째로 없애고,
+# 그 문을 **동굴 가장 깊은 곳**으로 옮겼다 — 스토리 20에서 동굴 입구에
+# 서면 이야기가 이어지고, 일곱 병을 부으면 가장 깊은 곳이 열린다.
+# (gate_open은 그대로 「그 문이 열렸는가」를 기억한다)
 
 
 func story20_ready() -> bool:
@@ -2273,10 +2271,10 @@ func story20_objective_short() -> String:
 				story20_told.size(), STORY20_TELL.size()]
 		"gate":
 			if gate_open:
-				return "돌문 안으로 들어가자."
-			return "오래된 돌문을 찾아가자."
+				return "가장 깊은 곳으로 내려가자."
+			return "동굴 입구로 가자."
 		"inner":
-			return "돌문 안쪽으로 나아가자."
+			return "가장 깊은 곳으로 나아가자."
 		"letter":
 			return "집으로 돌아가자."
 		"plant":
@@ -2563,7 +2561,7 @@ func quest_catalog() -> Array:
 		if story20_phase == "tell":
 			s20npc = "librarian" if "librarian" not in story20_told else "chief"
 		out.append({"id": "story20", "title": "가장 오래된 자리", "obj": o,
-			"desc": "마을보다 오래된 돌문이 조용히 서 있다.\n"
+			"desc": "동굴 가장 깊은 곳에 마을보다 오래된 돌문이 잠겨 있다.\n"
 				+ "할아버지가 마지막 몇 해를 보낸 자리라고 한다.\n\n"
 				+ "일곱 병의 물과 다섯 개의 유품,\n"
 				+ "그리고 끝까지 채운 노트를 들고 앞에 서면\n\n"
@@ -2681,14 +2679,47 @@ func _tut_reward_text(flag: String) -> String:
 var tracked_pick := ""
 
 
-func tracked_quest() -> Dictionary:
+# **Q창과 우측 미니창이 보는 단 하나의 목록.**
+#
+# 예전에는 Q창이 quest_catalog()를 한 번 더 걸러서(메인 이야기는 하나만)
+# 보여 주고, 미니창은 걸러지지 않은 목록의 맨 앞을 집었다. 그래서 둘이
+# 서로 다른 퀘스트를 가리키는 일이 생겼다. 이제 거르는 자리는 여기
+# 한 곳뿐이고, 두 창이 같은 목록을 읽는다.
+func quest_list() -> Array:
 	var cat := quest_catalog()
+	# 목록에 남길 메인 이야기 하나를 먼저 정한다 — 보통은 맨 앞이지만,
+	# 고정한 퀘스트가 메인이면 **그쪽이 언제나 이긴다.**
+	var keep_main := ""
+	for q: Dictionary in cat:
+		if str(q.get("cat", "sub")) != "main":
+			continue
+		if keep_main == "":
+			keep_main = str(q.id)
+		if str(q.id) == tracked_pick:
+			keep_main = tracked_pick
+	var out: Array = []
+	for q: Dictionary in cat:
+		var e: Dictionary = q.duplicate()
+		if not e.has("cat"):
+			e["cat"] = "sub"
+		if str(e.cat) == "main" and str(e.id) != keep_main:
+			continue          # 진행 중인 메인 이야기는 언제나 하나
+		out.append(e)
+	return out
+
+
+# 지금 따라가는 퀘스트 하나 — 고정한 것이 있으면 무조건 그것이다.
+# 고정한 퀘스트가 목록에서 사라지면 자동으로 맨 앞으로 돌아간다.
+func tracked_quest() -> Dictionary:
+	var cat := quest_list()
 	if cat.is_empty():
+		tracked_pick = ""
 		return {}
 	if tracked_pick != "":
 		for q: Dictionary in cat:
 			if str(q.id) == tracked_pick:
 				return q
+		tracked_pick = ""     # 끝난 퀘스트를 계속 붙들고 있지 않는다
 	return cat[0]
 
 
@@ -5399,10 +5430,21 @@ func tutorial_objective() -> String:
 	return ""
 
 
+# 밭 갈기 줄기(호미→씨앗→물→수확→요리)는 **이장에게 호미를 받은 뒤**에만
+# 안내로 뜬다. 호미는 상점이 서고 용식과 바닷길을 연 다음에 받으므로
+# (story2_phase: shop → fisher → farm_talk → farm), 앞선 퀘스트와
+# 나란히 떠서 헷갈리는 일이 없다.
+func farm_chain_open() -> bool:
+	return story2_phase in ["farm", "done"]
+
+
 func tutorial_current_flag() -> String:
 	if not tutorial.get("active", false):
 		return ""
 	for pair in TUTORIAL_ORDER:
+		# 밭 갈기 줄기는 호미를 받은 뒤부터
+		if pair[0] in FARM_CHAIN_FLAGS and not farm_chain_open():
+			continue
 		# 마을 생활 안내(첫 살림 줄기 밖 목표)는 스토리 3이 열어 줘야 나온다
 		if pair[0] not in FARM_CHAIN_FLAGS and not guide_active:
 			continue

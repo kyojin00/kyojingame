@@ -97,7 +97,7 @@ func do_brew(ids: Array) -> Dictionary:
 		# 처음 맞힌 순간이 이 시스템의 알맹이다 — 크게 알린다
 		m.hud.event_toast("새 조합법 발견!")
 		m.dialog.open("연금술 — 새 조합법",
-			"**%s** 을(를) 만들어냈다!\n\n%s\n\n필요한 속성: %s\n조합법이 연구 노트(N)에 적혔다."
+			"%s 을(를) 만들어냈다!\n\n%s\n\n필요한 속성: %s\n조합법이 연구 노트(N)에 적혔다."
 				% [GameData.FORMULAS[fid].name, GameData.FORMULAS[fid].effect,
 				GameData.formula_need_text(fid)],
 			[["좋아", null]])

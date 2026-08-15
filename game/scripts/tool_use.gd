@@ -53,9 +53,9 @@ func build_barn() -> void:
 	m.objnode._place_object(m.BARN_POS, "barn", 0)
 	m.worldgen._block_barn_art()
 	Sound.play_sfx("sfx_place")
-	m.hud.show_message("축사 완공! **농장(맵 서쪽)** 에 세워졌다. 동물 %d마리까지.\n"
+	m.hud.show_message("축사 완공! 농장(맵 서쪽) 에 세워졌다. 동물 %d마리까지.\n"
 		% GameData.BARN_MAX_ANIMALS
-		+ "울타리로 빈틈없이 둘러싸 **목초지**를 만들면 알아서 배부르다.", 6.0)
+		+ "울타리로 빈틈없이 둘러싸 목초지를 만들면 알아서 배부르다.", 6.0)
 	if Net.is_host():
 		m.netsync._broadcast_stats()
 

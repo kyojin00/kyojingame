@@ -226,7 +226,7 @@ func open(title_text: String, body_text: String, buttons: Array,
 		portrait_tex: Texture2D = null) -> void:
 	title_label.text = title_text
 	_name_plate.visible = title_text != ""   # 이름 없는 안내창엔 명패도 없다
-	body_label.text = body_text
+	body_label.text = clean_text(body_text)
 	# 일반 안내창에는 건너뛸 대사가 없다 — 시퀀스가 다시 켜 준다
 	skip_btn.visible = false
 	portrait.texture = portrait_tex
@@ -248,7 +248,41 @@ func open(title_text: String, body_text: String, buttons: Array,
 
 
 func set_body(text: String) -> void:
-	body_label.text = text
+	body_label.text = clean_text(text)
+
+
+# ---- 대사 다듬기 ----
+#
+# 창에 나가는 글에서 **눈에 띄어선 안 되는 것**을 걷어낸다.
+#   · 강조 기호(**) 같은 편집용 표시 — 게임 안에서는 아무 뜻이 없다
+#   · 이어진 공백
+# NPC가 입으로 하는 말(「」로 묶인 대사)에서는 괄호로 적어 둔 지문까지
+# 떼어낸다 — 말풍선 안에 「...」와 (지문)이 섞이면 읽는 사람이 헷갈린다.
+func clean_text(text: String) -> String:
+	var out := text.replace("", "")
+	while out.contains("  "):
+		out = out.replace("  ", " ")
+	return out.strip_edges()
+
+
+func _is_spoken(text: String) -> bool:
+	return text.contains("「") or text.contains("」")
+
+
+# 괄호로 묶인 부분을 통째로 걷어낸다 (중첩은 없다고 본다)
+func _strip_parens(text: String) -> String:
+	var out := ""
+	var depth := 0
+	for ch in text:
+		if ch == "(" or ch == "（":
+			depth += 1
+			continue
+		if ch == ")" or ch == "）":
+			depth = maxi(depth - 1, 0)
+			continue
+		if depth == 0:
+			out += ch
+	return out
 
 
 # 본문은 그대로 두고 버튼만 갈아 끼운다
@@ -293,12 +327,13 @@ func open_seq(speaker: String, portrait_tex: Texture2D, entries: Array,
 	_advance_seq()
 
 
-# 대사 한 페이지는 **두 줄까지**다 — 창이 불필요하게 커지지 않도록,
-# 길면 두 줄씩 끊어 다음 페이지로 자연스럽게 이어진다.
-# \n으로 나눈 줄뿐 아니라 **자동 줄바꿈으로 생기는 줄까지 픽셀 폭으로
-# 계산**해서, 한 줄이 아무리 길어도 화면에는 절대 두 줄을 넘지 않는다.
+# 대사 한 페이지는 세 줄까지다 — 창이 지나치게 커지지 않으면서도,
+# **한 문장이 두 화면에 걸쳐 끊기는 일이 없도록** 넉넉히 잡은 값이다.
+# \n으로 나눈 줄뿐 아니라 자동 줄바꿈으로 생기는 줄까지 픽셀 폭으로
+# 계산해서, 한 줄이 아무리 길어도 화면 밖으로 넘치지 않는다.
 # 이벤트는 첫 조각에서, 선택지·이름 같은 나머지 성질은 마지막 조각에 남는다.
 const WRAP_W := 330.0   # 본문이 실제로 쓰는 폭 (패널 - 초상화 - 여백)
+const PAGE_LINES := 3   # 한 페이지에 담는 줄 수
 
 
 func _wrap_at(text: String, width: float) -> PackedStringArray:
@@ -370,21 +405,28 @@ func _paginate_seq(entries: Array) -> Array:
 	var paged: Array = []
 	for e_v in entries:
 		var e: Dictionary = e_v
-		var body := str(e.get("text", ""))
+		var body := clean_text(str(e.get("text", "")))
+		# NPC가 하는 말에서는 괄호 지문을 떼어낸다 (지문만 있는 페이지는 그대로)
+		if _is_spoken(body):
+			var spoken := clean_text(_strip_parens(body))
+			if spoken != "":
+				body = spoken
 		var pages: Array[String] = []
 		var buf: PackedStringArray = []
 		for sent: String in _split_sentences(body):
 			var lines := _wrap_balanced(sent)
-			if lines.size() > 2:
+			if lines.size() > PAGE_LINES:
+				# 세 줄로도 안 담기는 아주 긴 문장만 어쩔 수 없이 나눈다
 				if not buf.is_empty():
 					pages.append("\n".join(buf))
 					buf = []
 				var i := 0
 				while i < lines.size():
-					pages.append("\n".join(lines.slice(i, mini(i + 2, lines.size()))))
-					i += 2
+					pages.append("\n".join(lines.slice(i,
+						mini(i + PAGE_LINES, lines.size()))))
+					i += PAGE_LINES
 				continue
-			if buf.size() + lines.size() > 2:
+			if buf.size() + lines.size() > PAGE_LINES:
 				pages.append("\n".join(buf))
 				buf = []
 			buf += lines
