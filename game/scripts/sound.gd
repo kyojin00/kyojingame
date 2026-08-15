@@ -22,7 +22,14 @@ const MP3_NAMES := ["bgm_main", "bgm_night2", "bgm_night3"]
 # 때(`finished`)를 알 수가 없다.
 const NIGHT_TRACKS := ["bgm_night", "bgm_night2", "bgm_night3"]
 const NIGHT_FADE := 1.6          # 다음 곡이 올라오는 시간(초)
+# 곡과 곡 사이에 두는 고요. 받은 밤 곡이 31초짜리라 쉬지 않고 이어 붙이면
+# 1분 30초마다 같은 곡이 돌아온다 — 「짧은 루프」로 들린다.
+# 사이를 조금 비우면 한 바퀴가 2분 반으로 늘고, 무엇보다 밤이 고요해진다.
+# (곡 자체를 길게 뽑아 오면 이 값은 줄여도 된다)
+const NIGHT_GAP_MIN := 6.0
+const NIGHT_GAP_MAX := 14.0
 var _night_i := 0
+var _night_gap := 0.0            # 남은 고요 (0이면 곡이 흐르는 중)
 
 var streams := {}
 var bgm_player: AudioStreamPlayer
@@ -116,13 +123,23 @@ const TRACK_GAIN := {
 func _on_bgm_finished() -> void:
 	if current_bgm not in NIGHT_TRACKS:
 		return
+	# 바로 다음 곡을 걸지 않는다 — 잠깐 풀벌레 소리만 남는 고요를 둔다
+	_night_gap = randf_range(NIGHT_GAP_MIN, NIGHT_GAP_MAX)
+
+
+func _process(delta: float) -> void:
+	if _night_gap <= 0.0:
+		return
+	_night_gap -= delta
+	if _night_gap > 0.0:
+		return
+	# 고요가 끝났다 — 다음 밤 곡을 서서히 켠다.
+	# 갑자기 제 크기로 튀어나오면 「곡이 바뀌었다」가 먼저 들린다.
 	_night_i = (_night_i + 1) % NIGHT_TRACKS.size()
 	var nxt: String = NIGHT_TRACKS[_night_i]
 	current_bgm = nxt
 	if _fade != null and _fade.is_valid():
 		_fade.kill()
-	# 앞 곡은 이미 끝나 조용하다 — 겹칠 것이 없으니 다음 곡을 서서히 켠다.
-	# 갑자기 제 크기로 튀어나오면 「곡이 바뀌었다」가 먼저 들린다.
 	var gain: float = float(TRACK_GAIN.get(nxt, 0.0))
 	bgm_player.stream = streams[nxt]
 	bgm_player.volume_db = gain - 24.0
@@ -137,10 +154,14 @@ func play_track(name: String) -> void:
 	# 시작하고, 이미 밤 곡이 돌고 있으면 건드리지 않는다 (한 곡 끝날 때마다
 	# `_on_bgm_finished`가 다음 곡으로 넘긴다).
 	if name == "bgm_night":
-		if current_bgm in NIGHT_TRACKS and bgm_player.playing:
+		# 고요를 두는 동안(_night_gap)에도 「밤 곡이 도는 중」이다 —
+		# 안 그러면 0.4초마다 오는 이 호출이 고요를 곧바로 덮어 버린다
+		if current_bgm in NIGHT_TRACKS and (bgm_player.playing or _night_gap > 0.0):
 			return
 		_night_i = randi() % NIGHT_TRACKS.size()
 		name = NIGHT_TRACKS[_night_i]
+	else:
+		_night_gap = 0.0        # 밤이 끝났다 — 남은 고요는 버린다
 	if not streams.has(name):
 		return
 	var gain: float = float(TRACK_GAIN.get(name, 0.0))
@@ -170,6 +191,7 @@ func play_track(name: String) -> void:
 
 func stop_bgm() -> void:
 	current_bgm = ""
+	_night_gap = 0.0
 	bgm_player.stop()
 
 

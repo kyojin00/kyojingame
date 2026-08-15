@@ -188,7 +188,95 @@ func _visible_tile(x: int, y: int) -> bool:
 		or main.VILLAGE_REGION.has_point(Vector2i(x, y))
 
 
+# 이 칸의 바닥 색. 같은 지형이라도 칸마다 밝기를 조금 흔들어 결을 낸다 —
+# 한 색으로 칠하면 초록 장판이 된다.
+func _ground_color(x: int, y: int, season: int) -> Color:
+	var g: String = main.grid[y][x].ground
+	var base: Color
+	match g:
+		"water":
+			base = Color(0.22, 0.42, 0.66)
+		"sand":
+			base = Color(0.85, 0.77, 0.55)
+		"dock":
+			base = Color(0.55, 0.38, 0.22)
+		"path":
+			base = Color(0.72, 0.62, 0.44)
+		"soil":
+			# 물을 준 밭은 짙다 — 지도만 봐도 어디에 물을 안 줬는지 보인다
+			base = Color(0.3, 0.21, 0.13) if main.grid[y][x].watered \
+				else Color(0.45, 0.33, 0.2)
+		_:
+			match season:
+				GameData.WINTER:
+					base = Color(0.82, 0.85, 0.9)
+				GameData.FALL:
+					base = Color(0.62, 0.5, 0.3)
+				_:
+					base = Color(0.3, 0.5, 0.26)
+	# 야생 지역은 그 땅의 결을 얹는다 (풀빛이 조금씩 다르다)
+	var tint := _region_tint(x, y)
+	if tint.a > 0.0:
+		base = base.lerp(Color(tint.r, tint.g, tint.b), tint.a)
+	var n: float = main._hash01(x * 13 + 5, y * 29 + 7) - 0.5
+	return Color(clampf(base.r + n * 0.09, 0.0, 1.0),
+		clampf(base.g + n * 0.09, 0.0, 1.0),
+		clampf(base.b + n * 0.09, 0.0, 1.0))
+
+
+# 야생 지역마다 옅게 다른 풀빛 (a = 섞는 정도). 이름표가 없어도
+# 「여기부터 다른 땅」이 눈에 들어와야 한다.
+const REGION_TINT := {
+	"deep": Color(0.13, 0.34, 0.18, 0.42),      # 짙은 숲
+	"orchard": Color(0.45, 0.6, 0.26, 0.32),    # 밝은 과수원
+	"quarry": Color(0.62, 0.56, 0.44, 0.3),     # 메마른 자갈
+	"meadow": Color(0.53, 0.68, 0.34, 0.3),     # 볕 드는 초원
+	"wetland": Color(0.26, 0.44, 0.42, 0.36),   # 물 먹은 땅
+	"pinewood": Color(0.16, 0.3, 0.26, 0.44),   # 서늘한 솔숲
+	"bluff": Color(0.55, 0.52, 0.42, 0.3),      # 바람 든 벼랑
+}
+
+
+# 칸마다 지역을 매번 찾으면 (지역 수 x 보이는 칸 수)만큼 헛일을 한다 —
+# 배율 1에서는 온 맵이 다 보이므로 한 프레임에 십수만 번이다.
+# 그래서 「칸 -> 지역 번호」를 한 번 만들어 두고 쓴다 (0 = 지역 밖).
+var _reg_idx := PackedByteArray()
+var _reg_cols: Array[Color] = []
+
+
+func _build_region_index() -> void:
+	_reg_idx.resize(main.MAP_W * main.MAP_H)
+	_reg_idx.fill(0)
+	_reg_cols = [Color(0, 0, 0, 0.0)]
+	for reg: Dictionary in main.REGIONS:
+		_reg_cols.append(REGION_TINT.get(str(reg.id), Color(0, 0, 0, 0.0)))
+		var n := _reg_cols.size() - 1
+		var r: Rect2i = reg.rect
+		for y in range(maxi(0, r.position.y), mini(main.MAP_H, r.end.y)):
+			for x in range(maxi(0, r.position.x), mini(main.MAP_W, r.end.x)):
+				_reg_idx[y * main.MAP_W + x] = n
+
+
+func _region_tint(x: int, y: int) -> Color:
+	return _reg_cols[_reg_idx[y * main.MAP_W + x]]
+
+
+# 물칸이 뭍과 닿아 있는가 (해안선을 그릴지 정한다)
+func _shore(x: int, y: int) -> bool:
+	for d: Vector2i in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+		var nx := x + d.x
+		var ny := y + d.y
+		if nx < 0 or ny < 0 or nx >= main.MAP_W or ny >= main.MAP_H:
+			continue
+		if main.grid[ny][nx].ground != "water":
+			return true
+	return false
+
+
 func _draw_map() -> void:
+	_taken.clear()
+	if _reg_idx.size() != main.MAP_W * main.MAP_H:
+		_build_region_index()
 	_cell = _base_cell() * zoom
 	var o := _origin(_cell)
 	_ox = o.x
@@ -200,8 +288,13 @@ func _draw_map() -> void:
 	var y0: int = maxi(0, int(floor(-_oy / _cell)))
 	var y1: int = mini(main.MAP_H, int(ceil((540.0 - _oy) / _cell)) + 1)
 
-	# 지형 (미탐사/미해금은 먹구름이 덮는다 — 아래 2단계에서 뭉게구름을 얹는다)
+	# ---- 지형 ----
+	#
+	# 한 칸을 한 색으로 칠하면 초록 장판이 된다. 같은 잔디라도 칸마다
+	# 밝기를 조금씩 흔들어 「그려 놓은 지도」처럼 결이 생기게 한다.
+	# (흔드는 값은 칸 좌표 해시라 볼 때마다 달라지지 않는다)
 	var fogged: Array = []
+	var season := GameData.season()
 	for y in range(y0, y1):
 		for x in range(x0, x1):
 			var r := Rect2(_ox + x * _cell, _oy + y * _cell, _cell + 0.5, _cell + 0.5)
@@ -209,49 +302,58 @@ func _draw_map() -> void:
 				canvas.draw_rect(r, FOG)
 				fogged.append(Vector2i(x, y))
 				continue
-			var cell: Dictionary = main.grid[y][x]
-			var c: Color
-			if cell.ground == "water":
-				c = Color(0.26, 0.45, 0.68)
-			elif cell.ground == "sand":
-				c = Color(0.85, 0.77, 0.55)
-			elif cell.ground == "dock":
-				c = Color(0.55, 0.38, 0.22)
-			elif cell.ground == "path":
-				c = Color(0.72, 0.62, 0.44)
-			elif cell.ground == "soil":
-				c = Color(0.42, 0.31, 0.19)
-			else:
-				match GameData.season():
-					GameData.WINTER:
-						c = Color(0.82, 0.85, 0.9)
-					GameData.FALL:
-						c = Color(0.62, 0.5, 0.3)
-					_:
-						c = Color(0.32, 0.52, 0.27)
-			canvas.draw_rect(r, c)
+			canvas.draw_rect(r, _ground_color(x, y, season))
+			# 물가: 뭍과 닿는 쪽에 옅은 띠를 둘러 해안선을 낸다.
+			# 이 선 하나로 호수와 바다가 「퍼진 파란 얼룩」에서 벗어난다.
+			if main.grid[y][x].ground == "water" and _shore(x, y):
+				canvas.draw_rect(Rect2(r.position, Vector2(r.size.x, maxf(1.0, _cell * 0.3))),
+					Color(0.58, 0.78, 0.88, 0.55))
 
-	# 오브젝트 (보이는 지역만)
+	# ---- 지형지물 ----
+	#
+	# 네모 한 칸으로 찍으면 나무도 바위도 건물도 그냥 「점」이다.
+	# 작아도 생김새를 흉내 내면 한눈에 무엇인지 읽힌다 —
+	# 나무는 밑동 위에 얹힌 둥근 잎, 바위는 위가 밝은 덩어리,
+	# 건물은 몸통 위에 얹힌 지붕.
+	var cs := _cell
 	for pos: Vector2i in main.objects:
 		if pos.x < x0 or pos.x >= x1 or pos.y < y0 or pos.y >= y1:
 			continue
 		if not _visible_tile(pos.x, pos.y):
 			continue
 		var kind: String = main.objects[pos].kind
-		var c: Color
+		var at := Vector2(_ox + pos.x * cs, _oy + pos.y * cs)
 		match kind:
 			"tree":
-				c = Color(0.15, 0.35, 0.14)
+				# 잎 두 겹 — 아래는 짙게, 위쪽 절반은 볕이 든 것처럼 밝게
+				canvas.draw_rect(Rect2(at.x, at.y + cs * 0.15, cs + 0.5, cs * 0.85),
+					Color(0.13, 0.31, 0.13))
+				canvas.draw_rect(Rect2(at.x + cs * 0.15, at.y + cs * 0.1,
+					cs * 0.6, cs * 0.45), Color(0.24, 0.47, 0.2))
 			"rock", "bigrock":
-				c = Color(0.55, 0.55, 0.6)
+				var big: float = 1.0 if kind == "bigrock" else 0.82
+				canvas.draw_rect(Rect2(at.x + cs * (1.0 - big) * 0.5,
+					at.y + cs * (1.0 - big) * 0.5, cs * big, cs * big),
+					Color(0.46, 0.46, 0.52))
+				canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.15,
+					cs * 0.45, cs * 0.3), Color(0.68, 0.68, 0.74))
 			"house", "art_block":
-				c = Color(0.62, 0.28, 0.2)
-			"board", "sign":
-				c = Color(0.95, 0.8, 0.35)
+				canvas.draw_rect(Rect2(at, Vector2(cs + 0.5, cs + 0.5)),
+					Color(0.76, 0.68, 0.56))                     # 벽
+				canvas.draw_rect(Rect2(at.x, at.y, cs + 0.5, maxf(1.0, cs * 0.45)),
+					Color(0.66, 0.27, 0.21))                     # 지붕
+			"board", "sign", "auction", "plotsite", "homeplot":
+				canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.2,
+					cs * 0.6, cs * 0.6), Color(0.95, 0.8, 0.35))
+			"searock":
+				canvas.draw_rect(Rect2(at, Vector2(cs + 0.5, cs + 0.5)),
+					Color(0.38, 0.38, 0.44))
+			"fence":
+				canvas.draw_rect(Rect2(at.x, at.y + cs * 0.3, cs + 0.5,
+					maxf(1.0, cs * 0.4)), Color(0.6, 0.45, 0.28))
 			_:
-				c = Color(0.5, 0.4, 0.3)
-		canvas.draw_rect(Rect2(_ox + pos.x * _cell, _oy + pos.y * _cell,
-			_cell + 0.5, _cell + 0.5), c)
+				canvas.draw_rect(Rect2(at.x + cs * 0.15, at.y + cs * 0.15,
+					cs * 0.7, cs * 0.7), Color(0.5, 0.4, 0.3))
 
 	# 동물/NPC (보이는 지역만)
 	var dot: float = maxf(3.0, _cell * 0.5)
@@ -326,7 +428,22 @@ func _draw_map() -> void:
 	canvas.draw_arc(pp + Vector2(0.5, 0.5), pulse + 3.0, 0, TAU, 20, Color(1, 0.85, 0.3, 0.9), 2.0)
 	canvas.draw_rect(Rect2(pp.x - 3, pp.y - 3, 7, 7), Color(1, 1, 1))
 	canvas.draw_rect(Rect2(pp.x - 2, pp.y - 2, 5, 5), Color(0.95, 0.3, 0.25))
-	_label(Vector2(pp.x, pp.y - 10), "내 위치")
+	_label(Vector2(pp.x, pp.y - 10), "내 위치", 22, true)
+
+	# 세계의 테두리 — 지도가 어디서 끝나는지 눈에 보이게 두른다.
+	# (테두리가 없으면 먹구름과 배경이 이어져 「여기가 끝인지」 알 수 없다)
+	var edge := Rect2(_ox, _oy, main.MAP_W * _cell, main.MAP_H * _cell)
+	canvas.draw_rect(edge.grow(3.0), Color(0.32, 0.26, 0.18), false, 3.0)
+	canvas.draw_rect(edge.grow(1.0), Color(0.58, 0.48, 0.32), false, 1.0)
+
+	# 이름패 — 지도 맨 위, 이 땅의 이름
+	var plate := "교진 마을 · %s의 농장" % GameData.seller_name()
+	var pw: float = main.UI_FONT.get_string_size(plate, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x
+	var pr2 := Rect2(480.0 - pw / 2.0 - 14.0, 4.0, pw + 28.0, 30.0)
+	canvas.draw_rect(pr2, Color(0.16, 0.12, 0.09, 0.92))
+	canvas.draw_rect(pr2, Color(0.62, 0.5, 0.32), false, 2.0)
+	canvas.draw_string(main.UI_FONT, Vector2(480.0 - pw / 2.0, 27.0), plate,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(1, 0.86, 0.5))
 
 	# 안내
 	var guide := "휠: 확대·축소 · 끌기: 이동 · R: 처음 크기 · M/ESC: 닫기 (배율 %.1fx)" % zoom
@@ -488,12 +605,29 @@ func _place_label(tx: int, ty: int, text: String) -> void:
 		_label(Vector2(_ox + tx * _cell, _oy + ty * _cell - 2), text)
 
 
-func _label(pos: Vector2, text: String, size := 22) -> void:
+# 이번 프레임에 이미 글씨가 놓인 자리들. 겹치는 이름표는 건너뛴다 —
+# 마을처럼 건물이 붙어 선 곳에서는 이름 예닐곱 개가 한자리에 겹쳐
+# 「동쪽제국잡화점연구소」 같은 글자 뭉치가 됐다.
+var _taken: Array = []
+
+
+# force=true면 겹쳐도 반드시 그린다 (내 위치·퀘스트 길라잡이처럼
+# 「지금 봐야 하는 것」은 다른 이름표에 밀리면 안 된다)
+func _label(pos: Vector2, text: String, size := 22, force := false) -> void:
 	# 화면 밖 라벨은 그리지 않는다 (확대했을 때 글자가 가장자리에 몰리지 않게)
 	if pos.x < -60.0 or pos.x > 1020.0 or pos.y < 0.0 or pos.y > 520.0:
 		return
 	var w: float = main.UI_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var p := Vector2(pos.x - w / 2.0, pos.y)
+	# 글자가 놓이는 자리 (기준선 위로 글자 높이만큼)
+	var box := Rect2(p.x - 3.0, p.y - size + 2.0, w + 6.0, size + 4.0)
+	if not force:
+		for t: Rect2 in _taken:
+			if t.intersects(box):
+				return
+	_taken.append(box)
+	# 바탕판 — 풀밭 위에 글씨만 얹으면 배경과 섞여 읽기 어렵다
+	canvas.draw_rect(box, Color(0.06, 0.05, 0.1, 0.55))
 	canvas.draw_string_outline(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 3,
 		Color(0.05, 0.04, 0.08))
 	canvas.draw_string(main.UI_FONT, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size,
