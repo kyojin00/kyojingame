@@ -735,12 +735,33 @@ function chimney(g, x, top, base) {
   g.rect(x + 1, top - 1, x + 5, top + 1, 'p4');
   g.px(x + 1, top - 1, 'p3'); g.px(x + 1, top, 'p3');
   g.rect(x + 2, top - 1, x + 4, top, 'O');
+  // 밑동 — **물받이(납판).**
+  //
+  // 굴뚝을 네모로 끝내면 지붕에 널빤지를 붙여 놓은 것처럼 밑이 뚝 끊긴다.
+  // 실제로 굴뚝이 지붕을 뚫고 나온 자리에는 빗물이 새지 않게 납판을 둘러 댄다.
+  // 아래로 갈수록 한 칸씩 벌어지는 이 **치마**가 굴뚝을 지붕에 앉혀 준다.
+  // 밝은 회색으로 넓게 둘렀더니 지붕 위에 붙인 **딱지**가 됐다. 납판은
+  // 이음매지 장식이 아니다 — 어둡고 좁아야 「끼워 넣은 자리」로 읽힌다.
+  for (let i = 0; i < 3; i++) {
+    const yy = base - 2 + i, e = i > 0 ? 1 : 0;
+    g.rect(x - e, yy, x1 + e, yy, i === 0 ? 'p4' : 'p5');
+    if (i === 0) g.px(x, yy, 'p3');                         // 윗줄 왼쪽만 빛
+  }
+  // 밑단은 **톱니로** 끊는다. 일자로 그으면 얹어 놓은 판이 되고,
+  // 한 칸씩 물리면 기와 사이로 밀어 넣은 것처럼 보인다
+  for (let xx = x - 1; xx <= x1 + 1; xx++)
+    g.vline(xx, base + 1, base + ((xx + base) % 3 === 0 ? 2 : 1), 'p5');
   // 지붕에 드리운 그림자 — 기와 **톤 사다리를 몇 단 아래로 밀어** 준다.
   // 색을 직접 칠하면 나중에 도는 기와 패스가 그대로 덮어쓴다
-  for (let y = top + 3; y <= base + 4; y++)
+  for (let y = top + 3; y <= base; y++)
     for (let d = 1; d <= 4; d++)
       if (roofT[y + 2] && roofT[y + 2][x1 + d] >= 0)
         roofT[y + 2][x1 + d] = Math.min(1, roofT[y + 2][x1 + d] + (d < 3 ? 0.30 : 0.15));
+  // 납판 바로 밑에도 그늘이 깔린다 — 굴뚝이 지붕 **위로 솟아 있다**는 표시
+  for (let d = 0; d < 6; d++)
+    for (let xx = x - 1 + d; xx <= x1 + 3; xx++)
+      if (roofT[base + 3 + d] && roofT[base + 3 + d][xx] >= 0)
+        roofT[base + 3 + d][xx] = Math.min(1, roofT[base + 3 + d][xx] + 0.30 - d * 0.045);
 }
 
 
@@ -783,7 +804,7 @@ function build(spec) {
   // 굴뚝은 **뒤를 붙인 뒤에.** 앞 지붕면에 세우면 벽기둥처럼 보인다 —
   // 뒤로 누운 면에서 솟아야 굴뚝으로 읽힌다
   if (spec.chimney !== false)
-    chimney(g, spec.chimneyX || X1 - 16, RIDGE - 12, RIDGE + 16);
+    chimney(g, spec.chimneyX || X1 - 16, RIDGE - 12, RIDGE + 20);
 
   // ---- 살림 (뒷면 뒤에 — 앞에 놓인 것들이라 묻히면 안 된다) ----
   lantern(g, CX - 13, MID + 8);
