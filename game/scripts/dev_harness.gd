@@ -4628,6 +4628,84 @@ func _debug_tick() -> void:
 				" 지금 ", m.worldgen.forage_count(), ")",
 				" 울타리레시피=", fence_ok, " 검정무지=", black_ok,
 				" 잠긴땅차단=", locked_ok, " 축제삭제=", fest_gone)
+		235:
+			# #152: 마을에 도착하는 순간 · 바닷길 길목으로 내려가는 길
+			m.dialog.close()
+			var k_tut := GameData.tutorial_space
+			var k_ph2 := GameData.story_phase
+			var k_pos2: Vector2 = m.player.position
+			var k_expl2: Dictionary = GameData.explored.duplicate()
+
+			# ── ① 마을 도착: 화면이 어두운 동안 카메라까지 마을로 온다
+			GameData.tutorial_space = true
+			GameData.story_phase = "travel"
+			m.story._plant_story_forest()
+			m.player.position = Vector2(m.STORY_SPAWN.x * m.TILE + 16,
+				m.STORY_SPAWN.y * m.TILE + 16)
+			m.story._apply_story_camera()
+			var cam2: Camera2D = m.player.get_node("Camera")
+			var tut_cam: bool = cam2.limit_top >= m.TUTORIAL_REGION.position.y * m.TILE
+			m.story._do_world_entry()          # 페이드 한가운데에서 벌어지는 일
+			var here2 := m.player_tile()
+			# 주인공도 카메라도 마을에 와 있어야 한다 (예전에는 카메라만 숲에 남았다)
+			var arrive_ok: bool = tut_cam and not GameData.tutorial_space \
+				and here2.y < m.WORLD_H and m.is_passable(here2) \
+				and cam2.limit_top < m.TUTORIAL_REGION.position.y * m.TILE \
+				and absf(cam2.get_screen_center_position().y
+					- m.player.position.y) < 200.0
+			# 튜토리얼 숲길은 한 칸도 남지 않았다
+			for ty3 in range(m.TUTORIAL_REGION.position.y, m.TUTORIAL_REGION.end.y):
+				if m.is_passable(Vector2i(m.STORY_SPAWN.x, ty3)):
+					arrive_ok = false
+			# 전환이 도는 동안에는 컷신 잠금이 저절로 풀리지 않는다
+			m.story._world_entry_running = true
+			m.story_cutscene = true
+			m._cutscene_idle = 0.0
+			for i3 in 40:
+				m.story._story_update(0.1)     # 4초 — 안전장치(1.5초)보다 길게
+			var lock_ok: bool = m.story_cutscene
+			m.story._world_entry_running = false
+			m.story_cutscene = false
+			m.dialog.close()
+
+			# ── ② 바닷길: 길목 바위까지 걸어서 닿을 수 있다
+			var k_sea3 := GameData.sea_open
+			var k_fq3 := GameData.fisher_quest
+			GameData.sea_open = false
+			GameData.fisher_quest = "follow"    # 용식과 함께 내려가는 중
+			m.worldgen._build_sea()
+			var gate3: Vector2i = m.SEA_GATE[0]
+			var stand := Vector2i(gate3.x, gate3.y - 1)   # 바위 바로 앞
+			var reach_ok: bool = m.is_passable(stand) \
+				and m.region_open_at(Vector2i(gate3.x, 100))   # 벼랑길이 열려 있다
+			# 마을에서 그 자리까지 실제로 길이 이어져 있는가
+			var seen3 := {}
+			var q3: Array[Vector2i] = [Vector2i(74, 20)]
+			var head3 := 0
+			seen3[q3[0]] = true
+			while head3 < q3.size():
+				var cur3: Vector2i = q3[head3]
+				head3 += 1
+				for d3 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var n3: Vector2i = cur3 + d3
+					if seen3.has(n3) or not m.is_passable(n3):
+						continue
+					seen3[n3] = true
+					q3.append(n3)
+			reach_ok = reach_ok and seen3.has(stand)
+			GameData.sea_open = k_sea3
+			GameData.fisher_quest = k_fq3
+			m.worldgen._build_sea()
+
+			GameData.tutorial_space = k_tut
+			GameData.story_phase = k_ph2
+			m.player.position = k_pos2
+			GameData.explored = k_expl2
+			m.story._apply_story_camera()
+			m.hud._toast_queue.clear()
+			print("VILLAGE_ENTRY_OK=", arrive_ok and lock_ok and reach_ok,
+				" 마을도착=", arrive_ok, " 전환중잠금=", lock_ok,
+				" 길목까지=", reach_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")

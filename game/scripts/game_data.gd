@@ -2979,7 +2979,11 @@ const REGION_UNLOCK := {
 	"meadow": "story8",      # 너른 초원 — 목동이 자리를 잡은 뒤
 	"wetland": "story10",    # 남쪽 습지 — 동굴 이야기로 발이 넓어진 뒤
 	"pinewood": "story12",   # 솔숲 골짜기 — 연금술사를 만난 뒤
-	"bluff": "sea",          # 바닷가 벼랑길 — 바닷길이 열린 뒤
+	# 바닷가 벼랑길 — **용식과 함께 내려가기 시작하면** 열린다.
+	# 예전에는 `sea_open`이었는데, 길목 바위(y107)에 닿으려면 이 벼랑길
+	# (y96~105)을 지나야 하고 그 바위를 캐야 sea_open이 된다 — 못 가서
+	# 못 캐고 못 캐서 못 가는 자물쇠였다.
+	"bluff": "fisher",
 }
 
 
@@ -2992,6 +2996,9 @@ func region_unlocked(id: String) -> bool:
 			return story2_phase == "done"
 		"sea":
 			return sea_open
+		"fisher":
+			# 낚시꾼이 앞장서는 순간부터 벼랑길이 열린다 (길을 연 뒤로는 늘 열려 있다)
+			return sea_open or fisher_quest in ["follow", "open", "done"]
 		"forest":
 			return forest_quest == "done"
 		"story8":

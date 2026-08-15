@@ -215,7 +215,8 @@ func _story_update(delta: float) -> void:
 	# 안전장치: 어떤 이유로든 연출이 끊겨 조작이 잠긴 채 남으면 풀어 준다.
 	# (편지 전달 중에는 원래 잠겨 있어야 한다)
 	if m.story_cutscene and not m.dialog.visible and m._name_layer == null \
-			and _postman_state != "deliver" and not _chief_greet:
+			and _postman_state != "deliver" and not _chief_greet \
+			and not _world_entry_running:
 		m._cutscene_idle += delta
 		if m._cutscene_idle > 1.5:
 			m._cutscene_idle = 0.0
@@ -759,9 +760,16 @@ func _story_chief() -> Node2D:
 const WORLD_ENTRY := Vector2i(58, 9)     # 마을 어귀 — 세계의 첫 걸음
 
 
+# 전환이 도는 동안에는 컷신 잠금이 저절로 풀리면 안 된다.
+# (`_story_update`의 「컷신이 1.5초 넘게 조용하면 풀어 준다」 안전장치가
+#  페이드 1.7초보다 먼저 터져, 화면이 아직 어두운데 조작이 살아났다)
+var _world_entry_running := false
+
+
 func _begin_world_entry() -> void:
-	if not GameData.tutorial_space:
+	if not GameData.tutorial_space or _world_entry_running:
 		return
+	_world_entry_running = true
 	m.story_cutscene = true
 	_postman_state = "talk"
 	var tw := create_tween()
@@ -779,13 +787,20 @@ func _do_world_entry() -> void:
 	m.player.dir = "right"
 	if _postman != null:
 		_postman.position = p + Vector2(-40.0, 6.0)
+	# **카메라를 여기서 풀어 준다.** 화면이 아직 검을 때 마을로 옮겨 놓아야
+	# 한다 — 예전에는 제한이 튜토리얼 띠(y122~159)에 묶인 채로 페이드가
+	# 걷혀서, 마을에 도착했는데도 화면에는 지나온 숲길이 그대로 보였고
+	# 카메라가 거기서 마을까지 미끄러져 오는 동안 조작까지 됐다.
+	_apply_story_camera()              # tutorial_space가 이미 false라 자유 카메라
+	_apply_story_visibility()
 	var cam: Camera2D = m.player.get_node("Camera")
-	cam.reset_smoothing()
+	cam.reset_smoothing()              # 제한을 푼 **뒤에** 스냅한다
 	GameData.mark_explored_at(WORLD_ENTRY)
 	m.queue_redraw()
 
 
 func _after_world_entry() -> void:
+	_world_entry_running = false
 	m.hud.story_banner("교진 마을 도착", "여기서부터가 진짜 하루다")
 	_apply_story_camera()
 	_apply_story_visibility()
