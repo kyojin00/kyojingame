@@ -505,6 +505,8 @@ func _talk_to(npc: Node2D) -> void:
 			plain_choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
 		if npc.id == "chief" and GameData.story4_phase == "done":
 			plain_choices.insert(0, ["마을 확장 이야기", _open_zone_dialog])
+		if npc.id == "chief" and GameData.plot3_quest in ["make", "report"]:
+			plain_choices.insert(0, ["집터 이야기", m.story.open_plot3_dialog])
 		if npc.id == "chief" and GameData.festival_open():
 			plain_choices.insert(0, ["축제 이야기", _open_festival_dialog])
 		m.dialog.open_seq(str(def.name), _npc_portrait(npc.id), [
@@ -550,6 +552,9 @@ func _talk_to(npc: Node2D) -> void:
 	# 마을 확장(스토리 4 이후) — 버려진 구역을 재료를 들여 되살린다
 	if npc.id == "chief" and GameData.story4_phase == "done":
 		choices.insert(0, ["마을 확장 이야기", _open_zone_dialog])
+	# 제4장 서브 — 새 이웃이 들어설 빈 집터 셋
+	if npc.id == "chief" and GameData.plot3_quest in ["make", "report"]:
+		choices.insert(0, ["집터 이야기", m.story.open_plot3_dialog])
 	# 축제날에는 이장이 진행을 맡는다
 	if npc.id == "chief" and GameData.festival_open():
 		choices.insert(0, ["축제 이야기", _open_festival_dialog])
@@ -649,6 +654,128 @@ func room_action(kind: String) -> void:
 				m.story._start_hall_open_dialog()
 			else:
 				_open_hall_dialog()
+		"mail":
+			_open_post_dialog()
+
+
+# ---- 우체국 (메인 스토리 3에서 세운다) ----
+#
+# 계산대의 우체부가 두 가지 일을 맡는다.
+#   · 편지 부치기 — 마을 사람 한 명에게. 값을 치르고, 다음 날 아침
+#     답장이 보관함에 도착하며 호감도가 조금 오른다. 하루 한 통.
+#   · 편지 보관함 — 가방에서 **수락한 편지**가 저절로 여기로 옮겨진다.
+#     가방을 비워도 지난 편지는 우체국에 그대로 남는다.
+
+const MAIL_PAGE := 6
+
+
+func _open_post_dialog() -> void:
+	var box: int = GameData.mail_box.size()
+	var body := "우체부 아저씨가 도장을 쥔 채 고개를 든다.\n\n"
+	body += "보관함에 편지 %d통이 쌓여 있다." % box
+	if not GameData.mail_out.is_empty():
+		body += "\n답장을 기다리는 편지 %d통 — 내일 아침에 닿는다." \
+			% GameData.mail_out.size()
+	var btns: Array = [
+		["편지 보관함", _open_mail_box.bind(0)],
+		["편지 부치기 — %dG" % GameData.MAIL_SEND_COST, _open_mail_send.bind(0)],
+		["그만두기", null],
+	]
+	m.dialog.open("우체국", body, btns, m.tex.get("icon_letter"))
+
+
+# 보관함 — 최근 편지가 위로 온다
+func _open_mail_box(page: int) -> void:
+	var mails: Array = GameData.mail_box
+	if mails.is_empty():
+		m.dialog.open("편지 보관함",
+			"아직 보관된 편지가 없다.\n\n받은 편지를 수락하면 이곳에 차곡차곡 쌓인다.",
+			[["돌아가기", _open_post_dialog]], m.tex.get("icon_letter"))
+		return
+	var pages := maxi(1, int(ceil(mails.size() / float(MAIL_PAGE))))
+	page = clampi(page, 0, pages - 1)
+	var btns: Array = []
+	for i in range(page * MAIL_PAGE, mini((page + 1) * MAIL_PAGE, mails.size())):
+		var idx: int = mails.size() - 1 - i          # 최근 것부터
+		var mail: Dictionary = mails[idx]
+		btns.append([str(mail.get("title", "편지")), _read_mail.bind(idx, page)])
+	if page + 1 < pages:
+		btns.append(["다음 장", _open_mail_box.bind(page + 1)])
+	if page > 0:
+		btns.append(["앞 장", _open_mail_box.bind(page - 1)])
+	btns.append(["돌아가기", _open_post_dialog])
+	m.dialog.open("편지 보관함",
+		"편지 %d통 (%d/%d장)\n\n읽고 싶은 편지를 고르자." % [mails.size(), page + 1, pages],
+		btns, m.tex.get("icon_letter"))
+
+
+func _read_mail(idx: int, page: int) -> void:
+	if idx < 0 or idx >= GameData.mail_box.size():
+		_open_mail_box(page)
+		return
+	var mail: Dictionary = GameData.mail_box[idx]
+	var day := int(mail.get("day", 0))
+	var head := "— %d일차에 받은 편지 —\n\n" % day if day > 0 else ""
+	m.dialog.open(str(mail.get("title", "편지")),
+		head + str(mail.get("body", "")),
+		[["편지를 접는다", _open_mail_box.bind(page)]], m.tex.get("icon_letter"))
+
+
+# 부치기 — 마을 사람 한 명을 고른다
+func _open_mail_send(page: int) -> void:
+	if GameData.mail_sent_today():
+		m.dialog.open("우체국",
+			"오늘 부칠 편지는 이미 보냈다.\n우편 마차는 하루에 한 번만 떠난다.",
+			[["돌아가기", _open_post_dialog]], m.tex.get("icon_letter"))
+		return
+	var ids: Array = []
+	for n in m.npcs:
+		if GameData.NPCS.has(n.id):
+			ids.append(str(n.id))
+	if ids.is_empty():
+		m.dialog.open("우체국", "아직 편지를 보낼 사람이 없다.",
+			[["돌아가기", _open_post_dialog]], m.tex.get("icon_letter"))
+		return
+	var pages := maxi(1, int(ceil(ids.size() / float(MAIL_PAGE))))
+	page = clampi(page, 0, pages - 1)
+	var poor: bool = GameData.money < GameData.MAIL_SEND_COST
+	var btns: Array = []
+	for i in range(page * MAIL_PAGE, mini((page + 1) * MAIL_PAGE, ids.size())):
+		var nid: String = str(ids[i])
+		btns.append([str(GameData.NPCS[nid].name), _send_mail.bind(nid)])
+	if page + 1 < pages:
+		btns.append(["다음 장", _open_mail_send.bind(page + 1)])
+	if page > 0:
+		btns.append(["앞 장", _open_mail_send.bind(page - 1)])
+	btns.append(["돌아가기", _open_post_dialog])
+	var body := "누구에게 부칠까? 값은 %dG다.\n소지금 %dG\n\n답장은 내일 아침 보관함에 닿는다." \
+		% [GameData.MAIL_SEND_COST, GameData.money]
+	if poor:
+		body = "우표값이 모자란다. 한 통에 %dG다.\n소지금 %dG" \
+			% [GameData.MAIL_SEND_COST, GameData.money]
+		btns = [["돌아가기", _open_post_dialog]]
+	m.dialog.open("편지 부치기", body, btns, m.tex.get("icon_letter"))
+
+
+func _send_mail(nid: String) -> void:
+	if GameData.money < GameData.MAIL_SEND_COST or GameData.mail_sent_today():
+		_open_post_dialog()
+		return
+	if not GameData.NPCS.has(nid):
+		_open_post_dialog()
+		return
+	GameData.money -= GameData.MAIL_SEND_COST
+	GameData.today_spent += GameData.MAIL_SEND_COST
+	GameData.mail_sent_day = GameData.day
+	GameData.mail_out.append({"npc": nid, "day": GameData.day})
+	var nm: String = str(GameData.NPCS[nid].name)
+	GameData.mail_store("%s에게 보낸 편지" % nm,
+		"『잘 지내고 있나요.\n요즘 우리 마을은 아침 공기가 참 좋습니다.\n"
+			+ "언제 한번 천천히 이야기 나눠요.』\n\n(우체부 아저씨가 도장을 꾹 눌러 주었다)")
+	Sound.play_sfx("sfx_coin")
+	m.hud.event_toast("%s에게 편지를 부쳤다!" % nm)
+	m.saveio.save_now()
+	_open_post_dialog()
 
 
 # ---- 마을회관 (메인 스토리 9) ----

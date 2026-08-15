@@ -99,6 +99,11 @@ func _apply_save(d: Dictionary) -> void:
 	if GameData.move_quest in ["show", "build"] \
 			and int(GameData.items.get("move_letter", 0)) <= 0:
 		GameData.items["move_letter"] = 1
+	GameData.plot3_quest = str(d.get("plot3_quest", ""))
+	GameData.plot3_made = int(d.get("plot3_made", 0))
+	GameData.mail_box = (d.get("mail_box", []) as Array)
+	GameData.mail_out = (d.get("mail_out", []) as Array)
+	GameData.mail_sent_day = int(d.get("mail_sent_day", 0))
 	GameData.mom_quest = str(d.get("mom_quest", ""))
 	GameData.mom_quests_done = (d.get("mom_quests_done", []) as Array)
 	GameData.spear_quest = str(d.get("spear_quest", ""))

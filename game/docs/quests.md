@@ -609,6 +609,30 @@ M 키를 눌러 지도를 열어 보자.
 새 구역을 더할 때는 `VILLAGE_ZONES`/`ZONE_ORDER`/`ZONE_COST`에
 한 줄씩만 더하면 된다.
 
+### 제4장 서브 퀘스트 — 새 이웃의 자리 (`plot3_quest`)
+
+4장이 끝나는 그 자리에서(`story._end_story4`) 이장이 곧바로 덧붙이는
+부탁이다. 넓어진 땅에 **빈 집터를 셋 더** 마련해 두자는 이야기.
+
+- `"" → make`(집터를 놓는 중) → `report`(이장에게) → `done`
+- 목표: 「빈 집터를 놓자 n/3」 — `PLOT3_GOAL` 3
+- 세는 곳: `story.try_place_home_plot()`에서 `GameData.plot3_add()`
+- 알리기: 이장 대화의 「집터 이야기」 선택지 (머리 위 **?**)
+- 사례: `PLOT3_MONEY` 900G + 못 `PLOT3_NAIL` 6개
+
+자세한 이야기는 `docs/economy_mail_plot3.md`.
+
+## 우체국 — 편지 부치기와 보관함 (`mail_*`)
+
+스토리 3에서 세운 우체국의 계산대(`ROOMS["post"].action = "mail"`)가
+두 가지를 맡는다. 편지 한 통을 부치는 값은 `MAIL_SEND_COST` 150G이고
+하루 한 통이며, 답장은 **다음 날 아침** 보관함에 닿는다
+(`GameData.mail_new_day()` → 호감도 +`MAIL_REPLY_AFF`).
+
+가방에서 **수락한 편지**(이주 희망·이사 신청·작별)는 사라지지 않고
+`story._store_letter()`를 지나 보관함으로 옮겨진다. 자세한 것은
+`docs/economy_mail_plot3.md`.
+
 ## 메인 스토리 6 — 오래된 책과 사서 (`story6_phase`)
 
 스토리 5(숲속에서 발견한 집)를 끝내면 광장 남동쪽 풀숲에 **오래된 책**이

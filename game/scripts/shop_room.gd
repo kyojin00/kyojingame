@@ -60,7 +60,7 @@ const ROOMS := {
 		"name": "우체국", "keeper": "postman",
 		"wall": Color(0.36, 0.33, 0.46), "floor": Color(0.55, 0.5, 0.62),
 		"counter": Color(0.4, 0.34, 0.5), "deco": "mail",
-		"tab": "", "tabs": [],
+		"tab": "", "tabs": [], "action": "mail",
 		"hint": "우체부 아저씨가 편지를 정리하고 있다.",
 	},
 	# ---- 거래 창 대신 제 나름의 기능을 가진 방들 ----

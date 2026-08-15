@@ -847,10 +847,11 @@ func _debug_tick() -> void:
 			var bin_menu: bool = m.dialog.visible
 			m.village._trash_sell()
 			var sell80: bool = m.shop.visible and absf(m.shop.sell_mult - 0.8) < 0.001
-			GameData.items["forage_glass"] = 10       # 34G짜리 — 80%면 개당 27G
+			GameData.items["forage_glass"] = 10       # 무인 판매는 제값의 80%
 			var money_t: int = GameData.money
+			var glass_g: int = GameData.item_value("forage_glass")
 			m.shop._on_sell_item("forage_glass")
-			var paid: bool = GameData.money == money_t + int(34 * 0.8) * 10 \
+			var paid: bool = GameData.money == money_t + int(glass_g * 0.8) * 10 \
 				and int(GameData.items["forage_glass"]) == 0
 			m.shop.close()
 			m.shop.open("sell", ["sell"], "잡화점 — 판매")
@@ -3875,6 +3876,152 @@ func _debug_tick() -> void:
 				" 상호작용안내=", prompt_ok,
 				" 안개=", fog_ok, "(처음 ", "%.1f" % (ratio * 100.0), "%)",
 				" 돌문숨김=", gate_hid, " 18장등장=", gate_18, " 마을밖=", far_ok)
+		297:
+			# #146: 제4장 집터 서브퀘 · 우체국 편지·보관함 · 고가치 경제
+			m.dialog.close()
+
+			# ── ① 스토리 4가 끝나면 이장이 집터 셋을 부탁한다
+			var k_s4e := GameData.story4_phase
+			var k_zones: Array = GameData.zones_open.duplicate()
+			var k_p3q := GameData.plot3_quest
+			var k_p3n := GameData.plot3_made
+			GameData.story4_phase = "ask"
+			GameData.plot3_quest = ""
+			GameData.plot3_made = 0
+			m.story._end_story4()
+			var p3_start: bool = GameData.plot3_quest == "make" \
+				and GameData.plot3_made == 0
+			var obj3 := GameData.plot3_objective_short()
+			var p3_obj: bool = obj3.contains("0/%d" % GameData.PLOT3_GOAL) \
+				and not obj3.contains("(") and obj3.length() <= 20
+			# Q창에도 서브 퀘스트로 오른다
+			var p3_cat := false
+			for q3: Dictionary in GameData.quest_catalog():
+				if str(q3.id) == "plot3":
+					p3_cat = str(q3.cat) == "sub" and str(q3.npc) == "chief"
+			# 집터를 셋 놓으면 보고 단계로 넘어간다
+			for i3 in GameData.PLOT3_GOAL:
+				GameData.plot3_add()
+			var p3_ready: bool = GameData.plot3_quest == "report" \
+				and GameData.plot3_objective_short() == "이장에게 알리자."
+			# 다른 ❗가 없을 때만 이장 머리 위에 ? 가 뜬다
+			var k_mvq := GameData.move_quest
+			GameData.move_quest = ""
+			var p3_mark: bool = GameData.quest_npc_marks().get("chief", "") == "?"
+			GameData.move_quest = k_mvq
+			var money_p3 := GameData.money
+			var nail_p3 := int(GameData.items.get("nail", 0))
+			m.story.open_plot3_dialog()
+			var p3_talk: bool = m.dialog.visible
+			m.dialog.skip_seq()
+			m.dialog.close()
+			var p3_done: bool = GameData.plot3_quest == "done" \
+				and GameData.money == money_p3 + GameData.PLOT3_MONEY \
+				and int(GameData.items["nail"]) == nail_p3 + GameData.PLOT3_NAIL \
+				and GameData.plot3_objective_short() == ""
+			GameData.money = money_p3
+			GameData.items["nail"] = nail_p3
+			GameData.plot3_quest = k_p3q
+			GameData.plot3_made = k_p3n
+			GameData.story4_phase = k_s4e
+			GameData.zones_open = k_zones
+
+			# ── ② 우체국 — 계산대가 편지 창을 연다
+			var post_act: bool = str(m.shop_room.ROOMS["post"].get("action", "")) \
+				== "mail"
+			var k_mbox: Array = GameData.mail_box.duplicate()
+			var k_mout: Array = GameData.mail_out.duplicate()
+			var k_msent := GameData.mail_sent_day
+			var k_money_m := GameData.money
+			var k_built_m: Array = GameData.village_built.duplicate()
+			if not GameData.village_built.has("post"):
+				GameData.village_built.append("post")
+			GameData.mail_box = []
+			GameData.mail_out = []
+			GameData.mail_sent_day = 0
+			GameData.money = 5000
+			m.village.room_action("mail")
+			var mail_ui: bool = m.dialog.visible and GameData.mail_open()
+			m.dialog.close()
+			# 부치기 — 값을 치르고, 하루 한 통
+			var aff_m := int(GameData.affinity.get("chief", 0))
+			m.village._send_mail("chief")
+			var sent_ok: bool = GameData.money == 5000 - GameData.MAIL_SEND_COST \
+				and GameData.mail_out.size() == 1 \
+				and GameData.mail_sent_today() \
+				and GameData.mail_box.size() == 1
+			m.dialog.close()
+			var money_after := GameData.money
+			m.village._send_mail("chief")
+			var once_ok: bool = GameData.money == money_after \
+				and GameData.mail_out.size() == 1
+			m.dialog.close()
+			# 다음 날 아침 — 답장이 보관함에 닿고 호감도가 오른다
+			GameData.day += 1
+			var replies_h: Array = GameData.mail_new_day()
+			var reply_ok: bool = replies_h.size() == 1 \
+				and GameData.mail_out.is_empty() \
+				and GameData.mail_box.size() == 2 \
+				and int(GameData.affinity.get("chief", 0)) \
+					== aff_m + GameData.MAIL_REPLY_AFF
+			GameData.day -= 1
+			# 가방에서 읽은 편지가 저절로 보관함으로 옮겨진다
+			var k_fare := int(GameData.items.get("farewell_letter", 0))
+			var k_lastf := GameData.last_farewell
+			GameData.items["farewell_letter"] = 1
+			GameData.last_farewell = "무진"
+			m.story.open_farewell_letter()
+			m.dialog.close()
+			var keep_ok: bool = GameData.mail_box.size() == 3 \
+				and int(GameData.items["farewell_letter"]) == 0 \
+				and str(GameData.mail_box[2].title).contains("무진")
+			GameData.items["farewell_letter"] = k_fare
+			GameData.last_farewell = k_lastf
+			# 보관함을 열면 편지가 줄지어 보인다
+			m.village._open_mail_box(0)
+			var box_ui: bool = m.dialog.visible
+			m.village._read_mail(0, 0)
+			var read_ui: bool = m.dialog.visible
+			m.dialog.close()
+			GameData.mail_box = k_mbox
+			GameData.mail_out = k_mout
+			GameData.mail_sent_day = k_msent
+			GameData.money = k_money_m
+			GameData.village_built = k_built_m
+			GameData.affinity["chief"] = aff_m
+
+			# ── ③ 고가치 경제 — 벌이는 얇아지고 돈은 무거워진다
+			var econ_ok: bool = GameData.START_MONEY <= 200 \
+				and GameData.MAIL_SEND_COST >= 100
+			var thin := 0
+			for cid: String in GameData.CROPS:
+				var cdef: Dictionary = GameData.CROPS[cid]
+				var sell_c := int(cdef.sell_price)
+				var seed_c := int(cdef.seed_price)
+				# 심으면 남아야 하고, 그 남는 몫이 씨앗값을 넘지 않는다
+				if sell_c <= seed_c or sell_c - seed_c > seed_c:
+					econ_ok = false
+				if sell_c <= 100:
+					thin += 1
+			# 대부분의 작물이 한 알에 100G를 넘지 않는다 (넘는 것은 긴 계절작물뿐)
+			if thin < GameData.CROPS.size() - 8:
+				econ_ok = false
+			# 의뢰 보상·도감·상점이 모두 같은 표를 본다
+			if GameData.item_value("egg") != int(GameData.ITEMS["egg"].sell) \
+					or GameData.item_value("wheat") \
+						!= int(GameData.CROPS["wheat"].sell_price):
+				econ_ok = false
+			print("MAILPLOT_OK=", p3_start and p3_obj and p3_cat and p3_ready
+				and p3_mark and p3_talk and p3_done and post_act and mail_ui
+				and sent_ok and once_ok and reply_ok and keep_ok and box_ui
+				and read_ui and econ_ok,
+				" 4장부탁=", p3_start, " 짧은목표=", p3_obj, " Q창=", p3_cat,
+				" 셋완료=", p3_ready, " 이장물음표=", p3_mark,
+				" 보고=", p3_talk and p3_done,
+				" 우체국창=", post_act and mail_ui, " 발송=", sent_ok,
+				" 하루한통=", once_ok, " 답장=", reply_ok,
+				" 수락편지보관=", keep_ok, " 보관함열람=", box_ui and read_ui,
+				" 경제=", econ_ok)
 		291:
 			# 새 제작대 창을 한 장 남긴다 (289에서 열어 둔 것)
 			_save_shot("_desk.png")
@@ -4707,7 +4854,8 @@ func _debug_tick() -> void:
 			m.village._open_quest_board()
 			m.dialog.close()
 			var board_done: bool = GameData.tutorial.get("board", false) \
-				and GameData.money == keep_money + 100
+				and GameData.money == keep_money \
+					+ int(GameData.TUTORIAL_REWARDS["board"]["money"])
 			# 「새로운 주민의 이사」= 메인 스토리 3으로 분류되고 Q창에 뜬다
 			GameData.move_quest = "show"
 			var cat_ok := false

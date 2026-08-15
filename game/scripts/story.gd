@@ -1783,6 +1783,11 @@ func try_place_home_plot(door: Vector2i) -> bool:
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("빈 집터 완성!")
 	m.hud.show_message("빈 집터를 마련했다. 이주 희망 편지를 수락하면 여기에 집이 선다.", 5.0)
+	# 이장의 부탁(제4장 서브)을 받은 중이면 세어 준다
+	var was_plot3 := GameData.plot3_quest
+	GameData.plot3_add()
+	if was_plot3 == "make" and GameData.plot3_quest == "report":
+		m.hud.event_toast("집터 셋을 다 마련했다 — 이장에게!")
 	m.queue_redraw()
 	m.saveio.save_now()
 	return true
@@ -1818,6 +1823,9 @@ func _try_accept_move() -> void:
 			p.used = true
 			break
 	GameData.items["move_letter"] = maxi(0, int(GameData.items.get("move_letter", 0)) - 1)
+	# 수락한 편지는 우체국 보관함으로 옮겨져 남는다
+	_store_letter("이주 희망 편지 — 재민",
+		"『숲과 강, 바다까지 있는 마을이라니...\n꼭 한번 살아 보고 싶어요. 받아 주실래요? — 재민』")
 	GameData.move_house = plot
 	m.objnode._remove_object(m.door_tile(plot))   # 집터 팻말 철거
 	for y in range(plot.y - 1, plot.y + 5):       # 그새 자란 것들 정리
@@ -1912,7 +1920,49 @@ func _end_story4() -> void:
 	m.hud.story_banner("메인 스토리 4 완결", "오래된 마을의 경계")
 	m.hud.show_message("옛 마을 북동쪽 터가 열렸다! 동쪽 다리 너머로 마을이 넓어졌다.\n"
 		+ "남은 구역은 이장님의 「마을 확장 이야기」에서 되살릴 수 있다. (지도 M)", 7.0)
+	# 넓어진 땅에는 빈자리가 필요하다 — 이장의 부탁이 곧바로 이어진다
+	if GameData.plot3_quest == "":
+		GameData.plot3_quest = "make"
+		GameData.plot3_made = 0
+		m.hud.quest_start_toast("이장의 부탁 — 새 이웃의 자리")
 	m.queue_redraw()
+	m.saveio.save_now()
+
+
+# ---- 제4장 서브 퀘스트: 새 이웃을 위한 빈 집터 셋 ----
+#
+# 이장에게 「집터 이야기」로 말을 걸면 언제든 다시 들을 수 있다.
+# 세 곳을 다 마련하고 말을 걸면 사례를 받고 끝난다.
+
+func open_plot3_dialog() -> void:
+	var chief_normal: Texture2D = m.tex["npc_chief_portrait_normal"]
+	var chief_happy: Texture2D = m.tex["npc_chief_portrait_happy"]
+	if GameData.plot3_quest == "report":
+		m.dialog.open_seq("이장 덕수", chief_happy, [
+			{"text": "「벌써 세 곳이나? 허허...\n자네는 늘 말보다 손이 빠르구먼.」"},
+			{"text": "「빈 집터라는 게 참 묘하네.\n아무도 안 사는데 마을이 벌써 넓어진 것 같아.」",
+				"portrait": chief_normal},
+			{"text": "「이건 마을 살림에서 떼어 둔 사례일세.\n못도 좀 챙기게 — 또 지을 일이 있을 테니.」",
+				"portrait": chief_happy},
+		], _end_plot3)
+		return
+	var left: int = maxi(GameData.PLOT3_GOAL - GameData.plot3_made, 0)
+	m.dialog.open_seq("이장 덕수", chief_normal, [
+		{"text": "「땅이 넓어졌으니 이제 자리를 마련할 차례일세.\n빈 집터를 세 곳만 더 놓아 주게.」"},
+		{"text": "「사람은 부른다고 오는 게 아니야.\n빈자리를 보고 오는 게지. ...%d곳 남았네.」" % left},
+	])
+
+
+func _end_plot3() -> void:
+	if GameData.plot3_quest != "report":
+		return
+	GameData.plot3_quest = "done"
+	GameData.money += GameData.PLOT3_MONEY
+	GameData.items["nail"] = int(GameData.items.get("nail", 0)) + GameData.PLOT3_NAIL
+	Sound.play_sfx("sfx_coin")
+	m.hud.event_toast("이장의 부탁 완료!")
+	m.hud.show_message("사례로 %dG와 못 %d개를 받았다.\n빈 집터에는 언젠가 새 이웃이 들어선다."
+		% [GameData.PLOT3_MONEY, GameData.PLOT3_NAIL], 6.0)
 	m.saveio.save_now()
 
 
@@ -4853,6 +4903,9 @@ func _settle_accept() -> void:
 	m.dialog.close()
 	GameData.items["settle_letter"] = 0
 	GameData.settler_offer = ""
+	# 수락한 편지는 우체국 보관함에 남는다
+	_store_letter("이사 신청 편지 — %s" % GameData.NPCS[nid].name,
+		str(SETTLE_LETTERS.get(nid, "『마을에서 살고 싶습니다.』")))
 	GameData.settler_homes[nid] = [anchor.x, anchor.y]
 	GameData.settler_arrive = nid
 	GameData.settler_arrive_day = GameData.day
@@ -4930,8 +4983,17 @@ func open_farewell_letter() -> void:
 	GameData.items["farewell_letter"] = \
 		int(GameData.items["farewell_letter"]) - 1
 	var nm := str(GameData.last_farewell)
-	m.dialog.open("짧은 작별 편지",
-		"『미안, 인사도 없이 떠나서.\n그동안 고마웠어. 몸 건강히 지내. — %s』\n\n(다음 이웃에게는 더 자주 말을 걸어 주자...)" % nm,
-		[["편지를 접는다", null]])
+	var body := "『미안, 인사도 없이 떠나서.\n그동안 고마웠어. 몸 건강히 지내. — %s』\n\n(다음 이웃에게는 더 자주 말을 걸어 주자...)" % nm
+	_store_letter("짧은 작별 편지 — %s" % nm, body)
+	m.dialog.open("짧은 작별 편지", body, [["편지를 접는다", null]],
+		m.tex.get("icon_letter"))
+
+
+# 읽고 나면 사라지던 편지를 우체국 보관함으로 옮긴다.
+# 우체국이 아직 없어도 보관해 둔다 — 세우고 나면 지난 편지가 다 들어 있다.
+func _store_letter(title: String, body: String) -> void:
+	GameData.mail_store(title, body)
+	if GameData.mail_open():
+		m.hud.show_message("편지는 우체국 보관함에 보관됐다.", 4.0)
 
 

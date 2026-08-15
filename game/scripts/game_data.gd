@@ -23,38 +23,38 @@ const WEATHER_STAR := 5
 # grow_days = 성장에 필요한 게임 시간(시). 초반 작물은 빨리, 비쌀수록 오래.
 const CROPS := {
 	# 밀 — 잡화점이 처음부터 파는 두 씨앗 중 하나. 사철 자라는 주식이다.
-	"wheat": {"name": "밀", "seed_price": 30, "sell_price": 75, "grow_days": 3,
+	"wheat": {"name": "밀", "seed_price": 20, "sell_price": 35, "grow_days": 3,
 		"seasons": [SPRING, SUMMER, FALL, WINTER]},
-	"potato": {"name": "감자", "seed_price": 30, "sell_price": 80, "grow_days": 2, "seasons": [SPRING]},
-	"carrot": {"name": "당근", "seed_price": 40, "sell_price": 110, "grow_days": 3, "seasons": [SPRING]},
-	"strawberry": {"name": "딸기", "seed_price": 60, "sell_price": 170, "grow_days": 4, "seasons": [SPRING]},
-	"tomato": {"name": "토마토", "seed_price": 50, "sell_price": 130, "grow_days": 3, "seasons": [SUMMER]},
+	"potato": {"name": "감자", "seed_price": 20, "sell_price": 35, "grow_days": 2, "seasons": [SPRING]},
+	"carrot": {"name": "당근", "seed_price": 30, "sell_price": 50, "grow_days": 3, "seasons": [SPRING]},
+	"strawberry": {"name": "딸기", "seed_price": 40, "sell_price": 75, "grow_days": 4, "seasons": [SPRING]},
+	"tomato": {"name": "토마토", "seed_price": 35, "sell_price": 60, "grow_days": 3, "seasons": [SUMMER]},
 	# 옥수수 — 처음부터 파는 두 번째 씨앗 (그래서 봄에도 심을 수 있다)
-	"corn": {"name": "옥수수", "seed_price": 40, "sell_price": 150, "grow_days": 4,
+	"corn": {"name": "옥수수", "seed_price": 40, "sell_price": 70, "grow_days": 4,
 		"seasons": [SPRING, SUMMER, FALL]},
-	"watermelon": {"name": "수박", "seed_price": 120, "sell_price": 380, "grow_days": 7, "seasons": [SUMMER]},
-	"pumpkin": {"name": "호박", "seed_price": 100, "sell_price": 320, "grow_days": 7, "seasons": [FALL]},
-	"eggplant": {"name": "가지", "seed_price": 45, "sell_price": 120, "grow_days": 3, "seasons": [FALL]},
-	"cabbage": {"name": "배추", "seed_price": 70, "sell_price": 200, "grow_days": 5, "seasons": [FALL]},
-	"winter_radish": {"name": "겨울무", "seed_price": 60, "sell_price": 180, "grow_days": 4, "seasons": [WINTER]},
+	"watermelon": {"name": "수박", "seed_price": 95, "sell_price": 170, "grow_days": 7, "seasons": [SUMMER]},
+	"pumpkin": {"name": "호박", "seed_price": 80, "sell_price": 145, "grow_days": 7, "seasons": [FALL]},
+	"eggplant": {"name": "가지", "seed_price": 30, "sell_price": 55, "grow_days": 3, "seasons": [FALL]},
+	"cabbage": {"name": "배추", "seed_price": 50, "sell_price": 90, "grow_days": 5, "seasons": [FALL]},
+	"winter_radish": {"name": "겨울무", "seed_price": 45, "sell_price": 80, "grow_days": 4, "seasons": [WINTER]},
 	# 봄
-	"spinach": {"name": "시금치", "seed_price": 35, "sell_price": 95, "grow_days": 2, "seasons": [SPRING]},
-	"onion": {"name": "양파", "seed_price": 55, "sell_price": 150, "grow_days": 4, "seasons": [SPRING]},
-	"pea": {"name": "완두", "seed_price": 45, "sell_price": 130, "grow_days": 3, "seasons": [SPRING, SUMMER]},
+	"spinach": {"name": "시금치", "seed_price": 25, "sell_price": 45, "grow_days": 2, "seasons": [SPRING]},
+	"onion": {"name": "양파", "seed_price": 40, "sell_price": 70, "grow_days": 4, "seasons": [SPRING]},
+	"pea": {"name": "완두", "seed_price": 35, "sell_price": 60, "grow_days": 3, "seasons": [SPRING, SUMMER]},
 	# 여름
-	"pepper": {"name": "고추", "seed_price": 65, "sell_price": 175, "grow_days": 4, "seasons": [SUMMER]},
-	"melon": {"name": "참외", "seed_price": 110, "sell_price": 330, "grow_days": 6, "seasons": [SUMMER]},
-	"garlic": {"name": "마늘", "seed_price": 50, "sell_price": 140, "grow_days": 3, "seasons": [SUMMER]},
+	"pepper": {"name": "고추", "seed_price": 45, "sell_price": 80, "grow_days": 4, "seasons": [SUMMER]},
+	"melon": {"name": "참외", "seed_price": 80, "sell_price": 150, "grow_days": 6, "seasons": [SUMMER]},
+	"garlic": {"name": "마늘", "seed_price": 35, "sell_price": 65, "grow_days": 3, "seasons": [SUMMER]},
 	# 가을
-	"sweet_potato": {"name": "고구마", "seed_price": 80, "sell_price": 230, "grow_days": 5, "seasons": [FALL]},
-	"bean": {"name": "콩", "seed_price": 55, "sell_price": 155, "grow_days": 4, "seasons": [FALL]},
-	"rice": {"name": "벼", "seed_price": 90, "sell_price": 260, "grow_days": 6, "seasons": [FALL]},
+	"sweet_potato": {"name": "고구마", "seed_price": 60, "sell_price": 105, "grow_days": 5, "seasons": [FALL]},
+	"bean": {"name": "콩", "seed_price": 40, "sell_price": 70, "grow_days": 4, "seasons": [FALL]},
+	"rice": {"name": "벼", "seed_price": 65, "sell_price": 115, "grow_days": 6, "seasons": [FALL]},
 	# 겨울 — 추운 계절은 종류가 적은 대신 값이 좋다
-	"leek": {"name": "대파", "seed_price": 55, "sell_price": 165, "grow_days": 3, "seasons": [WINTER]},
-	"beet": {"name": "비트", "seed_price": 85, "sell_price": 250, "grow_days": 5, "seasons": [WINTER]},
-	"snow_cabbage": {"name": "눈배추", "seed_price": 130, "sell_price": 400, "grow_days": 7, "seasons": [WINTER]},
+	"leek": {"name": "대파", "seed_price": 40, "sell_price": 75, "grow_days": 3, "seasons": [WINTER]},
+	"beet": {"name": "비트", "seed_price": 60, "sell_price": 110, "grow_days": 5, "seasons": [WINTER]},
+	"snow_cabbage": {"name": "눈배추", "seed_price": 100, "sell_price": 180, "grow_days": 7, "seasons": [WINTER]},
 	# 사계절 — 값은 싸지만 언제든 심을 수 있다
-	"herb_leaf": {"name": "약초잎", "seed_price": 40, "sell_price": 105, "grow_days": 3, "seasons": [SPRING, SUMMER, FALL, WINTER]},
+	"herb_leaf": {"name": "약초잎", "seed_price": 25, "sell_price": 45, "grow_days": 3, "seasons": [SPRING, SUMMER, FALL, WINTER]},
 }
 const CROP_IDS := [
 	"wheat",
@@ -97,7 +97,7 @@ const SAVE_PATH := "user://kyojin_farm_save.json"
 const DEV_MODE := true
 const DEV_MONEY := 100000000
 const DEV_STOCK := 10000        # 목재·석재·씨앗·아이템 개수
-const START_MONEY := 500        # 출시용 시작 소지금
+const START_MONEY := 200        # 출시용 시작 소지금 — 씨앗 몇 줌이 전부다
 
 # ---- 키 설정 (사람마다 다르게 바꿀 수 있다) ----
 const KEYBIND_PATH := "user://keybinds.json"
@@ -1115,7 +1115,7 @@ var move_day := 0
 var move_min := 0            # 집을 지은 시각 (분) — 여기서 조금 뒤에 이사 온다
 const MOVE_WAIT_MIN := 120   # 두 시간쯤 지나면 짐을 들고 나타난다            # 단계 전환 기준 날 (편지 도착·이사 대기)
 var move_house := Vector2i(-999, -999)   # 재민의 집 자리 (수락한 집터)
-const HOUSING_KIT_PRICE := 5000          # 집터 레시피 값 — 일부러 비싸다
+const HOUSING_KIT_PRICE := 2500          # 집터 레시피 값 — 일부러 비싸다
 # 스프링클러는 퀘스트 보상이 아니라 잡화점 레시피가 됐다 —
 # 농사 실력이 이만큼 붙어야 선반에 올라온다
 const SPRINKLER_FARM_LV := 3
@@ -1130,6 +1130,95 @@ func first_empty_plot() -> Vector2i:
 		if not bool(p.get("used", false)):
 			return Vector2i(int(p.x), int(p.y))
 	return Vector2i(-999, -999)
+
+
+func empty_plot_count() -> int:
+	var n := 0
+	for p: Dictionary in home_plots:
+		if not bool(p.get("used", false)):
+			n += 1
+	return n
+
+
+# ---- 제4장 서브 퀘스트: 새 이웃을 위한 빈 집터 셋 ----
+#
+# 옛 마을의 경계를 되찾자마자(스토리 4 완결) 이장이 덧붙이는 부탁이다.
+# 땅이 넓어졌으니 이제 사람이 들어올 자리를 미리 마련해 두자는 이야기 —
+# 빈 집터를 **PLOT3_GOAL개** 더 놓으면 이장에게 알리고 사례를 받는다.
+#   "": 아직 / make: 집터를 놓는 중 / report: 다 놓았다 — 이장에게 /
+#   done: 완료
+var plot3_quest := ""
+var plot3_made := 0               # 부탁을 받은 뒤로 새로 놓은 집터 수
+const PLOT3_GOAL := 3
+const PLOT3_MONEY := 900          # 이장이 마을 살림에서 떼어 주는 사례
+const PLOT3_NAIL := 6             # 다음 집터를 위한 못
+
+
+func plot3_objective_short() -> String:
+	match plot3_quest:
+		"make":
+			return "빈 집터를 놓자 %d/%d" % [plot3_made, PLOT3_GOAL]
+		"report":
+			return "이장에게 알리자."
+	return ""
+
+
+# 빈 집터를 하나 놓을 때마다 story.try_place_home_plot이 불러 준다
+func plot3_add() -> void:
+	if plot3_quest != "make":
+		return
+	plot3_made += 1
+	if plot3_made >= PLOT3_GOAL:
+		plot3_quest = "report"
+
+
+# ---- 우체국 — 편지 부치기와 보관함 ----
+#
+# 우체부가 자리를 잡으면(스토리 3 완결) 우체국이 두 가지 일을 맡는다.
+#   · 부치기 — 마을 사람에게 편지 한 통. 값을 치르는 대신 마음이 오간다.
+#     다음 날 아침 답장이 보관함에 도착하고 호감도가 조금 오른다.
+#   · 보관함 — 가방에서 **수락한 편지**가 자동으로 여기로 옮겨져 남는다.
+#     가방을 비워도 지난 편지는 우체국에 그대로 있다.
+const MAIL_SEND_COST := 150       # 편지 한 통을 부치는 값
+const MAIL_BOX_MAX := 40          # 보관함이 담아 두는 편지 수
+const MAIL_REPLY_AFF := 3         # 답장이 오면 오르는 호감도
+var mail_box: Array = []          # [{title, body, day}] — 오래된 것이 앞
+var mail_out: Array = []          # 부치고 답장을 기다리는 편지 [{npc, day}]
+var mail_sent_day := 0            # 하루 한 통 — 마지막으로 부친 날
+
+
+# 보관함에 한 통 넣는다 (수락한 편지·도착한 답장 모두 이 문을 지난다)
+func mail_store(title: String, body: String) -> void:
+	mail_box.append({"title": title, "body": body, "day": day})
+	while mail_box.size() > MAIL_BOX_MAX:
+		mail_box.pop_front()
+
+
+func mail_open() -> bool:
+	return village_built.has("post")
+
+
+func mail_sent_today() -> bool:
+	return mail_sent_day == day and day > 0
+
+
+# 아침에 도착한 답장들 — 보낸 사람 이름을 돌려준다 (day_cycle이 알린다)
+func mail_new_day() -> Array:
+	var came: Array = []
+	for i in range(mail_out.size() - 1, -1, -1):
+		var mo: Dictionary = mail_out[i]
+		if day <= int(mo.get("day", 0)):
+			continue
+		var nid := str(mo.get("npc", ""))
+		mail_out.remove_at(i)
+		if not NPCS.has(nid):
+			continue
+		var nm := str(NPCS[nid].name)
+		mail_store("%s의 답장" % nm, str(NPCS[nid].get("reply_letter",
+			"『편지 잘 받았어요.\n덕분에 하루가 환했습니다. 또 써 주세요.』")))
+		affinity[nid] = mini(int(affinity.get(nid, 0)) + MAIL_REPLY_AFF, 100)
+		came.append(nm)
+	return came
 # 쓰레기통(무인 판매함) 판매 배율 — 24시간 아무 때나 파는 대신 제값의 80%
 const TRASH_SELL_MULT := 0.8
 
@@ -2504,6 +2593,20 @@ func quest_catalog() -> Array:
 				+ "용식은 그때부터 이 마을 사람이 된다.",
 			"cat": "sub", "npc": "fisher",
 			"reward": "수납 상자 레시피 (목재 8)"})
+	# 서브: 새 이웃을 위한 빈 집터 셋 — 옛 경계를 되찾은 뒤 이장의 부탁
+	o = plot3_objective_short()
+	if o != "":
+		out.append({"id": "plot3", "title": "이장의 부탁 — 새 이웃의 자리",
+			"obj": o,
+			"desc": "덤불에 잠겼던 옛 마을 땅이 다시 열렸다.\n"
+				+ "이장은 그 넓어진 땅을 오래 바라보다 이렇게 말한다.\n\n"
+				+ "「사람은 부른다고 오는 게 아닐세.\n"
+				+ "빈자리가 먼저 있어야, 그 자리를 보고 오는 게지.」\n\n"
+				+ "아직 이름도 얼굴도 모르는 누군가를 위해\n"
+				+ "지붕이 설 자리를 미리 세 곳 골라 두자.\n"
+				+ "언젠가 그 문 앞에서 처음 인사를 나누게 될 것이다.",
+			"cat": "sub", "npc": "chief",
+			"reward": "이장의 사례 %dG + 못 %d개" % [PLOT3_MONEY, PLOT3_NAIL]})
 	# 서브: 상인의 노점 심부름
 	if merchant_errand == "doing":
 		var ready := wood >= STALL_WOOD \
@@ -2593,6 +2696,9 @@ func tracked_quest() -> Dictionary:
 #   "!" 아직 대화하지 않은 대상 / "?" 납품(보고)할 수 있는 대상
 func quest_npc_marks() -> Dictionary:
 	var marks := {}
+	# 서브 퀘스트 표시는 맨 먼저 — 메인 이야기의 ❗가 있으면 그쪽이 이긴다
+	if plot3_quest == "report":
+		marks["chief"] = "?"
 	if story2_phase == "farm_talk":
 		marks["chief"] = "!"
 	if fisher_quest == "meet":
@@ -3269,7 +3375,7 @@ const ANIMALS := {
 }
 const MAX_ANIMALS := 8          # 기본 동물 상한
 const BARN_MAX_ANIMALS := 16    # 축사 건설 후
-const BARN_COST_MONEY := 5000
+const BARN_COST_MONEY := 2500
 const BARN_COST_WOOD := 20
 var barn_built := false
 
@@ -3279,40 +3385,40 @@ func max_animals() -> int:
 
 # ---- 기타 판매 아이템 (동물 생산물, 물고기) ----
 const ITEMS := {
-	"egg": {"name": "달걀", "sell": 60},
-	"milk": {"name": "우유", "sell": 120},
-	"fish_crucian": {"name": "붕어", "sell": 40},
-	"fish_minnow": {"name": "피라미", "sell": 30},
-	"fish_loach": {"name": "미꾸라지", "sell": 55},
-	"fish_bitterling": {"name": "납자루", "sell": 45},
-	"fish_carp": {"name": "잉어", "sell": 60},
-	"fish_sweetfish": {"name": "은어", "sell": 110},
-	"fish_trout": {"name": "산천어", "sell": 140},
-	"fish_mandarin": {"name": "쏘가리", "sell": 160},
-	"fish_catfish": {"name": "메기", "sell": 90},
-	"fish_eel": {"name": "뱀장어", "sell": 180},
-	"fish_snakehead": {"name": "가물치", "sell": 200},
-	"fish_crab": {"name": "참게", "sell": 130},
-	"fish_salmon": {"name": "연어", "sell": 220},
-	"fish_rainbow": {"name": "무지개송어", "sell": 190},
-	"fish_smelt": {"name": "빙어", "sell": 70},
-	"fish_icecarp": {"name": "얼음잉어", "sell": 150},
-	"fish_lenok": {"name": "열목어", "sell": 240},
-	"fish_mistfish": {"name": "안개무늬", "sell": 170},
-	"fish_stormjack": {"name": "폭풍전갱이", "sell": 260},
-	"fish_moonfish": {"name": "달빛어", "sell": 320},
-	"fish_starcarp": {"name": "별잉어", "sell": 380},
-	"fish_ghost": {"name": "유령물고기", "sell": 420},
-	"fish_golden": {"name": "황금잉어", "sell": 300},
-	"fish_king": {"name": "무지개 왕송어", "sell": 500},
-	"fish_dragon": {"name": "이무기", "sell": 800},
-	"ore": {"name": "광석", "sell": 50},
-	"gem": {"name": "보석", "sell": 220},
-	"star_shard": {"name": "별빛 조각", "sell": 300},
+	"egg": {"name": "달걀", "sell": 25},
+	"milk": {"name": "우유", "sell": 55},
+	"fish_crucian": {"name": "붕어", "sell": 20},
+	"fish_minnow": {"name": "피라미", "sell": 15},
+	"fish_loach": {"name": "미꾸라지", "sell": 25},
+	"fish_bitterling": {"name": "납자루", "sell": 20},
+	"fish_carp": {"name": "잉어", "sell": 25},
+	"fish_sweetfish": {"name": "은어", "sell": 50},
+	"fish_trout": {"name": "산천어", "sell": 65},
+	"fish_mandarin": {"name": "쏘가리", "sell": 70},
+	"fish_catfish": {"name": "메기", "sell": 40},
+	"fish_eel": {"name": "뱀장어", "sell": 80},
+	"fish_snakehead": {"name": "가물치", "sell": 90},
+	"fish_crab": {"name": "참게", "sell": 60},
+	"fish_salmon": {"name": "연어", "sell": 100},
+	"fish_rainbow": {"name": "무지개송어", "sell": 85},
+	"fish_smelt": {"name": "빙어", "sell": 30},
+	"fish_icecarp": {"name": "얼음잉어", "sell": 70},
+	"fish_lenok": {"name": "열목어", "sell": 110},
+	"fish_mistfish": {"name": "안개무늬", "sell": 75},
+	"fish_stormjack": {"name": "폭풍전갱이", "sell": 115},
+	"fish_moonfish": {"name": "달빛어", "sell": 145},
+	"fish_starcarp": {"name": "별잉어", "sell": 170},
+	"fish_ghost": {"name": "유령물고기", "sell": 190},
+	"fish_golden": {"name": "황금잉어", "sell": 135},
+	"fish_king": {"name": "무지개 왕송어", "sell": 225},
+	"fish_dragon": {"name": "이무기", "sell": 360},
+	"ore": {"name": "광석", "sell": 20},
+	"gem": {"name": "보석", "sell": 100},
+	"star_shard": {"name": "별빛 조각", "sell": 135},
 	# 동굴 표본 (메인 스토리 10) — 조사가 시작돼야 동굴에 모습을 드러낸다
-	"crystal": {"name": "수정", "sell": 160},
-	"cave_moss": {"name": "동굴 이끼", "sell": 45},
-	"glow_shroom": {"name": "발광 버섯", "sell": 120},
+	"crystal": {"name": "수정", "sell": 70},
+	"cave_moss": {"name": "동굴 이끼", "sell": 20},
+	"glow_shroom": {"name": "발광 버섯", "sell": 55},
 	# 낡은 작은 상자 (메인 스토리 13) — 바다가 돌려준 것. 팔 수 없다
 	"old_box": {"name": "낡은 작은 상자", "sell": 0},
 	# 온천 복구 (메인 스토리 15) — 수맥을 뚫는 쐐기와 솟아난 물의 표본
@@ -3320,55 +3426,55 @@ const ITEMS := {
 	"spring_water": {"name": "샘물 표본", "sell": 0},
 	"bouquet": {"name": "꽃다발", "sell": 0},
 	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
-	"nail": {"name": "못", "sell": 15},
-	"cloth": {"name": "천", "sell": 45},
-	"rope": {"name": "밧줄", "sell": 25},
-	"hinge": {"name": "경첩", "sell": 110},
+	"nail": {"name": "못", "sell": 5},
+	"cloth": {"name": "천", "sell": 20},
+	"rope": {"name": "밧줄", "sell": 10},
+	"hinge": {"name": "경첩", "sell": 50},
 	"wedding_ring": {"name": "청혼 반지", "sell": 0},
-	"dish_baked_potato": {"name": "구운 감자", "sell": 70},
-	"dish_soup": {"name": "야채 수프", "sell": 110},
-	"dish_jam": {"name": "딸기잼", "sell": 150},
-	"dish_cornbread": {"name": "옥수수빵", "sell": 130},
+	"dish_baked_potato": {"name": "구운 감자", "sell": 30},
+	"dish_soup": {"name": "야채 수프", "sell": 50},
+	"dish_jam": {"name": "딸기잼", "sell": 70},
+	"dish_cornbread": {"name": "옥수수빵", "sell": 60},
 	# 초반 음식 사슬 — 산딸기잼 → 밀가루 → 빵 → 산딸기잼 토스트
-	"dish_berry_jam": {"name": "산딸기잼", "sell": 60},
-	"flour": {"name": "밀가루", "sell": 25},
-	"dish_bread": {"name": "빵", "sell": 70},
-	"dish_berry_toast": {"name": "산딸기잼 토스트", "sell": 150},
-	"dish_grilled_fish": {"name": "생선구이", "sell": 90},
-	"dish_stew": {"name": "매운탕", "sell": 200},
-	"dish_pie": {"name": "호박파이", "sell": 280},
-	"dish_salad": {"name": "치즈 샐러드", "sell": 170},
-	"dish_punch": {"name": "수박화채", "sell": 240},
-	"dish_eggplant": {"name": "가지볶음", "sell": 120},
-	"dish_pickle": {"name": "무김치", "sell": 140},
-	"dish_ratatouille": {"name": "야채볶음", "sell": 260},
-	"dish_pumpkin_soup": {"name": "호박죽", "sell": 230},
-	"dish_corn_salad": {"name": "옥수수 샐러드", "sell": 210},
-	"dish_sweet_potato": {"name": "군고구마", "sell": 160},
-	"dish_bean_rice": {"name": "콩밥", "sell": 200},
-	"dish_rice_cake": {"name": "인절미", "sell": 290},
-	"dish_melon_ice": {"name": "참외 빙수", "sell": 270},
-	"dish_onion_soup": {"name": "양파 수프", "sell": 190},
-	"dish_garlic_bread": {"name": "마늘빵", "sell": 150},
-	"dish_spinach_saute": {"name": "시금치 볶음", "sell": 155},
-	"dish_sashimi": {"name": "회", "sell": 300},
-	"dish_eel_rice": {"name": "장어덮밥", "sell": 420},
-	"dish_crab_soup": {"name": "게탕", "sell": 340},
-	"dish_salmon_steak": {"name": "연어 스테이크", "sell": 460},
-	"dish_smelt_fry": {"name": "빙어 튀김", "sell": 240},
-	"dish_fish_soup": {"name": "생선 맑은국", "sell": 180},
-	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 700},
-	"dish_moon_tea": {"name": "달빛차", "sell": 640},
-	"dish_coral_tea": {"name": "산호빛 차", "sell": 560},
-	"dish_feast": {"name": "한상차림", "sell": 1100},
+	"dish_berry_jam": {"name": "산딸기잼", "sell": 25},
+	"flour": {"name": "밀가루", "sell": 10},
+	"dish_bread": {"name": "빵", "sell": 30},
+	"dish_berry_toast": {"name": "산딸기잼 토스트", "sell": 70},
+	"dish_grilled_fish": {"name": "생선구이", "sell": 40},
+	"dish_stew": {"name": "매운탕", "sell": 90},
+	"dish_pie": {"name": "호박파이", "sell": 125},
+	"dish_salad": {"name": "치즈 샐러드", "sell": 75},
+	"dish_punch": {"name": "수박화채", "sell": 110},
+	"dish_eggplant": {"name": "가지볶음", "sell": 55},
+	"dish_pickle": {"name": "무김치", "sell": 65},
+	"dish_ratatouille": {"name": "야채볶음", "sell": 115},
+	"dish_pumpkin_soup": {"name": "호박죽", "sell": 105},
+	"dish_corn_salad": {"name": "옥수수 샐러드", "sell": 95},
+	"dish_sweet_potato": {"name": "군고구마", "sell": 70},
+	"dish_bean_rice": {"name": "콩밥", "sell": 90},
+	"dish_rice_cake": {"name": "인절미", "sell": 130},
+	"dish_melon_ice": {"name": "참외 빙수", "sell": 120},
+	"dish_onion_soup": {"name": "양파 수프", "sell": 85},
+	"dish_garlic_bread": {"name": "마늘빵", "sell": 70},
+	"dish_spinach_saute": {"name": "시금치 볶음", "sell": 70},
+	"dish_sashimi": {"name": "회", "sell": 135},
+	"dish_eel_rice": {"name": "장어덮밥", "sell": 190},
+	"dish_crab_soup": {"name": "게탕", "sell": 155},
+	"dish_salmon_steak": {"name": "연어 스테이크", "sell": 205},
+	"dish_smelt_fry": {"name": "빙어 튀김", "sell": 110},
+	"dish_fish_soup": {"name": "생선 맑은국", "sell": 80},
+	"dish_golden_roast": {"name": "황금잉어 구이", "sell": 315},
+	"dish_moon_tea": {"name": "달빛차", "sell": 290},
+	"dish_coral_tea": {"name": "산호빛 차", "sell": 250},
+	"dish_feast": {"name": "한상차림", "sell": 495},
 	# 컬렉션 보상으로 열리는 요리 레시피
-	"butter": {"name": "버터", "sell": 180},
-	"dish_fried_egg": {"name": "계란후라이", "sell": 90},
-	"dish_egg_roll": {"name": "계란말이", "sell": 200},
-	"dish_omurice": {"name": "오므라이스", "sell": 380},
-	"dish_butter_corn": {"name": "버터옥수수", "sell": 260},
+	"butter": {"name": "버터", "sell": 80},
+	"dish_fried_egg": {"name": "계란후라이", "sell": 40},
+	"dish_egg_roll": {"name": "계란말이", "sell": 90},
+	"dish_omurice": {"name": "오므라이스", "sell": 170},
+	"dish_butter_corn": {"name": "버터옥수수", "sell": 115},
 	# 채집물/곤충
-	"forage_berry": {"name": "산딸기", "sell": 40},
+	"forage_berry": {"name": "산딸기", "sell": 20},
 	# 엔딩 유품·물약 — 팔 수 없다
 	"water_life": {"name": "생명의 물", "sell": 0},
 	"settle_letter": {"name": "이사 신청 편지", "sell": 0},
@@ -3382,12 +3488,12 @@ const ITEMS := {
 	"weed": {"name": "잡초", "sell": 5},
 	"broom": {"name": "빗자루", "sell": 0},
 	# 해변 채집물 — 바다를 열면 아침마다 모래밭에 밀려온다
-	"forage_shell": {"name": "조개", "sell": 35},
-	"forage_trash": {"name": "젖은 비닐봉지", "sell": 12},
-	"forage_glass": {"name": "유리 조각", "sell": 34},
-	"forage_ring": {"name": "금속 고리", "sell": 28},
-	"forage_relic": {"name": "고대 조각", "sell": 480},
-	"bait": {"name": "미끼", "sell": 2},
+	"forage_shell": {"name": "조개", "sell": 15},
+	"forage_trash": {"name": "젖은 비닐봉지", "sell": 5},
+	"forage_glass": {"name": "유리 조각", "sell": 15},
+	"forage_ring": {"name": "금속 고리", "sell": 15},
+	"forage_relic": {"name": "고대 조각", "sell": 215},
+	"bait": {"name": "미끼", "sell": 5},
 	"housing_kit": {"name": "집터", "sell": 0},
 	"move_letter": {"name": "이주 희망 편지", "sell": 0},
 	# 메인 스토리 6의 핵심 물건 — 팔 수 없고, 완결 후 도서관에 보관된다
@@ -3397,14 +3503,14 @@ const ITEMS := {
 	# 초반 무기 (도구라 개수는 없지만, 도감·컬렉션 표시용 이름이 필요하다)
 	"spear": {"name": "돌 창", "sell": 0},
 	"sword": {"name": "돌 검", "sell": 0},
-	"arrow": {"name": "화살", "sell": 15},
-	"forage_coral": {"name": "산호 조각", "sell": 260},
-	"forage_herb": {"name": "약초", "sell": 60},
+	"arrow": {"name": "화살", "sell": 5},
+	"forage_coral": {"name": "산호 조각", "sell": 115},
+	"forage_herb": {"name": "약초", "sell": 25},
 	# 산자락 풀밭에 피는 노란 꽃 — 씨앗이 바람에 날린다
-	"forage_dandelion": {"name": "민들레", "sell": 45},
-	"bug_butterfly": {"name": "나비", "sell": 30},
-	"bug_dragonfly": {"name": "잠자리", "sell": 50},
-	"bug_firefly": {"name": "반딧불이", "sell": 90},
+	"forage_dandelion": {"name": "민들레", "sell": 20},
+	"bug_butterfly": {"name": "나비", "sell": 15},
+	"bug_dragonfly": {"name": "잠자리", "sell": 20},
+	"bug_firefly": {"name": "반딧불이", "sell": 40},
 	# 전설 재료 (판매 불가, 최후의 연금술 재료)
 	"gold_crop": {"name": "달빛 작물", "sell": 0, "legend": true},
 	"world_branch": {"name": "세계수 가지", "sell": 0, "legend": true},
@@ -3413,13 +3519,13 @@ const ITEMS := {
 	"golden_egg": {"name": "황금 달걀", "sell": 0, "legend": true},
 	"memory_piece": {"name": "할아버지의 기억 조각", "sell": 0, "legend": true},
 	# 연금술 결과물 (조합대에서 만든다)
-	"potion_energy": {"name": "원기 물약", "sell": 180},
-	"potion_luck": {"name": "행운의 물", "sell": 220},
-	"potion_swift": {"name": "바람 물약", "sell": 200},
-	"potion_ember": {"name": "불꽃 물약", "sell": 240},
-	"potion_grow": {"name": "성장 물약", "sell": 260},
-	"potion_guard": {"name": "수호 물약", "sell": 260},
-	"potion_moon": {"name": "달빛의 물", "sell": 400},
+	"potion_energy": {"name": "원기 물약", "sell": 80},
+	"potion_luck": {"name": "행운의 물", "sell": 100},
+	"potion_swift": {"name": "바람 물약", "sell": 90},
+	"potion_ember": {"name": "불꽃 물약", "sell": 110},
+	"potion_grow": {"name": "성장 물약", "sell": 115},
+	"potion_guard": {"name": "수호 물약", "sell": 115},
+	"potion_moon": {"name": "달빛의 물", "sell": 180},
 	"sludge": {"name": "탁한 앙금", "sell": 5},
 }
 const FISH_IDS := ["fish_crucian", "fish_minnow", "fish_loach", "fish_bitterling",
@@ -5173,20 +5279,20 @@ const ALL_TOOLS := ["hoe", "water", "seed", "axe", "pickaxe", "fence", "sprinkle
 
 # 튜토리얼 목표 달성 보상 (도구 해금과 별개)
 const TUTORIAL_REWARDS := {
-	"moved": {"money": 50},
-	"map": {"money": 50},
-	"quest": {"money": 50},
-	"note": {"money": 50},   # 씨앗을 그냥 주지 않는다 — 상점에서 사는 게 시작이다
-	"till": {"money": 30},
-	"plant": {"money": 50},
-	"water": {"money": 100},
-	"harvest": {"money": 100},
-	"board": {"money": 100},
+	"moved": {"money": 25},
+	"map": {"money": 25},
+	"quest": {"money": 25},
+	"note": {"money": 25},   # 씨앗을 그냥 주지 않는다 — 상점에서 사는 게 시작이다
+	"till": {"money": 15},
+	"plant": {"money": 25},
+	"water": {"money": 50},
+	"harvest": {"money": 50},
+	"board": {"money": 50},
 	"chop": {"wood": 5},
-	"slept": {"money": 150},
+	"slept": {"money": 75},
 	"mine": {"stone": 5},
-	"fish": {"money": 200},
-	"shop": {"money": 300},
+	"fish": {"money": 100},
+	"shop": {"money": 150},
 }
 
 # 도구 슬롯(빠른 사용 슬롯) 9칸: 1~9 숫자키로 선택 — 가방에서 자유 배치
@@ -5316,37 +5422,37 @@ const GRANDPA_QUESTS := [
 		"name": "밭에서 시작한다",
 		"desc": "작물 3종류를 수확해 노트에 기록하자",
 		"letter": "\"농사는 땅과 나누는 대화란다.\n무엇을 심어도 좋으니, 서로 다른 작물 셋을\n네 손으로 거둬 노트에 적어 두렴.\"",
-		"reward": {"money": 500, "seeds": {"tomato": 3}}},
+		"reward": {"money": 230, "seeds": {"tomato": 3}}},
 	{"id": "fish", "count": "fish_kinds", "goal": 3,
 		"name": "강가의 기록",
 		"desc": "물고기 3종류를 낚아 노트에 기록하자",
 		"letter": "\"물속에도 답이 있다.\n마을 남쪽 낚시터에서 서로 다른 물고기 셋을\n낚아 보렴. 기다림도 연구의 일부란다.\"",
-		"reward": {"money": 800}},
+		"reward": {"money": 360}},
 	{"id": "forage", "count": "forage_kinds", "goal": 3,
 		"name": "숲의 기록",
 		"desc": "채집물·곤충 3종류를 모아 노트에 기록하자",
 		"letter": "\"숲은 아무것도 팔지 않지만 모든 것을 준단다.\n열매든 풀이든 벌레든, 서로 다른 셋을 찾아\n노트에 붙여 두렴.\"",
-		"reward": {"money": 1000, "stone": 10}},
+		"reward": {"money": 450, "stone": 10}},
 	{"id": "mine", "count": "mob_kills", "goal": 10,
 		"name": "땅속의 기록",
 		"desc": "동굴에서 몬스터를 10마리 물리치자",
 		"letter": "\"동굴 깊은 곳의 것들은 사납지만,\n그 몸에서 나오는 것 또한 재료다.\n조심하되 물러서지는 말거라.\"",
-		"reward": {"money": 1500, "wood": 20}},
+		"reward": {"money": 680, "wood": 20}},
 	{"id": "cook", "count": "recipe_kinds", "goal": 3,
 		"name": "부엌의 기록",
 		"desc": "요리를 3종류 만들어 보자",
 		"letter": "\"불과 물과 시간을 다루는 일 —\n요리야말로 가장 오래된 연금술이란다.\n세 가지를 만들어 먹어 보렴.\"",
-		"reward": {"money": 2000}},
+		"reward": {"money": 900}},
 	{"id": "friend", "count": "best_affinity", "goal": 50,
 		"name": "사람의 기록",
 		"desc": "마을 사람과 친해지자 (호감도 50)",
 		"letter": "\"내가 끝내 못 채운 장이 사람이었다.\n마을 사람 하나와 진하게 친해져 보렴.\n선물도 좋고, 매일 인사도 좋다.\"",
-		"reward": {"money": 2500}},
+		"reward": {"money": 1130}},
 	{"id": "note", "count": "note_percent", "goal": 50,
 		"name": "절반의 노트",
 		"desc": "연구 노트를 절반(50%)까지 채우자",
 		"letter": "\"여기까지 왔다면 이제 알 게다.\n노트의 절반을 채우면, 남은 장이 무엇을 원하는지\n스스로 보이기 시작할 거야.\"",
-		"reward": {"money": 3000}},
+		"reward": {"money": 1350}},
 ]
 
 var grandpa_step := 0        # 지금 받은 부탁 번호 (GRANDPA_QUESTS의 인덱스)
@@ -5768,6 +5874,11 @@ func reset_all() -> void:
 	move_day = 0
 	move_house = Vector2i(-999, -999)
 	home_plots = []
+	plot3_quest = ""
+	plot3_made = 0
+	mail_box = []
+	mail_out = []
+	mail_sent_day = 0
 	mom_quest = ""
 	mom_quests_done = []
 	spear_quest = ""
@@ -5904,22 +6015,22 @@ const FESTIVALS := {
 		"goal": "마을 사람 모두와 인사하기",
 		"desc": "광장에 봄꽃을 늘어놓고 다 같이 모이는 날.\n"
 			+ "마을 사람 모두에게 말을 걸어 인사하자.",
-		"reward": {"money": 1200}},
+		"reward": {"money": 540}},
 	SUMMER: {"id": "fishing", "name": "여름 낚시대회", "day": 14, "place": "pier",
 		"goal": "낚시터에서 물고기 5마리 낚기",
 		"desc": "낚시터에서 열리는 마을 대회.\n"
 			+ "해가 지기 전까지 물고기를 많이 낚는 사람이 이긴다.",
-		"reward": {"money": 1500}},
+		"reward": {"money": 680}},
 	FALL: {"id": "harvest", "name": "가을 수확제", "day": 14, "place": "plaza",
 		"goal": "가장 좋은 작물 하나 출품하기",
 		"desc": "한 해 농사를 겨루는 날.\n"
 			+ "가장 자신 있는 작물 하나를 광장에 출품하자.",
-		"reward": {"money": 1000}},
+		"reward": {"money": 450}},
 	WINTER: {"id": "star", "name": "겨울 별빛제", "day": 14, "place": "plaza",
 		"goal": "요리 하나 나눠 주기",
 		"desc": "가장 긴 밤을 함께 넘기는 날.\n"
 			+ "직접 만든 요리를 하나 가져와 나누자.",
-		"reward": {"money": 1300}},
+		"reward": {"money": 590}},
 }
 
 # 오늘의 축제 진행 상태 (날이 바뀌면 초기화된다)
@@ -6203,6 +6314,9 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"move_seeds": move_seeds,
 		"move_house": [move_house.x, move_house.y],
 		"home_plots": home_plots,
+		"plot3_quest": plot3_quest, "plot3_made": plot3_made,
+		"mail_box": mail_box, "mail_out": mail_out,
+		"mail_sent_day": mail_sent_day,
 		"mom_quest": mom_quest, "mom_quests_done": mom_quests_done,
 		"spear_quest": spear_quest, "chief_house_lv": chief_house_lv,
 		"hall_noticed": hall_noticed, "shop_seeds": shop_seeds,

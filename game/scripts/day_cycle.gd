@@ -193,6 +193,9 @@ func _next_day(passed_out: bool) -> void:
 	# 만수의 해변 노점: 오늘 나와 있을 시각(하루 3번, 1시간씩)을 새로 뽑는다
 	GameData.roll_stall_hours()
 
+	# 어제 부친 편지의 답장이 우체국 보관함에 도착한다
+	var replies: Array = GameData.mail_new_day()
+
 	# 마을 성장: 주민이 늘면 어느 날 아침, 마을 사람들이 이장의 낡은 오두막을
 	# 제대로 된 집으로 다시 지어 드린다
 	if GameData.chief_house_lv == 0 \
@@ -224,6 +227,9 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n%s %d개를 얻었다!" % [GameData.ITEMS[product].name, collected[product]]
 	if season_changed:
 		note += "\n%s이 시작됐다!" % GameData.season_name()
+	if not replies.is_empty():
+		note += "\n우체국에 %s의 답장이 도착했다." \
+			% ", ".join(PackedStringArray(replies))
 	# 오늘 축제가 있으면 아침에 알려 준다 (하루 계획을 세울 수 있게)
 	GameData.reset_festival_state()
 	var fest: Dictionary = GameData.festival_today()
