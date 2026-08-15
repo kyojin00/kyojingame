@@ -192,7 +192,33 @@ HEAD_UP = [
     "...OOSSSSSSOO...",
 ]
 
-HEAD_X = 8
+HEAD_X = 9               # 머리를 한 둘레 깎은 만큼 한 칸 안으로 (아래 shrink_head)
+
+
+# ---- 머리 한 둘레 깎기 ----
+#
+# 두상은 16x16으로 그려 두고, 쓸 때 **폭 14 · 높이 15**로 깎는다.
+# 원본을 16으로 두는 이유: 머리 모양(_hairify)이 열 번호로 머리카락을
+# 얹는데, 원본을 줄이면 그 번호가 전부 어긋난다.
+#
+# 어디를 깎나:
+#   가로 — 1열과 14열 (눈 바깥쪽 살결). 좌우 한 칸씩이라 얼굴은
+#          가운데에 그대로 남고, 눈 사이 간격도 안 변한다.
+#   세로 — 5행 (눈 위 이마의 민 살결 한 줄). 6행과 똑같은 줄이라
+#          지워도 표 안 난다.
+# 턱은 제자리에 두어야 목과 안 벌어지므로, 그린 자리를 한 줄 내린다.
+HEAD_TRIM_COLS = (1, 14)
+HEAD_TRIM_ROW = 5
+_SHRUNK = {}
+
+
+def shrink_head(art):
+    key = tuple(art)
+    if key not in _SHRUNK:
+        c0, c1 = HEAD_TRIM_COLS
+        _SHRUNK[key] = [r[:c0] + r[c0 + 1:c1] + r[c1 + 1:]
+                        for i, r in enumerate(art) if i != HEAD_TRIM_ROW]
+    return _SHRUNK[key]
 
 
 def closed_eyes(art):
@@ -699,10 +725,11 @@ for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
 
 
 def head(g, art, bob, lean=0):
-    g.blit(art, HEAD_X + lean, HEAD_Y + bob)
+    # 한 줄 깎은 만큼 한 줄 내려 붙인다 — 턱이 제자리에 있어야 목과 안 벌어진다
+    g.blit(shrink_head(art), HEAD_X + lean, HEAD_Y + 1 + bob)
     # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
     if any(art is a for a in EARS_DOWN):             # 눈높이 양옆에 볼록 한 칸
-        for ex in (7, 24):
+        for ex in (HEAD_X - 1, HEAD_X + 14):
             g.px(ex + lean, HEAD_Y + 9 + bob, 's')
             g.px(ex + lean, HEAD_Y + 10 + bob, 'S')
     elif any(art is a for a in EARS_SIDE):           # 옆모습은 귓바퀴 모양
