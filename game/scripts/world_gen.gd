@@ -177,13 +177,13 @@ func _build_sea() -> void:
 	# 예전에는 세계의 높이(WORLD_H)까지만 물을 깔았다. 그런데 격자는 그
 	# 아래로도 튜토리얼 공간까지 이어져 있어서, 모래사장에 서면 파란 띠가
 	# 끊기고 **그 밑에 풀밭이 도로 보였다** — 바다 건너에 초원이 있는 꼴이다.
-	# 이제 격자 끝(MAP_H)까지 물로 채운다. 세계 밖에 따로 붙여 둔
-	# 튜토리얼 숲길만 비켜 간다 (거기는 그 공간의 땅이다).
-	var tut := m.TUTORIAL_REGION
+	# 이제 격자 끝(MAP_H)까지 **한 칸도 빼놓지 않고** 물로 채운다.
+	# 세계 밖의 튜토리얼 숲길도 예외가 아니다 — 그 공간이 살아 있는 동안에는
+	# `story._plant_story_forest`가 제 바닥을 다시 깔고, 마을로 넘어가며
+	# 닫힌 뒤에는 바다만 남는다. (예외를 두었더니 모래사장에서 파란 바다 밑에
+	#  초록 땅덩이가 떠 보였다 — 카메라가 열다섯 줄 아래까지 비춘다)
 	for y in range(m.SEA_Y0, m.MAP_H):
 		for x in m.MAP_W:
-			if tut.has_point(Vector2i(x, y)):
-				continue
 			m.grid[y][x].ground = "water"
 			m.objects.erase(Vector2i(x, y))
 	for y in range(m.BEACH_Y0, m.SEA_Y0):
@@ -201,6 +201,9 @@ func _build_sea() -> void:
 			m.objects.erase(p)      # 한 번 연 길은 무엇으로도 다시 막히지 않는다
 		elif not m.objects.has(p):
 			m.objects[p] = {"kind": "bigrock", "hp": m.BIGROCK_HP, "fixed": true}
+	# 튜토리얼 공간이 아직 살아 있으면 방금 덮어쓴 그 바닥을 도로 깔아 준다
+	if GameData.tutorial_space and m.story != null:
+		m.story._plant_story_forest()
 	if GameData.sea_open:
 		var have := false
 		for pos in m.objects:

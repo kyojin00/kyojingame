@@ -76,6 +76,13 @@ func _plant_story_forest() -> void:
 	# 아래의 y값은 전부 m.TUT_DY만큼 내려간 그 공간의 좌표다 —
 	# 마을이나 농장과는 한 칸도 이어져 있지 않다.
 	var dy: int = m.TUT_DY
+	# ⓪ 이 공간의 바닥을 먼저 깐다. 세계의 바다가 격자 끝까지 내려와 있어
+	#    (`world_gen._build_sea`) 여기도 물로 덮여 있다 — 숲길을 놓기 전에
+	#    잔디로 되돌린다. 안 그러면 나무 한 그루도 서지 않는다 (⑤가 잔디만 본다)
+	var base: Rect2i = m.TUTORIAL_REGION
+	for by in range(base.position.y, base.end.y):
+		for bx in range(base.position.x, base.end.x):
+			m.grid[by][bx].ground = "grass"
 	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래)
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
 		for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 1):
@@ -147,6 +154,11 @@ func _plant_story_forest() -> void:
 # 마을에 들어서는 순간 이 공간은 세계에서 사라진다 — 오브젝트를 전부
 # 걷어내고, 지나온 길의 기억(지도의 밝힌 자리)까지 지운다.
 # 다시는 그곳으로 가는 길도, 그곳을 비추는 지도도 없다.
+# 튜토리얼 공간을 닫는다 — 나무도, 울타리도, 밟고 온 흙길도 없앤다.
+#
+# 남는 바닥은 **물이다.** 이 자리는 세계의 바다보다 남쪽이라, 잔디로
+# 두면 모래사장에 섰을 때 파란 바다 밑에 초록 땅덩이가 떠 있는 것처럼
+# 보인다 (카메라가 열다섯 줄 아래까지 비춘다). 숲길은 사라지고 바다만 남는다.
 func _close_tutorial_space() -> void:
 	var r: Rect2i = m.TUTORIAL_REGION
 	for y in range(r.position.y, r.end.y):
@@ -156,7 +168,7 @@ func _close_tutorial_space() -> void:
 				m.objnode._remove_object(t)
 			m.objects.erase(t)
 			if y >= 0 and y < m.MAP_H and x >= 0 and x < m.MAP_W:
-				m.grid[y][x].ground = "grass"
+				m.grid[y][x].ground = "water"
 			GameData.explored.erase(Vector2i(x / GameData.EXPLORE_CHUNK,
 				y / GameData.EXPLORE_CHUNK))
 	GameData.tutorial_space = false
