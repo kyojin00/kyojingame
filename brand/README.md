@@ -35,3 +35,24 @@ cd brand && node make_brand.js      # -> brand/out/
   빈 띠가 100px대뿐이고, 그걸 늘리면 흐릿해진다
 - **도트는 정수배 최근접 확대만.** 보간해서 늘리면 뭉개져 도트 게임으로 안 보인다
 - 프로필은 **얼굴만** 자른다. 98px에 전신을 넣으면 아무것도 안 보인다
+
+## 시연 영상 (트레일러 원본)
+
+```
+cd game
+KYOJIN_SHOT=1 KYOJIN_REEL=1 godot --path . --write-movie /tmp/reel.avi --fixed-fps 60
+ffmpeg -i /tmp/reel.avi -vf "scale=1920:1080:flags=neighbor" \
+       -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p \
+       -c:a aac -b:a 160k -movflags +faststart reel.mp4
+```
+
+20초짜리 여섯 대목 — 농장 걷기 · 밭 갈고 심고 물 주기 · 나무 베기(쓰러지는
+모션) · 바위 캐기 · 마을 · 밤. 대목은 `dev_harness.gd`의 `_reel_tick()`에서
+프레임 번호로 짠다 (`--fixed-fps 60`이니 **60 = 1초**).
+
+- **`--fixed-fps`가 없으면 못 쓴다.** 헤드리스는 프레임이 들쭉날쭉해서 동작이
+  튄다. 이게 붙으면 Godot이 실제 시간과 무관하게 한 장씩 그려 저장한다
+- **확대는 `flags=neighbor`.** 기본 보간으로 늘리면 도트가 뭉개진다
+- 소지금은 2450G로 낮춰 찍는다 — 개발 빌드 그대로면 1억G이 화면에 나온다
+- **튜토리얼은 끄지 않는다.** `tutorial.active = false`로 내리면 대신 할아버지
+  편지창이 떠서 20초 내내 화면 한가운데를 덮는다. 목표 상자가 훨씬 낫다

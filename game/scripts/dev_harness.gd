@@ -58,6 +58,10 @@ func _debug_tick() -> void:
 	if OS.get_environment("KYOJIN_MP") != "":
 		_mp_tick()
 		return
+	if OS.get_environment("KYOJIN_REEL") != "":
+		_shot_frames += 1
+		_reel_tick()
+		return
 	if Net.is_guest() and not m._net_ready:
 		return  # 접속 완료 후부터 시퀀스 시작
 	_shot_frames += 1
@@ -6310,6 +6314,113 @@ func _ride_pose(face: String) -> void:
 #
 # 게스트가 MP_*_OK= 줄을 뱉고, 양쪽 다 스스로 끝낸다.
 const MP_TILE := Vector2i(20, 20)   # 게스트가 갈아 볼 칸 (농장 빈 자리)
+
+# ---------------------------------------------------------------- 시연 영상
+#
+# 유튜브·스팀에 올릴 **트레일러 원본**을 뽑는다. 검증 시퀀스(_debug_tick)는
+# 창을 열었다 닫았다 하며 이 잡는 게 목적이라 영상으로는 못 쓴다.
+#
+#   KYOJIN_SHOT=1 KYOJIN_REEL=1 godot --path game \
+#       --write-movie /tmp/reel.avi --fixed-fps 60
+#
+# `--fixed-fps`가 붙으면 Godot이 **실제 시간과 무관하게** 한 프레임씩 그려
+# 저장한다. 그래서 아래 프레임 번호가 그대로 초가 된다 (60 = 1초).
+# 이게 없으면 헤드리스에서 프레임이 들쭉날쭉해 동작이 튄다.
+const REEL_END := 1200          # 20초
+var _reel_walk := KEY_NONE      # 지금 누르고 있는 이동 키
+
+
+# 그 자리에 세계를 비워 두고 플레이어를 옮긴다 (장면 전환)
+func _reel_go(t: Vector2i, face: String, clear: int) -> void:
+	for cy in range(t.y - clear, t.y + clear + 1):
+		for cx in range(t.x - clear, t.x + clear + 1):
+			m.objnode._remove_object(Vector2i(cx, cy))
+	m.objnode._clear_tree_falls()
+	m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
+	(m.player.get_node("Camera") as Camera2D).reset_smoothing()
+	m.player.dir = face
+	_reel_stop()
+
+
+func _reel_walk_key(code: Key) -> void:
+	_reel_stop()
+	_reel_walk = code
+	_send_key_press(code)
+
+
+func _reel_stop() -> void:
+	if _reel_walk != KEY_NONE:
+		_send_key_release(_reel_walk)
+		_reel_walk = KEY_NONE
+
+
+func _reel_tick() -> void:
+	match _shot_frames:
+		# ---- 농사 (밭 갈기 -> 씨앗 -> 물) ----
+		1:
+			GameData.minutes = 8.0 * 60.0
+			# 개발 빌드는 소지금이 1억G이고 씨앗이 9999개다 — 화면에 그대로
+			# 나오면 영상이 우스워진다. 보여 줄 만한 값으로 낮춰 둔다.
+			GameData.money = 2450
+			for sid: String in GameData.seeds.keys():
+				GameData.seeds[sid] = mini(int(GameData.seeds[sid]), 12)
+			# 튜토리얼은 **끄지 않는다.** `tutorial.active = false`로 내려 봤더니
+			# 대신 할아버지 편지창(퀘스트 안내)이 떠서 20초 내내 화면 한가운데를
+			# 덮었다. 목표 상자는 화면 구석이라 이쪽이 훨씬 낫다.
+			_reel_go(m.START_TILE, "down", 2)
+		40: _reel_walk_key(KEY_D)
+		130: _reel_stop()
+		160: _send_key(KEY_1)                    # 호미
+		180: _send_key(KEY_SPACE)
+		240: _send_key(KEY_3)                    # 씨앗
+		260: _send_key(KEY_SPACE)
+		320: _send_key(KEY_2)                    # 물뿌리개
+		340: _send_key(KEY_SPACE)
+
+		# ---- 나무 베기 (쓰러지는 모션이 이 영상의 핵심) ----
+		400:
+			# 나무는 **마지막 한 방**이 볼거리다. 남은 체력만큼 다 쳐 줘야
+			# 쓰러지는 데까지 간다 (2번만 치고 넘어갔더니 다음 장면에서
+			# 뒤늦게 쓰러져 화면에 안 나왔다).
+			var ft := Vector2i(24, 34)
+			_reel_go(ft, "right", 4)
+			m.toolwork.set_tool("axe")
+			var tr := ft + Vector2i(1, 0)
+			m.objects[tr] = {"kind": "tree", "hp": m.TREE_HP}
+			m.objnode._spawn_object_node(tr, "tree")
+		440: _send_key(KEY_SPACE)
+		480: _send_key(KEY_SPACE)
+		520: _send_key(KEY_SPACE)                # 여기서 쓰러진다
+		# 쓰러지고 밑동이 남는 것까지 보여 주고 넘어간다
+
+		# ---- 바위 캐기 ----
+		640:
+			var rk := Vector2i(29, 40)
+			_reel_go(rk, "right", 3)
+			m.toolwork.set_tool("pickaxe")
+			var ro := rk + Vector2i(1, 0)
+			m.objects[ro] = {"kind": "rock", "hp": 1}
+			m.objnode._spawn_object_node(ro, "rock")
+		690: _send_key(KEY_SPACE)
+
+		# ---- 마을 ----
+		760:
+			GameData.minutes = 13.0 * 60.0
+			_reel_go(Vector2i(74, 24), "up", 0)
+		800: _reel_walk_key(KEY_W)
+		920: _reel_stop()
+
+		# ---- 밤 ----
+		960:
+			GameData.minutes = 21.0 * 60.0
+			m._weather_override = GameData.WEATHER_STAR
+		1000: _reel_walk_key(KEY_A)
+		1110: _reel_stop()
+
+		REEL_END:
+			print("REEL_DONE: %d프레임 (%.1f초)" % [REEL_END, REEL_END / 60.0])
+			get_tree().quit()
+
 
 func _mp_tick() -> void:
 	_shot_frames += 1
