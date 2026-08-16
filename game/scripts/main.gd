@@ -155,6 +155,22 @@ var _dc_base: Array = []            # 고정 바탕 Texture2D
 var _dc_water := PackedInt32Array() # 깊이*3 + 판
 var _dc_edge: Array = []            # 가장자리 Texture2D 묶음 (없으면 null)
 var _dc_tall: Array = []            # 두 칸 높이로 그리는 것 (벼랑면)
+# 켜(단) — 바탕을 그릴 때 이 값으로 톤을 조금 달리한다.
+#
+# 돌무지 언덕처럼 **다섯 단이 겹쳐 오르는** 자리에서, 바닥이 죄다 같은
+# 마당 흙이라 단이 하나도 안 보였다. 마루선과 발치 그늘은 흙빛이라
+# 흙 바닥 위에서는 있으나 마나였다 — 잔디 위에서만 통하던 것이다.
+# 높은 단일수록 볕을 더 받는다: 한 단 오를 때마다 아주 조금 밝게.
+var _dc_tier := PackedByteArray()
+const TIER_TINT := [
+	Color(1, 1, 1),
+	Color(1, 1, 1),
+	Color(1.055, 1.045, 1.025),
+	Color(1.11, 1.09, 1.05),
+	Color(1.165, 1.135, 1.075),
+	Color(1.22, 1.18, 1.10),
+	Color(1.275, 1.225, 1.125),
+]
 var _dc_season := ""                # 계절이 바뀌면 잔디 판 셋이 통째로 갈린다
 # 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
 # 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
@@ -2644,6 +2660,7 @@ func dirty_all() -> void:
 		_dc_base.resize(n)
 		_dc_edge.resize(n)
 		_dc_tall.resize(n)
+		_dc_tier.resize(n)
 	_dc_kind.fill(DC_NONE)
 
 
@@ -2952,6 +2969,7 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 				el.append(edge_tex["brink"][dn])
 	_dc_kind[ci] = kind
 	_dc_edge[ci] = el if not el.is_empty() else null
+	_dc_tier[ci] = mini((kc & 56) >> 3, TIER_TINT.size() - 1)
 	return kind
 
 
@@ -2990,7 +3008,11 @@ func _draw() -> void:
 	#
 	# 겹치는 순서는 지켜야 한다: 바탕 -> 길 가장자리 -> 작물.
 	# 바탕끼리는 한 칸에 하나뿐이라 서로 안 겹친다 — 순서를 바꿔도 안전하다.
-	var base := {}      # Texture2D -> Array[Vector2]
+	var base := {}      # Texture2D -> Array[Vector2] (지도 밖 들판)
+	# 켜마다 하나씩 — 같은 그림이라도 단이 다르면 톤이 다르다
+	var base_t: Array[Dictionary] = []
+	for _i in TIER_TINT.size():
+		base_t.append({})
 	var edges := {}
 	var tall := {}      # 두 칸 높이 (벼랑면) — 아래 칸까지 덮는다
 	var crops := {}
@@ -3066,10 +3088,13 @@ func _draw() -> void:
 			# put 을 안 쓰고 펼쳐 적는다 — 칸마다 도는 자리라 Callable 부르는
 			# 값이 그대로 곱해진다
 			if bt != null:
-				var bl = base.get(bt)
+				# 켜마다 통이 따로다 — 한 통은 한 번의 그리기라, 통이 늘어도
+				# 값은 그 켜가 실제로 화면에 있을 때만 든다
+				var tb: Dictionary = base_t[_dc_tier[ci]]
+				var bl = tb.get(bt)
 				if bl == null:
 					bl = [] as Array[Vector2]
-					base[bt] = bl
+					tb[bt] = bl
 				bl.append(at)
 			# 가장자리 — 물가·모래·마당·벼랑. 들판은 대부분 여기가 비어 있다
 			var el = _dc_edge[ci]
@@ -3106,6 +3131,15 @@ func _draw() -> void:
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)
+	# 올라선 단은 볕을 더 받는다 — 겹쳐 오르는 대지가 층으로 읽힌다
+	for lv in base_t.size():
+		var tb: Dictionary = base_t[lv]
+		if tb.is_empty():
+			continue
+		var tint: Color = TIER_TINT[lv]
+		for t: Texture2D in tb:
+			for at: Vector2 in tb[t]:
+				draw_texture_rect(t, Rect2(at, tile_size), false, tint)
 	# 물 위에 깐 나무 부두.
 	#
 	# 예전엔 여기서 갈색 네모 세 개를 겹쳐 그렸다 — 결도 못도 없는 판이라
