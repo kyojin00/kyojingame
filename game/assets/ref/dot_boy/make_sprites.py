@@ -47,7 +47,10 @@ PAL = {
     'j': (152, 100, 56),    # 머리카락 밝은 면
     'g': (86, 52, 30),      # 머리카락 그늘
     'k': (82, 53, 33),      # 신발
-    'K': (56, 37, 25),      # 신발 그늘
+    'n': (68, 44, 29),      # 먼 신발 — k와 K 사이. 뒤쪽 신발까지 K로 칠하면
+                            # 윤곽선 O(54,33,26)와 구분이 안 돼, 두 짝 사이
+                            # 경계선이 지워지고 발치가 새까만 덩이가 된다.
+    'K': (56, 37, 25),      # 신발 그늘 (밑창)
 }
 
 WALK = 5
@@ -541,11 +544,20 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     g.rect(c - 3 + dx, HIP_Y + sq, c + 4 + dx, HIP_Y + 2 + sq, 'p')
     g.hline(c - 3 + dx, c + 4 + dx, HIP_Y + sq, 'P')   # 셔츠 아랫단 그늘
     g.hline(c - 3 + dx, c + 4 + dx, HIP_Y + 2 + sq, 'P')  # 가랑이 그늘 줄 —
-    # 띠와 다리(7칸) 사이 단차를 그늘로 눌러 다리가 그늘 속에서
+    # 띠와 다리(5칸) 사이 단차를 그늘로 눌러 다리가 그늘 속에서
     # 나오는 것처럼 잇는다. 허벅지도 이 줄까지 겹쳐 세로로 이어진다.
     # 먼 다리를 그늘색으로 먼저, 가까운 다리를 위에 얹는다.
-    # 옆에서 본 다리는 앞뒤 두께가 몸통과 비슷해야 한다 — 7칸 폭
-    # (몸통 10칸). 가늘게 그리면 상자 밑에 젓가락을 꽂은 꼴이 된다.
+    # 옆에서 본 다리 굵기 — **5칸**, 신발도 **5칸**.
+    #
+    # 처음엔 다리 7칸에 신발 7칸(+앞코 2칸)이었다. 몸통 10칸에 견줘
+    # 젓가락처럼 보이지 말라고 잡은 굵기였는데, 서 있는 그림만 보고 정한
+    # 값이었다. 걸으면 두 발이 7칸쯤 떨어지는데 신발이 9칸씩이라 **두
+    # 짝이 겹쳤다**. 게다가 먼 신발은 통째로 K(제일 어두운 갈색)고 가까운
+    # 신발 밑창도 K라, 겹친 자리에 경계랄 게 없어 발치가 한 덩이의
+    # 검은 뭉텅이가 됐다. 다리가 굵어 보인 진짜 범인은 신발이었다.
+    #
+    # 신발을 5칸으로 줄이고 앞코를 한 칸으로 깎으니 보폭이 큰 칸에서
+    # 두 신발 사이에 빈 줄이 생긴다 — 그 한 줄이 「두 다리」를 만든다.
     #
     # 무릎: 다리를 허벅지(엉덩이→무릎)와 정강이(무릎→발)로 갈라 긋는다.
     # 뒤로 찬 다리는 무릎이 조금만 뒤로 가고 발이 더 크게 뒤로 차올라
@@ -564,11 +576,16 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
         hip_off = off * 0.3
         knee_off = off * (0.7 if back else 1.0)
         foot_off = round(off * 1.35) if back else off
-        pc, kc = ('P', 'K') if shade else ('p', 'k')
+        pc, kc = ('P', 'n') if shade else ('p', 'k')
         bot = GROUND - lift
         hip_row = HIP_Y + 2 + sq
-        knee_row = (hip_row + bot) // 2 + 1
-        ankle_row = bot - 4                    # 여기까지만 기울고, 발은 통짜다
+        knee_row = (hip_row + bot) // 2
+        # 발목 — 여기까지만 기울고, 아래는 신발이라 통짜다.
+        # 예전엔 bot-4(신발 4줄)였다. 다리 기둥이 11줄뿐인데 그 중 넷이
+        # 신발이면 종아리가 한 줄밖에 안 남아, 가늘어지는 맛이 사라지고
+        # 「굵은 허벅지 + 큰 신발」만 보였다. 2줄이면 발목부터 종아리가
+        # 가늘어지는 게 세 줄에 걸쳐 보이고, 신발은 굽 낮은 단화가 된다.
+        ankle_row = bot - 2
         for yy in range(LEG_Y - 1 + sq, bot + 1):   # 띠 아래 줄부터 겹쳐 잇는다
             if yy <= knee_row:                 # 허벅지
                 f = (yy - hip_row) / max(1, knee_row - hip_row)
@@ -584,36 +601,39 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
             # 굵기 — 허벅지는 굵고 발목으로 갈수록 가늘어진다.
             # 모든 줄을 같은 폭으로 그으면 통나무 두 개를 세워 둔 꼴이다.
             # 뒤(wb)는 종아리가 불룩하고, 앞(wf)은 정강이라 곧고 가늘다.
+            # 굵기는 「몸통에 견줘」 정해야 한다. 몸통이 10칸인데 다리를
+            # 5칸씩 두면, 보폭만큼 벌어졌을 때 다리 덩어리가 11칸 —
+            # **몸통보다 넓어진다**. 그래서 다리가 굵어 보였다.
+            # 4칸(뒤 2 + 앞 1 + 가운데)이면 벌어져도 9칸에 그친다.
             if yy <= knee_row:
-                wb, wf = 3, 3                      # 허벅지
-            elif yy < ankle_row:
+                wb, wf = 2, 1                      # 허벅지
+            elif yy <= ankle_row:
                 q = (yy - knee_row) / max(1, ankle_row - knee_row)
-                wb = 3 if q < 0.5 else 2           # 무릎 밑 장딴지
-                wf = 2                             # 정강이
-            else:
-                wb, wf = 3, 3                      # 발목부터는 신발이라 통짜
-            if yy == bot:
-                g.rect(x - 2, yy, x + 3, yy, cc)   # 뒤꿈치만 둥글게 (앞은 앞코로)
-            else:
-                g.rect(x - wb, yy, x + wf, yy, cc)
+                wb = 2 if q < 0.4 else 1           # 무릎 밑 장딴지
+                wf = 1                             # 정강이
+                if shade:
+                    wb = 1                         # 먼 종아리는 한 칸 더 얇게 —
+            else:                                  # 뒤에 있는 게 가늘어야 깊이가 산다
+                wb, wf = 2, 1                      # 발목부터는 신발이라 통짜
+            g.rect(x - wb, yy, x + wf, yy, cc)
             # 무릎 — 굽힌 다리에만 접힌 자국을 한 줄 넣는다.
             # 이 한 줄이 있어야 다리가 「굽었다」로 보인다 (없으면 그냥 기운 막대)
             if yy == knee_row and back:
                 g.rect(x, yy, x + wf, yy, 'P' if not shade else pc)
-            if not shade and hip_row < yy <= bot - 4:  # 띠에 겹친 줄은 건드리지
+            if not shade and hip_row < yy <= ankle_row:  # 띠에 겹친 줄은 건드리지
                 g.px(x - wb, yy, 'P')          # 않는다 — 가랑이 그늘 위에 밝은
-                if yy == bot - 4:              # 점이 찍히면 허리가 튀어 보인다
+                if yy == ankle_row:            # 점이 찍히면 허리가 튀어 보인다
                     # 발목 접단 — 밝게. 바지와 신발이 둘 다 어두운 갈색이라
                     # 여기가 어두우면 정강이부터 발끝까지 한 덩어리가 된다.
-                    g.rect(x - wb + 1, yy, x + wf, yy, 'q')
+                    g.rect(x - wb, yy, x + wf, yy, 'q')
                 else:
                     g.px(x + wf, yy, 'q')      # 앞쪽 하이라이트
-            if shade and yy == bot - 4:
-                g.rect(x - wb + 1, yy, x + wf, yy, 'p')   # 먼 다리 발목 접단
+            if shade and yy == ankle_row:
+                g.rect(x - wb, yy, x + wf, yy, 'p')       # 먼 다리 발목 접단
             if yy == bot:
-                g.hline(x - 2, x + 3, yy, 'K')            # 밑창은 늘 그늘
-            if not shade and yy == bot - 3:
-                g.px(x + 2, yy, 'p')           # 신발 코 광
+                g.hline(x - wb, x + wf + 1, yy, 'K')      # 밑창은 늘 그늘
+            if not shade and yy == ankle_row + 1:
+                g.px(x + wf, yy, 'p')          # 신발 코 광
             # 가까운 다리의 **뒤쪽 모서리**를 어둡게 눌러 먼 다리와 뗀다.
             # 둘 다 바지색이라 겹치면 한 덩어리로 보인다 — 이 한 줄이
             # 있어야 「앞다리와 뒷다리」로 읽힌다.
@@ -623,13 +643,14 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
                 if 0 <= bx < GW and g.d[yy][bx] in ('p', 'P', 'q', 'k', 'K'):
                     g.px(bx, yy, 'O')
         x = 15 + foot_off + lean
-        # 앞코 — 신발이 진행 방향으로 두 칸 나온 둥근 코. 뒤로 찬 발도
+        # 앞코 — 신발이 진행 방향으로 **한 칸** 나온 둥근 코. 뒤로 찬 발도
         # 코는 앞을 본다 (뒤꿈치만 들린다).
-        g.rect(x + 4, bot - 1, x + 5, bot - 1, kc)
-        g.px(x + 4, bot, kc)
-        g.px(x + 4, bot - 2, 'p' if not shade else kc)   # 발등 광
+        # 두 칸이던 걸 한 칸으로 깎았다. 신발 5칸에 앞코 2칸이면 7칸이라
+        # 보폭(7칸)을 다 잡아먹어 두 짝이 맞닿는다.
+        g.px(x + 2, bot - 1, kc)
+        g.px(x + 2, bot, 'K')
         if off < 0:
-            g.px(x - 4, bot - 1, kc)           # 들린 뒤꿈치
+            g.px(x - 3, bot - 1, kc)           # 들린 뒤꿈치
 
 
 def torso_up(g, bob, swing, dx=0, skip=None):
