@@ -206,11 +206,12 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	elif kind == "searock":
 		# 능선 바위도 크기를 조금씩 다르게 — 벽이 자로 잰 듯 보이지 않게
 		sc *= 0.85 + m._hash01(pos.x * 7 + 2, pos.y * 3 + 8) * 0.3
-	elif kind == "chief_hut" and GameData.chief_house_lv >= 1:
-		# 마을회관 새 그림은 **우리 도트 밀도**로 그렸다 — 712px 폭을 0.5배로
-		# 그려야 한 칸이 화면 2px이 되어 사람·다른 집과 도트 크기가 맞는다.
-		# 낡은 오두막(chief_hut)은 옛 밀도라 이 보정을 안 받는다 — 그래서
-		# 종류가 아니라 **그림별로** 잡는다.
+	elif kind == "chief_hut":
+		# 이장의 거처는 낡은 오두막·새 집 둘 다 **우리 도트 밀도**로 그렸다.
+		# 그림 한 도트가 4px이라 0.5배로 얹어야 화면에서 2px이 되고, 그래야
+		# 사람·다른 집과 도트 크기가 맞는다.
+		# (예전엔 오두막만 옛 1px 밀도라 이 보정에서 빼 뒀었다. 그때 오두막은
+		#  화면 72x62px — 주인공 64x96px보다 낮아, 이장이 제 집보다 컸다.)
 		sc = 0.5
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
