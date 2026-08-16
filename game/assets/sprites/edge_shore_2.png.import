@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jgikhhl4vvk0m"
-path="res://.godot/imported/landmark_spire_0.png-3f59615d59d7d92e2e34a82e8cac1524.ctex"
+uid="uid://0sb9paoajg3ug"
+path="res://.godot/imported/edge_shore_2.png-32f66c73443c26f11374ffaeb663d61d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/landmark_spire_0.png"
-dest_files=["res://.godot/imported/landmark_spire_0.png-3f59615d59d7d92e2e34a82e8cac1524.ctex"]
+source_file="res://assets/sprites/edge_shore_2.png"
+dest_files=["res://.godot/imported/edge_shore_2.png-32f66c73443c26f11374ffaeb663d61d.ctex"]
 
 [params]
 

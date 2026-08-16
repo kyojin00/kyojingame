@@ -270,7 +270,7 @@ func _context_hint() -> Array:
 				return ["동굴 탐험", above_tile]
 			"worldtree":
 				return ["세계수 동굴 — 위험!", above_tile]
-			"landmark_greattree", "landmark_falls", "landmark_spire":
+			"landmark_greattree", "landmark_falls", "deco_cairn":
 				for lm: Dictionary in m.LANDMARKS:
 					if lm.kind == obj.kind:
 						return [String(lm.name), above_tile]

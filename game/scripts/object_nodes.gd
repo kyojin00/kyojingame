@@ -192,7 +192,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
-		"landmark_greattree", "landmark_falls", "landmark_spire":
+		"landmark_greattree", "landmark_falls", "deco_cairn":
 			# 고장의 랜드마크 — 화면 열두 칸이 넘는 큰 그림. 밑변을 칸에
 			# 맞추고, 배율은 아래에서 0.5로 못 박는다 (건물과 같은 도트 밀도).
 			# 여러 장이라 첫 장으로 세우고, _tick_landmarks 가 돌린다
@@ -245,7 +245,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		#  화면 72x62px — 주인공 64x96px보다 낮아, 이장이 제 집보다 컸다.)
 		sc = 0.5
 	elif kind.begins_with("landmark_") or kind == "deco_wheel" \
-			or kind == "deco_stonelamp":
+			or kind == "deco_stonelamp" or kind == "deco_cairn":
 		sc = 0.5   # 원본 4px = 도트 한 칸 (make_landmarks.js)
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
@@ -556,7 +556,7 @@ const STREAM_H := 26      # 위아래
 const KEEP_ALWAYS := ["house", "chief_hut", "barn", "barn_block", "art_block",
 	"cave", "worldtree", "onsen", "stall", "board", "auction", "sign",
 	"housesite", "plotsite", "home_sign", "homeplot", "old_lookout", "old_barn",
-	"landmark_greattree", "landmark_falls", "landmark_spire", "deco_wheel",
+	"landmark_greattree", "landmark_falls", "deco_cairn", "deco_wheel",
 	"deco_fountain", "horse", "old_book", "seed_sprout", "carved_stone",
 	"old_bench", "bent_tree"]
 

@@ -123,7 +123,7 @@ var lm_timer := 0.0
 const LANDMARK_FPS := 7.0
 # 종류마다 장 수가 다르다 (ref/make_landmarks.js 와 같아야 한다)
 const LANDMARK_FRAMES := {
-	"landmark_greattree": 3, "landmark_falls": 4, "landmark_spire": 2,
+	"landmark_greattree": 3, "landmark_falls": 4,
 	# 물방앗간 곁의 물레방아 — 랜드마크는 아니지만 같은 규칙으로 돈다
 	"deco_wheel": 4,
 }
@@ -158,8 +158,11 @@ var _dc_tall: Array = []            # 두 칸 높이로 그리는 것 (벼랑면
 var _dc_season := ""                # 계절이 바뀌면 잔디 판 셋이 통째로 갈린다
 # 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
 # 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
-const EDGE_KINDS := ["shore", "shoal", "beach", "surf", "dune", "trod", "brink"]
-const EDGE_VAR_KINDS := ["cliff"]      # 판이 여럿인 것 (한 판만 쓰면 무늬가 반복된다)
+const EDGE_KINDS := ["beach", "surf", "dune", "trod", "brink"]
+# 판이 여럿인 것 — 한 판만 쓰면 **꼴이 같은 칸마다 같은 무늬**가 찍힌다.
+# 못을 두르는 물가가 죄다 같은 그림이라 한 칸 간격으로 되풀이됐고, 그게
+# 「쌓아 만든 축대」처럼 각져 보였다. 물가도 벼랑처럼 셋으로 나눈다
+const EDGE_VAR_KINDS := ["cliff", "shore", "shoal"]
 const EDGE_VARS := 3
 const EDGE_PX := 16
 var edge_tex := {}
@@ -264,7 +267,8 @@ const TEXTURE_NAMES := [
 	# 여러 장씩이다 — 물이 흐르고 잎이 흔들린다 (LANDMARK_FRAMES)
 	"landmark_greattree_0", "landmark_greattree_1", "landmark_greattree_2",
 	"landmark_falls_0", "landmark_falls_1", "landmark_falls_2", "landmark_falls_3",
-	"landmark_spire_0", "landmark_spire_1",
+	# 층대 꼭대기의 돌무지 (ref/make_landmarks.js)
+	"deco_cairn_0",
 	"deco_wheel_0", "deco_wheel_1", "deco_wheel_2", "deco_wheel_3",
 	# 돌계단을 따라 늘어선 석등 (ref/make_landmarks.js).
 	# 마을 광장의 가로등(deco_lamp)과 이름이 겹치지 않게 한다
@@ -559,9 +563,14 @@ const REGIONS := [
 	# 자작나무 언덕 — 훤한 숲. 나무는 많은데 바닥이 밝아 어둡지 않다
 	{"id": "birch", "name": "자작나무 언덕", "rect": Rect2i(316, 4 + NORTH_PAD, 60, 46),
 		"tree": 0.52, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
-	# 붉은바위 벌판 — 마른 자갈땅. 촛대바위가 여기 서 있다
+	# 붉은바위 벌판 — 마른 흙땅. 돌무지 언덕이 여기 있다.
+	#
+	# 바닥이 **자갈(path)** 이었다. 그런데 자갈 타일도 벼랑면도 같은 돌
+	# 사다리(STONE)로 칠한다 — 회색 위에 회색이라 층대의 단이 통째로
+	# 배경에 묻혔다. 「배경이 같아서 구분이 잘 안 된다」가 이것이다.
+	# 마른 흙(yard)으로 바꾼다: 갈색 바닥 위에 회색 바위벽이라야 단이 선다
 	{"id": "redrock", "name": "붉은바위 벌판", "rect": Rect2i(384, 10 + NORTH_PAD, 58, 54),
-		"tree": 0.02, "rock": 0.30, "ground": "path", "grid": 0, "pond": 0.0},
+		"tree": 0.02, "rock": 0.30, "ground": "yard", "grid": 0, "pond": 0.0},
 	# 억새 벌판 — 아무것도 없다. 바람만 지나간다 (너른 초원보다 더 비었다)
 	{"id": "reed", "name": "억새 벌판", "rect": Rect2i(236, 72 + NORTH_PAD, 74, 40),
 		"tree": 0.01, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
@@ -679,10 +688,15 @@ const LANDMARKS := [
 		# 내려가므로, 그림만 옆으로 밀면 마루가 벼랑 밑으로 처진다
 		"terrain": {"blobs": [[256, 9 + NORTH_PAD, 16.0, 11.0, 2, 91]],
 			"ramps": [[244, 20 + NORTH_PAD]]}},
-	# 촛대바위 — 층층이 깎여 남은 붉은 바위 기둥. **꼭대기까지 걸어 오른다**
-	{"id": "spire", "name": "촛대바위", "kind": "landmark_spire", "art": Vector2i(10, 18),
+	# 돌무지 언덕 — 층층이 올라가는 대지. **꼭대기까지 걸어 오른다**
+	#
+	# 예전에는 여기 커다란 바위 기둥이 서 있었다. 그건 「멀리서 보는 것」
+	# 이지 「올라가서 보는 것」이 아니었다 — 다 올라가 봐야 바위 밑동이다.
+	# 대신 사람들이 하나씩 얹고 간 돌무지를 꼭대기에 둔다. 손이 닿은
+	# 흔적이라, 올라온 사람이 「나도 하나 얹고 갈까」 하게 되는 물건이다.
+	{"id": "spire", "name": "돌무지 언덕", "kind": "deco_cairn", "art": Vector2i(3, 4),
 		"tile": Vector2i(410, 32 + NORTH_PAD),
-		"block": Rect2i(-3, -1, 7, 2), "clear": 11, "lakes": [], "river": [],
+		"block": Rect2i(-1, 0, 3, 1), "clear": 8, "lakes": [], "river": [],
 		# ---- 네 켜짜리 층대(層臺) ----
 		#
 		# 예전에는 두 켜였고, 올라가 봐야 바위 밑동이었다. 「올라갈 수
@@ -692,7 +706,7 @@ const LANDMARKS := [
 		# 켜 1 -> 2 -> 3 -> 4 -> 5. 대지는 남쪽으로만 깎여 있어(북쪽 자락은
 		# 다 붙어 있다) 층계참이 앞쪽에 층층이 드러나고, 오르막은 켜마다
 		# 좌우를 번갈아 둔다 — 지그재그로 접혀 올라가는 그 계단이다.
-		# 꼭대기 켜(5)에 촛대바위가 선다. 돌탑도 거기 있다
+		# 꼭대기 켜(5)에 돌무지가 있다
 		"terrain": {"blobs": [[410, 40 + NORTH_PAD, 30.0, 17.0, 2, 77],
 				[410, 36 + NORTH_PAD, 21.0, 12.0, 3, 78],
 				[410, 32 + NORTH_PAD, 13.0, 7.5, 4, 79],
@@ -2432,7 +2446,7 @@ const FADE_KINDS := ["tree", "bigrock", "cave", "worldtree", "barn",
 	"deco_fountain", "deco_lamp", "house", "art_block",
 	# 랜드마크는 화면 열두 칸이 넘는다 — 뒤로 걸어 들어가면 주인공이
 	# 통째로 사라지므로 반드시 비쳐야 한다
-	"landmark_greattree", "landmark_falls", "landmark_spire"]
+	"landmark_greattree", "landmark_falls", "deco_cairn"]
 const FADE_ALPHA := 0.35
 const FADE_SPEED := 6.0
 
@@ -2594,8 +2608,21 @@ func _cliff_foot(x: int, y: int) -> bool:
 	if terrain_level.is_empty() or is_ramp(x, y):
 		return false
 	var lv := level_at(x, y)
-	return level_at(x, y - 1) > lv or level_at(x, y + 1) > lv \
-		or level_at(x - 1, y) > lv or level_at(x + 1, y) > lv
+	if level_at(x, y - 1) > lv or level_at(x, y + 1) > lv \
+			or level_at(x - 1, y) > lv or level_at(x + 1, y) > lv:
+		return true
+	# ---- 벼랑면이 **두 칸**이 됐다 ----
+	#
+	# 높이를 느끼게 하려고 바위벽을 아래로 한 칸 더 늘였는데, 그 둘째 칸은
+	# 여태 걸을 수 있는 땅이었다 — 벽 한복판에 사람이 박혀 서 있었다.
+	# 「올라가지는 경우」가 이것이다. 그림이 벽이면 통행도 벽이라야 한다.
+	#
+	# **북쪽으로만** 본다. 옆이나 남쪽을 보는 벼랑은 면이 좁은 띠로만
+	# 드러나므로(cliffPx) 그림이 아래 칸까지 내려오지 않는다.
+	# 오르막 밑은 뺀다 — 계단은 벼랑을 끊고 낸 자리다
+	if is_ramp(x, y - 1):
+		return false
+	return level_at(x, y - 1) == lv and level_at(x, y - 2) > lv
 
 
 # 바닥 종류를 **숫자**로. 경계를 가릴 때 칸마다 여덟 이웃을 문자열로
@@ -2725,11 +2752,12 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 		if code != 0:
 			# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
 			var wk: String
+			var wv := int(_hash01(x * 17 + 2, y * 5 + 9) * 3.0) % 3
 			if wet:
 				wk = "surf" if (gn == K_SAND or gs == K_SAND
-					or gw == K_SAND or gek == K_SAND) else "shoal"
+					or gw == K_SAND or gek == K_SAND) else "shoal_%d" % wv
 			else:
-				wk = "beach" if gc == K_SAND else "shore"
+				wk = "beach" if gc == K_SAND else "shore_%d" % wv
 			el.append(edge_tex[wk][code])
 		# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
 		# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다

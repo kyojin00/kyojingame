@@ -1350,7 +1350,113 @@ function millWheel(f, NF) {
 
 
 // ============================================================
-// 5. 석등 — 돌계단을 따라 늘어선다
+// 5. 돌무지 — 층대 꼭대기에 쌓인 돌탑
+// ============================================================
+//
+// 올라온 끝에 볼 것이 있어야 오를 이유가 생긴다. 커다란 바위 기둥은 뺐다 —
+// 그건 「멀리서 보는 것」이지 「올라가서 보는 것」이 아니었다. 대신 사람들이
+// 하나씩 얹고 간 돌무지를 세운다. 손이 닿은 흔적이라, 올라온 사람이
+// 「나도 하나 얹고 갈까」 하게 되는 물건이다.
+//
+// 돌 하나하나를 **내려다보이는 원반**으로 그린다 (갓돌·켜와 같은 규칙):
+//   윗면  눌린 타원. 하늘을 정면으로 받으니 제일 밝다
+//   옆면  원반의 두께. 윗면보다 어둡다
+//   그늘  제 밑의 돌 위로 드리운다 — 이게 있어야 「얹혀 있다」가 된다
+// 이 셋이 없으면 아무리 잘 칠해도 **동전을 쌓아 놓은 것**처럼 보인다.
+function stoneCairn(f, NF) {
+  const W = 40, H = 64, CX = 20, GY = H - 3;
+  const g = new G(W, H);
+  groundShadow(g, CX, GY, 15);
+
+  // 돌 아홉 장. 위로 갈수록 작아지되 **고르게 줄지 않는다** — 주워 온
+  // 돌이라 크기가 들쭉날쭉하고, 얹은 자리도 조금씩 어긋난다
+  const STONE = [];
+  {
+    let y = GY;
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8;
+      const rx = 14.5 - t * 9.5 + (hash(i, 3) - 0.5) * 1.8;
+      const th = 3.2 + (1 - t) * 3.0 + hash(i, 5) * 1.6;   // 돌의 두께
+      const off = (hash(i, 7) - 0.5) * (3.4 - t * 1.6);    // 얹은 자리가 어긋난다
+      STONE.push({ cx: CX + off, cy: y, rx: rx, ry: rx * 0.42, th: th,
+                   tone: hash(i, 11) });
+      y -= th + rx * 0.42 * 0.9;
+    }
+  }
+
+  // **아래에서 위로** 쌓는다 — 위 돌이 아래 돌을 덮고 그 위에 그늘을 던진다
+  for (let i = 0; i < STONE.length; i++) {
+    const st = STONE[i];
+    // 제 밑의 돌 위로 드리우는 그늘 (깨끗한 타원은 접시가 된다 — 성글게)
+    if (i > 0) g.castEllipse(st.cx + st.rx * 0.16, st.cy + st.ry * 0.35,
+      st.rx * 0.98, st.ry * 1.1, 0.55);
+    // 옆면 — 윗면 타원의 **앞쪽 반**을 두께만큼 아래로 늘인다
+    for (let x = Math.round(st.cx - st.rx); x <= Math.round(st.cx + st.rx); x++) {
+      const rel = (x - st.cx) / st.rx;
+      const front = st.ry * Math.sqrt(Math.max(0, 1 - rel * rel));
+      // 옆면에도 원기둥의 결이 있다 — 왼쪽이 밝고 오른쪽이 그늘,
+      // 맨 끝은 되비침으로 한 단 올린다
+      let c = rel < -0.62 ? 'r2' : (rel < -0.1 ? 'r1' : (rel < 0.5 ? 'r2'
+        : (rel < 0.86 ? 'r3' : 'r2')));
+      if (st.tone > 0.72) c = DARKER[c] || c;
+      else if (st.tone < 0.26) c = LIGHTER[c] || c;
+      g.rect(x, st.cy, x, st.cy + front + st.th, c);
+    }
+    // 윗면 — 눌린 타원. 옆면보다 밝고, 뒤(위)가 더 밝다
+    for (let dy = -Math.ceil(st.ry); dy <= Math.ceil(st.ry); dy++) {
+      const t = dy / st.ry;
+      if (Math.abs(t) > 1) continue;
+      const hw = st.rx * Math.sqrt(1 - t * t);
+      const jag = hash(i * 7 + dy, 13) < 0.3 ? -1 : 0;    // 가장자리가 깨져 있다
+      for (let x = Math.round(st.cx - hw - jag); x <= Math.round(st.cx + hw + jag); x++) {
+        // 윗면은 **하늘을 정면으로 받는 면**이라 옆면보다 확실히 밝아야
+        // 한다. 반 단만 올리면 그냥 밝은 옆면으로 보여서 층이 안 갈린다
+        const u = (dy + st.ry) / (st.ry * 2);
+        let c = u < 0.5 ? 'r0' : (u < 0.82 ? 'r1' : 'r2');
+        if (st.tone > 0.78) c = DARKER[c] || c;
+        else if (st.tone < 0.18) c = LIGHTER[c] || c;
+        g.px(x, st.cy + dy, c);
+      }
+    }
+    // 윗면과 옆면이 만나는 모서리 한 줄 — 이 선이 두 면을 가른다
+    for (let x = Math.round(st.cx - st.rx); x <= Math.round(st.cx + st.rx); x++) {
+      const rel = (x - st.cx) / st.rx;
+      const fy = Math.round(st.cy + st.ry * Math.sqrt(Math.max(0, 1 - rel * rel)));
+      if (g.get(x, fy)[0] === 'r') g.px(x, fy, 'r2');
+    }
+  }
+
+  // 발치에 굴러 떨어진 돌 몇 개 — 다 쌓지 못하고 남은 것들
+  for (const [dx, dy, r] of [[-17, -1, 4], [16, -2, 3.4], [-11, 1, 2.6],
+                             [12, 1, 2.2]]) {
+    g.ellipse(CX + dx, GY + dy, r, r * 0.55, 'r2');
+    g.ellipse(CX + dx - r * 0.2, GY + dy - r * 0.22, r * 0.66, r * 0.3, 'r1', ['r2']);
+  }
+
+  // 이끼 — **포기로** 앉힌다.
+  //
+  // 낱알로 뿌렸더니 온 돌이 곰팡이 슨 것처럼 자글거렸다. 도트 하나가
+  // 화면에서 2px이라, 흩뿌린 점은 무늬가 아니라 **잡티**로 읽힌다.
+  // 낮은 씨앗으로 자리를 몇 군데 정하고 그 안에서만 촘촘하게 앉힌다.
+  // 그리고 밟히고 볕 드는 윗면이 아니라 **돌 틈과 그늘진 밑동**에 낀다.
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = g.d[y][x];
+    if (c[0] !== 'r') continue;
+    const patch = hash(x >> 3, y >> 2);
+    if (patch < 0.62) continue;                     // 이끼가 없는 자리
+    const low = y > GY - 14 ? 0.55 : 0.16;          // 밑동에 많다
+    const dark = (c === 'r3' || c === 'r4') ? 1.7 : 1.0;   // 그늘진 데에 낀다
+    if (hash(x * 5 + 1, y * 3 + 2) < low * dark)
+      g.px(x, y, hash(x, y) < 0.5 ? 'm1' : 'm2');
+  }
+
+  g.outline('O');
+  return g;
+}
+
+
+// ============================================================
+// 6. 석등 — 돌계단을 따라 늘어선다
 // ============================================================
 //
 // 계단만 놓으면 「지형이 낮아졌다 높아졌다」로 보인다. 참고 사진에서
@@ -1454,7 +1560,7 @@ function stoneLamp(f, NF) {
 const WORKS = {
   landmark_greattree: { fn: greatTree, frames: 3 },
   landmark_falls: { fn: bigFalls, frames: 4 },
-  landmark_spire: { fn: rockSpire, frames: 2 },
+  deco_cairn: { fn: stoneCairn, frames: 1 },
   deco_wheel: { fn: millWheel, frames: 4 },
   deco_stonelamp: { fn: stoneLamp, frames: 1 },
 };

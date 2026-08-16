@@ -741,37 +741,40 @@ function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
     return;
   }
   const k = Math.floor(s);
-  if (k < 2) { g.px(x, y, EARTH[5]); return; }               // 물에 닿는 젖은 자리
-  // 물가의 턱은 **벼랑과 같은 붓**으로 그린다.
+  // ---- 물가는 **둑이 아니라 비탈이다** ----
   //
-  // 따로 그렸더니 같은 세계 안에서 바다 능선은 바위 벼랑이고 연못가는
-  // 돌담이었다. 둘 다 「땅이 끊어져 떨어지는 자리」다. 다만 재는 방향이
-  // 반대라 — 여기서는 k가 물에서 뭍으로 들어가고, 벼랑에서는 마루에서
-  // 발치로 내려간다 — drop 을 뒤집어 넘긴다
-  const H = faceH(clamp(nay, 0, 1), i, seed);
-  if (H >= 3) {
-    const top = 2 + H;
-    if (k < top) { rockFace(g, x, y, 1.0 - (k - 2) / (H - 1), H, i, seed); return; }
-    // 마루 — 하늘을 보는 한 줄. 여기가 밝아야 바로 밑 바위면의 윗변이 되고,
-    // 둘이 만나 땅이 끊어져 떨어지는 것으로 읽힌다
-    if (k === top) { g.px(x, y, STONE[h(Math.floor(i / 3), 0, 60 + seed) < 0.3 ? 3 : 1]); return; }
-    if (k === top + 1) { g.px(x, y, EARTH[2]); return; }
-    if (k < top + 3 && h(x, y, 58 + seed) > 0.25) g.px(x, y, EARTH[3]);
+  // 여태 벼랑과 같은 붓(rockFace)으로 그렸다. 「둘 다 땅이 끊어져 떨어지는
+  // 자리」라는 생각이었는데, 못 가장자리는 끊어져 떨어지는 자리가 아니다 —
+  // 물이 흙을 씻어 완만하게 눕힌 자리다. 돌벽을 두르니 못이 아니라
+  // **축대를 쌓은 저수지**가 됐고, 곧고 각져 보인 게 그 탓이었다.
+  //
+  // 물에서 멀어지는 순서로 눕힌다:
+  //   젖은 흙 -> 마른 흙 -> 잔돌이 드러난 자리 -> 풀
+  // 폭은 자리마다 다르고, 끝은 성글게 흩어져 풀로 넘어간다. 돌은 **벽이
+  // 아니라 하나씩** 놓인다.
+  const wet = 2 + (h(Math.floor(i / 3), 0, 97 + seed) < 0.45 ? 0 : 1);
+  if (k < wet) { g.px(x, y, EARTH[5]); return; }             // 물에 닿아 젖은 자리
+  // 물가에 놓인 돌 — 여섯 칸에 하나쯤. 윗면이 밝고 밑이 어두운 한 덩이
+  if (h(Math.floor(i / 6), 0, 106 + seed) < 0.24) {
+    const sk = k - wet;
+    if (sk < 3) {
+      g.px(x, y, STONE[sk === 0 ? 2 : (sk === 1 ? 4 : 6)]);
+      return;
+    }
+  }
+  // 비탈의 폭 — 두 겹으로 흔든다 (일곱 칸짜리 들쭉날쭉 · 열세 칸짜리 너울)
+  const band = wet + 2 + Math.round(h(Math.floor(i / 7), 0, 102 + seed) * 3)
+    + (h(Math.floor(i / 13), 0, 103 + seed) < 0.40 ? 2 : 0);
+  if (k < band) {
+    const u = (k - wet) / Math.max(1, band - wet);
+    let c = EARTH[4 - Math.round(u * 1.6)];                  // 젖은 흙 -> 마른 흙
+    if (h(x, y, 104 + seed) > 0.88) c = STONE[h(x, y, 105 + seed) < 0.5 ? 4 : 5];
+    g.px(x, y, c);
     return;
   }
-  // 둑의 윗면. 옆으로 갈수록(nax) 넓고 돌이 많이 드러난다
-  const side = Math.abs(nax) > 0.55;
-  const w2 = side ? 6 : 4;
-  if (k < w2 && h(x, y, 57 + seed) > 0.14 + (k - 2) * 0.17)
-    g.px(x, y, EARTH[k < 4 ? 4 : 3]);
-  if (side) {
-    const st = 2 + Math.floor(h(Math.floor(i / 3), 0, 66) * 3);
-    if (k < 5 && h(x, y, 67 + seed) > 0.35) g.px(x, y, STONE[clamp(st + (k - 2), 0, 7)]);
-    if (k === 2 && i % 3 === 0) g.px(x, y, STONE[6]);
-  } else {
-    if (k === 2 && h(x, y, 62 + seed) < 0.28) g.px(x, y, STONE[4]);
-    if (k === 3 && h(x, y, 64 + seed) < 0.20) g.px(x, y, STONE[3]);
-  }
+  // 풀로 넘어가는 자락 — 성글게 흩어져야 자로 자른 선이 안 남는다
+  if (k < band + 3 && h(x, y, 58 + seed) > 0.24 + (k - band) * 0.30)
+    g.px(x, y, EARTH[3]);
 }
 
 // 모래사장의 물가 — 같은 자, 다른 재료.
@@ -895,7 +898,7 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
   if (s < 0) return;                                          // 위쪽 땅 — 그 칸이 그린다
   const k = Math.floor(s);
   const face = clamp(-nay, 0, 1);
-  const H = faceH(face, i, seed);
+  const H = faceH(face, i, seed, true);   // 벼랑 — 두 칸짜리 벽
   if (H >= 3 && k < H) { rockFace(g, x, y, k / (H - 1), H, i, seed); return; }
   if (H >= 3) { scree(g, x, y, k - H, i, seed); return; }
   // 비스듬히 보이는 옆면 — 바위가 좁게 드러날 뿐이다
@@ -907,21 +910,35 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
 }
 
 // 면의 높이. **두 겹으로** 흔든다 — 다섯 칸짜리 덩이(들쭉날쭉)와 열두 칸짜리
-// 너울(어디는 높고 어디는 낮은 벼랑). 칸마다 흔들면 밑동이 빗살이 된다
-function faceH(face, i, seed) {
-  // 한 칸(16)에서 **스물넷**으로. 화면에서 32px -> 48px 이다.
-  // 나머지 여덟 칸은 발치(scree)가 받아, 두 칸째가 통째로 바위벽이 아니라
-  // 「벽 밑에 무너져 쌓인 자리」가 된다 — 거기 사람이 서면 벽 앞에 선
-  // 것으로 보이지, 벽 속에 박힌 것으로 보이지 않는다
-  return Math.round((24.0 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 3.0)
-    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * 5.0) * face);
+// 너울(어디는 높고 어디는 낮은 벼랑). 칸마다 흔들면 밑동이 빗살이 된다.
+//
+// **벼랑과 물가의 높이가 달라야 한다.** 둘 다 「땅이 끊어져 떨어지는 자리」
+// 라 같은 붓을 쓰는데, 벼랑면을 두 칸으로 키우면서 이 값을 그냥 올렸더니
+// **연못가도 같이 두 칸짜리 돌벽**이 됐다 — 물가 칸이 통째로 바위로 덮여,
+// 못 둘레에 축대를 두른 것처럼 곧고 각진 띠가 생겼다.
+// 벼랑은 사람 키만 한 벽이고, 물가는 발에 걸리는 턱이다.
+// 물가 쪽은 **더 낮고 더 들쭉날쭉하게.** 열한 켜짜리 돌벽이 못을 한 바퀴
+// 두르면 그건 물가가 아니라 **축대**다 — 곧고 각져 보인 진짜 이유다.
+// 여섯 켜쯤으로 낮추고 너울을 키우면, 어떤 자리는 돌턱이 서고 어떤 자리는
+// (H가 3 밑으로 떨어져) 흙둑만 남는다. 그 둘이 섞여야 자연스러워진다
+function faceH(face, i, seed, tall) {
+  const base = tall ? 29.0 : 6.8;
+  // 칸마다 확 달라지면 물가에 **빗살**이 선다 — 잔 흔들림은 줄이고
+  // 열두 칸짜리 너울로 높낮이를 준다 (둔덕이 오르내리는 결)
+  const bump = tall ? 2.5 : 1.4;
+  const wave = tall ? 4.0 : 4.2;
+  return Math.round((base + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : bump)
+    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * wave) * face);
 }
 
 // 발치 — 접지 그늘과 흘러내린 돌덩이. 이게 없으면 바위가 땅에 꽂힌
 // 판자처럼 보인다 (d = 면이 끝난 뒤로 몇 칸)
 function scree(g, x, y, d, i, seed) {
-  if (d === 0) { g.px(x, y, EARTH[5]); return; }
-  if (d === 1 && h(x, y, 56 + seed) < 0.62) { g.px(x, y, EARTH[4]); return; }
+  // 접지 그늘 — **두 줄로** 깐다. 높이는 벽 자체보다 그 밑에 지는 그늘이
+  // 말해 준다. 한 줄이면 바위와 땅이 그냥 맞닿은 것으로 보인다
+  if (d === 0) { g.px(x, y, EARTH[6] || EARTH[5]); return; }
+  if (d === 1) { g.px(x, y, h(x, y, 56 + seed) < 0.72 ? EARTH[5] : EARTH[4]); return; }
+  if (d === 2 && h(x, y, 96 + seed) < 0.5) { g.px(x, y, EARTH[4]); return; }
   // 낱알로 뿌리면 모래가 된다. 두세 칸짜리 덩이를 놓고 윗변은 밝게
   // 아랫변은 어둡게 (자갈 한 알과 같은 규칙)
   if (d >= 1 && d <= 4 && h(Math.floor(i / 3), Math.floor((d - 1) / 2), 69 + seed) < 0.30) {
@@ -956,7 +973,7 @@ function brinkPx(g, x, y, s, nax, nay, i, seed) {
     if (k <= 1 && h(x, y, 66 + seed) < 0.5 - k * 0.26) g.px(x, y, EARTH[3]);
     return;
   }
-  if (k === 0) { g.px(x, y, worn ? EARTH[3] : STONE[1]); return; }
+  if (k === 0) { g.px(x, y, worn ? EARTH[2] : STONE[0]); return; }
   if (k === 1) { g.px(x, y, worn ? EARTH[4] : STONE[3]); return; }
   if (k === 2 && h(x, y, 61 + seed) < 0.5) { g.px(x, y, EARTH[2]); return; }
   if (k === 3 && h(x, y, 62 + seed) < 0.22) g.px(x, y, EARTH[3]);
@@ -1078,7 +1095,10 @@ for (let v = 0; v < 3; v++) save('dock_' + v, dockTile(v).render());
 // 경계일 때 아무것도 바꾸지 않는다. 그려 놓고 같은 것끼리 합치면 예순
 // 남짓으로 준다. 어느 꼴이 몇 번 그림인지는 표로 내보내 게임이 읽는다.
 const KIND = [
-  ['shore', true, null], ['shoal', false, null],
+  // 물가도 **판을 셋씩.** 꼴(code)이 같으면 그림도 같으므로, 못을 두르는
+  // 물가 칸이 죄다 똑같은 무늬였다 — 한 칸마다 되풀이되는 그 무늬가
+  // 「쌓아 만든 축대」로 보인 진짜 이유다 (벼랑은 이미 셋이었다)
+  ['shore', true, null, 3], ['shoal', false, null, 3],
   ['beach', true, beachPx], ['surf', false, beachPx],
   ['dune', true, spill(SAND, 84)], ['trod', true, spill(EARTH, 96)],
   // 벼랑 — 둘 다 **제 칸 안쪽**으로 층을 쌓는다. cliff 는 아래쪽 칸에서

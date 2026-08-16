@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ckeq45rlhgbz1"
-path="res://.godot/imported/edge_shore.png-517eb2c8dde834793ccf8a3e14efbe31.ctex"
+uid="uid://66ex4nnz5gz6q"
+path="res://.godot/imported/edge_shoal_1.png-89f8048b96e4764d9c27388e4335f397.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/edge_shore.png"
-dest_files=["res://.godot/imported/edge_shore.png-517eb2c8dde834793ccf8a3e14efbe31.ctex"]
+source_file="res://assets/sprites/edge_shoal_1.png"
+dest_files=["res://.godot/imported/edge_shoal_1.png-89f8048b96e4764d9c27388e4335f397.ctex"]
 
 [params]
 

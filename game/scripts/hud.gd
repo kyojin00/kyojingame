@@ -231,7 +231,7 @@ const MM_OBJ_COLORS := {
 	# 고장의 랜드마크 — 작은 지도에서도 눈에 띄어야 「저기다」가 된다
 	"landmark_greattree": Color(0.45, 0.85, 0.4),
 	"landmark_falls": Color(0.75, 0.92, 1.0),
-	"landmark_spire": Color(0.86, 0.46, 0.3),
+	"deco_cairn": Color(0.72, 0.68, 0.62),
 }
 
 
