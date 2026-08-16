@@ -87,13 +87,13 @@ func _plant_story_forest() -> void:
 	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래)
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
 		for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 1):
-			_carve_road(Vector2i(x, y))
+			_carve_road(Vector2i(x, y), m.STORY_GATE_ROWS.has(y))
 	for y in range(10 + dy, m.STORY_ROAD_Y0):         # 북쪽 갈래 (막다른 길)
 		for x in range(m.STORY_FORK.x - 1, m.STORY_FORK.x + 3):
-			_carve_road(Vector2i(x, y))
+			_carve_road(Vector2i(x, y), x >= m.STORY_FORK.x and x <= m.STORY_FORK.x + 1)
 	for y in range(m.STORY_ROAD_Y1 + 1, 22 + dy):     # 남쪽 갈래 (막다른 길)
 		for x in range(m.STORY_FORK.x - 1, m.STORY_FORK.x + 3):
-			_carve_road(Vector2i(x, y))
+			_carve_road(Vector2i(x, y), x >= m.STORY_FORK.x and x <= m.STORY_FORK.x + 1)
 
 	# ② 길 양옆은 울타리로 막는다 — 길을 벗어날 수 없다 (숲으로는 못 들어간다)
 	for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 2):
@@ -178,19 +178,42 @@ func _close_tutorial_space() -> void:
 
 
 # 길을 낸다: 흙바닥으로 바꾸고, 그 자리에 있던 오브젝트는 치운다
-func _carve_road(pos: Vector2i) -> void:
+# paint=false 면 **비우기만** 한다 — 걸을 수는 있되 흙은 안 깐다.
+# 오솔길은 사람이 밟는 두 줄만 풀이 죽고 양옆은 풀 갓길로 남는다.
+# (비우는 일은 네 줄 다 해야 한다. 안 그러면 갓길에 나무가 서서 길을 막는다)
+func _carve_road(pos: Vector2i, paint := true) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
 		return
-	m.grid[pos.y][pos.x].ground = "path"
+	if not paint:
+		m.objects.erase(pos)
+		return
+	# **자갈이 아니라 밟혀 다져진 흙이다.**
+	#
+	# 숲 한복판에 회색 자갈이 넉 줄로 깔리고 갈래까지 뻗으니, 「걸어가는
+	# 길」이 아니라 「포장된 마당」으로 보였다. 사람 몇이 오가며 풀이 죽은
+	# 자리 — 그게 이 숲길의 정체다
+	m.grid[pos.y][pos.x].ground = "yard"
 	m.dirty_tile(pos.x, pos.y)
 	m.objects.erase(pos)
 
 
-# 스토리용 울타리: 길을 벗어나지 못하게 막는다 (도끼로 걷어낼 수 없다)
+# 길가를 막는 것 — **울타리가 아니라 숲이다.**
+#
+# 나무 울타리를 길 양옆에 죽 세워 놨더니, 세로 구간이 사다리처럼 보이고
+# 무엇을 막는지 무엇을 안내하는지 알 수 없는 장식이 됐다. 여기는 사람이
+# 담을 두른 자리가 아니라 그냥 숲이다 — 길을 벗어날 수 없는 이유는
+# 울타리가 아니라 **나무가 빽빽해서**여야 한다.
+#
+# 막는 자리는 그대로 두고 놓이는 것만 바꾼다 (통행은 한 칸도 안 달라진다).
+# 도끼로 못 베게 fixed 를 유지한다 — 여기서 길을 뚫는 건 정해진
+# 길목(_story_narrow)뿐이다
 func _story_fence(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
 		return
-	m.objects[pos] = {"kind": "fence", "hp": 0, "fixed": true}
+	var tr := {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
+	if m._hash01(pos.x * 13 + 7, pos.y * 19 + 3) < 0.14:
+		tr["apple"] = true
+	m.objects[pos] = tr
 
 
 # 아직 뚫지 못한 길목(나무 줄) 수를 센다 — 한 칸만 베어도 그 줄은 열린 것으로 본다
