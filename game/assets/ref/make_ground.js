@@ -345,40 +345,82 @@ function thru(c, depth) {
   return c.map((v, i) => Math.round(v * (1 - depth) + w[i] * depth));
 }
 
-// deep = 물가에서 멀어진 한가운데. 물 타일이 한 장뿐이면 어디를 봐도 같은
-// 깊이라 얕아 보인다. 가장자리 물과 **한가운데 물**을 갈라야 깊이가 생긴다.
-function water(frame, deep) {
+// 깊이는 **세 단**이다 (lv 0 얕은 물 · 1 중간 · 2 한가운데).
+//
+// 두 단뿐일 때는 연못 한가운데에 **검푸른 직사각형**이 오려 붙은 것처럼
+// 떴다. 한 번에 두 계단을 뛰니 그 경계가 타일 변을 따라 그대로 보인 것이다.
+// 사이에 한 단을 끼워 계단을 한 칸씩으로 낮추면, 같은 직각 경계라도 눈에
+// 걸리지 않고 물이 가운데로 갈수록 깊어지는 것처럼 읽힌다.
+// 16칸에서 **감기는** 값잡음. 격자점 사이를 부드럽게 이어 붙인다.
+// h() 를 x>>2 로 바로 쓰면 4칸짜리 네모가 그대로 보인다 — 물 한가운데에
+// 바둑판이 뜬 게 그 탓이었다
+function vnoise(x, y, k, cell) {
+  const m = N / cell;
+  const gx = x / cell, gy = y / cell;
+  const x0 = Math.floor(gx), y0 = Math.floor(gy);
+  const sm = t => t * t * (3 - 2 * t);
+  const u = sm(gx - x0), v = sm(gy - y0);
+  const at = (a, b) => h(((a % m) + m) % m, ((b % m) + m) % m, k);
+  return (at(x0, y0) * (1 - u) + at(x0 + 1, y0) * u) * (1 - v)
+    + (at(x0, y0 + 1) * (1 - u) + at(x0 + 1, y0 + 1) * u) * v;
+}
+
+// 사다리 사이를 **반 단씩** 섞는다. 한 단이 통째로 갈리면 그 경계가
+// 타일마다 같은 자리에 나타나 격자가 된다
+function ramp(P, i) {
+  const a = clamp(Math.floor(i), 0, P.length - 1);
+  const b = clamp(a + 1, 0, P.length - 1);
+  const t = Math.round((i - a) * 2) / 2;
+  return P[a].map((c, k) => Math.round(c * (1 - t) + P[b][k] * t));
+}
+
+// 깊이는 **다섯 단**, 한 단이 반 톤이다 (물가 5 -> 한가운데 7).
+//
+// 처음엔 두 단이었다. 연못 한가운데에 검푸른 **직사각형**이 오려 붙은 것
+// 처럼 떴다 — 한 번에 두 톤을 뛰니 그 경계가 타일 변을 따라 그대로 보였다.
+// 세 단으로 늘려도 계단이 셋 보일 뿐이었다. 계단을 **반 톤**까지 낮추고
+// 단을 다섯으로 늘리자 비로소 경계가 안 보이고 물이 가운데로 갈수록
+// 깊어지는 것처럼 읽힌다. 반 톤은 사다리 사이를 절반씩 섞어 만든다.
+function baseWater(x, y, lv) {
+  const v = vnoise(x, y, 51, 4) * 0.62 + vnoise(x, y, 52, 2) * 0.38;
+  return ramp(WATER, 5 + (lv || 0) * 0.72 + (v - 0.5) * 1.7);
+}
+
+// 물 한 장. lv = 깊이(0~2), vr = **판**(0~2).
+//
+// 판이 왜 셋이나 필요한가 — 한 장을 호수 스무 칸에 반복해 깔면 잔물결이
+// **같은 자리마다 똑같이** 찍혀 물 위에 바둑판이 뜬다. 바탕색을 아무리
+// 부드럽게 이어도 이건 안 없어진다. 잔디를 세 판 그린 것과 같은 이유다.
+function water(frame, lv, vr) {
   const g = new T();
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    // 깊이 — 덩어리로 갈린다. 칸마다 흔들면 물이 아니라 모래가 된다
-    const v = h(x >> 2, y >> 2, 51) * 0.6 + h(x >> 1, y >> 1, 52) * 0.4;
-    g.px(x, y, WATER[deep ? (v < 0.3 ? 8 : (v > 0.72 ? 6 : 7)) : (v < 0.3 ? 6 : (v > 0.72 ? 4 : 5))]);
-  }
-  // 잔물결 — 가로로 짧게 그은 줄. 두 장이 서로 어긋나야 물이 흐른다
-  // 잔물결은 **다섯 줄이면 족하다.** 아홉 줄을 그었더니 타일이 반복되면서
-  // 대각선 줄무늬가 물 전체를 덮었다 — 물결이 아니라 빗금이었다
-  for (let i = 0; i < 5; i++) {
-    const ox = Math.floor(h(i, frame, 53) * N);
-    const oy = Math.floor(h(frame, i, 54) * N);
-    const len = 2 + Math.floor(h(i, i + frame, 55) * 3);
-    const lift = deep ? 2 : 0;
-    for (let k = 0; k < len; k++) g.px(ox + k, oy, WATER[(i % 2 ? 3 : 4) + lift]);
-    g.px(ox - 1, oy, WATER[6 + lift]);
+  const s = vr * 17;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, baseWater(x, y, lv));
+  // 잔물결 — 가로로 짧게 그은 줄. 두 장이 서로 어긋나야 물이 흐른다.
+  // 밝기는 **반 단**만 올린다. 한 단을 통째로 올렸더니 줄이 도드라져
+  // 타일마다 같은 무늬가 도는 게 그대로 보였다
+  for (let i = 0; i < 4; i++) {
+    const ox = Math.floor(h(i, frame + s, 53) * N);
+    const oy = Math.floor(h(frame + s, i, 54) * N);
+    const len = 2 + Math.floor(h(i, i + frame + s, 55) * 3);
+    const t = 4.5 + lv * 0.72;
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, ramp(WATER, t + (i % 2) * 0.5));
+    g.px(ox - 1, oy, ramp(WATER, t + 1.5));
   }
   // 물속에 비치는 바닥 — 모래톱과 조약돌, 수초 한 포기.
-  // 깊은 물이라 많이 섞는다(0.62) — 형태만 어렴풋이 보이는 정도
-  for (let i = 0; i < 3; i++) {
-    const ox = Math.floor(h(i + 11, frame, 81) * N), oy = Math.floor(h(frame, i + 11, 82) * N);
+  // 깊을수록 물빛에 더 섞여 형체만 남다가 결국 안 보인다
+  const mix = Math.min(0.95, 0.80 + lv * 0.045);
+  for (let i = 0; i < (lv < 3 ? 3 : 0); i++) {
+    const ox = Math.floor(h(i + 11 + s, frame, 81) * N), oy = Math.floor(h(frame, i + 11 + s, 82) * N);
     for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++)
-      if (!deep && h(ox + dx, oy + dy, 83) < 0.7) g.px(ox + dx, oy + dy, thru(EARTH[1], 0.80));
+      if (h(ox + dx, oy + dy, 83) < 0.7) g.px(ox + dx, oy + dy, thru(EARTH[1], mix));
   }
-  for (let i = 0; i < (deep ? 0 : 4); i++) {
-    const ox = Math.floor(h(i + 21, 5, 84) * N), oy = Math.floor(h(5, i + 21, 85) * N);
-    g.px(ox, oy, thru(STONE[2], 0.78)); g.px(ox + 1, oy, thru(STONE[3], 0.78));
-    g.px(ox, oy + 1, thru(STONE[4], 0.80));
+  for (let i = 0; i < (lv === 0 ? 4 : (lv < 3 ? 2 : 0)); i++) {
+    const ox = Math.floor(h(i + 21 + s, 5, 84) * N), oy = Math.floor(h(5, i + 21 + s, 85) * N);
+    g.px(ox, oy, thru(STONE[2], mix - 0.02)); g.px(ox + 1, oy, thru(STONE[3], mix - 0.02));
+    g.px(ox, oy + 1, thru(STONE[4], mix));
   }
-  for (let i = 0; i < (deep ? 0 : 2); i++) {                 // 수초
-    const ox = Math.floor(h(i + 31, 7, 86) * N), oy = Math.floor(h(7, i + 31, 87) * N);
+  for (let i = 0; i < (lv === 0 ? 2 : 0); i++) {             // 수초
+    const ox = Math.floor(h(i + 31 + s, 7, 86) * N), oy = Math.floor(h(7, i + 31 + s, 87) * N);
     for (const [dx, len] of [[-1, 2], [0, 3], [1, 2]])
       for (let k = 0; k <= len; k++)
         g.px(ox + dx, oy - k, thru(SEASON.summer[k === len ? 'tip' : 'base'], 0.72));
@@ -487,6 +529,115 @@ function shoreCorner(c) {
   return g;
 }
 
+// ---- 굽은 물가 ----
+//
+// 곧은 덧그림 넷으로는 물가가 **꺾일 때마다 직각**이다. 타일의 변을 그대로
+// 따라 그리니 당연하다 — 자연의 물가에 직각은 없다.
+//
+// 고치는 법은 「어느 변이냐」로 그리기를 그만두는 것이다. 대신 한 점마다
+//
+//   s   물가에서 뭍으로 들어간 **거리** (음수면 물)
+//   n   그 자리에서 **물 쪽을 가리키는 방향**
+//
+// 둘만 재고, 층은 s로 쌓고 벽이 보이는지는 n으로 정한다. 그러면 물가가
+// 직선이든 호(arc)든 같은 그림이 얹힌다. 모서리 칸에서는 이 거리를 원으로
+// 재기만 하면 물가가 둥글게 돌아 나간다.
+//
+//   s  = R - |p - C|   볼록한 귀퉁이 (물이 두 방향 — 뭍을 깎아 낸다)
+//   s  = |p - C| - R   오목한 귀퉁이 (뭍이 두 방향 — 물을 메운다)
+//
+// 원의 중심 C는 두 변에 **접하도록** 잡는다. 안 그러면 호가 곧은 이웃 칸과
+// 어긋나 이음매에 턱이 진다.
+
+// 물가 한 점. 곧은 물가(shore)와 똑같은 층을 쌓되 s와 n만 본다
+//   nay > 0  물이 남쪽 = 뭍의 턱이 나를 마주 본다 -> **벽면이 보인다**
+//   nay < 0  둑의 윗면만 보인다.  nax 만 크면 비스듬한 옆면
+function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
+  if (s < 0) {
+    // 물 쪽 — 여울. 둑이 드리우는 그늘은 뭍이 **북·서쪽**에 있을 때 진다.
+    //
+    // 그늘이냐 아니냐를 **참·거짓으로 가르면** 호가 돌아 나가다 그늘에서
+    // 볕으로 넘어가는 순간 가장 어두운 색 옆에 가장 밝은 색이 와서 얼룩이
+    // 진다. 빛은 왼쪽 위에서 오니 둑이 물 쪽을 가리키는 방향 n 을 그 빛에
+    // 견줘 **비율로** 섞는다 — 곧은 물가에서는 그대로 0 아니면 1이라
+    // 이웃 타일과 어긋나지 않는다
+    const d = Math.floor(-s);
+    const shade = clamp((nax + nay) * 0.5 + 0.707, 0, 1.414) / 1.414;
+    const deep = 3 + Math.floor(h(i, 0, 71 + seed) * 4);
+    const bare = d >= deep || (d > 1 && h(x, y, 72 + seed) < 0.08 + d * 0.11);
+    // fill = 이 칸은 **땅 타일**이다. 깎아 낸 자리는 밑에 물이 깔려 있지
+    // 않으니 성기게 두면 잔디가 비친다 — 물 바탕부터 깔고 여울을 얹는다
+    if (bare) { if (fill) g.px(x, y, baseWater(x, y)); return; }
+    const lit = d === 0 ? 0 : (d < 3 ? 1 : 2);
+    g.px(x, y, WATER[Math.round(lit + ((d < 2 ? 7 : 6) - lit) * shade)]);
+    if (shade > 0.5) return;                                 // 그늘엔 바닥이 안 비친다
+    if (d === 1 && h(x, y, 73 + seed) < 0.34) g.px(x, y, thru(EARTH[1], 0.3));
+    if (d === 2 && h(x, y, 74 + seed) < 0.22) g.px(x, y, thru(STONE[3], 0.35));
+    if (d === 3 && h(x, y, 75 + seed) < 0.18) g.px(x, y, thru(EARTH[2], 0.45));
+    return;
+  }
+  const k = Math.floor(s);
+  if (k < 2) { g.px(x, y, EARTH[5]); return; }               // 물에 닿는 젖은 자리
+  // 벽은 나를 마주 볼 때만 보인다. 호를 따라 돌면서 서서히 낮아져 옆면으로
+  // 넘어간다 — 이래야 남쪽 벽과 옆 둑이 한 덩어리로 이어진다
+  const wall = Math.round(6 * clamp(nay, 0, 1));
+  if (wall > 1) {
+    const top = 2 + wall;
+    if (k < top) {
+      const st = h(Math.floor(i / 3), 0, 63 + seed);
+      const up = (k - 2) / Math.max(1, wall - 1);
+      let t = 6 - Math.round(up * 3.4) + (st < 0.35 ? 1 : (st > 0.72 ? -1 : 0));
+      if ((i + Math.floor(k / 3)) % 3 === 0) t += 2;         // 돌 사이 틈
+      g.px(x, y, STONE[clamp(t, 0, 7)]);
+      return;
+    }
+    if (k === top) { g.px(x, y, STONE[0]); return; }         // 벽 마루 — 하늘을 본다
+    if (k === top + 1) { g.px(x, y, EARTH[2]); return; }
+    if (k < top + 3 && h(x, y, 58 + seed) > 0.25) g.px(x, y, EARTH[3]);
+    return;
+  }
+  // 둑의 윗면. 옆으로 갈수록(nax) 넓고 돌이 많이 드러난다
+  const side = Math.abs(nax) > 0.55;
+  const w2 = side ? 6 : 4;
+  if (k < w2 && h(x, y, 57 + seed) > 0.14 + (k - 2) * 0.17)
+    g.px(x, y, EARTH[k < 4 ? 4 : 3]);
+  if (side) {
+    const st = 2 + Math.floor(h(Math.floor(i / 3), 0, 66) * 3);
+    if (k < 5 && h(x, y, 67 + seed) > 0.35) g.px(x, y, STONE[clamp(st + (k - 2), 0, 7)]);
+    if (k === 2 && i % 3 === 0) g.px(x, y, STONE[6]);
+  } else {
+    if (k === 2 && h(x, y, 62 + seed) < 0.28) g.px(x, y, STONE[4]);
+    if (k === 3 && h(x, y, 64 + seed) < 0.20) g.px(x, y, STONE[3]);
+  }
+}
+
+const RC = 16;                     // 굽는 반지름 (논리 칸)
+const CEN = RC - 0.5;              // 두 변에 접하는 원의 중심
+
+// 한 귀퉁이 칸을 그린다.
+//   c   0=북서 1=북동 2=남서 3=남동 (두 이웃이 있는 쪽)
+//   out true면 볼록 — 물이 두 방향(땅 타일). false면 오목 — 뭍이 두 방향(물 타일)
+function roundCorner(c, out) {
+  const g = new T();
+  const north = (c < 2), west = (c % 2 === 0);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // 「이웃이 북서쪽에 있다」는 꼴로 돌려 놓고 잰다
+    const u = west ? x : N - 1 - x;
+    const v = north ? y : N - 1 - y;
+    let s, ncx, ncy;                                         // 돌려 놓은 좌표에서
+    if (u < CEN && v < CEN) {
+      const dx = u - CEN, dy = v - CEN, d = Math.hypot(dx, dy) || 0.0001;
+      s = RC - d;
+      ncx = dx / d; ncy = dy / d;                            // 원 바깥이 물
+    } else if (v <= u) { s = v + 0.5; ncx = 0; ncy = -1; }   // 위쪽 곧은 변
+    else { s = u + 0.5; ncx = -1; ncy = 0; }                 // 왼쪽 곧은 변
+    if (!out) { s = -s; ncx = -ncx; ncy = -ncy; }            // 오목은 부호만 뒤집는다
+    bankPx(g, x, y, s, (west ? 1 : -1) * ncx, (north ? 1 : -1) * ncy,
+      Math.round(u + v), c, out);
+  }
+  return g;
+}
+
 // 여울 — **물 쪽**에 얹는 덧그림. 땅이 그쪽에 있다.
 //
 // 깊이는 **둑이 물에 드리우는 그늘**이 만든다. 빛은 왼쪽 위에서 오므로
@@ -524,18 +675,20 @@ for (const s of Object.keys(SEASON))
   for (let v = 0; v < 3; v++) save(`grass_${s}_${v}`, grass(s, v).render());
 save('path', cobble(0).render());
 save('yard', yard().render());
-save('water_0', water(0, false).render());
-save('water_1', water(1, false).render());
-save('water_deep_0', water(0, true).render());
-save('water_deep_1', water(1, true).render());
+// water_<깊이>_<판>_<장> — 깊이 다섯 × 판 셋 × 장 둘
+for (let lv = 0; lv < 5; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
+  save(`water_${lv}_${vr}_${f}`, water(f, lv, vr).render());
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shore_' + d, shore(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shoal_' + d, shoal(i).render()));
 ['nw', 'ne', 'sw', 'se'].forEach((d, i) => save('shore_c_' + d, shoreCorner(i).render()));
+// 굽은 귀퉁이 — 물이 두 방향(볼록·땅 타일) / 뭍이 두 방향(오목·물 타일)
+['nw', 'ne', 'sw', 'se'].forEach((d, i) => save('shore_o_' + d, roundCorner(i, true).render()));
+['nw', 'ne', 'sw', 'se'].forEach((d, i) => save('shoal_c_' + d, roundCorner(i, false).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());
 
-console.log(`바닥 ${12 + 1 + 1 + 4 + 4 + 2 + 4 + 4}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
+console.log(`바닥 ${Object.keys(OUT).length}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
 console.log(INSTALL ? '  sprites/ 에 넣었다'
   : '  ref/proposed_*.png 로만 뽑았다 (--install 을 붙이면 게임에 넣는다)');
 

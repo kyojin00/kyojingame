@@ -99,6 +99,10 @@ var night: CanvasModulate
 var sleep_dialog: ConfirmationDialog
 var water_frame := 0
 var water_timer := 0.0
+# 물의 깊이 — 뭍에서 몇 걸음인지 미리 재 둔다 (0 = 뭍, 1 = 물가...).
+# 그릴 때마다 이웃을 훑으면 물 한 칸마다 스물다섯 칸을 보게 된다.
+# 물이 생기거나 없어지면 rebuild_water_levels()를 다시 부른다
+var water_dist: Array = []
 var _growth_timer := 0.0
 var tree_sprites: Array = []
 var weather_time := 0.0
@@ -303,11 +307,14 @@ const TEXTURE_NAMES := [
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
-	"soil_dry", "soil_wet", "water_0", "water_1", "path", "yard",
-	"water_deep_0", "water_deep_1",
+	"soil_dry", "soil_wet", "path", "yard",
+	# 물은 water_<깊이 0~4>_<판 0~2>_<장 0~1> — _load_textures가 훑는다
 	"shore_n", "shore_s", "shore_w", "shore_e",
 	"shoal_n", "shoal_s", "shoal_w", "shoal_e",
 	"shore_c_nw", "shore_c_ne", "shore_c_sw", "shore_c_se",
+	# 굽은 물가 — 물이 두 방향(볼록) / 뭍이 두 방향(오목)
+	"shore_o_nw", "shore_o_ne", "shore_o_sw", "shore_o_se",
+	"shoal_c_nw", "shoal_c_ne", "shoal_c_sw", "shoal_c_se",
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
@@ -593,6 +600,7 @@ func _ready() -> void:
 	_load_textures()
 	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
 	worldgen._build_map()
+	rebuild_water_levels()
 	farming.rebuild()
 
 	night = CanvasModulate.new()
@@ -749,6 +757,7 @@ func _ready() -> void:
 	var loaded := GameData.load_game()
 	if loaded.size() > 0:
 		saveio._apply_save(loaded)
+		rebuild_water_levels()   # 세이브의 물길로 깊이를 다시 잰다
 		apply_appearance()   # 세이브에 담긴 외형으로 다시 굽는다
 		# 옛 세이브의 튜토리얼은 세계 안(y7~22)에 있었다. 그 자리는 이제 마을 곁의
 		# 평범한 들판이라, 그대로 두면 세계 밖으로 옮겨 온 숲길과 어긋난다 —
@@ -863,6 +872,15 @@ func _setup_fade(animate_in: bool) -> void:
 func _load_textures() -> void:
 	for n in TEXTURE_NAMES:
 		tex[n] = load("res://assets/sprites/%s.png" % n)
+	# 물 — 깊이 다섯 단 × 판 셋 × 장 둘.
+	#   깊이  물가에서 멀수록 짙다. 한 단이 반 톤이라 경계가 안 보인다
+	#   판    한 장을 호수에 반복해 깔면 잔물결이 같은 자리마다 찍혀
+	#         물 위에 바둑판이 뜬다. 잔디처럼 판을 나눠 칸마다 골라 쓴다
+	for lv in WATER_LV:
+		for vr in 3:
+			for f in 2:
+				var wn := "water_%d_%d_%d" % [lv, vr, f]
+				tex[wn] = load("res://assets/sprites/%s.png" % wn)
 	# 물고기·요리·작물은 표가 곧 그림 목록이다. 여기서 따라가면 표에 한 줄
 	# 넣을 때마다 TEXTURE_NAMES도 고쳐야 하는 일이 없다 (빠뜨리면 아이콘이
 	# 통째로 사라지는데, 어서션에 안 걸려 한참 뒤에야 눈에 띈다).
@@ -1884,6 +1902,61 @@ func _is_water(x: int, y: int) -> bool:
 	return grid[y][x].ground == "water"
 
 
+# 물의 깊이를 잰다 — 뭍에서 몇 걸음(여덟 방향)인지.
+#
+# 물을 두 장(얕은 물·깊은 물)으로만 그렸더니 연못 한가운데에 검푸른
+# **직사각형**이 오려 붙은 것처럼 떴다. 깊이가 두 단뿐이라 그 경계가 타일
+# 변을 따라 그대로 보인 것이다. 단을 다섯으로 늘리고 한 단을 반 톤으로
+# 낮추면 경계가 눈에 안 걸리고 물이 가운데로 갈수록 깊어지는 것처럼 읽힌다.
+#
+# 여덟 방향으로 재는 이유 — 네 방향으로만 재면 깊이 띠가 마름모로 각진다.
+# 앞뒤 두 번 훑는 체스판 거리(chamfer)면 한 번에 맵 전체가 채워진다.
+const WATER_LV := 5
+
+func rebuild_water_levels() -> void:
+	water_dist = []
+	if grid.is_empty():
+		return
+	var big := 99
+	for y in MAP_H:
+		var row := PackedByteArray()
+		row.resize(MAP_W)
+		for x in MAP_W:
+			row[x] = 0 if grid[y][x].ground != "water" else big
+		water_dist.append(row)
+	# 앞으로 한 번(왼위 이웃), 뒤로 한 번(오른아래 이웃)
+	for y in MAP_H:
+		for x in MAP_W:
+			if water_dist[y][x] == 0:
+				continue
+			var d: int = water_dist[y][x]
+			for o: Vector2i in [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0)]:
+				var nx: int = x + o.x
+				var ny: int = y + o.y
+				if nx < 0 or ny < 0 or nx >= MAP_W or ny >= MAP_H:
+					continue
+				d = mini(d, water_dist[ny][nx] + 1)
+			water_dist[y][x] = mini(d, big)
+	for y in range(MAP_H - 1, -1, -1):
+		for x in range(MAP_W - 1, -1, -1):
+			if water_dist[y][x] == 0:
+				continue
+			var d: int = water_dist[y][x]
+			for o: Vector2i in [Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(1, 0)]:
+				var nx: int = x + o.x
+				var ny: int = y + o.y
+				if nx < 0 or ny < 0 or nx >= MAP_W or ny >= MAP_H:
+					continue
+				d = mini(d, water_dist[ny][nx] + 1)
+			water_dist[y][x] = mini(d, big)
+
+
+func _water_level(x: int, y: int) -> int:
+	if water_dist.is_empty():
+		return 0
+	return clampi(water_dist[y][x] - 1, 0, WATER_LV - 1)
+
+
 # ---- 렌더링 ----
 
 
@@ -1946,21 +2019,36 @@ func _draw() -> void:
 			elif ground == "sand":
 				sands.append(at)
 			elif ground == "water":
-				# 물가에서 떨어진 한가운데는 **깊은 물**로 그린다. 물 타일이 한 장
-				# 뿐이면 어디를 봐도 같은 깊이라, 아무리 어둡게 칠해도 얕아 보인다
-				var mid: bool = _is_water(x, y - 1) and _is_water(x, y + 1) \
-					and _is_water(x - 1, y) and _is_water(x + 1, y)
-				put.call(base, tex[("water_deep_%d" if mid else "water_%d") % water_frame], at)
+				# 물가에서 멀수록 깊다 — 다섯 단, 한 단이 반 톤.
+				# 판(0~2)은 칸마다 골라 쓴다. 한 판만 깔면 잔물결이 같은
+				# 자리마다 찍혀 물 위에 바둑판이 뜬다
+				put.call(base, tex["water_%d_%d_%d" % [_water_level(x, y),
+					int(_hash01(x * 3 + 1, y * 7 + 5) * 3.0) % 3, water_frame]], at)
 				# 여울 — 뭍에 가까운 물은 얕아서 바닥이 비친다.
 				# 물가를 땅 쪽에서만 만들면 경계가 얕다. **양쪽에서** 만들어야 깊어진다
-				if not _is_water(x, y - 1):
-					put.call(edges, tex["shoal_n"], at)
-				if not _is_water(x, y + 1):
-					put.call(edges, tex["shoal_s"], at)
-				if not _is_water(x - 1, y):
-					put.call(edges, tex["shoal_w"], at)
-				if not _is_water(x + 1, y):
-					put.call(edges, tex["shoal_e"], at)
+				var ln := not _is_water(x, y - 1)
+				var ls := not _is_water(x, y + 1)
+				var lw := not _is_water(x - 1, y)
+				var le := not _is_water(x + 1, y)
+				# 뭍이 **두 방향**에 있으면 물가가 직각으로 꺾인다. 곧은 덧그림
+				# 둘 대신 **호 한 장**을 얹어 뭍이 둥글게 메우고 돌아 나가게 한다
+				var c := ""
+				if not (ln and ls) and not (lw and le):
+					if ln and lw: c = "nw"
+					elif ln and le: c = "ne"
+					elif ls and lw: c = "sw"
+					elif ls and le: c = "se"
+				if c != "":
+					put.call(edges, tex["shoal_c_" + c], at)
+				else:
+					if ln:
+						put.call(edges, tex["shoal_n"], at)
+					if ls:
+						put.call(edges, tex["shoal_s"], at)
+					if lw:
+						put.call(edges, tex["shoal_w"], at)
+					if le:
+						put.call(edges, tex["shoal_e"], at)
 			elif ground == "soil":
 				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
 			elif ground == "path":
@@ -1983,14 +2071,31 @@ func _draw() -> void:
 			# 물가 — 물에 닿는 **땅 쪽**에 젖은 흙·조약돌·거품을 덧그린다.
 			# 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
 			if ground != "water" and ground != "dock":
-				if _is_water(x, y - 1):
-					put.call(edges, tex["shore_n"], at)
-				if _is_water(x, y + 1):
-					put.call(edges, tex["shore_s"], at)
-				if _is_water(x - 1, y):
-					put.call(edges, tex["shore_w"], at)
-				if _is_water(x + 1, y):
-					put.call(edges, tex["shore_e"], at)
+				var wn := _is_water(x, y - 1)
+				var ws := _is_water(x, y + 1)
+				var ww := _is_water(x - 1, y)
+				var we := _is_water(x + 1, y)
+				# 물이 **두 방향**에 있는 칸이 연못의 튀어나온 귀퉁이다.
+				# 곧은 덧그림 둘을 그냥 겹치면 물가가 직각으로 꺾인다 —
+				# 자연에 직각은 없다. 여기는 **호 한 장**으로 깎아 돌린다.
+				# (세 방향이 물인 곶은 호 둘이 서로를 덮어 버리니 곧게 둔다)
+				var oc := ""
+				if not (wn and ws) and not (ww and we):
+					if wn and ww: oc = "nw"
+					elif wn and we: oc = "ne"
+					elif ws and ww: oc = "sw"
+					elif ws and we: oc = "se"
+				if oc != "":
+					put.call(edges, tex["shore_o_" + oc], at)
+				else:
+					if wn:
+						put.call(edges, tex["shore_n"], at)
+					if ws:
+						put.call(edges, tex["shore_s"], at)
+					if ww:
+						put.call(edges, tex["shore_w"], at)
+					if we:
+						put.call(edges, tex["shore_e"], at)
 				# 대각선에만 물이 있는 귀퉁이 — 네 방향 덧그림만으로는 여기가
 				# 빈다. 안 그리면 물가가 뚝 끊겼다 이어진다
 				if _is_water(x - 1, y - 1) and not _is_water(x - 1, y) \
@@ -2042,7 +2147,7 @@ func _draw() -> void:
 					Color(0.95, 0.97, 0.98, 0.75))
 	# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
 	if not docks.is_empty():
-		var wt: Texture2D = tex["water_%d" % water_frame]
+		var wt: Texture2D = tex["water_0_0_%d" % water_frame]
 		for at: Vector2 in docks:
 			draw_texture_rect(wt, Rect2(at, tile_size), false)
 		for at: Vector2 in docks:

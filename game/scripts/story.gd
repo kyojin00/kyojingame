@@ -172,6 +172,7 @@ func _close_tutorial_space() -> void:
 			GameData.explored.erase(Vector2i(x / GameData.EXPLORE_CHUNK,
 				y / GameData.EXPLORE_CHUNK))
 	GameData.tutorial_space = false
+	m.rebuild_water_levels()   # 튜토리얼 자리가 바다가 됐다 — 깊이를 다시 잰다
 	m.queue_redraw()
 
 

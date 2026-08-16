@@ -252,6 +252,8 @@ func _build_sea() -> void:
 		if not have:
 			_seed_beach_forage(false)   # 노드는 뒤이어 _spawn_objects가 만든다
 		_place_stall(false)
+	# 바다가 통째로 깔렸다 — 물의 깊이를 다시 잰다 (물가에서 멀수록 짙다)
+	m.rebuild_water_levels()
 
 
 # 길이 열리는 순간 능선 너머가 드러난다 — 숲을 걷어내고 바다와 모래사장을 깐다
