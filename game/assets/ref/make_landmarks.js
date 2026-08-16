@@ -8,7 +8,9 @@
 // 가장자리에 그것이 걸치는 순간 「저기 뭐지」가 되고, 그게 걸어갈 이유다.
 //
 //   greattree  큰나무 숲   — 산만 한 나무 한 그루 (화면 12.5칸 x 16.5칸)
-//   falls      폭포골      — 두 단으로 쏟아지는 큰 폭포 (12.5칸 x 13칸)
+//   falls      폭포골      — 벼랑에 걸린 물 (5.5칸 x 6.5칸)
+//                            좌우로는 세계의 벼랑 타일이, 위아래로는
+//                            세계의 물 타일이 이어진다
 //   spire      붉은바위    — 층층이 깎인 바위 기둥 (7.75칸 x 14.5칸)
 //
 // 도트 크기는 **건물·사람과 같다.** 논리 한 칸 = 원본 4px, 게임에서 0.5배로
@@ -817,13 +819,37 @@ function rockSpire(f, NF) {
     });
     y += th + 1;
   }
-  for (const b of BANDS) g.rect(b.mid - b.l, b.y0, b.mid + b.r, b.y1, 'k2');
+  // ---- 켜 하나하나가 **원반**이다 ----
+  //
+  // 여기가 「평면이냐 입체냐」를 가른다.
+  //
+  // 켜를 네모로 쌓으면 아무리 톤을 잘 넣어도 **앞면만 있는 판**이다.
+  // 실제 기둥의 켜는 원반이고, 위에서 비스듬히 내려다보면 그 원반의
+  // 아랫변이 **가운데가 아래로 처진 곡선**으로 보인다 (원이 타원으로
+  // 눌린 것의 앞쪽 반). 그 곡선 하나가 「이건 원기둥이다」를 말한다.
+  //
+  // 곧은 가로선은 그 자리에서 종이가 접힌 것처럼 보인다 — 자연이 만든
+  // 것에는 곧은 가로선이 없다.
+  const sag = (rel, amt) => amt * Math.sqrt(Math.max(0, 1 - rel * rel));
+  for (const b of BANDS) {
+    const hw = Math.max(1, (b.l + b.r) / 2);
+    b.sagAmt = Math.max(1.6, hw * 0.26);
+    for (let x = Math.round(b.mid - b.l); x <= Math.round(b.mid + b.r); x++) {
+      const rel = (x - b.mid) / hw;
+      g.rect(x, b.y0, x, b.y1 + Math.round(sag(rel, b.sagAmt)), 'k2');
+    }
+  }
   // 켜와 켜 사이의 틈을 메운다 (한 줄씩 비워 두면 기둥이 토막 난다) —
   // 좁은 쪽 폭으로 이어 붙이면 그 자리가 저절로 그늘진 골이 된다
   for (let i = 0; i + 1 < BANDS.length; i++) {
     const a = BANDS[i], c = BANDS[i + 1];
-    g.rect(Math.max(a.mid - a.l, c.mid - c.l), a.y1,
-           Math.min(a.mid + a.r, c.mid + c.r), c.y0, 'k2');
+    const lo = Math.max(a.mid - a.l, c.mid - c.l);
+    const hi = Math.min(a.mid + a.r, c.mid + c.r);
+    const hw = Math.max(1, (hi - lo) / 2), mid = (lo + hi) / 2;
+    for (let x = Math.round(lo); x <= Math.round(hi); x++) {
+      const rel = (x - mid) / hw;
+      g.rect(x, a.y1, x, c.y0 + Math.round(sag(rel, a.sagAmt)), 'k2');
+    }
   }
 
   for (const b of BANDS) {
@@ -849,9 +875,17 @@ function rockSpire(f, NF) {
     }
     // 단단한 켜의 밑은 처마가 되어 그늘이 진다 — 켜가 **내밀었다**를
     // 말하는 한 줄. 켜 폭 차이만으로는 눈이 단차를 잘 못 읽는다
+    // 단단한 켜의 밑은 처마가 되어 그늘이 진다 — 그 그늘도 **곡선**을
+    // 따라가야 한다. 곧게 그으면 방금 만든 원반이 도로 납작해진다
     if (b.hard > 0.55) {
-      g.hline(b.mid - b.l + 1, b.mid + b.r - 1, b.y1, 'k4');
-      g.hline(b.mid - b.l + 2, b.mid + b.r - 2, b.y1 + 1, 'k3');
+      const hw2 = Math.max(1, (b.l + b.r) / 2);
+      for (let x = Math.round(b.mid - b.l + 1); x <= Math.round(b.mid + b.r - 1); x++) {
+        const rel = (x - b.mid) / hw2;
+        const yy = b.y1 + Math.round(b.sagAmt * Math.sqrt(Math.max(0, 1 - rel * rel)));
+        if (g.get(x, yy)[0] === 'k') g.px(x, yy, 'k4');
+        if (g.get(x, yy - 1)[0] === 'k') g.px(x, yy - 1, 'k4');
+        if (g.get(x, yy + 1)[0] === 'k') g.px(x, yy + 1, 'k3');
+      }
     }
   }
 
@@ -859,32 +893,80 @@ function rockSpire(f, NF) {
   // 단단한 층 하나가 모자처럼 얹혀 있어 그 밑이 안 깎였다 — 이 기둥이
   // 남은 이유다. 그래서 **처마처럼 내밀어야** 한다. 둥근 뚜껑을 얹으면
   // 병마개가 되고, 왜 안 깎였는지가 안 보인다.
-  // 다만 **자로 잰 네모**로 얹으면 로마 기둥의 머리(주두)가 된다.
-  // 갓돌도 깨진 돌이다 — 윗면이 기울고, 좌우로 내민 길이가 다르다.
-  const capX = midAt(TOP), capW = halfAt(TOP) + 5;
-  for (let x = Math.round(capX - capW - 4); x <= Math.round(capX + capW + 2); x++) {
-    const t = (x - (capX - capW)) / (capW * 2);
-    // 윗면은 오른쪽으로 살짝 기운다 + 가장자리가 조금씩 깨져 있다
-    const top = TOP - 11 + t * 3 + Math.round(hash(x >> 1, 51) * 2);
-    const bot = TOP + 2 + (x < capX ? 1 : 0);
-    g.rect(x, top, x, bot, 'k2');
+  // ---- 갓돌은 **내려다보이는 원반**이다 ----
+  //
+  // 네모로 얹으면 로마 기둥의 머리(주두)가 되고, 무엇보다 **윗면이 안
+  // 보인다** — 그러면 아무리 잘 칠해도 앞에서 본 판 한 장이다.
+  //
+  // 우리 집들이 하는 그대로 한다. 집은 지붕의 **윗면**이 뒤로 누워 보이고,
+  // 그 밑에 벽이 마주 서고, 처마가 벽 위로 내밀어 그늘을 던진다.
+  // 그 셋이 있어서 집이 상자로 보인다. 갓돌도 똑같이:
+  //
+  //   윗면   위에서 내려다본 원 -> **눌린 타원** (가로:세로 = 1:0.46).
+  //          이 게임이 세상을 내려다보는 각도가 그쯤이다
+  //   옆면   원반의 두께. 윗면보다 어둡다 (눕는 면 / 서는 면)
+  //   처마   옆면 밑으로 내민 그늘 — 기둥이 갓돌 **밑에** 있다는 표시
+  // 폭은 기둥보다 **조금만** 내민다. 넉넉히 내밀었더니 버섯 갓이 됐다 —
+  // 갓돌은 기둥에서 떨어져 나가다 만 켜지 딴 물건이 아니다
+  const capX = midAt(TOP), capW = halfAt(TOP) + 1;
+  const capRy = capW * 0.42;                 // 내려다본 만큼 눌린 세로
+  const capCy = TOP - 6;                     // 윗면 한가운데
+  const THICK = 6;                           // 원반의 두께
+  const capHalf = (dy) => {                  // 그 줄에서 원반의 반너비
+    const t = dy / capRy;
+    return Math.abs(t) > 1 ? -1 : capW * Math.sqrt(1 - t * t);
+  };
+  // 옆면 — 윗면 타원의 **앞쪽 반**을 두께만큼 아래로 늘인다
+  for (let x = Math.round(capX - capW); x <= Math.round(capX + capW); x++) {
+    const rel = (x - capX) / capW;
+    const front = capRy * Math.sqrt(Math.max(0, 1 - rel * rel));
+    g.rect(x, capCy, x, capCy + front + THICK, 'k3');
   }
-  // 내민 처마 밑은 늘 그늘 — 이 두 줄이 「내밀었다」를 만든다
-  g.hline(capX - capW - 3, capX + capW + 1, TOP + 2, 'k4');
-  g.hline(capX - capW - 1, capX + capW - 1, TOP + 3, 'k4');
-  // 갓돌 윗면의 잔금
-  for (let i = 0; i < 9; i++) {
-    const bx = capX - capW + hash(i, 21) * capW * 2;
-    const by = TOP - 9 + Math.round(hash(i, 25) * 3);
-    g.vline(bx, by, by + 1 + Math.round(hash(i, 23) * 2), 'k3');
+  // 윗면 — 눌린 타원. 옆면보다 **한 단 밝다** (하늘을 정면으로 받는 면)
+  for (let dy = -Math.ceil(capRy); dy <= Math.ceil(capRy); dy++) {
+    const hw = capHalf(dy);
+    if (hw < 0) continue;
+    const jag = Math.round(hash(dy, 51) * 2) - 1;   // 가장자리가 조금씩 깨져 있다
+    for (let x = Math.round(capX - hw - jag); x <= Math.round(capX + hw + jag); x++) {
+      // 윗면 안에서도 빛은 왼쪽 위 — 뒤쪽(위)이 밝고 앞쪽(아래)이 조금 어둡다
+      const t = (dy + capRy) / (capRy * 2);
+      g.px(x, capCy + dy, t < 0.34 ? 'k0' : (t < 0.72 ? 'k1' : 'k2'));
+    }
+  }
+  // 윗면과 옆면이 만나는 모서리 — 한 줄만 또렷하게. 이 선이 두 면을 가른다
+  for (let x = Math.round(capX - capW); x <= Math.round(capX + capW); x++) {
+    const rel = (x - capX) / capW;
+    const front = Math.round(capRy * Math.sqrt(Math.max(0, 1 - rel * rel)));
+    if (g.get(x, capCy + front)[0] === 'k') g.px(x, capCy + front, 'k2');
+  }
+  // 내민 처마 밑의 그늘 — 이 그늘도 원반의 곡선을 따라간다
+  for (let x = Math.round(capX - capW); x <= Math.round(capX + capW); x++) {
+    const rel = (x - capX) / capW;
+    const yy = Math.round(capCy + capRy * Math.sqrt(Math.max(0, 1 - rel * rel))) + THICK;
+    for (let d = 0; d < 2; d++)
+      if (g.get(x, yy + d)[0] === 'k') g.px(x, yy + d, d === 0 ? 'k4' : 'k3');
+  }
+  // 갓돌 윗면의 잔금 — 윗면에 있어야 윗면으로 읽힌다
+  for (let i = 0; i < 10; i++) {
+    const dy = Math.round((hash(i, 25) - 0.5) * capRy * 1.6);
+    const hw = capHalf(dy);
+    if (hw < 0) continue;
+    const bx = capX + (hash(i, 21) - 0.5) * hw * 1.8;
+    if (g.get(bx, capCy + dy)[0] === 'k') {
+      g.px(bx, capCy + dy, 'k2');
+      g.px(bx + 1, capCy + dy, 'k2');
+    }
   }
   // 갓돌 위의 마른 풀 한 줌 — 바람에 눕는다.
   // 이 그림에서 유일하게 살아 있는 것이라, 여기가 흔들려야 그림이 산다
-  for (let i = -6; i <= 6; i++) {
-    const bx = capX + i * 3.0 + hash(i + 9, 4) * 2;
-    const by = TOP - 10 + (i + 6) * 0.24;
-    const h2 = 4 + Math.round(hash(i + 9, 2) * 4);
-    const lean2 = Math.sin(wob + i * 0.6) * 2.0;
+  // 풀은 윗면 **뒤쪽 테두리**를 따라 난다. 한복판에 심으면 낙서처럼 보이고,
+  // 테두리를 따라 서야 그 테두리가 「둥근 윗면」임을 한 번 더 말해 준다
+  for (let i = 0; i < 16; i++) {
+    const th = Math.PI * (0.08 + (i / 15) * 0.84);        // 뒤쪽 반원
+    const bx = capX - Math.cos(th) * capW * 0.88;
+    const by = capCy - Math.sin(th) * capRy * 0.86;
+    const h2 = 3 + Math.round(hash(i + 9, 2) * 4);
+    const lean2 = Math.sin(wob + i * 0.6) * 1.8;
     for (let k = 0; k <= h2; k++)
       g.px(bx + lean2 * (k / h2), by - k, k > h2 - 2 ? 'm0' : 'm1');
   }
