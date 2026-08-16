@@ -635,13 +635,16 @@ func _build_hamlets() -> void:
 			if String(pr[1]) == "deco_wheel":
 				# 바퀴 **아랫도리가 잠기는** 자리에 판다. 밑에만 파 두었더니
 				# 바퀴가 물 위에 얹혀 헛도는 꼴이었다 — 물이 바퀴를 돌리려면
-				# 바퀴가 물속에 들어가 있어야 한다
-				for wy in range(p.y - 1, p.y + 2):
-					for wx in range(p.x - 2, p.x + 3):
+				# 바퀴가 물속에 들어가 있어야 한다.
+				# 이미 무언가 놓인 칸(방앗간 그림)은 건드리지 않는다 —
+				# 지웠다가는 집이 통째로 사라진다
+				for wy in range(p.y - 2, p.y + 3):
+					for wx in range(p.x - 3, p.x + 4):
+						if m.objects.has(Vector2i(wx, wy)):
+							continue
 						if wx < 0 or wy < 0 or wx >= m.MAP_W or wy >= m.WORLD_H:
 							continue
 						m.grid[wy][wx].ground = "water"
-						m.objects.erase(Vector2i(wx, wy))
 			m.objects[p] = {"kind": String(pr[1]), "hp": 0}
 
 

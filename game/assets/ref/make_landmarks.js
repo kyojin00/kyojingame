@@ -625,9 +625,19 @@ function greatTree(f, NF) {
 function bigFalls(f, NF) {
   // 4칸으로 줄였더니 이번엔 **물줄기가 가늘어** 큰 폭포로 안 보였다.
   // 벼랑에서 물이 넘어가는 자리는 벼랑에 팬 **넓은 홈**이다 — 6칸으로 넓힌다
-  const W = 96, H = 72, CX = 48;
-  const LIP = 4;                 // 물이 넘어가는 마루
-  const BASE = 58;               // 부서지는 자리 (밑 물의 수면)
+  // 마루 **위쪽 한 칸 반**을 그림이 같이 덮는다.
+  //
+  // 게임에 넣고서야 보였다 — 세계는 물가마다 **돌 테두리**(shore 타일)를
+  // 두른다. 그래서 윗못의 물과 폭포 사이에 그 돌 테두리가 한 줄 끼어,
+  // 물이 이어지지 않고 「돌 위에서 물이 새로 시작하는」 꼴이었다.
+  //
+  // 물칸을 못박아도 소용없다. 물이 있는 한 그 가장자리에는 테두리가 선다.
+  // 그러니 그림이 그 위를 **덮어** 지나가야 한다 — 윗못 안에서 시작해,
+  // 테두리를 건너, 마루를 넘어, 밑못까지. 그림 하나가 셋을 잇는다.
+  const W = 96, H = 96, CX = 48;
+  const HEAD = 28;               // 마루 위 — 아직 잔잔한 윗물 (테두리를 덮는다)
+  const LIP = HEAD;              // 물이 넘어가는 마루
+  const BASE = 82;               // 부서지는 자리 (밑 물의 수면)
   const g = new G(W, H);
   // 물은 **아래로** 흐른다. hash(y + f*6) 으로 두면 프레임마다 아래 것이
   // 위로 올라와 물이 거꾸로 솟는다 — 게임에 넣고서야 보였다. 빼야 내려간다
@@ -635,9 +645,34 @@ function bigFalls(f, NF) {
   const wob = (f / NF) * Math.PI * 2;
   const halfAt = (y) => 34 + Math.max(0, y - LIP) * 0.12;
 
+  // ---- 마루 위의 윗물 ----
+  // 윗못과 **같은 색**이라야 이어진다 (w5 = WATER[5], 게임 호수의 단).
+  // 마루로 갈수록 좁아지며 얕아진다 — 물이 홈으로 빨려 드는 모양
+  for (let y = 0; y < HEAD; y++) {
+    const t = y / HEAD;
+    const hw = 46 - t * 11;
+    // 바깥 가장자리는 **뜯어 놓는다.** 곧은 사선으로 끝나면 윗못 위에
+    // 깔때기를 얹어 놓은 것처럼 보인다 — 들쭉날쭉해야 물에 섞인다
+    const jag = Math.round(hash(0, y >> 1) * 4) - 2;
+    for (let x = Math.round(CX - hw - jag); x <= Math.round(CX + hw + jag); x++) {
+      const rel = Math.abs((x - CX) / hw);
+      if (rel > 1.0 && hash(x, y) > 0.5) continue;
+      // 가장자리는 얕아 밝고 가운데는 깊다 (게임 물의 깊이 규칙과 같다)
+      let c = rel > 0.86 ? 'w4' : (rel > 0.5 ? 'w5' : 'w6');
+      if (t > 0.72) c = LIGHTER[c];              // 마루 가까이는 얕아진다
+      g.px(x, y, c);
+    }
+    // 잔물결 — 가로로 짧게. 장마다 어긋나게 (게임 물 타일과 같은 방식)
+    for (let i = 0; i < 3; i++) {
+      const x0 = Math.round(CX - hw + hash(i, y) * hw * 2) + ((f * 2 + i) % 4) - 2;
+      const len = 2 + Math.floor(hash(i + 5, y) * 3);
+      for (let k = 0; k < len; k++)
+        if (g.get(x0 + k, y)[0] === 'w') g.px(x0 + k, y, LIGHTER[g.get(x0 + k, y)]);
+    }
+  }
   // 떨어지는 물
-  for (let y = 0; y <= BASE; y++) g.rect(CX - halfAt(y), y, CX + halfAt(y), y, 'w3');
-  for (let y = 0; y <= BASE; y++) {
+  for (let y = LIP; y <= BASE; y++) g.rect(CX - halfAt(y), y, CX + halfAt(y), y, 'w3');
+  for (let y = LIP; y <= BASE; y++) {
     const hw = halfAt(y);
     for (let x = Math.round(CX - hw); x <= Math.round(CX + hw); x++) {
       if (g.get(x, y)[0] !== 'w') continue;
@@ -1057,13 +1092,34 @@ function millWheel(f, NF) {
     }
   }
 
-  // ---- 물길 ----
-  // 바퀴 아랫도리가 잠긴다. 못은 안 그린다 (세계가 물길을 판다) —
-  // 잠긴 자리에서 **튀는 물**만 그린다
-  for (let i = 0; i < 10; i++) {
-    const px = CX - 14 + i * 3.1 + Math.sin(f * 1.7 + i) * 1.4;
-    const py = CY + R - 2 + Math.cos(f + i) * 2.5;
-    g.ellipse(px, py, 4, 2.2, i % 2 ? 'w0' : 'w1');
+  // ---- 물에 잠긴다 ----
+  //
+  // 바퀴는 물을 **퍼 올려야** 돌아간다. 수면에 얹혀만 있으면 헛돈다.
+  // 그래서 아랫도리 한 자락이 물속에 들어가 있어야 하고, 그 자리에는
+  //   ① 물에 잠긴 부분이 **어두워지는 물선**
+  //   ② 그 밑으로 비쳐 보이는 흐릿한 나무
+  //   ③ 수면에서 튀는 흰 물
+  // 이 셋이 다 있어야 「잠겼다」로 읽힌다. 하나만 있으면 물때가 낀 것 같다.
+  const WL = CY + R - 12;                    // 물선 (여기부터 잠긴다)
+  for (let y = WL; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = g.d[y][x];
+    if (c[0] !== 'b') continue;
+    // 깊이 들어갈수록 물빛에 먹힌다 — 형체만 남다가 결국 안 보인다
+    const d = Math.min(1.0, (y - WL) / 14.0);
+    g.px(x, y, d > 0.66 ? 'w5' : (d > 0.3 ? DARKER[DARKER[c]] : DARKER[c]));
+  }
+  // 물선 — 수면이 나무를 자르는 자리. 이 한 줄이 제일 크게 말한다
+  for (let x = 0; x < W; x++) {
+    if (g.get(x, WL)[0] === 'b' || g.get(x, WL)[0] === 'w')
+      g.px(x, WL, hash(x + f * 2, 3) > 0.5 ? 'w0' : 'w1');
+    if (g.get(x, WL + 1)[0] !== '.' && hash(x + f * 2, 5) > 0.6)
+      g.px(x, WL + 1, 'w1');
+  }
+  // 잠긴 자리에서 튀는 물
+  for (let i = 0; i < 12; i++) {
+    const px = CX - 18 + i * 3.2 + Math.sin(f * 1.7 + i) * 1.6;
+    const py = WL - 1 + Math.cos(f + i) * 2.2;
+    g.ellipse(px, py, 4, 2.0, i % 2 ? 'w0' : 'w1');
   }
   // 바퀴가 물을 퍼 올리며 떨어뜨리는 물줄기
   for (let i = 0; i < 5; i++) {
