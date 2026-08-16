@@ -70,14 +70,26 @@ WALK = 6
 # 뻗은 다리는 발이 무릎보다 더 뒤로 간다. 이 두 가지를 지키면 걸음이
 # 사람 걸음으로 보인다.
 #
-# (골반, 무릎, 발목이 몸 중심에서 앞으로 나간 칸, 발목이 땅에서 뜬 칸)
+# (골반, 무릎, 발목이 앞으로 나간 칸, 발목이 뜬 칸, **발 각도**)
+# 발 각도: +1 발끝이 들림(뒤꿈치로 딛는다) · 0 평평 · -1 뒤꿈치가 들림(발끝으로 민다)
+#
+# 발을 늘 수평으로 붙여 두면 다리가 비스듬한 칸에서 발목이 직각으로
+# 꺾인 것처럼 보인다. 사람 발은 걷는 내내 각도가 바뀐다 — 뒤꿈치로
+# 닿고, 평평하게 눌리고, 발끝으로 민다.
+# 여섯 칸 중 **넷은 땅, 둘은 공중**이다. 처음엔 다섯 대 하나로 짰는데,
+# 그러면 접혀 있던 다리가 한 칸 만에 쭉 펴지면서 땅까지 닿아야 한다 —
+# f2에서 f3으로 넘어갈 때 앞다리가 툭 튀는 게 그래서였다. 사람 걸음도
+# 디딤 60 : 흔듦 40쯤이라, 넷 대 둘이 맞다.
+#
+# 무릎이 굽는 칸은 셋이다. 1(체중을 받으며), 4(접어 올리며), 5(앞으로
+# 내밀며) — 셋 다 **무릎이 발보다 앞**이다. 반대로 굽는 칸은 없다.
 LEG = [
-    (1.4,  3.2,  5.0, 0),   # 0 디딤     — 앞으로 뻗어 뒤꿈치가 닿는다
-    (0.8,  2.2,  3.6, 0),   # 1 눌림     — 무릎이 굽어 체중을 받는다
-    (-0.2, -0.4, -0.6, 0),  # 2 통과     — 다리가 몸 밑에 곧게 선다 (딛는 쪽)
-    (-1.0, -2.4, -3.8, 0),  # 3 밀기     — 뒤로 곧게 뻗는다
-    (-1.4, -3.4, -5.0, 2),  # 4 발끝차기 — 뒤꿈치가 들린다
-    (0.2,  2.6,  0.4, 5),   # 5 통과     — 무릎이 올라오고 발이 그 뒤 밑에 접힌다
+    (1.4,  3.2,  5.0, 0, 1),   # 0 디딤   — 뻗어서 **뒤꿈치로** 닿는다
+    (0.6,  1.6,  2.6, 0, 0),   # 1 눌림   — 발이 평평하게 눌리며 체중을 받는다
+    (-0.2, -0.6, -1.0, 0, 0),  # 2 통과   — 다리가 몸 밑에 곧게 선다 (딛는 쪽)
+    (-1.2, -3.0, -4.6, 2, -1), # 3 밀기   — 뒤꿈치가 들리고 **발끝으로** 민다
+    (-1.0, 0.2,  -2.4, 4, -1), # 4 접기   — 무릎이 올라오고 발이 늘어져 접힌다
+    (0.8,  2.8,  3.2, 2, 1),   # 5 내밀기 — 발끝을 세워 디딜 채비를 한다
 ]
 LEG_LAG = WALK // 2        # 먼 다리는 반 바퀴 뒤 — 표를 세 칸 밀어 쓴다
 
@@ -94,7 +106,7 @@ HIP = [1, 1, 0, -1, -1, 0]
 # 옆모습 팔이 앞으로 나간 양 — 가까운 다리와 반대로.
 # 팔은 한 바퀴 내내 수직에 머무르지 않는다. 곧게 내려온 팔은 「서 있는
 # 사람」이고, 걷는 사람의 팔은 늘 어딘가로 가는 중이다.
-ARM = [-5, -4, 1, 5, 4, -1]
+ARM = [-5, -2, 1, 5, 2, -1]
 
 # 정면·뒷모습에서 통과 칸에 **허공을 지나가는 다리**.
 #   +1 = 화면 왼쪽 다리, -1 = 오른쪽 다리, 0 = 둘 다 딛고 있다
@@ -622,6 +634,7 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
             off = -stride if shade else stride
             hip_x, knee_x, foot_x = off * 0.35, off * 0.85, off * 1.35
             lift = 2 if off <= -3 else (1 if off < 0 else 0)
+            tilt = -1 if lift else 0
             if shade and not stride:
                 # 정지 자세에서 두 다리가 정확히 겹치면 먼 다리가 통째로
                 # 사라져 외다리가 된다. 한 칸 물려 그늘 한 줄을 남긴다.
@@ -629,15 +642,15 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
                 knee_x -= 0.7
                 foot_x -= 0.7
         else:
-            hip_x, knee_x, foot_x, lift = LEG[(phase + LEG_LAG) % WALK if shade
-                                              else phase % WALK]
+            hip_x, knee_x, foot_x, lift, tilt = LEG[(phase + LEG_LAG) % WALK
+                                                    if shade else phase % WALK]
         pc, kc = ('P', 'n') if shade else ('p', 'k')
         wf_leg = 2 if shade else 1
         bot = GROUND - lift
         hip_row = HIP_Y + 2 + sq
         knee_row = (hip_row + bot) // 2
         ankle_row = bot - 2                    # 아래 두 줄이 신발
-        for yy in range(LEG_Y - 1 + sq, bot + 1):   # 띠 아래 줄부터 겹쳐 잇는다
+        for yy in range(LEG_Y - 1 + sq, ankle_row + 1):  # 띠 아래부터 발목까지
             if yy <= knee_row:                 # 허벅지 — 골반에서 무릎으로
                 f = (yy - hip_row) / max(1, knee_row - hip_row)
                 o = hip_x + (knee_x - hip_x) * f
@@ -648,10 +661,8 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
             # 골반이 밀린 만큼은 **위에서만** 크고 발끝으로 갈수록 0이 된다.
             # 통째로 밀면 딛고 있는 발까지 따라 끌려가 미끄러진다.
             x = 16 + round(o + (dx + hip) * (1 - t)) + lean
-            boot = yy > ankle_row
-            if boot:
-                wb, wf = 2, wf_leg
-            elif yy <= knee_row:
+            boot = False
+            if yy <= knee_row:
                 # 띠(8칸)에서 정강이(4칸)로 한 줄에 떨어지면 넓은 상자 밑에
                 # 막대를 꽂아 둔 꼴이 된다. 여섯 줄에 걸쳐 좁혀 내려온다.
                 f = (yy - hip_row) / max(1, knee_row - hip_row)
@@ -659,6 +670,11 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
                 wf = 2 if f < 0.45 else wf_leg
             else:
                 wb, wf = 2, wf_leg
+            if shade:
+                # 먼 다리는 뒤쪽을 한 칸 더 둔다. 가까운 다리와 겹치는
+                # 칸에서 남는 게 한 칸뿐이면, 위아래가 이어져 보이지 않고
+                # 허벅지 따로 신발 따로 떠 있는 조각이 된다.
+                wb += 1
             g.rect(x - wb, yy, x + wf, yy, kc if boot else pc)
             if not boot and hip_row < yy:
                 g.px(x - wb, yy, 'P')          # 뒤쪽 모서리 그늘
@@ -670,19 +686,41 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
                 g.rect(x - wb, yy, x + wf, yy, 'q' if not shade else 'p')
             if yy == knee_row and knee_x > foot_x + 0.5:
                 g.px(x + wf, yy, 'P' if not shade else pc)   # 굽힌 무릎 자국
-            if yy == bot:
-                g.hline(x - wb, x + wf + 1, yy, 'K')         # 밑창은 늘 그늘
             # 가까운 다리에서 **먼 다리와 맞닿는 쪽** 모서리를 어둡게 눌러
             # 둘을 뗀다. 어느 쪽인지는 두 다리의 앞뒤가 정한다.
             if not shade and near_front is not None:
                 bx = x - wb - 1 if near_front else x + wf + 1
+                # 그 **바깥에 먼 다리가 더 남아 있을 때만** 긋는다. 먼
+                # 다리가 한 칸만 비죽 나온 자리에까지 그으면 그 한 칸이
+                # 검게 지워져 다리에 구멍이 뚫린다 — 위아래는 보이는데
+                # 가운데 한 줄만 사라져 다리가 잘린 것처럼 보였다.
+                ox = bx - 1 if near_front else bx + 1
+                LEGC = ('p', 'P', 'q', 'k', 'K', 'n')
+                if 0 <= bx < GW and 0 <= ox < GW \
+                        and g.d[yy][bx] in LEGC and g.d[yy][ox] in LEGC:
+                    g.px(bx, yy, 'O')
+        # 신발 — 두 줄. 각도에 따라 어느 줄이 땅에 닿는지가 달라진다.
+        #   +1 뒤꿈치만 닿고 발끝이 들린다   (윗줄이 앞으로 길다)
+        #    0 발바닥 전체가 닿는다
+        #   -1 발끝만 닿고 뒤꿈치가 들린다   (윗줄이 뒤로 길다)
+        fx = 16 + round(foot_x + (dx + hip) * 0.15) + lean
+        up, lo = bot - 1, bot
+        if tilt > 0:
+            hi_a, hi_b, lo_a, lo_b = fx - 2, fx + 3, fx - 2, fx
+        elif tilt < 0:
+            hi_a, hi_b, lo_a, lo_b = fx - 3, fx + 2, fx, fx + 3
+        else:
+            hi_a, hi_b, lo_a, lo_b = fx - 2, fx + 2, fx - 2, fx + 3
+        g.rect(hi_a, up, hi_b, up, kc)
+        g.rect(lo_a, lo, lo_b, lo, 'K')        # 땅에 닿는 줄은 늘 그늘
+        if not shade:
+            g.px(hi_b, up, 'p')                # 발등이 빛을 문다
+        # 두 다리가 맞닿는 쪽 모서리 — 다리 기둥과 같은 규칙
+        if not shade and near_front is not None:
+            for yy, a_, b_ in ((up, hi_a, hi_b), (lo, lo_a, lo_b)):
+                bx = a_ - 1 if near_front else b_ + 1
                 if 0 <= bx < GW and g.d[yy][bx] in ('p', 'P', 'q', 'k', 'K', 'n'):
                     g.px(bx, yy, 'O')
-        fx = 16 + round(foot_x) + lean
-        g.px(fx + wf_leg + 1, bot - 1, kc)     # 앞코 한 칸
-        g.px(fx + wf_leg + 1, bot, 'K')
-        if lift:
-            g.px(fx - 3, bot - 1, kc)          # 들린 뒤꿈치
 
 
 def torso_up(g, bob, swing, dx=0, skip=None):
