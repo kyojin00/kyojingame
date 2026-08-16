@@ -45,14 +45,46 @@ func save_now() -> void:
 	_auto_t = 0.0                # 어떤 이유로 담았든 15분을 다시 센다
 	if Net.is_guest():
 		return  # 저장은 호스트만
+	var g := grid_cells()
+	var objs := object_rows()
+	var anims := []
+	for a in m.animals:
+		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
+	GameData.save_game(g, m.player.position, objs, anims, m.MAP_W, m.MAP_H)
+
+
+# 격자는 **사람이 바꾼 칸만** 담는다.
+#
+# 예전에는 온 격자를 통째로 적었다. 224x146일 때는 3만 칸이라 견뎠는데,
+# 세계가 네 배로 넓어지며 13만 6천 칸이 됐다 — 저장 한 번에 오 메가바이트를
+# 쓰고, 밭 스무 칸 갈아 놓고 그 짓을 한다. 함께하기는 이걸 통째로 **전송**까지
+# 했다 — 접속 한 번에 5메가바이트다.
+#
+# 나머지 칸은 적을 이유가 없다. 세계를 짓는 일은 처음부터 끝까지
+# **해시로만** 정해지므로(무작위가 한 군데도 없다), 다시 지으면 잔디도
+# 자갈도 모래도 물도 한 칸까지 똑같이 나온다. 사람이 손댄 것 — 갈아 놓은
+# 흙, 심은 작물, 물 준 자리 — 만이 다시 못 만드는 것이다.
+#
+# (자갈을 잔디로 되돌린 자리는 담지 못한다. 하지만 그건 예전 형식도
+#  마찬가지였다 — 불러올 때 _paint_regions 가 자갈을 도로 깔았다)
+func grid_cells() -> Array:
 	var g := []
 	for y in m.MAP_H:
-		var row := []
 		for x in m.MAP_W:
 			var c: Dictionary = m.grid[y][x]
-			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day),
+			if str(c.ground) == "grass" and str(c.crop_id) == "" \
+					and float(c.wet_min) <= 0.0:
+				continue
+			if str(c.ground) in ["path", "yard", "sand", "water", "dock"] \
+					and str(c.crop_id) == "" and float(c.wet_min) <= 0.0:
+				continue      # 지형이 깐 바닥 — 다시 지으면 그대로 나온다
+			g.append([x, y, c.ground, float(c.wet_min), c.crop_id, float(c.crop_day),
 				1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
-		g.append(row)
+	return g
+
+
+# 세계에 놓인 것들 (나무·돌·울타리·설치물)
+func object_rows() -> Array:
 	var objs := []
 	for pos: Vector2i in m.objects:
 		objs.append([pos.x, pos.y, m.objects[pos].kind, m.objects[pos].hp,
@@ -60,10 +92,7 @@ func save_now() -> void:
 			1 if m.objects[pos].get("young", false) else 0,
 			int(m.objects[pos].get("grow", 0)),
 			1 if m.objects[pos].get("fixed", false) else 0])
-	var anims := []
-	for a in m.animals:
-		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
-	GameData.save_game(g, m.player.position, objs, anims)
+	return objs
 
 
 func _apply_save(d: Dictionary) -> void:
@@ -408,48 +437,78 @@ func _apply_save(d: Dictionary) -> void:
 	var pos_scale := float(m.TILE) / float(d.get("tile", 16))
 	m.player.position = Vector2(float(d.player[0]), float(d.player[1])) * pos_scale
 
-	# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다.
-	# 다만 **튜토리얼 공간이 격자 아래에 붙기 전(세계 높이만큼만 저장하던)** 것은
-	# 세계 부분이 한 칸도 어긋나지 않았다 — 그만큼만 읽어 밭을 그대로 살린다.
-	var g: Array = d.grid
-	var rows: int = m.MAP_H
-	if g.size() == m.WORLD_H and g.size() > 0 and g[0].size() == m.MAP_W:
-		rows = m.WORLD_H
-	elif g.size() != m.MAP_H or (g.size() > 0 and g[0].size() != m.MAP_W):
-		m.player.position = Vector2(m.START_TILE.x * m.TILE + 16, m.START_TILE.y * m.TILE + 16)
-		return
-	for y in rows:
-		for x in m.MAP_W:
-			var s: Array = g[y][x]
-			var cell: Dictionary = m.grid[y][x]
-			# 물 타일은 맵 생성 결과를 유지하고 경작 상태만 복원
-			if cell.ground != "water" and s[0] != "water":
-				cell.ground = s[0]
-			# 구버전 호환: 0/1 플래그였으면 젖음 6시간으로 간주
-			var wet := float(s[1])
-			if wet == 1.0:
-				wet = m.WET_MANUAL
-			cell.wet_min = wet
-			cell.watered = wet > 0.0
-			cell.crop_id = s[2]
-			# 구버전 호환: 일 단위(0~9)였으면 시간 단위(분)로 환산
-			var growth := float(s[3])
-			if growth > 0.0 and growth < 15.0:
-				growth *= 60.0
-			cell.crop_day = growth
-			cell.dead = s.size() > 4 and int(s[4]) == 1
-			cell.half_fed = s.size() > 5 and int(s[5]) == 1
-	# 흙길·부두·다리가 전부 없어졌다 — 옛 세이브의 길/데크는 잔디로.
-	# (옛 강 물칸은 위의 물 규칙 덕에 새 지형(잔디)을 그대로 따른다)
-	# 세계에만 적용한다 — 튜토리얼 공간의 숲길은 이야기가 깐 진짜 길이다.
-	for y in m.WORLD_H:
-		for x in m.MAP_W:
-			var cell: Dictionary = m.grid[y][x]
-			if cell.ground in ["path", "dock"]:
-				cell.ground = "grass"
-	# 위에서 자갈 바닥까지 같이 걷혔다 — 지역 바닥(채석장 자갈·습지 웅덩이)은
-	# 지형이 정하는 것이지 저장에 딸린 게 아니니 여기서 다시 깐다
-	m.worldgen._paint_regions()
+	# ---- 밭 상태 ----
+	#
+	# 새 형식은 **사람이 바꾼 칸만** 담는다. 세계가 448x264 로 넓어지면서
+	# 격자가 13만 6천 칸이 됐다 — 통째로 적으면 저장 한 번에 오 메가바이트고,
+	# 밭 스무 칸 갈아 놓고 그 짓을 한다. 나머지 칸은 세계를 다시 지으면
+	# 똑같이 나오므로 적을 이유가 없다 (save_now 참고).
+	if d.has("grid_cells"):
+		if int(d.get("grid_w", 0)) != m.MAP_W or int(d.get("grid_h", 0)) != m.MAP_H:
+			# 세계 크기가 달라진 옛 저장 — 밭도 오브젝트도 자리가 어긋난다
+			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16,
+				m.START_TILE.y * m.TILE + 16)
+			return
+		for s: Array in d.grid_cells:
+			var cx := int(s[0])
+			var cy := int(s[1])
+			if cx < 0 or cy < 0 or cx >= m.MAP_W or cy >= m.MAP_H:
+				continue
+			var c2: Dictionary = m.grid[cy][cx]
+			# 물 칸은 지형이 정한다 — 밭 상태만 얹는다
+			if c2.ground != "water" and str(s[2]) != "water":
+				c2.ground = s[2]
+			c2.wet_min = float(s[3])
+			c2.watered = float(s[3]) > 0.0
+			c2.crop_id = s[4]
+			c2.crop_day = float(s[5])
+			c2.dead = int(s[6]) == 1
+			c2.half_fed = int(s[7]) == 1
+	else:
+		# ---- 옛 형식: 격자를 통째로 적던 시절 ----
+		# 맵 크기가 다른 옛 저장이면 밭 상태는 버리고 진행 상황만 복원한다.
+		# 다만 **튜토리얼 공간이 격자 아래에 붙기 전(세계 높이만큼만 저장하던)**
+		# 것은 세계 부분이 한 칸도 안 어긋났다 — 그만큼만 읽어 밭을 살린다.
+		var g: Array = d.get("grid", [])
+		var rows: int = m.MAP_H
+		if g.size() == m.WORLD_H and g.size() > 0 and g[0].size() == m.MAP_W:
+			rows = m.WORLD_H
+		elif g.size() != m.MAP_H or (g.size() > 0 and g[0].size() != m.MAP_W):
+			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16,
+				m.START_TILE.y * m.TILE + 16)
+			return
+		for y in rows:
+			for x in m.MAP_W:
+				var s: Array = g[y][x]
+				var cell: Dictionary = m.grid[y][x]
+				# 물 타일은 맵 생성 결과를 유지하고 경작 상태만 복원
+				if cell.ground != "water" and s[0] != "water":
+					cell.ground = s[0]
+				# 구버전 호환: 0/1 플래그였으면 젖음 6시간으로 간주
+				var wet := float(s[1])
+				if wet == 1.0:
+					wet = m.WET_MANUAL
+				cell.wet_min = wet
+				cell.watered = wet > 0.0
+				cell.crop_id = s[2]
+				# 구버전 호환: 일 단위(0~9)였으면 시간 단위(분)로 환산
+				var growth := float(s[3])
+				if growth > 0.0 and growth < 15.0:
+					growth *= 60.0
+				cell.crop_day = growth
+				cell.dead = s.size() > 4 and int(s[4]) == 1
+				cell.half_fed = s.size() > 5 and int(s[5]) == 1
+		# 흙길·부두·다리가 전부 없어졌다 — 옛 세이브의 길/데크는 잔디로.
+		# (옛 강 물칸은 위의 물 규칙 덕에 새 지형(잔디)을 그대로 따른다)
+		# 세계에만 적용한다 — 튜토리얼 공간의 숲길은 이야기가 깐 진짜 길이다.
+		for y2 in m.WORLD_H:
+			for x2 in m.MAP_W:
+				var c3: Dictionary = m.grid[y2][x2]
+				if c3.ground in ["path", "dock"]:
+					c3.ground = "grass"
+		# 위에서 자갈 바닥까지 같이 걷혔다 — 지역 바닥(채석장 자갈·습지 웅덩이)은
+		# 지형이 정하는 것이지 저장에 딸린 게 아니니 여기서 다시 깐다
+		m.worldgen._paint_regions()
 	if d.has("objects"):
 		m.objects.clear()
 		for o in d.objects:

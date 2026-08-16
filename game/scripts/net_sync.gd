@@ -130,25 +130,16 @@ func _on_connection_failed() -> void:
 
 
 func _make_snapshot_json() -> String:
-	var g := []
-	for y in m.MAP_H:
-		var row := []
-		for x in m.MAP_W:
-			var c: Dictionary = m.grid[y][x]
-			row.append([c.ground, int(c.wet_min), c.crop_id, int(c.crop_day),
-				1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
-		g.append(row)
-	var objs := []
-	for pos: Vector2i in m.objects:
-		objs.append([pos.x, pos.y, m.objects[pos].kind, m.objects[pos].hp,
-			1 if m.objects[pos].get("apple", false) else 0,
-			1 if m.objects[pos].get("young", false) else 0,
-			int(m.objects[pos].get("grow", 0)),
-			1 if m.objects[pos].get("fixed", false) else 0])
+	# 저장과 **똑같은 것**을 보낸다 (saveio.grid_cells / object_rows).
+	# 예전에는 여기서 격자를 통째로 다시 훑었는데, 저장 형식이 「바뀐 칸만」으로
+	# 바뀌었을 때 이쪽만 옛 방식으로 남으면 접속마다 오 메가바이트를 보낸다.
+	var g := m.saveio.grid_cells()
+	var objs := m.saveio.object_rows()
 	var anims := []
 	for a in m.animals:
 		anims.append([a.type, a.position.x, a.position.y, 1 if a.fed else 0])
-	return JSON.stringify(GameData.build_save(g, m.player.position, objs, anims))
+	return JSON.stringify(GameData.build_save(g, m.player.position, objs, anims,
+		m.MAP_W, m.MAP_H))
 
 
 # 스냅샷은 **맵 전체**라 커서(168x90칸이면 300KB를 넘는다) 한 번에 못 보낸다.

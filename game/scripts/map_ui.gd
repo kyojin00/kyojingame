@@ -351,6 +351,25 @@ const REGION_TINT := {
 	"wetland": Color(0.26, 0.44, 0.42, 0.36),   # 물 먹은 땅
 	"pinewood": Color(0.16, 0.3, 0.26, 0.44),   # 서늘한 솔숲
 	"bluff": Color(0.55, 0.52, 0.42, 0.3),      # 바람 든 벼랑
+	# ---- 네 배로 넓히며 붙인 고장들 ----
+	# 색이 없으면 지도에서 그냥 풀밭이라, 넓힌 땅이 통째로 「빈 데」로 보인다.
+	# 고장마다 색이 있어야 지도를 펼친 순간 **세상이 갈라져 보인다**
+	"falls": Color(0.34, 0.56, 0.62, 0.38),     # 물안개 낀 골짜기
+	"birch": Color(0.62, 0.72, 0.5, 0.32),      # 훤한 자작나무
+	"redrock": Color(0.66, 0.4, 0.28, 0.36),    # 붉은 자갈땅
+	"reed": Color(0.68, 0.64, 0.4, 0.28),       # 마른 억새
+	"starlake": Color(0.3, 0.46, 0.66, 0.34),   # 호수 낀 땅
+	"flower": Color(0.72, 0.56, 0.66, 0.3),     # 꽃 핀 들
+	"greatwood": Color(0.2, 0.42, 0.22, 0.42),  # 큰나무의 숲
+	"boulder": Color(0.5, 0.48, 0.46, 0.34),    # 돌무지 비탈
+	"farpine": Color(0.12, 0.26, 0.24, 0.46),   # 세계에서 제일 깊은 숲
+	"mist": Color(0.34, 0.46, 0.48, 0.4),       # 안개 낀 늪
+	"southfield": Color(0.56, 0.68, 0.4, 0.28), # 남녘 들
+	"dune": Color(0.76, 0.7, 0.52, 0.32),       # 바다 앞 모래
+	"bramble": Color(0.38, 0.44, 0.26, 0.36),   # 걷기 사나운 잡목
+	"willow": Color(0.32, 0.5, 0.4, 0.34),      # 늪가 버들
+	"ashen": Color(0.58, 0.56, 0.52, 0.32),     # 색 없는 땅
+	"eastedge": Color(0.46, 0.5, 0.54, 0.34),   # 세계의 동쪽 끝
 }
 
 
@@ -615,9 +634,13 @@ func _draw_map() -> void:
 		if n.visible and _visible_tile(int(n.position.x / 32.0), int(n.position.y / 32.0)):
 			_dot(n.position, dot, Color(0.95, 0.55, 0.75))
 
-	# 시설 라벨 (그 위치를 발견했을 때만)
-	_place_label(73, 28, "우리집")
-	_place_label(18, 14, "농장")
+	# 시설 라벨 (그 위치를 발견했을 때만).
+	#
+	# 자리는 **상수에서 뽑는다.** 예전에는 숫자를 그대로 적어 두었는데,
+	# 세계를 북쪽으로 열두 줄 내렸을 때 이 라벨들만 제자리에 남아
+	# 「동굴」이 세계 맨 윗줄에, 「중앙 광장」이 이장집 위에 찍혔다.
+	_place_label(main.HOME_SITE.x - 2, main.HOME_SITE.y - 2, "우리집")
+	_place_label(main.START_TILE.x + 4, main.START_TILE.y + 4, "농장")
 	if GameData.barn_built:
 		_place_label(main.BARN_POS.x, main.BARN_POS.y, "축사")
 	if GameData.greenhouse_built:
@@ -630,9 +653,28 @@ func _draw_map() -> void:
 			_cell + 4, _cell + 4), Color(0.62, 0.42, 0.24))
 		# 글씨는 아래쪽에 — 위에 두면 「농장」·「축사」 라벨과 겹쳐 읽을 수 없다
 		_label(Vector2(_ox + h.x * _cell, _oy + h.y * _cell + _cell + 20), "말")
-	_place_label(74, 13, "중앙 광장")
-	_place_label(46, 31, "호수 낚시터")
-	_place_label(50, 1, "동굴")
+	_place_label(main.PLAZA.get_center().x - 3, main.PLAZA.get_center().y - 3, "중앙 광장")
+	_place_label(main.FISH_SPOT.get_center().x - 3,
+		main.FISH_SPOT.get_center().y - 1, "호수 낚시터")
+	_place_label(main.CAVE_POS.x, main.CAVE_POS.y, "동굴")
+	# 고장의 랜드마크 — 가 본 곳이면 **금빛 마름모**로 찍는다.
+	#
+	# 지역 이름표는 지역 한가운데에 붙지만, 랜드마크는 정확히 그 자리를
+	# 알려 줘야 한다. 세계가 네 배가 된 뒤로는 「그 고장 어딘가」로는
+	# 못 찾는다 — 열두 칸짜리 그림도 448칸 안에서는 점 하나다.
+	for lm: Dictionary in main.LANDMARKS:
+		var lt: Vector2i = lm.tile
+		if not _visible_tile(lt.x, lt.y):
+			continue
+		var lp := Vector2(_ox + lt.x * _cell + _cell * 0.5, _oy + lt.y * _cell)
+		var d: float = maxf(5.0, _cell * 1.6)
+		canvas.draw_colored_polygon(PackedVector2Array([
+			lp + Vector2(0, -d), lp + Vector2(d, 0),
+			lp + Vector2(0, d), lp + Vector2(-d, 0)]), Color(0.16, 0.12, 0.06))
+		canvas.draw_colored_polygon(PackedVector2Array([
+			lp + Vector2(0, -d + 2), lp + Vector2(d - 2, 0),
+			lp + Vector2(0, d - 2), lp + Vector2(-d + 2, 0)]), Color(1.0, 0.84, 0.36))
+		_label(lp + Vector2(0, -d - 4.0), str(lm.name), 22, true)
 	# 야생 지역 이름 — 가 본 곳만. 그 땅 한가운데에 옅은 테두리와 함께 적는다.
 	# 이름이 붙어야 「빈 잔디밭」이 아니라 「가 볼 데」로 보인다.
 	for reg: Dictionary in main.REGIONS:

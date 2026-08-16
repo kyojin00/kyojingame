@@ -29,7 +29,13 @@ extends Node2D
 # 그래서 **지역(REGIONS)** 으로 갈라 놓는다 — 과수원은 나무가 줄지어 서고,
 # 채석장은 자갈 바닥에 바위가 널렸고, 습지는 물웅덩이가 흩어져 있다.
 # 발을 들이는 순간 「다른 데 왔다」가 보여야 넓힌 값을 한다.
-const MAP_W := 224   # 동쪽: 확장 구역 너머의 과수원 · 채석장 · 솔숲
+#
+# 그리고 **세계를 네 배로 넓혔다** (224x132 -> 448x264, 넓이 4배).
+# 넓힌 땅은 그냥 두면 걸어도 걸어도 같은 풀밭이라, 각 고장마다
+# **한눈에 보이는 큰 것** 하나씩을 세웠다 (LANDMARKS) — 여기는 폭포가
+# 어마어마하게 쏟아지고, 저기는 나무 한 그루가 산만 하다. 멀리서
+# 그 하나가 보이면 「저기로 가 보자」가 된다. 그게 넓힌 값을 하는 길이다.
+const MAP_W := 448   # 동쪽: 확장 구역 너머의 과수원 · 채석장 · 솔숲 · 새 고장들
 # ---- 세계와 튜토리얼 공간 ----
 #
 # **튜토리얼은 실제 세계의 일부가 아니다.** 처음 눈을 뜨는 숲길은 세계
@@ -48,8 +54,8 @@ const MAP_W := 224   # 동쪽: 확장 구역 너머의 과수원 · 채석장 ·
 # 더하지 **않는** 것: BARN_ART 처럼 기준점에서 잰 상대 좌표, 그리고
 # TUT_DY·MAP_H 처럼 다른 상수에서 파생되는 값 (이미 밀린 값을 쓴다).
 const NORTH_PAD := 12
-const WORLD_H := 120 + NORTH_PAD   # 실제 세계의 높이 (남쪽: 습지 · 초원 · 능선-해변-바다)
-const TUT_Y0 := 134 + NORTH_PAD    # 튜토리얼 숲길이 놓이는 줄 (세계 밖으로 한참 내려간 자리)
+const WORLD_H := 252 + NORTH_PAD   # 실제 세계의 높이 (남쪽: 습지 · 초원 · 능선-해변-바다)
+const TUT_Y0 := WORLD_H + 14       # 튜토리얼 숲길이 놓이는 줄 (세계 밖으로 한참 내려간 자리)
 const TUT_DY := TUT_Y0 - 7          # 옛 숲길 좌표(y7~22)를 이 공간으로 옮기는 값
 # 숲길 위아래로 열 줄씩 더 둔다 — 화면이 온통 숲으로 차야 「한 장의 공간」으로 보인다
 const TUTORIAL_REGION := Rect2i(0, TUT_Y0 - 12, 62, 38)
@@ -216,6 +222,8 @@ const TEXTURE_NAMES := [
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
+	# 고장마다 하나씩 선 「엄청 큰 것」 (ref/make_landmarks.js)
+	"landmark_greattree", "landmark_falls", "landmark_spire",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
 	"icon_letter", "old_book",
@@ -373,7 +381,10 @@ const GREENHOUSE_COST_MONEY := 5000
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
 # 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
-const VILLAGE_REGION := Rect2i(54, 0 + NORTH_PAD, 46, 44)   # 부지를 벌리면서 서쪽으로 넓혔다
+# 부지를 오므리면서 구역도 같이 줄였다 (46x44 -> 40x38). 이 사각형 안에는
+# 나무·돌이 나지 않으므로, 줄인 만큼 **숲이 마을 코앞까지 다가온다** —
+# 넓은 세계에 파묻힌 작은 마을이라는 그림이 여기서 나온다
+const VILLAGE_REGION := Rect2i(57, 0 + NORTH_PAD, 40, 38)
 # 인도는 모두 3줄. 길 폭을 한 곳에서 정하고 건물은 이 선에 맞춰 놓는다.
 const ROAD_W := 3
 const WEST_LANE_X := 67                    # 서쪽 세로 인도 (x 67~69)
@@ -406,17 +417,20 @@ const FISH_SIGN := Vector2i(43, 35 + NORTH_PAD)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
 # 북쪽 산자락 — 이 줄 위쪽의 풀밭에는 민들레가 돋는다 (산에서 캐는 채집물)
 const MOUNTAIN_Y := 14 + NORTH_PAD
-const SEA_RIDGE_Y := 107 + NORTH_PAD           # 바위 능선 줄 — 바다로 가는 길을 막는다
-const BEACH_Y0 := 108 + NORTH_PAD              # 모래사장 (능선 아래 ~ 바다 위)
-const SEA_Y0 := 113 + NORTH_PAD                # 여기부터 남쪽 끝까지 바다
-const SEA_GATE := [Vector2i(63, 107 + NORTH_PAD), Vector2i(64, 107 + NORTH_PAD)]  # 곡괭이로 캐서 여는 길목
+# 남쪽 바다는 **언제나 세계의 맨 밑에 붙어 있다.** 그래서 이 넷은 절대
+# 좌표가 아니라 WORLD_H 에서 거꾸로 잰다 — 세계를 아래로 넓혀도 해안선이
+# 세계 한복판에 떠 있는 일이 없다 (넓힐 때마다 네 줄을 다시 세지 않아도 된다).
+const SEA_RIDGE_Y := WORLD_H - 13          # 바위 능선 줄 — 바다로 가는 길을 막는다
+const BEACH_Y0 := WORLD_H - 12             # 모래사장 (능선 아래 ~ 바다 위)
+const SEA_Y0 := WORLD_H - 7                # 여기부터 남쪽 끝까지 바다
+const SEA_GATE := [Vector2i(63, WORLD_H - 13), Vector2i(64, WORLD_H - 13)]  # 곡괭이로 캐서 여는 길목
 const FISHER_ARRIVE := Vector2i(78, 23 + NORTH_PAD)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
 const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...) 최대 수
 # 해변 모래밭에만 밀려오는 것들 — 조개·비닐봉지·유리 조각·금속 고리(기본),
 # 산호 조각·고대 조각(매우 희귀 — 숨겨진 이야기·레시피와 이어진다)
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
-const STALL_TILE := Vector2i(72, 109 + NORTH_PAD)  # 만수의 해변 노점 (게이트 서남쪽 모래밭)
+const STALL_TILE := Vector2i(72, BEACH_Y0 + 1)  # 만수의 해변 노점 (게이트 서남쪽 모래밭)
 # 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
 const ONSEN_POS := Vector2i(66, 6 + NORTH_PAD)
 # 옛 농지 (메인 스토리 16) — 마을 서쪽, 오래 묵어 수풀이 우거진 밭.
@@ -436,7 +450,7 @@ const HILL_TRACE_TILES := {
 }
 # 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
 # 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
-const BRACELET_ROCK := Vector2i(8, 112 + NORTH_PAD)
+const BRACELET_ROCK := Vector2i(8, SEA_Y0 - 1)
 const FISH_SPOT := Rect2i(42, 26 + NORTH_PAD, 14, 12)   # 이 안이면 「낚시터에 있다」
 # 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
 const FISH_CLEAR := Rect2i(41, 24 + NORTH_PAD, 20, 14)
@@ -463,8 +477,9 @@ const OLD_SIGN := Vector2i(99, 9 + NORTH_PAD)
 # 지역끼리는 일부러 사이를 벌려 둔다. 맞붙여 놓으면 경계가 자로 그은 듯해서
 # 「지도를 칸으로 나눠 놨구나」가 먼저 보인다.
 const REGIONS := [
+	# ---- 원래 있던 땅 (마을 · 농장 둘레) ----
 	# 예전부터 있던 남동쪽 깊은 숲 — 넓어진 만큼 남쪽으로 늘렸다
-	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40 + NORTH_PAD, 52, 26),
+	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40 + NORTH_PAD, 52, 24),
 		"tree": 0.30, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
 	# 옛 표지판 너머 첫 땅. 줄 맞춰 심긴 사과나무 — 사람 손이 닿았던 자리다
 	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8 + NORTH_PAD, 48, 26),
@@ -483,9 +498,102 @@ const REGIONS := [
 	# 그래서 「더 깊다」는 바위로 낸다 (바위는 두 칸 간격이라 훨씬 촘촘하다)
 	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70 + NORTH_PAD, 62, 24),
 		"tree": 0.34, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
-	# 능선 위 벼랑길 — 바다로 내려가기 전 마지막 땅. 돌투성이다
-	{"id": "bluff", "name": "바닷가 벼랑길", "rect": Rect2i(20, 96 + NORTH_PAD, 180, 10),
+
+	# ---- 네 배로 넓히며 붙인 땅 ----
+	#
+	# 여기부터는 **고장마다 테마가 있다.** 폭포골에는 어마어마한 폭포가
+	# 쏟아지고, 큰나무 숲에는 산만 한 나무 한 그루가 서 있다 (LANDMARKS).
+	# 나무·바위 밀도만 흔들면 「좀 다르네」에서 끝난다 — 고장마다 **한눈에
+	# 보이는 큰 것** 하나가 있어야 걸어갈 이유가 된다.
+
+	# 폭포골 — 물소리가 나는 골짜기. 젖은 땅이라 웅덩이가 흩어져 있다
+	{"id": "falls", "name": "폭포골", "rect": Rect2i(238, 6 + NORTH_PAD, 66, 52),
+		"tree": 0.24, "rock": 0.14, "ground": "", "grid": 0, "pond": 0.05},
+	# 자작나무 언덕 — 훤한 숲. 나무는 많은데 바닥이 밝아 어둡지 않다
+	{"id": "birch", "name": "자작나무 언덕", "rect": Rect2i(316, 4 + NORTH_PAD, 60, 46),
+		"tree": 0.52, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
+	# 붉은바위 벌판 — 마른 자갈땅. 촛대바위가 여기 서 있다
+	{"id": "redrock", "name": "붉은바위 벌판", "rect": Rect2i(384, 10 + NORTH_PAD, 58, 54),
+		"tree": 0.02, "rock": 0.30, "ground": "path", "grid": 0, "pond": 0.0},
+	# 억새 벌판 — 아무것도 없다. 바람만 지나간다 (너른 초원보다 더 비었다)
+	{"id": "reed", "name": "억새 벌판", "rect": Rect2i(236, 72 + NORTH_PAD, 74, 40),
+		"tree": 0.01, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
+	# 별빛 호수 — 한복판에 큰 호수가 있다 (LANDMARKS의 lake)
+	{"id": "starlake", "name": "별빛 호수", "rect": Rect2i(322, 74 + NORTH_PAD, 84, 60),
+		"tree": 0.10, "rock": 0.04, "ground": "", "grid": 0, "pond": 0.03},
+	# 가시덤불 골 — 마을 남쪽으로 내려가는 길목. 걷기 사나운 잡목 지대
+	{"id": "bramble", "name": "가시덤불 골", "rect": Rect2i(96, 80 + NORTH_PAD, 60, 32),
+		"tree": 0.20, "rock": 0.22, "ground": "", "grid": 0, "pond": 0.0},
+	# 버들 늪가 — 남쪽 습지에서 꽃벌판으로 넘어가는 좁은 띠
+	{"id": "willow", "name": "버들 늪가", "rect": Rect2i(14, 94 + NORTH_PAD, 62, 14),
+		"tree": 0.16, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.09},
+	# 잿빛 벌판 — 아무 색도 없는 땅. 큰나무 숲과 돌무지 사이의 빈 자리
+	{"id": "ashen", "name": "잿빛 벌판", "rect": Rect2i(172, 128 + NORTH_PAD, 54, 48),
+		"tree": 0.08, "rock": 0.12, "ground": "path", "grid": 0, "pond": 0.0},
+	# 동쪽 끝 벼랑 — 세계의 동쪽 끝. 여기서 더는 갈 데가 없다
+	{"id": "eastedge", "name": "동쪽 끝 벼랑", "rect": Rect2i(408, 76 + NORTH_PAD, 38, 60),
+		"tree": 0.06, "rock": 0.28, "ground": "", "grid": 0, "pond": 0.0},
+	# 꽃벌판 — 줄 맞춰 선 나무 사이로 훤한 들. 남쪽에서 제일 밝은 땅
+	{"id": "flower", "name": "꽃벌판", "rect": Rect2i(14, 110 + NORTH_PAD, 66, 48),
+		"tree": 0.7, "rock": 0.0, "ground": "", "grid": 5, "pond": 0.0},
+	# 큰나무 숲 — 산만 한 나무 한 그루를 둘러싼 숲
+	{"id": "greatwood", "name": "큰나무 숲", "rect": Rect2i(90, 116 + NORTH_PAD, 78, 60),
+		"tree": 0.36, "rock": 0.06, "ground": "", "grid": 0, "pond": 0.0},
+	# 돌무지 언덕 — 굴러떨어진 바위가 쌓인 비탈
+	{"id": "boulder", "name": "돌무지 언덕", "rect": Rect2i(230, 128 + NORTH_PAD, 70, 48),
+		"tree": 0.05, "rock": 0.34, "ground": "path", "grid": 0, "pond": 0.0},
+	# 먼 솔숲 — 세계에서 제일 깊은 숲. 여기까지 오면 정말 멀리 온 것이다
+	{"id": "farpine", "name": "먼 솔숲", "rect": Rect2i(330, 148 + NORTH_PAD, 96, 66),
+		"tree": 0.38, "rock": 0.30, "ground": "", "grid": 0, "pond": 0.0},
+	# 안개 늪 — 남쪽 습지보다 더 질척하다. 물웅덩이가 발에 채인다
+	{"id": "mist", "name": "안개 늪", "rect": Rect2i(14, 170 + NORTH_PAD, 68, 46),
+		"tree": 0.06, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.18},
+	# 남녘 들 — 바다로 내려가기 전 마지막 너른 땅
+	{"id": "southfield", "name": "남녘 들", "rect": Rect2i(96, 178 + NORTH_PAD, 110, 40),
+		"tree": 0.03, "rock": 0.02, "ground": "", "grid": 0, "pond": 0.0},
+	# 모래벌판 — 바다가 가까워 바닥이 모래로 바뀐다
+	{"id": "dune", "name": "모래벌판", "rect": Rect2i(240, 188 + NORTH_PAD, 86, 34),
+		"tree": 0.02, "rock": 0.06, "ground": "sand", "grid": 0, "pond": 0.0},
+
+	# 능선 위 벼랑길 — 바다로 내려가기 전 마지막 땅. 돌투성이다.
+	# **바다는 늘 세계의 맨 밑**이므로 이 띠도 능선에서 거꾸로 잰다
+	{"id": "bluff", "name": "바닷가 벼랑길", "rect": Rect2i(20, SEA_RIDGE_Y - 11, 400, 10),
 		"tree": 0.04, "rock": 0.16, "ground": "", "grid": 0, "pond": 0.0},
+]
+
+# ---- 고장의 랜드마크 ----
+#
+# 고장마다 **한눈에 보이는 큰 것** 하나. 화면 열두 칸이 넘는 그림이라
+# 멀리서도 화면 가장자리에 걸친다 — 그게 「저기 가 보자」가 된다.
+#
+#   kind   오브젝트 종류 ("" 면 그림 없이 지형만 — 호수처럼)
+#   tile   그림이 서는 칸 (밑변 한가운데)
+#   block  걸어 들어갈 수 없는 밑동 (tile 기준 상대 좌표)
+#   clear  이 반지름 안에는 나무·돌을 두지 않는다 (그림이 가려지면 안 된다)
+#   lake   있으면 그 자리에 호수를 판다 [중심x, 중심y, 가로반지름, 세로반지름]
+#   river  있으면 그 물에서 개울이 흘러나간다 [x0, y0, x1, y1, 폭]
+#          — 못만 있으면 물이 고인 웅덩이다. 흘러 나가야 폭포가 산다
+const LANDMARKS := [
+	# 큰나무 — 산만 한 나무 한 그루. 세계에서 제일 큰 그림(화면 12.5 x 16.5칸)
+	{"id": "greattree", "name": "큰나무", "kind": "landmark_greattree",
+		"tile": Vector2i(128, 148 + NORTH_PAD),
+		"block": Rect2i(-4, -1, 8, 2), "clear": 12, "lake": [], "river": []},
+	# 큰폭포 — 절벽에서 두 단으로 쏟아진다. 밑에 못이 파여 있다
+	{"id": "falls", "name": "큰폭포", "kind": "landmark_falls",
+		"tile": Vector2i(268, 32 + NORTH_PAD),
+		"block": Rect2i(-5, -4, 10, 5), "clear": 11,
+		"lake": [268, 36 + NORTH_PAD, 9.0, 5.0],
+		"river": [266, 40 + NORTH_PAD, 246, 74 + NORTH_PAD, 2.0]},
+	# 촛대바위 — 층층이 깎여 남은 붉은 바위 기둥
+	{"id": "spire", "name": "촛대바위", "kind": "landmark_spire",
+		"tile": Vector2i(410, 38 + NORTH_PAD),
+		"block": Rect2i(-3, -1, 7, 2), "clear": 9, "lake": [], "river": []},
+	# 별빛 호수 — 그림이 아니라 **지형**이 랜드마크다. 세계에서 제일 큰 물
+	{"id": "starlake", "name": "별빛 호수", "kind": "",
+		"tile": Vector2i(364, 104 + NORTH_PAD),
+		"block": Rect2i(0, 0, 0, 0), "clear": 0,
+		"lake": [364, 104 + NORTH_PAD, 26.0, 15.0],
+		"river": [352, 118 + NORTH_PAD, 322, 150 + NORTH_PAD, 2.4]},
 ]
 
 
@@ -498,20 +606,30 @@ const HOME_SITE := Vector2i(73, 30 + NORTH_PAD)  # 집터 표지판 (건물 그�
 # 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.
 # 건물은 5x4칸 그림에 둘레 마당까지 합쳐 한 채가 7x6칸을 차지한다.
 # 북쪽 한 줄 + 서/동 두 줄로 벌려 놓아 서로 붙어 보이지 않는다.
-# 부지 사이는 일부러 넓게 둔다 — 다닥다닥 붙으면 벽처럼 보인다.
-# 북쪽 줄은 18칸 간격(그림 8칸 + 마당 사이 풀 10칸), 옆줄은 바깥으로 뺐다.
+# ---- 마을을 **다시 오므렸다** ----
+#
+# 세계를 네 배로 넓히면서 마을만 그대로 두었더니, 걸어서 가게 셋을
+# 도는 데 서른 칸을 걸었다. 넓은 세계에서 마을까지 널찍하면 마을이
+# 「마을」로 안 읽힌다 — 그냥 집 몇 채가 흩어진 들판이다.
+#
+# **밖은 넓히고 안은 좁힌다.** 넓은 야생과 촘촘한 마을이 대비되어야
+# 마을에 들어선 순간 「돌아왔다」가 된다.
+#
+# 북쪽 줄은 18칸 -> **12칸** 간격(그림 7칸 + 사이 풀 5칸), 서쪽 줄은
+# 10칸 -> **8칸**(마당 6칸 + 사이 2칸). 이보다 더 좁히면 마당이 붙어
+# 벽처럼 보인다 — 여기가 끝이다.
 const VILLAGE_PLOTS := {
 	# 북쪽 줄 (큰길 위쪽)
-	"post":    {"anchor": Vector2i(56, 3 + NORTH_PAD),  "name": "우체국"},
-	"general": {"anchor": Vector2i(74, 3 + NORTH_PAD),  "name": "잡화점"},
-	"lab":     {"anchor": Vector2i(92, 3 + NORTH_PAD),  "name": "연구소"},
+	"post":    {"anchor": Vector2i(62, 2 + NORTH_PAD),  "name": "우체국"},
+	"general": {"anchor": Vector2i(74, 2 + NORTH_PAD),  "name": "잡화점"},
+	"lab":     {"anchor": Vector2i(86, 2 + NORTH_PAD),  "name": "연구소"},
 	# 서쪽 줄 (서쪽 세로 길가)
 	"smith":   {"anchor": Vector2i(60, 12 + NORTH_PAD), "name": "대장간"},
-	"ranch":   {"anchor": Vector2i(60, 22 + NORTH_PAD), "name": "목장 상회"},
-	"inn":     {"anchor": Vector2i(60, 32 + NORTH_PAD), "name": "여관"},
+	"ranch":   {"anchor": Vector2i(60, 20 + NORTH_PAD), "name": "목장 상회"},
+	"inn":     {"anchor": Vector2i(60, 28 + NORTH_PAD), "name": "여관"},
 	# 동쪽 줄 (동쪽 세로 길가)
-	"library": {"anchor": Vector2i(91, 12 + NORTH_PAD), "name": "도서관"},
-	"fish":    {"anchor": Vector2i(91, 26 + NORTH_PAD), "name": "수산시장"},
+	"library": {"anchor": Vector2i(89, 12 + NORTH_PAD), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(89, 22 + NORTH_PAD), "name": "수산시장"},
 	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
 	"hall":    {"anchor": Vector2i(80, 28 + NORTH_PAD), "name": "마을회관"},
 }
@@ -2006,7 +2124,10 @@ var _cam_shake_amp := 0.0
 # 지나갈 수 없게 된다 (한 칸짜리 통로가 다 막힌다). 그래서 범위는 그대로 두고,
 # **가리는 동안만 반투명**하게 해서 플레이어가 언제나 보이게 한다.
 const FADE_KINDS := ["tree", "bigrock", "cave", "worldtree", "barn",
-	"deco_fountain", "deco_lamp", "house", "art_block"]
+	"deco_fountain", "deco_lamp", "house", "art_block",
+	# 랜드마크는 화면 열두 칸이 넘는다 — 뒤로 걸어 들어가면 주인공이
+	# 통째로 사라지므로 반드시 비쳐야 한다
+	"landmark_greattree", "landmark_falls", "landmark_spire"]
 const FADE_ALPHA := 0.35
 const FADE_SPEED := 6.0
 
@@ -2493,7 +2614,7 @@ func room_action(kind: String) -> void:
 # 계절 곡만 틀면 어디를 가나 같은 소리가 난다. 지금 어디에 있고 무슨
 # 때인지를 보고 골라 준다. 0.4초에 한 번만 본다 — 매 프레임 볼 이유가 없고,
 # 경계에서 곡이 왔다 갔다 하면 그게 더 거슬린다.
-const VILLAGE_AREA := Rect2i(60, 6 + NORTH_PAD, 40, 36)   # 마을 전체 (큰길~강가)
+const VILLAGE_AREA := Rect2i(58, 2 + NORTH_PAD, 38, 34)   # 마을 전체 (오므린 부지 전체)
 var _bgm_t := 0.0
 
 

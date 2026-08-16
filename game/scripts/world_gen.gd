@@ -64,6 +64,7 @@ func _build_map() -> void:
 			m.objects[Vector2i(m.MAP_W - 1, y)] = {"kind": "tree", "hp": m.TREE_HP}
 
 	# 지역 바닥 먼저 (자갈밭·물웅덩이). 자연물은 그 위에 얹는다
+	_build_region_map()
 	_paint_regions()
 
 	# 흩어진 나무/돌 (결정적 해시 배치 — 지역마다 밀도가 다르다)
@@ -106,6 +107,10 @@ func _build_map() -> void:
 		if m.FISH_CLEAR.has_point(p):
 			m.objects.erase(p)
 	m.objects[m.FISH_SIGN] = {"kind": "sign", "hp": 0}
+	# 고장의 랜드마크 — 나무·돌을 다 흩고 **난 뒤에** 세운다. 먼저 세우면
+	# 그 위로 나무가 돋아 그림을 반쯤 가린다 (낚시터를 마지막에 비우는 것과
+	# 같은 이유다)
+	_build_landmarks()
 	# 온실 터 표지판 (농장 한켠) — 온실 자리는 자연물을 비워 둔다
 	for gy in range(m.GREENHOUSE.position.y, m.GREENHOUSE.end.y):
 		for gx in range(m.GREENHOUSE.position.x, m.GREENHOUSE.end.x):
@@ -126,12 +131,42 @@ func _build_map() -> void:
 	_respawn_forage(false)
 
 
-# 이 칸이 어느 야생 지역인가 (없으면 빈 사전)
+# 이 칸이 어느 야생 지역인가 (없으면 빈 사전).
+#
+# 예전에는 부를 때마다 지역 표를 처음부터 훑었다. 지역이 일곱이고 세계가
+# 224x132일 때는 20만 번이라 티가 안 났는데, 지역 스물에 448x264가 되면서
+# **240만 번**이 됐다 — 새 게임을 시작할 때 몇 초씩 멈췄다.
+#
+# 그래서 한 번만 훑어 칸마다 지역 번호를 적어 둔다. 118킬로바이트짜리
+# 표 하나면 그다음부터는 한 번에 찾는다.
+var _region_map: Array[PackedByteArray] = []
+
+func _build_region_map() -> void:
+	# 한 줄씩 **다 채워서** 넣는다. PackedByteArray 는 값 타입이라
+	# `_region_map[y][x] = v` 처럼 두 겹으로 넣는 건 기대대로 안 될 수 있다
+	_region_map = []
+	for y in m.WORLD_H:
+		var row := PackedByteArray()
+		row.resize(m.MAP_W)
+		for i in m.REGIONS.size():
+			var r: Rect2i = m.REGIONS[i].rect
+			if y < r.position.y or y >= r.end.y:
+				continue
+			for x in range(maxi(0, r.position.x), mini(m.MAP_W, r.end.x)):
+				if row[x] == 0:        # 먼저 적힌 지역이 이긴다 (0 = 지역 밖)
+					row[x] = i + 1
+		_region_map.append(row)
+	# 지역이 255를 넘으면 번호가 한 바이트에 안 들어간다 (지금은 스물 남짓)
+	assert(m.REGIONS.size() < 255, "REGIONS가 255개를 넘었다 — 표를 넓혀야 한다")
+
+
 func _region_at(pos: Vector2i) -> Dictionary:
-	for reg: Dictionary in m.REGIONS:
-		if (reg.rect as Rect2i).has_point(pos):
-			return reg
-	return {}
+	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.WORLD_H:
+		return {}
+	if _region_map.is_empty():
+		_build_region_map()
+	var i := _region_map[pos.y][pos.x]
+	return {} if i == 0 else m.REGIONS[i - 1]
 
 
 # 지역 바닥을 깐다 — 채석장 자갈, 습지 물웅덩이.
@@ -486,6 +521,45 @@ func _build_dock() -> void:
 				m.objects.erase(Vector2i(x, y))   # 물풀·바위가 널 위에 남지 않게
 
 
+# ---- 고장의 랜드마크 ----
+#
+# 고장마다 하나씩 서 있는 「엄청 큰 것」을 세운다 (m.LANDMARKS).
+#
+# 하는 일은 셋뿐이다:
+#   ① 둘레를 **비운다** — 화면 열두 칸짜리 그림 앞에 나무가 서면
+#      그림이 반쯤 가려져 무엇인지도 모르게 된다
+#   ② 필요하면 **물을 판다** — 폭포 밑의 못, 별빛 호수
+#   ③ 그림을 세우고 **밑동만** 막는다 — 뒤로 돌아가 걸을 수 있어야
+#      「지나가는 길에 서 있는 것」이 된다 (벽이 아니라)
+func _build_landmarks() -> void:
+	for lm: Dictionary in m.LANDMARKS:
+		var at: Vector2i = lm.tile
+		var clear: int = int(lm.clear)
+		# ① 둘레 비우기 — 그림은 밑변이 기준이라 **위로** 훨씬 높이 뻗는다.
+		#    그래서 위쪽을 넉넉히, 아래쪽은 조금만 비운다
+		for y in range(at.y - clear * 2, at.y + 3):
+			for x in range(at.x - clear, at.x + clear + 1):
+				m.objects.erase(Vector2i(x, y))
+		# ② 물
+		var lake: Array = lm.lake
+		if not lake.is_empty():
+			_carve_pond(int(lake[0]), int(lake[1]), float(lake[2]), float(lake[3]))
+		var riv: Array = lm.river
+		if not riv.is_empty():
+			_carve_river(int(riv[0]), int(riv[1]), int(riv[2]), int(riv[3]), float(riv[4]))
+		if String(lm.kind) == "":
+			continue
+		# ③ 그림과 밑동
+		var blk: Rect2i = lm.block
+		for by in range(blk.position.y, blk.end.y):
+			for bx in range(blk.position.x, blk.end.x):
+				var p := Vector2i(at.x + bx, at.y + by)
+				if p == at or p.x < 0 or p.y < 0 or p.x >= m.MAP_W or p.y >= m.WORLD_H:
+					continue
+				m.objects[p] = {"kind": "art_block", "hp": 0}
+		m.objects[at] = {"kind": String(lm.kind), "hp": 0}
+
+
 func _carve_pond(cx: int, cy: int, rx: float, ry: float) -> void:
 	var mx := int(ceil(rx)) + 2
 	var my := int(ceil(ry)) + 2
@@ -570,9 +644,12 @@ func _build_village() -> void:
 	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
 	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
 	# (광장의 가로등·벤치는 없앴다 — 밤이 되면 마을도 캄캄하다)
-	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다)
-	for x in range(60, 99):
-		for y in [1, 43]:
+	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다).
+	# 줄 번호는 **마을 구역에서 잰다** — 예전에는 1과 43을 그대로 적어
+	# 두었는데, 세계를 북쪽으로 열두 줄 내리면서 이 두 줄만 제자리에
+	# 남아 지도 맨 위에 뜬금없는 나무 띠가 생겼다
+	for x in range(m.VILLAGE_REGION.position.x + 4, m.VILLAGE_REGION.end.x - 1):
+		for y in [m.VILLAGE_REGION.position.y + 1, m.VILLAGE_REGION.end.y - 1]:
 			var rim := Vector2i(x, y)
 			if m.grid[y][x].ground == "grass" and not m.objects.has(rim) \
 					and m._hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
@@ -939,6 +1016,16 @@ func _respawn_ok(pos: Vector2i, kind: String, clear_dist := -1) -> bool:
 		return false  # 바다로 내려가는 길목은 어떤 것도 막지 않는다
 	for r: Rect2i in NO_SPAWN_RECTS:
 		if r.has_point(pos):
+			return false
+	# 랜드마크 앞도 비워 둔다 — 화면 열두 칸짜리 그림 앞에 산딸기 한 포기가
+	# 돋아도 그림이 가려진다. 그림은 밑변이 기준이라 **위로** 높이 뻗으므로
+	# 위쪽을 넉넉히 잡는다 (_build_landmarks 와 같은 규칙)
+	for lm: Dictionary in m.LANDMARKS:
+		var lc: int = int(lm.clear)
+		if lc <= 0:
+			continue
+		var lt: Vector2i = lm.tile
+		if absi(pos.x - lt.x) <= lc and pos.y <= lt.y + 2 and pos.y >= lt.y - lc * 2:
 			return false
 	# 마을 밖 집(재민의 집·숲속의 집·연금술사의 오두막) 문 앞도 비워 둔다
 	for anchor: Vector2i in [GameData.move_house, m.FOREST_HOUSE_ANCHOR,

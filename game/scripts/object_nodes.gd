@@ -176,6 +176,11 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"worldtree":
 			texture = m.tex["cave"]
 			offset = Vector2(0, -100)
+		"landmark_greattree", "landmark_falls", "landmark_spire":
+			# 고장의 랜드마크 — 화면 열두 칸이 넘는 큰 그림. 밑변을 칸에
+			# 맞추고, 배율은 아래에서 0.5로 못 박는다 (건물과 같은 도트 밀도)
+			texture = m.tex[kind]
+			offset = Vector2(0, -texture.get_height())
 		"barn":
 			texture = m.tex["barn"]
 			offset = Vector2(0, -texture.get_height())   # 밑변을 문 칸 아래에 맞춘다
@@ -213,6 +218,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		# (예전엔 오두막만 옛 1px 밀도라 이 보정에서 빼 뒀었다. 그때 오두막은
 		#  화면 72x62px — 주인공 64x96px보다 낮아, 이장이 제 집보다 컸다.)
 		sc = 0.5
+	elif kind.begins_with("landmark_"):
+		sc = 0.5   # 랜드마크도 원본 4px = 도트 한 칸 (make_landmarks.js)
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
 		if kind == "tree":

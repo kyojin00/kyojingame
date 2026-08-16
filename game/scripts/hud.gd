@@ -228,6 +228,10 @@ const MM_OBJ_COLORS := {
 	"cave": Color(0.2, 0.16, 0.2), "sign": Color(0.9, 0.76, 0.4),
 	"forage_berry": Color(0.85, 0.3, 0.4), "forage_herb": Color(0.5, 0.8, 0.4),
 	"deco_fountain": Color(0.4, 0.66, 0.85),
+	# 고장의 랜드마크 — 작은 지도에서도 눈에 띄어야 「저기다」가 된다
+	"landmark_greattree": Color(0.45, 0.85, 0.4),
+	"landmark_falls": Color(0.75, 0.92, 1.0),
+	"landmark_spire": Color(0.86, 0.46, 0.3),
 }
 
 

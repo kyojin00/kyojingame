@@ -6556,8 +6556,11 @@ func clock_text() -> String:
 
 # ---- 저장 ----
 
+# grid_data 는 **사람이 바꾼 칸만** 담긴 성긴 목록이다 (KyojinSaveIO.grid_cells).
+# grid_w/grid_h 는 그 목록이 만들어진 세계의 크기 — 세계가 넓어지면 좌표가
+# 어긋나므로, 불러올 때 이 둘이 다르면 밭 상태는 버린다.
 func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
-		animals_data: Array = []) -> Dictionary:
+		animals_data: Array = [], grid_w: int = 0, grid_h: int = 0) -> Dictionary:
 	return {
 		"day": day,
 		"minutes": minutes,
@@ -6696,17 +6699,19 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"main_story": story_phase,
 		"tile": 32,
 		"player": [player_pos.x, player_pos.y],
-		"grid": grid_data,
+		"grid_cells": grid_data,
+		"grid_w": grid_w, "grid_h": grid_h,
 		"objects": objects_data,
 		"animals": animals_data,
 	}
 
 
 func save_game(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
-		animals_data: Array = []) -> void:
+		animals_data: Array = [], grid_w: int = 0, grid_h: int = 0) -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify(build_save(grid_data, player_pos, objects_data, animals_data)))
+		f.store_string(JSON.stringify(build_save(grid_data, player_pos,
+			objects_data, animals_data, grid_w, grid_h)))
 
 
 # ---- 멀티플레이 동기화용 (그리드 제외 공유 상태) ----
