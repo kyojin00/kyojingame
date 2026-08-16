@@ -42,9 +42,8 @@ const BOX_H := 150.0
 # 짓는 도중에는 BUILD_CAP 위로 안 올라간다 — 아직 할 일이 남았는데 막대가
 # 꽉 차 있으면 그때부터는 멈춘 것으로 보인다.
 const CLIMB := 0.62               # 초당 차오르는 양
-const BUILD_CAP := 0.72           # 짓는 동안 보여 줄 수 있는 최대치
-const FILL_STEPS := 9             # 단계 사이를 메우는 장수
-const FILL_MS := 16               # 그 한 장에 두는 시간
+const BUILD_CAP := 0.75           # 짓는 동안 보여 줄 수 있는 최대치
+const WARMUP := 0.40              # 장면을 바꾸기 전에 미리 채워 두는 몫
 
 var _c: Control
 var _msg := "마을을 짓는 중…"
@@ -80,6 +79,20 @@ static func mark(tree: SceneTree, text: String, ratio: float) -> void:
 		n.step(text, ratio)
 
 
+# 목표만 정한다 — 채우는 건 _process 가 **실제 프레임에서** 한다.
+# 장면을 바꾸기 전(=아직 프레임이 도는 동안)에 미리 채워 두는 데 쓴다
+static func climb(tree: SceneTree, text: String, ratio: float) -> void:
+	var n: Node = tree.root.get_node_or_null(NODE_NAME)
+	if n != null:
+		n.aim(text, ratio)
+
+
+# 목표에 다다랐나 (타이틀이 이걸 보고 장면을 바꾼다)
+static func reached(tree: SceneTree) -> bool:
+	var n: Node = tree.root.get_node_or_null(NODE_NAME)
+	return n == null or n.is_at_target()
+
+
 # 다 지었다 — 막대를 100까지 채우고, 다 찬 뒤 hold 초를 기다렸다가 걷는다.
 # 기다리는 동안은 트리를 세운다: 화면은 아직 로딩판인데 뒤에서 사람이
 # 걸어다니면 그건 로딩이 아니다
@@ -100,23 +113,32 @@ func _ready() -> void:
 	add_child(_c)
 
 
-func step(text: String, ratio: float) -> void:
+func aim(text: String, ratio: float) -> void:
 	if text != "":
 		_msg = text
+	_target = clampf(ratio, 0.0, 1.0)
+
+
+func is_at_target() -> bool:
+	return _ratio >= _target - 0.005
+
+
+# 세계를 짓는 **도중**에 부른다. 여기서는 프레임이 안 돌기 때문에
+# force_draw() 로 직접 그려 보는데, 그게 먹지 않는 환경도 있다 —
+# 그래서 이 구간에 막대를 기대지 않는다. 눈에 보이는 채움은 앞뒤
+# (프레임이 도는 구간)에서 다 하고, 여기서는 되면 좋고 아니면 마는 덤이다
+func step(text: String, ratio: float) -> void:
+	_msg = text if text != "" else _msg
 	_target = clampf(ratio, 0.0, BUILD_CAP)
-	# 프레임이 안 도는 구간이라 **여기서 직접 몇 장을 그려** 그 사이를 메운다.
-	# 한 번에 꽂으면 막대가 툭 뛴다
-	var head := DisplayServer.get_name() != "headless"
-	var from := _ratio
-	for i in FILL_STEPS:
-		_ratio = lerpf(from, _target, float(i + 1) / float(FILL_STEPS))
-		_t += float(FILL_MS) / 1000.0
-		if _c != null:
-			_c.queue_redraw()
-		if not head:
-			break
+	# **보이는 값은 건드리지 않는다.** 여기서 값을 밀어 놓으면, force_draw
+	# 가 안 먹는 환경에서는 그 사이가 통째로 안 보이다가 다 지은 뒤에
+	# 한 번에 뛴다 (3%에 멈췄다가 100%가 되던 것이 이것이다).
+	# 채우는 일은 프레임이 도는 앞뒤 구간에 맡기고, 여기서는 글만 바꿔
+	# 본다 — 다시 그려지면 좋고, 아니면 마는 덤이다
+	if _c != null:
+		_c.queue_redraw()
+	if DisplayServer.get_name() != "headless":
 		RenderingServer.force_draw()
-		OS.delay_msec(FILL_MS)
 
 
 # 세계를 다 지었다. 남은 만큼을 _process 가 채운다

@@ -841,7 +841,13 @@ func _process(delta: float) -> void:
 # 동안 멈춰 있는 그림이 「짓는 중」이 된다 (예전엔 타이틀이 그대로 굳었다)
 func _enter_world(first_msg := "터를 고르는 중…") -> void:
 	var ld: Node = KyojinLoading.open(get_tree())
-	ld.step(first_msg, 0.03)
-	await get_tree().process_frame
-	await get_tree().process_frame
+	# 여기는 **아직 프레임이 도는 구간**이다. 세계를 짓기 시작하면 화면이
+	# 굳으므로, 눈에 보이는 채움은 그 앞뒤에서 해야 한다 — 먼저 40%까지
+	# 실제로 차오르는 것을 보여 주고 나서 장면을 바꾼다.
+	# (예전엔 3%를 찍어 놓고 바로 넘어가, 짓는 내내 3%에 멈춰 있었다)
+	ld.aim(first_msg, KyojinLoading.WARMUP)
+	var guard := 0
+	while not ld.is_at_target() and guard < 240:
+		guard += 1
+		await get_tree().process_frame
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
