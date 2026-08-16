@@ -640,7 +640,16 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
                 f = (yy - knee_row) / max(1, bot - knee_row)
                 o = knee_x + (foot_x - knee_x) * f
             t = (yy - hip_row) / (GROUND - hip_row)
-            x = 15 + round(o + dx * (1 - t)) + lean
+            # 다리 기둥은 **몸통 한가운데**에 선다.
+            #
+            # 기준을 15로 두고 뒤 2칸·앞 1칸으로 그렸더니, 다리 덩어리의
+            # 한가운데가 15.0인데 몸통 한가운데는 16.5였다 — 다리가 한 칸
+            # 반 뒤로 몰려, 가슴 앞쪽 아래가 텅 비고 다리는 등쪽 모서리에
+            # 붙었다. 서 있을 때도 어색하지만 걸으면 더 나쁘다: 몸은 앞으로
+            # 쏠려 있는데 다리만 뒤에 남아 **몸을 끌고 가는** 걸음이 된다.
+            # 기준을 16으로 올리면 다리 한가운데가 16.0 — 몸통과 반 칸
+            # 차이로, 뒤꿈치가 조금 뒤에 있는 정도로 읽힌다.
+            x = 16 + round(o + dx * (1 - t)) + lean
             boot = yy > ankle_row
             wb, wf = (2, 2) if boot else (2, 1)
             g.rect(x - wb, yy, x + wf, yy, kc if boot else pc)
@@ -667,7 +676,7 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
                 bx = x - wb - 1 if stride > 0 else x + wf + 1
                 if 0 <= bx < GW and g.d[yy][bx] in ('p', 'P', 'q', 'k', 'K', 'n'):
                     g.px(bx, yy, 'O')
-        fx = 15 + round(foot_x) + lean
+        fx = 16 + round(foot_x) + lean
         g.px(fx + 3, bot - 1, kc)              # 앞코 한 칸
         g.px(fx + 3, bot, 'K')
         if off < 0:
