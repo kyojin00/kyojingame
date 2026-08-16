@@ -332,6 +332,22 @@ func _build_levels() -> void:
 	_cut_ramp(51, 63 + m.NORTH_PAD)
 	_cut_ramp(60, 63 + m.NORTH_PAD)
 	_cut_ramp(190, 52 + m.NORTH_PAD)
+	# ---- 고장 랜드마크의 단차 ----
+	#
+	# 그림만 세우면 아무리 잘 그려도 평지에 붙인 판때기다. 폭포는
+	# **벼랑에서** 떨어져야 폭포고, 바위 기둥은 **대지 위에** 서야 높다.
+	# 그림이 그 벼랑의 한 자리를 맡으면, 좌우로 벼랑이 이어져 나가면서
+	# 그림과 세계가 한 몸이 된다.
+	#
+	# 켜를 다 올린 **뒤에** 오르막을 낸다 — 먼저 내면 나중 켜가 덮어 버려
+	# 올라갈 수 없는 섬이 된다.
+	for lm: Dictionary in m.LANDMARKS:
+		for b: Array in (lm.get("terrain", {}) as Dictionary).get("blobs", []):
+			_raise_blob(int(b[0]), int(b[1]), float(b[2]), float(b[3]),
+				int(b[4]), int(b[5]))
+	for lm2: Dictionary in m.LANDMARKS:
+		for r: Array in (lm2.get("terrain", {}) as Dictionary).get("ramps", []):
+			_cut_ramp(int(r[0]), int(r[1]))
 	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
 	_cut_ramp(m.SEA_GATE[0].x, m.SEA_RIDGE_Y, m.SEA_GATE.size())
 
