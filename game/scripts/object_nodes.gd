@@ -69,9 +69,12 @@ func _spawn_objects() -> void:
 		# 재민의 집 (스토리 3) — 플레이어가 정한 자리에 다시 세운다
 		m.objects.erase(m.door_tile(GameData.move_house))
 		m.worldgen._spawn_house_node(GameData.move_house)
-	for pos: Vector2i in m.objects:
-		if m.objects[pos].kind != "house":
-			_spawn_object_node(pos, m.objects[pos].kind)
+	# 나머지는 **가까운 것만** 세운다 (아래 _stream_nodes).
+	# 세계가 네 배가 되면서 나무·돌이 만 개를 넘었는데, world 는 y정렬을
+	# 쓰므로 자식이 만 개면 **매 프레임 만 개를 정렬한다** — 걸을 때마다
+	# 화면이 끊긴 게 이것이었다. 화면 둘레만 세우고 나머지는 안 만든다.
+	_stream_center = Vector2i(-9999, -9999)
+	_stream_nodes()
 	m.farming._recount_pasture()   # 불러온 세이브의 울타리도 목초지로 인정한다
 	m.story._apply_story_visibility()
 
@@ -523,3 +526,68 @@ func _tick_landmarks() -> void:
 		var kind: String = e[1]
 		var n: int = int(m.LANDMARK_FRAMES[kind])
 		spr.texture = m.tex["%s_%d" % [kind, m.lm_frame % n]]
+
+
+# ---- 가까운 것만 세운다 ----
+#
+# 세계를 네 배로 넓히니 나무·돌이 만 개를 넘었다. world 는 y정렬(뒤에
+# 있는 것이 먼저 그려지게)을 쓰는데, 자식이 만 개면 **매 프레임 만 개를
+# 정렬한다.** 걸을 때마다 화면이 끊긴 게 이것이었다.
+#
+# 화면에 보이지도 않는 지도 반대편 나무까지 노드로 들고 있을 이유가 없다.
+# 주인공 둘레 한 화면 반만 세우고, 걸어 나가면 뒤엣것은 치운다.
+#
+# **건물·랜드마크는 안 치운다.** 몇 개 안 되는데다, 멀리서 보이는 것이
+# 그 몫이라 화면 밖이라고 없애면 다가갈 때 불쑥 나타난다.
+const STREAM_W := 34      # 좌우 (화면 반폭 15칸 + 여유)
+const STREAM_H := 26      # 위아래
+const KEEP_ALWAYS := ["house", "chief_hut", "barn", "barn_block", "art_block",
+	"cave", "worldtree", "onsen", "stall", "board", "auction", "sign",
+	"housesite", "plotsite", "home_sign", "homeplot", "old_lookout", "old_barn",
+	"landmark_greattree", "landmark_falls", "landmark_spire", "deco_wheel",
+	"deco_fountain", "horse", "old_book", "seed_sprout", "carved_stone",
+	"old_bench", "bent_tree"]
+
+var _stream_center := Vector2i(-9999, -9999)
+
+
+func _stream_nodes() -> void:
+	if m.player == null:
+		return
+	var pt := m.player_tile()
+	if pt == _stream_center:
+		return
+	_stream_center = pt
+	var keep := Rect2i(pt.x - STREAM_W, pt.y - STREAM_H,
+		STREAM_W * 2 + 1, STREAM_H * 2 + 1)
+	# ① 나간 것 치우기 — 세워 둔 것만 훑으므로 몇백 개다
+	for pos: Vector2i in m.obj_nodes.keys():
+		if keep.has_point(pos):
+			continue
+		var kind: String = str(m.objects.get(pos, {}).get("kind", "house"))
+		if kind in KEEP_ALWAYS:
+			continue
+		var node: Node2D = m.obj_nodes[pos]
+		if node.get_child_count() > 0:
+			m.tree_sprites.erase(node.get_child(0))
+			m._faded_trees.erase(node.get_child(0))
+		m._fade_a.erase(pos)
+		node.queue_free()
+		m.obj_nodes.erase(pos)
+	# ② 들어온 것 세우기 — **칸을 훑는다.** objects 전체(만 개)를 훑으면
+	#    치우는 것보다 세는 데 더 든다. 창 안은 사천 칸뿐이다
+	for y in range(keep.position.y, keep.end.y):
+		if y < 0 or y >= m.MAP_H:
+			continue
+		for x in range(keep.position.x, keep.end.x):
+			if x < 0 or x >= m.MAP_W:
+				continue
+			var pos := Vector2i(x, y)
+			if m.obj_nodes.has(pos) or not m.objects.has(pos):
+				continue
+			var kind2: String = str(m.objects[pos].kind)
+			if kind2 == "house":
+				continue          # 건물 그림은 앵커에서 따로 세운다
+			_spawn_object_node(pos, kind2)
+			if kind2 == "tree":
+				_refresh_tree_sprite(pos)   # 계절·손상 단계를 바로 반영한다
