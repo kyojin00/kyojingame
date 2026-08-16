@@ -204,12 +204,29 @@ func _build_sea() -> void:
 	# `story._plant_story_forest`가 제 바닥을 다시 깔고, 마을로 넘어가며
 	# 닫힌 뒤에는 바다만 남는다. (예외를 두었더니 모래사장에서 파란 바다 밑에
 	#  초록 땅덩이가 떠 보였다 — 카메라가 열다섯 줄 아래까지 비춘다)
-	for y in range(m.SEA_Y0, m.MAP_H):
-		for x in m.MAP_W:
+	# 해안선은 **자로 그은 선이 아니다.**
+	#
+	# 예전에는 SEA_Y0 아래를 통째로 물, 그 위 띠를 통째로 모래로 깔았다.
+	# 바다가 화면을 가로지르는 파란 사각형이었다. 실제 해안은 굽이친다 —
+	# 곶이 튀어나오고 만이 파고든다.
+	#
+	# 두 파장으로 흔든다. 하나만 쓰면 규칙적인 물결이 되고, 셋 이상이면
+	# 해안이 너덜너덜해져 「닳은 종이」가 된다.
+	for x in m.MAP_W:
+		var t := float(x) / float(m.MAP_W)
+		var wave := sin(t * PI * 3.1) * 2.6 + sin(t * PI * 7.3) * 1.3
+		var sea_y := m.SEA_Y0 + int(round(wave))
+		# 모래사장 폭도 자리마다 다르다. 어디는 넓은 백사장, 어디는 좁은 갯바위
+		var beach_w := (m.SEA_Y0 - m.BEACH_Y0) + int(round(sin(t * PI * 4.7) * 1.8))
+		var beach_y: int = maxi(m.BEACH_Y0 - 2, sea_y - beach_w)
+		for y in range(sea_y, m.MAP_H):
+			if y < 0 or y >= m.MAP_H:
+				continue
 			m.grid[y][x].ground = "water"
 			m.objects.erase(Vector2i(x, y))
-	for y in range(m.BEACH_Y0, m.SEA_Y0):
-		for x in m.MAP_W:
+		for y in range(beach_y, sea_y):
+			if y < 0 or y >= m.MAP_H:
+				continue
 			m.grid[y][x].ground = "sand"
 			m.objects.erase(Vector2i(x, y))
 	for x in m.MAP_W:
