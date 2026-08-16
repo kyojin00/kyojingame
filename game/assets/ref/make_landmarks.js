@@ -623,15 +623,17 @@ function greatTree(f, NF) {
 // 이으려면 겹치는 것을 줄여야 한다. 세계가 그릴 수 있는 것은 세계에 맡기고,
 // 세계가 못 그리는 것(떨어지는 물)만 그린다.
 function bigFalls(f, NF) {
-  const W = 64, H = 64, CX = 32;
+  // 4칸으로 줄였더니 이번엔 **물줄기가 가늘어** 큰 폭포로 안 보였다.
+  // 벼랑에서 물이 넘어가는 자리는 벼랑에 팬 **넓은 홈**이다 — 6칸으로 넓힌다
+  const W = 96, H = 72, CX = 48;
   const LIP = 4;                 // 물이 넘어가는 마루
-  const BASE = 52;               // 부서지는 자리 (밑 물의 수면)
+  const BASE = 58;               // 부서지는 자리 (밑 물의 수면)
   const g = new G(W, H);
   // 물은 **아래로** 흐른다. hash(y + f*6) 으로 두면 프레임마다 아래 것이
   // 위로 올라와 물이 거꾸로 솟는다 — 게임에 넣고서야 보였다. 빼야 내려간다
   const flowY = -f * 6;          // 결 폭 8 · 네 장에 24 = 딱 맞아떨어진다
   const wob = (f / NF) * Math.PI * 2;
-  const halfAt = (y) => 14 + Math.max(0, y - LIP) * 0.10;
+  const halfAt = (y) => 34 + Math.max(0, y - LIP) * 0.12;
 
   // 떨어지는 물
   for (let y = 0; y <= BASE; y++) g.rect(CX - halfAt(y), y, CX + halfAt(y), y, 'w3');
@@ -664,9 +666,9 @@ function bigFalls(f, NF) {
   }
 
   // 부서지는 흰 물 — 못은 안 그린다 (세계가 진짜 물을 깔아 둔다)
-  for (let i = 0; i < 16; i++) {
-    const t = i / 15;
-    const px = CX + Math.sin(i * 2.3) * 22 * (0.3 + t * 0.7);
+  for (let i = 0; i < 26; i++) {
+    const t = i / 25;
+    const px = CX + Math.sin(i * 2.3) * 40 * (0.3 + t * 0.7);
     const py = BASE - 2 + Math.cos(i * 1.7) * 5;
     const r = (3.4 + hash(i, 7) * 4.4) * (1.0 + Math.sin(wob + i * 1.9) * 0.26);
     g.ellipse(px, py - Math.sin(wob + i) * 1.2, r, r * 0.5,
@@ -675,14 +677,14 @@ function bigFalls(f, NF) {
   // 수면에 퍼지는 흰 테 — 아주 납작해야 물 위에 누운 것으로 보인다
   for (let i = 0; i < 4; i++) {
     const grow = ((i + f) % 4);
-    g.ellipse(CX, BASE + 1 + grow * 2.6, 11 + grow * 6, 1.6 + grow * 0.8,
+    g.ellipse(CX, BASE + 1 + grow * 2.6, 20 + grow * 9, 1.8 + grow * 0.9,
       grow < 2 ? 'w0' : 'w1', ['.']);
   }
   // 물보라에 선 무지개 — 옅게, 흰 물 위에만
   for (let a = 0; a <= 80; a++) {
     const th = Math.PI + (a / 80) * Math.PI;
     for (let k = 0; k < 4; k++) {
-      const rr = 17 + k * 2;
+      const rr = 30 + k * 2.5;
       const x = CX + Math.cos(th) * rr;
       const y = BASE - 3 + Math.sin(th) * rr * 0.7;
       const at = g.get(x, y);
@@ -1019,11 +1021,40 @@ function millWheel(f, NF) {
   g.ellipse(CX + DX, CY + DY, 4, 4, 'b3');
   g.ellipse(CX, CY, 5, 5, 'b2');
   g.ellipse(CX - 1, CY - 1, 3, 3, 'b0');
-  // 결 — 젖은 나무라 아래쪽이 짙다
+  // ---- 결 ----
+  //
+  // 방앗간 바퀴는 **거친 나무**다. 물을 맞으며 몇십 년을 돈 널이라
+  // 매끈할 수가 없다 — 결이 일어나고, 옹이가 박히고, 톱자국이 남고,
+  // 물에 잠기는 아랫도리는 검게 삭는다.
+  //
+  // 처음엔 잔 얼룩만 뿌렸더니 새로 깎은 나무처럼 보였다. 거칠게 보이려면
+  // 얼룩이 아니라 **결의 방향**이 있어야 한다 — 널을 따라 길게.
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (g.d[y][x][0] !== 'b') continue;
-    if (y > CY + 8 && hash(x >> 1, y >> 1) > 0.58) g.px(x, y, DARKER[g.d[y][x]]);
-    else if (hash(x >> 2, y >> 2) > 0.86) g.px(x, y, LIGHTER[g.d[y][x]]);
+    const c = g.d[y][x];
+    if (c[0] !== 'b') continue;
+    // 바퀴살·물받이는 나뭇결이 **바큇살 방향**으로 간다. 굴대에서
+    // 바깥으로 뻗는 결이라, 굴대 기준 각도로 묶으면 저절로 그 방향이 된다
+    const dx = x - CX, dy = y - CY;
+    const rr = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
+    const grain = hash(Math.round(th * 9), Math.round(rr / 2.2));
+    let n = c;
+    if (grain > 0.70) n = DARKER[n];
+    else if (grain < 0.20) n = LIGHTER[n];
+    // 톱자국 — 결을 가로지르는 짧은 금
+    if (hash(x >> 1, y) > 0.93) n = DARKER[n];
+    // 옹이
+    if (hash(x >> 2, y >> 2) > 0.965) { n = 'b3'; }
+    // 물에 잠기는 아랫도리는 삭아서 검다
+    if (y > CY + 12 && hash(x, y >> 1) > 0.42) n = DARKER[n];
+    g.px(x, y, n);
+  }
+  // 널의 이음매 — 물받이 널 하나하나가 갈라져 보여야 짜 맞춘 것이 된다
+  for (let i = 0; i < 6; i++) {
+    const th = rot + i * (Math.PI * 2 / 6) + Math.PI / 6;
+    for (let r2 = R - 6; r2 <= R + 2; r2++) {
+      const x = CX + Math.cos(th) * r2, y = CY + Math.sin(th) * r2;
+      if (g.get(x, y)[0] === 'b') g.px(x, y, 'b3');
+    }
   }
 
   // ---- 물길 ----

@@ -560,6 +560,15 @@ func _build_landmarks() -> void:
 		# ② 물
 		for lake: Array in lm.lakes:
 			_carve_pond(int(lake[0]), int(lake[1]), float(lake[2]), float(lake[3]))
+		# 반드시 물이어야 하는 칸 — 못의 흔들린 가장자리가 여기를 비우면
+		# 폭포가 벼랑에서 끊겨 보인다. 못을 판 **뒤에** 못박는다
+		for sp: Rect2i in lm.get("spill", []):
+			for sy in range(sp.position.y, sp.end.y):
+				for sx in range(sp.position.x, sp.end.x):
+					if sx < 1 or sy < 1 or sx >= m.MAP_W - 1 or sy >= m.WORLD_H - 1:
+						continue
+					m.grid[sy][sx].ground = "water"
+					m.objects.erase(Vector2i(sx, sy))
 		var riv: Array = lm.river
 		if not riv.is_empty():
 			_carve_river(int(riv[0]), int(riv[1]), int(riv[2]), int(riv[3]), float(riv[4]))
