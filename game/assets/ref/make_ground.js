@@ -402,30 +402,32 @@ function shore(dir) {
     else if (dir === 2) g.px(k, i, c);
     else g.px(N - 1 - k, i, c);
   };
-  // 물가는 **단차**다.
+  // 물가는 **단차**다. 그리고 그 단차는 **높아야** 보인다.
   //
-  // 젖은 흙 띠만 둘렀더니 물이 땅과 같은 높이에 있었다. 실제 물가는
-  // 땅이 한 단 꺼지는 자리라, 그 턱에 **돌이 물려 있다.** 위에서 보면
-  // 돌 윗면이 빛을 받고 물 쪽 아랫면은 그늘진다 — 그 두 줄이 높이차다.
+  // 돌 두어 줄(화면 4~8px)로는 「젖은 자리」까지고 「내려가는 자리」가 아니다.
+  // 위에서 내려다보는 화면에서 높이는 **면의 세로 폭**으로만 드러난다.
+  // 그래서 물가 한 칸의 절반 남짓(7~9칸 = 화면 14~18px)을 벽에 준다.
   //
-  //   바깥  풀에서 넘어오는 마른 흙
-  //   둑    돌 한 줄. 윗면은 밝고 아랫면은 어둡다 (여기가 턱이다)
-  //   안쪽  턱 밑 그늘. 물에 잠긴 돌뿌리
+  //   물 쪽 2줄   턱 밑 그늘. 물에 잠긴 돌뿌리
+  //   벽 5~7줄    돌벽. **한 줄 내려갈수록 어두워진다** — 이게 높이다
+  //   마루 1줄    벽 꼭대기. 제일 밝다 (하늘을 본다)
+  //   땅 쪽 3줄   마른 흙에서 잔디로
   for (let i = 0; i < N; i++) {
-    const lip = 4 + Math.floor(h(i, dir, 56) * 3);          // 턱이 시작되는 깊이
-    const dry = lip + 2 + Math.floor(h(i, dir, 57) * 4);
-    // 턱 밑 그늘 — 물에 제일 가까운 두 줄
-    for (let k = 0; k < 2; k++) put(i, k, EARTH[5]);
-    // 돌 한 줄 — 세 칸짜리 덩어리로 물려 있다
-    const st = 1 + Math.floor(h(Math.floor(i / 3), dir, 63) * 3);
-    for (let k = 2; k < lip; k++) {
-      const top = (k === lip - 1);
-      put(i, k, STONE[top ? Math.max(0, st - 1) : Math.min(7, st + 2)]);
+    const wall = 5 + Math.floor(h(i, dir, 56) * 3);          // 벽 높이
+    const top = 2 + wall;                                    // 마루가 오는 줄
+    for (let k = 0; k < 2; k++) put(i, k, EARTH[5]);          // 턱 밑 그늘
+    // 돌벽 — 아래가 어둡고 위가 밝다. 세 칸짜리 돌덩이로 나뉜다
+    const st = h(Math.floor(i / 3), dir, 63);
+    for (let k = 2; k < top; k++) {
+      const up = (k - 2) / Math.max(1, wall - 1);            // 0(밑) ~ 1(꼭대기)
+      let t = 6 - Math.round(up * 3.4) + (st < 0.35 ? 1 : (st > 0.72 ? -1 : 0));
+      if ((i + Math.floor(k / 3)) % 3 === 0) t += 2;         // 돌 사이 틈
+      put(i, k, STONE[clamp(t, 0, 7)]);
     }
-    if (i % 3 === 2) for (let k = 2; k < lip; k++) put(i, k, STONE[6]);  // 돌 사이 틈
-    // 바깥 — 마른 흙에서 잔디로
-    for (let k = lip; k < dry; k++)
-      if (h(i, k, dir + 58) > 0.10 + (k - lip) * 0.18) put(i, k, EARTH[k === lip ? 2 : 3]);
+    put(i, top, STONE[0]);                                   // 벽 마루 — 하늘을 본다
+    put(i, top + 1, EARTH[2]);                               // 마루 뒤 흙
+    for (let k = top + 2; k < top + 5; k++)                  // 잔디로 넘어간다
+      if (h(i, k, dir + 58) > 0.2 + (k - top) * 0.2) put(i, k, EARTH[3]);
   }
   return g;
 }
