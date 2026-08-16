@@ -124,6 +124,8 @@ const LANDMARK_FPS := 7.0
 # 종류마다 장 수가 다르다 (ref/make_landmarks.js 와 같아야 한다)
 const LANDMARK_FRAMES := {
 	"landmark_greattree": 3, "landmark_falls": 4, "landmark_spire": 2,
+	# 물방앗간 곁의 물레방아 — 랜드마크는 아니지만 같은 규칙으로 돈다
+	"deco_wheel": 4,
 }
 var water_timer := 0.0
 # 물의 깊이 — 뭍에서 몇 걸음인지 미리 재 둔다 (0 = 뭍, 1 = 물가...).
@@ -239,6 +241,9 @@ const TEXTURE_NAMES := [
 	"landmark_greattree_0", "landmark_greattree_1", "landmark_greattree_2",
 	"landmark_falls_0", "landmark_falls_1", "landmark_falls_2", "landmark_falls_3",
 	"landmark_spire_0", "landmark_spire_1",
+	"deco_wheel_0", "deco_wheel_1", "deco_wheel_2", "deco_wheel_3",
+	# 고장의 작은 마을 집 (ref/make_buildings.js)
+	"house_mill", "house_creek", "house_cabin", "house_shade",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
 	"icon_letter", "old_book",
@@ -612,6 +617,55 @@ const LANDMARKS := [
 ]
 
 
+# ---- 고장의 작은 마을 ----
+#
+# 교진 마을 밖에도 사람이 산다. 세계를 네 배로 넓히고 랜드마크를 세웠더니
+# 「크고 멋있는데 아무도 안 사는 곳」이 됐다 — 구경거리지 마을이 아니다.
+# 큰 것 곁에는 그것 때문에 사는 사람이 있어야 한다. 폭포 밑에는 물로
+# 먹고사는 사람이, 큰나무 그늘에는 나무로 먹고사는 사람이.
+#
+# 교진 마을과 다른 점 하나: **여기는 짓는 게 아니다.** 처음부터 서 있고,
+# 발견하는 것이다. 마을 발전(VILLAGE_PLOTS)과 헷갈리지 않게 표를 따로 둔다.
+#
+#   houses  [앵커, 집 그림, 사는 사람] — 앵커는 5x4 본체의 왼쪽 위
+#   square  마을 한복판. 낮에 사람들이 모인다
+#   sign    마을 이름 표지판
+#   props   [칸, 종류] — 물레방아처럼 그 마을에만 있는 것
+const HAMLETS := {
+	# 물소리 마을 — 큰폭포 바로 동쪽. 물레방아 도는 소리가 하루 종일 난다
+	"brookside": {
+		"name": "물소리 마을",
+		"houses": [
+			[Vector2i(286, 20 + NORTH_PAD), "mill", "miller"],
+			[Vector2i(286, 32 + NORTH_PAD), "creek", "dyer"],
+			[Vector2i(296, 26 + NORTH_PAD), "cabin", "brook"],
+		],
+		"square": Vector2i(292, 27 + NORTH_PAD),
+		"sign": Vector2i(288, 25 + NORTH_PAD),
+		"props": [[Vector2i(283, 23 + NORTH_PAD), "deco_wheel"]],
+	},
+	# 나무그늘 마을 — 큰나무 서쪽 그늘. 나무를 베어 먹고사는 사람들인데
+	# 정작 큰나무만은 아무도 손대지 않는다
+	"treeshade": {
+		"name": "나무그늘 마을",
+		"houses": [
+			[Vector2i(96, 134 + NORTH_PAD), "cabin", "sawyer"],
+			[Vector2i(96, 146 + NORTH_PAD), "shade", "teller"],
+			[Vector2i(106, 156 + NORTH_PAD), "cabin", "beekeep"],
+		],
+		"square": Vector2i(103, 143 + NORTH_PAD),
+		"sign": Vector2i(100, 141 + NORTH_PAD),
+		"props": [],
+	},
+}
+# 이 사람이 어느 고장 사람인가 (없으면 교진 마을 사람). npcs.gd 가 본다
+const HAMLET_OF := {
+	"miller": "brookside", "dyer": "brookside", "brook": "brookside",
+	"sawyer": "treeshade", "teller": "treeshade", "beekeep": "treeshade",
+}
+const HAMLET_NPC_IDS := ["miller", "dyer", "brook", "sawyer", "beekeep", "teller"]
+
+
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
 const HOME_ANCHOR := Vector2i(71, 30 + NORTH_PAD)   # 광장에서 두 칸 떨어뜨렸다
@@ -711,6 +765,15 @@ const NPC_SCHEDULE := {
 	"painter":    [[6, "home"], [12, "plaza"], [17, "home"]],
 	"musician":   [[6, "home"], [13, "plaza"], [17, "home"]],
 	"weaver":     [[6, "home"], [10, "plaza"], [14, "home"]],
+	# ---- 고장 사람들 ----
+	# plaza 는 교진 마을 광장이라 여기 사람들은 안 간다. 대신 제 마을
+	# 한복판(square)에 모인다 — 하루가 제 고장 안에서 돈다
+	"miller":     [[6, "work"], [12, "square"], [14, "work"], [19, "home"]],
+	"dyer":       [[7, "work"], [11, "square"], [13, "work"], [19, "home"]],
+	"brook":      [[8, "square"], [10, "falls"], [15, "square"], [18, "home"]],
+	"sawyer":     [[6, "work"], [11, "square"], [13, "work"], [19, "home"]],
+	"beekeep":    [[7, "work"], [12, "square"], [15, "work"], [19, "home"]],
+	"teller":     [[9, "square"], [12, "tree"], [17, "square"], [19, "home"]],
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
 const NPC_PLAZA := {
@@ -1114,6 +1177,13 @@ func _load_textures() -> void:
 		tex["mature_" + id] = load("res://assets/sprites/mature_%s.png" % id)
 	for id: String in GameData.FORAGE_IDS:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
+	# 고장 마을 사람들 — 여덟 장씩(걷기 6 + 초상 2)이라 이름을 하나씩
+	# 적으면 표만 마흔여덟 줄이 된다. 표에서 따라간다
+	for nid: String in HAMLET_NPC_IDS:
+		for sfx: String in ["down_0", "down_1", "up_0", "up_1", "side_0", "side_1",
+				"portrait_normal", "portrait_happy"]:
+			var nn := "npc_%s_%s" % [nid, sfx]
+			tex[nn] = load("res://assets/sprites/%s.png" % nn)
 	# 프롤로그 일러스트 — 오프닝 편지지 위에 얹는 움직이는 장면 (4프레임)
 	for pn: String in ["grandpa", "box", "letter", "farm"]:
 		for i in 4:

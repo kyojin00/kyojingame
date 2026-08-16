@@ -4696,6 +4696,10 @@ const NPC_KIND := {
 	"herbalist": "normal", "painter": "normal", "musician": "normal",
 	"weaver": "normal",
 	"alchemist": "special",
+	# 고장 사람 — 제 고장에 뿌리내린 사람들이라 이사도 이탈도 없다.
+	# core 와 같은 취급이지만 「교진 마을 주민 수」에는 안 든다
+	"miller": "core", "dyer": "core", "brook": "core",
+	"sawyer": "core", "beekeep": "core", "teller": "core",
 }
 # 일반 주민 후보 — 앞쪽일수록 먼저 편지를 보내기 쉽다 (랜덤이지만 풀 순서대로
 # 소문이 도는 셈). 전부 정착하면 최대 주민 21명 (핵심 9 + 일반 10 +
@@ -5427,6 +5431,155 @@ const NPCS := {
 	"hates": ["sludge", "forage_trash"],
 	},
 
+	# ---- 물소리 마을 (폭포골) ----
+	#
+	# 큰폭포 밑에 세 집이 모여 산다. 물레방아가 도는 소리가 하루 종일
+	# 나서 마을 이름이 그렇게 붙었다. 물로 먹고사는 사람들이다.
+	"miller": {"name": "수길", "birthday": [FALL, 9], "gender": "m", "romance": false,
+	"lines": [
+		"어이, 교진 마을에서 왔나? 여긴 물소리가 커서 말도 크게 해야 해!",
+		"물방아는 사람이 안 밀어도 돌아. 물이 대신 일해 주는 거지.",
+		"밀가루 묻은 손으로 악수해서 미안해. 여긴 늘 이래.",
+		"폭포는 겨울에도 안 얼어. 저렇게 세게 떨어지는데 얼 새가 있나.",
+		"우리 마을엔 우물이 없어. 필요가 없거든.",
+	],
+	"season": {
+		SPRING: ["봄에 물이 제일 세. 방아가 너무 빨리 돌아서 붙잡아야 해."],
+		SUMMER: ["여름엔 폭포 밑이 제일 시원해. 낮잠 자기 좋지."],
+		FALL: ["가을이 방앗간 대목이야. 온 고장 곡식이 여기로 와."],
+		WINTER: ["겨울엔 물보라가 얼어붙어서 바위가 유리처럼 돼."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오면 폭포가 두 배가 돼. 오늘은 가까이 가지 마."],
+		WEATHER_STORM: ["폭풍 날엔 방아를 세워. 물이 너무 세면 축이 부러져."],
+		WEATHER_FOG: ["안개 낀 날엔 폭포 소리만 나고 폭포가 안 보여. 그게 제일 무섭지."],
+	},
+	"morning": ["첫 방아는 해 뜰 때 돌려. 아침 물이 제일 힘차거든."],
+	"night": ["이 시간에? 밤엔 물소리가 더 커. 잠이 안 올 거야."],
+	"loves": ["wheat", "dish_rice_cake", "dish_bread"],
+	"likes": ["potato", "corn", "dish_soup"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"dyer": {"name": "윤슬", "birthday": [SPRING, 21], "gender": "f", "romance": false,
+	"lines": [
+		"이 폭포 물로 물을 들이면 색이 안 바래요. 왜인지는 나도 몰라요.",
+		"쪽빛은 열두 번을 담가야 나와요. 한 번에 되는 색은 없어요.",
+		"손이 파란 건 씻어도 안 지워져요. 이제는 그냥 두기로 했어요.",
+		"물보라에 무지개가 설 때가 있어요. 그 색은 아직 못 냈어요.",
+		"꽃도, 나뭇잎도, 흙도 다 색이 돼요. 안 되는 건 없어요.",
+	],
+	"season": {
+		SPRING: ["봄꽃은 노란색이 제일 곱게 나와요."],
+		SUMMER: ["여름엔 천이 금방 말라서 좋아요."],
+		FALL: ["가을 잎으로 물들이면 그 잎 색이 그대로 나와요."],
+		WINTER: ["겨울엔 물이 차서 손이 곱아요. 그래도 색은 겨울 게 제일 맑아요."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오는 날엔 천을 못 널어요. 오늘은 쉬는 날."],
+		WEATHER_STAR: ["별 뜬 밤에 담근 천은... 기분 탓인지 색이 깊어요."],
+	},
+	"morning": ["아침 물이 제일 맑아요. 물들이기 좋은 시간이에요."],
+	"night": ["밤엔 색이 제대로 안 보여서 일을 못 해요."],
+	"loves": ["forage_dandelion", "bouquet", "cloth"],
+	"likes": ["forage_berry", "forage_herb", "gem"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"brook": {"name": "도담", "birthday": [SUMMER, 15], "gender": "m", "romance": false,
+	"lines": [
+		"나 폭포 뒤에 들어가 봤어! 아무한테도 말하면 안 돼.",
+		"저 통나무, 내가 띄운 거야. 저기까지 흘러가는 데 사흘 걸렸어.",
+		"물고기가 폭포를 거슬러 올라가는 거 봤어? 진짜야!",
+		"할아버지가 물방아 만지지 말래. 근데 한 번만 타 보고 싶어.",
+		"교진 마을은 여기서 얼마나 멀어? 나도 언젠가 가 볼 거야.",
+	],
+	"season": {
+		SUMMER: ["여름엔 하루 종일 물속에 있어. 아무도 안 말려."],
+		WINTER: ["겨울엔 물보라가 얼어서 바위가 반짝여. 그거 보러 가자!"],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오면 폭포가 우르르 소리를 내. 무섭기도 하고 좋기도 해."],
+	},
+	"morning": ["일찍 왔네! 나도 방금 나왔어."],
+	"night": ["이 시간에 밖에 있으면 혼나. 나도 너도."],
+	"loves": ["fish_sweetfish", "dish_grilled_fish", "forage_berry"],
+	"likes": ["fish_crucian", "fish_bitterling", "egg"],
+	"hates": ["sludge", "forage_trash"],
+	},
+
+	# ---- 나무그늘 마을 (큰나무 숲) ----
+	#
+	# 큰나무 그늘 안에 세 집. 나무를 베어 먹고사는 사람들인데,
+	# 정작 큰나무만은 아무도 손대지 않는다.
+	"sawyer": {"name": "동백", "birthday": [WINTER, 4], "gender": "m", "romance": false,
+	"lines": [
+		"큰나무? 저건 안 벤다. 우리 할아버지의 할아버지도 안 베셨어.",
+		"나무는 겨울에 베야 해. 물이 안 올라와 있을 때라야 안 갈라지거든.",
+		"이 숲에서 제일 오래된 건 저 나무고, 두 번째는 나야.",
+		"톱은 밀 때가 아니라 당길 때 썰려. 힘으로 하는 게 아니야.",
+		"나무 나이는 밑동을 보면 알아. 저 나무는 세어 볼 엄두도 안 나.",
+	],
+	"season": {
+		SPRING: ["봄엔 안 벤다. 물이 올라와서 나무가 운다."],
+		FALL: ["가을엔 장작을 쌓아 둬. 겨울이 길거든."],
+		WINTER: ["겨울 나무가 제일 단단해. 지금이 일할 때야."],
+	},
+	"weather": {
+		WEATHER_STORM: ["폭풍 날엔 숲에 안 들어가. 큰 가지가 떨어져."],
+		WEATHER_SNOW: ["눈 덮인 숲은 조용해. 톱 소리만 나지."],
+	},
+	"morning": ["해 뜨자마자 나와야 하루가 길어."],
+	"night": ["어두운 숲엔 들어가지 마. 길을 잃는 게 아니라 길이 없어져."],
+	"loves": ["wood", "dish_soup", "dish_grilled_fish"],
+	"likes": ["nail", "stone", "potato"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"beekeep": {"name": "꿀비", "birthday": [SUMMER, 28], "gender": "f", "romance": false,
+	"lines": [
+		"큰나무 꽃이 필 때 뜬 꿀이 제일 좋아요. 일 년에 딱 며칠이에요.",
+		"벌은 안 쏘아요. 무서워하지만 않으면.",
+		"벌통에 귀를 대 보면 소리가 나요. 나무가 웅웅거리는 것 같아요.",
+		"저 나무 하나에 벌이 몇 마린지 세어 본 적 있어요. 세다 말았지만요.",
+		"꿀은 안 상해요. 백 년 지난 꿀도 꿀이에요.",
+	],
+	"season": {
+		SPRING: ["봄엔 벌이 제일 바빠요. 나도 같이 바빠지죠."],
+		SUMMER: ["여름 꿀은 진해요. 겨울 꿀은 맑고요."],
+		FALL: ["가을엔 벌들 먹을 걸 남겨 둬야 해요. 다 뜨면 안 돼요."],
+		WINTER: ["겨울엔 벌통을 싸매 줘요. 우리보다 벌이 먼저예요."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오면 벌이 안 나와요. 나도 안 나가고요."],
+		WEATHER_FOG: ["안개 낀 날엔 벌이 길을 잃어요. 오늘은 벌통을 안 열어요."],
+	},
+	"morning": ["아침 이슬 걷히면 벌통을 열어요. 조금만 기다려요."],
+	"night": ["밤엔 벌도 자요. 조용히 지나가 줘요."],
+	"loves": ["dish_jam", "bouquet", "forage_berry"],
+	"likes": ["strawberry", "melon", "forage_herb"],
+	"hates": ["sludge", "forage_trash"],
+	},
+	"teller": {"name": "글샘", "birthday": [FALL, 30], "gender": "f", "romance": false,
+	"lines": [
+		"저 나무는 이 고장 이야기를 다 들었어요. 나는 그걸 받아 적을 뿐이고요.",
+		"밤에 나무 밑에 앉아 있으면 잎이 무슨 말을 해요. 웃지 말아요.",
+		"이야기는 사람이 짓는 게 아니에요. 있던 걸 찾아내는 거지.",
+		"교진 마을 이야기도 들려줘요. 나는 여기서만 살아서요.",
+		"오래 산 것 곁에 있으면 사람도 좀 길게 생각하게 돼요.",
+	],
+	"season": {
+		SPRING: ["봄엔 잎이 새로 나요. 새 이야기가 시작되는 것 같죠."],
+		FALL: ["가을엔 잎이 다 떨어져요. 이야기 하나가 끝나는 거예요."],
+		WINTER: ["겨울 나무는 말이 없어요. 나도 그때는 듣기만 해요."],
+	},
+	"weather": {
+		WEATHER_STAR: ["별 뜬 밤엔 잎 사이로 별이 보여요. 그 밤 이야기는 잘 써져요."],
+		WEATHER_FOG: ["안개 낀 날엔 나무가 반쯤 사라져요. 그게 제일 예뻐요."],
+	},
+	"morning": ["아침에 쓴 글이 제일 정직해요."],
+	"night": ["밤에는 이야기가 잘 와요. 오래 있다 가요."],
+	"loves": ["old_book", "world_branch", "dish_tea"],
+	"likes": ["forage_herb", "gem", "memory_piece"],
+	"hates": ["sludge", "forage_trash"],
+	},
 }
 var affinity := {"librarian": 0,
 	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
@@ -5434,7 +5587,10 @@ var affinity := {"librarian": 0,
 	"explorer": 0, "forest_mom": 0, "forest_girl": 0,
 	"farmer": 0, "foodie": 0, "angler": 0, "miner": 0, "florist": 0,
 	"carpenter": 0, "herbalist": 0, "painter": 0, "musician": 0,
-	"weaver": 0, "alchemist": 0}
+	"weaver": 0, "alchemist": 0,
+	# 고장의 작은 마을 사람들 — 교진 마을 밖에도 사람이 산다
+	"miller": 0, "dyer": 0, "brook": 0,
+	"sawyer": 0, "beekeep": 0, "teller": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
 const RING_PRICE := 12000

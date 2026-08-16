@@ -792,6 +792,69 @@ function rockSpire(f, NF) {
 }
 
 
+// ============================================================
+// 4. 물레방아 — 폭포골 마을의 방앗간 곁에서 돈다
+// ============================================================
+//
+// 랜드마크는 아니지만 여기 있는 게 맞다. **돌아가는 그림**을 뽑는
+// 규칙이 이 파일에 다 있고, 물레방아는 돌지 않으면 아무 의미가 없다.
+//
+// 도는 것을 그리는 요령은 **바큇살을 대칭으로 두지 않는 것**이다.
+// 여덟 살을 45도로 두면 반 바퀴에서 처음과 똑같아 보여 안 도는 것 같다.
+// 살을 여섯으로 두고 네 장에 15도씩 돌리면 (총 60도 = 살 간격) 딱 한
+// 칸 넘어가 매끄럽게 이어진다.
+function millWheel(f, NF) {
+  const W = 60, H = 68, CX = 30, CY = 30, R = 26;
+  const g = new G(W, H);
+  const rot = (f / NF) * (Math.PI * 2 / 6);      // 살 하나 간격만 돈다
+
+  // 물받이 통 — 살 끝에 달린 널. 물이 여기 담겨 바퀴를 돌린다
+  for (let i = 0; i < 6; i++) {
+    const th = rot + i * (Math.PI * 2 / 6);
+    const ex = CX + Math.cos(th) * R, ey = CY + Math.sin(th) * R;
+    // 살
+    g.bone(CX + Math.cos(th) * 6, CY + Math.sin(th) * 6, ex, ey, 4, 3, 'b1');
+    // 물받이 — 살 끝에서 바퀴를 따라 접힌다
+    const tx = ex + Math.cos(th + Math.PI / 2) * 6;
+    const ty = ey + Math.sin(th + Math.PI / 2) * 6;
+    g.bone(ex, ey, tx, ty, 5, 4, 'b2');
+    // 물이 담긴 통은 물이 넘친다 (위로 올라가는 쪽 셋만)
+    if (Math.sin(th) > 0.1) {
+      g.ellipse(tx, ty, 3, 2.4, 'w1');
+      g.px(tx, ty + 3, 'w0');
+      g.px(tx + 1, ty + 4, 'w1');
+    }
+  }
+  // 테 — 안팎 두 겹. 한 겹만 두면 바퀴가 아니라 별이 된다
+  for (let a = 0; a < 260; a++) {
+    const th = a / 260 * Math.PI * 2;
+    for (let k = -1; k <= 1; k++)
+      g.px(CX + Math.cos(th) * (R + k), CY + Math.sin(th) * (R + k), 'b1');
+    g.px(CX + Math.cos(th) * (R - 5), CY + Math.sin(th) * (R - 5), 'b2');
+  }
+  // 축
+  g.ellipse(CX, CY, 5, 5, 'b2');
+  g.ellipse(CX - 1, CY - 1, 3, 3, 'b0');
+  // 결 — 젖은 나무라 아래쪽이 짙다
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (g.d[y][x][0] !== 'b') continue;
+    if (y > CY + 8 && hash(x >> 1, y >> 1) > 0.55) g.px(x, y, 'b3');
+    else if (hash(x >> 2, y >> 2) > 0.84) g.px(x, y, 'b0');
+  }
+  // 물이 떨어지는 자리 — 바퀴 밑에 흰 물보라
+  for (let i = 0; i < 9; i++) {
+    const px = CX - 10 + i * 2.6 + Math.sin(f * 1.7 + i) * 1.2;
+    g.ellipse(px, H - 8 + Math.cos(f + i) * 2, 4, 2.6, i % 2 ? 'w0' : 'w1');
+  }
+  g.rect(0, H - 4, W - 1, H - 1, 'w2');
+  for (let x = 0; x < W; x++)
+    if (hash((x + f * 3) >> 1, 5) > 0.6) g.px(x, H - 4, 'w1');
+
+  g.outline('O');
+  return g;
+}
+
+
 // ---- 내보내기 ----
 //
 // 하나에 여러 장. 이름은 landmark_<id>_<장번호>.png 이고, 게임은
@@ -800,6 +863,7 @@ const WORKS = {
   landmark_greattree: { fn: greatTree, frames: 3 },
   landmark_falls: { fn: bigFalls, frames: 4 },
   landmark_spire: { fn: rockSpire, frames: 2 },
+  deco_wheel: { fn: millWheel, frames: 4 },
 };
 const made = [];
 for (const [name, w] of Object.entries(WORKS)) {

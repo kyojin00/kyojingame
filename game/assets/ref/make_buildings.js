@@ -1798,6 +1798,39 @@ const KINDS = {
   house_post: { sign: true, icon: 'letter', wallPal: 'warm', gable: 'clock',
     flag: true, ivy: 1, props: [['mailbox', -12], ['parcel', 3]] },
 
+  // ---- 고장의 작은 마을 (폭포골 · 큰나무 숲) ----
+  //
+  // 교진 마을 밖에도 사람이 산다. 다만 **가게가 아니라 사는 집**이다.
+  // 그래서 장사 간판 대신 살림으로 말한다 — 빨래, 장작, 화분, 연기.
+  //
+  // 그림체는 교진 마을과 **똑같이** 둔다. 다른 고장이지 다른 세계가
+  // 아니다. 대신 재료를 그 땅에 맞춘다:
+  //   폭포골     늘 젖어 있다 -> 돌벽 · 이끼 낀 지붕 · 굴뚝 연기
+  //   큰나무 숲  나무가 지천이다 -> 널벽(plank) · 따뜻한 나무색
+
+  // 물방앗간 — 폭포골의 중심. 물가에 선 집이라 돌벽에 이끼 낀 지붕.
+  // 문 앞에 곡식 자루와 궤짝이 쌓여 있다 (곁의 물레방아는 따로 돈다)
+  house_mill: { wallPal: 'stone', roofPal: 'moss', w: 4, pitch: -6, storey: 4,
+    gable: 'loft', vane: true, dormer: true, ivy: 2, lit: true,
+    sign: true, icon: 'jar', hang: true,
+    props: [['barrel', -15], ['crate', 4]] },
+
+  // 물가 오두막 — 비가 잦은 골짜기라 지붕이 가파르고 굴뚝에서 연기가 난다
+  house_creek: { wallPal: 'pale', roofPal: 'slate', w: -2, pitch: 6, storey: 2,
+    chim: 'big', smoke: true, ivy: 1, laundry: true, dormer: true,
+    props: [['planter', -10], ['barrel', 3]] },
+
+  // 통나무집 — 큰나무 숲. 나무를 켜서 지은 집. 장작과 건초가 쌓여 있다
+  house_cabin: { wall: 'plank', wallPal: 'warm', roofPal: 'moss', w: 2,
+    pitch: -10, storey: 2, gable: 'loft', ivy: 2, laundry: true,
+    props: [['crate', -13], ['hay', 4]] },
+
+  // 그늘집 — 큰나무 그늘에 든 집이라 낮에도 창에 불이 켜져 있다.
+  // 문 앞 긴 의자는 나무 밑에서 쉬어 가라는 자리다
+  house_shade: { wallPal: 'warm', roofPal: 'clay', w: 3, pitch: 4, storey: 4,
+    win3: true, lit: true, dormer: true, ivy: 2, laundry: true,
+    props: [['bench', -19], ['planter', 4]] },
+
   // 마을 회관 — 마을에서 **제일 크고 제일 높은** 집. 여기만 종탑이 있다.
   //
   // 회관의 성격은 「여럿이 모인다」이다. 그래서 다른 집엔 없는 것만 모았다:

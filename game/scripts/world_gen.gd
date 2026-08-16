@@ -111,6 +111,7 @@ func _build_map() -> void:
 	# 그 위로 나무가 돋아 그림을 반쯤 가린다 (낚시터를 마지막에 비우는 것과
 	# 같은 이유다)
 	_build_landmarks()
+	_build_hamlets()
 	# 온실 터 표지판 (농장 한켠) — 온실 자리는 자연물을 비워 둔다
 	for gy in range(m.GREENHOUSE.position.y, m.GREENHOUSE.end.y):
 		for gx in range(m.GREENHOUSE.position.x, m.GREENHOUSE.end.x):
@@ -558,6 +559,60 @@ func _build_landmarks() -> void:
 					continue
 				m.objects[p] = {"kind": "art_block", "hp": 0}
 		m.objects[at] = {"kind": String(lm.kind), "hp": 0}
+
+
+# ---- 고장의 작은 마을 ----
+#
+# 랜드마크만 세워 놓으니 「크고 멋있는데 아무도 안 사는 곳」이 됐다.
+# 큰 것 곁에는 그것 때문에 사는 사람이 있어야 한다.
+#
+# 교진 마을과 달리 **짓는 게 아니다.** 처음부터 서 있고, 걸어가서
+# 발견하는 것이다. 그래서 여기서 통째로 세운다.
+func _build_hamlets() -> void:
+	for hid: String in m.HAMLETS:
+		var h: Dictionary = m.HAMLETS[hid]
+		# 마을 자리를 먼저 비운다 — 집 그림 위로 나무가 서면 안 된다.
+		# 집 하나가 그림으로 덮는 칸은 7x6(앵커 기준 -1,-2 에서 시작)이고,
+		# 그 둘레 마당까지 비워야 「집이 숲에 파묻힌」 꼴이 안 난다
+		for entry: Array in h.houses:
+			var a: Vector2i = entry[0]
+			for y in range(a.y - 4, a.y + 6):
+				for x in range(a.x - 3, a.x + 8):
+					m.objects.erase(Vector2i(x, y))
+		# 마을 한복판과 표지판 둘레도 비운다
+		for c: Vector2i in [h.square, h.sign]:
+			for y in range(c.y - 2, c.y + 3):
+				for x in range(c.x - 2, c.x + 3):
+					m.objects.erase(Vector2i(x, y))
+
+		# 집 — 마당(다져진 흙)을 깔고 그림을 세운다
+		for entry2: Array in h.houses:
+			var a2: Vector2i = entry2[0]
+			_lay_yard(a2)
+			_fill_building(a2, String(entry2[1]))
+
+		# 마을 한복판 — 다져진 흙 마당. 여기서 사람들이 만난다
+		for y2 in range(h.square.y - 2, h.square.y + 3):
+			for x2 in range(h.square.x - 3, h.square.x + 4):
+				if x2 < 0 or y2 < 0 or x2 >= m.MAP_W or y2 >= m.WORLD_H:
+					continue
+				if str(m.grid[y2][x2].ground) == "grass":
+					m.grid[y2][x2].ground = "yard"
+				m.objects.erase(Vector2i(x2, y2))
+		m.objects[h.sign] = {"kind": "sign", "hp": 0}
+
+		# 그 마을에만 있는 것 (물레방아처럼)
+		for pr: Array in h.props:
+			var p: Vector2i = pr[0]
+			# 물레방아 밑에는 물이 있어야 한다 — 마른 땅에서 도는 방아는 없다
+			if String(pr[1]) == "deco_wheel":
+				for wy in range(p.y + 1, p.y + 3):
+					for wx in range(p.x - 1, p.x + 3):
+						if wx < 0 or wy < 0 or wx >= m.MAP_W or wy >= m.WORLD_H:
+							continue
+						m.grid[wy][wx].ground = "water"
+						m.objects.erase(Vector2i(wx, wy))
+			m.objects[p] = {"kind": String(pr[1]), "hp": 0}
 
 
 func _carve_pond(cx: int, cy: int, rx: float, ry: float) -> void:

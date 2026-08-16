@@ -63,6 +63,33 @@ const SETTLERS = {
     cloth: (r, g, b) => [Math.min(255, Math.round(r * 0.86 + 62)), Math.min(255, Math.round(g * 0.84 + 58)), Math.round(b * 0.78 + 48)],
     hair:  (r, g, b) => [Math.round(r * 0.66 + 26), Math.round(g * 0.52 + 18), Math.round(b * 0.42 + 12)],
   },
+  // -- 고장의 작은 마을 사람들 (폭포골 · 큰나무 숲) --
+  // 교진 마을 사람들과 **같은 도트**에서 색만 갈아 낀다. 다른 고장이라고
+  // 그림체까지 달라지면 다른 게임에서 걸어 들어온 사람이 된다.
+  miller: {   // 수길 — 물방앗간. 밀가루 묻은 미색 앞치마 / 희끗한 머리
+    cloth: (r, g, b) => [Math.min(255, Math.round(r * 0.88 + 58)), Math.min(255, Math.round(g * 0.88 + 56)), Math.min(255, Math.round(b * 0.86 + 60))],
+    hair:  (r, g, b) => [Math.round(r * 0.62 + 60), Math.round(g * 0.62 + 58), Math.round(b * 0.62 + 56)],
+  },
+  dyer: {     // 윤슬 — 염색장이. 폭포 물빛 쪽빛 / 검푸른 머리
+    cloth: (r, g, b) => [Math.round(r * 0.22 + 18), Math.round(g * 0.44 + 46), Math.min(255, Math.round(b * 0.72 + 96))],
+    hair:  (r, g, b) => [Math.round(r * 0.20 + 6), Math.round(g * 0.26 + 12), Math.round(b * 0.40 + 30)],
+  },
+  brook: {    // 도담 — 폭포지기 아이. 물이끼 청록 / 밝은 밤색
+    cloth: (r, g, b) => [Math.round(r * 0.30 + 20), Math.min(255, Math.round(g * 0.86 + 62)), Math.round(b * 0.62 + 52)],
+    hair:  (r, g, b) => [Math.min(255, Math.round(r * 0.82 + 30)), Math.round(g * 0.58 + 20), Math.round(b * 0.40 + 10)],
+  },
+  sawyer: {   // 동백 — 나무꾼. 짙은 팥죽빛 작업복 / 검은 머리
+    cloth: (r, g, b) => [Math.round(r * 0.58 + 26), Math.round(g * 0.26 + 12), Math.round(b * 0.26 + 14)],
+    hair:  (r, g, b) => [Math.round(r * 0.20 + 6), Math.round(g * 0.18 + 6), Math.round(b * 0.18 + 8)],
+  },
+  beekeep: {  // 꿀비 — 벌치는 사람. 꿀빛 노랑 / 옅은 금갈색
+    cloth: (r, g, b) => [Math.min(255, Math.round(r * 1.04 + 20)), Math.min(255, Math.round(g * 0.84 + 36)), Math.round(b * 0.24 + 8)],
+    hair:  (r, g, b) => [Math.min(255, Math.round(r * 0.86 + 40)), Math.round(g * 0.72 + 30), Math.round(b * 0.42 + 10)],
+  },
+  teller: {   // 글샘 — 이야기꾼. 나무그늘 짙은 초록 / 잿빛 머리
+    cloth: (r, g, b) => [Math.round(r * 0.30 + 14), Math.round(g * 0.60 + 30), Math.round(b * 0.34 + 20)],
+    hair:  (r, g, b) => [Math.round(r * 0.48 + 40), Math.round(g * 0.48 + 42), Math.round(b * 0.48 + 44)],
+  },
 };
 
 for (const [nid, tf] of Object.entries(SETTLERS)) {

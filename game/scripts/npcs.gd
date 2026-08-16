@@ -14,11 +14,13 @@ var m: KyojinMain    # main.gd
 const ONSEN_GOERS := ["blacksmith", "chief", "merchant"]
 
 
-func _spawn_npc(npc_id: String, tile: Vector2i) -> void:
+func _spawn_npc(npc_id: String, tile: Vector2i, region := Rect2i()) -> void:
 	var n: Node2D = preload("res://scripts/npc.gd").new()
 	n.main = m
 	n.id = npc_id
-	n.region = m.VILLAGE_REGION
+	# 어슬렁거릴 범위. 고장 사람은 제 마을 둘레를 돈다 —
+	# 교진 마을 구역을 주면 지도 반대편까지 걸어가려 든다
+	n.region = region if region.size.x > 0 else m.VILLAGE_REGION
 	n.position = Vector2(tile.x * m.TILE + 16, tile.y * m.TILE + 16)
 	m.npcs.append(n)
 	m.world.add_child(n)
@@ -57,8 +59,40 @@ func npc_place_now(npc_id: String) -> String:
 	return place
 
 
+# 고장 마을 사람이 갈 자리. 교진 마을의 광장·게시판·부두는 여기 없다 —
+# 하루가 제 고장 안에서 돈다.
+func _hamlet_tile(npc_id: String, place: String) -> Vector2i:
+	var h: Dictionary = m.HAMLETS[m.HAMLET_OF[npc_id]]
+	if place == "square":
+		return h.square
+	if place == "falls":
+		# 도담은 폭포 밑에서 논다 (그림 밑동은 못 밟으니 두 칸 옆)
+		for lm: Dictionary in m.LANDMARKS:
+			if lm.id == "falls":
+				return Vector2i(lm.tile.x + 8, lm.tile.y + 1)
+	if place == "tree":
+		# 글샘은 큰나무 밑에 앉아 이야기를 받아 적는다
+		for lm2: Dictionary in m.LANDMARKS:
+			if lm2.id == "greattree":
+				return Vector2i(lm2.tile.x - 7, lm2.tile.y + 1)
+	# home · work — 둘 다 제 집이다 (여기 사람들은 집이 일터다)
+	for entry: Array in h.houses:
+		if String(entry[2]) == npc_id:
+			return m.door_tile(entry[0]) + Vector2i(0, 1)
+	return h.square
+
+
 func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	var t := Vector2i(-999, -999)
+	if m.HAMLET_OF.has(npc_id):
+		t = _hamlet_tile(npc_id, place)
+		if m.is_passable(t):
+			return t
+		for d0: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0),
+				Vector2i(-1, 0), Vector2i(0, 2), Vector2i(2, 0), Vector2i(-2, 0)]:
+			if m.is_passable(t + d0):
+				return t + d0
+		return t
 	match place:
 		"stall":
 			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
@@ -111,7 +145,31 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	return t
 
 
+# 고장 마을 사람들 — 조건 없이 처음부터 제 마을에 산다.
+# 교진 마을 사람처럼 「이사 오는」 게 아니라 원래 거기 살던 사람들이다.
+# 멀어서 걸어가야 만난다 — 그 거리가 곧 해금이다.
+func _sync_hamlet_npcs() -> void:
+	for hid: String in m.HAMLETS:
+		var h: Dictionary = m.HAMLETS[hid]
+		# 어슬렁거릴 범위 = 집들과 한복판을 다 감싸는 네모 + 두 칸 여유
+		var box := Rect2i(h.square, Vector2i.ZERO)
+		for entry: Array in h.houses:
+			box = box.expand(entry[0]).expand(entry[0] + Vector2i(5, 4))
+		box = box.grow(3)
+		for entry2: Array in h.houses:
+			var nid: String = entry2[2]
+			var found := false
+			for n in m.npcs:
+				if n.id == nid:
+					found = true
+					break
+			if found:
+				continue
+			_spawn_npc(nid, m.door_tile(entry2[0]) + Vector2i(0, 1), box)
+
+
 func _sync_village_npcs() -> void:
+	_sync_hamlet_npcs()
 	# 건물이 생기면 그 건물의 주인이 마을에 나타난다 (없는 건물의 주인은 아직 없다)
 	for pid: String in m.VILLAGE_NPC:
 		if not GameData.village_built.has(pid):
