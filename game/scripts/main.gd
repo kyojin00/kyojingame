@@ -581,7 +581,7 @@ const LANDMARKS := [
 	# 큰폭포 — 절벽에서 두 단으로 쏟아진다. 밑에 못이 파여 있다
 	{"id": "falls", "name": "큰폭포", "kind": "landmark_falls",
 		"tile": Vector2i(268, 32 + NORTH_PAD),
-		"block": Rect2i(-5, -4, 10, 5), "clear": 11,
+		"block": Rect2i(-6, -4, 13, 5), "clear": 13,
 		"lake": [268, 36 + NORTH_PAD, 9.0, 5.0],
 		"river": [266, 40 + NORTH_PAD, 246, 74 + NORTH_PAD, 2.0]},
 	# 촛대바위 — 층층이 깎여 남은 붉은 바위 기둥
