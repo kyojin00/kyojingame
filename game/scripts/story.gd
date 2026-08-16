@@ -223,7 +223,15 @@ func _story_narrow(gx: int, kind: String, hp: int) -> void:
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
 		var p := Vector2i(gx, y)
 		if m.STORY_GATE_ROWS.has(y):
-			m.objects[p] = {"kind": kind, "hp": hp}
+			var o := {"kind": kind, "hp": hp}
+			# **보상이 먼저 보여야 한다.**
+			#
+			# 길을 막은 나무는 지금 그냥 벽이다 — 치우고 지나가라는 통행료다.
+			# 가지에 사과가 달려 있으면 「시켜서 벤다」가 「저거 갖고 싶다」가
+			# 된다. 같은 한 그루인데 서 있는 이유가 생긴다
+			if kind == "tree":
+				o["apple"] = true
+			m.objects[p] = o
 		else:
 			_story_fence(p)
 
