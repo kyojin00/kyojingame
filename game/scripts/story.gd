@@ -218,8 +218,58 @@ func _refresh_story_gates() -> void:
 	GameData.story_gates_left = left
 
 
+# ---- 길잡이 ----
+#
+# 안내가 글자뿐이면 「어느 쪽인지」는 결국 플레이어가 헤매서 알아낸다.
+# 단계마다 **지금 가야 할 곳**을 하나만 짚어 HUD 에 넘긴다 (핀 + 화살표).
+# 대화 중이거나 연출 중에는 끈다 — 그때는 화면이 이미 할 말을 하고 있다.
+func _guide_point() -> Array:
+	var t := func(v: Vector2i) -> Vector2:
+		return Vector2(v.x * m.TILE + 16, v.y * m.TILE + 16)
+	match GameData.story_phase:
+		"approach", "equip":
+			if _postman != null:
+				return [_postman.position, "우체부 아저씨"]
+		"chop":
+			# 아직 길을 막고 있는 첫 나무 줄
+			for gx: int in m.STORY_GATE_XS:
+				for yy in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
+					if m.objects.has(Vector2i(gx, yy)):
+						return [t.call(Vector2i(gx, yy)), "길을 막은 나무"]
+		"path":
+			return [t.call(m.STORY_FORK), "갈림길"]
+		"rock":
+			if m.objects.has(m.STORY_ROCK):
+				return [t.call(m.STORY_ROCK), "길을 막은 바위"]
+			return [t.call(m.STORY_ROCK), "지나온 자리"]
+		"travel":
+			return [t.call(Vector2i(m.STORY_ROAD_X1, m.STORY_LANE_Y)), "숲길 동쪽 끝"]
+		"deliver":
+			var ch := _story_chief()
+			if ch != null:
+				return [ch.position, "이장 덕수"]
+		"home_open":
+			return [t.call(m.HOME_SITE), "할아버지의 집"]
+	return []
+
+
+func _update_guide() -> void:
+	if m.hud == null:
+		return
+	if m.dialog.visible or m.story_cutscene or m.ui_open():
+		m.hud.clear_guide()
+		return
+	var g := _guide_point()
+	if g.is_empty():
+		m.hud.clear_guide()
+	else:
+		m.hud.set_guide(g[0], str(g[1]))
+
+
 func _story_update(delta: float) -> void:
 	if GameData.story_phase == "done" or Net.is_guest():
+		if m.hud != null:
+			m.hud.clear_guide()
 		# 스토리가 끝나도 우체부가 남아 있으면 떠나는 연출은 계속 돌린다
 		# (예전에는 여기서 바로 빠져나가 편지를 전한 자리에 그대로 서 있었다)
 		if not Net.is_guest() and _postman != null:
@@ -238,6 +288,7 @@ func _story_update(delta: float) -> void:
 			m.story_cutscene = false
 	else:
 		m._cutscene_idle = 0.0
+	_update_guide()
 	match GameData.story_phase:
 		"enter":
 			# (검증용) t를 지나는 첫 프레임에만 1회 발동

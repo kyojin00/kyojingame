@@ -316,6 +316,134 @@ func _build_tracker_scroll() -> void:
 	panel.add_child(deco)
 
 
+# ---- 길잡이 핀 ----
+#
+# 도입부에서 안내가 **글자뿐**이었다: 「우체부 아저씨를 따라 이장님께 가자」.
+# 어느 쪽인지는 말해 주지 않으니, 처음 하는 사람은 마을을 한 바퀴 돈다.
+#
+# 목표 자리에 통통 튀는 핀을 세우고, 화면 밖이면 가장자리에서 화살표가
+# 그쪽을 가리킨다. 거리도 칸 수로 같이 적어 준다.
+var _guide: Control = null
+var _guide_pos := Vector2.ZERO
+var _guide_name := ""
+var _guide_on := false
+var _guide_t := 0.0
+var _guide_fade := 0.0
+
+const GUIDE_GOLD := Color(0.98, 0.80, 0.28)
+const GUIDE_GOLD_DK := Color(0.80, 0.55, 0.13)
+const GUIDE_INK := Color(0.24, 0.15, 0.06)
+const GUIDE_CREAM := Color(0.97, 0.93, 0.83)
+const GUIDE_MARGIN := 54.0        # 가장자리에서 이만큼 안쪽에 화살표를 둔다
+const GUIDE_TOP := 96.0           # 위쪽은 HUD 패널이 있어 더 내려 잡는다
+
+
+# world_pos 는 **월드 좌표**(픽셀). 이름을 주면 핀 밑에 명패가 붙는다
+func set_guide(world_pos: Vector2, gname := "") -> void:
+	_make_guide()
+	_guide_pos = world_pos
+	_guide_name = gname
+	_guide_on = true
+
+
+func clear_guide() -> void:
+	_guide_on = false
+
+
+func _make_guide() -> void:
+	if _guide != null:
+		return
+	_guide = Control.new()
+	_guide.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_guide.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_guide.z_index = -1               # 핫바·토스트보다 아래
+	_guide.draw.connect(_draw_guide)
+	add_child(_guide)
+	move_child(_guide, 0)
+
+
+# 도트 그림에 맞춰 **네모를 쌓아** 삼각형을 만든다. 부드러운 폴리곤을 쓰면
+# 이 화면에서 저것만 사진처럼 매끈해 보인다
+func _tri(p: Vector2, w: float, hgt: float, col: Color, down := true) -> void:
+	var rows := int(hgt / 2.0)
+	for r in rows:
+		var t := float(r) / float(maxi(1, rows - 1))
+		var ww := w * (1.0 - t)
+		var yy := p.y + (float(r) * 2.0 if down else hgt - float(r) * 2.0 - 2.0)
+		_guide.draw_rect(Rect2(p.x - ww * 0.5, yy, maxf(2.0, ww), 2.0), col)
+
+
+func _draw_guide() -> void:
+	if _guide_fade <= 0.01:
+		return
+	var vp := _guide.size
+	var xf: Transform2D = main.get_viewport().get_canvas_transform()
+	var sp: Vector2 = xf * _guide_pos
+	var a := _guide_fade
+	var inner := Rect2(GUIDE_MARGIN, GUIDE_TOP,
+		vp.x - GUIDE_MARGIN * 2.0, vp.y - GUIDE_TOP - GUIDE_MARGIN * 1.6)
+	if inner.has_point(sp):
+		# ---- 화면 안 — 목표 바로 위에 핀이 뜬다 ----
+		var bob := sin(_guide_t * 3.2) * 4.0
+		var top := sp + Vector2(0, -46.0 + bob)
+		# 발밑 그림자 (핀이 떠 있는 것으로 읽히게)
+		_guide.draw_rect(Rect2(sp.x - 7, sp.y - 3, 14, 4),
+			Color(0, 0, 0, 0.22 * a))
+		# 테두리 -> 속 (두 번 그려 도트 윤곽을 만든다)
+		_tri(top + Vector2(0, -2), 22, 24, Color(GUIDE_INK, a))
+		_tri(top, 18, 20, Color(GUIDE_GOLD_DK, a))
+		_tri(top + Vector2(0, -1), 14, 15, Color(GUIDE_GOLD, a))
+		# 위쪽 반짝임 한 점
+		_guide.draw_rect(Rect2(top.x - 5, top.y - 1, 4, 3),
+			Color(1, 1, 1, 0.75 * a))
+		if _guide_name != "":
+			_plate(Vector2(sp.x, top.y - 16.0), _guide_name, a)
+		return
+	# ---- 화면 밖 — 가장자리에서 그쪽을 가리킨다 ----
+	var c := inner.get_center()
+	var dir := (sp - c).normalized()
+	if dir == Vector2.ZERO:
+		return
+	var e := _edge_hit(inner, c, dir)
+	var ang := dir.angle()
+	# 화살표 — 네모를 쌓아 만든 삼각형을 돌려 찍는다
+	var pts := PackedVector2Array()
+	for v: Vector2 in [Vector2(13, 0), Vector2(-9, -9), Vector2(-4, 0), Vector2(-9, 9)]:
+		pts.append(e + v.rotated(ang))
+	var out := PackedVector2Array()
+	for v: Vector2 in [Vector2(17, 0), Vector2(-12, -12), Vector2(-5, 0), Vector2(-12, 12)]:
+		out.append(e + v.rotated(ang))
+	_guide.draw_colored_polygon(out, Color(GUIDE_INK, a))
+	_guide.draw_colored_polygon(pts, Color(GUIDE_GOLD, a))
+	# 거리 — 몇 칸 남았나
+	var tiles := int(round(_guide_pos.distance_to(main.player.position) / float(main.TILE)))
+	_plate(e - dir * 22.0, "%s  %d칸" % [_guide_name, tiles] if _guide_name != ""
+		else "%d칸" % tiles, a)
+
+
+# 가운데에서 dir 로 나갔을 때 사각형과 만나는 점
+func _edge_hit(r: Rect2, c: Vector2, dir: Vector2) -> Vector2:
+	var hx: float = r.size.x * 0.5
+	var hy: float = r.size.y * 0.5
+	var t := INF
+	if absf(dir.x) > 0.0001:
+		t = minf(t, hx / absf(dir.x))
+	if absf(dir.y) > 0.0001:
+		t = minf(t, hy / absf(dir.y))
+	return c + dir * t
+
+
+# 크림색 작은 명패 — 대화창과 같은 톤
+func _plate(center: Vector2, text: String, a: float) -> void:
+	var f := FONT_SMALL
+	var w: float = f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+	var box := Rect2(center.x - w * 0.5 - 6.0, center.y - 9.0, w + 12.0, 16.0)
+	_guide.draw_rect(box.grow(2.0), Color(GUIDE_INK, 0.85 * a))
+	_guide.draw_rect(box, Color(GUIDE_CREAM, 0.95 * a))
+	_guide.draw_string(f, Vector2(box.position.x + 6.0, box.position.y + 12.0),
+		text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(GUIDE_INK, a))
+
+
 # ---- 퀘스트 완료/보상 토스트 ----
 
 var _toast_queue: Array = []
@@ -857,6 +985,14 @@ func _watch_goal(goal: String) -> void:
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	# 길잡이 핀 — 켜지고 꺼질 때 톡 끊기지 않게 부드럽게 여닫는다
+	if _guide != null:
+		_guide_t += delta
+		var want := 1.0 if _guide_on else 0.0
+		var prev := _guide_fade
+		_guide_fade = move_toward(_guide_fade, want, delta * 4.0)
+		if _guide_fade > 0.0 or prev > 0.0:
+			_guide.queue_redraw()
 	_update_story_banner(delta)
 	# 제작대에서 방금 완성된 것 (game_data는 UI를 못 부른다)
 	while not GameData.desk_done_pending.is_empty():

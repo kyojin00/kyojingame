@@ -22,6 +22,7 @@ var title_label: Label
 var body_label: Label
 var buttons_box: HFlowContainer
 var portrait: TextureRect
+var _pframe: Control = null      # 초상화가 그 안에서 튀어오르는 빈 틀
 var skip_btn: Button
 
 var _deco: Control = null          # 스티치·나뭇잎·진행 화살표를 그리는 겹
@@ -34,6 +35,19 @@ var _seq_name := ""
 var _seq_portrait: Texture2D = null
 var _seq_on_end := Callable()
 var _seq_has_choices := false
+
+# ---- 타자 효과 ----
+#
+# 대사가 통째로 툭 나타나면 「읽을 글」이지 「하는 말」이 아니다. 한 자씩
+# 찍히면 말의 속도가 생기고, 초상화가 그 박자에 맞춰 움직이면 그 사람이
+# 말하고 있는 것으로 보인다.
+#
+# 넘기기(E·다음)를 누르면 **먼저 전부 드러내고**, 한 번 더 눌러야 다음
+# 대사로 간다 — 급하게 눌러도 글을 놓치지 않는다.
+const TYPE_CPS := 42.0             # 초당 글자 수
+var _typing := false
+var _type_t := 0.0
+var _pop_t := 9.0                  # 초상화가 튀어오른 뒤 지난 시간
 
 
 # 대화창은 화면 아래 가운데에 고정하고, 내용 높이만큼만 커진다.
@@ -99,13 +113,25 @@ func _ready() -> void:
 	h.add_theme_constant_override("separation", 9)
 	panel.add_child(h)
 
+	# 초상화는 **틀 안에서** 움직인다. 컨테이너가 직접 자리를 잡아 주면
+	# 프레임마다 되돌려 놓으므로, 자리를 잡는 빈 틀을 하나 두고 그 안에서
+	# 튀어오르게 한다
+	_pframe = Control.new()
+	_pframe.custom_minimum_size = Vector2(PORTRAIT, PORTRAIT)
+	_pframe.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_pframe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pframe.clip_contents = false
+	h.add_child(_pframe)
+
 	portrait = TextureRect.new()
+	portrait.size = Vector2(PORTRAIT, PORTRAIT)
 	portrait.custom_minimum_size = Vector2(PORTRAIT, PORTRAIT)
 	portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	portrait.pivot_offset = Vector2(PORTRAIT, PORTRAIT) * 0.5
+	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	portrait.visible = false
-	h.add_child(portrait)
+	_pframe.add_child(portrait)
 
 	var v := VBoxContainer.new()
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -207,6 +233,33 @@ func _process(delta: float) -> void:
 	_deco_t += delta
 	if _deco != null:
 		_deco.queue_redraw()   # 진행 화살표가 콩콩 뛰도록
+	if _typing:
+		_type_t += delta
+		var n := int(_type_t * TYPE_CPS)
+		if n >= body_label.text.length():
+			_finish_typing()
+		else:
+			body_label.visible_characters = n
+	# 초상화 — 새 대사에서 한 번 톡 튀고, 말하는 동안 아주 조금 흔들린다
+	if portrait.visible:
+		_pop_t += delta
+		var pop: float = maxf(0.0, 1.0 - _pop_t * 5.0)
+		var bob: float = (sin(_deco_t * 11.0) * 1.2 if _typing else 0.0)
+		portrait.position.y = -pop * 5.0 + bob
+		portrait.scale = Vector2.ONE * (1.0 + pop * 0.10)
+
+
+func _finish_typing() -> void:
+	_typing = false
+	body_label.visible_characters = -1
+
+
+# 넘기기 — 아직 찍는 중이면 먼저 전부 드러낸다
+func _next_or_finish() -> void:
+	if _typing:
+		_finish_typing()
+	else:
+		_advance_seq()
 
 
 # 귀퉁이 스티치 점 4개 + 명패 옆 나뭇잎 + 진행 화살표.
@@ -238,6 +291,13 @@ func open(title_text: String, body_text: String, buttons: Array,
 	skip_btn.visible = false
 	portrait.texture = portrait_tex
 	portrait.visible = portrait_tex != null
+	if _pframe != null:
+		_pframe.visible = portrait.visible
+	# 시퀀스 대사만 한 자씩 찍는다 (안내창·상점창은 통으로 보여야 한다)
+	_typing = _seq_idx >= 0
+	_type_t = 0.0
+	_pop_t = 0.0
+	body_label.visible_characters = 0 if _typing else -1
 	for c in buttons_box.get_children():
 		c.queue_free()
 	for b in buttons:
@@ -344,6 +404,8 @@ func set_buttons(buttons: Array) -> void:
 func set_portrait(tex: Texture2D) -> void:
 	portrait.texture = tex
 	portrait.visible = tex != null
+	if _pframe != null:
+		_pframe.visible = portrait.visible
 
 
 func close() -> void:
@@ -551,9 +613,9 @@ func _advance_seq() -> void:
 	if _seq_has_choices:
 		btns = e.choices
 	elif _seq_idx < _seq.size() - 1:
-		btns = [["다음 >", _advance_seq]]
+		btns = [["다음 >", _next_or_finish]]
 	else:
-		btns = [["대화 끝", _end_seq]]
+		btns = [["대화 끝", _next_or_finish]]
 	open(str(e.get("name", _seq_name)), str(e.text), btns,
 		e.get("portrait", _seq_portrait))
 	skip_btn.visible = _can_skip()
@@ -608,5 +670,5 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif not _seq_has_choices \
 			and (event.is_action_pressed("talk") or event.is_action_pressed("interact")
 			or event.is_action_pressed("use_tool")):
-		_advance_seq()
+		_next_or_finish()
 		get_viewport().set_input_as_handled()
