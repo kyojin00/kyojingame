@@ -1075,8 +1075,11 @@ func _fisher_arrive() -> void:
 		fisher.visible = true
 		fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
 			m.FISHER_ARRIVE.y * m.TILE + 16)
-	m.hud.event_toast("낯선 낚시꾼이 마을에 왔다")
-	m.hud.show_message("항구 차림의 낯선 사람이 마을 광장에 서 있다. 말을 걸어 보자.", 6.0)
+	# 「항구 차림」은 이 마을에 어울리지 않는 말이었다 — 주인공은 아직
+	# 바다도 항구도 본 적이 없다. **보이는 것**으로 적는다:
+	# 어깨에 걸친 긴 낚싯대 하나면 이 사람이 누구인지 다 말해 준다.
+	m.hud.event_toast("처음 보는 사람이 마을에 왔다")
+	m.hud.show_message("긴 낚싯대를 둘러멘 사람이 분수 앞에 서 있다.\n말을 걸어 보자.", 6.0)
 	m.saveio.save_now()
 
 

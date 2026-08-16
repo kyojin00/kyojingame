@@ -4913,8 +4913,10 @@ func _debug_tick() -> void:
 			m.map_ui._ensure_vis_index()
 			var sea_seen := true
 			var sea_water := true
+			# 해안선이 굽이치므로 물이 확실한 깊은 쪽만 잰다
+			# (SEA_Y0 언저리 몇 줄은 자리마다 모래일 수 있다)
 			for sx in [4, 60, 120, m.MAP_W - 3]:
-				for sy in [m.SEA_Y0, m.SEA_Y0 + 3, m.WORLD_H - 1]:
+				for sy in [m.SEA_Y0 + 6, m.WORLD_H - 4, m.WORLD_H - 1]:
 					if not m.map_ui._visible_tile(sx, sy):
 						sea_seen = false
 					if str(m.grid[sy][sx].ground) != "water":
@@ -5715,7 +5717,12 @@ func _debug_tick() -> void:
 				and GameData.story2_phase == "farm_talk"
 			var ridge: bool = str(m.objects.get(Vector2i(30, m.SEA_RIDGE_Y),
 				{}).get("kind", "")) == "searock"
-			var sand: bool = m.grid[m.BEACH_Y0][30].ground == "sand"
+			# 해안선이 굽이치므로(world_gen._build_sea) 줄 하나를 콕 집어
+			# 보면 안 된다 — 그 칸에 모래가 한 줄이라도 깔렸는지로 본다
+			var sand := false
+			for sy0 in range(m.BEACH_Y0 - 4, m.SEA_Y0 + 6):
+				if sy0 >= 0 and sy0 < m.MAP_H and str(m.grid[sy0][30].ground) == "sand":
+					sand = true
 			var water: bool = m.grid[m.WORLD_H - 2][30].ground == "water"
 			var shells := 0
 			for pos in m.objects:

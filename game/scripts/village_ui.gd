@@ -83,7 +83,7 @@ func _build_shop() -> void:
 	m.dialog.set_buttons([["좋아!", null]])
 	if GameData.story2_phase == "shop":
 		GameData.story2_phase = "fisher"
-		m.hud.show_message("상점이 생겼다! ...그런데 낯선 낚시꾼이 마을에 온다는 소문이 돈다.", 6.0)
+		m.hud.show_message("상점이 생겼다!\n...그런데 낚싯대를 멘 사람이 마을로 오고 있다는 소문이 돈다.", 6.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 
