@@ -331,6 +331,16 @@ const WATER = [[132, 196, 226], [96, 166, 208], [66, 134, 184], [46, 106, 156],
                [32, 82, 128], [24, 62, 102]];
 const FOAM = [244, 250, 252];
 
+// 물 밑이 비쳐 보이게 — **바닥색을 물색에 섞는다.**
+//
+// 타일 밑에는 깔린 게 없어서 알파를 낮춰 봐야 배경이 비칠 뿐이다.
+// 대신 바닥(모래·조약돌·수초)을 그리되 물빛에 섞어서 그린다. 섞는 비율이
+// 곧 깊이다 — 얕으면 바닥색이 세고 깊으면 물색이 이긴다.
+function thru(c, depth) {
+  const w = WATER[depth < 0.5 ? 2 : 3];
+  return c.map((v, i) => Math.round(v * (1 - depth) + w[i] * depth));
+}
+
 function water(frame) {
   const g = new T();
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
@@ -348,10 +358,35 @@ function water(frame) {
     for (let k = 0; k < len; k++) g.px(ox + k, oy, WATER[i % 2 ? 1 : 2]);
     g.px(ox - 1, oy, WATER[3]);
   }
+  // 물속에 비치는 바닥 — 모래톱과 조약돌, 수초 한 포기.
+  // 깊은 물이라 많이 섞는다(0.62) — 형태만 어렴풋이 보이는 정도
+  for (let i = 0; i < 3; i++) {
+    const ox = Math.floor(h(i + 11, frame, 81) * N), oy = Math.floor(h(frame, i + 11, 82) * N);
+    for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++)
+      if (h(ox + dx, oy + dy, 83) < 0.7) g.px(ox + dx, oy + dy, thru(EARTH[1], 0.62));
+  }
+  for (let i = 0; i < 4; i++) {
+    const ox = Math.floor(h(i + 21, 5, 84) * N), oy = Math.floor(h(5, i + 21, 85) * N);
+    g.px(ox, oy, thru(STONE[2], 0.6)); g.px(ox + 1, oy, thru(STONE[3], 0.6));
+    g.px(ox, oy + 1, thru(STONE[4], 0.6));
+  }
+  for (let i = 0; i < 2; i++) {                             // 수초
+    const ox = Math.floor(h(i + 31, 7, 86) * N), oy = Math.floor(h(7, i + 31, 87) * N);
+    for (const [dx, len] of [[-1, 2], [0, 3], [1, 2]])
+      for (let k = 0; k <= len; k++)
+        g.px(ox + dx, oy - k, thru(SEASON.summer[k === len ? 'tip' : 'base'], 0.58));
+  }
   return g;
 }
 
 // 물가 — **땅 쪽**에 얹는 덧그림. 물이 그쪽에 있다 (0=위 1=아래 2=왼 3=오른)
+//
+// 물가는 **파인 자리**다. 흰 거품 줄만 그었더니 물이 땅 위에 얹힌 것처럼
+// 얕아 보였다 (그건 파도가 치는 바다의 그림이다). 연못·호수는 다르다:
+//
+//   둑     가장자리에 흙이 솟는다. 윗면이 빛을 받아 한 줄 밝다
+//   안쪽   둑 안으로는 **빈틈없이** 짙은 젖은 흙. 성기게 뿌리면 둑이 안 생긴다
+//   바깥   마르며 잔디로 넘어간다. 여기만 성기게
 function shore(dir) {
   const g = new T();
   const put = (i, k, c) => {
@@ -361,31 +396,28 @@ function shore(dir) {
     else g.px(N - 1 - k, i, c);
   };
   for (let i = 0; i < N; i++) {
-    const deep = 4 + Math.floor(h(i, dir, 56) * 6);         // 젖은 폭이 들쭉날쭉
-    for (let k = 0; k < deep; k++) {
-      // 멀어질수록 성기게 — 다만 **천천히**. 문턱을 가파르게 잡았더니
-      // 넓게 잡아 놓고도 실제로는 네 칸에서 끝나 버렸다
-      if (k > 3 && h(i, k, dir + 57) < 0.04 + k * 0.07) continue;
-      // 물에 가까울수록 짙다 — 갓 젖은 자리 / 마르는 자리 / 거의 마른 자리
-      put(i, k, EARTH[k === 0 ? 5 : (k < 3 ? 4 : (k < 6 ? 3 : 2))]);
+    const wet = 3 + Math.floor(h(i, dir, 56) * 2);          // 젖은 둑 (통으로)
+    const dry = wet + 2 + Math.floor(h(i, dir, 57) * 4);    // 마르는 자리
+    for (let k = 0; k < dry; k++) {
+      if (k < wet) put(i, k, EARTH[k === 0 ? 5 : 4]);       // 물에 닿는 쪽이 제일 짙다
+      else if (h(i, k, dir + 58) > 0.12 + (k - wet) * 0.16) put(i, k, EARTH[3]);
     }
-    // 조약돌 — 물가에는 늘 돌이 드러나 있다
-    if (h(i, 2, dir + 58) < 0.22) put(i, 1, STONE[3]);
-    if (h(i, 3, dir + 59) < 0.16) put(i, 2, STONE[4]);
-    // 거품 — 제일 바깥 한 줄, 절반쯤만. 통줄로 그으면 페인트가 된다
-    if (h(i, 0, dir + 60) < 0.60) put(i, 0, FOAM);
-    if (h(i, 1, dir + 61) < 0.25) put(i, 1, FOAM);          // 튄 자리
+    // 둑 마루 — 젖은 자리가 끝나는 줄이 빛을 받는다. 이 한 줄이 「솟은 것」을 만든다
+    put(i, wet, EARTH[1]);
+    if (h(i, 5, dir + 59) < 0.25) put(i, wet - 1, STONE[3]);   // 드러난 조약돌
+    if (h(i, 6, dir + 60) < 0.18) put(i, 1, STONE[4]);
   }
   return g;
 }
 
-
 // 여울 — **물 쪽**에 얹는 덧그림. 땅이 그쪽에 있다.
 //
-// 물가를 땅 쪽에서만 만들었더니 경계가 얕았다. 실제로 깊어 보이는 물가는
-// **양쪽에서** 만들어진다 — 물도 뭍에 가까울수록 얕아져 바닥이 비친다.
+// 깊이는 **둑이 물에 드리우는 그늘**이 만든다. 빛은 왼쪽 위에서 오므로
+// 위·왼쪽 물가는 그늘져 짙고, 아래·오른쪽은 볕이 들어 얕게 비친다.
+// 사방을 똑같이 밝게 둘렀더니 물이 접시처럼 평평했다.
 function shoal(dir) {
   const g = new T();
+  const shadow = (dir === 0 || dir === 2);                  // 위·왼쪽이 그늘
   const put = (i, k, c) => {
     if (dir === 0) g.px(i, k, c);
     else if (dir === 1) g.px(i, N - 1 - k, c);
@@ -396,12 +428,15 @@ function shoal(dir) {
     const deep = 3 + Math.floor(h(i, dir, 71) * 4);
     for (let k = 0; k < deep; k++) {
       if (k > 1 && h(i, k, dir + 72) < 0.08 + k * 0.11) continue;
-      // 얕을수록 밝다. WATER[2]는 바탕물과 같아서 안 보였다 — 0~1만 쓴다
-      put(i, k, WATER[k === 0 ? 0 : 1]);
+      if (shadow) put(i, k, WATER[k < 2 ? 5 : 4]);          // 둑 그늘
+      else put(i, k, WATER[k === 0 ? 0 : 1]);               // 볕 드는 얕은 물
     }
-    // 물속에 비치는 바닥 — 모래와 돌
-    if (h(i, 1, dir + 73) < 0.30) put(i, 1, EARTH[1]);
-    if (h(i, 2, dir + 74) < 0.18) put(i, 2, STONE[3]);
+    if (!shadow) {
+      // 얕은 쪽은 바닥이 훨씬 잘 보인다 — 조금만 섞는다(0.3)
+      if (h(i, 1, dir + 73) < 0.34) put(i, 1, thru(EARTH[1], 0.3));
+      if (h(i, 2, dir + 74) < 0.22) put(i, 2, thru(STONE[3], 0.35));
+      if (h(i, 3, dir + 75) < 0.18) put(i, 3, thru(EARTH[2], 0.45));
+    }
   }
   return g;
 }
