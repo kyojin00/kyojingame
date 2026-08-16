@@ -855,7 +855,8 @@ function treadPx(g, x, y, s, nax, nay, i, seed) {
   const reach = (5.5 + h(Math.floor(i / 5), 0, 133 + seed) * 3.2) * end;
   if (k > reach) return;
   const p = clamp(1 - k / Math.max(1, reach), 0, 1);
-  const t = h(x, y, 135 + seed);
+  // 질감은 낱알보다 **덩이**로 — 두 칸짜리 결에 잔 흔들림을 얹는다
+  const t = h(x >> 1, y >> 1, 135 + seed) * 0.66 + h(x, y, 141 + seed) * 0.34;
   if (t > p * p * 0.92) return;                       // 디딤돌이 그대로 보이는 자리
   const soil = EARTH[t < 0.30 ? 2 : (t > 0.76 ? 0 : 1)];   // 마당과 같은 배합
   g.px(x, y, mix(STONE[3], soil, 0.30 + p * 0.70));
@@ -863,25 +864,31 @@ function treadPx(g, x, y, s, nax, nay, i, seed) {
 
 // 계단이 바닥으로 흘러나온 자리 — **바닥 칸 쪽**에 깐다.
 //
-// 계단은 그대로 두고 바닥이 마중 나간다. 계단 앞은 늘 밟혀 맨흙이고,
-// 굴러 나온 돌 조각이 몇 걸음 앞까지 흩어져 있다. 여기서도 빛깔이
-// 이어져야 한다 — 변에서는 돌빛에 가깝고 멀어질수록 바닥빛이다
+// 계단은 그대로 두고 바닥이 마중 나간다. 다만 둘레를 **띠로 두르면**
+// 계단에 판을 깔아 놓은 꼴이 된다 — 밟혀 닳은 자리는 띠가 아니라
+// **동그랗게 몇 군데**다. 둘레를 따라 크게 부풀렸다 오므라들게 해서
+// 짧고 둥근 자국이 이어지게 한다.
+//
+// 질감도 낱알이 아니라 **두 칸짜리 덩이**로 찍는다. 한 점씩 뿌리면
+// 모래를 흩은 것처럼 자글거려서, 거친 맨흙으로 안 보인다
 function trailPx(g, x, y, s, nax, nay, i, seed) {
   if (s < 0) return;
   const k = Math.floor(s);
+  const lobe = h(Math.floor(i / 7), 0, 136 + seed) * 0.78
+    + h(Math.floor(i / 3), 0, 139 + seed) * 0.42;
   const end = Math.abs(nay) > Math.abs(nax) ? 1.0 : 0.5;
-  const reach = (6.0 + h(Math.floor(i / 5), 0, 136 + seed) * 3.4) * end;
+  const reach = (1.4 + lobe * 4.4) * end;
   if (k > reach) return;
   const p = clamp(1 - k / Math.max(1, reach), 0, 1);
-  const t = h(x, y, 137 + seed);
-  // 밟혀 닳은 흙 — 계단 앞은 풀이 안 산다. 변에 붙을수록 돌빛이 섞인다
-  if (t < 0.26 + p * p * 0.58) {
-    const soil = EARTH[t < 0.24 ? 2 : (t > 0.72 ? 0 : 1)];
-    g.px(x, y, mix(soil, STONE[4], p * p * 0.55));
+  const t = h(x >> 1, y >> 1, 137 + seed) * 0.74 + h(x, y, 140 + seed) * 0.26;
+  // 밟혀 닳은 맨흙 — 변에 붙을수록 돌빛이 섞인다
+  if (t < 0.24 + p * p * 0.66) {
+    const soil = EARTH[t < 0.26 ? 3 : (t > 0.70 ? 1 : 2)];
+    g.px(x, y, mix(soil, STONE[4], p * p * 0.5));
     return;
   }
   // 굴러 나온 돌 조각 — 가까울수록 잦다. 이것도 멀수록 흙빛에 잠긴다
-  if (t > 0.72 && h(Math.floor(i / 3), k >> 1, 138 + seed) < p * p * 0.62)
+  if (t > 0.74 && h(Math.floor(i / 3), k >> 1, 138 + seed) < p * p * 0.66)
     g.px(x, y, mix(STONE[k < 3 ? 2 : 4], EARTH[1], (1 - p) * 0.6));
 }
 
