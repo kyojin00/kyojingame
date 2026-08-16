@@ -386,6 +386,38 @@ function sandTile(v) {
 }
 
 
+// ---- 오르막 ----
+//
+// 벼랑을 깎아 낸 길. 밟혀 다져진 흙에 넓적한 돌을 놓아 계단을 삼았다.
+// 세로로 두 칸이 이어 붙으므로 무늬는 **네 칸마다** 되풀이되게 둔다 —
+// 16이 4로 나누어떨어져야 위아래 칸의 계단이 어긋나지 않는다.
+function rampTile(v) {
+  const g = new T(), s = v * 11;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const t = h(x >> 1, y >> 1, 71 + s) * 0.6 + h(x, y, 72 + s) * 0.4;
+    g.px(x, y, EARTH[t < 0.30 ? 3 : (t > 0.74 ? 1 : 2)]);
+  }
+  // 디딤돌은 **칸을 가로질러** 놓는다. 처음엔 폭과 자리를 흔들었더니
+  // 두 칸 폭 오르막의 한가운데에 세로 이음매가 그대로 보였다 — 계단이
+  // 반씩 어긋나 있었다. 대신 몇 자리의 돌을 빼서 들쭉날쭉하게 한다
+  for (let row = 0; row < 4; row++) {
+    const y = row * 4 + 1;
+    for (let x = 0; x < N; x++) {
+      if (h(x, row, 73 + s) < 0.13) continue;                          // 빠진 돌
+      g.px(x, y, STONE[h(x, row, 76 + s) < 0.22 ? 1 : 2]);             // 윗변 — 빛
+      g.px(x, y + 1, STONE[h(x, row, 75 + s) < 0.25 ? 5 : 4]);         // 속
+      g.px(x, y + 2, EARTH[4]);                                        // 디딤돌 밑 그늘
+    }
+  }
+  // 밟혀 닳은 자국 — 가운데가 반들거린다
+  for (let i = 0; i < 4; i++) {
+    const ox = Math.floor(h(i + 5, v, 77) * N), oy = Math.floor(h(v, i + 5, 78) * N);
+    if (g.get(ox, oy) === EARTH[2] || g.get(ox, oy) === EARTH[1]) g.px(ox, oy, EARTH[0]);
+  }
+  return g;
+}
+
+
 // ---- 물과 물가 ----
 //
 // 지금 물은 파란 사각형이고, 땅과 만나는 자리가 **자로 그은 선**이다.
@@ -669,8 +701,10 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
   if (s < 0) return;                                          // 위쪽 땅 — 그 칸이 그린다
   const k = Math.floor(s);
   const face = clamp(-nay, 0, 1);
-  // 높이는 **덩이로** 흔든다. 칸마다 흔들었더니 바닥이 빗살처럼 들쭉날쭉했다
-  const H = Math.round((12 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 2)) * face);
+  // 높이는 **두 겹으로** 흔든다 — 다섯 칸짜리 덩이(들쭉날쭉)와 열두 칸짜리
+  // 너울(어디는 높고 어디는 낮은 벼랑). 칸마다 흔들면 바닥이 빗살이 된다
+  const H = Math.round((11.2 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 1.8)
+    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * 2.6) * face);
   if (H >= 3 && k < H) {
     const up = k / (H - 1);                                   // 0(마루) ~ 1(발치)
     // 바위는 **세로로 쪼개진다.** 처음엔 벽돌처럼 가로 켜로 쌓았더니
@@ -682,6 +716,9 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
     const v = (h(i, 0, 52 + seed) - 0.5) * 0.9 + (h(Math.floor(i / 4), 0, 53 + seed) - 0.5) * 0.9;
     let t = 3.0 + up * 2.2 + v;
     if (h(i, 0, 54 + seed) < 0.09) t += 2.0;                  // 갈라진 틈 (한 칸 폭)
+    // 무늬층 — 가로로 눕는 켜. 세로 결만 있으면 나무 판자로 보인다
+    const band = h(Math.floor((k + Math.floor(i / 7)) / 3), 0, 68 + seed);
+    t += (band - 0.5) * 0.9;
     // 바위 선반 — 자리마다 높이가 다르고, 없는 데도 있다
     const sh = h(Math.floor(i / 5), 0, 64 + seed);
     const shelf = sh < 0.62 ? 2 + Math.floor(sh * 1.6 * Math.max(1, H - 5)) : -9;
@@ -704,8 +741,25 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
     const d = k - H;
     if (d === 0) { g.px(x, y, EARTH[5]); return; }
     if (d === 1 && h(x, y, 56 + seed) < 0.62) { g.px(x, y, EARTH[4]); return; }
-    if (d <= 3 && h(x, y, 57 + seed) < 0.30 - d * 0.06)
+    // 굴러 내린 돌덩이 — 낱알로 뿌리면 모래가 된다. 두세 칸짜리 덩이를
+    // 놓고 윗변은 밝게, 아랫변은 어둡게 (자갈 한 알과 같은 규칙)
+    if (d >= 1 && d <= 4) {
+      const bx = Math.floor(i / 3), by = Math.floor((d - 1) / 2);
+      if (h(bx, by, 69 + seed) < 0.30) {
+        const top = (d - 1) % 2 === 0;
+        g.px(x, y, STONE[top ? 3 : 5]);
+        if (i % 3 === 2) g.px(x, y, STONE[6]);              // 덩이 사이 그늘
+        return;
+      }
+    }
+    if (d <= 3 && h(x, y, 57 + seed) < 0.22 - d * 0.05) {
       g.px(x, y, STONE[clamp(4 + d, 0, 7)]);
+      return;
+    }
+    // 발치에 돋은 잡풀 — 바위와 잔디가 맞닿기만 하면 잘라 붙인 것처럼
+    // 보인다. 몇 포기가 그 사이를 물어야 한 땅이 된다
+    if (d >= 1 && d <= 3 && h(Math.floor(i / 2), d, 70 + seed) < 0.20)
+      g.px(x, y, MOSS[d < 3 ? 1 : 2]);
     return;
   }
   // 비스듬히 보이는 옆면 — 바위가 좁게 드러날 뿐이다
@@ -838,6 +892,7 @@ for (const s of Object.keys(SEASON))
 // 알의 톤·닳음만 흔든다)
 for (let v = 0; v < 3; v++) save('path_' + v, cobble(v * 5).render());
 for (let v = 0; v < 3; v++) save('yard_' + v, yard(v).render());
+for (let v = 0; v < 3; v++) save('ramp_' + v, rampTile(v).render());
 // water_<깊이>_<판>_<장> — 깊이 여덟 × 판 셋 × 장 둘
 for (let lv = 0; lv < 8; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
   save(`water_${lv}_${vr}_${f}`, water(f, lv, vr).render());

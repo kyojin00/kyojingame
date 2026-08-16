@@ -278,12 +278,17 @@ func _build_levels() -> void:
 			# 능선 위는 한 켜 높다. 그 아래(모래사장·바다)는 0
 			row[x] = 1 if y <= _ridge_y(x) else 0
 		m.terrain_level.append(row)
+	# 마을 북쪽 언덕 — **큰길에서 올려다보이는** 자리다. 벼랑면은 남쪽을
+	# 보고 서므로 길(y 8~10)보다 위에 있어야 얼굴이 보인다. 다만 벼랑 밑
+	# 한 줄은 지나갈 수 없으니 길과는 두 줄쯤 떼어 놓는다
+	_raise_blob(37, 1, 11.0, 4.6, 2, 71)
 	# 깊은 숲의 언덕 — 연못(74,51)과 겹치지 않게 서쪽으로 앉힌다
 	_raise_blob(56, 58, 9.0, 5.0, 2, 41)
 	# 동쪽 채석장의 단구 — 돌을 캐 낸 자리라 층이 진다
 	_raise_blob(196, 46, 13.0, 6.0, 2, 57)
 	# 오르막 — 벼랑을 끊고 내려오는 자리. 없으면 올라갈 수가 없다.
 	# **남쪽 자락**에 낸다 — 바위면이 보이는 쪽이라야 길로 읽힌다
+	_cut_ramp(33, 5)
 	_cut_ramp(51, 63)
 	_cut_ramp(60, 63)
 	_cut_ramp(190, 52)
@@ -331,6 +336,29 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 			var d := pow((x - cx) / (rx * w), 2.0) + pow((y - cy) / (ry * w), 2.0)
 			if d <= 1.0 and _lv(x, y) > 0:
 				_set_lv(x, y, to)
+	# 뾰족하게 튀어나온 칸을 다듬는다. 흔들어 놓은 가장자리는 한두 칸짜리
+	# 돌기를 남기는데, 그건 벼랑이 아니라 그리다 만 자국으로 보인다
+	var x0: int = maxi(1, cx - int(rx) - 3)
+	var x1: int = mini(m.MAP_W - 1, cx + int(rx) + 4)
+	var y0: int = maxi(1, cy - int(ry) - 3)
+	var y1: int = mini(m.MAP_H - 1, cy + int(ry) + 4)
+	for _pass in 2:
+		var fix: Array = []
+		for y in range(y0, y1):
+			for x in range(x0, x1):
+				if _lv(x, y) == 0:
+					continue          # 물 아래(바다)는 건드리지 않는다
+				var n := 0
+				for o: Vector2i in [Vector2i(0, -1), Vector2i(0, 1),
+						Vector2i(-1, 0), Vector2i(1, 0)]:
+					if _lv(x + o.x, y + o.y) == to:
+						n += 1
+				if _lv(x, y) == to and n <= 1:
+					fix.append([x, y, to - 1])
+				elif _lv(x, y) != to and n >= 3:
+					fix.append([x, y, to])
+		for f: Array in fix:
+			_set_lv(f[0], f[1], f[2])
 
 
 # 오르막 — 벼랑을 끊고 내려오는 자리.

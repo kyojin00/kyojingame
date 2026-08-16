@@ -919,7 +919,7 @@ func _load_textures() -> void:
 		edge_tex[kind] = arr
 	# 모래·길·마당도 판을 셋씩 — 한 장만 깔면 무늬가 같은 자리마다 찍힌다
 	for v in 3:
-		for kind: String in ["sand_", "path_", "yard_"]:
+		for kind: String in ["sand_", "path_", "yard_", "ramp_"]:
 			tex[kind + str(v)] = load("res://assets/sprites/%s%d.png" % [kind, v])
 	# 물고기·요리·작물은 표가 곧 그림 목록이다. 여기서 따라가면 표에 한 줄
 	# 넣을 때마다 TEXTURE_NAMES도 고쳐야 하는 일이 없다 (빠뜨리면 아이콘이
@@ -2123,7 +2123,10 @@ func _draw() -> void:
 			var kne: int = above[i + 1]
 			var ksw: int = below[i - 1]
 			var kse: int = below[i + 1]
-			if ground == "dock":
+			if (kc & 64) != 0:
+				# 오르막 — 벼랑을 깎아 낸 길. 밟혀 다져진 흙에 디딤돌을 놓았다
+				put.call(base, tex["ramp_%d" % (int(_hash01(x * 13, y * 3) * 3.0) % 3)], at)
+			elif ground == "dock":
 				docks.append(at)
 			elif ground == "sand":
 				# 모래사장 — 물결이 남긴 잔결에 조개·조약돌이 쓸려 와 있다.
