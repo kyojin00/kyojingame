@@ -1897,20 +1897,6 @@ var _fade_a := {}     # Vector2i -> 지금 알파
 # 이 오브젝트 그림이 플레이어를 덮고 있는가 (그리고 앞에 그려지는가)
 
 
-func _is_path(x: int, y: int) -> bool:
-	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-		return false
-	return grid[y][x].ground == "path"
-
-
-# 맵 밖은 **물로 친다.** 세계의 끝은 바다이고, 가장자리 칸의 물가가
-# 끊겨 보이면 거기가 세계의 끝이라는 게 드러난다
-func _is_water(x: int, y: int) -> bool:
-	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-		return true
-	return grid[y][x].ground == "water"
-
-
 # 물의 깊이를 잰다 — 뭍에서 몇 걸음(여덟 방향)인지.
 #
 # 물을 두 장(얕은 물·깊은 물)으로만 그렸더니 연못 한가운데에 검푸른
@@ -1966,42 +1952,18 @@ func _water_level(x: int, y: int) -> int:
 	return clampi(water_dist[y][x] - 1, 0, WATER_LV - 1)
 
 
-# 이웃 넷 중 **딴 쪽**이 어디인지 — 물 칸이면 뭍이, 뭍 칸이면 물이 있는 쪽.
-#   1=북 2=남 4=서 8=동
+# 한 칸의 바닥. 맵 밖은 **물로 친다** — 세계의 끝은 바다이고, 가장자리 칸의
+# 물가가 끊겨 보이면 거기가 세계의 끝이라는 게 드러난다.
 #
 # 물가를 방향마다 한 장씩(shore_n/s/w/e) 덧그리던 걸 그만뒀다. 그러면 꺾이는
 # 자리에서 두 장이 그대로 부딪혀 **직각**이 되고, 대각선만 물인 귀퉁이는
-# 빈다. 이웃 꼴 열다섯 가지를 각각 한 장으로 두면 곧은 변도 귀퉁이도 곶도
-# 한 자로 그려져 이음매가 없고, 꺾이는 자리는 호로 돌아 나간다.
-func _edge_mask(x: int, y: int) -> int:
-	var wet := _is_water(x, y)
-	var m := 0
-	if _is_water(x, y - 1) != wet: m |= 1
-	if _is_water(x, y + 1) != wet: m |= 2
-	if _is_water(x - 1, y) != wet: m |= 4
-	if _is_water(x + 1, y) != wet: m |= 8
-	return m
-
-
-func _is_kind(x: int, y: int, k: String) -> bool:
+# 빈다. 이웃 넷을 비트 하나씩(1=북 2=남 4=서 8=동) 모아 그 꼴에 맞는 한 장을
+# 얹으면 곧은 변도 귀퉁이도 곶도 한 자로 그려지고, 꺾이는 자리는 호로 돌아
+# 나간다. 모래·마당이 흘러드는 경계도 같은 비트를 쓴다.
+func _ground_at(x: int, y: int) -> String:
 	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-		return false
-	return grid[y][x].ground == k
-
-
-func _touches_sand(x: int, y: int) -> bool:
-	return _is_kind(x, y - 1, "sand") or _is_kind(x, y + 1, "sand") \
-		or _is_kind(x - 1, y, "sand") or _is_kind(x + 1, y, "sand")
-
-
-# 그 바닥이 있는 쪽 (물가와 같은 비트). 이웃 재료를 흘려 넣을 때 쓴다
-func _kind_mask(x: int, y: int, k: String) -> int:
-	var m := 0
-	if _is_kind(x, y - 1, k): m |= 1
-	if _is_kind(x, y + 1, k): m |= 2
-	if _is_kind(x - 1, y, k): m |= 4
-	if _is_kind(x + 1, y, k): m |= 8
-	return m
+		return "water"
+	return grid[y][x].ground
 
 
 # ---- 렌더링 ----
@@ -2060,6 +2022,13 @@ func _draw() -> void:
 			var cell: Dictionary = row[x]
 			var at := Vector2(x * TILE, y * TILE)
 			var ground: String = cell.ground
+			# 이웃 넷의 바닥을 **한 번만** 읽는다. 물가·모래·마당·길을 여기서
+			# 다 가른다 — 각각 따로 훑으면 칸마다 열몇 번씩 격자를 뒤지게 되고,
+			# _draw는 매 프레임 도니 그게 그대로 프레임 값이 된다
+			var gn := _ground_at(x, y - 1)
+			var gs := _ground_at(x, y + 1)
+			var gw := _ground_at(x - 1, y)
+			var ge := _ground_at(x + 1, y)
 			if ground == "dock":
 				docks.append(at)
 			elif ground == "sand":
@@ -2068,18 +2037,23 @@ func _draw() -> void:
 				# 혼자 종이처럼 매끈했다
 				put.call(base, tex["sand_%d" % (int(_hash01(x * 5, y * 11) * 3.0) % 3)], at)
 			elif ground == "water":
-				# 물가에서 멀수록 깊다 — 다섯 단, 한 단이 반 톤.
+				# 물가에서 멀수록 깊다 — 여덟 단, 한 단이 0.42톤.
 				# 판(0~2)은 칸마다 골라 쓴다. 한 판만 깔면 잔물결이 같은
 				# 자리마다 찍혀 물 위에 바둑판이 뜬다
 				put.call(base, tex["water_%d_%d_%d" % [_water_level(x, y),
 					int(_hash01(x * 3 + 1, y * 7 + 5) * 3.0) % 3, water_frame]], at)
 				# 여울 — 뭍에 가까운 물은 얕아서 바닥이 비친다.
 				# 물가를 땅 쪽에서만 만들면 경계가 얕다. **양쪽에서** 만들어야 깊어진다
-				var mk := _edge_mask(x, y)
+				var mk := 0
+				if gn != "water": mk |= 1
+				if gs != "water": mk |= 2
+				if gw != "water": mk |= 4
+				if ge != "water": mk |= 8
 				if mk != 0:
 					# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
-					put.call(edges, tex[("surf_m" if _touches_sand(x, y) else "shoal_m")
-						+ str(mk)], at)
+					var sandy := (gn == "sand" or gs == "sand"
+						or gw == "sand" or ge == "sand")
+					put.call(edges, tex[("surf_m" if sandy else "shoal_m") + str(mk)], at)
 			elif ground == "soil":
 				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
 			elif ground == "path":
@@ -2091,29 +2065,41 @@ func _draw() -> void:
 				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
 				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
 				# 길 쪽에서 흙이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다.
-				if _is_path(x, y - 1):
+				if gn == "path":
 					put.call(edges, tex["path_edge_n"], at)
-				if _is_path(x, y + 1):
+				if gs == "path":
 					put.call(edges, tex["path_edge_s"], at)
-				if _is_path(x - 1, y):
+				if gw == "path":
 					put.call(edges, tex["path_edge_w"], at)
-				if _is_path(x + 1, y):
+				if ge == "path":
 					put.call(edges, tex["path_edge_e"], at)
 			# 물가 — 물에 닿는 **땅 쪽**에 젖은 흙·둑·돌벽을 덧그린다.
 			# 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
 			if ground != "water" and ground != "dock":
-				var wm := _edge_mask(x, y)
+				var wm := 0
+				if gn == "water": wm |= 1
+				if gs == "water": wm |= 2
+				if gw == "water": wm |= 4
+				if ge == "water": wm |= 8
 				if wm != 0:
 					put.call(edges, tex[("beach_m" if ground == "sand" else "shore_m")
 						+ str(wm)], at)
 				# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
 				# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다
 				if ground != "sand":
-					var sm := _kind_mask(x, y, "sand")
+					var sm := 0
+					if gn == "sand": sm |= 1
+					if gs == "sand": sm |= 2
+					if gw == "sand": sm |= 4
+					if ge == "sand": sm |= 8
 					if sm != 0:
 						put.call(edges, tex["dune_m" + str(sm)], at)
 				if ground != "yard":
-					var ym := _kind_mask(x, y, "yard")
+					var ym := 0
+					if gn == "yard": ym |= 1
+					if gs == "yard": ym |= 2
+					if gw == "yard": ym |= 4
+					if ge == "yard": ym |= 8
 					if ym != 0:
 						put.call(edges, tex["trod_m" + str(ym)], at)
 			if cell.crop_id != "":
