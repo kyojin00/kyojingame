@@ -131,7 +131,9 @@ func _paint_regions() -> void:
 		var r: Rect2i = reg.rect
 		var g := str(reg.ground)
 		var pond := float(reg.pond)
-		if g == "" and pond <= 0.0:
+		if pond > 0.0:
+			_carve_region_ponds(r, pond)
+		if g == "":
 			continue
 		for y in range(maxi(1, r.position.y), mini(m.WORLD_H - 1, r.end.y)):
 			for x in range(maxi(1, r.position.x), mini(m.MAP_W - 1, r.end.x)):
@@ -140,20 +142,37 @@ func _paint_regions() -> void:
 					continue
 				if m.grid[y][x].ground != "grass":
 					continue
-				if pond > 0.0:
-					# 물웅덩이는 뭉쳐야 웅덩이로 보이지만, 세 칸씩 묶기만 하면
-					# **3x3 네모 웅덩이**가 된다. 묶은 값에 칸별 값을 섞어
-					# 가장자리를 허물어 준다 (덩어리는 남고 각은 사라진다)
-					var blob := m._hash01(x / 3 * 13 + 5, y / 3 * 17 + 3) * 0.7 \
-						+ m._hash01(x * 7 + 1, y * 11 + 3) * 0.3
-					if blob < pond:
-						m.grid[y][x].ground = "water"
-						continue
+				# 물은 **크게 몇 개**여야 물이다. 예전에는 칸마다 확률로 찍어서
+				# 작은 웅덩이가 온 들판에 흩뿌려졌다 — 물이 아니라 파란 얼룩이었다.
+				# 이제 지역마다 큰 웅덩이 몇 개를 파낸다 (아래 _carve_region_ponds)
 				if g != "":
 					# 가장자리로 갈수록 듬성듬성 — 네모 반듯하게 깔면
 					# 「자로 그어 놓은 땅」처럼 보인다
 					if m._hash01(x * 9 + 3, y * 7 + 1) < _edge_fade(pos, r):
 						m.grid[y][x].ground = g
+
+
+# 지역에 큰 웅덩이를 몇 개 판다.
+#
+# 물은 **크게 몇 개**여야 물로 보인다. 칸마다 확률로 찍으면 아무리 잘 그린
+# 타일을 깔아도 파란 얼룩이 흩뿌려질 뿐이다 — 물가도, 깊이도, 여울도
+# 세 칸짜리 웅덩이에서는 보이지 않는다.
+#
+# 개수는 지역 넓이에 맞춘다 (600칸에 하나쯤). 자리와 크기는 해시로 정해
+# 다시 시작해도 같은 지형이 나오게 한다.
+func _carve_region_ponds(r: Rect2i, pond: float) -> void:
+	var n := int(round(float(r.size.x * r.size.y) / 600.0 * (pond / 0.25)))
+	n = clampi(n, 1, 5)
+	for i in n:
+		var hx := m._hash01(r.position.x * 13 + i * 7 + 1, r.position.y * 17 + i * 5 + 3)
+		var hy := m._hash01(r.position.y * 11 + i * 3 + 5, r.position.x * 19 + i * 9 + 7)
+		var hs := m._hash01(i * 23 + r.position.x, i * 29 + r.position.y)
+		# 가장자리에서 넉넉히 안쪽에 — 지역 밖으로 물이 새면 지형이 어긋난다
+		var cx := r.position.x + 6 + int(hx * float(maxi(1, r.size.x - 12)))
+		var cy := r.position.y + 5 + int(hy * float(maxi(1, r.size.y - 10)))
+		if m.VILLAGE_REGION.has_point(Vector2i(cx, cy)) or m.ROAD.has_point(Vector2i(cx, cy)):
+			continue
+		_carve_pond(cx, cy, 5.0 + hs * 4.0, 3.5 + hs * 2.5)
 
 
 # 지역 가장자리에서 0, 세 칸쯤 안으로 들어오면 1에 가까워지는 값.
