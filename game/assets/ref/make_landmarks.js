@@ -57,8 +57,19 @@ const PAL = {
   'r0': [162, 158, 150], 'r1': [124, 120, 114], 'r2': [88, 85, 81],
   'r3': [58, 56, 54], 'r4': [38, 37, 36],
   // ---- 물 ----
-  'w0': [236, 248, 254], 'w1': [186, 224, 246], 'w2': [124, 182, 226],
-  'w3': [72, 134, 192], 'w4': [40, 90, 148],
+  //
+  // **게임의 물에서 그대로 가져왔다** (make_ground.js 의 WATER 사다리).
+  // 처음엔 내가 고른 하늘빛 파랑이었는데, 폭포 밑에 게임이 깔아 놓은
+  // 연못 타일과 나란히 놓이니 물 두 가지가 만난 꼴이었다 — 폭포만
+  // 환하고 못은 검푸르러서, 폭포가 못 위에 붙인 종이로 보였다.
+  //
+  // 사다리 자리도 뜻이 다르다:
+  //   w0 물보라(FOAM) · w1~w3 **떨어지는 물** (공기가 섞여 밝다)
+  //   w4~w6 **고인 물** (게임 연못과 같은 단 — 여기서 이어 붙는다)
+  'w0': [244, 250, 252],                                  // FOAM
+  'w1': [142, 204, 230], 'w2': [104, 174, 212],           // WATER[0..1]
+  'w3': [72, 142, 190], 'w4': [34, 84, 130],              // WATER[2], WATER[4]
+  'w5': [22, 60, 100], 'w6': [14, 42, 74],                // WATER[5..6] 깊은 물
   // ---- 이끼 ----
   'm0': [116, 164, 76], 'm1': [74, 118, 54], 'm2': [46, 80, 40],
   // ---- 붉은 바위 (사암) ----
@@ -90,7 +101,7 @@ const DARKER = {
   b0: 'b1', b1: 'b2', b2: 'b3', b3: 'b3',
   r0: 'r1', r1: 'r2', r2: 'r3', r3: 'r4', r4: 'r4',
   k0: 'k1', k1: 'k2', k2: 'k3', k3: 'k4', k4: 'k4',
-  w0: 'w1', w1: 'w2', w2: 'w3', w3: 'w4', w4: 'w4',
+  w0: 'w1', w1: 'w2', w2: 'w3', w3: 'w4', w4: 'w5', w5: 'w6', w6: 'w6',
   m0: 'm1', m1: 'm2', m2: 'm2', u0: 'u1', u1: 'u1',
   f0: 'f1', f1: 'f1', d0: 'd1', d1: 'd1', O: 'O', n0: 'n0',
 };
@@ -101,7 +112,7 @@ const LIGHTER = {
   b0: 'b0', b1: 'b0', b2: 'b1', b3: 'b2',
   r0: 'r0', r1: 'r0', r2: 'r1', r3: 'r2', r4: 'r3',
   k0: 'k0', k1: 'k0', k2: 'k1', k3: 'k2', k4: 'k3',
-  w0: 'w0', w1: 'w0', w2: 'w1', w3: 'w2', w4: 'w3',
+  w0: 'w0', w1: 'w0', w2: 'w1', w3: 'w2', w4: 'w3', w5: 'w4', w6: 'w5',
   m0: 'm0', m1: 'm0', m2: 'm1',
 };
 
@@ -176,13 +187,18 @@ class G {
     }
   }
   // 비어 있는 칸 중 그림에 닿은 곳에 윤곽선을 두른다
-  outline(c) {
+  // skip 에 든 색에는 테를 안 두른다.
+  //
+  // 고인 물이 그렇다. 세계가 이 그림 둘레에 **진짜 물 타일**을 깔아 두므로,
+  // 못 가장자리에 검은 선을 그으면 물 한복판에 구멍이 뚫린 것처럼 보인다.
+  // 바위·나무처럼 물건인 것만 테를 두른다.
+  outline(c, skip = []) {
     const add = [];
     for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) {
       if (this.d[y][x] !== '.') continue;
       for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
         const g = this.get(nx, ny);
-        if (g !== '.' && g !== c) { add.push([x, y]); break; }
+        if (g !== '.' && g !== c && !skip.includes(g)) { add.push([x, y]); break; }
       }
     }
     for (const [x, y] of add) this.px(x, y, c);
@@ -548,7 +564,31 @@ function greatTree(f, NF) {
         g.px(x, y, hash(x, y >> 1) > 0.6 ? 'm0' : 'm1');
   }
 
-  g.outline('O');
+  // 땅에 눕는 그림자 — **맨 마지막에** 다시 깐다.
+  //
+  // 맨 처음 깔았더니 뿌리와 풀숲이 그 위를 덮어 흔적도 안 남았다.
+  // 그림자가 없으면 아무리 잘 그려도 나무가 땅에 안 붙는다 — 잔디 위에
+  // 세워 놓은 판때기가 된다. 빛이 왼쪽 위에서 오니 그림자는 오른쪽 아래로,
+  // 그리고 **아주 납작하게** (해가 높이 뜬 낮이다)
+  {
+    const SX = CX + 34, SR = 88, SY = GY - 3, SH = 11;   // 그림자 한가운데·반지름
+    for (let y = SY - SH; y <= SY + SH; y++) {
+      const t = (y - SY) / SH;
+      if (Math.abs(t) > 1) continue;
+      const half = SR * Math.sqrt(1 - t * t);
+      for (let x = Math.round(SX - half); x <= Math.round(SX + half); x++) {
+        const at = g.get(x, y);
+        // 빈 땅에는 그림자를 깔고, 밑동 풀숲 위에는 **한 단 어둡게** 덮는다.
+        // 빈 칸만 칠했더니 뿌리와 풀에 다 가려 흔적도 안 남았다
+        if (at !== '.' && at !== 'm0' && at !== 'm1') continue;
+        const d = Math.hypot((x - SX) / SR, t);
+        if (hash(x, y) > 1.06 - d * 0.5) continue;   // 가장자리는 성글게 (반그림자)
+        g.px(x, y, at === '.' ? (d > 0.62 ? 'd0' : 'd1') : DARKER[at]);
+      }
+    }
+  }
+
+  g.outline('O', ['d0', 'd1']);
   return g;
 }
 
@@ -603,8 +643,28 @@ function bigFalls(f, NF) {
     const wob = y < LIP ? 1 : 3;
     const lx = CX - gap - 2 - Math.round(Math.sin(y * 0.11) * wob);
     const rx = CX + gap + 2 + Math.round(Math.sin(y * 0.09 + 2) * wob);
-    g.rect(CX - half, y, lx, y, y < LIP ? 'r3' : 'r2');
-    g.rect(rx, y, CX + half, y, y < LIP ? 'r3' : 'r2');
+    // 마루 **위**는 내려다보는 바닥(r1), 마루 **아래**는 마주보는 벽(r2).
+    // 이 게임은 위에서 비스듬히 내려다보는 화면이라, 눕는 면과 서는 면의
+    // 밝기가 갈려야 「높이」가 생긴다. 다 같은 회색으로 칠하면 아무리 잘
+    // 그려도 벽에 붙인 그림 한 장이다 (건물 지붕과 벽이 갈리는 것과 같다)
+    g.rect(CX - half, y, lx, y, y < LIP ? 'r1' : 'r2');
+    g.rect(rx, y, CX + half, y, y < LIP ? 'r1' : 'r2');
+  }
+  // 벼랑 마루 — 눕는 면과 서는 면이 만나는 **모서리**. 여기가 제일 밝다.
+  // 이 한 줄이 「여기서 뚝 떨어진다」를 말한다
+  for (let y = LIP - 3; y < LIP; y++)
+    for (let x = 0; x < W; x++)
+      if (g.get(x, y)[0] === 'r') g.px(x, y, y === LIP - 3 ? 'r1' : 'r0');
+  // 골짜기 벽의 **윗변** — 벽 꼭대기도 눕는 면이라 밝다.
+  // 없으면 벽이 종이처럼 얇아 보인다
+  for (let y = LIP; y <= POOL; y++) {
+    const half = massifHalf(y);
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < 4; k++) {
+        const x = Math.round(CX + side * (half - k));
+        if (g.get(x, y)[0] === 'r') g.px(x, y, k < 2 ? 'r1' : 'r2');
+      }
+    }
   }
 
   // 바위 결 — 가로로 층이 진 퇴적암. 세로줄은 물과 헷갈린다
@@ -674,6 +734,16 @@ function bigFalls(f, NF) {
   for (let y = 2; y < LIP; y++) {
     const gap = chanAt(y);
     g.rect(CX - gap, y, CX + gap, y, y > LIP - 5 ? 'w1' : 'w2');
+  }
+  // 윗물도 **흐른다.** 마루 위가 멎어 있으면 폭포가 어디서 오는지 없어져
+  // 물이 벽에서 솟는 꼴이 된다. 게임 물 타일과 같은 가로 잔물결
+  for (let i = 0; i < 16; i++) {
+    const y0 = 3 + Math.floor(hash(i, 71) * (LIP - 5)) ;
+    const gap = chanAt(y0);
+    const x0 = Math.round(CX - gap + hash(i, 72) * gap * 2) + ((f * 3 + i) % 5) - 2;
+    const len = 2 + Math.floor(hash(i, 73) * 4);
+    for (let k = 0; k < len; k++)
+      if (g.get(x0 + k, y0)[0] === 'w') g.px(x0 + k, y0, LIGHTER[g.get(x0 + k, y0)]);
   }
   // 떨어지는 물기둥
   for (let y = LIP; y <= POOL; y++) {
@@ -746,18 +816,41 @@ function bigFalls(f, NF) {
     g.ellipse(sx, sy + 4, 13, 4, 'w1', ['w2', 'w3']);
   }
 
-  // ---- 물웅덩이와 물보라 ----
-  // 웅덩이도 네모로 깔면 안 된다 — 바위 덩어리 안에 파인 못이라야
-  // 그림 밑변이 잔디와 직선으로 만나지 않는다
-  for (let y = POOL; y <= GY; y++) {
-    const half = massifHalf(POOL) - 4 - (y - POOL) * 0.9 + hash(0, y) * 4;
-    g.rect(CX - half, y, CX + half, y, 'w3');
+  // ---- 못 ----
+  //
+  // 못은 **땅바닥에 누워 있다.** 세로로 선 물 커튼과 같은 면일 수가 없다.
+  // 그래서 위에서 내려다본 **납작한 타원**으로 그린다 (게임의 연못이 그렇게
+  // 보인다). 앞서는 사각형에 가깝게 깔았는데, 그러니 폭포가 물을 벽에다
+  // 쏟는 꼴이었다 — 물이 어디에 담기는지가 안 보였다.
+  //
+  // 색은 게임 연못과 **같은 단**을 쓴다 (w4~w6). 세계가 이 그림 둘레에
+  // 진짜 물 타일을 깔아 두므로, 여기서 색이 어긋나면 경계가 그대로 보인다.
+  const PR = massifHalf(POOL) - 6;          // 못의 가로 반지름
+  const PY = POOL + 14;                     // 못 한가운데 (그림 밑동 쪽)
+  for (let y = POOL - 6; y <= GY; y++) {
+    const t = (y - PY) / 20.0;
+    if (Math.abs(t) > 1) continue;
+    const half = PR * Math.sqrt(1 - t * t) * (0.94 + hash(0, y) * 0.12);
+    for (let x = Math.round(CX - half); x <= Math.round(CX + half); x++) {
+      if (g.get(x, y)[0] === 'r') continue;       // 바위는 물에 안 잠긴다
+      // 가장자리는 얕고 가운데는 깊다 — 깊이는 물빛 자체가 말한다
+      const d = Math.hypot((x - CX) / PR, (y - PY) / 20.0);
+      g.px(x, y, d > 0.86 ? 'w4' : (d > 0.55 ? 'w5' : 'w6'));
+    }
   }
-  for (let y = POOL; y <= GY; y++) for (let x = 0; x < W; x++) {
-    if (g.d[y][x] !== 'w3') continue;
-    // 웅덩이는 잔물결 — 가로로 눕는다 (세로로 두면 아직 떨어지는 물이 된다)
-    const hh = hash((x + f * 3) >> 2, y);
-    g.px(x, y, hh > 0.80 ? 'w2' : (hh < 0.18 ? 'w4' : 'w3'));
+  // 잔물결 — **가로로 짧게 그은 줄**. 게임 물 타일과 같은 방식이다
+  // (세로로 그으면 아직 떨어지는 중인 물이 된다). 장마다 어긋나게 찍어
+  // 물이 흐르게 한다
+  for (let i = 0; i < 46; i++) {
+    const ang = hash(i, 61) * Math.PI * 2, rr = Math.sqrt(hash(i, 62)) * 0.92;
+    const x0 = Math.round(CX + Math.cos(ang) * PR * rr);
+    const y0 = Math.round(PY + Math.sin(ang) * 20.0 * rr) + ((f * 2 + i) % 3) - 1;
+    const len = 2 + Math.floor(hash(i, 63) * 4);
+    for (let k = 0; k < len; k++) {
+      const c = g.get(x0 + k, y0);
+      if (c[0] !== 'w' || c === 'w0' || c === 'w1') continue;
+      g.px(x0 + k, y0, LIGHTER[c]);
+    }
   }
   // 떨어진 자리에서 피어오르는 흰 물보라 — 폭포의 밑동이다
   for (let i = 0; i < 26; i++) {
@@ -766,20 +859,24 @@ function bigFalls(f, NF) {
     const py = POOL - 2 + Math.cos(i * 1.7) * 9;
     // 물보라는 **부푸는 것**이다. 덩이마다 다른 박자로 커졌다 작아진다
     const r = (5 + hash(i, 7) * 7) * (1.0 + Math.sin(wob + i * 1.9) * 0.22);
-    g.ellipse(px, py - Math.sin(wob + i) * 1.5, r, r * 0.55,
+    // 물보라는 물이 **떨어져 부딪히는 자리**에 인다 — 수면에 붙어
+    // 납작하게 퍼진다 (동그란 구름을 띄우면 솜뭉치가 뜬 것 같다)
+    g.ellipse(px, py - Math.sin(wob + i) * 1.5, r, r * 0.46,
       hash(i, 3) > 0.45 ? 'w0' : 'w1');
   }
   // 웅덩이에 퍼지는 흰 테 — 물보라가 물에 닿는 자리
   // 흰 테는 **퍼져 나간다** — 물보라가 물에 닿아 밀려 나가는 자리다.
   // 한 장에 한 칸씩 커지고, 다 커지면 처음 크기로 돌아온다
+  // 수면에 퍼지는 흰 테 — **아주 납작해야** 물 위에 누운 것으로 보인다.
+  // 동그랗게 그리면 물속에 박힌 고리가 된다
   for (let i = 0; i < 5; i++) {
     const grow = ((i + f) % 5);
-    const ry = 5 + grow * 4;
-    g.ellipse(CX, POOL + 4 + grow * 4, gapAt(POOL) + 8 + grow * 6, ry * 0.32,
-      grow < 2 ? 'w0' : 'w1', ['w2', 'w3', 'w4']);
+    g.ellipse(CX, POOL + 5 + grow * 3.4, PR * (0.36 + grow * 0.15),
+      (2.4 + grow * 1.1), grow < 2 ? 'w0' : 'w1', ['w4', 'w5', 'w6']);
   }
   // 웅덩이 앞의 젖은 바위 몇 덩이 — 물가에 놓여야 웅덩이에 깊이가 생긴다
-  for (const [rx2, ry2, r] of [[CX - 40, GY - 12, 11], [CX + 38, GY - 9, 9], [CX + 12, GY - 3, 7]]) {
+  for (const [rx2, ry2, r] of [[CX - 46, PY + 10, 11], [CX + 44, PY + 12, 9],
+                               [CX + 14, PY + 17, 7]]) {
     g.ellipse(rx2, ry2, r, r * 0.62, 'r2');
     g.ellipse(rx2 - r * 0.2, ry2 - r * 0.24, r * 0.6, r * 0.34, 'r1', ['r2']);
   }
@@ -821,11 +918,15 @@ function bigFalls(f, NF) {
   }
 
   // 물에 걸린 통나무 — 물가에 하나 놓이면 못에 크기가 생긴다
-  g.bone(CX - 56, GY - 14, CX - 20, GY - 8, 7, 6, 'b2');
-  g.bone(CX - 56, GY - 15, CX - 22, GY - 10, 3, 3, 'b1');
-  g.ellipse(CX - 20, GY - 8, 3, 3.4, 'b3');
+  g.bone(CX - 60, PY + 8, CX - 24, PY + 14, 7, 6, 'b2');
+  g.bone(CX - 60, PY + 7, CX - 26, PY + 12, 3, 3, 'b1');
+  g.ellipse(CX - 24, PY + 14, 3, 3.4, 'b3');
+  // 물에 잠긴 자리 — 나무 밑동에 물이 닿는 선이 있어야 **떠 있는** 게 된다
+  for (let x = CX - 66; x <= CX - 18; x++)
+    for (let y = PY + 12; y <= PY + 18; y++)
+      if (g.get(x, y)[0] === 'b' && hash(x, y) > 0.55) g.px(x, y, DARKER[g.get(x, y)]);
 
-  g.outline('O');
+  g.outline('O', ['w4', 'w5', 'w6']);
   return g;
 }
 
