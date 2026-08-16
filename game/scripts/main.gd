@@ -154,6 +154,7 @@ var _dc_kind := PackedByteArray()
 var _dc_base: Array = []            # 고정 바탕 Texture2D
 var _dc_water := PackedInt32Array() # 깊이*3 + 판
 var _dc_edge: Array = []            # 가장자리 Texture2D 묶음 (없으면 null)
+var _dc_tall: Array = []            # 두 칸 높이로 그리는 것 (벼랑면)
 var _dc_season := ""                # 계절이 바뀌면 잔디 판 셋이 통째로 갈린다
 # 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
 # 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
@@ -1257,12 +1258,16 @@ func _load_textures() -> void:
 			edge_bad.append(kind)
 		else:
 			edge_ok += 1
+		# 벼랑면만 **두 칸 높이**다 (make_ground.js 의 KIND 표에서 rows=2).
+		# 한 칸으로는 아무리 잘 칠해도 높이가 안 느껴져 층계참이 낮은 턱으로
+		# 보였다. 아틀라스 칸도 그만큼 세로로 길다
+		var ch: int = EDGE_PX * 2 if kind.begins_with("cliff") else EDGE_PX
 		var arr: Array[Texture2D] = []
 		arr.resize(256)
 		for c in 256:
 			var a := AtlasTexture.new()
 			a.atlas = sheet
-			a.region = Rect2((c % 16) * EDGE_PX, (c / 16) * EDGE_PX, EDGE_PX, EDGE_PX)
+			a.region = Rect2((c % 16) * EDGE_PX, (c / 16) * ch, EDGE_PX, ch)
 			arr[c] = a
 		edge_tex[kind] = arr
 	if edge_bad.is_empty():
@@ -2557,6 +2562,7 @@ func dirty_all() -> void:
 		_dc_water.resize(n)
 		_dc_base.resize(n)
 		_dc_edge.resize(n)
+		_dc_tall.resize(n)
 	_dc_kind.fill(DC_NONE)
 
 
@@ -2783,8 +2789,9 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 		# 맞다 (보이는 건 수면이다). 마루선(brink)도 마찬가지다.
 		if gc != K_WATER:
 			if up != 0:
-				el.append(edge_tex["cliff_%d"
-					% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up])
+				# 두 칸 높이라 딴 통에 담는다 (그리는 크기가 다르다)
+				_dc_tall[ci] = edge_tex["cliff_%d"
+					% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up]
 			if dn != 0:
 				el.append(edge_tex["brink"][dn])
 	_dc_kind[ci] = kind
@@ -2829,6 +2836,7 @@ func _draw() -> void:
 	# 바탕끼리는 한 칸에 하나뿐이라 서로 안 겹친다 — 순서를 바꿔도 안전하다.
 	var base := {}      # Texture2D -> Array[Vector2]
 	var edges := {}
+	var tall := {}      # 두 칸 높이 (벼랑면) — 아래 칸까지 덮는다
 	var crops := {}
 	var docks: Array[Vector2] = []
 
@@ -2886,6 +2894,7 @@ func _draw() -> void:
 			var ci := rb + x
 			var dk: int = _dc_kind[ci]
 			if dk == DC_NONE:
+				_dc_tall[ci] = null
 				dk = _dc_fill(x, y, ci, x - xa, above, cur, below, grass_prefix)
 			# 바탕은 한 칸에 하나뿐이다. 매번 달라지는 것만 여기서 고른다 —
 			# 물은 **장**, 밭은 **젖었는지**. 나머지는 캐시가 들고 있다
@@ -2915,6 +2924,13 @@ func _draw() -> void:
 						eb = [] as Array[Vector2]
 						edges[t] = eb
 					eb.append(at)
+			var tt = _dc_tall[ci]
+			if tt != null:
+				var tb = tall.get(tt)
+				if tb == null:
+					tb = [] as Array[Vector2]
+					tall[tt] = tb
+				tb.append(at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
 
@@ -2964,6 +2980,16 @@ func _draw() -> void:
 	for t: Texture2D in edges:
 		for at: Vector2 in edges[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)
+	# 벼랑면 — **제 칸과 그 아래 칸**에 걸쳐 선다.
+	#
+	# 한 칸(화면 32px)으로는 아무리 잘 칠해도 높이가 안 느껴진다. 두 칸이면
+	# 주인공(96px)의 3분의 2라 눈이 「벽」으로 읽는다. 아래 칸은 통째로
+	# 바위벽이 아니라 무너져 쌓인 발치라, 거기 서면 벽 **앞에** 선 것으로
+	# 보인다 (통행은 그대로 — 못 서는 칸은 예전과 같이 벼랑 밑 한 줄뿐이다)
+	var tall_size := Vector2(TILE, TILE * 2)
+	for t: Texture2D in tall:
+		for at: Vector2 in tall[t]:
+			draw_texture_rect(t, Rect2(at, tall_size), false)
 	for t: Texture2D in crops:
 		for at: Vector2 in crops[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)

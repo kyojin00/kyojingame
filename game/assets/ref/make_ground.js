@@ -70,16 +70,42 @@ class T {
   }
 }
 
+// 두 칸 높이 그릇 — **벼랑면 전용**.
+//
+// T 는 modulo N 으로 감는다 (이음매 없는 바닥 타일의 전부가 그 한 줄이다).
+// 벼랑면을 두 칸으로 그리려면 그 감기가 방해가 된다 — 아래 칸(16~31행)이
+// 위 칸으로 도로 접혀 버린다. 그래서 감지 않는 그릇을 따로 둔다.
+class TT {
+  constructor(h) {
+    this.h = h;
+    this.d = Array.from({ length: h }, () => new Array(N).fill(null));
+  }
+  px(x, y, c) { if (c && x >= 0 && x < N && y >= 0 && y < this.h) this.d[y][x] = c; }
+  get(x, y) { return (x >= 0 && x < N && y >= 0 && y < this.h) ? this.d[y][x] : null; }
+  small() {
+    const im = new PNG({ width: N, height: this.h });
+    im.data.fill(0);
+    for (let y = 0; y < this.h; y++) for (let x = 0; x < N; x++) {
+      const c = this.d[y][x];
+      if (!c) continue;
+      const i = (y * N + x) * 4;
+      im.data[i] = c[0]; im.data[i + 1] = c[1]; im.data[i + 2] = c[2]; im.data[i + 3] = 255;
+    }
+    return im;
+  }
+}
+
 // 경계 그림 한 벌을 **한 장에** 담는다. 파일을 천오백 개 따로 두면 불러오는
 // 것부터 일이고, 한 장에 모으면 그리기가 오히려 더 잘 묶인다 (같은 텍스처)
 const ATC = 16, ATR = 16;       // 꼴 값(0~255)이 그대로 자리다
-function atlas(name, tiles) {
-  const im = new PNG({ width: ATC * N, height: ATR * N });
+function atlas(name, tiles, ch) {
+  const CH = ch || N;
+  const im = new PNG({ width: ATC * N, height: ATR * CH });
   im.data.fill(0);
   tiles.forEach((t, idx) => {
     if (!t) return;
-    const ox = (idx % ATC) * N, oy = Math.floor(idx / ATC) * N;
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const ox = (idx % ATC) * N, oy = Math.floor(idx / ATC) * CH;
+    for (let y = 0; y < CH; y++) for (let x = 0; x < N; x++) {
       const a = (y * N + x) * 4, b = ((oy + y) * im.width + ox + x) * 4;
       im.data[b] = t.data[a]; im.data[b + 1] = t.data[a + 1];
       im.data[b + 2] = t.data[a + 2]; im.data[b + 3] = t.data[a + 3];
@@ -480,23 +506,43 @@ function rampTile(v) {
     // 한 단은 넓적한 돌 두세 장을 이어 붙인 것이다. 이음매 자리를 정해
     // 두고 그 칸만 어둡게 하면, 통돌이 아니라 **쌓아 만든 계단**이 된다
     const seam = new Set();
-    let x = 2 + Math.floor(h(row, v, 81) * 4);
-    while (x < N - 1) { seam.add(x); x += 4 + Math.floor(h(x, row, 82 + s) * 4); }
+    let sx = 2 + Math.floor(h(row, v, 81) * 4);
+    while (sx < N - 1) { seam.add(sx); sx += 4 + Math.floor(h(sx, row, 82 + s) * 4); }
+    // ---- 앞 모서리는 **곧지 않다** ----
+    //
+    // 자로 그은 가로선 넷을 그으면 사람이 어제 부어 놓은 콘크리트 계단이
+    // 된다. 참고 사진의 계단은 넓적한 자연석을 주워다 놓은 것이라, 돌마다
+    // 앞 끝이 반 칸씩 어긋나고 한복판이 밟혀 옴폭하다.
+    // 돌 하나(네 칸)마다 어긋남을 정해 두면 그 안에서는 이어진다
+    const lip = (x2) => (h(x2 >> 2, row, 88 + s) < 0.34 ? 1 : 0)
+      - (h(x2 >> 2, row, 89 + s) < 0.22 ? 1 : 0);
     for (let x2 = 0; x2 < N; x2++) {
       // 돌 하나하나의 밝기가 조금씩 다르다 (한 색이면 콘크리트가 된다)
       const k = h(x2 >> 2, row, 83 + s);
       const lift = k > 0.72 ? -1 : (k < 0.26 ? 1 : 0);
       const j = seam.has(x2) ? 2 : 0;               // 이음매는 두 단 어둡게
       const cl = (i) => STONE[clamp(i + lift + j, 0, STONE.length - 1)];
-      g.px(x2, y, cl(0));            // 모서리 — 닳아 반들거린다
-      g.px(x2, y + 1, cl(1));        // 디딤면
-      g.px(x2, y + 2, cl(3));        // 디딤면 안쪽 (조금 그늘)
-      g.px(x2, y + 3, cl(6));        // 챌면 — 다음 단이 드리우는 그늘
+      const o = lip(x2);
+      g.px(x2, y + o, cl(0));            // 모서리 — 닳아 반들거린다
+      g.px(x2, y + 1 + o, cl(1));        // 디딤면
+      g.px(x2, y + 2 + o, cl(3));        // 디딤면 안쪽 (조금 그늘)
+      g.px(x2, y + 3, cl(6));            // 챌면 — 다음 단이 드리우는 그늘
+      if (o < 0) g.px(x2, y + 3 + o, cl(3));   // 어긋난 만큼 디딤면을 늘린다
     }
-    // 디딤면 한복판은 사람이 밟아 닳았다 — 가운데만 한 단 밝게
-    for (let x2 = 4; x2 < N - 4; x2++) {
-      if (h(x2, row, 84 + s) < 0.45) continue;
-      g.px(x2, y + 1, STONE[0]);
+    // 디딤면 한복판은 사람이 밟아 닳았다 — 가운데만 한 단 밝게.
+    // 가운데가 **옴폭 꺼지도록** 양 끝으로 갈수록 덜 닳게 한다
+    for (let x2 = 3; x2 < N - 3; x2++) {
+      const mid = 1 - Math.abs(x2 - (N - 1) / 2) / ((N - 1) / 2);
+      if (h(x2, row, 84 + s) > mid * 0.9) continue;
+      g.px(x2, y + 1 + lip(x2), STONE[0]);
+    }
+    // 이 빠진 모서리 — 돌 하나에 한 자리쯤. 이게 있어야 「주워다 놓은 돌」이다
+    if (h(row, v, 90 + s) < 0.55) {
+      const bx = 1 + Math.floor(h(row, v, 91 + s) * (N - 3));
+      for (let d = 0; d < 2 + Math.floor(h(row, v, 92 + s) * 2); d++) {
+        g.px(bx + d, y + lip(bx), EARTH[2]);
+        g.px(bx + d, y + 1 + lip(bx), EARTH[3]);
+      }
     }
   }
   // 이끼 — **밟히지 않는 자리**에만 앉는다: 챌면 밑과 돌 사이 이음매.
@@ -512,11 +558,10 @@ function rampTile(v) {
     const p = (riser ? 0.42 : 0.10) * (patch > 0.58 ? 1.0 : 0.18);
     if (h(x, y, 85 + s) < p) g.px(x, y, MOSS[h(x >> 1, y, 86 + s) < 0.4 ? 1 : 2]);
   }
-  // 깨진 돌 몇 자리 — 자로 그은 계단은 사람이 어제 놓은 것으로 보인다
-  for (let i = 0; i < 3; i++) {
-    const ox = Math.floor(h(i + 5, v, 77) * N), oy = (Math.floor(h(v, i + 5, 78) * 4)) * 4 + 1;
-    g.px(ox, oy, EARTH[2]);
-    g.px(ox + 1, oy, EARTH[3]);
+  // 돌 틈에 낀 잔모래 몇 알 — 가까이 보면 볼 것이 하나 더 있어야 한다
+  for (let i = 0; i < 5; i++) {
+    const gx = Math.floor(h(i, v, 93) * N), gy = Math.floor(h(v, i, 94) * 4) * 4 + 3;
+    g.px(gx, gy, EARTH[h(i, v, 95) < 0.5 ? 3 : 4]);
   }
   return g;
 }
@@ -815,7 +860,9 @@ function rockFace(g, x, y, drop, n, i, seed) {
   // 된다 — 결은 은근히 두고, 몇 자리에만 깊은 틈과 가로 선반을 넣는다.
   // 바위는 고른 결이 아니라 **몇 개의 큰 사건**으로 읽힌다
   const v = (h(i, 0, 52 + seed) - 0.5) * 0.9 + (h(Math.floor(i / 4), 0, 53 + seed) - 0.5) * 0.9;
-  let t = 3.0 + drop * 2.2 + v;
+  // 위는 더 밝게, 발치는 더 어둡게. **높이는 명암차로 읽힌다** — 면을 두
+  // 칸으로 늘려 놓고 톤 폭이 그대로면 늘어난 만큼 밋밋해질 뿐이다
+  let t = 2.2 + drop * 3.4 + v;
   // 갈라진 틈 — 위에서 아래까지 곧게 뚫리면 기둥이 선 담장이 된다.
   // 시작과 끝을 자리마다 달리해 **조각조각** 갈라지게 한다
   if (h(i, 0, 54 + seed) < 0.17) {
@@ -862,8 +909,12 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
 // 면의 높이. **두 겹으로** 흔든다 — 다섯 칸짜리 덩이(들쭉날쭉)와 열두 칸짜리
 // 너울(어디는 높고 어디는 낮은 벼랑). 칸마다 흔들면 밑동이 빗살이 된다
 function faceH(face, i, seed) {
-  return Math.round((11.2 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 1.8)
-    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * 2.6) * face);
+  // 한 칸(16)에서 **스물넷**으로. 화면에서 32px -> 48px 이다.
+  // 나머지 여덟 칸은 발치(scree)가 받아, 두 칸째가 통째로 바위벽이 아니라
+  // 「벽 밑에 무너져 쌓인 자리」가 된다 — 거기 사람이 서면 벽 앞에 선
+  // 것으로 보이지, 벽 속에 박힌 것으로 보이지 않는다
+  return Math.round((24.0 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 3.0)
+    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * 5.0) * face);
 }
 
 // 발치 — 접지 그늘과 흘러내린 돌덩이. 이게 없으면 바위가 땅에 꽂힌
@@ -984,10 +1035,11 @@ function edgeField(code) {
 
 // 한 장. paint 는 (거리 s, 딴 쪽 방향 n, 물가를 따라가는 자리 i)만 본다.
 // 물 칸은 부호만 뒤집는다 — 붓은 언제나 「s>0이 뭍」으로 그린다
-function edgeTile(code, isLand, paint, vr) {
-  const s = edgeField(code), g = new T(), px = paint || bankPx;
+function edgeTile(code, isLand, paint, vr, hh) {
+  const H2 = hh || N;
+  const s = edgeField(code), g = H2 > N ? new TT(H2) : new T(), px = paint || bankPx;
   const at = (x, y) => s[(y + EPAD) * EG + (x + EPAD)];
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+  for (let y = 0; y < H2; y++) for (let x = 0; x < N; x++) {
     let sv = at(x, y);
     // 딴 쪽을 가리키는 방향 = 거리가 줄어드는 쪽
     let gx = (at(x + 1, y) - at(x - 1, y)) * 0.5;
@@ -1031,17 +1083,21 @@ const KIND = [
   ['dune', true, spill(SAND, 84)], ['trod', true, spill(EARTH, 96)],
   // 벼랑 — 둘 다 **제 칸 안쪽**으로 층을 쌓는다. cliff 는 아래쪽 칸에서
   // 위를 향해(면), brink 는 위쪽 칸에서 아래를 향해(마루)
-  ['cliff', true, cliffPx, 3], ['brink', true, brinkPx],
+  // 벼랑면만 **두 칸 높이**다. 한 칸(화면 32px)으로는 아무리 잘 칠해도
+  // 높이가 안 느껴진다 — 층계참이 낮은 턱으로 보인다. 같은 거리장에서
+  // 아래로 한 칸 더 이어 뽑으므로 이음매가 생기지 않는다
+  ['cliff', true, cliffPx, 3, 2], ['brink', true, brinkPx],
 ];
 // 그림 번호는 **꼴 값 그대로**다. 표를 따로 두면 게임 쪽과 어긋날 여지가
 // 생기는데, 어차피 겹치는 꼴이 거의 없어서 아낄 것도 없다 (256 -> 255).
 // 0번 자리는 비워 둔다 — 딴 쪽 이웃이 하나도 없으면 그릴 게 없다.
-for (const [name, isLand, paint, vars] of KIND) {
+for (const [name, isLand, paint, vars, rows] of KIND) {
+  const CH = (rows || 1) * N;
   for (let vr = 0; vr < (vars || 1); vr++) {
     const tiles = new Array(256).fill(null);
     for (let code = 1; code < 256; code++)
-      tiles[code] = edgeTile(code, isLand, paint, vr).small();
-    atlas('edge_' + name + (vars ? '_' + vr : ''), tiles);
+      tiles[code] = edgeTile(code, isLand, paint, vr, CH).small();
+    atlas('edge_' + name + (vars ? '_' + vr : ''), tiles, CH);
   }
 }
 

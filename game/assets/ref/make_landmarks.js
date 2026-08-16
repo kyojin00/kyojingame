@@ -268,8 +268,9 @@ function greatTree(f, NF) {
   // ---- 판근(板根) — 땅으로 벌어져 내리는 뿌리 ----
   // 밑동을 원기둥으로 끊으면 「기둥을 땅에 꽂았다」가 된다. 뿌리가
   // 부챗살로 벌어져야 나무가 땅에서 **자라 나온** 것으로 보인다.
-  for (const [dx, dy, w] of [[-58, -3, 13], [-38, -10, 15], [-16, -14, 14],
-                             [16, -14, 14], [40, -9, 15], [60, -2, 12]]) {
+  const ROOTS = [[-58, -3, 13], [-38, -10, 15], [-16, -14, 14],
+                 [16, -14, 14], [40, -9, 15], [60, -2, 12]];
+  for (const [dx, dy, w] of ROOTS) {
     g.bone(CX + dx * 0.24, GY - 26, CX + dx, GY + dy, 20, w, 'b1');
   }
   g.ellipse(CX, GY - 12, 46, 15, 'b1');
@@ -281,7 +282,10 @@ function greatTree(f, NF) {
     const t = (GY - y) / (GY - FORK);              // 0 밑동 → 1 갈래
     const base = 34 - 15 * Math.pow(t, 0.72);
     const flare = y > GY - 34 ? Math.pow((y - (GY - 34)) / 34, 2) * 22 : 0;
-    return base + flare;
+    // 살짝 울퉁불퉁하게 — 매끈한 원뿔은 깎아 세운 기둥으로 보인다.
+    // 굵기가 아주 조금씩 오르내려야 「자란 것」이 된다
+    const lump = Math.sin((GY - y) * 0.085) * 1.5 + Math.sin((GY - y) * 0.21) * 0.8;
+    return base + flare + lump;
   };
   const trunkMid = (y) => CX + Math.sin((GY - y) / 58) * 5;
   for (let y = FORK; y <= GY; y++) {
@@ -341,10 +345,21 @@ function greatTree(f, NF) {
       const w2 = Math.max(1, (rgt - lft) / 2);
       const rel = (x - (lft + rgt) / 2) / w2;
       let c = barrel(rel);
-      // 껍질 골 — 세로로 길게 (점으로 흩으면 이끼처럼 보인다)
-      const groove = hash(x >> 2, y >> 4);
-      if (groove > 0.72) c = DARKER[c] || c;
-      else if (groove < 0.13) c = { b0: 'b0', b1: 'b0', b2: 'b1', b3: 'b2' }[c] || c;
+      // ---- 껍질 골은 **원기둥을 따라 감긴다** ----
+      //
+      // hash(x>>2, y>>4) 로 뿌리면 그건 **화면 좌표의 격자**다. 어디서나
+      // 같은 폭으로 늘어서니 판때기에 그은 세로줄이지 원기둥의 골이 아니다.
+      // 실제 원기둥은 옆으로 갈수록 면이 우리에게서 비껴서 **골이 촘촘해
+      // 보인다** — 그 압축 하나가 「이건 둥글다」를 말한다.
+      // rel(-1..1)을 asin 으로 펼치면 그 간격이 저절로 나온다.
+      const u = Math.asin(Math.max(-1, Math.min(1, rel)));
+      // 또렷함도 가장자리와 코어 섀도에서 죽는다 (거기서는 면이 안 보인다)
+      const crisp = 1 - rel * rel * 0.65;
+      const groove = hash(Math.round(u * 7), y >> 4);
+      const fine = hash(Math.round(u * 17), y >> 2);
+      if (groove > 0.80 - crisp * 0.14) c = DARKER[c] || c;
+      else if (groove < 0.10 + crisp * 0.06) c = LIGHTER[c] || c;
+      if (fine > 0.86 - crisp * 0.10) c = DARKER[c] || c;
       g.px(x, y, c);
     }
   }
@@ -358,6 +373,62 @@ function greatTree(f, NF) {
       if (hash(x >> 1, y >> 2) < t * 0.85) g.px(x, y, DARKER[g.get(x, y)]);
     }
   }
+  // ---- 판근 하나하나를 **따로** 살린다 ----
+  //
+  // 바로 위의 통 계산은 「그 줄에 있는 나무 픽셀」을 통째로 원기둥 하나로
+  // 친다. 줄기에서는 맞는 말인데 밑동에서는 치명적이다 — 여섯 갈래로
+  // 벌어진 뿌리가 한 덩어리로 뭉쳐 **나팔처럼 벌어진 기둥**이 된다.
+  //
+  // 뿌리마다 축을 두고, 축에 가까우면 볼록(밝고) 축에서 멀면 오목(어둡게)
+  // 칠한다. 뿌리와 뿌리 사이가 골로 파여야 여섯 개가 여섯 개로 보인다.
+  for (let y = GY - 42; y <= GY + 2; y++) for (let x = 0; x < W; x++) {
+    if (g.get(x, y)[0] !== 'b') continue;
+    let best = 1e9, side = 0;
+    for (const [dx, dy, w] of ROOTS) {
+      const ax = CX + dx * 0.24, ay = GY - 26, bx = CX + dx, by = GY + dy;
+      const vx = bx - ax, vy = by - ay;
+      const tt = Math.max(0, Math.min(1,
+        ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy)));
+      const px2 = ax + vx * tt, py = ay + vy * tt;
+      const hw = Math.max(2, (20 + (w - 20) * tt) / 2);
+      const d = Math.hypot(x - px2, y - py) / hw;
+      if (d < best) { best = d; side = (x - px2) / hw; }
+    }
+    if (best > 1.35) continue;
+    let c = g.get(x, y);
+    // 빛은 왼쪽 위 — 축의 왼쪽 위가 볼록의 꼭대기다
+    const lit = -side * 0.55 + (1 - best) * 0.85;
+    if (lit > 0.62) c = LIGHTER[c] || c;
+    else if (lit < -0.22) c = DARKER[c] || c;
+    if (best > 0.98) c = DARKER[c] || c;          // 뿌리와 뿌리 사이의 골
+    g.px(x, y, c);
+  }
+
+  // ---- 판근의 **윗면** ----
+  //
+  // 위에서 비스듬히 내려다보는 화면이라, 밖으로 벌어져 내린 뿌리는 저마다
+  // 등이 하늘을 향한다. 그 등을 안 밝히면 뿌리가 줄기와 한 덩어리로 뭉쳐
+  // 「나팔처럼 벌어진 기둥」이 된다 — 뿌리 여섯 개가 따로 보여야 밑동이
+  // 땅을 움켜쥔 것으로 읽힌다.
+  //
+  // 우리 집에서 지붕(눕는 면)이 벽(서는 면)보다 밝은 것과 같은 규칙이다.
+  for (let y = GY - 38; y <= GY; y++) for (let x = 0; x < W; x++) {
+    const c = g.get(x, y);
+    if (c[0] !== 'b') continue;
+    if (g.get(x, y - 1)[0] === 'b') continue;      // 위가 나무면 등이 아니다
+    g.px(x, y, LIGHTER[c] || c);
+    const c2 = g.get(x, y + 1);
+    if (c2[0] === 'b' && hash(x, y) > 0.3) g.px(x, y + 1, LIGHTER[c2] || c2);
+  }
+  // 뿌리와 뿌리 **사이**는 골이다 — 등을 밝혔으면 그 사이는 어두워야
+  // 둘이 갈라진다. 위가 비어 있지 않은데 좌우가 비었으면 골의 안쪽이다
+  for (let y = GY - 30; y <= GY; y++) for (let x = 1; x < W - 1; x++) {
+    if (g.get(x, y)[0] !== 'b') continue;
+    if (g.get(x, y - 1)[0] === 'b') continue;
+    if (g.get(x - 1, y - 1)[0] === 'b' && g.get(x + 1, y - 1)[0] === 'b')
+      g.px(x, y, DARKER[g.get(x, y)]);
+  }
+
   // 옹이 — 오래 산 나무에는 아문 자리가 있다
   for (const [ox, oy, r] of [[CX - 16, GY - 74, 7], [CX + 20, GY - 46, 5]]) {
     g.ellipse(ox, oy, r, r * 0.78, 'b3', ['b0', 'b1', 'b2']);
@@ -1110,18 +1181,9 @@ function rockSpire(f, NF) {
     else { g.bone(bx - 1, by, bx - 6, by + 2, 2, 1, 'i1'); }
   }
 
-  // 돌탑 — 지나던 사람들이 하나씩 얹고 간 돌무지.
-  // 사람 손이 닿았다는 표시 하나로, 세상 끝의 바위가 「가 볼 데」가 된다
-  {
-    const tx = CX - 40;
-    let ty = GY - 2;
-    for (const r of [7, 6, 5, 4.2, 3.4, 2.6]) {
-      g.ellipse(tx, ty, r, r * 0.55, 'r2');
-      g.ellipse(tx - r * 0.24, ty - r * 0.2, r * 0.6, r * 0.3, 'r1', ['r2']);
-      g.hline(tx - r + 1, tx + r - 1, ty + Math.round(r * 0.55), 'r3');
-      ty -= Math.max(3, Math.round(r * 0.9));
-    }
-  }
+  // (밑동의 돌무지는 뺐다. 「사람 손이 닿았다」는 표시로 얹어 둔 것인데,
+  //  이제 그 말은 **꼭대기까지 난 돌계단**이 훨씬 크게 하고 있다 —
+  //  같은 말을 두 번 하면 작은 쪽이 군더더기가 된다)
 
   // ---- 밑동의 너덜 ----
   // 깎여 떨어진 조각들이 발치에 쌓여야 「깎여 나갔다」가 보인다
