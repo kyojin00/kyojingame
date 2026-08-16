@@ -29,10 +29,31 @@ const COL_LEAF_DK := Color(0.30, 0.44, 0.21)
 const BOX_W := 440.0
 const BOX_H := 150.0
 
+# ---- 막대는 **차오른다** ----
+#
+# 단계마다 값을 그대로 꽂았더니 0 -> 100 이 한 번에 튀었다. 눈에는
+# 「채워지는 것」이 아니라 「갑자기 다 됐다」로 보인다.
+#
+# 그래서 목표(_target)와 **보이는 값**(_ratio)을 따로 둔다. 보이는 값은
+# 정해진 속도로만 목표를 쫓아간다. 세계를 짓는 동안에는 프레임이 안 도니까
+# step() 안에서 몇 장을 직접 그려 그 사이를 메우고, 다 지은 뒤에는
+# _process 가 100까지 마저 채운다.
+#
+# 짓는 도중에는 BUILD_CAP 위로 안 올라간다 — 아직 할 일이 남았는데 막대가
+# 꽉 차 있으면 그때부터는 멈춘 것으로 보인다.
+const CLIMB := 0.62               # 초당 차오르는 양
+const BUILD_CAP := 0.72           # 짓는 동안 보여 줄 수 있는 최대치
+const FILL_STEPS := 9             # 단계 사이를 메우는 장수
+const FILL_MS := 16               # 그 한 장에 두는 시간
+
 var _c: Control
 var _msg := "마을을 짓는 중…"
-var _ratio := 0.0
+var _ratio := 0.0                 # 지금 화면에 보이는 값
+var _target := 0.0                # 다다르려는 값
 var _t := 0.0
+var _hold := -1.0                 # 100% 를 채운 뒤 기다리는 시간 (음수면 아직)
+var _held := 0.0
+var _done := false                # 다 지었다 — 이제 100까지 채운다
 
 
 # 이미 떠 있으면 그것을 쓰고, 없으면 만들어 붙인다
@@ -59,6 +80,16 @@ static func mark(tree: SceneTree, text: String, ratio: float) -> void:
 		n.step(text, ratio)
 
 
+# 다 지었다 — 막대를 100까지 채우고, 다 찬 뒤 hold 초를 기다렸다가 걷는다.
+# 기다리는 동안은 트리를 세운다: 화면은 아직 로딩판인데 뒤에서 사람이
+# 걸어다니면 그건 로딩이 아니다
+static func finish(tree: SceneTree, hold := 2.0) -> void:
+	var n: Node = tree.root.get_node_or_null(NODE_NAME)
+	if n == null:
+		return
+	n.done(hold)
+
+
 func _ready() -> void:
 	layer = 200
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -72,20 +103,52 @@ func _ready() -> void:
 func step(text: String, ratio: float) -> void:
 	if text != "":
 		_msg = text
-	_ratio = clampf(ratio, 0.0, 1.0)
-	_t += 0.35                       # 멈춰 있는 동안에도 새싹이 자라 보이게
-	if _c != null:
-		_c.queue_redraw()
-	# **그 자리에서 다시 그린다.** await 를 쓰면 장면 트리가 한 바퀴 돌아,
-	# 아직 절반만 지어진 세계에서 남의 _process 가 먼저 깨어난다
-	if DisplayServer.get_name() != "headless":
+	_target = clampf(ratio, 0.0, BUILD_CAP)
+	# 프레임이 안 도는 구간이라 **여기서 직접 몇 장을 그려** 그 사이를 메운다.
+	# 한 번에 꽂으면 막대가 툭 뛴다
+	var head := DisplayServer.get_name() != "headless"
+	var from := _ratio
+	for i in FILL_STEPS:
+		_ratio = lerpf(from, _target, float(i + 1) / float(FILL_STEPS))
+		_t += float(FILL_MS) / 1000.0
+		if _c != null:
+			_c.queue_redraw()
+		if not head:
+			break
 		RenderingServer.force_draw()
+		OS.delay_msec(FILL_MS)
+
+
+# 세계를 다 지었다. 남은 만큼을 _process 가 채운다
+func done(hold: float) -> void:
+	_done = true
+	_target = 1.0
+	_hold = hold
+	_msg = "마을이 다 지어졌다"
+	get_tree().paused = true          # 뒤에서 게임이 먼저 굴러가지 않게
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	if _done:
+		_ratio = move_toward(_ratio, 1.0, CLIMB * delta)
+		if _ratio >= 1.0:
+			_held += delta
+			if _held >= _hold:
+				get_tree().paused = false
+				queue_free()
+				return
+	else:
+		_ratio = move_toward(_ratio, _target, CLIMB * delta)
 	if _c != null:
 		_c.queue_redraw()
+
+
+func _exit_tree() -> void:
+	# 어떤 길로 지워지든 멈춰 둔 트리는 반드시 되돌린다
+	var tr := get_tree()
+	if tr != null:
+		tr.paused = false
 
 
 func _draw_screen() -> void:
@@ -126,14 +189,15 @@ func _draw_screen() -> void:
 
 	# ---- 글 ----
 	var tx := box.position.x + 78.0
+	var head_text := "마을이 다 지어졌다" if _ratio >= 1.0 else "마을을 짓는 중"
 	_c.draw_string(FONT, Vector2(tx, box.position.y + 42.0),
-		"마을을 짓는 중", HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_INK)
+		head_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, COL_INK)
 	# 점 셋이 하나씩 켜진다 — 이게 「살아 있음」을 말한다
 	var dots := int(fmod(_t * 2.6, 4.0))
-	var dw: float = FONT.get_string_size("마을을 짓는 중", HORIZONTAL_ALIGNMENT_LEFT,
+	var dw: float = FONT.get_string_size(head_text, HORIZONTAL_ALIGNMENT_LEFT,
 		-1, 19).x
 	for i in 3:
-		if i < dots:
+		if i < dots and _ratio < 1.0:
 			_c.draw_rect(Rect2(tx + dw + 4.0 + float(i) * 7.0,
 				box.position.y + 36.0, 4, 4), COL_INK)
 	_c.draw_string(FONT, Vector2(tx, box.position.y + 68.0),

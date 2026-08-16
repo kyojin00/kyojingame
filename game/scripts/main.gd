@@ -1217,9 +1217,9 @@ func _ready() -> void:
 	KyojinLoading.mark(get_tree(), "마을 사람들을 깨우는 중…", 1.0)
 	_setup_fade(loaded.size() > 0 or _shot_path != "")
 	# 신규 게임은 _show_intro가 스토리 동안 화면을 가렸다가 직접 페이드한다
-	# 다 지었다 — 로딩 화면을 걷는다 (다음 프레임에 지운다: 지금 지우면
-	# 아직 첫 프레임이 안 그려져 한 칸 검게 번쩍한다)
-	KyojinLoading.close.bind(get_tree()).call_deferred()
+	# 다 지었다 — 막대를 100까지 마저 채우고, 다 찬 뒤 두 박자 쉬었다가
+	# 로딩판을 걷는다 (기다리는 동안 트리는 서 있다: loading.gd 참고)
+	KyojinLoading.finish(get_tree(), 2.0)
 
 
 # 갈라낸 모듈 하나를 자식으로 붙인다.
