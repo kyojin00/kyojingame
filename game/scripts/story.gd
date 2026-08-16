@@ -1389,6 +1389,57 @@ func _end_forest_monologue() -> void:
 #
 # 3장부터는 손대지 않는다 — 날짜와 행동으로 열리는 이야기라, 여기서
 # 억지로 「끝난 것」으로 만들면 주민·유품·건물이 앞뒤가 안 맞는다.
+# ---- 우체부와 걷는 대목만 건너뛴다 ----
+#
+# 메인 스토리 건너뛰기(F8)는 1~2장을 통째로 넘긴다 — 집도 잡화점도 바닷길도
+# 다 열린 채로 시작한다. 그건 「이야기를 안 보겠다」는 뜻이라, **뒤 이야기를
+# 손보는 동안 앞의 숲길만 넘기고 싶을 때**는 쓸 수가 없다.
+#
+# 여기서 넘기는 것은 딱 그 숲길이다: 나무 베고 · 지도 보고 · 바위 캐고 ·
+# 우체부를 따라 마을 어귀까지 걷는 대목. 도착한 자리부터는 원래 이야기가
+# 그대로 이어진다 (편지 전하기 -> 이장 -> 집).
+#
+# 그 사이에 받는 것(도끼·곡괭이)은 쥐여 준다. 안 그러면 넘긴 사람만
+# 나무를 못 벤다 — 건너뛰기는 앞을 넘기는 것이지 뒤를 망치는 게 아니다.
+const INTRO_PHASES := ["enter", "approach", "equip", "chop", "path", "map",
+	"rock", "travel"]
+
+
+func skip_intro_walk() -> void:
+	if not INTRO_PHASES.has(GameData.story_phase):
+		m.hud.show_message("[개발] 이미 마을에 도착한 뒤다.")
+		return
+	m.dialog.close()
+	for t: String in ["axe", "pickaxe"]:
+		if not GameData.is_tool_unlocked(t):
+			GameData.unlocked_tools.append(t)
+	GameData.story_rock_state = 2          # 바위 대목은 끝난 것으로 친다
+	_rock_intro_started = true
+	_story_map_opened = true
+	m.story_cutscene = false
+	m._cutscene_idle = 0.0
+	# 숲길이 이미 닫혀 있으면 마을 어귀 연출을 돌릴 수 없다 (_begin_world_entry
+	# 가 그 자리에서 되돌아 나간다). 그대로 두면 「travel」에 갇히므로,
+	# 그때는 손수 옮겨 놓고 다음 대목으로 넘긴다
+	if not GameData.tutorial_space:
+		GameData.story_phase = "deliver"
+		m.player.position = Vector2(WORLD_ENTRY.x * m.TILE + 16,
+			WORLD_ENTRY.y * m.TILE + 16)
+		var cam1: Camera2D = m.player.get_node("Camera")
+		cam1.reset_smoothing()
+		GameData.mark_explored_at(WORLD_ENTRY)
+		_apply_story_camera()
+		m.hud.show_message("[개발] 마을 어귀로 옮겼다.", 3.0)
+		return
+	# 우체부가 아직 안 나왔으면 세운다 — 마을 어귀 연출이 그를 데리고 간다
+	if _postman == null:
+		_spawn_postman()
+	_postman_state = "follow"
+	GameData.story_phase = "travel"
+	_begin_world_entry()
+	m.hud.show_message("[개발] 숲길을 건너뛰었다 — 마을 어귀부터 이어진다.", 4.0)
+
+
 func skip_main_story() -> void:
 	if GameData.story_phase == "done" and GameData.story2_phase == "done":
 		m.hud.show_message("이미 메인 스토리를 건너뛴 상태다.")

@@ -20,7 +20,7 @@ extends CanvasLayer
 
 var title_label: Label
 var body_label: Label
-var buttons_box: HBoxContainer
+var buttons_box: HFlowContainer
 var portrait: TextureRect
 var skip_btn: Button
 
@@ -167,9 +167,16 @@ func _ready() -> void:
 	body_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body_label)
 
-	buttons_box = HBoxContainer.new()
-	buttons_box.add_theme_constant_override("separation", 8)
-	buttons_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	# **줄바꿈되는** 가로 상자.
+	#
+	# HBoxContainer 는 단추가 늘어나면 창 밖으로 밀려 나간다. 선택지가 둘셋일
+	# 때는 티가 안 나는데, 개발자 메뉴처럼 예닐곱이 되면 마지막 단추가 아예
+	# 화면에서 사라진다 — 눌러야 할 것이 안 보이는 것이다.
+	# HFlowContainer 는 폭이 모자라면 다음 줄로 넘긴다 (둘셋일 때는 똑같다).
+	buttons_box = HFlowContainer.new()
+	buttons_box.add_theme_constant_override("h_separation", 8)
+	buttons_box.add_theme_constant_override("v_separation", 6)
+	buttons_box.alignment = FlowContainer.ALIGNMENT_CENTER
 	v.add_child(buttons_box)
 
 

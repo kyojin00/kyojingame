@@ -1642,6 +1642,48 @@ var _sel_target := Vector2i(-999, -999)
 
 
 # 개발/테스트용 — 지도를 통째로 연다 (F7).
+# ---- 개발자 메뉴 (ESC -> [개발] 개발자 메뉴) ----
+#
+# 개발용 기능이 F키에만 달려 있었다. 손가락이 기억하는 사람에게는 그게 제일
+# 빠르지만, **어떤 기능이 있는지 알 길이 없다** — 코드를 열어 keycode 를
+# 훑어야 안다. 같은 일을 하는 단추를 한자리에 늘어놓고 옆에 단축키를 적는다.
+#
+# 순서는 「자주 쓰는 것부터」가 아니라 **되돌릴 수 없는 것을 아래로**.
+# 건너뛰기는 한 번 누르면 그 이야기를 그 세이브에서 다시 못 본다.
+func _dev_menu() -> void:
+	Sound.play_sfx("sfx_ui")
+	var phase := str(GameData.story_phase)
+	var walking: bool = story.INTRO_PHASES.has(phase)
+	var btns: Array = [
+		["아이템 채우기 (F10)", func() -> void:
+			dialog.close()
+			_dev_fill_stock()],
+		["지도 전부 열기 (F7)", func() -> void:
+			dialog.close()
+			_dev_open_world()],
+		["프레임 시간 %s (F3)" % ("끔" if perf_show else "켬"), func() -> void:
+			dialog.close()
+			perf_show = not perf_show
+			if not perf_show and _perf_label != null:
+				_perf_label.visible = false
+			hud.show_message("[개발] 프레임 시간 %s" % ("켬 — F3으로 끈다" if perf_show else "끔"))],
+		["하루 넘기기", func() -> void:
+			dialog.close()
+			daycycle._fade_next_day(false)],
+		# ---- 여기서부터는 되돌릴 수 없다 ----
+		["숲길 건너뛰기 (F6)" if walking else "숲길 건너뛰기 — 지났다 (F6)", func() -> void:
+			dialog.close()
+			story.skip_intro_walk()],
+		["스토리 건너뛰기 (F8)", func() -> void:
+			dialog.close()
+			story.skip_main_story()],
+		["닫기", null],
+	]
+	var body := "지금 이야기: %s\n마우스 자리로 순간이동은 F9다 " % phase \
+		+ "(단추로는 자리를 못 집는다).\n\n※ 아래 두 개는 되돌릴 수 없다."
+	dialog.open("[개발] 개발자 메뉴", body, btns)
+
+
 func _dev_open_world() -> void:
 	var wr := world_rect()
 	var cw: int = GameData.EXPLORE_CHUNK
@@ -2320,6 +2362,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			and event.keycode == KEY_F8 and GameData.DEV_MODE:
 		story.skip_main_story()
 		return
+	# 개발/테스트: F6 — **숲길만** 건너뛰기 (우체부를 따라 마을까지 걷는 대목)
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F6 and GameData.DEV_MODE:
+		story.skip_intro_walk()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		# 게임 메뉴: 함께하기 방 코드 + 저장 후 타이틀로.
 		# (방 코드를 화면에 늘 띄우면 눈에 거슬려서 여기서 꺼내 본다)
@@ -2340,11 +2387,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif Net.is_guest():
 			body = "친구의 농장에서 함께 일하는 중이다.\n\n%s" % body
 		if GameData.DEV_MODE:
-			# 테스트용 — 출시 전에 DEV_MODE를 끄면 이 단추들도 같이 사라진다
-			btns.push_front(["[개발] 아이템 10000개 (F10)", _dev_fill_stock])
-			btns.push_front(["[개발] 메인 스토리 건너뛰기 (F8)", func() -> void:
+			# 테스트용 — 출시 전에 DEV_MODE를 끄면 이 단추도 같이 사라진다.
+			# 단추를 여기 죄다 늘어놓으면 「계속하기」가 저 아래로 밀려서,
+			# 정작 늘 쓰는 단추를 찾느라 눈이 헤맨다 — 한 겹 더 들어간다
+			btns.push_front(["[개발] 개발자 메뉴", func() -> void:
 					dialog.close()
-					story.skip_main_story()])
+					_dev_menu()])
 		dialog.open("게임 메뉴", body, btns)
 		return
 	for slot_i in 9:
