@@ -1897,10 +1897,20 @@ func _process(delta: float) -> void:
 	_work_lock = maxf(_work_lock - delta, 0.0)
 	toolwork._update_hit_fx(delta)
 	objnode._update_tree_fall(delta)
+	var _pt := Time.get_ticks_usec() if perf_show else 0
 	objnode._update_object_fade(delta)
+	if perf_show:
+		_perf["fade"] = Time.get_ticks_usec() - _pt
+		_pt = Time.get_ticks_usec()
 	# 화면 둘레 것만 노드로 세워 둔다 (칸이 바뀔 때만 도는 일이라 싸다)
 	objnode._stream_nodes()
+	if perf_show:
+		_perf["stream"] = Time.get_ticks_usec() - _pt
+		_pt = Time.get_ticks_usec()
 	objnode._drain_spawn_queue()   # 세우는 일은 프레임마다 몇 개씩만
+	if perf_show:
+		_perf["spawn"] = Time.get_ticks_usec() - _pt
+		_perf_tick(delta)
 	if GameData.story_phase == "done":
 		story._grandpa_update(delta)
 	for ft in float_texts:
@@ -2140,6 +2150,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			and event.keycode == KEY_F7 and GameData.DEV_MODE:
 		_dev_open_world()
 		return
+	# 개발/테스트: F3 — 프레임 시간 재기 (끊길 때 어디가 먹는지 본다)
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F3 and GameData.DEV_MODE:
+		perf_show = not perf_show
+		if not perf_show and _perf_label != null:
+			_perf_label.visible = false
+		hud.show_message("[개발] 프레임 시간 %s" % ("켬 — F3으로 끈다" if perf_show else "끔"))
+		return
 	# 개발/테스트: F8 — 메인 스토리 건너뛰기
 	if event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode == KEY_F8 and GameData.DEV_MODE:
@@ -2281,6 +2299,20 @@ const FADE_SPEED := 6.0
 
 var _fade_a := {}     # Vector2i -> 지금 알파
 
+# ---- 프레임 시간 재기 (F3) ----
+#
+# 끊김의 원인을 **짐작으로** 여러 번 고쳤다. 세 번은 맞았고 그때마다
+# 「이번엔 됐겠지」였다. 짐작을 그만두려면 재야 한다.
+#
+# F3 을 누르면 한 프레임이 어디서 몇 밀리초를 쓰는지 화면 왼쪽 위에 뜬다.
+# 16.7ms 가 60프레임의 예산이다 — 어느 줄이 그 예산을 먹는지 보면 된다.
+var perf_show := false
+var _perf := {"draw": 0, "fade": 0, "stream": 0, "spawn": 0}
+var _perf_n := 0
+var _perf_acc := {"draw": 0, "fade": 0, "stream": 0, "spawn": 0}
+var _perf_worst := 0.0
+var _perf_label: Label = null
+
 
 # 이 오브젝트 그림이 플레이어를 덮고 있는가 (그리고 앞에 그려지는가)
 
@@ -2406,6 +2438,7 @@ func _row_kind(y: int, xa: int, n: int) -> PackedByteArray:
 
 
 func _draw() -> void:
+	var _t0 := Time.get_ticks_usec() if perf_show else 0
 	# 카메라에 보이는 타일만 그린다 (120x90 맵 컬링)
 	var vis: Rect2 = get_canvas_transform().affine_inverse() * get_viewport_rect()
 	var vx0 := int(floor(vis.position.x / TILE)) - 1
@@ -2605,11 +2638,19 @@ func _draw() -> void:
 						up |= 1 << b
 					elif nlb < lvb:
 						dn |= 1 << b
-				if up != 0:
-					put.call(edges, edge_tex["cliff_%d"
-						% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up], at)
-				if dn != 0:
-					put.call(edges, edge_tex["brink"][dn], at)
+				# **물 위에는 벼랑을 안 그린다.**
+				#
+				# 벼랑면은 「위 칸이 더 높다」는 표시로 **아랫 칸에** 그린다.
+				# 그런데 그 아랫 칸이 물이면, 호수 한복판에 돌담 토막이
+				# 떠 있는 꼴이 된다 — 폭포골처럼 켜가 다른 두 못이 나란히
+				# 있는 데서 이게 그대로 보였다. 물에 잠긴 벼랑은 안 보이는 게
+				# 맞다 (보이는 건 수면이다). 마루선(brink)도 마찬가지다.
+				if gc != K_WATER:
+					if up != 0:
+						put.call(edges, edge_tex["cliff_%d"
+							% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up], at)
+					if dn != 0:
+						put.call(edges, edge_tex["brink"][dn], at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
 		above = cur
@@ -2676,6 +2717,45 @@ func _draw() -> void:
 			else:
 				draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 					Color(1, 1, 1, 0.6), false, 1.0)
+	if perf_show:
+		_perf["draw"] = Time.get_ticks_usec() - _t0
+
+
+# ---- F3: 한 프레임이 어디서 몇 밀리초를 쓰는가 ----
+#
+# 짐작으로 고치는 것을 그만두려고 넣었다. 예산은 16.7ms(60프레임)이고,
+# 어느 줄이 그걸 먹는지 보면 답이 나온다. **worst** 는 최근 1초 동안의
+# 최악 프레임이다 — 끊김은 평균이 아니라 최악에서 온다.
+func _perf_tick(delta: float) -> void:
+	if _perf_label == null:
+		_perf_label = Label.new()
+		_perf_label.position = Vector2(8, 8)
+		_perf_label.add_theme_font_size_override("font_size", 15)
+		_perf_label.add_theme_color_override("font_color", Color(1, 1, 0.75))
+		_perf_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+		_perf_label.add_theme_constant_override("outline_size", 5)
+		hud.add_child(_perf_label)
+	_perf_label.visible = true
+	for k: String in _perf_acc:
+		_perf_acc[k] = int(_perf_acc[k]) + int(_perf[k])
+	_perf_n += 1
+	_perf_worst = maxf(_perf_worst, delta * 1000.0)
+	if _perf_n < 30:
+		return
+	var n := float(_perf_n)
+	var lines := "FPS %d   프레임 %.1fms   최악 %.1fms\n" % [
+		Engine.get_frames_per_second(), delta * 1000.0, _perf_worst]
+	lines += "그리기 %.2f · 비침 %.2f · 스트림 %.2f · 세우기 %.2f (ms)\n" % [
+		int(_perf_acc.draw) / n / 1000.0, int(_perf_acc.fade) / n / 1000.0,
+		int(_perf_acc.stream) / n / 1000.0, int(_perf_acc.spawn) / n / 1000.0]
+	lines += "노드 %d (월드 자식 %d) · 물건 %d · 세울 차례 %d" % [
+		obj_nodes.size(), world.get_child_count(), objects.size(),
+		objnode._spawn_queue.size()]
+	_perf_label.text = lines
+	_perf_n = 0
+	_perf_worst = 0.0
+	for k2: String in _perf_acc:
+		_perf_acc[k2] = 0
 
 
 # 건물/오브젝트 위에 그려야 하는 것들 (안내 텍스트·화살표·파티클·날씨)
