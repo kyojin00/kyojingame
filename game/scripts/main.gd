@@ -907,15 +907,18 @@ func _load_textures() -> void:
 	for kind: String in EDGE_VAR_KINDS:
 		for v in EDGE_VARS:
 			sheets.append("%s_%d" % [kind, v])
+	# 못 불러오면 **조용히 넘어가지 않는다.** AtlasTexture는 atlas가 null이어도
+	# 오류 없이 아무것도 안 그린다 — edge_*.png에 .import가 빠졌을 때 물가
+	# 타일 256장이 통째로 사라졌는데 로그에 한 줄도 안 남고, 연못만 각진 파란
+	# 덩어리로 나왔다. 실행하자마자 몇 장이 붙었는지 한 줄로 찍는다.
+	var edge_ok := 0
+	var edge_bad: Array[String] = []
 	for kind: String in sheets:
 		var sheet: Texture2D = load("res://assets/sprites/edge_%s.png" % kind)
-		# 못 불러오면 **조용히 넘어가지 않는다.** AtlasTexture는 atlas가
-		# null이어도 오류 없이 아무것도 안 그린다 — 그래서 edge_*.png에
-		# .import가 빠졌을 때, 물가 타일 256장이 통째로 사라졌는데도 로그에
-		# 한 줄도 안 남고 연못만 각진 파란 덩어리로 나왔다. 다시 그러지 말자.
 		if sheet == null:
-			push_error("물가 아틀라스를 못 불렀다: edge_%s.png "
-				% kind + "(.import 파일이 있는지 보라 — 없으면 물가가 통째로 안 그려진다)")
+			edge_bad.append(kind)
+		else:
+			edge_ok += 1
 		var arr: Array[Texture2D] = []
 		arr.resize(256)
 		for c in 256:
@@ -924,6 +927,13 @@ func _load_textures() -> void:
 			a.region = Rect2((c % 16) * EDGE_PX, (c / 16) * EDGE_PX, EDGE_PX, EDGE_PX)
 			arr[c] = a
 		edge_tex[kind] = arr
+	if edge_bad.is_empty():
+		print("[물가] 아틀라스 %d/%d 장 붙음 — 정상" % [edge_ok, sheets.size()])
+	else:
+		print("[물가] !!! %d장을 못 불렀다: %s" % [edge_bad.size(), ", ".join(edge_bad)])
+		print("[물가]     assets/sprites/edge_*.png.import 가 있는지 보라.")
+		print("[물가]     없으면 물가 타일이 통째로 안 그려져 연못이 각지게 나온다.")
+		push_error("물가 아틀라스 %d장 로드 실패: %s" % [edge_bad.size(), ", ".join(edge_bad)])
 	# 모래·길·마당도 판을 셋씩 — 한 장만 깔면 무늬가 같은 자리마다 찍힌다
 	for v in 3:
 		for kind: String in ["sand_", "path_", "yard_", "ramp_"]:
