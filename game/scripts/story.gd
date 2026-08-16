@@ -269,7 +269,9 @@ func _guide_point() -> Array:
 				if ch2 != null:
 					return [ch2.position, "이장 덕수"]
 			"farm":
-				return [t.call(m.HOME_ANCHOR + Vector2i(2, 5)), "집 앞 풀밭"]
+				# 호미를 아직 슬롯에 안 넣었으면 밭을 가리켜 봐야 소용없다
+				if GameData.tool_slots.has("hoe"):
+					return [t.call(m.HOME_ANCHOR + Vector2i(2, 5)), "집 앞 풀밭"]
 			"cook":
 				return [t.call(m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)),
 					"만수 (잡화점)"]
@@ -1067,8 +1069,13 @@ func _end_farm_intro() -> void:
 	GameData.story2_phase = "farm"
 	if not GameData.is_tool_unlocked("hoe"):
 		GameData.unlocked_tools.append("hoe")  # 대화를 스킵해도 지급 보장
-	m.hud.quest_start_toast("밭을 일구자")
-	m.hud.show_message("호미로 밭을 갈아 농사를 시작하자! (밭 갈기 → 씨앗 → 물 → 수확)", 6.0)
+	# 도끼 때와 같은 차례로: **먼저 슬롯에 넣게 하고** 그 다음이 밭이다
+	if GameData.tool_slots.has("hoe"):
+		m.hud.quest_start_toast("밭을 일구자")
+		m.hud.show_message("호미로 밭을 갈아 농사를 시작하자! (밭 갈기 → 씨앗 → 물 → 수확)", 6.0)
+	else:
+		m.hud.quest_start_toast("호미를 빠른 슬롯에 넣자")
+		m.hud.show_message("가방(I)을 열어 호미를 아래 빠른 슬롯으로 옮기자.\n넣어야 숫자키로 꺼내 쓸 수 있다.", 7.0)
 	m.saveio.save_now()
 
 

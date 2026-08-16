@@ -1034,6 +1034,16 @@ func story2_objective_short() -> String:
 				mini(stone, SHOP_BUILD_STONE), SHOP_BUILD_STONE]
 		"farm_talk":
 			return "이장과 대화하자."
+		"farm":
+			# **호미도 도끼와 같이 손을 잡아 준다.**
+			#
+			# 도끼는 빠른 슬롯에 넣을 때까지 기다려 주는 대목(equip)이
+			# 따로 있는데, 호미는 「가방에서 슬롯에 넣어야 쓴다」는 말풍선
+			# 한 줄이 전부였다. 안 넣고 지나가면 밭 앞에서 아무것도 안 된다 —
+			# 같은 구조인데 한쪽만 손을 놓고 있었다
+			if not tool_slots.has("hoe"):
+				return "가방(I)에서 호미를 빠른 슬롯에 넣자."
+			return "집 앞 풀밭을 갈아 밭을 만들자."
 		"cook":
 			# 첫 수확을 마친 뒤 — 만수가 밥 이야기를 꺼낸다.
 			# 말을 걸고 나면 **그 뒤의 잔 단계를 그대로 이어서** 보여 준다.
