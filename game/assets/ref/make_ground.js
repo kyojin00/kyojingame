@@ -593,20 +593,19 @@ function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
   }
   const k = Math.floor(s);
   if (k < 2) { g.px(x, y, EARTH[5]); return; }               // 물에 닿는 젖은 자리
-  // 벽 높이는 자리마다 한 칸씩 흔든다 — 자로 그은 마루는 담장이지 둑이 아니다.
-  // 호를 따라 돌면서 서서히 낮아져 옆면으로 넘어간다
-  const wall = Math.round((6 + (h(i, 0, 56 + seed) < 0.5 ? 0 : 1)) * clamp(nay, 0, 1));
-  if (wall > 1) {
-    const top = 2 + wall;
-    if (k < top) {
-      const st = h(Math.floor(i / 3), 0, 63 + seed);
-      const up = (k - 2) / Math.max(1, wall - 1);
-      let t = 6 - Math.round(up * 3.4) + (st < 0.35 ? 1 : (st > 0.72 ? -1 : 0));
-      if ((i + Math.floor(k / 3)) % 3 === 0) t += 2;         // 돌 사이 틈
-      g.px(x, y, STONE[clamp(t, 0, 7)]);
-      return;
-    }
-    if (k === top) { g.px(x, y, STONE[0]); return; }         // 벽 마루 — 하늘을 본다
+  // 물가의 턱은 **벼랑과 같은 붓**으로 그린다.
+  //
+  // 따로 그렸더니 같은 세계 안에서 바다 능선은 바위 벼랑이고 연못가는
+  // 돌담이었다. 둘 다 「땅이 끊어져 떨어지는 자리」다. 다만 재는 방향이
+  // 반대라 — 여기서는 k가 물에서 뭍으로 들어가고, 벼랑에서는 마루에서
+  // 발치로 내려간다 — drop 을 뒤집어 넘긴다
+  const H = faceH(clamp(nay, 0, 1), i, seed);
+  if (H >= 3) {
+    const top = 2 + H;
+    if (k < top) { rockFace(g, x, y, 1.0 - (k - 2) / (H - 1), H, i, seed); return; }
+    // 마루 — 하늘을 보는 한 줄. 여기가 밝아야 바로 밑 바위면의 윗변이 되고,
+    // 둘이 만나 땅이 끊어져 떨어지는 것으로 읽힌다
+    if (k === top) { g.px(x, y, STONE[h(Math.floor(i / 3), 0, 60 + seed) < 0.3 ? 3 : 1]); return; }
     if (k === top + 1) { g.px(x, y, EARTH[2]); return; }
     if (k < top + 3 && h(x, y, 58 + seed) > 0.25) g.px(x, y, EARTH[3]);
     return;
@@ -697,77 +696,92 @@ function spill(P, key) {
 // 면은 나를 마주 볼 때만 보인다 — 위쪽 땅이 북쪽에 있을 때. 옆이면
 // 비스듬해 좁은 띠만 드러나고, 남쪽이면 등을 돌려 아예 안 보인다.
 // (사방에 면을 두르면 땅이 상자가 된다. 물가에서 이미 겪었다)
+// 바위면 한 점 — **벼랑과 물가가 같은 붓을 쓴다.**
+//
+// 물가의 둑을 따로 그렸더니, 같은 세계 안에서 바다 능선은 바위 벼랑이고
+// 연못가는 돌담이었다. 둘 다 「땅이 끊어져 떨어지는 자리」다 — 한 붓으로
+// 그려야 한 세계가 된다.
+//
+//   drop  0(마루) ~ 1(발치). 어느 쪽에서 재든 이 값만 맞추면 된다
+//   n     면의 높이. 무늬가 면 안에서 어디쯤인지 가늠하는 데 쓴다
+function rockFace(g, x, y, drop, n, i, seed) {
+  const k = Math.round(drop * Math.max(1, n - 1));
+  // 바위는 **세로로 쪼개진다.** 벽돌처럼 가로 켜로 쌓았더니 벼랑이 아니라
+  // 정원 담장이 됐다. 다만 기둥마다 톤을 크게 흔들면 이번엔 나무 울타리가
+  // 된다 — 결은 은근히 두고, 몇 자리에만 깊은 틈과 가로 선반을 넣는다.
+  // 바위는 고른 결이 아니라 **몇 개의 큰 사건**으로 읽힌다
+  const v = (h(i, 0, 52 + seed) - 0.5) * 0.9 + (h(Math.floor(i / 4), 0, 53 + seed) - 0.5) * 0.9;
+  let t = 3.0 + drop * 2.2 + v;
+  // 갈라진 틈 — 위에서 아래까지 곧게 뚫리면 기둥이 선 담장이 된다.
+  // 시작과 끝을 자리마다 달리해 **조각조각** 갈라지게 한다
+  if (h(i, 0, 54 + seed) < 0.17) {
+    const c0 = Math.floor(h(i, 1, 79 + seed) * n * 0.55);
+    if (k >= c0 && k <= c0 + 1 + Math.floor(h(i, 2, 80 + seed) * n * 0.5)) t += 2.0;
+  }
+  // 큰 덩이의 명암 — 어디는 볕을 받고 어디는 그늘에 든다. 이게 없으면
+  // 면 전체가 한 색이라 콘크리트가 된다
+  t += (h(Math.floor(i / 9), 0, 81 + seed) - 0.5) * 0.9;
+  // 무늬층 — 가로로 눕는 켜. 세로 결만 있으면 나무 판자로 보인다
+  t += (h(Math.floor((k + Math.floor(i / 7)) / 3), 0, 68 + seed) - 0.5) * 0.9;
+  // 바위 선반 — 자리마다 높이가 다르고, 없는 데도 있다
+  const sh = h(Math.floor(i / 5), 0, 64 + seed);
+  const shelf = sh < 0.62 ? 2 + Math.floor(sh * 1.6 * Math.max(1, n - 5)) : -9;
+  if (k === shelf) t -= 1.2;                                  // 윗면이 빛을 받는다
+  else if (k === shelf + 1) t += 0.9;                         // 그 밑은 그늘
+  if (drop > 0.82) t += 0.7;                                  // 발치는 그늘에 잠긴다
+  if (k === 0) t = 7.4;                                       // 위에서 드리우는 그늘
+  else if (k <= 2) t -= 1.0;                                  // 볕이 닿는 윗면
+  g.px(x, y, STONE[clamp(Math.round(t), 0, 7)]);
+  // 마루에서 늘어진 이끼 — 낱알로 뿌리면 자글거리니 **포기로** 앉힌다.
+  // 이게 있어야 바위가 땅에서 솟은 것으로 보인다
+  if (k >= 1 && k <= 5 && h(Math.floor(i / 2), 0, 55 + seed) < 0.22
+    && h(i, k, 63 + seed) < 0.62 - k * 0.09) g.px(x, y, MOSS[k < 3 ? 1 : 2]);
+}
+
+// 벼랑면 — **아래쪽 칸**에 드리운다. 나를 마주 볼 때(위쪽 땅이 북쪽)만
+// 온전히 보이고, 옆이면 좁은 띠, 남쪽이면 등을 돌려 아예 안 보인다
 function cliffPx(g, x, y, s, nax, nay, i, seed) {
   if (s < 0) return;                                          // 위쪽 땅 — 그 칸이 그린다
   const k = Math.floor(s);
   const face = clamp(-nay, 0, 1);
-  // 높이는 **두 겹으로** 흔든다 — 다섯 칸짜리 덩이(들쭉날쭉)와 열두 칸짜리
-  // 너울(어디는 높고 어디는 낮은 벼랑). 칸마다 흔들면 바닥이 빗살이 된다
-  const H = Math.round((11.2 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 1.8)
-    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * 2.6) * face);
-  if (H >= 3 && k < H) {
-    const up = k / (H - 1);                                   // 0(마루) ~ 1(발치)
-    // 바위는 **세로로 쪼개진다.** 처음엔 벽돌처럼 가로 켜로 쌓았더니
-    // 벼랑이 아니라 정원 담장이 됐다. 기둥마다 톤을 달리해 세로 결을
-    // 내고, 가끔 가로로 균열을 넣어 판자처럼 보이는 것만 막는다
-    // 기둥마다 톤을 크게 흔들었더니 나무 울타리가 됐다. 결은 **은근히**
-    // 두고, 대신 몇 자리에만 깊은 틈과 가로 선반을 넣는다 — 바위는
-    // 고른 결이 아니라 몇 개의 큰 사건으로 읽힌다
-    const v = (h(i, 0, 52 + seed) - 0.5) * 0.9 + (h(Math.floor(i / 4), 0, 53 + seed) - 0.5) * 0.9;
-    let t = 3.0 + up * 2.2 + v;
-    if (h(i, 0, 54 + seed) < 0.09) t += 2.0;                  // 갈라진 틈 (한 칸 폭)
-    // 무늬층 — 가로로 눕는 켜. 세로 결만 있으면 나무 판자로 보인다
-    const band = h(Math.floor((k + Math.floor(i / 7)) / 3), 0, 68 + seed);
-    t += (band - 0.5) * 0.9;
-    // 바위 선반 — 자리마다 높이가 다르고, 없는 데도 있다
-    const sh = h(Math.floor(i / 5), 0, 64 + seed);
-    const shelf = sh < 0.62 ? 2 + Math.floor(sh * 1.6 * Math.max(1, H - 5)) : -9;
-    if (k === shelf) t -= 1.2;                                // 윗면이 빛을 받는다
-    else if (k === shelf + 1) t += 0.9;                       // 그 밑은 그늘
-    if (k >= H - 2) t += 0.7;                                 // 발치는 그늘에 잠긴다
-    if (k === 0) t = 7.4;                                     // 위에서 드리우는 그늘
-    else if (k <= 2) t -= 1.0;                                // 볕이 닿는 윗면
-    g.px(x, y, STONE[clamp(Math.round(t), 0, 7)]);
-    // 마루에서 늘어진 풀·이끼 — 위 몇 줄에만. 이게 있어야 바위가
-    // 땅에서 솟은 것으로 보인다
-    // 마루에서 늘어진 이끼 — 낱알로 뿌리면 자글거리니 **포기로** 앉힌다
-    if (k >= 1 && k <= 5 && h(Math.floor(i / 2), 0, 55 + seed) < 0.22
-      && h(i, k, 63 + seed) < 0.62 - k * 0.09) g.px(x, y, MOSS[k < 3 ? 1 : 2]);
-    return;
-  }
-  if (H >= 3) {
-    // 발치 — 접지 그늘과 흘러내린 돌부스러기. 이게 없으면 바위가 땅에
-    // 꽂힌 판자처럼 보인다
-    const d = k - H;
-    if (d === 0) { g.px(x, y, EARTH[5]); return; }
-    if (d === 1 && h(x, y, 56 + seed) < 0.62) { g.px(x, y, EARTH[4]); return; }
-    // 굴러 내린 돌덩이 — 낱알로 뿌리면 모래가 된다. 두세 칸짜리 덩이를
-    // 놓고 윗변은 밝게, 아랫변은 어둡게 (자갈 한 알과 같은 규칙)
-    if (d >= 1 && d <= 4) {
-      const bx = Math.floor(i / 3), by = Math.floor((d - 1) / 2);
-      if (h(bx, by, 69 + seed) < 0.30) {
-        const top = (d - 1) % 2 === 0;
-        g.px(x, y, STONE[top ? 3 : 5]);
-        if (i % 3 === 2) g.px(x, y, STONE[6]);              // 덩이 사이 그늘
-        return;
-      }
-    }
-    if (d <= 3 && h(x, y, 57 + seed) < 0.22 - d * 0.05) {
-      g.px(x, y, STONE[clamp(4 + d, 0, 7)]);
-      return;
-    }
-    // 발치에 돋은 잡풀 — 바위와 잔디가 맞닿기만 하면 잘라 붙인 것처럼
-    // 보인다. 몇 포기가 그 사이를 물어야 한 땅이 된다
-    if (d >= 1 && d <= 3 && h(Math.floor(i / 2), d, 70 + seed) < 0.20)
-      g.px(x, y, MOSS[d < 3 ? 1 : 2]);
-    return;
-  }
+  const H = faceH(face, i, seed);
+  if (H >= 3 && k < H) { rockFace(g, x, y, k / (H - 1), H, i, seed); return; }
+  if (H >= 3) { scree(g, x, y, k - H, i, seed); return; }
   // 비스듬히 보이는 옆면 — 바위가 좁게 드러날 뿐이다
   if (Math.abs(nax) > 0.5) {
     const w = 3 + (h(i, 0, 58 + seed) < 0.5 ? 0 : 1);
     if (k < w) g.px(x, y, STONE[clamp(3 + k + (h(i, k, 59 + seed) < 0.30 ? -1 : 0), 0, 7)]);
     else if (k === w && h(x, y, 60 + seed) < 0.4) g.px(x, y, EARTH[4]);
   }
+}
+
+// 면의 높이. **두 겹으로** 흔든다 — 다섯 칸짜리 덩이(들쭉날쭉)와 열두 칸짜리
+// 너울(어디는 높고 어디는 낮은 벼랑). 칸마다 흔들면 밑동이 빗살이 된다
+function faceH(face, i, seed) {
+  return Math.round((11.2 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 1.8)
+    + (h(Math.floor(i / 12), 0, 67 + seed) - 0.5) * 2.6) * face);
+}
+
+// 발치 — 접지 그늘과 흘러내린 돌덩이. 이게 없으면 바위가 땅에 꽂힌
+// 판자처럼 보인다 (d = 면이 끝난 뒤로 몇 칸)
+function scree(g, x, y, d, i, seed) {
+  if (d === 0) { g.px(x, y, EARTH[5]); return; }
+  if (d === 1 && h(x, y, 56 + seed) < 0.62) { g.px(x, y, EARTH[4]); return; }
+  // 낱알로 뿌리면 모래가 된다. 두세 칸짜리 덩이를 놓고 윗변은 밝게
+  // 아랫변은 어둡게 (자갈 한 알과 같은 규칙)
+  if (d >= 1 && d <= 4 && h(Math.floor(i / 3), Math.floor((d - 1) / 2), 69 + seed) < 0.30) {
+    g.px(x, y, STONE[(d - 1) % 2 === 0 ? 3 : 5]);
+    if (i % 3 === 2) g.px(x, y, STONE[6]);                    // 덩이 사이 그늘
+    return;
+  }
+  if (d <= 3 && h(x, y, 57 + seed) < 0.22 - d * 0.05) {
+    g.px(x, y, STONE[clamp(4 + d, 0, 7)]);
+    return;
+  }
+  // 발치에 돋은 잡풀 — 바위와 잔디가 맞닿기만 하면 잘라 붙인 것처럼
+  // 보인다. 몇 포기가 그 사이를 물어야 한 땅이 된다
+  if (d >= 1 && d <= 3 && h(Math.floor(i / 2), d, 70 + seed) < 0.20)
+    g.px(x, y, MOSS[d < 3 ? 1 : 2]);
 }
 
 // 벼랑 마루 — **위쪽 칸**에 얹는다.
