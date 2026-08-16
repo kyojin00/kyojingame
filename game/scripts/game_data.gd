@@ -329,7 +329,10 @@ func seller_name() -> String:
 
 
 # 지도 이름패·엔딩 통계에 쓰는 농장 이름.
-# 생성창에서 따로 짓지 않았으면 「<이름>의 농장」으로 대신한다.
+#
+# 예전에는 생성창에서 따로 지었다. 마을 칸과 나란히 놓고 보면 **같은 것을
+# 두 번** 묻는 꼴이라 칸을 없앴고, 이제 농장은 주인 이름을 따른다.
+# (옛 세이브에 지어 둔 이름이 있으면 그건 그대로 쓴다)
 func farm_title() -> String:
 	var n := farm_name.strip_edges()
 	return n.substr(0, 12) if n != "" else "%s의 농장" % seller_name()

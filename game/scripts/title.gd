@@ -165,8 +165,11 @@ func _start_new(g: String) -> void:
 # 성별은 글자 대신 ♂♀ 표식을, 머리 모양만 이름이 있어 화살표로 넘긴다.
 # 무엇을 고르든 왼쪽 액자의 도트가 그 자리에서 갈아입는다.
 #
-# 이름과 농장 이름도 여기서 짓는다. 예전에는 숲에서 우체부 아저씨가
+# 이름과 마을 이름도 여기서 짓는다. 예전에는 숲에서 우체부 아저씨가
 # 이름을 물었지만, 이제는 처음부터 알고 있는 사이로 시작한다.
+#
+# 농장 이름 칸은 없앴다. 마을 칸과 나란히 놓고 보면 **같은 것을 두 번**
+# 묻는 꼴이었다 — 둘 다 「여기가 어디인가」다. 농장은 주인 이름을 따른다.
 
 var _appear := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0,
 	"skin": 0, "hair_col": 0}
@@ -175,7 +178,6 @@ var _appear_preview: TextureRect = null
 var _hair_label: Label = null
 var _hair_row: HBoxContainer = null
 var _name_edit: LineEdit = null
-var _farm_edit: LineEdit = null
 var _village_edit: LineEdit = null
 var _gender_btns := {}
 var _swatch_btns := {}          # 부위 -> [Button, ...]
@@ -357,18 +359,12 @@ func _build_gender_panel() -> void:
 	name_row.add_child(_name_edit)
 	right.add_child(name_row)
 
-	var farm_row := HBoxContainer.new()
-	farm_row.add_theme_constant_override("separation", 8)
-	farm_row.add_child(_mk_tag("농장"))
-	_farm_edit = _mk_field("우리 농장 이름", 12)
-	farm_row.add_child(_farm_edit)
-	right.add_child(farm_row)
-
-	# 마을 이름 — 비워 두면 「교진」. 대사·간판·지도에 전부 이 이름이 쓰인다
+	# 마을 이름 — 비워 두면 「교진」. 대사·간판·지도에 전부 이 이름이 쓰이고,
+	# 농장도 이 마을에 있는 「<이름>의 농장」이 된다
 	var vil_row := HBoxContainer.new()
 	vil_row.add_theme_constant_override("separation", 8)
 	vil_row.add_child(_mk_tag("마을"))
-	_village_edit = _mk_field("정착할 마을 이름 (기본: 교진)", 8)
+	_village_edit = _mk_field("정착할 마을 이름 (비우면 교진)", 8)
 	vil_row.add_child(_village_edit)
 	right.add_child(vil_row)
 
@@ -460,7 +456,6 @@ func _start_selected() -> void:
 	GameData.gender = _appear_gender
 	GameData.appearance = _appear.duplicate()
 	GameData.player_name = _name_edit.text.strip_edges()
-	GameData.farm_name = _farm_edit.text.strip_edges()
 	GameData.village_name = _village_edit.text.strip_edges()
 	if GameData.player_name == "":
 		GameData.player_name = "친구"
@@ -511,10 +506,9 @@ func _creator_report() -> String:
 	var rows_ok: bool = sw_hair.size() == GameData.APPEAR_HAIR_COL.size() \
 		and sw_skin.size() == GameData.APPEAR_SKIN.size() \
 		and sw_shirt.size() == GameData.APPEAR_SHIRT.size()
-	var typed: bool = _name_edit.text != "" and _farm_edit.text != "" \
-		and _village_edit.text != ""
+	var typed: bool = _name_edit.text != "" and _village_edit.text != ""
 	var ok: bool = hair_n > 0 and skin_n > 0 and stale == 0 and rows_ok and typed
-	return "%s 머리색=%d 피부=%d 옛색남음=%d 스와치=%s 이름·농장칸=%s" \
+	return "%s 머리색=%d 피부=%d 옛색남음=%d 스와치=%s 이름·마을칸=%s" \
 		% [ok, hair_n, skin_n, stale, rows_ok, typed]
 
 
@@ -826,7 +820,6 @@ func _process(delta: float) -> void:
 	elif _shot_frames == 42:
 		# 화면에 남길 한 장은 실제로 골라 본 모습으로 (빈 칸만 찍으면 소용없다)
 		_name_edit.text = "교진"
-		_farm_edit.text = "햇살 농장"
 		_village_edit.text = "교진"
 		_appear_gender = "f"
 		_appear = {"hair": 3, "shirt": 1, "pants": 1, "shoes": 2,
