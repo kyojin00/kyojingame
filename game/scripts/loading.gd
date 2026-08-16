@@ -44,6 +44,7 @@ const BOX_H := 150.0
 const CLIMB := 0.62               # 초당 차오르는 양
 const BUILD_CAP := 0.75           # 짓는 동안 보여 줄 수 있는 최대치
 const WARMUP := 0.40              # 장면을 바꾸기 전에 미리 채워 두는 몫
+const FILL_FRAMES := 5            # 단계마다 손수 그려 그 사이를 메우는 장 수
 
 var _c: Control
 var _msg := "마을을 짓는 중…"
@@ -130,14 +131,23 @@ func is_at_target() -> bool:
 func step(text: String, ratio: float) -> void:
 	_msg = text if text != "" else _msg
 	_target = clampf(ratio, 0.0, BUILD_CAP)
-	# **보이는 값은 건드리지 않는다.** 여기서 값을 밀어 놓으면, force_draw
-	# 가 안 먹는 환경에서는 그 사이가 통째로 안 보이다가 다 지은 뒤에
-	# 한 번에 뛴다 (3%에 멈췄다가 100%가 되던 것이 이것이다).
-	# 채우는 일은 프레임이 도는 앞뒤 구간에 맡기고, 여기서는 글만 바꿔
-	# 본다 — 다시 그려지면 좋고, 아니면 마는 덤이다
-	if _c != null:
+	# **보이는 값도 여기서 민다.**
+	#
+	# 예전에는 목표만 바꾸고 보이는 값은 손대지 않았다. 프레임이 안 도는
+	# 구간이라 _process 가 채워 줄 수 없는데, 그러면 세계를 짓는 내내 막대가
+	# 워밍업이 멈춘 자리(40%)에 붙박여 있다가 다 지은 뒤에야 움직인다 —
+	# 눈에는 그냥 **「39%에서 멈췄다가 갑자기 올라간다」**이다.
+	#
+	# 그래서 여기서 몇 장을 직접 그려 그 사이를 메운다. force_draw 가 안
+	# 먹는 환경이면 그림만 안 보일 뿐 값은 제대로 올라가 있으니, 예전처럼
+	# 3%에 붙박였다가 100%로 뛰는 일은 없다.
+	if _c == null or DisplayServer.get_name() == "headless":
+		_ratio = maxf(_ratio, _target)
+		return
+	var from := _ratio
+	for i in FILL_FRAMES:
+		_ratio = maxf(_ratio, lerpf(from, _target, float(i + 1) / float(FILL_FRAMES)))
 		_c.queue_redraw()
-	if DisplayServer.get_name() != "headless":
 		RenderingServer.force_draw()
 
 

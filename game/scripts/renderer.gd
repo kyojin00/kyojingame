@@ -225,11 +225,21 @@ func _draw_question(pos: Vector2) -> void:
 		m.overlay.draw_rect(r, Color(0.55, 0.95, 0.45))
 
 
+# 머리 위 안내가 뜨는 높이 (월드 픽셀). 예전 값(100)은 주인공 정수리에
+# 딱 붙어 있어서 도트 그림과 글자가 서로 먹었다 — 한 뼘 띄운다.
+const HINT_LIFT := 124.0
+
+
 func _context_hint() -> Array:
 	# 반환: [문구, 기준 위치(월드)] 또는 []
 	if m.player == null or m.ui_open():
 		return []
-	var above_player := m.player.position + Vector2(0, -100)
+	# 머리 위 안내는 **말풍선 위로** 비켜선다.
+	#
+	# 둘 다 「주인공 머리 위」에 붙어 있어서 말을 하는 순간 글자가 겹쳐
+	# 둘 다 못 읽었다. 말풍선이 떠 있으면 그 키만큼 더 올라간다.
+	var lift: float = HINT_LIFT + (m.hud.bubble_lift() if m.hud != null else 0.0)
+	var above_player := m.player.position + Vector2(0, -lift)
 	if m.fishing_state == "bite":
 		return ["지금이다!", above_player]
 	if m.fishing_state == "waiting":
@@ -238,7 +248,7 @@ func _context_hint() -> Array:
 	if m.story._postman != null and m.story._postman_state == "wait" \
 			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
 		return ["%s: 말 걸기" % GameData.key_label("talk"),
-			m.story._postman.position + Vector2(0, -112)]
+			m.story._postman.position + Vector2(0, -(HINT_LIFT + 12.0))]
 	# 대화는 대화키(F) 하나로 통일 — 어떤 키인지 머리 위에 같이 적어 준다
 	if m.actions.nearby_npc() != null:
 		return ["%s: 대화" % GameData.key_label("talk"), above_player]
@@ -252,7 +262,7 @@ func _context_hint() -> Array:
 			t = bt
 	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
 		return []
-	var above_tile := Vector2(t.x * m.TILE + 16, t.y * m.TILE - 12)
+	var above_tile := Vector2(t.x * m.TILE + 16, t.y * m.TILE - 24)
 	var obj: Variant = m.objects.get(t)
 	if obj != null:
 		match obj.kind:

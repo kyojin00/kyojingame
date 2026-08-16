@@ -89,9 +89,11 @@ func object_rows() -> Array:
 			1 if m.objects[pos].get("young", false) else 0,
 			int(m.objects[pos].get("grow", 0)),
 			1 if m.objects[pos].get("fixed", false) else 0,
-			# 8: 누워 있는 나무 (숲길을 막은 그 나무) · 9: 광석이 박힌 바위.
+			# 8: 누워 있는 나무 — **누운 쪽**까지 담는다 (0 안 누움 / 1 서쪽 /
+			#    2 동쪽) · 9: 광석이 박힌 바위.
 			# 옛 세이브에는 이 자리가 없다 — 읽는 쪽이 길이를 본다
-			1 if m.objects[pos].get("fallen", false) else 0,
+			(2 if float(m.objects[pos].get("fallen", 0.0)) > 0.0
+				else (1 if m.objects[pos].get("fallen", false) else 0)),
 			1 if m.objects[pos].get("ore", false) else 0])
 	return objs
 
@@ -528,8 +530,9 @@ func _apply_save(d: Dictionary) -> void:
 				od["grow"] = int(o[6])
 			if o.size() > 7 and int(o[7]) == 1:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
-			if o.size() > 8 and int(o[8]) == 1:
-				od["fallen"] = true  # 길 위에 누운 나무 (그림만 누워 있다)
+			if o.size() > 8 and int(o[8]) != 0:
+				# 길 위에 누운 나무 (그림만 누워 있다). 1 서쪽 · 2 동쪽
+				od["fallen"] = 1.0 if int(o[8]) == 2 else -1.0
 			if o.size() > 9 and int(o[9]) == 1:
 				od["ore"] = true     # 광석이 박힌 바위
 			m.objects[Vector2i(int(o[0]), int(o[1]))] = od

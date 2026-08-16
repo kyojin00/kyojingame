@@ -131,8 +131,12 @@ func _plant_story_forest() -> void:
 	#
 	#    동쪽 끝만 열어 둔다 — 거기 서면 마을로 넘어가는 연출이 시작된다
 	#    (마을이 가까울수록 숲이 성겨지는 것으로도 읽힌다).
-	const EDGE_ODDS := [1.0, 0.72, 0.52, 0.44]
-	const FOREST_ODDS := 0.42       # 그 바깥 — 화면을 채우는 배경 숲
+	#
+	#    한 겹(band 1)만 **못 베는 벽**이고 그 바깥은 다 벨 수 있는 숲이다.
+	#    바깥을 너무 빽빽하게 깔았더니 벨 수 있는 나무가 벽에 묻혀 안 보였다 —
+	#    한 그루씩 읽히도록 바깥으로 갈수록 성기게 둔다.
+	const EDGE_ODDS := [1.0, 0.55, 0.42, 0.36]
+	const FOREST_ODDS := 0.34       # 그 바깥 — 화면을 채우는 배경 숲
 	for y in range(base.position.y, base.end.y):
 		for x in range(base.position.x, base.end.x):
 			var e := Vector2i(x, y)
@@ -163,14 +167,20 @@ func _plant_story_forest() -> void:
 		_story_narrow(g)
 
 	# ③' 눈앞에서 쓰러질 그 나무는 길가에 서 있다 (아직은 풍경의 일부다)
-	m.objects[m.STORY_FALL_TREE] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
+	for ft: Dictionary in m.STORY_FALL_TREES:
+		m.objects[ft.at] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
 	# 옛 세이브를 이 숲으로 옮겨 심는 길에서는 이미 지난 대목이다 —
-	# 그 나무는 벌써 누워 있어야 한다 (연출을 되감을 수는 없다)
+	# 그 나무들은 벌써 누워 있어야 한다 (연출을 되감을 수는 없다)
 	if GameData.story_phase != "" and GameData.story_phase != "enter":
 		_first_fall_done = true
-		m.objects.erase(m.STORY_FALL_TREE)
-		for p: Vector2i in _gate_tiles(m.STORY_GATES[0]):
-			m.objects[p] = _gate_object("log")
+		for ft2: Dictionary in m.STORY_FALL_TREES:
+			m.objects.erase(ft2.at)
+		var rest0: Array = _gate_tiles(m.STORY_GATES[0])
+		for i2 in rest0.size():
+			var o0 := _gate_object("log")
+			# 서쪽 그루가 앞칸을, 동쪽 그루가 뒤칸을 덮은 모양 그대로
+			o0["fallen"] = 1.0 if i2 < rest0.size() - 1 else -1.0
+			m.objects[rest0[i2]] = o0
 
 	# ③'' 숲 어귀의 빈터 — 성긴 나무가 선 들판이다.
 	#     빈터를 잔디만으로 두면 「무대」로 보인다. 나무를 드문드문 세우면
@@ -329,24 +339,38 @@ func _lane_band(t: Vector2i, max_band: int, rects: Array) -> int:
 # 가로 구간이면 위아래가, 세로 구간이면 좌우가 좁아진다 — 길이 꺾이는 곳에
 # 길목이 서도 뜻이 그대로다.
 
-# 길목 한 곳이 실제로 막는 두 칸
+# 길목이 가로지르는 방향 (가로 구간이면 아래로, 세로 구간이면 오른쪽으로)
+func _gate_step(g: Dictionary) -> Vector2i:
+	return Vector2i(0, 1) if str(g.axis) == "h" else Vector2i(1, 0)
+
+
+# 한복판(at)에서 몇 칸째부터 막는가 — span 칸을 한복판에 맞춰 놓는다
+func _gate_lo(g: Dictionary) -> int:
+	return -int((int(g.get("span", 3)) - 1) / 2)
+
+
+# 길목 한 곳이 실제로 막는 칸들
 func _gate_tiles(g: Dictionary) -> Array:
-	var at: Vector2i = g.at
-	if str(g.axis) == "h":
-		return [at, at + Vector2i(0, 1)]
-	return [at, at + Vector2i(1, 0)]
+	var step := _gate_step(g)
+	var lo := _gate_lo(g)
+	var out: Array = []
+	for k in range(lo, lo + int(g.get("span", 3))):
+		out.append(g.at + step * k)
+	return out
 
 
-# 그 두 칸의 바깥 — 길을 두 줄로 좁히려고 채우는 갓길 전부.
+# 그 바깥 — 길을 좁히려고 숲으로 채우는 갓길 전부.
 # 길 폭(STORY_LANE_BACK·FWD)에서 뽑아 낸다 — 길을 넓히면 여기도 따라 넓어진다.
 # (예전에는 「좌우 한 칸씩」이라고 못 박아 두어서, 길이 한 칸 넓어진 순간
 #  길목 옆에 뚫린 한 칸이 생겼다)
 func _gate_shoulders(g: Dictionary) -> Array:
-	var step := Vector2i(0, 1) if str(g.axis) == "h" else Vector2i(1, 0)
+	var step := _gate_step(g)
+	var lo := _gate_lo(g)
+	var span := int(g.get("span", 3))
 	var out: Array = []
 	for k in range(-m.STORY_LANE_BACK, m.STORY_LANE_FWD + 1):
-		if k == 0 or k == 1:
-			continue          # 가운데 두 칸은 막을 것이 채운다
+		if k >= lo and k < lo + span:
+			continue          # 가운데 span 칸은 막을 것이 채운다
 		out.append(g.at + step * k)
 	return out
 
@@ -373,8 +397,9 @@ func _gate_object(kind: String) -> Dictionary:
 			# **광석이 박혀 있다** — 곡괭이가 무엇을 하는 도구인지 여기서 보인다
 			return {"kind": "bigrock", "hp": m.BIGROCK_HP, "ore": true}
 		"log":
-			# 쓰러진 나무. 판정은 선 나무와 똑같다 (도끼로 벤다) — 그림만 누워 있다
-			return {"kind": "tree", "hp": m.TREE_HP, "fallen": true}
+			# 쓰러진 나무. 판정은 선 나무와 똑같다 (도끼로 벤다) — 그림만 누워
+			# 있다. fallen 은 **누운 쪽**이다 (-1 서쪽 / +1 동쪽)
+			return {"kind": "tree", "hp": m.TREE_HP, "fallen": -1.0}
 	# **보상이 먼저 보여야 한다.**
 	#
 	# 길을 막은 나무는 그냥 벽이다 — 치우고 지나가라는 통행료다. 가지에
@@ -440,7 +465,24 @@ func _topple_first_tree() -> void:
 	for p: Vector2i in rest:
 		m.objects[p] = _gate_object("log")
 	Sound.play_sfx("sfx_chop", 0.0, 0.7)   # 뿌리가 갈라지는 소리
-	m.objnode._topple_onto(m.STORY_FALL_TREE, -1.0, rest)
+	# 양쪽에서 한 그루씩 넘어온다. 서쪽 그루가 앞칸부터, 동쪽 그루가 뒤에서부터
+	# 맡아 길 위에서 겹친다 — 누운 몸통도 서로 마주 보고 눕는다
+	var head := 0
+	var tail: int = rest.size()
+	for ft: Dictionary in m.STORY_FALL_TREES:
+		var dir := float(ft.dir)
+		var take: int = mini(int(ft.take), tail - head)
+		if take <= 0:
+			continue
+		var mine: Array = rest.slice(head, head + take) if dir > 0.0 \
+			else rest.slice(tail - take, tail)
+		if dir > 0.0:
+			head += take
+		else:
+			tail -= take
+		for p2: Vector2i in mine:
+			m.objects[p2]["fallen"] = dir     # 넘어온 쪽으로 누워 있다
+		m.objnode._topple_onto(ft.at, dir, mine)
 	_refresh_story_gates()
 
 
@@ -945,7 +987,7 @@ func _story_give_axe() -> void:
 func _end_postman_dialog() -> void:
 	m.story_cutscene = false
 	GameData.story_phase = "equip"
-	m.hud.show_message("새 퀘스트: 받은 나무도끼를 가방의 슬롯에 장착해 보자 (I: 가방)", 6.0)
+	m.hud.show_message("도끼를 가방(I)에서 꺼내 슬롯에 넣어 두자.", 6.0)
 	if _postman != null:
 		_postman_state = "follow"  # 우체부는 떠나지 않고 마을까지 동행한다
 
@@ -991,7 +1033,7 @@ func _start_fork_dialog() -> void:
 	], func() -> void:
 		m.story_cutscene = false
 		GameData.story_phase = "map"
-		m.hud.show_message("새 퀘스트: M 키를 눌러 지도를 열어 보자", 6.0))
+		m.hud.show_message("지도를 한번 펴 보자. M 키랬지.", 6.0))
 
 
 func _after_map_dialog() -> void:
@@ -1837,7 +1879,7 @@ func _start_forest_monologue() -> void:
 
 func _end_forest_monologue() -> void:
 	m.story_cutscene = false
-	m.hud.show_message("퀘스트 시작: 숲 안으로 들어가 보자", 6.0)
+	m.hud.show_message("일단 저 숲으로 들어가 보자.", 6.0)
 
 
 # 메인 스토리 건너뛰기 (개발/테스트용 — DEV_MODE에서 F8 또는 ESC 메뉴).

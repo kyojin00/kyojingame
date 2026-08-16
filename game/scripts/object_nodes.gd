@@ -260,8 +260,18 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
-		if bool(m.objects.get(pos, {}).get("fallen", false)):
-			_lay_tree_down(node.get_child(0))   # 누운 채로 길을 막은 나무
+		var od: Dictionary = m.objects.get(pos, {})
+		var lie: float = float(od.get("fallen", 0.0))
+		if lie != 0.0:
+			_lay_tree_down(node.get_child(0), lie)   # 누운 채로 길을 막은 나무
+		# ---- 벨 수 있는 나무와 못 베는 나무 ----
+		#
+		# 둘이 똑같이 생겨서, 빽빽한 숲에서는 어느 것이 벽이고 어느 것이
+		# 목재인지 도끼를 대 봐야 알 수 있었다 (「나무가 너무 우거져
+		# 벨 엄두가 나지 않는다」). **못 베는 것은 한 톤 어둡게** 깐다 —
+		# 깊은 숲은 뒤로 물러나고 벨 수 있는 나무만 앞으로 나온다.
+		if bool(od.get("fixed", false)):
+			(node.get_child(0) as Sprite2D).modulate = DEEP_WOOD
 	elif m.LANDMARK_FRAMES.has(kind):
 		m.landmark_sprites.append([node.get_child(0), kind])
 	m.world.add_child(node)
@@ -273,14 +283,15 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 # 도끼로 베고, 목재가 나오고, 길이 열린다. 새 그림을 그리지 않고 서 있는
 # 나무를 밑동째 눕혀 쓴다 (`_fell_tree`가 쓰러뜨리는 각과 같은 각이다).
 #
-# 늘 서쪽으로 눕힌다. 첫 나무가 길 동쪽 갓길에서 서쪽으로 넘어오는데,
-# 그 자리에 남는 몸통이 반대로 누워 있으면 방금 본 것과 어긋난다.
-func _lay_tree_down(spr: Sprite2D) -> void:
+# 누운 쪽은 **넘어온 쪽**을 따른다 (dir: -1 서쪽 / +1 동쪽). 길 양옆에서
+# 한 그루씩 넘어오는데 남은 몸통이 둘 다 같은 쪽으로 누워 있으면 방금 본
+# 것과 어긋난다.
+func _lay_tree_down(spr: Sprite2D, dir: float) -> void:
 	if spr.texture == null:
 		return
 	var pivot := Vector2(m.TILE / 2.0,
 		(spr.offset.y + spr.texture.get_height()) * spr.scale.y)
-	var a := -FALL_ANGLE
+	var a := FALL_ANGLE * (1.0 if dir > 0.0 else -1.0)
 	spr.rotation = a
 	spr.position = pivot - pivot.rotated(a)
 
@@ -291,8 +302,9 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 	if m.objects[pos].kind != "tree":
 		return
 	var spr: Sprite2D = m.obj_nodes[pos].get_child(0)
-	if bool(m.objects[pos].get("fallen", false)):
-		_lay_tree_down(spr)   # 도끼질로 그림이 바뀌어도 계속 누워 있다
+	var lie: float = float(m.objects[pos].get("fallen", 0.0))
+	if lie != 0.0:
+		_lay_tree_down(spr, lie)   # 도끼질로 그림이 바뀌어도 계속 누워 있다
 	var hp := int(m.objects[pos].hp)
 	if hp >= m.TREE_HP:
 		if bool(m.objects[pos].get("young", false)):
@@ -348,6 +360,10 @@ func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> voi
 # 판정은 `_fell_tree`를 부르는 그 자리에서 이미 끝나 있다 (objects에서 지운다).
 # 여기 있는 것은 전부 그림뿐이라, 도중에 날이 바뀌거나 세이브를 불러와도
 # 노드만 치우면 그만이다 (`_clear_tree_falls`).
+# 벨 수 없는 나무(fixed)에 입히는 빛깔 — 그늘진 깊은 숲.
+# 채도를 조금 죽이고 어둡게만 한다. 색을 바꾸면 다른 종류의 나무로 보인다.
+const DEEP_WOOD := Color(0.66, 0.74, 0.68)
+
 const FALL_WIND := 0.12         # 반동 시간
 const FALL_WIND_ANGLE := 0.11   # 되젖히는 각(라디안)
 const FALL_DOWN := 0.46         # 넘어가는 시간

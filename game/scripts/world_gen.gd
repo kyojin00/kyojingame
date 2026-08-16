@@ -44,17 +44,22 @@ func _build_map() -> void:
 	# 흐르는 물이 하나는 있어야 지형에 방향이 생긴다
 	_carve_river(30, 24, 44, 46, 2.2)
 
+	m.mark_build("높낮이를 잡는 중…", 0.48)
 	_build_levels()
+	m.mark_build("마을 터를 놓는 중…", 0.56)
 	_build_village()
 
 	# 농장 -> 마을 이음새는 잔디 그대로 둔다 (흙길은 깔지 않는다 —
 	# 바닥 타일은 앞으로 플레이어가 직접 깐다. m.ROAD 직사각형은
 	# 자연물이 스폰되지 않는 통행로로 계속 쓰인다)
 
-	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
-	m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
+	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다).
+	# 자리를 정할 때까지는 놓지 않는다 (main.CAVE_PLACED 참고)
+	if m.CAVE_PLACED:
+		m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
 	m.objects[m.WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
+	m.mark_build("숲을 심는 중…", 0.64)
 	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in m.MAP_W:
 		if x % 4 == 0 and not m.objects.has(Vector2i(x, 0)):

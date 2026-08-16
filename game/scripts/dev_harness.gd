@@ -1602,7 +1602,10 @@ func _debug_tick() -> void:
 			# 눈앞에서 쓰러지는 나무는 **길 밖**에 서 있어야 한다 — 길 위였다면
 			# 넘어지며 비운 그 칸이 길목 옆의 샛길이 된다
 			var gate_ok: bool = m.STORY_GATES.size() == 4 \
-				and not m.tutorial_walkable(m.STORY_FALL_TREE)
+				and m.STORY_FALL_TREES.size() == 2
+			for ft5: Dictionary in m.STORY_FALL_TREES:
+				if m.tutorial_walkable(ft5.at):
+					gate_ok = false   # 쓰러지며 비운 칸이 샛길이 된다
 			for g5: Dictionary in m.STORY_GATES:
 				for p5: Vector2i in m.story._gate_tiles(g5) + m.story._gate_shoulders(g5):
 					if not m.tutorial_walkable(p5):
@@ -1682,17 +1685,26 @@ func _debug_tick() -> void:
 						for p8: Vector2i in m.story._gate_tiles(g8):
 							m.objects.erase(p8)
 				m.story._refresh_story_gates()
-			# ① 심은 직후: 길은 갈림길까지 열려 있고, 쓰러질 나무는 길가에 서 있다
+			# ① 심은 직후: 길은 갈림길까지 열려 있고, 쓰러질 나무는 **양쪽**
+			#    길가에 서 있다
 			var plant8: bool = not m.objects.has(m.STORY_GATES[0].at) \
-				and str(m.objects.get(m.STORY_FALL_TREE, {}).get("kind", "")) == "tree" \
 				and walk8.call(m.STORY_FORK) and not walk8.call(m.STORY_EXIT) \
 				and GameData.story_gates_left == 1
-			# ② 첫 나무가 눈앞에서 쓰러진다 — 길가에서 사라지고 길 위에 눕는다
+			for ft8: Dictionary in m.STORY_FALL_TREES:
+				if str(m.objects.get(ft8.at, {}).get("kind", "")) != "tree":
+					plant8 = false
+			# ② 양쪽에서 한 그루씩 넘어온다 — 길가에서 사라지고 길 위에 눕는다.
+			#    누운 쪽이 서로 반대여야 「양쪽에서 넘어왔다」로 읽힌다
 			m.story._topple_first_tree()
-			var fell8: bool = not m.objects.has(m.STORY_FALL_TREE) \
-				and bool(m.objects.get(m.STORY_GATES[0].at, {}).get("fallen", false)) \
-				and not walk8.call(m.STORY_FORK) \
-				and GameData.story_gates_left == 2
+			var rest8: Array = m.story._gate_tiles(m.STORY_GATES[0])
+			var fell8: bool = not walk8.call(m.STORY_FORK) \
+				and GameData.story_gates_left == 2 \
+				and float(m.objects.get(rest8[0], {}).get("fallen", 0.0)) > 0.0 \
+				and float(m.objects.get(rest8[rest8.size() - 1], {})
+					.get("fallen", 0.0)) < 0.0
+			for ft9: Dictionary in m.STORY_FALL_TREES:
+				if m.objects.has(ft9.at):
+					fell8 = false
 			# ③ 그 나무를 치우면 갈림길까지, 지름길을 뚫으면 바위까지 간다
 			clear8.call("first")
 			var chop8: bool = walk8.call(m.STORY_FORK) \
@@ -4205,8 +4217,10 @@ func _debug_tick() -> void:
 			GameData.story20_phase = "gate"
 			GameData.tracked_pick = "story20"
 			var gs20: Array = m.map_ui._quest_guides()
-			var gate_hid: bool = gs20.size() == 1
-			if gate_hid:
+			# 동굴을 아직 세상에 놓지 않았다면 그리로 가리키는 마커도 없어야
+			# 한다 (없는 곳을 짚는 핀이 지도에 뜨면 그게 더 나쁘다)
+			var gate_hid: bool = gs20.size() == (1 if m.CAVE_PLACED else 0)
+			if gate_hid and m.CAVE_PLACED:
 				var g20: Dictionary = gs20[0]
 				var t20: Vector2i = g20.tile
 				gate_hid = t20 == m.CAVE_POS

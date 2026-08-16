@@ -849,6 +849,11 @@ func refresh(force := false) -> void:
 # 화면 아래 검은 띠 대신, **주인공 머리 위에 뜨는 작은 말풍선**이다.
 # 글자는 미리 폭에 맞춰 잘라 두고, 풍선을 그 크기에 맞춰 키운다 —
 # 그래서 어떤 문장이 와도 풍선 밖으로 삐져나오지 않는다.
+#
+# **여기 담는 말은 전부 주인공의 목소리다.** 꼬리가 주인공을 가리키고
+# 있으므로, 「새 퀘스트:」 같은 창 문구를 넣으면 주인공이 그걸 소리 내어
+# 읽는 꼴이 된다. 퀘스트 이름은 오른쪽 두루마리와 토스트가 맡는다 —
+# 여기에는 주인공이 속으로 할 법한 말만 적는다.
 const BUB_FONT := 11
 const BUB_W := 250.0        # 말풍선 안쪽 글 폭 (넘으면 줄바꿈)
 const BUB_LINE := 15.0
@@ -933,6 +938,18 @@ func _place_bubble() -> void:
 	# 화면 밖으로 밀렸으면 꼬리도 주인공 쪽을 가리키게 옮긴다
 	_bub_tail.position = Vector2(
 		clampf(anchor.x - p.x, 12.0, _bub.size.x - 12.0), _bub.size.y - 1.0)
+
+
+# 말풍선이 **주인공 머리 위에서 차지하는 높이**(월드 픽셀). 안 뜨면 0.
+#
+# 머리 위에 뜨는 것이 둘이다 — 이 말풍선과, 「F: 대화」 같은 안내 문구
+# (renderer._draw_context_hint). 둘 다 같은 높이에 붙어 있어서 말을 하는
+# 순간 글자가 겹쳐 둘 다 못 읽는 일이 생겼다. 안내 문구가 이만큼 비켜선다.
+func bubble_lift() -> float:
+	if _bub == null or not _bub.visible or main == null:
+		return 0.0
+	var zoom: float = maxf(main.CAMERA_ZOOM, 0.01)
+	return (_bub.size.y + 24.0) / zoom
 
 
 # 말풍선을 즉시 걷는다 (창이 열리거나 장면이 바뀔 때)

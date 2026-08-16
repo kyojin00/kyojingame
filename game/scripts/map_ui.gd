@@ -656,7 +656,8 @@ func _draw_map() -> void:
 	_place_label(main.PLAZA.get_center().x - 3, main.PLAZA.get_center().y - 3, "중앙 광장")
 	_place_label(main.FISH_SPOT.get_center().x - 3,
 		main.FISH_SPOT.get_center().y - 1, "호수 낚시터")
-	_place_label(main.CAVE_POS.x, main.CAVE_POS.y, "동굴")
+	if main.CAVE_PLACED:
+		_place_label(main.CAVE_POS.x, main.CAVE_POS.y, "동굴")
 	# 고장의 랜드마크 — 가 본 곳이면 **금빛 마름모**로 찍는다.
 	#
 	# 지역 이름표는 지역 한가운데에 붙지만, 랜드마크는 정확히 그 자리를
@@ -861,13 +862,13 @@ func _quest_spot(qid: String) -> Vector2i:
 				return _plot_center("post")
 		"story10", "story11":
 			if GameData.story11_phase == "deep" or GameData.story10_phase == "dig":
-				return main.CAVE_POS
+				return main.CAVE_POS if main.CAVE_PLACED else Vector2i(-999, -999)
 		"story13":
 			if GameData.story13_phase in ["rock", "fish"]:
 				return main.BRACELET_ROCK
 		"story15":
 			if GameData.story15_phase == "dig":
-				return main.CAVE_POS
+				return main.CAVE_POS if main.CAVE_PLACED else Vector2i(-999, -999)
 			if GameData.story15_phase == "water":
 				return main.ONSEN_POS
 		"story16":
@@ -881,7 +882,7 @@ func _quest_spot(qid: String) -> Vector2i:
 				return main.HILL_POS
 		"story20":
 			if GameData.story20_phase in ["gate", "inner"]:
-				return main.CAVE_POS
+				return main.CAVE_POS if main.CAVE_PLACED else Vector2i(-999, -999)
 			if GameData.story20_phase == "plant":
 				return main.HOME_ANCHOR + Vector2i(2, 5)
 		"fisher_home":
