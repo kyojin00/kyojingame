@@ -828,8 +828,13 @@ function archDoor(g, cx, w, h, GROUND) {
   g.px(x0 + w - 4, y0 + Math.floor(h / 2) + 1, 'Y');       // 손잡이
   // 문 위 **현관 지붕**. 작은 차양 두 줄로는 문이 벽에 뚫린 구멍으로 보인다.
   // 처마가 밖으로 나오고 밑에 그늘이 깔려야 「들어가는 곳」이 된다
+  // 현관 지붕도 **기와를 얹는다.** 주황 막대 하나로 두면 큰 지붕만 기와고
+  // 여기만 색종이가 된다. roofT 를 찍어 두면 기와 패스가 알아서 깔아 준다
   for (let i = 0; i < 3; i++)
-    g.rect(x0 - 2 - i, y0 - 4 + i, x0 + w + 1 + i, y0 - 4 + i, i === 0 ? 'l' : 'r');
+    for (let x = x0 - 2 - i; x <= x0 + w + 1 + i; x++) {
+      g.px(x, y0 - 4 + i, i === 0 ? 'l' : 'r');
+      markRoof(x, y0 - 4 + i, roofToneAt(y0 - 4 + i), y0 - 2);
+    }
   g.hline(x0 - 4, x0 + w + 3, y0 - 1, 'R');
   g.hline(x0 - 3, x0 + w + 2, y0, 'D');                    // 현관 지붕 밑 그늘
   // 문지방 돌
@@ -903,12 +908,33 @@ function stampIcon(g, cx, cy, name, dark, lite) {
   }
 }
 
+// 가로로 짠 나무판 — 간판·게시판. **문과 짜는 방향이 다르다.**
+// 문은 세로 널(비가 흘러내려야 하니까), 간판은 가로 판(글씨를 넓게 쓰니까).
+// 방향이 다르면 같은 나무여도 다른 물건으로 읽힌다.
+function boardFace(g, x0, y0, x1, y1) {
+  const BH2 = 4;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (!'bB'.includes(g.get(x, y))) continue;
+    const row = Math.floor((y - y0) / BH2), r = hash(row, 23);
+    let c = r < 0.32 ? 'B' : 'b';
+    if ((y - y0) % BH2 === 0) c = 'B';                     // 판 사이 이음매
+    if (hash(x >> 1, y * 3) < 0.11) c = 'B';               // 결
+    g.px(x, y, c);
+  }
+  // 귀쇠 — 네 귀퉁이를 쇠로 물린다. 간판이 「걸린 물건」이 된다
+  for (const [px, py] of [[x0, y0], [x1 - 1, y0], [x0, y1 - 1], [x1 - 1, y1 - 1]]) {
+    g.rect(px, py, px + 1, py + 1, 'S');
+    g.px(px, py, 'p3');
+  }
+}
+
 function sign(g, cx, icon) {
   const w = 24, x0 = cx - w / 2, y = EAVE + 4;
   g.vline(x0 + 4, y - 4, y, 'T');
   g.vline(x0 + w - 4, y - 4, y, 'T');
   g.rect(x0, y, x0 + w, y + 13, 'B');
   g.rect(x0 + 1, y + 1, x0 + w - 1, y + 12, 'b');
+  boardFace(g, x0 + 1, y + 1, x0 + w - 1, y + 12);
   g.hline(x0 + 1, x0 + w - 1, y + 1, 'x');                 // 판 윗변이 빛을 받는다
   stampIcon(g, cx, y + 7, icon, 'T', 'u');
 }
@@ -920,6 +946,7 @@ function hangSign(g, x, y, icon) {
   g.vline(x + 3, y + 1, y + 2, 'S'); g.vline(x + 9, y + 1, y + 2, 'S');
   g.rect(x - 1, y + 3, x + 13, y + 15, 'B');
   g.rect(x, y + 4, x + 12, y + 14, 'b');
+  boardFace(g, x, y + 4, x + 12, y + 14);
   stampIcon(g, x + 6, y + 9, icon, 'T', 'u');
 }
 
@@ -1189,7 +1216,13 @@ function laundry(g, x0, x1, y) {
     const px = x0 + 6 + i * 12;
     const sag = Math.round(Math.sin((px - x0) / (x1 - x0) * Math.PI) * 2);
     g.rect(px, y + sag, px + 7, y + sag + h, c);
-    g.hline(px, px + 7, y + sag + h, 'W');
+    // 주름 — 천은 평평하지 않다. 세로 접힘 두 줄과 아랫단 그늘이면 충분하다
+    const fold = { x: 'W', g: 'G', A: 'B' }[c] || 'W';
+    g.vline(px + 2, y + sag + 1, y + sag + h - 1, fold);
+    g.vline(px + 5, y + sag + 2, y + sag + h - 1, fold);
+    g.hline(px, px + 7, y + sag, 'x');                     // 줄에 걸린 윗변
+    g.hline(px, px + 7, y + sag + h, fold);
+    g.px(px + 1, y + sag + h + 1, fold); g.px(px + 6, y + sag + h + 1, fold);
   });
 }
 
@@ -1257,6 +1290,7 @@ function noticeboard(g, x, y) {
   g.vline(x + 2, y - 8, y, 'T'); g.vline(x + 14, y - 8, y, 'T');
   g.rect(x, y - 24, x + 16, y - 7, 'T');
   g.rect(x + 1, y - 23, x + 15, y - 8, 'b');
+  boardFace(g, x + 1, y - 23, x + 15, y - 8);
   for (const [dx, dy, w, h] of [[2, 21, 5, 6], [9, 20, 5, 7], [4, 13, 8, 4]]) {
     g.rect(x + dx, y - dy, x + dx + w, y - dy + h, 'x');
     g.px(x + dx + (w >> 1), y - dy, 'A');                  // 압정
