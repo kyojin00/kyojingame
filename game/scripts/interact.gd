@@ -382,6 +382,14 @@ func interact() -> void:
 		if obj.kind == "auction":
 			m.auction_ui.open()
 			return
+		if obj.kind == "sign" and t == m.STORY_TRAIL_SIGN:
+			# 숲 어귀의 낡은 표지판 — 「내가 왜 여기 서 있는가」에 대한 답이다
+			m.dialog.open("낡은 표지판",
+				"      교진 마을  →\n\n글씨는 비바람에 반쯤 지워져 있다.\n"
+				+ "화살표만 저 숲 쪽을 가리키고 있다.\n\n"
+				+ "(사람이 안 다닌 지 오래된 길인 모양이다.)",
+				[["숲으로 들어간다", null]])
+			return
 		if obj.kind == "sign" and t == m.OLD_SIGN:
 			m.story.examine_old_sign()
 			return

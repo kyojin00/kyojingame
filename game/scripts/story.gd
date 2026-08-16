@@ -81,6 +81,10 @@ func _apply_story_visibility() -> void:
 	# 마을로 이동하는 travel 단계부터는 마을이 보여야 하므로 표시한다.
 	var show := GameData.story_phase not in ["enter", "approach", "equip", "chop", "path", "map", "rock"]
 	for pos: Vector2i in m.obj_nodes:
+		# 숲길의 표지판은 **여기 것**이다 — 마을 건물을 감추는 규칙에 딸려
+		# 같이 사라지면 안 된다 (그것 때문에 세운 표지판이다)
+		if m.TUTORIAL_REGION.has_point(pos):
+			continue
 		# 부지 앵커로 만든 집 노드는 objects에 없다 -> house로 간주
 		var kind: String = m.objects[pos].kind if m.objects.has(pos) else "house"
 		if kind in ["house", "housesite", "board", "sign", "barn", "barn_block",
@@ -134,6 +138,9 @@ func _plant_story_forest() -> void:
 			var e := Vector2i(x, y)
 			if m.tutorial_walkable(e) or e.x > m.STORY_EXIT.x:
 				continue
+			if e.x < m.STORY_CLEARING.position.x:
+				continue   # 빈터 서쪽 — **여기는 막지 않는다.** 지나온 길이
+				           # 화면 밖으로 나가야 등 뒤에 벽이 없다
 			var band := _lane_band(e, EDGE_ODDS.size(), rects)
 			var odds: float = FOREST_ODDS if band < 1 else float(EDGE_ODDS[band - 1])
 			if m._hash01(x * 11 + 3, y * 7 + 5) >= odds:
@@ -164,6 +171,24 @@ func _plant_story_forest() -> void:
 		m.objects.erase(m.STORY_FALL_TREE)
 		for p: Vector2i in _gate_tiles(m.STORY_GATES[0]):
 			m.objects[p] = _gate_object("log")
+
+	# ③'' 숲 어귀의 빈터 — 성긴 나무가 선 들판이다.
+	#     빈터를 잔디만으로 두면 「무대」로 보인다. 나무를 드문드문 세우면
+	#     숲이 시작하기 **전의 땅**, 그러니까 지나온 들판이 된다.
+	#     흙길 위에는 놓지 않는다 (길은 화면 밖까지 이어져야 한다).
+	var clear: Rect2i = m.STORY_CLEARING
+	for y in range(clear.position.y, clear.end.y):
+		for x in range(clear.position.x, clear.end.x):
+			var c := Vector2i(x, y)
+			if m.objects.has(c) or m.grid[y][x].ground == "yard":
+				continue
+			var hc := m._hash01(x * 29 + 5, y * 13 + 11)
+			if hc < 0.16:
+				m.objects[c] = {"kind": "tree", "hp": m.TREE_HP}
+			elif hc > 0.94:
+				m.objects[c] = {"kind": "forage_herb", "hp": 0}
+	# 숲으로 드는 입구의 낡은 표지판 — 이 길이 어디로 가는 길인지 알려 준다
+	m.objects[m.STORY_TRAIL_SIGN] = {"kind": "sign", "hp": 0}
 
 	# ④ 갓길의 채집물 — 걸어가며 주울 것들.
 	#
@@ -1799,7 +1824,9 @@ func _end_intro() -> void:
 func _start_forest_monologue() -> void:
 	m.story_cutscene = true
 	m.dialog.open_seq("나", null, [
+		{"text": "(여기서부터는 걸어야 한다고 했다.)"},
 		{"text": "(눈앞에 우거진 숲이 펼쳐져 있다...)"},
+		{"text": "(마을로 가는 길은 저 숲으로 들어가 버렸다.)"},
 		{"text": "(문득, 할아버지가 하셨던 말이 떠오른다.)"},
 		{"text": "『집으로 가는 길이 조금 힘들 거다.』"},
 		{"text": "(그때는 무슨 뜻인지 몰랐는데...)"},

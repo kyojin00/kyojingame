@@ -1570,12 +1570,22 @@ func _debug_tick() -> void:
 			#        가르는 유일한 검사다
 			var lane_pts: Array = m.STORY_LANE
 			var det_pts: Array = m.STORY_DETOUR
-			var named_ok: bool = lane_pts[0] == m.STORY_SPAWN \
+			var named_ok: bool = m.STORY_CLEARING.has_point(m.STORY_SPAWN) \
 				and lane_pts[lane_pts.size() - 1] == m.STORY_EXIT \
 				and lane_pts.has(m.STORY_FORK) and det_pts[0] == m.STORY_FORK \
 				and det_pts[det_pts.size() - 1] == m.STORY_MERGE \
 				and m.tutorial_walkable(m.STORY_MERGE) \
 				and m.tutorial_walkable(m.STORY_ROCK)
+			# 숲 어귀: 시작 자리는 빈터 안이고, 지나온 길은 **화면 밖으로 나간다**.
+			# 빈터 서쪽 끝에 서면 그 너머로 한 칸도 못 가야 정상이지만(맵 끝),
+			# 거기까지 가는 동안 등 뒤에 나무 벽이 서 있으면 안 된다 —
+			# 어귀가 아니라 또 하나의 막다른 길이 된다.
+			var head_ok: bool = m.STORY_CLEARING.position.x <= 1 \
+				and m.tutorial_walkable(Vector2i(m.STORY_CLEARING.position.x,
+					m.STORY_SPAWN.y)) \
+				and m.STORY_CLEARING.has_point(m.STORY_TRAIL_SIGN) \
+				and not m.story_dirt_rect(lane_pts[0], lane_pts[1]).has_point(
+					m.STORY_TRAIL_SIGN)   # 표지판이 길 한복판을 막으면 안 된다
 			# 마디는 가로 아니면 세로 (비스듬한 마디는 사각형으로 못 편다)
 			var axis_ok := true
 			var lane_box := m.story_lane_bounds()
@@ -1628,10 +1638,11 @@ func _debug_tick() -> void:
 			var det_ok: bool = lane_reach.call(["detour"])             # 우회로가 막혀도 지름길로 간다
 			var both_ok: bool = not lane_reach.call(["short", "detour"])
 			var rock_ok: bool = not lane_reach.call(["rock"])          # 바위는 합류 뒤 — 못 피한다
-			print("STORY_LANE_OK=", named_ok and axis_ok and fit_ok and gate_ok
-					and open_ok and first_ok and short_ok and det_ok
+			print("STORY_LANE_OK=", named_ok and head_ok and axis_ok and fit_ok
+					and gate_ok and open_ok and first_ok and short_ok and det_ok
 					and both_ok and rock_ok,
-				" 이름난자리=", named_ok, " 축나란함=", axis_ok, " 숲안에=", fit_ok,
+				" 이름난자리=", named_ok, " 숲어귀=", head_ok,
+				" 축나란함=", axis_ok, " 숲안에=", fit_ok,
 				" 길목자리=", gate_ok, " 다뚫림=", open_ok, " 첫나무막힘=", first_ok,
 				" 지름길막혀도=", short_ok, " 우회로막혀도=", det_ok,
 				" 둘다막히면=", both_ok, " 바위못피함=", rock_ok,

@@ -261,6 +261,8 @@ func _context_hint() -> Array:
 			"horse":
 				return ["%s: 말 타기" % GameData.key_label("mount"), above_tile]
 			"sign":
+				if t == m.STORY_TRAIL_SIGN:
+					return ["낡은 표지판", above_tile]
 				if t == m.FISH_SIGN:
 					return ["낚시터 안내", above_tile]
 				if t == m.GREENHOUSE_SIGN:

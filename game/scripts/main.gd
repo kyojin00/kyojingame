@@ -1193,9 +1193,10 @@ func _ready() -> void:
 				GameData.tool_slots.append("")
 			GameData.tool = "hoe"
 			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
+			player.dir = "right"   # 등 뒤는 지나온 들판, 눈앞이 숲이다
 			story._plant_story_forest()
 			story._apply_story_camera.call_deferred()
-			hud.show_message("우거진 숲... 이 숲을 지나야 마을이 나온다.", 5.0)
+			hud.show_message("숲 어귀에 닿았다. 이 숲을 지나야 마을이 나온다.", 5.0)
 			if not story_shot:
 				story._show_intro.call_deferred()
 		else:
@@ -1611,6 +1612,8 @@ func _tile_accessible(t: Vector2i) -> bool:
 # 상태를 들고 있지 않는다 — 숲을 아직 심지 않았어도, 두 번 심어도 같은 답이
 # 나온다 (하네스가 심기 전후로 이걸 묻는다).
 func tutorial_walkable(t: Vector2i) -> bool:
+	if STORY_CLEARING.has_point(t):
+		return true          # 숲 어귀의 빈터 (길이 여기서 넓어진다)
 	return on_story_lane(t, STORY_LANE) or on_story_lane(t, STORY_DETOUR)
 
 
@@ -1647,7 +1650,7 @@ func story_corner_rect(v: Vector2i) -> Rect2i:
 
 # 길이 덮는 사각형 전부 (마디 + 꺾이는 자리). 한 번 받아 두고 훑는 쪽에서 쓴다.
 func story_road_rects() -> Array:
-	var out: Array = []
+	var out: Array = [STORY_CLEARING]
 	for lane: Array in [STORY_LANE, STORY_DETOUR]:
 		for i in range(lane.size() - 1):
 			out.append(story_lane_rect(lane[i], lane[i + 1]))
@@ -1959,7 +1962,7 @@ const FEST_COLORS := {
 const STORY_LANE_BACK := 1                 # 한복판에서 이만큼 뒤(북)까지가 길
 const STORY_LANE_FWD := 3                  # 한복판에서 이만큼 앞(남)까지가 길
 const STORY_LANE := [
-	Vector2i(18, 13 + TUT_DY),   # ① 숲 서쪽 — 여기서 이야기가 시작한다
+	Vector2i(1, 13 + TUT_DY),    # ① 숲 어귀의 빈터 — 여기서 이야기가 시작한다
 	Vector2i(25, 13 + TUT_DY),   # ② 길이 북으로 꺾이는 자리
 	Vector2i(25, 6 + TUT_DY),    # ③ 오르막 — 여기서 첫 나무가 쓰러진다
 	Vector2i(33, 6 + TUT_DY),    # ④ 갈림길
@@ -1973,9 +1976,23 @@ const STORY_DETOUR := [
 	Vector2i(45, 19 + TUT_DY),   # 동쪽으로 길게 돌고
 	Vector2i(45, 13 + TUT_DY),   # 다시 올라와 본길에 합류한다
 ]
+# ---- 이야기가 시작하는 자리는 숲 **한복판**이 아니라 **어귀**다 ----
+#
+# 예전에는 길 한가운데에 툭 놓였다. 앞도 뒤도 빽빽한 숲이라, 밝아지자마자
+# 나오는 독백 「눈앞에 우거진 숲이 펼쳐져 있다」가 화면과 맞지 않았고 —
+# 숲은 눈앞이 아니라 사방에 있었다 — 무엇보다 **여기까지 어떻게 왔는지**에
+# 대한 답이 화면 어디에도 없었다. 세계가 만들어지고 사람이 그 안에 얹힌
+# 것처럼 보였다.
+#
+# 이 빈터가 그 답이다. 성긴 나무가 선 들판이 화면 **서쪽 끝까지** 이어져
+# 지나온 길이 화면 밖으로 나가고(그래서 등 뒤에 벽이 없다), 흙길은 그
+# 들판을 가로질러 동쪽의 빽빽한 숲으로 빨려 들어간다. 그 입구에 표지판이
+# 서 있다 — 이 길이 어디로 가는 길인지 화면이 먼저 말해 준다.
+const STORY_CLEARING := Rect2i(1, 10 + TUT_DY, 13, 7)
+const STORY_TRAIL_SIGN := Vector2i(12, 11 + TUT_DY)   # 숲으로 드는 입구의 낡은 표지판
 # 꺾은선 위의 이름난 자리들 (위 배열의 ①·④·⑦ 과 같은 점이어야 한다 —
 # 어긋나면 하네스의 STORY_LANE_OK 가 잡아낸다)
-const STORY_SPAWN := Vector2i(18, 13 + TUT_DY)   # 화면 왼쪽에서 시작
+const STORY_SPAWN := Vector2i(5, 13 + TUT_DY)    # 빈터 한복판 — 숲을 마주 보고 선다
 const STORY_FORK := Vector2i(33, 6 + TUT_DY)     # 숲길이 갈라지는 갈림길 (지도 퀘스트)
 const STORY_MERGE := Vector2i(45, 13 + TUT_DY)   # 두 길이 다시 만나는 자리
 const STORY_EXIT := Vector2i(54, 13 + TUT_DY)    # 여기 서면 마을로 넘어간다

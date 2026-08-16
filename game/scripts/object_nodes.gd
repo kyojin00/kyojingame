@@ -665,6 +665,16 @@ func _stream_nodes() -> void:
 	_stream_center = pt
 	var keep := Rect2i(pt.x - STREAM_W, pt.y - STREAM_H,
 		STREAM_W * 2 + 1, STREAM_H * 2 + 1)
+	# **튜토리얼 숲은 통째로 세운다.**
+	#
+	# 이 창은 「카메라는 늘 주인공을 한가운데 둔다」를 전제로 잡혀 있다.
+	# 세계에서는 맞는 말이지만, 튜토리얼 숲은 화면 하나만 한 공간이라
+	# 카메라 제한에 걸려 붙박여 있다 — 주인공이 서쪽 어귀에 서 있어도
+	# 화면에는 동쪽 끝까지 다 보인다. 주인공 둘레(좌우 34칸)만 세우면
+	# 화면 오른쪽 숲이 통째로 안 그려지고 흙길만 뜬 맨땅이 남는다.
+	# 한 장뿐인 공간이니 그 한 장을 다 세운다.
+	if GameData.tutorial_space:
+		keep = m.TUTORIAL_REGION
 	_stream_prev = keep
 	# 한 칸도 안 겹치게 멀리 뛰었으면(순간이동·불러오기) 통째로 다시 센다
 	if not prev.intersects(keep):
