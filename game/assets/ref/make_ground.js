@@ -897,16 +897,44 @@ function rockFace(g, x, y, drop, n, i, seed) {
 function cliffPx(g, x, y, s, nax, nay, i, seed) {
   if (s < 0) return;                                          // 위쪽 땅 — 그 칸이 그린다
   const k = Math.floor(s);
+  // 면이 **얼마나 나를 마주 보는가.** 정면이면 1, 옆이면 0.
+  //
+  // 그대로 쓰면 경계가 비스듬해지는 자리에서 값이 훅 떨어져 벽이 사라진다.
+  // 조금이라도 마주 보면 바닥값을 준다 — 비스듬한 벽은 낮아 보일 뿐
+  // 없어지지는 않는다
   const face = clamp(-nay, 0, 1);
-  const H = faceH(face, i, seed, true);   // 벼랑 — 두 칸짜리 벽
-  if (H >= 3 && k < H) { rockFace(g, x, y, k / (H - 1), H, i, seed); return; }
-  if (H >= 3) { scree(g, x, y, k - H, i, seed); return; }
-  // 비스듬히 보이는 옆면 — 바위가 좁게 드러날 뿐이다
-  if (Math.abs(nax) > 0.5) {
-    const w = 3 + (h(i, 0, 58 + seed) < 0.5 ? 0 : 1);
-    if (k < w) g.px(x, y, STONE[clamp(3 + k + (h(i, k, 59 + seed) < 0.30 ? -1 : 0), 0, 7)]);
-    else if (k === w && h(x, y, 60 + seed) < 0.4) g.px(x, y, EARTH[4]);
+  const lean = face > 0.08 ? Math.max(face, 0.56) : face;
+  const H = faceH(lean, i, seed, true);
+
+  // ---- ① 옆면을 **먼저 깔고** 정면을 그 위에 얹는다 ----
+  //
+  // 예전에는 둘 중 하나만 그렸다(정면이면 옆면은 건너뛰기). 경계가 가로에서
+  // 세로로 꺾이는 자리마다 벽이 뚝 끊겨, 벼랑이 회색 덩어리 몇 개로 흩어져
+  // 보였다 — 「비는 부분」이 그것이다. 먼저 깔아 두면 모서리에서 둘이
+  // 이어 붙고, 정면이 있는 칸은 정면이 덮으므로 손해가 없다.
+  //
+  // 여기서 k는 경계에서 **옆으로** 들어간 거리다. 모서리가 밝고 안으로
+  // 갈수록 어두워지면, 그 폭이 곧 벽의 두께로 읽힌다.
+  if (Math.abs(nax) > 0.32) {
+    const w = 6 + Math.round(h(Math.floor(i / 4), 0, 110 + seed) * 3);
+    if (k < w) {
+      let t = 2.2 + (k / Math.max(1, w - 1)) * 3.6;
+      t += (h(Math.floor(i / 3), 0, 111 + seed) - 0.5) * 1.2;   // 돌결
+      if (h(i, k, 112 + seed) > 0.86) t += 1.0;
+      if (k === 0) t -= 0.8;                                    // 모서리는 볕을 받는다
+      g.px(x, y, STONE[clamp(Math.round(t), 0, 7)]);
+    } else if (k === w) {
+      g.px(x, y, EARTH[5]);                                     // 발치 그늘
+    } else if (k === w + 1 && h(x, y, 113 + seed) < 0.55) {
+      g.px(x, y, EARTH[4]);
+    } else if (k === w + 2 && h(x, y, 114 + seed) < 0.25) {
+      g.px(x, y, EARTH[3]);
+    }
   }
+
+  // ---- ② 나를 마주 보는 면 ----
+  if (H >= 3 && k < H) { rockFace(g, x, y, k / (H - 1), H, i, seed); return; }
+  if (H >= 3) scree(g, x, y, k - H, i, seed);
 }
 
 // 면의 높이. **두 겹으로** 흔든다 — 다섯 칸짜리 덩이(들쭉날쭉)와 열두 칸짜리

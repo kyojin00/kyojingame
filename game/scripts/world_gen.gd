@@ -415,6 +415,22 @@ func _build_levels() -> void:
 			var yb := _cut_ramp(int(r[0]), int(r[1]), tw)
 			if lit and yb >= 0:
 				stairs.append([int(r[0]), yb, tw])
+	# ---- 벼랑면 위에는 아무것도 안 난다 ----
+	#
+	# 벼랑면은 「위 칸이 더 높다」는 표시로 **아랫 칸에** 그리는 그림이다.
+	# 그 칸의 바닥은 여전히 잔디라, 나무도 바위도 거기 돋았다 — 바위벽
+	# 한복판에 바위가 박히고 나무가 벽에서 자랐다.
+	# 이제 벽이 **두 칸**이라 더 크게 눈에 띈다. 통행은 이미 막아 두었으니
+	# (main.gd `_cliff_foot`) 심기는 것만 막으면 된다.
+	for y in range(1, m.MAP_H):
+		var b := y * m.MAP_W
+		for x in m.MAP_W:
+			if _lv(x, y - 1) <= _lv(x, y):
+				continue                      # 위가 더 높지 않으면 벼랑면이 아니다
+			m.no_spawn[b + x] = 1             # 면 첫 칸
+			if y + 1 < m.MAP_H and _lv(x, y + 1) == _lv(x, y):
+				m.no_spawn[b + m.MAP_W + x] = 1   # 두 칸째 (그림이 여기까지 내려온다)
+
 	# 층계참을 잇는 길 — 오르막을 낸 뒤라야 그 발치까지 이어 붙는다
 	for lm3: Dictionary in m.LANDMARKS:
 		var tr: Dictionary = lm3.get("terrain", {})
@@ -503,8 +519,12 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 	for y in range(maxi(0, cy - int(ry) - 3), mini(m.MAP_H, cy + int(ry) + 4)):
 		for x in range(maxi(0, cx - int(rx) - 3), mini(m.MAP_W, cx + int(rx) + 4)):
 			var a := atan2(float(y - cy), float(x - cx))
-			var w := 0.86 + m._hash01(int(round(a * 4.0)), seed) * 0.16 \
-				+ m._hash01(int(round(a * 8.0)), seed + 1) * 0.14
+			# 흔들림을 **크게 몇 번**으로. 잔 흔들림(a*8)이 크면 가장자리가
+			# 두세 칸씩 들쭉날쭉해지는데, 벼랑면이 한 칸일 때는 그게 「거친
+			# 벼랑」이었지만 두 칸이 되고 나서는 **회색 덩어리가 뚝뚝 끊겨**
+			# 놓인 것처럼 보인다. 벽은 이어져야 벽이다
+			var w := 0.90 + m._hash01(int(round(a * 3.0)), seed) * 0.15 \
+				+ m._hash01(int(round(a * 7.0)), seed + 1) * 0.06
 			var d := pow((x - cx) / (rx * w), 2.0) + pow((y - cy) / (ry * w), 2.0)
 			if d <= 1.0 and _lv(x, y) > 0:
 				_set_lv(x, y, to)
@@ -514,7 +534,7 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 	var x1: int = mini(m.MAP_W - 1, cx + int(rx) + 4)
 	var y0: int = maxi(1, cy - int(ry) - 3)
 	var y1: int = mini(m.MAP_H - 1, cy + int(ry) + 4)
-	for _pass in 2:
+	for _pass in 4:
 		var fix: Array = []
 		for y in range(y0, y1):
 			for x in range(x0, x1):
