@@ -2743,11 +2743,24 @@ func _perf_tick(delta: float) -> void:
 	if _perf_n < 30:
 		return
 	var n := float(_perf_n)
+	# 엔진이 재 주는 값 — **내가 안 잰 데**가 어디인지 여기서 갈린다.
+	# 스크립트(TIME_PROCESS)가 크면 내 코드, 그리기 호출/정점이 크면
+	# 화면에 너무 많이 그리는 것이다. 짐작할 자리가 없어진다.
+	var proc_ms := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+	var phys_ms := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+	var calls := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	var prims := int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
+	var objs := int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
+	var mine := (int(_perf_acc.draw) + int(_perf_acc.fade) + int(_perf_acc.stream)
+		+ int(_perf_acc.spawn)) / n / 1000.0
 	var lines := "FPS %d   프레임 %.1fms   최악 %.1fms\n" % [
 		Engine.get_frames_per_second(), delta * 1000.0, _perf_worst]
-	lines += "그리기 %.2f · 비침 %.2f · 스트림 %.2f · 세우기 %.2f (ms)\n" % [
+	lines += "스크립트 전체 %.1f · 물리 %.1f · 내가 잰 것 %.2f (ms)\n" % [
+		proc_ms, phys_ms, mine]
+	lines += "  그리기 %.2f · 비침 %.2f · 스트림 %.2f · 세우기 %.2f\n" % [
 		int(_perf_acc.draw) / n / 1000.0, int(_perf_acc.fade) / n / 1000.0,
 		int(_perf_acc.stream) / n / 1000.0, int(_perf_acc.spawn) / n / 1000.0]
+	lines += "그리기 호출 %d · 정점묶음 %d · 그린 것 %d\n" % [calls, prims, objs]
 	lines += "노드 %d (월드 자식 %d) · 물건 %d · 세울 차례 %d" % [
 		obj_nodes.size(), world.get_child_count(), objects.size(),
 		objnode._spawn_queue.size()]

@@ -217,6 +217,7 @@ func use_tool() -> void:
 					if m.objects.has(pos) or c.ground != "grass":
 						continue
 					c.ground = "soil"
+					m.farming.touch(c)   # 갈아 놓은 흙도 「밭」이다 (하루가 넘어갈 때 여기만 돈다)
 					if GameData.weather_wet(m.weather_now()):
 						m.farming._wet(c, m.WET_ALL_DAY)
 					m.renderer.spawn_particles(pos, "dirt")

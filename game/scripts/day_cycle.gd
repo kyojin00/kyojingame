@@ -94,12 +94,14 @@ func _fade_next_day(passed_out: bool) -> void:
 
 
 func _next_day(passed_out: bool) -> void:
-	# 밤사이 밭은 마른다 (성장은 실시간 _growth_tick에서)
-	for y in m.MAP_H:
-		for x in m.MAP_W:
-			var cell: Dictionary = m.grid[y][x]
-			cell.watered = false
-			cell.wet_min = 0.0
+	# 밤사이 밭은 마른다 (성장은 실시간 _growth_tick에서).
+	#
+	# **밭 칸만 돈다.** 예전에는 지도 전체(13만 6천 칸)를 훑었다 —
+	# 하루가 넘어갈 때마다 1초씩 멈췄고, 배속을 올리면 하루가 몇 초마다
+	# 넘어가니 그 멈춤이 계속 걸렸다. 마를 것은 젖은 칸뿐이다.
+	for cell: Dictionary in m.farming.farm_cells():
+		cell.watered = false
+		cell.wet_min = 0.0
 
 	if m.cave.visible:
 		m.cave.visible = false  # 새벽이 되면 동굴에서 나온다
@@ -118,35 +120,30 @@ func _next_day(passed_out: bool) -> void:
 	var season_changed := GameData.season() != prev_season
 	var wilted := 0
 	if season_changed:
-		for y in m.MAP_H:
-			for x in m.MAP_W:
-				var cell: Dictionary = m.grid[y][x]
-				if cell.crop_id != "" and not cell.dead \
-						and GameData.season() not in GameData.CROPS[cell.crop_id].seasons \
-						and not m.village.in_greenhouse(Vector2i(x, y)):
-					cell.dead = true
-					wilted += 1
+		for cell: Dictionary in m.farming.farm_cells():
+			if cell.crop_id != "" and not cell.dead \
+					and GameData.season() not in GameData.CROPS[cell.crop_id].seasons \
+					and not m.village.in_greenhouse(Vector2i(int(cell.tx), int(cell.ty))):
+				cell.dead = true
+				wilted += 1
 		m.objnode._apply_season_visuals()
 
 	# 폭풍이 지나간 아침: 자란 작물 일부가 상하고, 대신 목재가 잔뜩 떨어져 있다
 	var storm_hurt := 0
 	var storm_wood := 0
 	if m.weather_now() == GameData.WEATHER_STORM:
-		for y in m.MAP_H:
-			for x in m.MAP_W:
-				var sc: Dictionary = m.grid[y][x]
-				if sc.crop_id != "" and not sc.dead and randf() < m.STORM_CROP_HURT:
-					sc.crop_day = maxf(0.0, float(sc.crop_day) - 60.0 * 12.0)
-					storm_hurt += 1
+		for sc: Dictionary in m.farming.farm_cells():
+			if sc.crop_id != "" and not sc.dead and randf() < m.STORM_CROP_HURT:
+				sc.crop_day = maxf(0.0, float(sc.crop_day) - 60.0 * 12.0)
+				storm_hurt += 1
 		storm_wood = randi_range(m.STORM_WOOD_MIN, m.STORM_WOOD_MAX)
 		GameData.wood += storm_wood
 
 	# 비·폭풍이 온 날은 밭이 하루 종일 젖어 있다
 	if GameData.weather_wet(m.weather_now()):
-		for y in m.MAP_H:
-			for x in m.MAP_W:
-				if m.grid[y][x].ground == "soil":
-					m.farming._wet(m.grid[y][x], m.WET_ALL_DAY)
+		for wc: Dictionary in m.farming.farm_cells():
+			if str(wc.ground) == "soil":
+				m.farming._wet(wc, m.WET_ALL_DAY)
 
 	m.farming._sprinkler_tick()
 
@@ -273,9 +270,10 @@ func _next_day(passed_out: bool) -> void:
 	if Net.is_host():
 		m.netsync.send_new_day(m.netsync._make_snapshot_json(), s_title, s_body)
 	m.queue_redraw()
-	# 밤새 물기가 마르고 작물이 자랐다 — 「돌아가는 칸」 목록을 다시 만든다.
-	# 어딘가에서 touch를 빠뜨려도 여기서 하루 안에 저절로 맞춰진다.
-	m.farming.rebuild()
+	# 밤새 물기가 마르고 작물이 자랐다 — 목록에서 빠질 것만 걸러 낸다.
+	# (예전에는 여기서 rebuild 로 지도 전체를 다시 훑었다. 13만 6천 칸을
+	#  매일 훑는 값이 배속에서 그대로 멈춤이 됐다 — 여는 순간에만 훑는다)
+	m.farming.refresh()
 
 func _update_night() -> void:
 	# 가로등이 없는 마을 — 해가 지면 정말로 캄캄해진다

@@ -24,8 +24,12 @@ func _build_map() -> void:
 		var row := []
 		for x in m.MAP_W:
 			# crop_day = 누적 성장 시간(게임 분), wet_min = 남은 젖음 시간(게임 분)
+			# tx/ty — 칸이 **제 좌표를 안다.** 하루가 넘어갈 때 밭 칸 목록만
+			# 돌면서 온실 안인지 따위를 물어야 하는데, 목록에는 칸만 들어
+			# 있어서 좌표를 되찾을 길이 없었다 (그래서 지도를 다시 훑었다)
 			row.append({"ground": "grass", "watered": false, "wet_min": 0.0,
-				"crop_id": "", "crop_day": 0.0, "dead": false, "half_fed": false})
+				"crop_id": "", "crop_day": 0.0, "dead": false, "half_fed": false,
+				"tx": x, "ty": y})
 		m.grid.append(row)
 
 	# 연못들 (숲/깊은 숲) — 시작 부지의 연못은 없앴다

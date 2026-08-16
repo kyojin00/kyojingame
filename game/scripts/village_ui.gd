@@ -626,6 +626,7 @@ func _build_greenhouse() -> void:
 			if m.objects.has(t) and m.objects[t].kind != "sign":
 				m.objnode._remove_object(t)
 			m.grid[y][x].ground = "soil"
+			m.farming.touch(m.grid[y][x])   # 갈아 놓은 흙도 「밭」이다
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("온실 완공!")
 	m.saveio.save_now()

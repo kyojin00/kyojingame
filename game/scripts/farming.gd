@@ -62,17 +62,42 @@ func _blocks_pasture(t: Vector2i) -> bool:
 
 func _recount_pasture() -> void:
 	m.pasture.clear()
-	# ① 가장자리에서 흘려보내 「바깥」을 표시한다
+	# ---- 울타리 둘레만 본다 ----
+	#
+	# 예전에는 지도 **전체**에서 흘려보냈다. 224x132 일 때는 3만 칸이라
+	# 견뎠는데, 448x264 가 되면서 13만 6천 칸이 됐다 — 하루가 넘어갈 때마다
+	# (그리고 울타리를 놓을 때마다) 그걸 두 번씩 훑는다. 배속을 올리면
+	# 하루가 몇 초마다 넘어가니 그게 1초짜리 멈춤으로 계속 걸렸다.
+	#
+	# 목초지는 **울타리로 둘러싼 곳**이다. 울타리가 하나도 없으면 볼 것도
+	# 없고, 있어도 그 울타리들을 감싸는 네모 바깥은 절대 갇힐 수 없다.
+	var fx0 := m.MAP_W
+	var fy0 := m.MAP_H
+	var fx1 := -1
+	var fy1 := -1
+	for pos: Vector2i in m.objects:
+		if str(m.objects[pos].kind) != "fence":
+			continue
+		fx0 = mini(fx0, pos.x); fy0 = mini(fy0, pos.y)
+		fx1 = maxi(fx1, pos.x); fy1 = maxi(fy1, pos.y)
+	if fx1 < 0:
+		return                      # 울타리가 없으면 목초지도 없다
+	# 울타리 네모에서 두 칸 넉넉히 — 그 테두리에서 물을 흘려보낸다
+	var bx0: int = maxi(0, fx0 - 2)
+	var by0: int = maxi(0, fy0 - 2)
+	var bx1: int = mini(m.MAP_W - 1, fx1 + 2)
+	var by1: int = mini(m.MAP_H - 1, fy1 + 2)
+	# ① 네모 테두리에서 흘려보내 「바깥」을 표시한다
 	var outside := {}
 	var queue: Array[Vector2i] = []
-	for x in m.MAP_W:
-		for y in [0, m.MAP_H - 1]:
+	for x in range(bx0, bx1 + 1):
+		for y in [by0, by1]:
 			var t := Vector2i(x, y)
 			if not _blocks_pasture(t) and not outside.has(t):
 				outside[t] = true
 				queue.append(t)
-	for y2 in m.MAP_H:
-		for x2 in [0, m.MAP_W - 1]:
+	for y2 in range(by0, by1 + 1):
+		for x2 in [bx0, bx1]:
 			var t2 := Vector2i(x2, y2)
 			if not _blocks_pasture(t2) and not outside.has(t2):
 				outside[t2] = true
@@ -83,7 +108,7 @@ func _recount_pasture() -> void:
 		head += 1
 		for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			var n: Vector2i = cur + d
-			if n.x < 0 or n.y < 0 or n.x >= m.MAP_W or n.y >= m.MAP_H:
+			if n.x < bx0 or n.y < by0 or n.x > bx1 or n.y > by1:
 				continue
 			if outside.has(n) or _blocks_pasture(n):
 				continue
@@ -91,8 +116,8 @@ func _recount_pasture() -> void:
 			queue.append(n)
 	# ② 바깥에 닿지 못한 빈 칸 = 갇힌 칸. 덩어리별로 크기를 재서 너무 넓으면 뺀다
 	var seen := {}
-	for y3 in m.MAP_H:
-		for x3 in m.MAP_W:
+	for y3 in range(by0, by1 + 1):
+		for x3 in range(bx0, bx1 + 1):
 			var t3 := Vector2i(x3, y3)
 			if seen.has(t3) or outside.has(t3) or _blocks_pasture(t3):
 				continue
@@ -104,7 +129,7 @@ func _recount_pasture() -> void:
 				h2 += 1
 				for d2 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 					var n2: Vector2i = c2 + d2
-					if n2.x < 0 or n2.y < 0 or n2.x >= m.MAP_W or n2.y >= m.MAP_H:
+					if n2.x < bx0 or n2.y < by0 or n2.x > bx1 or n2.y > by1:
 						continue
 					if seen.has(n2) or _blocks_pasture(n2):
 						continue
@@ -188,6 +213,33 @@ func touch(cell: Dictionary) -> void:
 	_ticking.append(cell)
 
 
+# 이 칸을 「밭」으로 볼 것인가 — 젖었거나 · 심겼거나 · 갈아 놓은 흙.
+# 하루가 넘어갈 때 마르게 하고 시들게 하는 일도 전부 이 조건이다.
+func _is_farm_cell(c: Dictionary) -> bool:
+	return float(c.wet_min) > 0.0 or str(c.crop_id) != "" or str(c.ground) == "soil"
+
+
+# 지금 「밭」인 칸들. 하루가 넘어갈 때 여기만 돌면 된다 —
+# 지도 전체(13만 6천 칸)를 훑을 이유가 없다
+func farm_cells() -> Array[Dictionary]:
+	return _ticking
+
+
+# 하루가 넘어갈 때 — **목록만 걸러 낸다.** 지도는 안 훑는다.
+# (rebuild 는 세이브를 펴거나 세계를 다시 지을 때만 부른다)
+func refresh() -> void:
+	var keep: Array[Dictionary] = []
+	for c: Dictionary in _ticking:
+		if _is_farm_cell(c):
+			keep.append(c)
+		else:
+			c["ticking"] = false
+	_ticking = keep
+
+
+# 지도를 통째로 훑어 목록을 다시 만든다 — **여는 순간에만.**
+# 하루가 넘어갈 때마다 부르면 13만 6천 칸을 매일 훑는다 (예전에 그랬고,
+# 배속을 올리면 그게 1초짜리 멈춤이 되어 계속 걸렸다)
 func rebuild() -> void:
 	rebuild_sprinklers()
 	_ticking.clear()
@@ -196,7 +248,7 @@ func rebuild() -> void:
 		for x in m.MAP_W:
 			var c: Dictionary = row[x]
 			c["ticking"] = false
-			if float(c.wet_min) > 0.0 or str(c.crop_id) != "":
+			if _is_farm_cell(c):
 				touch(c)
 
 
@@ -219,8 +271,8 @@ func _growth_tick(game_minutes: float) -> void:
 					changed = true
 				if m.renderer._crop_texture(cell) != before_stage:
 					changed = true
-		# 마르고 작물도 없으면 더 볼 일이 없다
-		if float(cell.wet_min) > 0.0 or str(cell.crop_id) != "":
+		# 마르고 · 작물도 없고 · 갈아 놓은 흙도 아니면 더 볼 일이 없다
+		if _is_farm_cell(cell):
 			keep.append(cell)
 		else:
 			cell["ticking"] = false
