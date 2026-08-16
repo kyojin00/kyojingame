@@ -777,6 +777,41 @@ function ivy(g, x, yBottom, yTop) {
 }
 
 
+// 널문 — 벽돌에 줄눈이 있듯 문에는 **널과 띠쇠**가 있다.
+//
+// 매끈한 판때기로 두면 벽만 재질이 있고 문은 색종이가 된다. 문도 사람이
+// 만든 물건이라 짜 맞춘 자국이 남는다:
+//
+//   널     세로로 짜 맞춘다. 이음매는 어둡고 그 옆이 빛을 받는다
+//   널색   한 장씩 조금씩 다르다 (같은 나무에서 잘라도 결이 다르다)
+//   결·옹이 세로로 길게 지나간다
+//   띠쇠   위아래 두 줄. 못머리가 박혀 있다 — 이 한 줄이 문을 「문」으로 만든다
+//   밑동   비에 젖어 짙다. 문은 아래부터 썩는다
+function plankFace(g, x0, x1, yTop, yBot) {
+  // 널은 **다섯 칸**. 네 칸으로 좁혔더니 이음매(어두운 줄)가 문의 40%를
+  // 차지해서 문이 통째로 까매졌다. 결도 0.16 -> 0.09로 줄인다 —
+  // 재질을 넣는 것과 어둡게 칠하는 건 다른 일이다
+  const PW = 5;
+  for (let y = yTop; y <= yBot; y++) for (let x = x0; x <= x1; x++) {
+    if (!'tuT'.includes(g.get(x, y))) continue;
+    const col = Math.floor((x - x0) / PW), r = hash(col, 17);
+    let c = r < 0.18 ? 'u' : (r > 0.72 ? 'u' : 't');       // 널마다 조금씩 다르게
+    if ((x - x0) % PW === 0) c = 'T';                      // 널 사이 이음매
+    else if ((x - x0) % PW === 1) c = 'u';                 // 이음매 옆이 빛을 받는다
+    if (hash(x, y >> 2) < 0.09) c = (c === 'u') ? 't' : 'T';   // 결·옹이
+    g.px(x, y, c);
+  }
+  for (const by of [yTop + 4, yBot - 5]) {                 // 띠쇠
+    if (by <= yTop || by >= yBot) continue;
+    g.hline(x0, x1, by, 'S');
+    g.hline(x0, x1, by + 1, 'p5');
+    for (let x = x0 + 2; x <= x1; x += 5) g.px(x, by, 'p3');   // 못머리
+  }
+  for (let y = yBot - 5; y <= yBot; y++) for (let x = x0; x <= x1; x++)  // 젖은 밑동
+    if ('tu'.includes(g.get(x, y)) && hash(x, y * 3) < (y - (yBot - 6)) / 6 * 0.55)
+      g.px(x, y, 'T');
+}
+
 function archDoor(g, cx, w, h, GROUND) {
   // 아치문 — 위 세 줄을 한 칸씩 좁혀 둥글린다
   const x0 = cx - Math.floor(w / 2), y0 = GROUND - h;
@@ -786,9 +821,11 @@ function archDoor(g, cx, w, h, GROUND) {
   for (let i = 0; i < 3; i++)
     g.rect(x0 + 1 + (2 - i), y0 + 1 + i, x0 + w - 2 - (2 - i), y0 + 1 + i, 't');
   g.rect(x0 + 1, y0 + 4, x0 + w - 2, GROUND, 't');
-  g.vline(x0 + 1, y0 + 4, GROUND, 'u');                    // 왼쪽 빛
-  g.vline(cx, y0 + 4, GROUND, 'T');                        // 가운데 널
-  g.px(x0 + w - 3, y0 + Math.floor(h / 2), 'y');           // 손잡이
+  plankFace(g, x0 + 1, x0 + w - 2, y0 + 1, GROUND - 1);    // 널·띠쇠·결
+  g.vline(x0, y0 + 4, GROUND, 'T');                        // 문설주
+  g.vline(x0 + w - 1, y0 + 4, GROUND, 'T');
+  g.rect(x0 + w - 4, y0 + Math.floor(h / 2) - 1, x0 + w - 3, y0 + Math.floor(h / 2), 'y');
+  g.px(x0 + w - 4, y0 + Math.floor(h / 2) + 1, 'Y');       // 손잡이
   // 문 위 **현관 지붕**. 작은 차양 두 줄로는 문이 벽에 뚫린 구멍으로 보인다.
   // 처마가 밖으로 나오고 밑에 그늘이 깔려야 「들어가는 곳」이 된다
   for (let i = 0; i < 3; i++)
@@ -1386,7 +1423,7 @@ function loftDoor(g, cx, y, w, h) {
   const a = cx - (w >> 1), b = cx + (w >> 1);
   g.rect(a, y, b, y + h, 'T');
   g.rect(a + 1, y + 1, b - 1, y + h - 1, 't');
-  g.vline(cx, y + 1, y + h - 1, 'T');
+  plankFace(g, a + 1, b - 1, y + 1, y + h - 1);
   g.hline(a, b, y, 'u');
   g.vline(cx, y - 5, y - 3, 'T');                          // 도르래 팔
   g.rect(cx - 3, y - 6, cx + 1, y - 5, 'T');
