@@ -305,6 +305,7 @@ const TEXTURE_NAMES := [
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
 	"soil_dry", "soil_wet", "water_0", "water_1", "path", "yard",
 	"shore_n", "shore_s", "shore_w", "shore_e",
+	"shoal_n", "shoal_s", "shoal_w", "shoal_e",
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
@@ -1931,6 +1932,16 @@ func _draw() -> void:
 				sands.append(at)
 			elif ground == "water":
 				put.call(base, tex["water_%d" % water_frame], at)
+				# 여울 — 뭍에 가까운 물은 얕아서 바닥이 비친다.
+				# 물가를 땅 쪽에서만 만들면 경계가 얕다. **양쪽에서** 만들어야 깊어진다
+				if not _is_water(x, y - 1):
+					put.call(edges, tex["shoal_n"], at)
+				if not _is_water(x, y + 1):
+					put.call(edges, tex["shoal_s"], at)
+				if not _is_water(x - 1, y):
+					put.call(edges, tex["shoal_w"], at)
+				if not _is_water(x + 1, y):
+					put.call(edges, tex["shoal_e"], at)
 			elif ground == "soil":
 				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
 			elif ground == "path":

@@ -361,11 +361,13 @@ function shore(dir) {
     else g.px(N - 1 - k, i, c);
   };
   for (let i = 0; i < N; i++) {
-    const deep = 3 + Math.floor(h(i, dir, 56) * 5);         // 젖은 폭이 들쭉날쭉
+    const deep = 4 + Math.floor(h(i, dir, 56) * 6);         // 젖은 폭이 들쭉날쭉
     for (let k = 0; k < deep; k++) {
-      if (k > 2 && h(i, k, dir + 57) < 0.15 + k * 0.13) continue;
-      // 물에 가까울수록 짙다 — 갓 젖은 자리와 마르는 자리
-      put(i, k, EARTH[k === 0 ? 5 : (k < 3 ? 4 : 3)]);
+      // 멀어질수록 성기게 — 다만 **천천히**. 문턱을 가파르게 잡았더니
+      // 넓게 잡아 놓고도 실제로는 네 칸에서 끝나 버렸다
+      if (k > 3 && h(i, k, dir + 57) < 0.04 + k * 0.07) continue;
+      // 물에 가까울수록 짙다 — 갓 젖은 자리 / 마르는 자리 / 거의 마른 자리
+      put(i, k, EARTH[k === 0 ? 5 : (k < 3 ? 4 : (k < 6 ? 3 : 2))]);
     }
     // 조약돌 — 물가에는 늘 돌이 드러나 있다
     if (h(i, 2, dir + 58) < 0.22) put(i, 1, STONE[3]);
@@ -373,6 +375,33 @@ function shore(dir) {
     // 거품 — 제일 바깥 한 줄, 절반쯤만. 통줄로 그으면 페인트가 된다
     if (h(i, 0, dir + 60) < 0.60) put(i, 0, FOAM);
     if (h(i, 1, dir + 61) < 0.25) put(i, 1, FOAM);          // 튄 자리
+  }
+  return g;
+}
+
+
+// 여울 — **물 쪽**에 얹는 덧그림. 땅이 그쪽에 있다.
+//
+// 물가를 땅 쪽에서만 만들었더니 경계가 얕았다. 실제로 깊어 보이는 물가는
+// **양쪽에서** 만들어진다 — 물도 뭍에 가까울수록 얕아져 바닥이 비친다.
+function shoal(dir) {
+  const g = new T();
+  const put = (i, k, c) => {
+    if (dir === 0) g.px(i, k, c);
+    else if (dir === 1) g.px(i, N - 1 - k, c);
+    else if (dir === 2) g.px(k, i, c);
+    else g.px(N - 1 - k, i, c);
+  };
+  for (let i = 0; i < N; i++) {
+    const deep = 3 + Math.floor(h(i, dir, 71) * 4);
+    for (let k = 0; k < deep; k++) {
+      if (k > 1 && h(i, k, dir + 72) < 0.08 + k * 0.11) continue;
+      // 얕을수록 밝다. WATER[2]는 바탕물과 같아서 안 보였다 — 0~1만 쓴다
+      put(i, k, WATER[k === 0 ? 0 : 1]);
+    }
+    // 물속에 비치는 바닥 — 모래와 돌
+    if (h(i, 1, dir + 73) < 0.30) put(i, 1, EARTH[1]);
+    if (h(i, 2, dir + 74) < 0.18) put(i, 2, STONE[3]);
   }
   return g;
 }
@@ -386,11 +415,12 @@ save('yard', yard().render());
 save('water_0', water(0).render());
 save('water_1', water(1).render());
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shore_' + d, shore(i).render()));
+['n', 's', 'w', 'e'].forEach((d, i) => save('shoal_' + d, shoal(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());
 
-console.log(`바닥 ${12 + 1 + 1 + 4 + 2 + 2 + 4}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
+console.log(`바닥 ${12 + 1 + 1 + 4 + 2 + 2 + 4 + 4}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
 console.log(INSTALL ? '  sprites/ 에 넣었다'
   : '  ref/proposed_*.png 로만 뽑았다 (--install 을 붙이면 게임에 넣는다)');
 
