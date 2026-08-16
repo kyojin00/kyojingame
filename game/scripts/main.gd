@@ -2970,8 +2970,14 @@ func _perf_tick(delta: float) -> void:
 		return
 	var n := float(_perf_n)
 	# 엔진이 재 주는 값 — **내가 안 잰 데**가 어디인지 여기서 갈린다.
-	# 스크립트(TIME_PROCESS)가 크면 내 코드, 그리기 호출/정점이 크면
-	# 화면에 너무 많이 그리는 것이다. 짐작할 자리가 없어진다.
+	# 스크립트가 크면 내 코드, 그리기 호출/정점이 크면 화면에 너무 많이
+	# 그리는 것이다. 짐작할 자리가 없어진다.
+	#
+	# **TIME_PROCESS 는 「지금 프레임」이 아니다.** 고도는 1초 동안의
+	# _process 중 **가장 오래 걸린 것**을 담아 두었다가 초가 바뀔 때
+	# 내놓는다. 그걸 「지금」으로 읽어서 「스크립트 566ms 인데 프레임
+	# 5.6ms」 같은 말이 안 되는 짝이 나왔다 — 그건 최악 한 프레임이었고,
+	# 실제로 그 초의 FPS가 반토막이었다. 이름을 바로 적어 둔다.
 	var proc_ms := Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 	var phys_ms := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
 	var calls := int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
@@ -2982,12 +2988,19 @@ func _perf_tick(delta: float) -> void:
 	var lines := "FPS %d   프레임 %.1fms   최악(3초) %.1fms / 스크립트 %.1fms\n" % [
 		Engine.get_frames_per_second(), delta * 1000.0,
 		maxf(_perf_worst, _perf_worst_show), maxf(_perf_proc_worst, _perf_proc_show)]
-	lines += "스크립트 지금 %.1f · 물리 %.1f · 내가 잰 것 %.2f (ms)\n" % [
+	lines += "스크립트 최악(1초) %.1f · 물리 %.1f · 내가 잰 것(평균) %.2f (ms)\n" % [
 		proc_ms, phys_ms, mine]
 	lines += "  그리기 %.2f · 비침 %.2f · 스트림 %.2f · 세우기 %.2f\n" % [
 		int(_perf_acc.draw) / n / 1000.0, int(_perf_acc.fade) / n / 1000.0,
 		int(_perf_acc.stream) / n / 1000.0, int(_perf_acc.spawn) / n / 1000.0]
-	lines += "그리기 호출 %d · 정점묶음 %d · 그린 것 %d\n" % [calls, prims, objs]
+	# 프레임이 안 올라가는 게 **못 올라가는** 것인지 **안 올리는** 것인지.
+	# 수직 동기화가 켜져 있으면 주사율 위로는 그려 봐야 화면에 안 나온다 —
+	# 남는 힘이 없는 게 아니라 쓸 데가 없는 것이다. 헷갈릴 자리를 없앤다
+	var vs := DisplayServer.window_get_vsync_mode()
+	var hz := DisplayServer.screen_get_refresh_rate()
+	lines += "그리기 호출 %d · 정점묶음 %d · 그린 것 %d · 수직동기 %s%s\n" % [
+		calls, prims, objs, "켬" if vs != DisplayServer.VSYNC_DISABLED else "끔",
+		(" (화면 %.0fHz)" % hz) if hz > 0.0 else ""]
 	# 끊김은 평균이 아니라 **한 번 터지는 것**에서 온다. 하루 넘김이
 	# 그중 제일 크다 — 어느 토막이 먹는지 여기서 바로 읽힌다
 	lines += "하루넘김 %.0fms (밭 %.0f · 자람 %.0f · 리젠 %.0f · 저장 %.0f)\n" % [
