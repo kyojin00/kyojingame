@@ -2855,6 +2855,14 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 			var nb: int = nbuf[b]
 			if ramp and (nb & 64) != 0:
 				continue          # 오르막끼리는 경계가 아니다
+			# **계단 쪽으로는 벽을 이어 붙이지 않는다.**
+			#
+			# 대각선 이웃이 오르막이면 그 칸은 (오르막끼리 경계가 아니므로)
+			# 벽을 안 세운다. 그런데 이쪽은 「저 대각선이 높다」고 읽어
+			# 벽을 끝까지 세우니, 계단 옆에서 두 칸 높이 벽이 직각으로 뚝
+			# 잘렸다. 그 비트를 빼면 벽이 어깨를 지고 계단 쪽으로 흘러내린다
+			if b >= 4 and (nb & 64) != 0:
+				continue
 			var nlb: int = nb & 56
 			if nlb > lvb:
 				up |= 1 << b

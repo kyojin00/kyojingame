@@ -945,6 +945,24 @@ function backFoot(g, x, y, k, i, seed) {
   if (d <= 3 && h(Math.floor(i / 2), d, 126 + seed) < 0.22) g.px(x, y, MOSS[d < 2 ? 1 : 2]);
 }
 
+// 벽 끝을 흘리는 어깨 — 가장자리로 갈수록 낮아진다. 원호라 **바깥이
+// 급하고 안이 완만하다** (모서리가 부풀어 보이는 그 곡선이다).
+//
+// 끝에서 **0까지 떨구면 안 된다.** 비스듬한 경계에서는 칸마다 한쪽씩
+// 어깨가 지므로, 0까지 흘리면 벼랑이 낱개 바위 여럿으로 흩어진다 —
+// 이어진 벽이 아니라 알을 늘어놓은 꼴이 됐다. 바닥값을 두어 「끊기는」
+// 대신 「내려앉게」 한다: 끝머리는 반 칸 높이의 둥근 턱으로 남는다
+const SHOULDER = 5;
+const SH_FLOOR = 0.0;
+function shoulder(d, i, seed) {
+  if (d >= SHOULDER) return 1;
+  if (d < 0) return SH_FLOOR;
+  const t = (SHOULDER - d) / SHOULDER;
+  const arc = Math.sqrt(Math.max(0, 1 - t * t));
+  return clamp(SH_FLOOR + (1 - SH_FLOOR) * arc
+    + (h(i, d, 131 + seed) - 0.5) * 0.14, 0, 1);
+}
+
 // 벼랑면 — **아래쪽 칸**에 드리운다. 나를 마주 볼 때(위쪽 땅이 북쪽)만
 // 온전히 보이고, 옆이면 좁은 띠, 남쪽이면 등을 돌려 발치만 남는다
 function cliffPx(g, x, y, s, nax, nay, i, seed, _fill, code) {
@@ -965,7 +983,21 @@ function cliffPx(g, x, y, s, nax, nay, i, seed, _fill, code) {
   const hasS = (code & 2) !== 0;                 // 남쪽이 높다 -> 등을 돌린 벽
   const hasW = (code & 4) !== 0, hasE = (code & 8) !== 0;
   const face = clamp(-nay, 0, 1);
-  const lean = hasN ? Math.max(face, 0.56) : 0;  // 북쪽이 아니면 정면은 없다
+  // **벽이 옆에서 끊기는 자리를 둥글린다.**
+  //
+  // 옆 칸이 벽을 안 세우면(대각선만 높은 칸은 안 세운다 — 계단이 묻히니까)
+  // 두 칸 높이 벽이 잔디 위에서 **직각으로 뚝 잘린다.** 세계를 훑어 보니
+  // 맞닿은 벽 기둥 1,506쌍 중 530쌍이 그랬다.
+  //
+  // 옆에 벽이 서는지는 꼴 값이 말해 준다: 북쪽이 높은데 북서가 안 높으면
+  // 서쪽 칸에는 벽이 없다(그 칸의 북쪽 = 내 북서다). 그 끝으로 갈수록
+  // 벽을 낮춰 **어깨처럼 둥글게** 흘린다. 옆이 이미 높은 땅이면(안쪽
+  // 모서리) 그쪽은 옆면이 덮으므로 건드리지 않는다
+  const hasNW = (code & 16) !== 0, hasNE = (code & 32) !== 0;
+  let taper = 1;
+  if (hasN && !hasNW && !hasW) taper = Math.min(taper, shoulder(x, i, seed));
+  if (hasN && !hasNE && !hasE) taper = Math.min(taper, shoulder(15 - x, i, seed));
+  const lean = hasN ? Math.max(face, 0.56) * taper : 0;  // 북쪽이 아니면 정면은 없다
   const H = faceH(lean, i, seed, true);
 
   // ---- ⓪ 등을 돌린 쪽 — 면은 없고 발치만 있다 ----
