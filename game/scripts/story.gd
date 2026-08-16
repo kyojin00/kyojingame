@@ -1733,7 +1733,7 @@ func _forest_update(delta: float) -> void:
 	# 정착한 다음 날 아침, 숲을 쏘다니던 재민이 뭔가를 발견했다.
 	if GameData.forest_quest == "settle" and GameData.day > GameData.forest_day:
 		GameData.forest_quest = "found"
-		m.hud.story_banner("메인 스토리 5 시작", "숲속에서 발견한 집")
+		m.hud.quest_start_toast("숲속에서 발견한 집")
 		m.hud.quest_start_toast("재민이 할 말이 있는 듯하다")
 
 
@@ -1945,7 +1945,7 @@ func _end_forest_quest() -> void:
 	GameData.forest_quest = "done"
 	GameData.affinity_open = true
 	_forest_party_release()
-	m.hud.story_banner("메인 스토리 5 완결", "숲속에서 발견한 집")
+	m.hud.quest_toast("숲속에서 발견한 집")
 	m.hud.event_toast("호감도 시스템이 해금되었습니다")
 	m.dialog.open("호감도 시스템이 해금되었습니다",
 		"주민에게 말을 걸고, 부탁을 들어주고, 선물을 건네면\n"
@@ -2056,7 +2056,7 @@ func _start_move_letter_dialog() -> void:
 func _end_move_letter() -> void:
 	if GameData.move_quest == "letter":
 		GameData.move_quest = "show"
-		m.hud.story_banner("메인 스토리 3 시작", "새로운 주민의 이사")
+		m.hud.quest_start_toast("새로운 주민의 이사")
 		m.hud.quest_start_toast("마을 생활 안내가 열렸다! (Q에서 확인)")
 	m.saveio.save_now()
 
@@ -2240,7 +2240,7 @@ func examine_old_sign() -> void:
 
 func _begin_story4() -> void:
 	GameData.story4_phase = "ask"
-	m.hud.story_banner("메인 스토리 4 시작", "오래된 마을의 경계")
+	m.hud.quest_start_toast("오래된 마을의 경계")
 	m.hud.quest_start_toast("낡은 표지판 — 이장에게 물어보자")
 	m.saveio.save_now()
 
@@ -2268,7 +2268,7 @@ func _end_story4() -> void:
 	if not GameData.zones_open.has("east_north"):
 		GameData.zones_open.append("east_north")
 		m.dirty_walk()
-	m.hud.story_banner("메인 스토리 4 완결", "오래된 마을의 경계")
+	m.hud.quest_toast("오래된 마을의 경계")
 	m.hud.show_message("옛 마을 북동쪽 터가 열렸다! 동쪽 다리 너머로 마을이 넓어졌다.\n"
 		+ "남은 구역은 이장님의 「마을 확장 이야기」에서 되살릴 수 있다. (지도 M)", 7.0)
 	# 넓어진 땅에는 빈자리가 필요하다 — 이장의 부탁이 곧바로 이어진다
@@ -2433,7 +2433,7 @@ func _start_postman_settle_dialog() -> void:
 func _end_postman_settle() -> void:
 	if GameData.move_quest == "postgreet":
 		GameData.move_quest = "done"
-		m.hud.story_banner("메인 스토리 3 완결", "새로운 주민의 이사")
+		m.hud.quest_toast("새로운 주민의 이사")
 		m.hud.show_message("우체국이 문을 열었다! 우체부 아저씨가 마을에 자리 잡았다.", 6.0)
 		# 정착 다음 날, 재민의 숲 모험이 시작된다 (숲속에서 발견한 집으로 이어진다)
 		GameData.forest_quest = "settle"
@@ -2857,7 +2857,7 @@ func examine_old_book(t: Vector2i) -> void:
 
 
 func _end_book_found() -> void:
-	m.hud.story_banner("메인 스토리 6 시작", "오래된 책과 사서")
+	m.hud.quest_start_toast("오래된 책과 사서")
 	m.saveio.save_now()
 
 
@@ -2984,7 +2984,7 @@ func _end_library_done() -> void:
 	# (키를 지우면 가방 목록이 빈 키를 밟는다 — 개수만 0으로)
 	GameData.items["old_book"] = 0
 	GameData.old_book_stored = true
-	m.hud.story_banner("메인 스토리 6 완결", "오래된 책과 사서")
+	m.hud.quest_toast("오래된 책과 사서")
 	m.hud.show_message("사서 서하가 마을에 정착했다!\n도서관에서 오래된 책과 마을의 기록을 볼 수 있다.", 7.0)
 	m.saveio.save_now()
 
@@ -3022,7 +3022,7 @@ func _start_forge_worry_dialog() -> void:
 func _end_forge_worry() -> void:
 	if GameData.story7_phase == "worry":
 		GameData.story7_phase = "lore"
-		m.hud.story_banner("메인 스토리 7 시작", "식지 않는 화로")
+		m.hud.quest_start_toast("식지 않는 화로")
 		m.hud.quest_start_toast("도서관의 서하에게 물어보자")
 	m.saveio.save_now()
 
@@ -3081,7 +3081,7 @@ func _end_forge_fire() -> void:
 	GameData.items["ore"] -= GameData.STORY7_ORE
 	GameData.items["gem"] -= GameData.STORY7_GEM
 	GameData.story7_phase = "done"
-	m.hud.story_banner("메인 스토리 7 완결", "식지 않는 화로")
+	m.hud.quest_toast("식지 않는 화로")
 	m.hud.show_message("화로가 되살아났다! 대장간의 도구 강화 골드 비용이 20% 싸진다.", 7.0)
 	m.saveio.save_now()
 
@@ -3120,7 +3120,7 @@ func _start_rancher_visit_dialog() -> void:
 func _end_rancher_visit() -> void:
 	if GameData.story8_phase == "visit":
 		GameData.story8_phase = "ask"
-		m.hud.story_banner("메인 스토리 8 시작", "초원에서 온 목동")
+		m.hud.quest_start_toast("초원에서 온 목동")
 		m.hud.quest_start_toast("목장 이야기를 이장과 상의하자")
 	m.saveio.save_now()
 
@@ -3161,7 +3161,7 @@ func _end_ranch_done() -> void:
 	GameData.story8_phase = "done"
 	if not GameData.npc_greeted.has("rancher"):
 		GameData.npc_greeted.append("rancher")   # 정식 주민으로 정착
-	m.hud.story_banner("메인 스토리 8 완결", "초원에서 온 목동")
+	m.hud.quest_toast("초원에서 온 목동")
 	m.hud.show_message("목동 보라가 마을에 정착했다!\n목장 상회에서 동물·축사·말·펫을 들일 수 있다.", 7.0)
 	m.saveio.save_now()
 
@@ -3207,7 +3207,7 @@ func _start_hall_ask_dialog() -> void:
 func _end_hall_ask() -> void:
 	if GameData.story9_phase == "ask":
 		GameData.story9_phase = "invite"
-		m.hud.story_banner("메인 스토리 9 시작", "마을의 심장, 마을회관")
+		m.hud.quest_start_toast("마을의 심장, 마을회관")
 		m.hud.quest_start_toast("주민을 초대하자 — 목표 %d명 (지금 %d명)" %
 			[GameData.HALL_RESIDENTS, maxi(GameData.residents_now - 1, 0)])
 	m.saveio.save_now()
@@ -3230,7 +3230,7 @@ func _end_hall_open() -> void:
 	if GameData.story9_phase != "build" or not GameData.village_built.has("hall"):
 		return
 	GameData.story9_phase = "done"
-	m.hud.story_banner("메인 스토리 9 완결", "마을의 심장, 마을회관")
+	m.hud.quest_toast("마을의 심장, 마을회관")
 	m.hud.show_message("마을회관이 문을 열었다! 접수대에서 주민 명부와\n마을 소식을 볼 수 있다 — 마을이 클수록 할 일이 늘어난다.", 8.0)
 	m.saveio.save_now()
 
@@ -3269,7 +3269,7 @@ func _start_cave_note_dialog() -> void:
 func _end_cave_note() -> void:
 	if GameData.story10_phase == "note":
 		GameData.story10_phase = "survey"
-		m.hud.story_banner("메인 스토리 10 시작", "동굴과 탐험")
+		m.hud.quest_start_toast("동굴과 탐험")
 		m.hud.quest_start_toast("동굴 조사 — %d층 도달 + 새 표본 %d종 발견" %
 			[GameData.STORY10_DEPTH, GameData.STORY10_FINDS])
 		m.hud.show_message("연구 노트(N)에 동굴 컬렉션 두 쪽이 열렸다!\n다 채우면 채광·탐험에 영구 보상이 붙는다.", 7.0)
@@ -3301,7 +3301,7 @@ func _end_cave_report() -> void:
 	if GameData.story10_phase != "survey" or not GameData.story10_survey_done():
 		return
 	GameData.story10_phase = "done"
-	m.hud.story_banner("메인 스토리 10 완결", "동굴과 탐험")
+	m.hud.quest_toast("동굴과 탐험")
 	m.hud.show_message("할아버지의 동굴 조사를 이어받았다!\n연구 노트(N)의 동굴 컬렉션을 채우면 영구 보상이 열린다.", 7.0)
 	m.saveio.save_now()
 
@@ -3370,7 +3370,7 @@ func _end_hat_visit() -> void:
 	if GameData.story11_phase == "visit":
 		GameData.story11_phase = "clue"
 		GameData.story11_clues = []
-		m.hud.story_banner("메인 스토리 11 시작", "할머니의 모자")
+		m.hud.quest_start_toast("할머니의 모자")
 		m.hud.quest_start_toast("주민들에게 할머니의 모자 이야기를 듣자 (0/%d)"
 			% GameData.STORY11_CLUE_NPCS.size())
 	m.saveio.save_now()
@@ -3439,28 +3439,28 @@ func _end_grandma_record() -> void:
 	# 기록 읽기가 이야기의 끝맺음이 되는 장 — 스토리 11(모자)·13(팔찌)
 	if GameData.story11_phase == "record":
 		GameData.story11_phase = "done"
-		m.hud.story_banner("메인 스토리 11 완결", "할머니의 모자")
+		m.hud.quest_toast("할머니의 모자")
 		m.hud.show_message("첫 번째 유품을 찾았다. 할머니의 기록은 유품을\n찾을 때마다 한 장씩 열린다 — 이야기는 계속된다.", 7.0)
 		m.saveio.save_now()
 		return
 	if GameData.story13_phase == "record":
 		GameData.story13_phase = "done"
 		GameData.story13_done_day = GameData.day   # 다음 이야기 전, 자유 생활
-		m.hud.story_banner("메인 스토리 13 완결", "할머니의 팔찌")
+		m.hud.quest_toast("할머니의 팔찌")
 		m.hud.show_message("두 번째 유품을 찾았다. 바다도 약속은 지킨다 —\n남은 유품들이 어딘가에서 기다리고 있다.", 7.0)
 		m.saveio.save_now()
 		return
 	if GameData.story16_phase == "tale":
 		GameData.story16_phase = "done"
 		GameData.story16_done_day = GameData.day
-		m.hud.story_banner("메인 스토리 16 완결", "할머니의 반지")
+		m.hud.quest_toast("할머니의 반지")
 		m.hud.show_message("세 번째 유품을 찾았다. 흙이 오래 품고 있던 약속 —\n할아버지는 끝내 지키고 싶었던 것이다.", 7.0)
 		m.saveio.save_now()
 		return
 	if GameData.story17_phase == "tale":
 		GameData.story17_phase = "done"
 		GameData.story17_done_day = GameData.day
-		m.hud.story_banner("메인 스토리 17 완결", "할머니의 목걸이")
+		m.hud.quest_toast("할머니의 목걸이")
 		m.hud.show_message("네 번째 유품을 찾았다. 남은 유품은 하나 —\n두 분의 마지막 이야기가 기다리고 있다.", 7.0)
 		m.saveio.save_now()
 		return
@@ -3492,7 +3492,7 @@ func story12_note_read() -> void:
 	if GameData.story12_phase != "note":
 		return
 	GameData.story12_phase = "ask"
-	m.hud.story_banner("메인 스토리 12 시작", "숲의 연금술사")
+	m.hud.quest_start_toast("숲의 연금술사")
 	m.hud.quest_start_toast("이 기록... 도서관의 서하에게 보여주자")
 	m.saveio.save_now()
 
@@ -3623,7 +3623,7 @@ func _end_alch_demo() -> void:
 		GameData.items[mid] = int(GameData.items[mid]) - int(GameData.STORY12_MATS[mid])
 	GameData.story12_phase = "done"
 	GameData.story12_done_day = GameData.day   # 다음 이야기 전, 자유 생활 보장
-	m.hud.story_banner("메인 스토리 12 완결", "숲의 연금술사")
+	m.hud.quest_toast("숲의 연금술사")
 	m.hud.show_message("연금술이 열렸다! 집 안의 조합대에서 물약을\n만들 수 있다 — 조합법은 나무·바위·몬스터에게서 배운다.", 8.0)
 	m.saveio.save_now()
 
@@ -3673,7 +3673,7 @@ func _end_sea_rumor() -> void:
 	if GameData.story13_phase == "rumor":
 		GameData.story13_phase = "clue"
 		GameData.story13_heard = []
-		m.hud.story_banner("메인 스토리 13 시작", "할머니의 팔찌")
+		m.hud.quest_start_toast("할머니의 팔찌")
 		m.hud.quest_start_toast("주민들에게 할머니와 바다 이야기를 듣자 (0/%d)"
 			% GameData.STORY13_TALES)
 	m.saveio.save_now()
@@ -3813,7 +3813,7 @@ func _end_fest_meet() -> void:
 		GameData.story14_phase = "prep"
 		GameData.story14_tasks = []
 		GameData.story14_greet = []
-		m.hud.story_banner("메인 스토리 14 시작", "마을의 첫 축제")
+		m.hud.quest_start_toast("마을의 첫 축제")
 		m.hud.quest_start_toast("축제 준비 — 여섯 가지 중 %d가지만 고르자"
 			% GameData.STORY14_PICK)
 	m.saveio.save_now()
@@ -3946,7 +3946,7 @@ func _end_fest_day() -> void:
 		return
 	GameData.story14_phase = "done"
 	GameData.story14_done_day = GameData.day
-	m.hud.story_banner("메인 스토리 14 완결", "마을의 첫 축제")
+	m.hud.quest_toast("마을의 첫 축제")
 	m.hud.show_message("마을의 첫 축제가 끝났다!\n마을회관에서 「축제·행사 일정」을 볼 수 있게 됐다.", 7.0)
 	m.saveio.save_now()
 
@@ -3983,7 +3983,7 @@ func _start_onsen_tale_dialog() -> void:
 func _end_onsen_tale() -> void:
 	if GameData.story15_phase == "tale":
 		GameData.story15_phase = "book"
-		m.hud.story_banner("메인 스토리 15 시작", "마른 온천")
+		m.hud.quest_start_toast("마른 온천")
 		m.hud.quest_start_toast("도서관에서 온천 기록을 찾아보자")
 	m.saveio.save_now()
 
@@ -4085,7 +4085,7 @@ func _end_onsen_water() -> void:
 	GameData.onsen_open = true
 	m.worldgen._spawn_onsen()
 	m.npcmgr._sync_village_npcs()
-	m.hud.story_banner("메인 스토리 15 완결", "마른 온천")
+	m.hud.quest_toast("마른 온천")
 	m.hud.show_message("마을 북쪽 온천에 다시 물이 찼다!\n하루 한 번 몸을 담그면 체력이 가득 찬다.", 8.0)
 	m.queue_redraw()
 	m.saveio.save_now()
@@ -4134,7 +4134,7 @@ func _end_ring_record() -> void:
 	if GameData.story16_phase == "record":
 		GameData.story16_phase = "clue"
 		GameData.story16_heard = []
-		m.hud.story_banner("메인 스토리 16 시작", "할머니의 반지")
+		m.hud.quest_start_toast("할머니의 반지")
 		m.hud.quest_start_toast("주민들에게 옛 농지 이야기를 듣자 (0/%d)"
 			% GameData.STORY16_TALES)
 	m.saveio.save_now()
@@ -4239,7 +4239,7 @@ func _end_barn_cloth() -> void:
 	if GameData.story17_phase == "cloth":
 		GameData.story17_phase = "clue"
 		GameData.story17_heard = []
-		m.hud.story_banner("메인 스토리 17 시작", "할머니의 목걸이")
+		m.hud.quest_start_toast("할머니의 목걸이")
 		m.hud.quest_start_toast("주민들에게 할머니와 목장 이야기를 듣자 (0/%d)"
 			% GameData.STORY17_TALES)
 	m.saveio.save_now()
@@ -4360,7 +4360,7 @@ func _end_watch_memo() -> void:
 	if GameData.story18_phase == "memo":
 		GameData.story18_phase = "clue"
 		GameData.story18_heard = []
-		m.hud.story_banner("메인 스토리 18 시작", "할머니의 시계")
+		m.hud.quest_start_toast("할머니의 시계")
 		m.hud.quest_start_toast("주민들에게 그 언덕 이야기를 듣자 (0/%d)"
 			% GameData.STORY18_TALES)
 	m.saveio.save_now()
@@ -4501,7 +4501,7 @@ func _end_watch_last() -> void:
 	GameData.story18_phase = "done"
 	GameData.story18_done_day = GameData.day
 	GameData.grandma_read = maxi(GameData.grandma_read, GameData.RELICS.size())
-	m.hud.story_banner("메인 스토리 18 완결", "할머니의 시계")
+	m.hud.quest_toast("할머니의 시계")
 	m.hud.show_message("다섯 유품이 모두 제자리로 돌아왔다.\n남은 것은 할아버지가 준비해 둔 마지막 몫뿐이다.", 8.0)
 	m.saveio.save_now()
 
@@ -4519,7 +4519,7 @@ func _story19_update(_delta: float) -> void:
 	if GameData.story19_phase == "" and GameData.story19_ready():
 		GameData.story19_phase = "seek"
 		var back := GameData.water_backfill()   # 이미 만렙인 분야는 소급 지급
-		m.hud.story_banner("메인 스토리 19 시작", "일곱 갈래의 삶")
+		m.hud.quest_start_toast("일곱 갈래의 삶")
 		if back.is_empty():
 			m.hud.quest_start_toast("일곱 분야를 끝까지 익히자 — 생명의 물 0/%d"
 				% GameData.ENDING_SKILLS.size())
@@ -4576,7 +4576,7 @@ func _end_last_page() -> void:
 	if GameData.story19_phase != "page":
 		return
 	GameData.story19_phase = "done"
-	m.hud.story_banner("메인 스토리 19 완결", "일곱 갈래의 삶")
+	m.hud.quest_toast("일곱 갈래의 삶")
 	m.hud.show_message("일곱 병이 준비됐다.\n마지막 장소가 기다리고 있다.", 7.0)
 	m.saveio.save_now()
 
@@ -4947,7 +4947,7 @@ func _story20_update(_delta: float) -> void:
 	if GameData.story20_phase == "" and GameData.story20_ready():
 		GameData.story20_phase = "tell"
 		GameData.story20_told = []
-		m.hud.story_banner("메인 스토리 20 시작", "가장 오래된 자리")
+		m.hud.quest_start_toast("가장 오래된 자리")
 		m.hud.quest_start_toast("서하와 이장에게 마지막 페이지를 보여주자")
 		m.saveio.save_now()
 		return
