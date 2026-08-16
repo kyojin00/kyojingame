@@ -88,7 +88,7 @@ LEG = [
     (0.6,  1.6,  2.6, 0, 0),   # 1 눌림   — 발이 평평하게 눌리며 체중을 받는다
     (-0.2, -0.6, -1.0, 0, 0),  # 2 통과   — 다리가 몸 밑에 곧게 선다 (딛는 쪽)
     (-1.2, -3.0, -4.6, 2, -1), # 3 밀기   — 뒤꿈치가 들리고 **발끝으로** 민다
-    (-0.6, 0.8,  -1.2, 4, -1), # 4 접기   — 무릎이 올라오고 발이 늘어져 접힌다
+    (-1.0, 0.2,  -2.4, 4, -1), # 4 접기   — 무릎이 올라오고 발이 늘어져 접힌다
     (0.8,  2.8,  3.2, 2, 1),   # 5 내밀기 — 발끝을 세워 디딜 채비를 한다
 ]
 LEG_LAG = WALK // 2        # 먼 다리는 반 바퀴 뒤 — 표를 세 칸 밀어 쓴다
@@ -670,6 +670,11 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
                 wf = 2 if f < 0.45 else wf_leg
             else:
                 wb, wf = 2, wf_leg
+            if shade:
+                # 먼 다리는 뒤쪽을 한 칸 더 둔다. 가까운 다리와 겹치는
+                # 칸에서 남는 게 한 칸뿐이면, 위아래가 이어져 보이지 않고
+                # 허벅지 따로 신발 따로 떠 있는 조각이 된다.
+                wb += 1
             g.rect(x - wb, yy, x + wf, yy, kc if boot else pc)
             if not boot and hip_row < yy:
                 g.px(x - wb, yy, 'P')          # 뒤쪽 모서리 그늘
@@ -685,7 +690,14 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
             # 둘을 뗀다. 어느 쪽인지는 두 다리의 앞뒤가 정한다.
             if not shade and near_front is not None:
                 bx = x - wb - 1 if near_front else x + wf + 1
-                if 0 <= bx < GW and g.d[yy][bx] in ('p', 'P', 'q', 'k', 'K', 'n'):
+                # 그 **바깥에 먼 다리가 더 남아 있을 때만** 긋는다. 먼
+                # 다리가 한 칸만 비죽 나온 자리에까지 그으면 그 한 칸이
+                # 검게 지워져 다리에 구멍이 뚫린다 — 위아래는 보이는데
+                # 가운데 한 줄만 사라져 다리가 잘린 것처럼 보였다.
+                ox = bx - 1 if near_front else bx + 1
+                LEGC = ('p', 'P', 'q', 'k', 'K', 'n')
+                if 0 <= bx < GW and 0 <= ox < GW \
+                        and g.d[yy][bx] in LEGC and g.d[yy][ox] in LEGC:
                     g.px(bx, yy, 'O')
         # 신발 — 두 줄. 각도에 따라 어느 줄이 땅에 닿는지가 달라진다.
         #   +1 뒤꿈치만 닿고 발끝이 들린다   (윗줄이 앞으로 길다)
