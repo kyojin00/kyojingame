@@ -307,7 +307,7 @@ const TEXTURE_NAMES := [
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
-	"soil_dry", "soil_wet", "path", "yard",
+	"soil_dry", "soil_wet",
 	# 물(water_<깊이>_<판>_<장>)과 물가(shore_m<꼴>·shoal_m<꼴>)는
 	# 이름이 규칙적이라 _load_textures가 훑는다
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
@@ -879,9 +879,17 @@ func _load_textures() -> void:
 	# 물가 — 이웃 넷 중 어디가 딴 쪽인지(1=북 2=남 4=서 8=동)로 한 장씩.
 	# 방향마다 따로 그리던 걸 그만뒀다: 곧은 변·귀퉁이·곶·섬이 다 한 자로
 	# 그려져 이웃과 어긋날 수가 없고, 꺾이는 자리는 호로 돌아 나간다
+	#   shore/shoal  연못·강 — 둑이 서고 벽면이 진다
+	#   beach/surf   바다 — 모래가 그대로 기울어 들고 거품이 밀려온다
+	#   dune         잔디 칸으로 흘러드는 모래
 	for mk in range(1, 16):
-		for pre: String in ["shore_m", "shoal_m"]:
+		for pre: String in ["shore_m", "shoal_m", "beach_m", "surf_m",
+				"dune_m", "trod_m"]:
 			tex[pre + str(mk)] = load("res://assets/sprites/%s%d.png" % [pre, mk])
+	# 모래·길·마당도 판을 셋씩 — 한 장만 깔면 무늬가 같은 자리마다 찍힌다
+	for v in 3:
+		for kind: String in ["sand_", "path_", "yard_"]:
+			tex[kind + str(v)] = load("res://assets/sprites/%s%d.png" % [kind, v])
 	# 물고기·요리·작물은 표가 곧 그림 목록이다. 여기서 따라가면 표에 한 줄
 	# 넣을 때마다 TEXTURE_NAMES도 고쳐야 하는 일이 없다 (빠뜨리면 아이콘이
 	# 통째로 사라지는데, 어서션에 안 걸려 한참 뒤에야 눈에 띈다).
@@ -1975,6 +1983,27 @@ func _edge_mask(x: int, y: int) -> int:
 	return m
 
 
+func _is_kind(x: int, y: int, k: String) -> bool:
+	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+		return false
+	return grid[y][x].ground == k
+
+
+func _touches_sand(x: int, y: int) -> bool:
+	return _is_kind(x, y - 1, "sand") or _is_kind(x, y + 1, "sand") \
+		or _is_kind(x - 1, y, "sand") or _is_kind(x + 1, y, "sand")
+
+
+# 그 바닥이 있는 쪽 (물가와 같은 비트). 이웃 재료를 흘려 넣을 때 쓴다
+func _kind_mask(x: int, y: int, k: String) -> int:
+	var m := 0
+	if _is_kind(x, y - 1, k): m |= 1
+	if _is_kind(x, y + 1, k): m |= 2
+	if _is_kind(x - 1, y, k): m |= 4
+	if _is_kind(x + 1, y, k): m |= 8
+	return m
+
+
 # ---- 렌더링 ----
 
 
@@ -2005,7 +2034,6 @@ func _draw() -> void:
 	var edges := {}
 	var crops := {}
 	var docks: Array[Vector2] = []
-	var sands: Array[Vector2] = []
 
 	var put := func(bin: Dictionary, t: Texture2D, at: Vector2) -> void:
 		if not bin.has(t):
@@ -2035,7 +2063,10 @@ func _draw() -> void:
 			if ground == "dock":
 				docks.append(at)
 			elif ground == "sand":
-				sands.append(at)
+				# 모래사장 — 물결이 남긴 잔결에 조개·조약돌이 쓸려 와 있다.
+				# 색 한 판에 점 세 개로 칠했더니 새로 그린 바닥들 옆에서
+				# 혼자 종이처럼 매끈했다
+				put.call(base, tex["sand_%d" % (int(_hash01(x * 5, y * 11) * 3.0) % 3)], at)
 			elif ground == "water":
 				# 물가에서 멀수록 깊다 — 다섯 단, 한 단이 반 톤.
 				# 판(0~2)은 칸마다 골라 쓴다. 한 판만 깔면 잔물결이 같은
@@ -2046,14 +2077,16 @@ func _draw() -> void:
 				# 물가를 땅 쪽에서만 만들면 경계가 얕다. **양쪽에서** 만들어야 깊어진다
 				var mk := _edge_mask(x, y)
 				if mk != 0:
-					put.call(edges, tex["shoal_m" + str(mk)], at)
+					# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
+					put.call(edges, tex[("surf_m" if _touches_sand(x, y) else "shoal_m")
+						+ str(mk)], at)
 			elif ground == "soil":
 				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
 			elif ground == "path":
-				put.call(base, tex["path"], at)
+				put.call(base, tex["path_%d" % (int(_hash01(x * 7, y * 3) * 3.0) % 3)], at)
 			elif ground == "yard":
 				# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
-				put.call(base, tex["yard"], at)
+				put.call(base, tex["yard_%d" % (int(_hash01(x * 9, y * 5) * 3.0) % 3)], at)
 			else:
 				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
 				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
@@ -2071,7 +2104,18 @@ func _draw() -> void:
 			if ground != "water" and ground != "dock":
 				var wm := _edge_mask(x, y)
 				if wm != 0:
-					put.call(edges, tex["shore_m" + str(wm)], at)
+					put.call(edges, tex[("beach_m" if ground == "sand" else "shore_m")
+						+ str(wm)], at)
+				# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
+				# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다
+				if ground != "sand":
+					var sm := _kind_mask(x, y, "sand")
+					if sm != 0:
+						put.call(edges, tex["dune_m" + str(sm)], at)
+				if ground != "yard":
+					var ym := _kind_mask(x, y, "yard")
+					if ym != 0:
+						put.call(edges, tex["trod_m" + str(ym)], at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
 
@@ -2091,22 +2135,6 @@ func _draw() -> void:
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)
-	# 해변 모래밭 — 옅은 모래 바탕에 알갱이를 점점이 뿌린다
-	if not sands.is_empty():
-		for at: Vector2 in sands:
-			draw_rect(Rect2(at, tile_size), Color(0.87, 0.79, 0.57))
-		for at: Vector2 in sands:
-			var gx := int(at.x / TILE)
-			var gy := int(at.y / TILE)
-			for i in 3:
-				var hx := _hash01(gx * 7 + i * 13, gy * 11 + i * 5)
-				var hy := _hash01(gx * 5 + i * 3, gy * 13 + i * 7)
-				draw_rect(Rect2(at + Vector2(hx * 28.0 + 2.0, hy * 28.0 + 2.0),
-					Vector2(2, 2)), Color(0.76, 0.66, 0.44, 0.85))
-			# 바다와 닿는 줄에는 물거품 띠
-			if gy + 1 < MAP_H and grid[gy + 1][gx].ground == "water":
-				draw_rect(Rect2(at + Vector2(0, TILE - 3), Vector2(TILE, 3)),
-					Color(0.95, 0.97, 0.98, 0.75))
 	# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
 	if not docks.is_empty():
 		var wt: Texture2D = tex["water_0_0_%d" % water_frame]

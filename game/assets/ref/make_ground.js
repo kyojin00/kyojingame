@@ -291,28 +291,61 @@ function soil(wet) {
 //
 // 길(자갈)과는 다르다. 길은 깐 것이고 마당은 **닳은 것**이라, 돌을 놓지 않고
 // 흙에 잔돌과 풀 몇 포기만 남긴다.
-function yard() {
-  const g = new T(), p = SEASON.spring;
+function yard(v) {
+  const g = new T(), p = SEASON.spring, s = v * 13;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const v = h(x >> 1, y >> 1, 61) * 0.6 + h(x, y, 62) * 0.4;
-    g.px(x, y, EARTH[v < 0.30 ? 2 : (v > 0.76 ? 0 : 1)]);
+    const t = h(x >> 1, y >> 1, 61) * 0.6 + h(x, y, 62) * 0.4;
+    g.px(x, y, EARTH[t < 0.30 ? 2 : (t > 0.76 ? 0 : 1)]);
   }
   // 발에 파인 자국 — 가로로 길게 눌린 자리
   for (let i = 0; i < 5; i++) {
-    const ox = Math.floor(h(i, 3, 63) * N), oy = Math.floor(h(3, i, 64) * N);
-    for (let k = 0; k < 3 + Math.floor(h(i, i, 65) * 3); k++)
+    const ox = Math.floor(h(i + s, 3, 63) * N), oy = Math.floor(h(3, i + s, 64) * N);
+    for (let k = 0; k < 3 + Math.floor(h(i + s, i, 65) * 3); k++)
       g.px(ox + k, oy, EARTH[3]);
     g.px(ox, oy - 1, EARTH[2]);
   }
   // 잔돌 몇 알
   for (let i = 0; i < 3; i++) {
-    const ox = Math.floor(h(i + 9, 5, 66) * N), oy = Math.floor(h(5, i + 9, 67) * N);
+    const ox = Math.floor(h(i + 9 + s, 5, 66) * N), oy = Math.floor(h(5, i + 9 + s, 67) * N);
     g.px(ox, oy, STONE[2]); g.px(ox + 1, oy, STONE[3]);
     g.px(ox, oy + 1, STONE[4]);
   }
   // 밟히고도 살아남은 풀 두 포기 — 이게 있어야 흙바닥이 아니라 마당이다
   for (let i = 0; i < 2; i++)
-    tuft(g, Math.floor(h(i + 30, 7, 68) * N), Math.floor(h(7, i + 30, 69) * N), p, false);
+    tuft(g, Math.floor(h(i + 30 + s, 7, 68) * N), Math.floor(h(7, i + 30 + s, 69) * N), p, false);
+  return g;
+}
+
+
+// ---- 모래사장 ----
+//
+// 바닷가는 색 한 판에 점 세 개로 칠해 두었었다. 새로 그린 바닥들 옆에
+// 놓으면 혼자 종이처럼 매끈해서 딴 그림이 된다. 흙·자갈과 같은 규칙으로
+// 다시 그린다 — 다만 모래는 **알이 안 보이는 재료**라, 자갈처럼 알을
+// 그리는 대신 잔결과 쓸려 온 것들(조개·조약돌·해초)로 읽히게 한다.
+const SAND = [[240, 226, 190], [226, 208, 166], [208, 186, 140],
+              [186, 162, 116], [160, 136, 94], [132, 110, 74]];
+
+function sandTile(v) {
+  const g = new T();
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // 물결이 남긴 잔결 — 가로로 길게 눕는다. 등방성 잡음은 사포가 된다
+    const w = vnoise(x, y * 2 + v, 41 + v, 4) * 0.65 + vnoise(x, y, 42 + v, 2) * 0.35;
+    g.px(x, y, ramp(SAND, 1 + (w - 0.5) * 2.2));
+  }
+  for (let i = 0; i < 3; i++) {                              // 쓸려 온 조약돌
+    const ox = Math.floor(h(i + 3, v, 43) * N), oy = Math.floor(h(v, i + 3, 44) * N);
+    g.px(ox, oy, STONE[2]); g.px(ox + 1, oy, STONE[3]); g.px(ox, oy + 1, STONE[4]);
+  }
+  if (v !== 1) {                                             // 조개 한 알
+    const ox = Math.floor(h(v + 7, 2, 45) * N), oy = Math.floor(h(2, v + 7, 46) * N);
+    g.px(ox, oy, [250, 240, 232]); g.px(ox + 1, oy, [236, 214, 206]);
+    g.px(ox, oy + 1, [214, 186, 178]); g.px(ox + 1, oy + 1, [236, 214, 206]);
+  }
+  for (let i = 0; i < 2; i++) {                              // 마른 해초 한 가닥
+    const ox = Math.floor(h(i + 11, v, 47) * N), oy = Math.floor(h(v, i + 11, 48) * N);
+    for (let k = 0; k < 3; k++) g.px(ox + k, oy + (k === 1 ? 1 : 0), SAND[5]);
+  }
   return g;
 }
 
@@ -509,6 +542,50 @@ function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
   }
 }
 
+// 모래사장의 물가 — 같은 자, 다른 재료.
+//
+// 연못가에는 흙이 솟아 **둑**이 서지만 바닷가에는 그런 턱이 없다. 모래가
+// 물속으로 그대로 기울어 들어간다. 그래서 여기엔 돌벽도, 벽이 드리우는
+// 그늘도 없다 — 젖은 모래와 밀려온 거품, 그리고 바닥이 비치는 얕은 물뿐이다.
+// (모래 위에 돌벽을 세워 놨더니 해변에 옹벽을 친 꼴이었다)
+function beachPx(g, x, y, s, nax, nay, i, seed, fill) {
+  if (s < 0) {                                               // 물 쪽 — 파도가 닿는 자리
+    const d = Math.floor(-s);
+    const deep = 4 + Math.floor(h(i, 0, 76 + seed) * 4);
+    if (d >= deep) { if (fill) g.px(x, y, baseWater(x, y)); return; }
+    if (d === 0) { g.px(x, y, FOAM); return; }                // 밀려온 거품
+    if (d === 1 && h(i, 0, 77 + seed) < 0.45) { g.px(x, y, FOAM); return; }
+    // 얕아서 바닥이 훤히 비친다 — 깊어질수록 모래가 물빛에 잠긴다
+    const mix = clamp(0.18 + d * 0.17, 0, 0.86);
+    g.px(x, y, thru(SAND[clamp(d - 1, 0, 5)], mix));
+    if (h(x, y, 78 + seed) < 0.16) g.px(x, y, thru(SAND[4], mix + 0.06));
+    return;
+  }
+  const k = Math.floor(s);
+  if (k < 2) { g.px(x, y, SAND[4]); return; }                 // 젖은 모래 — 짙다
+  if (k < 4) { g.px(x, y, SAND[3 - (k - 2)]); return; }       // 마르며 밝아진다
+  if (k < 7 && h(x, y, 79 + seed) > 0.22 + (k - 4) * 0.24) g.px(x, y, SAND[2]);
+  // 물이 밀어 올려 놓은 것들 — 조개껍데기 부스러기와 조약돌
+  if (k === 2 && h(x, y, 80 + seed) < 0.10) g.px(x, y, [246, 236, 226]);
+  if (k === 3 && h(x, y, 81 + seed) < 0.08) g.px(x, y, STONE[3]);
+}
+
+// 흘러드는 경계 — **이웃 칸의 재료가 이쪽으로 파고든다.**
+//
+// 물가만 손보고 났더니 이번엔 잔디와 모래, 잔디와 마당의 경계가 계단으로
+// 남았다. 바람에 날린 모래도 밟혀 번진 마당 흙도 풀밭 쪽으로 손가락처럼
+// 파고들지, 자로 자른 듯 끊기지 않는다. 물가와 같은 자를 쓰되 층은
+// 둘뿐이다 — 젖은 둑도 돌벽도 없으니까.
+function spill(P, key) {
+  return function (g, x, y, s, nax, nay, i, seed) {
+    if (s < 2) { g.px(x, y, ramp(P, 1.0)); return; }          // 깎인 귀퉁이까지 통으로
+    const k = Math.floor(s);
+    // 안으로 갈수록 성기게 — 끝은 알갱이 몇 개만 풀 사이에 남는다
+    if (k < 7 && h(x, y, key + seed) > 0.08 + (k - 2) * 0.21)
+      g.px(x, y, P[k < 4 ? 1 : 2]);
+  };
+}
+
 const RC = 16;                     // 굽는 반지름 (논리 칸). 타일 한 변까지 굽는다
 
 // 물가 한 장 — 이웃 넷 중 어디가 **딴 쪽**인지(mask)만 보고 그린다.
@@ -525,8 +602,9 @@ const RC = 16;                     // 굽는 반지름 (논리 칸). 타일 한 
 // 물 타일은 **부호만 뒤집으면** 된다 — 물이 상자 안이니 뭍으로 가는 거리가
 // 음수다. 볼록한 귀퉁이는 뭍이 깎여 물이 돌아 나가고, 오목한 귀퉁이는
 // 뭍이 메워 들어간다. 같은 원의 안팎일 뿐이다.
-function edgeTile(mask, isLand) {
+function edgeTile(mask, isLand, paint) {
   const g = new T();
+  const px = paint || bankPx;
   const FAR = 64;
   const x0 = (mask & 4) ? -0.5 : -FAR;
   const x1 = (mask & 8) ? N - 0.5 : N - 1 + FAR;
@@ -552,7 +630,7 @@ function edgeTile(mask, isLand) {
     if (!isLand) { s = -s; nx = -nx; ny = -ny; }
     // 물가를 따라가는 자리 — 돌 이음매가 변을 따라 흐르게 한다
     const i = Math.round(x * Math.abs(ny) + y * Math.abs(nx));
-    bankPx(g, x, y, s, nx, ny, i, mask, isLand);
+    px(g, x, y, s, nx, ny, i, mask, isLand);
   }
   return g;
 }
@@ -561,15 +639,25 @@ function edgeTile(mask, isLand) {
 // ---- 뽑기 ----
 for (const s of Object.keys(SEASON))
   for (let v = 0; v < 3; v++) save(`grass_${s}_${v}`, grass(s, v).render());
-save('path', cobble(0).render());
-save('yard', yard().render());
+// 길과 마당도 판을 셋씩. 한 장만 깔면 닳은 자국이 같은 자리마다 찍혀
+// 바닥에 격자가 뜬다 (자갈은 줄눈이 이어져야 하므로 **배치는 그대로** 두고
+// 알의 톤·닳음만 흔든다)
+for (let v = 0; v < 3; v++) save('path_' + v, cobble(v * 5).render());
+for (let v = 0; v < 3; v++) save('yard_' + v, yard(v).render());
 // water_<깊이>_<판>_<장> — 깊이 다섯 × 판 셋 × 장 둘
 for (let lv = 0; lv < 5; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
   save(`water_${lv}_${vr}_${f}`, water(f, lv, vr).render());
-// 물가 — 이웃 꼴(mask) 열다섯 가지. shore = 땅 타일, shoal = 물 타일
+for (let v = 0; v < 3; v++) save('sand_' + v, sandTile(v).render());
+// 물가 — 이웃 꼴(mask) 열다섯 가지 × 네 종류.
+//   shore 땅 타일 · shoal 물 타일      (연못·강 — 둑이 서고 벽이 진다)
+//   beach 모래 타일 · surf 물 타일     (바다 — 모래가 그대로 기울어 든다)
 for (let m = 1; m < 16; m++) {
   save('shore_m' + m, edgeTile(m, true).render());
   save('shoal_m' + m, edgeTile(m, false).render());
+  save('beach_m' + m, edgeTile(m, true, beachPx).render());
+  save('surf_m' + m, edgeTile(m, false, beachPx).render());
+  save('dune_m' + m, edgeTile(m, true, spill(SAND, 84)).render());
+  save('trod_m' + m, edgeTile(m, true, spill(EARTH, 96)).render());
 }
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
@@ -604,7 +692,7 @@ function blit(im, ox, oy, scale) {
 const DOOR_X = 13;
 const isRoad = (x, y) => (y >= 10 && y <= 11) || (x >= DOOR_X && x <= DOOR_X + 1 && y >= 8);
 for (let y = 0; y < VH; y++) for (let x = 0; x < VW; x++) {
-  if (isRoad(x, y)) { blit(OUT['path'], x * TILE, y * TILE, 0.5); continue; }
+  if (isRoad(x, y)) { blit(OUT['path_' + Math.floor(h(x, y, 88) * 3)], x * TILE, y * TILE, 0.5); continue; }
   blit(OUT[`grass_spring_${Math.floor(h(x, y, 77) * 3)}`], x * TILE, y * TILE, 0.5);
   if (isRoad(x, y - 1)) blit(OUT['path_edge_n'], x * TILE, y * TILE, 0.5);
   if (isRoad(x, y + 1)) blit(OUT['path_edge_s'], x * TILE, y * TILE, 0.5);
