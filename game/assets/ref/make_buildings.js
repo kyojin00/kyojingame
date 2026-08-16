@@ -641,12 +641,15 @@ function bargeBoard(g, x0, x1, top, base) {
 
 
 // 벽 — 벽돌이면 크림색 귀돌로 각을 잡고, 회벽이면 하프팀버 목재를 두른다.
-function wall(g, x0, x1, y0, y1, plinth) {
+// skip: 'left' | 'right' — 다른 덩어리와 **붙는 쪽**은 귀돌을 안 넣는다.
+// 양쪽 다 넣으면 이음매에 밝은 줄이 두 개 겹쳐서, 벽이 이어진 게 아니라
+// 두 채가 맞닿은 것으로 보인다.
+function wall(g, x0, x1, y0, y1, plinth, skip) {
   g.rect(x0, y0, x1, y1, WB);
   if (WALL === 'brick') {
     for (let y = y0 + 1; y < y1 - 3; y += 6) {             // 귀돌
-      g.rect(x0, y, x0 + 2, y + 2, 'w');
-      g.rect(x1 - 2, y, x1, y + 2, 'w');
+      if (skip !== 'left') g.rect(x0, y, x0 + 2, y + 2, 'w');
+      if (skip !== 'right') g.rect(x1 - 2, y, x1, y + 2, 'w');
     }
   } else if (WALL === 'plank') {
     // 널판 — 세로로 널을 대고 이음매마다 어두운 줄. 헛간의 벽이다
@@ -1206,6 +1209,13 @@ function noticeboard(g, x, y) {
 //
 // 그리고 본채는 옆에 붙은 것 위로 **그림자를 드리운다.** 낮은 곁채 지붕이
 // 높은 본채 옆에서 그늘 없이 밝으면, 두 채가 그냥 나란히 서 있어 보인다.
+// 본채 지붕이 쓰는 자 — 높이만 넣으면 그 자리의 톤이 나온다.
+// 덧붙인 지붕은 전부 이걸 써야 이어지는 자리에서 색이 안 끊긴다.
+function roofToneAt(y) {
+  const t = FRONT_SHARE * (EAVE - y) / Math.max(1, EAVE - RIDGE);
+  return Math.max(0, Math.min(1, t));
+}
+
 function markRoof(x, y, t, base) {
   if (y < 0 || y >= GH || x < 0 || x >= GW) return;
   roofT[y][x] = t;
@@ -1230,7 +1240,7 @@ function dormer(g, cx, base) {
 // 대장간처럼 「작업하는 집」은 이 덩어리 하나로 성격이 정해진다
 function leanTo(g, xa, xb, top) {
   const inner = xa < CX ? xb : xa;                         // 본채에 붙는 쪽
-  wall(g, xa, xb, top + 7, GROUND, true);
+  wall(g, xa, xb, top + 7, GROUND, true, xa < CX ? 'right' : 'left');
   for (let x = xa; x <= xb; x++) {
     const t = Math.abs(x - inner) / Math.max(1, xb - xa);
     const y = top + Math.round(t * 8);
@@ -1238,11 +1248,11 @@ function leanTo(g, xa, xb, top) {
     const shade = Math.max(0, 0.30 - Math.abs(x - inner) * 0.035);
     for (let k = 0; k < 6; k++) {
       g.px(x, y + k, 'r');
-      markRoof(x, y + k, 0.46 - k * 0.04 + shade, y + 5);
+      // 톤은 **본채 자**로 재고, 켜도 본채 처마 기준으로 세어 줄이 이어진다
+      markRoof(x, y + k, Math.min(1, roofToneAt(y + k) + shade), EAVE);
     }
     g.px(x, y + 6, SHADE);
   }
-  g.vline(inner + (xa < CX ? 1 : -1), top, GROUND - 3, SHADE);   // 본채와의 이음매
   archWin(g, Math.round((xa + xb) / 2) - 5, top + 15, 11, 14, false);
 }
 
@@ -1255,7 +1265,7 @@ function tower(g, cx, wallTop, hgt, withBell) {
   const a = cx - 9, b = cx + 9, CONE = 24;
   const H = hgt || 28;                                     // 벽 위로 솟는 높이
   const shaftTop = wallTop - (H - CONE), rt = shaftTop - CONE;
-  wall(g, a, b, shaftTop, GROUND, true);
+  wall(g, a, b, shaftTop, GROUND, true, cx < CX ? 'right' : 'left');
   for (let i = 0; i <= CONE; i++) {
     const w = Math.round(2 + 9 * Math.pow(i / CONE, 0.9));
     for (let x = cx - w; x <= cx + w; x++) {
@@ -1269,7 +1279,28 @@ function tower(g, cx, wallTop, hgt, withBell) {
   louver(g, cx, ly, 11, 11);
   if (withBell) bell(g, cx, ly + 3);
   archWin(g, cx - 5, wallTop + 6, 11, 15, false);
-  g.vline(cx + (cx < CX ? 9 : -9), wallTop, GROUND - 3, SHADE);  // 본채와의 이음매
+}
+
+// 이어 나온 한 칸 (wing) — 곁채와 달리 **본채의 일부처럼** 보여야 한다.
+//
+// 「붙인 느낌」은 세 가지에서 온다: 이음매의 어두운 줄, 겹친 귀돌,
+// 그리고 지붕 켜가 안 맞는 것. 셋을 다 지운다 —
+//   * 이음매 줄을 안 긋는다 (벽이 그냥 이어진다)
+//   * 붙는 쪽 귀돌을 생략한다
+//   * 지붕 켜를 **본채 처마 기준**으로 세어 기와 줄이 그대로 이어진다
+function wing(g, xa, xb, eaveY) {
+  const rightSide = xa > CX;
+  wall(g, xa, xb, eaveY + 6, GROUND, true, rightSide ? 'left' : 'right');
+  for (let x = xa; x <= xb; x++) {
+    for (let k = 0; k < 6; k++) {
+      g.px(x, eaveY + k, 'r');
+      markRoof(x, eaveY + k, roofToneAt(eaveY + k), EAVE);
+    }
+    g.px(x, eaveY + 6, SHADE);                             // 처마 밑 그늘
+  }
+  const mx = Math.round((xa + xb) / 2);
+  archWin(g, mx - 6, eaveY + 14, 13, 15, false);
+  archWin(g, mx - 6, eaveY + 34, 13, 15, false);
 }
 
 // 풍향계 — 용마루 위에 꽂는 것. 한 줄짜리지만 하늘로 삐죽 나와서
@@ -1515,6 +1546,12 @@ function build(spec) {
     tower(g, c, EAVE + 10, spec.towerH, spec.bell);
     footL = Math.min(footL, c - 9); footR = Math.max(footR, c + 9);
   }
+  if (spec.wing) {
+    const r = spec.wing === 'right';
+    const a = r ? X1 + JUT - 1 : X0 - JUT - 25, b = r ? X1 + JUT + 25 : X0 - JUT + 1;
+    wing(g, a, b, EAVE + 16);
+    footL = Math.min(footL, a); footR = Math.max(footR, b);
+  }
   if (spec.stall) stall(g, CX - 16, CX + 16, GROUND);
   if (spec.steps) steps(g, CX, 22, GROUND);
   // 옆으로 늘어난 만큼 **주춧돌을 하나로 잇는다.** 덩어리마다 따로 두면
@@ -1664,11 +1701,11 @@ const KINDS = {
   // 회관만 **그림판이 크다** (164x168 -> 656x672). 같은 판에서 폭만 늘렸더니
   // 왼쪽 종탑과 오른쪽 깃발이 캔버스 밖으로 잘렸다 — 회관은 옆에 붙는 게
   // 많아서 판부터 키워야 한다. 층높이도 열두 칸 올려 창까지 같이 커진다.
-  chief_house: { canvas: [164, 168], w: 16, storey: 12,
+  chief_house: { canvas: [178, 168], w: 14, storey: 12,
     sign: true, icon: 'bell', pitch: 10, win3: true,
     gable: 'clock', tower: 'left', towerH: 64, bell: true, steps: true, bunting: true,
-    flag: true, dormer: true, lit: true, wallPal: 'stone', ivy: 2,
-    props: [['notice', -20], ['bench', 6]] },
+    wing: 'right', flag: true, dormer: true, lit: true, wallPal: 'stone', ivy: 2,
+    props: [['notice', -34], ['bench', -18]] },   // 의자는 종탑 밑에 — 깃발과 안 겹치게
 };
 
 let n = 0;
