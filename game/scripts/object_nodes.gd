@@ -74,6 +74,7 @@ func _spawn_objects() -> void:
 	# 쓰므로 자식이 만 개면 **매 프레임 만 개를 정렬한다** — 걸을 때마다
 	# 화면이 끊긴 게 이것이었다. 화면 둘레만 세우고 나머지는 안 만든다.
 	_stream_center = Vector2i(-9999, -9999)
+	_stream_prev = Rect2i()
 	_stream_nodes()
 	m.farming._recount_pasture()   # 불러온 세이브의 울타리도 목초지로 인정한다
 	m.story._apply_story_visibility()
@@ -549,6 +550,7 @@ const KEEP_ALWAYS := ["house", "chief_hut", "barn", "barn_block", "art_block",
 	"old_bench", "bent_tree"]
 
 var _stream_center := Vector2i(-9999, -9999)
+var _stream_prev := Rect2i()      # 지난번 창 (새로 들어온 띠만 훑으려고)
 
 
 func _stream_nodes() -> void:
@@ -557,9 +559,14 @@ func _stream_nodes() -> void:
 	var pt := m.player_tile()
 	if pt == _stream_center:
 		return
+	var prev := _stream_prev
 	_stream_center = pt
 	var keep := Rect2i(pt.x - STREAM_W, pt.y - STREAM_H,
 		STREAM_W * 2 + 1, STREAM_H * 2 + 1)
+	_stream_prev = keep
+	# 한 칸도 안 겹치게 멀리 뛰었으면(순간이동·불러오기) 통째로 다시 센다
+	if not prev.intersects(keep):
+		prev = Rect2i()
 	# ① 나간 것 치우기 — 세워 둔 것만 훑으므로 몇백 개다
 	for pos: Vector2i in m.obj_nodes.keys():
 		if keep.has_point(pos):
@@ -574,20 +581,38 @@ func _stream_nodes() -> void:
 		m._fade_a.erase(pos)
 		node.queue_free()
 		m.obj_nodes.erase(pos)
-	# ② 들어온 것 세우기 — **칸을 훑는다.** objects 전체(만 개)를 훑으면
-	#    치우는 것보다 세는 데 더 든다. 창 안은 사천 칸뿐이다
-	for y in range(keep.position.y, keep.end.y):
-		if y < 0 or y >= m.MAP_H:
-			continue
-		for x in range(keep.position.x, keep.end.x):
-			if x < 0 or x >= m.MAP_W:
+	# ② 들어온 것 세우기 — **새로 들어온 띠만** 훑는다.
+	#
+	# 창 전체(69x53 = 3657칸)를 매번 훑으면 한 칸 걸을 때마다 사천 번을
+	# 뒤진다. 걸으면 초에 서너 칸이니 그것만으로 화면이 걸린다.
+	# 한 칸 움직였을 때 새로 들어오는 것은 **세로 한 줄과 가로 한 줄**뿐이다.
+	var bands: Array[Rect2i] = []
+	if prev.size.x == 0:
+		bands.append(keep)                       # 처음 한 번은 통째로
+	else:
+		var dx: int = keep.position.x - prev.position.x
+		var dy: int = keep.position.y - prev.position.y
+		if dx > 0:
+			bands.append(Rect2i(prev.end.x, keep.position.y, dx, keep.size.y))
+		elif dx < 0:
+			bands.append(Rect2i(keep.position.x, keep.position.y, -dx, keep.size.y))
+		if dy > 0:
+			bands.append(Rect2i(keep.position.x, prev.end.y, keep.size.x, dy))
+		elif dy < 0:
+			bands.append(Rect2i(keep.position.x, keep.position.y, keep.size.x, -dy))
+	for band: Rect2i in bands:
+		for y in range(band.position.y, band.end.y):
+			if y < 0 or y >= m.MAP_H:
 				continue
-			var pos := Vector2i(x, y)
-			if m.obj_nodes.has(pos) or not m.objects.has(pos):
-				continue
-			var kind2: String = str(m.objects[pos].kind)
-			if kind2 == "house":
-				continue          # 건물 그림은 앵커에서 따로 세운다
-			_spawn_object_node(pos, kind2)
-			if kind2 == "tree":
-				_refresh_tree_sprite(pos)   # 계절·손상 단계를 바로 반영한다
+			for x in range(band.position.x, band.end.x):
+				if x < 0 or x >= m.MAP_W:
+					continue
+				var pos := Vector2i(x, y)
+				if m.obj_nodes.has(pos) or not m.objects.has(pos):
+					continue
+				var kind2: String = str(m.objects[pos].kind)
+				if kind2 == "house":
+					continue          # 건물 그림은 앵커에서 따로 세운다
+				_spawn_object_node(pos, kind2)
+				if kind2 == "tree":
+					_refresh_tree_sprite(pos)   # 계절·손상 단계를 바로 반영한다
