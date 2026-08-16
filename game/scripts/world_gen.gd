@@ -32,6 +32,9 @@ func _build_map() -> void:
 	_carve_pond(49, 31, 4.5, 3.5)
 	# (호수는 마을 서쪽 낚시터가 됐다 — 마을을 가르던 강은 전부 없앴다)
 	_carve_pond(74, 51, 5.0, 3.0)    # 깊은 숲 연못
+	# 숲을 가로지르는 개울 — 웅덩이만 있으면 물이 고인 땅으로 보인다.
+	# 흐르는 물이 하나는 있어야 지형에 방향이 생긴다
+	_carve_river(30, 24, 44, 46, 2.2)
 
 	_build_village()
 
@@ -322,6 +325,38 @@ func _carve_pond(cx: int, cy: int, rx: float, ry: float) -> void:
 			if dx * dx + dy * dy <= wob * wob:
 				m.grid[y][x].ground = "water"
 				m.objects.erase(Vector2i(x, y))
+
+
+# 강을 판다 — 굽이치는 띠.
+#
+# 웅덩이가 타원이라면 강은 **길이 있는 물**이다. 시작점에서 끝점까지
+# 조금씩 흔들리며 나아가되, 폭도 함께 흔든다. 폭이 일정하면 강이 아니라
+# 수로가 된다.
+func _carve_river(x0: int, y0: int, x1: int, y1: int, w: float) -> void:
+	var steps := int(max(abs(x1 - x0), abs(y1 - y0)))
+	if steps <= 0:
+		return
+	for i in steps + 1:
+		var t := float(i) / float(steps)
+		# 두 파장으로 굽이친다 — 한 겹만 쓰면 규칙적인 물결이 된다
+		var bend := sin(t * PI * 2.4) * 4.0 + sin(t * PI * 5.7) * 1.8
+		var cx := int(round(lerpf(float(x0), float(x1), t) + bend))
+		var cy := int(round(lerpf(float(y0), float(y1), t) - bend * 0.35))
+		var rad := w * (0.78 + m._hash01(cx * 7 + 1, cy * 11 + 3) * 0.5)
+		var ri := int(ceil(rad))
+		for dy in range(-ri, ri + 1):
+			for dx in range(-ri, ri + 1):
+				var px := cx + dx
+				var py := cy + dy
+				if px < 1 or py < 1 or px >= m.MAP_W - 1 or py >= m.WORLD_H - 1:
+					continue
+				if m.VILLAGE_REGION.has_point(Vector2i(px, py)) \
+					or m.ROAD.has_point(Vector2i(px, py)):
+					continue
+				if float(dx * dx + dy * dy) > rad * rad:
+					continue
+				m.grid[py][px].ground = "water"
+				m.objects.erase(Vector2i(px, py))
 
 
 func _build_village() -> void:

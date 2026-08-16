@@ -331,7 +331,8 @@ function yard() {
 // 보였다 — 깊이는 물빛 자체가 말한다. 바탕은 아래쪽 단(4~6)을 쓰고,
 // 밝은 단(0~2)은 물가 여울에만 쓴다. 그래야 가장자리만 환하고 가운데가 깊다.
 const WATER = [[142, 204, 230], [104, 174, 212], [72, 142, 190], [50, 112, 162],
-               [34, 84, 130], [22, 60, 100], [14, 42, 74], [9, 28, 52]];
+               [34, 84, 130], [22, 60, 100], [14, 42, 74], [9, 28, 52],
+               [6, 19, 37], [4, 13, 26]];
 const FOAM = [244, 250, 252];
 
 // 물 밑이 비쳐 보이게 — **바닥색을 물색에 섞는다.**
@@ -344,12 +345,14 @@ function thru(c, depth) {
   return c.map((v, i) => Math.round(v * (1 - depth) + w[i] * depth));
 }
 
-function water(frame) {
+// deep = 물가에서 멀어진 한가운데. 물 타일이 한 장뿐이면 어디를 봐도 같은
+// 깊이라 얕아 보인다. 가장자리 물과 **한가운데 물**을 갈라야 깊이가 생긴다.
+function water(frame, deep) {
   const g = new T();
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     // 깊이 — 덩어리로 갈린다. 칸마다 흔들면 물이 아니라 모래가 된다
     const v = h(x >> 2, y >> 2, 51) * 0.6 + h(x >> 1, y >> 1, 52) * 0.4;
-    g.px(x, y, WATER[v < 0.3 ? 6 : (v > 0.72 ? 4 : 5)]);
+    g.px(x, y, WATER[deep ? (v < 0.3 ? 8 : (v > 0.72 ? 6 : 7)) : (v < 0.3 ? 6 : (v > 0.72 ? 4 : 5))]);
   }
   // 잔물결 — 가로로 짧게 그은 줄. 두 장이 서로 어긋나야 물이 흐른다
   // 잔물결은 **다섯 줄이면 족하다.** 아홉 줄을 그었더니 타일이 반복되면서
@@ -358,22 +361,23 @@ function water(frame) {
     const ox = Math.floor(h(i, frame, 53) * N);
     const oy = Math.floor(h(frame, i, 54) * N);
     const len = 2 + Math.floor(h(i, i + frame, 55) * 3);
-    for (let k = 0; k < len; k++) g.px(ox + k, oy, WATER[i % 2 ? 3 : 4]);
-    g.px(ox - 1, oy, WATER[6]);
+    const lift = deep ? 2 : 0;
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, WATER[(i % 2 ? 3 : 4) + lift]);
+    g.px(ox - 1, oy, WATER[6 + lift]);
   }
   // 물속에 비치는 바닥 — 모래톱과 조약돌, 수초 한 포기.
   // 깊은 물이라 많이 섞는다(0.62) — 형태만 어렴풋이 보이는 정도
   for (let i = 0; i < 3; i++) {
     const ox = Math.floor(h(i + 11, frame, 81) * N), oy = Math.floor(h(frame, i + 11, 82) * N);
     for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++)
-      if (h(ox + dx, oy + dy, 83) < 0.7) g.px(ox + dx, oy + dy, thru(EARTH[1], 0.80));
+      if (!deep && h(ox + dx, oy + dy, 83) < 0.7) g.px(ox + dx, oy + dy, thru(EARTH[1], 0.80));
   }
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (deep ? 0 : 4); i++) {
     const ox = Math.floor(h(i + 21, 5, 84) * N), oy = Math.floor(h(5, i + 21, 85) * N);
     g.px(ox, oy, thru(STONE[2], 0.78)); g.px(ox + 1, oy, thru(STONE[3], 0.78));
     g.px(ox, oy + 1, thru(STONE[4], 0.80));
   }
-  for (let i = 0; i < 2; i++) {                             // 수초
+  for (let i = 0; i < (deep ? 0 : 2); i++) {                 // 수초
     const ox = Math.floor(h(i + 31, 7, 86) * N), oy = Math.floor(h(7, i + 31, 87) * N);
     for (const [dx, len] of [[-1, 2], [0, 3], [1, 2]])
       for (let k = 0; k <= len; k++)
@@ -398,17 +402,30 @@ function shore(dir) {
     else if (dir === 2) g.px(k, i, c);
     else g.px(N - 1 - k, i, c);
   };
+  // 물가는 **단차**다.
+  //
+  // 젖은 흙 띠만 둘렀더니 물이 땅과 같은 높이에 있었다. 실제 물가는
+  // 땅이 한 단 꺼지는 자리라, 그 턱에 **돌이 물려 있다.** 위에서 보면
+  // 돌 윗면이 빛을 받고 물 쪽 아랫면은 그늘진다 — 그 두 줄이 높이차다.
+  //
+  //   바깥  풀에서 넘어오는 마른 흙
+  //   둑    돌 한 줄. 윗면은 밝고 아랫면은 어둡다 (여기가 턱이다)
+  //   안쪽  턱 밑 그늘. 물에 잠긴 돌뿌리
   for (let i = 0; i < N; i++) {
-    const wet = 3 + Math.floor(h(i, dir, 56) * 2);          // 젖은 둑 (통으로)
-    const dry = wet + 2 + Math.floor(h(i, dir, 57) * 4);    // 마르는 자리
-    for (let k = 0; k < dry; k++) {
-      if (k < wet) put(i, k, EARTH[k === 0 ? 5 : 4]);       // 물에 닿는 쪽이 제일 짙다
-      else if (h(i, k, dir + 58) > 0.12 + (k - wet) * 0.16) put(i, k, EARTH[3]);
+    const lip = 4 + Math.floor(h(i, dir, 56) * 3);          // 턱이 시작되는 깊이
+    const dry = lip + 2 + Math.floor(h(i, dir, 57) * 4);
+    // 턱 밑 그늘 — 물에 제일 가까운 두 줄
+    for (let k = 0; k < 2; k++) put(i, k, EARTH[5]);
+    // 돌 한 줄 — 세 칸짜리 덩어리로 물려 있다
+    const st = 1 + Math.floor(h(Math.floor(i / 3), dir, 63) * 3);
+    for (let k = 2; k < lip; k++) {
+      const top = (k === lip - 1);
+      put(i, k, STONE[top ? Math.max(0, st - 1) : Math.min(7, st + 2)]);
     }
-    // 둑 마루 — 젖은 자리가 끝나는 줄이 빛을 받는다. 이 한 줄이 「솟은 것」을 만든다
-    put(i, wet, EARTH[1]);
-    if (h(i, 5, dir + 59) < 0.25) put(i, wet - 1, STONE[3]);   // 드러난 조약돌
-    if (h(i, 6, dir + 60) < 0.18) put(i, 1, STONE[4]);
+    if (i % 3 === 2) for (let k = 2; k < lip; k++) put(i, k, STONE[6]);  // 돌 사이 틈
+    // 바깥 — 마른 흙에서 잔디로
+    for (let k = lip; k < dry; k++)
+      if (h(i, k, dir + 58) > 0.10 + (k - lip) * 0.18) put(i, k, EARTH[k === lip ? 2 : 3]);
   }
   return g;
 }
@@ -450,15 +467,17 @@ for (const s of Object.keys(SEASON))
   for (let v = 0; v < 3; v++) save(`grass_${s}_${v}`, grass(s, v).render());
 save('path', cobble(0).render());
 save('yard', yard().render());
-save('water_0', water(0).render());
-save('water_1', water(1).render());
+save('water_0', water(0, false).render());
+save('water_1', water(1, false).render());
+save('water_deep_0', water(0, true).render());
+save('water_deep_1', water(1, true).render());
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shore_' + d, shore(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shoal_' + d, shoal(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());
 
-console.log(`바닥 ${12 + 1 + 1 + 4 + 2 + 2 + 4 + 4}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
+console.log(`바닥 ${12 + 1 + 1 + 4 + 4 + 2 + 4 + 4}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
 console.log(INSTALL ? '  sprites/ 에 넣었다'
   : '  ref/proposed_*.png 로만 뽑았다 (--install 을 붙이면 게임에 넣는다)');
 

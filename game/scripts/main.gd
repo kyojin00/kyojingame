@@ -304,6 +304,7 @@ const TEXTURE_NAMES := [
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
 	"soil_dry", "soil_wet", "water_0", "water_1", "path", "yard",
+	"water_deep_0", "water_deep_1",
 	"shore_n", "shore_s", "shore_w", "shore_e",
 	"shoal_n", "shoal_s", "shoal_w", "shoal_e",
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
@@ -1713,6 +1714,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			and event.keycode == KEY_F10 and GameData.DEV_MODE:
 		_dev_fill_stock()
 		return
+	# 개발/테스트: F9 — **마우스 자리로 순간이동** (DEV_MODE에서만)
+	#
+	# 맵이 120x90이라 걸어서 구석을 확인하는 데만 몇 분이 걸린다. 지형을
+	# 손볼 때는 「거기까지 가는 일」이 작업 시간을 다 먹는다. 물·절벽처럼
+	# 멀리 있는 것을 고칠 때 이 한 줄이 없으면 확인을 안 하게 된다.
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F9 and GameData.DEV_MODE:
+		var w: Vector2 = world.get_global_mouse_position()
+		var tx := clampi(int(w.x / TILE), 0, MAP_W - 1)
+		var ty := clampi(int(w.y / TILE), 0, MAP_H - 1)
+		player.position = Vector2(tx * TILE + 16, ty * TILE + 16)
+		hud.show_message("[개발] (%d, %d) 로 이동" % [tx, ty], 1.5)
+		return
 	# 개발/테스트: F8 — 메인 스토리 건너뛰기
 	if event is InputEventKey and event.pressed and not event.echo \
 			and event.keycode == KEY_F8 and GameData.DEV_MODE:
@@ -1931,7 +1945,11 @@ func _draw() -> void:
 			elif ground == "sand":
 				sands.append(at)
 			elif ground == "water":
-				put.call(base, tex["water_%d" % water_frame], at)
+				# 물가에서 떨어진 한가운데는 **깊은 물**로 그린다. 물 타일이 한 장
+				# 뿐이면 어디를 봐도 같은 깊이라, 아무리 어둡게 칠해도 얕아 보인다
+				var mid: bool = _is_water(x, y - 1) and _is_water(x, y + 1) \
+					and _is_water(x - 1, y) and _is_water(x + 1, y)
+				put.call(base, tex[("water_deep_%d" if mid else "water_%d") % water_frame], at)
 				# 여울 — 뭍에 가까운 물은 얕아서 바닥이 비친다.
 				# 물가를 땅 쪽에서만 만들면 경계가 얕다. **양쪽에서** 만들어야 깊어진다
 				if not _is_water(x, y - 1):
