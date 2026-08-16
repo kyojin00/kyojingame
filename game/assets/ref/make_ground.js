@@ -899,7 +899,7 @@ function rockFace(g, x, y, drop, n, i, seed) {
 
 // 벼랑면 — **아래쪽 칸**에 드리운다. 나를 마주 볼 때(위쪽 땅이 북쪽)만
 // 온전히 보이고, 옆이면 좁은 띠, 남쪽이면 등을 돌려 아예 안 보인다
-function cliffPx(g, x, y, s, nax, nay, i, seed) {
+function cliffPx(g, x, y, s, nax, nay, i, seed, _fill, code) {
   if (s < 0) return;                                          // 위쪽 땅 — 그 칸이 그린다
   const k = Math.floor(s);
   // 면이 **얼마나 나를 마주 보는가.** 정면이면 1, 옆이면 0.
@@ -907,8 +907,16 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
   // 그대로 쓰면 경계가 비스듬해지는 자리에서 값이 훅 떨어져 벽이 사라진다.
   // 조금이라도 마주 보면 바닥값을 준다 — 비스듬한 벽은 낮아 보일 뿐
   // 없어지지는 않는다
+  // 어느 쪽 땅이 높은가는 **꼴 값이 이미 말해 준다** (1=북 2=남 4=서 8=동).
+  //
+  // 여태 거리장의 기울기(nax/nay)로 짐작했다. 경계가 비뚤면 그 기울기가
+  // 칸마다 흔들려서, 같은 벽인데 어느 칸은 그려지고 어느 칸은 안 그려졌다 —
+  // 대지 뒤쪽 어깨에서 벽이 토막토막 끊겨 보인 것이 이것이다.
+  // 짐작을 그만두고 꼴 값을 그대로 쓴다.
+  const hasN = (code & 1) !== 0;                 // 북쪽이 높다 -> 나를 마주 보는 벽
+  const hasW = (code & 4) !== 0, hasE = (code & 8) !== 0;
   const face = clamp(-nay, 0, 1);
-  const lean = face > 0.08 ? Math.max(face, 0.56) : face;
+  const lean = hasN ? Math.max(face, 0.56) : 0;  // 북쪽이 아니면 정면은 없다
   const H = faceH(lean, i, seed, true);
 
   // ---- ① 옆면을 **먼저 깔고** 정면을 그 위에 얹는다 ----
@@ -920,7 +928,13 @@ function cliffPx(g, x, y, s, nax, nay, i, seed) {
   //
   // 여기서 k는 경계에서 **옆으로** 들어간 거리다. 모서리가 밝고 안으로
   // 갈수록 어두워지면, 그 폭이 곧 벽의 두께로 읽힌다.
-  if (Math.abs(nax) > 0.32) {
+  // 뒤쪽 어깨에서는 옆면도 안 그린다.
+  //
+  // 남쪽 땅이 높으면 그 벽은 저쪽을 향해 서 있다. 어깨(서·동이 높으면서
+  // 남쪽도 높은 자리)에 옆면을 그리면, 그 사이사이 「남쪽만 높은」 칸에는
+  // 그릴 게 없어서 **점선처럼 끊긴 회색 토막**이 남는다.
+  // 뒤쪽은 마루선(brink) 한 줄이 말하게 두고 벽은 아예 안 세운다
+  if ((hasW || hasE) && (code & 2) === 0) {
     const w = 6 + Math.round(h(Math.floor(i / 4), 0, 110 + seed) * 3);
     if (k < w) {
       let t = 2.2 + (k / Math.max(1, w - 1)) * 3.6;
@@ -1098,7 +1112,7 @@ function edgeTile(code, isLand, paint, vr, hh) {
     let nx = -gx / L, ny = -gy / L;
     if (!isLand) { sv = -sv; nx = -nx; ny = -ny; }
     const i = Math.round(x * Math.abs(ny) + y * Math.abs(nx));
-    px(g, x, y, sv, nx, ny, i, (vr || 0) * 31, isLand);
+    px(g, x, y, sv, nx, ny, i, (vr || 0) * 31, isLand, code);
   }
   return g;
 }

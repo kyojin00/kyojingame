@@ -96,15 +96,28 @@ func _build_map() -> void:
 				continue
 			var reg := _region_at(pos)
 			var h := m._hash01(x * 3 + 7, y * 5 + 11)
-			var tree_p := 0.06
-			var rock_p := 0.12          # 나무 확률 위에 이어 붙는 문턱값
+			var tree_p := 0.05
+			var rock_p := 0.09          # 나무 확률 위에 이어 붙는 문턱값
 			if not reg.is_empty():
 				# 줄지어 심은 땅(과수원)은 격자 위에만 선다 — 그 사이는 훤히 비운다
 				var g := int(reg.grid)
 				if g > 0 and (x % g != 0 or y % g != 0):
 					continue
 				tree_p = float(reg.tree)
-				rock_p = tree_p + float(reg.rock)
+				rock_p = float(reg.rock)
+			# ---- **덩어리로** 난다 ----
+			#
+			# 확률 하나로 온 세계에 뿌리면 어디를 가나 똑같이 성긴 숲이다 —
+			# 걸어도 걸어도 같은 풍경이라 「저기는 뭐가 있나」가 안 생긴다.
+			# 진짜 숲은 빽빽한 데와 훤한 데가 갈린다.
+			#
+			# 굵은 얼룩 둘을 곱한다: 스물여섯 칸짜리(수풀이 우거진 골)와
+			# 열 칸짜리(그 안의 덤불). 평균은 1이고 0에서 2.5까지 벌어지므로,
+			# 같은 밀도를 두고도 밀림과 빈터가 함께 나온다
+			var clump: float = clampf(_vnoise(x, y, 26, 5) * 2.0
+				* _vnoise(x, y, 10, 137) * 2.0, 0.0, 2.5)
+			tree_p *= clump
+			rock_p = tree_p + rock_p * clump
 			if h < tree_p:
 				if _nature_clear(pos, "tree"):
 					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
@@ -424,14 +437,28 @@ func _build_levels() -> void:
 	# 한복판에 바위가 박히고 나무가 벽에서 자랐다.
 	# 이제 벽이 **두 칸**이라 더 크게 눈에 띈다. 통행은 이미 막아 두었으니
 	# (main.gd `_cliff_foot`) 심기는 것만 막으면 된다.
-	for y in range(1, m.MAP_H):
-		var b := y * m.MAP_W
-		for x in m.MAP_W:
-			if _lv(x, y - 1) <= _lv(x, y):
-				continue                      # 위가 더 높지 않으면 벼랑면이 아니다
-			m.no_spawn[b + x] = 1             # 면 첫 칸
-			if y + 1 < m.MAP_H and _lv(x, y + 1) == _lv(x, y):
-				m.no_spawn[b + m.MAP_W + x] = 1   # 두 칸째 (그림이 여기까지 내려온다)
+	# 벼랑면뿐 아니라 **켜가 바뀌는 자리 둘레 전체**를 비운다.
+	#
+	# 나무 한 그루의 그림은 두 칸 반이고 밑변이 칸에 맞는다. 마루(위쪽 땅의
+	# 가장자리)에 서면 잎이 벼랑면을 통째로 덮고, 발치에 서면 밑동이 벽에
+	# 파묻힌다 — 어느 쪽이든 「경계에 걸친」 꼴이다. 경계는 지형이 말하는
+	# 자리라, 거기만은 훤히 비워 두는 편이 낫다
+	for y in range(1, m.MAP_H - 1):
+		for x in range(1, m.MAP_W - 1):
+			var lv0 := _lv(x, y)
+			var edge := false
+			for o: Vector2i in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0),
+					Vector2i(1, 0), Vector2i(-1, -1), Vector2i(1, -1),
+					Vector2i(-1, 1), Vector2i(1, 1)]:
+				if _lv(x + o.x, y + o.y) != lv0:
+					edge = true
+					break
+			if not edge:
+				continue
+			_no_spawn_rect(x, y, x, y, 1)
+			# 벼랑면은 아래로 두 칸을 덮는다 — 그 밑까지 비운다
+			if _lv(x, y - 1) > lv0:
+				_no_spawn_rect(x, y + 1, x, y + 2, 1)
 
 	# 층계참을 잇는 길 — 오르막을 낸 뒤라야 그 발치까지 이어 붙는다
 	for lm3: Dictionary in m.LANDMARKS:
@@ -490,6 +517,27 @@ func _ridge_y(x: int) -> int:
 
 
 # 자연물 금지 칸을 못박는다 (여백을 함께 준다 — 그림은 밑동보다 넓다)
+# 부드러운 값잡음 (칸 크기 cell). 굵은 얼룩을 만들 때 쓴다.
+#
+# m._hash01(x / 9, y / 9) 처럼 나눗셈으로 뭉치면 아홉 칸짜리 **네모**가
+# 그대로 보인다 — 숲이 바둑판이 된다. 격자점 넷을 부드럽게 이어야 얼룩이
+# 얼룩으로 보인다
+func _vnoise(x: int, y: int, cell: int, seed: int) -> float:
+	var gx := float(x) / float(cell)
+	var gy := float(y) / float(cell)
+	var x0 := int(floor(gx))
+	var y0 := int(floor(gy))
+	var u := gx - x0
+	var v := gy - y0
+	u = u * u * (3.0 - 2.0 * u)
+	v = v * v * (3.0 - 2.0 * v)
+	var a := m._hash01(x0 + seed, y0 + seed)
+	var b := m._hash01(x0 + 1 + seed, y0 + seed)
+	var c := m._hash01(x0 + seed, y0 + 1 + seed)
+	var d := m._hash01(x0 + 1 + seed, y0 + 1 + seed)
+	return lerpf(lerpf(a, b, u), lerpf(c, d, u), v)
+
+
 func _no_spawn_rect(x0: int, y0: int, x1: int, y1: int, pad := 0) -> void:
 	for y in range(maxi(0, y0 - pad), mini(m.MAP_H, y1 + pad + 1)):
 		var b := y * m.MAP_W
