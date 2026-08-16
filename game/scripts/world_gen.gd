@@ -365,7 +365,50 @@ func _nature_clear(pos: Vector2i, kind: String, override_dist := -1) -> bool:
 
 # 건물이 차지하는 칸과 마당만 만든다 (그림 노드는 _spawn_objects가 세운다).
 # 맵을 만드는 단계에서는 아직 world 노드가 없으므로 이쪽만 부른다.
+# 집 둘레의 부지 — 다져진 흙 마당과 문 앞 오솔길.
+#
+# 집이 잔디 위에 그냥 얹혀 있으면 「놓아 둔 모형」으로 보인다. 사람이 사는
+# 집 둘레에는 풀이 못 자란 자리가 생기고, 문 앞에서 큰길까지 길이 난다.
+# 이 둘이 집을 땅에 앉힌다.
+func _lay_yard(anchor: Vector2i) -> void:
+	for y in range(anchor.y - 1, anchor.y + 6):
+		for x in range(anchor.x - 2, anchor.x + 7):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			var cell: Dictionary = m.grid[y][x]
+			if cell.ground != "grass":
+				continue                      # 길·물·밭·모래는 건드리지 않는다
+			# 가장자리는 **자로 잰 듯하면 안 된다.** 바깥 한 겹을 확률로 빼서
+			# 들쭉날쭉하게 만든다 (모서리일수록 많이 빠진다)
+			var edge := 0
+			if x == anchor.x - 2 or x == anchor.x + 6:
+				edge += 1
+			if y == anchor.y - 1 or y == anchor.y + 5:
+				edge += 1
+			if edge > 0 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.4 * float(edge):
+				continue
+			cell.ground = "yard"
+	# 문 앞에서 큰길까지 — 마당만 있고 길이 없으면 부지가 섬처럼 뜬다.
+	# 아래로 먼저 찾고, 없으면 위로. 큰길에 닿는 쪽만 깐다
+	var d: Vector2i = m.door_tile(anchor)
+	for dir in [1, -1]:
+		var run: Array[Vector2i] = []
+		for k in range(1, 9):
+			var t := Vector2i(d.x, d.y + dir * k)
+			if t.y < 0 or t.y >= m.MAP_H:
+				break
+			var g: String = m.grid[t.y][t.x].ground
+			if g == "path":
+				for q: Vector2i in run:
+					m.grid[q.y][q.x].ground = "path"
+				return
+			if g != "grass" and g != "yard":
+				break
+			run.append(t)
+
+
 func _place_building_tiles(anchor: Vector2i) -> void:
+	_lay_yard(anchor)
 	for y in range(anchor.y, anchor.y + 4):
 		for x in range(anchor.x, anchor.x + 5):
 			m.objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}

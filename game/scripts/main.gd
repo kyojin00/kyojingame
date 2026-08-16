@@ -303,7 +303,7 @@ const TEXTURE_NAMES := [
 	"grass_summer_0", "grass_summer_1", "grass_summer_2",
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
-	"soil_dry", "soil_wet", "water_0", "water_1", "path",
+	"soil_dry", "soil_wet", "water_0", "water_1", "path", "yard",
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
@@ -1926,6 +1926,9 @@ func _draw() -> void:
 				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
 			elif ground == "path":
 				put.call(base, tex["path"], at)
+			elif ground == "yard":
+				# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
+				put.call(base, tex["yard"], at)
 			else:
 				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
 				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.

@@ -336,9 +336,15 @@ func _spawn_postman() -> void:
 	_postman.position = Vector2(m.STORY_ROAD_X0 * m.TILE + 16, m.STORY_LANE_Y * m.TILE + 16)
 	_postman_spr = Sprite2D.new()
 	_postman_spr.centered = false
-	# 플레이어와 같은 밀도의 도트. 어른이라 주인공보다 조금 크게 그린다.
-	_postman_spr.offset = Vector2(-64, -188)
-	_postman_spr.scale = Vector2(0.56, 0.56)
+	# 어른이라 주인공보다 조금 크게 그린다.
+	#
+	# 이 두 줄은 **그림 크기에 매여 있다.** 예전 우체부 그림은 주인공과 같은
+	# 128x192였고 0.56배가 맞았는데, 주민을 32x48로 다시 그리면서 이 값이
+	# 그대로 남아 우체부가 18x27로 쪼그라들고 공중에 떴다.
+	# 이제 npc.gd 와 같은 규칙을 쓴다: offset(-16,-47) + 배율 2가 주인공 크기,
+	# 2.24면 그보다 한 뼘 크다.
+	_postman_spr.offset = Vector2(-16, -47)
+	_postman_spr.scale = Vector2(2.24, 2.24)
 	_postman_spr.texture = m.tex["npc_postman_side_0"]
 	_postman.add_child(_postman_spr)
 	m.world.add_child(_postman)
@@ -2703,8 +2709,8 @@ func _spawn_book_post(mode: String, tile: Vector2i) -> void:
 	_book_post.position = Vector2(tile.x * m.TILE + 16, tile.y * m.TILE + 16)
 	_book_post_spr = Sprite2D.new()
 	_book_post_spr.centered = false
-	_book_post_spr.offset = Vector2(-64, -188)
-	_book_post_spr.scale = Vector2(0.56, 0.56)
+	_book_post_spr.offset = Vector2(-16, -47)   # npc.gd 와 같은 규칙 (32x48 기준)
+	_book_post_spr.scale = Vector2(2.24, 2.24)
 	_book_post_spr.texture = m.tex["npc_postman_down_0"]
 	_book_post.add_child(_book_post_spr)
 	m.world.add_child(_book_post)
