@@ -830,11 +830,16 @@ func _begin_world_entry() -> void:
 	_world_entry_running = true
 	m.story_cutscene = true
 	_postman_state = "talk"
+	# **한 박자를 준다.** 예전엔 0.6 -> 0.3 -> 0.8, 다 해서 1.7초에 곧바로
+	# 우체부 대사였다. 숲길을 한참 걸어왔는데 장면이 잘려 붙은 것처럼
+	# 느껴진 게 그래서다 — 어두운 동안 지명을 한 번 보여 주고, 밝아진 뒤에도
+	# 마을을 눈에 담을 틈을 두고 나서 말을 건다
 	var tw := create_tween()
-	tw.tween_property(m.fade_rect, "color:a", 1.0, 0.6)
+	tw.tween_property(m.fade_rect, "color:a", 1.0, 0.9)
 	tw.tween_callback(_do_world_entry)
-	tw.tween_interval(0.3)
-	tw.tween_property(m.fade_rect, "color:a", 0.0, 0.8)
+	tw.tween_interval(1.1)                      # 어둠 속에서 지명 카드
+	tw.tween_property(m.fade_rect, "color:a", 0.0, 1.2)
+	tw.tween_interval(1.0)                      # 마을을 한 번 둘러볼 틈
 	tw.tween_callback(_after_world_entry)
 
 
@@ -854,6 +859,9 @@ func _do_world_entry() -> void:
 	var cam: Camera2D = m.player.get_node("Camera")
 	cam.reset_smoothing()              # 제한을 푼 **뒤에** 스냅한다
 	GameData.mark_explored_at(WORLD_ENTRY)
+	# 어두운 동안 뜨는 지명 카드 — 「어디에 도착했는가」를 화면이 먼저 말한다
+	var vn := GameData.village_name if GameData.village_name != "" else "교진"
+	m.hud.story_banner("%s 마을" % vn, "마을 어귀")
 	m.queue_redraw()
 
 
