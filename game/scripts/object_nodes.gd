@@ -217,6 +217,11 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 물방앗간 곁의 물레방아 — 돈다 (_tick_landmarks)
 			texture = m.tex["deco_wheel_0"]
 			offset = Vector2(0, -texture.get_height())
+		"deco_stonelamp":
+			# 돌계단을 따라 늘어선 석등 — 하나로 볼 것이 아니라 **줄지어**
+			# 섰을 때 길의 방향과 길이를 말한다
+			texture = m.tex["deco_stonelamp_0"]
+			offset = Vector2(0, -texture.get_height())
 		"horse":
 			texture = m.tex["horse_side_0"]   # 세워 둔 말
 			offset = Vector2(0, -80)
@@ -239,7 +244,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		# (예전엔 오두막만 옛 1px 밀도라 이 보정에서 빼 뒀었다. 그때 오두막은
 		#  화면 72x62px — 주인공 64x96px보다 낮아, 이장이 제 집보다 컸다.)
 		sc = 0.5
-	elif kind.begins_with("landmark_") or kind == "deco_wheel":
+	elif kind.begins_with("landmark_") or kind == "deco_wheel" \
+			or kind == "deco_stonelamp":
 		sc = 0.5   # 원본 4px = 도트 한 칸 (make_landmarks.js)
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)

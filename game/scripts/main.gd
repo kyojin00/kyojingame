@@ -265,6 +265,9 @@ const TEXTURE_NAMES := [
 	"landmark_falls_0", "landmark_falls_1", "landmark_falls_2", "landmark_falls_3",
 	"landmark_spire_0", "landmark_spire_1",
 	"deco_wheel_0", "deco_wheel_1", "deco_wheel_2", "deco_wheel_3",
+	# 돌계단을 따라 늘어선 석등 (ref/make_landmarks.js).
+	# 마을 광장의 가로등(deco_lamp)과 이름이 겹치지 않게 한다
+	"deco_stonelamp_0",
 	# 고장의 작은 마을 집 (ref/make_buildings.js)
 	"house_mill", "house_creek", "house_cabin", "house_shade",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
@@ -635,14 +638,14 @@ const REGIONS := [
 # 섬이 되고, 큰 것을 세워 놓고 가까이 못 가는 꼴이 된다.
 const LANDMARKS := [
 	# 큰나무 — 산만 한 나무 한 그루. 세계에서 제일 큰 그림(화면 12.5 x 16.5칸)
-	{"id": "greattree", "name": "큰나무", "kind": "landmark_greattree",
+	{"id": "greattree", "name": "큰나무", "kind": "landmark_greattree", "art": Vector2i(13, 17),
 		"tile": Vector2i(128, 148 + NORTH_PAD),
 		"block": Rect2i(-4, -1, 8, 2), "clear": 12, "lakes": [], "river": [],
 		# 큰나무는 야트막한 둔덕 위에 선다 — 숲 어디서나 우듬지가 보이게
 		"terrain": {"blobs": [[128, 152 + NORTH_PAD, 15.0, 8.0, 2, 63]],
 			"ramps": [[126, 165 + NORTH_PAD]]}},
 	# 큰폭포 — 절벽에서 두 단으로 쏟아진다. 밑에 못이 파여 있다
-	{"id": "falls", "name": "큰폭포", "kind": "landmark_falls",
+	{"id": "falls", "name": "큰폭포", "kind": "landmark_falls", "art": Vector2i(6, 6),
 		# 그림은 **윗못에서 밑못까지**만 맡는다 (화면 6칸 x 6칸).
 		# 좌우로는 세계의 벼랑 타일이, 위아래로는 세계의 물 타일이 이어진다.
 		#
@@ -675,16 +678,40 @@ const LANDMARKS := [
 		# 내려가므로, 그림만 옆으로 밀면 마루가 벼랑 밑으로 처진다
 		"terrain": {"blobs": [[256, 9 + NORTH_PAD, 16.0, 11.0, 2, 91]],
 			"ramps": [[244, 20 + NORTH_PAD]]}},
-	# 촛대바위 — 층층이 깎여 남은 붉은 바위 기둥
-	{"id": "spire", "name": "촛대바위", "kind": "landmark_spire",
-		"tile": Vector2i(410, 38 + NORTH_PAD),
-		"block": Rect2i(-3, -1, 7, 2), "clear": 9, "lakes": [], "river": [],
-		# 촛대바위는 **층층이 올라가는 대지** 위에 선다. 켜 1 -> 2 -> 3,
-		# 층마다 오르막이 있어 걸어서 꼭대기 단까지 올라간다.
-		# 돌탑도 그 계단참에 있다 — 올라가 볼 이유가 하나 더 생긴다
-		"terrain": {"blobs": [[410, 38 + NORTH_PAD, 20.0, 11.0, 2, 77],
-				[410, 34 + NORTH_PAD, 9.0, 5.0, 3, 78]],
-			"ramps": [[398, 50 + NORTH_PAD], [404, 40 + NORTH_PAD]]}},
+	# 촛대바위 — 층층이 깎여 남은 붉은 바위 기둥. **꼭대기까지 걸어 오른다**
+	{"id": "spire", "name": "촛대바위", "kind": "landmark_spire", "art": Vector2i(10, 18),
+		"tile": Vector2i(410, 32 + NORTH_PAD),
+		"block": Rect2i(-3, -1, 7, 2), "clear": 11, "lakes": [], "river": [],
+		# ---- 네 켜짜리 층대(層臺) ----
+		#
+		# 예전에는 두 켜였고, 올라가 봐야 바위 밑동이었다. 「올라갈 수
+		# 있다」와 「올라가고 싶다」는 다르다 — 오르는 동안 **층계참이
+		# 몇 번 나오고**, 그 끝에 볼 것이 있어야 한다.
+		#
+		# 켜 1 -> 2 -> 3 -> 4 -> 5. 대지는 남쪽으로만 깎여 있어(북쪽 자락은
+		# 다 붙어 있다) 층계참이 앞쪽에 층층이 드러나고, 오르막은 켜마다
+		# 좌우를 번갈아 둔다 — 지그재그로 접혀 올라가는 그 계단이다.
+		# 꼭대기 켜(5)에 촛대바위가 선다. 돌탑도 거기 있다
+		"terrain": {"blobs": [[410, 40 + NORTH_PAD, 30.0, 17.0, 2, 77],
+				[410, 36 + NORTH_PAD, 21.0, 12.0, 3, 78],
+				[410, 32 + NORTH_PAD, 13.0, 7.5, 4, 79],
+				[410, 29 + NORTH_PAD, 7.0, 4.0, 5, 80]],
+			# 오르막 = 돌계단. 서 -> 동 -> 서 -> 동으로 접힌다
+			# 맨 위 계단은 **바위 밑동을 피해서** 낸다. 그림이 차지하는 칸
+			# (block: 좌우 세 칸)은 못 밟는 자리라, 거기로 계단을 내면
+			# 다 올라와서 벽에 부딪힌다 — 켜만 보는 검사로는 안 잡힌다
+			"ramps": [[392, 57 + NORTH_PAD], [424, 48 + NORTH_PAD],
+				[398, 39 + NORTH_PAD], [414, 33 + NORTH_PAD]],
+			"lamps": true,       # 계단마다 양옆에 석등 한 쌍
+			# 층계참을 잇는 길. 계단만 놓으면 층계참이 허허벌판이라
+			# 어디로 가야 다음 계단인지 안 보인다 — 밟혀 다져진 길이
+			# 이어져야 발이 저절로 따라간다
+			"paths": [[[392, 64 + NORTH_PAD], [392, 54 + NORTH_PAD],
+					[424, 54 + NORTH_PAD], [424, 45 + NORTH_PAD]],
+				[[424, 45 + NORTH_PAD], [424, 44 + NORTH_PAD],
+					[398, 44 + NORTH_PAD], [398, 36 + NORTH_PAD]],
+				[[398, 36 + NORTH_PAD], [398, 35 + NORTH_PAD],
+					[414, 35 + NORTH_PAD], [414, 30 + NORTH_PAD]]]}},
 	# 별빛 호수 — 그림이 아니라 **지형**이 랜드마크다. 세계에서 제일 큰 물
 	{"id": "starlake", "name": "별빛 호수", "kind": "",
 		"tile": Vector2i(364, 104 + NORTH_PAD),
@@ -1380,6 +1407,25 @@ const OBJECT_SCALES := {
 # 나무는 "옆으로 나란히" 있을 때만 그림이 지저분하게 겹친다.
 # 앞뒤(위아래)로 겹치는 것은 y정렬로 앞 나무가 뒤 나무를 가려 주므로
 # 오히려 깊은 숲처럼 보인다. 그래서 가로 간격만 넓게 잡고 세로는 촘촘히 둔다.
+# ---- 자연물이 **절대** 나면 안 되는 칸 ----
+#
+# 「나무 한 그루가 그림을 반쯤 가린다」는 자리마다 따로 막아 왔다 —
+# 랜드마크는 clear 값으로, 낚시터는 다 흩고 나서 지우기로, 오르막은
+# is_ramp 로. 자리를 하나 새로 만들 때마다 그 예외를 어딘가에 또 적어야
+# 했고, 지역(REGIONS) 안에서는 바닥 종류 검사가 통째로 건너뛰어져서
+# **깔아 놓은 길과 돌계단 위에 나무가 돋았다.**
+#
+# 칸마다 한 바이트로 못박아 둔다. 지형을 지을 때 표시해 두면, 처음 흩을
+# 때도 아침마다 되살아날 때도 같은 자리를 본다.
+var no_spawn := PackedByteArray()
+
+
+func spawn_blocked(x: int, y: int) -> bool:
+	if no_spawn.is_empty() or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+		return false
+	return no_spawn[y * MAP_W + x] != 0
+
+
 const TREE_DX := 4   # 가로로 4칸 이내이면서
 const TREE_DY := 2   # 세로로 2칸 이내면 겹쳐 보인다 -> 금지
 const NATURE_CLEAR := {
@@ -1409,6 +1455,10 @@ const OBJECT_PAD := {
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
 	"board": Vector2(3, 2), "sign": Vector2(3, 2),
+	# 석등(계단 옆)은 마을 광장의 가로등(deco_lamp)과 **다른 물건**이다.
+	# 계단 바로 옆에 서므로 여백이 넓으면 두 칸짜리 계단을 양쪽에서
+	# 좁혀 지나갈 수가 없어진다
+	"deco_stonelamp": Vector2(2, 2),
 }
 
 

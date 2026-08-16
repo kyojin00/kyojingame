@@ -85,6 +85,15 @@ func _build_map() -> void:
 				continue  # 시작 지점 주변도 비워둔다
 			if m.VILLAGE_REGION.has_point(pos) or m.ROAD.has_point(pos):
 				continue  # 마을/길은 비워둔다
+			if m.spawn_blocked(x, y):
+				continue  # 그림·계단·길이 차지한 자리
+			# 잔디가 아닌 바닥(길·마당·모래·자갈)에는 아무것도 안 둔다.
+			#
+			# **이 검사가 예전에는 지역 밖에서만 돌았다.** 지역(REGIONS) 안이면
+			# 통째로 건너뛰어서, 깔아 놓은 길이든 돌계단이든 그 위에 나무가
+			# 돋았다 — 촛대바위의 계단이 바로 지역 한복판이다
+			if m.grid[y][x].ground != "grass":
+				continue
 			var reg := _region_at(pos)
 			var h := m._hash01(x * 3 + 7, y * 5 + 11)
 			var tree_p := 0.06
@@ -96,8 +105,6 @@ func _build_map() -> void:
 					continue
 				tree_p = float(reg.tree)
 				rock_p = tree_p + float(reg.rock)
-			elif m.grid[y][x].ground != "grass":
-				continue                # 지역 밖의 흙·모래 위에는 아무것도 안 둔다
 			if h < tree_p:
 				if _nature_clear(pos, "tree"):
 					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
@@ -129,11 +136,59 @@ func _build_map() -> void:
 				m.grid[gy2][gx2].ground = "soil"
 	# (낚시터의 가로등·벤치도 없앴다)
 
+	# ---- 마지막 비질 ----
+	#
+	# 「여기는 비워라」를 자리마다 따로 적어 왔다 — 랜드마크는 clear 로,
+	# 낚시터는 다 흩고 나서 지우기로, 계단은 is_ramp 로. 새 자리를 만들 때마다
+	# 그 예외를 어딘가에 또 적어야 했고, 한 군데만 빠뜨리면 그림 위에 나무가
+	# 섰다. 못박아 둔 판(no_spawn)을 **한 번에 훑어** 쓸어 낸다.
+	#
+	# 순서가 중요하다. 랜드마크·마을·바다까지 다 세운 **뒤**라야, 그 사이에
+	# 새로 놓인 것도 같이 걸린다.
+	sweep_blocked_nature()
+
 	_build_sea()
 	# 채집물은 첫날부터 들판에 흩어져 있다. 예전에는 세계를 지을 때
 	# 한 포기도 두지 않아, 새 농장의 첫날은 산딸기 한 알 없는 빈 들판이었다.
 	# (아직 화면도 주인공도 없는 시점이라 노드는 만들지 않는다)
 	_respawn_forage(false)
+
+
+# 그림·계단·길 위에 선 자연물을 쓸어 낸다.
+#
+# **세이브를 편 뒤에도 부른다.** 오브젝트는 통째로 저장되므로, 계단을 새로
+# 놓기 전에 저장한 세계를 열면 그 자리에 옛 나무와 바위가 그대로 살아난다 —
+# 새로 시작한 사람만 깨끗하고 이어서 하는 사람은 계단이 막혀 있게 된다.
+# 저절로 난 것인가 (나무·돌·잡초·채집물). 사람이 놓은 것 — 표지판·석등·
+# 건물·그림 — 은 「비우기」의 대상이 아니다.
+#
+# 이 구분이 없어서 랜드마크 둘레를 비우는 한 줄이 방금 세운 석등까지
+# 지웠다. 「비운다」는 말이 두 가지를 뜻하고 있었던 것이다
+func _is_wild(kind: String) -> bool:
+	return kind == "tree" or kind == "rock" or kind == "weed" \
+		or kind == "bigrock" or kind.begins_with("forage_")
+
+
+func _clear_wild(x: int, y: int) -> void:
+	var p := Vector2i(x, y)
+	if m.objects.has(p) and _is_wild(String(m.objects[p].kind)):
+		m.objects.erase(p)
+
+
+func sweep_blocked_nature() -> void:
+	var swept := 0
+	for p2: Vector2i in m.objects.keys():
+		if not m.spawn_blocked(p2.x, p2.y):
+			continue
+		if not _is_wild(String(m.objects[p2].kind)):
+			continue          # 사람이 놓은 것(표지판·석등·그림)은 그대로 둔다
+		if m.obj_nodes.has(p2):
+			m.objnode._remove_object(p2)
+		else:
+			m.objects.erase(p2)
+		swept += 1
+	if swept > 0:
+		print("[자연물] 그림·계단·길 위에 있던 %d개를 치웠다" % swept)
 
 
 # 이 칸이 어느 야생 지역인가 (없으면 빈 사전).
@@ -314,6 +369,8 @@ func _build_sea() -> void:
 #   켜 0   능선 아래 — 모래사장과 바다. 능선이 그대로 벼랑이 된다
 #   켜 2   대지(臺地) 몇 군데. 깊은 숲의 언덕과 채석장의 단구
 func _build_levels() -> void:
+	m.no_spawn = PackedByteArray()
+	m.no_spawn.resize(m.MAP_W * m.MAP_H)
 	m.terrain_level = []
 	for y in m.MAP_H:
 		var row := PackedByteArray()
@@ -352,6 +409,16 @@ func _build_levels() -> void:
 	for lm2: Dictionary in m.LANDMARKS:
 		for r: Array in (lm2.get("terrain", {}) as Dictionary).get("ramps", []):
 			_cut_ramp(int(r[0]), int(r[1]))
+	# 층계참을 잇는 길 — 오르막을 낸 뒤라야 그 발치까지 이어 붙는다
+	for lm3: Dictionary in m.LANDMARKS:
+		var tr: Dictionary = lm3.get("terrain", {})
+		for chain: Array in tr.get("paths", []):
+			_lay_path(chain)
+		# 석등은 길을 **다 깔고 나서** 세운다 — _lay_path 가 지나는 자리의
+		# 물건을 쓸어 내므로, 먼저 세우면 방금 세운 등을 제가 지운다
+		if bool(tr.get("lamps", false)):
+			for chain2: Array in tr.get("paths", []):
+				_lay_lamps(chain2)
 	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
 	_cut_ramp(m.SEA_GATE[0].x, m.SEA_RIDGE_Y, m.SEA_GATE.size())
 
@@ -365,6 +432,14 @@ func _ridge_y(x: int) -> int:
 	var t := float(x) / float(m.MAP_W)
 	var w := sin(t * PI * 5.3) * 1.3 + sin(t * PI * 11.9) * 0.9
 	return m.SEA_RIDGE_Y - clampi(int(round(w + 1.6)), 0, 3)
+
+
+# 자연물 금지 칸을 못박는다 (여백을 함께 준다 — 그림은 밑동보다 넓다)
+func _no_spawn_rect(x0: int, y0: int, x1: int, y1: int, pad := 0) -> void:
+	for y in range(maxi(0, y0 - pad), mini(m.MAP_H, y1 + pad + 1)):
+		var b := y * m.MAP_W
+		for x in range(maxi(0, x0 - pad), mini(m.MAP_W, x1 + pad + 1)):
+			m.no_spawn[b + x] = 1
 
 
 func _lv(x: int, y: int) -> int:
@@ -421,11 +496,88 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 			_set_lv(f[0], f[1], f[2])
 
 
+# 층계참을 잇는 길 — 이음점을 따라 **두 칸 폭**으로 다져 놓는다.
+#
+# 계단만 놓아 두면 층계참이 허허벌판이라 다음 계단이 어디인지 안 보인다.
+# 사람이 다니면 풀이 죽고 흙이 드러난다 — 그 자국이 곧 안내다.
+#
+# 가로/세로로만 꺾는다. 비스듬한 길은 칸 단위 세계에서 톱니로 나오고,
+# 무엇보다 **오르막이 세로로만 나므로** 길도 같은 결이라야 이어 붙는다.
+func _lay_path(chain: Array) -> void:
+	for i in range(chain.size() - 1):
+		var a: Array = chain[i]
+		var b: Array = chain[i + 1]
+		var x0: int = mini(int(a[0]), int(b[0]))
+		var x1: int = maxi(int(a[0]), int(b[0]))
+		var y0: int = mini(int(a[1]), int(b[1]))
+		var y1: int = maxi(int(a[1]), int(b[1]))
+		for y in range(y0, y1 + 2):
+			for x in range(x0, x1 + 2):
+				if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.MAP_H - 1:
+					continue
+				# 계단(오르막) 위에는 안 깐다 — 거기는 이미 돌계단이다.
+				# 잔디가 아닌 데도 안 건드린다 (물 위로 길이 지나가면 안 된다)
+				# **밟혀 다져진 흙(yard)** 으로 낸다.
+				#
+				# 처음엔 흙길(path)로 깔았는데 촛대바위 둘레는 채석장 지역이라
+				# 바닥이 이미 흙길이었다 — 길을 깔았는데 아무것도 안 달라졌고,
+				# 어디로 가야 다음 계단인지 여전히 안 보였다. 마당 흙은 자갈과
+				# 색이 갈리고, 오르막(_cut_ramp)이 쓰는 바닥과도 같은 것이라
+				# 계단 발치에서 자연스럽게 이어 붙는다.
+				var gr: String = m.grid[y][x].ground
+				if (m.terrain_level[y][x] & 8) == 0 and (gr == "grass" or gr == "path"):
+					m.grid[y][x].ground = "yard"
+				m.objects.erase(Vector2i(x, y))
+				# 길 양옆 두 칸까지 비운다 — 나무 그림이 두 칸 반이라 바로
+				# 옆에 서면 길을 통째로 덮는다
+				_no_spawn_rect(x, y, x, y, 2)
+
+
+# ---- 석등 — 길을 따라 **줄지어** 선다 ----
+#
+# 계단만 놓으면 「지형이 낮아졌다 높아졌다」로 보인다. 참고 사진에서 그 길을
+# 길로 만드는 건 계단이 아니라 **양옆에 늘어선 등**이다. 같은 것이 일정한
+# 간격으로 되풀이되면서 길의 방향과 길이를 한눈에 말해 준다 — 우리 집들이
+# 처마 밑에 같은 창을 늘어놓아 「벽」을 말하는 것과 같은 일이다.
+#
+# 그래서 계단 끝에 한 쌍만 세우면 안 된다. 처음엔 그렇게 했는데, 대지
+# 가장자리가 흔들려 있어 여덟 자리 중 넷이 벼랑 밖이라 빠지고, 남은 것도
+# 길을 까는 손이 도로 지웠다 — 다섯 개가 흩어져 서 있으면 그건 줄이 아니다.
+#
+# 길은 가로/세로로만 꺾으므로, 등은 **길의 결과 직각으로** 한 칸 옆에 선다.
+const LAMP_EVERY := 5          # 몇 칸마다 한 쌍
+func _lay_lamps(chain: Array) -> void:
+	for i in range(chain.size() - 1):
+		var a: Array = chain[i]
+		var b: Array = chain[i + 1]
+		var horiz: bool = int(a[1]) == int(b[1])
+		var n: int = absi(int(b[0]) - int(a[0])) if horiz else absi(int(b[1]) - int(a[1]))
+		var step := 1 if (int(b[0]) - int(a[0]) if horiz else int(b[1]) - int(a[1])) >= 0 else -1
+		for k in range(1, n, LAMP_EVERY):
+			var cx: int = int(a[0]) + (k * step if horiz else 0)
+			var cy: int = int(a[1]) + (0 if horiz else k * step)
+			# 길은 두 칸 폭이다 (cx..cx+1 또는 cy..cy+1). 그 **바깥** 한 칸씩
+			for side in [-1, 2]:
+				var lx: int = cx if horiz else cx + side
+				var ly: int = cy + side if horiz else cy
+				if lx < 1 or ly < 1 or lx >= m.MAP_W - 1 or ly >= m.MAP_H - 1:
+					continue
+				if m.objects.has(Vector2i(lx, ly)):
+					continue
+				# 벼랑 밖이면 등이 허공에 뜨고, 계단 위면 길을 막는다
+				if _lv(lx, ly) != _lv(cx, cy) or (m.terrain_level[ly][lx] & 8) != 0:
+					continue
+				if m.grid[ly][lx].ground == "water":
+					continue
+				m.objects[Vector2i(lx, ly)] = {"kind": "deco_stonelamp", "hp": 0}
+				_no_spawn_rect(lx, ly, lx, ly, 1)
+
+
 # 오르막 — 벼랑을 끊고 내려오는 자리.
 #
 # **두 칸 폭**으로 낸다. 한 칸이면 양옆 바위벽이 서로 맞물려 길이 막힌다.
 # 그리고 그 두 칸의 경계를 한 줄에 맞춘다 — 어긋나면 오르막이 비뚤어진다
-func _cut_ramp(x: int, near_y: int, w := 2) -> void:
+func _cut_ramp(x: int, near_y: int, w := 2) -> int:
 	# 어느 벼랑인지는 **줄로 짚어 준다.** 위에서부터 훑으면 대지의 북쪽
 	# 자락이 먼저 걸리는데, 거기는 바위면이 아예 안 보이는 쪽이다
 	var yb := -1
@@ -439,7 +591,7 @@ func _cut_ramp(x: int, near_y: int, w := 2) -> void:
 		if yb >= 0:
 			break
 	if yb < 0:
-		return
+		return -1
 	var hi := _lv(x, yb)
 	var lo := _lv(x, yb + 1)
 	for i in w:
@@ -452,6 +604,12 @@ func _cut_ramp(x: int, near_y: int, w := 2) -> void:
 		for ry in [yb, yb + 1]:
 			if m.grid[ry][cx].ground == "grass":
 				m.grid[ry][cx].ground = "yard"
+			m.objects.erase(Vector2i(cx, ry))
+		# 계단 **양옆 두 칸**까지 비운다. 나무 한 그루의 그림은 두 칸 반이라,
+		# 바로 옆에 서 있으면 잎이 계단을 통째로 덮는다 — 올라가는 길이
+		# 보이지 않으면 올라갈 수 있다는 것도 모른다
+		_no_spawn_rect(cx, yb - 1, cx, yb + 2, 2)
+	return yb
 
 
 # 길이 열리는 순간 능선 너머가 드러난다 — 숲을 걷어내고 바다와 모래사장을 깐다
@@ -552,6 +710,37 @@ func _build_dock() -> void:
 #   ② 필요하면 **물을 판다** — 폭포 밑의 못, 별빛 호수
 #   ③ 그림을 세우고 **밑동만** 막는다 — 뒤로 돌아가 걸을 수 있어야
 #      「지나가는 길에 서 있는 것」이 된다 (벽이 아니라)
+# 그림 한 장이 **몇 칸을 덮는가.**
+#
+# 손으로 적어 둔 clear 값으로만 비우고 있었는데, 그림을 키우면 그 값을 같이
+# 고쳐야 한다는 걸 아무도 안 알려 준다 — 촛대바위를 7.75칸에서 9.5칸으로
+# 키운 순간 양옆 한 칸씩이 비워지지 않았다.
+#
+# 그래서 표(LANDMARKS.art)에 **칸 수를 적어 둔다.** 텍스처에서 재 오는 게
+# 더 깔끔해 보이지만, .import 가 없으면 load()가 null 을 주고 그러면 둘레를
+# 통째로 안 비우게 된다 — 그림이 안 보이는 것도 모자라 그 위에 나무까지
+# 돋는다. 세계를 짓는 일이 PNG 하나에 매달리면 안 된다.
+#
+# 대신 그림이 있을 때는 **맞는지 견준다.** 도트 규칙이 「원본 4px = 화면
+# 2px = 한 칸의 1/16」이라 칸 = 픽셀/64 다. 어긋나면 여기서 걸린다.
+func _art_tiles(lm: Dictionary) -> Vector2i:
+	var kind := String(lm.kind)
+	var art: Vector2i = lm.get("art", Vector2i.ZERO)
+	if kind == "":
+		return Vector2i.ZERO
+	var t: Texture2D = m.tex.get(kind + "_0", m.tex.get(kind))
+	if t != null:
+		var real := Vector2i(int(ceil(t.get_width() / 64.0)),
+			int(ceil(t.get_height() / 64.0)))
+		if real != art:
+			push_error("[랜드마크] %s 그림이 %s칸인데 표에는 %s칸으로 적혀 있다 — "
+				% [kind, real, art] + "LANDMARKS.art 를 고쳐라")
+			return real
+	elif art == Vector2i.ZERO:
+		push_error("[랜드마크] %s — 그림도 없고 art 도 안 적혀 있다" % kind)
+	return art
+
+
 func _build_landmarks() -> void:
 	for lm: Dictionary in m.LANDMARKS:
 		var at: Vector2i = lm.tile
@@ -560,7 +749,18 @@ func _build_landmarks() -> void:
 		#    그래서 위쪽을 넉넉히, 아래쪽은 조금만 비운다
 		for y in range(at.y - clear * 2, at.y + 3):
 			for x in range(at.x - clear, at.x + clear + 1):
-				m.objects.erase(Vector2i(x, y))
+				_clear_wild(x, y)
+		# ①-2 그림이 **실제로 덮는 자리**는 텍스처에서 재서 못박는다.
+		#     clear 는 「둘레를 트이게」 하는 값이고, 이쪽은 「그림 위에
+		#     나무가 돋지 않게」 하는 값이다 — 둘은 다른 일이다
+		var art := _art_tiles(lm)
+		if art != Vector2i.ZERO:
+			_no_spawn_rect(at.x - art.x / 2, at.y - art.y + 1,
+				at.x + art.x / 2, at.y + 1, 1)
+			for y in range(maxi(0, at.y - art.y), mini(m.MAP_H, at.y + 3)):
+				for x in range(maxi(0, at.x - art.x / 2 - 1),
+						mini(m.MAP_W, at.x + art.x / 2 + 2)):
+					_clear_wild(x, y)
 		# ② 물
 		for lake: Array in lm.lakes:
 			_carve_pond(int(lake[0]), int(lake[1]), float(lake[2]), float(lake[3]))
@@ -1106,6 +1306,8 @@ const NO_SPAWN_RECTS: Array[Rect2i] = [
 func _respawn_ok(pos: Vector2i, kind: String, clear_dist := -1) -> bool:
 	if pos.x < 1 or pos.y < 1 or pos.x >= m.MAP_W - 1 or pos.y >= m.WORLD_H - 1:
 		return false
+	if m.spawn_blocked(pos.x, pos.y):
+		return false   # 그림·돌계단·층계참 길이 차지한 자리
 	var cell: Dictionary = m.grid[pos.y][pos.x]
 	if m.objects.has(pos) or cell.ground != "grass" or str(cell.crop_id) != "":
 		return false

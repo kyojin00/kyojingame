@@ -625,6 +625,12 @@ func _apply_save(d: Dictionary) -> void:
 	var pt := m.player_tile()
 	if not GameData.is_tile_owned(pt.x, pt.y):
 		m.player.position = Vector2(78 * m.TILE + 16, 20 * m.TILE + 16)
+	# 이어서 하는 사람도 새 계단을 오를 수 있어야 한다.
+	#
+	# 오브젝트는 통째로 저장된다 — 계단과 층계참 길을 놓기 **전에** 저장한
+	# 세계를 열면 그 자리에 옛 나무와 바위가 그대로 되살아난다. 새로 시작한
+	# 사람만 깨끗하고 이어서 하는 사람은 길이 막혀 있게 된다.
+	m.worldgen.sweep_blocked_nature()
 	# 격자가 통째로 바뀌었다 — 「돌아가는 칸」 목록을 다시 만든다
 	m.farming.rebuild()
 

@@ -97,6 +97,8 @@ const PAL = {
   'u0': [232, 214, 190], 'u1': [196, 108, 92],   // 버섯 (갓·대)
   'n0': [58, 46, 34],                             // 나무 구멍 속 (제일 어두운 데)
   'i0': [246, 246, 250], 'i1': [64, 60, 72],      // 새 (몸·부리)
+  // ---- 석등의 불 ----
+  'g0': [255, 240, 190], 'g1': [246, 206, 122], 'g2': [214, 158, 78],
   // 무지개 — 물보라에 뜬다. 옅게만 (진하면 스티커가 된다)
   'c0': [232, 152, 132], 'c1': [232, 206, 132], 'c2': [156, 214, 152],
   'c3': [140, 186, 226],
@@ -368,27 +370,67 @@ function greatTree(f, NF) {
   //   ① 덩이를 여럿 흩어 놓고
   //   ② 다 그린 뒤 **구멍을 뚫는다** (아래 HOLE)
   // 이 둘이 있어야 초록 사탕이 아니라 나무가 된다.
+  //
+  // ---- 캐노피에도 **지붕처럼 윗면이 있다** ----
+  //
+  // 우리 집이 상자로 보이는 까닭은 셋이다. 지붕의 **윗면**이 뒤로 누워
+  // 보이고, 그 밑에 벽이 마주 서고, 처마가 벽 위로 그늘을 던진다.
+  //
+  // 나무도 똑같다. 위에서 비스듬히 내려다보는 화면이니 잎덩이의 **위쪽은
+  // 하늘을 향해 누운 면**이고 아래쪽은 우리를 마주 보는 면이다. 예전에는
+  // 덩이를 위아래 똑같이 동그랗게 그렸다 — 둥글기는 한데 「내려다보고
+  // 있다」가 안 읽혀서, 크라운이 통째로 공 하나였다.
+  //
+  //   윗면(HZ 위)    **눌린** 타원. 위로 갈수록 더 눌리고 작아진다 (원근).
+  //                  하늘을 정면으로 받으니 한 단 밝다
+  //   앞면(HZ 아래)  동그란 덩이. 우리를 마주 보니 한 단 어둡다
+  //   처마           윗면 앞끝이 앞면 위로 내밀어 그늘을 던진다 — 이 한 줄이
+  //                  「윗면이 위에 있다」를 말한다
+  //   용마루         맨 뒤 테두리는 하늘을 스치므로 제일 밝다
+  const HZ = 94;                       // 캐노피의 지평선 (윗면 / 앞면)
+  const CROWN_TOP = 14;
+  // 어느 만큼 누운 면인가 (1 = 완전히 윗면, 0 = 마주 보는 앞면)
+  const lay = (by) => Math.max(0, Math.min(1, (HZ - by) / (HZ - CROWN_TOP)));
+
   const BLOB = [
-    [100, 62, 54, 40], [58, 82, 42, 33], [142, 82, 42, 33],
-    [100, 30, 44, 25], [56, 44, 34, 25], [144, 44, 34, 25],
+    // 윗면 — 뒤로 갈수록(위로 갈수록) 작고 촘촘하다. 집 지붕의 기와 켜가
+    // 뒤로 갈수록 촘촘해지는 것과 같은 말이다 (그 간격이 곧 기울기다)
+    [100, 18, 30, 15], [68, 26, 23, 12], [132, 26, 23, 12],
+    [100, 38, 40, 20], [52, 46, 30, 16], [148, 46, 30, 16],
+    [100, 62, 52, 30], [56, 78, 40, 25], [144, 78, 40, 25],
+    // 앞면 — 우리를 마주 보는 처마 밑. 여기는 동그랗다
     [28, 104, 26, 21], [172, 104, 26, 21], [100, 106, 56, 28],
     [72, 122, 26, 17], [128, 122, 26, 17],
-  ].map(([bx, by, rx, ry]) => [bx + sway(by), by, rx, ry]);
+  ].map(([bx, by, rx, ry]) => [bx + sway(by), by, rx, ry, lay(by)]);
 
   // **뒤에서 앞으로** 그린다 (화면에서 위에 있는 덩이가 뒤다).
   // 하나 그리기 직전에 그 덩이의 그림자를 먼저 던져 두면, 그림자는 이미
   // 그려진 뒤쪽 덩이 위에만 앉는다 — 순서 하나로 앞뒤가 맞는다.
   const ORDER = BLOB.slice().sort((a, b) => a[1] - b[1]);
-  for (const [bx, by, rx, ry] of ORDER) {
-    // 빛은 왼쪽 위에서 온다 -> 그늘은 오른쪽 아래로 진다
-    g.castEllipse(bx + rx * 0.12, by + ry * 0.34, rx * 0.90, ry * 0.86, 0.78);
-    g.ellipse(bx, by, rx, ry, 'l2');
-    // 덩이 하나하나가 **공**이다: 위쪽 밝은 면 -> 아랫배 그늘 -> 밑에서
-    // 되비치는 빛. 이 셋이 있어야 잎덩이가 원반이 아니라 덩어리로 보인다
-    g.ellipse(bx, by - ry * 0.28, rx * 0.88, ry * 0.62, 'l1', ['l2']);
-    g.ellipse(bx - rx * 0.24, by - ry * 0.50, rx * 0.54, ry * 0.36, 'l0', ['l1']);
-    g.ellipse(bx + rx * 0.12, by + ry * 0.44, rx * 0.82, ry * 0.50, 'l3', ['l2']);
-    g.ellipse(bx + rx * 0.20, by + ry * 0.70, rx * 0.60, ry * 0.30, 'l4', ['l3']);
+  for (const [bx, by, rx, ry0, up] of ORDER) {
+    // 누운 만큼 눌린다. 위에서 내려다본 원은 타원이 되고, 뒤로 갈수록
+    // 더 납작해진다 — 이 하나로 크라운이 「면」이 된다
+    const ry = ry0 * (1 - 0.42 * up);
+    // 그늘은 앞(아래)으로 진다. 누운 면일수록 제 그늘이 짧다
+    g.castEllipse(bx + rx * 0.12, by + ry * (0.34 + 0.30 * up),
+      rx * 0.90, ry * 0.86, 0.78 - up * 0.22);
+    // 바탕 — 윗면은 한 단 밝은 데서 시작한다 (하늘을 정면으로 받는다)
+    g.ellipse(bx, by, rx, ry, up > 0.5 ? 'l1' : 'l2');
+    if (up > 0.5) {
+      // 윗면: 위(뒤)가 밝고 앞끝이 조금 어둡다. 아랫배 그늘은 거의 없다 —
+      // 누운 면에는 아랫배가 안 보인다
+      g.ellipse(bx, by - ry * 0.22, rx * 0.90, ry * 0.70, 'l0', ['l1']);
+      g.ellipse(bx - rx * 0.22, by - ry * 0.40, rx * 0.56, ry * 0.42, 'l0', ['l0']);
+      g.ellipse(bx + rx * 0.10, by + ry * 0.52, rx * 0.84, ry * 0.42, 'l2', ['l1']);
+      g.ellipse(bx + rx * 0.16, by + ry * 0.80, rx * 0.62, ry * 0.24, 'l3', ['l2']);
+    } else {
+      // 앞면: 덩이 하나하나가 **공**이다 — 위쪽 밝은 면 -> 아랫배 그늘 ->
+      // 밑에서 되비치는 빛. 이 셋이 있어야 원반이 아니라 덩어리로 보인다
+      g.ellipse(bx, by - ry * 0.28, rx * 0.88, ry * 0.62, 'l1', ['l2']);
+      g.ellipse(bx - rx * 0.24, by - ry * 0.50, rx * 0.54, ry * 0.36, 'l0', ['l1']);
+      g.ellipse(bx + rx * 0.12, by + ry * 0.44, rx * 0.82, ry * 0.50, 'l3', ['l2']);
+      g.ellipse(bx + rx * 0.20, by + ry * 0.70, rx * 0.60, ry * 0.30, 'l4', ['l3']);
+    }
     // 되비침 — 아래 가장자리 한 겹만 한 단 올린다 (땅에서 튕겨 온 빛)
     for (let a = 0; a < 90; a++) {
       const th = (a / 90) * Math.PI;                 // 아래쪽 반원만
@@ -419,17 +461,60 @@ function greatTree(f, NF) {
   //                          오른쪽 아래가 어둡다
   //   작은 덩어리(small form) 그 위에 얹힌 잎덩이 하나하나
   // 작은 것만 있으면 납작하고, 큰 것만 있으면 브로콜리다. 둘 다 있어야 한다.
+  // 빛점은 왼쪽 **위**인데, 세로를 더 좁게 잡아 **위아래 차이가 크게** 만든다.
+  // 동그란 등고선으로 두면 크라운이 공으로만 보인다 — 우리가 원하는 건
+  // 「위에서 내려다본 면」이라, 밝기가 좌우보다 위아래로 더 갈려야 한다
   {
-    const LX = 66, LY = 24;                  // 크라운의 빛점 (왼쪽 위)
+    const LX = 74, LY = 22;                  // 크라운의 빛점 (왼쪽 위)
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const c = g.d[y][x];
       if (c[0] !== 'l') continue;
-      const d = Math.hypot((x - LX) / 132, (y - LY) / 124);
+      const d = Math.hypot((x - LX) / 168, (y - LY) / 96);
       // 경계에 테가 생기지 않게 문턱을 칸마다 조금씩 흔든다
       const j = (hash(x, y) - 0.5) * 0.09;
       if (d + j > 1.06) g.px(x, y, DARKER[DARKER[c]]);
       else if (d + j > 0.80) g.px(x, y, DARKER[c]);
       else if (d + j < 0.30) g.px(x, y, LIGHTER[c]);
+    }
+  }
+
+  // ---- 처마 — 윗면 앞끝이 앞면 위로 내민다 ----
+  //
+  // 집에서 지붕이 「위에 얹혀 있다」를 말하는 건 처마 밑의 그늘 한 줄이다.
+  // 면을 아무리 잘 칠해도 그 그늘이 없으면 지붕과 벽이 같은 판에 그린
+  // 무늬가 된다. 캐노피도 같다.
+  //
+  // 지평선은 **곧은 가로선이 아니다.** 둥근 덩어리를 위에서 비스듬히 보면
+  // 윗면과 앞면의 경계는 타원의 앞쪽 반이라 **한복판이 아래로 처진다**
+  // (우리 쪽으로 가장 가까운 데가 한복판이다). 곧게 그으면 크라운이 그
+  // 자리에서 접힌 종이가 된다 — 갓돌·켜에 쓴 sag 와 같은 규칙이다.
+  {
+    const CW = 94;                           // 크라운 반너비
+    for (let x = 0; x < W; x++) {
+      const rel = (x - CX) / CW;
+      if (Math.abs(rel) > 1) continue;
+      const hz = HZ + Math.round(15 * Math.sqrt(1 - rel * rel));
+      for (let d = 0; d < 20; d++) {
+        const c = g.get(x, hz + d);
+        if (c[0] !== 'l') continue;
+        const t = 1 - d / 20;                // 처마 바로 밑이 제일 어둡다
+        if (hash(x * 5 + 7, (hz + d) * 3 + 2) < t * 0.88) g.px(x, hz + d, DARKER[c]);
+      }
+    }
+  }
+
+  // ---- 용마루 — 맨 뒤 테두리는 하늘을 스친다 ----
+  //
+  // 집도 지붕 맨 뒤 모서리 한 줄만 밝게 둔다. 그 한 줄이 「여기서 면이
+  // 끝나고 하늘이다」를 말해서, 뒤로 누운 면이 정말 누워 보인다.
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      if (g.get(x, y)[0] !== 'l') continue;
+      for (let d = 0; d < 3; d++) {
+        const c2 = g.get(x, y + d);
+        if (c2[0] === 'l' && hash(x * 3 + d * 29, y) > 0.22) g.px(x, y + d, LIGHTER[c2]);
+      }
+      break;
     }
   }
 
@@ -770,11 +855,14 @@ function bigFalls(f, NF) {
 // 바람과 물이 무른 층을 먼저 파먹고 단단한 층만 남으면 기둥이 된다.
 // 그래서 **허리가 잘록하고 머리가 넓다**. 위아래 굵기가 같으면 굴뚝이다.
 function rockSpire(f, NF) {
-  const W = 124, H = 232, CX = 62, GY = H - 4;
+  // 올라갈 수 있는 바위가 됐으니 그만큼 커야 한다 — 사람이 네 켜를 걸어
+  // 올라온 끝에 서는 것인데, 그 앞의 바위가 제 키의 열 배는 되어야
+  // 「여기가 꼭대기다」가 된다 (7.75 x 14.5칸 -> 9.5 x 17.25칸)
+  const W = 152, H = 276, CX = 76, GY = H - 4;
   const g = new G(W, H);
   const wob = (f / NF) * Math.PI * 2;
 
-  groundShadow(g, CX, GY, 40);
+  groundShadow(g, CX, GY, 48);
 
   // 굵기 — **잘록하게 하되 좌우 대칭으로는 안 된다.**
   //
@@ -784,16 +872,16 @@ function rockSpire(f, NF) {
   //   ① 허리를 얕게만 파고 (30 -> 22)
   //   ② 켜마다 좌우로 다르게 물러나게 하고 (notch)
   //   ③ 기둥 전체를 조금 기울인다 (lean) — 곧추선 것은 사람이 세운 것이다
-  const TOP = 22;
-  const lean = (y) => (GY - y) / (GY - TOP) * 7;   // 위로 갈수록 오른쪽으로
+  const TOP = 24;
+  const lean = (y) => (GY - y) / (GY - TOP) * 8;   // 위로 갈수록 오른쪽으로
   const halfAt = (y) => {
     const t = (GY - y) / (GY - TOP);              // 0 밑동 → 1 꼭대기
-    const waist = 30 - 10 * Math.sin(Math.min(1, t / 0.74) * Math.PI * 0.5);
-    const cap = t > 0.80 ? Math.pow((t - 0.80) / 0.20, 1.2) * 11 : 0;
-    const foot = t < 0.13 ? Math.pow((0.13 - t) / 0.13, 2) * 10 : 0;
-    return Math.max(6, waist + cap + foot);
+    const waist = 37 - 12 * Math.sin(Math.min(1, t / 0.74) * Math.PI * 0.5);
+    const cap = t > 0.80 ? Math.pow((t - 0.80) / 0.20, 1.2) * 13 : 0;
+    const foot = t < 0.13 ? Math.pow((0.13 - t) / 0.13, 2) * 12 : 0;
+    return Math.max(7, waist + cap + foot);
   };
-  const midAt = (y) => CX + lean(y) + Math.sin((GY - y) / 66) * 3;
+  const midAt = (y) => CX + lean(y) + Math.sin((GY - y) / 78) * 3;
 
   // ---- 지층 ----
   //
@@ -887,6 +975,43 @@ function rockSpire(f, NF) {
     }
   }
 
+  // ---- 켜의 **윗면** — 내려다보이는 턱 ----
+  //
+  // 여기가 「우리 집처럼」의 핵심이다.
+  //
+  // 아래 켜가 위 켜보다 넓으면 그 차이만큼 **윗면이 드러난다.** 집으로
+  // 치면 벽 위로 내민 처마의 윗면이고, 갓돌로 치면 이미 그려 둔 그 원반이다.
+  // 그런데 켜에서는 그걸 안 그려서, 넓어지는 자리가 죄다 **곧은 가로 단차**
+  // 였다 — 판을 층층이 쌓아 올린 것처럼 보인 진짜 이유다.
+  //
+  // 윗면의 뒤 테두리는 앞 밑변과 **반대로 휜다** (원반의 뒤쪽 반이라
+  // 한복판이 위로 부푼다). 그리고 서는 면보다 **밝다** — 하늘을 정면으로
+  // 받는 면이니까. 우리 집 지붕이 벽보다 밝은 것과 같은 이유다.
+  for (let i = 1; i < BANDS.length; i++) {
+    const b = BANDS[i], a = BANDS[i - 1];
+    const hw = Math.max(1, (b.l + b.r) / 2);
+    const lo = Math.max(a.mid - a.l, b.mid - b.l);   // 위 켜에 덮이는 구간
+    const hi = Math.min(a.mid + a.r, b.mid + b.r);
+    const ledge = [];
+    for (let x = Math.round(b.mid - b.l); x <= Math.round(b.mid + b.r); x++) {
+      if (x >= lo && x <= hi) continue;              // 덮인 데는 윗면이 안 보인다
+      const rel = (x - b.mid) / hw;
+      const back = Math.round(sag(rel, b.sagAmt * 0.85));
+      if (back < 1) continue;
+      ledge.push([x, back]);
+      for (let d = 1; d <= back; d++) g.px(x, b.y0 - d, 'k1');
+    }
+    // 윗면 안에서도 뒤가 밝고 앞이 조금 어둡다 (하늘에 가까운 쪽이 밝다)
+    for (const [x, back] of ledge) {
+      for (let d = 1; d <= back; d++) {
+        const t = d / back;                          // 1 = 뒤 테두리
+        g.px(x, b.y0 - d, t > 0.62 ? 'k0' : (t > 0.28 ? 'k1' : 'k2'));
+      }
+      // 윗면과 서는 면이 만나는 모서리 한 줄 — 이 선이 두 면을 가른다
+      if (g.get(x, b.y0)[0] === 'k') g.px(x, b.y0, 'k2');
+    }
+  }
+
   // ---- 꼭대기 갓돌 ----
   // 단단한 층 하나가 모자처럼 얹혀 있어 그 밑이 안 깎였다 — 이 기둥이
   // 남은 이유다. 그래서 **처마처럼 내밀어야** 한다. 둥근 뚜껑을 얹으면
@@ -906,10 +1031,10 @@ function rockSpire(f, NF) {
   //   처마   옆면 밑으로 내민 그늘 — 기둥이 갓돌 **밑에** 있다는 표시
   // 폭은 기둥보다 **조금만** 내민다. 넉넉히 내밀었더니 버섯 갓이 됐다 —
   // 갓돌은 기둥에서 떨어져 나가다 만 켜지 딴 물건이 아니다
-  const capX = midAt(TOP), capW = halfAt(TOP) + 1;
+  const capX = midAt(TOP), capW = halfAt(TOP) + 2;
   const capRy = capW * 0.42;                 // 내려다본 만큼 눌린 세로
   const capCy = TOP - 6;                     // 윗면 한가운데
-  const THICK = 6;                           // 원반의 두께
+  const THICK = 7;                           // 원반의 두께
   const capHalf = (dy) => {                  // 그 줄에서 원반의 반너비
     const t = dy / capRy;
     return Math.abs(t) > 1 ? -1 : capW * Math.sqrt(1 - t * t);
@@ -1162,6 +1287,104 @@ function millWheel(f, NF) {
 }
 
 
+// ============================================================
+// 5. 석등 — 돌계단을 따라 늘어선다
+// ============================================================
+//
+// 계단만 놓으면 「지형이 낮아졌다 높아졌다」로 보인다. 참고 사진에서
+// 그 길을 **길로** 만드는 건 계단이 아니라 **양옆에 늘어선 등**이다.
+// 같은 것이 되풀이되면서 길의 방향과 길이를 한눈에 말해 준다 —
+// 우리 집들이 처마 밑에 같은 창을 늘어놓아 「벽」을 말하는 것과 같다.
+//
+// 그래서 이 그림은 하나로 잘 보일 필요가 없다. **여럿이 줄지어 섰을 때**
+// 리듬이 나와야 한다. 그러려면 실루엣이 단순하고 위아래가 또렷해야 한다:
+//   갓   위에서 내려다보이는 **눌린 사각뿔** — 지붕이다
+//   불집 네모 상자. 앞면에 불빛이 새는 창
+//   기둥 원기둥 (다섯 켜)
+//   받침 땅에 앉는 **눌린 원반**
+function stoneLamp(f, NF) {
+  const W = 20, H = 34, CX = 10, GY = H - 2;
+  const g = new G(W, H);
+  groundShadow(g, CX, GY, 7);
+
+  // ---- 받침 — 내려다본 원반 ----
+  const baseCy = GY - 3, baseW = 7, baseRy = baseW * 0.42;
+  for (let x = CX - baseW; x <= CX + baseW; x++) {
+    const rel = (x - CX) / baseW;
+    const front = baseRy * Math.sqrt(Math.max(0, 1 - rel * rel));
+    g.rect(x, baseCy, x, baseCy + front + 3, 'r3');
+  }
+  g.ellipse(CX, baseCy, baseW, baseRy, 'r1');
+  g.ellipse(CX, baseCy - baseRy * 0.3, baseW * 0.8, baseRy * 0.6, 'r0', ['r1']);
+
+  // ---- 기둥 — 원기둥 다섯 켜 ----
+  const postTop = 13, postW = 3;
+  for (let y = postTop; y <= baseCy; y++) {
+    for (let x = CX - postW; x <= CX + postW; x++) {
+      const rel = (x - CX) / postW;
+      let c = rel < -0.72 ? 'r1' : (rel < -0.24 ? 'r0' : (rel < 0.2 ? 'r1'
+        : (rel < 0.6 ? 'r2' : (rel < 0.9 ? 'r3' : 'r2'))));
+      if (hash(x, y >> 1) > 0.86) c = DARKER[c] || c;   // 돌결
+      g.px(x, y, c);
+    }
+  }
+
+  // ---- 불집 — 상자. 앞면에 불빛이 새는 창 ----
+  const boxY0 = 6, boxY1 = 13, boxW = 5;
+  for (let y = boxY0; y <= boxY1; y++)
+    for (let x = CX - boxW; x <= CX + boxW; x++)
+      g.px(x, y, x - CX < -1 ? 'r1' : (x - CX > 2 ? 'r3' : 'r2'));
+  // 창 — 안쪽이 제일 밝고 테두리로 갈수록 잦아든다 (등은 **속이** 밝다)
+  for (let y = boxY0 + 2; y <= boxY1 - 2; y++)
+    for (let x = CX - boxW + 2; x <= CX + boxW - 2; x++) {
+      const d = Math.hypot((x - CX + 0.5) / (boxW - 1.5), (y - (boxY0 + boxY1) / 2) / 2.6);
+      g.px(x, y, d < 0.45 ? 'g0' : (d < 0.8 ? 'g1' : 'g2'));
+    }
+  // 창살 — 세로 두 줄. 이게 없으면 노란 네모다
+  for (let y = boxY0 + 1; y <= boxY1 - 1; y++) {
+    g.px(CX - 2, y, 'r3');
+    g.px(CX + 1, y, 'r3');
+  }
+
+  // ---- 갓 — **내려다보이는 지붕** ----
+  //
+  // 여기가 우리 집과 같은 자리다. 처마가 불집 밖으로 내밀고, 그 윗면이
+  // 뒤로 누워 보이고, 처마 밑에 그늘 한 줄이 진다. 그 셋이 있어야 상자
+  // 위에 얹힌 뚜껑이 아니라 「지붕」이 된다
+  const capW = boxW + 3, capCy = boxY0 - 3, capRy = capW * 0.40;
+  for (let x = CX - capW; x <= CX + capW; x++) {
+    const rel = (x - CX) / capW;
+    const front = capRy * Math.sqrt(Math.max(0, 1 - rel * rel));
+    g.rect(x, capCy, x, capCy + front + 2, 'r3');       // 갓의 두께(서는 면)
+  }
+  for (let dy = -Math.ceil(capRy); dy <= Math.ceil(capRy); dy++) {
+    const t = (dy + capRy) / (capRy * 2);
+    const hw = capW * Math.sqrt(Math.max(0, 1 - (dy / capRy) ** 2));
+    for (let x = Math.round(CX - hw); x <= Math.round(CX + hw); x++)
+      g.px(x, capCy + dy, t < 0.34 ? 'r0' : (t < 0.72 ? 'r1' : 'r2'));
+  }
+  // 처마 밑 그늘 — 「갓이 위에 있다」를 말하는 한 줄
+  for (let x = CX - capW; x <= CX + capW; x++) {
+    const rel = (x - CX) / capW;
+    const yy = Math.round(capCy + capRy * Math.sqrt(Math.max(0, 1 - rel * rel))) + 2;
+    if (g.get(x, yy)[0] === 'r' || g.get(x, yy)[0] === 'g') g.px(x, yy, 'r4');
+  }
+  // 꼭지 — 갓 위의 작은 구슬
+  g.ellipse(CX, capCy - capRy - 1, 2, 1.6, 'r1');
+  g.ellipse(CX - 0.5, capCy - capRy - 1.4, 1.2, 0.9, 'r0', ['r1']);
+
+  // 이끼 — 밑동과 북쪽 면에. 오래 서 있었다는 표시
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (g.d[y][x][0] !== 'r') continue;
+    const low = y > baseCy - 4 ? 0.34 : (y > postTop ? 0.10 : 0.04);
+    if (hash(x * 3 + 1, y * 5 + 2) < low) g.px(x, y, hash(x, y) < 0.5 ? 'm1' : 'm2');
+  }
+
+  g.outline('O');
+  return g;
+}
+
+
 // ---- 내보내기 ----
 //
 // 하나에 여러 장. 이름은 landmark_<id>_<장번호>.png 이고, 게임은
@@ -1171,6 +1394,7 @@ const WORKS = {
   landmark_falls: { fn: bigFalls, frames: 4 },
   landmark_spire: { fn: rockSpire, frames: 2 },
   deco_wheel: { fn: millWheel, frames: 4 },
+  deco_stonelamp: { fn: stoneLamp, frames: 1 },
 };
 const made = [];
 for (const [name, w] of Object.entries(WORKS)) {
