@@ -909,6 +909,13 @@ func _load_textures() -> void:
 			sheets.append("%s_%d" % [kind, v])
 	for kind: String in sheets:
 		var sheet: Texture2D = load("res://assets/sprites/edge_%s.png" % kind)
+		# 못 불러오면 **조용히 넘어가지 않는다.** AtlasTexture는 atlas가
+		# null이어도 오류 없이 아무것도 안 그린다 — 그래서 edge_*.png에
+		# .import가 빠졌을 때, 물가 타일 256장이 통째로 사라졌는데도 로그에
+		# 한 줄도 안 남고 연못만 각진 파란 덩어리로 나왔다. 다시 그러지 말자.
+		if sheet == null:
+			push_error("물가 아틀라스를 못 불렀다: edge_%s.png "
+				% kind + "(.import 파일이 있는지 보라 — 없으면 물가가 통째로 안 그려진다)")
 		var arr: Array[Texture2D] = []
 		arr.resize(256)
 		for c in 256:
