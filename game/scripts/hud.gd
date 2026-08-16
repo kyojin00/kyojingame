@@ -969,16 +969,19 @@ var _goal_seen := "<init>"
 
 
 func _watch_goal(goal: String) -> void:
-	if goal == _goal_seen:
+	# 목표 뒤에 붙는 「— 목재 12/30」 같은 **세는 자리**는 알림에서 뺀다.
+	# 안 그러면 나무 한 번 벨 때마다 「새로운 목표」가 뜬다
+	var head := goal.split(" — ")[0]
+	if head == _goal_seen:
 		return
 	var first := _goal_seen == "<init>"
-	_goal_seen = goal
+	_goal_seen = head
 	if first or goal == "":
 		return   # 게임을 막 켰을 때·목표가 사라질 때는 조용히
 	for t in _toast_queue:
-		if str(t.get("body", "")) == goal:
+		if str(t.get("body", "")).split(" — ")[0] == head:
 			return   # 같은 목표가 이미 대기 중이면 또 쌓지 않는다
-	_toast_queue.append({"head": "새로운 목표", "body": goal, "icon": null,
+	_toast_queue.append({"head": "새로운 목표", "body": head, "icon": null,
 		"head_col": Color(0.78, 0.42, 0.02)})
 	Sound.play_sfx("sfx_ui")
 

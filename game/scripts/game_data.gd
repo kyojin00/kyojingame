@@ -1023,9 +1023,15 @@ var story2_phase := ""
 func story2_objective_short() -> String:
 	match story2_phase:
 		"shop":
-			# 목표는 한 호흡에 읽히게 — 재료 수치도, 조작키도, 괄호도 없다.
-			# 「무엇을」만 남기고 나머지는 이야기와 게시판이 맡는다.
-			return "상점을 세우자."
+			# 목표는 한 호흡에 읽히게 — 조작키도 괄호도 없다.
+			#
+			# 다만 **재료만은 세어 준다.** 이장이 「목재 30에 돌 20」이라고
+			# 한 번 말하고 마는데, 지금 얼마나 모았는지는 어디에도 안 나온다 —
+			# 다 모았는지 알 방법이 게시판까지 걸어가 보는 것뿐이었다.
+			# 「— 」 뒤는 트래커가 세는 자리다 (알림은 앞부분만 본다)
+			return "상점을 세우자 — 목재 %d/%d · 돌 %d/%d" % [
+				mini(wood, SHOP_BUILD_WOOD), SHOP_BUILD_WOOD,
+				mini(stone, SHOP_BUILD_STONE), SHOP_BUILD_STONE]
 		"farm_talk":
 			return "이장과 대화하자."
 		"cook":
