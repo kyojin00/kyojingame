@@ -402,20 +402,29 @@ function shore(dir) {
     else if (dir === 2) g.px(k, i, c);
     else g.px(N - 1 - k, i, c);
   };
-  // 물가는 **단차**다. 그리고 그 단차는 **높아야** 보인다.
+  // **벽면은 한 방향에서만 보인다.**
   //
-  // 돌 두어 줄(화면 4~8px)로는 「젖은 자리」까지고 「내려가는 자리」가 아니다.
-  // 위에서 내려다보는 화면에서 높이는 **면의 세로 폭**으로만 드러난다.
-  // 그래서 물가 한 칸의 절반 남짓(7~9칸 = 화면 14~18px)을 벽에 준다.
+  // 사방에 돌벽을 둘렀더니 어색했다. 위에서 내려다보는 화면에서 벽의 「면」이
+  // 보이는 건 그 벽이 **나를 마주 볼 때**뿐이다:
   //
-  //   물 쪽 2줄   턱 밑 그늘. 물에 잠긴 돌뿌리
-  //   벽 5~7줄    돌벽. **한 줄 내려갈수록 어두워진다** — 이게 높이다
-  //   마루 1줄    벽 꼭대기. 제일 밝다 (하늘을 본다)
-  //   땅 쪽 3줄   마른 흙에서 잔디로
+  //   물이 아래(dir=1)   땅이 위에 있고 그 턱이 나를 마주 본다 -> **벽이 보인다**
+  //   물이 위(dir=0)     둑의 **윗면**만 보인다. 벽은 반대쪽을 향해 숨는다
+  //   물이 옆(dir=2,3)   비스듬히 보여 좁은 면만 — 절반 높이
+  //
+  // 이걸 안 지키면 연못이 사방에서 벽으로 둘러싸인 「수조」가 된다.
+  const wallH = dir === 1 ? 6 : (dir === 0 ? 0 : 3);
   for (let i = 0; i < N; i++) {
-    const wall = 5 + Math.floor(h(i, dir, 56) * 3);          // 벽 높이
-    const top = 2 + wall;                                    // 마루가 오는 줄
-    for (let k = 0; k < 2; k++) put(i, k, EARTH[5]);          // 턱 밑 그늘
+    const wall = wallH > 0 ? wallH + Math.floor(h(i, dir, 56) * 2) : 0;
+    for (let k = 0; k < 2; k++) put(i, k, EARTH[5]);          // 물에 닿는 젖은 자리
+    if (wall === 0) {
+      // 벽이 안 보이는 쪽 — 젖은 둑의 윗면만. 돌이 드문드문 드러난다
+      for (let k = 2; k < 5; k++)
+        if (h(i, k, dir + 57) > 0.18 + (k - 2) * 0.22) put(i, k, EARTH[k < 4 ? 4 : 3]);
+      if (h(i, 6, dir + 62) < 0.28) put(i, 2, STONE[4]);
+      if (h(i, 7, dir + 64) < 0.20) put(i, 3, STONE[3]);
+      continue;
+    }
+    const top = 2 + wall;
     // 돌벽 — 아래가 어둡고 위가 밝다. 세 칸짜리 돌덩이로 나뉜다
     const st = h(Math.floor(i / 3), dir, 63);
     for (let k = 2; k < top; k++) {
@@ -425,9 +434,9 @@ function shore(dir) {
       put(i, k, STONE[clamp(t, 0, 7)]);
     }
     put(i, top, STONE[0]);                                   // 벽 마루 — 하늘을 본다
-    put(i, top + 1, EARTH[2]);                               // 마루 뒤 흙
-    for (let k = top + 2; k < top + 5; k++)                  // 잔디로 넘어간다
-      if (h(i, k, dir + 58) > 0.2 + (k - top) * 0.2) put(i, k, EARTH[3]);
+    put(i, top + 1, EARTH[2]);
+    for (let k = top + 2; k < top + 4; k++)
+      if (h(i, k, dir + 58) > 0.25) put(i, k, EARTH[3]);
   }
   return g;
 }
