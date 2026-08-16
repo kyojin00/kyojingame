@@ -39,7 +39,7 @@ func spawn_animal(type: String, pos: Vector2 = Vector2.ZERO, fed: bool = false) 
 	a.type = type
 	a.fed = fed
 	if pos == Vector2.ZERO:
-		var t := _find_free_tile_near(Vector2i(10, 7))
+		var t := _find_free_tile_near(Vector2i(10, 7 + m.NORTH_PAD))
 		pos = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
 	a.position = pos
 	m.animals.append(a)

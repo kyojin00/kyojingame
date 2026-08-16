@@ -731,7 +731,7 @@ func _story_chief() -> Node2D:
 # 숲길 동쪽 끝에 닿으면 **걸어서 이어지지 않는다.** 화면이 어두워지고,
 # 그 사이에 튜토리얼 공간이 닫히고(오브젝트·지도 기억까지) 주인공과
 # 우체부가 마을 어귀에 선다. 다시 밝아지면 거기가 세계의 시작점이다.
-const WORLD_ENTRY := Vector2i(58, 9)     # 마을 어귀 — 세계의 첫 걸음
+const WORLD_ENTRY := Vector2i(58, 9 + KyojinMain.NORTH_PAD)  # 마을 어귀 — 세계의 첫 걸음
 
 
 # 전환이 도는 동안에는 컷신 잠금이 저절로 풀리면 안 된다.
@@ -2684,7 +2684,7 @@ func _story6_update(delta: float) -> void:
 
 # 광장 남동쪽 풀숲에서 빈 잔디칸을 찾아 책을 놓는다
 func _place_old_book() -> void:
-	var base := Vector2i(78, 22)
+	var base := Vector2i(78, 22 + m.NORTH_PAD)
 	for r in 7:
 		for dy in range(-r, r + 1):
 			for dx in range(-r, r + 1):

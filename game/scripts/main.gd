@@ -36,8 +36,20 @@ const MAP_W := 224   # 동쪽: 확장 구역 너머의 과수원 · 채석장 ·
 # 바깥(WORLD_H 아래)에 따로 붙여 둔 일회성 공간이고, 마을과는 한 칸도
 # 이어져 있지 않다. 튜토리얼을 마치면 그 공간은 통째로 닫히고
 # (GameData.tutorial_space = false), 다시는 발을 들일 수 없다.
-const WORLD_H := 120   # 실제 세계의 높이 (남쪽: 습지 · 초원 · 능선-해변-바다)
-const TUT_Y0 := 134    # 튜토리얼 숲길이 놓이는 줄 (세계 밖으로 한참 내려간 자리)
+# ---- 북쪽으로 넓힌 자리 ----
+#
+# 마을은 원래 지도 북쪽 끝(y=0)에 딱 붙어 있었다. 북쪽 가게 줄의 그림이
+# y=1까지 올라가서, 마을 어디에도 구역 하나 더 낼 자리가 없었다.
+#
+# 그래서 **지도 위에 열두 줄을 얹고 세계 전체를 그만큼 내렸다.** 이 값을
+# 세계의 모든 세로 좌표에 더한다 — 상수 정의에서 한 번씩만 더하면, 그
+# 상수를 읽는 코드는 하나도 안 고쳐도 된다.
+#
+# 더하지 **않는** 것: BARN_ART 처럼 기준점에서 잰 상대 좌표, 그리고
+# TUT_DY·MAP_H 처럼 다른 상수에서 파생되는 값 (이미 밀린 값을 쓴다).
+const NORTH_PAD := 12
+const WORLD_H := 120 + NORTH_PAD   # 실제 세계의 높이 (남쪽: 습지 · 초원 · 능선-해변-바다)
+const TUT_Y0 := 134 + NORTH_PAD    # 튜토리얼 숲길이 놓이는 줄 (세계 밖으로 한참 내려간 자리)
 const TUT_DY := TUT_Y0 - 7          # 옛 숲길 좌표(y7~22)를 이 공간으로 옮기는 값
 # 숲길 위아래로 열 줄씩 더 둔다 — 화면이 온통 숲으로 차야 「한 장의 공간」으로 보인다
 const TUTORIAL_REGION := Rect2i(0, TUT_Y0 - 12, 62, 38)
@@ -326,14 +338,14 @@ const TEXTURE_NAMES := [
 	"dock_edge_n", "dock_edge_s", "dock_edge_w", "dock_edge_e",
 ]
 
-const START_TILE := Vector2i(14, 10)
-const CAVE_POS := Vector2i(50, 1)
-const WORLDTREE_POS := Vector2i(68, 50)  # 세계수 동굴 (깊은 숲)
+const START_TILE := Vector2i(14, 10 + NORTH_PAD)
+const CAVE_POS := Vector2i(50, 1 + NORTH_PAD)
+const WORLDTREE_POS := Vector2i(68, 50 + NORTH_PAD)  # 세계수 동굴 (깊은 숲)
 # 축사(구입 시 농장에 건설). 이 칸이 축사 **문 칸**이고, 그림은 여기서
 # 위로 5칸 반 · 좌우로 3칸씩 뻗는다 (7 x 5.5칸). BARN_ART 참고.
-const BARN_POS := Vector2i(10, 6)
+const BARN_POS := Vector2i(10, 6 + NORTH_PAD)
 const BARN_ART := Rect2i(-3, -4, 7, 5)   # BARN_POS 기준 그림이 덮는 칸
-const HORSE_HOME := Vector2i(10, 9)      # 산 말을 세워 두는 자리 (축사 앞마당)
+const HORSE_HOME := Vector2i(10, 9 + NORTH_PAD)      # 산 말을 세워 두는 자리 (축사 앞마당)
 # ---- 탈 것 (말) ----
 #
 # 목장 상회에서 사면 그 자리 근처에 말이 서 있다. **F로 타고 내린다.**
@@ -352,8 +364,8 @@ const HORSE_HOME := Vector2i(10, 9)      # 산 말을 세워 두는 자리 (축�
 # 농장 한켠의 유리집. 이 안에서는 계절을 타지 않는다 —
 # 아무 씨앗이나 심을 수 있고, 계절이 바뀌어도 시들지 않는다.
 # (겨울 작물이 하나뿐이라 겨울이 통째로 비는 문제를 메운다)
-const GREENHOUSE := Rect2i(4, 13, 9, 7)
-const GREENHOUSE_SIGN := Vector2i(4, 20)
+const GREENHOUSE := Rect2i(4, 13 + NORTH_PAD, 9, 7)
+const GREENHOUSE_SIGN := Vector2i(4, 20 + NORTH_PAD)
 const GREENHOUSE_COST_WOOD := 150
 const GREENHOUSE_COST_STONE := 80
 const GREENHOUSE_COST_MONEY := 5000
@@ -361,22 +373,22 @@ const GREENHOUSE_COST_MONEY := 5000
 # 마을에는 처음에 건물이 하나도 없다.
 # 넓은 중앙 광장과 사방으로 뻗은 길, 그리고 나중에 건물이 들어설 빈 부지뿐이다.
 # 건물은 진행에 따라 하나씩 세워지며, 그때마다 마을의 모습이 달라진다.
-const VILLAGE_REGION := Rect2i(54, 0, 46, 44)   # 부지를 벌리면서 서쪽으로 넓혔다
+const VILLAGE_REGION := Rect2i(54, 0 + NORTH_PAD, 46, 44)   # 부지를 벌리면서 서쪽으로 넓혔다
 # 인도는 모두 3줄. 길 폭을 한 곳에서 정하고 건물은 이 선에 맞춰 놓는다.
 const ROAD_W := 3
 const WEST_LANE_X := 67                    # 서쪽 세로 인도 (x 67~69)
 const EAST_LANE_X := 86                    # 동쪽 세로 인도 (x 86~88)
 const NS_LANE_X := 77                      # 광장을 지나는 남북 인도 (x 77~79)
-const ROAD := Rect2i(30, 8, 30, 3)         # 농장/숲 -> 마을 공용 길 (3줄)
-const MAIN_STREET_Y := 8                   # 마을 입구를 가로지르는 큰길 (y 8~10)
-const PLAZA := Rect2i(70, 14, 16, 12)      # 중앙 광장 (아주 넓은 평지)
-const FOUNTAIN := Rect2i(76, 18, 4, 4)     # 광장 중앙 분수
-const FOUNTAIN_DECO := Vector2i(77, 20)    # 분수 조형물 (분수 한가운데)
+const ROAD := Rect2i(30, 8 + NORTH_PAD, 30, 3)         # 농장/숲 -> 마을 공용 길 (3줄)
+const MAIN_STREET_Y := 8 + NORTH_PAD                   # 마을 입구를 가로지르는 큰길 (y 8~10)
+const PLAZA := Rect2i(70, 14 + NORTH_PAD, 16, 12)      # 중앙 광장 (아주 넓은 평지)
+const FOUNTAIN := Rect2i(76, 18 + NORTH_PAD, 4, 4)     # 광장 중앙 분수
+const FOUNTAIN_DECO := Vector2i(77, 20 + NORTH_PAD)    # 분수 조형물 (분수 한가운데)
 # (마을을 가르던 남쪽 강과 동쪽 세로 강은 없앴다 — 맵은 하나로 이어진
 #  큰 육지다. 물은 서쪽 호수·깊은 숲 연못·남쪽 바다만 남는다)
 # ---- 낚시터 (마을 서쪽 호수, 맵에 하나뿐) ----
 # 호숫가 잔디밭에서 물을 보고 낚싯대를 던진다. 「낚시」 목표는 여기.
-const DOCK_Y := 36                         # 호수 남쪽 물가 (물은 y 27~35)
+const DOCK_Y := 36 + NORTH_PAD                         # 호수 남쪽 물가 (물은 y 27~35)
 const FISH_YARD_X0 := 44
 const FISH_YARD_X1 := 54
 # 나무 부두 — 남쪽 물가에서 호수 한복판으로 걸어 나가는 판자길.
@@ -387,53 +399,53 @@ const FISH_YARD_X1 := 54
 #
 # 목 두 칸 + 끝의 넓은 머리 — 머리가 있어야 여럿이 서고, 낚싯대를 드리울
 # 자리가 생긴다. 곧은 막대 하나는 부두가 아니라 다리다.
-const DOCK_STEM := Rect2i(48, 31, 2, 6)    # 물가(y36)에서 호수로 뻗는 목
-const DOCK_HEAD := Rect2i(47, 29, 4, 2)    # 끝의 넓은 머리 (여기 서서 낚는다)
-const DOCK_STAND := Vector2i(47, 29)       # 낚시꾼이 서 있는 자리 (머리 왼쪽)
-const FISH_SIGN := Vector2i(43, 35)
+const DOCK_STEM := Rect2i(48, 31 + NORTH_PAD, 2, 6)    # 물가(y36)에서 호수로 뻗는 목
+const DOCK_HEAD := Rect2i(47, 29 + NORTH_PAD, 4, 2)    # 끝의 넓은 머리 (여기 서서 낚는다)
+const DOCK_STAND := Vector2i(47, 29 + NORTH_PAD)       # 낚시꾼이 서 있는 자리 (머리 왼쪽)
+const FISH_SIGN := Vector2i(43, 35 + NORTH_PAD)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
 # 북쪽 산자락 — 이 줄 위쪽의 풀밭에는 민들레가 돋는다 (산에서 캐는 채집물)
-const MOUNTAIN_Y := 14
-const SEA_RIDGE_Y := 107           # 바위 능선 줄 — 바다로 가는 길을 막는다
-const BEACH_Y0 := 108              # 모래사장 (능선 아래 ~ 바다 위)
-const SEA_Y0 := 113                # 여기부터 남쪽 끝까지 바다
-const SEA_GATE := [Vector2i(63, 107), Vector2i(64, 107)]  # 곡괭이로 캐서 여는 길목
-const FISHER_ARRIVE := Vector2i(78, 23)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
+const MOUNTAIN_Y := 14 + NORTH_PAD
+const SEA_RIDGE_Y := 107 + NORTH_PAD           # 바위 능선 줄 — 바다로 가는 길을 막는다
+const BEACH_Y0 := 108 + NORTH_PAD              # 모래사장 (능선 아래 ~ 바다 위)
+const SEA_Y0 := 113 + NORTH_PAD                # 여기부터 남쪽 끝까지 바다
+const SEA_GATE := [Vector2i(63, 107 + NORTH_PAD), Vector2i(64, 107 + NORTH_PAD)]  # 곡괭이로 캐서 여는 길목
+const FISHER_ARRIVE := Vector2i(78, 23 + NORTH_PAD)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
 const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...) 최대 수
 # 해변 모래밭에만 밀려오는 것들 — 조개·비닐봉지·유리 조각·금속 고리(기본),
 # 산호 조각·고대 조각(매우 희귀 — 숨겨진 이야기·레시피와 이어진다)
 const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic"]
-const STALL_TILE := Vector2i(72, 109)  # 만수의 해변 노점 (게이트 서남쪽 모래밭)
+const STALL_TILE := Vector2i(72, 109 + NORTH_PAD)  # 만수의 해변 노점 (게이트 서남쪽 모래밭)
 # 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
-const ONSEN_POS := Vector2i(66, 6)
+const ONSEN_POS := Vector2i(66, 6 + NORTH_PAD)
 # 옛 농지 (메인 스토리 16) — 마을 서쪽, 오래 묵어 수풀이 우거진 밭.
 # 단서를 다 모으면 잡초·돌·나무가 우거진 채로 드러난다
-const OLD_FARM := Rect2i(20, 44, 10, 7)
+const OLD_FARM := Rect2i(20, 44 + NORTH_PAD, 10, 7)
 # 옛 헛간 (메인 스토리 17) — 목장 남쪽에 방치된 헛간과 그 둘레
-const OLD_BARN := Vector2i(14, 30)
-const OLD_BARN_AREA := Rect2i(10, 27, 9, 7)
+const OLD_BARN := Vector2i(14, 30 + NORTH_PAD)
+const OLD_BARN_AREA := Rect2i(10, 27 + NORTH_PAD, 9, 7)
 # 옛 전망대 (메인 스토리 18) — 마을 북서쪽 외곽, 길 위쪽 언덕.
 # 무너져 가는 나무 전망대와 그 둘레의 흔적 세 곳
-const HILL_POS := Vector2i(31, 3)
-const HILL_AREA := Rect2i(26, 1, 11, 6)
+const HILL_POS := Vector2i(31, 3 + NORTH_PAD)
+const HILL_AREA := Rect2i(26, 1 + NORTH_PAD, 11, 6)
 const HILL_TRACE_TILES := {
-	"bench": Vector2i(28, 4),
-	"stone": Vector2i(34, 4),
-	"tree": Vector2i(27, 1),
+	"bench": Vector2i(28, 4 + NORTH_PAD),
+	"stone": Vector2i(34, 4 + NORTH_PAD),
+	"tree": Vector2i(27, 1 + NORTH_PAD),
 }
 # 두 사람의 바위 (메인 스토리 13) — 해변 서쪽 끝, 두 분이 노을을 보던 자리.
 # 단서를 다 모으면 표식이 놓이고, 그 곁 바다에서 특별한 입질이 온다
-const BRACELET_ROCK := Vector2i(8, 112)
-const FISH_SPOT := Rect2i(42, 26, 14, 12)   # 이 안이면 「낚시터에 있다」
+const BRACELET_ROCK := Vector2i(8, 112 + NORTH_PAD)
+const FISH_SPOT := Rect2i(42, 26 + NORTH_PAD, 14, 12)   # 이 안이면 「낚시터에 있다」
 # 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
-const FISH_CLEAR := Rect2i(41, 24, 20, 14)
-const BOARD_POS := Vector2i(82, 14)        # 광장 게시판 (오늘의 의뢰)
-const AUCTION_POS := Vector2i(85, 14)      # 경매 게시판 (온 세상 농부들의 장터)
+const FISH_CLEAR := Rect2i(41, 24 + NORTH_PAD, 20, 14)
+const BOARD_POS := Vector2i(82, 14 + NORTH_PAD)        # 광장 게시판 (오늘의 의뢰)
+const AUCTION_POS := Vector2i(85, 14 + NORTH_PAD)      # 경매 게시판 (온 세상 농부들의 장터)
 # (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
 # 메인 스토리 4 — 동쪽 다리 건너, 옛 마을의 경계를 알리는 낡은 표지판.
 # 너머(GameData.VILLAGE_ZONES)는 구역을 해금해야 들어갈 수 있다.
-const OLD_SIGN := Vector2i(99, 9)
+const OLD_SIGN := Vector2i(99, 9 + NORTH_PAD)
 
 # ---- 야생 지역 ----
 #
@@ -452,35 +464,35 @@ const OLD_SIGN := Vector2i(99, 9)
 # 「지도를 칸으로 나눠 놨구나」가 먼저 보인다.
 const REGIONS := [
 	# 예전부터 있던 남동쪽 깊은 숲 — 넓어진 만큼 남쪽으로 늘렸다
-	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40, 52, 26),
+	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40 + NORTH_PAD, 52, 26),
 		"tree": 0.30, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
 	# 옛 표지판 너머 첫 땅. 줄 맞춰 심긴 사과나무 — 사람 손이 닿았던 자리다
-	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8, 48, 26),
+	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8 + NORTH_PAD, 48, 26),
 		"tree": 0.9, "rock": 0.0, "ground": "", "grid": 4, "pond": 0.0},
 	# 자갈이 깔린 채석장. 나무는 거의 없고 바위가 지천이다
-	{"id": "quarry", "name": "동쪽 채석장", "rect": Rect2i(172, 40, 48, 26),
+	{"id": "quarry", "name": "동쪽 채석장", "rect": Rect2i(172, 40 + NORTH_PAD, 48, 26),
 		"tree": 0.02, "rock": 0.34, "ground": "path", "grid": 0, "pond": 0.0},
 	# 탁 트인 초원 — 아무것도 없다. 넓은 하늘과 풀뿐
-	{"id": "meadow", "name": "너른 초원", "rect": Rect2i(102, 46, 44, 26),
+	{"id": "meadow", "name": "너른 초원", "rect": Rect2i(102, 46 + NORTH_PAD, 44, 26),
 		"tree": 0.02, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
 	# 남쪽 습지 — 발밑이 질척하고 물웅덩이가 흩어져 있다
-	{"id": "wetland", "name": "남쪽 습지", "rect": Rect2i(16, 64, 54, 30),
+	{"id": "wetland", "name": "남쪽 습지", "rect": Rect2i(16, 64 + NORTH_PAD, 54, 30),
 		"tree": 0.07, "rock": 0.02, "ground": "", "grid": 0, "pond": 0.12},
 	# 동남쪽 솔숲 — 깊은 숲보다 더 깊다. 여기까지 오면 꽤 멀리 온 것이다.
 	# 나무는 NATURE_CLEAR(가로 4칸)에 걸려 아무리 올려도 6%쯤에서 포화된다 —
 	# 그래서 「더 깊다」는 바위로 낸다 (바위는 두 칸 간격이라 훨씬 촘촘하다)
-	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70, 62, 24),
+	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70 + NORTH_PAD, 62, 24),
 		"tree": 0.34, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
 	# 능선 위 벼랑길 — 바다로 내려가기 전 마지막 땅. 돌투성이다
-	{"id": "bluff", "name": "바닷가 벼랑길", "rect": Rect2i(20, 96, 180, 10),
+	{"id": "bluff", "name": "바닷가 벼랑길", "rect": Rect2i(20, 96 + NORTH_PAD, 180, 10),
 		"tree": 0.04, "rock": 0.16, "ground": "", "grid": 0, "pond": 0.0},
 ]
 
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
-const HOME_ANCHOR := Vector2i(71, 30)   # 광장에서 두 칸 떨어뜨렸다
-const HOME_SITE := Vector2i(73, 30)  # 집터 표지판 (건물 그림 한가운데)
+const HOME_ANCHOR := Vector2i(71, 30 + NORTH_PAD)   # 광장에서 두 칸 떨어뜨렸다
+const HOME_SITE := Vector2i(73, 30 + NORTH_PAD)  # 집터 표지판 (건물 그림 한가운데)
 
 # 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
 # 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.
@@ -490,18 +502,18 @@ const HOME_SITE := Vector2i(73, 30)  # 집터 표지판 (건물 그림 한가운
 # 북쪽 줄은 18칸 간격(그림 8칸 + 마당 사이 풀 10칸), 옆줄은 바깥으로 뺐다.
 const VILLAGE_PLOTS := {
 	# 북쪽 줄 (큰길 위쪽)
-	"post":    {"anchor": Vector2i(56, 3),  "name": "우체국"},
-	"general": {"anchor": Vector2i(74, 3),  "name": "잡화점"},
-	"lab":     {"anchor": Vector2i(92, 3),  "name": "연구소"},
+	"post":    {"anchor": Vector2i(56, 3 + NORTH_PAD),  "name": "우체국"},
+	"general": {"anchor": Vector2i(74, 3 + NORTH_PAD),  "name": "잡화점"},
+	"lab":     {"anchor": Vector2i(92, 3 + NORTH_PAD),  "name": "연구소"},
 	# 서쪽 줄 (서쪽 세로 길가)
-	"smith":   {"anchor": Vector2i(60, 12), "name": "대장간"},
-	"ranch":   {"anchor": Vector2i(60, 22), "name": "목장 상회"},
-	"inn":     {"anchor": Vector2i(60, 32), "name": "여관"},
+	"smith":   {"anchor": Vector2i(60, 12 + NORTH_PAD), "name": "대장간"},
+	"ranch":   {"anchor": Vector2i(60, 22 + NORTH_PAD), "name": "목장 상회"},
+	"inn":     {"anchor": Vector2i(60, 32 + NORTH_PAD), "name": "여관"},
 	# 동쪽 줄 (동쪽 세로 길가)
-	"library": {"anchor": Vector2i(91, 12), "name": "도서관"},
-	"fish":    {"anchor": Vector2i(91, 26), "name": "수산시장"},
+	"library": {"anchor": Vector2i(91, 12 + NORTH_PAD), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(91, 26 + NORTH_PAD), "name": "수산시장"},
 	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
-	"hall":    {"anchor": Vector2i(80, 28), "name": "마을회관"},
+	"hall":    {"anchor": Vector2i(80, 28 + NORTH_PAD), "name": "마을회관"},
 }
 # 이장의 거처 — 처음부터 마을에 있는 집 (광장 북쪽). 주민이 늘면 회관 급
 # 새 집으로 다시 지어진다 (GameData.chief_house_lv).
@@ -511,9 +523,9 @@ const VILLAGE_PLOTS := {
 # 물건 배치의 기본 규칙(밑변을 한 칸 아래, 가로는 칸 한가운데)이 그대로
 # 5x4 본체에 맞아떨어진다. 그림이 다른 집들과 같은 512x552 판이 되면서
 # 한 칸짜리 물건처럼 세우면 집이 문 앞으로 반쯤 튀어나왔다.
-const CHIEF_ANCHOR := Vector2i(70, 9)          # 본체 5x4 의 왼쪽 위
-const CHIEF_HUT := Vector2i(72, 12)            # = door_tile(CHIEF_ANCHOR)
-const CHIEF_ART := Rect2i(69, 7, 7, 6)         # 그림이 덮는 칸
+const CHIEF_ANCHOR := Vector2i(70, 9 + NORTH_PAD)          # 본체 5x4 의 왼쪽 위
+const CHIEF_HUT := Vector2i(72, 12 + NORTH_PAD)            # = door_tile(CHIEF_ANCHOR)
+const CHIEF_ART := Rect2i(69, 7 + NORTH_PAD, 7, 6)         # 그림이 덮는 칸
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
@@ -569,23 +581,23 @@ const NPC_SCHEDULE := {
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
 const NPC_PLAZA := {
-	"chief": Vector2i(74, 13), "merchant": Vector2i(70, 15),
-	"blacksmith": Vector2i(80, 15), "rancher": Vector2i(70, 19),
-	"fisher": Vector2i(80, 19),
+	"chief": Vector2i(74, 13 + NORTH_PAD), "merchant": Vector2i(70, 15 + NORTH_PAD),
+	"blacksmith": Vector2i(80, 15 + NORTH_PAD), "rancher": Vector2i(70, 19 + NORTH_PAD),
+	"fisher": Vector2i(80, 19 + NORTH_PAD),
 	# 이사 온 주민들 — 광장 남쪽에 삼삼오오 모여 수다를 떤다
-	"farmer": Vector2i(72, 17), "foodie": Vector2i(74, 17),
-	"angler": Vector2i(78, 17), "alchemist": Vector2i(76, 15),
-	"miner": Vector2i(76, 19), "florist": Vector2i(72, 15),
-	"carpenter": Vector2i(78, 15), "herbalist": Vector2i(74, 19),
-	"painter": Vector2i(82, 17), "musician": Vector2i(76, 17),
-	"weaver": Vector2i(82, 15),
+	"farmer": Vector2i(72, 17 + NORTH_PAD), "foodie": Vector2i(74, 17 + NORTH_PAD),
+	"angler": Vector2i(78, 17 + NORTH_PAD), "alchemist": Vector2i(76, 15 + NORTH_PAD),
+	"miner": Vector2i(76, 19 + NORTH_PAD), "florist": Vector2i(72, 15 + NORTH_PAD),
+	"carpenter": Vector2i(78, 15 + NORTH_PAD), "herbalist": Vector2i(74, 19 + NORTH_PAD),
+	"painter": Vector2i(82, 17 + NORTH_PAD), "musician": Vector2i(76, 17 + NORTH_PAD),
+	"weaver": Vector2i(82, 15 + NORTH_PAD),
 }
 # 건물이 없는 NPC(이장)의 집 자리
-const NPC_HOME := {"chief": Vector2i(72, 20), "explorer": Vector2i(78, 16),
-	"forest_mom": Vector2i(31, 28), "forest_girl": Vector2i(34, 28),
-	"librarian": Vector2i(76, 14),   # 방문객 시절 — 광장 분수 곁
-	"rancher": Vector2i(70, 20),     # 방문객 시절 — 광장 남서쪽 풀밭
-	"alchemist": Vector2i(58, 50)}   # 깊은 숲 오두막 문 앞 (ALCH_HOUSE_ANCHOR 문+1)
+const NPC_HOME := {"chief": Vector2i(72, 20 + NORTH_PAD), "explorer": Vector2i(78, 16 + NORTH_PAD),
+	"forest_mom": Vector2i(31, 28 + NORTH_PAD), "forest_girl": Vector2i(34, 28 + NORTH_PAD),
+	"librarian": Vector2i(76, 14 + NORTH_PAD),   # 방문객 시절 — 광장 분수 곁
+	"rancher": Vector2i(70, 20 + NORTH_PAD),     # 방문객 시절 — 광장 남서쪽 풀밭
+	"alchemist": Vector2i(58, 50 + NORTH_PAD)}   # 깊은 숲 오두막 문 앞 (ALCH_HOUSE_ANCHOR 문+1)
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
 const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타일)
@@ -728,7 +740,7 @@ func _ready() -> void:
 
 	# 마을 사람들: 이장만 처음부터 광장에 있고,
 	# 나머지는 자기 건물이 지어진 뒤에 마을에 자리를 잡는다
-	npcmgr._spawn_npc("chief", Vector2i(71, 20))
+	npcmgr._spawn_npc("chief", Vector2i(71, 20 + NORTH_PAD))
 
 	sleep_dialog = ConfirmationDialog.new()
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
@@ -1387,12 +1399,12 @@ const STORY_ROAD_Y1 := 18 + TUT_DY         # 네 줄 폭의 숲길
 const STORY_ROAD_X0 := 18
 const STORY_ROAD_X1 := 47
 # 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
-const FOREST_HOUSE_ANCHOR := Vector2i(30, 24)
+const FOREST_HOUSE_ANCHOR := Vector2i(30, 24 + NORTH_PAD)
 # 연금술사의 오두막 (메인 스토리 12) — 깊은 숲(deep_rect) 연못 서쪽.
 # 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
-const ALCH_HOUSE_ANCHOR := Vector2i(56, 46)
+const ALCH_HOUSE_ANCHOR := Vector2i(56, 46 + NORTH_PAD)
 const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
-const EXPLORER_ARRIVE := Vector2i(78, 16)  # 모험가 재민이 처음 서성이는 광장 언저리
+const EXPLORER_ARRIVE := Vector2i(78, 16 + NORTH_PAD)  # 모험가 재민이 처음 서성이는 광장 언저리
 # 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
 # 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
 # 길을 막은 길목. 예전에는 네 곳 x 네 줄 = 나무 16그루라 초반이 지루했다.
@@ -2445,7 +2457,7 @@ func room_action(kind: String) -> void:
 # 계절 곡만 틀면 어디를 가나 같은 소리가 난다. 지금 어디에 있고 무슨
 # 때인지를 보고 골라 준다. 0.4초에 한 번만 본다 — 매 프레임 볼 이유가 없고,
 # 경계에서 곡이 왔다 갔다 하면 그게 더 거슬린다.
-const VILLAGE_AREA := Rect2i(60, 6, 40, 36)   # 마을 전체 (큰길~강가)
+const VILLAGE_AREA := Rect2i(60, 6 + NORTH_PAD, 40, 36)   # 마을 전체 (큰길~강가)
 var _bgm_t := 0.0
 
 

@@ -32,10 +32,10 @@ func _build_map() -> void:
 	# 낚시터 호수 — 부두를 놓으려고 넓혔다 (4.5x3.5 -> 6.5x4.2).
 	# 옛 크기에서는 T자 부두 하나가 연못을 거의 다 덮어, 낚시터가 아니라
 	# 물웅덩이에 널을 깐 꼴이 됐다. 부두 양옆으로 물이 남아야 낚는 자리다.
-	_carve_pond(49, 31, 6.5, 4.2)
+	_carve_pond(49, 31 + m.NORTH_PAD, 6.5, 4.2)
 	_build_dock()
 	# (호수는 마을 서쪽 낚시터가 됐다 — 마을을 가르던 강은 전부 없앴다)
-	_carve_pond(74, 51, 5.0, 3.0)    # 깊은 숲 연못
+	_carve_pond(74, 51 + m.NORTH_PAD, 5.0, 3.0)    # 깊은 숲 연못
 	# 숲을 가로지르는 개울 — 웅덩이만 있으면 물이 고인 땅으로 보인다.
 	# 흐르는 물이 하나는 있어야 지형에 방향이 생긴다
 	_carve_river(30, 24, 44, 46, 2.2)
@@ -285,17 +285,17 @@ func _build_levels() -> void:
 	# 마을 북쪽 언덕 — **큰길에서 올려다보이는** 자리다. 벼랑면은 남쪽을
 	# 보고 서므로 길(y 8~10)보다 위에 있어야 얼굴이 보인다. 다만 벼랑 밑
 	# 한 줄은 지나갈 수 없으니 길과는 두 줄쯤 떼어 놓는다
-	_raise_blob(37, 1, 11.0, 4.6, 2, 71)
+	_raise_blob(37, 1 + m.NORTH_PAD, 11.0, 4.6, 2, 71)
 	# 깊은 숲의 언덕 — 연못(74,51)과 겹치지 않게 서쪽으로 앉힌다
-	_raise_blob(56, 58, 9.0, 5.0, 2, 41)
+	_raise_blob(56, 58 + m.NORTH_PAD, 9.0, 5.0, 2, 41)
 	# 동쪽 채석장의 단구 — 돌을 캐 낸 자리라 층이 진다
-	_raise_blob(196, 46, 13.0, 6.0, 2, 57)
+	_raise_blob(196, 46 + m.NORTH_PAD, 13.0, 6.0, 2, 57)
 	# 오르막 — 벼랑을 끊고 내려오는 자리. 없으면 올라갈 수가 없다.
 	# **남쪽 자락**에 낸다 — 바위면이 보이는 쪽이라야 길로 읽힌다
-	_cut_ramp(33, 5)
-	_cut_ramp(51, 63)
-	_cut_ramp(60, 63)
-	_cut_ramp(190, 52)
+	_cut_ramp(33, 5 + m.NORTH_PAD)
+	_cut_ramp(51, 63 + m.NORTH_PAD)
+	_cut_ramp(60, 63 + m.NORTH_PAD)
+	_cut_ramp(190, 52 + m.NORTH_PAD)
 	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
 	_cut_ramp(m.SEA_GATE[0].x, m.SEA_RIDGE_Y, m.SEA_GATE.size())
 
@@ -917,7 +917,11 @@ func _advance_tree_growth() -> void:
 const NATURE_CAP := {"tree": 260, "rock": 120, "weed": 220}
 # 자연물이 절대 나면 안 되는 곳 — 스토리 숲길(길목이 도로 막히면 안 된다)
 # 자연물이 다시 나면 안 되는 자리 — 농장 앞마당, 옛 전망대 언덕(m.HILL_AREA)
-const NO_SPAWN_RECTS: Array[Rect2i] = [Rect2i(3, 12, 45, 9), Rect2i(26, 1, 11, 6)]
+# 세계가 북쪽으로 밀린 만큼 여기도 민다 (밭 언저리 · 언덕 자리).
+# m.NORTH_PAD 로는 못 쓴다 — 멤버 초기화는 m 이 꽂히기 전에 돌아간다.
+const NO_SPAWN_RECTS: Array[Rect2i] = [
+	Rect2i(3, 12 + KyojinMain.NORTH_PAD, 45, 9),
+	Rect2i(26, 1 + KyojinMain.NORTH_PAD, 11, 6)]
 
 
 # 이 칸에 자연물이 나도 되는가 — 나무/돌/잡초가 전부 같은 검사를 쓴다.
@@ -1134,7 +1138,7 @@ func _spawn_bugs() -> void:
 # 농장의 출하 상자는 아예 없앴다 (판매는 마을 잡화점에서 한다).
 # 오브젝트는 통째로 저장되므로, 불러올 때 한 번 자리를 맞춰 준다.
 func _migrate_farm_layout() -> void:
-	const OLD_BARN := Vector2i(10, 3)
+	const OLD_BARN := Vector2i(10, 3)   # 헛간 안 실내 좌표 — 세계 좌표가 아니다
 	const OLD_BARN_ART := Rect2i(9, 2, 4, 2)
 	for p: Vector2i in m.objects.keys():
 		var kind: String = m.objects[p].kind

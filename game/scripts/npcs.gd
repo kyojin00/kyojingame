@@ -71,7 +71,7 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 		"fountain":
 			t = Vector2i(m.FOUNTAIN.position.x + 1, m.FOUNTAIN.end.y + 1)
 		"plaza":
-			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13))
+			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13 + m.NORTH_PAD))
 		"board":
 			t = m.BOARD_POS + Vector2i(0, 1)
 		"pier":
@@ -101,7 +101,7 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 				var sh: Array = GameData.settler_homes[npc_id]
 				t = m.door_tile(Vector2i(int(sh[0]), int(sh[1]))) + Vector2i(0, 1)
 			if t.x == -999:
-				t = m.NPC_HOME.get(npc_id, Vector2i(72, 20))
+				t = m.NPC_HOME.get(npc_id, Vector2i(72, 20 + m.NORTH_PAD))
 	if m.is_passable(t):
 		return t
 	for d: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0),

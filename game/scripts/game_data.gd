@@ -1432,8 +1432,10 @@ func npc_open(nid: String) -> bool:
 var story4_phase := ""             # "" -> "ask"(이장에게 묻기) -> "done"
 var zones_open: Array = []         # 열린 구역 id 목록
 const VILLAGE_ZONES := {
-	"east_north": {"rect": Rect2i(100, 1, 68, 20), "name": "옛 마을 북동쪽 터"},
-	"east_south": {"rect": Rect2i(100, 21, 68, 23), "name": "옛 마을 남동쪽 터"},
+	# y 는 main.gd 의 NORTH_PAD(12) 를 이미 더한 값이다. 여기서 KyojinMain 을
+	# 참조하면 main -> GameData -> main 순환이 되어 파싱이 막힌다.
+	"east_north": {"rect": Rect2i(100, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(100, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
 }
 const ZONE_ORDER := ["east_north", "east_south"]
 const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
@@ -4335,7 +4337,7 @@ const HORSE_PRICE := 8000
 const HORSE_SPEED_MULT := 2.3
 var has_horse := false
 var riding := false
-var horse_tile := Vector2i(14, 12)   # 세워 둔 자리
+var horse_tile := Vector2i(14, 24)   # 세워 둔 자리 (12 + NORTH_PAD 12)
 
 
 # 작물 성장에 걸리는 시간 배율 (씨앗 개량 + 성장 물약. 작을수록 빨리 자란다)
@@ -6274,7 +6276,7 @@ func reset_all() -> void:
 	greenhouse_built = false
 	has_horse = false
 	riding = false
-	horse_tile = Vector2i(14, 12)
+	horse_tile = Vector2i(14, 24)
 	mine_deepest = 1
 	fest_history = []
 	reset_festival_state()
