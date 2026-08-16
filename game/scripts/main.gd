@@ -716,17 +716,21 @@ const LANDMARKS := [
 			# (block: 좌우 세 칸)은 못 밟는 자리라, 거기로 계단을 내면
 			# 다 올라와서 벽에 부딪힌다 — 켜만 보는 검사로는 안 잡힌다
 			"ramps": [[392, 57 + NORTH_PAD], [424, 48 + NORTH_PAD],
-				[398, 39 + NORTH_PAD], [414, 33 + NORTH_PAD]],
-			"lamps": true,       # 계단마다 양옆에 석등 한 쌍
+				[398, 39 + NORTH_PAD], [412, 33 + NORTH_PAD]],
+			# 계단과 길의 폭. 두 칸이면 화면에서 64px — 주인공 몸 폭(12px)
+			# 다섯이라 「지나는 틈」이지 「오르는 계단」이 아니었다.
+			# 네 칸이면 사람 넷이 나란히 오르는 길이 된다
+			"width": 4,
+			"lamps": true,       # 길 따라 양옆에 석등
 			# 층계참을 잇는 길. 계단만 놓으면 층계참이 허허벌판이라
 			# 어디로 가야 다음 계단인지 안 보인다 — 밟혀 다져진 길이
 			# 이어져야 발이 저절로 따라간다
-			"paths": [[[392, 64 + NORTH_PAD], [392, 54 + NORTH_PAD],
-					[424, 54 + NORTH_PAD], [424, 45 + NORTH_PAD]],
-				[[424, 45 + NORTH_PAD], [424, 44 + NORTH_PAD],
-					[398, 44 + NORTH_PAD], [398, 36 + NORTH_PAD]],
-				[[398, 36 + NORTH_PAD], [398, 35 + NORTH_PAD],
-					[414, 35 + NORTH_PAD], [414, 30 + NORTH_PAD]]]}},
+			"paths": [[[392, 64 + NORTH_PAD], [392, 53 + NORTH_PAD],
+					[424, 53 + NORTH_PAD], [424, 45 + NORTH_PAD]],
+				[[424, 45 + NORTH_PAD], [424, 43 + NORTH_PAD],
+					[398, 43 + NORTH_PAD], [398, 36 + NORTH_PAD]],
+				[[398, 36 + NORTH_PAD], [398, 34 + NORTH_PAD],
+					[412, 34 + NORTH_PAD], [412, 30 + NORTH_PAD]]]}},
 	# 별빛 호수 — 그림이 아니라 **지형**이 랜드마크다. 세계에서 제일 큰 물
 	{"id": "starlake", "name": "별빛 호수", "kind": "",
 		"tile": Vector2i(364, 104 + NORTH_PAD),

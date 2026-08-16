@@ -406,19 +406,56 @@ func _build_levels() -> void:
 		for b: Array in (lm.get("terrain", {}) as Dictionary).get("blobs", []):
 			_raise_blob(int(b[0]), int(b[1]), float(b[2]), float(b[3]),
 				int(b[4]), int(b[5]))
+	var stairs: Array = []          # [x, yb, 폭] — 석등을 세울 자리
 	for lm2: Dictionary in m.LANDMARKS:
-		for r: Array in (lm2.get("terrain", {}) as Dictionary).get("ramps", []):
-			_cut_ramp(int(r[0]), int(r[1]))
+		var t2: Dictionary = lm2.get("terrain", {})
+		var tw: int = int(t2.get("width", 2))
+		var lit: bool = bool(t2.get("lamps", false))
+		for r: Array in t2.get("ramps", []):
+			var yb := _cut_ramp(int(r[0]), int(r[1]), tw)
+			if lit and yb >= 0:
+				stairs.append([int(r[0]), yb, tw])
 	# 층계참을 잇는 길 — 오르막을 낸 뒤라야 그 발치까지 이어 붙는다
 	for lm3: Dictionary in m.LANDMARKS:
 		var tr: Dictionary = lm3.get("terrain", {})
 		for chain: Array in tr.get("paths", []):
-			_lay_path(chain)
-		# 석등은 길을 **다 깔고 나서** 세운다 — _lay_path 가 지나는 자리의
-		# 물건을 쓸어 내므로, 먼저 세우면 방금 세운 등을 제가 지운다
-		if bool(tr.get("lamps", false)):
-			for chain2: Array in tr.get("paths", []):
-				_lay_lamps(chain2)
+			_lay_path(chain, int(tr.get("width", 2)))
+	# ---- 석등 — **계단마다 한 쌍씩만** ----
+	#
+	# 길을 따라 대여섯 칸마다 죽 세웠더니 층계참이 등으로 뒤덮였다. 참고
+	# 사진의 등은 **계단을 따라** 서 있지 온 산에 서 있는 게 아니다.
+	# 계단 넷에 여덟이면 「여기가 오르는 자리다」는 충분히 말한다.
+	#
+	# 길을 다 깐 **뒤에** 세운다 — _lay_path 가 지나는 자리의 물건을 쓸어
+	# 내므로, 먼저 세우면 방금 세운 등을 제가 지운다
+	for st: Array in stairs:
+		var sx := int(st[0])
+		# 계단 **한 칸 위**(윗단 쪽)에 세운다.
+		#
+		# 벼랑 마루 줄(yb)에 세우려 했더니 여덟 자리 중 다섯이 빠졌다 —
+		# 대지 가장자리가 흔들려 있어서, 계단에서 두어 칸만 옆으로 가도
+		# 그 줄은 이미 벼랑 아래였다. 한 줄 위는 윗단이 통으로 이어져 있다.
+		#
+		# 아래쪽(yb+2)에는 세우지 않는다. 그림이 위로 두 칸 넘게 뻗으므로
+		# 계단 남쪽에 서면 제 몸으로 계단을 덮는다
+		var sy := maxi(1, int(st[1]) - 1)
+		var sw := int(st[2])
+		# 양옆으로 **한 자리씩 밀어 가며** 설 데를 찾는다. 대지 가장자리가
+		# 흔들려 있어서 「계단에서 두 칸 옆」이 벼랑 밖일 때가 있다 —
+		# 한 자리만 보고 말면 계단 넷 중 둘은 등이 없이 남는다
+		for dir: int in [-1, 1]:
+			for step in 3:
+				var lx: int = sx - 2 - step if dir < 0 else sx + sw + 1 + step
+				if lx < 1 or lx >= m.MAP_W - 1 or m.objects.has(Vector2i(lx, sy)):
+					continue
+				# 벼랑 밖이면 등이 허공에 뜨고, 계단 위면 길을 막는다
+				if _lv(lx, sy) != _lv(sx, sy) or (m.terrain_level[sy][lx] & 8) != 0:
+					continue
+				if m.grid[sy][lx].ground == "water" or _lamp_hides_stairs(lx, sy):
+					continue
+				m.objects[Vector2i(lx, sy)] = {"kind": "deco_stonelamp", "hp": 0}
+				_no_spawn_rect(lx, sy, lx, sy, 1)
+				break
 	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
 	_cut_ramp(m.SEA_GATE[0].x, m.SEA_RIDGE_Y, m.SEA_GATE.size())
 
@@ -503,7 +540,7 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 #
 # 가로/세로로만 꺾는다. 비스듬한 길은 칸 단위 세계에서 톱니로 나오고,
 # 무엇보다 **오르막이 세로로만 나므로** 길도 같은 결이라야 이어 붙는다.
-func _lay_path(chain: Array) -> void:
+func _lay_path(chain: Array, w := 2) -> void:
 	for i in range(chain.size() - 1):
 		var a: Array = chain[i]
 		var b: Array = chain[i + 1]
@@ -511,8 +548,8 @@ func _lay_path(chain: Array) -> void:
 		var x1: int = maxi(int(a[0]), int(b[0]))
 		var y0: int = mini(int(a[1]), int(b[1]))
 		var y1: int = maxi(int(a[1]), int(b[1]))
-		for y in range(y0, y1 + 2):
-			for x in range(x0, x1 + 2):
+		for y in range(y0, y1 + w):
+			for x in range(x0, x1 + w):
 				if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.MAP_H - 1:
 					continue
 				# 계단(오르막) 위에는 안 깐다 — 거기는 이미 돌계단이다.
@@ -545,32 +582,37 @@ func _lay_path(chain: Array) -> void:
 # 길을 까는 손이 도로 지웠다 — 다섯 개가 흩어져 서 있으면 그건 줄이 아니다.
 #
 # 길은 가로/세로로만 꺾으므로, 등은 **길의 결과 직각으로** 한 칸 옆에 선다.
-const LAMP_EVERY := 5          # 몇 칸마다 한 쌍
-func _lay_lamps(chain: Array) -> void:
-	for i in range(chain.size() - 1):
-		var a: Array = chain[i]
-		var b: Array = chain[i + 1]
-		var horiz: bool = int(a[1]) == int(b[1])
-		var n: int = absi(int(b[0]) - int(a[0])) if horiz else absi(int(b[1]) - int(a[1]))
-		var step := 1 if (int(b[0]) - int(a[0]) if horiz else int(b[1]) - int(a[1])) >= 0 else -1
-		for k in range(1, n, LAMP_EVERY):
-			var cx: int = int(a[0]) + (k * step if horiz else 0)
-			var cy: int = int(a[1]) + (0 if horiz else k * step)
-			# 길은 두 칸 폭이다 (cx..cx+1 또는 cy..cy+1). 그 **바깥** 한 칸씩
-			for side in [-1, 2]:
-				var lx: int = cx if horiz else cx + side
-				var ly: int = cy + side if horiz else cy
-				if lx < 1 or ly < 1 or lx >= m.MAP_W - 1 or ly >= m.MAP_H - 1:
-					continue
-				if m.objects.has(Vector2i(lx, ly)):
-					continue
-				# 벼랑 밖이면 등이 허공에 뜨고, 계단 위면 길을 막는다
-				if _lv(lx, ly) != _lv(cx, cy) or (m.terrain_level[ly][lx] & 8) != 0:
-					continue
-				if m.grid[ly][lx].ground == "water":
-					continue
-				m.objects[Vector2i(lx, ly)] = {"kind": "deco_stonelamp", "hp": 0}
-				_no_spawn_rect(lx, ly, lx, ly, 1)
+# 이 자리에 등을 세우면 **계단이 가려지는가.**
+#
+# 그림은 밑변을 칸에 맞추고 **위로** 뻗는다 (석등은 두 칸이 조금 넘는다).
+# 그래서 계단 **남쪽**에 선 등은 제 몸으로 계단을 덮는다 — 「계단보다 앞에
+# 있거나 계단을 가리는 경우」가 이것이다. 옆으로도 그림 폭만큼은 떨어져야
+# 계단 어깨를 안 문다.
+func _lamp_hides_stairs(lx: int, ly: int) -> bool:
+	for dy in range(0, 4):                 # 제 자리와 **위쪽 세 칸**
+		for dx in range(-1, 2):
+			var x := lx + dx
+			var y := ly - dy
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if (m.terrain_level[y][x] & 8) != 0:
+				return true
+	# 큰 그림 곁에도 서지 않는다. 돌무지 바로 뒤에 세우면 그 그림에 가려
+	# 보이지도 않고, 삐져나오면 그것대로 지저분하다.
+	#
+	# **놓인 물건이 아니라 표를 본다.** 석등은 지형을 지을 때 세우고
+	# 랜드마크는 한참 뒤에 세우므로, 이 시점에 m.objects 를 뒤져 봐야
+	# 거기엔 아직 아무것도 없다 (그래서 돌무지 바로 뒤에 하나가 섰다)
+	for lm: Dictionary in m.LANDMARKS:
+		if String(lm.kind) == "":
+			continue
+		var at: Vector2i = lm.tile
+		var art: Vector2i = lm.get("art", Vector2i(3, 3))
+		if absi(lx - at.x) <= art.x / 2 + 2 \
+				and ly <= at.y + 2 and ly >= at.y - art.y - 1:
+			return true
+	return false
+
 
 
 # 오르막 — 벼랑을 끊고 내려오는 자리.
@@ -608,7 +650,7 @@ func _cut_ramp(x: int, near_y: int, w := 2) -> int:
 		# 계단 **양옆 두 칸**까지 비운다. 나무 한 그루의 그림은 두 칸 반이라,
 		# 바로 옆에 서 있으면 잎이 계단을 통째로 덮는다 — 올라가는 길이
 		# 보이지 않으면 올라갈 수 있다는 것도 모른다
-		_no_spawn_rect(cx, yb - 1, cx, yb + 2, 2)
+		_no_spawn_rect(cx, yb - 2, cx, yb + 3, 3)
 	return yb
 
 
