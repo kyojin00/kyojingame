@@ -389,10 +389,12 @@ func _build_levels() -> void:
 	_raise_blob(196, 46 + m.NORTH_PAD, 13.0, 6.0, 2, 57)
 	# 오르막 — 벼랑을 끊고 내려오는 자리. 없으면 올라갈 수가 없다.
 	# **남쪽 자락**에 낸다 — 바위면이 보이는 쪽이라야 길로 읽힌다
-	_cut_ramp(33, 5 + m.NORTH_PAD)
-	_cut_ramp(51, 63 + m.NORTH_PAD)
-	_cut_ramp(60, 63 + m.NORTH_PAD)
-	_cut_ramp(190, 52 + m.NORTH_PAD)
+	# 폭은 **네 칸**. 두 칸이면, 벼랑면이 두 칸 높이가 된 지금은 계단이
+	# 벽 사이에 낀 틈처럼 보인다 — 실제로 「계단이 묻혔다」고 보였다
+	_cut_ramp(33, 5 + m.NORTH_PAD, 4)
+	_cut_ramp(51, 63 + m.NORTH_PAD, 4)
+	_cut_ramp(60, 63 + m.NORTH_PAD, 4)
+	_cut_ramp(190, 52 + m.NORTH_PAD, 4)
 	# ---- 고장 랜드마크의 단차 ----
 	#
 	# 그림만 세우면 아무리 잘 그려도 평지에 붙인 판때기다. 폭포는

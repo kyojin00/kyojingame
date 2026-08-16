@@ -762,9 +762,13 @@ function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
       return;
     }
   }
-  // 비탈의 폭 — 두 겹으로 흔든다 (일곱 칸짜리 들쭉날쭉 · 열세 칸짜리 너울)
-  const band = wet + 2 + Math.round(h(Math.floor(i / 7), 0, 102 + seed) * 3)
-    + (h(Math.floor(i / 13), 0, 103 + seed) < 0.40 ? 2 : 0);
+  // 비탈의 폭 — 두 겹으로 흔든다 (일곱 칸짜리 들쭉날쭉 · 열세 칸짜리 너울).
+  //
+  // 처음엔 열 켜까지 갔다. 마을 낚시터에 대 보니 못 둘레로 **갈색 진흙이
+  // 넓게 둘러** 물이 진흙탕에 담긴 꼴이었다. 물가는 띠지 벌판이 아니다 —
+  // 서너 켜면 「물이 씻어 낸 자리」로 충분하고, 그 바깥은 풀이 이긴다
+  const band = wet + 1 + Math.round(h(Math.floor(i / 7), 0, 102 + seed) * 2)
+    + (h(Math.floor(i / 13), 0, 103 + seed) < 0.35 ? 1 : 0);
   if (k < band) {
     const u = (k - wet) / Math.max(1, band - wet);
     let c = EARTH[4 - Math.round(u * 1.6)];                  // 젖은 흙 -> 마른 흙
@@ -772,8 +776,9 @@ function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
     g.px(x, y, c);
     return;
   }
-  // 풀로 넘어가는 자락 — 성글게 흩어져야 자로 자른 선이 안 남는다
-  if (k < band + 3 && h(x, y, 58 + seed) > 0.24 + (k - band) * 0.30)
+  // 풀로 넘어가는 자락 — 성글게 흩어져야 자로 자른 선이 안 남는다.
+  // 빨리 옅어지게 한다 (넓게 깔면 그게 다시 진흙 벌판이 된다)
+  if (k < band + 3 && h(x, y, 58 + seed) > 0.30 + (k - band) * 0.34)
     g.px(x, y, EARTH[3]);
 }
 
