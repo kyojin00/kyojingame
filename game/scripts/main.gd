@@ -1249,6 +1249,28 @@ var _mouse_target := Vector2i(-999, -999)
 var _sel_target := Vector2i(-999, -999)
 
 
+# 개발/테스트용 — 지도를 통째로 연다 (F7).
+func _dev_open_world() -> void:
+	var wr := world_rect()
+	var cw: int = GameData.EXPLORE_CHUNK
+	for cy in range((wr.end.y + cw - 1) / cw):
+		for cx in range((wr.end.x + cw - 1) / cw):
+			GameData.explored[Vector2i(cx, cy)] = true
+	GameData.zones_open = GameData.ZONE_ORDER.duplicate()
+	# 가게는 **짓는 것과 같은 길**로 세운다 (_fill_building). 세계를 다시
+	# 만들면 밭도 심은 것도 날아간다.
+	var built := 0
+	for pid: String in VILLAGE_BUILD_ORDER:
+		if GameData.village_built.has(pid):
+			continue
+		GameData.village_built.append(pid)
+		objnode._remove_object(door_tile(VILLAGE_PLOTS[pid].anchor))
+		worldgen._fill_building(VILLAGE_PLOTS[pid].anchor, pid)
+		built += 1
+	queue_redraw()
+	hud.show_message("[개발] 지도를 다 열었다 — 안개·확장 구역·가게 %d채" % built, 2.5)
+
+
 # 개발/테스트용 — 가방을 통째로 채운다.
 # 장터에 올려 보거나 요리·조합을 훑어볼 때 손으로 모으고 있을 수 없다.
 func _dev_fill_stock() -> void:
@@ -1837,6 +1859,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		var ty := clampi(int(w.y / TILE), 0, MAP_H - 1)
 		player.position = Vector2(tx * TILE + 16, ty * TILE + 16)
 		hud.show_message("[개발] (%d, %d) 로 이동" % [tx, ty], 1.5)
+		return
+	# 개발/테스트: F7 — **지도를 통째로 연다** (DEV_MODE에서만)
+	#
+	# 지형을 손볼 때 제일 오래 걸리는 일이 「거기까지 가서 안개를 걷는 것」이다.
+	# 미니맵은 밟아 본 청크만 그리므로, 새로 넓힌 땅을 확인하려면 구석구석
+	# 걸어 다녀야 한다. F9(순간이동)로 날아가도 안개는 한 칸씩만 걷힌다.
+	#
+	# 세 가지를 한 번에 연다:
+	#   ① 탐사 안개 — 세계 전체 청크를 밟은 것으로 친다
+	#   ② 확장 구역 — 메인 스토리 4로 열리는 옛 마을 동쪽 땅
+	#   ③ 마을 부지 — 아직 안 지은 가게를 전부 세운다
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_F7 and GameData.DEV_MODE:
+		_dev_open_world()
 		return
 	# 개발/테스트: F8 — 메인 스토리 건너뛰기
 	if event is InputEventKey and event.pressed and not event.echo \
