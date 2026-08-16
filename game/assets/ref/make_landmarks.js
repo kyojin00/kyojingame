@@ -83,6 +83,28 @@ function hash(x, y) {
   return ((h * 1274126177) & 0x7FFFFFFF) / 2147483647.0;
 }
 
+// 한 단 어둡게 — 그늘을 던질 때 쓴다. 색을 새로 만들지 않고 **팔레트의
+// 다음 단**으로 내려야 그림 전체가 같은 색조로 묶인다
+const DARKER = {
+  l0: 'l1', l1: 'l2', l2: 'l3', l3: 'l4', l4: 'l4',
+  b0: 'b1', b1: 'b2', b2: 'b3', b3: 'b3',
+  r0: 'r1', r1: 'r2', r2: 'r3', r3: 'r4', r4: 'r4',
+  k0: 'k1', k1: 'k2', k2: 'k3', k3: 'k4', k4: 'k4',
+  w0: 'w1', w1: 'w2', w2: 'w3', w3: 'w4', w4: 'w4',
+  m0: 'm1', m1: 'm2', m2: 'm2', u0: 'u1', u1: 'u1',
+  f0: 'f1', f1: 'f1', d0: 'd1', d1: 'd1', O: 'O', n0: 'n0',
+};
+
+// 한 단 밝게 — 큰 덩어리의 빛을 얹을 때 쓴다
+const LIGHTER = {
+  l0: 'l0', l1: 'l0', l2: 'l1', l3: 'l2', l4: 'l3',
+  b0: 'b0', b1: 'b0', b2: 'b1', b3: 'b2',
+  r0: 'r0', r1: 'r0', r2: 'r1', r3: 'r2', r4: 'r3',
+  k0: 'k0', k1: 'k0', k2: 'k1', k3: 'k2', k4: 'k3',
+  w0: 'w0', w1: 'w0', w2: 'w1', w3: 'w2', w4: 'w3',
+  m0: 'm0', m1: 'm0', m2: 'm1',
+};
+
 class G {
   constructor(w, h) {
     this.w = w; this.h = h;
@@ -122,6 +144,35 @@ class G {
       const x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t;
       const w = (w0 + (w1 - w0) * t) / 2;
       this.ellipse(x, y, w, w, c);
+    }
+  }
+  // 드리운 그늘 — 덩이가 **제 뒤에 있는 것 위로** 그림자를 던진다.
+  //
+  // 큰 그림이 납작해 보이는 진짜 이유는 톤이 모자라서가 아니다. 덩이마다
+  // 밝기를 잘 나눠 놔도, 덩이끼리 그림자를 안 주고받으면 전부 **같은
+  // 평면에 붙은 무늬**로 읽힌다. 하나가 다른 하나를 덮고 그 위에 그늘을
+  // 던져야 그제서야 「앞뒤가 있다」가 된다.
+  //
+  // 그래서 덩이는 **뒤에서 앞으로** 그린다. 하나 그리기 직전에 그 덩이의
+  // 그림자를 먼저 던지면, 그 그림자는 이미 그려진 것(=뒤에 있는 것) 위에만
+  // 앉는다. 순서 하나로 앞뒤가 저절로 맞는다.
+  // dither < 1 이면 그만큼만 어둡게 한다. **깨끗한 타원 그림자는 쓰면 안
+  // 된다** — 잎덩이 밑에 접시를 깔아 놓은 것처럼 층층이 겹쳐 보인다.
+  // 성글게 찍어야 잎 사이로 새는 볕이 되고, 그게 나뭇잎 그늘이다.
+  castEllipse(cx, cy, rx, ry, dither = 1.0, depth = 1) {
+    for (let y = Math.round(cy - ry); y <= Math.round(cy + ry); y++) {
+      const t = (y - cy) / ry;
+      if (Math.abs(t) > 1) continue;
+      // 가장자리로 갈수록 옅어진다 (그림자에도 가장자리가 있다)
+      const half = rx * Math.sqrt(1 - t * t);
+      for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) {
+        let c = this.get(x, y);
+        if (c === '.') continue;
+        const edge = Math.hypot((x - cx) / rx, (y - cy) / ry);
+        if (hash(x * 7 + 3, y * 5 + 1) > dither * (1.25 - edge * 0.55)) continue;
+        for (let d = 0; d < depth; d++) c = DARKER[c] || c;
+        this.px(x, y, c);
+      }
     }
   }
   // 비어 있는 칸 중 그림에 닿은 곳에 윤곽선을 두른다
@@ -220,20 +271,58 @@ function greatTree(f, NF) {
     g.bone(ex, ey, ex - dx * 0.16, ey - 26, w1, 3, 'b1');
   }
 
-  // ---- 껍질 결 ----
-  // 세로로 길게 패인 골. 점으로 흩으면 이끼처럼 보이니 **세로줄**로 낸다.
-  for (let y = FORK - 30; y <= GY; y++) {
+  // ---- 줄기와 뿌리의 **부피** ----
+  //
+  // 줄기는 원기둥이다. 왼쪽 밝고 오른쪽 어둡게만 해서는 부피가 안 산다 —
+  // 그건 「반씩 칠한 판때기」다. 원기둥이 원기둥으로 보이려면 다섯 켜가
+  // 다 있어야 한다:
+  //
+  //   ① 하이라이트   빛 쪽으로 살짝 치우친 **좁은** 띠 (넓으면 납작해진다)
+  //   ② 밝은 면
+  //   ③ 중간
+  //   ④ 코어 섀도    제일 어두운 데. **가장자리가 아니라 안쪽**이다
+  //   ⑤ 되비침       그늘 쪽 맨 끝. 땅과 하늘에서 튕겨 온 빛이라 한 단 밝다
+  //
+  // ④와 ⑤가 핵심이다. 그늘 쪽 끝까지 새카맣게 두면 기둥이 **잘려** 보이고,
+  // 끝을 한 단 올리면 그 순간 뒤로 말려 들어간다.
+  //
+  // 뿌리도 같은 규칙으로 칠한다. 예전에는 줄기 폭 안쪽만 칠해서, 밖으로
+  // 벌어진 판근이 통째로 한 색 — 나무 밑동에 갈색 종이를 오려 붙인 꼴이었다.
+  const barrel = (rel) => {
+    const a = Math.abs(rel);
+    if (rel < -0.72) return 'b1';       // 왼쪽 끝 — 빛을 스쳐 지나 조금 어둡다
+    if (rel < -0.28) return 'b0';       // ① 하이라이트
+    if (rel < 0.16) return 'b1';        // ② 밝은 면
+    if (rel < 0.52) return 'b2';        // ③ 중간
+    if (rel < 0.86) return 'b3';        // ④ 코어 섀도
+    return 'b2';                        // ⑤ 되비침
+  };
+  for (let y = FORK - 34; y <= GY; y++) {
+    const mx = trunkMid(y), hw = trunkHalf(y);
+    for (let x = Math.round(mx - hw - 26); x <= Math.round(mx + hw + 26); x++) {
+      if (g.get(x, y) !== 'b1') continue;
+      // 뿌리 쪽은 줄기보다 넓다 — 그 칸의 **실제 폭**을 재서 나눈다
+      let lft = x, rgt = x;
+      while (g.get(lft - 1, y)[0] === 'b') lft--;
+      while (g.get(rgt + 1, y)[0] === 'b') rgt++;
+      const w2 = Math.max(1, (rgt - lft) / 2);
+      const rel = (x - (lft + rgt) / 2) / w2;
+      let c = barrel(rel);
+      // 껍질 골 — 세로로 길게 (점으로 흩으면 이끼처럼 보인다)
+      const groove = hash(x >> 2, y >> 4);
+      if (groove > 0.72) c = DARKER[c] || c;
+      else if (groove < 0.13) c = { b0: 'b0', b1: 'b0', b2: 'b1', b3: 'b2' }[c] || c;
+      g.px(x, y, c);
+    }
+  }
+  // 잎덩이가 줄기에 던지는 그늘 — 나무에서 제일 큰 그림자다.
+  // 이게 없으면 잎이 줄기 **뒤**가 아니라 **옆**에 붙은 것처럼 보인다
+  for (let y = FORK - 20; y <= FORK + 34; y++) {
+    const t = 1 - Math.min(1, (y - (FORK - 20)) / 54);
     const mx = trunkMid(y), hw = trunkHalf(y);
     for (let x = Math.round(mx - hw); x <= Math.round(mx + hw); x++) {
-      if (g.get(x, y) !== 'b1') continue;
-      const rel = (x - mx) / Math.max(1, hw);       // -1 왼쪽 … +1 오른쪽
-      // 빛은 왼쪽 위에서 온다 — 왼쪽 면이 밝고 오른쪽이 그늘
-      let c = rel < -0.62 ? 'b0' : (rel > 0.5 ? 'b2' : 'b1');
-      if (rel > 0.84) c = 'b3';
-      const groove = hash(x >> 2, y >> 4);
-      if (groove > 0.72) c = c === 'b0' ? 'b1' : (c === 'b1' ? 'b2' : 'b3');
-      else if (groove < 0.13) c = c === 'b2' ? 'b1' : (c === 'b1' ? 'b0' : c);
-      g.px(x, y, c);
+      if (g.get(x, y)[0] !== 'b') continue;
+      if (hash(x >> 1, y >> 2) < t * 0.85) g.px(x, y, DARKER[g.get(x, y)]);
     }
   }
   // 옹이 — 오래 산 나무에는 아문 자리가 있다
@@ -254,7 +343,29 @@ function greatTree(f, NF) {
     [28, 104, 26, 21], [172, 104, 26, 21], [100, 106, 56, 28],
     [72, 122, 26, 17], [128, 122, 26, 17],
   ].map(([bx, by, rx, ry]) => [bx + sway(by), by, rx, ry]);
-  for (const [bx, by, rx, ry] of BLOB) g.ellipse(bx, by, rx, ry, 'l2');
+
+  // **뒤에서 앞으로** 그린다 (화면에서 위에 있는 덩이가 뒤다).
+  // 하나 그리기 직전에 그 덩이의 그림자를 먼저 던져 두면, 그림자는 이미
+  // 그려진 뒤쪽 덩이 위에만 앉는다 — 순서 하나로 앞뒤가 맞는다.
+  const ORDER = BLOB.slice().sort((a, b) => a[1] - b[1]);
+  for (const [bx, by, rx, ry] of ORDER) {
+    // 빛은 왼쪽 위에서 온다 -> 그늘은 오른쪽 아래로 진다
+    g.castEllipse(bx + rx * 0.12, by + ry * 0.34, rx * 0.90, ry * 0.86, 0.78);
+    g.ellipse(bx, by, rx, ry, 'l2');
+    // 덩이 하나하나가 **공**이다: 위쪽 밝은 면 -> 아랫배 그늘 -> 밑에서
+    // 되비치는 빛. 이 셋이 있어야 잎덩이가 원반이 아니라 덩어리로 보인다
+    g.ellipse(bx, by - ry * 0.28, rx * 0.88, ry * 0.62, 'l1', ['l2']);
+    g.ellipse(bx - rx * 0.24, by - ry * 0.50, rx * 0.54, ry * 0.36, 'l0', ['l1']);
+    g.ellipse(bx + rx * 0.12, by + ry * 0.44, rx * 0.82, ry * 0.50, 'l3', ['l2']);
+    g.ellipse(bx + rx * 0.20, by + ry * 0.70, rx * 0.60, ry * 0.30, 'l4', ['l3']);
+    // 되비침 — 아래 가장자리 한 겹만 한 단 올린다 (땅에서 튕겨 온 빛)
+    for (let a = 0; a < 90; a++) {
+      const th = (a / 90) * Math.PI;                 // 아래쪽 반원만
+      const x = bx + Math.cos(th) * rx * 0.96;
+      const y = by + Math.sin(th) * ry * 0.96;
+      if (g.get(x, y) === 'l4') g.px(x, y, 'l3');
+    }
+  }
   // 덩이와 덩이 **사이의 골**. 바깥에서 살짝만 베어 문다.
   //
   // 처음엔 크게 물어냈더니 크라운이 납작해져 버섯이 됐다. 노거수는
@@ -266,13 +377,52 @@ function greatTree(f, NF) {
     [46, 126, 15, 13], [154, 124, 15, 13],
   ]) g.ellipse(bx + sway(by), by, rx, ry, '.', ['l2']);
 
-  // 층 나누기 — 덩이마다 위쪽은 빛, 아래쪽은 그늘. 덩이 **단위로**
-  // 밝기를 갈라야 겹친 것이 겹쳐 보인다 (전체 그러데이션은 한 덩이가 된다)
-  for (const [bx, by, rx, ry] of BLOB) {
-    g.ellipse(bx, by - ry * 0.30, rx * 0.86, ry * 0.60, 'l1', ['l2']);
-    g.ellipse(bx - rx * 0.22, by - ry * 0.52, rx * 0.52, ry * 0.34, 'l0', ['l1']);
-    g.ellipse(bx + rx * 0.10, by + ry * 0.46, rx * 0.80, ry * 0.48, 'l3', ['l2']);
-    g.ellipse(bx + rx * 0.16, by + ry * 0.72, rx * 0.58, ry * 0.28, 'l4', ['l3']);
+  // ---- 크라운 전체의 빛 (large form) ----
+  //
+  // 잎덩이를 하나하나 공처럼 칠하고 그림자까지 던져도, **크라운 전체**가
+  // 공으로 안 보이면 여전히 납작하다. 작은 덩어리마다 빛이 따로 놀아서
+  // 「구슬을 한 판에 늘어놓은」 그림이 된다.
+  //
+  // 큰 것을 그릴 때는 켜가 둘이다:
+  //   큰 덩어리(large form)  크라운 전체가 하나의 공 — 왼쪽 위가 밝고
+  //                          오른쪽 아래가 어둡다
+  //   작은 덩어리(small form) 그 위에 얹힌 잎덩이 하나하나
+  // 작은 것만 있으면 납작하고, 큰 것만 있으면 브로콜리다. 둘 다 있어야 한다.
+  {
+    const LX = 66, LY = 24;                  // 크라운의 빛점 (왼쪽 위)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const c = g.d[y][x];
+      if (c[0] !== 'l') continue;
+      const d = Math.hypot((x - LX) / 132, (y - LY) / 124);
+      // 경계에 테가 생기지 않게 문턱을 칸마다 조금씩 흔든다
+      const j = (hash(x, y) - 0.5) * 0.09;
+      if (d + j > 1.06) g.px(x, y, DARKER[DARKER[c]]);
+      else if (d + j > 0.80) g.px(x, y, DARKER[c]);
+      else if (d + j < 0.30) g.px(x, y, LIGHTER[c]);
+    }
+  }
+
+  // 톤 경계를 **뜯는다.**
+  //
+  // 공처럼 칠하고 그림자까지 던지고 나면 부피는 생기는데, 경계가 죄다
+  // 자로 그은 타원이라 잎덩이가 도자기 접시처럼 보인다. 진짜 잎덩이의
+  // 경계는 잎 다발 하나하나가 들쭉날쭉 물고 있다.
+  //
+  // 그래서 마지막에 **톤이 바뀌는 자리만** 찾아 이웃 톤과 섞는다.
+  // 면은 그대로 두고 경계만 뜯으니 부피는 안 무너지고 자국만 사라진다.
+  for (let pass = 0; pass < 2; pass++) {
+    const swap = [];
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const c = g.d[y][x];
+      if (c[0] !== 'l') continue;
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        const n = g.get(nx, ny);
+        if (n[0] !== 'l' || n === c) continue;
+        if (hash(x * 13 + pass * 71, y * 17 + 5) > 0.62) swap.push([x, y, n]);
+        break;
+      }
+    }
+    for (const [x, y, c] of swap) g.px(x, y, c);
   }
 
   // 잎 결 — 서너 칸짜리 뭉텅이. 잎 한 장을 그리는 게 아니라 **다발**이다
@@ -473,6 +623,39 @@ function bigFalls(f, NF) {
     if (hash(x >> 2, y >> 1) > 0.86) c = c === 'r1' ? 'r0' : 'r1';
     g.px(x, y, c);
   }
+  // ---- 골짜기 벽의 **부피** ----
+  //
+  // 가로로 켜만 그으면 벽이 아니라 **줄무늬 벽지**다. 골짜기 벽은
+  // 오목한 면이라, 바깥 마루에서 물길 쪽으로 들어갈수록 하늘이 안 보여
+  // 어두워진다 (그늘이 지는 게 아니라 **빛이 안 닿는** 것이다).
+  //
+  // 줄기와 같은 다섯 켜를 눕혀서 준다:
+  //   바깥 마루   하늘을 정면으로 받는다 — 제일 밝다
+  //   비탈        점점 어두워진다
+  //   물길 언저리 제일 깊다 (코어)
+  //   물가 한 겹  흰 물이 튕겨 온 빛 — 한 단 밝다 (되비침)
+  for (let y = 2; y <= POOL; y++) {
+    const half = massifHalf(y);
+    const gap = (y < LIP ? chanAt(y) : gapAt(y)) + 3;
+    for (const side of [-1, 1]) {
+      const outer = CX + side * (half + 6);
+      const inner = CX + side * gap;
+      const span = Math.max(1, Math.abs(outer - inner));
+      for (let k = 0; k <= span; k++) {
+        const x = Math.round(inner + side * k);      // 물길 -> 바깥
+        if (g.get(x, y)[0] !== 'r') continue;
+        const t = k / span;                          // 0 물길 · 1 바깥 마루
+        const j = (hash(x, y >> 1) - 0.5) * 0.10;
+        let step = 0;
+        if (t + j > 0.74) step = -1;                 // 바깥 마루 — 밝게
+        else if (t + j < 0.10) step = -1;            // 물가 되비침
+        else if (t + j < 0.34) step = 1;             // 물길 언저리 — 깊다
+        if (step > 0) g.px(x, y, DARKER[g.get(x, y)]);
+        else if (step < 0) g.px(x, y, LIGHTER[g.get(x, y)]);
+      }
+    }
+  }
+
   // 벽에 낀 이끼 — 늘 젖어 있는 바위에는 이끼가 산다. 물길 가장자리에만
   for (let y = LIP + 6; y <= POOL - 4; y++) {
     for (const side of [-1, 1]) {
@@ -518,6 +701,28 @@ function bigFalls(f, NF) {
     if (Math.abs(rel) < 0.24 && streak < 0.6 && flow > 0.2) c = 'w3';
     g.px(x, y, c);
   }
+  // 왼쪽 벽이 물 위로 던지는 그늘 — 물이 골짜기 **안에** 있다는 표시다.
+  // 이게 없으면 물 커튼이 바위 앞에 걸려 있는 것처럼 떠 보인다
+  for (let y = LIP; y <= POOL; y++) {
+    const gap = gapAt(y);
+    for (let k = 0; k < 9; k++) {
+      const x = Math.round(CX - gap + k);
+      if (g.get(x, y)[0] !== 'w') continue;
+      if (hash(x * 5, y * 3 + 1) < 0.82 - k * 0.09)
+        g.px(x, y, DARKER[g.get(x, y)]);
+    }
+  }
+  // 물 커튼도 평평한 천이 아니다 — 가운데가 앞으로 불룩하고 양쪽은
+  // 뒤로 말려 든다. 양 끝 한 겹을 한 단 내려 두께를 준다
+  for (let y = LIP; y <= POOL; y++) {
+    const gap = gapAt(y);
+    for (const side of [-1, 1]) for (let k = 0; k < 4; k++) {
+      const x = Math.round(CX + side * (gap - 1 - k));
+      if (g.get(x, y) === 'w1' || g.get(x, y) === 'w2')
+        g.px(x, y, DARKER[g.get(x, y)]);
+    }
+  }
+
   // 마루에서 넘어가는 자리 — 물이 둥글게 말리며 흰 선이 선다
   for (let x = 0; x < W; x++) {
     for (let d = 0; d < 4; d++) {
@@ -696,8 +901,12 @@ function rockSpire(f, NF) {
         if (g.get(x, y) !== 'k2') continue;
         const rel = (x - mx) / Math.max(1, hw);
         // 빛은 왼쪽 위. 오른쪽 세 번째부터 그늘로 넘어간다
+        // 원기둥 다섯 켜 — 하이라이트 · 밝은 면 · 중간 · 코어 섀도 ·
+        // **되비침**. 마지막 한 겹을 한 단 올려야 기둥이 뒤로 말려 든다
+        // (끝까지 새카맣게 두면 칼로 잘라 놓은 것처럼 보인다)
         let c = rel < -0.55 ? 'k1' : (rel > 0.34 ? 'k3' : 'k2');
-        if (rel > 0.80) c = 'k4';
+        if (rel > 0.78) c = 'k4';
+        if (rel > 0.93) c = 'k3';
         if (rel < -0.86) c = 'k0';
         if (tone > 0.70) c = { k0: 'k1', k1: 'k2', k2: 'k3', k3: 'k4', k4: 'k4' }[c];
         else if (tone < 0.24) c = { k0: 'k0', k1: 'k0', k2: 'k1', k3: 'k2', k4: 'k3' }[c];
