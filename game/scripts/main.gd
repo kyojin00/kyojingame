@@ -1008,11 +1008,11 @@ func _ready() -> void:
 	# 로딩판은 PROCESS_MODE_ALWAYS 라 멈춘 트리에서도 혼자 움직인다.
 	visible = false
 	get_tree().paused = true
-	await KyojinLoading.breathe(get_tree(), "그림을 굽는 중…", 0.10)
+	await KyojinLoading.breathe(get_tree(), "그림을 굽는 중…", 0.14)
 	_load_textures()
-	await KyojinLoading.breathe(get_tree(), "옷을 입히는 중…", 0.34)
+	await KyojinLoading.breathe(get_tree(), "옷을 입히는 중…", 0.26)
 	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
-	await KyojinLoading.breathe(get_tree(), "땅을 고르고 숲을 심는 중…", 0.40)
+	await KyojinLoading.breathe(get_tree(), "땅을 고르고 숲을 심는 중…", 0.34)
 	await worldgen._build_map()
 	await KyojinLoading.breathe(get_tree(), "물길을 내는 중…", 0.72)
 	rebuild_water_levels()

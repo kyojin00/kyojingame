@@ -43,7 +43,19 @@ const BOX_H := 150.0
 # 꽉 차 있으면 그때부터는 멈춘 것으로 보인다.
 const CLIMB := 0.62               # 초당 차오르는 양
 const BUILD_CAP := 0.75           # 짓는 동안 보여 줄 수 있는 최대치
-const WARMUP := 0.40              # 장면을 바꾸기 전에 미리 채워 두는 몫
+# 장면을 바꾸기 전에 미리 채워 두는 몫.
+#
+# **작아야 한다.** 예전에는 0.40이었는데, 세계를 짓는 첫 세 단계의 목표가
+# 0.10·0.34·0.40 이라 전부 이 값보다 낮았다 — 이미 지나온 자리라 막대가
+# 움직일 것이 없고, 그래서 **프레임을 한 장도 못 벌었다.** 하필 그 구간이
+# 로딩에서 가장 긴 대목(그림 굽기·땅 고르기)이라, 화면은 마지막에 그린
+# 39%에 그대로 굳어 있었다.
+const WARMUP := 0.08
+const MIN_HOLD := 4               # 단계마다 적어도 이만큼은 프레임을 흘려 보낸다
+# 한 프레임에 이만큼 넘게는 안 채운다. 짓는 동안에는 프레임 간격이 0.5초를
+# 넘기도 해서, 그대로 두면 move_toward 가 두 프레임 만에 껑충 뛴다 —
+# 「차오른다」가 아니라 「띄엄띄엄 갈아 끼운다」로 보인다.
+const STEP_MAX := 0.05
 
 var _c: Control
 var _msg := "마을을 짓는 중…"
@@ -161,7 +173,7 @@ func hold(text: String, ratio: float) -> void:
 		_ratio = maxf(_ratio, _target)
 		return
 	var guard := 0
-	while _ratio < _target - 0.005 and guard < 180:
+	while (guard < MIN_HOLD or _ratio < _target - 0.005) and guard < 180:
 		guard += 1
 		await get_tree().process_frame
 
@@ -186,7 +198,7 @@ func _process(delta: float) -> void:
 				queue_free()
 				return
 	else:
-		_ratio = move_toward(_ratio, _target, CLIMB * delta)
+		_ratio = move_toward(_ratio, _target, minf(CLIMB * delta, STEP_MAX))
 	if _c != null:
 		_c.queue_redraw()
 
