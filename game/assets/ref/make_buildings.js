@@ -36,13 +36,20 @@ const OUT = INSTALL ? SPR : REF;
 const PRE = INSTALL ? '' : 'proposed_';
 
 const S = 4;                     // 논리 한 칸 = 원본 4px (화면에서 2px)
-// 캔버스를 위로 서른여섯 칸 키웠다. 앞모습은 그대로 아래로 내려앉고,
-// 새로 생긴 위쪽 자리를 **뒤로 물러나는 지붕**이 전부 쓴다.
+// 캔버스는 **집마다 다르다.** 회관처럼 마을에서 제일 큰 집은 그림판부터
+// 커야 진짜로 커진다 — 같은 판 안에서 폭만 늘리면 옆에 붙는 종탑·깃발이
+// 잘려 나갈 뿐이다.
 //
-// 바닥선(GROUND)도 같이 내려야 한다 — world_gen 이 그림 **높이**로 밑변을
-// 맞추므로, 바닥을 그대로 두고 캔버스만 키우면 집이 공중에 뜬다.
-const GW = 128, GH = 138;
-const FW = GW * S, FH = GH * S;
+// 바닥선(GROUND)은 캔버스 밑에서 일곱 칸. world_gen 이 그림 **높이**로
+// 밑변을 맞추므로 판이 커져도 집은 늘 같은 땅에 선다.
+let GW = 128, GH = 138;
+let FW = GW * S, FH = GH * S;
+let GROUND = GH - 7;
+let CX = Math.round(GW / 2);
+function setCanvas(w, h) {
+  GW = w; GH = h; FW = w * S; FH = h * S;
+  GROUND = h - 7; CX = Math.round(w / 2);
+}
 
 // 옛 집에서 뽑은 색. 각 재료는 [기본, 그늘, 밝은 면] 세 톤.
 const PAL = {
@@ -547,16 +554,15 @@ function extrude(g) {
 // 옛 판과 다른 건 좌우 위치뿐이다. 예전엔 10..100에 그려 오른쪽이 비어
 // 있었는데(비스듬히 밀던 시절의 자리), 지금은 곧게 뒤로 미니까
 // 캔버스 한가운데에 놓는 게 맞다.
-const GROUND = 131;              // 바닥선 (모든 집이 같은 땅에 선다)
-// 아래 넷은 **건물마다 바뀐다** — build() 가 spec 을 보고 다시 잡는다
-let MID = 109;                  // 1층·2층 경계
-let EAVE = 87;                 // 처마. 낮을수록 지붕이 커진다
-let RIDGE = 47;                // 용마루 (위로 DEPTH만큼 더 물러날 자리를 남긴다)
+// 아래 셋은 **건물마다 바뀐다** — build() 가 spec 을 보고 다시 잡는다
+let MID = 109;                   // 1층·2층 경계
+let EAVE = 87;                   // 처마. 낮을수록 지붕이 커진다
+let RIDGE = 47;                  // 용마루 (위로 DEPTH만큼 더 물러날 자리를 남긴다)
 // 크기는 **옛 집에서 재 왔다** — 내용이 292x384px = 73x96칸이고 캔버스
 // 한가운데에 있다. 이걸 안 맞추면 집만 혼자 커져서 마을이 안 맞는다.
-let X0 = 34, X1 = 94;          // 1층 벽 좌우 (지붕까지 73칸, 한가운데 정렬)
+let X0 = 34, X1 = 94;            // 1층 벽 좌우 (build 에서 CX 기준으로 다시 잡는다)
 const JUT = 3;                   // 2층이 앞으로 나온 턱 (제티)
-const CX = 64;   // 캔버스 한가운데 — 폭이 바뀌어도 중심은 안 움직인다
+
 
 // 벽 재료를 고를 수 있게 해 뒀다. 사진은 벽돌이고 옛 우리 집은 회벽이라,
 // 어느 쪽이 마을에 맞는지는 나란히 놓고 봐야 안다.
@@ -1240,27 +1246,30 @@ function leanTo(g, xa, xb, top) {
   archWin(g, Math.round((xa + xb) / 2) - 5, top + 15, 11, 14, false);
 }
 
-// 탑 — 한쪽에 세운 좁고 높은 덩어리. 도서관·연구소처럼 「위를 보는 집」에
-function tower(g, cx, wallTop) {
-  const a = cx - 9, b = cx + 9, rt = wallTop - 28;
-  wall(g, a, b, wallTop, GROUND, true);
-  // 탑 지붕은 본채의 **뒤로 누운 지붕 옆**에 선다. 0.45~0.10으로 잡았더니
-  // 사다리의 q1~q2밖에 못 써서, 뒤 지붕(q5~q7) 옆에서 혼자 쨍하게 밝았다.
-  // 위는 뒤 지붕만큼 어둡고 아래로 오면서 밝아져야 한 마을 지붕으로 보인다
-  for (let i = 0; i <= 26; i++) {
-    const w = Math.round(2 + 9 * Math.pow(i / 26, 0.9));
+// 탑 — 한쪽에 세운 좁고 높은 덩어리. 도서관·회관처럼 「위를 보는 집」에.
+//
+// 몸통(벽)과 고깔지붕을 따로 잡는다. 원뿔 하나를 통째로 늘리면 높일수록
+// 뾰족해지기만 하고 **탑이 아니라 송곳**이 된다 — 높아져야 하는 건
+// 지붕이 아니라 그 밑의 기둥이다. 종은 그 기둥 꼭대기 살창에 매단다.
+function tower(g, cx, wallTop, hgt, withBell) {
+  const a = cx - 9, b = cx + 9, CONE = 24;
+  const H = hgt || 28;                                     // 벽 위로 솟는 높이
+  const shaftTop = wallTop - (H - CONE), rt = shaftTop - CONE;
+  wall(g, a, b, shaftTop, GROUND, true);
+  for (let i = 0; i <= CONE; i++) {
+    const w = Math.round(2 + 9 * Math.pow(i / CONE, 0.9));
     for (let x = cx - w; x <= cx + w; x++) {
       g.px(x, rt + i, 'r');
-      markRoof(x, rt + i, 0.82 - i / 26 * 0.58, wallTop);
+      markRoof(x, rt + i, 0.82 - i / CONE * 0.58, shaftTop);
     }
   }
-  g.vline(cx + (cx < CX ? 9 : -9), wallTop, GROUND - 3, SHADE);  // 본채와의 이음매
-  g.hline(a - 2, b + 2, wallTop, 'R');
-  g.hline(a - 1, b + 1, wallTop + 1, SHADE);
-  // 창은 **바닥선 안쪽에서** 끝나야 한다. 두 층으로 넣었더니 아래 창이
-  // 주춧돌을 뚫고 내려가 땅속에 반쯤 묻혔다
+  g.hline(a - 2, b + 2, shaftTop, 'R');
+  g.hline(a - 1, b + 1, shaftTop + 1, SHADE);
+  const ly = shaftTop + 5;                                 // 종탑 살창
+  louver(g, cx, ly, 11, 11);
+  if (withBell) bell(g, cx, ly + 3);
   archWin(g, cx - 5, wallTop + 6, 11, 15, false);
-  louver(g, cx, rt + 15, 9, 9);                            // 종탑 살창
+  g.vline(cx + (cx < CX ? 9 : -9), wallTop, GROUND - 3, SHADE);  // 본채와의 이음매
 }
 
 // 풍향계 — 용마루 위에 꽂는 것. 한 줄짜리지만 하늘로 삐죽 나와서
@@ -1408,6 +1417,9 @@ function anvil(g, x, y) {
 // 그리는 **차례가 곧 깊이다.** 뒤에 있는 것부터 깔고 앞엣것으로 덮는다:
 //   1층 벽 -> 2층 벽(제티) -> 창·문 -> 지붕 -> 뒤로 눕히기 -> 살림·담쟁이
 function build(spec) {
+  // 캔버스를 **격자를 만들기 전에** 잡는다. 순서를 반대로 뒀더니 이전 집
+  // 크기로 격자가 만들어진 뒤에 판이 커져서 밖으로 쓰다가 터졌다
+  setCanvas(spec.canvas ? spec.canvas[0] : 128, spec.canvas ? spec.canvas[1] : 138);
   const g = new G();
   resetRoof();
 
@@ -1431,11 +1443,11 @@ function build(spec) {
   // 하나는 늘 뜨겁고 하나는 늘 닦는 집이다
   MOSSY = !['soot', 'copper'].includes(spec.roofPal || 'clay');
 
-  const wide = spec.w || 0;
-  X0 = 34 - wide; X1 = 94 + wide;
-  RIDGE = 47 - (spec.pitch || 0);                          // +면 더 뾰족
-  EAVE = 87 + (spec.eave || 0);
-  MID = 109;
+  const wide = spec.w || 0, st = spec.storey || 0;         // 폭 가감 / 층높이 가감
+  X0 = CX - 30 - wide; X1 = CX + 30 + wide;
+  MID = GROUND - 22 - st;                                  // 1층 천장
+  EAVE = MID - 22 - st + (spec.eave || 0);                 // 2층 천장 = 처마
+  RIDGE = EAVE - 40 - (spec.pitch || 0);                   // +면 더 뾰족
 
   // ---- 몸통 ----
   wall(g, X0, X1, MID, GROUND);                            // 1층
@@ -1457,16 +1469,17 @@ function build(spec) {
   // 차양을 치는 집은 창을 **내려 단다.** 안 그러면 천이 창 위쪽을 덮어
   // 창이 반만 보이고, 그건 가게가 아니라 공사 중으로 보인다
   const wy = spec.awning ? MID + 10 : MID + 4;
-  const wh = spec.awning ? 10 : 12;
+  const wh = (spec.awning ? 10 : 12) + Math.round(st * 0.7);   // 층이 높으면 창도 크다
   archWin(g, CX - 13 - bw, wy, bw, wh, !spec.bigWin && !spec.awning);
   archWin(g, CX + 14, wy, bw, wh, !spec.bigWin && !spec.awning);
   if (spec.win3) {                                          // 여관 — 2층 창이 셋
-    archWin(g, CX - 31, EAVE + 6, 11, 13, false);
-    archWin(g, CX - 5, EAVE + 6, 11, 13, false);
-    archWin(g, CX + 21, EAVE + 6, 11, 13, false);
+    const h2 = 13 + Math.round(st * 0.7);
+    archWin(g, CX - 31, EAVE + 6, 11, h2, false);
+    archWin(g, CX - 5, EAVE + 6, 11, h2, false);
+    archWin(g, CX + 21, EAVE + 6, 11, h2, false);
   } else {
-    archWin(g, CX - 24, EAVE + 6, 12, 13, false);
-    archWin(g, CX + 13, EAVE + 6, 12, 13, false);
+    archWin(g, CX - 24, EAVE + 6, 12, 13 + Math.round(st * 0.7), false);
+    archWin(g, CX + 13, EAVE + 6, 12, 13 + Math.round(st * 0.7), false);
   }
 
   // ---- 문 ----
@@ -1499,12 +1512,10 @@ function build(spec) {
   if (spec.tower) {
     const r = spec.tower === 'right';
     const c = r ? X1 + JUT + 11 : X0 - JUT - 11;
-    tower(g, c, EAVE + 10);
+    tower(g, c, EAVE + 10, spec.towerH, spec.bell);
     footL = Math.min(footL, c - 9); footR = Math.max(footR, c + 9);
   }
   if (spec.stall) stall(g, CX - 16, CX + 16, GROUND);
-  if (spec.bell) bell(g, (spec.tower === 'right' ? X1 + JUT + 11 : X0 - JUT - 11),
-    EAVE + 10 - 28 + 19);
   if (spec.steps) steps(g, CX, 22, GROUND);
   // 옆으로 늘어난 만큼 **주춧돌을 하나로 잇는다.** 덩어리마다 따로 두면
   // 밑에 틈이 생겨서 두 채를 나란히 세워 놓은 것처럼 보인다 — 한 채의
@@ -1650,11 +1661,12 @@ const KINDS = {
   //   만국기·깃발   행사가 열리는 집
   // 창은 전부 불이 켜져 있다 — 회관은 밤에도 사람이 있다.
   //
-  // 폭은 5칸만 늘렸다. 12칸으로 늘렸더니 왼쪽 종탑과 오른쪽 깃발이
-  // 캔버스 밖으로 잘려 나갔다 — 회관은 옆으로 붙는 게 많아서 **몸통을
-  // 넓히면 그만큼 부속이 밀려난다.** 큰 느낌은 폭이 아니라 종탑 높이가 낸다.
-  chief_house: { sign: true, icon: 'bell', w: 5, pitch: 4, win3: true,
-    gable: 'clock', tower: 'left', bell: true, steps: true, bunting: true,
+  // 회관만 **그림판이 크다** (164x168 -> 656x672). 같은 판에서 폭만 늘렸더니
+  // 왼쪽 종탑과 오른쪽 깃발이 캔버스 밖으로 잘렸다 — 회관은 옆에 붙는 게
+  // 많아서 판부터 키워야 한다. 층높이도 열두 칸 올려 창까지 같이 커진다.
+  chief_house: { canvas: [164, 168], w: 16, storey: 12,
+    sign: true, icon: 'bell', pitch: 10, win3: true,
+    gable: 'clock', tower: 'left', towerH: 64, bell: true, steps: true, bunting: true,
     flag: true, dormer: true, lit: true, wallPal: 'stone', ivy: 2,
     props: [['notice', -20], ['bench', 6]] },
 };
