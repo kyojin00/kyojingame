@@ -937,6 +937,9 @@ const UI_FONT_SMALL := preload("res://assets/fonts/Galmuri9.ttf")
 var npcs: Array = []
 
 
+const KyojinLoading := preload("res://scripts/loading.gd")
+
+
 func _ready() -> void:
 	# 갈라낸 모듈부터 붙인다 — 바로 아래 _build_map()이 worldgen을 쓴다.
 	# @rpc는 노드 경로로 상대를 찾으므로 **NetSync는 이름을 바꾸면 통신이 죽는다.**
@@ -956,10 +959,18 @@ func _ready() -> void:
 	saveio = _mount("save_load", "SaveIO")
 	doing = _mount("player_actions", "PlayerActions")
 
+	# 여기부터 몇 초쯤 화면이 굳는다 — 그동안 무엇을 하고 있는지 말해 준다.
+	# await 가 아니라 그 자리에서 다시 그리는 방식이라(loading.gd 참고),
+	# 절반만 지어진 세계에 남의 _process 가 끼어들 일이 없다
+	KyojinLoading.mark(get_tree(), "그림을 굽는 중…", 0.10)
 	_load_textures()
+	KyojinLoading.mark(get_tree(), "옷을 입히는 중…", 0.34)
 	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
+	KyojinLoading.mark(get_tree(), "땅을 고르고 숲을 심는 중…", 0.40)
 	worldgen._build_map()
+	KyojinLoading.mark(get_tree(), "물길을 내는 중…", 0.80)
 	rebuild_water_levels()
+	KyojinLoading.mark(get_tree(), "밭을 일구는 중…", 0.88)
 	farming.rebuild()
 
 	night = CanvasModulate.new()
@@ -1203,8 +1214,12 @@ func _ready() -> void:
 	if GameData.quest.is_empty() and GameData.quest_offers.is_empty():
 		GameData.make_daily_quest()
 
+	KyojinLoading.mark(get_tree(), "마을 사람들을 깨우는 중…", 1.0)
 	_setup_fade(loaded.size() > 0 or _shot_path != "")
 	# 신규 게임은 _show_intro가 스토리 동안 화면을 가렸다가 직접 페이드한다
+	# 다 지었다 — 로딩 화면을 걷는다 (다음 프레임에 지운다: 지금 지우면
+	# 아직 첫 프레임이 안 그려져 한 칸 검게 번쩍한다)
+	KyojinLoading.close.bind(get_tree()).call_deferred()
 
 
 # 갈라낸 모듈 하나를 자식으로 붙인다.

@@ -12,6 +12,9 @@ var _waiting_action := ""
 var _key_buttons := {}
 
 
+const KyojinLoading := preload("res://scripts/loading.gd")
+
+
 func _ready() -> void:
 	# 배경: 참고 도트 풍경화 한 장 (960x540 그대로 화면을 채운다)
 	var bg := TextureRect.new()
@@ -129,7 +132,7 @@ var _menu_nodes: Array = []      # 생성창이 열려 있는 동안 치워 두�
 
 
 func _on_continue() -> void:
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_enter_world("저장한 마을을 여는 중…")
 
 
 func _on_new_game() -> void:
@@ -155,7 +158,7 @@ func _start_new(g: String) -> void:
 		"skin": 0, "hair_col": 0}
 	if FileAccess.file_exists(GameData.SAVE_PATH):
 		DirAccess.remove_absolute(GameData.SAVE_PATH)
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_enter_world("%s의 터를 고르는 중…" % (GameData.village_name if GameData.village_name != "" else "마을"))
 
 
 # ---- 캐릭터 생성창 (「새로 시작」) ----
@@ -461,7 +464,7 @@ func _start_selected() -> void:
 		GameData.player_name = "친구"
 	if FileAccess.file_exists(GameData.SAVE_PATH):
 		DirAccess.remove_absolute(GameData.SAVE_PATH)
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_enter_world("%s의 터를 고르는 중…" % (GameData.village_name if GameData.village_name != "" else "마을"))
 
 
 # 검증용 — 고른 색이 정말 액자 속 도트에 칠해졌는지 픽셀로 센다.
@@ -610,7 +613,7 @@ func _show_start_button(text: String) -> void:
 	_start_row.add_child(_mk_button(text, func() -> void:
 		if _room_code != "":
 			DisplayServer.clipboard_set(_room_code)   # 붙여넣어 알려 주기 편하게
-		get_tree().change_scene_to_file("res://scenes/main.tscn")))
+		_enter_world("농장을 여는 중…")))
 
 
 # 참가 — 코드로 주소를 물어보고, 받은 주소로 붙는다
@@ -631,7 +634,7 @@ func _on_room_found(ok: bool, ip: String, port: int, msg: String) -> void:
 	if Net.join_game(ip, port) != OK:
 		mp_status.text = "접속 시작 실패... 잠시 뒤 다시 해보자."
 		return
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	_enter_world("친구의 농장으로 가는 중…")
 
 
 func _build_settings_panel() -> void:
@@ -831,3 +834,14 @@ func _process(delta: float) -> void:
 		img3.save_png(OS.get_environment("KYOJIN_SHOT") + "_gender.png")
 	elif _shot_frames == 46:
 		_start_new("f")
+
+
+# 장면을 바꾸기 **전에** 로딩 화면을 띄우고 두 프레임을 흘려 보낸다.
+# 한 프레임으로는 안 된다 — 그린 것이 화면에 실제로 올라와야, 세계를 짓는
+# 동안 멈춰 있는 그림이 「짓는 중」이 된다 (예전엔 타이틀이 그대로 굳었다)
+func _enter_world(first_msg := "터를 고르는 중…") -> void:
+	var ld: Node = KyojinLoading.open(get_tree())
+	ld.step(first_msg, 0.03)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
