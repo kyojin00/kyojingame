@@ -128,10 +128,45 @@ func _sprinkle(pos: Vector2i) -> void:
 			_wet(m.grid[n.y][n.x], m.WET_ALL_DAY)
 
 
-func _sprinkler_tick() -> void:
+# ---- 스프링클러도 「있는 것만」 돈다 ----
+#
+# 0.7초마다 **세계의 모든 물건**(m.objects)을 훑어 스프링클러를 찾고 있었다.
+# 224x132 일 때는 이천 개라 티가 안 났는데, 448x264 가 되면서 나무·돌만
+# 만 개를 넘었다 — 0.7초마다 만 번을 뒤지니 그 주기로 화면이 걸렸다.
+# 바로 밑 _ticking 이 같은 이유로 이미 한 번 고쳐진 자리인데, 물건 쪽만
+# 남아 있었다.
+#
+# 놓을 때 목록에 넣고(add_sprinkler), 걷어낸 것은 도는 김에 빠진다.
+var _sprinklers: Array[Vector2i] = []
+
+
+func add_sprinkler(pos: Vector2i) -> void:
+	if not _sprinklers.has(pos):
+		_sprinklers.append(pos)
+
+
+# 세이브를 펴거나 하루가 넘어갈 때 통째로 다시 만든다 — 어딘가에서
+# add_sprinkler 를 빠뜨려도 하루 안에 저절로 맞춰진다
+func rebuild_sprinklers() -> void:
+	_sprinklers.clear()
 	for pos: Vector2i in m.objects:
 		if m.objects[pos].kind == "sprinkler":
-			_sprinkle(pos)
+			_sprinklers.append(pos)
+
+
+func _sprinkler_tick() -> void:
+	var gone := false
+	for pos: Vector2i in _sprinklers:
+		if str((m.objects.get(pos, {}) as Dictionary).get("kind", "")) != "sprinkler":
+			gone = true
+			continue
+		_sprinkle(pos)
+	if gone:
+		var keep: Array[Vector2i] = []
+		for pos2: Vector2i in _sprinklers:
+			if str((m.objects.get(pos2, {}) as Dictionary).get("kind", "")) == "sprinkler":
+				keep.append(pos2)
+		_sprinklers = keep
 
 
 # ---- 「지금 돌아가고 있는 칸」만 돈다 ----
@@ -154,6 +189,7 @@ func touch(cell: Dictionary) -> void:
 
 
 func rebuild() -> void:
+	rebuild_sprinklers()
 	_ticking.clear()
 	for y in m.MAP_H:
 		var row: Array = m.grid[y]

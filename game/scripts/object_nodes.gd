@@ -77,6 +77,7 @@ func _spawn_objects() -> void:
 	_stream_prev = Rect2i()
 	_stream_nodes()
 	m.farming._recount_pasture()   # 불러온 세이브의 울타리도 목초지로 인정한다
+	m.farming.rebuild_sprinklers() # 세계가 통째로 바뀌었으니 목록도 다시
 	m.story._apply_story_visibility()
 
 
@@ -451,6 +452,8 @@ func _clear_tree_falls() -> void:
 func _place_object(pos: Vector2i, kind: String, hp: int) -> void:
 	m.objects[pos] = {"kind": kind, "hp": hp}
 	_spawn_object_node(pos, kind)
+	if kind == "sprinkler":
+		m.farming.add_sprinkler(pos)   # 물 주는 목록에 넣는다 (매번 다 뒤지지 않게)
 
 
 func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Node2D:

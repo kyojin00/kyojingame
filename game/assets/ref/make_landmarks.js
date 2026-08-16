@@ -645,29 +645,40 @@ function bigFalls(f, NF) {
   const wob = (f / NF) * Math.PI * 2;
   const halfAt = (y) => 34 + Math.max(0, y - LIP) * 0.12;
 
-  // ---- 마루 위의 윗물 ----
-  // 윗못과 **같은 색**이라야 이어진다 (w5 = WATER[5], 게임 호수의 단).
-  // 마루로 갈수록 좁아지며 얕아진다 — 물이 홈으로 빨려 드는 모양
-  for (let y = 0; y < HEAD; y++) {
-    const t = y / HEAD;
-    const hw = 46 - t * 11;
-    // 바깥 가장자리는 **뜯어 놓는다.** 곧은 사선으로 끝나면 윗못 위에
-    // 깔때기를 얹어 놓은 것처럼 보인다 — 들쭉날쭉해야 물에 섞인다
-    const jag = Math.round(hash(0, y >> 1) * 4) - 2;
-    for (let x = Math.round(CX - hw - jag); x <= Math.round(CX + hw + jag); x++) {
-      const rel = Math.abs((x - CX) / hw);
-      if (rel > 1.0 && hash(x, y) > 0.5) continue;
-      // 가장자리는 얕아 밝고 가운데는 깊다 (게임 물의 깊이 규칙과 같다)
-      let c = rel > 0.86 ? 'w4' : (rel > 0.5 ? 'w5' : 'w6');
-      if (t > 0.72) c = LIGHTER[c];              // 마루 가까이는 얕아진다
-      g.px(x, y, c);
+  // ---- 마루 위: **물을 칠하지 않는다** ----
+  //
+  // 윗못을 덮는 판을 한 장 깔아 봤다. 색을 게임 호수 단에서 가져와도
+  // 못 위에 **네모난 딴 물**이 얹혀 보였다 — 잔물결 무늬가 타일과 따로
+  // 놀아서, 아무리 가장자리를 뜯어도 그 자리만 결이 어긋난다.
+  //
+  // 마루 위에서 그림이 할 일은 물을 그리는 게 아니라 **물이 빨려 드는
+  // 것**을 그리는 일이다. 바탕은 비워 세계의 못이 그대로 비치게 두고,
+  // 홈으로 모여드는 흐름 줄기 몇 가닥만 얹는다. 안 그리는 게 제일 잘 잇는다.
+  for (let i = 0; i < 18; i++) {
+    const t0 = hash(i, 91);
+    // 줄기는 바깥에서 시작해 마루 한복판으로 모인다.
+    // 짧은 것을 많이 뿌렸더니 비 오는 것처럼 보였다 — 길게, 성글게
+    const x0 = CX + (t0 - 0.5) * 76;
+    const y0 = Math.floor(hash(i, 92) * (HEAD - 8));
+    const len = 6 + Math.floor(hash(i, 93) * 10);
+    for (let k = 0; k < len; k++) {
+      const t = (y0 + k) / HEAD;
+      // 아래로 갈수록 마루 쪽으로 모인다
+      const x = Math.round(x0 * (1 - t * 0.42) + CX * t * 0.42);
+      const y = y0 + k + ((f * 2) % 4) - 1;
+      if (y < 0 || y >= HEAD) continue;
+      if (Math.abs(x - CX) > halfAt(LIP) + 14) continue;
+      g.px(x, y, hash(i, 94) > 0.72 ? 'w1' : 'w2');
     }
-    // 잔물결 — 가로로 짧게. 장마다 어긋나게 (게임 물 타일과 같은 방식)
-    for (let i = 0; i < 3; i++) {
-      const x0 = Math.round(CX - hw + hash(i, y) * hw * 2) + ((f * 2 + i) % 4) - 2;
-      const len = 2 + Math.floor(hash(i + 5, y) * 3);
-      for (let k = 0; k < len; k++)
-        if (g.get(x0 + k, y)[0] === 'w') g.px(x0 + k, y, LIGHTER[g.get(x0 + k, y)]);
+  }
+  // 마루로 다가갈수록 물이 얕아져 밝아진다 — 마지막 세 줄만 옅게 깔아
+  // 마루가 어디서 시작하는지 알려 준다 (성글게 찍어 못과 섞이게)
+  for (let y = HEAD - 5; y < HEAD; y++) {
+    const hw = halfAt(LIP) + (HEAD - y);
+    for (let x = Math.round(CX - hw); x <= Math.round(CX + hw); x++) {
+      const d = (y - (HEAD - 5)) / 5.0;
+      if (hash(x, y + f * 3) > 0.25 + d * 0.7) continue;
+      g.px(x, y, d > 0.6 ? 'w2' : 'w3');
     }
   }
   // 떨어지는 물
