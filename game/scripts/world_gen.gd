@@ -29,13 +29,9 @@ func _build_map() -> void:
 		m.grid.append(row)
 
 	# 연못들 (숲/깊은 숲) — 시작 부지의 연못은 없앴다
-	for y in range(28, 35):
-		for x in range(45, 53):
-			m.grid[y][x].ground = "water"
+	_carve_pond(49, 31, 4.5, 3.5)
 	# (호수는 마을 서쪽 낚시터가 됐다 — 마을을 가르던 강은 전부 없앴다)
-	for y in range(48, 54):          # 깊은 숲 연못
-		for x in range(70, 79):
-			m.grid[y][x].ground = "water"
+	_carve_pond(74, 51, 5.0, 3.0)    # 깊은 숲 연못
 
 	_build_village()
 
@@ -145,8 +141,12 @@ func _paint_regions() -> void:
 				if m.grid[y][x].ground != "grass":
 					continue
 				if pond > 0.0:
-					# 물웅덩이는 뭉쳐야 웅덩이로 보인다 — 세 칸씩 묶어 본다
-					if m._hash01(x / 3 * 13 + 5, y / 3 * 17 + 3) < pond:
+					# 물웅덩이는 뭉쳐야 웅덩이로 보이지만, 세 칸씩 묶기만 하면
+					# **3x3 네모 웅덩이**가 된다. 묶은 값에 칸별 값을 섞어
+					# 가장자리를 허물어 준다 (덩어리는 남고 각은 사라진다)
+					var blob := m._hash01(x / 3 * 13 + 5, y / 3 * 17 + 3) * 0.7 \
+						+ m._hash01(x * 7 + 1, y * 11 + 3) * 0.3
+					if blob < pond:
 						m.grid[y][x].ground = "water"
 						continue
 				if g != "":
@@ -283,10 +283,33 @@ func _place_stall(with_node := true) -> void:
 
 # 교진 마을: 건물은 하나도 짓지 않는다.
 # 넓은 중앙 광장 + 사방으로 뻗은 길 + 나중에 건물이 들어설 빈 부지만 만든다.
+# 웅덩이를 **파낸다.** 사각형으로 칠하면 물이 아니라 수영장이다.
+#
+# 타원으로 자르되 반지름을 칸마다 흔든다 — 가장자리가 들쭉날쭉해야
+# 물이 땅을 파고든 것처럼 보인다. 흔드는 폭은 반지름의 1/4쯤이면 충분하다.
+# (더 흔들면 웅덩이가 아니라 얼룩이 된다)
+func _carve_pond(cx: int, cy: int, rx: float, ry: float) -> void:
+	var mx := int(ceil(rx)) + 2
+	var my := int(ceil(ry)) + 2
+	for y in range(cy - my, cy + my + 1):
+		for x in range(cx - mx, cx + mx + 1):
+			if x < 1 or y < 1 or x >= m.MAP_W - 1 or y >= m.WORLD_H - 1:
+				continue
+			var dx := (float(x) - float(cx)) / rx
+			var dy := (float(y) - float(cy)) / ry
+			# 두 파장으로 반지름을 흔든다 — 한 겹만 쓰면 규칙적인 물결이 남는다
+			var wob := 0.86 + m._hash01(x * 5 + 3, y * 7 + 1) * 0.16 \
+				+ m._hash01(x / 2 * 11 + 5, y / 2 * 13 + 7) * 0.14
+			if dx * dx + dy * dy <= wob * wob:
+				m.grid[y][x].ground = "water"
+				m.objects.erase(Vector2i(x, y))
+
+
 func _build_village() -> void:
 	# 흙길은 더 이상 깔지 않는다 — 마을 바닥은 잔디이고, 길·광장 바닥은
 	# 앞으로 플레이어가 직접 타일을 깔아 꾸미는 구조로 간다.
 	# 광장 한가운데 분수
+	# 분수만은 네모로 둔다 — 사람이 만든 것이라 자로 잰 게 맞다
 	for y in range(m.FOUNTAIN.position.y, m.FOUNTAIN.end.y):
 		for x in range(m.FOUNTAIN.position.x, m.FOUNTAIN.end.x):
 			m.grid[y][x].ground = "water"
