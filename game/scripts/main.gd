@@ -105,9 +105,16 @@ var water_timer := 0.0
 var water_dist: Array = []
 # 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
 # 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
-const EDGE_KINDS := ["shore", "shoal", "beach", "surf", "dune", "trod"]
+const EDGE_KINDS := ["shore", "shoal", "beach", "surf", "dune", "trod", "brink"]
+const EDGE_VAR_KINDS := ["cliff"]      # 판이 여럿인 것 (한 판만 쓰면 무늬가 반복된다)
+const EDGE_VARS := 3
 const EDGE_PX := 16
 var edge_tex := {}
+# 땅의 높이 — 칸마다 켜(0~7, 비트 0~2)와 **오르막** 표시(비트 3).
+#
+# 벼랑은 따로 놓는 물건이 아니라 **높이가 다른 두 땅이 만나는 자리**다.
+# 켜만 정해 두면 그림도(면과 마루) 통행도 거기서 나온다
+var terrain_level: Array = []
 var _growth_timer := 0.0
 var tree_sprites: Array = []
 var weather_time := 0.0
@@ -894,7 +901,13 @@ func _load_textures() -> void:
 	#
 	# 꼴이 256가지라 파일로 두면 천오백 장이다. 한 장에 모으면 불러오기도
 	# 가볍고, 같은 텍스처라 그리기가 오히려 더 잘 묶인다
+	var sheets: Array[String] = []
 	for kind: String in EDGE_KINDS:
+		sheets.append(kind)
+	for kind: String in EDGE_VAR_KINDS:
+		for v in EDGE_VARS:
+			sheets.append("%s_%d" % [kind, v])
+	for kind: String in sheets:
 		var sheet: Texture2D = load("res://assets/sprites/edge_%s.png" % kind)
 		var arr: Array[Texture2D] = []
 		arr.resize(256)
@@ -1089,6 +1102,8 @@ func is_passable(t: Vector2i) -> bool:
 		return false
 	if objects.has(t):
 		return false
+	if _cliff_foot(t.x, t.y):
+		return false  # 벼랑 밑 — 오르막으로만 오르내린다
 	if not _tile_accessible(t):
 		return false  # 해금하지 않은 부지는 들어갈 수 없다
 	return true
@@ -1970,6 +1985,32 @@ func _water_level(x: int, y: int) -> int:
 	return clampi(water_dist[y][x] - 1, 0, WATER_LV - 1)
 
 
+func level_at(x: int, y: int) -> int:
+	if terrain_level.is_empty() or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+		return 0
+	return terrain_level[y][x] & 7
+
+
+func is_ramp(x: int, y: int) -> bool:
+	if terrain_level.is_empty() or x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+		return false
+	return (terrain_level[y][x] & 8) != 0
+
+
+# 벼랑 밑 — **위쪽 땅에 붙은 칸**으로는 들어갈 수 없다. 그 칸이 곧 바위면이
+# 서 있는 자리다. 오르내리는 길은 오르막뿐이다.
+#
+# 통행을 「칸에서 칸으로 건널 수 있는가」로 두면 검사할 자리가 사방으로
+# 늘어난다. 벼랑 밑 한 줄을 막아 두면 애초에 그 자리에 설 수가 없어서,
+# 아래에서 위로 붙는 일 자체가 없다 — 검사는 칸 하나로 끝난다
+func _cliff_foot(x: int, y: int) -> bool:
+	if terrain_level.is_empty() or is_ramp(x, y):
+		return false
+	var lv := level_at(x, y)
+	return level_at(x, y - 1) > lv or level_at(x, y + 1) > lv \
+		or level_at(x - 1, y) > lv or level_at(x + 1, y) > lv
+
+
 # 바닥 종류를 **숫자**로. 경계를 가릴 때 칸마다 여덟 이웃을 문자열로
 # 견주면 그 비교만 수만 번이라, 줄을 읽어 둘 때 한 번만 표를 뒤진다
 const K_GRASS := 0
@@ -1984,17 +2025,25 @@ const KIND_OF := {"water": K_WATER, "sand": K_SAND, "yard": K_YARD, "path": K_PA
 func _row_kind(y: int, xa: int, n: int) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(n)
-	if y < 0 or y >= MAP_H:
-		for i in n:
-			out[i] = K_WATER
-		return out
-	var row: Array = grid[y]
+	# 맵 밖은 **물로 친다** — 세계의 끝은 바다이고, 가장자리 칸의 물가가
+	# 끊겨 보이면 거기가 세계의 끝이라는 게 드러난다. 다만 **켜는 안쪽을
+	# 따라간다**: 0으로 두면 세계 둘레에 있지도 않은 벼랑이 한 바퀴 선다
+	var cy: int = clampi(y, 0, MAP_H - 1)
+	var off_y: bool = y != cy
+	var row: Array = grid[cy]
+	var lv: PackedByteArray = terrain_level[cy] if not terrain_level.is_empty() \
+		else PackedByteArray()
 	for i in n:
 		var x: int = xa + i
-		if x < 0 or x >= MAP_W:
-			out[i] = K_WATER
-		else:
-			out[i] = KIND_OF.get(row[x].ground, K_GRASS)
+		var cx: int = clampi(x, 0, MAP_W - 1)
+		# 바닥 종류(0~2비트) · 켜(3~5비트) · 오르막(6비트)을 한 바이트에.
+		# 벼랑 경계도 물가와 같은 이웃 여덟 칸을 보므로, 따로 훑으면
+		# 격자를 또 여덟 번 뒤지게 된다
+		var b: int = K_WATER if (off_y or x != cx) else KIND_OF.get(row[cx].ground, K_GRASS)
+		if not lv.is_empty():
+			var t: int = lv[cx]
+			b |= ((t & 7) << 3) | ((t & 8) << 3)
+		out[i] = b
 	return out
 
 
@@ -2052,6 +2101,8 @@ func _draw() -> void:
 	# **줄 단위로** 읽어 두고 세 줄을 굴리면 칸당 한 번으로 준다
 	var xa := x0 - 1
 	var span := x1 - x0 + 2
+	# 이웃 여덟의 켜를 담을 그릇 — 칸마다 새로 만들면 그만큼 할당이 는다
+	var nbuf: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0]
 	var above := _row_kind(y0 - 1, xa, span)
 	var cur := _row_kind(y0, xa, span)
 	var below := _row_kind(y0 + 1, xa, span)
@@ -2152,6 +2203,41 @@ func _draw() -> void:
 					if kse == K_YARD: yc |= 128
 					if yc != 0:
 						put.call(edges, edge_tex["trod"][yc], at)
+			# 벼랑 — 높이가 다른 두 땅이 만나는 자리. 면은 **아래쪽 칸**에
+			# 드리우고(위에서 내려다보면 벽이 차지하는 자리가 거기다),
+			# 마루는 위쪽 칸에 얹는다. 오르막끼리 맞닿은 자리만 경계에서
+			# 빼면 그 사이로 길이 뚫리고 양옆에는 바위벽이 남는다
+			# 평지가 대부분이라 **먼저 싸게 가른다** — 이웃 여덟의 켜가 다
+			# 나와 같으면 여기는 볼 것이 없다
+			var lvb: int = kc & 56
+			if (kn & 56) != lvb or (ks & 56) != lvb or (kw & 56) != lvb \
+				or (ke & 56) != lvb or (knw & 56) != lvb or (kne & 56) != lvb \
+				or (ksw & 56) != lvb or (kse & 56) != lvb:
+				var ramp: bool = (kc & 64) != 0
+				nbuf[0] = kn
+				nbuf[1] = ks
+				nbuf[2] = kw
+				nbuf[3] = ke
+				nbuf[4] = knw
+				nbuf[5] = kne
+				nbuf[6] = ksw
+				nbuf[7] = kse
+				var up := 0
+				var dn := 0
+				for b in 8:
+					var nb: int = nbuf[b]
+					if ramp and (nb & 64) != 0:
+						continue          # 오르막끼리는 경계가 아니다
+					var nlb: int = nb & 56
+					if nlb > lvb:
+						up |= 1 << b
+					elif nlb < lvb:
+						dn |= 1 << b
+				if up != 0:
+					put.call(edges, edge_tex["cliff_%d"
+						% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up], at)
+				if dn != 0:
+					put.call(edges, edge_tex["brink"][dn], at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
 		above = cur

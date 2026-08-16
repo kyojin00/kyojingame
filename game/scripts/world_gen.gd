@@ -36,6 +36,7 @@ func _build_map() -> void:
 	# 흐르는 물이 하나는 있어야 지형에 방향이 생긴다
 	_carve_river(30, 24, 44, 46, 2.2)
 
+	_build_levels()
 	_build_village()
 
 	# 농장 -> 마을 이음새는 잔디 그대로 둔다 (흙길은 깔지 않는다 —
@@ -67,6 +68,8 @@ func _build_map() -> void:
 			var pos := Vector2i(x, y)
 			if m.objects.has(pos) or m.grid[y][x].ground == "water":
 				continue
+			if m.is_ramp(x, y):
+				continue  # 오르막은 비워둔다 — 나무 한 그루가 길을 막는다
 			if x >= 1 and x <= 10 and y >= 0 and y <= 6:
 				continue  # 축사 주변은 비워둔다
 			if abs(x - m.START_TILE.x) <= 3 and abs(y - m.START_TILE.y) <= 3:
@@ -229,8 +232,10 @@ func _build_sea() -> void:
 				continue
 			m.grid[y][x].ground = "sand"
 			m.objects.erase(Vector2i(x, y))
+	# 능선 바위는 **벼랑 마루를 따라** 놓는다. 곧은 줄에 늘어놓으면 굽이치는
+	# 벼랑과 어긋나 바위가 허공에 뜬다
 	for x in m.MAP_W:
-		var p := Vector2i(x, m.SEA_RIDGE_Y)
+		var p := Vector2i(x, _ridge_y(x))
 		m.objects.erase(p)
 		if p in m.SEA_GATE:
 			continue
@@ -254,6 +259,111 @@ func _build_sea() -> void:
 		_place_stall(false)
 	# 바다가 통째로 깔렸다 — 물의 깊이를 다시 잰다 (물가에서 멀수록 짙다)
 	m.rebuild_water_levels()
+
+
+# ---- 땅의 높이 ----
+#
+# 벼랑은 따로 놓는 물건이 아니라 **높이가 다른 두 땅이 만나는 자리**다.
+# 칸마다 켜(0~7)만 정해 두면 바위면도 마루도 통행 막힘도 거기서 나온다.
+#
+#   켜 1   세계의 바닥. 남쪽 능선 위쪽은 전부 여기다
+#   켜 0   능선 아래 — 모래사장과 바다. 능선이 그대로 벼랑이 된다
+#   켜 2   대지(臺地) 몇 군데. 깊은 숲의 언덕과 채석장의 단구
+func _build_levels() -> void:
+	m.terrain_level = []
+	for y in m.MAP_H:
+		var row := PackedByteArray()
+		row.resize(m.MAP_W)
+		for x in m.MAP_W:
+			# 능선 위는 한 켜 높다. 그 아래(모래사장·바다)는 0
+			row[x] = 1 if y <= _ridge_y(x) else 0
+		m.terrain_level.append(row)
+	# 깊은 숲의 언덕 — 연못(74,51)과 겹치지 않게 서쪽으로 앉힌다
+	_raise_blob(56, 58, 9.0, 5.0, 2, 41)
+	# 동쪽 채석장의 단구 — 돌을 캐 낸 자리라 층이 진다
+	_raise_blob(196, 46, 13.0, 6.0, 2, 57)
+	# 오르막 — 벼랑을 끊고 내려오는 자리. 없으면 올라갈 수가 없다.
+	# **남쪽 자락**에 낸다 — 바위면이 보이는 쪽이라야 길로 읽힌다
+	_cut_ramp(51, 63)
+	_cut_ramp(60, 63)
+	_cut_ramp(190, 52)
+	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
+	_cut_ramp(m.SEA_GATE[0].x, m.SEA_RIDGE_Y, m.SEA_GATE.size())
+
+
+# 능선이 지나는 줄. **자로 그은 선이 아니다** — 굽이친다.
+# 다만 길목(SEA_GATE) 언저리는 반듯하게 둔다: 큰 바위가 놓인 자리와
+# 오르막이 어긋나면 바닷길이 엉뚱한 데로 난다
+func _ridge_y(x: int) -> int:
+	if absi(x - m.SEA_GATE[0].x) <= 4:
+		return m.SEA_RIDGE_Y
+	var t := float(x) / float(m.MAP_W)
+	var w := sin(t * PI * 5.3) * 1.3 + sin(t * PI * 11.9) * 0.9
+	return m.SEA_RIDGE_Y - clampi(int(round(w + 1.6)), 0, 3)
+
+
+func _lv(x: int, y: int) -> int:
+	if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+		return 0
+	return m.terrain_level[y][x] & 7
+
+
+func _set_lv(x: int, y: int, v: int) -> void:
+	if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+		return
+	m.terrain_level[y][x] = (m.terrain_level[y][x] & 8) | (v & 7)
+
+
+func _set_ramp(x: int, y: int) -> void:
+	if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+		return
+	m.terrain_level[y][x] = m.terrain_level[y][x] | 8
+
+
+# 대지 하나 — 연못과 같은 방식으로 가장자리를 흔든다. 타원 그대로 두면
+# 땅이 아니라 접시가 된다
+func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> void:
+	for y in range(maxi(0, cy - int(ry) - 3), mini(m.MAP_H, cy + int(ry) + 4)):
+		for x in range(maxi(0, cx - int(rx) - 3), mini(m.MAP_W, cx + int(rx) + 4)):
+			var a := atan2(float(y - cy), float(x - cx))
+			var w := 0.86 + m._hash01(int(round(a * 4.0)), seed) * 0.16 \
+				+ m._hash01(int(round(a * 8.0)), seed + 1) * 0.14
+			var d := pow((x - cx) / (rx * w), 2.0) + pow((y - cy) / (ry * w), 2.0)
+			if d <= 1.0 and _lv(x, y) > 0:
+				_set_lv(x, y, to)
+
+
+# 오르막 — 벼랑을 끊고 내려오는 자리.
+#
+# **두 칸 폭**으로 낸다. 한 칸이면 양옆 바위벽이 서로 맞물려 길이 막힌다.
+# 그리고 그 두 칸의 경계를 한 줄에 맞춘다 — 어긋나면 오르막이 비뚤어진다
+func _cut_ramp(x: int, near_y: int, w := 2) -> void:
+	# 어느 벼랑인지는 **줄로 짚어 준다.** 위에서부터 훑으면 대지의 북쪽
+	# 자락이 먼저 걸리는데, 거기는 바위면이 아예 안 보이는 쪽이다
+	var yb := -1
+	for d in 7:
+		for y: int in [near_y + d, near_y - d]:
+			if y < 1 or y >= m.MAP_H - 2:
+				continue
+			if _lv(x, y) > _lv(x, y + 1):
+				yb = y
+				break
+		if yb >= 0:
+			break
+	if yb < 0:
+		return
+	var hi := _lv(x, yb)
+	var lo := _lv(x, yb + 1)
+	for i in w:
+		var cx: int = x + i
+		for y in range(maxi(0, yb - 2), mini(m.MAP_H, yb + 4)):
+			_set_lv(cx, y, hi if y <= yb else lo)
+		_set_ramp(cx, yb)
+		_set_ramp(cx, yb + 1)
+		# 오르내리며 밟혀 풀이 죽은 자리 — 길이 난 것처럼 보인다
+		for ry in [yb, yb + 1]:
+			if m.grid[ry][cx].ground == "grass":
+				m.grid[ry][cx].ground = "yard"
 
 
 # 길이 열리는 순간 능선 너머가 드러난다 — 숲을 걷어내고 바다와 모래사장을 깐다

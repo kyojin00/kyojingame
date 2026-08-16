@@ -655,6 +655,90 @@ function spill(P, key) {
 // 모양은 식이 아니라 **재서** 얻는다. 창을 덮개(0/1)로 깔고 뭉갠 뒤
 // 0.5에서 자르면 모서리가 둥글려지고 — 볼록이든 오목이든 한꺼번에 —
 // 거기서 부호 거리를 재면 어떤 꼴이든 같은 자로 층을 쌓을 수 있다.
+// ---- 벼랑 ----
+//
+// 높이 차가 있는 땅. 물가와 **똑같은 자**로 잰다 — 위쪽 땅이 「제 편」이고
+// 아래쪽 땅이 「딴 쪽」일 뿐이다. 다만 그림은 물가와 주인이 반대다:
+// 둑은 높은 쪽(뭍)에 서지만, 벼랑면은 **아래쪽 칸**에 드리운다. 위에서
+// 내려다보는 화면에서 벽면이 차지하는 자리가 거기이기 때문이다.
+//
+// 면은 나를 마주 볼 때만 보인다 — 위쪽 땅이 북쪽에 있을 때. 옆이면
+// 비스듬해 좁은 띠만 드러나고, 남쪽이면 등을 돌려 아예 안 보인다.
+// (사방에 면을 두르면 땅이 상자가 된다. 물가에서 이미 겪었다)
+function cliffPx(g, x, y, s, nax, nay, i, seed) {
+  if (s < 0) return;                                          // 위쪽 땅 — 그 칸이 그린다
+  const k = Math.floor(s);
+  const face = clamp(-nay, 0, 1);
+  // 높이는 **덩이로** 흔든다. 칸마다 흔들었더니 바닥이 빗살처럼 들쭉날쭉했다
+  const H = Math.round((12 + (h(Math.floor(i / 5), 0, 51 + seed) < 0.45 ? 0 : 2)) * face);
+  if (H >= 3 && k < H) {
+    const up = k / (H - 1);                                   // 0(마루) ~ 1(발치)
+    // 바위는 **세로로 쪼개진다.** 처음엔 벽돌처럼 가로 켜로 쌓았더니
+    // 벼랑이 아니라 정원 담장이 됐다. 기둥마다 톤을 달리해 세로 결을
+    // 내고, 가끔 가로로 균열을 넣어 판자처럼 보이는 것만 막는다
+    // 기둥마다 톤을 크게 흔들었더니 나무 울타리가 됐다. 결은 **은근히**
+    // 두고, 대신 몇 자리에만 깊은 틈과 가로 선반을 넣는다 — 바위는
+    // 고른 결이 아니라 몇 개의 큰 사건으로 읽힌다
+    const v = (h(i, 0, 52 + seed) - 0.5) * 0.9 + (h(Math.floor(i / 4), 0, 53 + seed) - 0.5) * 0.9;
+    let t = 3.0 + up * 2.2 + v;
+    if (h(i, 0, 54 + seed) < 0.09) t += 2.0;                  // 갈라진 틈 (한 칸 폭)
+    // 바위 선반 — 자리마다 높이가 다르고, 없는 데도 있다
+    const sh = h(Math.floor(i / 5), 0, 64 + seed);
+    const shelf = sh < 0.62 ? 2 + Math.floor(sh * 1.6 * Math.max(1, H - 5)) : -9;
+    if (k === shelf) t -= 1.2;                                // 윗면이 빛을 받는다
+    else if (k === shelf + 1) t += 0.9;                       // 그 밑은 그늘
+    if (k >= H - 2) t += 0.7;                                 // 발치는 그늘에 잠긴다
+    if (k === 0) t = 7.4;                                     // 위에서 드리우는 그늘
+    else if (k <= 2) t -= 1.0;                                // 볕이 닿는 윗면
+    g.px(x, y, STONE[clamp(Math.round(t), 0, 7)]);
+    // 마루에서 늘어진 풀·이끼 — 위 몇 줄에만. 이게 있어야 바위가
+    // 땅에서 솟은 것으로 보인다
+    // 마루에서 늘어진 이끼 — 낱알로 뿌리면 자글거리니 **포기로** 앉힌다
+    if (k >= 1 && k <= 5 && h(Math.floor(i / 2), 0, 55 + seed) < 0.22
+      && h(i, k, 63 + seed) < 0.62 - k * 0.09) g.px(x, y, MOSS[k < 3 ? 1 : 2]);
+    return;
+  }
+  if (H >= 3) {
+    // 발치 — 접지 그늘과 흘러내린 돌부스러기. 이게 없으면 바위가 땅에
+    // 꽂힌 판자처럼 보인다
+    const d = k - H;
+    if (d === 0) { g.px(x, y, EARTH[5]); return; }
+    if (d === 1 && h(x, y, 56 + seed) < 0.62) { g.px(x, y, EARTH[4]); return; }
+    if (d <= 3 && h(x, y, 57 + seed) < 0.30 - d * 0.06)
+      g.px(x, y, STONE[clamp(4 + d, 0, 7)]);
+    return;
+  }
+  // 비스듬히 보이는 옆면 — 바위가 좁게 드러날 뿐이다
+  if (Math.abs(nax) > 0.5) {
+    const w = 3 + (h(i, 0, 58 + seed) < 0.5 ? 0 : 1);
+    if (k < w) g.px(x, y, STONE[clamp(3 + k + (h(i, k, 59 + seed) < 0.30 ? -1 : 0), 0, 7)]);
+    else if (k === w && h(x, y, 60 + seed) < 0.4) g.px(x, y, EARTH[4]);
+  }
+}
+
+// 벼랑 마루 — **위쪽 칸**에 얹는다.
+//
+// 아래쪽 땅이 남쪽이면 그 마루가 빛을 받아 한 줄 밝다. 바로 아래에 붙는
+// 바위면의 첫 줄이 짙은 그늘이라, 둘이 만나 「밝은 모서리 -> 그늘 -> 바위」
+// 가 되고 그제서야 땅이 **끊어져 떨어지는** 것으로 읽힌다.
+function brinkPx(g, x, y, s, nax, nay, i, seed) {
+  if (s < 0) return;
+  const k = Math.floor(s);
+  const lip = clamp(nay, 0, 1);
+  // 자로 그은 밝은 줄은 칠해 놓은 선으로 보인다 — 군데군데 흙이 물린다
+  const worn = h(Math.floor(i / 3), 0, 60 + seed) < 0.30;
+  if (lip <= 0.35) {
+    // 등을 돌린 쪽 — 여기서는 벼랑면이 아예 안 보인다. 마루까지 또렷하게
+    // 그으면 땅에 테두리를 두른 꼴이 된다. 흙이 조금 드러날 뿐이다
+    if (k <= 1 && h(x, y, 66 + seed) < 0.5 - k * 0.26) g.px(x, y, EARTH[3]);
+    return;
+  }
+  if (k === 0) { g.px(x, y, worn ? EARTH[3] : STONE[1]); return; }
+  if (k === 1) { g.px(x, y, worn ? EARTH[4] : STONE[3]); return; }
+  if (k === 2 && h(x, y, 61 + seed) < 0.5) { g.px(x, y, EARTH[2]); return; }
+  if (k === 3 && h(x, y, 62 + seed) < 0.22) g.px(x, y, EARTH[3]);
+}
+
 const EPAD = 20;                   // 덧대는 논리 칸 (띠가 최대 열세 칸)
 const EG = N + 2 * EPAD;           // 창 한 변
 const EROUND = 5;                  // 모서리를 둥글리는 반지름 (논리 칸)
@@ -728,7 +812,7 @@ function edgeField(code) {
 
 // 한 장. paint 는 (거리 s, 딴 쪽 방향 n, 물가를 따라가는 자리 i)만 본다.
 // 물 칸은 부호만 뒤집는다 — 붓은 언제나 「s>0이 뭍」으로 그린다
-function edgeTile(code, isLand, paint) {
+function edgeTile(code, isLand, paint, vr) {
   const s = edgeField(code), g = new T(), px = paint || bankPx;
   const at = (x, y) => s[(y + EPAD) * EG + (x + EPAD)];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
@@ -740,7 +824,7 @@ function edgeTile(code, isLand, paint) {
     let nx = -gx / L, ny = -gy / L;
     if (!isLand) { sv = -sv; nx = -nx; ny = -ny; }
     const i = Math.round(x * Math.abs(ny) + y * Math.abs(nx));
-    px(g, x, y, sv, nx, ny, i, 0, isLand);
+    px(g, x, y, sv, nx, ny, i, (vr || 0) * 31, isLand);
   }
   return g;
 }
@@ -770,14 +854,20 @@ const KIND = [
   ['shore', true, null], ['shoal', false, null],
   ['beach', true, beachPx], ['surf', false, beachPx],
   ['dune', true, spill(SAND, 84)], ['trod', true, spill(EARTH, 96)],
+  // 벼랑 — 둘 다 **제 칸 안쪽**으로 층을 쌓는다. cliff 는 아래쪽 칸에서
+  // 위를 향해(면), brink 는 위쪽 칸에서 아래를 향해(마루)
+  ['cliff', true, cliffPx, 3], ['brink', true, brinkPx],
 ];
 // 그림 번호는 **꼴 값 그대로**다. 표를 따로 두면 게임 쪽과 어긋날 여지가
 // 생기는데, 어차피 겹치는 꼴이 거의 없어서 아낄 것도 없다 (256 -> 255).
 // 0번 자리는 비워 둔다 — 딴 쪽 이웃이 하나도 없으면 그릴 게 없다.
-for (const [name, isLand, paint] of KIND) {
-  const tiles = new Array(256).fill(null);
-  for (let code = 1; code < 256; code++) tiles[code] = edgeTile(code, isLand, paint).small();
-  atlas('edge_' + name, tiles);
+for (const [name, isLand, paint, vars] of KIND) {
+  for (let vr = 0; vr < (vars || 1); vr++) {
+    const tiles = new Array(256).fill(null);
+    for (let code = 1; code < 256; code++)
+      tiles[code] = edgeTile(code, isLand, paint, vr).small();
+    atlas('edge_' + name + (vars ? '_' + vr : ''), tiles);
+  }
 }
 
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
