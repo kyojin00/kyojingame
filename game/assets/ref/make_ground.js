@@ -56,6 +56,10 @@ class T {
   }
 }
 
+// 지난 번 제안본은 먼저 지운다. 미리보기가 proposed_*.png 를 집어 쓰는 바람에
+// 타일을 새로 뽑고도 **옛 그림을 보며** 판단할 뻔했다
+for (const f of fs.readdirSync(REF)) if (f.startsWith('proposed_')) fs.unlinkSync(REF + f);
+
 const OUT = {};
 const save = (name, im) => {
   OUT[name] = im;
