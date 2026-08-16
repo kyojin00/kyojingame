@@ -266,7 +266,16 @@ func _update_guide() -> void:
 		m.hud.set_guide(g[0], str(g[1]))
 
 
+# 예전 저장을 이어받는 자리 — 2장 한복판에서 저장한 사람은 그 줄기가
+# 사라졌으니 갈 곳이 없다. 남은 마디를 접고 2·3장이 주던 것을 내어 준다
+const OLD_STORY2 := ["shop", "fisher", "farm_talk", "farm", "cook"]
+
+
 func _story_update(delta: float) -> void:
+	if GameData.story2_phase in OLD_STORY2 and not Net.is_guest():
+		GameData.story2_phase = "done"
+		_open_village_at_once()
+		m.saveio.save_now()
 	if GameData.story_phase == "done" or Net.is_guest():
 		if m.hud != null:
 			m.hud.clear_guide()
@@ -994,25 +1003,51 @@ func _start_story2_dialog() -> void:
 		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
 		{"text": "「책상에서는 손수 가구를 만들 수 있네.\n물론 재료가 있어야만 만들 수 있지.」"},
 		{"text": "「그나저나... 보다시피 마을이 텅 비었네. 젊은 사람들이 다 떠났거든.」"},
-		{"text": "「자네가 와 준 김에 부탁 하나 함세. 우선 상점부터 세워 보지 않겠나?」",
+		{"text": "「그래도 남은 사람들은 저마다 사는 일이 있네.\n다니면서 말을 붙여 보게 — 다들 부탁 하나씩은 안고 있을 걸세.」",
 			"portrait": chief_happy},
-		{"text": "「목재 %d에 돌 %d... 나무를 베고 바위를 캐면 모일 걸세.」"
-			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]},
-		{"text": "「재료가 모이면 광장 북쪽 상점 터의 게시판에서 짓게. 상점이 서면 만수가 와서 씨앗이며 생필품을 팔 거야.」"},
+		{"text": "「자네 손이 닿는 만큼 이 마을이 되살아날 게야.\n서두르지 말고, 하고 싶은 일부터 하게.」"},
 	], _end_home_greet)
 
 
+# ---- 메인 스토리는 여기서 끝난다 ----
+#
+# 예전에는 여기서 2장(마을을 깨우다)이 시작하고, 그 뒤로 3장(낚시꾼)이
+# 이어졌다. 이제 큰 줄기는 **오프닝 하나**뿐이다 — 그 뒤는 주민 저마다의
+# 이야기(서브 퀘스트)로 간다.
+#
+# 다만 2·3장은 이야기만 하고 있던 게 아니라 **잡화점 · 바닷길 · 호미 ·
+# 낚싯대**를 쥐고 있었다. 줄기를 걷어내면서 그것까지 없애면 게임이 반쪽이
+# 된다 — 그래서 그 해금을 이 자리로 옮긴다. 이야기로 얻던 것을 이제
+# 마을이 처음부터 갖고 있는 것으로 친다.
 func _end_home_greet() -> void:
 	m.story_cutscene = false
 	_chief_greet = false
 	GameData.story_phase = "done"
-	GameData.story2_phase = "shop"
+	GameData.story2_phase = "done"      # 2장은 없다 — 끝난 것으로 둔다
 	var chief: Variant = _story_chief()
 	if chief != null:
 		chief.scripted = false
-	# 검은 알림 바 대신 말풍선 연출만 — 자세한 재료는 트래커/Q창이 보여 준다
-	m.hud.story_banner("메인 스토리 2 시작", "마을을 깨우다")
+	_open_village_at_once()
+	m.hud.story_banner("이야기의 시작", "저마다의 사정")
 	m.saveio.save_now()
+
+
+# 2·3장이 내어 주던 것을 한자리에서 연다
+func _open_village_at_once() -> void:
+	for t: String in ["hoe", "water", "seed", "rod"]:
+		if not GameData.is_tool_unlocked(t):
+			GameData.unlocked_tools.append(t)
+	# 잡화점 한 채 (2장의 「상점을 세우자」가 끝난 자리). 나머지 부지는
+	# 빈 채로 둔다 — 거기서부터가 주민들의 이야기다
+	if not GameData.village_built.has("general"):
+		GameData.village_built.append("general")
+		m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
+	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
+	m.worldgen._reveal_sea()             # 바닷길 (3장이 뚫던 능선)
+	GameData.fisher_quest = "done"
+	m.npcmgr._sync_village_npcs()
+	m.hud.reward_toast("호미 · 물뿌리개 · 간이낚싯대", m.tex["icon_hoe"])
+	m.hud.show_message("마을을 둘러보고, 만나는 사람마다 말을 붙여 보자.", 6.0)
 
 
 # 상점이 서고 바닷길까지 열리면, 이장이 호미를 주며 밭 갈기를 권한다
