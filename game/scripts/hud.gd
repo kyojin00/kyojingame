@@ -334,6 +334,7 @@ const GUIDE_GOLD := Color(0.98, 0.80, 0.28)
 const GUIDE_GOLD_DK := Color(0.80, 0.55, 0.13)
 const GUIDE_INK := Color(0.24, 0.15, 0.06)
 const GUIDE_CREAM := Color(0.97, 0.93, 0.83)
+const GUIDE_PIN_UP := 84.0        # 핀이 뜨는 높이 — 주민 그림(약 59px)보다 위
 const GUIDE_MARGIN := 54.0        # 가장자리에서 이만큼 안쪽에 화살표를 둔다
 const GUIDE_TOP := 96.0           # 위쪽은 HUD 패널이 있어 더 내려 잡는다
 
@@ -384,8 +385,13 @@ func _draw_guide() -> void:
 		vp.x - GUIDE_MARGIN * 2.0, vp.y - GUIDE_TOP - GUIDE_MARGIN * 1.6)
 	if inner.has_point(sp):
 		# ---- 화면 안 — 목표 바로 위에 핀이 뜬다 ----
+		# 핀은 **사람 키 위로** 뜬다.
+		#
+		# 46픽셀은 주민 그림의 절반쯤이라, 사람을 가리키는 핀이 그 사람의
+		# 얼굴을 덮고 명패가 몸통을 가렸다 — 누구를 가리키는지 알려 주려고
+		# 세운 것이 정작 그 사람을 안 보이게 했다.
 		var bob := sin(_guide_t * 3.2) * 4.0
-		var top := sp + Vector2(0, -46.0 + bob)
+		var top := sp + Vector2(0, -GUIDE_PIN_UP + bob)
 		# 발밑 그림자 (핀이 떠 있는 것으로 읽히게)
 		_guide.draw_rect(Rect2(sp.x - 7, sp.y - 3, 14, 4),
 			Color(0, 0, 0, 0.22 * a))

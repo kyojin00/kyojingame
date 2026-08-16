@@ -44,9 +44,9 @@ func _build_map() -> void:
 	# 흐르는 물이 하나는 있어야 지형에 방향이 생긴다
 	_carve_river(30, 24, 44, 46, 2.2)
 
-	m.mark_build("높낮이를 잡는 중…", 0.48)
+	await m.mark_build("높낮이를 잡는 중…", 0.48)
 	_build_levels()
-	m.mark_build("마을 터를 놓는 중…", 0.56)
+	await m.mark_build("마을 터를 놓는 중…", 0.56)
 	_build_village()
 
 	# 농장 -> 마을 이음새는 잔디 그대로 둔다 (흙길은 깔지 않는다 —
@@ -59,7 +59,7 @@ func _build_map() -> void:
 		m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
 	m.objects[m.WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
-	m.mark_build("숲을 심는 중…", 0.64)
+	await m.mark_build("숲을 심는 중…", 0.64)
 	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in m.MAP_W:
 		if x % 4 == 0 and not m.objects.has(Vector2i(x, 0)):
@@ -1685,10 +1685,14 @@ func _migrate_farm_layout() -> void:
 const GATE_X0 := 53
 const GATE_X1 := 63
 const GATE_LANE := 3          # 가운데로 비워 두는 폭 (사람 셋이 지난다)
+const GATE_Y := 21            # 목이 서는 줄 (9 + NORTH_PAD — 마을 서쪽 문턱)
 
 
 func _make_village_gate() -> void:
-	var cy: int = m.story.WORLD_ENTRY.y
+	# 어귀의 목은 **마을 문턱**에 선다. 예전에는 도착 자리(WORLD_ENTRY)의
+	# 높이를 그대로 썼는데, 그 자리가 세계 서쪽 끝으로 옮겨 가면서 목이
+	# 엉뚱한 줄에 서 버렸다 — 여기는 마을 쪽 좌표로 못 박는다
+	var cy: int = GATE_Y
 	var y0: int = cy - GATE_LANE / 2
 	var y1: int = y0 + GATE_LANE - 1
 	for x in range(GATE_X0, GATE_X1 + 1):

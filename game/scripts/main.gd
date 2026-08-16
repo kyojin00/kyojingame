@@ -974,8 +974,9 @@ const KyojinLoading := preload("res://scripts/loading.gd")
 #
 # 가장 긴 대목이 `_build_map()` 하나다. 그 앞뒤에서만 값을 바꾸면 짓는 내내
 # 막대가 한 자리에 붙박여 「멈췄다」로 보이므로, 안에서도 몇 번 부른다.
+# **await 로 부른다** — 막대가 거기까지 차오르는 동안 진짜 프레임이 돈다.
 func mark_build(text: String, ratio: float) -> void:
-	KyojinLoading.mark(get_tree(), text, ratio)
+	await KyojinLoading.breathe(get_tree(), text, ratio)
 
 
 func _ready() -> void:
@@ -1000,16 +1001,25 @@ func _ready() -> void:
 	# 여기부터 몇 초쯤 화면이 굳는다 — 그동안 무엇을 하고 있는지 말해 준다.
 	# await 가 아니라 그 자리에서 다시 그리는 방식이라(loading.gd 참고),
 	# 절반만 지어진 세계에 남의 _process 가 끼어들 일이 없다
-	KyojinLoading.mark(get_tree(), "그림을 굽는 중…", 0.10)
+	# **짓는 동안 트리는 멈추고 세계는 감춘다.**
+	#
+	# 아래 breathe() 들이 진짜 프레임을 흘려 보내므로(막대가 차오르는 자리다),
+	# 그대로 두면 절반만 지어진 세계가 그려지고 남의 _process 도 끼어든다.
+	# 로딩판은 PROCESS_MODE_ALWAYS 라 멈춘 트리에서도 혼자 움직인다.
+	visible = false
+	get_tree().paused = true
+	await KyojinLoading.breathe(get_tree(), "그림을 굽는 중…", 0.10)
 	_load_textures()
-	KyojinLoading.mark(get_tree(), "옷을 입히는 중…", 0.34)
+	await KyojinLoading.breathe(get_tree(), "옷을 입히는 중…", 0.34)
 	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
-	KyojinLoading.mark(get_tree(), "땅을 고르고 숲을 심는 중…", 0.40)
-	worldgen._build_map()
-	KyojinLoading.mark(get_tree(), "물길을 내는 중…", 0.72)
+	await KyojinLoading.breathe(get_tree(), "땅을 고르고 숲을 심는 중…", 0.40)
+	await worldgen._build_map()
+	await KyojinLoading.breathe(get_tree(), "물길을 내는 중…", 0.72)
 	rebuild_water_levels()
-	KyojinLoading.mark(get_tree(), "밭을 일구는 중…", 0.75)
+	await KyojinLoading.breathe(get_tree(), "밭을 일구는 중…", 0.75)
 	farming.rebuild()
+	get_tree().paused = false
+	visible = true
 
 	night = CanvasModulate.new()
 	add_child(night)

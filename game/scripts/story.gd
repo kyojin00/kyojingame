@@ -728,6 +728,11 @@ func _story_update(delta: float) -> void:
 					and m.player_tile().x >= m.STORY_EXIT.x:
 				_begin_world_entry()
 		"deliver":
+			# 이장 곁에 다다르면 그제야 우체부가 편지를 들고 앞으로 나선다
+			if _postman_state == "follow":
+				var ch3 := _story_chief()
+				if ch3 != null and m.player.position.distance_to(ch3.position) < 340.0:
+					_postman_state = "deliver"
 			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
 		"home_open":
 			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
@@ -1218,7 +1223,13 @@ func _story_chief() -> Node2D:
 # 숲길 동쪽 끝에 닿으면 **걸어서 이어지지 않는다.** 화면이 어두워지고,
 # 그 사이에 튜토리얼 공간이 닫히고(오브젝트·지도 기억까지) 주인공과
 # 우체부가 마을 어귀에 선다. 다시 밝아지면 거기가 세계의 시작점이다.
-const WORLD_ENTRY := Vector2i(58, 9 + KyojinMain.NORTH_PAD)  # 마을 어귀 — 세계의 첫 걸음
+# ---- 숲을 빠져나오는 자리 ----
+#
+# **세계의 서쪽 끝 위**다. 예전에는 마을 문턱(58, 21)이라, 숲길을 한참
+# 걸어 나온 보람도 없이 이미 마을 앞이었다 — 도착이 곧 목적지였다.
+# 지금은 세계의 반대편 구석에 내려놓는다. 여기서 마을까지는 제 발로
+# 걸어야 하고, 그 길에 농장도 호수도 벼랑도 처음으로 눈에 담긴다.
+const WORLD_ENTRY := Vector2i(3, 2 + KyojinMain.NORTH_PAD)
 
 
 # 전환이 도는 동안에는 컷신 잠금이 저절로 풀리면 안 된다.
@@ -1297,9 +1308,13 @@ func _end_arrival() -> void:
 		GameData.arrive_day = GameData.day
 		GameData.arrive_clock = GameData.clock_text()
 	m.hud.quest_toast("마을 도착")
-	m.hud.show_message("우체부 아저씨를 따라 이장님께 가자.", 6.0)
+	m.hud.show_message("우체부 아저씨와 함께 마을로 가자.", 6.0)
 	if _postman != null:
-		_postman_state = "deliver"   # 이장에게 곧장 걸어간다
+		# **아직 곧장 가지 않는다.** 마을 어귀가 세계 서쪽 끝으로 옮겨 가면서
+		# 여기서 이장까지는 맵을 가로지르는 길이 됐다 — 그 거리를 직선으로
+		# 걸으면 연못도 벼랑도 뚫고 지나간다. 주인공의 발자국을 밟으며
+		# 따라오다가, 이장이 눈에 들어오면 그때 곧장 걸어간다
+		_postman_state = "follow"
 	m.saveio.save_now()
 
 
