@@ -457,6 +457,36 @@ function shore(dir) {
   return g;
 }
 
+// 모서리 — 물이 **대각선에만** 있을 때.
+//
+// 네 방향 덧그림만으로는 여기가 빈다. 물이 북서쪽 대각에만 있으면 북쪽도
+// 서쪽도 물이 아니라 아무것도 안 그려지는데, 실제로는 그 귀퉁이에서
+// 둑이 꺾여 돌아 나간다 — 안 그리면 물가가 뚝 끊겼다 이어진다.
+//
+// c: 0=북서 1=북동 2=남서 3=남동
+function shoreCorner(c) {
+  const g = new T();
+  const north = (c < 2), west = (c % 2 === 0);
+  // 아래쪽 귀퉁이(남서·남동)는 벽면이 보이는 쪽이라 조금 두껍게
+  const R = north ? 5 : 7;
+  for (let dy = 0; dy < R; dy++) for (let dx = 0; dx < R; dx++) {
+    const d = Math.hypot(R - dx, R - dy);
+    if (d > R) continue;
+    const x = west ? dx : N - 1 - dx;
+    const y = north ? dy : N - 1 - dy;
+    // 귀퉁이 끝으로 갈수록 물에 가깝다 = 짙다
+    const k = Math.round(d);
+    if (k <= 1) g.px(x, y, EARTH[5]);
+    else if (!north && k <= 4) g.px(x, y, STONE[clamp(6 - (k - 2), 0, 7)]);
+    else if (h(x, y, 91 + c) > 0.25) g.px(x, y, EARTH[k <= 3 ? 4 : 3]);
+  }
+  if (!north) for (let i = 0; i < 3; i++) {                 // 벽 마루 몇 알
+    const x = west ? 4 + i : N - 5 - i, y = N - 1 - (4 + i);
+    g.px(x, y, STONE[0]);
+  }
+  return g;
+}
+
 // 여울 — **물 쪽**에 얹는 덧그림. 땅이 그쪽에 있다.
 //
 // 깊이는 **둑이 물에 드리우는 그늘**이 만든다. 빛은 왼쪽 위에서 오므로
@@ -500,6 +530,7 @@ save('water_deep_0', water(0, true).render());
 save('water_deep_1', water(1, true).render());
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shore_' + d, shore(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('shoal_' + d, shoal(i).render()));
+['nw', 'ne', 'sw', 'se'].forEach((d, i) => save('shore_c_' + d, shoreCorner(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());

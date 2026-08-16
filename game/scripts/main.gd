@@ -307,6 +307,7 @@ const TEXTURE_NAMES := [
 	"water_deep_0", "water_deep_1",
 	"shore_n", "shore_s", "shore_w", "shore_e",
 	"shoal_n", "shoal_s", "shoal_w", "shoal_e",
+	"shore_c_nw", "shore_c_ne", "shore_c_sw", "shore_c_se",
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
@@ -1990,6 +1991,20 @@ func _draw() -> void:
 					put.call(edges, tex["shore_w"], at)
 				if _is_water(x + 1, y):
 					put.call(edges, tex["shore_e"], at)
+				# 대각선에만 물이 있는 귀퉁이 — 네 방향 덧그림만으로는 여기가
+				# 빈다. 안 그리면 물가가 뚝 끊겼다 이어진다
+				if _is_water(x - 1, y - 1) and not _is_water(x - 1, y) \
+					and not _is_water(x, y - 1):
+					put.call(edges, tex["shore_c_nw"], at)
+				if _is_water(x + 1, y - 1) and not _is_water(x + 1, y) \
+					and not _is_water(x, y - 1):
+					put.call(edges, tex["shore_c_ne"], at)
+				if _is_water(x - 1, y + 1) and not _is_water(x - 1, y) \
+					and not _is_water(x, y + 1):
+					put.call(edges, tex["shore_c_sw"], at)
+				if _is_water(x + 1, y + 1) and not _is_water(x + 1, y) \
+					and not _is_water(x, y + 1):
+					put.call(edges, tex["shore_c_se"], at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
 
