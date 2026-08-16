@@ -945,7 +945,7 @@ func home_entered() -> void:
 	if GameData.story_phase != "home_open":
 		return
 	GameData.story_phase = "greet"
-	m.hud.story_banner("메인 스토리 1 완결", "우체부 아저씨와의 첫 만남")
+	m.hud.story_banner("튜토리얼 ① 숲길과 편지", "도끼를 쥐고, 편지를 전하고, 집을 얻었다")
 	m.hud.show_message("집을 둘러보고 밖으로 나가 보자.", 6.0)
 	m.saveio.save_now()
 
@@ -1011,7 +1011,7 @@ func _end_home_greet() -> void:
 	if chief != null:
 		chief.scripted = false
 	# 검은 알림 바 대신 말풍선 연출만 — 자세한 재료는 트래커/Q창이 보여 준다
-	m.hud.story_banner("메인 스토리 2 시작", "마을을 깨우다")
+	m.hud.story_banner("튜토리얼 ② 마을을 깨우다", "상점 · 바닷길 · 첫 밭")
 	m.saveio.save_now()
 
 
@@ -4717,12 +4717,13 @@ func _end_kitchen_deliver() -> void:
 	if GameData.story2_phase != "done":
 		GameData.story2_phase = "done"
 		GameData.move_day = GameData.day   # 하룻밤 자면 이주 편지가 온다
-		m.hud.story_banner("메인 스토리 2 완결", "마을을 깨우다")
-		m.dialog.open("메인 스토리 2 — 마을을 깨우다",
+		m.hud.story_banner("튜토리얼 완료", "이제부터는 마을 사람들의 이야기다")
+		m.dialog.open("튜토리얼 완료 — 마을을 깨우다",
 			"상점이 서고, 바닷길이 열리고, 첫 작물을 거두고,\n"
 			+ "그 작물로 첫 끼를 지어 먹었다.\n\n"
 			+ "잠든 마을에 다시 하루가 돌기 시작했다.\n\n"
-			+ "오늘은 마음껏 둘러보고, 밤이 되면 잠자리에 들자.",
+			+ "여기까지가 배우는 대목이다. 이제 이끄는 이야기는 없다 —\n"
+			+ "만나는 사람마다 저마다의 사정이 있으니, 말을 붙여 보자.",
 			[["좋다", null]])
 	m.saveio.save_now()
 
