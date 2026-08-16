@@ -75,9 +75,15 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 		"board":
 			t = m.BOARD_POS + Vector2i(0, 1)
 		"pier":
-			# 낚시대회 때는 다섯이 한 칸에 겹치지 않게 호수 남쪽 물가에 선다
-			var i: int = maxi(0, m.NPC_PIER_ORDER.find(npc_id))
-			t = Vector2i(m.FISH_YARD_X0 + 2 + i * 2, m.DOCK_Y + 1)
+			# 낚시꾼은 **부두 위에** 선다 — 낚시터의 주인이니 제일 좋은 자리다.
+			# 나머지는 낚시대회 때 한 칸에 겹치지 않게 남쪽 물가에 늘어선다.
+			if npc_id == "fisher" or npc_id == "angler":
+				t = m.DOCK_STAND
+				if npc_id == "angler":
+					t += Vector2i(2, 0)
+			else:
+				var i: int = maxi(0, m.NPC_PIER_ORDER.find(npc_id))
+				t = Vector2i(m.FISH_YARD_X0 + 2 + i * 2, m.DOCK_Y + 1)
 		_:
 			# 제 집을 얻은 사람은 「집」 시간대에 그 집으로 돌아간다 (용식의 집)
 			if place == "home" and GameData.settler_homes.has(npc_id):

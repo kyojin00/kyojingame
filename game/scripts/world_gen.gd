@@ -29,7 +29,11 @@ func _build_map() -> void:
 		m.grid.append(row)
 
 	# 연못들 (숲/깊은 숲) — 시작 부지의 연못은 없앴다
-	_carve_pond(49, 31, 4.5, 3.5)
+	# 낚시터 호수 — 부두를 놓으려고 넓혔다 (4.5x3.5 -> 6.5x4.2).
+	# 옛 크기에서는 T자 부두 하나가 연못을 거의 다 덮어, 낚시터가 아니라
+	# 물웅덩이에 널을 깐 꼴이 됐다. 부두 양옆으로 물이 남아야 낚는 자리다.
+	_carve_pond(49, 31, 6.5, 4.2)
+	_build_dock()
 	# (호수는 마을 서쪽 낚시터가 됐다 — 마을을 가르던 강은 전부 없앴다)
 	_carve_pond(74, 51, 5.0, 3.0)    # 깊은 숲 연못
 	# 숲을 가로지르는 개울 — 웅덩이만 있으면 물이 고인 땅으로 보인다.
@@ -467,6 +471,21 @@ func _place_stall(with_node := true) -> void:
 # 타원으로 자르되 반지름을 칸마다 흔든다 — 가장자리가 들쭉날쭉해야
 # 물이 땅을 파고든 것처럼 보인다. 흔드는 폭은 반지름의 1/4쯤이면 충분하다.
 # (더 흔들면 웅덩이가 아니라 얼룩이 된다)
+# 낚시터의 나무 부두 — 물 위에 판자를 깐다.
+#
+# 호수를 판 **뒤에** 깐다. 순서가 바뀌면 연못 파기가 널을 다시 물로 지운다.
+# 목이 뭍에 닿는 자리는 물이 아니어도 그냥 깐다 — 부두는 물가에서 시작해야
+# 걸어 올라설 수 있다.
+func _build_dock() -> void:
+	for r: Rect2i in [m.DOCK_STEM, m.DOCK_HEAD]:
+		for y in range(r.position.y, r.end.y):
+			for x in range(r.position.x, r.end.x):
+				if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+					continue
+				m.grid[y][x].ground = "dock"
+				m.objects.erase(Vector2i(x, y))   # 물풀·바위가 널 위에 남지 않게
+
+
 func _carve_pond(cx: int, cy: int, rx: float, ry: float) -> void:
 	var mx := int(ceil(rx)) + 2
 	var my := int(ceil(ry)) + 2

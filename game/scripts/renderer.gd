@@ -46,7 +46,9 @@ func _draw_festival() -> void:
 	# 깃발 줄을 거는 구간 (모이는 자리 위)
 	var x0: int = m.FISH_YARD_X0 if str(f.place) == "pier" else m.PLAZA.position.x
 	var x1: int = m.FISH_YARD_X1 if str(f.place) == "pier" else m.PLAZA.end.x - 1
-	var y: int = m.DOCK_Y - 2 if str(f.place) == "pier" else m.PLAZA.position.y
+	# 낚시대회 깃발줄은 **물가 남쪽 잔디** 위에 건다. DOCK_Y-2 였는데,
+	# 호수를 넓히면서 그 줄이 물 한복판이 됐다 — 줄이 수면에 잠겼다.
+	var y: int = m.DOCK_Y + 1 if str(f.place) == "pier" else m.PLAZA.position.y
 	var top := float(y) * m.TILE
 	for i in range(x0, x1):
 		var px := float(i) * m.TILE

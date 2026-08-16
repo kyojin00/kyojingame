@@ -323,6 +323,7 @@ const TEXTURE_NAMES := [
 	# 물(water_<깊이>_<판>_<장>)과 경계 아틀라스(edge_*)는 이름이
 	# 규칙적이라 _load_textures가 훑는다
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
+	"dock_edge_n", "dock_edge_s", "dock_edge_w", "dock_edge_e",
 ]
 
 const START_TILE := Vector2i(14, 10)
@@ -375,9 +376,20 @@ const FOUNTAIN_DECO := Vector2i(77, 20)    # 분수 조형물 (분수 한가운�
 #  큰 육지다. 물은 서쪽 호수·깊은 숲 연못·남쪽 바다만 남는다)
 # ---- 낚시터 (마을 서쪽 호수, 맵에 하나뿐) ----
 # 호숫가 잔디밭에서 물을 보고 낚싯대를 던진다. 「낚시」 목표는 여기.
-const DOCK_Y := 35                         # 호수 남쪽 물가 (물은 y 28~34)
+const DOCK_Y := 36                         # 호수 남쪽 물가 (물은 y 27~35)
 const FISH_YARD_X0 := 44
 const FISH_YARD_X1 := 54
+# 나무 부두 — 남쪽 물가에서 호수 한복판으로 걸어 나가는 판자길.
+#
+# 「부두」라는 말은 진작부터 있었다 (NPC 일과의 pier, 여름 낚시대회 장소).
+# 그런데 정작 부두는 없었다 — dock 바닥이 세계의 어느 칸에도 안 깔려 있어서,
+# 낚시꾼도 대회도 그냥 물가 잔디에 서 있었다. 실물을 놓는다.
+#
+# 목 두 칸 + 끝의 넓은 머리 — 머리가 있어야 여럿이 서고, 낚싯대를 드리울
+# 자리가 생긴다. 곧은 막대 하나는 부두가 아니라 다리다.
+const DOCK_STEM := Rect2i(48, 31, 2, 6)    # 물가(y36)에서 호수로 뻗는 목
+const DOCK_HEAD := Rect2i(47, 29, 4, 2)    # 끝의 넓은 머리 (여기 서서 낚는다)
+const DOCK_STAND := Vector2i(47, 29)       # 낚시꾼이 서 있는 자리 (머리 왼쪽)
 const FISH_SIGN := Vector2i(43, 35)
 # 남쪽 바다 (낚시꾼 퀘스트로 열린다) — 능선이 뭍과 해변을 가른다
 # 북쪽 산자락 — 이 줄 위쪽의 풀밭에는 민들레가 돋는다 (산에서 캐는 채집물)
@@ -944,7 +956,7 @@ func _load_textures() -> void:
 		push_error("물가 아틀라스 %d장 로드 실패: %s" % [edge_bad.size(), ", ".join(edge_bad)])
 	# 모래·길·마당도 판을 셋씩 — 한 장만 깔면 무늬가 같은 자리마다 찍힌다
 	for v in 3:
-		for kind: String in ["sand_", "path_", "yard_", "ramp_"]:
+		for kind: String in ["sand_", "path_", "yard_", "ramp_", "dock_"]:
 			tex[kind + str(v)] = load("res://assets/sprites/%s%d.png" % [kind, v])
 	# 물고기·요리·작물은 표가 곧 그림 목록이다. 여기서 따라가면 표에 한 줄
 	# 넣을 때마다 TEXTURE_NAMES도 고쳐야 하는 일이 없다 (빠뜨리면 아이콘이
@@ -2303,18 +2315,33 @@ func _draw() -> void:
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)
-	# 강 위 나무 부두 — 물 위에 판자를 깐 것처럼 보이게 한다
+	# 물 위에 깐 나무 부두.
+	#
+	# 예전엔 여기서 갈색 네모 세 개를 겹쳐 그렸다 — 결도 못도 없는 판이라
+	# 물 위에 색종이를 오려 붙인 것 같았다. 이제 널 타일을 깔고, 물에
+	# 닿는 쪽에는 잘린 널 끝과 물 속으로 박힌 기둥을 얹는다.
 	if not docks.is_empty():
 		var wt: Texture2D = tex["water_0_0_%d" % water_frame]
 		for at: Vector2 in docks:
-			draw_texture_rect(wt, Rect2(at, tile_size), false)
+			draw_texture_rect(wt, Rect2(at, tile_size), false)   # 판자 밑으로 물이 비친다
 		for at: Vector2 in docks:
-			draw_rect(Rect2(at + Vector2(0, 2), Vector2(TILE, TILE - 4)),
-				Color(0.55, 0.38, 0.22))
-			for i in 3:
-				draw_rect(Rect2(at + Vector2(0, 2 + i * 9), Vector2(TILE, 1)),
-					Color(0.38, 0.25, 0.14))
-			draw_rect(Rect2(at + Vector2(0, 2), Vector2(TILE, 2)), Color(0.68, 0.5, 0.3))
+			var dx := int(at.x) / TILE
+			var dy := int(at.y) / TILE
+			draw_texture_rect(tex["dock_%d" % (int(_hash01(dx * 7, dy * 3) * 3.0) % 3)],
+				Rect2(at, tile_size), false)
+		for at: Vector2 in docks:
+			var dx := int(at.x) / TILE
+			var dy := int(at.y) / TILE
+			for d in 4:
+				var o: Vector2i = [Vector2i(0, -1), Vector2i(0, 1),
+					Vector2i(-1, 0), Vector2i(1, 0)][d]
+				var n := Vector2i(dx + o.x, dy + o.y)
+				if n.x < 0 or n.y < 0 or n.x >= MAP_W or n.y >= MAP_H:
+					continue
+				if grid[n.y][n.x].ground == "dock":
+					continue     # 부두끼리 맞닿은 쪽은 이어진 널이다
+				draw_texture_rect(tex["dock_edge_%s" % ["n", "s", "w", "e"][d]],
+					Rect2(at, tile_size), false)
 	for t: Texture2D in edges:
 		for at: Vector2 in edges[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false)

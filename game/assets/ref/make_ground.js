@@ -353,6 +353,73 @@ function yard(v) {
 }
 
 
+// ---- 나무 부두 ----
+//
+// 물 위에 깐 판자다. 지금까지는 게임이 갈색 네모 세 개를 겹쳐 그렸다 —
+// 결도 못도 없는 판이라 물 위에 색종이를 오려 붙인 것 같았다.
+//
+// 판자로 읽히려면 세 가지가 있어야 한다.
+//   ① 널의 **이음매** — 판자 한 장의 끝이 어디인지가 보여야 한다
+//   ② **나뭇결** — 이음매와 같은 방향으로 흐르는 결
+//   ③ **못** — 널을 받침목에 박은 자리. 이게 있어야 「깐 것」이 된다
+// 널은 **가로로** 눕힌다. 부두는 물 쪽으로 걸어 나가는 길이라, 결이
+// 걸음과 직각이어야 한 걸음씩 딛는 게 보인다.
+const DECK = [[168, 130, 88], [146, 110, 72], [124, 92, 58],
+              [102, 74, 46], [80, 57, 35], [58, 40, 24]];
+
+function dockTile(v) {
+  const g = new T(), s = v * 17;
+  const PLANK = 4;                       // 널 한 장의 폭 (칸)
+  for (let y = 0; y < N; y++) {
+    const b = Math.floor(y / PLANK);     // 몇 번째 널인가
+    const tone = h(b + s, 0, 71);        // 널마다 색이 조금씩 다르다
+    const base = tone < 0.3 ? 0 : tone < 0.7 ? 1 : 2;
+    for (let x = 0; x < N; x++) {
+      // 결 — 널 방향(가로)으로 길게 흐른다
+      const w = vnoise(x * 2, y + b * 7 + s, 72 + v, 5);
+      let k = base + (w < 0.36 ? 1 : w > 0.74 ? -1 : 0);
+      if (y % PLANK === 0) k += 2;       // 이음매 — 널과 널 사이의 그늘
+      else if (y % PLANK === 1) k -= 1;  // 그 바로 밑은 빛을 문다
+      g.px(x, y, DECK[clamp(k, 0, 5)]);
+    }
+  }
+  // 못 — 널 끝을 받침목에 박은 자리. 좌우 끝에서 두 칸 들어온 자리에 박힌다
+  for (let b = 0; b < N / PLANK; b++) {
+    const yy = b * PLANK + 2;
+    for (const xx of [2, N - 3]) {
+      g.px(xx, yy, DECK[5]);
+      g.px(xx, yy - 1, DECK[0]);
+    }
+  }
+  return g;
+}
+
+// 부두 가장자리 — 물에 닿는 쪽. 널 끝이 잘려 있고 그 밑에 기둥이 선다.
+// d: 0=북 1=남 2=서 3=동
+function dockEdge(d) {
+  const g = new T();
+  const put = (x, y, c) => {
+    if (d === 0) g.px(x, y, c);
+    else if (d === 1) g.px(x, N - 1 - y, c);
+    else if (d === 2) g.px(y, x, c);
+    else g.px(N - 1 - y, x, c);
+  };
+  for (let x = 0; x < N; x++) {
+    put(x, 0, DECK[5]);                  // 잘린 널 끝
+    put(x, 1, DECK[4]);
+  }
+  // 기둥 두 대 — 물 속으로 박힌 통나무. 부두가 「떠 있지 않다」를 말한다
+  if (d === 0 || d === 1) {
+    for (const px of [3, N - 5]) for (let i = 0; i < 3; i++) {
+      put(px + i, 0, DECK[i === 1 ? 2 : 4]);
+      put(px + i, 1, DECK[i === 1 ? 3 : 5]);
+      put(px + i, 2, DECK[4]);
+    }
+  }
+  return g;
+}
+
+
 // ---- 모래사장 ----
 //
 // 바닷가는 색 한 판에 점 세 개로 칠해 두었었다. 새로 그린 바닥들 옆에
@@ -911,6 +978,8 @@ for (let v = 0; v < 3; v++) save('ramp_' + v, rampTile(v).render());
 for (let lv = 0; lv < 8; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
   save(`water_${lv}_${vr}_${f}`, water(f, lv, vr).render());
 for (let v = 0; v < 3; v++) save('sand_' + v, sandTile(v).render());
+for (let v = 0; v < 3; v++) save('dock_' + v, dockTile(v).render());
+['n', 's', 'w', 'e'].forEach((d, i) => save('dock_edge_' + d, dockEdge(i).render()));
 // 경계 — 이웃 여덟 칸의 꼴(256가지) × 여섯 종류.
 //   shore 땅 칸 · shoal 물 칸    연못·강 — 둑이 서고 남쪽을 보는 면에 돌벽
 //   beach 모래 칸 · surf 물 칸   바다 — 벽 없이 모래가 기울어 들고 거품이 민다
