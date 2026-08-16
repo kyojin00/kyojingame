@@ -12,3 +12,7 @@ __pycache__/
 
 # node
 node_modules
+
+*.import
+.godot/
+export_presets.cfg
