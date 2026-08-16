@@ -75,7 +75,9 @@ func _spawn_objects() -> void:
 	# 화면이 끊긴 게 이것이었다. 화면 둘레만 세우고 나머지는 안 만든다.
 	_stream_center = Vector2i(-9999, -9999)
 	_stream_prev = Rect2i()
+	_spawn_queue.clear()
 	_stream_nodes()
+	_drain_spawn_queue(true)   # 세계를 처음 펼 때는 한 번에 (여긴 이미 멈춰 있다)
 	m.farming._recount_pasture()   # 불러온 세이브의 울타리도 목초지로 인정한다
 	m.farming.rebuild_sprinklers() # 세계가 통째로 바뀌었으니 목록도 다시
 	m.story._apply_story_visibility()
@@ -555,6 +557,36 @@ const KEEP_ALWAYS := ["house", "chief_hut", "barn", "barn_block", "art_block",
 var _stream_center := Vector2i(-9999, -9999)
 var _stream_prev := Rect2i()      # 지난번 창 (새로 들어온 띠만 훑으려고)
 
+# ---- 세우는 일을 **여러 프레임에 나눠** 한다 ----
+#
+# world 는 y정렬을 쓴다. y정렬 노드에 자식을 붙이면 그 자리에서 형제들이
+# 다시 정렬된다 — 자식이 천 개면 한 번 붙일 때마다 천 개를 정렬한다.
+# 빽빽한 숲에서는 한 칸 걸을 때마다 예닐곱 그루가 새로 들어오니, 그
+# 순간에만 정렬이 예닐곱 번 겹쳐 화면이 딱딱 걸렸다.
+#
+# 「폭포 가기 전까지는 끊기고 폭포를 보면 안 끊긴다」가 이것이었다 —
+# 폭포 둘레는 물이라 새로 세울 게 없다.
+#
+# 한 프레임에 몇 개씩만 세운다. 화면 밖 한 칸 너머에서 들어오는 것이라
+# 몇 프레임 늦어도 눈에 안 띈다.
+const SPAWN_PER_FRAME := 5
+var _spawn_queue: Array[Vector2i] = []
+
+
+func _drain_spawn_queue(burst := false) -> void:
+	var n := 0
+	while not _spawn_queue.is_empty() and (burst or n < SPAWN_PER_FRAME):
+		var pos: Vector2i = _spawn_queue.pop_back()
+		if m.obj_nodes.has(pos) or not m.objects.has(pos):
+			continue
+		var kind: String = str(m.objects[pos].kind)
+		if kind == "house":
+			continue
+		_spawn_object_node(pos, kind)
+		if kind == "tree":
+			_refresh_tree_sprite(pos)   # 계절·손상 단계를 바로 반영한다
+		n += 1
+
 
 func _stream_nodes() -> void:
 	if m.player == null:
@@ -616,6 +648,4 @@ func _stream_nodes() -> void:
 				var kind2: String = str(m.objects[pos].kind)
 				if kind2 == "house":
 					continue          # 건물 그림은 앵커에서 따로 세운다
-				_spawn_object_node(pos, kind2)
-				if kind2 == "tree":
-					_refresh_tree_sprite(pos)   # 계절·손상 단계를 바로 반영한다
+				_spawn_queue.append(pos)

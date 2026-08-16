@@ -702,6 +702,24 @@ function bigFalls(f, NF) {
       else if (Math.abs(rel) > 0.62) c = DARKER[c];
       g.px(x, y, c);
     }
+    // ---- 가장자리를 **뜯어 놓는다** ----
+    //
+    // 게임에서 보니 물줄기 좌우가 자로 자른 세로선이라, 폭포 자리에
+    // **네모난 경계**가 보였다. 물이 바위에 스치는 자리는 갈라지고 튀어
+    // 들쭉날쭉하다 — 바깥 세 줄을 성글게 지우고, 그 너머로 물방울을
+    // 몇 개 튀겨 경계를 흐린다.
+    for (let k = 0; k < 3; k++) {
+      for (const side of [-1, 1]) {
+        const xin = Math.round(CX + side * (hw - k));
+        if (g.get(xin, y)[0] === 'w'
+            && hash(xin * 3 + 1, y * 5 + side) < 0.30 + k * 0.22)
+          g.px(xin, y, '.');
+        const xout = Math.round(CX + side * (hw + 1 + k));
+        if (g.get(xout, y) === '.'
+            && hash(xout * 7 + 5, y * 3 + flowY) > 0.90 - k * 0.03)
+          g.px(xout, y, hash(xout, y) > 0.5 ? 'w1' : 'w0');
+      }
+    }
   }
   // 넘어가는 마루 — 물이 둥글게 말리며 흰 선이 선다. 폭포의 시작점이라
   // 여기가 또렷해야 「여기서 떨어진다」가 보인다

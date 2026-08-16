@@ -1900,6 +1900,7 @@ func _process(delta: float) -> void:
 	objnode._update_object_fade(delta)
 	# 화면 둘레 것만 노드로 세워 둔다 (칸이 바뀔 때만 도는 일이라 싸다)
 	objnode._stream_nodes()
+	objnode._drain_spawn_queue()   # 세우는 일은 프레임마다 몇 개씩만
 	if GameData.story_phase == "done":
 		story._grandpa_update(delta)
 	for ft in float_texts:
