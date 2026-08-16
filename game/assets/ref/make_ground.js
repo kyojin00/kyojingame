@@ -412,16 +412,32 @@ function shore(dir) {
   //   물이 옆(dir=2,3)   비스듬히 보여 좁은 면만 — 절반 높이
   //
   // 이걸 안 지키면 연못이 사방에서 벽으로 둘러싸인 「수조」가 된다.
-  const wallH = dir === 1 ? 6 : (dir === 0 ? 0 : 3);
+  // 옆(dir=2,3)도 벽으로 그렸다가 접었다. 같은 그림을 90도 돌려 쓰면
+  // **돌결이 세로로 선다** — 명암이 「아래로 갈수록 어둡게」가 아니라
+  // 「오른쪽으로 갈수록 어둡게」가 되어 벽이 누워 버린다.
+  // 옆은 벽이 아니라 **둑이 돌아 나가는 윗면**이다. 위쪽과 같이 그리되
+  // 돌을 더 많이 드러내 남쪽 벽으로 자연스럽게 이어지게 한다.
+  const wallH = dir === 1 ? 6 : 0;
+  const side = (dir === 2 || dir === 3);
   for (let i = 0; i < N; i++) {
     const wall = wallH > 0 ? wallH + Math.floor(h(i, dir, 56) * 2) : 0;
     for (let k = 0; k < 2; k++) put(i, k, EARTH[5]);          // 물에 닿는 젖은 자리
     if (wall === 0) {
-      // 벽이 안 보이는 쪽 — 젖은 둑의 윗면만. 돌이 드문드문 드러난다
-      for (let k = 2; k < 5; k++)
-        if (h(i, k, dir + 57) > 0.18 + (k - 2) * 0.22) put(i, k, EARTH[k < 4 ? 4 : 3]);
-      if (h(i, 6, dir + 62) < 0.28) put(i, 2, STONE[4]);
-      if (h(i, 7, dir + 64) < 0.20) put(i, 3, STONE[3]);
+      // 벽이 안 보이는 쪽 — 젖은 둑의 **윗면**. 옆은 조금 더 넓고 돌이 많다
+      const w2 = side ? 6 : 4;
+      for (let k = 2; k < w2; k++)
+        if (h(i, k, dir + 57) > 0.14 + (k - 2) * 0.17) put(i, k, EARTH[k < 4 ? 4 : 3]);
+      // 둑 위에 얹힌 돌 — 톤은 **자리(i)** 로만 흔든다. 깊이(k)로 흔들면
+      // 명암이 옆으로 눕는 그러데이션이 되어 벽처럼 보인다
+      if (side) {
+        const st = 2 + Math.floor(h(Math.floor(i / 3), dir, 66) * 3);
+        for (let k = 2; k < 5; k++)
+          if (h(i, k, dir + 67) > 0.35) put(i, k, STONE[clamp(st + (k - 2), 0, 7)]);
+        if (i % 3 === 0) put(i, 2, STONE[6]);               // 돌 사이 틈
+      } else {
+        if (h(i, 6, dir + 62) < 0.28) put(i, 2, STONE[4]);
+        if (h(i, 7, dir + 64) < 0.20) put(i, 3, STONE[3]);
+      }
       continue;
     }
     const top = 2 + wall;
