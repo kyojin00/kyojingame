@@ -2141,6 +2141,20 @@ func _draw() -> void:
 			var kne: int = above[i + 1]
 			var ksw: int = below[i - 1]
 			var kse: int = below[i + 1]
+			# **종류만 뽑아 쓴다.** 이 바이트에는 켜(3~5비트)와 오르막(6비트)이
+			# 같이 들어 있어서, 통째로 K_WATER 와 견주면 켜가 0이 아닌 칸에서는
+			# 물이 물로 안 읽힌다. _build_levels 가 능선 북쪽을 전부 켜 1로
+			# 깔아 두므로 **지도 거의 전부가** 그랬다 — 물가도 길도 모래도
+			# 가장자리가 통째로 안 그려지던 진짜 이유다.
+			var gc := kc & 7
+			var gn := kn & 7
+			var gs := ks & 7
+			var gw := kw & 7
+			var gek := ke & 7
+			var gnw := knw & 7
+			var gne := kne & 7
+			var gsw := ksw & 7
+			var gse := kse & 7
 			if (kc & 64) != 0:
 				# 오르막 — 벼랑을 깎아 낸 길. 밟혀 다져진 흙에 디딤돌을 놓았다
 				put.call(base, tex["ramp_%d" % (int(_hash01(x * 13, y * 3) * 3.0) % 3)], at)
@@ -2168,60 +2182,60 @@ func _draw() -> void:
 				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
 				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
 				# 길 쪽에서 자갈이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다
-				if kn == K_PATH:
+				if gn == K_PATH:
 					put.call(edges, tex["path_edge_n"], at)
-				if ks == K_PATH:
+				if gs == K_PATH:
 					put.call(edges, tex["path_edge_s"], at)
-				if kw == K_PATH:
+				if gw == K_PATH:
 					put.call(edges, tex["path_edge_w"], at)
-				if ke == K_PATH:
+				if gek == K_PATH:
 					put.call(edges, tex["path_edge_e"], at)
 			# 물가 — 물과 뭍의 경계. 물 칸에는 여울을, 뭍 칸에는 젖은 흙과
 			# 둑을. 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
 			if ground != "dock":
-				var wet := kc == K_WATER
+				var wet := gc == K_WATER
 				var code := 0
-				if (kn == K_WATER) != wet: code |= 1
-				if (ks == K_WATER) != wet: code |= 2
-				if (kw == K_WATER) != wet: code |= 4
-				if (ke == K_WATER) != wet: code |= 8
-				if (knw == K_WATER) != wet: code |= 16
-				if (kne == K_WATER) != wet: code |= 32
-				if (ksw == K_WATER) != wet: code |= 64
-				if (kse == K_WATER) != wet: code |= 128
+				if (gn == K_WATER) != wet: code |= 1
+				if (gs == K_WATER) != wet: code |= 2
+				if (gw == K_WATER) != wet: code |= 4
+				if (gek == K_WATER) != wet: code |= 8
+				if (gnw == K_WATER) != wet: code |= 16
+				if (gne == K_WATER) != wet: code |= 32
+				if (gsw == K_WATER) != wet: code |= 64
+				if (gse == K_WATER) != wet: code |= 128
 				if code != 0:
 					# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
 					var kind: String
 					if wet:
-						kind = "surf" if (kn == K_SAND or ks == K_SAND
-							or kw == K_SAND or ke == K_SAND) else "shoal"
+						kind = "surf" if (gn == K_SAND or gs == K_SAND
+							or gw == K_SAND or gek == K_SAND) else "shoal"
 					else:
-						kind = "beach" if kc == K_SAND else "shore"
+						kind = "beach" if gc == K_SAND else "shore"
 					put.call(edges, edge_tex[kind][code], at)
 				# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
 				# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다
-				if kc != K_SAND:
+				if gc != K_SAND:
 					var sc := 0
-					if kn == K_SAND: sc |= 1
-					if ks == K_SAND: sc |= 2
-					if kw == K_SAND: sc |= 4
-					if ke == K_SAND: sc |= 8
-					if knw == K_SAND: sc |= 16
-					if kne == K_SAND: sc |= 32
-					if ksw == K_SAND: sc |= 64
-					if kse == K_SAND: sc |= 128
+					if gn == K_SAND: sc |= 1
+					if gs == K_SAND: sc |= 2
+					if gw == K_SAND: sc |= 4
+					if gek == K_SAND: sc |= 8
+					if gnw == K_SAND: sc |= 16
+					if gne == K_SAND: sc |= 32
+					if gsw == K_SAND: sc |= 64
+					if gse == K_SAND: sc |= 128
 					if sc != 0:
 						put.call(edges, edge_tex["dune"][sc], at)
-				if kc != K_YARD:
+				if gc != K_YARD:
 					var yc := 0
-					if kn == K_YARD: yc |= 1
-					if ks == K_YARD: yc |= 2
-					if kw == K_YARD: yc |= 4
-					if ke == K_YARD: yc |= 8
-					if knw == K_YARD: yc |= 16
-					if kne == K_YARD: yc |= 32
-					if ksw == K_YARD: yc |= 64
-					if kse == K_YARD: yc |= 128
+					if gn == K_YARD: yc |= 1
+					if gs == K_YARD: yc |= 2
+					if gw == K_YARD: yc |= 4
+					if gek == K_YARD: yc |= 8
+					if gnw == K_YARD: yc |= 16
+					if gne == K_YARD: yc |= 32
+					if gsw == K_YARD: yc |= 64
+					if gse == K_YARD: yc |= 128
 					if yc != 0:
 						put.call(edges, edge_tex["trod"][yc], at)
 			# 벼랑 — 높이가 다른 두 땅이 만나는 자리. 면은 **아래쪽 칸**에
