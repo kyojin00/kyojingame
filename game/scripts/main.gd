@@ -103,6 +103,11 @@ var water_timer := 0.0
 # 그릴 때마다 이웃을 훑으면 물 한 칸마다 스물다섯 칸을 보게 된다.
 # 물이 생기거나 없어지면 rebuild_water_levels()를 다시 부른다
 var water_dist: Array = []
+# 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
+# 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
+const EDGE_KINDS := ["shore", "shoal", "beach", "surf", "dune", "trod"]
+const EDGE_PX := 16
+var edge_tex := {}
 var _growth_timer := 0.0
 var tree_sprites: Array = []
 var weather_time := 0.0
@@ -308,8 +313,8 @@ const TEXTURE_NAMES := [
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
 	"soil_dry", "soil_wet",
-	# 물(water_<깊이>_<판>_<장>)과 물가(shore_m<꼴>·shoal_m<꼴>)는
-	# 이름이 규칙적이라 _load_textures가 훑는다
+	# 물(water_<깊이>_<판>_<장>)과 경계 아틀라스(edge_*)는 이름이
+	# 규칙적이라 _load_textures가 훑는다
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
@@ -876,16 +881,29 @@ func _load_textures() -> void:
 			for f in 2:
 				var wn := "water_%d_%d_%d" % [lv, vr, f]
 				tex[wn] = load("res://assets/sprites/%s.png" % wn)
-	# 물가 — 이웃 넷 중 어디가 딴 쪽인지(1=북 2=남 4=서 8=동)로 한 장씩.
-	# 방향마다 따로 그리던 걸 그만뒀다: 곧은 변·귀퉁이·곶·섬이 다 한 자로
-	# 그려져 이웃과 어긋날 수가 없고, 꺾이는 자리는 호로 돌아 나간다
-	#   shore/shoal  연못·강 — 둑이 서고 벽면이 진다
-	#   beach/surf   바다 — 모래가 그대로 기울어 들고 거품이 밀려온다
-	#   dune         잔디 칸으로 흘러드는 모래
-	for mk in range(1, 16):
-		for pre: String in ["shore_m", "shoal_m", "beach_m", "surf_m",
-				"dune_m", "trod_m"]:
-			tex[pre + str(mk)] = load("res://assets/sprites/%s%d.png" % [pre, mk])
+	# 경계 — 이웃 **여덟 칸**의 꼴(0~255)마다 한 칸씩 담긴 아틀라스 한 장.
+	#
+	# 이웃 넷만 보고 그렸더니, 볼록한 귀퉁이에서 땅 칸은 제 모서리를 깎아
+	# 물을 들이는데 바로 옆 물 칸은 물가가 아직 타일 변에 있는 줄 알았다.
+	# 같은 자리를 두 칸이 다르게 그려서 여울 띠가 모서리마다 어긋나 끊겼다.
+	# 아홉 칸을 보면 이웃한 두 칸이 겹치는 창을 보므로 경계를 똑같이 잰다.
+	#
+	#   shore/shoal  연못·강 — 둑이 서고 남쪽을 보는 면에 돌벽
+	#   beach/surf   바다 — 벽 없이 모래가 기울어 들고 거품이 민다
+	#   dune/trod    잔디 칸으로 흘러드는 모래 · 마당 흙
+	#
+	# 꼴이 256가지라 파일로 두면 천오백 장이다. 한 장에 모으면 불러오기도
+	# 가볍고, 같은 텍스처라 그리기가 오히려 더 잘 묶인다
+	for kind: String in EDGE_KINDS:
+		var sheet: Texture2D = load("res://assets/sprites/edge_%s.png" % kind)
+		var arr: Array[Texture2D] = []
+		arr.resize(256)
+		for c in 256:
+			var a := AtlasTexture.new()
+			a.atlas = sheet
+			a.region = Rect2((c % 16) * EDGE_PX, (c / 16) * EDGE_PX, EDGE_PX, EDGE_PX)
+			arr[c] = a
+		edge_tex[kind] = arr
 	# 모래·길·마당도 판을 셋씩 — 한 장만 깔면 무늬가 같은 자리마다 찍힌다
 	for v in 3:
 		for kind: String in ["sand_", "path_", "yard_"]:
@@ -1952,18 +1970,32 @@ func _water_level(x: int, y: int) -> int:
 	return clampi(water_dist[y][x] - 1, 0, WATER_LV - 1)
 
 
-# 한 칸의 바닥. 맵 밖은 **물로 친다** — 세계의 끝은 바다이고, 가장자리 칸의
-# 물가가 끊겨 보이면 거기가 세계의 끝이라는 게 드러난다.
-#
-# 물가를 방향마다 한 장씩(shore_n/s/w/e) 덧그리던 걸 그만뒀다. 그러면 꺾이는
-# 자리에서 두 장이 그대로 부딪혀 **직각**이 되고, 대각선만 물인 귀퉁이는
-# 빈다. 이웃 넷을 비트 하나씩(1=북 2=남 4=서 8=동) 모아 그 꼴에 맞는 한 장을
-# 얹으면 곧은 변도 귀퉁이도 곶도 한 자로 그려지고, 꺾이는 자리는 호로 돌아
-# 나간다. 모래·마당이 흘러드는 경계도 같은 비트를 쓴다.
-func _ground_at(x: int, y: int) -> String:
-	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
-		return "water"
-	return grid[y][x].ground
+# 바닥 종류를 **숫자**로. 경계를 가릴 때 칸마다 여덟 이웃을 문자열로
+# 견주면 그 비교만 수만 번이라, 줄을 읽어 둘 때 한 번만 표를 뒤진다
+const K_GRASS := 0
+const K_WATER := 1
+const K_SAND := 2
+const K_YARD := 3
+const K_PATH := 4
+const KIND_OF := {"water": K_WATER, "sand": K_SAND, "yard": K_YARD, "path": K_PATH}
+
+# 한 줄어치 바닥 종류. 맵 밖은 **물로 친다** — 세계의 끝은 바다이고,
+# 가장자리 칸의 물가가 끊겨 보이면 거기가 세계의 끝이라는 게 드러난다
+func _row_kind(y: int, xa: int, n: int) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(n)
+	if y < 0 or y >= MAP_H:
+		for i in n:
+			out[i] = K_WATER
+		return out
+	var row: Array = grid[y]
+	for i in n:
+		var x: int = xa + i
+		if x < 0 or x >= MAP_W:
+			out[i] = K_WATER
+		else:
+			out[i] = KIND_OF.get(row[x].ground, K_GRASS)
+	return out
 
 
 # ---- 렌더링 ----
@@ -2016,19 +2048,30 @@ func _draw() -> void:
 			if x % 3 == 0 and y % 2 == 0 and _hash01(x * 5 + 1, y * 7 + 3) < 0.55:
 				out_trees.append(Vector2(x * TILE, y * TILE))
 
+	# 이웃 여덟 칸을 칸마다 따로 훑으면 격자를 여덟 번씩 뒤지게 된다.
+	# **줄 단위로** 읽어 두고 세 줄을 굴리면 칸당 한 번으로 준다
+	var xa := x0 - 1
+	var span := x1 - x0 + 2
+	var above := _row_kind(y0 - 1, xa, span)
+	var cur := _row_kind(y0, xa, span)
+	var below := _row_kind(y0 + 1, xa, span)
 	for y in range(y0, y1):
 		var row: Array = grid[y]
 		for x in range(x0, x1):
 			var cell: Dictionary = row[x]
 			var at := Vector2(x * TILE, y * TILE)
 			var ground: String = cell.ground
-			# 이웃 넷의 바닥을 **한 번만** 읽는다. 물가·모래·마당·길을 여기서
-			# 다 가른다 — 각각 따로 훑으면 칸마다 열몇 번씩 격자를 뒤지게 되고,
-			# _draw는 매 프레임 도니 그게 그대로 프레임 값이 된다
-			var gn := _ground_at(x, y - 1)
-			var gs := _ground_at(x, y + 1)
-			var gw := _ground_at(x - 1, y)
-			var ge := _ground_at(x + 1, y)
+			var i := x - xa
+			var kc: int = cur[i]
+			# 이웃 여덟 칸 (1=북 2=남 4=서 8=동 16=북서 32=북동 64=남서 128=남동)
+			var kn: int = above[i]
+			var ks: int = below[i]
+			var kw: int = cur[i - 1]
+			var ke: int = cur[i + 1]
+			var knw: int = above[i - 1]
+			var kne: int = above[i + 1]
+			var ksw: int = below[i - 1]
+			var kse: int = below[i + 1]
 			if ground == "dock":
 				docks.append(at)
 			elif ground == "sand":
@@ -2042,18 +2085,6 @@ func _draw() -> void:
 				# 자리마다 찍혀 물 위에 바둑판이 뜬다
 				put.call(base, tex["water_%d_%d_%d" % [_water_level(x, y),
 					int(_hash01(x * 3 + 1, y * 7 + 5) * 3.0) % 3, water_frame]], at)
-				# 여울 — 뭍에 가까운 물은 얕아서 바닥이 비친다.
-				# 물가를 땅 쪽에서만 만들면 경계가 얕다. **양쪽에서** 만들어야 깊어진다
-				var mk := 0
-				if gn != "water": mk |= 1
-				if gs != "water": mk |= 2
-				if gw != "water": mk |= 4
-				if ge != "water": mk |= 8
-				if mk != 0:
-					# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
-					var sandy := (gn == "sand" or gs == "sand"
-						or gw == "sand" or ge == "sand")
-					put.call(edges, tex[("surf_m" if sandy else "shoal_m") + str(mk)], at)
 			elif ground == "soil":
 				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
 			elif ground == "path":
@@ -2064,46 +2095,68 @@ func _draw() -> void:
 			else:
 				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
 				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
-				# 길 쪽에서 흙이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다.
-				if gn == "path":
+				# 길 쪽에서 자갈이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다
+				if kn == K_PATH:
 					put.call(edges, tex["path_edge_n"], at)
-				if gs == "path":
+				if ks == K_PATH:
 					put.call(edges, tex["path_edge_s"], at)
-				if gw == "path":
+				if kw == K_PATH:
 					put.call(edges, tex["path_edge_w"], at)
-				if ge == "path":
+				if ke == K_PATH:
 					put.call(edges, tex["path_edge_e"], at)
-			# 물가 — 물에 닿는 **땅 쪽**에 젖은 흙·둑·돌벽을 덧그린다.
-			# 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
-			if ground != "water" and ground != "dock":
-				var wm := 0
-				if gn == "water": wm |= 1
-				if gs == "water": wm |= 2
-				if gw == "water": wm |= 4
-				if ge == "water": wm |= 8
-				if wm != 0:
-					put.call(edges, tex[("beach_m" if ground == "sand" else "shore_m")
-						+ str(wm)], at)
+			# 물가 — 물과 뭍의 경계. 물 칸에는 여울을, 뭍 칸에는 젖은 흙과
+			# 둑을. 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
+			if ground != "dock":
+				var wet := kc == K_WATER
+				var code := 0
+				if (kn == K_WATER) != wet: code |= 1
+				if (ks == K_WATER) != wet: code |= 2
+				if (kw == K_WATER) != wet: code |= 4
+				if (ke == K_WATER) != wet: code |= 8
+				if (knw == K_WATER) != wet: code |= 16
+				if (kne == K_WATER) != wet: code |= 32
+				if (ksw == K_WATER) != wet: code |= 64
+				if (kse == K_WATER) != wet: code |= 128
+				if code != 0:
+					# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
+					var kind: String
+					if wet:
+						kind = "surf" if (kn == K_SAND or ks == K_SAND
+							or kw == K_SAND or ke == K_SAND) else "shoal"
+					else:
+						kind = "beach" if kc == K_SAND else "shore"
+					put.call(edges, edge_tex[kind][code], at)
 				# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
 				# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다
-				if ground != "sand":
-					var sm := 0
-					if gn == "sand": sm |= 1
-					if gs == "sand": sm |= 2
-					if gw == "sand": sm |= 4
-					if ge == "sand": sm |= 8
-					if sm != 0:
-						put.call(edges, tex["dune_m" + str(sm)], at)
-				if ground != "yard":
-					var ym := 0
-					if gn == "yard": ym |= 1
-					if gs == "yard": ym |= 2
-					if gw == "yard": ym |= 4
-					if ge == "yard": ym |= 8
-					if ym != 0:
-						put.call(edges, tex["trod_m" + str(ym)], at)
+				if kc != K_SAND:
+					var sc := 0
+					if kn == K_SAND: sc |= 1
+					if ks == K_SAND: sc |= 2
+					if kw == K_SAND: sc |= 4
+					if ke == K_SAND: sc |= 8
+					if knw == K_SAND: sc |= 16
+					if kne == K_SAND: sc |= 32
+					if ksw == K_SAND: sc |= 64
+					if kse == K_SAND: sc |= 128
+					if sc != 0:
+						put.call(edges, edge_tex["dune"][sc], at)
+				if kc != K_YARD:
+					var yc := 0
+					if kn == K_YARD: yc |= 1
+					if ks == K_YARD: yc |= 2
+					if kw == K_YARD: yc |= 4
+					if ke == K_YARD: yc |= 8
+					if knw == K_YARD: yc |= 16
+					if kne == K_YARD: yc |= 32
+					if ksw == K_YARD: yc |= 64
+					if kse == K_YARD: yc |= 128
+					if yc != 0:
+						put.call(edges, edge_tex["trod"][yc], at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
+		above = cur
+		cur = below
+		below = _row_kind(y + 2, xa, span)
 
 	# 맵 바깥 (어둡게)
 	for t: Texture2D in out_grass:

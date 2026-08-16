@@ -54,6 +54,38 @@ class T {
     }
     return im;
   }
+  // 경계 그림은 **한 도트에 1픽셀**로 낸다. 꼴이 256가지라 4배로 부풀리면
+  // 한 벌이 16배가 된다 — 화면에서는 어차피 두 배로 늘려 그리므로
+  // (프로젝트 필터가 nearest) 결과는 한 점도 다르지 않다
+  small() {
+    const im = new PNG({ width: N, height: N });
+    im.data.fill(0);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const c = this.d[y][x];
+      if (!c) continue;
+      const i = (y * N + x) * 4;
+      im.data[i] = c[0]; im.data[i + 1] = c[1]; im.data[i + 2] = c[2]; im.data[i + 3] = 255;
+    }
+    return im;
+  }
+}
+
+// 경계 그림 한 벌을 **한 장에** 담는다. 파일을 천오백 개 따로 두면 불러오는
+// 것부터 일이고, 한 장에 모으면 그리기가 오히려 더 잘 묶인다 (같은 텍스처)
+const ATC = 16, ATR = 16;       // 꼴 값(0~255)이 그대로 자리다
+function atlas(name, tiles) {
+  const im = new PNG({ width: ATC * N, height: ATR * N });
+  im.data.fill(0);
+  tiles.forEach((t, idx) => {
+    if (!t) return;
+    const ox = (idx % ATC) * N, oy = Math.floor(idx / ATC) * N;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const a = (y * N + x) * 4, b = ((oy + y) * im.width + ox + x) * 4;
+      im.data[b] = t.data[a]; im.data[b + 1] = t.data[a + 1];
+      im.data[b + 2] = t.data[a + 2]; im.data[b + 3] = t.data[a + 3];
+    }
+  });
+  save(name, im);
 }
 
 // 지난 번 제안본은 먼저 지운다. 미리보기가 proposed_*.png 를 집어 쓰는 바람에
@@ -382,12 +414,6 @@ function thru(c, depth) {
   return c.map((v, i) => Math.round(v * (1 - depth) + w[i] * depth));
 }
 
-// 깊이는 **세 단**이다 (lv 0 얕은 물 · 1 중간 · 2 한가운데).
-//
-// 두 단뿐일 때는 연못 한가운데에 **검푸른 직사각형**이 오려 붙은 것처럼
-// 떴다. 한 번에 두 계단을 뛰니 그 경계가 타일 변을 따라 그대로 보인 것이다.
-// 사이에 한 단을 끼워 계단을 한 칸씩으로 낮추면, 같은 직각 경계라도 눈에
-// 걸리지 않고 물이 가운데로 갈수록 깊어지는 것처럼 읽힌다.
 // 16칸에서 **감기는** 값잡음. 격자점 사이를 부드럽게 이어 붙인다.
 // h() 를 x>>2 로 바로 쓰면 4칸짜리 네모가 그대로 보인다 — 물 한가운데에
 // 바둑판이 뜬 게 그 탓이었다
@@ -419,10 +445,18 @@ function ramp(P, i) {
 // 개울은 어차피 두 단밖에 못 쓰니, **단의 높이 자체를 낮춰야** 했다.
 // 여덟 단 × 0.42톤이면 가장 깊은 곳은 전과 같은데 계단 하나는 반도
 // 안 된다 — 사다리를 반 단씩 섞어 찍으니 경계가 아예 흩어져 버린다.
-function baseWater(x, y, lv) {
+// 물빛을 **사다리 값**으로 낸다. 여울이 바깥 물로 이어질 때 그 값이
+// 있어야 색을 이어 붙일 수 있다 (여울이 얹히는 칸은 언제나 lv 0이다 —
+// 뭍에 닿은 물이니까)
+function waterTone(x, y, lv) {
   const v = vnoise(x, y, 51, 4) * 0.62 + vnoise(x, y, 52, 2) * 0.38;
-  return ramp(WATER, 5 + (lv || 0) * 0.42 + (v - 0.5) * 1.7);
+  return 5 + (lv || 0) * 0.42 + (v - 0.5) * 1.7;
 }
+
+function baseWater(x, y, lv) { return ramp(WATER, waterTone(x, y, lv)); }
+
+const mixc = (a, b, t) => a.map((v, i) => Math.round(v * (1 - t) + b[i] * t));
+const smooth = t => t * t * (3 - 2 * t);
 
 // 물 한 장. lv = 깊이(0~2), vr = **판**(0~2).
 //
@@ -491,25 +525,38 @@ function water(frame, lv, vr) {
 // 90도 돌려 쓰면 돌결이 세로로 서서 벽이 누워 버린다.
 function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
   if (s < 0) {
-    // 물 쪽 — 여울. 둑이 드리우는 그늘은 뭍이 **북·서쪽**에 있을 때 진다.
+    // 물 쪽 — 여울.
     //
-    // 그늘이냐 아니냐를 **참·거짓으로 가르면** 호가 돌아 나가다 그늘에서
-    // 볕으로 넘어가는 순간 가장 어두운 색 옆에 가장 밝은 색이 와서 얼룩이
-    // 진다. 빛은 왼쪽 위에서 오니 물 쪽 방향 n 을 그 빛에 견줘 **비율로**
-    // 섞는다 — 곧은 물가에서는 그대로 0 아니면 1이라 이웃과 어긋나지 않는다
-    const d = Math.floor(-s);
+    // 여기를 **확률로 성기게** 뿌렸었다. 물가에 잔모래를 뿌린 것처럼
+    // 자글거려서, 얕아지는 물이 아니라 흰 점이 흩어진 테두리로 보였다.
+    // 땅 쪽을 층으로 쌓아 고쳤듯 물 쪽도 값으로 잇는다 — 물가의 톤에서
+    // **바깥 물의 톤까지 이어지는 값**을 재서 사다리에 얹는다. 여울이
+    // 얹히는 칸은 언제나 lv 0이라 바깥 물빛을 여기서 그대로 알 수 있다.
+    //
+    // 물가 톤은 빛이 정한다. 빛은 왼쪽 위에서 오니, 둑이 북·서쪽에 있으면
+    // 그 그늘이 물에 드리워 짙고(7.7) 남·동쪽이면 볕이 들어 옅다(0.9).
+    // 참·거짓으로 가르면 호가 돌다 그늘에서 볕으로 넘어가는 자리에서
+    // 가장 어두운 색 옆에 가장 밝은 색이 와 얼룩이 진다 — 비율로 섞는다.
+    const d = -s;
     const shade = clamp((nax + nay) * 0.5 + 0.707, 0, 1.414) / 1.414;
-    const deep = 3 + Math.floor(h(i, 0, 71 + seed) * 4);
-    const bare = d >= deep || (d > 1 && h(x, y, 72 + seed) < 0.08 + d * 0.11);
-    // fill = 이 칸은 **땅 타일**이다. 깎아 낸 자리는 밑에 물이 깔려 있지
-    // 않으니 성기게 두면 잔디가 비친다 — 물 바탕부터 깔고 여울을 얹는다
-    if (bare) { if (fill) g.px(x, y, baseWater(x, y)); return; }
-    const lit = d === 0 ? 0 : (d < 3 ? 1 : 2);
-    g.px(x, y, WATER[Math.round(lit + ((d < 2 ? 7 : 6) - lit) * shade)]);
-    if (shade > 0.5) return;                                 // 그늘엔 바닥이 안 비친다
-    if (d === 1 && h(x, y, 73 + seed) < 0.34) g.px(x, y, thru(EARTH[1], 0.3));
-    if (d === 2 && h(x, y, 74 + seed) < 0.22) g.px(x, y, thru(STONE[3], 0.35));
-    if (d === 3 && h(x, y, 75 + seed) < 0.18) g.px(x, y, thru(EARTH[2], 0.45));
+    const t1 = waterTone(x, y, 0);                           // 바깥 물
+    // 띠 폭은 물가를 따라 흔든다. 일정하면 물가를 그대로 복사한 선이 하나
+    // 더 생겨서, 물가가 두 겹으로 보인다
+    const band = 3.8 + h(i, 0, 71 + seed) * 2.6 + h(Math.floor(i / 5), 0, 70 + seed) * 2.0;
+    if (d >= band) { if (fill) g.px(x, y, ramp(WATER, t1)); return; }
+    const t0 = 0.9 + (7.7 - 0.9) * shade;                    // 물가 바로 옆
+    const u = smooth(clamp(d / band, 0, 1));
+    let c = ramp(WATER, t0 + (t1 - t0) * u);
+    // 볕 드는 얕은 물에는 바닥이 비친다. 낱알로 뿌리면 또 자글거리니
+    // **덩어리로** 뜨는 값잡음에서 모양을 얻는다
+    if (shade < 0.55 && u < 0.62) {
+      const b = vnoise(x, y, 93 + seed, 2) * 0.6 + vnoise(x, y, 94 + seed, 4) * 0.4;
+      if (b > 0.58) {
+        const sandy = mixc(b > 0.74 ? STONE[3] : EARTH[1], c, 0.30 + u * 0.62);
+        c = sandy;
+      }
+    }
+    g.px(x, y, c);
     return;
   }
   const k = Math.floor(s);
@@ -555,15 +602,17 @@ function bankPx(g, x, y, s, nax, nay, i, seed, fill) {
 // (모래 위에 돌벽을 세워 놨더니 해변에 옹벽을 친 꼴이었다)
 function beachPx(g, x, y, s, nax, nay, i, seed, fill) {
   if (s < 0) {                                               // 물 쪽 — 파도가 닿는 자리
-    const d = Math.floor(-s);
-    const deep = 4 + Math.floor(h(i, 0, 76 + seed) * 4);
-    if (d >= deep) { if (fill) g.px(x, y, baseWater(x, y)); return; }
-    if (d === 0) { g.px(x, y, FOAM); return; }                // 밀려온 거품
-    if (d === 1 && h(i, 0, 77 + seed) < 0.45) { g.px(x, y, FOAM); return; }
-    // 얕아서 바닥이 훤히 비친다 — 깊어질수록 모래가 물빛에 잠긴다
-    const mix = clamp(0.18 + d * 0.17, 0, 0.86);
-    g.px(x, y, thru(SAND[clamp(d - 1, 0, 5)], mix));
-    if (h(x, y, 78 + seed) < 0.16) g.px(x, y, thru(SAND[4], mix + 0.06));
+    const d = -s;
+    const t1 = waterTone(x, y, 0);                           // 바깥 물
+    const band = 5 + h(i, 0, 76 + seed) * 4;
+    if (d >= band) { if (fill) g.px(x, y, ramp(WATER, t1)); return; }
+    if (d < 1) { g.px(x, y, FOAM); return; }                  // 밀려온 거품 한 줄
+    if (d < 2 && h(i, 0, 77 + seed) < 0.45) { g.px(x, y, FOAM); return; }
+    // 얕아서 바닥이 훤히 비친다 — 깊어질수록 모래가 물빛에 잠긴다.
+    // 여기도 **이어지는 값**으로 섞는다. 층으로 끊으면 물가에 테가 진다
+    const u = smooth(clamp((d - 1) / (band - 1), 0, 1));
+    const bed = SAND[clamp(Math.round(d) - 1, 0, 5)];
+    g.px(x, y, mixc(bed, ramp(WATER, t1), 0.22 + u * 0.78));
     return;
   }
   const k = Math.floor(s);
@@ -591,51 +640,107 @@ function spill(P, key) {
   };
 }
 
-const RC = 16;                     // 굽는 반지름 (논리 칸). 타일 한 변까지 굽는다
+// ---- 경계는 이웃 **아홉 칸**으로 잰다 ----
+//
+// 이웃 넷만 보고 그렸더니, 볼록한 귀퉁이에서 땅 칸은 제 모서리를 깎아
+// 물을 들이는데 바로 옆 물 칸은 물가가 아직 타일 변에 있는 줄 알았다.
+// 같은 자리를 두 칸이 서로 다르게 그리니 여울 띠가 모서리마다 어긋나
+// 뚝 끊겼다 — 「물 쪽이 잘 안 된」 게 이거였다.
+//
+// 한 칸의 경계 모양은 **이웃 아홉 칸이면 완전히 정해진다**: 변을 이루는
+// 두 칸과 그 변의 양 끝에 닿는 네 칸이 모두 그 안에 든다. 그래서 여덟
+// 이웃을 비트로 모아 꼴마다 한 장씩 뽑는다. 이웃한 두 칸은 서로 겹치는
+// 창을 보므로 경계를 **똑같이** 재고, 이음매가 생길 수가 없다.
+//
+// 모양은 식이 아니라 **재서** 얻는다. 창을 덮개(0/1)로 깔고 뭉갠 뒤
+// 0.5에서 자르면 모서리가 둥글려지고 — 볼록이든 오목이든 한꺼번에 —
+// 거기서 부호 거리를 재면 어떤 꼴이든 같은 자로 층을 쌓을 수 있다.
+const EPAD = 20;                   // 덧대는 논리 칸 (띠가 최대 열세 칸)
+const EG = N + 2 * EPAD;           // 창 한 변
+const EROUND = 5;                  // 모서리를 둥글리는 반지름 (논리 칸)
 
-// 물가 한 장 — 이웃 넷 중 어디가 **딴 쪽**인지(mask)만 보고 그린다.
-//   mask 비트  1=북 2=남 4=서 8=동
-//   isLand     true면 땅 타일(그 방향이 물), false면 물 타일(그 방향이 뭍)
-//
-// 이 칸의 제 편(땅 타일이면 땅, 물 타일이면 물)을 **모서리 둥근 상자**로
-// 본다. 딴 쪽이 있는 변만 상자의 변이 되고, 없는 변은 저 멀리 밀어 둔다.
-// 그러면 열여섯 가지 이웃 꼴이 상자 하나로 다 나온다:
-//
-//   한 변      곧은 물가          두 변 맞은편  좁은 물목
-//   두 변 이웃 볼록/오목 귀퉁이   세 변         곶      네 변  섬
-//
-// 물 타일은 **부호만 뒤집으면** 된다 — 물이 상자 안이니 뭍으로 가는 거리가
-// 음수다. 볼록한 귀퉁이는 뭍이 깎여 물이 돌아 나가고, 오목한 귀퉁이는
-// 뭍이 메워 들어간다. 같은 원의 안팎일 뿐이다.
-function edgeTile(mask, isLand, paint) {
-  const g = new T();
-  const px = paint || bankPx;
-  const FAR = 64;
-  const x0 = (mask & 4) ? -0.5 : -FAR;
-  const x1 = (mask & 8) ? N - 0.5 : N - 1 + FAR;
-  const y0 = (mask & 1) ? -0.5 : -FAR;
-  const y1 = (mask & 2) ? N - 0.5 : N - 1 + FAR;
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  const bx = (x1 - x0) / 2, by = (y1 - y0) / 2;
-  const R = Math.min(RC, bx, by);                            // 상자보다 크게는 못 굽는다
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const ex = x - cx, ey = y - cy;
-    const ax = Math.abs(ex) - (bx - R), ay = Math.abs(ey) - (by - R);
-    let s, nx, ny;
-    if (ax > 0 && ay > 0) {                                  // 귀퉁이 — 호를 돈다
-      const d = Math.hypot(ax, ay) || 1e-4;
-      s = R - d;
-      nx = (ax / d) * Math.sign(ex);
-      ny = (ay / d) * Math.sign(ey);
-    } else {                                                 // 곧은 변 — 가까운 쪽
-      const dx = bx - Math.abs(ex), dy = by - Math.abs(ey);
-      if (dx <= dy) { s = dx; nx = Math.sign(ex); ny = 0; }
-      else { s = dy; nx = 0; ny = Math.sign(ey); }
+// 비트: 1=북 2=남 4=서 8=동 16=북서 32=북동 64=남서 128=남동. 1이면 딴 쪽
+function otherAt(code, cx, cy) {
+  if (cx === 0 && cy === 0) return false;
+  let b;
+  if (cy < 0) b = cx < 0 ? 16 : (cx > 0 ? 32 : 1);
+  else if (cy > 0) b = cx < 0 ? 64 : (cx > 0 ? 128 : 2);
+  else b = cx < 0 ? 4 : 8;
+  return (code & b) !== 0;
+}
+
+// 상자흐림 세 번 = 종 모양. 모서리를 둥글리는 건 이 한 번뿐이다
+function blur3(a, w, r) {
+  const t = new Float32Array(a.length);
+  const cl = v => clamp(v, 0, w - 1);
+  for (let pass = 0; pass < 3; pass++) {
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let k = -r; k <= r; k++) sum += a[y * w + cl(x + k)];
+      t[y * w + x] = sum / (2 * r + 1);
     }
-    if (!isLand) { s = -s; nx = -nx; ny = -ny; }
-    // 물가를 따라가는 자리 — 돌 이음매가 변을 따라 흐르게 한다
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+      let sum = 0;
+      for (let k = -r; k <= r; k++) sum += t[cl(y + k) * w + x];
+      a[y * w + x] = sum / (2 * r + 1);
+    }
+  }
+}
+
+// 두 번 훑는 체스판 거리 — want 인 칸에서 아닌 칸까지
+function chamfer(bin, w, want) {
+  const INF = 1e6, d = new Float32Array(w * w).fill(INF);
+  const A = 0.9619, B = 1.3604;                              // 오차가 가장 작은 짝
+  for (let i = 0; i < d.length; i++) if (bin[i] !== want) d[i] = 0;
+  const rd = (x, y) => (x < 0 || y < 0 || x >= w || y >= w) ? INF : d[y * w + x];
+  for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) {
+    let v = d[y * w + x];
+    v = Math.min(v, rd(x - 1, y) + A, rd(x, y - 1) + A,
+      rd(x - 1, y - 1) + B, rd(x + 1, y - 1) + B);
+    d[y * w + x] = v;
+  }
+  for (let y = w - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) {
+    let v = d[y * w + x];
+    v = Math.min(v, rd(x + 1, y) + A, rd(x, y + 1) + A,
+      rd(x + 1, y + 1) + B, rd(x - 1, y + 1) + B);
+    d[y * w + x] = v;
+  }
+  return d;
+}
+
+const FIELD = {};
+function edgeField(code) {
+  if (FIELD[code]) return FIELD[code];
+  const cov = new Float32Array(EG * EG);
+  for (let y = 0; y < EG; y++) for (let x = 0; x < EG; x++) {
+    const cx = clamp(Math.floor((x - EPAD) / N), -1, 1);
+    const cy = clamp(Math.floor((y - EPAD) / N), -1, 1);
+    cov[y * EG + x] = otherAt(code, cx, cy) ? 1 : 0;
+  }
+  blur3(cov, EG, EROUND);
+  const bin = new Uint8Array(EG * EG);
+  for (let i = 0; i < cov.length; i++) bin[i] = cov[i] < 0.5 ? 1 : 0;   // 1 = 제 편
+  const din = chamfer(bin, EG, 1), dout = chamfer(bin, EG, 0);
+  const s = new Float32Array(EG * EG);
+  for (let i = 0; i < s.length; i++) s[i] = bin[i] ? din[i] - 0.5 : -(dout[i] - 0.5);
+  return (FIELD[code] = s);
+}
+
+// 한 장. paint 는 (거리 s, 딴 쪽 방향 n, 물가를 따라가는 자리 i)만 본다.
+// 물 칸은 부호만 뒤집는다 — 붓은 언제나 「s>0이 뭍」으로 그린다
+function edgeTile(code, isLand, paint) {
+  const s = edgeField(code), g = new T(), px = paint || bankPx;
+  const at = (x, y) => s[(y + EPAD) * EG + (x + EPAD)];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let sv = at(x, y);
+    // 딴 쪽을 가리키는 방향 = 거리가 줄어드는 쪽
+    let gx = (at(x + 1, y) - at(x - 1, y)) * 0.5;
+    let gy = (at(x, y + 1) - at(x, y - 1)) * 0.5;
+    const L = Math.hypot(gx, gy) || 1;
+    let nx = -gx / L, ny = -gy / L;
+    if (!isLand) { sv = -sv; nx = -nx; ny = -ny; }
     const i = Math.round(x * Math.abs(ny) + y * Math.abs(nx));
-    px(g, x, y, s, nx, ny, i, mask, isLand);
+    px(g, x, y, sv, nx, ny, i, 0, isLand);
   }
   return g;
 }
@@ -653,17 +758,28 @@ for (let v = 0; v < 3; v++) save('yard_' + v, yard(v).render());
 for (let lv = 0; lv < 8; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
   save(`water_${lv}_${vr}_${f}`, water(f, lv, vr).render());
 for (let v = 0; v < 3; v++) save('sand_' + v, sandTile(v).render());
-// 물가 — 이웃 꼴(mask) 열다섯 가지 × 네 종류.
-//   shore 땅 타일 · shoal 물 타일      (연못·강 — 둑이 서고 벽이 진다)
-//   beach 모래 타일 · surf 물 타일     (바다 — 모래가 그대로 기울어 든다)
-for (let m = 1; m < 16; m++) {
-  save('shore_m' + m, edgeTile(m, true).render());
-  save('shoal_m' + m, edgeTile(m, false).render());
-  save('beach_m' + m, edgeTile(m, true, beachPx).render());
-  save('surf_m' + m, edgeTile(m, false, beachPx).render());
-  save('dune_m' + m, edgeTile(m, true, spill(SAND, 84)).render());
-  save('trod_m' + m, edgeTile(m, true, spill(EARTH, 96)).render());
+// 경계 — 이웃 여덟 칸의 꼴(256가지) × 여섯 종류.
+//   shore 땅 칸 · shoal 물 칸    연못·강 — 둑이 서고 남쪽을 보는 면에 돌벽
+//   beach 모래 칸 · surf 물 칸   바다 — 벽 없이 모래가 기울어 들고 거품이 민다
+//   dune · trod                  잔디 칸으로 흘러드는 모래 · 마당 흙
+//
+// 256가지라지만 **같은 그림이 수두룩하다** — 대각선 이웃은 그 변이 이미
+// 경계일 때 아무것도 바꾸지 않는다. 그려 놓고 같은 것끼리 합치면 예순
+// 남짓으로 준다. 어느 꼴이 몇 번 그림인지는 표로 내보내 게임이 읽는다.
+const KIND = [
+  ['shore', true, null], ['shoal', false, null],
+  ['beach', true, beachPx], ['surf', false, beachPx],
+  ['dune', true, spill(SAND, 84)], ['trod', true, spill(EARTH, 96)],
+];
+// 그림 번호는 **꼴 값 그대로**다. 표를 따로 두면 게임 쪽과 어긋날 여지가
+// 생기는데, 어차피 겹치는 꼴이 거의 없어서 아낄 것도 없다 (256 -> 255).
+// 0번 자리는 비워 둔다 — 딴 쪽 이웃이 하나도 없으면 그릴 게 없다.
+for (const [name, isLand, paint] of KIND) {
+  const tiles = new Array(256).fill(null);
+  for (let code = 1; code < 256; code++) tiles[code] = edgeTile(code, isLand, paint).small();
+  atlas('edge_' + name, tiles);
 }
+
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());
