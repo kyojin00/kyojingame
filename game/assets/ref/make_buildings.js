@@ -730,16 +730,49 @@ function clockFace(g, cx, cy, r) {
 // 처마 밑**을 타고 오른다. 넓은 면 한복판에 붙이면 얼룩으로 보인다.
 function ivy(g, x, yBottom, yTop) {
   const h = Math.max(1, yBottom - yTop);
+  const on = (px, py) => g.get(px, py) !== '.';            // 실루엣 안에서만 자란다
+
+  // 잎 한 장 — **세 색이 다 들어가야** 잎으로 보인다: 윤곽·속·빛.
+  // 한 색으로 칠한 덩어리는 이끼지 잎이 아니다
+  const leaf = (px, py, big) => {
+    const w = big ? 2 : 1;
+    for (let dy = 0; dy <= w; dy++) for (let dx = -w; dx <= w; dx++) {
+      if (Math.abs(dx) + dy > w + 1) continue;
+      if (on(px + dx, py + dy)) g.px(px + dx, py + dy, 'n');
+    }
+    if (on(px, py)) g.px(px, py, 'v');                     // 윗면이 빛을 받는다
+    if (on(px, py + w)) g.px(px, py + w, 'N');             // 밑은 그늘
+  };
+
+  let side = 1;
   for (let y = yBottom; y >= yTop; y--) {
     const t = (yBottom - y) / h;
-    const px = x + Math.round(Math.sin(y * 0.42) * 1.7 + Math.sin(y * 0.17) * 1.2);
-    const dens = 0.66 - t * 0.40;                          // 끝으로 갈수록 성기게
-    for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [-2, 1], [2, -1], [1, 1], [-1, 1]]) {
-      if (dx && hash(px * 3 + dx, y * 5 + dy) > dens) continue;
-      if (g.get(px + dx, y + dy) === '.') continue;        // 실루엣 밖으로는 안 뻗는다
-      g.px(px + dx, y + dy, hash(px + dx * 7, y + dy * 11) < 0.28 ? 'v'
-        : (hash(px + dx, y - dy) < 0.35 ? 'N' : 'n'));
+    // 줄기 — 두 파장으로 휘며 오른다. 곧게 그으면 밧줄이 된다.
+    // 그리고 **띄엄띄엄** 끊는다 — 통줄이면 그것도 밧줄이다
+    const sx = x + Math.round(Math.sin(y * 0.27) * 2.4 + Math.sin(y * 0.09) * 1.7);
+    if (on(sx, y) && hash(sx, y) < 0.8) g.px(sx, y, 'N');
+    // 잎은 줄기 **옆에 한 장씩** 번갈아. 위로 갈수록 성기다
+    if (hash(sx * 5 + 1, y * 3) < 0.52 - t * 0.40) {
+      side = -side;
+      leaf(sx + side * 2, y, hash(y, sx) < 0.45);
     }
+    // 곁가지 — 가끔 옆으로 뻗어 나가며 잎을 단다. 이게 있어야 「자란 것」이 된다
+    if (t < 0.75 && hash(y, 91) < 0.055) {
+      const dir = hash(y, 7) < 0.5 ? -1 : 1;
+      const len = 3 + Math.floor(hash(y, 5) * 4);
+      for (let k = 1; k <= len; k++) {
+        const bx = sx + dir * k, by = y - (k >> 1);
+        if (!on(bx, by)) break;
+        g.px(bx, by, 'N');
+        if (k % 2 === 0) leaf(bx, by - 1, false);
+      }
+    }
+  }
+  // 끝의 덩굴손 — 꼭대기에서 한두 가닥이 가늘게 삐져나온다.
+  // 덩굴이 뭉툭하게 끝나면 잘라 붙인 것처럼 보인다
+  for (let k = 0; k < 4; k++) {
+    const ty = yTop - k, tx = x + Math.round(Math.sin(ty * 0.27) * 2.4) + (k % 2 ? 1 : -1);
+    if (on(tx, ty)) g.px(tx, ty, k < 2 ? 'n' : 'N');
   }
 }
 
@@ -1613,8 +1646,11 @@ function build(spec) {
   if (spec.smoke) smoke(g, (spec.chimneyX || CX) + 5, RIDGE - 39);
   // 담쟁이는 **맨 마지막**에. 창틀·간판 위로 조금 넘어가야 자란 것처럼 보인다
   const iv = spec.ivy === undefined ? 2 : spec.ivy;
-  if (iv >= 1) ivy(g, X0 - JUT + 2, GROUND - 3, EAVE + 3);
-  if (iv >= 2) ivy(g, X1 + JUT - 2, GROUND - 3, EAVE + 3);
+  // 덩어리가 붙은 쪽은 담쟁이를 **안으로 들인다.** 이음매 위에 얹으면
+  // 가려 주기는커녕 「여기가 경계다」를 초록으로 표시하는 꼴이 된다
+  const att = k => spec.tower === k || spec.lean === k || spec.wing === k;
+  if (iv >= 1) ivy(g, att('left') ? X0 + 9 : X0 - JUT + 2, GROUND - 3, EAVE + 3);
+  if (iv >= 2) ivy(g, att('right') ? X1 - 9 : X1 + JUT - 2, GROUND - 3, EAVE + 3);
 
   roughen(g);           // 기와 한 장씩 얹기 + 벽 줄눈·결
   bargeBoard(g, X0 - JUT - 3, X1 + JUT + 3, RIDGE, EAVE);  // 빗변 널은 기와 위에
