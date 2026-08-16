@@ -250,6 +250,29 @@ func _guide_point() -> Array:
 				return [ch.position, "이장 덕수"]
 		"home_open":
 			return [t.call(m.HOME_SITE), "할아버지의 집"]
+	# ---- 튜토리얼 ② — 상점 · 바닷길 · 첫 밭 ----
+	#
+	# 여기가 통째로 비어 있었다. 이장이 「상점을 세워 보게」라고 말은 하는데
+	# 어디에 세우는지는 말로만 있다 (광장 북쪽 게시판). 처음 하는 사람은
+	# 마을을 한 바퀴 돌게 된다 — 짚어 주면 그 한 바퀴가 사라진다
+	if GameData.story_phase == "done":
+		match GameData.story2_phase:
+			"shop":
+				return [t.call(m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)),
+					"잡화점 터 게시판"]
+			"fisher":
+				var f: Variant = _fisher_node()
+				if f != null:
+					return [f.position, "낚시꾼"]
+			"farm_talk":
+				var ch2 := _story_chief()
+				if ch2 != null:
+					return [ch2.position, "이장 덕수"]
+			"farm":
+				return [t.call(m.HOME_ANCHOR + Vector2i(2, 5)), "집 앞 풀밭"]
+			"cook":
+				return [t.call(m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)),
+					"만수 (잡화점)"]
 	return []
 
 
@@ -268,7 +291,13 @@ func _update_guide() -> void:
 
 func _story_update(delta: float) -> void:
 	if GameData.story_phase == "done" or Net.is_guest():
-		if m.hud != null:
+		# 스토리 1이 끝나도 **튜토리얼은 아직 남았다** (상점 -> 바닷길 ->
+		# 호미 -> 밭 -> 첫 끼). 여기서 길잡이를 꺼 버렸더니, 편지를 전한
+		# 순간 핀이 사라져 「이제 뭘 하지」가 됐다 — 튜토리얼이 끝날 때까지
+		# 계속 짚어 준다
+		if not Net.is_guest():
+			_update_guide()
+		elif m.hud != null:
 			m.hud.clear_guide()
 		# 스토리가 끝나도 우체부가 남아 있으면 떠나는 연출은 계속 돌린다
 		# (예전에는 여기서 바로 빠져나가 편지를 전한 자리에 그대로 서 있었다)
