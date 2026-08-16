@@ -317,16 +317,80 @@ function yard() {
 }
 
 
+// ---- 물과 물가 ----
+//
+// 지금 물은 파란 사각형이고, 땅과 만나는 자리가 **자로 그은 선**이다.
+// 실제 물가는 세 겹이다:
+//
+//   물     깊은 쪽은 짙고 가장자리는 옅다 (얕아지니까)
+//   거품   파도가 닿는 자리에 흰 줄이 들쭉날쭉 남는다
+//   젖은 땅 물이 들었다 난 자리. 마른 땅보다 짙고 조약돌이 드러난다
+//
+// 이 세 겹이 있어야 물이 「땅에 담긴 것」으로 보인다.
+const WATER = [[132, 196, 226], [96, 166, 208], [66, 134, 184], [46, 106, 156],
+               [32, 82, 128], [24, 62, 102]];
+const FOAM = [244, 250, 252];
+
+function water(frame) {
+  const g = new T();
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // 깊이 — 덩어리로 갈린다. 칸마다 흔들면 물이 아니라 모래가 된다
+    const v = h(x >> 2, y >> 2, 51) * 0.6 + h(x >> 1, y >> 1, 52) * 0.4;
+    g.px(x, y, WATER[v < 0.3 ? 4 : (v > 0.72 ? 2 : 3)]);
+  }
+  // 잔물결 — 가로로 짧게 그은 줄. 두 장이 서로 어긋나야 물이 흐른다
+  // 잔물결은 **다섯 줄이면 족하다.** 아홉 줄을 그었더니 타일이 반복되면서
+  // 대각선 줄무늬가 물 전체를 덮었다 — 물결이 아니라 빗금이었다
+  for (let i = 0; i < 5; i++) {
+    const ox = Math.floor(h(i, frame, 53) * N);
+    const oy = Math.floor(h(frame, i, 54) * N);
+    const len = 2 + Math.floor(h(i, i + frame, 55) * 3);
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, WATER[i % 2 ? 1 : 2]);
+    g.px(ox - 1, oy, WATER[3]);
+  }
+  return g;
+}
+
+// 물가 — **땅 쪽**에 얹는 덧그림. 물이 그쪽에 있다 (0=위 1=아래 2=왼 3=오른)
+function shore(dir) {
+  const g = new T();
+  const put = (i, k, c) => {
+    if (dir === 0) g.px(i, k, c);
+    else if (dir === 1) g.px(i, N - 1 - k, c);
+    else if (dir === 2) g.px(k, i, c);
+    else g.px(N - 1 - k, i, c);
+  };
+  for (let i = 0; i < N; i++) {
+    const deep = 3 + Math.floor(h(i, dir, 56) * 5);         // 젖은 폭이 들쭉날쭉
+    for (let k = 0; k < deep; k++) {
+      if (k > 2 && h(i, k, dir + 57) < 0.15 + k * 0.13) continue;
+      // 물에 가까울수록 짙다 — 갓 젖은 자리와 마르는 자리
+      put(i, k, EARTH[k === 0 ? 5 : (k < 3 ? 4 : 3)]);
+    }
+    // 조약돌 — 물가에는 늘 돌이 드러나 있다
+    if (h(i, 2, dir + 58) < 0.22) put(i, 1, STONE[3]);
+    if (h(i, 3, dir + 59) < 0.16) put(i, 2, STONE[4]);
+    // 거품 — 제일 바깥 한 줄, 절반쯤만. 통줄로 그으면 페인트가 된다
+    if (h(i, 0, dir + 60) < 0.60) put(i, 0, FOAM);
+    if (h(i, 1, dir + 61) < 0.25) put(i, 1, FOAM);          // 튄 자리
+  }
+  return g;
+}
+
+
 // ---- 뽑기 ----
 for (const s of Object.keys(SEASON))
   for (let v = 0; v < 3; v++) save(`grass_${s}_${v}`, grass(s, v).render());
 save('path', cobble(0).render());
 save('yard', yard().render());
+save('water_0', water(0).render());
+save('water_1', water(1).render());
+['n', 's', 'w', 'e'].forEach((d, i) => save('shore_' + d, shore(i).render()));
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());
 
-console.log(`바닥 ${12 + 1 + 1 + 4 + 2}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
+console.log(`바닥 ${12 + 1 + 1 + 4 + 2 + 2 + 4}장 — ${F}x${F} (논리 ${N}x${N} · 화면에서 도트 2px)`);
 console.log(INSTALL ? '  sprites/ 에 넣었다'
   : '  ref/proposed_*.png 로만 뽑았다 (--install 을 붙이면 게임에 넣는다)');
 

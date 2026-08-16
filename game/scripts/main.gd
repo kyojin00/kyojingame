@@ -304,6 +304,7 @@ const TEXTURE_NAMES := [
 	"grass_fall_0", "grass_fall_1", "grass_fall_2",
 	"grass_winter_0", "grass_winter_1", "grass_winter_2",
 	"soil_dry", "soil_wet", "water_0", "water_1", "path", "yard",
+	"shore_n", "shore_s", "shore_w", "shore_e",
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
 ]
 
@@ -1859,6 +1860,14 @@ func _is_path(x: int, y: int) -> bool:
 	return grid[y][x].ground == "path"
 
 
+# 맵 밖은 **물로 친다.** 세계의 끝은 바다이고, 가장자리 칸의 물가가
+# 끊겨 보이면 거기가 세계의 끝이라는 게 드러난다
+func _is_water(x: int, y: int) -> bool:
+	if x < 0 or y < 0 or x >= MAP_W or y >= MAP_H:
+		return true
+	return grid[y][x].ground == "water"
+
+
 # ---- 렌더링 ----
 
 
@@ -1941,6 +1950,17 @@ func _draw() -> void:
 					put.call(edges, tex["path_edge_w"], at)
 				if _is_path(x + 1, y):
 					put.call(edges, tex["path_edge_e"], at)
+			# 물가 — 물에 닿는 **땅 쪽**에 젖은 흙·조약돌·거품을 덧그린다.
+			# 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
+			if ground != "water" and ground != "dock":
+				if _is_water(x, y - 1):
+					put.call(edges, tex["shore_n"], at)
+				if _is_water(x, y + 1):
+					put.call(edges, tex["shore_s"], at)
+				if _is_water(x - 1, y):
+					put.call(edges, tex["shore_w"], at)
+				if _is_water(x + 1, y):
+					put.call(edges, tex["shore_e"], at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
 
