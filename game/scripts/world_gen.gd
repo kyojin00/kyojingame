@@ -558,8 +558,7 @@ func _build_landmarks() -> void:
 			for x in range(at.x - clear, at.x + clear + 1):
 				m.objects.erase(Vector2i(x, y))
 		# ② 물
-		var lake: Array = lm.lake
-		if not lake.is_empty():
+		for lake: Array in lm.lakes:
 			_carve_pond(int(lake[0]), int(lake[1]), float(lake[2]), float(lake[3]))
 		var riv: Array = lm.river
 		if not riv.is_empty():
