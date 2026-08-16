@@ -21,6 +21,19 @@
 //   * 결(무늬)은 **좌표로 묶어** 덩어리로 낸다. 점으로 흩으면 노이즈다
 //   * 밑동은 땅에 앉는 자리다. 여기만 어둡게 깔아야 떠 보이지 않는다
 //
+// ---- 움직인다 ----
+//
+// 폭포가 안 흐르면 그건 폭포 그림이지 폭포가 아니다. 세워 두는 것마다
+// **몇 장씩** 뽑아 게임에서 돌린다 (main.gd 의 lm_frame).
+//
+//   falls      4장  물줄기가 흘러내리고, 물보라가 부풀고, 못에 물결이 간다
+//   greattree  3장  잎덩이가 흔들린다 — 위로 갈수록 크게 (덩굴도 같이)
+//   spire      2장  꼭대기 마른 풀이 눕고, 앉은 새가 날개를 친다
+//
+// 물줄기는 **딱 맞아떨어지게** 흘려야 한다. 결의 세로 폭이 8이고 한 장에
+// 6씩 내리면 네 장에 24 — 8의 배수라 네 장째가 첫 장과 이어진다.
+// 안 맞으면 한 바퀴 돌 때마다 물이 한 번씩 튄다.
+//
 // 실행:  node make_landmarks.js            -> ref/proposed_landmark_*.png
 //        node make_landmarks.js --install  -> sprites/ 에 실제로 넣는다
 const fs = require('fs'), { PNG } = require('pngjs');
@@ -53,6 +66,14 @@ const PAL = {
   'k3': [108, 54, 36], 'k4': [70, 34, 25],
   // ---- 그림자 (땅에 앉는 자리) ----
   'd0': [64, 78, 52], 'd1': [46, 58, 40],
+  // ---- 곁들이 ----
+  'f0': [246, 232, 128], 'f1': [232, 176, 72],   // 꽃·열매
+  'u0': [232, 214, 190], 'u1': [196, 108, 92],   // 버섯 (갓·대)
+  'n0': [58, 46, 34],                             // 나무 구멍 속 (제일 어두운 데)
+  'i0': [246, 246, 250], 'i1': [64, 60, 72],      // 새 (몸·부리)
+  // 무지개 — 물보라에 뜬다. 옅게만 (진하면 스티커가 된다)
+  'c0': [232, 152, 132], 'c1': [232, 206, 132], 'c2': [156, 214, 152],
+  'c3': [140, 186, 226],
 };
 
 // 결 — 좌표를 묶어야 덩어리가 된다. hash(x,y)는 점, hash(x>>3,y>>2)는 결.
@@ -149,10 +170,14 @@ function groundShadow(g, cx, gy, rx) {
 //   * 줄기가 굵고 짧으며 낮은 데서 갈라지고
 //   * 잎덩이가 여러 층으로 겹쳐 하나가 아니라 **숲처럼** 보인다
 // 이 셋을 지키면 실루엣만으로 「오래되고 크다」가 읽힌다.
-function greatTree() {
+function greatTree(f, NF) {
   const W = 200, H = 264, CX = 100, GY = H - 4;
   const g = new G(W, H);
   const FORK = 128;          // 줄기가 갈라지는 높이
+  // 바람 — 줄기는 안 흔들리고 **위로 갈수록** 크게 흔들린다.
+  // 나무를 통째로 밀면 뿌리째 뽑혀 옮겨 다니는 것처럼 보인다.
+  const phase = (f / NF) * Math.PI * 2;
+  const sway = (y) => Math.sin(phase) * 3.2 * Math.max(0, (FORK - y) / FORK);
 
   groundShadow(g, CX, GY, 62);
 
@@ -228,7 +253,7 @@ function greatTree() {
     [100, 30, 44, 25], [56, 44, 34, 25], [144, 44, 34, 25],
     [28, 104, 26, 21], [172, 104, 26, 21], [100, 106, 56, 28],
     [72, 122, 26, 17], [128, 122, 26, 17],
-  ];
+  ].map(([bx, by, rx, ry]) => [bx + sway(by), by, rx, ry]);
   for (const [bx, by, rx, ry] of BLOB) g.ellipse(bx, by, rx, ry, 'l2');
   // 덩이와 덩이 **사이의 골**. 바깥에서 살짝만 베어 문다.
   //
@@ -239,7 +264,7 @@ function greatTree() {
   for (const [bx, by, rx, ry] of [
     [26, 62, 15, 15], [174, 60, 15, 15],
     [46, 126, 15, 13], [154, 124, 15, 13],
-  ]) g.ellipse(bx, by, rx, ry, '.', ['l2']);
+  ]) g.ellipse(bx + sway(by), by, rx, ry, '.', ['l2']);
 
   // 층 나누기 — 덩이마다 위쪽은 빛, 아래쪽은 그늘. 덩이 **단위로**
   // 밝기를 갈라야 겹친 것이 겹쳐 보인다 (전체 그러데이션은 한 덩이가 된다)
@@ -288,11 +313,80 @@ function greatTree() {
       [70, 116, 40, 134, 4], [130, 114, 162, 130, 4],
       [78, 52, 52, 22, 3], [124, 50, 150, 18, 3],
     ]) {
-      tip.bone(x0, y0, x1, y1, w, 2, 'b2');
-      tip.bone(x1, y1, x1 + (x1 - x0) * 0.22, y1 - 8, 2, 1, 'b2');
+      const s0 = sway(y0), s1 = sway(y1);
+      tip.bone(x0 + s0, y0, x1 + s1, y1, w, 2, 'b2');
+      tip.bone(x1 + s1, y1, x1 + s1 + (x1 - x0) * 0.22, y1 - 8, 2, 1, 'b2');
     }
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++)
       if (tip.d[y][x] !== '.' && g.d[y][x] === '.') g.px(x, y, 'b2');
+  }
+
+  // ---- 곁들이 ----
+  //
+  // 여기까지는 「큰 나무」다. 여기서부터가 **살아 온 나무**다.
+  // 큰 것 하나만 잘 그려도 크게는 보이지만, 가까이 갔을 때 볼 게 없으면
+  // 배경 그림이 된다. 세월이 앉은 자리를 몇 군데 만든다.
+
+  // 나무 구멍 — 오래된 나무에는 구멍이 있다. 속이 제일 어두워야 깊어 보인다
+  g.ellipse(CX - 22, GY - 44, 13, 17, 'b3', ['b0', 'b1', 'b2']);
+  g.ellipse(CX - 22, GY - 45, 10, 14, 'n0', ['b3']);
+  g.ellipse(CX - 22, GY - 52, 7, 6, 'b3', ['n0']);      // 구멍 위턱의 되비침
+  // 구멍 언저리는 아물면서 도톰해진다 — 다만 **줄기 위에만**.
+  // 그냥 원을 그렸더니 왼쪽 테두리가 줄기 밖 허공에 활처럼 떴다
+  for (let a = 0; a < 80; a++) {
+    const th = a / 80 * Math.PI * 2;
+    const x = CX - 22 + Math.cos(th) * 13.6, y = GY - 44 + Math.sin(th) * 17.6;
+    if (g.get(x, y)[0] === 'b') g.px(x, y, 'b0');
+  }
+
+  // 이끼 — 늘 그늘인 쪽(오른쪽 아래)에만 앉는다. 사방에 두르면 이끼 옷이 된다
+  // 점으로 흩었더니 초록 바둑판이 됐다 — 이끼는 **덩어리로** 앉는다.
+  // 큰 좌표(x>>3, y>>4)로 「이끼가 앉은 자리」를 먼저 정하고, 그 안에서만
+  // 잔 무늬를 준다. 그리고 밑동에 가까울수록 짙다 (물이 고이는 쪽)
+  for (let y = GY - 60; y <= GY - 6; y++) {
+    const mx = trunkMid(y), hw = trunkHalf(y);
+    const low = Math.min(1, (y - (GY - 60)) / 54);
+    for (let x = Math.round(mx + hw * 0.34); x <= Math.round(mx + hw); x++) {
+      if (g.get(x, y)[0] !== 'b') continue;
+      if (hash(x >> 3, y >> 4) < 0.62) continue;       // 이끼가 앉은 덩어리 안에서만
+      const hh = hash(x >> 1, y >> 1);
+      if (hh > 0.72 - low * 0.3) g.px(x, y, hh > 0.9 ? 'm1' : 'm2');
+    }
+  }
+
+  // 덩굴 — 아래 가지에서 늘어진다. 잎덩이 **밑으로** 나와야 보인다.
+  // 바람에 나무보다 크게 흔들린다 (가벼운 것이 더 흔들리는 게 눈에 맞다)
+  for (const [vx, vy, len] of [[52, 118, 34], [148, 116, 28], [86, 132, 22],
+                               [118, 130, 26], [34, 112, 18]]) {
+    const sw = sway(vy) * 1.6;
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      const x = vx + sw * (1 + t * 1.4) + Math.sin(t * 3.4 + vx) * 2.0;
+      const y = vy + i;
+      if (g.get(x, y) !== '.') continue;
+      g.px(x, y, i % 5 === 4 ? 'l1' : 'l3');
+      if (i % 7 === 3) { g.px(x - 1, y, 'l2'); g.px(x + 1, y, 'l2'); }
+    }
+  }
+
+  // 꽃 — 잎덩이 사이에 노란 점 몇. 이 한 줌이 나무에 「철」을 준다
+  for (let i = 0; i < 34; i++) {
+    const bi = BLOB[i % BLOB.length];
+    const th = hash(i, 31) * Math.PI * 2, rr = 0.35 + hash(i, 37) * 0.55;
+    const fx = bi[0] + Math.cos(th) * bi[2] * rr;
+    const fy = bi[1] + Math.sin(th) * bi[3] * rr;
+    if (g.get(fx, fy)[0] !== 'l') continue;
+    g.px(fx, fy, 'f0');
+    if (hash(i, 41) > 0.5) g.px(fx + 1, fy, 'f1');
+  }
+
+  // 버섯 — 뿌리 사이에 돋는다. 밑동에 시선이 머물 거리를 만든다
+  for (const [mx2, my2, r] of [[CX - 48, GY - 6, 4], [CX - 40, GY - 3, 3],
+                               [CX + 44, GY - 5, 4], [CX + 52, GY - 2, 3],
+                               [CX + 12, GY - 2, 3]]) {
+    g.rect(mx2 - 1, my2, mx2 + 1, my2 + 3, 'u0');
+    g.ellipse(mx2, my2, r, r * 0.72, 'u1');
+    g.ellipse(mx2 - r * 0.3, my2 - r * 0.3, r * 0.4, r * 0.3, 'u0', ['u1']);
   }
 
   // 나무 밑동 앞의 풀숲 — 뿌리와 땅이 만나는 자리를 덮는다
@@ -319,9 +413,13 @@ function greatTree() {
 //   * 마루에서 물이 **넘어가며** 둥글게 휘는 자리
 //   * 떨어지는 물의 세로 줄기 — 굵기가 제각각이라야 흐르는 것 같다
 //   * 밑에서 튀어 오르는 흰 물보라 (여기가 없으면 물이 땅에 스민다)
-function bigFalls() {
+function bigFalls(f, NF) {
   const W = 200, H = 208, CX = 100, GY = H - 4;
   const g = new G(W, H);
+  // 물이 한 장에 여섯 칸씩 내려간다. 결의 세로 폭이 8이라 네 장이면
+  // 24 = 8의 배수 — 마지막 장이 첫 장과 이어져 튀지 않는다
+  const flowY = f * 6;
+  const wob = (f / NF) * Math.PI * 2;
   const LIP = 26;            // 물이 넘어가는 마루
   const LEDGE = 124;         // 중간 단 (여기서 한 번 부딪혀 갈라진다)
   const POOL = 172;          // 물웅덩이 수면
@@ -404,15 +502,20 @@ function bigFalls() {
     if (g.d[y][x] !== 'w2') continue;
     const rel = (x - CX) / Math.max(1, gapAt(y));
     // 줄기는 x 로 묶고 y 로는 길게 이어진다 (y>>5 — 아주 완만하게만 변한다)
+    // 두 겹이다 — **안 움직이는 긴 줄기**(물길의 결)와 그 위를
+    // **흘러내리는 결**. 흐르는 것만 있으면 물이 통째로 미끄러지고,
+    // 긴 줄기만 있으면 얼어붙은 물이 된다
     const streak = hash(x >> 1, y >> 5);
+    const flow = hash(x >> 1, (y + flowY) >> 3);
     let c = 'w2';
     if (streak > 0.78) c = 'w1';
-    else if (streak > 0.92) c = 'w0';
     else if (streak < 0.22) c = 'w3';
+    if (flow > 0.82) c = (c === 'w1') ? 'w0' : 'w1';
+    else if (flow < 0.15) c = (c === 'w3') ? 'w4' : 'w3';
     // 양쪽 가장자리는 벽에 스쳐 하얗게 부서진다
-    if (Math.abs(rel) > 0.82) c = hash(x, y) > 0.4 ? 'w1' : 'w0';
+    if (Math.abs(rel) > 0.82) c = hash(x, y + flowY) > 0.4 ? 'w1' : 'w0';
     // 가운데 굵은 본류는 짙다 (두꺼운 물은 색이 깊다)
-    if (Math.abs(rel) < 0.24 && streak < 0.6) c = 'w3';
+    if (Math.abs(rel) < 0.24 && streak < 0.6 && flow > 0.2) c = 'w3';
     g.px(x, y, c);
   }
   // 마루에서 넘어가는 자리 — 물이 둥글게 말리며 흰 선이 선다
@@ -448,7 +551,7 @@ function bigFalls() {
   for (let y = POOL; y <= GY; y++) for (let x = 0; x < W; x++) {
     if (g.d[y][x] !== 'w3') continue;
     // 웅덩이는 잔물결 — 가로로 눕는다 (세로로 두면 아직 떨어지는 물이 된다)
-    const hh = hash(x >> 2, y);
+    const hh = hash((x + f * 3) >> 2, y);
     g.px(x, y, hh > 0.80 ? 'w2' : (hh < 0.18 ? 'w4' : 'w3'));
   }
   // 떨어진 자리에서 피어오르는 흰 물보라 — 폭포의 밑동이다
@@ -456,20 +559,66 @@ function bigFalls() {
     const t = i / 25;
     const px = CX + Math.sin(i * 2.3) * (gapAt(POOL) + 10) * (0.35 + t * 0.65);
     const py = POOL - 2 + Math.cos(i * 1.7) * 9;
-    const r = 5 + hash(i, 7) * 7;
-    g.ellipse(px, py, r, r * 0.55, hash(i, 3) > 0.45 ? 'w0' : 'w1');
+    // 물보라는 **부푸는 것**이다. 덩이마다 다른 박자로 커졌다 작아진다
+    const r = (5 + hash(i, 7) * 7) * (1.0 + Math.sin(wob + i * 1.9) * 0.22);
+    g.ellipse(px, py - Math.sin(wob + i) * 1.5, r, r * 0.55,
+      hash(i, 3) > 0.45 ? 'w0' : 'w1');
   }
   // 웅덩이에 퍼지는 흰 테 — 물보라가 물에 닿는 자리
+  // 흰 테는 **퍼져 나간다** — 물보라가 물에 닿아 밀려 나가는 자리다.
+  // 한 장에 한 칸씩 커지고, 다 커지면 처음 크기로 돌아온다
   for (let i = 0; i < 5; i++) {
-    const ry = 5 + i * 4;
-    g.ellipse(CX, POOL + 4 + i * 4, gapAt(POOL) + 8 + i * 6, ry * 0.32,
-      i < 2 ? 'w0' : 'w1', ['w2', 'w3', 'w4']);
+    const grow = ((i + f) % 5);
+    const ry = 5 + grow * 4;
+    g.ellipse(CX, POOL + 4 + grow * 4, gapAt(POOL) + 8 + grow * 6, ry * 0.32,
+      grow < 2 ? 'w0' : 'w1', ['w2', 'w3', 'w4']);
   }
   // 웅덩이 앞의 젖은 바위 몇 덩이 — 물가에 놓여야 웅덩이에 깊이가 생긴다
   for (const [rx2, ry2, r] of [[CX - 40, GY - 12, 11], [CX + 38, GY - 9, 9], [CX + 12, GY - 3, 7]]) {
     g.ellipse(rx2, ry2, r, r * 0.62, 'r2');
     g.ellipse(rx2 - r * 0.2, ry2 - r * 0.24, r * 0.6, r * 0.34, 'r1', ['r2']);
   }
+
+  // ---- 곁들이 ----
+
+  // 무지개 — 물보라가 이는 곳에는 무지개가 선다. **옅게만** 얹는다.
+  // 진하게 그리면 폭포 위에 스티커를 붙인 꼴이 된다.
+  // 물 위에는 안 그린다 (물빛을 먹어 얼룩이 된다) — 바위와 물보라 위에만
+  // 처음엔 바위 위에만 그렸더니 무지개가 어디에도 안 걸려 사라졌다.
+  // 무지개가 서는 자리는 **물보라 속**이다 — 흰 물보라(w0/w1) 위에만,
+  // 세 칸에 한 칸씩만 찍는다 (촘촘히 찍으면 색 테이프가 된다)
+  for (let a = 0; a <= 120; a++) {
+    const th = Math.PI + (a / 120) * Math.PI;        // 위로 볼록한 반원
+    for (let k = 0; k < 4; k++) {
+      const rr = 48 + k * 3;
+      const x = CX + Math.cos(th) * rr;
+      const y = POOL + 2 + Math.sin(th) * rr * 0.66;
+      const at = g.get(x, y);
+      if (at !== 'w0' && at !== 'w1') continue;
+      // 세 칸에 한 칸씩 찍었더니 색종이 조각을 뿌린 꼴이었다.
+      // **각도로** 끊어야 띠로 보인다 — 한 각도에서는 네 색을 다 찍는다
+      if (a % 2 === 0) g.px(x, y, ['c0', 'c1', 'c2', 'c3'][k]);
+    }
+  }
+
+  // 고사리 — 늘 젖어 있는 바위 턱에 돋는다. 폭포 곁이라야 사는 것들
+  for (const [fx, fy] of [[CX - 68, 118], [CX + 66, 126], [CX - 78, 150],
+                          [CX + 76, 146], [CX - 60, 96], [CX + 62, 92]]) {
+    for (let b = -3; b <= 3; b++) {
+      const len = 9 - Math.abs(b);
+      for (let i = 0; i < len; i++) {
+        const x = fx + b * 1.6 + Math.sin(wob + b) * 0.8 * (i / len);
+        const y = fy - i;
+        if (g.get(x, y)[0] !== 'r') continue;
+        g.px(x, y, i > len - 3 ? 'm0' : 'm1');
+      }
+    }
+  }
+
+  // 물에 걸린 통나무 — 물가에 하나 놓이면 못에 크기가 생긴다
+  g.bone(CX - 56, GY - 14, CX - 20, GY - 8, 7, 6, 'b2');
+  g.bone(CX - 56, GY - 15, CX - 22, GY - 10, 3, 3, 'b1');
+  g.ellipse(CX - 20, GY - 8, 3, 3.4, 'b3');
 
   g.outline('O');
   return g;
@@ -482,9 +631,10 @@ function bigFalls() {
 //
 // 바람과 물이 무른 층을 먼저 파먹고 단단한 층만 남으면 기둥이 된다.
 // 그래서 **허리가 잘록하고 머리가 넓다**. 위아래 굵기가 같으면 굴뚝이다.
-function rockSpire() {
+function rockSpire(f, NF) {
   const W = 124, H = 232, CX = 62, GY = H - 4;
   const g = new G(W, H);
+  const wob = (f / NF) * Math.PI * 2;
 
   groundShadow(g, CX, GY, 40);
 
@@ -586,11 +736,44 @@ function rockSpire() {
     const by = TOP - 9 + Math.round(hash(i, 25) * 3);
     g.vline(bx, by, by + 1 + Math.round(hash(i, 23) * 2), 'k3');
   }
-  // 갓돌 위의 마른 풀 한 줌
+  // 갓돌 위의 마른 풀 한 줌 — 바람에 눕는다.
+  // 이 그림에서 유일하게 살아 있는 것이라, 여기가 흔들려야 그림이 산다
   for (let i = -6; i <= 6; i++) {
     const bx = capX + i * 3.0 + hash(i + 9, 4) * 2;
     const by = TOP - 10 + (i + 6) * 0.24;
-    g.vline(bx, by - 4 - Math.round(hash(i + 9, 2) * 4), by, 'm1');
+    const h2 = 4 + Math.round(hash(i + 9, 2) * 4);
+    const lean2 = Math.sin(wob + i * 0.6) * 2.0;
+    for (let k = 0; k <= h2; k++)
+      g.px(bx + lean2 * (k / h2), by - k, k > h2 - 2 ? 'm0' : 'm1');
+  }
+
+  // ---- 곁들이 ----
+
+  // 갓돌에 앉은 새 — 날개를 친다. 이 하나가 기둥의 크기를 말해 준다
+  // (사람이 못 올라가는 데 앉은 것이라야 「높다」가 읽힌다)
+  {
+    const bx = capX + 6, by = TOP - 14;
+    g.ellipse(bx, by, 3.2, 2.4, 'i1');            // 몸
+    g.ellipse(bx - 1, by - 1, 1.8, 1.4, 'i0', ['i1']);
+    g.px(bx + 4, by - 1, 'i1'); g.px(bx + 5, by - 1, 'i1');   // 부리
+    g.px(bx + 3, by - 3, 'i1');                                // 머리
+    // 날개 — 프레임마다 접었다 폈다
+    const up = f % 2 === 0;
+    if (up) { g.bone(bx - 1, by - 1, bx - 5, by - 6, 2, 1, 'i1'); }
+    else { g.bone(bx - 1, by, bx - 6, by + 2, 2, 1, 'i1'); }
+  }
+
+  // 돌탑 — 지나던 사람들이 하나씩 얹고 간 돌무지.
+  // 사람 손이 닿았다는 표시 하나로, 세상 끝의 바위가 「가 볼 데」가 된다
+  {
+    const tx = CX - 40;
+    let ty = GY - 2;
+    for (const r of [7, 6, 5, 4.2, 3.4, 2.6]) {
+      g.ellipse(tx, ty, r, r * 0.55, 'r2');
+      g.ellipse(tx - r * 0.24, ty - r * 0.2, r * 0.6, r * 0.3, 'r1', ['r2']);
+      g.hline(tx - r + 1, tx + r - 1, ty + Math.round(r * 0.55), 'r3');
+      ty -= Math.max(3, Math.round(r * 0.9));
+    }
   }
 
   // ---- 밑동의 너덜 ----
@@ -610,28 +793,32 @@ function rockSpire() {
 
 
 // ---- 내보내기 ----
+//
+// 하나에 여러 장. 이름은 landmark_<id>_<장번호>.png 이고, 게임은
+// main.gd 의 LANDMARK_FRAMES 표를 보고 돌린다.
 const WORKS = {
-  landmark_greattree: greatTree,
-  landmark_falls: bigFalls,
-  landmark_spire: rockSpire,
+  landmark_greattree: { fn: greatTree, frames: 3 },
+  landmark_falls: { fn: bigFalls, frames: 4 },
+  landmark_spire: { fn: rockSpire, frames: 2 },
 };
 const made = [];
-for (const [name, fn] of Object.entries(WORKS)) {
-  const g = fn();
-  const im = g.render();
-  fs.writeFileSync(OUT + PRE + name + '.png', PNG.sync.write(im));
-  made.push([name, im.width, im.height]);
-  console.log('%s  %dx%d px  (화면 %d x %d px = %.1f x %.1f 칸)',
-    name, im.width, im.height, im.width / 2, im.height / 2,
-    im.width / 64, im.height / 64);
+for (const [name, w] of Object.entries(WORKS)) {
+  for (let f = 0; f < w.frames; f++) {
+    const im = w.fn(f, w.frames).render();
+    fs.writeFileSync(OUT + PRE + name + '_' + f + '.png', PNG.sync.write(im));
+    if (f === 0) made.push([name, im.width, im.height, w.frames]);
+  }
 }
+for (const [name, ww, hh, nf] of made)
+  console.log('%s  %d장  %dx%d px  (화면 %.2f x %.2f 칸)',
+    name, nf, ww, hh, ww / 64, hh / 64);
 
 // 한 장에 나란히 — 크기 비교가 되어야 「엄청 크다」가 맞는지 눈으로 본다.
 // 곁에 주인공(2 x 3칸)을 세워 둔다. 사람 없이 큰 것만 보면 큰지 알 수 없다.
 {
   const pad = 16;
+  const ims = made.map(([n]) => PNG.sync.read(fs.readFileSync(OUT + PRE + n + '_0.png')));
   let tw = pad, th = 0;
-  const ims = made.map(([n]) => PNG.sync.read(fs.readFileSync(OUT + PRE + n + '.png')));
   for (const im of ims) { tw += im.width + pad; th = Math.max(th, im.height); }
   tw += 64 + pad;                       // 주인공 자리
   const cmp = new PNG({ width: tw, height: th + pad * 2 });
@@ -649,11 +836,48 @@ for (const [name, fn] of Object.entries(WORKS)) {
     }
     x += im.width + pad;
   }
-  // 주인공 실루엣 (64x96 화면px -> 이 판에서는 원본 배율이라 128x192)
   for (let y = 0; y < 192; y++) for (let xx = 0; xx < 64; xx++) {
     const di = ((y + pad + th - 192) * cmp.width + (x + 32 + xx)) * 4;
     cmp.data[di] = 40; cmp.data[di + 1] = 48; cmp.data[di + 2] = 60;
   }
   fs.writeFileSync(REF + 'preview_landmarks.png', PNG.sync.write(cmp));
-  console.log('preview_landmarks.png  (맨 오른쪽 검은 실루엣이 주인공 크기)');
+}
+
+// 움직이는지 보려면 장을 가로로 늘어놓고 봐야 한다 (한 줄에 한 랜드마크)
+{
+  const pad = 10;
+  let tw = 0, th = pad;
+  const rows = [];
+  for (const [name, , , nf] of made) {
+    const ims = [];
+    for (let f = 0; f < nf; f++)
+      ims.push(PNG.sync.read(fs.readFileSync(OUT + PRE + name + '_' + f + '.png')));
+    rows.push(ims);
+    tw = Math.max(tw, pad + ims.length * (ims[0].width / 2 + pad));
+    th += ims[0].height / 2 + pad;
+  }
+  const cmp = new PNG({ width: Math.round(tw), height: Math.round(th) });
+  for (let i = 0; i < cmp.data.length; i += 4) {
+    cmp.data[i] = 112; cmp.data[i + 1] = 144; cmp.data[i + 2] = 96; cmp.data[i + 3] = 255;
+  }
+  let oy = pad;
+  for (const ims of rows) {
+    let ox = pad;
+    for (const im of ims) {
+      // 게임에 그려지는 크기(0.5배) 그대로 — 이 크기에서 움직임이 보여야 한다
+      for (let y = 0; y < im.height; y += 2) for (let x = 0; x < im.width; x += 2) {
+        const si = (y * im.width + x) * 4;
+        if (im.data[si + 3] === 0) continue;
+        const X = Math.round(ox + x / 2), Y = Math.round(oy + y / 2);
+        if (X < 0 || Y < 0 || X >= cmp.width || Y >= cmp.height) continue;
+        const di = (Y * cmp.width + X) * 4;
+        cmp.data[di] = im.data[si]; cmp.data[di + 1] = im.data[si + 1];
+        cmp.data[di + 2] = im.data[si + 2];
+      }
+      ox += im.width / 2 + pad;
+    }
+    oy += ims[0].height / 2 + pad;
+  }
+  fs.writeFileSync(REF + 'preview_landmark_frames.png', PNG.sync.write(cmp));
+  console.log('preview_landmarks.png · preview_landmark_frames.png (장별로 늘어놓은 것)');
 }

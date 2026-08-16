@@ -116,6 +116,15 @@ var summary: CanvasLayer
 var night: CanvasModulate
 var sleep_dialog: ConfirmationDialog
 var water_frame := 0
+# 랜드마크 애니메이션 — 폭포는 흐르고, 큰나무는 흔들리고, 새는 날개를 친다.
+# 물타일(0.8초)보다 훨씬 빨라야 「흐른다」로 보인다
+var lm_frame := 0
+var lm_timer := 0.0
+const LANDMARK_FPS := 7.0
+# 종류마다 장 수가 다르다 (ref/make_landmarks.js 와 같아야 한다)
+const LANDMARK_FRAMES := {
+	"landmark_greattree": 3, "landmark_falls": 4, "landmark_spire": 2,
+}
 var water_timer := 0.0
 # 물의 깊이 — 뭍에서 몇 걸음인지 미리 재 둔다 (0 = 뭍, 1 = 물가...).
 # 그릴 때마다 이웃을 훑으면 물 한 칸마다 스물다섯 칸을 보게 된다.
@@ -135,6 +144,9 @@ var edge_tex := {}
 var terrain_level: Array = []
 var _growth_timer := 0.0
 var tree_sprites: Array = []
+# 돌려야 하는 랜드마크 그림들 — [스프라이트, 종류]. 세계에 넷뿐이라
+# 매 프레임 뒤지지 않고 세울 때 한 번 적어 둔다 (_tick_landmarks)
+var landmark_sprites: Array = []
 var weather_time := 0.0
 var animals: Array = []
 
@@ -222,8 +234,11 @@ const TEXTURE_NAMES := [
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
-	# 고장마다 하나씩 선 「엄청 큰 것」 (ref/make_landmarks.js)
-	"landmark_greattree", "landmark_falls", "landmark_spire",
+	# 고장마다 하나씩 선 「엄청 큰 것」 (ref/make_landmarks.js).
+	# 여러 장씩이다 — 물이 흐르고 잎이 흔들린다 (LANDMARK_FRAMES)
+	"landmark_greattree_0", "landmark_greattree_1", "landmark_greattree_2",
+	"landmark_falls_0", "landmark_falls_1", "landmark_falls_2", "landmark_falls_3",
+	"landmark_spire_0", "landmark_spire_1",
 	"rock", "house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
 	"icon_letter", "old_book",
@@ -1774,6 +1789,11 @@ func _process(delta: float) -> void:
 		if water_timer > 0.8:
 			water_timer = 0.0
 			water_frame = 1 - water_frame
+		lm_timer += delta
+		if lm_timer > 1.0 / LANDMARK_FPS:
+			lm_timer = 0.0
+			lm_frame += 1
+			objnode._tick_landmarks()
 		_growth_timer += delta
 		if _growth_timer >= 0.7:
 			farming._growth_tick(_growth_timer * MIN_PER_SEC)

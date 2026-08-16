@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://nbnajxc9zqbvh"
-path="res://.godot/imported/landmark_falls.png-444f095600ba7ad6a3794540632b7c17.ctex"
+uid="uid://d6f3oahnn49hq"
+path="res://.godot/imported/landmark_greattree_0.png-60a2da6b2be89afbfdbae1ac55b30a21.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/landmark_falls.png"
-dest_files=["res://.godot/imported/landmark_falls.png-444f095600ba7ad6a3794540632b7c17.ctex"]
+source_file="res://assets/sprites/landmark_greattree_0.png"
+dest_files=["res://.godot/imported/landmark_greattree_0.png-60a2da6b2be89afbfdbae1ac55b30a21.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jgb6bolxkhxxl"
-path="res://.godot/imported/landmark_spire.png-99159582a9d37b28013d85ef34fa64b3.ctex"
+uid="uid://fbk3h3iw3utm8"
+path="res://.godot/imported/landmark_greattree_2.png-7d2187141e4978f101e25c30537707b8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/landmark_spire.png"
-dest_files=["res://.godot/imported/landmark_spire.png-99159582a9d37b28013d85ef34fa64b3.ctex"]
+source_file="res://assets/sprites/landmark_greattree_2.png"
+dest_files=["res://.godot/imported/landmark_greattree_2.png-7d2187141e4978f101e25c30537707b8.ctex"]
 
 [params]
 

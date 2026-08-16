@@ -42,6 +42,7 @@ func _spawn_objects() -> void:
 	_clear_tree_falls()   # 쓰러지던 나무는 obj_nodes 밖에 있다 — 따로 치운다
 	m.obj_nodes.clear()
 	m.tree_sprites.clear()
+	m.landmark_sprites.clear()
 	# 지은 뒤에만 존재한다. 문 칸은 비워 둔다 (구버전 저장도 여기서 열린다)
 	for pid: String in GameData.village_built:
 		if m.VILLAGE_PLOTS.has(pid):
@@ -178,8 +179,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -100)
 		"landmark_greattree", "landmark_falls", "landmark_spire":
 			# 고장의 랜드마크 — 화면 열두 칸이 넘는 큰 그림. 밑변을 칸에
-			# 맞추고, 배율은 아래에서 0.5로 못 박는다 (건물과 같은 도트 밀도)
-			texture = m.tex[kind]
+			# 맞추고, 배율은 아래에서 0.5로 못 박는다 (건물과 같은 도트 밀도).
+			# 여러 장이라 첫 장으로 세우고, _tick_landmarks 가 돌린다
+			texture = m.tex[kind + "_0"]
 			offset = Vector2(0, -texture.get_height())
 		"barn":
 			texture = m.tex["barn"]
@@ -233,6 +235,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
+	elif m.LANDMARK_FRAMES.has(kind):
+		m.landmark_sprites.append([node.get_child(0), kind])
 	m.world.add_child(node)
 
 
@@ -493,3 +497,17 @@ func _update_object_fade(delta: float) -> void:
 			spr2.modulate.a = a
 		if is_equal_approx(a, 1.0) and not want.has(t):
 			m._fade_a.erase(t)
+
+
+# ---- 랜드마크를 돌린다 ----
+#
+# 폭포가 안 흐르면 그건 폭포 그림이지 폭포가 아니다. 세계에 넷뿐이라
+# 매 프레임 도는 것보다 훨씬 싸다 — 초당 일곱 번, 그림 넷만 갈아 끼운다.
+func _tick_landmarks() -> void:
+	for e: Array in m.landmark_sprites:
+		var spr: Sprite2D = e[0]
+		if not is_instance_valid(spr):
+			continue
+		var kind: String = e[1]
+		var n: int = int(m.LANDMARK_FRAMES[kind])
+		spr.texture = m.tex["%s_%d" % [kind, m.lm_frame % n]]
