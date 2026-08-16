@@ -407,16 +407,17 @@ function ramp(P, i) {
   return P[a].map((c, k) => Math.round(c * (1 - t) + P[b][k] * t));
 }
 
-// 깊이는 **다섯 단**, 한 단이 반 톤이다 (물가 5 -> 한가운데 7).
+// 깊이는 **여덟 단**, 한 단이 0.42톤이다 (물가 5 -> 한가운데 7.9).
 //
 // 처음엔 두 단이었다. 연못 한가운데에 검푸른 **직사각형**이 오려 붙은 것
 // 처럼 떴다 — 한 번에 두 톤을 뛰니 그 경계가 타일 변을 따라 그대로 보였다.
-// 세 단으로 늘려도 계단이 셋 보일 뿐이었다. 계단을 **반 톤**까지 낮추고
-// 단을 다섯으로 늘리자 비로소 경계가 안 보이고 물이 가운데로 갈수록
-// 깊어지는 것처럼 읽힌다. 반 톤은 사다리 사이를 절반씩 섞어 만든다.
+// 세 단, 다섯 단으로 늘려도 계단이 그만큼 보일 뿐이었다. 폭이 네 칸인
+// 개울은 어차피 두 단밖에 못 쓰니, **단의 높이 자체를 낮춰야** 했다.
+// 여덟 단 × 0.42톤이면 가장 깊은 곳은 전과 같은데 계단 하나는 반도
+// 안 된다 — 사다리를 반 단씩 섞어 찍으니 경계가 아예 흩어져 버린다.
 function baseWater(x, y, lv) {
   const v = vnoise(x, y, 51, 4) * 0.62 + vnoise(x, y, 52, 2) * 0.38;
-  return ramp(WATER, 5 + (lv || 0) * 0.72 + (v - 0.5) * 1.7);
+  return ramp(WATER, 5 + (lv || 0) * 0.42 + (v - 0.5) * 1.7);
 }
 
 // 물 한 장. lv = 깊이(0~2), vr = **판**(0~2).
@@ -435,13 +436,13 @@ function water(frame, lv, vr) {
     const ox = Math.floor(h(i, frame + s, 53) * N);
     const oy = Math.floor(h(frame + s, i, 54) * N);
     const len = 2 + Math.floor(h(i, i + frame + s, 55) * 3);
-    const t = 4.5 + lv * 0.72;
+    const t = 4.5 + lv * 0.42;
     for (let k = 0; k < len; k++) g.px(ox + k, oy, ramp(WATER, t + (i % 2) * 0.5));
     g.px(ox - 1, oy, ramp(WATER, t + 1.5));
   }
   // 물속에 비치는 바닥 — 모래톱과 조약돌, 수초 한 포기.
   // 깊을수록 물빛에 더 섞여 형체만 남다가 결국 안 보인다
-  const mix = Math.min(0.95, 0.80 + lv * 0.045);
+  const mix = Math.min(0.94, 0.80 + lv * 0.05);
   for (let i = 0; i < (lv < 3 ? 3 : 0); i++) {
     const ox = Math.floor(h(i + 11 + s, frame, 81) * N), oy = Math.floor(h(frame, i + 11 + s, 82) * N);
     for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++)
@@ -452,7 +453,7 @@ function water(frame, lv, vr) {
     g.px(ox, oy, thru(STONE[2], mix - 0.02)); g.px(ox + 1, oy, thru(STONE[3], mix - 0.02));
     g.px(ox, oy + 1, thru(STONE[4], mix));
   }
-  for (let i = 0; i < (lv === 0 ? 2 : 0); i++) {             // 수초
+  for (let i = 0; i < (lv === 0 ? 2 : (lv < 2 ? 1 : 0)); i++) {  // 수초
     const ox = Math.floor(h(i + 31 + s, 7, 86) * N), oy = Math.floor(h(7, i + 31 + s, 87) * N);
     for (const [dx, len] of [[-1, 2], [0, 3], [1, 2]])
       for (let k = 0; k <= len; k++)
@@ -644,8 +645,8 @@ for (const s of Object.keys(SEASON))
 // 알의 톤·닳음만 흔든다)
 for (let v = 0; v < 3; v++) save('path_' + v, cobble(v * 5).render());
 for (let v = 0; v < 3; v++) save('yard_' + v, yard(v).render());
-// water_<깊이>_<판>_<장> — 깊이 다섯 × 판 셋 × 장 둘
-for (let lv = 0; lv < 5; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
+// water_<깊이>_<판>_<장> — 깊이 여덟 × 판 셋 × 장 둘
+for (let lv = 0; lv < 8; lv++) for (let vr = 0; vr < 3; vr++) for (let f = 0; f < 2; f++)
   save(`water_${lv}_${vr}_${f}`, water(f, lv, vr).render());
 for (let v = 0; v < 3; v++) save('sand_' + v, sandTile(v).render());
 // 물가 — 이웃 꼴(mask) 열다섯 가지 × 네 종류.

@@ -1920,7 +1920,7 @@ func _is_water(x: int, y: int) -> bool:
 #
 # 여덟 방향으로 재는 이유 — 네 방향으로만 재면 깊이 띠가 마름모로 각진다.
 # 앞뒤 두 번 훑는 체스판 거리(chamfer)면 한 번에 맵 전체가 채워진다.
-const WATER_LV := 5
+const WATER_LV := 8
 
 func rebuild_water_levels() -> void:
 	water_dist = []
