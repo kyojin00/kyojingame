@@ -83,6 +83,7 @@ func _plant_story_forest() -> void:
 	for by in range(base.position.y, base.end.y):
 		for bx in range(base.position.x, base.end.x):
 			m.grid[by][bx].ground = "grass"
+	m.dirty_all()   # 튜토리얼 자리를 통째로 다시 깔았다
 	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래)
 	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
 		for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 1):
@@ -181,6 +182,7 @@ func _carve_road(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
 		return
 	m.grid[pos.y][pos.x].ground = "path"
+	m.dirty_tile(pos.x, pos.y)
 	m.objects.erase(pos)
 
 

@@ -1140,11 +1140,17 @@ func _respawn_ok(pos: Vector2i, kind: String, clear_dist := -1) -> bool:
 	return true
 
 
-func _nature_count(kind: String) -> int:
-	var n := 0
+# 종류별로 **한 번에** 센다.
+#
+# 예전에는 `_nature_count(kind)` 하나가 물건 전부(6천 개)를 훑었고, 그걸
+# 잡초 돋는 반복문 **안에서** 불렀다 — 비 오는 날은 108번. 6천 × 108 =
+# 육십오만 번이다. 하루가 넘어갈 때 반 초가 여기서 갔다.
+# 한 번 세어 놓고, 놓을 때마다 하나씩 올리면 된다.
+func _nature_counts() -> Dictionary:
+	var n := {}
 	for pos in m.objects:
-		if String(m.objects[pos].kind) == kind:
-			n += 1
+		var k := String(m.objects[pos].kind)
+		n[k] = int(n.get(k, 0)) + 1
 	return n
 
 
@@ -1152,13 +1158,14 @@ func _nature_count(kind: String) -> int:
 # 맵의 「빈자리 검사」를 통과한 랜덤 위치에서 새로 자란다.
 # 잡초는 그와 별개로 시간이 지나면 저절로도 돋는다 (상한 안에서).
 func _respawn_resources() -> void:
+	var cnt := _nature_counts()
 	var keep: Array = []
 	for e in GameData.respawn_queue:
 		if int(e.due) > GameData.day:
 			keep.append(e)
 			continue
 		var kind := str(e.kind)
-		if _nature_count(kind) >= int(NATURE_CAP.get(kind, 999)):
+		if int(cnt.get(kind, 0)) >= int(NATURE_CAP.get(kind, 999)):
 			continue   # 이미 빽빽하다 — 이 리젠은 조용히 사라진다
 		var placed := false
 		for attempt in 30:
@@ -1167,6 +1174,7 @@ func _respawn_resources() -> void:
 				continue   # 못 놓는 자리면 강제하지 않고 다른 자리를 다시 찾는다
 			m.objnode._place_object(pos, kind,
 				m.TREE_HP if kind == "tree" else (m.ROCK_HP if kind == "rock" else 0))
+			cnt[kind] = int(cnt.get(kind, 0)) + 1
 			placed = true
 			break
 		if not placed:
@@ -1178,13 +1186,16 @@ func _respawn_resources() -> void:
 	var wet: bool = m.weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]
 	var weed_want := 18 if wet else 9
 	var weed_sprouts := 0
+	var weed_n := int(cnt.get("weed", 0))
+	var weed_cap := int(NATURE_CAP["weed"])
 	for attempt in weed_want * 6:
-		if weed_sprouts >= weed_want or _nature_count("weed") >= int(NATURE_CAP["weed"]):
+		if weed_sprouts >= weed_want or weed_n >= weed_cap:
 			break
 		var pos2 := Vector2i(randi_range(1, m.MAP_W - 2), randi_range(1, m.WORLD_H - 2))
 		if _respawn_ok(pos2, "weed"):
 			m.objnode._place_object(pos2, "weed", 0)
 			weed_sprouts += 1
+			weed_n += 1
 
 
 # 지금 날씨가 받쳐 주는 채집물 상한

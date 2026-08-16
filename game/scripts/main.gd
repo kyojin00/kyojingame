@@ -132,6 +132,29 @@ var water_timer := 0.0
 # 그릴 때마다 이웃을 훑으면 물 한 칸마다 스물다섯 칸을 보게 된다.
 # 물이 생기거나 없어지면 rebuild_water_levels()를 다시 부른다
 var water_dist: Array = []
+# 물 그림을 **평평한 배열**로 한 벌 더 들고 있는다 — [(깊이*3+판)*2 + 장].
+# tex["water_%d_%d_%d"] 는 칸마다 글자를 짜맞추고 사전을 뒤진다
+var _water_tex: Array = []
+
+# ---- 그리기 캐시: 칸마다 「무엇을 그릴지」는 지도가 바뀔 때만 바뀐다 ----
+#
+# 그런데 프레임마다 다시 셈하고 있었다. 보이는 칸이 구백이면 구백 벌씩,
+# 이웃 여덟 견주기 · _hash01 네댓 번 · **글자 짜맞추기와 사전 뒤지기**를.
+# 지도는 밭을 갈 때 말고는 안 바뀐다. 한 번 셈해서 **텍스처 참조 그대로**
+# 담아 두고, 걸음을 옮겨 새로 들어온 칸만 셈한다.
+#
+# 칸마다 달라지는 것(물의 장 · 흙의 젖음 · 작물)은 캐시에 안 담는다 —
+# 담을 수 없어서가 아니라, 담으면 매번 버려야 해서 캐시가 아니게 된다.
+const DC_NONE := 0    # 아직 안 셈했다
+const DC_FIXED := 1   # 바탕이 고정 (_dc_base)
+const DC_WATER := 2   # 물 — 깊이·판은 굳었고 장만 매번 (_dc_water)
+const DC_SOIL := 3    # 밭 — 젖었는지는 매번
+const DC_DOCK := 4    # 부두 — 물·널·널끝을 따로 그린다
+var _dc_kind := PackedByteArray()
+var _dc_base: Array = []            # 고정 바탕 Texture2D
+var _dc_water := PackedInt32Array() # 깊이*3 + 판
+var _dc_edge: Array = []            # 가장자리 Texture2D 묶음 (없으면 null)
+var _dc_season := ""                # 계절이 바뀌면 잔디 판 셋이 통째로 갈린다
 # 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
 # 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
 const EDGE_KINDS := ["shore", "shoal", "beach", "surf", "dune", "trod", "brink"]
@@ -1166,11 +1189,13 @@ func _load_textures() -> void:
 	#   깊이  물가에서 멀수록 짙다. 한 단이 반 톤이라 경계가 안 보인다
 	#   판    한 장을 호수에 반복해 깔면 잔물결이 같은 자리마다 찍혀
 	#         물 위에 바둑판이 뜬다. 잔디처럼 판을 나눠 칸마다 골라 쓴다
+	_water_tex.resize(WATER_LV * 3 * 2)
 	for lv in WATER_LV:
 		for vr in 3:
 			for f in 2:
 				var wn := "water_%d_%d_%d" % [lv, vr, f]
 				tex[wn] = load("res://assets/sprites/%s.png" % wn)
+				_water_tex[(lv * 3 + vr) * 2 + f] = tex[wn]
 	# 경계 — 이웃 **여덟 칸**의 꼴(0~255)마다 한 칸씩 담긴 아틀라스 한 장.
 	#
 	# 이웃 넷만 보고 그렸더니, 볼록한 귀퉁이에서 땅 칸은 제 모서리를 깎아
@@ -2308,6 +2333,9 @@ var _fade_a := {}     # Vector2i -> 지금 알파
 # 16.7ms 가 60프레임의 예산이다 — 어느 줄이 그 예산을 먹는지 보면 된다.
 var perf_show := false
 var _perf := {"draw": 0, "fade": 0, "stream": 0, "spawn": 0}
+# 하루가 넘어갈 때 **한 번** 터지는 값 — 평균에 섞으면 사라져 버린다.
+# 마지막으로 넘어간 하루가 어디서 몇 밀리초를 썼는지 그대로 들고 있는다
+var _perf_day := {"total": 0, "farm": 0, "grow": 0, "spawn": 0, "save": 0}
 var _perf_n := 0
 var _perf_acc := {"draw": 0, "fade": 0, "stream": 0, "spawn": 0}
 var _perf_worst := 0.0
@@ -2364,6 +2392,36 @@ func rebuild_water_levels() -> void:
 					continue
 				d = mini(d, water_dist[ny][nx] + 1)
 			water_dist[y][x] = mini(d, big)
+	# 물길이 바뀌면 깊이도 물가도 다 바뀐다 — 그려 둔 것을 통째로 버린다.
+	# (지도를 짓고 나서도, 세이브를 읽고 나서도 여기를 지나간다)
+	dirty_all()
+
+
+# ---- 그리기 캐시 버리기 ----
+#
+# 가장자리는 **이웃 여덟 칸**을 보고 그린다. 그러니 한 칸이 바뀌면 그 칸
+# 하나가 아니라 둘레 아홉 칸이 같이 상한다. 여기를 한 칸으로 줄이면
+# 갈아엎은 밭 언저리에 옛 잔디 테두리가 남는다.
+func dirty_tile(x: int, y: int) -> void:
+	if _dc_kind.is_empty():
+		return
+	for yy in range(maxi(0, y - 1), mini(MAP_H, y + 2)):
+		var b := yy * MAP_W
+		for xx in range(maxi(0, x - 1), mini(MAP_W, x + 2)):
+			_dc_kind[b + xx] = DC_NONE
+
+
+# 텍스처 참조까지 비우지는 않는다 — 종류가 DC_NONE 이면 어차피 다시 셈해서
+# 덮어쓴다. 여기서 하는 일은 136KB 한 판을 0으로 미는 것뿐이라, 반복문
+# 안에서 불러도 부담이 없다
+func dirty_all() -> void:
+	var n := MAP_W * MAP_H
+	if _dc_kind.size() != n:
+		_dc_kind.resize(n)
+		_dc_water.resize(n)
+		_dc_base.resize(n)
+		_dc_edge.resize(n)
+	_dc_kind.fill(DC_NONE)
 
 
 func _water_level(x: int, y: int) -> int:
@@ -2437,6 +2495,167 @@ func _row_kind(y: int, xa: int, n: int) -> PackedByteArray:
 # ---- 렌더링 ----
 
 
+# 한 칸이 무엇을 그리는지 **한 번만** 셈해서 담아 둔다.
+#
+# 여기 적힌 일이 전부 프레임마다 돌던 것이다 — 이웃 여덟 견주기, _hash01
+# 네댓 번, 그리고 "water_%d_%d_%d" 같은 **글자 짜맞추기와 사전 뒤지기**.
+# 보이는 칸이 구백이면 프레임마다 구백 벌이었다. 지도는 밭을 갈 때 말고는
+# 안 바뀌니, 한 번 셈해서 텍스처 참조 그대로 들고 있으면 된다.
+func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
+		cur: PackedByteArray, below: PackedByteArray, grass_prefix: String) -> int:
+	var ground: String = grid[y][x].ground
+	var kc: int = cur[i]
+	# 이웃 여덟 칸 (1=북 2=남 4=서 8=동 16=북서 32=북동 64=남서 128=남동)
+	var kn: int = above[i]
+	var ks: int = below[i]
+	var kw: int = cur[i - 1]
+	var ke: int = cur[i + 1]
+	var knw: int = above[i - 1]
+	var kne: int = above[i + 1]
+	var ksw: int = below[i - 1]
+	var kse: int = below[i + 1]
+	# **종류만 뽑아 쓴다.** 이 바이트에는 켜(3~5비트)와 오르막(6비트)이
+	# 같이 들어 있어서, 통째로 K_WATER 와 견주면 켜가 0이 아닌 칸에서는
+	# 물이 물로 안 읽힌다. _build_levels 가 능선 북쪽을 전부 켜 1로
+	# 깔아 두므로 **지도 거의 전부가** 그랬다 — 물가도 길도 모래도
+	# 가장자리가 통째로 안 그려지던 진짜 이유다.
+	var gc := kc & 7
+	var gn := kn & 7
+	var gs := ks & 7
+	var gw := kw & 7
+	var gek := ke & 7
+	var gnw := knw & 7
+	var gne := kne & 7
+	var gsw := ksw & 7
+	var gse := kse & 7
+	var el: Array[Texture2D] = []
+	var kind := DC_FIXED
+	if (kc & 64) != 0:
+		# 오르막 — 벼랑을 깎아 낸 길. 밟혀 다져진 흙에 디딤돌을 놓았다
+		_dc_base[ci] = tex["ramp_%d" % (int(_hash01(x * 13, y * 3) * 3.0) % 3)]
+	elif ground == "dock":
+		kind = DC_DOCK
+	elif ground == "sand":
+		# 모래사장 — 물결이 남긴 잔결에 조개·조약돌이 쓸려 와 있다.
+		# 색 한 판에 점 세 개로 칠했더니 새로 그린 바닥들 옆에서
+		# 혼자 종이처럼 매끈했다
+		_dc_base[ci] = tex["sand_%d" % (int(_hash01(x * 5, y * 11) * 3.0) % 3)]
+	elif ground == "water":
+		# 물가에서 멀수록 깊다 — 여덟 단, 한 단이 0.42톤.
+		# 판(0~2)은 칸마다 골라 쓴다. 한 판만 깔면 잔물결이 같은
+		# 자리마다 찍혀 물 위에 바둑판이 뜬다.
+		# 깊이와 판은 여기서 굳고, **장**만 그릴 때 고른다
+		kind = DC_WATER
+		_dc_water[ci] = _water_level(x, y) * 3 \
+			+ int(_hash01(x * 3 + 1, y * 7 + 5) * 3.0) % 3
+	elif ground == "soil":
+		kind = DC_SOIL
+	elif ground == "path":
+		_dc_base[ci] = tex["path_%d" % (int(_hash01(x * 7, y * 3) * 3.0) % 3)]
+	elif ground == "yard":
+		# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
+		_dc_base[ci] = tex["yard_%d" % (int(_hash01(x * 9, y * 5) * 3.0) % 3)]
+	else:
+		_dc_base[ci] = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
+		# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
+		# 길 쪽에서 자갈이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다
+		if gn == K_PATH:
+			el.append(tex["path_edge_n"])
+		if gs == K_PATH:
+			el.append(tex["path_edge_s"])
+		if gw == K_PATH:
+			el.append(tex["path_edge_w"])
+		if gek == K_PATH:
+			el.append(tex["path_edge_e"])
+	# 물가 — 물과 뭍의 경계. 물 칸에는 여울을, 뭍 칸에는 젖은 흙과
+	# 둑을. 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
+	if ground != "dock":
+		var wet := gc == K_WATER
+		var code := 0
+		if (gn == K_WATER) != wet: code |= 1
+		if (gs == K_WATER) != wet: code |= 2
+		if (gw == K_WATER) != wet: code |= 4
+		if (gek == K_WATER) != wet: code |= 8
+		if (gnw == K_WATER) != wet: code |= 16
+		if (gne == K_WATER) != wet: code |= 32
+		if (gsw == K_WATER) != wet: code |= 64
+		if (gse == K_WATER) != wet: code |= 128
+		if code != 0:
+			# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
+			var wk: String
+			if wet:
+				wk = "surf" if (gn == K_SAND or gs == K_SAND
+					or gw == K_SAND or gek == K_SAND) else "shoal"
+			else:
+				wk = "beach" if gc == K_SAND else "shore"
+			el.append(edge_tex[wk][code])
+		# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
+		# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다
+		if gc != K_SAND:
+			var sc := 0
+			if gn == K_SAND: sc |= 1
+			if gs == K_SAND: sc |= 2
+			if gw == K_SAND: sc |= 4
+			if gek == K_SAND: sc |= 8
+			if gnw == K_SAND: sc |= 16
+			if gne == K_SAND: sc |= 32
+			if gsw == K_SAND: sc |= 64
+			if gse == K_SAND: sc |= 128
+			if sc != 0:
+				el.append(edge_tex["dune"][sc])
+		if gc != K_YARD:
+			var yc := 0
+			if gn == K_YARD: yc |= 1
+			if gs == K_YARD: yc |= 2
+			if gw == K_YARD: yc |= 4
+			if gek == K_YARD: yc |= 8
+			if gnw == K_YARD: yc |= 16
+			if gne == K_YARD: yc |= 32
+			if gsw == K_YARD: yc |= 64
+			if gse == K_YARD: yc |= 128
+			if yc != 0:
+				el.append(edge_tex["trod"][yc])
+	# 벼랑 — 높이가 다른 두 땅이 만나는 자리. 면은 **아래쪽 칸**에
+	# 드리우고(위에서 내려다보면 벽이 차지하는 자리가 거기다),
+	# 마루는 위쪽 칸에 얹는다. 오르막끼리 맞닿은 자리만 경계에서
+	# 빼면 그 사이로 길이 뚫리고 양옆에는 바위벽이 남는다
+	# 평지가 대부분이라 **먼저 싸게 가른다** — 이웃 여덟의 켜가 다
+	# 나와 같으면 여기는 볼 것이 없다
+	var lvb: int = kc & 56
+	if (kn & 56) != lvb or (ks & 56) != lvb or (kw & 56) != lvb \
+		or (ke & 56) != lvb or (knw & 56) != lvb or (kne & 56) != lvb \
+		or (ksw & 56) != lvb or (kse & 56) != lvb:
+		var ramp: bool = (kc & 64) != 0
+		var nbuf: Array[int] = [kn, ks, kw, ke, knw, kne, ksw, kse]
+		var up := 0
+		var dn := 0
+		for b in 8:
+			var nb: int = nbuf[b]
+			if ramp and (nb & 64) != 0:
+				continue          # 오르막끼리는 경계가 아니다
+			var nlb: int = nb & 56
+			if nlb > lvb:
+				up |= 1 << b
+			elif nlb < lvb:
+				dn |= 1 << b
+		# **물 위에는 벼랑을 안 그린다.**
+		#
+		# 벼랑면은 「위 칸이 더 높다」는 표시로 **아랫 칸에** 그린다.
+		# 그런데 그 아랫 칸이 물이면, 호수 한복판에 돌담 토막이
+		# 떠 있는 꼴이 된다 — 폭포골처럼 켜가 다른 두 못이 나란히
+		# 있는 데서 이게 그대로 보였다. 물에 잠긴 벼랑은 안 보이는 게
+		# 맞다 (보이는 건 수면이다). 마루선(brink)도 마찬가지다.
+		if gc != K_WATER:
+			if up != 0:
+				el.append(edge_tex["cliff_%d"
+					% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up])
+			if dn != 0:
+				el.append(edge_tex["brink"][dn])
+	_dc_kind[ci] = kind
+	_dc_edge[ci] = el if not el.is_empty() else null
+	return kind
+
+
 func _draw() -> void:
 	var _t0 := Time.get_ticks_usec() if perf_show else 0
 	# 카메라에 보이는 타일만 그린다 (120x90 맵 컬링)
@@ -2452,6 +2671,17 @@ func _draw() -> void:
 
 	var grass_prefix := "grass_" + GameData.season_key() + "_"
 	var tile_size := Vector2(TILE, TILE)
+
+	# 캐시가 아직 없거나(첫 프레임), 계절이 넘어가 잔디 판이 통째로 갈렸으면
+	# 여기서 버린다. 계절은 글자 하나 견주는 값이면 알아낼 수 있다
+	if _dc_kind.size() != MAP_W * MAP_H or _dc_season != grass_prefix:
+		_dc_season = grass_prefix
+		dirty_all()
+	# 검증 하네스는 격자를 직접 뜯어고친다 — 문 앞을 잔디로 밀고, 집을 지우고.
+	# 그 자리마다 손대라고 할 것 없이, 하네스가 붙어 있으면 캐시를 안 쓴다.
+	# 거기서 중요한 건 빠르기가 아니라 찍힌 그림이 격자 그대로인 것이다
+	if harness != null:
+		_dc_kind.fill(DC_NONE)
 
 	# ---- 텍스처별로 모았다가 한 번에 그린다 ----
 	#
@@ -2475,187 +2705,82 @@ func _draw() -> void:
 	# (카메라 제한을 풀어 주인공을 항상 화면 가운데 두기 위한 배경)
 	var out_grass := {}
 	var out_trees: Array[Vector2] = []
+	# 잔디 판 셋은 미리 꺼내 둔다 — 칸마다 글자를 붙여 사전을 뒤질 일이 아니다
+	var g3: Array[Texture2D] = [tex[grass_prefix + "0"], tex[grass_prefix + "1"],
+		tex[grass_prefix + "2"]]
 	for y in range(vy0, vy1):
 		for x in range(vx0, vx1):
 			if x >= 0 and y >= 0 and x < MAP_W and y < MAP_H:
 				continue
-			put.call(out_grass, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)],
+			put.call(out_grass, g3[int(_hash01(x, y) * 3.0) % 3],
 				Vector2(x * TILE, y * TILE))
 			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다
 			if x % 3 == 0 and y % 2 == 0 and _hash01(x * 5 + 1, y * 7 + 3) < 0.55:
 				out_trees.append(Vector2(x * TILE, y * TILE))
 
 	# 이웃 여덟 칸을 칸마다 따로 훑으면 격자를 여덟 번씩 뒤지게 된다.
-	# **줄 단위로** 읽어 두고 세 줄을 굴리면 칸당 한 번으로 준다
+	# **줄 단위로** 읽어 두고, 그마저도 **아직 안 셈한 칸이 있는 줄에서만**
+	# 읽는다. 걸음을 멈추고 있으면 여기서 다 걸러져 셈이 통째로 빠진다
 	var xa := x0 - 1
 	var span := x1 - x0 + 2
-	# 이웃 여덟의 켜를 담을 그릇 — 칸마다 새로 만들면 그만큼 할당이 는다
-	var nbuf: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0]
-	var above := _row_kind(y0 - 1, xa, span)
-	var cur := _row_kind(y0, xa, span)
-	var below := _row_kind(y0 + 1, xa, span)
+	var rows := {}
+	var rowk := func(ry: int) -> PackedByteArray:
+		if not rows.has(ry):
+			rows[ry] = _row_kind(ry, xa, span)
+		return rows[ry]
+
+	var soil_wet: Texture2D = tex["soil_wet"]
+	var soil_dry: Texture2D = tex["soil_dry"]
+	var no_row := PackedByteArray()
 	for y in range(y0, y1):
 		var row: Array = grid[y]
+		var rb := y * MAP_W
+		var above := no_row
+		var cur := no_row
+		var below := no_row
+		for x in range(x0, x1):
+			if _dc_kind[rb + x] == DC_NONE:
+				above = rowk.call(y - 1)
+				cur = rowk.call(y)
+				below = rowk.call(y + 1)
+				break
 		for x in range(x0, x1):
 			var cell: Dictionary = row[x]
 			var at := Vector2(x * TILE, y * TILE)
-			var ground: String = cell.ground
-			var i := x - xa
-			var kc: int = cur[i]
-			# 이웃 여덟 칸 (1=북 2=남 4=서 8=동 16=북서 32=북동 64=남서 128=남동)
-			var kn: int = above[i]
-			var ks: int = below[i]
-			var kw: int = cur[i - 1]
-			var ke: int = cur[i + 1]
-			var knw: int = above[i - 1]
-			var kne: int = above[i + 1]
-			var ksw: int = below[i - 1]
-			var kse: int = below[i + 1]
-			# **종류만 뽑아 쓴다.** 이 바이트에는 켜(3~5비트)와 오르막(6비트)이
-			# 같이 들어 있어서, 통째로 K_WATER 와 견주면 켜가 0이 아닌 칸에서는
-			# 물이 물로 안 읽힌다. _build_levels 가 능선 북쪽을 전부 켜 1로
-			# 깔아 두므로 **지도 거의 전부가** 그랬다 — 물가도 길도 모래도
-			# 가장자리가 통째로 안 그려지던 진짜 이유다.
-			var gc := kc & 7
-			var gn := kn & 7
-			var gs := ks & 7
-			var gw := kw & 7
-			var gek := ke & 7
-			var gnw := knw & 7
-			var gne := kne & 7
-			var gsw := ksw & 7
-			var gse := kse & 7
-			if (kc & 64) != 0:
-				# 오르막 — 벼랑을 깎아 낸 길. 밟혀 다져진 흙에 디딤돌을 놓았다
-				put.call(base, tex["ramp_%d" % (int(_hash01(x * 13, y * 3) * 3.0) % 3)], at)
-			elif ground == "dock":
-				docks.append(at)
-			elif ground == "sand":
-				# 모래사장 — 물결이 남긴 잔결에 조개·조약돌이 쓸려 와 있다.
-				# 색 한 판에 점 세 개로 칠했더니 새로 그린 바닥들 옆에서
-				# 혼자 종이처럼 매끈했다
-				put.call(base, tex["sand_%d" % (int(_hash01(x * 5, y * 11) * 3.0) % 3)], at)
-			elif ground == "water":
-				# 물가에서 멀수록 깊다 — 여덟 단, 한 단이 0.42톤.
-				# 판(0~2)은 칸마다 골라 쓴다. 한 판만 깔면 잔물결이 같은
-				# 자리마다 찍혀 물 위에 바둑판이 뜬다
-				put.call(base, tex["water_%d_%d_%d" % [_water_level(x, y),
-					int(_hash01(x * 3 + 1, y * 7 + 5) * 3.0) % 3, water_frame]], at)
-			elif ground == "soil":
-				put.call(base, tex["soil_wet"] if cell.watered else tex["soil_dry"], at)
-			elif ground == "path":
-				put.call(base, tex["path_%d" % (int(_hash01(x * 7, y * 3) * 3.0) % 3)], at)
-			elif ground == "yard":
-				# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
-				put.call(base, tex["yard_%d" % (int(_hash01(x * 9, y * 5) * 3.0) % 3)], at)
+			var ci := rb + x
+			var dk: int = _dc_kind[ci]
+			if dk == DC_NONE:
+				dk = _dc_fill(x, y, ci, x - xa, above, cur, below, grass_prefix)
+			# 바탕은 한 칸에 하나뿐이다. 매번 달라지는 것만 여기서 고른다 —
+			# 물은 **장**, 밭은 **젖었는지**. 나머지는 캐시가 들고 있다
+			var bt: Texture2D = null
+			if dk == DC_FIXED:
+				bt = _dc_base[ci]
+			elif dk == DC_WATER:
+				bt = _water_tex[_dc_water[ci] * 2 + water_frame]
+			elif dk == DC_SOIL:
+				bt = soil_wet if cell.watered else soil_dry
 			else:
-				put.call(base, tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)], at)
-				# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
-				# 길 쪽에서 자갈이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다
-				if gn == K_PATH:
-					put.call(edges, tex["path_edge_n"], at)
-				if gs == K_PATH:
-					put.call(edges, tex["path_edge_s"], at)
-				if gw == K_PATH:
-					put.call(edges, tex["path_edge_w"], at)
-				if gek == K_PATH:
-					put.call(edges, tex["path_edge_e"], at)
-			# 물가 — 물과 뭍의 경계. 물 칸에는 여울을, 뭍 칸에는 젖은 흙과
-			# 둑을. 이게 없으면 연못이 파란 사각형을 오려 붙인 것처럼 보인다
-			if ground != "dock":
-				var wet := gc == K_WATER
-				var code := 0
-				if (gn == K_WATER) != wet: code |= 1
-				if (gs == K_WATER) != wet: code |= 2
-				if (gw == K_WATER) != wet: code |= 4
-				if (gek == K_WATER) != wet: code |= 8
-				if (gnw == K_WATER) != wet: code |= 16
-				if (gne == K_WATER) != wet: code |= 32
-				if (gsw == K_WATER) != wet: code |= 64
-				if (gse == K_WATER) != wet: code |= 128
-				if code != 0:
-					# 모래에 닿는 물은 파도가 밀려드는 자리다 — 둑도 그늘도 없다
-					var kind: String
-					if wet:
-						kind = "surf" if (gn == K_SAND or gs == K_SAND
-							or gw == K_SAND or gek == K_SAND) else "shoal"
-					else:
-						kind = "beach" if gc == K_SAND else "shore"
-					put.call(edges, edge_tex[kind][code], at)
-				# 잔디와 모래·마당의 경계 — 날린 모래도 밟혀 번진 흙도
-				# 풀밭으로 파고든다. 안 그리면 여기가 자로 자른 계단으로 남는다
-				if gc != K_SAND:
-					var sc := 0
-					if gn == K_SAND: sc |= 1
-					if gs == K_SAND: sc |= 2
-					if gw == K_SAND: sc |= 4
-					if gek == K_SAND: sc |= 8
-					if gnw == K_SAND: sc |= 16
-					if gne == K_SAND: sc |= 32
-					if gsw == K_SAND: sc |= 64
-					if gse == K_SAND: sc |= 128
-					if sc != 0:
-						put.call(edges, edge_tex["dune"][sc], at)
-				if gc != K_YARD:
-					var yc := 0
-					if gn == K_YARD: yc |= 1
-					if gs == K_YARD: yc |= 2
-					if gw == K_YARD: yc |= 4
-					if gek == K_YARD: yc |= 8
-					if gnw == K_YARD: yc |= 16
-					if gne == K_YARD: yc |= 32
-					if gsw == K_YARD: yc |= 64
-					if gse == K_YARD: yc |= 128
-					if yc != 0:
-						put.call(edges, edge_tex["trod"][yc], at)
-			# 벼랑 — 높이가 다른 두 땅이 만나는 자리. 면은 **아래쪽 칸**에
-			# 드리우고(위에서 내려다보면 벽이 차지하는 자리가 거기다),
-			# 마루는 위쪽 칸에 얹는다. 오르막끼리 맞닿은 자리만 경계에서
-			# 빼면 그 사이로 길이 뚫리고 양옆에는 바위벽이 남는다
-			# 평지가 대부분이라 **먼저 싸게 가른다** — 이웃 여덟의 켜가 다
-			# 나와 같으면 여기는 볼 것이 없다
-			var lvb: int = kc & 56
-			if (kn & 56) != lvb or (ks & 56) != lvb or (kw & 56) != lvb \
-				or (ke & 56) != lvb or (knw & 56) != lvb or (kne & 56) != lvb \
-				or (ksw & 56) != lvb or (kse & 56) != lvb:
-				var ramp: bool = (kc & 64) != 0
-				nbuf[0] = kn
-				nbuf[1] = ks
-				nbuf[2] = kw
-				nbuf[3] = ke
-				nbuf[4] = knw
-				nbuf[5] = kne
-				nbuf[6] = ksw
-				nbuf[7] = kse
-				var up := 0
-				var dn := 0
-				for b in 8:
-					var nb: int = nbuf[b]
-					if ramp and (nb & 64) != 0:
-						continue          # 오르막끼리는 경계가 아니다
-					var nlb: int = nb & 56
-					if nlb > lvb:
-						up |= 1 << b
-					elif nlb < lvb:
-						dn |= 1 << b
-				# **물 위에는 벼랑을 안 그린다.**
-				#
-				# 벼랑면은 「위 칸이 더 높다」는 표시로 **아랫 칸에** 그린다.
-				# 그런데 그 아랫 칸이 물이면, 호수 한복판에 돌담 토막이
-				# 떠 있는 꼴이 된다 — 폭포골처럼 켜가 다른 두 못이 나란히
-				# 있는 데서 이게 그대로 보였다. 물에 잠긴 벼랑은 안 보이는 게
-				# 맞다 (보이는 건 수면이다). 마루선(brink)도 마찬가지다.
-				if gc != K_WATER:
-					if up != 0:
-						put.call(edges, edge_tex["cliff_%d"
-							% (int(_hash01(x * 11, y * 7) * 3.0) % 3)][up], at)
-					if dn != 0:
-						put.call(edges, edge_tex["brink"][dn], at)
+				docks.append(at)
+			# put 을 안 쓰고 펼쳐 적는다 — 칸마다 도는 자리라 Callable 부르는
+			# 값이 그대로 곱해진다
+			if bt != null:
+				var bl = base.get(bt)
+				if bl == null:
+					bl = [] as Array[Vector2]
+					base[bt] = bl
+				bl.append(at)
+			# 가장자리 — 물가·모래·마당·벼랑. 들판은 대부분 여기가 비어 있다
+			var el = _dc_edge[ci]
+			if el != null:
+				for t: Texture2D in el:
+					var eb = edges.get(t)
+					if eb == null:
+						eb = [] as Array[Vector2]
+						edges[t] = eb
+					eb.append(at)
 			if cell.crop_id != "":
 				put.call(crops, renderer._crop_texture(cell), at)
-		above = cur
-		cur = below
-		below = _row_kind(y + 2, xa, span)
 
 	# 맵 바깥 (어둡게)
 	for t: Texture2D in out_grass:
@@ -2679,7 +2804,7 @@ func _draw() -> void:
 	# 물 위에 색종이를 오려 붙인 것 같았다. 이제 널 타일을 깔고, 물에
 	# 닿는 쪽에는 잘린 널 끝과 물 속으로 박힌 기둥을 얹는다.
 	if not docks.is_empty():
-		var wt: Texture2D = tex["water_0_0_%d" % water_frame]
+		var wt: Texture2D = _water_tex[water_frame]
 		for at: Vector2 in docks:
 			draw_texture_rect(wt, Rect2(at, tile_size), false)   # 판자 밑으로 물이 비친다
 		for at: Vector2 in docks:
@@ -2761,6 +2886,12 @@ func _perf_tick(delta: float) -> void:
 		int(_perf_acc.draw) / n / 1000.0, int(_perf_acc.fade) / n / 1000.0,
 		int(_perf_acc.stream) / n / 1000.0, int(_perf_acc.spawn) / n / 1000.0]
 	lines += "그리기 호출 %d · 정점묶음 %d · 그린 것 %d\n" % [calls, prims, objs]
+	# 끊김은 평균이 아니라 **한 번 터지는 것**에서 온다. 하루 넘김이
+	# 그중 제일 크다 — 어느 토막이 먹는지 여기서 바로 읽힌다
+	lines += "하루넘김 %.0fms (밭 %.0f · 자람 %.0f · 리젠 %.0f · 저장 %.0f)\n" % [
+		int(_perf_day.total) / 1000.0, int(_perf_day.farm) / 1000.0,
+		int(_perf_day.grow) / 1000.0, int(_perf_day.spawn) / 1000.0,
+		int(_perf_day.save) / 1000.0]
 	lines += "노드 %d (월드 자식 %d) · 물건 %d · 세울 차례 %d" % [
 		obj_nodes.size(), world.get_child_count(), objects.size(),
 		objnode._spawn_queue.size()]

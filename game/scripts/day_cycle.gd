@@ -94,6 +94,9 @@ func _fade_next_day(passed_out: bool) -> void:
 
 
 func _next_day(passed_out: bool) -> void:
+	# 하루 넘김은 프레임 하나에 몰아서 터진다 — F3에서 토막마다 재 둔다
+	var _t_all := Time.get_ticks_usec()
+	var _t := _t_all
 	# 밤사이 밭은 마른다 (성장은 실시간 _growth_tick에서).
 	#
 	# **밭 칸만 돈다.** 예전에는 지도 전체(13만 6천 칸)를 훑었다 —
@@ -114,7 +117,10 @@ func _next_day(passed_out: bool) -> void:
 	# 한숨 자고 나면 속이 조금은 든든하다 (완전히 차지는 않는다)
 	GameData.hunger = maxf(GameData.hunger, GameData.HUNGER_WAKE_MIN)
 	GameData.reset_daily()
+	m._perf_day["farm"] = Time.get_ticks_usec() - _t
+	_t = Time.get_ticks_usec()
 	m.worldgen._advance_tree_growth()
+	m._perf_day["grow"] = Time.get_ticks_usec() - _t
 
 	# 계절이 바뀌면 제철 아닌 작물은 시든다
 	var season_changed := GameData.season() != prev_season
@@ -183,9 +189,11 @@ func _next_day(passed_out: bool) -> void:
 		a.fed = false
 
 	# 나무/돌이 조금씩 다시 자란다
+	_t = Time.get_ticks_usec()
 	m.worldgen._respawn_resources()
 	m.worldgen._respawn_forage()
 	m.worldgen._spawn_bugs()
+	m._perf_day["spawn"] = Time.get_ticks_usec() - _t
 
 	m.tutorial_notify("slept")
 
@@ -227,7 +235,9 @@ func _next_day(passed_out: bool) -> void:
 				m.hud.show_message("주민이 %d명이 됐다! 마을회관에서\n「%s」이(가) 열렸다." % [int(feat[1]), str(feat[2])], 6.0)
 		GameData.hall_donate_morning(m.npcs.size())
 
+	_t = Time.get_ticks_usec()
 	m.saveio.save_now()
+	m._perf_day["save"] = Time.get_ticks_usec() - _t
 
 	var note := ""
 	for product in collected:
@@ -274,6 +284,8 @@ func _next_day(passed_out: bool) -> void:
 	# (예전에는 여기서 rebuild 로 지도 전체를 다시 훑었다. 13만 6천 칸을
 	#  매일 훑는 값이 배속에서 그대로 멈춤이 됐다 — 여는 순간에만 훑는다)
 	m.farming.refresh()
+	m._perf_day["total"] = Time.get_ticks_usec() - _t_all
+
 
 func _update_night() -> void:
 	# 가로등이 없는 마을 — 해가 지면 정말로 캄캄해진다

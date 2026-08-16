@@ -291,6 +291,8 @@ func _broadcast_area(center: Vector2i) -> void:
 func _net_area(cx: int, cy: int, cells: Array, objs: Array) -> void:
 	for entry in cells:
 		var c: Dictionary = m.grid[entry[1]][entry[0]]
+		if c.ground != entry[2]:
+			m.dirty_tile(int(entry[0]), int(entry[1]))
 		c.ground = entry[2]
 		c.wet_min = float(entry[3])
 		c.watered = float(entry[3]) > 0.0

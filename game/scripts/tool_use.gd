@@ -205,6 +205,7 @@ func use_tool() -> void:
 				cell.ground = "grass"
 				cell.watered = false
 				cell.wet_min = 0.0
+				m.dirty_tile(t.x, t.y)   # 그려 둔 그림을 버린다 (둘레 아홉 칸)
 				_charge()
 				swing_motion(t)
 				Sound.play_sfx("sfx_hoe", 0.1)
@@ -217,6 +218,7 @@ func use_tool() -> void:
 					if m.objects.has(pos) or c.ground != "grass":
 						continue
 					c.ground = "soil"
+					m.dirty_tile(pos.x, pos.y)   # 그려 둔 그림을 버린다
 					m.farming.touch(c)   # 갈아 놓은 흙도 「밭」이다 (하루가 넘어갈 때 여기만 돈다)
 					if GameData.weather_wet(m.weather_now()):
 						m.farming._wet(c, m.WET_ALL_DAY)

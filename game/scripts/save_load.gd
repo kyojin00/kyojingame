@@ -67,19 +67,16 @@ func save_now() -> void:
 #
 # (자갈을 잔디로 되돌린 자리는 담지 못한다. 하지만 그건 예전 형식도
 #  마찬가지였다 — 불러올 때 _paint_regions 가 자갈을 도로 깔았다)
+# (담을 칸을 **찾는 일**도 지도를 안 훑는다. 예전에는 여기서 13만 6천 칸을
+#  하나씩 걸렀는데, 남는 것은 언제나 **밭 칸**뿐이었다 — 젖었거나 · 심겼거나 ·
+#  갈아 놓은 흙. 그건 농사 쪽이 이미 목록으로 들고 있다. 저장은 잠들 때마다
+#  일어나므로 그 훑기가 그대로 하루 넘김의 멈춤이 됐다)
 func grid_cells() -> Array:
 	var g := []
-	for y in m.MAP_H:
-		for x in m.MAP_W:
-			var c: Dictionary = m.grid[y][x]
-			if str(c.ground) == "grass" and str(c.crop_id) == "" \
-					and float(c.wet_min) <= 0.0:
-				continue
-			if str(c.ground) in ["path", "yard", "sand", "water", "dock"] \
-					and str(c.crop_id) == "" and float(c.wet_min) <= 0.0:
-				continue      # 지형이 깐 바닥 — 다시 지으면 그대로 나온다
-			g.append([x, y, c.ground, float(c.wet_min), c.crop_id, float(c.crop_day),
-				1 if c.dead else 0, 1 if c.get("half_fed", false) else 0])
+	for c: Dictionary in m.farming.farm_cells():
+		g.append([int(c.tx), int(c.ty), c.ground, float(c.wet_min), c.crop_id,
+			float(c.crop_day), 1 if c.dead else 0,
+			1 if c.get("half_fed", false) else 0])
 	return g
 
 
