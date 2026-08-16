@@ -49,6 +49,14 @@ func _spawn_objects() -> void:
 			m.objects.erase(m.door_tile(m.VILLAGE_PLOTS[pid].anchor))
 			m.worldgen._spawn_house_node(m.VILLAGE_PLOTS[pid].anchor, pid)
 			m.worldgen._trim_paths_under_building(m.VILLAGE_PLOTS[pid].anchor)
+	# 고장 마을의 집 — 세계를 지을 때는 칸만 놓였다 (그때는 m.world 가
+	# 없다). 그림은 여기서 세운다. 짓는 게 아니라 처음부터 있는 집이라
+	# 조건 없이 전부 세운다
+	for hid: String in m.HAMLETS:
+		for entry: Array in (m.HAMLETS[hid] as Dictionary).houses:
+			var ha: Vector2i = entry[0]
+			m.objects.erase(m.door_tile(ha))
+			m.worldgen._spawn_house_node(ha, String(entry[1]))
 	if GameData.house_lv >= 1:
 		m.objects.erase(m.door_tile(m.HOME_ANCHOR))
 		m.worldgen._spawn_house_node(m.HOME_ANCHOR)

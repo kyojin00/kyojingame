@@ -601,11 +601,14 @@ func _build_hamlets() -> void:
 				for x in range(c.x - 2, c.x + 3):
 					m.objects.erase(Vector2i(x, y))
 
-		# 집 — 마당(다져진 흙)을 깔고 그림을 세운다
+		# 집 — **칸과 마당만** 여기서 만든다.
+		#
+		# 그림 노드는 못 세운다. 세계를 짓는 이 시점에는 아직 m.world 가
+		# 없어서 _fill_building 을 부르면 add_child 가 null 에서 터진다.
+		# 마을 가게(_build_village)가 _place_building_tiles 만 부르는 것과
+		# 같은 이유다 — 그림은 뒤이어 _spawn_objects 가 세운다.
 		for entry2: Array in h.houses:
-			var a2: Vector2i = entry2[0]
-			_lay_yard(a2)
-			_fill_building(a2, String(entry2[1]))
+			_place_building_tiles(entry2[0])
 
 		# 마을 한복판 — 다져진 흙 마당. 여기서 사람들이 만난다
 		for y2 in range(h.square.y - 2, h.square.y + 3):
@@ -822,7 +825,15 @@ func _place_building_tiles(anchor: Vector2i) -> void:
 	_build_yard(anchor)
 
 
+# 칸을 놓고 그림까지 세운다 — **세계가 다 지어진 뒤에만** 부를 수 있다.
+#
+# 세계를 짓는 중(_build_map)에는 m.world 가 아직 없어서, 여기서 세우려
+# 들면 add_child 가 null 에서 터진다. 그때는 _place_building_tiles 만
+# 부르고 그림은 _spawn_objects 에 맡긴다 (마을 가게·고장 마을이 그렇게 한다).
+# 오류 문구가 「null 에 add_child」뿐이라 어디서 잘못 불렀는지 안 보였다.
 func _fill_building(anchor: Vector2i, kind: String = "") -> void:
+	assert(m.world != null,
+		"_fill_building 은 세계가 다 지어진 뒤에만 부른다 — 짓는 중이면 _place_building_tiles")
 	_place_building_tiles(anchor)
 	_spawn_house_node(anchor, kind)
 
