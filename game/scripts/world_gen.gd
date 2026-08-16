@@ -624,8 +624,11 @@ func _build_hamlets() -> void:
 			var p: Vector2i = pr[0]
 			# 물레방아 밑에는 물이 있어야 한다 — 마른 땅에서 도는 방아는 없다
 			if String(pr[1]) == "deco_wheel":
-				for wy in range(p.y + 1, p.y + 3):
-					for wx in range(p.x - 1, p.x + 3):
+				# 바퀴 **아랫도리가 잠기는** 자리에 판다. 밑에만 파 두었더니
+				# 바퀴가 물 위에 얹혀 헛도는 꼴이었다 — 물이 바퀴를 돌리려면
+				# 바퀴가 물속에 들어가 있어야 한다
+				for wy in range(p.y - 1, p.y + 2):
+					for wx in range(p.x - 2, p.x + 3):
 						if wx < 0 or wy < 0 or wx >= m.MAP_W or wy >= m.WORLD_H:
 							continue
 						m.grid[wy][wx].ground = "water"
