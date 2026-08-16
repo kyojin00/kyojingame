@@ -775,7 +775,9 @@ func _do_world_entry() -> void:
 
 func _after_world_entry() -> void:
 	_world_entry_running = false
-	m.hud.story_banner("교진 마을 도착", "여기서부터가 진짜 하루다")
+	# 여기서는 배너를 띄우지 않는다. 큰 배너는 **메인 스토리가 시작할 때와
+	# 끝날 때만** 나온다 — 중간 마디마다 뜨면 그 두 번이 특별하지 않다.
+	# (마을에 닿았다는 것은 뒤이어 오는 우체부의 대사가 말해 준다)
 	_apply_story_camera()
 	_apply_story_visibility()
 	_start_arrival_dialog()
