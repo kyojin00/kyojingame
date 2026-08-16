@@ -535,8 +535,12 @@ func _build_village() -> void:
 
 	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
 	m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
-	# 이장의 거처 — 처음부터 있는 작고 낡은 오두막 (마을의 유일한 지붕)
+	# 이장의 거처 — 처음부터 있는 집 (마을의 유일한 지붕)
 	m.objects[m.CHIEF_HUT] = {"kind": "chief_hut", "hp": 0}
+	# 그림이 덮는 칸을 막는다. 안 막으면 512x552 짜리 집 안으로 걸어
+	# 들어가진다 (예전 오두막은 한 칸짜리라 이럴 일이 없었다).
+	# 문 칸만 남겨 둔다 — 거기서 이장을 부른다.
+	_block_under_art(m.CHIEF_ART, Rect2i(m.CHIEF_HUT.x, m.CHIEF_HUT.y, 1, 1))
 	# 상점 터 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 여기서 짓는다)
 	if not GameData.village_built.has("general"):
 		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}

@@ -491,9 +491,17 @@ const VILLAGE_PLOTS := {
 	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
 	"hall":    {"anchor": Vector2i(80, 28), "name": "마을회관"},
 }
-# 이장의 거처 — 처음부터 마을에 있는 작고 낡은 오두막 (광장 북서쪽).
-# 주민이 늘면 제대로 된 집으로 다시 지어진다 (GameData.chief_house_lv)
-const CHIEF_HUT := Vector2i(71, 11)
+# 이장의 거처 — 처음부터 마을에 있는 집 (광장 북쪽). 주민이 늘면 회관 급
+# 새 집으로 다시 지어진다 (GameData.chief_house_lv).
+#
+# 이 값은 **문 칸**이다 — 건물 왼쪽 위 모서리가 아니다. 마을 건물이
+# door_tile(anchor) = anchor + (2,3) 을 문으로 쓰는 것과 같은 자리라,
+# 물건 배치의 기본 규칙(밑변을 한 칸 아래, 가로는 칸 한가운데)이 그대로
+# 5x4 본체에 맞아떨어진다. 그림이 다른 집들과 같은 512x552 판이 되면서
+# 한 칸짜리 물건처럼 세우면 집이 문 앞으로 반쯤 튀어나왔다.
+const CHIEF_ANCHOR := Vector2i(70, 9)          # 본체 5x4 의 왼쪽 위
+const CHIEF_HUT := Vector2i(72, 12)            # = door_tile(CHIEF_ANCHOR)
+const CHIEF_ART := Rect2i(69, 7, 7, 6)         # 그림이 덮는 칸
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
 const YARD_PAD := 1
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
