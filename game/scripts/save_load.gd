@@ -88,7 +88,11 @@ func object_rows() -> Array:
 			1 if m.objects[pos].get("apple", false) else 0,
 			1 if m.objects[pos].get("young", false) else 0,
 			int(m.objects[pos].get("grow", 0)),
-			1 if m.objects[pos].get("fixed", false) else 0])
+			1 if m.objects[pos].get("fixed", false) else 0,
+			# 8: 누워 있는 나무 (숲길을 막은 그 나무) · 9: 광석이 박힌 바위.
+			# 옛 세이브에는 이 자리가 없다 — 읽는 쪽이 길이를 본다
+			1 if m.objects[pos].get("fallen", false) else 0,
+			1 if m.objects[pos].get("ore", false) else 0])
 	return objs
 
 
@@ -524,6 +528,10 @@ func _apply_save(d: Dictionary) -> void:
 				od["grow"] = int(o[6])
 			if o.size() > 7 and int(o[7]) == 1:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
+			if o.size() > 8 and int(o[8]) == 1:
+				od["fallen"] = true  # 길 위에 누운 나무 (그림만 누워 있다)
+			if o.size() > 9 and int(o[9]) == 1:
+				od["ore"] = true     # 광석이 박힌 바위
 			m.objects[Vector2i(int(o[0]), int(o[1]))] = od
 		# 경매 게시판이 생기기 전 세이브 — 광장에 세워 준다
 		if not m.objects.has(m.AUCTION_POS):

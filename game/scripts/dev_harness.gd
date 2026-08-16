@@ -118,10 +118,11 @@ func _debug_tick() -> void:
 			# 서 있는 칸이 지도에 드러나 있어야 한다 (마커만 검은 벌판에 뜨면 안 된다)
 			var pt9: Vector2i = m.player_tile()
 			var here_lit: bool = m.map_ui._visible_tile(pt9.x, pt9.y)
-			# 지나온 길도 드러나 있다
+			# 지나온 길도 드러나 있다 (첫 마디 — 서쪽에서 걸어온 그 줄)
 			var road_lit := 0
-			for rx9 in range(m.STORY_ROAD_X0, pt9.x + 1):
-				if m.map_ui._visible_tile(rx9, m.STORY_LANE_Y):
+			var lane0: Vector2i = m.STORY_LANE[0]
+			for rx9 in range(lane0.x, pt9.x + 1):
+				if m.map_ui._visible_tile(rx9, lane0.y):
 					road_lit += 1
 			# 이름패에 아직 마을 이름은 없다 (본 적도 들은 적도 없는 곳이다)
 			var plate9: String = m.map_ui.map_plate()
@@ -1558,14 +1559,158 @@ func _debug_tick() -> void:
 				" 걸어갈 수 있는 칸=", seen_w.size())
 			# 나무·돌 여백을 넓혀도 한 칸 통로는 살아 있어야 한다
 			print("PAD_INFO=", m.OBJECT_PAD["tree"], m.OBJECT_PAD["rock"])
-			# 스토리 길목: 두 곳 · 각 두 그루(개), 막는 줄은 길 안에서 이어져 있어야
-			# 한다 (떨어져 있으면 사이로 그냥 지나가 버린다)
-			print("STORY_GATE_OK=", m.STORY_GATE_XS.size() == 2
-					and m.STORY_GATE_ROWS.size() == 2
-					and int(m.STORY_GATE_ROWS[1]) == int(m.STORY_GATE_ROWS[0]) + 1
-					and int(m.STORY_GATE_ROWS[0]) >= m.STORY_ROAD_Y0
-					and int(m.STORY_GATE_ROWS[1]) <= m.STORY_ROAD_Y1,
-				" 길목=", m.STORY_GATE_XS.size(), "곳 · 막는 줄=", m.STORY_GATE_ROWS)
+			# ---- 튜토리얼 숲길의 모양 ----
+			#
+			# 길이 고정된 가로 띠에서 **꺾은선 배열**이 됐다. 좌표를 손으로
+			# 옮기는 일이라, 여기서 지키는 것은 셋이다:
+			#   ① 이름난 자리(시작·갈림길·합류·어귀)가 정말 꺾은선 위에 있는가
+			#   ② 마디가 전부 축에 나란한가 · 길이 숲 한 장 안에 들어오는가
+			#   ③ **길목이 실제로 막고, 두 갈래가 실제로 통하는가**
+			#      — 이게 갈림길이 「고를 수 있는 길」인지 「막다른 길 두 개」인지
+			#        가르는 유일한 검사다
+			var lane_pts: Array = m.STORY_LANE
+			var det_pts: Array = m.STORY_DETOUR
+			var named_ok: bool = lane_pts[0] == m.STORY_SPAWN \
+				and lane_pts[lane_pts.size() - 1] == m.STORY_EXIT \
+				and lane_pts.has(m.STORY_FORK) and det_pts[0] == m.STORY_FORK \
+				and det_pts[det_pts.size() - 1] == m.STORY_MERGE \
+				and m.tutorial_walkable(m.STORY_MERGE) \
+				and m.tutorial_walkable(m.STORY_ROCK)
+			# 마디는 가로 아니면 세로 (비스듬한 마디는 사각형으로 못 편다)
+			var axis_ok := true
+			var lane_box := m.story_lane_bounds()
+			for lane_arr: Array in [lane_pts, det_pts]:
+				for li in range(lane_arr.size() - 1):
+					var pa: Vector2i = lane_arr[li]
+					var pb: Vector2i = lane_arr[li + 1]
+					if pa.x != pb.x and pa.y != pb.y:
+						axis_ok = false
+			# 길과 그 둘레의 숲이 튜토리얼 한 장 · 카메라 폭 안에 들어온다
+			var fit_ok: bool = m.TUTORIAL_REGION.encloses(lane_box.grow(1)) \
+				and lane_box.end.x + 1 <= m.STORY_FOREST_W
+			# 길목은 길 위에 있고, 좁히는 갓길도 길 위에 있다.
+			# 눈앞에서 쓰러지는 나무는 **길 밖**에 서 있어야 한다 — 길 위였다면
+			# 넘어지며 비운 그 칸이 길목 옆의 샛길이 된다
+			var gate_ok: bool = m.STORY_GATES.size() == 4 \
+				and not m.tutorial_walkable(m.STORY_FALL_TREE)
+			for g5: Dictionary in m.STORY_GATES:
+				for p5: Vector2i in m.story._gate_tiles(g5) + m.story._gate_shoulders(g5):
+					if not m.tutorial_walkable(p5):
+						gate_ok = false
+			# 막힌 길목을 넣고 서쪽 끝에서 마을 어귀까지 걸어 본다.
+			# (갓길은 늘 막혀 있다 — 길목이 길을 두 줄로 좁히는 자리다)
+			var lane_reach := func(shut: Array) -> bool:
+				var block := {}
+				for g6: Dictionary in m.STORY_GATES:
+					for s6: Vector2i in m.story._gate_shoulders(g6):
+						block[s6] = true
+					if not shut.has(str(g6.role)):
+						continue
+					for t6: Vector2i in m.story._gate_tiles(g6):
+						block[t6] = true
+				var seen6 := {m.STORY_SPAWN: true}
+				var q6: Array[Vector2i] = [m.STORY_SPAWN]
+				var h6 := 0
+				while h6 < q6.size():
+					var c6: Vector2i = q6[h6]
+					h6 += 1
+					for d6: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
+							Vector2i(0, 1), Vector2i(0, -1)]:
+						var n6: Vector2i = c6 + d6
+						if seen6.has(n6) or block.has(n6) or not m.tutorial_walkable(n6):
+							continue
+						seen6[n6] = true
+						q6.append(n6)
+				return seen6.has(m.STORY_EXIT)
+			var open_ok: bool = lane_reach.call([])                    # 다 뚫리면 통한다
+			var first_ok: bool = not lane_reach.call(["first"])        # 첫 나무는 길을 통째로 막는다
+			var short_ok: bool = lane_reach.call(["short"])            # 지름길이 막혀도 우회로로 간다
+			var det_ok: bool = lane_reach.call(["detour"])             # 우회로가 막혀도 지름길로 간다
+			var both_ok: bool = not lane_reach.call(["short", "detour"])
+			var rock_ok: bool = not lane_reach.call(["rock"])          # 바위는 합류 뒤 — 못 피한다
+			print("STORY_LANE_OK=", named_ok and axis_ok and fit_ok and gate_ok
+					and open_ok and first_ok and short_ok and det_ok
+					and both_ok and rock_ok,
+				" 이름난자리=", named_ok, " 축나란함=", axis_ok, " 숲안에=", fit_ok,
+				" 길목자리=", gate_ok, " 다뚫림=", open_ok, " 첫나무막힘=", first_ok,
+				" 지름길막혀도=", short_ok, " 우회로막혀도=", det_ok,
+				" 둘다막히면=", both_ok, " 바위못피함=", rock_ok,
+				" 길범위=", lane_box)
+
+			# ---- 숲길을 실제로 심어 놓고 걸어 본다 ----
+			#
+			# 위가 좌표의 이야기라면 여기는 **놓인 것들**의 이야기다.
+			# 첫 나무는 눈앞에서 쓰러져 길을 막고, 그 뒤로는 도끼로 뚫은
+			# 만큼만 앞으로 갈 수 있어야 한다.
+			var k_tut8: bool = GameData.tutorial_space
+			var k_ph8: String = GameData.story_phase
+			var k_gate8: int = GameData.story_gates_left
+			var k_expl8: Dictionary = GameData.explored.duplicate()
+			GameData.tutorial_space = true
+			GameData.story_phase = "enter"
+			m.story._plant_story_forest()
+			# 서쪽 끝에서 그 칸까지 실제로 걸어갈 수 있는가 (놓인 것까지 본다)
+			var walk8 := func(goal: Vector2i) -> bool:
+				var seen8 := {m.STORY_SPAWN: true}
+				var q8: Array[Vector2i] = [m.STORY_SPAWN]
+				var h8 := 0
+				while h8 < q8.size():
+					var c8: Vector2i = q8[h8]
+					h8 += 1
+					for d8: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
+							Vector2i(0, 1), Vector2i(0, -1)]:
+						var n8: Vector2i = c8 + d8
+						if seen8.has(n8) or not m.is_passable(n8):
+							continue
+						seen8[n8] = true
+						q8.append(n8)
+				return seen8.has(goal)
+			var clear8 := func(role: String) -> void:
+				for g8: Dictionary in m.STORY_GATES:
+					if str(g8.role) == role:
+						for p8: Vector2i in m.story._gate_tiles(g8):
+							m.objects.erase(p8)
+				m.story._refresh_story_gates()
+			# ① 심은 직후: 길은 갈림길까지 열려 있고, 쓰러질 나무는 길가에 서 있다
+			var plant8: bool = not m.objects.has(m.STORY_GATES[0].at) \
+				and str(m.objects.get(m.STORY_FALL_TREE, {}).get("kind", "")) == "tree" \
+				and walk8.call(m.STORY_FORK) and not walk8.call(m.STORY_EXIT) \
+				and GameData.story_gates_left == 1
+			# ② 첫 나무가 눈앞에서 쓰러진다 — 길가에서 사라지고 길 위에 눕는다
+			m.story._topple_first_tree()
+			var fell8: bool = not m.objects.has(m.STORY_FALL_TREE) \
+				and bool(m.objects.get(m.STORY_GATES[0].at, {}).get("fallen", false)) \
+				and not walk8.call(m.STORY_FORK) \
+				and GameData.story_gates_left == 2
+			# ③ 그 나무를 치우면 갈림길까지, 지름길을 뚫으면 바위까지 간다
+			clear8.call("first")
+			var chop8: bool = walk8.call(m.STORY_FORK) \
+				and not walk8.call(m.STORY_EXIT) and GameData.story_gates_left == 1
+			clear8.call("short")
+			var short8: bool = walk8.call(m.STORY_ROCK + Vector2i(-1, 0)) \
+				and not walk8.call(m.STORY_EXIT) and GameData.story_gates_left == 0
+			# ④ 바위에는 광석이 박혀 있고, 캐야만 마을 어귀에 닿는다
+			var ore8: bool = bool(m.objects.get(m.STORY_ROCK, {}).get("ore", false))
+			clear8.call("rock")
+			var exit8: bool = walk8.call(m.STORY_EXIT)
+			# ⑤ 우회로만으로도 똑같이 닿는다 (지름길을 도로 막고 우회로를 뚫는다)
+			m.story._plant_story_forest()
+			m.story._topple_first_tree()
+			clear8.call("first")
+			clear8.call("detour")
+			clear8.call("rock")
+			var detour8: bool = walk8.call(m.STORY_EXIT) \
+				and GameData.story_gates_left == 0
+			m.story._close_tutorial_space()
+			GameData.explored = k_expl8
+			GameData.tutorial_space = k_tut8
+			GameData.story_phase = k_ph8
+			GameData.story_gates_left = k_gate8
+			print("STORY_WALK_OK=", plant8 and fell8 and chop8 and short8
+					and ore8 and exit8 and detour8,
+				" 심은직후=", plant8, " 눈앞에서쓰러짐=", fell8, " 치우면열림=", chop8,
+				" 지름길=", short8, " 바위에광석=", ore8, " 어귀도착=", exit8,
+				" 우회로로도=", detour8)
 		384:
 			# 나무 뒤에 서면 나무가 비쳐 보여야 한다 (플레이어가 안 가려지게)
 			var ft := Vector2i(24, 22)

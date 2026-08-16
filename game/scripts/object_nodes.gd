@@ -260,9 +260,29 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
+		if bool(m.objects.get(pos, {}).get("fallen", false)):
+			_lay_tree_down(node.get_child(0))   # 누운 채로 길을 막은 나무
 	elif m.LANDMARK_FRAMES.has(kind):
 		m.landmark_sprites.append([node.get_child(0), kind])
 	m.world.add_child(node)
+
+
+# ---- 누워 있는 나무 ----
+#
+# 길 위로 넘어온 나무는 **그림만** 누워 있다. 판정은 선 나무와 똑같다 —
+# 도끼로 베고, 목재가 나오고, 길이 열린다. 새 그림을 그리지 않고 서 있는
+# 나무를 밑동째 눕혀 쓴다 (`_fell_tree`가 쓰러뜨리는 각과 같은 각이다).
+#
+# 늘 서쪽으로 눕힌다. 첫 나무가 길 동쪽 갓길에서 서쪽으로 넘어오는데,
+# 그 자리에 남는 몸통이 반대로 누워 있으면 방금 본 것과 어긋난다.
+func _lay_tree_down(spr: Sprite2D) -> void:
+	if spr.texture == null:
+		return
+	var pivot := Vector2(m.TILE / 2.0,
+		(spr.offset.y + spr.texture.get_height()) * spr.scale.y)
+	var a := -FALL_ANGLE
+	spr.rotation = a
+	spr.position = pivot - pivot.rotated(a)
 
 
 func _refresh_tree_sprite(pos: Vector2i) -> void:
@@ -271,6 +291,8 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 	if m.objects[pos].kind != "tree":
 		return
 	var spr: Sprite2D = m.obj_nodes[pos].get_child(0)
+	if bool(m.objects[pos].get("fallen", false)):
+		_lay_tree_down(spr)   # 도끼질로 그림이 바뀌어도 계속 누워 있다
 	var hp := int(m.objects[pos].hp)
 	if hp >= m.TREE_HP:
 		if bool(m.objects[pos].get("young", false)):
@@ -373,6 +395,36 @@ func _fell_tree(pos: Vector2i, dir: float) -> void:
 	})
 
 
+# ---- 쓰러진 채로 **남는** 나무 ----
+#
+# `_fell_tree`는 벤 나무다 — 넘어가고, 잠깐 누웠다가, 스르르 사라진다.
+# 이쪽은 길가에 서 있던 나무가 **길 위로 넘어와 그대로 눕는** 것이다
+# (메인 스토리 1의 첫 나무). 넘어가는 그림은 같고, 착지한 자리에 누운
+# 몸통이 남는다.
+#
+# 통행은 **부르는 즉시** 막힌다 (objects에 이미 놓고 부른다). 그림만
+# 늦게 온다 — 넘어가는 동안은 쓰러지는 나무가 그 자리를 덮고 있다.
+func _topple_onto(pos: Vector2i, dir: float, rest: Array) -> void:
+	if not m.obj_nodes.has(pos):
+		for p: Vector2i in rest:
+			_spawn_object_node(p, "tree")
+		m.objects.erase(pos)
+		return
+	_fell_tree(pos, dir)
+	if m._tree_falls.is_empty():
+		for p: Vector2i in rest:
+			_spawn_object_node(p, "tree")
+		return
+	var f: Dictionary = m._tree_falls[-1]
+	f["rest"] = rest
+	f["wait"] = 0.0        # 도끼질이 아니다 — 그 자리에서 바로 기운다
+	var stv: Variant = f.stump
+	if is_instance_valid(stv):
+		# 밑동만 남기는 건 「벤 나무」의 그림이다. 이건 뿌리째 넘어간 것이다
+		(stv as Sprite2D).queue_free()
+		f["stump"] = null
+
+
 # 0(서 있음) ~ FALL_ANGLE(다 누움). 부호는 부르는 쪽에서 곱한다.
 func _fall_angle(t: float) -> float:
 	if t < FALL_WIND:
@@ -406,6 +458,15 @@ func _update_tree_fall(delta: float) -> void:
 		if not f.landed and f.t >= FALL_WIND + FALL_DOWN:
 			f.landed = true
 			_tree_landed(node, spr, f)
+			if f.has("rest"):
+				# 길 위로 넘어와 **그대로 눕는다** — 누운 몸통을 그 자리에
+				# 세우고 쓰러지던 그림은 물린다 (둘 다 누운 나무라 이어져 보인다)
+				for p: Vector2i in f.rest:
+					if m.objects.has(p) and not m.obj_nodes.has(p):
+						_spawn_object_node(p, str(m.objects[p].kind))
+				m._tree_falls.erase(f)
+				node.queue_free()
+				continue
 		if not f.landed:
 			continue
 		var lie: float = f.t - FALL_WIND - FALL_DOWN

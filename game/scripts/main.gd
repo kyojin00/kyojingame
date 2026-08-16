@@ -1600,22 +1600,77 @@ func _tile_accessible(t: Vector2i) -> bool:
 		or GameData.is_tile_owned(t.x, t.y)
 
 
-# 튜토리얼 숲길 — **울타리 안**만 걸을 수 있다.
+# 튜토리얼 숲길 — **길 위**만 걸을 수 있다.
 #
 # 예전에는 튜토리얼 공간(TUTORIAL_REGION) 전체를 열어 두었다. 울타리는
 # 세워 두었지만 그 너머도 통행 가능한 땅이라, 나무 사이 틈으로 빠져나가면
 # 숲 바깥 풀밭을 마음대로 걸어 다닐 수 있었다 — 우체부와 말도 섞기 전에
-# 길 밖으로 나가 버리는 일이 그래서 생겼다. 길과 두 갈래만 남긴다.
+# 길 밖으로 나가 버리는 일이 그래서 생겼다.
+#
+# 지금은 꺾은선 두 개(본길 · 우회로)가 덮는 칸이 곧 걸을 수 있는 땅이다.
+# 상태를 들고 있지 않는다 — 숲을 아직 심지 않았어도, 두 번 심어도 같은 답이
+# 나온다 (하네스가 심기 전후로 이걸 묻는다).
 func tutorial_walkable(t: Vector2i) -> bool:
-	# 본길 (동쪽 끝 X1에 닿으면 마을로 넘어가는 연출이 시작된다)
-	if t.x >= STORY_ROAD_X0 and t.x <= STORY_ROAD_X1 \
-			and t.y >= STORY_ROAD_Y0 and t.y <= STORY_ROAD_Y1:
-		return true
-	# 갈림길의 북·남 갈래 (둘 다 막다른 길 — 지도 퀘스트가 여기서 헤맨다)
-	if t.x >= STORY_FORK.x - 1 and t.x <= STORY_FORK.x + 2 \
-			and t.y >= 10 + TUT_DY and t.y <= 21 + TUT_DY:
-		return true
+	return on_story_lane(t, STORY_LANE) or on_story_lane(t, STORY_DETOUR)
+
+
+func on_story_lane(t: Vector2i, lane: Array) -> bool:
+	for i in range(lane.size() - 1):
+		if story_lane_rect(lane[i], lane[i + 1]).has_point(t):
+			return true
+	for i in range(1, lane.size() - 1):
+		if story_corner_rect(lane[i]).has_point(t):
+			return true
 	return false
+
+
+# 마디 하나가 덮는 칸 — 한복판의 -STORY_LANE_BACK ~ +STORY_LANE_FWD.
+func story_lane_rect(a: Vector2i, b: Vector2i) -> Rect2i:
+	var w: int = STORY_LANE_BACK + STORY_LANE_FWD + 1
+	if a.y == b.y:
+		return Rect2i(mini(a.x, b.x), a.y - STORY_LANE_BACK,
+			absi(b.x - a.x) + 1, w)
+	return Rect2i(a.x - STORY_LANE_BACK, mini(a.y, b.y),
+		w, absi(b.y - a.y) + 1)
+
+
+# 꺾이는 자리마다 놓는 **정사각형 한 칸**.
+#
+# 마디 둘만 겹쳐 두면 안쪽 모서리는 이어지지만 **바깥쪽 모서리가 옴폭 팬다.**
+# 그 옴폭한 자리에 선 나무는 제 칸에서 위로 세 칸을 덮어 그리므로, 꺾어져
+# 올라가는 길을 통째로 가려 버린다 — 길이 꺾이는 바로 그 순간에 길이
+# 안 보인다. 모서리를 길 폭만큼 네모나게 터 준다.
+func story_corner_rect(v: Vector2i) -> Rect2i:
+	var w: int = STORY_LANE_BACK + STORY_LANE_FWD + 1
+	return Rect2i(v.x - STORY_LANE_BACK, v.y - STORY_LANE_BACK, w, w)
+
+
+# 길이 덮는 사각형 전부 (마디 + 꺾이는 자리). 한 번 받아 두고 훑는 쪽에서 쓴다.
+func story_road_rects() -> Array:
+	var out: Array = []
+	for lane: Array in [STORY_LANE, STORY_DETOUR]:
+		for i in range(lane.size() - 1):
+			out.append(story_lane_rect(lane[i], lane[i + 1]))
+		for i in range(1, lane.size() - 1):
+			out.append(story_corner_rect(lane[i]))
+	return out
+
+
+# 밟혀 다져진 흙이 깔리는 가운데 두 줄 (양옆 한 줄씩은 풀 갓길로 남는다)
+func story_dirt_rect(a: Vector2i, b: Vector2i) -> Rect2i:
+	if a.y == b.y:
+		return Rect2i(mini(a.x, b.x), a.y, absi(b.x - a.x) + 1, 2)
+	return Rect2i(a.x, mini(a.y, b.y), 2, absi(b.y - a.y) + 1)
+
+
+# 길 전체를 감싸는 칸 범위 — 카메라가 숲을 어디까지 비출지 여기서 잰다
+func story_lane_bounds() -> Rect2i:
+	var out := Rect2i()
+	var first := true
+	for r: Rect2i in story_road_rects():
+		out = r if first else out.merge(r)
+		first = false
+	return out
 
 
 # 이 칸이 속한 지역이 이미 열렸는가 (지금은 언제나 열려 있다 — 아래 주석 참고)
@@ -1879,33 +1934,101 @@ const FEST_COLORS := {
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(18, 16 + TUT_DY)   # 화면 왼쪽에서 시작
-const STORY_LANE_Y := 16 + TUT_DY          # 우체부가 왼쪽에서 걸어오는 길
-const STORY_FORK := Vector2i(34, 16 + TUT_DY)    # 숲길이 갈라지는 갈림길 (지도 퀘스트)
-const STORY_ROCK := Vector2i(40, 16 + TUT_DY)    # 길을 막는 커다란 바위 (퀘스트 5)
-# 스토리 숲의 가로 폭. 화면(37.5칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
-# 옆으로 움직인다. 숲길(x 4~33) 동쪽은 들어갈 수 없는 배경 숲이다.
+#
+# **숲길의 모양은 아래 꺾은선 두 개가 전부다.**
+#
+# 예전에는 고정된 가로 띠 하나였다 — 한복판이 STORY_LANE_Y 한 줄, 그
+# 위아래로 네 줄. 길이 자로 잰 듯 곧아서 「숲을 걸어간다」가 아니라
+# 「복도를 지난다」에 가까웠고, 갈림길의 두 갈래는 **둘 다 막다른 길**이라
+# 고를 것이 없었다. 지도를 펴 볼 구실로만 서 있던 갈림길이다.
+#
+# 지금은 점을 차례로 이은 꺾은선이 길의 한복판이다. 우체부의 걸음도,
+# 카메라도, 길목 판정도 전부 이 배열만 읽는다 — 길 모양을 바꾸고 싶으면
+# 여기 점만 옮기면 되고, 고정 y를 아는 코드는 어디에도 없다.
+#
+#   STORY_LANE    서쪽 시작 -> 갈림길 -> **지름길** -> 합류 -> 마을 어귀
+#   STORY_DETOUR  갈림길 -> 남쪽 골짜기로 크게 돌아 -> 같은 자리에서 합류
+#
+# 길의 폭은 다섯 칸(한복판의 -1 ~ +3). 가운데 두 줄만 밟혀 다져진 흙이고,
+# 나머지는 풀 갓길이다.
+#
+# **남쪽이 넓은 것은 나무 그림 때문이다.** 나무는 제 칸에서 위로 세 칸을
+# 덮어 그린다. 길 남쪽 가장자리에 선 나무는 그 위 두 줄을 가리는데, 남쪽
+# 여유가 두 칸뿐이면 그 두 줄 중 하나가 **다져진 흙길**이라 길이 반쯤
+# 나뭇잎에 덮여 보였다. 한 칸을 더 두면 가려지는 것은 풀 갓길뿐이다.
+const STORY_LANE_BACK := 1                 # 한복판에서 이만큼 뒤(북)까지가 길
+const STORY_LANE_FWD := 3                  # 한복판에서 이만큼 앞(남)까지가 길
+const STORY_LANE := [
+	Vector2i(18, 13 + TUT_DY),   # ① 숲 서쪽 — 여기서 이야기가 시작한다
+	Vector2i(25, 13 + TUT_DY),   # ② 길이 북으로 꺾이는 자리
+	Vector2i(25, 6 + TUT_DY),    # ③ 오르막 — 여기서 첫 나무가 쓰러진다
+	Vector2i(33, 6 + TUT_DY),    # ④ 갈림길
+	Vector2i(41, 6 + TUT_DY),    # ⑤ 지름길: 쓰러진 나무를 넘어 곧장 동쪽으로
+	Vector2i(41, 13 + TUT_DY),   # ⑥ 다시 남으로 내려와
+	Vector2i(54, 13 + TUT_DY),   # ⑦ 마을 어귀
+]
+const STORY_DETOUR := [
+	Vector2i(33, 6 + TUT_DY),    # 갈림길에서 갈라져
+	Vector2i(33, 19 + TUT_DY),   # 남쪽 골짜기로 내려가
+	Vector2i(45, 19 + TUT_DY),   # 동쪽으로 길게 돌고
+	Vector2i(45, 13 + TUT_DY),   # 다시 올라와 본길에 합류한다
+]
+# 꺾은선 위의 이름난 자리들 (위 배열의 ①·④·⑦ 과 같은 점이어야 한다 —
+# 어긋나면 하네스의 STORY_LANE_OK 가 잡아낸다)
+const STORY_SPAWN := Vector2i(18, 13 + TUT_DY)   # 화면 왼쪽에서 시작
+const STORY_FORK := Vector2i(33, 6 + TUT_DY)     # 숲길이 갈라지는 갈림길 (지도 퀘스트)
+const STORY_MERGE := Vector2i(45, 13 + TUT_DY)   # 두 길이 다시 만나는 자리
+const STORY_EXIT := Vector2i(54, 13 + TUT_DY)    # 여기 서면 마을로 넘어간다
+const STORY_ROCK := Vector2i(50, 13 + TUT_DY)    # 길을 막는 커다란 바위 (퀘스트 5)
+# 눈앞에서 쓰러지는 첫 나무가 **서 있는** 자리.
+#
+# **반드시 길 밖이어야 한다.** 쓰러진 자리는 빈 칸이 되는데, 그 칸이 길
+# 위였다면 나무가 넘어지는 순간 길목 옆으로 빠져나갈 틈이 생긴다 —
+# 막으려고 쓰러뜨린 나무가 길을 여는 셈이다. (STORY_LANE_OK가 지킨다)
+const STORY_FALL_TREE := Vector2i(29, 10 + TUT_DY)
+# 스토리 숲의 가로 폭. 화면(53.6칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
+# 옆으로 움직인다. 길(x 18~54)의 동쪽은 들어갈 수 없는 배경 숲이다.
 const STORY_FOREST_W := 58
-# 숲길은 4줄 폭의 흙길. 양옆은 울타리로 막혀 있어 길을 벗어날 수 없다.
-const STORY_ROAD_Y0 := 15 + TUT_DY
-const STORY_ROAD_Y1 := 18 + TUT_DY         # 네 줄 폭의 숲길
-const STORY_ROAD_X0 := 18
-const STORY_ROAD_X1 := 47
 # 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
 const FOREST_HOUSE_ANCHOR := Vector2i(30, 24 + NORTH_PAD)
 # 연금술사의 오두막 (메인 스토리 12) — 깊은 숲(deep_rect) 연못 서쪽.
 # 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
 const ALCH_HOUSE_ANCHOR := Vector2i(56, 46 + NORTH_PAD)
-const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
 const EXPLORER_ARRIVE := Vector2i(78, 16 + NORTH_PAD)  # 모험가 재민이 처음 서성이는 광장 언저리
-# 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
-# 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
-# 길을 막은 길목. 예전에는 네 곳 x 네 줄 = 나무 16그루라 초반이 지루했다.
-# 지금은 두 곳이고, 길목마다 길이 두 줄로 좁아진다 → 나무 4그루.
-const STORY_GATE_XS := [27, 38]
-const STORY_GATE_ROWS := [16 + TUT_DY, 17 + TUT_DY]   # 막히는 줄
+# ---- 길을 막고 선 것들 ----
+#
+# 자리와 성격을 **여기 한 곳에** 적는다. 예전에는 「가로막는 x 두 개
+# (STORY_GATE_XS) × 막히는 y 두 줄 (STORY_GATE_ROWS)」이라, 길이 세로로
+# 꺾이는 순간 뜻을 잃는 표였다.
+#
+#   at    한복판 칸. 길목에서는 길이 두 줄로 좁아지고 그 두 칸이 막힌다
+#         (네 줄을 다 뚫게 하면 초반부터 지루하다)
+#   axis  "h" 가로 구간 (위아래가 좁아진다) · "v" 세로 구간 (좌우가 좁아진다)
+#   kind  tree 선 나무 / log 쓰러진 나무 (도끼는 같다) / bigrock 커다란 바위
+#   role  이야기에서 맡은 몫
+const STORY_GATES := [
+	# ③ 눈앞에서 쓰러지는 첫 나무 — 처음에는 비어 있다가, 다가서면 길가의
+	#    나무(STORY_FALL_TREE)가 이 자리로 넘어와 눕는다
+	{"at": Vector2i(25, 10 + TUT_DY), "axis": "v", "kind": "log", "role": "first"},
+	# ② 지름길을 가로막은 오래된 등걸 — 넘어가려면 도끼가 필요하다.
+	#    누운 나무는 **세로 구간**에만 놓는다 — 가로 구간에 놓으면 몸통이
+	#    길과 나란히 누워, 막고 선 것이 아니라 길가에 치워 둔 것으로 보인다
+	{"at": Vector2i(41, 9 + TUT_DY), "axis": "v", "kind": "log", "role": "short"},
+	# ② 우회로 끝, 마을 어귀 직전의 한 그루 — 돌아와도 도끼는 배우게 된다
+	{"at": Vector2i(45, 16 + TUT_DY), "axis": "v", "kind": "tree", "role": "detour"},
+	# ④ 광석이 박힌 커다란 바위 (곡괭이 대목) — 두 길이 합친 뒤라 어느 쪽으로
+	#    와도 반드시 만난다
+	{"at": Vector2i(50, 13 + TUT_DY), "axis": "h", "kind": "bigrock", "role": "rock"},
+]
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
+# 숲길을 막은 그 바위에는 **광석이 박혀 있다.**
+#
+# 예전에는 돌 넉 장만 떨어졌다. 곡괭이를 처음 쥐는 대목인데 나오는 것이
+# 나무를 벨 때와 다를 바 없어서, 「새 도구를 얻었다」가 아니라 「또 치웠다」가
+# 됐다. 반짝이는 것이 하나 나오면 곡괭이가 무엇을 하는 도구인지 손이 먼저
+# 안다 — 동굴에 들어갈 이유도 여기서 생긴다.
+const STORY_ROCK_ORE := 2                  # 그 바위에만 박혀 있는 광석
 var story_cutscene := false                # 컷신 중 조작 잠금
 var house_preview := false                 # 집터 자리 고르기 (동물의 숲식 범위 표시)
 const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)

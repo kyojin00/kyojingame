@@ -1180,12 +1180,10 @@ func _spawn_forest_house() -> void:
 	for y in range(a.y - 2, a.y + 6):
 		for x in range(a.x - 3, a.x + 9):
 			m.objnode._remove_object(Vector2i(x, y))
-	# 숲길(y18) 남쪽에서 문 앞까지 내려오는 좁은 오솔길
-	for y in range(m.STORY_ROAD_Y1 + 1, a.y + 5):
-		for x in [m.FOREST_TRAIL_X, m.FOREST_TRAIL_X + 1]:
-			m.objnode._remove_object(Vector2i(x, y))
-			if m.grid[y][x].ground == "grass":
-				m.grid[y][x].ground = "path"
+	# 여기에 「숲길 남쪽에서 문 앞까지 내려오는 오솔길」을 내는 줄이 있었다.
+	# 그 숲길은 **세계 안(y15~18)에 있던 시절**의 튜토리얼 길이다 —
+	# 세계 밖으로 옮겨 간 뒤로는 시작 줄이 끝 줄보다 커서, 이 반복문은
+	# 한 번도 돌지 않았다 (길은 오래전부터 없었다). 죽은 줄을 걷어낸다.
 	_fill_building(a)
 	m.objects.erase(m.door_tile(a))
 	m.queue_redraw()

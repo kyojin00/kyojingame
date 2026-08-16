@@ -22,6 +22,12 @@ var _story_t := 0.0
 var _story_snapped := false
 var _story_map_opened := false
 var _rock_intro_started := false
+var _first_fall_done := false      # 첫 나무가 이미 눈앞에서 쓰러졌는가
+# 우체부가 밟고 따라올 **주인공의 발자국**. 길이 꺾이므로 직선으로 다가오면
+# 숲을 뚫고 지나간다 — 지나온 자리를 그대로 되밟게 한다.
+var _player_trail: Array[Vector2] = []
+const TRAIL_STEP := 11.0           # 이만큼 움직일 때마다 발자국 하나
+const TRAIL_LAG := 52.0            # 우체부는 이만큼 뒤에서 따라온다
 var _story_idx := 0
 var _story_pages: Array = []
 var _story_mode := "intro"  # "intro": 오프닝 / "ending": 엔딩
@@ -36,6 +42,10 @@ var _story_art_frame := 0
 const INTRO_ART := ["grandpa", "grandpa", "grandpa", "box", "letter",
 	"farm", "farm"]
 var _grandpa_timer := 0.0
+# 숲길 둘레에 남겨 두는 숲의 여유분 (칸). 화면 세로가 서른 칸이라, 길
+# 위아래로 이만큼은 더 있어야 카메라가 움직일 자리도 생기고 화면 가장자리가
+# 늘 숲으로 찬다.
+const CAM_FRAME := 8
 
 
 func _apply_story_camera() -> void:
@@ -48,11 +58,18 @@ func _apply_story_camera() -> void:
 			"equip", "chop", "path", "map", "rock", "travel"]:
 		# 튜토리얼 공간 안 — 카메라도 이 한 장 밖으로 나가지 않는다.
 		# (세계는 격자 위쪽에 있지만, 여기서는 있는지조차 보이지 않아야 한다)
+		#
+		# **위아래 제한은 길이 정한다.** 예전에는 숲 한 장(38줄) 전체가
+		# 제한이었다. 길이 가운데 한 줄로 곧게 지나던 때는 그래도 맞았는데,
+		# 길이 위아래로 꺾이자 화면 절반이 아무것도 없는 배경 숲이 됐다.
+		# 길이 지나는 자리를 감싸고 숲을 여유분(FRAME)만큼만 더 둔다 —
+		# 길 모양을 바꾸면 화면이 알아서 따라온다.
 		var r: Rect2i = m.TUTORIAL_REGION
+		var lane: Rect2i = m.story_lane_bounds().grow(CAM_FRAME)
 		cam.limit_left = r.position.x * m.TILE
-		cam.limit_top = r.position.y * m.TILE
 		cam.limit_right = m.STORY_FOREST_W * m.TILE
-		cam.limit_bottom = r.end.y * m.TILE
+		cam.limit_top = maxi(r.position.y, lane.position.y) * m.TILE
+		cam.limit_bottom = mini(r.end.y, lane.end.y) * m.TILE
 		cam.position_smoothing_enabled = true
 	else:
 		m._free_camera_limits(cam)
@@ -75,7 +92,6 @@ func _plant_story_forest() -> void:
 	# 튜토리얼 공간은 **세계 밖에 따로 붙여 둔 한 장의 숲길**이다.
 	# 아래의 y값은 전부 m.TUT_DY만큼 내려간 그 공간의 좌표다 —
 	# 마을이나 농장과는 한 칸도 이어져 있지 않다.
-	var dy: int = m.TUT_DY
 	# ⓪ 이 공간의 바닥을 먼저 깐다. 세계의 바다가 격자 끝까지 내려와 있어
 	#    (`world_gen._build_sea`) 여기도 물로 덮여 있다 — 숲길을 놓기 전에
 	#    잔디로 되돌린다. 안 그러면 나무 한 그루도 서지 않는다 (⑤가 잔디만 본다)
@@ -84,47 +100,82 @@ func _plant_story_forest() -> void:
 		for bx in range(base.position.x, base.end.x):
 			m.grid[by][bx].ground = "grass"
 	m.dirty_all()   # 튜토리얼 자리를 통째로 다시 깔았다
-	# ① 4줄 폭의 흙길을 낸다 (본길 + 갈림길의 북/남 갈래)
-	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
-		for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 1):
-			_carve_road(Vector2i(x, y), m.STORY_GATE_ROWS.has(y))
-	for y in range(10 + dy, m.STORY_ROAD_Y0):         # 북쪽 갈래 (막다른 길)
-		for x in range(m.STORY_FORK.x - 1, m.STORY_FORK.x + 3):
-			_carve_road(Vector2i(x, y), x >= m.STORY_FORK.x and x <= m.STORY_FORK.x + 1)
-	for y in range(m.STORY_ROAD_Y1 + 1, 22 + dy):     # 남쪽 갈래 (막다른 길)
-		for x in range(m.STORY_FORK.x - 1, m.STORY_FORK.x + 3):
-			_carve_road(Vector2i(x, y), x >= m.STORY_FORK.x and x <= m.STORY_FORK.x + 1)
+	_first_fall_done = false
 
-	# ② 길 양옆은 울타리로 막는다 — 길을 벗어날 수 없다 (숲으로는 못 들어간다)
-	for x in range(m.STORY_ROAD_X0, m.STORY_ROAD_X1 + 2):
-		var at_fork: bool = x >= m.STORY_FORK.x - 1 and x <= m.STORY_FORK.x + 2
-		if not at_fork:
-			_story_fence(Vector2i(x, m.STORY_ROAD_Y0 - 1))   # 위쪽 (갈래는 열어 둔다)
-			_story_fence(Vector2i(x, m.STORY_ROAD_Y1 + 1))   # 아래쪽
-	for y in range(9 + dy, m.STORY_ROAD_Y0):          # 북쪽 갈래 양옆 + 막다른 끝
-		_story_fence(Vector2i(m.STORY_FORK.x - 2, y))
-		_story_fence(Vector2i(m.STORY_FORK.x + 3, y))
-	for x in range(m.STORY_FORK.x - 2, m.STORY_FORK.x + 4):
-		_story_fence(Vector2i(x, 9 + dy))
-	for y in range(m.STORY_ROAD_Y1 + 1, 22 + dy):     # 남쪽 갈래 양옆 + 막다른 끝
-		_story_fence(Vector2i(m.STORY_FORK.x - 2, y))
-		_story_fence(Vector2i(m.STORY_FORK.x + 3, y))
-	for x in range(m.STORY_FORK.x - 2, m.STORY_FORK.x + 4):
-		_story_fence(Vector2i(x, 22 + dy))
-	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):   # 본길 양 끝
-		# 동쪽 끝은 열어 둔다 — 거기 서면 마을로 넘어가는 연출이 시작된다
-		_story_fence(Vector2i(m.STORY_ROAD_X0 - 1, y))
+	# ① 꺾은선을 따라 길을 낸다 (본길 + 우회로).
+	#    폭을 통째로 비우고, 가운데 두 줄에만 흙을 깐다 —
+	#    갓길에 나무가 서면 좁은 자리에서 길이 도로 막힌다.
+	var rects: Array = m.story_road_rects()
+	for r1: Rect2i in rects:
+		for y in range(r1.position.y, r1.end.y):
+			for x in range(r1.position.x, r1.end.x):
+				_carve_road(Vector2i(x, y), false)
+	for lane: Array in [m.STORY_LANE, m.STORY_DETOUR]:
+		for i in range(lane.size() - 1):
+			var dirt: Rect2i = m.story_dirt_rect(lane[i], lane[i + 1])
+			for y in range(dirt.position.y, dirt.end.y):
+				for x in range(dirt.position.x, dirt.end.x):
+					_carve_road(Vector2i(x, y), true)
 
-	# ③ 길을 가로막고 선 나무 — 베어야만 지나갈 수 있다.
-	#    길목에서는 길이 두 줄로 좁아지므로 나무 두 그루면 막힌다.
-	for gx: int in m.STORY_GATE_XS:
-		_story_narrow(gx, "tree", m.TREE_HP)
+	# ② 길가는 **빽빽한 숲**으로 막는다 — 길을 벗어날 수 없다.
+	#
+	#    길에 바로 닿는 한 겹은 빈틈없이 채운다 (여기서 길을 벗어날 수 없다).
+	#    그 바깥은 확률을 줄여 가며 심는다 — **한 겹만 세우면 산울타리 미로가
+	#    된다.** 길 밖이 곧바로 성긴 잔디밭이면 나무 줄이 「숲」이 아니라
+	#    「담」으로 읽히고, 길이 꺾일수록 미로처럼 보인다. 가장자리를 흐려
+	#    놓아야 숲 한복판을 지나는 오솔길이 된다.
+	#
+	#    동쪽 끝만 열어 둔다 — 거기 서면 마을로 넘어가는 연출이 시작된다
+	#    (마을이 가까울수록 숲이 성겨지는 것으로도 읽힌다).
+	const EDGE_ODDS := [1.0, 0.72, 0.52, 0.44]
+	const FOREST_ODDS := 0.42       # 그 바깥 — 화면을 채우는 배경 숲
+	for y in range(base.position.y, base.end.y):
+		for x in range(base.position.x, base.end.x):
+			var e := Vector2i(x, y)
+			if m.tutorial_walkable(e) or e.x > m.STORY_EXIT.x:
+				continue
+			var band := _lane_band(e, EDGE_ODDS.size(), rects)
+			var odds: float = FOREST_ODDS if band < 1 else float(EDGE_ODDS[band - 1])
+			if m._hash01(x * 11 + 3, y * 7 + 5) >= odds:
+				continue
+			if band == 1:
+				_story_fence(e)   # 길에 닿는 한 겹 — 벨 수 없다 (길은 정해져 있다)
+			else:
+				# 그 바깥은 그냥 숲이다. **베어도 된다** — 베어 봐야 길은 열리지
+				# 않는다 (통행은 꺾은선이 정한다). 목재를 더 모으고 싶은
+				# 사람에게는 숲이 있고, 열다섯 그루째에는 능력치 창도 배운다
+				m.objects[e] = {"kind": "tree", "hp": m.TREE_HP}
 
-	# ④ 퀘스트 5: 커다란 바위 두 개가 좁아진 길을 막는다
-	_story_narrow(m.STORY_ROCK.x, "bigrock", m.BIGROCK_HP)
+	# ③ 길을 막고 선 것들 — 자리도 성격도 m.STORY_GATES 한 곳에 적혀 있다.
+	#    첫 나무(role "first")만은 처음에 비워 둔다: 다가서면 길가의 나무가
+	#    눈앞에서 이 자리로 쓰러진다 (_topple_first_tree).
+	for g: Dictionary in m.STORY_GATES:
+		if str(g.role) == "first":
+			_story_open(g)
+			continue
+		_story_narrow(g)
 
-	# ⑤ 길 바깥의 숲: 서로 겹치지 않게 간격을 지켜 세운다 (울타리 너머 풍경).
-	#    이 공간 밖으로는 한 그루도 나가지 않는다 — 나중에 통째로 닫을 것이므로.
+	# ③' 눈앞에서 쓰러질 그 나무는 길가에 서 있다 (아직은 풍경의 일부다)
+	m.objects[m.STORY_FALL_TREE] = {"kind": "tree", "hp": m.TREE_HP, "fixed": true}
+	# 옛 세이브를 이 숲으로 옮겨 심는 길에서는 이미 지난 대목이다 —
+	# 그 나무는 벌써 누워 있어야 한다 (연출을 되감을 수는 없다)
+	if GameData.story_phase != "" and GameData.story_phase != "enter":
+		_first_fall_done = true
+		m.objects.erase(m.STORY_FALL_TREE)
+		for p: Vector2i in _gate_tiles(m.STORY_GATES[0]):
+			m.objects[p] = _gate_object("log")
+
+	# ④ 갓길의 채집물 — 걸어가며 주울 것들.
+	#
+	#    **우회로에 더 둔다.** 돌아가는 길이 그저 길기만 하면 지름길이 언제나
+	#    정답이고, 갈림길은 고르는 시늉만 하게 된다. 풀숲에 열매가 몇 개 더
+	#    있으면 「돌아가도 손해는 아니다」가 되고, 그때부터 고를 만해진다.
+	#    (다져진 흙에는 놓지 않는다 — 길 한복판을 막아서는 안 된다)
+	_scatter_forage(m.STORY_LANE, 0.07)
+	_scatter_forage(m.STORY_DETOUR, 0.18)
+
+	# ⑤ 나무 사이의 것들: 바위와 채집물 (숲은 ②가 이미 다 세웠다).
+	#    이 공간 밖으로는 하나도 나가지 않는다 — 나중에 통째로 닫을 것이므로.
 	var reg: Rect2i = m.TUTORIAL_REGION
 	for y in range(reg.position.y, reg.end.y):
 		for x in range(reg.position.x, reg.end.x):
@@ -133,14 +184,10 @@ func _plant_story_forest() -> void:
 				continue
 			if m.grid[y][x].ground != "grass":
 				continue
+			if m.tutorial_walkable(pos):
+				continue   # 풀 갓길도 길이다 — 여기 나무가 서면 길이 막힌다
 			var h := m._hash01(x, y)
-			if h < 0.55:
-				if m.worldgen._nature_clear(pos, "tree"):
-					var tr := {"kind": "tree", "hp": m.TREE_HP}
-					if m._hash01(x * 17 + 2, y * 23 + 5) < 0.12:
-						tr["apple"] = true  # 일부 나무에만 사과 3개가 열린다
-					m.objects[pos] = tr
-			elif h > 0.93:
+			if h > 0.93:
 				if m.worldgen._nature_clear(pos, "rock"):
 					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
 			elif h > 0.86:
@@ -148,6 +195,24 @@ func _plant_story_forest() -> void:
 					m.objects[pos] = {"kind": "forage_herb" if h < 0.895 else "forage_berry",
 						"hp": 0}
 	_refresh_story_gates()
+
+
+# 풀 갓길에만 채집물을 흩는다 (다져진 흙길과 이미 무언가 놓인 자리는 건너뛴다).
+# 갓길이 막혀도 길은 가운데 두 줄로 그대로 이어진다.
+func _scatter_forage(lane: Array, odds: float) -> void:
+	for i in range(lane.size() - 1):
+		var road: Rect2i = m.story_lane_rect(lane[i], lane[i + 1])
+		var dirt: Rect2i = m.story_dirt_rect(lane[i], lane[i + 1])
+		for y in range(road.position.y, road.end.y):
+			for x in range(road.position.x, road.end.x):
+				var p := Vector2i(x, y)
+				if dirt.has_point(p) or m.objects.has(p):
+					continue
+				var h := m._hash01(x * 23 + 9, y * 31 + 4)
+				if h >= odds:
+					continue
+				m.objects[p] = {"hp": 0,
+					"kind": "forage_herb" if h < odds * 0.5 else "forage_berry"}
 
 
 # ---- 튜토리얼 공간을 닫는다 ----
@@ -207,6 +272,10 @@ func _carve_road(pos: Vector2i, paint := true) -> void:
 # 막는 자리는 그대로 두고 놓이는 것만 바꾼다 (통행은 한 칸도 안 달라진다).
 # 도끼로 못 베게 fixed 를 유지한다 — 여기서 길을 뚫는 건 정해진
 # 길목(_story_narrow)뿐이다
+#
+# 사과는 **길에 닿는 이 한 겹에만** 달린다 (그 바깥은 평범한 숲이다).
+# 배경까지 사과가 열리면 화면이 온통 빨간 점이 되고, 손이 닿지도 않는
+# 열매라 약만 오른다.
 func _story_fence(pos: Vector2i) -> void:
 	if pos.x < 0 or pos.y < 0 or pos.x >= m.MAP_W or pos.y >= m.MAP_H:
 		return
@@ -216,37 +285,181 @@ func _story_fence(pos: Vector2i) -> void:
 	m.objects[pos] = tr
 
 
-# 아직 뚫지 못한 길목(나무 줄) 수를 센다 — 한 칸만 베어도 그 줄은 열린 것으로 본다
-# 그 자리에서 길을 두 줄로 좁히고, 남은 두 줄을 막을 것으로 채운다.
-# (길이 네 줄이면 네 개를 다 캐야 하는데 초반부터 그건 지루하다)
-func _story_narrow(gx: int, kind: String, hp: int) -> void:
-	for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
-		var p := Vector2i(gx, y)
-		if m.STORY_GATE_ROWS.has(y):
-			var o := {"kind": kind, "hp": hp}
-			# **보상이 먼저 보여야 한다.**
-			#
-			# 길을 막은 나무는 지금 그냥 벽이다 — 치우고 지나가라는 통행료다.
-			# 가지에 사과가 달려 있으면 「시켜서 벤다」가 「저거 갖고 싶다」가
-			# 된다. 같은 한 그루인데 서 있는 이유가 생긴다
-			if kind == "tree":
-				o["apple"] = true
-			m.objects[p] = o
-		else:
-			_story_fence(p)
+# 이 칸이 길에서 몇 칸 떨어져 있는가 — 길 위면 0, max 칸을 넘으면 -1.
+# (길이 몇 번을 꺾어도 「가장자리」가 저절로 따라온다)
+func _lane_band(t: Vector2i, max_band: int, rects: Array) -> int:
+	for n in range(0, max_band + 1):
+		for r: Rect2i in rects:
+			if r.grow(n).has_point(t):
+				return n
+	return -1
 
 
+# ---- 길목 ----
+#
+# 길목에서는 길이 **두 줄로 좁아진다.** 네 줄을 다 뚫게 하면 첫 십 분이
+# 도끼질 열여섯 번이 된다. 좁히는 두 줄은 갓길 쪽이고, 남은 가운데 두 칸을
+# 막을 것으로 채운다.
+#
+# 가로 구간이면 위아래가, 세로 구간이면 좌우가 좁아진다 — 길이 꺾이는 곳에
+# 길목이 서도 뜻이 그대로다.
+
+# 길목 한 곳이 실제로 막는 두 칸
+func _gate_tiles(g: Dictionary) -> Array:
+	var at: Vector2i = g.at
+	if str(g.axis) == "h":
+		return [at, at + Vector2i(0, 1)]
+	return [at, at + Vector2i(1, 0)]
+
+
+# 그 두 칸의 바깥 — 길을 두 줄로 좁히려고 채우는 갓길 전부.
+# 길 폭(STORY_LANE_BACK·FWD)에서 뽑아 낸다 — 길을 넓히면 여기도 따라 넓어진다.
+# (예전에는 「좌우 한 칸씩」이라고 못 박아 두어서, 길이 한 칸 넓어진 순간
+#  길목 옆에 뚫린 한 칸이 생겼다)
+func _gate_shoulders(g: Dictionary) -> Array:
+	var step := Vector2i(0, 1) if str(g.axis) == "h" else Vector2i(1, 0)
+	var out: Array = []
+	for k in range(-m.STORY_LANE_BACK, m.STORY_LANE_FWD + 1):
+		if k == 0 or k == 1:
+			continue          # 가운데 두 칸은 막을 것이 채운다
+		out.append(g.at + step * k)
+	return out
+
+
+# 길을 좁히기만 하고 **가운데는 비워 둔다** (아직 막을 것이 오지 않은 길목)
+func _story_open(g: Dictionary) -> void:
+	for s: Vector2i in _gate_shoulders(g):
+		_story_fence(s)
+	for p: Vector2i in _gate_tiles(g):
+		m.objects.erase(p)
+
+
+# 좁힌 자리를 막을 것으로 채운다
+func _story_narrow(g: Dictionary) -> void:
+	_story_open(g)
+	var kind := str(g.kind)
+	for p: Vector2i in _gate_tiles(g):
+		m.objects[p] = _gate_object(kind)
+
+
+func _gate_object(kind: String) -> Dictionary:
+	match kind:
+		"bigrock":
+			# **광석이 박혀 있다** — 곡괭이가 무엇을 하는 도구인지 여기서 보인다
+			return {"kind": "bigrock", "hp": m.BIGROCK_HP, "ore": true}
+		"log":
+			# 쓰러진 나무. 판정은 선 나무와 똑같다 (도끼로 벤다) — 그림만 누워 있다
+			return {"kind": "tree", "hp": m.TREE_HP, "fallen": true}
+	# **보상이 먼저 보여야 한다.**
+	#
+	# 길을 막은 나무는 그냥 벽이다 — 치우고 지나가라는 통행료다. 가지에
+	# 사과가 달려 있으면 「시켜서 벤다」가 「저거 갖고 싶다」가 된다.
+	# 같은 한 그루인데 서 있는 이유가 생긴다
+	return {"kind": "tree", "hp": m.TREE_HP, "apple": true}
+
+
+# 이 칸이 이야기가 세워 둔 길목인가 (베어도 다시 자라지 않는다 —
+# 뚫어 놓은 길이 사흘 뒤에 도로 막히면 안 된다)
+func _is_gate_tile(t: Vector2i) -> bool:
+	for g: Dictionary in m.STORY_GATES:
+		if _gate_tiles(g).has(t):
+			return true
+	return false
+
+
+# 아직 뚫지 못한 길목 수를 센다 — 한 칸만 치워도 그 길목은 열린 것으로 본다.
+# **지금 갈 수 있는 길목만 센다.** 갈림길에서 한쪽을 골랐는데 「남은 길목
+# 2곳」이 뜨면, 고른 적도 없는 반대편 길을 마저 뚫으라는 말로 읽힌다.
 func _refresh_story_gates() -> void:
 	var left := 0
-	for gx: int in m.STORY_GATE_XS:
-		var blocked := true
-		for y in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
-			if not m.objects.has(Vector2i(gx, y)):
-				blocked = false
-				break
-		if blocked:
-			left += 1
+	if _gate_blocked("first"):
+		left += 1
+	# 지름길과 우회로 중 **한쪽만 뚫으면 된다.** 둘 다 막혀 있어도 남은 몫은
+	# 한 곳이고, 한쪽을 뚫으면 남은 몫은 없다 — 고르지도 않은 반대편 길을
+	# 마저 뚫으라고 세면 「선택」이 「숙제 둘」이 된다
+	if _gate_blocked("short") and _gate_blocked("detour"):
+		left += 1
+	# 바위는 여기서 세지 않는다 (곡괭이 대목이 따로 맡는다)
 	GameData.story_gates_left = left
+
+
+# 그 몫을 맡은 길목의 한복판 (월드 좌표)
+func _gate_center(role: String) -> Vector2:
+	for g: Dictionary in m.STORY_GATES:
+		if str(g.role) != role:
+			continue
+		var ts: Array = _gate_tiles(g)
+		var a: Vector2i = ts[0]
+		var b: Vector2i = ts[1]
+		return Vector2((a.x + b.x) * m.TILE * 0.5 + 16.0,
+			(a.y + b.y) * m.TILE * 0.5 + 16.0)
+	return Vector2.ZERO
+
+
+# ---- 첫 나무는 **눈앞에서** 쓰러진다 ----
+#
+# 예전에는 처음부터 길에 나무가 박혀 있었고, 걸어가다 몸으로 부딪히면
+# 「더 이상 갈 수 없는 길인 것 같다」가 떴다. 부딪힌 게 나무인지 바위인지도
+# 모르는 채로 자막만 나오니, 이야기가 시작하는 게 아니라 벽을 만난 것이었다.
+#
+# 지금은 길이 열려 있다. 오르막을 걸어 올라가면 그 자리에서 길가의 나무가
+# **우지끈 넘어와** 앞을 가로막는다 — 우체부가 나타날 이유도 여기서 생긴다.
+func _topple_first_tree() -> void:
+	if _first_fall_done:
+		return
+	_first_fall_done = true
+	var g: Dictionary = m.STORY_GATES[0]
+	var rest: Array = _gate_tiles(g)
+	# 통행은 **지금** 막힌다. 그림만 반 박자 늦게 온다 (넘어가는 동안은
+	# 쓰러지는 나무가 그 자리를 덮고 있다)
+	for p: Vector2i in rest:
+		m.objects[p] = _gate_object("log")
+	Sound.play_sfx("sfx_chop", 0.0, 0.7)   # 뿌리가 갈라지는 소리
+	m.objnode._topple_onto(m.STORY_FALL_TREE, -1.0, rest)
+	_refresh_story_gates()
+
+
+# 지금 서 있는 자리에서 가장 가까운, 아직 막혀 있는 길목 한 칸.
+# 갈림길에서 어느 쪽을 골랐는지 묻지 않아도 **간 쪽**이 저절로 잡힌다.
+func _nearest_blocked_gate() -> Array:
+	var best := Vector2i(-999, -999)
+	var best_d := 1e20
+	for g: Dictionary in m.STORY_GATES:
+		if str(g.role) not in ["short", "detour"]:
+			continue
+		for p: Vector2i in _gate_tiles(g):
+			if not m.objects.has(p):
+				continue
+			var d: float = m.player.position.distance_squared_to(
+				Vector2(p.x * m.TILE + 16, p.y * m.TILE + 16))
+			if d < best_d:
+				best_d = d
+				best = p
+	if best.x == -999:
+		return []
+	var name := "길을 막은 나무"
+	if _gate_role_at(best) == "short":
+		name = "길을 막은 등걸"
+	return [Vector2(best.x * m.TILE + 16, best.y * m.TILE + 16), name]
+
+
+func _gate_role_at(t: Vector2i) -> String:
+	for g: Dictionary in m.STORY_GATES:
+		if _gate_tiles(g).has(t):
+			return str(g.role)
+	return ""
+
+
+# 그 몫을 맡은 길목이 아직 막혀 있는가
+func _gate_blocked(role: String) -> bool:
+	for g: Dictionary in m.STORY_GATES:
+		if str(g.role) != role:
+			continue
+		for p: Vector2i in _gate_tiles(g):
+			if m.objects.has(p):
+				return true
+		return false
+	return false
 
 
 # ---- 길잡이 ----
@@ -262,19 +475,27 @@ func _guide_point() -> Array:
 			if _postman != null:
 				return [_postman.position, "우체부 아저씨"]
 		"chop":
-			# 아직 길을 막고 있는 첫 나무 줄
-			for gx: int in m.STORY_GATE_XS:
-				for yy in range(m.STORY_ROAD_Y0, m.STORY_ROAD_Y1 + 1):
-					if m.objects.has(Vector2i(gx, yy)):
-						return [t.call(Vector2i(gx, yy)), "길을 막은 나무"]
+			# 눈앞에서 쓰러진 그 나무 (아직 치우지 않았다면)
+			for g: Dictionary in m.STORY_GATES:
+				if str(g.role) != "first":
+					continue
+				for p: Vector2i in _gate_tiles(g):
+					if m.objects.has(p):
+						return [t.call(p), "길을 막은 나무"]
 		"path":
 			return [t.call(m.STORY_FORK), "갈림길"]
 		"rock":
+			# 갈림길에서 고른 길이 아직 막혀 있으면 **그 자리**를 먼저 짚는다.
+			# 바위는 두 길이 합친 뒤라 어느 쪽으로 와도 만나게 되어 있다 —
+			# 앞을 막은 나무를 건너뛰고 바위부터 가리키면 길잡이가 헛짚는다
+			var near: Array = _nearest_blocked_gate()
+			if not near.is_empty():
+				return near
 			if m.objects.has(m.STORY_ROCK):
 				return [t.call(m.STORY_ROCK), "길을 막은 바위"]
 			return [t.call(m.STORY_ROCK), "지나온 자리"]
 		"travel":
-			return [t.call(Vector2i(m.STORY_ROAD_X1, m.STORY_LANE_Y)), "숲길 동쪽 끝"]
+			return [t.call(m.STORY_EXIT), "숲길 동쪽 끝"]
 		"deliver":
 			var ch := _story_chief()
 			if ch != null:
@@ -351,6 +572,7 @@ func _story_update(delta: float) -> void:
 	else:
 		m._cutscene_idle = 0.0
 	_update_guide()
+	_record_trail()      # 뒤따르는 우체부가 밟을 자리
 	match GameData.story_phase:
 		"enter":
 			# (검증용) t를 지나는 첫 프레임에만 1회 발동
@@ -361,19 +583,19 @@ func _story_update(delta: float) -> void:
 				m.quest_ui.close()
 			if story_shot and absf(_story_t - 0.7) < delta:
 				_snap_story("story_forest")
-			# 숲으로 걷다가 나무에 정면으로 막히는 순간 퀘스트 1 완료
-			var hit_tree := false
-			if m.player.moving and m.player.bumped:
-				var dirs := {"down": Vector2i(0, 1), "up": Vector2i(0, -1),
-					"left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
-				var ahead: Variant = m.objects.get(m.player_tile() + dirs[m.player.dir])
-				hit_tree = ahead != null and ahead.kind == "tree"
-			if hit_tree or (story_shot and _story_t > 0.8):
-				if story_shot:   # 실제 플레이처럼 첫 나무 줄 앞까지 걸어와 있게 한다
+			# **길은 처음부터 막혀 있지 않다.** 걸어 올라가면 그 자리에서
+			# 길가의 나무가 우지끈 넘어와 앞을 가로막는다 — 「막힌 길을
+			# 발견했다」가 아니라 「눈앞에서 길이 막혔다」다.
+			var reached: bool = not _first_fall_done \
+				and m.player.position.distance_to(_gate_center("first")) < 132.0
+			if reached or (story_shot and _story_t > 0.8):
+				if story_shot:   # 실제 플레이처럼 그 자리 앞까지 걸어와 있게 한다
+					var stand: Vector2i = m.STORY_GATES[0].at + Vector2i(0, 3)
 					m.player.position = Vector2(
-						(m.STORY_GATE_XS[0] - 1) * m.TILE + 16, m.STORY_LANE_Y * m.TILE + 16)
+						stand.x * m.TILE + 16, stand.y * m.TILE + 16)
+				_topple_first_tree()
 				GameData.story_phase = "approach"
-				m.hud.show_message("더 이상 갈 수 없는 길인 것 같다.", 4.0)
+				m.hud.show_message("쿵 — 눈앞에서 나무가 넘어와 길을 막았다.", 4.0)
 				if story_shot:
 					m.hud.quest_start_toast("숲 안으로 들어가보기")
 					_spawn_postman()
@@ -436,7 +658,7 @@ func _story_update(delta: float) -> void:
 			# 화면이 어두워졌다가 **마을 어귀**에서 다시 밝아진다
 			if _postman_state == "follow" and not m.dialog.visible \
 					and not m.story_cutscene \
-					and m.player_tile().x >= m.STORY_ROAD_X1:
+					and m.player_tile().x >= m.STORY_EXIT.x:
 				_begin_world_entry()
 		"deliver":
 			_update_postman(delta, false)   # 우체부가 떠나는 연출은 계속 돌린다
@@ -449,7 +671,8 @@ func _story_update(delta: float) -> void:
 
 func _spawn_postman() -> void:
 	_postman = Node2D.new()
-	_postman.position = Vector2(m.STORY_ROAD_X0 * m.TILE + 16, m.STORY_LANE_Y * m.TILE + 16)
+	# 주인공이 걸어 나온 그 자리에서 뒤따라 온다 (길 위다 — 숲에서 튀어나오지 않는다)
+	_postman.position = Vector2(m.STORY_SPAWN.x * m.TILE + 16, m.STORY_SPAWN.y * m.TILE + 16)
 	_postman_spr = Sprite2D.new()
 	_postman_spr.centered = false
 	# 어른이라 주인공보다 조금 크게 그린다.
@@ -471,6 +694,66 @@ func _spawn_postman() -> void:
 			func() -> void: _snap_story("story_postman"))
 
 
+# ---- 꺾은선 위를 걷는 법 ----
+#
+# 길은 점 몇 개를 이은 꺾은선이다. 그 위의 **거리**로 자리를 잡으면,
+# 길이 몇 번을 꺾든 사람이 길을 밟는다.
+func _lane_world(i: int) -> Vector2:
+	var v: Vector2i = m.STORY_LANE[i]
+	return Vector2(v.x * m.TILE + 16, v.y * m.TILE + 16)
+
+
+# 이 자리는 꺾은선의 어디쯤인가 (시작점에서 잰 거리)
+func _lane_s(p: Vector2) -> float:
+	var best := 0.0
+	var best_d := INF
+	var acc := 0.0
+	for i in range(m.STORY_LANE.size() - 1):
+		var a := _lane_world(i)
+		var seg := _lane_world(i + 1) - a
+		var seg_len := seg.length()
+		if seg_len > 0.001:
+			var u := clampf((p - a).dot(seg) / (seg_len * seg_len), 0.0, 1.0)
+			var d := (a + seg * u).distance_squared_to(p)
+			if d < best_d:
+				best_d = d
+				best = acc + seg_len * u
+		acc += seg_len
+	return best
+
+
+# 시작점에서 s만큼 간 자리
+func _lane_at(s: float) -> Vector2:
+	var acc := 0.0
+	var last: int = m.STORY_LANE.size() - 2
+	for i in range(last + 1):
+		var a := _lane_world(i)
+		var seg := _lane_world(i + 1) - a
+		var seg_len := seg.length()
+		if s <= acc + seg_len or i == last:
+			if seg_len <= 0.001:
+				return a
+			return a + seg.normalized() * clampf(s - acc, 0.0, seg_len)
+		acc += seg_len
+	return _lane_world(0)
+
+
+# ---- 주인공의 발자국 ----
+#
+# 뒤따르는 사람이 밟을 자리다. 뒤에서 TRAIL_LAG 만큼만 남긴다 —
+# 그보다 오래된 발자국은 지운다 (기억이 길 필요가 없다).
+func _record_trail() -> void:
+	if _player_trail.is_empty() \
+			or _player_trail[-1].distance_to(m.player.position) >= TRAIL_STEP:
+		_player_trail.append(m.player.position)
+	var total := 0.0
+	for i in range(_player_trail.size() - 1, 0, -1):
+		total += _player_trail[i].distance_to(_player_trail[i - 1])
+		if total > TRAIL_LAG:
+			_player_trail = _player_trail.slice(i)
+			return
+
+
 func _update_postman(delta: float, story_shot: bool) -> void:
 	if _postman == null:
 		return
@@ -479,13 +762,20 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 		"approach":
 			# 멀리서 뚜벅뚜벅 걸어온다. 검증 시퀀스만 붙자마자 대화를 시작하고,
 			# 실제 플레이에서는 옆에 서서 기다린다 (플레이어가 E로 말을 건다)
+			#
+			# **길을 밟고 온다.** 예전에는 주인공 쪽으로 곧장 걸었다 — 길이
+			# 곧을 때는 그게 곧 길 위였지만, 길이 꺾이자 숲을 가로질러
+			# 나무를 뚫고 다가왔다. 꺾은선 위의 거리로 다가선다.
 			var to_player := m.player.position - _postman.position
 			if to_player.length() > m.POSTMAN_STOP_DIST:
 				var far := to_player.length() > 320.0   # 멀어지면 서둘러 따라온다
 				var spd := 90.0 if story_shot else (110.0 if far else 45.0)
-				_postman.position += to_player.normalized() * spd * delta
+				var step := _lane_at(move_toward(_lane_s(_postman.position),
+					_lane_s(m.player.position), spd * delta)) - _postman.position
+				_postman.position += step
 				_postman_spr.texture = m.tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
-				_postman_spr.flip_h = to_player.x < 0
+				if absf(step.x) > 0.5:
+					_postman_spr.flip_h = step.x < 0
 			else:
 				_postman_state = "wait"
 				_postman_spr.texture = m.tex["npc_postman_side_0"]
@@ -504,9 +794,17 @@ func _update_postman(delta: float, story_shot: bool) -> void:
 				if absf(to_wait.x) > 4.0:
 					_postman_spr.flip_h = to_wait.x < 0
 		"follow":
-			# 마을까지 동행: 주인공 옆에서 함께 걷고, 개척하는 동안 기다린다
-			var to := m.player.position + Vector2(-42, 6) - _postman.position
-			if to.length() > 14.0:
+			# 마을까지 동행 — **주인공이 밟고 온 자리를 그대로 되밟는다.**
+			#
+			# 예전에는 「주인공의 왼쪽 42픽셀」에 서려고 했다. 길이 가로로만
+			# 뻗어 있을 때는 나란히 걷는 모양이었지만, 세로 구간에서는 그
+			# 자리가 숲 한복판이라 나무를 뚫고 따라왔고, 갈림길에서는 어느
+			# 쪽으로 갔는지도 모른 채 직선으로 가로질렀다.
+			# 발자국을 따라가면 고른 길이 저절로 그의 길이 된다.
+			var goal: Vector2 = _player_trail[0] if not _player_trail.is_empty() \
+				else m.player.position
+			var to := goal - _postman.position
+			if to.length() > 10.0:
 				var spd := minf(to.length() * 2.5, 160.0)
 				_postman.position += to.normalized() * spd * delta
 				_postman_spr.texture = m.tex["npc_postman_side_%d" % (int(_postman_anim * 5.0) % 2)]
@@ -659,7 +957,9 @@ func _start_fork_dialog() -> void:
 	m.story_cutscene = true
 	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_normal"], [
 		{"text": "(우체부 아저씨가 갈라진 길을 둘러본다...)"},
-		{"text": "「길이 여러 갈래로 나뉘었구먼.」"},
+		{"text": "「길이 두 갈래로 나뉘었구먼.」"},
+		{"text": "「곧장 가는 쪽이 빠르네만... 저 앞에 큰 나무가\n쓰러져 길을 덮고 있지. 넘어가려면 도끼질을\n좀 해야 할 걸세.」"},
+		{"text": "「남쪽으로 도는 길은 걷기는 편해도 한참 돌아야 하고.\n어느 쪽으로 가든 마을에서는 다시 만난다네.」"},
 		{"text": "「이럴 때는 지도를 확인하는 게 좋다네.」"},
 		{"text": "「M 키를 누르면 지도를 볼 수 있어.」"},
 		{"text": "「지도에서는 자네가 지금 어디에 있는지와, 지금까지 가본 곳들을 확인할 수 있다네.」"},
@@ -678,9 +978,9 @@ func _after_map_dialog() -> void:
 		return
 	m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
 		{"text": "「이제 우리가 어디쯤 있는지 알겠나?」"},
-		{"text": "「마을은 이쪽 방향일세. 계속 가보세.」"},
+		{"text": "「마을은 동쪽일세. 어느 길로 갈지는 자네가 정하게 —\n나는 뒤를 따라가지.」"},
 	], func() -> void:
-		m.hud.show_message("열린 길을 따라 마을로 가보자.", 6.0))
+		m.hud.show_message("지름길과 우회로 — 어느 쪽으로 갈지 골라 보자.", 6.0))
 
 
 func _start_rock_dialog() -> void:
@@ -735,11 +1035,16 @@ func _story_rock_mined() -> void:
 		return
 	GameData.story_rock_state = 2
 	m.hud.reward_toast("돌 × %d" % m.BIGROCK_STONE, m.tex["icon_stone"])
+	m.hud.reward_toast("광석 × %d" % m.STORY_ROCK_ORE, m.tex["ore"])
 	get_tree().create_timer(1.2).timeout.connect(func() -> void:
 		if m.dialog.visible or m.ui_open():
 			return  # 창이 열려 있으면 말을 걸 때 같은 안내가 나온다
 		m.dialog.open_seq("우체부 아저씨", m.tex["npc_postman_portrait_happy"], [
 			{"text": "「잘했네. 이제 길이 열렸구먼.」"},
+			# 광석이 무엇인지 여기서 한 번 짚어 준다 — 동굴에 들어갈 이유가
+			# 이 한 줄에서 생긴다
+			{"text": "「그런데 이건... 광석 아닌가!\n이런 게 박혀 있었구먼.」"},
+			{"text": "「이런 건 마을 동쪽 동굴에서나 나오는 것인데 말이야.\n잘 챙겨 두게. 쓸 데가 있을 걸세.」"},
 		], func() -> void:
 			m.hud.show_message("우체부 아저씨에게 곡괭이를 돌려주자 (%s: 대화)"
 				% GameData.key_label("talk"), 6.0)))
@@ -879,6 +1184,7 @@ func _do_world_entry() -> void:
 	var p := Vector2(WORLD_ENTRY.x * m.TILE + 16, WORLD_ENTRY.y * m.TILE + 16)
 	m.player.position = p
 	m.player.dir = "right"
+	_player_trail.clear()              # 숲길의 발자국은 여기 오면 뜻이 없다
 	if _postman != null:
 		_postman.position = p + Vector2(-40.0, 6.0)
 	# **카메라를 여기서 풀어 준다.** 화면이 아직 검을 때 마을로 옮겨 놓아야

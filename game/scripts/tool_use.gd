@@ -313,7 +313,13 @@ func use_tool() -> void:
 				var felled: bool = obj.hp <= 0
 				# 판정은 여기서 끝난다. 그림이 바뀌는 것은 **날이 닿는 순간**이다 —
 				# 마지막 한 방이면 그 박자에 맞춰 나무가 옆으로 쓰러지기 시작한다.
-				if felled:
+				if felled and bool(obj.get("fallen", false)):
+					# 이미 누워 있는 나무다 — 다시 넘어갈 데가 없다.
+					# 토막이 팍 튀는 것으로 끝낸다 (쓰러지는 연출을 또 돌리면
+					# 누웠던 몸통이 벌떡 일어섰다가 다시 넘어간다)
+					swing_at(t, "wood", true)
+					m.objnode._remove_object(t, true, m.HIT_AT)
+				elif felled:
 					swing_at(t, "wood", true)
 					m.objnode._fell_tree(t, _fall_side(t))
 				else:
@@ -322,8 +328,7 @@ func use_tool() -> void:
 				if felled:
 					# 숲길을 막고 있던 나무는 다시 자라지 않는다 (길이 도로 막히면 안 된다)
 					var story_gate: bool = GameData.story_phase != "done" \
-						and m.STORY_GATE_XS.has(t.x) \
-						and t.y >= m.STORY_ROAD_Y0 and t.y <= m.STORY_ROAD_Y1
+						and m.story._is_gate_tile(t)
 					if not story_gate:
 						# 3~5일 뒤, 맵의 빈자리 어딘가에서 새 나무가 자란다
 						GameData.queue_respawn("tree")
@@ -409,10 +414,20 @@ func use_tool() -> void:
 				Sound.play_sfx("sfx_pick", 0.15)
 				swing_at(t, "stone", true)
 				if obj.hp <= 0:
+					# 광석이 박힌 바위인가 (숲길을 막고 선 그 바위) —
+					# 지우기 전에 봐 둔다
+					var has_ore: bool = bool(obj.get("ore", false))
 					# 돌도 곡괭이 날이 닿는 순간에 맞춰 튄다 (main.HIT_AT)
 					m.objnode._remove_object(t, true, m.HIT_AT)
 					GameData.stone += m.BIGROCK_STONE
-					m.hud.show_message("석재를 얻었다!")
+					if has_ore:
+						# 곡괭이를 처음 쥐는 대목이다. 돌만 나오면 「또 치웠다」로
+						# 끝나지만, 반짝이는 것이 하나 섞이면 이 도구가 무엇을
+						# 하는 물건인지 손이 먼저 안다
+						m.doing.gain_item("ore", m.STORY_ROCK_ORE)
+						m.hud.show_message("석재와 함께 — 갈라진 틈에서 광석이 나왔다!")
+					else:
+						m.hud.show_message("석재를 얻었다!")
 					m.doing._maybe_drop_recipe("bigrock")
 					gain_skill("mine", 4.0)
 					m.story._story_rock_mined()
