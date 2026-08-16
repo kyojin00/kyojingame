@@ -158,7 +158,7 @@ var _dc_tall: Array = []            # 두 칸 높이로 그리는 것 (벼랑면
 var _dc_season := ""                # 계절이 바뀌면 잔디 판 셋이 통째로 갈린다
 # 경계 그림 — 종류 -> 꼴 값(0~255)로 찾는 256칸. 한 도트가 1픽셀이라
 # 화면에 그릴 때 두 배로 늘어난다 (프로젝트 필터가 nearest)
-const EDGE_KINDS := ["beach", "surf", "dune", "trod", "brink"]
+const EDGE_KINDS := ["beach", "surf", "dune", "trod", "brink", "tread", "trail"]
 # 판이 여럿인 것 — 한 판만 쓰면 **꼴이 같은 칸마다 같은 무늬**가 찍힌다.
 # 못을 두르는 물가가 죄다 같은 그림이라 한 칸 간격으로 되풀이됐고, 그게
 # 「쌓아 만든 축대」처럼 각져 보였다. 물가도 벼랑처럼 셋으로 나눈다
@@ -2754,6 +2754,20 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 	if (kc & 64) != 0:
 		# 오르막 — 벼랑을 깎아 낸 길. 밟혀 다져진 흙에 디딤돌을 놓았다
 		_dc_base[ci] = tex["ramp_%d" % (int(_hash01(x * 13, y * 3) * 3.0) % 3)]
+		# 계단이 **시작하고 끝나는** 자리 — 돌이 타일 변에서 딱 끊기면
+		# 바닥과 맞붙어 오려 붙인 것으로 보인다. 끝머리 한두 단은 흙에
+		# 묻히고 밟혀 뭉개진 것이 맞다 (make_ground.js 의 treadPx)
+		var rc := 0
+		if (kn & 64) == 0: rc |= 1
+		if (ks & 64) == 0: rc |= 2
+		if (kw & 64) == 0: rc |= 4
+		if (ke & 64) == 0: rc |= 8
+		if (knw & 64) == 0: rc |= 16
+		if (kne & 64) == 0: rc |= 32
+		if (ksw & 64) == 0: rc |= 64
+		if (kse & 64) == 0: rc |= 128
+		if rc != 0:
+			el.append(edge_tex["tread"][rc])
 	elif ground == "dock":
 		kind = DC_DOCK
 	elif ground == "sand":
@@ -2825,6 +2839,21 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 			if gse == K_SAND: sc |= 128
 			if sc != 0:
 				el.append(edge_tex["dune"][sc])
+		# 계단 앞뒤 — 돌 조각과 닳은 흙이 바닥으로 흘러나온다.
+		# 계단 쪽(tread)과 바닥 쪽(trail)이 양쪽에서 마중 나가야
+		# 회색 돌과 갈색 흙이 한 줄에서 안 갈린다
+		if (kc & 64) == 0:
+			var tc := 0
+			if (kn & 64) != 0: tc |= 1
+			if (ks & 64) != 0: tc |= 2
+			if (kw & 64) != 0: tc |= 4
+			if (ke & 64) != 0: tc |= 8
+			if (knw & 64) != 0: tc |= 16
+			if (kne & 64) != 0: tc |= 32
+			if (ksw & 64) != 0: tc |= 64
+			if (kse & 64) != 0: tc |= 128
+			if tc != 0:
+				el.append(edge_tex["trail"][tc])
 		if gc != K_YARD:
 			var yc := 0
 			if gn == K_YARD: yc |= 1

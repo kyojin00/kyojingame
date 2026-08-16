@@ -828,6 +828,63 @@ function spill(P, key) {
   };
 }
 
+// 두 빛깔 사이를 섞는다. 그냥 섞으면 색이 무한정 늘어나 도트가 사진처럼
+// 뭉개지므로 **일곱 단으로 끊어** 섞는다
+function mix(a, b, t) {
+  const q = Math.round(clamp(t, 0, 1) * 6) / 6;
+  return a.map((c, k) => Math.round(c * (1 - q) + b[k] * q));
+}
+
+// 계단 마감 — 돌빛이 **점점 흙빛으로** 옅어진다.
+//
+// 오르막 칸은 통째로 디딤돌이라, 계단이 시작하고 끝나는 자리에서 회색 돌이
+// 갈색 흙에 딱 맞붙었다 — 오려 붙인 것처럼 보인다.
+//
+// 두 번 헛짚었다. ① 끝머리를 흙으로 덮었더니 이음매는 사라졌지만
+// **계단이 짧아졌다** (네 단짜리가 두 단이 된다). ② 흙알을 뿌렸더니
+// 이번엔 뿌린 자리와 안 뿌린 자리의 경계가 그대로 또렷했다.
+//
+// 옅어져야 하는 건 **빛깔**이다. 덮는 양은 바깥 한두 켜에만 몰아 주고
+// (제곱으로 떨어뜨린다 — 계단은 그대로 네 단이다), 그 대신 찍는 빛깔을
+// 변에서는 마당 흙, 안으로 갈수록 돌빛에 가깝게 이어서 섞는다.
+function treadPx(g, x, y, s, nax, nay, i, seed) {
+  if (s < 0) return;                                  // 딴 쪽 — 그 칸이 그린다
+  const k = Math.floor(s);
+  // 오르내리는 끝머리는 멀리까지, 옆구리는 짧게 (옆은 벼랑이 바로 붙는다)
+  const end = Math.abs(nay) > Math.abs(nax) ? 1.0 : 0.5;
+  const reach = (5.5 + h(Math.floor(i / 5), 0, 133 + seed) * 3.2) * end;
+  if (k > reach) return;
+  const p = clamp(1 - k / Math.max(1, reach), 0, 1);
+  const t = h(x, y, 135 + seed);
+  if (t > p * p * 0.92) return;                       // 디딤돌이 그대로 보이는 자리
+  const soil = EARTH[t < 0.30 ? 2 : (t > 0.76 ? 0 : 1)];   // 마당과 같은 배합
+  g.px(x, y, mix(STONE[3], soil, 0.30 + p * 0.70));
+}
+
+// 계단이 바닥으로 흘러나온 자리 — **바닥 칸 쪽**에 깐다.
+//
+// 계단은 그대로 두고 바닥이 마중 나간다. 계단 앞은 늘 밟혀 맨흙이고,
+// 굴러 나온 돌 조각이 몇 걸음 앞까지 흩어져 있다. 여기서도 빛깔이
+// 이어져야 한다 — 변에서는 돌빛에 가깝고 멀어질수록 바닥빛이다
+function trailPx(g, x, y, s, nax, nay, i, seed) {
+  if (s < 0) return;
+  const k = Math.floor(s);
+  const end = Math.abs(nay) > Math.abs(nax) ? 1.0 : 0.5;
+  const reach = (6.0 + h(Math.floor(i / 5), 0, 136 + seed) * 3.4) * end;
+  if (k > reach) return;
+  const p = clamp(1 - k / Math.max(1, reach), 0, 1);
+  const t = h(x, y, 137 + seed);
+  // 밟혀 닳은 흙 — 계단 앞은 풀이 안 산다. 변에 붙을수록 돌빛이 섞인다
+  if (t < 0.26 + p * p * 0.58) {
+    const soil = EARTH[t < 0.24 ? 2 : (t > 0.72 ? 0 : 1)];
+    g.px(x, y, mix(soil, STONE[4], p * p * 0.55));
+    return;
+  }
+  // 굴러 나온 돌 조각 — 가까울수록 잦다. 이것도 멀수록 흙빛에 잠긴다
+  if (t > 0.72 && h(Math.floor(i / 3), k >> 1, 138 + seed) < p * p * 0.62)
+    g.px(x, y, mix(STONE[k < 3 ? 2 : 4], EARTH[1], (1 - p) * 0.6));
+}
+
 // ---- 경계는 이웃 **아홉 칸**으로 잰다 ----
 //
 // 이웃 넷만 보고 그렸더니, 볼록한 귀퉁이에서 땅 칸은 제 모서리를 깎아
@@ -1269,6 +1326,8 @@ const KIND = [
   ['shore', true, null, 3], ['shoal', false, null, 3],
   ['beach', true, beachPx], ['surf', false, beachPx],
   ['dune', true, spill(SAND, 84)], ['trod', true, spill(EARTH, 96)],
+  // tread 는 **오르막 칸 제 안쪽**에 깐다 — 계단이 흙에 묻혀 드는 자리
+  ['tread', true, treadPx], ['trail', true, trailPx],
   // 벼랑 — 둘 다 **제 칸 안쪽**으로 층을 쌓는다. cliff 는 아래쪽 칸에서
   // 위를 향해(면), brink 는 위쪽 칸에서 아래를 향해(마루)
   // 벼랑면만 **두 칸 높이**다. 한 칸(화면 32px)으로는 아무리 잘 칠해도
