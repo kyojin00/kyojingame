@@ -2165,6 +2165,7 @@ func _end_story4() -> void:
 	GameData.story4_phase = "done"
 	if not GameData.zones_open.has("east_north"):
 		GameData.zones_open.append("east_north")
+		m.dirty_walk()
 	m.hud.story_banner("메인 스토리 4 완결", "오래된 마을의 경계")
 	m.hud.show_message("옛 마을 북동쪽 터가 열렸다! 동쪽 다리 너머로 마을이 넓어졌다.\n"
 		+ "남은 구역은 이장님의 「마을 확장 이야기」에서 되살릴 수 있다. (지도 M)", 7.0)

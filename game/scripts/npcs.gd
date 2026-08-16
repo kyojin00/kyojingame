@@ -285,25 +285,87 @@ func _sync_village_npcs() -> void:
 				m.FOREST_HOUSE_ANCHOR.x - 3, m.FOREST_HOUSE_ANCHOR.y + 3, 12, 5)
 
 
+# 펼칠 칸 수의 상한. 넘으면 「못 간다」로 친다.
+#
+# 펼칠 칸의 상한은 **거리에 맞춘다.**
+#
+# 스무 칸 앞을 못 찾겠으면 팔천 칸을 더 펼쳐도 못 찾는다. 반대로 마을에서
+# 농장까지 가는 길은 숲을 헤치느라 수천 칸을 펼치기도 한다. 한 값으로
+# 묶으면 가까운 데서 낭비하거나 먼 데서 길을 못 찾거나 둘 중 하나다.
+#
+# 상한에 걸린다는 것은 「길이 멀다」가 아니라 **닿을 수 없다**는 뜻이다 —
+# 갈 수 있는 땅과 끊긴 웅덩이 안. 거기서 세계를 다 훑어도 답은 똑같다.
+const PATH_BUDGET_MIN := 3000
+const PATH_BUDGET_MAX := 12000
+const BIG_G := 1 << 30
+var _path_opened := 0        # 마지막으로 펼친 칸 수 (검증·F3용)
+
+const PATH_DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0),
+	Vector2i(0, 1), Vector2i(0, -1)]
+
+
+func _h(a: Vector2i, b: Vector2i) -> int:
+	return absi(a.x - b.x) + absi(a.y - b.y)
+
+
+# 칸 단위 길찾기 — **A***.
+#
+# 예전에는 너비 우선이었다. 「갈 수 있는 칸이면 무조건 다 펼친다」는 뜻이다.
+# 224x132 시절에는 그래도 됐다. 448x304 가 되면서, **닿을 수 없는 목적지**
+# 하나가 세계 전체(8만 칸)를 훑는 일이 됐다 — 한 프레임이 0.1~0.5초로 튀고,
+# 실패하면 2초 뒤에 또 훑는다. 「최악이 튀고 바로 돌아와」가 이것이었다.
+#
+# A*는 목적지 쪽으로 먼저 펼친다. 맨해튼 거리는 네 방향 격자에서 실제 거리를
+# 넘지 않으므로(admissible·consistent) **길 자체는 너비 우선과 똑같이 짧게**
+# 나온다 — 값만 줄고 그림은 안 바뀐다. 그리고 펼칠 칸에 상한을 둔다.
 func _tile_path(start: Vector2i, goal: Vector2i) -> Array:
 	if start == goal:
 		return []
+	# 목적지 칸 자체를 못 밟으면 훑을 것도 없다. 예전에도 답은 「없다」였는데,
+	# 그 답을 내려고 세계를 다 펼쳤다 — 건물에 막힌 목적지 하나가 그랬다
+	if not m.is_passable(goal):
+		return []
+	var t0 := Time.get_ticks_usec() if m.perf_show else 0
+	var budget := clampi(_h(start, goal) * 150, PATH_BUDGET_MIN, PATH_BUDGET_MAX)
 	var prev := {start: start}
-	var queue: Array[Vector2i] = [start]
-	var head := 0
+	var gsc := {start: 0}
+	var blocked := {}          # 못 가는 칸 — 이웃 넷이 저마다 물어보지 않게
+	# 작은 이진 힙 — [f, 넣은 차례, 칸, g]. 차례는 f가 같을 때 순서를 굳혀
+	# 같은 자리에서 부를 때마다 길이 달라지지 않게 한다
+	var heap: Array = [[_h(start, goal), 0, start, 0]]
+	var seq := 0
+	var opened := 0
 	var found := false
-	while head < queue.size():
-		var cur: Vector2i = queue[head]
-		head += 1
+	while not heap.is_empty():
+		var top: Array = _heap_pop(heap)
+		var cur: Vector2i = top[2]
+		# 묵은 표 — 이 칸에 더 싼 길이 이미 났다.
+		# (꺼내는 차례는 f 순이지 g 순이 아니라서, 넣을 때 굳혀 두면
+		#  두어 칸 돌아가는 길이 나온다. 실제로 87칸이 89칸으로 나왔다)
+		if int(top[3]) > int(gsc.get(cur, BIG_G)):
+			continue
 		if cur == goal:
 			found = true
 			break
-		for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		opened += 1
+		if opened > budget:
+			break
+		var ng: int = int(top[3]) + 1
+		for d: Vector2i in PATH_DIRS:
 			var n: Vector2i = cur + d
-			if prev.has(n) or not m.is_passable(n):
+			if ng >= int(gsc.get(n, BIG_G)) or blocked.has(n):
 				continue
+			if not m.is_passable(n):
+				blocked[n] = true
+				continue
+			gsc[n] = ng
 			prev[n] = cur
-			queue.append(n)
+			seq += 1
+			heap.append([ng + _h(n, goal), seq, n, ng])
+			_heap_up(heap, heap.size() - 1)
+	if m.perf_show:
+		m._pm("길찾기", t0)
+	_path_opened = opened
 	if not found:
 		return []
 	var path: Array = []
@@ -312,3 +374,45 @@ func _tile_path(start: Vector2i, goal: Vector2i) -> Array:
 		path.push_front(Vector2(at.x * m.TILE + 16, at.y * m.TILE + 16))
 		at = prev[at]
 	return path
+
+
+func _heap_less(a: Array, b: Array) -> bool:
+	if int(a[0]) != int(b[0]):
+		return int(a[0]) < int(b[0])
+	return int(a[1]) < int(b[1])
+
+
+func _heap_up(h: Array, i: int) -> void:
+	while i > 0:
+		var par: int = (i - 1) >> 1
+		if not _heap_less(h[i], h[par]):
+			return
+		var t: Array = h[i]
+		h[i] = h[par]
+		h[par] = t
+		i = par
+
+
+func _heap_pop(h: Array) -> Array:
+	var top: Array = h[0]
+	var last: Array = h.pop_back()
+	if h.is_empty():
+		return top
+	h[0] = last
+	var i := 0
+	var n := h.size()
+	while true:
+		var l := i * 2 + 1
+		var sm := i
+		if l < n and _heap_less(h[l], h[sm]):
+			sm = l
+		if l + 1 < n and _heap_less(h[l + 1], h[sm]):
+			sm = l + 1
+		if sm == i:
+			return top
+		var t: Array = h[i]
+		h[i] = h[sm]
+		h[sm] = t
+		i = sm
+	return top
+

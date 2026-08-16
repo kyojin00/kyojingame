@@ -104,6 +104,10 @@ func _update_schedule() -> void:
 	_route_cd = 2.0   # 길이 막혀 있으면 잠시 뒤 다시 시도한다
 	var p: Array = main.npcmgr._tile_path(t, dest)
 	if p.is_empty():
+		# 못 찾았다는 것은 대개 **닿을 수 없다**는 뜻이다 (잠긴 구역, 건물에
+		# 둘러싸인 칸). 그걸 2초마다 다시 찾으면 실패하는 값만 계속 문다 —
+		# 실패한 자리는 한참 뒤에 다시 본다
+		_route_cd = 15.0
 		return
 	route = p
 	target = route.pop_front()

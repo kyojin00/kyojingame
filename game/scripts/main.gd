@@ -1051,6 +1051,7 @@ func _ready() -> void:
 		GameData.reset_all()
 		GameData.tutorial = {"active": false}
 		GameData.tutorial_space = false   # 합동 농장은 세계에서 바로 시작한다
+		dirty_walk()
 		GameData.story_phase = "done"
 		GameData.story2_phase = "done"
 		GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
@@ -1122,6 +1123,7 @@ func _ready() -> void:
 		else:
 			# 검증 샌드박스·합동 농장은 튜토리얼을 건너뛴 셈이다 — 처음부터 세계 안이다
 			GameData.tutorial_space = false
+			dirty_walk()
 			player.position = Vector2(4 * TILE + 16, 5 * TILE + 16)
 		if _shot_path != "" and not story_shot:
 			GameData.unlock_all_tools()  # 검증 시퀀스는 모든 도구 사용
@@ -1133,6 +1135,7 @@ func _ready() -> void:
 			# 스토리 4(마을 확장)도 끝난 샌드박스 — 검증은 263이 처음부터 돌린다
 			GameData.story4_phase = "done"
 			GameData.zones_open = GameData.ZONE_ORDER.duplicate()
+			dirty_walk()
 			# 이주 인사도 전부 끝난 샌드박스 — 도착 연출 검증은 265가 돌린다
 			GameData.npc_greeted = ["merchant", "blacksmith", "rancher",
 				"fisher", "explorer"]
@@ -1428,18 +1431,51 @@ func _hash01(x: int, y: int) -> float:
 
 # ---- 통행/타겟 ----
 
+# ---- 걸을 수 있는 땅 ----
+#
+# 물건(나무·돌·설치물)만 빼면 이 답은 **좀처럼 안 바뀐다** — 물길, 벼랑,
+# 해금된 구역으로 정해진다. 그런데 물을 때마다 지역 스물셋과 마을 구역들의
+# 네모를 하나씩 물어봤다. 한 번에 4µs다.
+#
+# 길찾기가 이걸 수만 번 부른다. 길 하나에 60ms가 여기서 갔다 — 걸음마다,
+# 밤 몬스터가 나올 자리를 찾을 때마다, 끼임을 풀 때마다 같이 물었다.
+# 칸마다 한 번만 재고 담아 둔다. 지형이나 해금이 바뀌면 통째로 버린다.
+const WALK_UNKNOWN := 0
+const WALK_OK := 1
+const WALK_NO := 2
+var _walk := PackedByteArray()
+
+
+func dirty_walk() -> void:
+	# 136KB 한 판을 0으로 미는 것뿐 — 구역을 살 때마다 불러도 된다
+	var n := MAP_W * MAP_H
+	if _walk.size() != n:
+		_walk.resize(n)
+	_walk.fill(WALK_UNKNOWN)
+
+
 func is_passable(t: Vector2i) -> bool:
 	if t.x < 0 or t.y < 0 or t.x >= MAP_W or t.y >= MAP_H:
 		return false
-	if grid[t.y][t.x].ground == "water":
-		return false
 	if objects.has(t):
 		return false
-	if _cliff_foot(t.x, t.y):
-		return false  # 벼랑 밑 — 오르막으로만 오르내린다
-	if not _tile_accessible(t):
-		return false  # 해금하지 않은 부지는 들어갈 수 없다
-	return true
+	if grid.is_empty():
+		return false
+	# 검증 하네스는 해금 상태(구역·튜토리얼 공간)를 직접 뒤집는다 —
+	# 거기서는 캐시를 안 쓴다. 중요한 건 빠르기가 아니라 답이 맞는 것이다
+	if harness != null:
+		return grid[t.y][t.x].ground != "water" and not _cliff_foot(t.x, t.y) \
+			and _tile_accessible(t)
+	if _walk.size() != MAP_W * MAP_H:
+		dirty_walk()
+	var i := t.y * MAP_W + t.x
+	var w: int = _walk[i]
+	if w == WALK_UNKNOWN:
+		# 벼랑 밑은 오르막으로만 오르내리고, 해금하지 않은 부지에는 못 든다
+		w = WALK_OK if (grid[t.y][t.x].ground != "water"
+			and not _cliff_foot(t.x, t.y) and _tile_accessible(t)) else WALK_NO
+		_walk[i] = w
+	return w == WALK_OK
 
 
 func _tile_accessible(t: Vector2i) -> bool:
@@ -1540,6 +1576,7 @@ func _dev_open_world() -> void:
 		for cx in range((wr.end.x + cw - 1) / cw):
 			GameData.explored[Vector2i(cx, cy)] = true
 	GameData.zones_open = GameData.ZONE_ORDER.duplicate()
+	dirty_walk()
 	# 가게는 **짓는 것과 같은 길**로 세운다 (_fill_building). 세계를 다시
 	# 만들면 밭도 심은 것도 날아간다.
 	var built := 0
@@ -1886,13 +1923,18 @@ func rescue_trapped() -> void:
 
 
 func _process(delta: float) -> void:
+	var _p := Time.get_ticks_usec() if perf_show else 0
 	_bgm_tick(delta)
 	GameData.playtime_sec += delta   # 엔딩 통계 리포트용 실제 플레이 시간
 	_rescue_t += delta
 	if _rescue_t >= RESCUE_EVERY:
 		_rescue_t = 0.0
 		rescue_trapped()
+	if perf_show:
+		_p = _pm("갇힘구조", _p)
 	saveio.autosave_tick(delta)   # 15분마다 알아서 담는다 (시계는 save_load.gd)
+	if perf_show:
+		_p = _pm("자동저장", _p)
 	story._story_update(delta)
 	story._fisher_update(delta)
 	story._move_update(delta)
@@ -1917,6 +1959,8 @@ func _process(delta: float) -> void:
 	story._fisher_home_update(delta)
 	story._kitchen_update(delta)
 	story._settler_update(delta)
+	if perf_show:
+		_p = _pm("이야기", _p)
 	if house_preview:
 		overlay.queue_redraw()   # 집터 프리뷰가 마우스를 따라다닌다
 	_work_lock = maxf(_work_lock - delta, 0.0)
@@ -1926,16 +1970,16 @@ func _process(delta: float) -> void:
 	objnode._update_object_fade(delta)
 	if perf_show:
 		_perf["fade"] = Time.get_ticks_usec() - _pt
-		_pt = Time.get_ticks_usec()
+		_pt = _pm("비침", _pt)
 	# 화면 둘레 것만 노드로 세워 둔다 (칸이 바뀔 때만 도는 일이라 싸다)
 	objnode._stream_nodes()
 	if perf_show:
 		_perf["stream"] = Time.get_ticks_usec() - _pt
-		_pt = Time.get_ticks_usec()
+		_pt = _pm("스트림", _pt)
 	objnode._drain_spawn_queue()   # 세우는 일은 프레임마다 몇 개씩만
 	if perf_show:
 		_perf["spawn"] = Time.get_ticks_usec() - _pt
-		_perf_tick(delta)
+		_p = _pm("세우기", _pt)
 	if GameData.story_phase == "done":
 		story._grandpa_update(delta)
 	for ft in float_texts:
@@ -1961,6 +2005,8 @@ func _process(delta: float) -> void:
 		if _growth_timer >= 0.7:
 			farming._growth_tick(_growth_timer * MIN_PER_SEC)
 			_growth_timer = 0.0
+			if perf_show:
+				_p = _pm("자람", _p)
 		# 해변: 게임 시간 10~15분마다 조개가 하나씩 밀려온다 (상한에서 멈춘다)
 		if GameData.sea_open and not Net.is_guest():
 			toolwork._weapon_cd = maxf(0.0, toolwork._weapon_cd - delta)
@@ -1968,6 +2014,8 @@ func _process(delta: float) -> void:
 			if _shell_cd <= 0.0:
 				_shell_cd = GameData.shell_respawn_minutes()
 				worldgen._tick_beach()
+				if perf_show:
+					_p = _pm("조개", _p)
 		# 비 오는 날은 걷는 동안에도 풀과 열매가 계속 돋는다
 		if not Net.is_guest() and weather_now() in [GameData.WEATHER_RAIN,
 				GameData.WEATHER_STORM]:
@@ -1975,8 +2023,12 @@ func _process(delta: float) -> void:
 			if _rain_forage_cd <= 0.0:
 				_rain_forage_cd = RAIN_FORAGE_MINUTES
 				worldgen._tick_rain_forage()
+				if perf_show:
+					_p = _pm("비채집", _p)
 		actions._update_mouse_target()
 		fishing._update_fishing(delta)
+		if perf_show:
+			_p = _pm("조준", _p)
 		if player_tile() != _last_explore_tile:
 			_last_explore_tile = player_tile()
 			GameData.mark_explored_at(_last_explore_tile)
@@ -1999,9 +2051,16 @@ func _process(delta: float) -> void:
 	daycycle._update_night_mobs(delta)
 	objnode._update_tree_fade()
 	story._update_u_intro()
+	if perf_show:
+		_p = _pm("효과", _p)
 	netsync._net_process(delta)
+	if perf_show:
+		_p = _pm("그물", _p)
 	daycycle._update_night()
 	hud.refresh()
+	if perf_show:
+		_p = _pm("HUD", _p)
+		_perf_tick(delta)
 	queue_redraw()
 	overlay.queue_redraw()
 	if _shot_path != "":
@@ -2341,6 +2400,32 @@ var _perf_acc := {"draw": 0, "fade": 0, "stream": 0, "spawn": 0}
 var _perf_worst := 0.0
 var _perf_label: Label = null
 
+# ---- 한 번씩 터지는 프레임을 잡는 그물 ----
+#
+# 「스크립트 전체 566ms 인데 최악 5.6ms」가 같이 떴다. 둘 다 맞을 수는 없다.
+# 최악을 **서른 프레임마다** 지우고 있었기 때문이다 — 180프레임이면 0.17초다.
+# 튀는 프레임은 몇 초에 한 번 오니까 거의 언제나 지워진 뒤였다.
+#
+# 창을 3초로 늘리고, 그 창 안에서 **토막마다 가장 오래 걸린 값**을 들고 있는다.
+# 평균은 튀는 것을 감춘다 — 끊김을 볼 때 봐야 하는 건 최댓값이다.
+const PERF_WIN := 3.0
+var _perf_win_t := 0.0
+var _perf_max := {}          # 토막 이름 -> 창 안에서 가장 오래 걸린 usec
+var _perf_max_show := {}     # 화면에 띄우고 있는 판 (창이 넘어갈 때 갈린다)
+var _perf_proc_worst := 0.0  # 엔진이 잰 _process 시간의 창 안 최댓값
+var _perf_worst_show := 0.0
+var _perf_proc_show := 0.0
+
+
+# 토막 하나를 재고, 다음 토막의 시작 시각을 돌려준다.
+# perf_show 가 꺼져 있으면 아무 데서도 안 불린다
+func _pm(pname: String, t0: int) -> int:
+	var now := Time.get_ticks_usec()
+	var dt := now - t0
+	if dt > int(_perf_max.get(pname, 0)):
+		_perf_max[pname] = dt
+	return now
+
 
 # 이 오브젝트 그림이 플레이어를 덮고 있는가 (그리고 앞에 그려지는가)
 
@@ -2395,6 +2480,7 @@ func rebuild_water_levels() -> void:
 	# 물길이 바뀌면 깊이도 물가도 다 바뀐다 — 그려 둔 것을 통째로 버린다.
 	# (지도를 짓고 나서도, 세이브를 읽고 나서도 여기를 지나간다)
 	dirty_all()
+	dirty_walk()   # 물이 바뀌었으면 걸을 수 있는 땅도 바뀐다
 
 
 # ---- 그리기 캐시 버리기 ----
@@ -2844,6 +2930,7 @@ func _draw() -> void:
 					Color(1, 1, 1, 0.6), false, 1.0)
 	if perf_show:
 		_perf["draw"] = Time.get_ticks_usec() - _t0
+		_pm("그리기", _t0)
 
 
 # ---- F3: 한 프레임이 어디서 몇 밀리초를 쓰는가 ----
@@ -2864,7 +2951,21 @@ func _perf_tick(delta: float) -> void:
 	for k: String in _perf_acc:
 		_perf_acc[k] = int(_perf_acc[k]) + int(_perf[k])
 	_perf_n += 1
+	# **프레임마다** 재 둔다. 창이 넘어갈 때만 보면 튀는 프레임은 그 사이에
+	# 지나가 버린다 — 「스크립트 566ms 인데 최악 5.6ms」가 그래서 나왔다
 	_perf_worst = maxf(_perf_worst, delta * 1000.0)
+	_perf_proc_worst = maxf(_perf_proc_worst,
+		Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0)
+	# 창(3초)이 넘어가면 최댓값 판을 화면 쪽으로 넘기고 새로 센다
+	_perf_win_t += delta
+	if _perf_win_t >= PERF_WIN:
+		_perf_win_t = 0.0
+		_perf_max_show = _perf_max
+		_perf_max = {}
+		_perf_worst_show = _perf_worst
+		_perf_proc_show = _perf_proc_worst
+		_perf_worst = 0.0
+		_perf_proc_worst = 0.0
 	if _perf_n < 30:
 		return
 	var n := float(_perf_n)
@@ -2878,9 +2979,10 @@ func _perf_tick(delta: float) -> void:
 	var objs := int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME))
 	var mine := (int(_perf_acc.draw) + int(_perf_acc.fade) + int(_perf_acc.stream)
 		+ int(_perf_acc.spawn)) / n / 1000.0
-	var lines := "FPS %d   프레임 %.1fms   최악 %.1fms\n" % [
-		Engine.get_frames_per_second(), delta * 1000.0, _perf_worst]
-	lines += "스크립트 전체 %.1f · 물리 %.1f · 내가 잰 것 %.2f (ms)\n" % [
+	var lines := "FPS %d   프레임 %.1fms   최악(3초) %.1fms / 스크립트 %.1fms\n" % [
+		Engine.get_frames_per_second(), delta * 1000.0,
+		maxf(_perf_worst, _perf_worst_show), maxf(_perf_proc_worst, _perf_proc_show)]
+	lines += "스크립트 지금 %.1f · 물리 %.1f · 내가 잰 것 %.2f (ms)\n" % [
 		proc_ms, phys_ms, mine]
 	lines += "  그리기 %.2f · 비침 %.2f · 스트림 %.2f · 세우기 %.2f\n" % [
 		int(_perf_acc.draw) / n / 1000.0, int(_perf_acc.fade) / n / 1000.0,
@@ -2892,12 +2994,33 @@ func _perf_tick(delta: float) -> void:
 		int(_perf_day.total) / 1000.0, int(_perf_day.farm) / 1000.0,
 		int(_perf_day.grow) / 1000.0, int(_perf_day.spawn) / 1000.0,
 		int(_perf_day.save) / 1000.0]
+	# ---- 창 안에서 **가장 오래 걸린 토막** 넷 ----
+	#
+	# 평균은 한 번 터지는 것을 감춘다. 몇 초에 한 번 오는 0.5초짜리를
+	# 찾으려면 평균이 아니라 최댓값을 봐야 하고, 그게 어느 토막인지
+	# 이름이 나와야 한다. 짐작할 자리를 여기서 없앤다.
+	var top: Array = []
+	for k3: String in _perf_max_show:
+		top.append([int(_perf_max_show[k3]), k3])
+	for k4: String in _perf_max:
+		var v4 := int(_perf_max[k4])
+		var seen := false
+		for e in top:
+			if e[1] == k4:
+				e[0] = maxi(int(e[0]), v4)
+				seen = true
+		if not seen:
+			top.append([v4, k4])
+	top.sort_custom(func(a: Array, b: Array) -> bool: return int(a[0]) > int(b[0]))
+	var tline := ""
+	for i in mini(4, top.size()):
+		tline += "%s %.1f · " % [str(top[i][1]), int(top[i][0]) / 1000.0]
+	lines += "가장 오래 걸린 토막: %s\n" % tline.trim_suffix(" · ")
 	lines += "노드 %d (월드 자식 %d) · 물건 %d · 세울 차례 %d" % [
 		obj_nodes.size(), world.get_child_count(), objects.size(),
 		objnode._spawn_queue.size()]
 	_perf_label.text = lines
 	_perf_n = 0
-	_perf_worst = 0.0
 	for k2: String in _perf_acc:
 		_perf_acc[k2] = 0
 

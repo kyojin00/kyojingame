@@ -140,6 +140,7 @@ func _unlock_zone(zid: String) -> void:
 	GameData.wood -= int(cost[0])
 	GameData.stone -= int(cost[1])
 	GameData.zones_open.append(zid)
+	m.dirty_walk()   # 부지가 열렸다 — 걸을 수 있는 땅이 바뀐다
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("마을 확장!")
 	m.hud.show_message("%s를 되살렸다! 마을이 넓어졌다. (지도 M)" %

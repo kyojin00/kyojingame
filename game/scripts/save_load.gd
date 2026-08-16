@@ -181,6 +181,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.chief_house_lv = int(d.get("chief_house_lv", 0))
 	GameData.story4_phase = str(d.get("story4_phase", ""))
 	GameData.zones_open = d.get("zones_open", [])
+	m.dirty_walk()   # 세이브의 해금 상태로 걸을 수 있는 땅을 다시 잰다
 	GameData.story6_phase = str(d.get("story6_phase", ""))
 	GameData.story6_day = int(d.get("story6_day", 0))
 	GameData.old_book_stored = bool(d.get("old_book_stored", false))
