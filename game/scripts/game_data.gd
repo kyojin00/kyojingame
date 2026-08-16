@@ -3588,26 +3588,42 @@ func swing_tex_base(key: String) -> String:
 	return "pc_%s_swing" % key
 
 
+# 걷기 프레임 수와 속도. 다섯 칸에서 **여섯 칸**으로 늘렸다.
+#
+# 걸음은 두 발짝이 한 바퀴다. 한 바퀴 안에 다리를 모으는 「통과」가 두 번,
+# 벌리는 「딛기」가 두 번 있어야 하는데, 다섯 칸으로는 담을 수가 없다 —
+# 통과는 위상 0도와 180도인데 다섯 등분의 눈금 간격이 72도라 180도에
+# 눈금이 없다. 그래서 두 발짝 중 하나만 몸이 통통 뜨는 절뚝걸음이었다.
+# 여섯이면 눈금이 60도라 둘 다 눈금에 놓인다.
+#
+# 초당 칸 수도 8에서 12로 올렸다. 8fps × 여섯 칸이면 한 바퀴가 0.75초,
+# 이동 속도 150px/s로는 한 발짝에 3.5칸(112px)을 간다 — 발이 미끄러진다.
+# 12fps면 한 발짝이 1.2칸쯤이라 다리 길이에 가깝다.
+const WALK_FRAMES := 6
+const WALK_FPS := 12.0
+
+
 func player_side_tex(is_moving: bool, _suffix: String, t: float) -> String:
-	# 옆모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
-	# (4박자 로직의 "서기" 박자가 걷기에 끼어들지 않게 moving을 직접 본다)
+	# 옆모습. 걷는 중엔 걷기 프레임, 멈추면 숨쉬기(스케일) 모션.
+	# (_suffix는 안 쓴다 — 부르는 쪽이 넘기던 옛 박자 값이다. 걷기 칸은
+	#  여기서 anim_time으로 직접 고른다.)
 	if not is_moving:
 		return "pc_side_idle"
-	return "pc_side_walk_%d" % (int(t * 8.0) % 5)
+	return "pc_side_walk_%d" % (int(t * WALK_FPS) % WALK_FRAMES)
 
 
 func player_down_tex(is_moving: bool, _suffix: String, t: float) -> String:
-	# 앞모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	# 앞모습. 걷는 중엔 걷기 프레임, 멈추면 숨쉬기(스케일) 모션.
 	if not is_moving:
 		return "pc_down_idle"
-	return "pc_down_walk_%d" % (int(t * 8.0) % 5)
+	return "pc_down_walk_%d" % (int(t * WALK_FPS) % WALK_FRAMES)
 
 
 func player_up_tex(is_moving: bool, _suffix: String, t: float) -> String:
-	# 뒷모습. 걷는 중엔 5프레임 걷기(8fps), 멈추면 숨쉬기(스케일) 모션.
+	# 뒷모습. 걷는 중엔 걷기 프레임, 멈추면 숨쉬기(스케일) 모션.
 	if not is_moving:
 		return "pc_up_idle"
-	return "pc_up_walk_%d" % (int(t * 8.0) % 5)
+	return "pc_up_walk_%d" % (int(t * WALK_FPS) % WALK_FRAMES)
 
 
 # 벌목 누적 횟수 (스토리 중 15그루째에 우체부가 능력치 창을 알려준다)

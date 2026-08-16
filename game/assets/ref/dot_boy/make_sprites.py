@@ -53,11 +53,36 @@ PAL = {
     'K': (56, 37, 25),      # 신발 그늘 (밑창)
 }
 
-WALK = 5
-# 오른다리 앞으로 나간 양 (논리 px). 사인 5등분 — 끝에서 처음으로 매끄럽게 돈다.
-STRIDE = [0, 3, 2, -2, -3]
-# 몸통이 내려앉는 양. 다리가 벌어진 칸에서 낮고(2) 모인 칸에서 높다(0).
-BOB = [0, 2, 1, 1, 2]
+# 걷기 칸 수 — **여섯**. 다섯이던 걸 늘렸다.
+#
+# 걸음은 두 발짝이 한 바퀴다. 그러니 한 바퀴 안에 「모으는 칸(통과)」이
+# **두 번**, 「벌린 칸(딛기)」이 **두 번** 있어야 한다. 그런데 다섯 칸은
+# 이걸 담을 수가 없다: 통과는 위상 0도와 180도인데, 다섯 등분의 눈금은
+# 72도 간격이라 180도에 눈금이 없다. 어떻게 돌려 놔도 통과 하나는
+# 칸과 칸 **사이로 빠진다**.
+#
+# 옛 [0, 3, 2, -2, -3]이 딱 그랬다. 다리가 +2에서 -2로 건너뛰며 모이는
+# 순간을 아무도 못 보고, 몸이 뜨는 지점도 한 바퀴에 한 번뿐이라 —
+# 두 발짝 중 한 발짝만 통통 튀는 **절뚝걸음**이 됐다. 게다가 통과 칸이
+# 팔도 다리도 곧게 선 「차렷」 그림이라, 0.6초마다 한 번씩 걷다 말고
+# 우뚝 서는 딸꾹질이 보였다.
+#
+# 여섯이면 눈금이 60도 간격이라 0도와 180도가 둘 다 눈금에 놓인다.
+WALK = 6
+# 가까운 쪽 다리가 앞으로 나간 양 (논리 px).
+#   f0 통과 · f1 나가는 중 · f2 딛기 · f3 통과 · f4 나가는 중 · f5 딛기
+# 반 바퀴 밀면 부호만 뒤집힌다(s[i+3] == -s[i]) — 두 발짝이 똑같다.
+STRIDE = [0, 2, 3, 0, -2, -3]
+# 몸통이 내려앉는 양. 벌린 칸에서 낮고(2) 모인 칸에서 높다(0).
+# 한 바퀴에 두 번 오르내린다 — 발짝마다 한 번씩.
+BOB = [0, 1, 2, 0, 1, 2]
+# 통과 칸에서 **어느 다리가 허공을 지나가는가**.
+#   +1 = 가까운 다리(정면에선 화면 왼쪽), -1 = 저편 다리, 0 = 둘 다 딛고 있다
+# 두 다리를 나란히 세워 두면 통과 칸이 「차렷」이 된다. 지나가는 다리의
+# 발을 땅에서 떼고 무릎을 앞으로 접어야 비로소 **걷는 중의 한 칸**이 된다.
+# f0에선 가까운 다리가 앞으로 나가는 참(다음 칸이 +2)이고,
+# f3에선 반대로 저편 다리가 나가는 참이다(다음 칸이 -2).
+PASS = [1, 0, 0, -1, 0, 0]
 
 # 세로 배치 (bob 적용 전 기준 행). 몸통 12행 + 다리 14행 — 처음(10+12)보다
 # 1.2배쯤 길다. 몸통이 짧으면 거기 묶인 팔도 짧아져 머리만 큰 비율이 된다.
@@ -412,10 +437,11 @@ def torso_down(g, bob, swing, dx=0, skip=None):
         g.px(out, y + 9 + dy, '.')               # 주먹 끝 모서리 깎기
 
 
-def legs_down(g, stride, dx=0, sq=0):
+def legs_down(g, stride, dx=0, sq=0, pass_leg=0):
     """앞모습 다리. stride: 화면 왼쪽 다리가 앞으로 나간 양 -3..+3
     dx/sq: 휘두르기 때 몸이 쏠리고 주저앉는 양 — 엉덩이는 몸통을 따라가고
-    발은 디딘 자리에 남아, 다리가 엉덩이에서 발로 기울어진다."""
+    발은 디딘 자리에 남아, 다리가 엉덩이에서 발로 기울어진다.
+    pass_leg: +1 왼쪽 다리가, -1 오른쪽 다리가 허공을 지나가는 중."""
     # 바지는 셔츠보다 한 칸씩 안으로 들어간다 (11~20, 셔츠는 10~21) —
     # 셔츠 밑단이 바지를 살짝 덮은 실루엣이라, 폭이 아래로 갈수록
     # 좁아지기만 하고 옆으로 되튀어나오는 데가 없다.
@@ -423,7 +449,11 @@ def legs_down(g, stride, dx=0, sq=0):
     g.hline(11 + dx, 20 + dx, HIP_Y + sq, 'P')  # 셔츠 아랫단 그늘
     g.rect(15 + dx, HIP_Y + 2 + sq, 16 + dx, HIP_Y + 2 + sq, 'P')
     for x0, s in ((11, stride), (17, -stride)):
-        lift = min(3, -s) if s < 0 else 0      # 뒤로 간 다리는 들려 짧아진다
+        # 통과 칸에 허공을 지나가는 다리 — 앞모습에서도 한 다리를 들어야
+        # 「모으고 서 있는 그림」이 안 된다 (정면은 보폭이 안 보이니
+        #  들어 올린 발이 걸음을 말해 주는 유일한 단서다).
+        swinging = (pass_leg > 0 and x0 == 11) or (pass_leg < 0 and x0 == 17)
+        lift = 3 if swinging else (min(3, -s) if s < 0 else 0)
         pc = 'P' if lift else 'p'              # 들린 다리는 그늘에 잠긴다
         inner = x0 + 3 if x0 == 11 else x0     # 가랑이 쪽 그늘 열
         top = LEG_Y + sq
@@ -534,10 +564,11 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True):
         _side_arm(g, c, y, sw, True)           # 가까운 팔 — 몸 위에
 
 
-def legs_side(g, stride, lean=0, dx=0, sq=0):
+def legs_side(g, stride, lean=0, dx=0, sq=0, pass_leg=0):
     """옆모습 다리. stride: 가까운 다리가 앞으로 나간 양 -3..+3
     허벅지는 엉덩이에 붙어 있고 발끝으로 갈수록 stride 만큼 기울어진다.
-    dx/sq: 휘두르기 쏠림·주저앉음 (엉덩이만 따라가고 발은 제자리)."""
+    dx/sq: 휘두르기 쏠림·주저앉음 (엉덩이만 따라가고 발은 제자리).
+    pass_leg: +1 가까운 다리가, -1 저편 다리가 허공을 지나가는 중 (통과 칸)."""
     c = 15 + lean
     # 바지는 몸통(10칸)보다 한 칸씩 안으로 들어간 8칸 — 셔츠 밑단이
     # 바지를 덮은 실루엣이라 옆으로 되튀어나오는 데가 없다.
@@ -564,7 +595,11 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
     # 무릎이 접힌 게 보인다. 앞 다리는 무릎이 반 발 앞서는 정도만.
     for off, shade in ((-stride, True), (stride, False)):
         back = off < 0
-        lift = 2 if back else 0                # 뒤로 간 다리는 뒤꿈치가 들린다
+        # 통과 칸에서 허공을 지나가는 다리 — 발을 떼고 무릎을 접는다.
+        # 이 한 가지가 「걷는 중」과 「차렷」을 가른다. 두 다리를 모아
+        # 곧게 세우면 아무리 팔을 저어도 서 있는 그림이다.
+        swinging = (pass_leg > 0 and not shade) or (pass_leg < 0 and shade)
+        lift = 3 if swinging else (2 if back else 0)   # 뒤로 간 다리는 뒤꿈치가 들린다
         # 허벅지도 함께 젓는다.
         #
         # 예전에는 엉덩이 끝을 0으로 못 박고 무릎만 보폭의 2/3까지
@@ -576,6 +611,17 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
         hip_off = off * 0.3
         knee_off = off * (0.7 if back else 1.0)
         foot_off = round(off * 1.35) if back else off
+        if swinging:
+            # 무릎이 앞으로 나오고 종아리는 그 밑에 매달린다 — 굽힌 무릎이
+            # 발보다 앞서야 「끌고 오는 다리」가 아니라 「차 내는 다리」다.
+            #
+            # 옆으로도 반드시 **비켜 세운다**. 통과 칸은 보폭이 0이라 두
+            # 다리가 같은 열에 겹치는데, 거기서 한쪽만 위로 들면 한 다리에
+            # 신발이 둘 달린 꼴이 된다 (위아래로 포개진 두 짝이 「굽힌
+            # 다리」로 안 읽히고 부러진 다리로 보였다).
+            hip_off += 1
+            knee_off += 3
+            foot_off += 2
         pc, kc = ('P', 'n') if shade else ('p', 'k')
         bot = GROUND - lift
         hip_row = HIP_Y + 2 + sq
@@ -618,7 +664,7 @@ def legs_side(g, stride, lean=0, dx=0, sq=0):
             g.rect(x - wb, yy, x + wf, yy, cc)
             # 무릎 — 굽힌 다리에만 접힌 자국을 한 줄 넣는다.
             # 이 한 줄이 있어야 다리가 「굽었다」로 보인다 (없으면 그냥 기운 막대)
-            if yy == knee_row and back:
+            if yy == knee_row and (back or swinging):
                 g.rect(x, yy, x + wf, yy, 'P' if not shade else pc)
             if not shade and hip_row < yy <= ankle_row:  # 띠에 겹친 줄은 건드리지
                 g.px(x - wb, yy, 'P')          # 않는다 — 가랑이 그늘 위에 밝은
@@ -685,8 +731,8 @@ def torso_up(g, bob, swing, dx=0, skip=None):
         g.px(out, y + 9 + dy, '.')               # 주먹 끝 모서리 깎기
 
 
-def legs_up(g, stride, dx=0, sq=0):
-    legs_down(g, stride, dx, sq)               # 뒤모습 다리는 앞모습과 같은 규칙
+def legs_up(g, stride, dx=0, sq=0, pass_leg=0):
+    legs_down(g, stride, dx, sq, pass_leg)     # 뒤모습 다리는 앞모습과 같은 규칙
 
 
 # --------------------------------------------------------------- 휘두르기
@@ -897,7 +943,7 @@ def roughen(g):
                 g.d[y][x] = ROUGH_LITE[c]
 
 
-def frame(direction, stride=None, bob=0):
+def frame(direction, stride=None, bob=0, pass_leg=0):
     art, torso, legs = PARTS[direction]
     g = G()
     s = 0 if stride is None else stride
@@ -906,11 +952,11 @@ def frame(direction, stride=None, bob=0):
     # 발은 땅에 붙어 있으니 그만큼 무릎이 눌린다.
     if direction == 'side':
         lean = 0 if stride is None else 1      # 걸을 때 몸이 살짝 앞으로 쏠린다
-        legs(g, s, lean, 0, bob)
+        legs(g, s, lean, 0, bob, pass_leg)
         torso(g, bob, s, lean)
         head(g, art, bob, lean)
     else:
-        legs(g, s, 0, bob)
+        legs(g, s, 0, bob, pass_leg)
         torso(g, bob, s)
         head(g, art, bob)
     roughen(g)
@@ -1023,7 +1069,7 @@ def render_set(heads, blinks, ref_prefix, out_prefix):
     for d in ('down', 'side', 'up'):
         images[f'{d}_idle'] = frame(d).render()
         for i in range(WALK):
-            images[f'{d}_walk_{i}'] = frame(d, STRIDE[i], BOB[i]).render()
+            images[f'{d}_walk_{i}'] = frame(d, STRIDE[i], BOB[i], PASS[i]).render()
         for i in range(SWING_N):
             images[f'{d}_swing_{i}'] = swing_frame(d, i).render()
     for d, art in blinks.items():              # 눈 감은 정지 한 장씩

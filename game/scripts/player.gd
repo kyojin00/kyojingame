@@ -498,16 +498,11 @@ func _update_sprite() -> void:
 	if riding != _was_riding:
 		_was_riding = riding
 		queue_redraw()          # 발밑 그림자 크기가 바뀐다
-	# 4박자 걷기: 발걸음A -> 서기(통과) -> 발걸음B -> 서기(통과)
+	# 걷기 칸은 GameData.player_*_tex 가 anim_time으로 직접 고른다.
+	# (예전엔 여기서 4박자를 세어 suffix로 넘겼는데, 그 함수들이 오래전부터
+	#  suffix를 안 보고 있었다 — 세어 봐야 아무 데도 안 쓰이는 값이었다.
+	#  걷기가 여섯 칸이 되면서 「4박자」라는 주석까지 거짓이 돼 걷어낸다.)
 	var suffix := "idle"
-	if walking:
-		match int(anim_time * 8.0) % 4:
-			0:
-				suffix = "0"
-			2:
-				suffix = "1"
-			_:
-				suffix = "idle"
 	var tex_name := ""
 	sprite.flip_h = false
 	match dir:

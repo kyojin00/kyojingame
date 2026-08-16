@@ -950,12 +950,12 @@ func _load_textures() -> void:
 				tex[sn] = load(sp)
 
 
-# 플레이어 한 벌을 이루는 프레임 이름들 (idle 3 + walk 15 + blink 2 + swing 15)
+# 플레이어 한 벌을 이루는 프레임 이름들 (idle 3 + walk 18 + blink 2 + swing 15)
 func _player_suffixes() -> Array[String]:
 	var out: Array[String] = ["down_idle", "up_idle", "side_idle",
 		"down_blink", "side_blink"]
 	for d: String in ["down", "up", "side"]:
-		for i in 5:
+		for i in GameData.WALK_FRAMES:
 			out.append("%s_walk_%d" % [d, i])
 		for i in 5:   # player.gd의 SWING_FRAMES와 같은 수
 			out.append("%s_swing_%d" % [d, i])
