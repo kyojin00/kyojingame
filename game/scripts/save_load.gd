@@ -266,6 +266,11 @@ func _apply_save(d: Dictionary) -> void:
 	# 대기로 이어 준다 (옛 세이브는 마을이 이미 다 서 있다)
 	GameData.story2_phase = str(d.get("story2_phase",
 		"done" if str(d.get("fisher_quest", "")) == "done" else "fisher"))
+	# 튜토리얼이 닫혔는가 — 이 값이 없는 옛 세이브는 **낚시를 배웠는가**로
+	# 잰다. 튜토리얼이 부두의 첫 한 마리에서 끝나게 바뀌기 전 세이브라,
+	# 낚싯대를 이미 받았다면 그 대목은 지나온 것이다
+	GameData.tutorial_closed = bool(d.get("tutorial_closed",
+		str(d.get("fisher_quest", "")) in ["open", "done"]))
 	# 가게는 이제 **처음부터 아홉 채가 다 열려 있다.** 하나씩 여는 이야기를
 	# 없앴으므로, 옛 세이브도 열려 있는 쪽으로 맞춰 준다 — 안 그러면 예전에
 	# 저장한 사람은 열 수 없는 가게 앞에서 영영 문이 잠긴다

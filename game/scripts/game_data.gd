@@ -1018,6 +1018,24 @@ var shop_seeds: Array = ["wheat", "corn"]
 const SHOP_BUILD_WOOD := 30
 const SHOP_BUILD_STONE := 20
 
+# ---- 튜토리얼은 **낚시꾼과 한 마리를 낚는 데서** 끝난다 ----
+#
+# 예전에는 상점·바닷길·첫 밭·첫 끼까지를 한 줄로 이끌고서야 「이제부터는
+# 마을 사람들의 이야기」라고 말했다. 그 줄이 너무 길었다 — 배우는 대목이
+# 한 시간을 넘어가면 그건 배우는 게 아니라 시키는 대로 하는 것이다.
+#
+# 이제 이끄는 줄기는 **도구를 한 번씩 써 보는 데까지**다. 호미로 갈고,
+# 도끼로 베고, 곡괭이로 캐고, 마지막으로 부두에서 낚싯대를 던져 한 마리.
+# 그 뒤로는 이끌지 않는다 — 호미 밭이든 만수의 첫 끼든 이주 편지든,
+# 전부 **만나는 사람이 저마다 들고 있는 부탁**(서브 퀘스트)이 된다.
+#
+# 이 값이 켜지는 순간이 그 경계다. 단계값(story2_phase 따위)은 그대로
+# 돌아간다 — 바뀌는 것은 「메인 이야기인가 곁이야기인가」뿐이다.
+var tutorial_closed := false
+
+# 튜토리얼이 닫히기 전까지 메인으로 남는 퀘스트
+const TUTORIAL_QUEST_IDS := ["story1", "story2", "fisher", "tutorial"]
+
 # 메인 스토리 2 진행 — 집 인사 후 이 순서로 이어진다:
 #   shop: 재료를 모아 상점 짓기 / fisher: 낚시꾼 퀘스트(fisher_quest가 세부) /
 #   farm_talk: 이장에게 가 호미 받기 / farm: 밭 갈기(STORY2_FLAGS) / done: 완료
@@ -2861,8 +2879,31 @@ var tracked_pick := ""
 # 보여 주고, 미니창은 걸러지지 않은 목록의 맨 앞을 집었다. 그래서 둘이
 # 서로 다른 퀘스트를 가리키는 일이 생겼다. 이제 거르는 자리는 여기
 # 한 곳뿐이고, 두 창이 같은 목록을 읽는다.
+# 튜토리얼이 닫힌 뒤에는 **메인 이야기가 없다.**
+#
+# 장(章)은 그대로 스무 개가 이어지지만, 그것을 「지금 따라가야 하는 줄기」로
+# 보여 주면 마을은 끝까지 시키는 대로 하는 곳이 된다. 낚시까지 배우고 나면
+# 남는 것은 사람들이다 — 이장의 밭, 만수의 첫 끼, 재민의 편지, 다 저마다의
+# 부탁이지 이어 달리는 한 줄이 아니다.
+#
+# 단계값은 하나도 안 건드린다. 표에 붙은 이름표만 바꾼다 — 그래야 이야기의
+# 앞뒤(장 번호)는 살아 있으면서 이끌지는 않는다.
+func _resort_quests(cat: Array) -> Array:
+	if not tutorial_closed:
+		return cat
+	for q: Dictionary in cat:
+		if str(q.get("cat", "sub")) != "main":
+			continue
+		q["cat"] = "sub"
+		# 장 번호는 남긴다 — 「이야기 7」처럼. 앞뒤 순서를 아는 것과
+		# 「지금 이걸 따라가라」는 전혀 다른 말이다
+		if q.has("ep"):
+			q["ep"] = str(q["ep"]).replace("메인 스토리", "이야기")
+	return cat
+
+
 func quest_list() -> Array:
-	var cat := quest_catalog()
+	var cat := _resort_quests(quest_catalog())
 	# 목록에 남길 메인 이야기 하나를 먼저 정한다 — 보통은 맨 앞이지만,
 	# 고정한 퀘스트가 메인이면 **그쪽이 언제나 이긴다.**
 	var keep_main := ""
@@ -6437,6 +6478,7 @@ func reset_all() -> void:
 	shop_seeds = ["wheat", "corn"]
 	recipe_pending = []
 	story2_phase = ""
+	tutorial_closed = false
 	village_built = ALL_VILLAGE_PLOTS.duplicate()
 	if DEV_MODE and OS.get_environment("KYOJIN_SHOT") != "":
 		# 검증 하네스 전용: 기본 아이템을 잔뜩 들고 시작한다.
@@ -6796,6 +6838,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"home_signs": home_signs,
 		"storage_stock": storage_stock,
 		"sea_open": sea_open, "story2_phase": story2_phase,
+		"tutorial_closed": tutorial_closed,
 		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
 		"stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,

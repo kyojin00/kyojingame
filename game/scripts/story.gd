@@ -1480,7 +1480,10 @@ func _end_home_greet() -> void:
 	if chief != null:
 		chief.scripted = false
 	# 검은 알림 바 대신 말풍선 연출만 — 자세한 재료는 트래커/Q창이 보여 준다
-	m.hud.story_banner("튜토리얼 ② 마을을 깨우다", "상점 · 바닷길 · 첫 밭")
+	# 부제는 **여기서 배울 것**만 적는다. 예전에는 「상점 · 바닷길 · 첫 밭」
+	# 이라고 적어 놓고 실제로는 첫 끼까지 시켰다 — 이제 배우는 대목은
+	# 부두에서 한 마리를 낚는 데서 끝난다 (_close_tutorial)
+	m.hud.story_banner("튜토리얼 ② 마을을 깨우다", "호수의 낚시꾼과 첫 한 마리")
 	m.saveio.save_now()
 
 
@@ -1639,9 +1642,50 @@ func fisher_lesson_caught() -> void:
 		{"text": "「자네 곡괭이라면 캐낼 수 있겠지? 나는 여기서 기다림세.」",
 			"portrait": m.tex["npc_fisher_portrait_happy"]},
 	], func() -> void:
-		m.hud.quest_start_toast("바닷길을 열자")
-		m.hud.show_message("남쪽 바위 능선의 길목을 곡괭이로 캐자.", 6.0)
+		# 완료 창을 먼저 띄우고, 창을 닫으면 그제야 다음 부탁을 알린다.
+		# 둘을 같이 내보내면 「끝났다」와 「이걸 하라」가 한 화면에 겹친다
+		_close_tutorial(func() -> void:
+			m.hud.quest_start_toast("바닷길을 열자")
+			m.hud.show_message("남쪽 바위 능선의 길목을 곡괭이로 캐자.", 6.0))
 		m.saveio.save_now())
+
+
+# ---- 여기서 배우는 대목이 끝난다 ----
+#
+# 부두에서 한 마리를 낚으면 도구를 한 번씩 다 써 본 것이다 — 호미·도끼·
+# 곡괭이·물뿌리개, 그리고 낚싯대. 더 이끌 것이 없다.
+#
+# 예전에는 여기서도 한참을 더 갔다. 능선을 뚫고, 이장에게 호미를 받고,
+# 밭을 갈고, 첫 끼를 지어 만수에게 가져다주고 나서야 「튜토리얼 완료」가
+# 떴다. 그 줄이 너무 길어서 배우는 대목이 아니라 심부름 목록이었다.
+#
+# 뒤에 남은 것들(바닷길·첫 밭·첫 끼·이주 편지)은 없어지지 않는다.
+# **서브 퀘스트로 자리를 옮길 뿐이다** — 단계값은 그대로 돌아가고,
+# 퀘스트 표에서 이름표만 바뀐다 (game_data._resort_quests).
+func _close_tutorial(after := Callable()) -> void:
+	if GameData.tutorial_closed:
+		if after.is_valid():
+			after.call()
+		return
+	GameData.tutorial_closed = true
+	# 하룻밤 자면 이주 편지가 온다 (예전에는 첫 끼를 지은 뒤였다)
+	GameData.move_day = GameData.day
+	# 이장의 밭 이야기를 **바로** 열어 둔다. 예전에는 능선을 뚫어야 열렸는데,
+	# 이제 능선은 그 자체로 곁가지 부탁이라 그 뒤에 줄을 세울 이유가 없다.
+	# 튜토리얼이 끝난 마을에는 부탁이 여럿 놓여 있고, 순서는 사람이 정한다
+	if GameData.story2_phase == "fisher":
+		GameData.story2_phase = "farm_talk"
+	m.hud.story_banner("튜토리얼 완료", "이제부터는 마을 사람들의 이야기다")
+	m.dialog.open("튜토리얼 완료 — 도구를 다 잡아 보았다",
+		"흙을 갈고, 나무를 베고, 돌을 캐고,\n"
+		+ "마지막으로 부두에서 한 마리를 낚았다.\n\n"
+		+ "여기까지가 배우는 대목이다. 이제 이끄는 이야기는 없다 —\n"
+		+ "만나는 사람마다 저마다의 사정이 있으니, 말을 붙여 보자.\n\n"
+		+ "이장은 밭 이야기를, 만수는 밥 이야기를 하고 싶어 한다.",
+		# **빈 Callable 을 그대로 넘기지 않는다.** 창은 `b[1] != null` 로만
+		# 보는데 빈 Callable 은 null 이 아니라서, 그대로 넘기면 아무 데도
+		# 안 매인 신호에 연결하려다 오류가 난다
+		[["좋다", after if after.is_valid() else null]])
 
 
 # 길목의 바위가 부서질 때마다 불린다 (tool_use) — 둘 다 캐면 보상 대화
@@ -1973,6 +2017,7 @@ func _skip_tutorial() -> void:
 			GameData.unlocked_tools.append(t)
 	GameData.story_phase = "done"
 	GameData.story2_phase = "done"
+	GameData.tutorial_closed = true
 	# 건너뛰기도 결국 「튜토리얼 공간을 떠난다」는 뜻이다 —
 	# 그 숲길을 닫고 마을 어귀에 세운다 (안 그러면 세계 밖에 갇힌다)
 	if GameData.tutorial_space:
@@ -5173,6 +5218,12 @@ func _end_kitchen_deliver() -> void:
 	# 여기서 메인 스토리 2가 끝난다 — 상점 안에서 완결 창이 뜬다
 	if GameData.story2_phase != "done":
 		GameData.story2_phase = "done"
+		if GameData.tutorial_closed:
+			# 배우는 대목은 진작 부두에서 닫혔다 (_close_tutorial).
+			# 여기서 또 완료 창을 띄우면 「끝났다」가 두 번이 된다
+			m.hud.quest_toast("만수의 첫 끼")
+			m.saveio.save_now()
+			return
 		GameData.move_day = GameData.day   # 하룻밤 자면 이주 편지가 온다
 		m.hud.story_banner("튜토리얼 완료", "이제부터는 마을 사람들의 이야기다")
 		m.dialog.open("튜토리얼 완료 — 마을을 깨우다",
