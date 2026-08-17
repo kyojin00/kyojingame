@@ -1074,11 +1074,6 @@ func _build_village() -> void:
 	# 들어가진다 (예전 오두막은 한 칸짜리라 이럴 일이 없었다).
 	# 문 칸만 남겨 둔다 — 거기서 이장을 부른다.
 	_block_under_art(m.CHIEF_ART, Rect2i(m.CHIEF_HUT.x, m.CHIEF_HUT.y, 1, 1))
-	# 상점 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 사람을 들인다).
-	# 건물은 이미 서 있으므로 문 칸이 아니라 **문 옆**에 세운다
-	if not GameData.village_built.has("general"):
-		m.objects[m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor)] = \
-			{"kind": "plotsite", "hp": 0}
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	# 경매 게시판 — 다른 농장 사람들과 사고파는 장터로 이어진다
 	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
@@ -1090,14 +1085,58 @@ func _build_village() -> void:
 	# 줄 번호는 **마을 구역에서 잰다** — 예전에는 1과 43을 그대로 적어
 	# 두었는데, 세계를 북쪽으로 열두 줄 내리면서 이 두 줄만 제자리에
 	# 남아 지도 맨 위에 뜬금없는 나무 띠가 생겼다
-	for x in range(m.VILLAGE_REGION.position.x + 4, m.VILLAGE_REGION.end.x - 1):
-		for y in [m.VILLAGE_REGION.position.y + 1, m.VILLAGE_REGION.end.y - 1]:
-			var rim := Vector2i(x, y)
-			if _in_any_plot_ring(rim):
-				continue          # 부지 울타리 안(과 그 문턱)에는 심지 않는다
-			if m.grid[y][x].ground == "grass" and not m.objects.has(rim) \
-					and m._hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
-				m.objects[rim] = {"kind": "tree", "hp": m.TREE_HP}
+	_plant_village_greenery()
+
+
+# 부지와 부지 **사이**를 숲으로 채운다.
+#
+# 마을 구역 안에는 자연물을 한 포기도 두지 않았다. 부지가 다닥다닥 붙어
+# 있던 시절에는 그게 맞았는데, 한 부지를 한 구역으로 벌려 놓고 나니
+# 사이가 통째로 맨 잔디밭이 됐다 — 「이 집 다음 이 집」, 주택 단지다.
+#
+# 사진 속 마을은 집이 **제 환경을 두르고** 있다. 나무와 덤불 사이에 한 채가
+# 서 있고, 다음 집까지는 숲 사이를 걸어간다. 그 사이를 여기서 심는다.
+#
+# 건드리지 않는 것: 길·광장·부지 울타리 안·문 앞 통로·잔디가 아닌 바닥.
+# 길이 사방으로 뚫려 있으므로 나무가 부지를 가둘 일은 없다.
+func _plant_village_greenery() -> void:
+	var r: Rect2i = m.VILLAGE_REGION
+	for y in range(maxi(1, r.position.y), mini(m.WORLD_H - 1, r.end.y)):
+		for x in range(maxi(1, r.position.x), mini(m.MAP_W - 1, r.end.x)):
+			var pos := Vector2i(x, y)
+			if m.grid[y][x].ground != "grass":
+				continue          # 흙길·자갈 마당·물은 그대로
+			if m.objects.has(pos) or m.spawn_blocked(x, y):
+				continue
+			if m.PLAZA.has_point(pos) or m.ROAD.has_point(pos) or _on_village_road(pos):
+				continue
+			if _in_any_plot_ring(pos) or _is_plot_gateway(pos):
+				continue
+			# 길가 한 줄은 비워 둔다 — 나무 그림이 길을 덮으면 답답하다
+			if _next_to_village_road(pos):
+				continue
+			var h := m._hash01(x * 3 + 11, y * 5 + 7)
+			# 덩어리로 난다 (world_gen 의 흩뿌리기와 같은 결)
+			var clump: float = clampf(_vnoise(x, y, 14, 23) * 2.2, 0.0, 2.2)
+			if h < 0.26 * clump:
+				if _nature_clear(pos, "tree"):
+					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
+			elif h < 0.26 * clump + 0.03:
+				if _nature_clear(pos, "rock"):
+					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
+			elif h < 0.42:
+				# 풀숲 — 걸어 다니는 데 걸리지 않는 잔것.
+				# **채집물(forage_*)은 심지 않는다.** 그건 하루 상한이 있는
+				# 물건이라, 마을을 채운 만큼 들판이 텅 빈다 (LIVELY_OK 채집)
+				m.objects[pos] = {"kind": "weed", "hp": 0}
+
+
+# 마을 길에 붙은 칸인가 (길 양옆 한 줄은 비워 둔다)
+func _next_to_village_road(t: Vector2i) -> bool:
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if _on_village_road(t + d) or m.ROAD.has_point(t + d):
+			return true
+	return false
 
 
 # 이 칸이 어느 부지의 울타리 테두리 안(문턱 한 줄 포함)인가
@@ -1739,6 +1778,14 @@ func _forage_ok(pos: Vector2i) -> bool:
 	# 길을 막지 않는다 — 나무 간격(네 칸)을 그대로 쓰면 온 들판이 「자리 없음」이 된다.
 	if not _respawn_ok(pos, "weed", 1):
 		return false
+	# 마을 안에서는 **길·광장·부지 마당**을 피한다. 마을 사이가 숲이 되면서
+	# 채집물도 마을에 돋게 됐는데, 아침마다 흙길 한복판과 대장간 자갈 마당에
+	# 산딸기가 돋았다 — 사람이 쓸고 다니는 자리다
+	if m.VILLAGE_REGION.has_point(pos):
+		if m.PLAZA.has_point(pos) or m.ROAD.has_point(pos) or _on_village_road(pos):
+			return false
+		if _in_any_plot_ring(pos) or _is_plot_gateway(pos):
+			return false
 	# 아직 이야기가 닿지 않은 땅에는 돋지 않는다 — 가지도 못하는 곳에
 	# 상한을 채워 버리면 정작 다닐 수 있는 들판이 텅 빈다
 	return m.region_open_at(pos) and GameData.is_tile_owned(pos.x, pos.y)

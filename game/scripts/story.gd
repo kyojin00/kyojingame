@@ -1463,12 +1463,11 @@ func _start_story2_dialog() -> void:
 		{"text": "「할아버지가 쓰시던 침대와 책상이 그대로 남아 있을 걸세.」"},
 		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
 		{"text": "「책상에서는 손수 가구를 만들 수 있네.\n물론 재료가 있어야만 만들 수 있지.」"},
-		{"text": "「그나저나... 보다시피 마을 가게가 죄다 닫혀 있네.\n사람은 남았는데 물건이 끊겼거든.」"},
-		{"text": "「자네가 와 준 김에 부탁 하나 함세.\n우선 잡화점부터 다시 열어 보지 않겠나?」",
+		{"text": "「가게들은 다 문을 열어 뒀네. 사람도 제자리에 있고.\n자네는 그저 필요한 걸 사고팔면 되네.」"},
+		{"text": "「그러니 자네가 할 일은 하나일세 —\n집 앞 풀밭을 갈아 밭을 만드는 것.」",
 			"portrait": chief_happy},
-		{"text": "「목재 %d에 돌 %d... 나무를 베고 바위를 캐면 모일 걸세.」"
-			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]},
-		{"text": "「재료가 모이면 잡화점 문 옆 게시판에 걸어 두게.\n문이 열리면 만수가 계산대에 설 걸세.」"},
+		{"text": "「호미는 내가 챙겨 뒀네. 밭일이 손에 익으면\n이 마을에서 못 할 게 없지.」"},
+		{"text": "「아, 그리고... 서쪽 호수에 낯선 사람이 하나 와 있다더군.\n긴 낚싯대를 둘러멘 사람이라는데.」"},
 	], _end_home_greet)
 
 
@@ -1476,7 +1475,7 @@ func _end_home_greet() -> void:
 	m.story_cutscene = false
 	_chief_greet = false
 	GameData.story_phase = "done"
-	GameData.story2_phase = "shop"
+	GameData.story2_phase = "fisher"
 	var chief: Variant = _story_chief()
 	if chief != null:
 		chief.scripted = false
@@ -2860,7 +2859,7 @@ func _start_move_post_dialog() -> void:
 		{"text": "「편지가 닿지 않는 마을엔 아무도 못 오네.\n올 사람도 우리를 모르니까.」",
 			"portrait": m.tex["npc_chief_portrait_happy"]},
 		{"text": "「우체국을 다시 세우세. 자리는 광장 북쪽,\n예전 그 터가 아직 비어 있네.」"},
-		{"text": "「재료만 모아 오게. 나머지는 마을 사람들과\n내가 맡음세. — 「마을 발전」에서 고르면 되네.」"},
+		{"text": "「우체국은 그대로 있으니 기별만 넣으면 되네.\n그 친구, 오늘 안에 올 걸세.」"},
 	], _end_move_post_start)
 
 
@@ -2868,6 +2867,7 @@ func _end_move_post_start() -> void:
 	if GameData.move_quest != "post":
 		return
 	GameData.move_quest = "postbuild"
+	m.village.open_shop("post")   # 우체국은 이미 서 있다 — 기별만 넣으면 된다
 	m.hud.quest_start_toast("마을에 우체국을 — 이장과 함께 짓자")
 	m.saveio.save_now()
 
@@ -3405,13 +3405,14 @@ func _start_book_chief2_dialog() -> void:
 		{"text": "「하긴, 마을이 예전보다 부쩍 컸지.\n앞으로 사람도 더 늘 게고... 책과 기록을\n둘 곳이 있어야겠구먼.」"},
 		{"text": "「좋네! 마을에 작은 도서관을 짓기로 하지.\n자리는 비워 두겠네.」",
 			"portrait": m.tex["npc_chief_portrait_happy"]},
-		{"text": "「재료가 모이면 나에게 「마을 발전 이야기」로\n오게. 목재 90에 석재 50 — 마을 사람들도\n거들 걸세!」"},
+		{"text": "「도서관 건물은 예전 그대로 있네.\n먼지만 털면 오늘부터 문을 열 수 있지.」"},
 	], _end_book_chief2)
 
 
 func _end_book_chief2() -> void:
 	if GameData.story6_phase == "told":
 		GameData.story6_phase = "build"
+		m.village.open_shop("library")   # 도서관은 이미 서 있다
 		m.hud.quest_start_toast("도서관 건설을 준비하자")
 	m.saveio.save_now()
 
@@ -3586,13 +3587,14 @@ func _start_ranch_chief_dialog() -> void:
 		{"text": "「초원이야 넉넉하지. 목동이 자리만 잡으면\n마을이 또 한 번 살아나겠구먼.」"},
 		{"text": "「좋네! 목장 상회 자리는 비워 두겠네.\n서쪽 길가 — 대장간 아랫자리일세.」",
 			"portrait": m.tex["npc_chief_portrait_happy"]},
-		{"text": "「재료가 모이면 「마을 발전 이야기」로 오게.\n목재 80에 석재 40 — 다 같이 세워 봄세!」"},
+		{"text": "「상회 건물이야 그대로 서 있으니\n오늘부터 문을 열면 되지 않겠나.」"},
 	], _end_ranch_chief)
 
 
 func _end_ranch_chief() -> void:
 	if GameData.story8_phase == "ask":
 		GameData.story8_phase = "build"
+		m.village.open_shop("ranch")     # 목장 상회는 이미 서 있다
 		m.hud.quest_start_toast("목장 상회 건설을 준비하자")
 	m.saveio.save_now()
 
@@ -3641,8 +3643,9 @@ func _story9_update(_delta: float) -> void:
 	if GameData.story9_phase == "invite" \
 			and m.village_residents() > GameData.HALL_RESIDENTS:
 		GameData.story9_phase = "build"
+		m.village.open_shop("hall")      # 마을회관은 이미 서 있다
 		m.hud.event_toast("마을회관 해금!")
-		m.hud.quest_start_toast("마을회관을 짓자 — 이장 「마을 발전 이야기」")
+		m.hud.quest_start_toast("마을회관 개관식")
 		m.saveio.save_now()
 
 

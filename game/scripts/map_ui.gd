@@ -854,9 +854,10 @@ func _quest_guides() -> Array:
 func _quest_spot(qid: String) -> Vector2i:
 	match qid:
 		"story2":
-			# 첫 상점을 세울 자리 — 「어디에 짓지?」를 지도가 대신 말한다
-			if GameData.story2_phase == "shop":
-				return _plot_center("general")
+			# 밭을 만들 자리 — 「어디를 갈지?」를 지도가 대신 말한다
+			# (「첫 상점을 세울 자리」는 없앴다 — 가게는 처음부터 다 열려 있다)
+			if GameData.story2_phase == "farm" and GameData.tool_slots.has("hoe"):
+				return main.HOME_ANCHOR + Vector2i(2, 5)
 		"move":
 			if GameData.move_quest == "postbuild":
 				return _plot_center("post")

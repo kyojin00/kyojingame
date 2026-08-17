@@ -123,7 +123,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.player_name = str(d.get("player_name", ""))
 	GameData.farm_name = str(d.get("farm_name", ""))
 	GameData.village_name = str(d.get("village_name", ""))
-	GameData.village_built = d.get("village_built", [])
+	GameData.village_built = d.get("village_built", GameData.ALL_VILLAGE_PLOTS.duplicate())
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))
 	GameData.desk_lv = int(d.get("desk_lv", 0))
@@ -266,12 +266,13 @@ func _apply_save(d: Dictionary) -> void:
 	# 대기로 이어 준다 (옛 세이브는 마을이 이미 다 서 있다)
 	GameData.story2_phase = str(d.get("story2_phase",
 		"done" if str(d.get("fisher_quest", "")) == "done" else "fisher"))
-	# 무건물 시작 버그(reset_all 잔재가 ALL을 다시 채우던 시절) 세이브 교정:
-	# 스토리가 거기까지 안 갔으면 건물이 서 있을 수 없다
-	if GameData.story_phase != "done" or GameData.story2_phase == "":
-		GameData.village_built = []
-	elif GameData.story2_phase == "shop":
-		GameData.village_built.erase("general")   # 상점은 퀘스트로 지어야 한다
+	# 가게는 이제 **처음부터 아홉 채가 다 열려 있다.** 하나씩 여는 이야기를
+	# 없앴으므로, 옛 세이브도 열려 있는 쪽으로 맞춰 준다 — 안 그러면 예전에
+	# 저장한 사람은 열 수 없는 가게 앞에서 영영 문이 잠긴다
+	GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
+	for own_id: String in ["merchant", "blacksmith", "rancher", "librarian"]:
+		if own_id not in GameData.npc_greeted:
+			GameData.npc_greeted.append(own_id)
 	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
 	# 발견한 것으로 친다 — 쓰던 조리대가 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",

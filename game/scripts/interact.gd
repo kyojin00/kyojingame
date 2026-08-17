@@ -343,9 +343,6 @@ func interact() -> void:
 		if obj.kind == "housesite":
 			m.village._open_build_dialog()
 			return
-		if obj.kind == "plotsite":
-			m.village._open_shop_site_dialog()
-			return
 		if obj.kind == "stall":
 			m.village.open_stall()
 			return

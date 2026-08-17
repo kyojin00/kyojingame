@@ -57,12 +57,6 @@ func _spawn_objects() -> void:
 		# 붙었다 (「자고 일어나야 울타리가 생긴다」가 이것이다).
 		# 이미 놓인 칸은 건너뛰므로 몇 번을 불러도 같은 모습이다.
 		m.worldgen.decorate_plot(m.VILLAGE_PLOTS[pid].anchor, pid)
-	# 첫 가게의 게시판은 **문 옆**에 선다. 문 칸에 세워 둔 옛 세이브는
-	# 바로 위에서 문을 비우며 같이 지워지므로 여기서 다시 세운다
-	if not GameData.village_built.has("general"):
-		var gb: Vector2i = m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor)
-		if not m.objects.has(gb):
-			m.objects[gb] = {"kind": "plotsite", "hp": 0}
 	# 고장 마을의 집 — 세계를 지을 때는 칸만 놓였다 (그때는 m.world 가
 	# 없다). 그림은 여기서 세운다. 짓는 게 아니라 처음부터 있는 집이라
 	# 조건 없이 전부 세운다

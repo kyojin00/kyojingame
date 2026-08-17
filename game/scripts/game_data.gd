@@ -985,12 +985,16 @@ var player_name := ""
 var farm_name := ""
 var village_name := ""
 
-# 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
-# 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
-# 재료를 모아 하나씩 세운다. (건물 id는 main.gd의 VILLAGE_PLOTS 키)
+# 마을 가게 아홉 채는 **처음부터 다 서 있고 다 문을 열고 있다.**
+#
+# 한동안 `village_built` 은 「문을 연 가게」라는 뜻이었고, 이장에게 재료를
+# 대고 한 곳씩 여는 것이 이야기였다. 그런데 건물도 사람도 처음부터 다
+# 있는 마을에서 「가게를 열자」는 심부름은 남는 것이 없다 — 이미 다 있다.
+# 이 배열은 이제 **저장 형식과 옛 세이브를 위해** 남아 있고, 새 게임은
+# 처음부터 아홉을 다 담는다.
 const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
 	"library", "fish", "hall"]
-var village_built: Array = []
+var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
 
 # ---- 이장 거처 · 마을 성장 ----
 #
@@ -1022,16 +1026,6 @@ var story2_phase := ""
 
 func story2_objective_short() -> String:
 	match story2_phase:
-		"shop":
-			# 목표는 한 호흡에 읽히게 — 조작키도 괄호도 없다.
-			#
-			# 다만 **재료만은 세어 준다.** 이장이 「목재 30에 돌 20」이라고
-			# 한 번 말하고 마는데, 지금 얼마나 모았는지는 어디에도 안 나온다 —
-			# 다 모았는지 알 방법이 게시판까지 걸어가 보는 것뿐이었다.
-			# 「— 」 뒤는 트래커가 세는 자리다 (알림은 앞부분만 본다)
-			return "잡화점을 열자 — 목재 %d/%d · 돌 %d/%d" % [
-				mini(wood, SHOP_BUILD_WOOD), SHOP_BUILD_WOOD,
-				mini(stone, SHOP_BUILD_STONE), SHOP_BUILD_STONE]
 		"farm_talk":
 			return "이장과 대화하자."
 		"farm":
@@ -1421,7 +1415,10 @@ func move_seed_planted() -> void:
 # 정상적으로 장사(생활)를 시작한다. 앞으로 이주해 오는 모든 NPC 공통.
 # (낚시꾼은 자기 퀘스트로 이미 인사를 나누는 특수 경로 — 여기 안 탄다)
 var arrivals: Array = []      # [{"id": npc_id, "day": 확정된 날}] — 방문 대기열
-var npc_greeted: Array = []   # 첫 인사를 마친 NPC id — 이때부터 영업/일과
+# 첫 인사를 마친 NPC id — 이때부터 영업/일과.
+# 가게가 처음부터 다 열려 있으므로 주인 넷도 처음부터 제자리에 앉아 있다
+# (용식과 우체부만은 마을 밖에서 오는 사람이라 이야기로 들어온다).
+var npc_greeted: Array = ["merchant", "blacksmith", "rancher", "librarian"]
 
 # ---- 자연물 리젠 ----
 # 나무/돌/잡초를 캐서 없애면 그 자리가 아니라, 3~5일 뒤(자원마다 랜덤)
@@ -1455,8 +1452,8 @@ var zones_open: Array = []         # 열린 구역 id 목록
 const VILLAGE_ZONES := {
 	# y 는 main.gd 의 NORTH_PAD(12) 를 이미 더한 값이다. 여기서 KyojinMain 을
 	# 참조하면 main -> GameData -> main 순환이 되어 파싱이 막힌다.
-	"east_north": {"rect": Rect2i(148, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
-	"east_south": {"rect": Rect2i(148, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
+	"east_north": {"rect": Rect2i(160, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(160, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
 }
 const ZONE_ORDER := ["east_north", "east_south"]
 const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
@@ -6431,7 +6428,7 @@ func reset_all() -> void:
 	hall_feat_noticed = []
 	zones_open = []
 	arrivals = []
-	npc_greeted = []
+	npc_greeted = ["merchant", "blacksmith", "rancher", "librarian"]
 	recipe_items = {}
 	tracked_pick = ""
 	respawn_queue = []
@@ -6440,7 +6437,7 @@ func reset_all() -> void:
 	shop_seeds = ["wheat", "corn"]
 	recipe_pending = []
 	story2_phase = ""
-	village_built = []
+	village_built = ALL_VILLAGE_PLOTS.duplicate()
 	if DEV_MODE and OS.get_environment("KYOJIN_SHOT") != "":
 		# 검증 하네스 전용: 기본 아이템을 잔뜩 들고 시작한다.
 		# 보통 새 게임은 (DEV_MODE라도) 가방이 완전히 비어 있다 —
