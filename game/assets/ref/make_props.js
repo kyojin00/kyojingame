@@ -17,6 +17,10 @@
 // 도트 크기: 논리 한 칸 = 4px. 게임에서 0.5배로 얹으므로 화면에서 2px —
 // 사람·집·바닥과 정확히 같다 (object_nodes 가 `deco_` 살림을 0.5로 못박는다).
 //
+// 숫돌과 통은 그렸다가 **뺐다.** 화면에서 열여섯 도트로 줄어들면 숫돌은
+// 벽시계가 되고 통은 쓰레기통이 된다 — 무엇인지 모를 물건은 마당을
+// 어지럽힐 뿐이다. 한 칸에 담기려면 **윤곽만으로 이름이 나와야** 한다.
+//
 // **화로만 여러 장이다.** 불은 흔들려야 불이다. 네 장을 돌려 찍는다
 // (main.LANDMARK_FRAMES 에 {"deco_forge": 4} 로 적어 두면 알아서 돈다).
 //
@@ -275,28 +279,6 @@ function anvil() {
   return outline(g);
 }
 
-// ---- 숫돌 ----
-// 날을 가는 자리. 나무 틀에 둥근 돌이 물려 있고 손잡이가 달렸다
-function grindstone() {
-  const g = new P(16, 14);
-  g.ground(8, 12, 6, 1.6);
-  g.disc(8, 7, 4.4, 4.4, ST[3]);
-  g.disc(8, 7, 4.4, 4.4, null);
-  g.disc(8, 7, 4.2, 4.2, ST[3]);
-  for (let a = 0; a < 24; a++) {
-    const t = a / 24 * Math.PI * 2;
-    g.px(8 + Math.cos(t) * 4.2, 7 + Math.sin(t) * 4.2, ST[5]);
-  }
-  g.disc(8, 6, 3.0, 3.0, ST[2]);
-  g.disc(8, 7, 1.1, 1.1, IR[3]);     // 굴대
-  // 나무 틀
-  g.vline(3, 6, 12, W[4]); g.vline(2, 6, 12, W[3]);
-  g.vline(13, 6, 12, W[4]); g.vline(14, 6, 12, W[3]);
-  g.hline(2, 14, 12, W[5]);
-  g.hline(2, 14, 11, W[3]);
-  g.px(14, 7, IR[2]); g.px(15, 8, IR[2]); g.px(15, 9, IR[3]);   // 손잡이
-  return outline(g);
-}
 
 // ---- 장작더미 ----
 // 마구리(잘린 면)가 보이게 쌓는다 — 나이테 한 줄이면 통나무가 된다
@@ -403,25 +385,6 @@ function netrack() {
   return outline(g);
 }
 
-// ---- 통 ----
-// 젓갈이든 못이든 밀가루든, 가게 앞에는 통이 하나쯤 서 있다
-function barrel() {
-  const g = new P(14, 18);
-  g.ground(7, 16, 6, 1.6);
-  for (let y = 3; y <= 16; y++) {
-    const bulge = Math.round(Math.sin((y - 3) / 13 * Math.PI) * 1.4);
-    const x0 = 3 - bulge, x1 = 10 + bulge;
-    for (let x = x0; x <= x1; x++) {
-      const st = ((x - x0) % 3 === 2) ? W[5] : W[3];
-      g.px(x, y, x === x0 ? W[4] : (x === x1 ? W[5] : st));
-    }
-  }
-  g.disc(7, 3, 4.4, 1.6, W[2]);       // 뚜껑 — 위를 보는 면
-  for (let x = 3; x <= 10; x++) if (h(x, 1, 61) < 0.4) g.px(x, 3, W[1]);
-  hoop(g, 1, 12, 6); hoop(g, 1, 12, 13);
-  g.hline(3, 10, 16, W[6]);
-  return outline(g);
-}
 
 // ---- 화단 ----
 // 길게 짠 나무 상자에 흙을 채우고 꽃을 심었다. 여관·회관·도서관 앞
@@ -514,13 +477,11 @@ function specimen() {
 const OUTS = {};
 for (let f = 0; f < 4; f++) OUTS['deco_forge_' + f] = forge(f).render();
 OUTS['deco_anvil'] = anvil().render();
-OUTS['deco_grindstone'] = grindstone().render();
 OUTS['deco_logpile'] = logpile().render();
 OUTS['deco_trough'] = trough(true).render();
 OUTS['deco_feedbox'] = trough(false).render();
 OUTS['deco_hay'] = hay().render();
 OUTS['deco_netrack'] = netrack().render();
-OUTS['deco_barrel'] = barrel().render();
 OUTS['deco_planter'] = planter().render();
 OUTS['deco_cart'] = cart().render();
 OUTS['deco_bookstack'] = bookstack().render();

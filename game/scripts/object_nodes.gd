@@ -238,8 +238,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 대장간의 화로 — 불이 흔들린다 (_tick_landmarks 가 장을 갈아 낀다)
 			texture = m.tex["deco_forge_0"]
 			offset = Vector2(0, -texture.get_height())
-		"deco_anvil", "deco_grindstone", "deco_logpile", "deco_trough", \
-		"deco_feedbox", "deco_hay", "deco_netrack", "deco_barrel", \
+		"deco_anvil", "deco_logpile", "deco_trough", \
+		"deco_feedbox", "deco_hay", "deco_netrack", \
 		"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen":
 			# 마당에 세워 두는 살림 (ref/make_props.js). 밑변을 칸에 맞춘다
 			texture = m.tex[kind]
