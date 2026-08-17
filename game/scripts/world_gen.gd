@@ -645,9 +645,14 @@ func _raise_plot_hill(anchor: Vector2i) -> void:
 		# 북쪽 자락 — 두 칸까지 위로 부푼다
 		if y < y0 - int(round(m._hash01(y * 3 + 5, 19) * 2.0)):
 			continue
-		var west: int = x0 - (1 if m._hash01(y * 7 + 3, 21) < 0.45 else 0)
-		var east: int = x1 + (1 if m._hash01(y * 5 + 9, 23) < 0.45 else 0)
-		for x in range(maxi(0, west), mini(m.MAP_W, east + 1)):
+		# 동서 변은 **자로 잰 듯 곧게** 둔다.
+		#
+		# 줄마다 한 칸씩 흔들어 봤더니 옆구리 벼랑이 톱니가 됐다. 옆을 보는
+		# 벼랑면은 그리기가 반 칸 폭 띠로만 그린다(make_ground.cliffPx) —
+		# 그 좁은 띠가 한 칸씩 좌우로 튀니 벽이 아니라 **땅에 간 금**으로
+		# 보였고, 톱니가 꺾이는 자리마다 띠가 끊겨 「뚫린」 것처럼 보였다.
+		# 남쪽 축대만 정면이라 제대로 서고, 옆은 곧아야 옆으로 읽힌다.
+		for x in range(maxi(0, x0), mini(m.MAP_W, x1 + 1)):
 			if _lv(x, y) > 0:
 				_set_lv(x, y, 2)
 
