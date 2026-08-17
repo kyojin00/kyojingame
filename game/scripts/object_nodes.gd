@@ -240,7 +240,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -texture.get_height())
 		"deco_anvil", "deco_logpile", "deco_trough", \
 		"deco_feedbox", "deco_hay", "deco_netrack", \
-		"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen":
+		"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen", \
+		"deco_crate", "deco_sack", "deco_orepile", "deco_toolrack":
 			# 마당에 세워 두는 살림 (ref/make_props.js). 밑변을 칸에 맞춘다
 			texture = m.tex[kind]
 			offset = Vector2(0, -texture.get_height())

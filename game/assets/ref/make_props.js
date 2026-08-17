@@ -64,6 +64,13 @@ const BOOK = [[196, 76, 62], [64, 108, 150], [86, 130, 76], [176, 140, 68]];
 // 화로는 하루 종일 불을 때는 물건이라 돌이 검게 그을리는 게 맞기도 하다
 const FG = [[152, 112, 92], [126, 90, 72], [100, 70, 56], [78, 52, 42],
             [58, 38, 32], [42, 28, 24]];
+// 마대 자루 — 나무도 짚도 아닌 거친 삼베. 궤짝 옆에 놓으면 재료가 갈린다
+const SACK = [[214, 192, 152], [186, 162, 122], [154, 132, 96], [118, 98, 68]];
+// 광석 덩이 — **쇠보다 어둡고 푸르다.** 길바닥 자갈로 그렸더니 마당에서
+// 회색 얼룩이었다. 부순 광석은 검고, 깨진 면에서만 쇳빛이 번쩍인다
+const ORE = [[112, 122, 138], [86, 94, 110], [62, 70, 84], [42, 48, 60],
+             [28, 32, 42]];
+const ORE_LIT = [[196, 214, 232], [150, 172, 198]];
 const OUT = [38, 26, 20];
 const SHADOW = [30, 26, 34, 78];
 
@@ -473,10 +480,127 @@ function specimen() {
   return outline(g);
 }
 
+
+// ---- 나무 궤짝 ----
+//
+// 가게 마당에 제일 많이 놓이는 것. 예전에는 가방 아이콘(old_box·chest)을
+// 그대로 갖다 놨는데, 그건 **뚜껑 열린 보물상자**라 어느 가게에 놓아도
+// 「누가 보물을 두고 갔나」가 됐다. 짐은 판때기를 못으로 친 궤짝이다.
+function crate() {
+  const g = new P(16, 15);
+  g.ground(8, 13, 7, 1.6);
+  g.rect(2, 6, 13, 13, W[3]);
+  g.hline(2, 13, 6, W[1]);            // 뚜껑 윗면 = 빛
+  g.hline(2, 13, 7, W[2]);
+  g.hline(2, 13, 13, W[6]);           // 밑변 턱
+  for (let x = 4; x <= 12; x += 3) g.vline(x, 8, 12, W[5]);   // 판 사이
+  for (let x = 2; x <= 13; x++) if (h(x, 6, 91) < 0.22) g.px(x, 9 + (x % 3), W[4]);
+  g.vline(2, 6, 13, W[2]); g.vline(13, 6, 13, W[5]);
+  hoop(g, 2, 13, 8);                  // 쇠띠 한 줄
+  g.rect(5, 2, 11, 5, W[3]);          // 위에 얹은 작은 궤짝
+  g.hline(5, 11, 2, W[1]);
+  g.hline(5, 11, 5, W[5]);
+  g.vline(8, 3, 5, W[5]);
+  g.px(5, 3, W[2]); g.px(11, 4, W[5]);
+  return outline(g);
+}
+
+
+// ---- 마대 자루 ----
+//
+// 궤짝만 늘어놓으면 마당이 네모투성이가 된다. 자루는 **둥글고 늘어져**
+// 있어서, 같은 짐인데도 옆에 놓으면 둘 다 살아난다
+function sack() {
+  const g = new P(18, 14);
+  g.ground(9, 12, 8, 1.6);
+  // 동그란 덩어리 셋으로 그렸더니 허연 얼룩 하나로 뭉쳤다. 자루는 **서
+  // 있는 것**이다 — 아래로 벌어지는 배와, 오므려 묶은 목이 있어야 한다
+  const one = (x0, x1, top, seed) => {
+    const cx = Math.round((x0 + x1) / 2);
+    for (let y = top; y <= 12; y++) {
+      const t = (y - top) / (12 - top);
+      const w = Math.round((x1 - x0) / 2 * (0.44 + t * 0.56));
+      for (let x = cx - w; x <= cx + w; x++) {
+        let c = SACK[1];
+        if (x <= cx - w + 1) c = SACK[0];          // 왼쪽 = 빛
+        if (x >= cx + w - 1) c = SACK[2];          // 오른쪽 = 그늘
+        if (y >= 12) c = SACK[3];                  // 밑변 턱
+        g.px(x, y, c);
+      }
+      if (h(y, seed, 93) < 0.35) g.px(cx - 1, y, SACK[2]);   // 주름
+    }
+    g.rect(cx - 1, top - 2, cx + 1, top - 1, SACK[2]);       // 오므린 목
+    g.hline(cx - 2, cx + 2, top - 1, W[4]);                  // 새끼줄
+    g.px(cx, top - 3, SACK[0]);
+  };
+  one(1, 8, 6, 3);
+  one(10, 17, 5, 9);
+  return outline(g);
+}
+
+
+// ---- 광석 더미 ----
+//
+// 캐 온 것을 부려 놓은 자리. 회색 돌로 그렸더니 자갈 바닥과 한 값이라
+// 안 보였다 — 부순 광석은 **검고**, 깨진 면에서만 쇳빛이 번쩍인다
+function orepile() {
+  const g = new P(18, 12);
+  g.ground(9, 10, 8, 1.6);
+  const chunk = (cx, cy, r, seed) => {
+    for (let y = Math.round(cy - r); y <= Math.round(cy + r); y++)
+      for (let x = Math.round(cx - r - 1); x <= Math.round(cx + r + 1); x++) {
+        const d = Math.abs(x - cx) * 0.8 + Math.abs(y - cy);
+        if (d > r + h(x, y, seed) * 0.8) continue;
+        let c = ORE[2];
+        if (y <= cy - r + 1) c = ORE[1];               // 윗면 = 빛
+        if (y >= cy + r - 0.5) c = ORE[4];             // 아랫변 = 턱
+        g.px(x, y, c);
+      }
+    // 깨진 면 — 한두 점만. 많으면 광석이 아니라 별이 된다
+    if (h(cx, cy, seed + 3) < 0.75) g.px(cx, Math.round(cy - r + 1), ORE_LIT[0]);
+    if (h(cx, cy, seed + 7) < 0.45) g.px(cx + 1, cy, ORE_LIT[1]);
+  };
+  chunk(4, 9, 2.4, 11); chunk(9, 9, 2.8, 17); chunk(14, 9, 2.2, 23);
+  chunk(6, 5, 2.2, 29); chunk(11, 5, 2.4, 31);
+  chunk(9, 2, 2.0, 37);
+  return outline(g);
+}
+
+
+// ---- 연장 걸이 ----
+//
+// 대장간·잡화점 앞. 망치와 집게가 걸려 있으면 「여기서 만든다」가 된다
+function toolrack() {
+  const g = new P(16, 18);
+  g.ground(8, 16, 7, 1.6);
+  g.vline(2, 3, 16, W[4]); g.vline(3, 3, 16, W[3]);
+  g.vline(12, 3, 16, W[4]); g.vline(13, 3, 16, W[3]);
+  g.hline(1, 14, 3, W[1]); g.hline(1, 14, 4, W[5]);
+  g.hline(1, 14, 16, W[5]);
+  g.vline(5, 6, 12, W[4]);            // 망치 자루
+  g.rect(4, 5, 7, 7, IR[2]);
+  g.hline(4, 7, 5, IR[1]); g.hline(4, 7, 7, IR[4]);
+  g.vline(9, 6, 9, IR[2]); g.vline(11, 6, 9, IR[2]);   // 집게
+  g.px(9, 10, IR[3]); g.px(10, 11, IR[3]); g.px(11, 10, IR[3]);
+  g.px(10, 5, IR[1]);
+  for (const hx of [5, 10]) {         // 편자 둘
+    for (let a = 2; a <= 10; a++) {
+      const t = a / 12 * Math.PI * 2;
+      g.px(hx + Math.cos(t) * 1.8, 14 + Math.sin(t) * 1.6, IR[2]);
+    }
+  }
+  return outline(g);
+}
+
+
 // ---- 내보내기 ----
 const OUTS = {};
 for (let f = 0; f < 4; f++) OUTS['deco_forge_' + f] = forge(f).render();
 OUTS['deco_anvil'] = anvil().render();
+OUTS['deco_crate'] = crate().render();
+OUTS['deco_sack'] = sack().render();
+OUTS['deco_orepile'] = orepile().render();
+OUTS['deco_toolrack'] = toolrack().render();
 OUTS['deco_logpile'] = logpile().render();
 OUTS['deco_trough'] = trough(true).render();
 OUTS['deco_feedbox'] = trough(false).render();
