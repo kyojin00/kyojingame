@@ -274,12 +274,19 @@ func _debug_tick() -> void:
 			m.player.position = Vector2(74 * m.TILE + 16, 11 * m.TILE + 16)
 			m.player.dir = "up"
 		186: _save_shot("_village2.png")
-		187: m.shop_room.open("general")                 # 가게 방 (잡화점)
-		190: _save_shot("_shoproom.png")
-		191: m.shop.open("buy", ["buy", "sell"], "잡화점")
-		193: _save_shot("_shop.png")
-		194: m.shop.close()
-		195:
+		187:
+			# 대장간 마당 한 채만 따로 — 부지 꾸밈을 눈으로 보는 자리
+			var sa87: Vector2i = m.VILLAGE_PLOTS["smith"].anchor
+			m.player.position = Vector2((sa87.x + 2) * m.TILE + 16,
+				(sa87.y + 7) * m.TILE + 16)
+			m.player.dir = "up"
+		189: _save_shot("_plot_smith.png")
+		190: m.shop_room.open("general")                 # 가게 방 (잡화점)
+		192: _save_shot("_shoproom.png")
+		193: m.shop.open("buy", ["buy", "sell"], "잡화점")
+		194: _save_shot("_shop.png")
+		195: m.shop.close()
+		196:
 			m.shop_room.close()
 			m.shop_room.open("smith")                    # 가게 방 (대장간)
 		197: _save_shot("_shoproom2.png")
@@ -6625,7 +6632,7 @@ func _debug_tick() -> void:
 			var blind94 := ""
 			var scratch94 := Vector2i(2, m.WORLD_H - 3)
 			for pid94: String in m.VILLAGE_PLOTS:
-				for e94: Array in m.PLOT_DECOR.get(pid94, []):
+				for e94: Array in (m.PLOT_DECOR.get(pid94, {}) as Dictionary).get("props", []):
 					var kind94 := str(e94[1])
 					m.objnode._spawn_object_node(scratch94, kind94)
 					var nd94: Variant = m.obj_nodes.get(scratch94)
@@ -6700,7 +6707,7 @@ func _debug_tick() -> void:
 				m.player.position = Vector2((a97.x + 2) * m.TILE + 16,
 					(a97.y + 6) * m.TILE + 16)
 				m.objnode._spawn_objects()
-				for e97: Array in m.PLOT_DECOR.get(pid97, []):
+				for e97: Array in (m.PLOT_DECOR.get(pid97, {}) as Dictionary).get("props", []):
 					var t97: Vector2i = a97 + (e97[0] as Vector2i)
 					if m.objects.has(t97) and not m.obj_nodes.has(t97):
 						node_ok94 = false

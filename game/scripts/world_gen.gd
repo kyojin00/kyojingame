@@ -1229,17 +1229,35 @@ func _plot_side_gate_x(anchor: Vector2i) -> int:
 	return ring_r if anchor.x + 2 < m.PLAZA.get_center().x else ring_l
 
 
-# 그 가게다운 것들을 문 앞에 내놓는다 (main.PLOT_DECOR).
+# 그 가게다운 마당을 편다 (main.PLOT_DECOR) — 바닥을 먼저 깔고 살림을 놓는다.
 # 자리가 이미 차 있으면 그 하나만 건너뛴다 — 나머지는 그대로 놓는다.
 func _plot_props(anchor: Vector2i, pid: String) -> void:
-	for entry: Array in m.PLOT_DECOR.get(pid, []):
+	var spec: Dictionary = m.PLOT_DECOR.get(pid, {})
+	# ① 바닥 — 자갈 마당이든 다진 흙이든, 소품보다 먼저 깐다
+	for f: Array in spec.get("floor", []):
+		var r: Rect2i = f[0] as Rect2i
+		for y in range(anchor.y + r.position.y, anchor.y + r.end.y):
+			for x in range(anchor.x + r.position.x, anchor.x + r.end.x):
+				if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+					continue
+				var t0 := Vector2i(x, y)
+				if m.ROAD.has_point(t0) or m.PLAZA.has_point(t0) or _on_village_road(t0):
+					continue
+				if m.grid[y][x].ground not in ["grass", "yard"]:
+					continue      # 물·모래·이미 깐 바닥은 건드리지 않는다
+				m.grid[y][x].ground = str(f[1])
+	# ② 살림
+	for entry: Array in spec.get("props", []):
 		var t: Vector2i = anchor + (entry[0] as Vector2i)
 		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
 			continue
-		if m.objects.has(t) or m.grid[t.y][t.x].ground not in ["grass", "yard"]:
+		if m.objects.has(t) \
+				or m.grid[t.y][t.x].ground not in ["grass", "yard", "path", "sand"]:
 			continue
 		if m.ROAD.has_point(t) or m.PLAZA.has_point(t) or _on_village_road(t):
 			continue
+		if _is_plot_gateway(t):
+			continue      # 드나드는 목은 무엇으로도 막지 않는다
 		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
 
 

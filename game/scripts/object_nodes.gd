@@ -254,7 +254,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		# (texture 가 null 인 채로 노드만 선다). 전부 32x32 한 칸짜리라
 		# 밑변을 칸에 맞추고(-height), 배율은 OBJECT_SCALES 가 잡는다.
 		"flower_pot", "chest", "storage_box", "ore_node", "rock_wedge", \
-		"bait", "crystal", "rope", "broom":
+		"bait", "crystal", "rope", "broom", \
+		"old_box", "ore", "star_ore", "nail", "cloth", "gem", \
+		"recipe", "glow_shroom", "spring_water", "sludge":
 			texture = m.tex[kind]
 			offset = Vector2(0, -texture.get_height())
 	var node := _make_object(texture, Vector2(pos.x * m.TILE, (pos.y + 1) * m.TILE), offset)
