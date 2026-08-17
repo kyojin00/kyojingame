@@ -1057,7 +1057,7 @@ func story2_objective_short() -> String:
 
 # 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
 # 남쪽 바위 능선을 뚫어 바다·해변을 열고, 간이낚싯대(낚시)를 얻는다.
-#   "": 아직 (첫 수확 뒤 시작) / meet: 광장의 낚시꾼에게 말 걸기 /
+#   "": 아직 (첫 수확 뒤 시작) / meet: 호수 부두의 낚시꾼에게 말 걸기 /
 #   follow: 함께 능선으로 / open: 길목 바위 캐기 / done: 완료
 var fisher_quest := ""
 var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
@@ -3184,7 +3184,7 @@ func beach_rare_chance() -> float:
 func fisher_objective_short() -> String:
 	match fisher_quest:
 		"meet":
-			return "낚시꾼과 대화하자."
+			return "서쪽 호수 부두의 낚시꾼과 대화하자."
 		"follow":
 			return "함께 바위 능선으로 가자."
 		"open":

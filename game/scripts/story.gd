@@ -1607,7 +1607,7 @@ func _fisher_arrive() -> void:
 	# 바다도 항구도 본 적이 없다. **보이는 것**으로 적는다:
 	# 어깨에 걸친 긴 낚싯대 하나면 이 사람이 누구인지 다 말해 준다.
 	m.hud.event_toast("처음 보는 사람이 마을에 왔다")
-	m.hud.show_message("긴 낚싯대를 둘러멘 사람이 분수 앞에 서 있다.\n말을 걸어 보자.", 6.0)
+	m.hud.show_message("긴 낚싯대를 둘러멘 사람이 서쪽 호수의 부두 끝에 서 있다.\n찾아가 말을 걸어 보자.", 6.0)
 	m.saveio.save_now()
 
 
@@ -1616,7 +1616,7 @@ func _start_fisher_dialog() -> void:
 	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_normal"], [
 		{"text": "「오, 처음 보는 얼굴이군! 나는 낚시꾼 용식이라고 하네.」",
 			"portrait": m.tex["npc_fisher_portrait_happy"]},
-		{"text": "「이 마을 물줄기에 전설의 황금잉어가 산다는 소문을 듣고 왔지.」"},
+		{"text": "「이 호수에 전설의 황금잉어가 산다는 소문을 듣고 왔지.\n한나절을 드리웠는데 입질 하나 없구먼.」"},
 		{"text": "「큰 놈은 바다를 오간다네. 남쪽 능선 너머가 바다인데 바위가 길을 막고 있더군.」"},
 		{"text": "「%s, 자네도 황금잉어에 관심이 있나?」" % nm,
 			"choices": [

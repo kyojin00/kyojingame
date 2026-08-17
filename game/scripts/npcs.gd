@@ -112,7 +112,7 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 		"fountain":
 			t = Vector2i(m.FOUNTAIN.position.x + 1, m.FOUNTAIN.end.y + 1)
 		"plaza":
-			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 13 + m.NORTH_PAD))
+			t = m.NPC_PLAZA.get(npc_id, Vector2i(74, 17 + m.NORTH_PAD))
 		"board":
 			t = m.BOARD_POS + Vector2i(0, 1)
 		"pier":

@@ -177,8 +177,11 @@ func _debug_tick() -> void:
 		73: _save_shot("_map.png")
 		74:
 			m.map_ui.close()
-			m.player.position = Vector2(76 * m.TILE + 16, 12 * m.TILE + 16)
-			m.player.dir = "right"                       # 마을 광장 게시판 앞으로
+			# 게시판 **바로 앞**에 선다. 좌표를 손으로 박아 두었더니 광장과
+			# 게시판이 옮겨 간 뒤로 엉뚱한 풀밭을 보고 E를 누르고 있었다
+			m.player.position = Vector2(m.BOARD_POS.x * m.TILE + 16,
+				(m.BOARD_POS.y + 1) * m.TILE + 16)
+			m.player.dir = "up"
 			# 게시판 캡처를 위해 NPC를 비켜둔다. **빈 땅으로 비켜야 한다** —
 			# 예전에 쓰던 (62,25)는 이제 대장간 안이다 (마을 건물이 처음부터
 			# 다 선다). 사람이 지붕 밑에 박힌 채로 찍혔다
@@ -190,8 +193,11 @@ func _debug_tick() -> void:
 		84: _save_shot("_quest.png")
 		86: m.dialog.close()
 		87:
-			m.player.position = Vector2(74 * m.TILE + 16, 20 * m.TILE + 16)
-			m.player.dir = "up"                          # 중앙 광장(건물 없는 초기 마을)
+			# 광장 남쪽에서 북쪽을 본다 — 분수 너머로 마을회관이 들어온다
+			m.player.position = Vector2(
+				(m.PLAZA.get_center().x - 2) * m.TILE + 16,
+				(m.PLAZA.end.y - 1) * m.TILE + 16)
+			m.player.dir = "up"
 		89: _save_shot("_village.png")
 		90:
 			m.player.position = m.npcs[0].position + Vector2(12, 0)
@@ -323,6 +329,12 @@ func _debug_tick() -> void:
 			# 회귀 검사: 커다란 바위 사이의 한 칸 틈은 계속 지나갈 수 있어야 한다
 			# (퀘스트 5에서 바위 하나를 캐면 그 자리로 빠져나간다)
 			var gap := Vector2i(20, 40)
+			# 재는 것은 **큰 바위 둘 사이의 틈**이다. 그 자리에 어쩌다 돋아난
+			# 풀 한 포기(채집물은 randf 로 흩어진다)가 제 그림 여백으로 틈을
+			# 막으면 이 검사가 들쭉날쭉해진다 — 둘레를 먼저 비우고 잰다
+			for gdy in range(-1, 2):
+				for gdx in range(-1, 2):
+					m.objects.erase(gap + Vector2i(gdx, gdy))
 			m.objects[gap + Vector2i(0, -1)] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			m.objects[gap + Vector2i(0, 1)] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			print("BIGROCK_GAP_OK=", m.is_passable_px(
@@ -6660,14 +6672,18 @@ func _debug_tick() -> void:
 			# **그림 노드까지 실제로 서는가.** objects 에 넣는 것과 화면에
 			# 서는 것은 다른 일이다 — 세계를 다시 지은 뒤 노드를 다시 세우고
 			# (스트리밍 창 안으로) 세어 본다
-			m.player.position = Vector2(
-				(m.VILLAGE_PLOTS["general"].anchor.x + 2) * m.TILE + 16,
-				(m.VILLAGE_PLOTS["general"].anchor.y + 6) * m.TILE + 16)
-			m.objnode._spawn_objects()
+			#
+			# **부지마다 그 앞에 서서** 본다. 노드는 주인공 둘레 34x26 칸만
+			# 세워지므로(_stream_nodes), 부지들을 넓게 벌려 놓은 지금은 한자리에
+			# 서서 아홉 곳을 다 볼 수 없다 — 멀리 있는 부지의 소품이 「안 섰다」로
+			# 잡히는데 그건 스트리밍이 제 할 일을 한 것이다
 			var node_ok94 := true
 			var miss94 := ""
-			for pid97: String in ["post", "general", "lab"]:
+			for pid97: String in m.VILLAGE_PLOTS:
 				var a97: Vector2i = m.VILLAGE_PLOTS[pid97].anchor
+				m.player.position = Vector2((a97.x + 2) * m.TILE + 16,
+					(a97.y + 6) * m.TILE + 16)
+				m.objnode._spawn_objects()
 				for e97: Array in m.PLOT_DECOR.get(pid97, []):
 					var t97: Vector2i = a97 + (e97[0] as Vector2i)
 					if m.objects.has(t97) and not m.obj_nodes.has(t97):
