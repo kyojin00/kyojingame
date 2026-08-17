@@ -11,8 +11,19 @@
 //
 // 그리는 규칙은 건물·바닥과 같다 —
 //   톤 사다리   재료마다 예닐곱 단. 한 자로 재야 물건들이 한 바닥에 놓인다
-//   윗변은 빛   위를 보는 면은 한 단 밝게, 아랫변은 두 단 어둡게 (턱)
 //   밑그림자    바닥에 닿는 자리에 반투명 그늘. 이게 없으면 물건이 뜬다
+//
+// ---- **윗면을 그린다** (이제부터 만드는 것은 전부) ----
+//
+// 화면은 정면이 아니라 **비스듬히 위에서 내려다보는** 각이다. 그런데 한동안
+// 물건을 정면(입면도)으로만 그렸다 — 옆에서 본 판때기라, 같은 화면의
+// 집·바닥과 각이 안 맞아 종이를 오려 세운 것처럼 보였다.
+//
+// 위에서 보면 **윗면이 보인다.** 면이 있는 것에는 반드시 두 면을 그린다:
+//   윗면   두 줄. 제일 밝다 (하늘을 보고 있다). 뒤 모서리는 한 칸 안으로
+//   정면   그 아래. 두 단 어둡다
+//   턱     맨 아랫줄. 네 단 어둡다 (땅에 닿는 자리)
+// 기둥·가로대·궤짝·선반 — 예외 없이 이 규칙을 따른다 (topFace 로 찍는다)
 //
 // 도트 크기: 논리 한 칸 = 4px. 게임에서 0.5배로 얹으므로 화면에서 2px —
 // 사람·집·바닥과 정확히 같다 (object_nodes 가 `deco_` 살림을 0.5로 못박는다).
@@ -182,6 +193,34 @@ function outline(g) {
   return g;
 }
 
+// ---- 윗면 ----
+//
+// 네모난 것 위에 얹는 두 줄. yFront 는 **정면이 시작하는 줄**이고,
+// 그 위 두 줄이 윗면이다. 뒤 모서리(제일 위)는 한 칸씩 안으로 들어가
+// 「멀어지는 면」이 된다.
+// depth = 윗면 줄 수. **이 값이 곧 카메라 각도다.**
+//
+// 두 줄로 그렸을 때는 「살짝 기울인 정면도」였다 — 여전히 평면적이라는
+// 말을 들었다. 위에서 내려다볼수록 윗면은 깊어지고 정면은 얇아진다.
+// 네 줄쯤 되면 「올려다보는 물건」이 아니라 「내려다보는 물건」이 된다.
+//
+// 뒤로 갈수록 한 칸씩 좁아져야 면이 **멀어진다**. 같은 폭으로 쌓으면
+// 그건 깊은 윗면이 아니라 그냥 밝은 벽이다.
+function topFace(g, x0, x1, yFront, pal, depth) {
+  const t = pal || W;
+  const d = depth || 4;
+  for (let k = d; k >= 1; k--) {
+    const inset = Math.round((k - 1) * 0.5);
+    g.hline(x0 + inset, x1 - inset, yFront - k, k === d ? t[1] : t[0]);
+  }
+  g.px(x1, yFront - 1, t[1]);                  // 오른쪽 모서리
+  // **앞 모서리** — 윗면과 정면이 꺾이는 자리에 한 줄 진하게 긋는다.
+  // 이 한 줄이 없으면 밝은 띠 하나로 뭉개져서, 윗면을 그려 놓고도
+  // 「위에서 본다」가 안 읽힌다. 두 면은 **선으로** 갈린다
+  g.hline(x0, x1, yFront, t[5]);
+}
+
+
 // 쇠테 한 줄 — 통·여물통을 묶는다
 function hoop(g, x0, x1, y) {
   g.hline(x0, x1, y, IR[1]);
@@ -190,105 +229,133 @@ function hoop(g, x0, x1, y) {
 
 // ---- 화로 ----
 //
-// 대장간 곁에 서서 **불이 보이는** 것. 지금까지는 돌무지(deco_cairn)를
-// 갖다 놨는데 그건 돌을 쌓아 둔 무더기지 화로가 아니었다 — 불이 없으니
-// 대장간인지 채석장인지 알 수가 없었다.
+// 대장간 곁에 서서 **불이 보이는** 것. 집만큼 커야 한다 — 참고 그림의
+// 화로는 초가지붕 집 옆에 나란히 선 **돌탑**이다. 처음에 스물넉 도트짜리
+// 납작한 상자로 그렸더니 「집 옆의 작은 굴뚝」이었고, 서른두 도트로 키운
+// 뒤에도 여전히 **정면 한 장**이라 평면적이었다.
 //
-// 세 부분으로 그린다.
-//   ① 돌 아궁이  쌓은 돌. 아가리는 어둡고 그 안에 숯불이 벌겋다
-//   ② 쇠 굴뚝    아가리 위로 좁아지며 올라가는 후드와 연통
-//   ③ 불         아가리에서 굴뚝 밑까지 솟는다. **장마다 다르게 흔들린다**
+// 부피는 세 가지로 낸다.
+//   ① 면이 셋   왼쪽(빛) · 정면 · 오른쪽(그늘). 오른쪽 한 겹이 있어야
+//               「돌아간 모서리」가 생기고 그제야 덩어리로 보인다
+//   ② 턱마다 윗면  받침 · 어깨 · 갓. 가로로 꺾이는 자리마다 윗면 두 줄과
+//               앞 모서리 한 줄 (topFace)
+//   ③ 좁아진다  굴뚝은 위로 갈수록 좁아진다. 곧은 통은 파이프고,
+//               좁아지는 것이 굴뚝이다
 //
-// **크게 그린다.** 스물넉 도트짜리로는 화로가 집 옆의 작은 굴뚝처럼
-// 보였다. 서른두 도트(화면 두 칸 폭)로 키우고, 늘어난 자리에 풀무와
-// 재 무더기와 기대 놓은 집게를 넣는다 — 커지기만 하면 그냥 큰 덩어리다.
-const FW = 32, FH = 40;
+// 돌은 **집과 같은 회색 돌**(ST)이다. 대장간 본채가 회색 돌집이라, 곁의
+// 화로가 벽돌이면 둘이 남남으로 보인다. 아가리 둘레만 그을려 검다.
+const FW = 34, FH = 52;
 
 function flame(g, cx, base, hgt, f, seed) {
   for (let k = 0; k < hgt; k++) {
     const t = k / hgt;
-    // 밑동은 굵고 끝은 한 점. 장마다 다른 결로 흔들린다
-    const wide = (1 - t) * 4.6 + Math.sin((k * 0.62) + f * 1.9 + seed) * 1.1;
+    const wide = (1 - t) * 4.8 + Math.sin((k * 0.58) + f * 1.9 + seed) * 1.2;
     const wd = Math.max(0, Math.round(wide));
-    const sway = Math.round(Math.sin(k * 0.42 + f * 1.7 + seed) * 2.1 * t);
+    const sway = Math.round(Math.sin(k * 0.38 + f * 1.7 + seed) * 2.2 * t);
     for (let dx = -wd; dx <= wd; dx++) {
       let c;
       if (Math.abs(dx) === wd) c = t > 0.55 ? FI[4] : FI[3];
       else if (t > 0.62) c = FI[2];
       else if (t > 0.28) c = FI[1];
-      // **속불은 심지처럼 가늘게.** 밑동을 통째로 제일 밝은 단으로
-      // 칠했더니 아궁이 안에 흰 종이 뭉치가 든 것처럼 보였다
       else c = Math.abs(dx) <= 1 ? FI[0] : FI[1];
       g.px(cx + dx + sway, base - k, c);
     }
   }
-  // 튀는 불티 — 굴뚝 쪽으로 몇 점
-  for (let i = 0; i < 5; i++) {
-    const sx = cx + Math.round(Math.sin(i * 2.1 + f * 1.3) * 5);
-    const sy = base - hgt - 1 - ((i * 4 + f * 3) % 9);
-    g.px(sx, sy, i % 2 === 0 ? FI[1] : FI[2]);
+}
+
+// 돌탑 한 켜 — 왼쪽은 빛, 오른쪽 두 칸은 돌아간 면
+function towerRow(g, x0, x1, y, seed, lift) {
+  for (let x = x0; x <= x1; x++) {
+    const course = Math.floor(y / 3);
+    const col = Math.floor((x + (course % 2) * 2) / 4);
+    let i = 2 + Math.floor(h(col, course, seed) * 2.0) + lift;
+    if (y % 3 === 0) i -= 1;                      // 켜 윗줄 = 빛
+    if ((x + (course % 2) * 2) % 4 === 3) i += 1; // 세로 줄눈
+    if (x <= x0 + 1) i -= 1;                      // 왼쪽 = 빛을 받는 면
+    if (x >= x1 - 2) i += 2;                      // 오른쪽 = 돌아간 면
+    g.px(x, y, ST[clamp(i, 0, 7)]);
   }
 }
 
 function forge(f) {
   const g = new P(FW, FH);
-  g.ground(16, 38, 13, 2.6);
-  // ② 쇠 후드와 연통 — 먼저 그리고 돌로 덮는다 (아궁이가 앞이다)
-  for (let y = 13; y <= 23; y++) {
-    const inset = Math.round((23 - y) * 0.62);
-    g.rect(6 + inset, y, 25 - inset, y, IR[3]);
-    g.px(6 + inset, y, IR[2]);
-    g.px(25 - inset, y, IR[4]);
+  g.ground(17, 50, 15, 3.0);
+  // ---- 굴뚝 — 위로 갈수록 좁아진다 ----
+  for (let y = 9; y <= 32; y++) {
+    const t = (32 - y) / 23;                      // 0(아래) ~ 1(위)
+    const half = Math.round(9 - t * 4);           // 반폭 9 -> 5
+    towerRow(g, 17 - half, 17 + half, y, 7, 0);
   }
-  g.rect(13, 3, 18, 13, IR[3]);
-  g.vline(13, 3, 13, IR[2]);
-  g.vline(18, 3, 13, IR[4]);
-  g.hline(11, 20, 3, IR[2]);          // 연통 갓
-  g.hline(11, 20, 4, IR[4]);
-  for (let y = 5; y <= 12; y++) if (h(y, f, 11) < 0.3) g.px(15, y, IR[4]);
-  hoop(g, 13, 18, 9);                 // 연통을 조인 쇠테
-  // ① 돌 아궁이
-  stonework(g, 4, 27, 23, 38, 5, FG);
-  g.hline(4, 27, 23, FG[0]);          // 상판 — 위를 보는 면
-  g.hline(4, 27, 24, FG[2]);
-  g.hline(4, 27, 38, FG[5]);          // 밑동
-  // 아가리 — 안쪽은 그을려 새까맣다
-  g.rect(11, 26, 20, 36, [26, 18, 16]);
-  g.hline(11, 20, 26, OUT);
-  g.px(11, 26, FG[5]); g.px(20, 26, FG[5]);
-  // 아가리 둘레는 불빛에 물든다 — 그을린 돌 위의 벌건 테
-  for (let y = 27; y <= 35; y++) { g.px(10, y, FG[1]); g.px(21, y, FG[1]); }
-  g.px(10, 32, FI[4]); g.px(21, 32, FI[4]);
-  // 아가리 바닥의 쇠살대 — 그 사이로 재가 떨어진다
-  for (let x = 11; x <= 20; x += 2) g.vline(x, 35, 36, IR[4]);
-  // 숯불 — 아가리 바닥에 깔린다. 장마다 벌겋고 어둡고
-  for (let x = 11; x <= 20; x++) {
+  // 어깨 — 굴뚝이 받침에 얹히는 턱
+  towerRow(g, 6, 28, 33, 7, 0);
+  topFace(g, 6, 28, 33, ST);
+  // 갓 — 맨 위로 한 번 벌어진다
+  towerRow(g, 10, 24, 8, 7, 0);
+  towerRow(g, 10, 24, 7, 7, 0);
+  topFace(g, 10, 24, 7, ST);
+  g.hline(11, 23, 4, ST[6]);                      // 연기 구멍 (속이 비었다)
+  g.hline(12, 22, 5, ST[7]);
+  // ---- 받침 ----
+  for (let y = 34; y <= 49; y++) towerRow(g, 4, 29, y, 5, 0);
+  topFace(g, 4, 29, 34, ST);
+  g.hline(4, 29, 49, ST[7]);                      // 밑동
+  // ---- 아치 아가리 ----
+  //
+  // 네모로 뚫으면 아궁이가 아니라 창문이다. 위를 둥글게 깎아야 아치가 된다
+  const MX0 = 11, MX1 = 22, MY0 = 36, MY1 = 47;
+  for (let y = MY0; y <= MY1; y++) {
+    const dy = y - (MY0 + 6);
+    const cut = dy < 0 ? Math.round(6 - Math.sqrt(Math.max(0, 36 - dy * dy))) : 0;
+    for (let x = MX0 + cut; x <= MX1 - cut; x++) g.px(x, y, [24, 16, 14]);
+  }
+  // 아치 테두리 — 쐐기돌을 둘러 박았다
+  for (let y = MY0 - 1; y <= MY1; y++) {
+    const dy = y - (MY0 + 6);
+    const cut = dy < 0 ? Math.round(6 - Math.sqrt(Math.max(0, 36 - dy * dy))) : 0;
+    g.px(MX0 + cut - 1, y, ST[2]);
+    g.px(MX1 - cut + 1, y, ST[5]);
+  }
+  // 그을음 — 아가리 위로 검게 번진다. 위로 갈수록 옅어진다
+  for (let x = MX0 - 3; x <= MX1 + 3; x++) {
+    const hh = 4 + Math.floor(h(x, 0, 61) * 5);
+    for (let k = 0; k < hh; k++) {
+      if (k > 2 && h(x, k, 63) < 0.35) continue;    // 위쪽은 성기게
+      g.px(x, MY0 - 2 - k, ST[clamp(7 - Math.floor(k / 2), 4, 7)]);
+    }
+  }
+  // ---- 숯불과 불 ----
+  for (let x = MX0 + 1; x <= MX1 - 1; x++) {
     const v = h(x, f, 17);
-    g.px(x, 36, v < 0.45 ? FI[3] : FI[4]);
-    if (v < 0.30) g.px(x, 35, FI[2]);
-    if (v > 0.86) g.px(x, 35, FI[1]);
+    g.px(x, MY1, v < 0.45 ? FI[3] : FI[4]);
+    if (v < 0.30) g.px(x, MY1 - 1, FI[2]);
+    if (v > 0.86) g.px(x, MY1 - 1, FI[1]);
   }
-  // 왼쪽에 붙인 풀무 — 자루를 눌러 바람을 넣는다
-  g.rect(0, 28, 4, 33, W[4]);
-  g.hline(0, 4, 28, W[2]);
-  g.hline(0, 4, 33, W[6]);
-  g.px(4, 30, IR[3]); g.px(5, 30, IR[3]);        // 바람 나가는 목
-  g.hline(0, 3, 27, W[3]);
-  g.px(0, 26, W[3]); g.px(1, 26, W[4]);          // 손잡이
-  // 오른쪽에 기대 놓은 집게
-  g.vline(29, 29, 37, IR[2]); g.vline(30, 30, 37, IR[3]);
-  g.px(28, 28, IR[1]); g.px(29, 28, IR[1]);
-  // 발치의 재 무더기
-  for (let x = 22; x <= 27; x++)
-    if (h(x, f, 41) < 0.7) { g.px(x, 38, ST[4]); if (h(x, 1, 43) < 0.4) g.px(x, 37, ST[3]); }
-  // ③ 불
-  flame(g, 15 + (f % 2), 35, 15 + (f % 4), f, 0);
-  flame(g, 18, 36, 10 + ((f + 1) % 4), f, 2.4);
-  // 아가리에서 새어 나온 빛이 돌 상판을 물들인다
-  for (let x = 10; x <= 21; x++) {
-    if (h(x, f, 23) < 0.6) g.px(x, 25, FI[4]);
-    if (h(x, f, 29) < 0.3) g.px(x, 24, FI[4]);
+  flame(g, 16 + (f % 2), MY1 - 1, 8 + (f % 4), f, 0);
+  flame(g, 19, MY1, 6 + ((f + 1) % 3), f, 2.4);
+  // 아가리에서 새어 나온 빛이 **발치 돌만** 물들인다.
+  //
+  // 처음에는 아가리 좌우를 위아래로 죽 물들였더니, 돌탑 양쪽에 **빨간
+  // 막대 두 개**가 그어졌다 — 불빛이 아니라 페인트칠로 보였다.
+  // 빛은 불에서 가까울수록 세다. 아래쪽 몇 줄에만, 그것도 성기게.
+  for (let y = MY1 - 3; y <= MY1; y++) {
+    if (h(y, f, 23) < 0.55) g.px(MX0 - 2, y, FI[4]);
+    if (h(y, f, 27) < 0.55) g.px(MX1 + 2, y, FI[4]);
   }
+  for (let x = MX0 - 3; x <= MX1 + 3; x++)
+    if (h(x, f, 29) < 0.45) g.px(x, MY1 + 1, FI[4]);
+  // ---- 불티 ----
+  for (let i = 0; i < 6; i++) {
+    const sx = 17 + Math.round(Math.sin(i * 2.1 + f * 1.3) * 4);
+    const sy = 3 - ((i * 3 + f * 2) % 4);
+    g.px(sx, sy, i % 2 === 0 ? FI[1] : FI[2]);
+  }
+  // ---- 발치 ----
+  g.rect(0, 46, 3, 49, ST[5]);                    // 굴러 떨어진 돌
+  g.hline(0, 3, 46, ST[3]);
+  g.rect(30, 47, 33, 49, ST[6]);
+  g.hline(30, 33, 47, ST[4]);
+  for (let x = 5; x <= 28; x++)                   // 아가리 앞에 떨어진 재
+    if (h(x, f, 41) < 0.6) g.px(x, 50, ST[5]);
   return outline(g);
 }
 
@@ -369,15 +436,16 @@ function weaponrack() {
   const g = new P(30, 32);
   g.ground(15, 30, 13, 2.2);
   // 시렁 — 기둥 둘에 가로대 둘. 무기보다 **뒤에** 있으므로 먼저 깐다
-  g.rect(1, 11, 3, 30, W[4]); g.vline(1, 11, 30, W[3]);
-  g.rect(26, 11, 28, 30, W[4]); g.vline(26, 11, 30, W[3]);
-  for (const cy of [13, 22]) {
-    g.rect(1, cy, 28, cy + 2, W[3]);
-    g.hline(1, 28, cy, W[2]);
-    g.hline(1, 28, cy + 2, W[5]);
+  g.rect(1, 13, 3, 30, W[4]); g.vline(1, 13, 30, W[3]);
+  g.rect(26, 13, 28, 30, W[4]); g.vline(26, 13, 30, W[3]);
+  topFace(g, 1, 3, 13); topFace(g, 26, 28, 13);      // 기둥 머리
+  for (const cy of [16, 24]) {
+    g.rect(1, cy, 28, cy + 1, W[3]);                 // 가로대 정면
+    topFace(g, 1, 28, cy);                           // 가로대 윗면
+    g.hline(1, 28, cy + 1, W[5]);
   }
   g.rect(0, 29, 29, 30, W[4]);
-  g.hline(0, 29, 29, W[3]);
+  topFace(g, 0, 29, 29);                             // 발치 받침 윗면
   g.hline(0, 29, 30, W[6]);
   // 셋을 **떨어뜨려** 세운다. 붙여 놓으면 날이 한 덩어리가 돼 무엇이
   // 무엇인지 안 갈린다. 끝나는 높이도 다 달리 둔다
@@ -443,8 +511,8 @@ function logpile() {
 function trough(wet) {
   const g = new P(20, 12);
   g.ground(10, 10, 9, 1.6);
-  plank(g, 1, 18, 4, 10, 41);
-  g.hline(1, 18, 3, W[2]);           // 아가리 테
+  plank(g, 1, 18, 7, 10, 41);
+  topFace(g, 1, 18, 7);              // 아가리 테 — 위를 보는 면
   g.rect(2, 4, 17, 6, wet ? AQUA[1] : STRAW[2]);
   if (wet) {
     g.hline(2, 17, 4, AQUA[0]);
@@ -469,9 +537,8 @@ function hay() {
   g.ground(9, 12, 8, 1.6);
   // **네모로 묶는다.** 둥근 덩어리로 그렸더니 형체가 안 잡혀 잔디 위에
   // 허연 얼룩 하나로 보였다 — 볏단인지 돌인지 알 수가 없었다.
-  g.rect(2, 4, 15, 12, STRAW[2]);
-  g.hline(2, 15, 4, STRAW[0]);        // 윗면 = 빛
-  g.hline(2, 15, 5, STRAW[1]);
+  g.rect(2, 7, 15, 12, STRAW[2]);
+  topFace(g, 2, 15, 7, STRAW);        // 윗면
   g.hline(2, 15, 12, STRAW[3]);       // 밑변 = 턱
   g.vline(2, 4, 12, STRAW[1]);
   g.vline(15, 4, 12, STRAW[3]);
@@ -526,8 +593,9 @@ function netrack() {
 function planter() {
   const g = new P(20, 13);
   g.ground(10, 11, 9, 1.6);
-  plank(g, 1, 18, 6, 11, 71);
-  g.rect(2, 4, 17, 5, [112, 88, 64]);
+  plank(g, 1, 18, 8, 11, 71);
+  topFace(g, 1, 18, 8);               // 상자 테 윗면
+  g.rect(2, 5, 17, 7, [112, 88, 64]);
   for (let x = 2; x <= 17; x++) if (h(x, 4, 73) < 0.4) g.px(x, 4, [92, 70, 50]);
   // 잎과 꽃 — 상자 위로 봉긋하게
   for (let i = 0; i < 16; i++) {
@@ -548,8 +616,8 @@ function planter() {
 function cart() {
   const g = new P(22, 16);
   g.ground(11, 14, 9, 1.6);
-  plank(g, 3, 18, 4, 9, 81);
-  g.hline(3, 18, 3, W[1]);
+  plank(g, 3, 18, 7, 9, 81);
+  topFace(g, 3, 18, 7);               // 짐칸 테 윗면
   g.rect(4, 5, 17, 8, W[4]);          // 짐칸 속
   for (let x = 5; x <= 16; x += 4) g.vline(x, 5, 8, W[5]);
   g.hline(3, 18, 10, W[5]);
@@ -575,7 +643,8 @@ function bookstack() {
   rows.forEach(([x0, y, x1], i) => {
     const c = BOOK[i % 4];
     g.rect(x0, y - 1, x1, y, c);
-    g.hline(x0, x1, y - 1, c.map(v => Math.min(255, v + 34)));
+    g.hline(x0 + 1, x1 - 1, y - 2, c.map(v => Math.min(255, v + 18)));
+    g.hline(x0, x1, y - 1, c.map(v => Math.min(255, v + 46)));   // 윗면
     g.hline(x0, x1, y + 1, c.map(v => Math.round(v * 0.55)));
     g.vline(x0, y - 1, y, PAPER[1]);   // 책배
     g.px(x1, y, PAPER[2]);
@@ -592,8 +661,8 @@ function specimen() {
   const g = new P(18, 18);
   g.ground(9, 16, 8, 1.6);
   g.vline(2, 4, 16, W[4]); g.vline(15, 4, 16, W[4]);
-  for (const sy of [9, 15]) { g.hline(1, 16, sy, W[2]); g.hline(1, 16, sy + 1, W[5]); }
-  g.hline(1, 16, 4, W[2]); g.hline(1, 16, 5, W[5]);
+  for (const sy of [9, 15]) { topFace(g, 1, 16, sy); g.hline(1, 16, sy + 1, W[5]); }
+  topFace(g, 1, 16, 4); g.hline(1, 16, 5, W[5]);
   const jar = (x, y, c) => {
     g.rect(x, y - 3, x + 2, y, AQUA[2]);
     g.rect(x, y - 3, x + 2, y, [c[0], c[1], c[2]]);
@@ -617,19 +686,18 @@ function specimen() {
 function crate() {
   const g = new P(16, 15);
   g.ground(8, 13, 7, 1.6);
-  g.rect(2, 6, 13, 13, W[3]);
-  g.hline(2, 13, 6, W[1]);            // 뚜껑 윗면 = 빛
-  g.hline(2, 13, 7, W[2]);
+  g.rect(2, 9, 13, 13, W[4]);         // 정면 — 윗면이 깊어진 만큼 얇다
+  topFace(g, 2, 13, 9);               // 뚜껑 윗면
   g.hline(2, 13, 13, W[6]);           // 밑변 턱
   for (let x = 4; x <= 12; x += 3) g.vline(x, 8, 12, W[5]);   // 판 사이
   for (let x = 2; x <= 13; x++) if (h(x, 6, 91) < 0.22) g.px(x, 9 + (x % 3), W[4]);
-  g.vline(2, 6, 13, W[2]); g.vline(13, 6, 13, W[5]);
-  hoop(g, 2, 13, 8);                  // 쇠띠 한 줄
-  g.rect(5, 2, 11, 5, W[3]);          // 위에 얹은 작은 궤짝
-  g.hline(5, 11, 2, W[1]);
+  g.vline(2, 9, 13, W[3]); g.vline(13, 9, 13, W[6]);
+  hoop(g, 2, 13, 11);                  // 쇠띠 한 줄
+  g.rect(5, 4, 11, 5, W[4]);          // 위에 얹은 작은 궤짝
+  topFace(g, 5, 11, 4, W, 3);
   g.hline(5, 11, 5, W[5]);
   g.vline(8, 3, 5, W[5]);
-  g.px(5, 3, W[2]); g.px(11, 4, W[5]);
+  g.px(11, 4, W[5]);
   return outline(g);
 }
 
@@ -667,28 +735,43 @@ function sack() {
 }
 
 
-// ---- 연장 걸이 ----
+// ---- 작업대 ----
 //
-// 대장간·잡화점 앞. 망치와 집게가 걸려 있으면 「여기서 만든다」가 된다
+// 처음에는 「연장 걸이」로 그렸다 — 기둥 둘에 가로대. 그런데 그건 무기
+// 거치대와 **같은 실루엣**이라, 마당에 둘을 놓으면 어느 쪽이 어느 쪽인지
+// 알 수가 없었다. 물건은 서로 **다르게 생겨야** 구분된다.
+//
+// 그래서 작업대로 바꾼다. 다리 넷에 두꺼운 상판, 그 위에 바이스와 연장,
+// 아래에는 널어 둔 연장 한 벌. 세워 둔 틀이 아니라 **엎어 놓은 판**이라
+// 옆에 무기 거치대가 서 있어도 한눈에 갈린다.
 function toolrack() {
-  const g = new P(16, 18);
-  g.ground(8, 16, 7, 1.6);
-  g.vline(2, 3, 16, W[4]); g.vline(3, 3, 16, W[3]);
-  g.vline(12, 3, 16, W[4]); g.vline(13, 3, 16, W[3]);
-  g.hline(1, 14, 3, W[1]); g.hline(1, 14, 4, W[5]);
-  g.hline(1, 14, 16, W[5]);
-  g.vline(5, 6, 12, W[4]);            // 망치 자루
-  g.rect(4, 5, 7, 7, IR[2]);
-  g.hline(4, 7, 5, IR[1]); g.hline(4, 7, 7, IR[4]);
-  g.vline(9, 6, 9, IR[2]); g.vline(11, 6, 9, IR[2]);   // 집게
-  g.px(9, 10, IR[3]); g.px(10, 11, IR[3]); g.px(11, 10, IR[3]);
-  g.px(10, 5, IR[1]);
-  for (const hx of [5, 10]) {         // 편자 둘
-    for (let a = 2; a <= 10; a++) {
-      const t = a / 12 * Math.PI * 2;
-      g.px(hx + Math.cos(t) * 1.8, 14 + Math.sin(t) * 1.6, IR[2]);
-    }
+  const g = new P(20, 18);
+  g.ground(10, 16, 9, 1.8);
+  // 다리 넷
+  for (const lx of [2, 15]) {
+    g.rect(lx, 9, lx + 2, 16, W[4]);
+    g.vline(lx, 9, 16, W[3]);
+    g.vline(lx + 2, 9, 16, W[5]);
+    g.hline(lx, lx + 2, 16, W[6]);
   }
+  g.rect(3, 12, 16, 13, W[4]);          // 다리 사이 가로 버팀
+  g.hline(3, 16, 12, W[2]);
+  // 상판 — 두껍다. 윗면 두 줄 + 앞 모서리
+  g.rect(0, 8, 19, 9, W[4]);
+  topFace(g, 0, 19, 8);
+  g.hline(0, 19, 9, W[6]);
+  for (let x = 1; x <= 18; x++) if (h(x, 0, 131) < 0.2) g.px(x, 7, W[1]);
+  // 상판 위 — 바이스(쇠 물림쇠)와 망치
+  g.rect(3, 4, 6, 6, IR[2]);
+  g.hline(3, 6, 4, IR[0]); g.hline(3, 6, 6, IR[4]);
+  g.px(2, 5, IR[3]); g.px(7, 5, IR[1]);
+  g.rect(11, 3, 13, 4, IR[2]);
+  g.hline(11, 13, 3, IR[0]); g.hline(11, 13, 4, IR[4]);
+  g.hline(14, 17, 4, W[4]); g.hline(14, 17, 3, W[2]);
+  // 상판 밑에 걸어 둔 연장 — 톱니 하나, 집게 하나
+  g.vline(6, 10, 14, IR[3]);
+  for (let y = 11; y <= 14; y++) g.px(7, y, IR[2]);
+  g.vline(11, 10, 13, IR[2]); g.vline(12, 11, 13, IR[3]);
   return outline(g);
 }
 

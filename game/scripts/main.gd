@@ -975,18 +975,22 @@ const PLOT_DECOR := {
 	# 가게가 **무엇을 하는 집인지**만 말하면 된다 — 대장간이라면 불과
 	# 모루와 벼려 놓은 것들, 그 셋이면 끝이다.
 	"smith": {
-		"floor": [
-			[Rect2i(5, -2, 5, 6), "path"],     # 화로 둘레 — 불티가 튀는 자리
-			[Rect2i(1, 6, 3, 4), "path"],      # 문 앞에서 어귀까지 난 길
-		],
+		# 자로 잰 네모가 아니라 **닳은 자리 한 덩어리**다 (world_gen 의 apron).
+		# 불 앞과 문 앞을 함께 감싼다 — 사람이 오가는 자리는 이어져 있다
+		"apron": [[Vector2i(5, 3), 7.5, 6.0, "path"]],
 		"props": [
 			# 집 그림 뒤(x -1~+5, y +3 위)에는 아무것도 두지 않는다 —
-			# 집 한 채가 여덟 칸 폭이라 그 안에 놓은 것은 지붕에 먹힌다
+			# 집 한 채가 여덟 칸 폭이라 그 안에 놓은 것은 지붕에 먹힌다.
+			#
+			# **쇠 부리는 것끼리 한자리에 모은다.** 화로 · 그 앞의 모루 ·
+			# 곁의 작업대 · 담금질통. 마당에 고르게 흩어 놓으면 물건은
+			# 있는데 「일하는 자리」가 없다
 			[Vector2i(7, 1), "deco_forge"],
-			[Vector2i(6, 4), "deco_anvil"], [Vector2i(9, 4), "deco_toolrack"],
+			[Vector2i(6, 4), "deco_anvil"], [Vector2i(9, 5), "deco_toolrack"],
+			[Vector2i(7, 7), "deco_trough"],
 			[Vector2i(-4, 4), "deco_weaponrack"],
 			[Vector2i(-5, -4), "deco_logpile"], [Vector2i(-5, 0), "deco_crate"],
-			[Vector2i(-4, 7), "deco_logpile"], [Vector2i(6, 7), "deco_crate"],
+			[Vector2i(-4, 7), "deco_logpile"], [Vector2i(-2, 7), "deco_crate"],
 			[Vector2i(-5, 8), "deco_lamp"], [Vector2i(5, 8), "deco_lamp"],
 			[Vector2i(9, 8), "weed"],
 		],

@@ -1443,6 +1443,32 @@ func _plot_props(anchor: Vector2i, pid: String) -> void:
 				if m.grid[y][x].ground not in ["grass", "yard"]:
 					continue      # 물·모래·이미 깐 바닥은 건드리지 않는다
 				m.grid[y][x].ground = str(f[1])
+	# ①-b **닳은 자리** — 자로 잰 네모가 아니라 둥근 얼룩이다.
+	#
+	# 대장간 앞은 사람이 하루 종일 오가며 밟아 다진 자리다. 그런데 바닥을
+	# 네모로 깔았더니 마당에 회색 카펫을 오려 붙인 꼴이었다 — 「배치가
+	# 안 어울린다」가 이것이다. 불 앞과 문 앞을 감싸는 **한 덩어리**로 깔고,
+	# 가장자리는 들쭉날쭉하게 흩어 놓는다.
+	for ap: Array in spec.get("apron", []):
+		var c: Vector2i = anchor + (ap[0] as Vector2i)
+		var rx: float = float(ap[1])
+		var ry: float = float(ap[2])
+		for y in range(c.y - int(ry) - 1, c.y + int(ry) + 2):
+			for x in range(c.x - int(rx) - 1, c.x + int(rx) + 2):
+				if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+					continue
+				var t1 := Vector2i(x, y)
+				if m.ROAD.has_point(t1) or m.PLAZA.has_point(t1) or _on_village_road(t1):
+					continue
+				if m.grid[y][x].ground not in ["grass", "yard"]:
+					continue
+				var d: float = pow((x - c.x) / rx, 2.0) + pow((y - c.y) / ry, 2.0)
+				if d > 1.0:
+					continue
+				# 가장자리는 확률로 뺀다 — 둥근 자국도 자로 그으면 접시가 된다
+				if d > 0.62 and m._hash01(x * 7 + 5, y * 11 + 3) < (d - 0.62) * 2.2:
+					continue
+				m.grid[y][x].ground = str(ap[3])
 	# ② 살림
 	for entry: Array in spec.get("props", []):
 		var t: Vector2i = anchor + (entry[0] as Vector2i)

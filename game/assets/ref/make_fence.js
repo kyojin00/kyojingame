@@ -66,10 +66,21 @@ const SHADOW = [30, 26, 34, 78];
 //
 // 말뚝은 칸 한복판에 서서 밑동이 칸 밑변에 닿는다 (y=14). 위로 y=3 까지.
 // 가로장 둘은 말뚝 **뒤로** 지나간다 — 먼저 그리고 말뚝으로 덮는다.
+// ---- **위에서 내려다본다** ----
+//
+// 화면은 정면이 아니라 비스듬히 위에서 내려다보는 각이다. 그런데 울타리를
+// 정면(입면도)으로만 그려 두었다 — 말뚝도 가로장도 **옆에서 본 판때기**라,
+// 같은 화면의 집·바닥과 각이 안 맞아 종이를 오려 세운 것처럼 보였다.
+//
+// 위에서 보면 **윗면이 보인다.** 말뚝은 잘린 머리의 네모가, 가로장은 긴
+// 윗면이 보인다. 그래서 물건마다 두 면을 그린다 —
+//   윗면   두 줄. 제일 밝다 (하늘을 보고 있다). 뒤 모서리는 한 칸 안으로
+//   정면   그 아래. 한두 단 어둡다
+//   턱     맨 아랫줄. 두 단 어둡다 (땅에 닿는 자리)
 const PX0 = 6, PX1 = 9;          // 말뚝 좌우
-const PTOP = 3, PBOT = 14;       // 말뚝 위·아래
-const RAIL = [6, 10];            // 가로장 두 줄의 윗변 (각 3줄 두께)
-const VX0 = 7, VX1 = 8;          // 세로 널 좌우
+const PTOP = 2, PBOT = 14;       // 말뚝 윗면 줄·밑동
+const RAIL = [3, 9];             // 가로장 두 줄의 윗면 첫 줄 (각 6줄 두께)
+const VX0 = 6, VX1 = 9;          // 세로 널 좌우 (윗면이 보이므로 말뚝만큼 넓다)
 
 class T {
   constructor() {
@@ -112,19 +123,25 @@ class T {
 // 가로장 한 개 = 윗변(밝다) · 속 · 아랫변(턱). 세 줄이면 판자가 된다.
 function railH(g, x0, x1, y, seed) {
   if (x1 < x0) return;
-  g.hline(x0, x1, y, W[1]);          // 윗변 — 위를 보고 있으니 빛을 받는다
-  g.hline(x0, x1, y + 1, W[3]);      // 속
-  g.hline(x0, x1, y + 2, W[5]);      // 아랫변 = 턱
-  // 나뭇결 — 결이 없으면 판자가 아니라 색 띠다. 속줄에만, 성기게
+  // **윗면 세 줄, 정면 한 줄.** 이 비율이 곧 카메라 각도다 — 위에서
+  // 내려다볼수록 윗면이 깊어지고 정면은 얇아진다
+  g.hline(x0, x1, y, W[1]);          // 윗면 뒤 모서리 (멀어지는 쪽)
+  g.hline(x0, x1, y + 1, W[0]);      // 윗면
+  g.hline(x0, x1, y + 2, W[0]);      // 윗면 앞줄
+  // **앞 모서리** — 윗면과 정면이 꺾이는 자리. 두 면은 선으로 갈린다
+  g.hline(x0, x1, y + 3, W[5]);
+  g.hline(x0, x1, y + 4, W[3]);      // 정면
+  g.hline(x0, x1, y + 5, W[6]);      // 아랫변 = 턱
+  // 나뭇결 — 결이 없으면 판자가 아니라 색 띠다. 윗면과 정면에 성기게
   for (let x = x0; x <= x1; x++) {
-    if (h(x, y, seed + 3) < 0.22) g.px(x, y + 1, W[4]);
-    if (h(x, y, seed + 5) < 0.14) g.px(x, y, W[2]);      // 윗변에도 결 한 점
+    if (h(x, y, seed + 3) < 0.22) g.px(x, y + 4, W[4]);
+    if (h(x, y, seed + 5) < 0.16) g.px(x, y + 1, W[1]);
   }
   // 옹이 하나 — 판자마다는 아니고 가끔
   const kx = x0 + Math.floor(h(x0, y, seed + 7) * Math.max(1, x1 - x0));
   if (h(kx, y, seed + 9) < 0.45) {
-    g.px(kx, y + 1, W[5]);
-    g.px(kx + 1, y + 1, W[4]);
+    g.px(kx, y + 4, W[5]);
+    g.px(kx + 1, y + 4, W[4]);
   }
 }
 
@@ -139,17 +156,21 @@ function post(g, seed) {
   // 그늘 — 오른쪽 아래로 진다 (해가 왼쪽 위)
   for (let y = PTOP + 2; y <= PBOT; y++) g.px(PX1 + 1, y + 1, SHADOW);
   g.px(PX1 + 2, PBOT + 1, SHADOW);
-  // 몸통
-  g.rect(PX0, PTOP, PX1, PBOT, W[3]);
-  g.vline(PX0, PTOP, PBOT, W[2]);          // 왼쪽 = 빛
-  g.vline(PX0 + 1, PTOP, PBOT, W[2]);
-  g.vline(PX1, PTOP, PBOT, W[5]);          // 오른쪽 = 그늘
-  // 윗머리 — 한 줄 밝게 하고 오른쪽 모서리는 깎아 낸다
-  g.hline(PX0, PX1 - 1, PTOP, W[0]);
-  g.px(PX1, PTOP, W[2]);
+  // 몸통 (정면)
+  g.rect(PX0, PTOP + 2, PX1, PBOT, W[4]);
+  g.hline(PX0, PX1, PTOP + 2, W[5]);       // 앞 모서리 — 윗면과 갈리는 선
+  g.vline(PX0, PTOP + 3, PBOT, W[3]);      // 왼쪽 = 빛
+  g.vline(PX0 + 1, PTOP + 3, PBOT, W[3]);
+  g.vline(PX1, PTOP + 3, PBOT, W[6]);      // 오른쪽 = 그늘
+  // **잘린 머리의 윗면** — 두 줄. 뒤 모서리는 한 칸 안으로 들어간다.
+  // 이 두 줄이 「위에서 내려다본다」를 말한다
+  g.hline(PX0 + 1, PX1 - 1, PTOP - 1, W[1]);   // 뒤 모서리 (한 칸 안으로)
+  g.hline(PX0, PX1, PTOP, W[0]);               // 윗면
+  g.hline(PX0, PX1, PTOP + 1, W[0]);           // 윗면 앞줄
+  g.px(PX1, PTOP + 1, W[1]);                   // 오른쪽 모서리는 살짝 죽인다
   if (h(seed, 1, 21) < 0.5) g.px(PX1, PTOP, null);   // 쪼개진 머리
   // 결 — 세로로 흐른다. 판자와 같은 규칙(속줄에만)
-  for (let y = PTOP + 1; y <= PBOT; y++) {
+  for (let y = PTOP + 3; y <= PBOT; y++) {
     if (h(y, seed, 23) < 0.30) g.px(PX0 + 1, y, W[4]);
     if (h(y, seed, 27) < 0.24) g.px(PX0 + 2, y, W[4]);
     if (h(y, seed, 29) < 0.16) g.px(PX0, y, W[3]);
@@ -178,16 +199,23 @@ function railV(g, up, seed) {
   // 말뚝보다 **한 칸 좁게** 둔다. 같은 폭으로 깔았더니 세로줄이 통나무
   // 한 대로 보여서 말뚝이 어디 서 있는지 안 보였다. 잘록해야 「말뚝과
   // 장」으로 읽힌다.
+  // 세로줄에서 보이는 것은 가로장의 **윗면**이다. 위에서 내려다보니
+  // 그 면이 그대로 하늘을 향한다 — 어둡게 깔면 말뚝 사이가 끊겨 보인다
   if (up) {
     // 말뚝 머리 위로 — 여기만 보인다 (아래는 말뚝이 덮는다)
-    g.vline(VX0, 0, PTOP + 1, W[1]);
-    g.vline(VX1, 0, PTOP + 1, W[3]);
-    for (let y = 0; y <= PTOP; y++) if (h(y, seed, 41) < 0.28) g.px(VX0, y, W[2]);
+    g.vline(VX0, 0, PTOP + 2, W[1]);
+    g.vline(VX0 + 1, 0, PTOP + 2, W[0]);
+    g.vline(VX0 + 2, 0, PTOP + 2, W[0]);
+    g.vline(VX1, 0, PTOP + 2, W[2]);
+    for (let y = 0; y <= PTOP; y++)
+      if (h(y, seed, 41) < 0.28) g.px(VX0 + 1, y, W[1]);
     g.px(VX1 + 1, 0, SHADOW); g.px(VX1 + 1, 1, SHADOW);
   } else {
     // 발치 아래 — 말뚝 밑동과 아랫칸 널 사이의 한 줄을 메운다
-    g.vline(VX0, PBOT, N - 1, W[3]);
-    g.vline(VX1, PBOT, N - 1, W[5]);
+    g.vline(VX0, PBOT, N - 1, W[2]);
+    g.vline(VX0 + 1, PBOT, N - 1, W[1]);
+    g.vline(VX0 + 2, PBOT, N - 1, W[1]);
+    g.vline(VX1, PBOT, N - 1, W[4]);
   }
 }
 
@@ -204,15 +232,15 @@ function fence(mask) {
   for (let r = 0; r < 2; r++) {
     const y = RAIL[r];
     // 장 밑의 그늘 — 땅에 뜬 것으로 보이려면 아랫변만으로는 모자라다
-    if (ww) { g.hline(0, PX0 - 1, y + 3, SHADOW); railH(g, 0, PX0 - 1, y, seed * 7 + r); }
-    if (ee) { g.hline(PX1 + 1, N - 1, y + 3, SHADOW); railH(g, PX1 + 1, N - 1, y, seed * 11 + r); }
+    if (ww) { g.hline(0, PX0 - 1, y + 6, SHADOW); railH(g, 0, PX0 - 1, y, seed * 7 + r); }
+    if (ee) { g.hline(PX1 + 1, N - 1, y + 6, SHADOW); railH(g, PX1 + 1, N - 1, y, seed * 11 + r); }
   }
   // ③ 말뚝
   post(g, seed);
   // ④ 못 — 장이 말뚝에 닿는 자리
   for (let r = 0; r < 2; r++) {
-    if (ww) nail(g, PX0, RAIL[r] + 1);
-    if (ee) nail(g, PX1, RAIL[r] + 1);
+    if (ww) nail(g, PX0, RAIL[r] + 5);
+    if (ee) nail(g, PX1, RAIL[r] + 5);
   }
   // ⑤ 외따로 선 말뚝은 조금 낮춰 둔다 — 끝은 끝으로 보여야 한다
   if (mask === 0) {
