@@ -408,6 +408,9 @@ func _build_levels() -> void:
 	_raise_blob(56, 58 + m.NORTH_PAD, 9.0, 5.0, 2, 41)
 	# 동쪽 채석장의 단구 — 돌을 캐 낸 자리라 층이 진다
 	_raise_blob(196, 46 + m.NORTH_PAD, 13.0, 6.0, 2, 57)
+	# 언덕 위에 얹히는 부지 몇 곳 (main.HILL_PLOTS)
+	for hid: String in m.HILL_PLOTS:
+		_raise_plot_hill(m.VILLAGE_PLOTS[hid].anchor)
 	# 오르막 — 벼랑을 끊고 내려오는 자리. 없으면 올라갈 수가 없다.
 	# **남쪽 자락**에 낸다 — 바위면이 보이는 쪽이라야 길로 읽힌다
 	# 폭은 **네 칸**. 두 칸이면, 벼랑면이 두 칸 높이가 된 지금은 계단이
@@ -416,6 +419,10 @@ func _build_levels() -> void:
 	_cut_ramp(51, 63 + m.NORTH_PAD, 4)
 	_cut_ramp(60, 63 + m.NORTH_PAD, 4)
 	_cut_ramp(190, 52 + m.NORTH_PAD, 4)
+	# 언덕 위 부지의 문 앞에서 큰길로 내려오는 돌계단 (문 앞 세 칸 그대로)
+	for hid2: String in m.HILL_PLOTS:
+		var ha: Vector2i = m.VILLAGE_PLOTS[hid2].anchor
+		_cut_ramp(ha.x + 1, ha.y + 4 + m.YARD_PAD + 1, 3)
 	# ---- 고장 랜드마크의 단차 ----
 	#
 	# 그림만 세우면 아무리 잘 그려도 평지에 붙인 판때기다. 폭포는
@@ -618,6 +625,33 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 #
 # 가로/세로로만 꺾는다. 비스듬한 길은 칸 단위 세계에서 톱니로 나오고,
 # 무엇보다 **오르막이 세로로만 나므로** 길도 같은 결이라야 이어 붙는다.
+# ---- 언덕 하나 ----
+#
+# 부지의 울타리 테두리(17x16)를 **한 칸 여유로 감싸는 네모**를 한 켜 올린다.
+# `_raise_blob` 은 타원이라 여기 못 쓴다 — 테두리가 네모라서, 타원 가장자리가
+# 부지를 비스듬히 잘라 마당 한쪽이 벼랑 아래로 떨어진다.
+#
+# **남쪽 변만은 자로 잰 듯 곧다.** 거기가 계단이 걸리는 축대이고, 한 줄만
+# 남쪽으로 밀려도 바위벽 두 줄이 큰길 첫 줄을 먹어 마을이 두 쪽 난다.
+# 나머지 세 변은 들쭉날쭉하게 부풀린다 — 부지 사이 숲으로 파고드는 자락이라
+# 흔들어도 아무것도 안 막는다. 다만 동서로는 **한 칸까지만** — 두 칸이면
+# 옆으로 지나는 세로 줄기 길에 닿는다.
+func _raise_plot_hill(anchor: Vector2i) -> void:
+	var x0: int = anchor.x - m.YARD_PAD - 2
+	var x1: int = anchor.x + 4 + m.YARD_PAD + 2
+	var y0: int = anchor.y - m.YARD_PAD - 2
+	var y1: int = anchor.y + 4 + m.YARD_PAD + 1        # 축대 — 곧게
+	for y in range(maxi(0, y0 - 2), mini(m.MAP_H, y1 + 1)):
+		# 북쪽 자락 — 두 칸까지 위로 부푼다
+		if y < y0 - int(round(m._hash01(y * 3 + 5, 19) * 2.0)):
+			continue
+		var west: int = x0 - (1 if m._hash01(y * 7 + 3, 21) < 0.45 else 0)
+		var east: int = x1 + (1 if m._hash01(y * 5 + 9, 23) < 0.45 else 0)
+		for x in range(maxi(0, west), mini(m.MAP_W, east + 1)):
+			if _lv(x, y) > 0:
+				_set_lv(x, y, 2)
+
+
 func _lay_path(chain: Array, w := 2) -> void:
 	for i in range(chain.size() - 1):
 		var a: Array = chain[i]
@@ -1074,6 +1108,15 @@ func _build_village() -> void:
 	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
 	_decorate_plaza()
+	# 언덕으로 오르는 돌계단 양옆에 석등 한 쌍. 계단이 어디로 나 있는지는
+	# 멀리서 보이지 않는다 — 등 두 개가 「여기로 오른다」를 대신 말한다
+	for hid: String in m.HILL_PLOTS:
+		var ha: Vector2i = m.VILLAGE_PLOTS[hid].anchor
+		var sy: int = ha.y + 4 + m.YARD_PAD + 1        # 축대 줄
+		for sx: int in [ha.x, ha.x + 4]:
+			var st := Vector2i(sx, sy)
+			if not m.objects.has(st):
+				m.objects[st] = {"kind": "deco_stonelamp", "hp": 0}
 	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
 	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다).
