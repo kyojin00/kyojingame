@@ -310,7 +310,7 @@ const TEXTURE_NAMES := [
 	# 그림(ore_node·rock_wedge)을 그대로 갖다 놨다. 뚜껑 열린 보물상자가
 	# 아홉 마당에 스물몇 개씩 놓여 있었고, 회색 돌붙이는 자갈 바닥에
 	# 묻혀 보이지도 않았다
-	"deco_crate", "deco_sack", "deco_orepile", "deco_toolrack",
+	"deco_crate", "deco_sack", "deco_toolrack",
 	# 무기 거치대 — 대장간이 무엇을 만드는 집인지 말하는 물건
 	"deco_weaponrack",
 	# 고장의 작은 마을 집 (ref/make_buildings.js)
@@ -985,9 +985,8 @@ const PLOT_DECOR := {
 			[Vector2i(7, 1), "deco_forge"],
 			[Vector2i(6, 4), "deco_anvil"], [Vector2i(9, 4), "deco_toolrack"],
 			[Vector2i(-4, 4), "deco_weaponrack"],
-			[Vector2i(-5, -4), "deco_logpile"], [Vector2i(7, -3), "deco_orepile"],
-			[Vector2i(-5, 0), "deco_orepile"],
-			[Vector2i(-4, 7), "deco_orepile"], [Vector2i(6, 7), "deco_logpile"],
+			[Vector2i(-5, -4), "deco_logpile"], [Vector2i(-5, 0), "deco_crate"],
+			[Vector2i(-4, 7), "deco_logpile"], [Vector2i(6, 7), "deco_crate"],
 			[Vector2i(-5, 8), "deco_lamp"], [Vector2i(5, 8), "deco_lamp"],
 			[Vector2i(9, 8), "weed"],
 		],
@@ -1829,7 +1828,7 @@ const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 
 const DOT_PROPS := ["deco_forge", "deco_anvil",
 	"deco_logpile", "deco_trough", "deco_feedbox", "deco_hay", "deco_netrack",
 	"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen",
-	"deco_crate", "deco_sack", "deco_orepile", "deco_toolrack",
+	"deco_crate", "deco_sack", "deco_toolrack",
 	"deco_weaponrack"]
 
 # 오브젝트가 실제로 막는 크기(픽셀). 기준 칸(32px) 밖으로 얼마나 더 넓히는지다.
