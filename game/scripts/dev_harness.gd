@@ -6618,6 +6618,18 @@ func _debug_tick() -> void:
 					if m.objects.has(t97) and not m.obj_nodes.has(t97):
 						node_ok94 = false
 						miss94 += "%s:%s " % [pid97, str(e97[1])]
+			# **마을 생활 공간 안에는 나무가 없다.**
+			#
+			# 마을 어귀의 목(x53~63)이 도착 자리를 옮긴 뒤로 감쌀 것도 없이
+			# 마을 서쪽 한복판에 나무 덩어리로 남아 있었다. 바깥 테두리
+			# 두 줄은 원래 나무를 두르는 자리라 빼고 본다.
+			var inner94 := m.VILLAGE_REGION.grow(-2)
+			var wild94 := 0
+			for wt94: Vector2i in m.objects:
+				if str(m.objects[wt94].kind) != "tree":
+					continue
+				if inner94.has_point(wt94):
+					wild94 += 1
 			# 큰길·광장 위에는 말뚝 하나 박지 않는다
 			var road_ok94 := true
 			for rt94: Vector2i in m.objects:
@@ -6628,11 +6640,12 @@ func _debug_tick() -> void:
 			GameData.village_built = k_built94
 			m.worldgen._build_map()
 			print("PLOT_DECOR_OK=", art_ok94 and door_ok94 and reach94
-					and road_ok94 and ring_ok94 and node_ok94,
+					and road_ok94 and ring_ok94 and node_ok94 and wild94 == 0,
 				" 그림있음=", art_ok94, "(", blind94, ")", " 문열림=", door_ok94,
 				" 광장에서닿음=", reach94, "(", shut94, ")", " 길안막음=", road_ok94,
 				" 경계있음=", ring_ok94, "(", bare94, ")",
-				" 그림섬=", node_ok94, "(", miss94, ")")
+				" 그림섬=", node_ok94, "(", miss94, ")",
+				" 마을안나무=", wild94, "그루")
 			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
 			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.
 			var k_all := {

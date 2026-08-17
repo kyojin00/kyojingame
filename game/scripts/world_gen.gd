@@ -1035,7 +1035,6 @@ func _build_village() -> void:
 		if m.VILLAGE_PLOTS.has(pid):
 			_place_building_tiles(m.VILLAGE_PLOTS[pid].anchor)
 
-	_make_village_gate()
 
 	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
 	m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
@@ -1744,43 +1743,14 @@ func _migrate_farm_layout() -> void:
 			m.player.position = Vector2(out.x * m.TILE + 16, out.y * m.TILE + 16)
 
 
-# ---- 마을 어귀 ----
+# ---- 마을 어귀의 목은 걷어냈다 ----
 #
-# 숲길을 한참 걸어와서 닿는 자리인데, 여기는 좌표 한 점(WORLD_ENTRY)일 뿐
-# 사방이 트인 벌판이었다. 마을에 **들어서는** 게 아니라 그냥 나타난다.
+# 여기에 x53~63 을 나무로 두껍게 채워 **목**을 만드는 함수가 있었다.
+# 도착 자리(story.WORLD_ENTRY)가 마을 문턱(58, 21)이던 시절, 숲길을 걸어
+# 나와 그 자리에서 눈을 뜨면 사방이 트인 벌판이라 「마을에 들어선다」가
+# 아니라 그냥 나타나는 것이었다 — 양옆을 숲으로 막은 이유가 그것이다.
 #
-# 바닥에 길을 까는 것으로는 못 고친다 — 마을 바닥은 잔디로 두는 것이
-# 이 게임의 약속이고(포장은 플레이어가 직접 한다), 어귀만 흙길이면
-# 그 약속이 거기서만 깨진다. 대신 **나무로 목을 만든다**: 양옆을 숲으로
-# 막고 가운데 세 칸을 비우면, 도착한 자리가 「길목」이 되고 동쪽으로
-# 걸어 나가야 마을이 열린다.
-const GATE_X0 := 53
-const GATE_X1 := 63
-const GATE_LANE := 3          # 가운데로 비워 두는 폭 (사람 셋이 지난다)
-const GATE_Y := 21            # 목이 서는 줄 (9 + NORTH_PAD — 마을 서쪽 문턱)
-
-
-func _make_village_gate() -> void:
-	# 어귀의 목은 **마을 문턱**에 선다. 예전에는 도착 자리(WORLD_ENTRY)의
-	# 높이를 그대로 썼는데, 그 자리가 세계 서쪽 끝으로 옮겨 가면서 목이
-	# 엉뚱한 줄에 서 버렸다 — 여기는 마을 쪽 좌표로 못 박는다
-	var cy: int = GATE_Y
-	var y0: int = cy - GATE_LANE / 2
-	var y1: int = y0 + GATE_LANE - 1
-	for x in range(GATE_X0, GATE_X1 + 1):
-		# 가장자리로 갈수록 숲이 두껍다 — 목이 좁아지며 마을이 열린다
-		var depth := 3 if x < GATE_X0 + 4 else 2
-		# (동쪽 끝은 한 겹만 — 마을 쪽은 트여 있어야 한다)
-		if x >= GATE_X1 - 1:
-			depth = 1
-		for d in range(1, depth + 1):
-			for ty in [y0 - d, y1 + d]:
-				if ty < 1 or ty >= m.WORLD_H - 1:
-					continue
-				if m.objects.has(Vector2i(x, ty)):
-					continue
-				if m.grid[ty][x].ground != "grass":
-					continue
-				m.objects[Vector2i(x, ty)] = {"kind": "tree", "hp": m.TREE_HP}
-	# 걷는 자리에는 아무것도 나지 않게
-	_no_spawn_rect(GATE_X0, y0, GATE_X1, y1, 0)
+# 도착 자리가 **세계 서쪽 끝**으로 옮겨 가면서 그 이유가 통째로 사라졌다.
+# 이제는 거기서 눈을 뜨지 않고 농장을 지나 걸어서 마을에 든다. 감쌀 것이
+# 없어진 나무 벽만 마을 서쪽 한복판에 덩어리로 남아, 지나갈 때마다
+# 「여기 왜 숲이 있지」가 됐다.
