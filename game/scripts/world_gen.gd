@@ -1493,21 +1493,42 @@ func _lay_yard(anchor: Vector2i) -> void:
 	# 울타리 테두리 **안쪽을 다 채운다.** 자리를 넓히면(YARD_PAD) 마당도
 	# 같이 넓어져야 한다 — 예전에는 아홉 칸으로 박아 두어서, 부지를 키우면
 	# 넓어진 자리만 잔디로 남아 울타리 안에 풀밭이 생겼다
-	for y in range(anchor.y - m.YARD_PAD, anchor.y + 4 + m.YARD_PAD):
-		for x in range(anchor.x - m.YARD_PAD, anchor.x + 5 + m.YARD_PAD):
+	# ---- 마당은 **울타리에서 뚝 끊기지 않는다** ----
+	#
+	# 예전에는 테두리 안쪽까지만 흙을 깔았다. 그러면 바깥에서 볼 때
+	# 잔디 → 말뚝 → 흙이 한 줄에 딱 붙어, 마당이 잔디밭에 오려 붙인
+	# 갈색 네모가 됐다. 경계 그림(trod)이 번져 주기는 하는데 그게 하필
+	# **말뚝이 선 줄**이라 울타리 그림에 가려 아무도 못 봤다.
+	#
+	# 사람이 드나드는 자리의 흙은 울타리 **밖으로도 새어 나간다.** 안쪽은
+	# 다 채우고, 테두리부터는 멀어질수록 성기게 — 두 칸 밖이면 몇 점만
+	# 남는다. 그 성긴 자락이 잔디와 흙을 이어 준다.
+	var SPILL := [0.0, 0.30, 0.62, 0.86]      # 테두리에서 0·1·2·3칸 나갈 확률
+	for y in range(anchor.y - m.YARD_PAD - 3, anchor.y + 7 + m.YARD_PAD):
+		for x in range(anchor.x - m.YARD_PAD - 3, anchor.x + 8 + m.YARD_PAD):
 			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
 				continue
 			var cell: Dictionary = m.grid[y][x]
 			if cell.ground != "grass":
 				continue                      # 길·물·밭·모래는 건드리지 않는다
-			# 가장자리는 **자로 잰 듯하면 안 된다.** 바깥 한 겹을 확률로 빼서
-			# 들쭉날쭉하게 만든다 (모서리일수록 많이 빠진다)
-			var edge := 0
-			if x == anchor.x - m.YARD_PAD or x == anchor.x + 4 + m.YARD_PAD:
-				edge += 1
-			if y == anchor.y - m.YARD_PAD or y == anchor.y + 3 + m.YARD_PAD:
-				edge += 1
-			if edge > 0 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.4 * float(edge):
+			# 마당 네모에서 얼마나 벗어났는가 (안쪽이면 0)
+			var out_x: int = maxi(anchor.x - m.YARD_PAD - x,
+				x - (anchor.x + 4 + m.YARD_PAD))
+			var out_y: int = maxi(anchor.y - m.YARD_PAD - y,
+				y - (anchor.y + 3 + m.YARD_PAD))
+			var out: int = maxi(maxi(out_x, out_y), 0)
+			if out > 3:
+				continue
+			# 안쪽 가장자리 한 겹도 자로 잰 듯하면 안 된다 (모서리일수록 많이)
+			if out == 0:
+				var edge := 0
+				if x == anchor.x - m.YARD_PAD or x == anchor.x + 4 + m.YARD_PAD:
+					edge += 1
+				if y == anchor.y - m.YARD_PAD or y == anchor.y + 3 + m.YARD_PAD:
+					edge += 1
+				if edge > 0 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.28 * float(edge):
+					continue
+			elif m._hash01(x * 5 + 9, y * 13 + 7) < SPILL[out]:
 				continue
 			cell.ground = "yard"
 	# 문 앞에서 큰길까지 — 마당만 있고 길이 없으면 부지가 섬처럼 뜬다.

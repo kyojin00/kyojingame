@@ -234,6 +234,16 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 물방앗간 곁의 물레방아 — 돈다 (_tick_landmarks)
 			texture = m.tex["deco_wheel_0"]
 			offset = Vector2(0, -texture.get_height())
+		"deco_forge":
+			# 대장간의 화로 — 불이 흔들린다 (_tick_landmarks 가 장을 갈아 낀다)
+			texture = m.tex["deco_forge_0"]
+			offset = Vector2(0, -texture.get_height())
+		"deco_anvil", "deco_grindstone", "deco_logpile", "deco_trough", \
+		"deco_feedbox", "deco_hay", "deco_netrack", "deco_barrel", \
+		"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen":
+			# 마당에 세워 두는 살림 (ref/make_props.js). 밑변을 칸에 맞춘다
+			texture = m.tex[kind]
+			offset = Vector2(0, -texture.get_height())
 		"deco_stonelamp":
 			# 돌계단을 따라 늘어선 석등 — 하나로 볼 것이 아니라 **줄지어**
 			# 섰을 때 길의 방향과 길이를 말한다
@@ -273,8 +283,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		#  화면 72x62px — 주인공 64x96px보다 낮아, 이장이 제 집보다 컸다.)
 		sc = 0.5
 	elif kind.begins_with("landmark_") or kind == "deco_wheel" \
-			or kind == "deco_stonelamp" or kind == "deco_cairn":
-		sc = 0.5   # 원본 4px = 도트 한 칸 (make_landmarks.js)
+			or kind == "deco_stonelamp" or kind == "deco_cairn" \
+			or kind in m.DOT_PROPS:
+		sc = 0.5   # 원본 4px = 도트 한 칸 (make_landmarks.js · make_props.js)
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
 		if kind == "tree":
@@ -677,13 +688,27 @@ func _update_object_fade(delta: float) -> void:
 # 폭포가 안 흐르면 그건 폭포 그림이지 폭포가 아니다. 세계에 넷뿐이라
 # 매 프레임 도는 것보다 훨씬 싸다 — 초당 일곱 번, 그림 넷만 갈아 끼운다.
 func _tick_landmarks() -> void:
+	# **치운 노드는 목록에서도 뺀다.**
+	#
+	# 랜드마크는 KEEP_ALWAYS 라 한 번 서면 안 치워졌다 — 그래서 목록에
+	# 죽은 것이 쌓일 일이 없었다. 그런데 대장간의 화로(deco_forge)는
+	# 마당의 살림이라 화면을 벗어나면 치워진다. 치운 스프라이트가 목록에
+	# 그대로 남아, 다음 박자에 그 자리를 갈아 끼우려다 매번 터졌다.
+	#
+	# `var spr: Sprite2D = e[0]` 은 **살았는지 묻기 전에** 이미 터진다 —
+	# 형을 박아 받는 대입이 곧 접근이다. 먼저 Variant 로 받아 물어본다.
+	var live: Array = []
 	for e: Array in m.landmark_sprites:
-		var spr: Sprite2D = e[0]
-		if not is_instance_valid(spr):
+		var sv: Variant = e[0]
+		if not is_instance_valid(sv):
 			continue
+		var spr: Sprite2D = sv
 		var kind: String = e[1]
 		var n: int = int(m.LANDMARK_FRAMES[kind])
 		spr.texture = m.tex["%s_%d" % [kind, m.lm_frame % n]]
+		live.append(e)
+	if live.size() != m.landmark_sprites.size():
+		m.landmark_sprites = live
 
 
 # ---- 가까운 것만 세운다 ----
