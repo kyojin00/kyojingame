@@ -171,7 +171,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["tree_bare"]     # 마을 쪽으로 굽은 나무
 			offset = Vector2(0, -100)
 		"fence":
-			texture = m.tex["fence"]
+			texture = m.tex["fence_%d" % fence_mask(pos)]
 		"sprinkler":
 			texture = m.tex["sprinkler"]
 		"forage_berry":
@@ -354,6 +354,8 @@ func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> voi
 		m.story.story16_field_work("clear", pos)
 		m.story.story17_barn_work("clear", pos)
 	m.objects.erase(pos)
+	if gone == "fence":
+		restyle_fences_around(pos)   # 남은 말뚝은 여기가 끝인 줄 알아야 한다
 	if m.obj_nodes.has(pos):
 		var node: Node2D = m.obj_nodes[pos]
 		var sprite := node.get_child(0)
@@ -570,6 +572,42 @@ func _place_object(pos: Vector2i, kind: String, hp: int) -> void:
 	_spawn_object_node(pos, kind)
 	if kind == "sprinkler":
 		m.farming.add_sprinkler(pos)   # 물 주는 목록에 넣는다 (매번 다 뒤지지 않게)
+	elif kind == "fence":
+		restyle_fences_around(pos)     # 옆 말뚝에도 장이 뻗어 나가야 한다
+
+
+# ---- 울타리는 **이웃을 보고** 제 모습을 정한다 ----
+#
+# 북1 · 동2 · 남4 · 서8. 이어진 쪽으로만 가로장을 뻗는 그림을 고른다
+# (ref/make_fence.js 가 열여섯 벌을 찍어 둔다).
+const FENCE_DIRS: Array[Vector2i] = [
+	Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0),
+]
+
+
+func fence_mask(pos: Vector2i) -> int:
+	var mk := 0
+	for i in 4:
+		if str(m.objects.get(pos + FENCE_DIRS[i], {}).get("kind", "")) == "fence":
+			mk |= 1 << i
+	return mk
+
+
+# 한 칸이 바뀌면 **이웃 넷의 그림도 바뀐다.** 말뚝 하나를 새로 박았는데
+# 옆 말뚝이 여태 「끝」인 채로 서 있으면 장이 허공에서 끊긴다.
+# 그림만 갈아 끼운다 — 노드를 다시 세우면 나무 페이드 목록 같은 것이 꼬인다.
+func restyle_fences_around(pos: Vector2i) -> void:
+	for d: Vector2i in FENCE_DIRS:
+		var t: Vector2i = pos + d
+		if str(m.objects.get(t, {}).get("kind", "")) != "fence":
+			continue
+		if not m.obj_nodes.has(t):
+			continue
+		var node: Node2D = m.obj_nodes[t]
+		if not is_instance_valid(node) or node.get_child_count() == 0:
+			continue
+		var spr: Sprite2D = node.get_child(0)
+		spr.texture = m.tex["fence_%d" % fence_mask(t)]
 
 
 func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Node2D:

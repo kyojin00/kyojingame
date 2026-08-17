@@ -1031,10 +1031,10 @@ func _build_village() -> void:
 	# 「마을 바닥은 잔디」라는 약속은 **부지 안**의 이야기다. 부지 사이까지
 	# 잔디로 두면 집들이 잔디밭에 그냥 얹혀 있는 모형 줄로 보인다 —
 	# 사람이 다녀 풀이 죽은 길이 있어야 마을이 된다.
-	# 바닥은 **다져진 흙**("yard")이다. 자갈("path")로 깔아 봤더니 마을
-	# 한복판에 회색 포장도로가 격자로 뻗어 도시가 됐다 — 여기는 사람이
-	# 밟고 다녀 풀이 죽은 시골길이다. 마당과 같은 흙이라 마을이 한 덩어리로
-	# 읽히고, 잔디와 닿는 자리는 그리기가 알아서 번지게 이어 준다.
+	# 바닥은 **자갈**("path")이다. 마당 흙과 같은 흙으로 깔아 봤더니 마당과
+	# 길이 한 덩어리로 뭉개져 어디까지가 남의 마당인지 안 보였다.
+	# 대신 길은 자로 그은 네모가 아니라 **굽이친다**(_paint_village_lane) —
+	# 곧게 그은 자갈 격자는 시골 마을이 아니라 도시였다.
 	var lanes: Array = m.VILLAGE_ROADS.duplicate()
 	lanes.append(m.ROAD)          # 농장에서 드는 큰길도 같은 길이다
 	for lane: Rect2i in lanes:
@@ -1073,14 +1073,82 @@ func _build_village() -> void:
 	# 경매 게시판 — 다른 농장 사람들과 사고파는 장터로 이어진다
 	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
+	_decorate_plaza()
 	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
 	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
-	# (광장의 가로등·벤치는 없앴다 — 밤이 되면 마을도 캄캄하다)
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다).
 	# 줄 번호는 **마을 구역에서 잰다** — 예전에는 1과 43을 그대로 적어
 	# 두었는데, 세계를 북쪽으로 열두 줄 내리면서 이 두 줄만 제자리에
 	# 남아 지도 맨 위에 뜬금없는 나무 띠가 생겼다
 	_plant_village_greenery()
+
+
+# ---- 광장 ----
+#
+# 마을 한복판이 **맨 잔디밭**이었다. 열일곱 칸 × 열여섯 칸 초록 네모 안에
+# 네모난 물웅덩이 하나 — 광장이 아니라 아직 손대지 않은 공터로 보였다.
+# 사방에서 자갈길이 들어오는데 정작 그 길이 닿는 자리에는 아무것도 없다.
+#
+# 세 가지로 광장을 만든다.
+#   ① 바닥   자갈을 깐다. 다만 **가장자리는 들쭉날쭉하게** — 네모로 딱
+#            떨어지게 깔면 잔디밭에 회색 카펫을 오려 붙인 꼴이 된다
+#   ② 둘레   가로등 네 귀퉁이, 평상 네 변. 앉을 자리가 있어야 광장이다
+#   ③ 화분   분수 둘레에 놓아 물가를 두른다
+#
+# 게시판·경매판·분수는 이미 서 있다 — 여기서는 그 사이를 채운다.
+func _decorate_plaza() -> void:
+	var p: Rect2i = m.PLAZA
+	# ⓪ 광장 안의 나무·돌·풀숲을 먼저 걷고, **다시 나지 않게 막는다.**
+	#
+	# 세계를 흩뿌릴 때 심긴 것들이 그대로 남아 있었다. 광장이 맨 잔디밭일
+	# 때는 그럭저럭 넘어갔는데, 자갈을 깔고 나니 **포장 한복판에 전나무가
+	# 다섯 그루** 서 있는 꼴이 됐다. 사람이 닦아 놓은 자리다.
+	#
+	# 걷어 내기만 해서는 안 된다 — 숲을 심는 일(_build_map)은 마을을
+	# 놓은 **뒤에** 돈다. 실제로 지웠는데 그대로 다시 자라 있었다.
+	_no_spawn_rect(p.position.x, p.position.y, p.end.x - 1, p.end.y - 1)
+	for pid: String in m.VILLAGE_PLOTS:
+		var pa: Vector2i = m.VILLAGE_PLOTS[pid].anchor
+		_no_spawn_rect(pa.x - m.YARD_PAD - 1, pa.y - m.YARD_PAD - 1,
+			pa.x + 4 + m.YARD_PAD + 1, pa.y + 3 + m.YARD_PAD + 1)
+	for y in range(p.position.y, p.end.y):
+		for x in range(p.position.x, p.end.x):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			var t := Vector2i(x, y)
+			if _is_wild(str(m.objects.get(t, {}).get("kind", ""))):
+				m.objects.erase(t)
+	for y in range(p.position.y, p.end.y):
+		for x in range(p.position.x, p.end.x):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue      # 물(분수)과 이미 깔린 길은 그대로
+			# 바깥 두 겹은 확률로 남긴다 — 잔디가 자갈 사이로 파고들게
+			var edge: int = mini(mini(x - p.position.x, p.end.x - 1 - x),
+				mini(y - p.position.y, p.end.y - 1 - y))
+			if edge < 2 and m._hash01(x * 5 + 3, y * 7 + 1) < 0.55 - edge * 0.30:
+				continue
+			m.grid[y][x].ground = "path"
+	# 둘레의 살림. 광장 왼쪽 위 모서리에서 잰다
+	var deco := [
+		[Vector2i(1, 1), "deco_lamp"], [Vector2i(15, 1), "deco_lamp"],
+		[Vector2i(1, 14), "deco_lamp"], [Vector2i(15, 14), "deco_lamp"],
+		[Vector2i(1, 7), "deco_lamp"], [Vector2i(15, 7), "deco_lamp"],
+		[Vector2i(4, 4), "deco_bench"], [Vector2i(12, 4), "deco_bench"],
+		[Vector2i(4, 11), "deco_bench"], [Vector2i(12, 11), "deco_bench"],
+		[Vector2i(8, 3), "deco_bench"], [Vector2i(8, 12), "deco_bench"],
+		[Vector2i(5, 6), "flower_pot"], [Vector2i(11, 6), "flower_pot"],
+		[Vector2i(5, 9), "flower_pot"], [Vector2i(11, 9), "flower_pot"],
+		[Vector2i(3, 13), "flower_pot"], [Vector2i(13, 13), "flower_pot"],
+	]
+	for entry: Array in deco:
+		var t: Vector2i = p.position + (entry[0] as Vector2i)
+		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+			continue
+		if m.objects.has(t) or m.grid[t.y][t.x].ground == "water":
+			continue
+		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
 
 
 # 부지와 부지 **사이**를 숲으로 채운다.
@@ -1260,7 +1328,10 @@ func _paint_village_lane(lane: Rect2i) -> void:
 		# 화면에서 열 칸 폭의 자갈 얼룩이 됐다 — 길이 아니라 자갈밭이었다.
 		# 서른 칸 주기 하나로 완만하게 휜다.
 		var wob := int(round(sin(float(a) * 0.19) * 1.4))
-		for k in range(0, width + 1):
+		# 줄기 폭 **그대로** 깐다. 예전에는 한 겹을 덤으로 얹고(width+1) 거기에
+		# 굽이 한 칸이 더해져, 세 줄짜리 시골길이 화면에서 대여섯 칸 폭의
+		# 자갈 대로가 됐다 — 마을이 아니라 광장 사이를 잇는 활주로였다.
+		for k in range(0, width):
 			var c: int = across0 + wob + k
 			var x: int = c if vertical else a
 			var y: int = a if vertical else c
@@ -1272,8 +1343,9 @@ func _paint_village_lane(lane: Rect2i) -> void:
 			# 말뚝이 한 개도 안 선다 (_plot_bounds 는 잔디·마당에만 박는다)
 			if _in_any_plot_ring(Vector2i(x, y)):
 				continue
-			# 마지막 한 겹은 확률로 뺀다 (가장자리가 자로 잰 듯하지 않게)
-			if k >= width and m._hash01(x * 7 + 1, y * 5 + 3) < 0.6:
+			# 양 가장자리는 확률로 뺀다 (가장자리가 자로 잰 듯하지 않게).
+			# 길은 가운데 한 줄만 늘 밟히고, 양옆은 밟혔다 말았다 한다
+			if (k == 0 or k == width - 1) and m._hash01(x * 7 + 1, y * 5 + 3) < 0.25:
 				continue
 			m.grid[y][x].ground = "path"
 
@@ -1284,7 +1356,10 @@ func _paint_village_lane(lane: Rect2i) -> void:
 # 것을 「길목」으로 보고, 울타리·소품·나무를 그 안에 두지 않는다.
 func _on_village_road(t: Vector2i) -> bool:
 	for lane: Rect2i in m.VILLAGE_ROADS:
-		if lane.grow(2).has_point(t):
+		# 두 칸씩 부풀렸더니 길 양옆으로 **네 칸짜리 민둥 띠**가 생겼다.
+		# 나무가 그 밖에서 멈추니 세 줄짜리 길이 일곱 줄로 보였다 —
+		# 시골길은 풀과 나무가 바짝 붙어 있어야 시골길이다.
+		if lane.grow(1).has_point(t):
 			return true
 	return false
 
@@ -1325,8 +1400,11 @@ func _plot_props(anchor: Vector2i, pid: String) -> void:
 		var t: Vector2i = anchor + (entry[0] as Vector2i)
 		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
 			continue
-		if m.objects.has(t) \
-				or m.grid[t.y][t.x].ground not in ["grass", "yard", "path", "sand"]:
+		# 깔아 둔 바닥이면 무엇이든 그 위에 놓는다. 예전에는 잔디·마당·자갈·
+		# 모래만 꼽아 뒀는데, 연구소 앞에 밭흙("soil")을 깔고 수산시장 앞에
+		# 널("dock")을 깔자 **제가 깐 바닥 위에 제 살림을 못 놓는** 꼴이 됐다
+		if m.objects.has(t) or m.grid[t.y][t.x].ground \
+				not in ["grass", "yard", "path", "sand", "soil", "dock"]:
 			continue
 		if m.ROAD.has_point(t) or m.PLAZA.has_point(t) or _on_village_road(t):
 			continue

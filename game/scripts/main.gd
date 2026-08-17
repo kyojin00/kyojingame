@@ -299,6 +299,10 @@ const TEXTURE_NAMES := [
 	"icon_letter", "old_book",
 	# 제작 재료·결과물 그림 — 제작대(책상) 창이 글자 대신 이 그림으로 말한다
 	"nail", "cloth", "broom",
+	# 밧줄 — 가게 마당에 내놓는 살림(PLOT_DECOR)에만 쓴다. 그림 파일은
+	# 진작 있었는데 여기 이름이 빠져 있어서, 마당에 놓는 순간 tex["rope"]가
+	# 사전에 없다며 매 프레임 오류가 났다
+	"rope",
 	# 민들레는 필드 그림(forage_dandelion, FORAGE_IDS로 자동 로드)과
 	# 가방 아이콘 그림이 서로 다르다
 	"icon_forage_dandelion",
@@ -913,70 +917,205 @@ const VILLAGE_PLOTS := {
 #   "props": [[Vector2i(오프셋), 종류], ...]
 #
 # 자리는 **건물 왼쪽 위 모서리에서 잰다.** 본체는 5x4, 문은 (2,3), 마당은
-# YARD_PAD 만큼 사방으로 (지금은 -3..+7 · -3..+6). 문 앞 통로(x +1~+3,
-# y +4 아래)는 무엇도 놓지 않는다 — 드나드는 길이다.
+# YARD_PAD 만큼 사방으로 (지금은 x -5..+9 · y -5..+8), 울타리는 그 한 칸
+# 바깥이다. 문 앞 통로(x +1~+3, y +4 아래)는 무엇도 놓지 않는다 — 드나드는 길이다.
+#
+# 그리고 **집 그림 뒤에는 아무것도 두지 않는다.** 집 한 채가 512px 판이라
+# 화면에서 여덟 칸 폭이다 — x -1~+5 · y +3 위에 놓은 것은 죄다 지붕에
+# 먹힌다. 소품은 x -5~-2 와 x +6~+9 두 줄, 그리고 앞마당(y +6~+8)에 둔다.
+# 앞마당 널마루(y +4~+5, x 0~4)도 비워 둔다 — 거기는 나무 널이 깔린다.
 const PLOT_DECOR := {
-	# ── 대장간 ── 자갈 마당 · 곁에 돌 화덕 · 광석 산
+	# ── 대장간 ── 다진 흙 일터 · 돌 화덕 · 광석 산 · 문 앞 자갈길
+	#
+	# 처음에는 마당 열넉 칸을 통째로 자갈로 깔았다. 그랬더니 회색 자갈 위에
+	# 회색 광석이 놓여 **아무것도 안 보였다** — 대장간이 아니라 빈 주차장이었다.
+	# 일터 바닥은 흙이고, 자갈은 화덕 둘레와 문 앞 길에만 깐다.
 	"smith": {
-		"floor": [[Rect2i(-4, -4, 14, 13), "path"]],
+		"floor": [
+			[Rect2i(5, -2, 5, 6), "path"],     # 화덕 둘레 — 불티가 튀는 자리
+			[Rect2i(1, 6, 3, 4), "path"],      # 문 앞에서 어귀까지 난 길
+		],
 		"props": [
 			# **곁에 선 돌 화덕** — 이 집이 무엇을 하는 집인지 멀리서 말한다
 			[Vector2i(7, -1), "deco_cairn"],
-			# 캐 온 것을 부려 놓은 뒷마당
-			[Vector2i(-4, -4), "old_box"], [Vector2i(-2, -4), "storage_box"],
-			[Vector2i(1, -4), "ore_node"], [Vector2i(3, -4), "rock_wedge"],
-			[Vector2i(6, -4), "ore_node"], [Vector2i(8, -4), "old_box"],
-			[Vector2i(-3, -3), "ore"], [Vector2i(0, -3), "nail"],
-			[Vector2i(2, -3), "ore_node"], [Vector2i(4, -3), "star_ore"],
-			[Vector2i(7, -3), "rock_wedge"],
-			# 동쪽 광석 산
+			# 캐 온 것을 부려 놓은 뒷마당.
+			# **집 그림 뒤(x -1~+5, y +3 위)에는 아무것도 두지 않는다** —
+			# 집 한 채가 여덟 칸 폭이라 그 안에 놓은 것은 지붕에 먹힌다
+			[Vector2i(-5, -4), "old_box"], [Vector2i(-3, -4), "storage_box"],
+			[Vector2i(6, -4), "ore_node"], [Vector2i(8, -4), "rock_wedge"],
+			[Vector2i(-5, -2), "ore_node"], [Vector2i(-3, -2), "ore"],
+			# 동쪽 광석 산 — 화덕 곁
 			[Vector2i(6, 1), "ore_node"], [Vector2i(9, 0), "rock_wedge"],
 			[Vector2i(6, 3), "ore"], [Vector2i(8, 2), "ore_node"],
 			[Vector2i(9, 4), "star_ore"], [Vector2i(7, 5), "ore_node"],
 			# 서쪽 짐짝과 궤짝
-			[Vector2i(-5, -2), "rock_wedge"], [Vector2i(-4, -1), "storage_box"],
-			[Vector2i(-5, 1), "chest"], [Vector2i(-3, 2), "old_box"],
-			[Vector2i(-5, 3), "storage_box"], [Vector2i(-4, 5), "ore_node"],
+			[Vector2i(-5, 0), "chest"], [Vector2i(-3, 1), "old_box"],
+			[Vector2i(-4, 2), "storage_box"], [Vector2i(-4, 4), "ore_node"],
+			[Vector2i(-2, 4), "rock_wedge"],
 			# 앞마당 — 식히고 두드리는 자리
-			[Vector2i(-2, 6), "rock_wedge"], [Vector2i(0, 7), "nail"],
+			[Vector2i(-4, 6), "rock_wedge"], [Vector2i(-2, 7), "nail"],
 			[Vector2i(5, 6), "broom"], [Vector2i(7, 7), "ore"],
-			[Vector2i(-1, 8), "deco_lamp"], [Vector2i(5, 8), "deco_lamp"],
-			[Vector2i(-5, 7), "weed"], [Vector2i(9, 7), "weed"],
+			[Vector2i(-5, 8), "deco_lamp"], [Vector2i(5, 8), "deco_lamp"],
+			[Vector2i(-3, 8), "ore_node"], [Vector2i(7, 8), "star_ore"],
+			[Vector2i(9, 8), "weed"], [Vector2i(9, 6), "rock_wedge"],
 		],
 	},
-	# ── 아래 여덟은 아직 손대지 않았다 (대장간을 보고 하나씩 채운다) ──
-	"post": {"props": [
-		[Vector2i(-1, 6), "storage_box"], [Vector2i(5, 6), "storage_box"],
-		[Vector2i(-4, 1), "deco_lamp"], [Vector2i(8, 1), "deco_lamp"],
-		[Vector2i(-4, 7), "deco_bench"], [Vector2i(8, 7), "storage_box"]]},
-	"general": {"props": [
-		[Vector2i(-1, 6), "chest"], [Vector2i(5, 6), "chest"],
-		[Vector2i(-4, 1), "flower_pot"], [Vector2i(8, 1), "deco_lamp"],
-		[Vector2i(-4, 7), "storage_box"], [Vector2i(8, 7), "storage_box"]]},
-	"ranch": {"props": [
-		[Vector2i(-1, 6), "storage_box"], [Vector2i(5, 6), "weed"],
-		[Vector2i(-4, 1), "weed"], [Vector2i(8, 1), "storage_box"],
-		[Vector2i(-4, 7), "weed"], [Vector2i(8, 7), "storage_box"]]},
-	"inn": {"props": [
-		[Vector2i(-1, 6), "deco_bench"], [Vector2i(5, 6), "broom"],
-		[Vector2i(-4, 1), "deco_lamp"], [Vector2i(8, 1), "deco_lamp"],
-		[Vector2i(-4, 7), "flower_pot"], [Vector2i(8, 7), "deco_bench"]]},
-	"library": {"props": [
-		[Vector2i(-1, 6), "old_book"], [Vector2i(5, 6), "deco_bench"],
-		[Vector2i(-4, 1), "deco_lamp"], [Vector2i(8, 1), "deco_lamp"],
-		[Vector2i(-4, 7), "old_book"], [Vector2i(8, 7), "deco_bench"]]},
-	"fish": {"props": [
-		[Vector2i(-1, 6), "bait"], [Vector2i(5, 6), "forage_shell"],
-		[Vector2i(-4, 1), "forage_coral"], [Vector2i(8, 1), "bait"],
-		[Vector2i(-4, 7), "forage_shell"], [Vector2i(8, 7), "storage_box"]]},
-	"lab": {"props": [
-		[Vector2i(-1, 6), "crystal"], [Vector2i(5, 6), "flower_pot"],
-		[Vector2i(-4, 1), "deco_stonelamp"], [Vector2i(8, 1), "deco_stonelamp"],
-		[Vector2i(-4, 7), "crystal"], [Vector2i(8, 7), "flower_pot"]]},
-	"hall": {"props": [
-		[Vector2i(-1, 6), "deco_lamp"], [Vector2i(5, 6), "deco_lamp"],
-		[Vector2i(-4, 1), "flower_pot"], [Vector2i(8, 1), "flower_pot"],
-		[Vector2i(-4, 7), "deco_bench"], [Vector2i(8, 7), "deco_bench"]]},
+	# ── 우체국 ── 부린 짐 궤짝 · 손수레 · 짐 싣는 흙마당
+	"post": {
+		"floor": [[Rect2i(-5, 6, 5, 3), "path"], [Rect2i(5, 6, 5, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "storage_box"], [Vector2i(-3, -4), "old_box"],
+			[Vector2i(6, -4), "storage_box"], [Vector2i(8, -4), "old_box"],
+			[Vector2i(-5, -2), "chest"], [Vector2i(-3, -1), "storage_box"],
+			[Vector2i(7, -2), "old_box"], [Vector2i(9, -1), "storage_box"],
+			[Vector2i(-4, 1), "old_box"], [Vector2i(8, 1), "chest"],
+			[Vector2i(-4, 3), "rope"], [Vector2i(8, 3), "rope"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(-4, 6), "storage_box"], [Vector2i(-2, 6), "old_box"],
+			[Vector2i(5, 6), "storage_box"], [Vector2i(7, 6), "old_box"],
+			[Vector2i(-4, 8), "deco_lamp"], [Vector2i(6, 8), "deco_lamp"],
+			[Vector2i(-5, 7), "cloth"], [Vector2i(9, 7), "cloth"],
+			[Vector2i(0, 8), "storage_box"], [Vector2i(4, 8), "old_box"],
+		],
+	},
+	# ── 연구소 ── 돌등 줄 · 결정 표본 · 샘물과 진흙 단지
+	"lab": {
+		"floor": [[Rect2i(-5, 6, 5, 3), "soil"], [Rect2i(5, 6, 5, 3), "soil"]],
+		"props": [
+			[Vector2i(-5, -4), "crystal"], [Vector2i(-3, -4), "gem"],
+			[Vector2i(6, -4), "crystal"], [Vector2i(8, -4), "glow_shroom"],
+			[Vector2i(-5, -2), "spring_water"], [Vector2i(-3, -1), "sludge"],
+			[Vector2i(7, -2), "sludge"], [Vector2i(9, -1), "spring_water"],
+			[Vector2i(-4, 1), "crystal"], [Vector2i(8, 1), "gem"],
+			[Vector2i(-4, 3), "glow_shroom"], [Vector2i(8, 3), "glow_shroom"],
+			[Vector2i(-1, 4), "deco_stonelamp"], [Vector2i(5, 4), "deco_stonelamp"],
+			[Vector2i(-4, 6), "flower_pot"], [Vector2i(-2, 7), "recipe"],
+			[Vector2i(5, 6), "flower_pot"], [Vector2i(7, 7), "recipe"],
+			[Vector2i(-5, 8), "deco_stonelamp"], [Vector2i(9, 8), "deco_stonelamp"],
+			[Vector2i(0, 8), "crystal"], [Vector2i(4, 8), "gem"],
+			[Vector2i(-3, 8), "flower_pot"], [Vector2i(7, 8), "flower_pot"],
+		],
+	},
+	# ── 마을회관 ── 넓은 자갈 앞뜰 · 평상과 등불 · 옛 물레바퀴
+	"hall": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "carved_stone"], [Vector2i(7, -4), "carved_stone"],
+			[Vector2i(-5, -2), "deco_bench"], [Vector2i(8, -2), "deco_bench"],
+			[Vector2i(-4, 0), "flower_pot"], [Vector2i(9, 0), "flower_pot"],
+			[Vector2i(-4, 2), "deco_lamp"], [Vector2i(8, 2), "deco_lamp"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(-4, 6), "deco_bench"], [Vector2i(-2, 6), "deco_bench"],
+			[Vector2i(5, 6), "deco_bench"], [Vector2i(7, 6), "deco_bench"],
+			[Vector2i(-5, 8), "flower_pot"], [Vector2i(-3, 8), "deco_lamp"],
+			[Vector2i(6, 8), "deco_lamp"], [Vector2i(8, 8), "flower_pot"],
+			[Vector2i(0, 8), "flower_pot"], [Vector2i(4, 8), "flower_pot"],
+		],
+	},
+	# ── 도서관 ── 돌등 줄 · 내놓은 책 궤짝 · 앉아 읽는 평상
+	"library": {
+		"floor": [[Rect2i(-5, 6, 5, 3), "path"], [Rect2i(5, 6, 5, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "old_box"], [Vector2i(7, -4), "old_box"],
+			[Vector2i(-5, -2), "old_book"], [Vector2i(8, -2), "recipe"],
+			[Vector2i(-4, 0), "chest"], [Vector2i(9, 0), "chest"],
+			[Vector2i(-4, 2), "deco_bench"], [Vector2i(8, 2), "deco_bench"],
+			[Vector2i(-1, 4), "deco_stonelamp"], [Vector2i(5, 4), "deco_stonelamp"],
+			[Vector2i(-4, 6), "deco_bench"], [Vector2i(-2, 7), "old_book"],
+			[Vector2i(5, 6), "deco_bench"], [Vector2i(7, 7), "old_book"],
+			[Vector2i(-5, 8), "deco_stonelamp"], [Vector2i(9, 8), "deco_stonelamp"],
+			[Vector2i(0, 8), "old_book"], [Vector2i(4, 8), "recipe"],
+			[Vector2i(-3, 8), "flower_pot"], [Vector2i(7, 8), "flower_pot"],
+		],
+	},
+	# ── 수산시장 ── 널판 마당과 모래 · 그물과 통발 · 널어 말리는 천
+	"fish": {
+		"floor": [
+			[Rect2i(-5, 6, 15, 3), "dock"],    # 앞마당은 물가처럼 널을 깐다
+			[Rect2i(-5, -4, 4, 9), "sand"], [Rect2i(6, -4, 4, 9), "sand"],
+		],
+		"props": [
+			[Vector2i(-5, -4), "old_box"], [Vector2i(-3, -4), "rope"],
+			[Vector2i(6, -4), "old_box"], [Vector2i(8, -4), "rope"],
+			[Vector2i(-5, -2), "storage_box"], [Vector2i(-3, -1), "bait"],
+			[Vector2i(7, -2), "storage_box"], [Vector2i(9, -1), "bait"],
+			[Vector2i(-4, 1), "cloth"], [Vector2i(8, 1), "cloth"],
+			[Vector2i(-4, 3), "forage_shell"], [Vector2i(8, 3), "forage_coral"],
+			[Vector2i(-1, 4), "rope"], [Vector2i(5, 4), "rope"],
+			[Vector2i(-4, 6), "old_box"], [Vector2i(-2, 6), "bait"],
+			[Vector2i(5, 6), "old_box"], [Vector2i(7, 6), "bait"],
+			[Vector2i(-5, 8), "chest"], [Vector2i(9, 8), "storage_box"],
+			[Vector2i(0, 8), "deco_lamp"], [Vector2i(4, 8), "deco_lamp"],
+			[Vector2i(-3, 8), "cloth"], [Vector2i(7, 8), "cloth"],
+		],
+	},
+	# ── 잡화점 ── 자갈 장터 앞마당 · 내놓은 궤짝 장 · 천막천과 화분
+	"general": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "storage_box"], [Vector2i(7, -4), "storage_box"],
+			[Vector2i(-5, -2), "old_box"], [Vector2i(8, -2), "old_box"],
+			[Vector2i(-4, 0), "chest"], [Vector2i(9, 0), "chest"],
+			[Vector2i(-4, 2), "broom"], [Vector2i(8, 2), "recipe"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(-4, 6), "chest"], [Vector2i(-2, 6), "old_box"],
+			[Vector2i(5, 6), "chest"], [Vector2i(7, 6), "old_box"],
+			[Vector2i(-5, 8), "storage_box"], [Vector2i(-3, 8), "cloth"],
+			[Vector2i(6, 8), "cloth"], [Vector2i(8, 8), "storage_box"],
+			[Vector2i(0, 8), "flower_pot"], [Vector2i(4, 8), "flower_pot"],
+		],
+	},
+	# ── 여관 ── 등불 늘어선 앞뜰 · 평상과 화분 · 뒤뜰에 널린 빨래
+	"inn": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "cloth"], [Vector2i(-3, -4), "cloth"],
+			[Vector2i(6, -4), "cloth"], [Vector2i(8, -4), "cloth"],
+			[Vector2i(-5, -2), "storage_box"], [Vector2i(8, -2), "storage_box"],
+			[Vector2i(-4, 0), "flower_pot"], [Vector2i(9, 0), "flower_pot"],
+			[Vector2i(-4, 2), "broom"], [Vector2i(8, 2), "deco_bench"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(-4, 6), "deco_bench"], [Vector2i(-2, 6), "flower_pot"],
+			[Vector2i(5, 6), "deco_bench"], [Vector2i(7, 6), "flower_pot"],
+			[Vector2i(-5, 8), "deco_lamp"], [Vector2i(-3, 8), "deco_bench"],
+			[Vector2i(6, 8), "deco_bench"], [Vector2i(8, 8), "deco_lamp"],
+			[Vector2i(0, 8), "flower_pot"], [Vector2i(4, 8), "flower_pot"],
+		],
+	},
+	# ── 목장 상회 ── **울타리 우리** · 여물 · 사료 짐짝
+	#
+	# 이 부지만은 살림이 아니라 **우리 한 칸**으로 말한다. 서쪽에 네 칸 ×
+	# 일곱 칸 울타리를 두르고 남쪽 한 칸을 문으로 터 둔다 — 목장이 무엇을
+	# 파는 집인지 이 한 칸이면 끝난다.
+	"ranch": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			# 우리 — 윗변
+			[Vector2i(-5, -4), "fence"], [Vector2i(-4, -4), "fence"],
+			[Vector2i(-3, -4), "fence"], [Vector2i(-2, -4), "fence"],
+			# 우리 — 좌우 기둥. **y +1~+3 로는 내려가지 않는다** — 그 줄에는
+			# 부지의 옆문이 나 있어서, 말뚝을 박으면 광장 쪽 길이 막힌다
+			[Vector2i(-5, -3), "fence"], [Vector2i(-5, -2), "fence"],
+			[Vector2i(-5, -1), "fence"],
+			[Vector2i(-2, -3), "fence"], [Vector2i(-2, -2), "fence"],
+			[Vector2i(-2, -1), "fence"],
+			# 우리 — 아랫변 (가운데 한 칸이 문이다)
+			[Vector2i(-5, 0), "fence"], [Vector2i(-4, 0), "fence"],
+			[Vector2i(-2, 0), "fence"],
+			# 우리 안 — 여물과 풀
+			[Vector2i(-4, -2), "weed"], [Vector2i(-3, -1), "weed"],
+			[Vector2i(-4, -3), "storage_box"],
+			# 동쪽 — 사료 짐짝과 짐수레
+			[Vector2i(6, -4), "storage_box"], [Vector2i(8, -4), "old_box"],
+			[Vector2i(7, -2), "rope"], [Vector2i(9, -1), "storage_box"],
+			[Vector2i(8, 1), "old_box"], [Vector2i(8, 3), "rope"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(-4, 6), "storage_box"], [Vector2i(-2, 6), "weed"],
+			[Vector2i(5, 6), "storage_box"], [Vector2i(7, 6), "weed"],
+			[Vector2i(-5, 8), "deco_bench"], [Vector2i(9, 8), "old_box"],
+			[Vector2i(0, 8), "flower_pot"], [Vector2i(4, 8), "flower_pot"],
+		],
+	},
 }
 
 
@@ -1456,6 +1595,14 @@ func _setup_fade(animate_in: bool) -> void:
 func _load_textures() -> void:
 	for n in TEXTURE_NAMES:
 		tex[n] = load("res://assets/sprites/%s.png" % n)
+	# 울타리 — **이웃 넷의 꼴마다 한 장**(북1 · 동2 · 남4 · 서8).
+	#
+	# 예전에는 한 장을 열 칸에 그대로 찍었다. 조각 하나에 말뚝이 둘,
+	# 그 사이에 가로장 — 그것을 나란히 놓으면 말뚝이 두 개씩 붙어 서고
+	# 모퉁이에서는 장이 허공으로 뻗었다. 울타리가 아니라 도장이었다.
+	# 이제는 이어진 쪽으로만 장을 뻗는다 (ref/make_fence.js).
+	for fm in 16:
+		tex["fence_%d" % fm] = load("res://assets/sprites/fence_%d.png" % fm)
 	# 물 — 깊이 다섯 단 × 판 셋 × 장 둘.
 	#   깊이  물가에서 멀수록 짙다. 한 단이 반 톤이라 경계가 안 보인다
 	#   판    한 장을 호수에 반복해 깔면 잔물결이 같은 자리마다 찍혀
@@ -2226,7 +2373,11 @@ const FOREST_HOUSE_ANCHOR := Vector2i(30, 24 + NORTH_PAD)
 # 연금술사의 오두막 (메인 스토리 12) — 깊은 숲(deep_rect) 연못 서쪽.
 # 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
 const ALCH_HOUSE_ANCHOR := Vector2i(56, 46 + NORTH_PAD)
-const EXPLORER_ARRIVE := Vector2i(146, 26 + NORTH_PAD)  # 모험가 재민이 처음 서성이는 광장 언저리
+# 모험가 재민이 처음 서성이는 자리 — **분수 남쪽**이다.
+# 예전 값(146, 26+PAD)은 분수 네모(144~147 · 24~27+PAD) **한복판**이라,
+# 재민이 물 위에 서 있었다. 광장이 맨 잔디밭이던 시절에는 분수가 눈에
+# 안 띄어서 아무도 몰랐다.
+const EXPLORER_ARRIVE := Vector2i(146, 29 + NORTH_PAD)
 # ---- 길을 막고 선 것들 ----
 #
 # 자리와 성격을 **여기 한 곳에** 적는다. 예전에는 「가로막는 x 두 개

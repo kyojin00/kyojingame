@@ -62,6 +62,10 @@ func _debug_tick() -> void:
 		_shot_frames += 1
 		_reel_tick()
 		return
+	if OS.get_environment("KYOJIN_ALBUM") != "":
+		_shot_frames += 1
+		_album_tick()
+		return
 	if Net.is_guest() and not m._net_ready:
 		return  # 접속 완료 후부터 시퀀스 시작
 	_shot_frames += 1
@@ -6786,17 +6790,36 @@ func _debug_tick() -> void:
 			# **길이 실제로 깔렸는가.** 3줄짜리 흙길이 부지 사이를 지나야 한다
 			var lane_ok94 := true
 			var thin94 := ""
+			# **네모가 다 덮였는가**가 아니라 **한 줄기로 이어졌는가**를 잰다.
+			#
+			# 길은 굽이친다. 줄기 네모(lane) 안이 몇 할이나 자갈이냐로 재면,
+			# 잘 굽은 길일수록 점수가 낮다 — 실제로 곧은 길은 100%, 굽은
+			# 길은 64%가 나왔다. 그건 길이 안 깔린 게 아니라 옆으로 비킨 것이다.
+			#
+			# 그래서 줄기를 따라 한 칸씩 걸어가며, **그 자리에서 좌우 세 칸
+			# 안에 자갈이 있는가**를 본다. 있으면 거기 길이 지나간 것이다.
 			for lane95: Rect2i in m.VILLAGE_ROADS:
+				var vert95: bool = lane95.size.y > lane95.size.x
 				var paved95 := 0
 				var cells95 := 0
-				for ly95 in range(lane95.position.y, lane95.end.y):
-					for lx95 in range(lane95.position.x, lane95.end.x):
+				var a0_95: int = lane95.position.y if vert95 else lane95.position.x
+				var a1_95: int = lane95.end.y if vert95 else lane95.end.x
+				var mid95: int = int((lane95.position.x + lane95.end.x) / 2) if vert95 \
+					else int((lane95.position.y + lane95.end.y) / 2)
+				for a95 in range(a0_95, a1_95):
+					var hit95 := false
+					for off95 in range(-3, 4):
+						var lx95: int = mid95 + off95 if vert95 else a95
+						var ly95: int = a95 if vert95 else mid95 + off95
 						if lx95 < 0 or ly95 < 0 or lx95 >= m.MAP_W or ly95 >= m.MAP_H:
 							continue
-						cells95 += 1
-						if m.grid[ly95][lx95].ground == "yard":
-							paved95 += 1
-				if cells95 == 0 or float(paved95) / float(cells95) < 0.8:
+						if m.grid[ly95][lx95].ground == "path":
+							hit95 = true
+							break
+					cells95 += 1
+					if hit95:
+						paved95 += 1
+				if cells95 == 0 or float(paved95) / float(cells95) < 0.9:
 					lane_ok94 = false
 					thin94 += "%s(%d/%d) " % [lane95, paved95, cells95]
 			GameData.village_built = k_built94
@@ -7091,3 +7114,61 @@ func _mp_tick() -> void:
 			_save_shot("_mp_guest.png")
 		360:
 			get_tree().quit()
+
+
+# ---- 부지 사진첩 ----
+#
+# 「누가 봐도 대장간」인지는 **눈으로** 확인할 수밖에 없다. 그런데 본
+# 시퀀스에 사진 찍는 자리를 끼워 넣으면 걸음 수(_shot_frames)가 밀려서
+# 뒤의 검증이 통째로 어긋난다 — 한 번 그렇게 해 보고 겨울 튜토리얼 벌판에
+# 선 대장간 사진을 얻었다.
+#
+# 그래서 아예 딴 모드로 뺀다. KYOJIN_ALBUM=1 로 켜면 검증은 한 줄도 돌지
+# 않고, 부지를 한 곳씩 돌며 사진만 찍고 끝난다 (십수 초).
+#
+#   KYOJIN_ALBUM=1 KYOJIN_SHOT=<dir>/ godot --rendering-driver opengl3
+const ALBUM_HOLD := 26        # 자리를 잡고 카메라가 따라붙을 때까지
+
+
+func _album_tick() -> void:
+	var ids: Array = m.VILLAGE_PLOTS.keys()
+	var slot := int(_shot_frames / ALBUM_HOLD)
+	var beat := _shot_frames % ALBUM_HOLD
+	if slot > ids.size():
+		get_tree().quit()
+		return
+	# 마지막 한 장은 **광장**이다 — 부지가 아니라 그 사이의 한복판
+	var plaza := slot == ids.size()
+	var pid := "plaza" if plaza else str(ids[slot])
+	var a: Vector2i = m.PLAZA.get_center() - Vector2i(2, 2) if plaza \
+		else (m.VILLAGE_PLOTS[pid].anchor as Vector2i)
+	if beat == 1:
+		m.dialog.close()
+		# 문 칸 위에 세우면 가게 문이 열려 대화창이 사진을 덮는다 — 마당 아래로
+		m.player.position = Vector2((a.x + 2) * m.TILE + 16, (a.y + 7) * m.TILE + 16)
+		m.player.dir = "up"
+	elif beat == 3:
+		# **순간이동한 자리에서는 소품이 한 박자 늦게 선다.**
+		# 노드는 걸어 들어오는 속도에 맞춰 한 줄씩 세워진다(_stream_nodes).
+		# 사진기는 걸어오지 않으니 큐를 한 번에 비워야 마당이 다 찬다 —
+		# 이걸 안 해서 「소품이 안 보인다」고 한나절을 헤맸다
+		m.objnode._stream_nodes()
+		m.objnode._drain_spawn_queue(true)
+	elif beat == ALBUM_HOLD - 1:
+		_save_shot("_zplot_%s.png" % pid)
+		# 놓으라고 적어 둔 살림이 **정말 다 섰는지** 한 줄로 센다.
+		# 자리를 옮길 때마다 몇 개씩 조용히 사라졌다 — 밭흙 위라서, 옆문
+		# 자리라서. 사진만 봐서는 무엇이 빠졌는지 알 수가 없다
+		var miss := []
+		for entry: Array in (m.PLOT_DECOR.get(pid, {}) as Dictionary).get("props", []):
+			var t: Vector2i = a + (entry[0] as Vector2i)
+			var have := m.objects.has(t)
+			var node := m.obj_nodes.has(t)
+			var texok := false
+			if node:
+				var nd: Node2D = m.obj_nodes[t]
+				texok = is_instance_valid(nd) and nd.get_child_count() > 0 \
+					and (nd.get_child(0) as Sprite2D).texture != null
+			if not (have and node and texok):
+				miss.append("%s@%s obj=%s node=%s tex=%s" % [entry[1], entry[0], have, node, texok])
+		print("ALBUM_", pid, "_MISS=", miss.size(), " ", miss)

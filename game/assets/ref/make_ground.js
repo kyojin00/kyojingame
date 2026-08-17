@@ -263,17 +263,23 @@ function grass(season, variant) {
   // ① 바탕 — 2x2 잔 얼룩 위에 4x4 큰 결. 톤 폭은 **좁게**.
   //    32px 타일이 수백 번 반복되므로, 여기서 대비를 주면 그게 그대로
   //    격자무늬가 된다. 무대가 튀면 배우가 안 보인다
+  //    다만 **결이 세 겹**은 돼야 한다. 두 겹으로 칠했더니 4x4 네모
+  //    얼룩이 그대로 보여서, 들판이 초록 체크무늬로 깔렸다.
+  const mid = p.base.map((c, j) => Math.round((c + p.lo[j]) / 2));
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const v = h(x >> 2, y >> 2, variant) * 0.45 + h(x >> 1, y >> 1, variant + 9) * 0.55;
-    g.px(x, y, v < 0.38 ? p.lo : p.base);                   // 바탕은 두 단만
+    const v = h(x >> 2, y >> 2, variant) * 0.38 + h(x >> 1, y >> 1, variant + 9) * 0.42
+      + h(x, y, variant + 17) * 0.20;
+    g.px(x, y, v < 0.30 ? p.lo : (v < 0.56 ? mid : p.base));
   }
   // ② 흙이 드러난 자리 — 풀만 빽빽하면 양탄자가 되지만, **아주 드물게**.
   //    10%로 뿌렸더니 들판이 녹슨 카펫이 됐다. 색도 순 흙빛이 아니라
   //    잔디 쪽으로 당겨 섞는다 — 풀 사이로 비치는 흙은 그만큼 죽어 보인다
-  const soilTone = k => p.base.map((v, j) => Math.round(v * 0.45 + EARTH[k][j] * 0.55));
+  // 흙빛을 더 많이 섞었더니 들판에 **분홍 점**이 흩뿌려졌다 — 초록 위의
+  // 붉은 흙은 아무리 어두워도 눈에 띈다. 잔디 쪽으로 더 당겨 섞는다
+  const soilTone = k => p.base.map((v, j) => Math.round(v * 0.62 + EARTH[k][j] * 0.38));
   const s1 = soilTone(1), s2 = soilTone(2);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    if (h(x >> 1, (y >> 1) + 40, variant) > 0.035) continue;
+    if (h(x >> 1, (y >> 1) + 40, variant) > 0.022) continue;
     g.px(x, y, season === 'winter' ? p.lo : (h(x, y, 5) < 0.5 ? s1 : s2));
   }
   // ③ 포기 — 다섯. 많이 심을수록 타일이 「무늬」로 기억된다
@@ -281,6 +287,17 @@ function grass(season, variant) {
     const ox = Math.floor(h(i, variant, 1) * N);
     const oy = Math.floor(h(variant, i, 2) * N);
     tuft(g, ox, oy, p, h(i, i + variant, 6) < 0.4);
+  }
+  // ③-b 홑잎 — 포기가 못 되는 **잎 한두 장**. 포기만 다섯이면 그 다섯이
+  //     무늬로 기억되지만, 그 사이를 홑잎이 메우면 「풀밭」이 된다.
+  //     포기와 달리 밑동(dark)을 안 찍는다 — 검은 점이 늘면 얼룩이 된다
+  for (let i = 0; i < 9; i++) {
+    const ox = Math.floor(h(i + 50, variant, 12) * N);
+    const oy = Math.floor(h(variant, i + 50, 13) * N);
+    const len = 1 + Math.floor(h(i, variant + 3, 14) * 2);
+    const lean = h(i, variant, 15) < 0.5 ? -1 : 1;
+    for (let k = 1; k <= len; k++)
+      g.px(ox + (k === len ? lean : 0), oy - k, k === len ? p.tip : p.hi);
   }
   // ④ 잔돌 하나 — 바닥에 굴러다니는 것. 풀만 있는 땅은 없다
   {
@@ -353,26 +370,75 @@ function soil(wet) {
 //
 // 길(자갈)과는 다르다. 길은 깐 것이고 마당은 **닳은 것**이라, 돌을 놓지 않고
 // 흙에 잔돌과 풀 몇 포기만 남긴다.
+// 지푸라기·검불 — 마당에만 있는 것. 집에서 쓸려 나오고 수레에서 떨어진다.
+// 흙빛 사다리 밖의 **마른 풀색**이라 한 점만 있어도 「사람이 드나드는 자리」가 된다
+const STRAW = [[196, 170, 108], [166, 140, 84], [132, 108, 62]];
+
 function yard(v) {
   const g = new T(), p = SEASON.spring, s = v * 13;
+  // ① 바탕 — 큰 결 · 중간 결 · 잔 결을 겹쳐 섞는다.
+  //    예전엔 두 겹뿐이라 4x4 네모 얼룩이 그대로 보였다 (마당에 바둑판이
+  //    떴다). 세 겹을 다른 비율로 섞으면 어디서 칸이 끊기는지 안 보인다.
+  //    톤도 두 단에서 **네 단**으로 늘렸다 — 다진 흙은 평평한 색이 아니라
+  //    밟힌 자리와 안 밟힌 자리가 얼룩덜룩한 땅이다
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const t = h(x >> 1, y >> 1, 61) * 0.6 + h(x, y, 62) * 0.4;
-    g.px(x, y, EARTH[t < 0.30 ? 2 : (t > 0.76 ? 0 : 1)]);
+    const t = h(x >> 2, y >> 2, 60) * 0.30 + h(x >> 1, y >> 1, 61) * 0.40
+      + h(x, y, 62) * 0.30;
+    g.px(x, y, EARTH[t < 0.22 ? 3 : (t < 0.50 ? 2 : (t < 0.84 ? 1 : 0))]);
   }
-  // 발에 파인 자국 — 가로로 길게 눌린 자리
-  for (let i = 0; i < 5; i++) {
+  // ② 반들반들 다져진 자리 — 사람이 늘 밟고 다니는 목. 넓게 한두 군데.
+  //    이게 있어야 흙이 「깔린 것」이 아니라 「닳은 것」으로 보인다
+  for (let i = 0; i < 2; i++) {
+    const cx = h(i + s, 11, 70) * N, cy = h(11, i + s, 71) * N;
+    const rx = 3 + h(i, s, 72) * 3, ry = 2 + h(s, i, 73) * 2;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+      if (d > 1) continue;
+      if (d > 0.45 && h(x, y, 74) < 0.55) continue;     // 가장자리는 흩어 놓는다
+      // 한복판만 훤하다. 덩어리 전부를 제일 밝은 단으로 깔았더니 마당에
+      // 흰 얼룩이 규칙적으로 떠서 타일 자리가 그대로 드러났다
+      g.px(x, y, EARTH[d > 0.35 ? 1 : 0]);
+    }
+  }
+  // ③ 발자국 — 뒤꿈치가 깊고 앞이 얕다. 파인 자리는 어둡고 **파낸 흙이
+  //    앞쪽에 밀려** 한 단 밝게 도드라진다. 그냥 어두운 선 하나로는
+  //    자국이 아니라 긁힌 자국이었다
+  for (let i = 0; i < 4; i++) {
     const ox = Math.floor(h(i + s, 3, 63) * N), oy = Math.floor(h(3, i + s, 64) * N);
-    for (let k = 0; k < 3 + Math.floor(h(i + s, i, 65) * 3); k++)
-      g.px(ox + k, oy, EARTH[3]);
-    g.px(ox, oy - 1, EARTH[2]);
+    const len = 2 + Math.floor(h(i + s, i, 65) * 3);
+    // 뒤꿈치를 제일 어두운 단(EARTH[5])으로 찍었더니 마당 전체에 검은
+    // 점이 흩뿌려져 자국이 아니라 때가 됐다. 한 단 올린다
+    g.px(ox, oy, EARTH[4]);                              // 뒤꿈치
+    for (let k = 1; k <= len; k++) g.px(ox + k, oy, EARTH[4 - (k === len ? 1 : 0)]);
+    g.px(ox, oy - 1, EARTH[1]); g.px(ox + 1, oy - 1, EARTH[0]);   // 밀린 흙
   }
-  // 잔돌 몇 알
-  for (let i = 0; i < 3; i++) {
+  // ④ 마른 흙이 갈라진 금 — 짧게 꺾이며 끊긴다. 곧게 그으면 흠집이 된다
+  for (let i = 0; i < 2; i++) {
+    let cx = Math.floor(h(i + s + 5, 13, 75) * N), cy = Math.floor(h(13, i + s + 5, 76) * N);
+    for (let k = 0; k < 5; k++) {
+      if (h(cx, cy, 77) < 0.25) break;                   // 금은 끊긴다
+      g.px(cx, cy, EARTH[4]);
+      if (h(cx, cy, 78) < 0.45) cy += h(cx, cy, 79) < 0.5 ? 1 : -1;
+      cx += 1;
+    }
+  }
+  // ⑤ 흙에 박힌 잔돌 — 윗변은 빛, 아랫변은 턱, 둘레는 눌린 흙.
+  //    이 세 부분이 있어야 「얹어 놓은 점」이 아니라 「박힌 돌」이 된다
+  for (let i = 0; i < 4; i++) {
     const ox = Math.floor(h(i + 9 + s, 5, 66) * N), oy = Math.floor(h(5, i + 9 + s, 67) * N);
     g.px(ox, oy, STONE[2]); g.px(ox + 1, oy, STONE[3]);
-    g.px(ox, oy + 1, STONE[4]);
+    g.px(ox, oy + 1, STONE[5]);
+    if (h(i, s, 80) < 0.5) g.px(ox + 1, oy + 1, STONE[4]);
+    g.px(ox - 1, oy + 1, EARTH[4]);                      // 돌 밑에 진 그늘
   }
-  // 밟히고도 살아남은 풀 두 포기 — 이게 있어야 흙바닥이 아니라 마당이다
+  // ⑥ 지푸라기 — 두어 오라기. 헛간 앞이든 가게 앞이든 마당에는 늘 있다
+  for (let i = 0; i < 3; i++) {
+    const ox = Math.floor(h(i + 40 + s, 9, 81) * N), oy = Math.floor(h(9, i + 40 + s, 82) * N);
+    const dy = h(i, s, 83) < 0.5 ? 0 : 1;
+    g.px(ox, oy, STRAW[1]); g.px(ox + 1, oy, STRAW[0]);
+    g.px(ox + 2, oy + dy, STRAW[1]); g.px(ox + 3, oy + dy, STRAW[2]);
+  }
+  // ⑦ 밟히고도 살아남은 풀 두 포기 — 이게 있어야 흙바닥이 아니라 마당이다
   for (let i = 0; i < 2; i++)
     tuft(g, Math.floor(h(i + 30 + s, 7, 68) * N), Math.floor(h(7, i + 30 + s, 69) * N), p, false);
   return g;
