@@ -856,6 +856,56 @@ const VILLAGE_PLOTS := {
 	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
 	"hall":    {"anchor": Vector2i(80, 28 + NORTH_PAD), "name": "마을회관"},
 }
+# ---- 부지마다 「여기는 뭐 하는 곳」 ----
+#
+# 가게가 다 같은 집 그림에 이름표만 다르면, 마을은 지어 놓은 모형 줄이다.
+# 문 앞에 그 가게다운 것이 한둘 나와 있으면 이름표를 안 읽어도 읽힌다 —
+# 대장간 앞에 광석 더미가, 수산시장 앞에 미끼통이 있는 식이다.
+#
+# 자리는 **건물 왼쪽 위 모서리에서 잰다.** 본체는 5x4 이고 문은 (2,3),
+# 문 앞은 (2,4) 다 — 그 세 칸(1~3, 4)은 비워 둔다. 드나드는 길이다.
+#
+#   (0,4) 앞마당 왼쪽 · (4,4) 앞마당 오른쪽 · (-1,2) 왼옆 · (5,2) 오른옆
+const PLOT_DECOR := {
+	# 우체국 — 부칠 짐이 문 앞에 쌓여 있다
+	"post": [[Vector2i(0, 4), "storage_box"], [Vector2i(4, 4), "storage_box"],
+		[Vector2i(5, 2), "deco_lamp"]],
+	# 잡화점 — 차양 친 좌판과 물건 상자
+	"general": [[Vector2i(0, 4), "stall"], [Vector2i(4, 4), "chest"],
+		[Vector2i(-1, 2), "flower_pot"]],
+	# 대장간 — 캐 온 광석과 쐐기 박은 돌
+	"smith": [[Vector2i(0, 4), "ore_node"], [Vector2i(4, 4), "rock_wedge"],
+		[Vector2i(5, 2), "ore_node"]],
+	# 목장 상회 — 밧줄과 여물 (울타리는 경계가 대신한다)
+	"ranch": [[Vector2i(0, 4), "storage_box"], [Vector2i(4, 4), "weed"],
+		[Vector2i(5, 2), "storage_box"]],
+	# 여관 — 앉을 자리와 등, 쓸어 둔 문간
+	"inn": [[Vector2i(0, 4), "deco_bench"], [Vector2i(4, 4), "broom"],
+		[Vector2i(5, 2), "deco_lamp"]],
+	# 도서관 — 내놓은 책과 읽을 자리
+	"library": [[Vector2i(0, 4), "old_book"], [Vector2i(4, 4), "deco_bench"],
+		[Vector2i(-1, 2), "deco_lamp"]],
+	# 수산시장 — 미끼통과 물가에서 온 것들
+	"fish": [[Vector2i(0, 4), "bait"], [Vector2i(4, 4), "forage_shell"],
+		[Vector2i(-1, 2), "forage_coral"]],
+	# 연구소 — 수정과 화분 (기르고 캐는 것을 들여다보는 곳)
+	"lab": [[Vector2i(0, 4), "crystal"], [Vector2i(4, 4), "flower_pot"],
+		[Vector2i(5, 2), "deco_stonelamp"]],
+	# 마을회관 — 등을 양옆에 세우고 게시판을 앞에
+	"hall": [[Vector2i(0, 4), "deco_lamp"], [Vector2i(4, 4), "deco_lamp"],
+		[Vector2i(-1, 2), "flower_pot"]],
+}
+
+
+# 이 모서리가 마을 부지인가 (아니면 빈 문자열). 마당을 꾸밀 때만 쓴다 —
+# 농장 집·고장 집·숲속 집은 같은 _build_yard 를 지나가지만 꾸미지 않는다.
+func plot_at_anchor(anchor: Vector2i) -> String:
+	for pid: String in VILLAGE_PLOTS:
+		if VILLAGE_PLOTS[pid].anchor == anchor:
+			return pid
+	return ""
+
+
 # 이장의 거처 — 처음부터 마을에 있는 집 (광장 북쪽). 주민이 늘면 회관 급
 # 새 집으로 다시 지어진다 (GameData.chief_house_lv).
 #
@@ -1488,6 +1538,10 @@ const OBJECT_SCALES := {
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)
 	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
+	# 가게 마당의 소품 — 32x32 한 칸짜리라 2.0이면 화면에서 딱 한 칸이다.
+	# 조금씩 다르게 두어 늘어놓았을 때 자로 잰 듯 보이지 않게 한다
+	"flower_pot": 2.0, "chest": 2.1, "storage_box": 2.2, "ore_node": 2.2,
+	"rock_wedge": 2.0, "bait": 2.0, "crystal": 1.9, "rope": 1.9, "broom": 2.0,
 }
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
 #
@@ -1546,6 +1600,10 @@ const OBJECT_PAD := {
 	# 계단 바로 옆에 서므로 여백이 넓으면 두 칸짜리 계단을 양쪽에서
 	# 좁혀 지나갈 수가 없어진다
 	"deco_stonelamp": Vector2(2, 2),
+	# 마당 소품은 여백을 거의 안 준다 — 가게 앞 한 칸 틈으로도 지나갈 수 있어야 한다
+	"flower_pot": Vector2(2, 2), "chest": Vector2(2, 2), "storage_box": Vector2(2, 2),
+	"ore_node": Vector2(2, 2), "rock_wedge": Vector2(2, 2), "bait": Vector2(2, 2),
+	"crystal": Vector2(2, 2), "rope": Vector2(2, 2), "broom": Vector2(2, 2),
 }
 
 

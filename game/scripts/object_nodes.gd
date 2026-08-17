@@ -225,6 +225,15 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"horse":
 			texture = m.tex["horse_side_0"]   # 세워 둔 말
 			offset = Vector2(0, -80)
+		# ---- 가게 마당에 내놓는 것들 ----
+		#
+		# 그림은 진작에 있었는데 이 match 에 없어서 **투명하게** 놓였다
+		# (texture 가 null 인 채로 노드만 선다). 전부 32x32 한 칸짜리라
+		# 밑변을 칸에 맞추고(-height), 배율은 OBJECT_SCALES 가 잡는다.
+		"flower_pot", "chest", "storage_box", "ore_node", "rock_wedge", \
+		"bait", "crystal", "rope", "broom":
+			texture = m.tex[kind]
+			offset = Vector2(0, -texture.get_height())
 	var node := _make_object(texture, Vector2(pos.x * m.TILE, (pos.y + 1) * m.TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = m.OBJECT_SCALES.get(kind, 1.0) / m.OBJECT_TEX_DENSITY

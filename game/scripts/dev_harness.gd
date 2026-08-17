@@ -6526,6 +6526,113 @@ func _debug_tick() -> void:
 				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)",
 				" 굽기=", bake, "us")
 		406:
+			# 부지마다 「여기는 뭐 하는 곳」 — 내놓은 소품과 울타리 경계.
+			#
+			# 지키는 것은 셋이다:
+			#   ① 소품이 **보이는가.** object_nodes 의 match 에 없는 종류를
+			#      적으면 texture 가 null 인 채 노드만 서서 투명하게 놓인다 —
+			#      눈으로 보기 전에는 절대 모른다
+			#   ② 문과 문 앞이 열려 있는가 (내놓은 물건이 가게를 닫아걸면 안 된다)
+			#   ③ 광장에서 **걸어서 문까지 닿는가** (경계 울타리가 목을 잠그면 안 된다)
+			var k_built94: Array = GameData.village_built.duplicate()
+			GameData.village_built = m.VILLAGE_PLOTS.keys()
+			m.worldgen._build_map()
+			# ① 그림이 붙는 종류인가 — 빈 칸에 한 번 세워 보고 지운다
+			var art_ok94 := true
+			var blind94 := ""
+			var scratch94 := Vector2i(2, m.WORLD_H - 3)
+			for pid94: String in m.VILLAGE_PLOTS:
+				for e94: Array in m.PLOT_DECOR.get(pid94, []):
+					var kind94 := str(e94[1])
+					m.objnode._spawn_object_node(scratch94, kind94)
+					var nd94: Variant = m.obj_nodes.get(scratch94)
+					var spr94: Variant = nd94.get_child(0) if nd94 != null else null
+					if spr94 == null or (spr94 as Sprite2D).texture == null:
+						art_ok94 = false
+						blind94 += kind94 + " "
+					if nd94 != null:
+						(nd94 as Node2D).queue_free()
+						m.obj_nodes.erase(scratch94)
+			# ②③ 문이 열려 있고 광장에서 걸어 닿는가
+			var seen94 := {}
+			# 광장 **한가운데는 분수다** — 거기서 출발하면 물에 갇혀 한 칸도
+			# 못 나간다 (이 검사가 처음에 아홉 곳 다 「길없음」을 뱉은 이유)
+			var plaza94: Vector2i = m.nearest_open_tile(
+				m.PLAZA.position + Vector2i(1, 1))
+			var q94: Array[Vector2i] = [plaza94]
+			seen94[plaza94] = true
+			var h94 := 0
+			while h94 < q94.size():
+				var c94: Vector2i = q94[h94]
+				h94 += 1
+				for d94: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
+						Vector2i(0, 1), Vector2i(0, -1)]:
+					var n94: Vector2i = c94 + d94
+					if seen94.has(n94) or not m.is_passable(n94):
+						continue
+					seen94[n94] = true
+					q94.append(n94)
+			var door_ok94 := true
+			var reach94 := true
+			var shut94 := ""
+			for pid95: String in m.VILLAGE_PLOTS:
+				var a95: Vector2i = m.VILLAGE_PLOTS[pid95].anchor
+				var front95: Vector2i = a95 + Vector2i(2, 4)
+				if m.objects.has(m.door_tile(a95)) or not m.is_passable(front95):
+					door_ok94 = false
+					shut94 += pid95 + " "
+				if not seen94.has(front95):
+					reach94 = false
+					shut94 += pid95 + "(길없음) "
+			# 경계가 **실제로 서 있는가.** 예전에 이 검사가 「길을 안 막았나」만
+			# 보다가, 말뚝이 한 개도 안 선 것을 통과시켰다 (땅이 잔디가 아니라
+			# 마당 흙이라 전부 건너뛰고 있었다)
+			var ring_ok94 := true
+			var bare94 := ""
+			for pid96: String in m.VILLAGE_PLOTS:
+				var a96: Vector2i = m.VILLAGE_PLOTS[pid96].anchor
+				var ring96 := Rect2i(a96.x - m.YARD_PAD - 1, a96.y - m.YARD_PAD - 1,
+					5 + m.YARD_PAD * 2 + 2, 4 + m.YARD_PAD * 2 + 2)
+				var posts96 := 0
+				for yy96 in range(ring96.position.y, ring96.end.y):
+					for xx96 in range(ring96.position.x, ring96.end.x):
+						if str(m.objects.get(Vector2i(xx96, yy96), {})
+								.get("kind", "")) == "fence":
+							posts96 += 1
+				if posts96 < 8:
+					ring_ok94 = false
+					bare94 += "%s(%d) " % [pid96, posts96]
+			# **그림 노드까지 실제로 서는가.** objects 에 넣는 것과 화면에
+			# 서는 것은 다른 일이다 — 세계를 다시 지은 뒤 노드를 다시 세우고
+			# (스트리밍 창 안으로) 세어 본다
+			m.player.position = Vector2(
+				(m.VILLAGE_PLOTS["general"].anchor.x + 2) * m.TILE + 16,
+				(m.VILLAGE_PLOTS["general"].anchor.y + 6) * m.TILE + 16)
+			m.objnode._spawn_objects()
+			var node_ok94 := true
+			var miss94 := ""
+			for pid97: String in ["post", "general", "lab"]:
+				var a97: Vector2i = m.VILLAGE_PLOTS[pid97].anchor
+				for e97: Array in m.PLOT_DECOR.get(pid97, []):
+					var t97: Vector2i = a97 + (e97[0] as Vector2i)
+					if m.objects.has(t97) and not m.obj_nodes.has(t97):
+						node_ok94 = false
+						miss94 += "%s:%s " % [pid97, str(e97[1])]
+			# 큰길·광장 위에는 말뚝 하나 박지 않는다
+			var road_ok94 := true
+			for rt94: Vector2i in m.objects:
+				if str(m.objects[rt94].kind) != "fence":
+					continue
+				if m.ROAD.has_point(rt94) or m.PLAZA.has_point(rt94):
+					road_ok94 = false
+			GameData.village_built = k_built94
+			m.worldgen._build_map()
+			print("PLOT_DECOR_OK=", art_ok94 and door_ok94 and reach94
+					and road_ok94 and ring_ok94 and node_ok94,
+				" 그림있음=", art_ok94, "(", blind94, ")", " 문열림=", door_ok94,
+				" 광장에서닿음=", reach94, "(", shut94, ")", " 길안막음=", road_ok94,
+				" 경계있음=", ring_ok94, "(", bare94, ")",
+				" 그림섬=", node_ok94, "(", miss94, ")")
 			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
 			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.
 			var k_all := {

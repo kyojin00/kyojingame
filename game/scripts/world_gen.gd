@@ -1078,8 +1078,80 @@ func _build_yard(anchor: Vector2i) -> void:
 			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
 				continue
 			m.grid[y][x].ground = "grass"
-	# (건물을 감싸던 마당 울타리는 없앴다 — 마당은 잔디로 트여 있다.
-	#  문 앞 흙길도 더 이상 내지 않는다 — 바닥 타일은 플레이어 몫이다)
+	# 문 앞 흙길은 내지 않는다 — **마을 바닥은 잔디**이고 포장은 플레이어
+	# 몫이라는 약속이 있다 (마을 어귀도 그래서 흙길 대신 나무로 목을 만들었다).
+	# 「여기는 뭐 하는 곳」은 바닥이 아니라 **내놓은 물건과 경계**로 말한다.
+	var pid: String = m.plot_at_anchor(anchor)
+	if pid == "":
+		return          # 농장 집 · 고장 집 · 숲속 집은 꾸미지 않는다
+	_plot_bounds(anchor)
+	_plot_props(anchor, pid)
+
+
+# 부지의 경계 — 마당 한 칸 바깥을 울타리로 두르고 **문 앞만 터 둔다.**
+#
+# 가게들이 잔디 위에 나란히 놓여 있으면 어디까지가 그 가게의 자리인지
+# 알 수가 없다. 낮은 울타리 한 겹이면 「여기부터 저기까지가 대장간」이 된다.
+#
+# 이미 무언가 서 있는 칸, 잔디가 아닌 칸, 큰길과 광장은 건드리지 않는다 —
+# 부지들이 서로 가깝고 이장 집 그림과도 닿아 있어서, 그냥 두르면 남의
+# 자리에 말뚝을 박는다.
+func _plot_bounds(anchor: Vector2i) -> void:
+	var ring := Rect2i(anchor.x - m.YARD_PAD - 1, anchor.y - m.YARD_PAD - 1,
+		5 + m.YARD_PAD * 2 + 2, 4 + m.YARD_PAD * 2 + 2)
+	var gate_y: int = ring.end.y - 1              # 아래 변 = 문이 난 쪽
+	for y in range(ring.position.y, ring.end.y):
+		for x in range(ring.position.x, ring.end.x):
+			var edge: bool = x == ring.position.x or x == ring.end.x - 1 \
+				or y == ring.position.y or y == gate_y
+			if not edge:
+				continue
+			# 드나드는 목 — 문 앞 세 칸은 비운다
+			if y == gate_y and absi(x - (anchor.x + 2)) <= 1:
+				continue
+			var t := Vector2i(x, y)
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.objects.has(t):
+				continue
+			# 잔디와 **마당 흙**에만 박는다. `_lay_yard` 가 부지 둘레를 이미
+			# 흙마당으로 깔아 두므로 잔디만 보면 말뚝이 한 개도 안 선다.
+			# 문 앞에서 큰길로 난 길("path")은 건드리지 않는다 — 드나드는 길이다
+			if m.grid[y][x].ground not in ["grass", "yard"]:
+				continue
+			if m.ROAD.has_point(t) or m.PLAZA.has_point(t):
+				continue
+			if _is_plot_gateway(t):
+				continue
+			m.objects[t] = {"kind": "fence", "hp": 0}
+
+
+# **어느 부지든** 문 앞 목에 걸리는 칸인가.
+#
+# 부지는 한 곳씩 지어지는데 서로 가깝다. 제 울타리만 보고 두르면, 나중에
+# 지은 집의 경계가 **앞서 지은 집의 출입구를 덮는다** — 대장간 문 앞을
+# 목장 상회의 울타리가 막아 광장에서 대장간까지 길이 끊겼다.
+# 어느 부지의 목이든 세 칸 폭 · 두 줄 깊이로 비워 둔다.
+func _is_plot_gateway(t: Vector2i) -> bool:
+	for pid: String in m.VILLAGE_PLOTS:
+		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
+		if absi(t.x - (a.x + 2)) <= 1 and (t.y == a.y + 5 or t.y == a.y + 6):
+			return true
+	return false
+
+
+# 그 가게다운 것들을 문 앞에 내놓는다 (main.PLOT_DECOR).
+# 자리가 이미 차 있으면 그 하나만 건너뛴다 — 나머지는 그대로 놓는다.
+func _plot_props(anchor: Vector2i, pid: String) -> void:
+	for entry: Array in m.PLOT_DECOR.get(pid, []):
+		var t: Vector2i = anchor + (entry[0] as Vector2i)
+		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+			continue
+		if m.objects.has(t) or m.grid[t.y][t.x].ground != "grass":
+			continue
+		if m.ROAD.has_point(t) or m.PLAZA.has_point(t):
+			continue
+		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
 
 
 # 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,
