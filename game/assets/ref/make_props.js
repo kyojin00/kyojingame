@@ -208,10 +208,19 @@ function outline(g) {
 // 그건 깊은 윗면이 아니라 그냥 밝은 벽이다.
 function topFace(g, x0, x1, yFront, pal, depth) {
   const t = pal || W;
-  const d = depth || 4;
+  const d = depth || 7;
   for (let k = d; k >= 1; k--) {
-    const inset = Math.round((k - 1) * 0.5);
-    g.hline(x0 + inset, x1 - inset, yFront - k, k === d ? t[1] : t[0]);
+    // 뒤로 갈수록 **또렷하게** 좁아지고 어두워진다. 완만하게 줄이면
+    // 「깊은 윗면」이 아니라 그냥 밝은 벽이다 — 각이 안 올라간다
+    // **좁아지는 데도 한도가 있다.** 줄마다 꼬박꼬박 좁혔더니 열두 칸짜리
+    // 궤짝이 일곱 줄 만에 봉긋한 덩어리가 됐다 — 네모가 아니라 두건이었다.
+    // 폭의 오분의 일까지만 좁힌다
+    const maxIn = Math.max(0, Math.floor((x1 - x0) / 5));
+    const inset = Math.min(maxIn, Math.round((k - 1) * 0.7));
+    var tone = t[0];
+    if (k >= d) tone = t[2];                   // 제일 먼 줄
+    else if (k >= d - 1) tone = t[1];
+    g.hline(x0 + inset, x1 - inset, yFront - k, tone);
   }
   g.px(x1, yFront - 1, t[1]);                  // 오른쪽 모서리
   // **앞 모서리** — 윗면과 정면이 꺾이는 자리에 한 줄 진하게 긋는다.
@@ -286,18 +295,27 @@ function forge(f) {
     const half = Math.round(9 - t * 4);           // 반폭 9 -> 5
     towerRow(g, 17 - half, 17 + half, y, 7, 0);
   }
-  // 어깨 — 굴뚝이 받침에 얹히는 턱
+  // 어깨 — 굴뚝이 받침에 얹히는 턱. **윗면이 보인다**
   towerRow(g, 6, 28, 33, 7, 0);
-  topFace(g, 6, 28, 33, ST);
-  // 갓 — 맨 위로 한 번 벌어진다
+  topFace(g, 6, 28, 33, ST, 3);
+  // 갓 — 맨 위로 한 번 벌어지고, **속이 뚫린 것이 위에서 보인다**
   towerRow(g, 10, 24, 8, 7, 0);
   towerRow(g, 10, 24, 7, 7, 0);
-  topFace(g, 10, 24, 7, ST);
-  g.hline(11, 23, 4, ST[6]);                      // 연기 구멍 (속이 비었다)
-  g.hline(12, 22, 5, ST[7]);
+  topFace(g, 10, 24, 7, ST, 3);
+  // 연기 구멍 — 위에서 내려다보므로 **구멍의 안쪽 벽**까지 보인다.
+  // 가로줄 하나로 그으면 구멍이 아니라 그림자 자국이다
+  g.rect(12, 2, 22, 4, [26, 20, 18]);
+  g.hline(12, 22, 2, ST[6]);                      // 저쪽 안벽 (빛이 조금 든다)
+  g.hline(11, 23, 1, ST[3]);                      // 테두리 윗면
+  g.hline(11, 23, 5, ST[5]);                      // 앞쪽 테두리
   // ---- 받침 ----
+  //
+  // 여기 윗면이 **화로의 상판**이다 — 위에서 내려다보는 각이라 이 면이
+  // 제일 크게 보여야 한다. 대여섯 줄은 잡아야 「올려다본 벽」이 아니다
   for (let y = 34; y <= 49; y++) towerRow(g, 4, 29, y, 5, 0);
-  topFace(g, 4, 29, 34, ST);
+  topFace(g, 4, 29, 34, ST, 5);
+  for (let x = 6; x <= 27; x++)                   // 상판에 흩어진 재와 부스러기
+    if (h(x, 0, 71) < 0.3) g.px(x, 31 + (x % 2), ST[5]);
   g.hline(4, 29, 49, ST[7]);                      // 밑동
   // ---- 아치 아가리 ----
   //
@@ -511,8 +529,8 @@ function logpile() {
 function trough(wet) {
   const g = new P(20, 12);
   g.ground(10, 10, 9, 1.6);
-  plank(g, 1, 18, 7, 10, 41);
-  topFace(g, 1, 18, 7);              // 아가리 테 — 위를 보는 면
+  plank(g, 1, 18, 9, 10, 41);
+  topFace(g, 1, 18, 9, W, 6);              // 아가리 테 — 위를 보는 면
   g.rect(2, 4, 17, 6, wet ? AQUA[1] : STRAW[2]);
   if (wet) {
     g.hline(2, 17, 4, AQUA[0]);
@@ -537,8 +555,8 @@ function hay() {
   g.ground(9, 12, 8, 1.6);
   // **네모로 묶는다.** 둥근 덩어리로 그렸더니 형체가 안 잡혀 잔디 위에
   // 허연 얼룩 하나로 보였다 — 볏단인지 돌인지 알 수가 없었다.
-  g.rect(2, 7, 15, 12, STRAW[2]);
-  topFace(g, 2, 15, 7, STRAW);        // 윗면
+  g.rect(2, 10, 15, 12, STRAW[2]);
+  topFace(g, 2, 15, 10, STRAW, 6);        // 윗면
   g.hline(2, 15, 12, STRAW[3]);       // 밑변 = 턱
   g.vline(2, 4, 12, STRAW[1]);
   g.vline(15, 4, 12, STRAW[3]);
@@ -593,9 +611,9 @@ function netrack() {
 function planter() {
   const g = new P(20, 13);
   g.ground(10, 11, 9, 1.6);
-  plank(g, 1, 18, 8, 11, 71);
-  topFace(g, 1, 18, 8);               // 상자 테 윗면
-  g.rect(2, 5, 17, 7, [112, 88, 64]);
+  plank(g, 1, 18, 10, 11, 71);
+  topFace(g, 1, 18, 10, W, 4);        // 상자 테 윗면
+  g.rect(2, 4, 17, 8, [112, 88, 64]);   // 흙은 위에서 훤히 보인다
   for (let x = 2; x <= 17; x++) if (h(x, 4, 73) < 0.4) g.px(x, 4, [92, 70, 50]);
   // 잎과 꽃 — 상자 위로 봉긋하게
   for (let i = 0; i < 16; i++) {
@@ -616,8 +634,8 @@ function planter() {
 function cart() {
   const g = new P(22, 16);
   g.ground(11, 14, 9, 1.6);
-  plank(g, 3, 18, 7, 9, 81);
-  topFace(g, 3, 18, 7);               // 짐칸 테 윗면
+  plank(g, 3, 18, 9, 9, 81);
+  topFace(g, 3, 18, 9, W, 6);         // 짐칸 테 윗면
   g.rect(4, 5, 17, 8, W[4]);          // 짐칸 속
   for (let x = 5; x <= 16; x += 4) g.vline(x, 5, 8, W[5]);
   g.hline(3, 18, 10, W[5]);
@@ -686,15 +704,15 @@ function specimen() {
 function crate() {
   const g = new P(16, 15);
   g.ground(8, 13, 7, 1.6);
-  g.rect(2, 9, 13, 13, W[4]);         // 정면 — 윗면이 깊어진 만큼 얇다
-  topFace(g, 2, 13, 9);               // 뚜껑 윗면
+  g.rect(2, 11, 13, 13, W[4]);        // 정면 — 두 줄이면 된다
+  topFace(g, 2, 13, 11);              // 뚜껑 윗면 (일곱 줄)
   g.hline(2, 13, 13, W[6]);           // 밑변 턱
   for (let x = 4; x <= 12; x += 3) g.vline(x, 8, 12, W[5]);   // 판 사이
   for (let x = 2; x <= 13; x++) if (h(x, 6, 91) < 0.22) g.px(x, 9 + (x % 3), W[4]);
-  g.vline(2, 9, 13, W[3]); g.vline(13, 9, 13, W[6]);
-  hoop(g, 2, 13, 11);                  // 쇠띠 한 줄
-  g.rect(5, 4, 11, 5, W[4]);          // 위에 얹은 작은 궤짝
-  topFace(g, 5, 11, 4, W, 3);
+  g.vline(2, 11, 13, W[3]); g.vline(13, 11, 13, W[6]);
+  hoop(g, 2, 13, 12);                  // 쇠띠 한 줄
+  g.rect(5, 5, 11, 5, W[4]);          // 위에 얹은 작은 궤짝
+  topFace(g, 5, 11, 5, W, 4);
   g.hline(5, 11, 5, W[5]);
   g.vline(8, 3, 5, W[5]);
   g.px(11, 4, W[5]);
@@ -757,8 +775,8 @@ function toolrack() {
   g.rect(3, 12, 16, 13, W[4]);          // 다리 사이 가로 버팀
   g.hline(3, 16, 12, W[2]);
   // 상판 — 두껍다. 윗면 두 줄 + 앞 모서리
-  g.rect(0, 8, 19, 9, W[4]);
-  topFace(g, 0, 19, 8);
+  g.rect(0, 9, 19, 9, W[4]);
+  topFace(g, 0, 19, 9, W, 6);
   g.hline(0, 19, 9, W[6]);
   for (let x = 1; x <= 18; x++) if (h(x, 0, 131) < 0.2) g.px(x, 7, W[1]);
   // 상판 위 — 바이스(쇠 물림쇠)와 망치
