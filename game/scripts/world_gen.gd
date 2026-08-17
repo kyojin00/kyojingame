@@ -1036,14 +1036,9 @@ func _build_village() -> void:
 	# 밟고 다녀 풀이 죽은 시골길이다. 마당과 같은 흙이라 마을이 한 덩어리로
 	# 읽히고, 잔디와 닿는 자리는 그리기가 알아서 번지게 이어 준다.
 	var lanes: Array = m.VILLAGE_ROADS.duplicate()
-	lanes.append(m.ROAD)          # 농장에서 드는 큰길도 같은 흙길이다
+	lanes.append(m.ROAD)          # 농장에서 드는 큰길도 같은 길이다
 	for lane: Rect2i in lanes:
-		for y in range(lane.position.y, lane.end.y):
-			for x in range(lane.position.x, lane.end.x):
-				if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
-					continue
-				if m.grid[y][x].ground == "grass":
-					m.grid[y][x].ground = "yard"
+		_paint_village_lane(lane)
 	# 광장 한가운데 분수
 	# 분수만은 네모로 둔다 — 사람이 만든 것이라 자로 잰 게 맞다
 	for y in range(m.FOUNTAIN.position.y, m.FOUNTAIN.end.y):
@@ -1246,10 +1241,50 @@ func _is_plot_gateway(t: Vector2i) -> bool:
 	return false
 
 
-# 이 칸이 마을 길(3줄) 위인가
+# 길 한 줄을 **굽이치게** 깐다.
+#
+# 자로 그은 네모로 깔면 마을이 격자 도시가 된다 — 시골길은 지형을 피해
+# 휘고, 밟히는 폭도 들쭉날쭉하다. 줄기(lane)는 그대로 두고 칸마다 두어 칸씩
+# 좌우로 흔들면서, 가장자리 한 겹은 확률로 빼서 톱니를 남긴다.
+#
+# 바닥은 자갈("path")이다. 흙마당과 같은 흙으로 깔았더니 마당과 길이
+# 한 덩어리로 뭉개져 어디까지가 마당인지 안 보였다.
+func _paint_village_lane(lane: Rect2i) -> void:
+	var vertical: bool = lane.size.y > lane.size.x
+	var along0: int = lane.position.y if vertical else lane.position.x
+	var along1: int = lane.end.y if vertical else lane.end.x
+	var across0: int = lane.position.x if vertical else lane.position.y
+	var width: int = lane.size.x if vertical else lane.size.y
+	for a in range(along0, along1):
+		# 굽이는 **한 칸 남짓**이면 된다. 두세 칸씩 흔들었더니 3줄짜리 길이
+		# 화면에서 열 칸 폭의 자갈 얼룩이 됐다 — 길이 아니라 자갈밭이었다.
+		# 서른 칸 주기 하나로 완만하게 휜다.
+		var wob := int(round(sin(float(a) * 0.19) * 1.4))
+		for k in range(0, width + 1):
+			var c: int = across0 + wob + k
+			var x: int = c if vertical else a
+			var y: int = a if vertical else c
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue
+			# **부지 안은 건드리지 않는다.** 길이 울타리 자리를 자갈로 덮으면
+			# 말뚝이 한 개도 안 선다 (_plot_bounds 는 잔디·마당에만 박는다)
+			if _in_any_plot_ring(Vector2i(x, y)):
+				continue
+			# 마지막 한 겹은 확률로 뺀다 (가장자리가 자로 잰 듯하지 않게)
+			if k >= width and m._hash01(x * 7 + 1, y * 5 + 3) < 0.6:
+				continue
+			m.grid[y][x].ground = "path"
+
+
+# 이 칸이 마을 길 위인가.
+#
+# 길이 굽이치므로 네모 안에 드는지로는 못 잰다 — 줄기 네모를 두 칸 부풀린
+# 것을 「길목」으로 보고, 울타리·소품·나무를 그 안에 두지 않는다.
 func _on_village_road(t: Vector2i) -> bool:
 	for lane: Rect2i in m.VILLAGE_ROADS:
-		if lane.has_point(t):
+		if lane.grow(2).has_point(t):
 			return true
 	return false
 
@@ -1373,8 +1408,26 @@ func _lay_yard(anchor: Vector2i) -> void:
 			run.append(t)
 
 
+# 집 앞 **나무 데크**. 건물이 바닥에 그냥 붙어 있으면 종이를 오려 붙인
+# 것처럼 납작하다 — 문 앞에 널을 한 겹 깔면 집이 한 단 올라선다.
+#
+# 널은 건물 폭만큼(문 앞 다섯 칸) 두 줄. 드나드는 통로 위이므로 지나갈 수
+# 있어야 하고(바닥일 뿐 오브젝트가 아니다), 길·광장은 건드리지 않는다.
+func _lay_porch(anchor: Vector2i) -> void:
+	for dy in range(4, 6):
+		for dx in range(0, 5):
+			var t := anchor + Vector2i(dx, dy)
+			if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+				continue
+			if m.PLAZA.has_point(t) or m.ROAD.has_point(t) or _on_village_road(t):
+				continue
+			if m.grid[t.y][t.x].ground in ["grass", "yard", "path"]:
+				m.grid[t.y][t.x].ground = "dock"
+
+
 func _place_building_tiles(anchor: Vector2i) -> void:
 	_lay_yard(anchor)
+	_lay_porch(anchor)
 	for y in range(anchor.y, anchor.y + 4):
 		for x in range(anchor.x, anchor.x + 5):
 			m.objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}

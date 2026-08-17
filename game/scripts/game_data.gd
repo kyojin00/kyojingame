@@ -1452,8 +1452,8 @@ var zones_open: Array = []         # 열린 구역 id 목록
 const VILLAGE_ZONES := {
 	# y 는 main.gd 의 NORTH_PAD(12) 를 이미 더한 값이다. 여기서 KyojinMain 을
 	# 참조하면 main -> GameData -> main 순환이 되어 파싱이 막힌다.
-	"east_north": {"rect": Rect2i(160, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
-	"east_south": {"rect": Rect2i(160, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
+	"east_north": {"rect": Rect2i(196, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(196, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
 }
 const ZONE_ORDER := ["east_north", "east_south"]
 const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
