@@ -2252,17 +2252,44 @@ func rescue_trapped() -> void:
 			to = START_TILE
 		player.position = Vector2(to.x * TILE + 16, to.y * TILE + 16)
 		hud.show_message("길이 없는 곳에 갇혀 있었다 — 가까운 땅으로 나왔다.", 4.0)
-	# 마을 사람 — 잠긴 구역이나 맵 밖으로 밀려났으면 제 자리로 돌려보낸다
+	# 마을 사람 — 잠긴 구역이나 맵 밖으로 밀려났으면 제 자리로 돌려보낸다.
+	#
+	# **튜토리얼 동안에는 한 사람도 건드리지 않는다.**
+	#
+	# 그때는 세계가 통째로 「닿을 수 없는 땅」이다 — `_tile_accessible` 이
+	# 숲길만 참으로 보기 때문이다. 그래서 이 고리가 **마을 사람 전부를
+	# 갇힌 것으로 읽고** 제 자리로 돌려보냈는데, NPC_HOME 에 없는 사람은
+	# 갈 곳이 START_TILE 이었다. 숲길을 걷는 동안 시골 마을 여섯이 농장
+	# 한복판(14, 22)에 모여 있다가, 마을에 도착하는 순간 거기서 제 고장까지
+	# **맵을 가로질러 걸어가던 것**이 이것이다. 길이 안 나오는 사람은
+	# 15초씩 서 있었고(npc._route_cd), 그게 「가만히 있는 NPC」다.
+	if GameData.tutorial_space:
+		return
 	for n in npcs:
 		var nt := Vector2i(int(n.position.x / TILE), int(n.position.y / TILE))
 		if nt.x >= 0 and nt.y >= 0 and nt.x < MAP_W and nt.y < MAP_H \
 				and _tile_accessible(nt):
 			continue
-		var home: Vector2i = NPC_HOME.get(n.id, START_TILE)
+		var home: Vector2i = npc_home_tile(n.id)
 		var ht := nearest_open_tile(home)
 		if ht.x < 0:
 			ht = home
 		n.position = Vector2(ht.x * TILE + 16, ht.y * TILE + 16)
+
+
+# 이 사람을 돌려보낼 자리.
+#
+# NPC_HOME 은 교진 마을 사람들의 표다 — 고장 사람은 거기 없어서 START_TILE
+# (농장 한복판)로 떨어졌다. 제 고장이 있는 사람은 제 고장으로 보낸다.
+func npc_home_tile(nid: String) -> Vector2i:
+	if NPC_HOME.has(nid):
+		return NPC_HOME[nid]
+	if HAMLET_OF.has(nid):
+		for entry: Array in HAMLETS[HAMLET_OF[nid]].houses:
+			if str(entry[2]) == nid:
+				return door_tile(entry[0]) + Vector2i(0, 1)
+		return HAMLETS[HAMLET_OF[nid]].square
+	return START_TILE
 
 
 func _process(delta: float) -> void:

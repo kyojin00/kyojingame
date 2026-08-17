@@ -94,9 +94,26 @@ func _debug_tick() -> void:
 			for hp in m.objects:
 				if String(m.objects[hp].kind) == "house":
 					houses += 1
+			# 마을에는 이장뿐이다. **고장 사람은 제 고장에 있어야 한다** —
+			# 여기 섞여 있으면 그건 「아직 안 만난 사람」이 아니라 「끌려온
+			# 사람」이다. 예전에는 튜토리얼 동안 rescue_trapped 가 세계를
+			# 통째로 못 가는 땅으로 읽고 여섯을 농장 한복판으로 데려왔고,
+			# 마을에 도착하면 거기서 제 고장까지 맵을 가로질러 걸어갔다.
 			var nids: Array = []
+			var home_ok := true
 			for n2 in m.npcs:
 				nids.append(n2.id)
+				var nt2 := Vector2i(int(n2.position.x / m.TILE),
+					int(n2.position.y / m.TILE))
+				if str(n2.id) == "chief":
+					if not m.VILLAGE_REGION.has_point(nt2):
+						home_ok = false
+					continue
+				if not m.HAMLET_OF.has(str(n2.id)):
+					home_ok = false      # 교진 마을 사람은 아직 없어야 한다
+					continue
+				if not n2.region.grow(2).has_point(nt2):
+					home_ok = false      # 제 고장을 벗어나 있다
 			var hut0: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
 				== "chief_hut" and GameData.chief_house_lv == 0
 			# 새 게임에는 낡은 표지판이 서 있고, 동쪽 확장 구역은 잠겨 있다
@@ -104,8 +121,9 @@ func _debug_tick() -> void:
 				and GameData.story4_phase == "" \
 				and not GameData.is_tile_owned(105, 10) and not m.is_passable(Vector2i(105, 10))
 			print("VILLAGE_INIT_OK=", GameData.village_built.is_empty()
-				and houses == 0 and nids == ["chief"] and hut0 and zone0,
+				and houses == 0 and home_ok and hut0 and zone0,
 				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids,
+				" 제자리=", home_ok,
 				" 이장오두막=", hut0, " 동쪽구역잠김=", zone0)
 		elif m.story._story_snapped and not _tut_map_snapped and m.story._story_t >= 3.6:
 			_tut_map_snapped = true
