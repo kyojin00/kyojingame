@@ -49,6 +49,14 @@ func _spawn_objects() -> void:
 			m.objects.erase(m.door_tile(m.VILLAGE_PLOTS[pid].anchor))
 			m.worldgen._spawn_house_node(m.VILLAGE_PLOTS[pid].anchor, pid)
 			m.worldgen._trim_paths_under_building(m.VILLAGE_PLOTS[pid].anchor)
+			# 마당의 소품과 경계도 여기서 챙긴다.
+			#
+			# 이 둘은 `_build_yard` 안에 있었는데 그건 **건물이 놓이는
+			# 순간에만** 돈다 — 이미 지어 놓은 세이브를 불러오면 마당이
+			# 텅 빈 채로 있다가, 자고 일어나 세계를 다시 지을 때에야
+			# 붙었다 (「자고 일어나야 울타리가 생긴다」가 이것이다).
+			# 이미 놓인 칸은 건너뛰므로 몇 번을 불러도 같은 모습이다.
+			m.worldgen.decorate_plot(m.VILLAGE_PLOTS[pid].anchor, pid)
 	# 고장 마을의 집 — 세계를 지을 때는 칸만 놓였다 (그때는 m.world 가
 	# 없다). 그림은 여기서 세운다. 짓는 게 아니라 처음부터 있는 집이라
 	# 조건 없이 전부 세운다

@@ -6630,6 +6630,16 @@ func _debug_tick() -> void:
 					continue
 				if inner94.has_point(wt94):
 					wild94 += 1
+			# **집 칸 위에 끼이면 구조된다.** 통행을 막는 것은 지형만이
+			# 아니라 그 칸에 놓인 것이기도 한데, rescue_trapped 가 지형만
+			# 보고 있어서 지붕 위에 올라선 채로 갇혔다
+			var k_pos94: Vector2 = m.player.position
+			var roof94: Vector2i = m.VILLAGE_PLOTS["general"].anchor + Vector2i(1, 1)
+			m.player.position = Vector2(roof94.x * m.TILE + 16, roof94.y * m.TILE + 16)
+			m.rescue_trapped()
+			var freed94: bool = m.is_passable(m.player_tile())
+			m.player.position = k_pos94
+			m.hud.hide_bubble()
 			# 큰길·광장 위에는 말뚝 하나 박지 않는다
 			var road_ok94 := true
 			for rt94: Vector2i in m.objects:
@@ -6640,12 +6650,13 @@ func _debug_tick() -> void:
 			GameData.village_built = k_built94
 			m.worldgen._build_map()
 			print("PLOT_DECOR_OK=", art_ok94 and door_ok94 and reach94
-					and road_ok94 and ring_ok94 and node_ok94 and wild94 == 0,
+					and road_ok94 and ring_ok94 and node_ok94 and wild94 == 0
+					and freed94,
 				" 그림있음=", art_ok94, "(", blind94, ")", " 문열림=", door_ok94,
 				" 광장에서닿음=", reach94, "(", shut94, ")", " 길안막음=", road_ok94,
 				" 경계있음=", ring_ok94, "(", bare94, ")",
 				" 그림섬=", node_ok94, "(", miss94, ")",
-				" 마을안나무=", wild94, "그루")
+				" 마을안나무=", wild94, "그루", " 집위구조=", freed94)
 			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
 			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.
 			var k_all := {

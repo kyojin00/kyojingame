@@ -1083,6 +1083,14 @@ func _build_yard(anchor: Vector2i) -> void:
 	var pid: String = m.plot_at_anchor(anchor)
 	if pid == "":
 		return          # 농장 집 · 고장 집 · 숲속 집은 꾸미지 않는다
+	decorate_plot(anchor, pid)
+
+
+# 마당의 소품과 경계 — **여러 번 불러도 같은 모습**이다 (이미 놓인 칸은
+# 건너뛴다). 건물을 놓을 때와 세계를 펼 때 양쪽에서 부른다:
+# 짓는 순간에만 두었더니, 이미 지어 놓은 세이브는 자고 일어나 세계를
+# 다시 지을 때까지 마당이 텅 비어 있었다.
+func decorate_plot(anchor: Vector2i, pid: String) -> void:
 	_plot_bounds(anchor)
 	_plot_props(anchor, pid)
 

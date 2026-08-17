@@ -2303,6 +2303,17 @@ func rescue_trapped() -> void:
 	var pt := player_tile()
 	var stuck: bool = pt.x < 0 or pt.y < 0 or pt.x >= MAP_W or pt.y >= MAP_H \
 		or not _tile_accessible(pt) or grid[clampi(pt.y, 0, MAP_H - 1)][clampi(pt.x, 0, MAP_W - 1)].ground == "water"
+	# **깔고 앉은 것도 갇힌 것이다.**
+	#
+	# 여기는 「못 가는 지역인가 · 물인가」만 봤다. 그런데 통행을 막는 것은
+	# 지형만이 아니라 **그 칸에 놓인 것**이기도 하다(is_passable 이 제일 먼저
+	# objects 를 본다) — 집 칸 위에 서면 사방이 다 제 몸이라 한 칸도 못
+	# 움직이는데, 이 검사는 멀쩡한 것으로 봤다. 집을 드나드는 대목에서
+	# 지붕 위에 끼이던 것이 이것이다.
+	#
+	# 말을 타고 있을 때는 뺀다 — 그때는 말 칸 위에 서 있는 것이 정상이다.
+	if not stuck and not GameData.riding and objects.has(pt):
+		stuck = true
 	if stuck:
 		var to := nearest_open_tile(Vector2i(clampi(pt.x, 1, MAP_W - 2),
 			clampi(pt.y, 1, MAP_H - 2)))
