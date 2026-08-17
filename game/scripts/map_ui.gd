@@ -893,7 +893,7 @@ func _quest_spot(qid: String) -> Vector2i:
 				return main.HOME_ANCHOR + Vector2i(2, 3)
 			if GameData.kitchen_quest in ["broom", "make"] \
 					and GameData.village_built.has("general"):
-				return main.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)
+				return main.door_tile(main.VILLAGE_PLOTS["general"].anchor)
 		"tutorial":
 			if GameData.tutorial_current_flag() == "cook":
 				return main.HOME_ANCHOR + Vector2i(2, 3)

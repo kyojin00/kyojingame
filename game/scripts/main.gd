@@ -906,6 +906,25 @@ func plot_at_anchor(anchor: Vector2i) -> String:
 	return ""
 
 
+# 이 칸을 몸통으로 삼는 마을 부지 (아니면 빈 문자열).
+# 건물이 처음부터 다 서 있게 되면서, 「이 집은 어느 가게인가」를 물을 일이
+# `village_built` 바깥에서도 생겼다 — 아직 사람이 들지 않은 가게가 그렇다.
+func plot_body_at(t: Vector2i) -> String:
+	for pid: String in VILLAGE_PLOTS:
+		var a: Vector2i = VILLAGE_PLOTS[pid].anchor
+		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
+			return pid
+	return ""
+
+
+# 부지 앞 게시판이 서는 칸 — **문 옆**이다.
+#
+# 예전에는 문 칸(anchor+(2,3))에 세웠다. 그때는 빈 터였으니 문이랄 것도
+# 없었지만, 건물이 처음부터 서 있는 지금 그 자리는 드나드는 문이다.
+func plot_board_tile(anchor: Vector2i) -> Vector2i:
+	return anchor + Vector2i(-1, 4)
+
+
 # 이장의 거처 — 처음부터 마을에 있는 집 (광장 북쪽). 주민이 늘면 회관 급
 # 새 집으로 다시 지어진다 (GameData.chief_house_lv).
 #
@@ -1303,10 +1322,9 @@ func _ready() -> void:
 			for cy in range(0, WORLD_H / GameData.EXPLORE_CHUNK + 1):
 				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
 					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
-			for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
-				for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
-					objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
-			objects.erase(HOME_SITE)
+			# (집 칸을 손으로 채우고 「집터」 표지판을 지우던 네 줄은 없앴다 —
+			#  이제 우리집도 세계를 지을 때 다른 건물과 같이 선다. 표지판을
+			#  지우던 그 한 줄이 이제는 **집 한복판에 구멍을 뚫는다**)
 	npcmgr._sync_village_npcs()
 	objnode._spawn_objects()
 	objnode._apply_season_visuals()

@@ -132,8 +132,11 @@ func _build_map() -> void:
 
 	# 낚시터 둘레는 마지막에 비운다 — 나무/돌 그림이 부두와 강을 덮으면 안 된다.
 	# (자연물 배치가 모두 끝난 뒤라야 확실히 비워진다)
+	# **저절로 난 것만** 걷는다. 여기서 통째로 지웠더니 낚시터 네모의 동쪽
+	# 끝(x=60)에 걸친 **여관 건물의 왼쪽 한 줄**까지 같이 날아갔다 —
+	# 부지 아홉 곳 중 여관 한 곳만 건물이 안 서던 것이 이것이었다.
 	for p: Vector2i in m.objects.keys():
-		if m.FISH_CLEAR.has_point(p):
+		if m.FISH_CLEAR.has_point(p) and _is_wild(str(m.objects[p].kind)):
 			m.objects.erase(p)
 	m.objects[m.FISH_SIGN] = {"kind": "sign", "hp": 0}
 	# 고장의 랜드마크 — 나무·돌을 다 흩고 **난 뒤에** 세운다. 먼저 세우면
@@ -1030,23 +1033,32 @@ func _build_village() -> void:
 	# (마을을 가르던 강과 다리는 전부 없앴다 — 물을 걷어낸 자리는
 	#  잔디로 이어지고, 낚시터는 서쪽 호수로 옮겼다)
 
-	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
-	for pid: String in GameData.village_built:
-		if m.VILLAGE_PLOTS.has(pid):
-			_place_building_tiles(m.VILLAGE_PLOTS[pid].anchor)
+	# 마을 건물은 **처음부터 다 서 있다.** `village_built` 은 「문을 연 가게」
+	# 라는 뜻만 남는다 — 건물은 있고 안이 비어 있다가, 이장이 사람을 들이면
+	# 그때 장사가 시작된다.
+	for pid: String in m.VILLAGE_PLOTS:
+		_place_building_tiles(m.VILLAGE_PLOTS[pid].anchor)
 
 
-	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
-	m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
+	# **할아버지의 낡은 집** — 빈 터가 아니라 집이 서 있다.
+	#
+	# 예전에는 여기에 「집터」 표지판 하나를 꽂아 두고 목재를 모아 새로
+	# 지었다. 그런데 이야기는 처음부터 「자네 할아버지가 지내던 집이 마을
+	# 서쪽에 그대로 있네」라고 말한다 — 빈 터를 보여 주면 그 말이 거짓이 된다.
+	# 집은 처음부터 서 있고, 오래 비워 둬서 낡았을 뿐이다. 플레이어가 할 일은
+	# 짓는 것이 아니라 **보수**다 (village_ui._open_build_dialog).
+	_place_building_tiles(m.HOME_ANCHOR)
 	# 이장의 거처 — 처음부터 있는 집 (마을의 유일한 지붕)
 	m.objects[m.CHIEF_HUT] = {"kind": "chief_hut", "hp": 0}
 	# 그림이 덮는 칸을 막는다. 안 막으면 512x552 짜리 집 안으로 걸어
 	# 들어가진다 (예전 오두막은 한 칸짜리라 이럴 일이 없었다).
 	# 문 칸만 남겨 둔다 — 거기서 이장을 부른다.
 	_block_under_art(m.CHIEF_ART, Rect2i(m.CHIEF_HUT.x, m.CHIEF_HUT.y, 1, 1))
-	# 상점 터 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 여기서 짓는다)
+	# 상점 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 사람을 들인다).
+	# 건물은 이미 서 있으므로 문 칸이 아니라 **문 옆**에 세운다
 	if not GameData.village_built.has("general"):
-		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
+		m.objects[m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor)] = \
+			{"kind": "plotsite", "hp": 0}
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	# 경매 게시판 — 다른 농장 사람들과 사고파는 장터로 이어진다
 	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
@@ -1107,6 +1119,7 @@ func _plot_bounds(anchor: Vector2i) -> void:
 	var ring := Rect2i(anchor.x - m.YARD_PAD - 1, anchor.y - m.YARD_PAD - 1,
 		5 + m.YARD_PAD * 2 + 2, 4 + m.YARD_PAD * 2 + 2)
 	var gate_y: int = ring.end.y - 1              # 아래 변 = 문이 난 쪽
+	var side_x: int = _plot_side_gate_x(anchor)   # 옆문 = 마을 한복판 쪽
 	for y in range(ring.position.y, ring.end.y):
 		for x in range(ring.position.x, ring.end.x):
 			var edge: bool = x == ring.position.x or x == ring.end.x - 1 \
@@ -1115,6 +1128,9 @@ func _plot_bounds(anchor: Vector2i) -> void:
 				continue
 			# 드나드는 목 — 문 앞 세 칸은 비운다
 			if y == gate_y and absi(x - (anchor.x + 2)) <= 1:
+				continue
+			# 옆문 세 칸
+			if x == side_x and y >= anchor.y + 1 and y <= anchor.y + 3:
 				continue
 			var t := Vector2i(x, y)
 			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
@@ -1144,7 +1160,24 @@ func _is_plot_gateway(t: Vector2i) -> bool:
 		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
 		if absi(t.x - (a.x + 2)) <= 1 and (t.y == a.y + 5 or t.y == a.y + 6):
 			return true
+		var sx: int = _plot_side_gate_x(a)
+		if absi(t.x - sx) <= 1 and t.y >= a.y + 1 and t.y <= a.y + 3:
+			return true
 	return false
+
+
+# 부지의 **옆문**이 난 줄 — 마을 한복판을 바라보는 쪽이다.
+#
+# 앞문(남쪽) 하나로는 모자란다. 서쪽 줄의 세 부지(대장간·목장 상회·여관)는
+# 여덟 칸 간격으로 놓여 있고 울타리 테두리가 여덟 줄이라, 테두리끼리 **틈
+# 없이 맞닿는다** — 세 마당이 남쪽으로만 뚫린 하나의 관이 되고, 그 관은
+# 가운데 선 건물이 스스로 막는다. 광장에서 대장간까지 걸어갈 길이 없었다.
+# (여태 이게 안 드러난 것은 낚시터를 비우는 네모가 여관의 서쪽 울타리를
+#  통째로 지워 우연히 구멍을 내 주고 있었기 때문이다)
+func _plot_side_gate_x(anchor: Vector2i) -> int:
+	var ring_l: int = anchor.x - m.YARD_PAD - 1
+	var ring_r: int = anchor.x + 4 + m.YARD_PAD + 1
+	return ring_r if anchor.x + 2 < m.PLAZA.get_center().x else ring_l
 
 
 # 그 가게다운 것들을 문 앞에 내놓는다 (main.PLOT_DECOR).

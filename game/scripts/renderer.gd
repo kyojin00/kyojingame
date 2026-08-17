@@ -22,9 +22,9 @@ func _draw_building_signs() -> void:
 		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
 		_draw_name_plate(f, str(m.VILLAGE_PLOTS[pid].name),
 			Vector2((a.x + 2) * m.TILE + 16, a.y * m.TILE - 6))
-	if GameData.house_lv >= 1:
-		_draw_name_plate(f, "우리집",
-			Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16, m.HOME_ANCHOR.y * m.TILE - 6))
+	# 손보기 전에도 집은 서 있다 — 다만 아직 「우리집」이라 부르기엔 이르다
+	_draw_name_plate(f, "우리집" if GameData.house_lv >= 1 else "할아버지의 낡은 집",
+		Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16, m.HOME_ANCHOR.y * m.TILE - 6))
 
 
 func _draw_name_plate(f: Font, text: String, at: Vector2) -> void:
@@ -303,8 +303,14 @@ func _context_hint() -> Array:
 				var bk: String = m.actions._building_kind_at(t)
 				if bk == "home":
 					return ["집에 들어가기", above_tile]
+				if bk == "home_ruin":
+					return ["집 보수 — 목재 %d" % GameData.HOUSE_BUILD_WOOD, above_tile]
 				if bk in ["general", "ranch", "smith", "fish"]:
 					return [m.BUILDING_NAMES[bk], above_tile]
+				# 서 있기는 하되 아직 사람이 들지 않은 가게
+				var ep: String = m.plot_body_at(t)
+				if ep != "":
+					return ["빈 %s" % str(m.VILLAGE_PLOTS[ep].name), above_tile]
 		return []
 	var cell: Dictionary = m.grid[t.y][t.x]
 	if cell.crop_id != "":

@@ -43,20 +43,26 @@ func _spawn_objects() -> void:
 	m.obj_nodes.clear()
 	m.tree_sprites.clear()
 	m.landmark_sprites.clear()
-	# 지은 뒤에만 존재한다. 문 칸은 비워 둔다 (구버전 저장도 여기서 열린다)
-	for pid: String in GameData.village_built:
-		if m.VILLAGE_PLOTS.has(pid):
-			m.objects.erase(m.door_tile(m.VILLAGE_PLOTS[pid].anchor))
-			m.worldgen._spawn_house_node(m.VILLAGE_PLOTS[pid].anchor, pid)
-			m.worldgen._trim_paths_under_building(m.VILLAGE_PLOTS[pid].anchor)
-			# 마당의 소품과 경계도 여기서 챙긴다.
-			#
-			# 이 둘은 `_build_yard` 안에 있었는데 그건 **건물이 놓이는
-			# 순간에만** 돈다 — 이미 지어 놓은 세이브를 불러오면 마당이
-			# 텅 빈 채로 있다가, 자고 일어나 세계를 다시 지을 때에야
-			# 붙었다 (「자고 일어나야 울타리가 생긴다」가 이것이다).
-			# 이미 놓인 칸은 건너뛰므로 몇 번을 불러도 같은 모습이다.
-			m.worldgen.decorate_plot(m.VILLAGE_PLOTS[pid].anchor, pid)
+	# 마을 건물은 처음부터 다 서 있다 (village_built 는 「문을 연 가게」).
+	# 문 칸은 비워 둔다 — 거기서 안으로 들어간다.
+	for pid: String in m.VILLAGE_PLOTS:
+		m.objects.erase(m.door_tile(m.VILLAGE_PLOTS[pid].anchor))
+		m.worldgen._spawn_house_node(m.VILLAGE_PLOTS[pid].anchor, pid)
+		m.worldgen._trim_paths_under_building(m.VILLAGE_PLOTS[pid].anchor)
+		# 마당의 소품과 경계도 여기서 챙긴다.
+		#
+		# 이 둘은 `_build_yard` 안에 있었는데 그건 **건물이 놓이는
+		# 순간에만** 돈다 — 이미 지어 놓은 세이브를 불러오면 마당이
+		# 텅 빈 채로 있다가, 자고 일어나 세계를 다시 지을 때에야
+		# 붙었다 (「자고 일어나야 울타리가 생긴다」가 이것이다).
+		# 이미 놓인 칸은 건너뛰므로 몇 번을 불러도 같은 모습이다.
+		m.worldgen.decorate_plot(m.VILLAGE_PLOTS[pid].anchor, pid)
+	# 첫 가게의 게시판은 **문 옆**에 선다. 문 칸에 세워 둔 옛 세이브는
+	# 바로 위에서 문을 비우며 같이 지워지므로 여기서 다시 세운다
+	if not GameData.village_built.has("general"):
+		var gb: Vector2i = m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor)
+		if not m.objects.has(gb):
+			m.objects[gb] = {"kind": "plotsite", "hp": 0}
 	# 고장 마을의 집 — 세계를 지을 때는 칸만 놓였다 (그때는 m.world 가
 	# 없다). 그림은 여기서 세운다. 짓는 게 아니라 처음부터 있는 집이라
 	# 조건 없이 전부 세운다
@@ -65,10 +71,19 @@ func _spawn_objects() -> void:
 			var ha: Vector2i = entry[0]
 			m.objects.erase(m.door_tile(ha))
 			m.worldgen._spawn_house_node(ha, String(entry[1]))
-	if GameData.house_lv >= 1:
-		m.objects.erase(m.door_tile(m.HOME_ANCHOR))
-		m.worldgen._spawn_house_node(m.HOME_ANCHOR)
-		m.worldgen._trim_paths_under_building(m.HOME_ANCHOR)
+	# 우리집 — **보수하기 전에도 서 있다** (할아버지가 남긴 낡은 집).
+	# 아직 손을 안 봤으면 빛을 죽여서 「오래 비워 둔 집」으로 보이게 한다.
+	# 옛 세이브에는 집 한가운데에 「집터」 표지판이 저장돼 있다 — 이제 그
+	# 자리는 집 안이라 치운다
+	if str(m.objects.get(m.HOME_SITE, {}).get("kind", "")) == "housesite":
+		m.objects[m.HOME_SITE] = {"kind": "house", "hp": 0}
+	m.objects.erase(m.door_tile(m.HOME_ANCHOR))
+	m.worldgen._spawn_house_node(m.HOME_ANCHOR)
+	m.worldgen._trim_paths_under_building(m.HOME_ANCHOR)
+	if GameData.house_lv < 1:
+		var hn: Variant = m.obj_nodes.get(m.HOME_ANCHOR)
+		if hn != null:
+			(hn as Node2D).modulate = OLD_HOUSE
 	if GameData.forest_quest in ["visit", "done"]:
 		# 숲속의 집 (스토리 5) — 저장된 발자취 그대로 그림만 다시 세운다
 		m.objects.erase(m.door_tile(m.FOREST_HOUSE_ANCHOR))
@@ -380,6 +395,9 @@ func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> voi
 # 벨 수 없는 나무(fixed)에 입히는 빛깔 — 그늘진 깊은 숲.
 # 채도를 조금 죽이고 어둡게만 한다. 색을 바꾸면 다른 종류의 나무로 보인다.
 const DEEP_WOOD := Color(0.66, 0.74, 0.68)
+# 아직 보수하지 않은 할아버지의 집 — 빛이 바래고 이끼가 앉은 낡은 집.
+# 형체는 그대로 두고 밝기와 채도만 죽인다 (다른 집으로 보이면 안 된다).
+const OLD_HOUSE := Color(0.62, 0.64, 0.58)
 
 const FALL_WIND := 0.12         # 반동 시간
 const FALL_WIND_ANGLE := 0.11   # 되젖히는 각(라디안)

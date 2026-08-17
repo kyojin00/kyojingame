@@ -3192,7 +3192,9 @@ func fisher_objective_short() -> String:
 	return ""
 
 
-# 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
+# 집: 할아버지가 남긴 낡은 집이 마을 서쪽에 **처음부터 서 있다.** 스토리 1을
+# 마치면 물려받고, 목재를 모아 손을 봐야 들어가 산다.
+# (0=아직 낡은 채 / 1=보수한 집 / 2=확장한 집)
 var house_lv := 0
 var has_bed := false  # 침대는 직접 제작해야 잠을 잘 수 있다
 
@@ -3588,7 +3590,11 @@ func story_objective_short() -> String:
 		"deliver":
 			return "이장에게 가 보자."
 		"home_open":
-			return "집에 들어가 보자."
+			# 집은 서 있지만 낡았다 — 손을 봐야 들어가 산다
+			if house_lv >= 1:
+				return "집에 들어가 보자."
+			return "할아버지의 낡은 집을 손보자. (목재 %d/%d)" % [
+				mini(wood, HOUSE_BUILD_WOOD), HOUSE_BUILD_WOOD]
 		"greet":
 			return "집을 둘러보고 나가 보자."
 	return ""

@@ -179,8 +179,12 @@ func _debug_tick() -> void:
 			m.map_ui.close()
 			m.player.position = Vector2(76 * m.TILE + 16, 12 * m.TILE + 16)
 			m.player.dir = "right"                       # 마을 광장 게시판 앞으로
-			for n in m.npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
-				n.position = Vector2(62 * m.TILE + 16, 25 * m.TILE + 16)
+			# 게시판 캡처를 위해 NPC를 비켜둔다. **빈 땅으로 비켜야 한다** —
+			# 예전에 쓰던 (62,25)는 이제 대장간 안이다 (마을 건물이 처음부터
+			# 다 선다). 사람이 지붕 밑에 박힌 채로 찍혔다
+			var park74: Vector2i = m.nearest_open_tile(Vector2i(62, 46))
+			for n in m.npcs:
+				n.position = Vector2(park74.x * m.TILE + 16, park74.y * m.TILE + 16)
 				n.target = n.position
 		78: _send_key(KEY_E)
 		84: _save_shot("_quest.png")
@@ -3427,12 +3431,21 @@ func _debug_tick() -> void:
 					break
 			var desk_block: bool = desk_hit and kit_hit and free_spot
 			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라)
+			#
+			# **사방이 트인 자리에서 잰다.** 앞 걸음이 남겨 둔 자리가 어쩌다
+			# 집 문 앞이면 북쪽 세 칸이 통째로 지붕이라, 「북쪽에서 오면
+			# 북쪽 칸」이 성립할 수 없다 — 그건 이 함수의 잘못이 아니다
+			var k_ppos: Vector2 = m.player.position
+			var open0: Vector2i = m.nearest_open_tile(
+				m.PLAZA.position + Vector2i(2, 2))
+			m.player.position = Vector2(open0.x * m.TILE + 16, open0.y * m.TILE + 16)
 			var pt0 := m.player_tile()
 			var from_north := Vector2((pt0.x) * m.TILE + 16.0, (pt0.y - 8) * m.TILE + 16.0)
 			var spot_n := m.story._walk_tile_near_player(3, from_north)
 			var from_west := Vector2((pt0.x - 8) * m.TILE + 16.0, (pt0.y) * m.TILE + 16.0)
 			var spot_w := m.story._walk_tile_near_player(3, from_west)
 			var side_ok: bool = spot_n.y < pt0.y and spot_w.x < pt0.x
+			m.player.position = k_ppos
 			m.hud._toast_queue.clear()
 			print("SUBFIX_OK=", chain_ok and bubble_ok and no_black_bar
 				and desk_block and side_ok,
@@ -4991,7 +5004,15 @@ func _debug_tick() -> void:
 			var e_silent := false
 			var t_pos: Vector2 = m.player.position
 			var t_tool: String = GameData.tool
+			var t_npos: Vector2 = talk_npc.position if talk_npc != null else Vector2.ZERO
 			if talk_npc != null:
+				# **빈 땅에 세워 놓고 잰다.** 이 사람이 어쩌다 가게나 우리집
+				# 앞에 서 있으면, E를 눌렀을 때 열리는 것은 「말 걸기」가 아니라
+				# 그 건물의 창이다 — 그건 E가 사람에게 말을 건 것이 아니다
+				var open_t: Vector2i = m.nearest_open_tile(
+					m.PLAZA.position + Vector2i(3, 3))
+				talk_npc.position = Vector2(open_t.x * m.TILE + 16,
+					open_t.y * m.TILE + 16)
 				m.player.position = talk_npc.position + Vector2(0, 20)
 				m.player.dir = "up"
 				m._sel_target = Vector2i(-999, -999)
@@ -5001,6 +5022,7 @@ func _debug_tick() -> void:
 				m.dialog.close()
 				m.actions.interact()           # 같은 자리에서 E
 				e_silent = not m.dialog.visible
+				talk_npc.position = t_npos
 			# ③ 아무도 없으면 F는 false를 돌려준다 (그래야 말 타기로 넘어간다)
 			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16,
 				(m.START_TILE.y + 3) * m.TILE + 16)
@@ -5966,8 +5988,15 @@ func _debug_tick() -> void:
 			var deliver_talk := m.dialog.visible
 			m.dialog.close()
 			m.story._end_delivery()
-			var opened := GameData.house_lv == 1 and GameData.has_bed \
+			# 편지를 전하면 **집을 물려받는다.** 다만 낡아서 손을 봐야
+			# 들어가 산다 — 집이 그 자리에서 열리지는 않는다
+			var inherit: bool = GameData.house_lv == 0 and GameData.has_bed \
 				and GameData.story_phase == "home_open"
+			GameData.wood += GameData.HOUSE_BUILD_WOOD
+			m.village._build_house()
+			m.dialog.close()
+			var opened: bool = inherit and GameData.house_lv == 1 \
+				and str(m.objects.get(m.HOME_SITE, {}).get("kind", "")) == "house"
 			m.interior.open()
 			var s1_done := GameData.story_phase == "greet"
 			var small: bool = m.interior.ROOM.size.x < 500.0   # 처음 집은 좁은 오두막
@@ -6534,8 +6563,34 @@ func _debug_tick() -> void:
 			#      눈으로 보기 전에는 절대 모른다
 			#   ② 문과 문 앞이 열려 있는가 (내놓은 물건이 가게를 닫아걸면 안 된다)
 			#   ③ 광장에서 **걸어서 문까지 닿는가** (경계 울타리가 목을 잠그면 안 된다)
+			#   ④ **문을 열기 전에도 건물이 서 있는가.** village_built 는
+			#      「문을 연 가게」라는 뜻만 남았다 — 한 곳도 열지 않은 채로
+			#      세계를 지어도 아홉 채가 다 서 있어야 한다
+			#      (낚시터를 비우는 네모가 여관 왼쪽 한 줄을 갉아먹고 있었다)
 			var k_built94: Array = GameData.village_built.duplicate()
-			GameData.village_built = m.VILLAGE_PLOTS.keys()
+			GameData.village_built = []
+			m.worldgen._build_map()
+			var stand94 := true
+			var gone94 := ""
+			for pid93: String in m.VILLAGE_PLOTS:
+				var a93: Vector2i = m.VILLAGE_PLOTS[pid93].anchor
+				var body93 := 0
+				for y93 in range(a93.y, a93.y + 4):
+					for x93 in range(a93.x, a93.x + 5):
+						if Vector2i(x93, y93) == m.door_tile(a93):
+							continue
+						if not m.is_passable(Vector2i(x93, y93)):
+							body93 += 1
+				if body93 < 19:
+					stand94 = false
+					gone94 += "%s(%d/19) " % [pid93, body93]
+			# 할아버지의 낡은 집도 처음부터 서 있다 (빈 터 표지판이 아니다)
+			var k_hl94: int = GameData.house_lv
+			GameData.house_lv = 0
+			m.worldgen._build_map()
+			var home94: bool = not m.is_passable(m.HOME_ANCHOR) \
+				and str(m.objects.get(m.HOME_SITE, {}).get("kind", "")) == "house"
+			GameData.house_lv = k_hl94
 			m.worldgen._build_map()
 			# ① 그림이 붙는 종류인가 — 빈 칸에 한 번 세워 보고 지운다
 			var art_ok94 := true
@@ -6647,11 +6702,25 @@ func _debug_tick() -> void:
 					continue
 				if m.ROAD.has_point(rt94) or m.PLAZA.has_point(rt94):
 					road_ok94 = false
+			# **사람은 건물 안에 서지 않는다.** 건물이 처음부터 다 서면서,
+			# 「문 앞」으로 적어 둔 자리 몇이 건물 안이 됐다 — 거기 세우면
+			# 길찾기가 막힌 칸에서 시작해 한 발도 못 떼고 굳어 선다
+			var npc_ok94 := true
+			var inside94 := ""
+			for pid98: String in m.VILLAGE_NPC:
+				var nid98: String = m.VILLAGE_NPC[pid98]
+				for pl98: String in ["home", "work", "plaza", "board"]:
+					var t98: Vector2i = m.npcmgr.npc_place_tile(nid98, pl98)
+					if not m.is_passable(t98):
+						npc_ok94 = false
+						inside94 += "%s/%s " % [nid98, pl98]
 			GameData.village_built = k_built94
 			m.worldgen._build_map()
 			print("PLOT_DECOR_OK=", art_ok94 and door_ok94 and reach94
 					and road_ok94 and ring_ok94 and node_ok94 and wild94 == 0
-					and freed94,
+					and freed94 and stand94 and home94 and npc_ok94,
+				" 건물다섬=", stand94, "(", gone94, ")", " 낡은집섬=", home94,
+				" 사람선자리=", npc_ok94, "(", inside94, ")",
 				" 그림있음=", art_ok94, "(", blind94, ")", " 문열림=", door_ok94,
 				" 광장에서닿음=", reach94, "(", shut94, ")", " 길안막음=", road_ok94,
 				" 경계있음=", ring_ok94, "(", bare94, ")",

@@ -568,7 +568,7 @@ func _guide_point() -> Array:
 			if ch != null:
 				return [ch.position, "이장 덕수"]
 		"home_open":
-			return [t.call(m.HOME_SITE), "할아버지의 집"]
+			return [t.call(m.door_tile(m.HOME_ANCHOR)), "할아버지의 낡은 집"]
 	# ---- 튜토리얼 ② — 상점 · 바닷길 · 첫 밭 ----
 	#
 	# 여기가 통째로 비어 있었다. 이장이 「상점을 세워 보게」라고 말은 하는데
@@ -577,8 +577,8 @@ func _guide_point() -> Array:
 	if GameData.story_phase == "done":
 		match GameData.story2_phase:
 			"shop":
-				return [t.call(m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)),
-					"잡화점 터 게시판"]
+				return [t.call(m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor)),
+					"빈 잡화점 게시판"]
 			"fisher":
 				var f: Variant = _fisher_node()
 				if f != null:
@@ -592,7 +592,7 @@ func _guide_point() -> Array:
 				if GameData.tool_slots.has("hoe"):
 					return [t.call(m.HOME_ANCHOR + Vector2i(2, 5)), "집 앞 풀밭"]
 			"cook":
-				return [t.call(m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 3)),
+				return [t.call(m.door_tile(m.VILLAGE_PLOTS["general"].anchor)),
 					"만수 (잡화점)"]
 	return []
 
@@ -1350,17 +1350,28 @@ func _start_delivery_dialog() -> void:
 	], _end_delivery)
 
 
-# 이장이 할아버지의 집을 내어 준다 — 낡은 침대와 책상이 남아 있다
+# 이장이 할아버지의 집을 내어 준다 — 낡은 침대와 책상이 남아 있다.
+#
+# **집이 이 자리에서 열리지는 않는다.** 집은 처음부터 마을 서쪽에 서 있고,
+# 오래 비워 둬서 문이 뒤틀리고 서까래가 내려앉았다. 목재를 모아 문 앞에서
+# 손을 봐야 들어가 산다 (village_ui._build_house). 이야기가 「그대로 있네,
+# 낡았네만」이라고 말해 왔으니, 받는 것과 사는 것 사이에 손볼 일이 있어야 한다.
 func _story_open_home() -> void:
 	if GameData.house_lv >= 1:
 		return
-	GameData.house_lv = 1
 	GameData.has_bed = true    # 할아버지가 쓰던 낡은 침대
 	GameData.bed_lv = 0
-	m.objnode._remove_object(m.HOME_SITE)
-	m.worldgen._fill_building(m.HOME_ANCHOR)
 	Sound.play_sfx("sfx_place")
 	m.hud.quest_toast("할아버지의 집을 물려받았다")
+
+
+# 이야기를 건너뛸 때는 손보는 일까지 끝난 것으로 친다 —
+# 건너뛴 사람을 목재 모으기 앞에 세워 둘 수는 없다
+func _force_open_home() -> void:
+	_story_open_home()
+	if GameData.house_lv < 1:
+		GameData.house_lv = 1
+		m.worldgen._fill_building(m.HOME_ANCHOR)
 
 
 func _story_give_hoe() -> void:
@@ -1376,11 +1387,12 @@ func _story_give_hoe() -> void:
 func _end_delivery() -> void:
 	m.story_cutscene = false
 	GameData.story_phase = "home_open"
-	_story_open_home()   # 대화를 스킵해도 집은 열린다
+	_story_open_home()   # 대화를 스킵해도 집은 물려받는다
 	_apply_story_camera()
 	_apply_story_visibility()
 	m.hud.quest_toast("편지 전달 완료")
-	m.hud.show_message("마을 서쪽, 이장님이 내어 준 집에 들어가 보자. (문 앞에서 E)", 6.0)
+	m.hud.show_message("마을 서쪽, 이장님이 내어 준 낡은 집을 손보자.\n목재 %d이 필요하다 — 도끼로 나무를 베자. (문 앞에서 E)"
+		% GameData.HOUSE_BUILD_WOOD, 7.0)
 	# 인사를 마친 우체부는 마을 북쪽 길을 따라 떠난다
 	if _postman != null:
 		_postman_path = m.npcmgr._tile_path(
@@ -1994,13 +2006,13 @@ func _skip_tutorial() -> void:
 		var cam0: Camera2D = m.player.get_node("Camera")
 		cam0.reset_smoothing()
 		GameData.mark_explored_at(WORLD_ENTRY)
-	_story_open_home()   # 이장이 내어 주는 집도 바로 받는다
+	_force_open_home()   # 건너뛴 사람에게는 손본 집을 그대로 준다
 	# 잡화점 한 채만 세운다 (2장의 「상점을 세우자」가 끝난 자리).
 	# 나머지 부지는 빈 채로 둔다 — 거기서부터가 이장의 이야기다.
 	if not GameData.village_built.has("general"):
 		GameData.village_built.append("general")
 		m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
-	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
+	m.objnode._remove_object(m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor))
 	# 바닷길도 2장에서 열린다 (낚시꾼과 함께 능선을 뚫는 대목)
 	m.worldgen._reveal_sea()
 	GameData.fisher_quest = "done"

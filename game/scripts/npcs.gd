@@ -15,6 +15,13 @@ const ONSEN_GOERS := ["blacksmith", "chief", "merchant"]
 
 
 func _spawn_npc(npc_id: String, tile: Vector2i, region := Rect2i()) -> void:
+	# 막힌 칸에는 세우지 않는다. 마을 건물이 **처음부터 다 서 있게** 되면서
+	# 「문 앞」으로 적어 둔 자리 몇이 건물 안이 됐다 — 거기 세우면 길찾기가
+	# 막힌 칸에서 시작해 한 발도 못 떼고, 그 자리에 굳은 채로 서 있는다.
+	if not m.is_passable(tile):
+		var open: Vector2i = m.nearest_open_tile(tile)
+		if open.x >= 0:
+			tile = open
 	var n: Node2D = preload("res://scripts/npc.gd").new()
 	n.main = m
 	n.id = npc_id
@@ -142,7 +149,10 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			Vector2i(0, 2), Vector2i(2, 0), Vector2i(-2, 0)]:
 		if m.is_passable(t + d):
 			return t + d
-	return t
+	# 여덟 칸을 다 뒤져도 없으면 **더 멀리** 본다. 막힌 칸을 목적지로 돌려
+	# 주면 길찾기가 매번 실패해 그 사람은 열다섯 초씩 굳어 서 있는다
+	var far: Vector2i = m.nearest_open_tile(t)
+	return far if far.x >= 0 else t
 
 
 # 고장 마을 사람들 — 조건 없이 처음부터 제 마을에 산다.

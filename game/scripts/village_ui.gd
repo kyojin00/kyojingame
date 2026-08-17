@@ -12,18 +12,23 @@ var m: KyojinMain    # main.gd
 var _gift_layer: CanvasLayer = null
 
 
+# ---- 할아버지의 낡은 집 (보수) ----
+#
+# 빈 터에 새로 짓는 이야기가 아니다. 집은 처음부터 서 있고, 오래 비워 둬서
+# 서까래가 내려앉고 문이 뒤틀렸다. 목재를 모아 **손을 봐야** 들어가 산다.
 func _open_build_dialog() -> void:
-	m.dialog.open("집터",
-		"할아버지가 남긴 집터다.\n재료를 모아 직접 집을 지어야 한다.\n\n필요 재료: 목재 %d (보유 %d)" %
+	m.dialog.open("할아버지의 낡은 집",
+		"할아버지가 지내던 집이다. 오래 비워 둬서\n문이 뒤틀리고 서까래가 내려앉았다.\n"
+		+ "목재를 모아 손을 보면 들어가 살 수 있다.\n\n필요 재료: 목재 %d (보유 %d)" %
 			[GameData.HOUSE_BUILD_WOOD, GameData.wood], [
-		["집 짓기", _build_house],
+		["집 보수하기", _build_house],
 		["닫기", null],
 	])
 
 
 func _build_house() -> void:
 	if GameData.house_lv > 0:
-		return  # 이미 지은 집 — 두 번 지어지지 않는다
+		return  # 이미 손본 집 — 두 번 보수되지 않는다
 	if GameData.wood < GameData.HOUSE_BUILD_WOOD:
 		m.dialog.set_body("목재가 부족하다... (%d/%d)\n도끼로 나무를 베어 목재를 모으자." %
 			[GameData.wood, GameData.HOUSE_BUILD_WOOD])
@@ -31,30 +36,33 @@ func _build_house() -> void:
 	GameData.wood -= GameData.HOUSE_BUILD_WOOD
 	GameData.house_lv = 1
 	m.tutorial_notify("home")
-	m.objnode._remove_object(m.HOME_SITE)
+	# 그림을 다시 세운다 — 낡아 보이게 죽여 둔 빛깔을 벗는다
 	m.worldgen._fill_building(m.HOME_ANCHOR)
 	Sound.play_sfx("sfx_place")
-	m.dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
+	m.dialog.set_body("집을 손봤다!\n아직 안은 휑하다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
 		GameData.BED_WOOD)
 	m.dialog.set_buttons([["좋아!", null]])
-	m.hud.event_toast("집 짓기")
+	m.hud.event_toast("집 보수")
 	m.saveio.save_now()
 
 
-# ---- 상점 터 (메인 스토리 2 첫 퀘스트: 재료를 모아 마을의 첫 상점을 짓는다) ----
+# ---- 빈 잡화점 (메인 스토리 2 첫 퀘스트: 재료를 모아 첫 가게에 사람을 들인다) ----
+#
+# 건물은 옛 교진 마을 시절 그대로 서 있다 — 비어 있을 뿐이다. 그래서
+# 이 게시판은 「여기에 짓자」가 아니라 「여기를 다시 열자」를 말한다.
 func _open_shop_site_dialog() -> void:
 	if GameData.village_built.has("general"):
 		return
 	if GameData.story2_phase == "":
 		# 아직 이장의 부탁을 받기 전이다 (스토리 1 진행 중)
-		m.dialog.open("상점 터", "낡은 게시판이 서 있다.\n「상점이 들어설 자리」라고 적혀 있다.",
+		m.dialog.open("빈 잡화점", "낡은 게시판이 서 있다.\n「주인을 구합니다」라고 적혀 있다.",
 			[["닫기", null]])
 		return
-	m.dialog.open("상점 터",
-		"이장이 말한 상점 자리다.\n재료를 모아 마을의 첫 상점을 세우자.\n\n필요 재료: 목재 %d (보유 %d) · 돌 %d (보유 %d)" %
+	m.dialog.open("빈 잡화점",
+		"이장이 말한 그 가게다. 문은 닫혀 있고 안은 텅 비었다.\n재료를 모아 손보면 주인이 들어올 수 있다.\n\n필요 재료: 목재 %d (보유 %d) · 돌 %d (보유 %d)" %
 			[GameData.SHOP_BUILD_WOOD, GameData.wood,
 			GameData.SHOP_BUILD_STONE, GameData.stone], [
-		["상점 짓기", _build_shop],
+		["잡화점 손보기", _build_shop],
 		["닫기", null],
 	])
 
@@ -71,19 +79,19 @@ func _build_shop() -> void:
 	GameData.wood -= GameData.SHOP_BUILD_WOOD
 	GameData.stone -= GameData.SHOP_BUILD_STONE
 	GameData.village_built.append("general")
-	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
+	m.objnode._remove_object(m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor))
 	m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
 	# 만수는 오늘 밤 이삿짐을 옮기고, **내일** 직접 인사하러 온다.
 	# 인사를 나눠야 상점 문이 열린다 (이주 NPC 공통 규칙)
 	if not GameData.npc_greeted.has("merchant"):
 		GameData.arrivals.append({"id": "merchant", "day": GameData.day})
 	Sound.play_sfx("sfx_place")
-	m.hud.event_toast("상점 완성!")
-	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n주인 만수는 내일 이사 와서 인사하러 온다고 한다.")
+	m.hud.event_toast("상점 개업!")
+	m.dialog.set_body("마을의 첫 상점이 다시 문을 연다!\n주인 만수는 내일 이사 와서 인사하러 온다고 한다.")
 	m.dialog.set_buttons([["좋아!", null]])
 	if GameData.story2_phase == "shop":
 		GameData.story2_phase = "fisher"
-		m.hud.show_message("상점이 생겼다!\n...그런데 낚싯대를 멘 사람이 마을로 오고 있다는 소문이 돈다.", 6.0)
+		m.hud.show_message("상점이 다시 열렸다!\n...그런데 낚싯대를 멘 사람이 마을로 오고 있다는 소문이 돈다.", 6.0)
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -154,21 +162,23 @@ func _open_village_build_dialog() -> void:
 	if pid == "":
 		if not GameData.village_built.has("hall"):
 			m.dialog.open("마을 발전",
-				"지금 지을 수 있는 건물은 다 세웠네.\n\n남은 건 마을회관뿐인데... 회관은 마을 사람이\n"
+				"지금 사람을 들일 수 있는 곳은 다 채웠네.\n\n남은 건 마을회관뿐인데... 회관은 마을 사람이\n"
 				+ "%d명은 넘어야 의미가 있지. (지금 %d명)\n주민이 더 늘면 다시 이야기함세." %
 					[GameData.HALL_RESIDENTS, m.village_residents()],
 				[["알겠습니다", null]])
 			return
 		m.dialog.open("마을 발전",
-			"지금 지을 수 있는 건물은 다 세웠네.\n마을이 제법 그럴듯해졌구먼!",
+			"빈 가게에는 이제 다 사람이 들었네.\n마을이 제법 그럴듯해졌구먼!",
 			[["좋군요!", null]])
 		return
 	var plot: Dictionary = m.VILLAGE_PLOTS[pid]
 	var cost: Array = m.VILLAGE_BUILD_COST[pid]
+	# 건물은 옛 교진 마을 시절 그대로 서 있다 — 다만 안이 비어 있다.
+	# 그러니 이장이 꺼내는 이야기는 「짓자」가 아니라 「사람을 들이자」다
 	m.dialog.open("마을 발전 — %s" % plot.name,
-		"%s(을)를 지을 자리는 이미 비워 두었네.\n재료만 모아 오면 마을 사람들과 함께 세우겠네.\n\n필요 재료: 목재 %d (보유 %d) · 석재 %d (보유 %d)" %
+		"%s 건물은 예전 그대로 서 있네. 안이 비어 있을 뿐이지.\n서까래를 손보고 물건을 들이면 사람이 올 걸세.\n\n필요 재료: 목재 %d (보유 %d) · 석재 %d (보유 %d)" %
 			[plot.name, cost[0], GameData.wood, cost[1], GameData.stone], [
-		["%s 짓기" % plot.name, _build_village_building.bind(pid)],
+		["%s에 사람 들이기" % plot.name, _build_village_building.bind(pid)],
 		["나중에", null],
 	])
 
@@ -186,7 +196,7 @@ func _build_village_building(pid: String) -> void:
 	GameData.stone -= int(cost[1])
 	GameData.village_built.append(pid)
 	if pid == "general":
-		m.objnode._remove_object(m.door_tile(plot.anchor))  # 상점 터 게시판 철거
+		m.objnode._remove_object(m.plot_board_tile(plot.anchor))  # 상점 게시판 철거
 		if GameData.story2_phase == "shop":
 			GameData.story2_phase = "fisher"   # 이장 경로로 지어도 이야기는 이어진다
 	m.worldgen._fill_building(plot.anchor, pid)
@@ -218,8 +228,8 @@ func _build_village_building(pid: String) -> void:
 		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
 	m.npcmgr._sync_village_npcs()
 	Sound.play_sfx("sfx_place")
-	m.hud.event_toast("%s 완공!" % plot.name)
-	m.dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼.%s" % [plot.name, greet_note])
+	m.hud.event_toast("%s 개업!" % plot.name)
+	m.dialog.set_body("%s에 다시 불이 들어왔네!\n마을이 조금씩 살아나는구먼.%s" % [plot.name, greet_note])
 	m.dialog.set_buttons([["좋군요!", null]])
 	m.queue_redraw()
 	m.saveio.save_now()
