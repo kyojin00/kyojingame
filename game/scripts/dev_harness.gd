@@ -783,17 +783,19 @@ func _debug_tick() -> void:
 			# 이주 NPC 공통 「완공 다음 날, 직접 찾아와 첫 인사」 +
 			# 집터 자리 고르기 프리뷰 (동물의 숲식 범위 표시)
 			m.dialog.close()
-			# ① 첫 인사 전에는 잡화점 문이 닫혀 있고 주인도 없다
+			# ① **주인은 처음부터 마을에 있다.** 닫혀 있는 것은 가게 문뿐이다.
+			#    (예전에는 인사를 나누기 전까지 사람 자체가 없었다 — 그래서
+			#     집만 아홉 채 서 있고 사람은 이장 하나인 마을이 됐다)
 			GameData.npc_greeted.erase("merchant")
 			for nm in m.npcs.duplicate():
 				if nm.id == "merchant":
 					m.npcs.erase(nm)
 					nm.queue_free()
 			m.npcmgr._sync_village_npcs()
-			var no_spawn := true
+			var in_town := false
 			for nm2 in m.npcs:
 				if nm2.id == "merchant":
-					no_spawn = false
+					in_town = true
 			m.actions._enter_building("general")
 			var door_locked: bool = not m.shop_room.visible
 			# ② 완공 다음 날 — 만수가 직접 걸어와 인사한다
@@ -833,10 +835,10 @@ func _debug_tick() -> void:
 			m.story._pickup_home_plot(hdoor2)     # 정리 — 집터를 도로 거둔다
 			GameData.items["housing_kit"] = int(GameData.items["housing_kit"]) - 1
 			m.dialog.close()
-			print("ARRIVE_OK=", no_spawn and door_locked and came and hello
+			print("ARRIVE_OK=", in_town and door_locked and came and hello
 				and settled and door_open and prev_on and bad_tile and good_tile
 				and placed2,
-				" 미등장=", no_spawn, " 문닫힘=", door_locked, " 방문=", came,
+				" 주인마을에있음=", in_town, " 문닫힘=", door_locked, " 방문=", came,
 				" 인사=", hello, " 정착=", settled, " 문열림=", door_open,
 				" 프리뷰=", prev_on, " 빨강=", bad_tile, " 초록=", good_tile,
 				" 설치=", placed2)
@@ -3965,7 +3967,7 @@ func _debug_tick() -> void:
 				and str(shop_entry.desc).contains("\n")
 			# 목표는 짧고, 괄호도 조작키 안내도 없다
 			var shop_obj := str(shop_entry.get("obj", ""))
-			var obj_soft: bool = shop_obj == "상점을 세우자." \
+			var obj_soft: bool = shop_obj == "잡화점을 열자." \
 				and not shop_obj.contains("(") and not shop_obj.contains("E")
 			# 지금 떠 있는 모든 퀘스트의 목표에 내부 키(밑줄)와 재료 수치가 없다
 			var no_keys := true
@@ -4184,7 +4186,8 @@ func _debug_tick() -> void:
 					"post", "postbuild", "postgreet"], "move_objective_short"],
 				["kitchen_quest", ["broom", "make", "sweep", "found", "jam"],
 					"kitchen_quest_objective_short"],
-				["fisher_quest", ["meet", "follow", "open"], "fisher_objective_short"],
+				["fisher_quest", ["meet", "cast", "open"], "fisher_objective_short"],
+				["story_phase", ["home_open"], "story_objective_short"],
 				["forest_quest", ["arrive", "found", "ask", "go", "back"],
 					"forest_objective_short"],
 				["story6_phase", ["show_chief", "ask_post", "wait", "visit", "told",
@@ -5905,8 +5908,8 @@ func _debug_tick() -> void:
 					thin = true
 			print("SEASON_CONTENT_OK=", not thin, " ", per_season)
 		376:
-			# 낚시꾼 퀘스트(메인 스토리 3): 등장 -> 황금잉어 선택지 ->
-			# 길목 바위 -> 바다/해변 해금 + 간이낚싯대(낚시 해금) + 조개
+			# 낚시꾼 퀘스트: 부두 등장 -> 황금잉어 선택지 -> **낚싯대를 받고
+			# 그 자리에서 한 마리** -> 그다음에야 길목 바위 -> 바다/해변 해금
 			GameData.fisher_quest = ""
 			GameData.sea_open = false
 			GameData.unlocked_tools.erase("rod")
@@ -5925,9 +5928,21 @@ func _debug_tick() -> void:
 			var picked: bool = GameData.fisher_choice == 2 and m.dialog.visible
 			m.dialog.close()
 			m.story._end_fisher_meet()
-			var follow: bool = GameData.fisher_quest == "follow" \
+			# **낚싯대는 만나는 자리에서 받는다** (배울 것은 곡괭이가 아니라 낚싯대다)
+			var lesson: bool = GameData.fisher_quest == "cast" \
+				and GameData.is_tool_unlocked("rod") \
 				and GameData.fisher_objective_short() != ""
-			GameData.fisher_quest = "open"         # 게이트 앞 대화가 끝난 상태
+			# 부두에서 한 마리 — 그러면 바다 이야기로 넘어간다
+			var k_pos76: Vector2 = m.player.position
+			m.player.position = Vector2(m.DOCK_STAND.x * m.TILE + 16,
+				m.DOCK_STAND.y * m.TILE + 16)
+			m.story.fisher_lesson_caught()
+			var caught: bool = GameData.fisher_quest == "open" and m.dialog.visible
+			m.dialog.skip_seq()
+			m.dialog.close()
+			m.player.position = k_pos76
+			# 부두를 벗어나 낚은 것은 이 수업으로 치지 않는다
+			GameData.fisher_quest = "open"         # 길목 바위를 캘 차례
 			for p: Vector2i in m.SEA_GATE:         # 길목 바위 둘을 캐낸 셈 친다
 				m.objnode._remove_object(p)
 			m.story._sea_gate_mined()              # -> 보상(간이낚싯대) 대화
@@ -5952,10 +5967,11 @@ func _debug_tick() -> void:
 					shells += 1
 			var shell_ok: bool = GameData.ITEMS.has("forage_shell") \
 				and m.tex.has("forage_shell") and m.tex.has("forage_coral") and shells > 0
-			print("SEA_OK=", met and choice_shown and picked and follow and reward
+			print("SEA_OK=", met and choice_shown and picked and lesson and caught and reward
 				and sea and ridge and sand and water and shell_ok and hidden,
 				" 등장=", met, " 선택지=", choice_shown, " 선택반영=", picked,
-				" 동행=", follow, " 보상대화=", reward, " 바다해금=", sea,
+				" 낚싯대받음=", lesson, " 부두에서한마리=", caught,
+				" 보상대화=", reward, " 바다해금=", sea,
 				" 열기전길막힘=", hidden, " 능선=", ridge, " 모래=", sand,
 				" 바닷물=", water, " 조개=", shells)
 			GameData.story2_phase = "done"
@@ -6718,6 +6734,9 @@ func _debug_tick() -> void:
 					continue
 				if m.ROAD.has_point(rt94) or m.PLAZA.has_point(rt94):
 					road_ok94 = false
+				for lane94: Rect2i in m.VILLAGE_ROADS:
+					if lane94.has_point(rt94):
+						road_ok94 = false
 			# **사람은 건물 안에 서지 않는다.** 건물이 처음부터 다 서면서,
 			# 「문 앞」으로 적어 둔 자리 몇이 건물 안이 됐다 — 거기 세우면
 			# 길찾기가 막힌 칸에서 시작해 한 발도 못 떼고 굳어 선다
@@ -6730,13 +6749,30 @@ func _debug_tick() -> void:
 					if not m.is_passable(t98):
 						npc_ok94 = false
 						inside94 += "%s/%s " % [nid98, pl98]
+			# **길이 실제로 깔렸는가.** 3줄짜리 흙길이 부지 사이를 지나야 한다
+			var lane_ok94 := true
+			var thin94 := ""
+			for lane95: Rect2i in m.VILLAGE_ROADS:
+				var paved95 := 0
+				var cells95 := 0
+				for ly95 in range(lane95.position.y, lane95.end.y):
+					for lx95 in range(lane95.position.x, lane95.end.x):
+						if lx95 < 0 or ly95 < 0 or lx95 >= m.MAP_W or ly95 >= m.MAP_H:
+							continue
+						cells95 += 1
+						if m.grid[ly95][lx95].ground == "yard":
+							paved95 += 1
+				if cells95 == 0 or float(paved95) / float(cells95) < 0.8:
+					lane_ok94 = false
+					thin94 += "%s(%d/%d) " % [lane95, paved95, cells95]
 			GameData.village_built = k_built94
 			m.worldgen._build_map()
 			print("PLOT_DECOR_OK=", art_ok94 and door_ok94 and reach94
 					and road_ok94 and ring_ok94 and node_ok94 and wild94 == 0
-					and freed94 and stand94 and home94 and npc_ok94,
+					and freed94 and stand94 and home94 and npc_ok94 and lane_ok94,
 				" 건물다섬=", stand94, "(", gone94, ")", " 낡은집섬=", home94,
 				" 사람선자리=", npc_ok94, "(", inside94, ")",
+				" 길깔림=", lane_ok94, "(", thin94, ")",
 				" 그림있음=", art_ok94, "(", blind94, ")", " 문열림=", door_ok94,
 				" 광장에서닿음=", reach94, "(", shut94, ")", " 길안막음=", road_ok94,
 				" 경계있음=", ring_ok94, "(", bare94, ")",

@@ -1463,12 +1463,12 @@ func _start_story2_dialog() -> void:
 		{"text": "「할아버지가 쓰시던 침대와 책상이 그대로 남아 있을 걸세.」"},
 		{"text": "「침대는 낡았어도 쓸 만하네. 밤에는 꼭 침대에서 자게 — 어두워지면 들판에 지네가 나온다네.」"},
 		{"text": "「책상에서는 손수 가구를 만들 수 있네.\n물론 재료가 있어야만 만들 수 있지.」"},
-		{"text": "「그나저나... 보다시피 마을이 텅 비었네. 젊은 사람들이 다 떠났거든.」"},
-		{"text": "「자네가 와 준 김에 부탁 하나 함세. 우선 상점부터 세워 보지 않겠나?」",
+		{"text": "「그나저나... 보다시피 마을 가게가 죄다 닫혀 있네.\n사람은 남았는데 물건이 끊겼거든.」"},
+		{"text": "「자네가 와 준 김에 부탁 하나 함세.\n우선 잡화점부터 다시 열어 보지 않겠나?」",
 			"portrait": chief_happy},
 		{"text": "「목재 %d에 돌 %d... 나무를 베고 바위를 캐면 모일 걸세.」"
 			% [GameData.SHOP_BUILD_WOOD, GameData.SHOP_BUILD_STONE]},
-		{"text": "「재료가 모이면 광장 북쪽 상점 터의 게시판에서 짓게. 상점이 서면 만수가 와서 씨앗이며 생필품을 팔 거야.」"},
+		{"text": "「재료가 모이면 잡화점 문 옆 게시판에 걸어 두게.\n문이 열리면 만수가 계산대에 설 걸세.」"},
 	], _end_home_greet)
 
 
@@ -1524,7 +1524,6 @@ func _end_farm_intro() -> void:
 # 낚시꾼이 마을 광장에 나타난다. 함께 남쪽 바위 능선으로 내려가
 # 길목의 바위를 캐면 바다와 해변이 열리고, 보답으로 간이낚싯대를
 # 받아 낚시가 해금된다. 황금잉어 선택지는 대사만 가른다.
-var _fisher_gate_talked := false
 
 
 func _fisher_node() -> Variant:
@@ -1532,10 +1531,6 @@ func _fisher_node() -> Variant:
 		if n.id == "fisher":
 			return n
 	return null
-
-
-func _sea_gate_center() -> Vector2:
-	return Vector2(m.SEA_GATE[0].x * m.TILE + 32.0, m.SEA_GATE[0].y * m.TILE - 16.0)
 
 
 func _fisher_update(delta: float) -> void:
@@ -1551,30 +1546,8 @@ func _fisher_update(delta: float) -> void:
 			# 길을 연 채로 저장했다가 불러온 경우: 보상 대화를 다시 잇는다
 			if GameData.sea_open and not m.ui_open():
 				_start_fisher_reward_dialog()
-		"follow":
-			if m.ui_open():
-				return
-			var fisher: Variant = _fisher_node()
-			if fisher == null:
-				return
-			# 주인공을 따라 걷는다 (우체부 동행과 같은 느낌)
-			var want: Vector2 = m.player.position + Vector2(44.0, -4.0)
-			var to: Vector2 = want - fisher.position
-			if to.length() > 16.0:
-				fisher.position += to.normalized() * minf(to.length() * 2.2, 150.0) * delta
-				fisher.moving = true
-				fisher.anim_time += delta
-				fisher.dir = _face_dir(fisher.position, want)
-				fisher._update_sprite()
-			else:
-				fisher.moving = false
-				fisher.dir = _face_dir(fisher.position, m.player.position)
-				fisher._update_sprite()
-			# 능선 길목에 다다르면 바위 앞 대화
-			if not _fisher_gate_talked \
-					and m.player.position.distance_to(_sea_gate_center()) < 150.0:
-				_fisher_gate_talked = true
-				_start_fisher_gate_dialog()
+		"cast":
+			pass          # 부두에서 한 마리 낚기를 기다린다 (fisher_lesson_caught)
 
 
 # 퀘스트 도중 저장한 게임을 불러오면 낚시꾼을 제자리에 되돌린다
@@ -1583,15 +1556,11 @@ func _restore_fisher() -> void:
 	if fisher == null:
 		return
 	fisher.scripted = true
-	match GameData.fisher_quest:
-		"meet":
-			fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
-				m.FISHER_ARRIVE.y * m.TILE + 16)
-		"follow":
-			fisher.position = m.player.position + Vector2(44.0, -4.0)
-		"open":
-			fisher.position = Vector2((m.SEA_GATE[0].x - 2) * m.TILE + 16,
-				(m.SEA_GATE[0].y - 1) * m.TILE + 16)
+	# 낚시꾼은 이 퀘스트 내내 **부두에 서 있다.** 능선까지 데리고 다니던
+	# 대목을 없앴으므로 자리도 하나뿐이다
+	if GameData.fisher_quest in ["meet", "cast", "open"]:
+		fisher.position = Vector2(m.FISHER_ARRIVE.x * m.TILE + 16,
+			m.FISHER_ARRIVE.y * m.TILE + 16)
 
 
 func _fisher_arrive() -> void:
@@ -1630,39 +1599,49 @@ func _fisher_choose(pick: int) -> void:
 	GameData.fisher_choice = pick
 	var first := "「하하, 좋은 눈빛이야! 그럼 우리는 경쟁자로군. 정정당당하게 겨뤄 보세!」" \
 		if pick == 1 else "「욕심이 없는 것도 낚시꾼의 덕목이지. 물은 조용한 사람을 좋아하거든.」"
+	# **여기서 낚시를 가르친다.** 예전에는 이 대목이 「같이 남쪽 능선으로
+	# 내려가 바위를 캐 달라」는 심부름이었다 — 낚시꾼을 만나 놓고 정작
+	# 낚시는 안 배우고 곡괭이를 들었다. 배울 것은 낚싯대다.
 	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_happy"], [
 		{"text": first},
-		{"text": "「마침 잘됐군. 같이 남쪽으로 내려가 주지 않겠나?」",
+		{"text": "「마침 잘됐군. 자네 낚싯대는 있나?」",
 			"portrait": m.tex["npc_fisher_portrait_normal"]},
-		{"text": "「듣자 하니 자네, 곡괭이 솜씨가 보통이 아니라던데.」"},
+		{"text": "「없구먼. 자, 내가 손수 깎은 간이낚싯대일세. 받게.」"},
+		{"text": "「쓰는 법은 간단해. 물을 보고 서서 던지면 되네.」",
+			"portrait": m.tex["npc_fisher_portrait_happy"]},
+		{"text": "「찌가 흔들리고 (!) 가 뜨면 그때 한 번 더 — 그게 채는 걸세.」"},
+		{"text": "「여기 이 부두에서 한 마리만 낚아 보게. 옆에서 봐 주지.」"},
 	], _end_fisher_meet)
 
 
 func _end_fisher_meet() -> void:
-	GameData.fisher_quest = "follow"
-	_fisher_gate_talked = false
-	m.hud.quest_start_toast("낚시꾼과 함께 바다로")
-	m.hud.show_message("낚시꾼과 함께 남쪽 바위 능선으로 가자.", 6.0)
+	# 낚싯대는 **여기서** 준다. 대사 중간의 event 로 걸어 두었더니 대화를
+	# 건너뛴 사람에게는 낚싯대가 안 들어갔다 — 배울 물건은 대화가 어떻게
+	# 끝나든 손에 있어야 한다
+	_story_give_rod()
+	GameData.fisher_quest = "cast"
+	m.hud.quest_start_toast("부두에서 한 마리")
+	m.hud.show_message("낚싯대를 슬롯에 넣고, 부두에서 물을 보고 던지자.\n(!) 가 뜨면 한 번 더!", 7.0)
 	m.saveio.save_now()
 
 
-func _start_fisher_gate_dialog() -> void:
-	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_normal"], [
-		{"text": "「여기군! 능선 너머에서 파도 소리가 들려.」"},
-		{"text": "「길목의 저 커다란 바위 두 개... 자네 곡괭이라면 캐낼 수 있겠지?」"},
-		{"text": "「부탁하네. 길이 열리면 보답은 톡톡히 하지!」",
+# 부두에서 한 마리를 낚았다 (fishing._on_fishing_finished 가 부른다)
+func fisher_lesson_caught() -> void:
+	if GameData.fisher_quest != "cast" or not m.fishing.at_fishing_spot():
+		return
+	GameData.fisher_quest = "open"
+	var nm := GameData.player_name if GameData.player_name != "" else "친구"
+	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_happy"], [
+		{"text": "「좋았어! 손목 쓰는 게 제법인데?」"},
+		{"text": "「이 호수는 이제 자네 것이나 마찬가지야. 물가면 어디서든 던져 보게.」",
+			"portrait": m.tex["npc_fisher_portrait_normal"]},
+		{"text": "「그런데 %s, 부탁이 하나 있네.」" % nm},
+		{"text": "「황금잉어 큰 놈은 바다를 오간다더군. 남쪽 능선 너머가 바단데\n길목을 큰 바위 두 개가 막고 있어.」"},
+		{"text": "「자네 곡괭이라면 캐낼 수 있겠지? 나는 여기서 기다림세.」",
 			"portrait": m.tex["npc_fisher_portrait_happy"]},
 	], func() -> void:
-		GameData.fisher_quest = "open"
-		var fisher: Variant = _fisher_node()
-		if fisher != null:   # 낚시꾼은 길목 옆에서 기다린다
-			fisher.position = Vector2((m.SEA_GATE[0].x - 2) * m.TILE + 16,
-				(m.SEA_GATE[0].y - 1) * m.TILE + 16)
-			fisher.moving = false
-			fisher.dir = "right"
-			fisher._update_sprite()
 		m.hud.quest_start_toast("바닷길을 열자")
-		m.hud.show_message("곡괭이로 길목의 커다란 바위를 캐자!", 5.0)
+		m.hud.show_message("남쪽 바위 능선의 길목을 곡괭이로 캐자.", 6.0)
 		m.saveio.save_now())
 
 
@@ -1687,9 +1666,7 @@ func _start_fisher_reward_dialog() -> void:
 	m.dialog.open_seq("낚시꾼 용식", m.tex["npc_fisher_portrait_happy"], [
 		{"text": "「열렸다! 이 바람, 이 냄새... 바다야!」"},
 		{"text": "「고맙네, %s. 자네 덕에 길이 열렸어.」" % nm},
-		{"text": "「약속한 보답일세 — 내가 손수 깎은 간이낚싯대야.」",
-			"event": _story_give_rod},
-		{"text": "「물가 어디서든 던져 보게. 입질(!)이 오면 다시 E일세.」",
+		{"text": "「내가 준 그 낚싯대, 바다에서도 잘 듣네. 던져 보게.」",
 			"portrait": m.tex["npc_fisher_portrait_normal"]},
 		{"text": brag, "portrait": m.tex["npc_fisher_portrait_happy"]},
 		{"text": "「참, 해변 모래밭에는 조개가 밀려온다네. 물때마다 주워 가게.」"},

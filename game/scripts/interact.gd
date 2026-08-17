@@ -74,7 +74,7 @@ func _enter_building(kind: String) -> void:
 		# 주인이 아직 첫 인사를 안 했으면 이사 준비 중 — 문이 닫혀 있다
 		var owner := str(m.VILLAGE_NPC.get(kind, ""))
 		if owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
-			m.hud.show_message("이사 준비로 분주한 모양이다.\n내일 주인이 직접 인사하러 온다고 했다.", 4.0)
+			m.hud.show_message("아직 문을 열 채비가 안 된 모양이다.", 4.0)
 			return
 		# 공공 건물은 영업시간에만 문을 연다 (개인 주거지는 해당 없음)
 		var why := GameData.shop_closed_why()

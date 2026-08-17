@@ -81,13 +81,14 @@ func _build_shop() -> void:
 	GameData.village_built.append("general")
 	m.objnode._remove_object(m.plot_board_tile(m.VILLAGE_PLOTS["general"].anchor))
 	m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
-	# 만수는 오늘 밤 이삿짐을 옮기고, **내일** 직접 인사하러 온다.
-	# 인사를 나눠야 상점 문이 열린다 (이주 NPC 공통 규칙)
+	# 만수는 **원래 이 마을 사람이다.** 가게가 닫혀 있었을 뿐이라, 문이
+	# 열리는 그날로 계산대에 선다 (이사 와서 다음 날 인사하던 대목은 없앴다 —
+	# 사람이 처음부터 다 있는 마을에서는 앞뒤가 맞지 않는다)
 	if not GameData.npc_greeted.has("merchant"):
-		GameData.arrivals.append({"id": "merchant", "day": GameData.day})
+		GameData.npc_greeted.append("merchant")
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("상점 개업!")
-	m.dialog.set_body("마을의 첫 상점이 다시 문을 연다!\n주인 만수는 내일 이사 와서 인사하러 온다고 한다.")
+	m.dialog.set_body("마을의 첫 상점이 다시 문을 연다!\n만수가 오늘부터 계산대를 지킨다고 한다.")
 	m.dialog.set_buttons([["좋아!", null]])
 	if GameData.story2_phase == "shop":
 		GameData.story2_phase = "fisher"
@@ -202,7 +203,13 @@ func _build_village_building(pid: String) -> void:
 	m.worldgen._fill_building(plot.anchor, pid)
 	# 주인이 있는 건물은 바로 영업하지 않는다 — 다음 날 주인이 직접
 	# 찾아와 첫 인사를 나눈 뒤부터 문을 연다 (이주 NPC 공통 규칙)
+	# 주인은 이미 마을에 살고 있다 — 문이 열리는 그날로 가게에 든다.
+	# 낚시꾼과 우체부만은 예외다. 둘 다 **마을 밖에서 오는 사람**이라
+	# 따로 찾아와 인사하는 대목이 있다 (우체부의 재회가 3장의 끝맺음이다)
 	var owner := str(m.VILLAGE_NPC.get(pid, ""))
+	if owner != "" and owner != "fisher" and owner != "postman" \
+			and not GameData.npc_greeted.has(owner):
+		GameData.npc_greeted.append(owner)
 	var greet_note := ""
 	if pid == "library":
 		# 사서는 이미 마을에 와 있다 (스토리 6 방문객) — 이사 대기열 없이
@@ -217,15 +224,15 @@ func _build_village_building(pid: String) -> void:
 		# 다른 건물과 달리 「오늘 안에」 온다 (기다리던 재회니까)
 		if GameData.move_quest == "postbuild":
 			GameData.move_quest = "postgreet"
+		# 우체부는 마을 밖에 있다 — 기별을 넣으면 돌아온다 (3장의 끝맺음)
 		if not GameData.npc_greeted.has("postman"):
 			GameData.arrivals.append({"id": "postman", "day": GameData.day - 1})
 		greet_note = "\n우체부 그 친구를 불렀네. 곧 인사하러 올 걸세."
 	elif pid == "hall":
 		# 마을회관 — 개관식은 접수대에서 이장과 (메인 스토리 9의 끝맺음)
 		greet_note = "\n내일부터 낮에는 내가 회관을 지키겠네.\n접수대로 와 주게 — 개관식을 해야지!"
-	elif owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
-		GameData.arrivals.append({"id": owner, "day": GameData.day})
-		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
+	elif owner != "" and owner != "fisher":
+		greet_note = "\n주인이 오늘부터 저기 앉을 걸세. 들러 보게."
 	m.npcmgr._sync_village_npcs()
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("%s 개업!" % plot.name)
@@ -293,6 +300,20 @@ func _talk_to(npc: Node2D) -> void:
 		return
 	if npc.id == "fisher" and GameData.fisher_quest == "meet":
 		m.story._start_fisher_dialog()
+		return
+	if npc.id == "fisher" and GameData.fisher_quest == "cast":
+		# 부두 수업 중 — 다시 물으면 던지는 법을 한 번 더 일러 준다
+		m.dialog.open("낚시꾼 용식",
+			"「낚싯대를 빠른 슬롯에 넣고, 물을 보고 서서 던지게.」\n"
+			+ "「찌가 흔들리고 (!) 가 뜨면 그때 한 번 더 — 그게 채는 걸세.」\n"
+			+ "「여기 부두 끝이 제일 잘 물리는 자리야.」",
+			[["해 보겠습니다", null]])
+		return
+	if npc.id == "fisher" and GameData.fisher_quest == "open":
+		m.dialog.open("낚시꾼 용식",
+			"「남쪽 능선 길목의 큰 바위 둘 말일세.\n곡괭이로 캐 주면 바닷길이 열리네.」\n"
+			+ "「나는 여기서 찌나 보고 있겠네.」",
+			[["다녀오겠습니다", null]])
 		return
 	if npc.id == "chief" and GameData.move_quest == "show":
 		m.story._start_move_chief_dialog()

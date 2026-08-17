@@ -132,9 +132,14 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 				t = m.door_tile(Vector2i(int(mh[0]), int(mh[1]))) + Vector2i(0, 1)
 				if m.is_passable(t):
 					return t
-			# 자기 건물 문 앞 (집도 일터도 같은 건물이다)
+			# 자기 건물 문 앞 (집도 일터도 같은 건물이다).
+			#
+			# **가게 문이 닫혀 있어도 제자리다.** 예전에는 `village_built` 을
+			# 함께 봐서, 아직 안 연 가게의 주인은 갈 곳이 없어 전부 광장
+			# 한 칸(NPC_HOME 의 기본값)에 겹쳐 섰다 — 사람이 처음부터 다
+			# 사는 마을이 되면서 그 한 칸에 여섯이 포개졌다
 			for pid: String in m.VILLAGE_NPC:
-				if m.VILLAGE_NPC[pid] == npc_id and GameData.village_built.has(pid):
+				if m.VILLAGE_NPC[pid] == npc_id:
 					t = m.door_tile(m.VILLAGE_PLOTS[pid].anchor) + Vector2i(0, 1)
 					break
 			# 이사 온 주민은 집터에 지은 자기 집이 곧 거처다
@@ -180,15 +185,24 @@ func _sync_hamlet_npcs() -> void:
 
 func _sync_village_npcs() -> void:
 	_sync_hamlet_npcs()
-	# 건물이 생기면 그 건물의 주인이 마을에 나타난다 (없는 건물의 주인은 아직 없다)
+	# **마을 사람은 처음부터 다 여기 산다.**
+	#
+	# 예전에는 건물이 서고(village_built) 인사까지 나눠야(npc_greeted) 사람이
+	# 나타났다. 그러다 보니 마을에 집만 아홉 채 서 있고 사람은 이장 하나였다 —
+	# 「사람이 사는 마을」이 아니라 모형 마을이었다. 이제 건물이 처음부터 다
+	# 서 있듯 사람도 처음부터 다 있고, **닫힌 것은 가게 문뿐**이다.
+	# 문을 여는 일(재료를 대고 이장과 이야기하는 일)이 곧 이야기다.
 	for pid: String in m.VILLAGE_NPC:
-		if not GameData.village_built.has(pid):
-			continue
 		var nid: String = m.VILLAGE_NPC[pid]
+		# 낚시꾼은 이 마을 사람이 아니다 — 황금잉어 소문을 듣고 찾아오는
+		# 손님이라, 그 퀘스트가 시작돼야 부두에 선다
 		if nid == "fisher" and GameData.fisher_quest == "":
-			continue  # 낚시꾼은 황금잉어 소문을 듣고 뒤늦게 온다 (상점 완공 뒤 퀘스트)
-		if nid != "fisher" and not GameData.npc_greeted.has(nid):
-			continue  # 이사 온 다음 날 첫 인사를 나눠야 마을에 자리 잡는다
+			continue
+		# 우체부만은 **정말로 돌아오는 사람**이다. 숲길 끝에서 「다음 배달을
+		# 가야겠다」며 떠나고, 우체국이 문을 여는 날 다시 마을에 든다 —
+		# 그 재회가 3장의 끝맺음이라 여기서 미리 세워 두면 안 된다
+		if nid == "postman" and GameData.move_quest not in ["postgreet", "done"]:
+			continue
 		var found := false
 		for n in m.npcs:
 			if n.id == nid:
