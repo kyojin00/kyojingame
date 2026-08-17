@@ -55,6 +55,11 @@ const BLOOM = [[244, 128, 148], [250, 212, 100], [238, 244, 238]];
 const AQUA = [[132, 198, 226], [92, 160, 202], [58, 118, 168]];
 const PAPER = [[236, 226, 200], [200, 186, 152], [152, 138, 106]];
 const BOOK = [[196, 76, 62], [64, 108, 150], [86, 130, 76], [176, 140, 68]];
+// 화로의 돌 — **불에 그을린 검붉은 돌.** 길바닥 자갈(ST)과 같은 사다리를
+// 썼더니, 자갈 마당에 얹은 순간 바닥과 한 덩어리가 돼 화로가 안 보였다.
+// 화로는 하루 종일 불을 때는 물건이라 돌이 검게 그을리는 게 맞기도 하다
+const FG = [[152, 112, 92], [126, 90, 72], [100, 70, 56], [78, 52, 42],
+            [58, 38, 32], [42, 28, 24]];
 const OUT = [38, 26, 20];
 const SHADOW = [30, 26, 34, 78];
 
@@ -118,7 +123,8 @@ function plank(g, x0, x1, y0, y1, seed, pal) {
 }
 
 // 쌓은 돌 한 덩이 — 켜마다 반 칸씩 어긋나고 줄눈이 한 칸
-function stonework(g, x0, x1, y0, y1, seed) {
+function stonework(g, x0, x1, y0, y1, seed, pal) {
+  const t = pal || ST;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const course = Math.floor((y - y0) / 3);
     const col = Math.floor((x - x0 + (course % 2) * 2) / 4);
@@ -126,8 +132,32 @@ function stonework(g, x0, x1, y0, y1, seed) {
     if ((y - y0) % 3 === 0) i -= 1;                 // 윗줄 = 빛
     if ((y - y0) % 3 === 2) i += 2;                 // 아랫줄 = 줄눈
     if ((x - x0 + (course % 2) * 2) % 4 === 3) i += 2;
-    g.px(x, y, ST[clamp(i, 0, 7)]);
+    g.px(x, y, t[clamp(i, 0, t.length - 1)]);
   }
+}
+
+
+// ---- 윤곽선 ----
+//
+// 바닥이 무슨 색이든 물건이 **떠 보여야** 한다. 자갈 마당에 회색 화로를
+// 얹었더니 바닥과 한 덩어리가 됐다 — 색만 바꿔서는 다음번 바닥에서
+// 또 같은 일이 난다. 건물 그림이 굵은 윤곽선을 쓰는 것과 같은 이유다.
+//
+// 그늘(반투명)은 물건이 아니므로 선을 안 두른다. 이미 그늘이 깔린 칸도
+// 건드리지 않는다 — 밑변에 새까만 테가 둘리면 물건이 땅에서 다시 뜬다
+function outline(g) {
+  const add = [];
+  for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+    if (g.d[y][x]) continue;
+    let near = false;
+    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const c = g.get(x + dx, y + dy);
+      if (c && c.length < 4) { near = true; break; }
+    }
+    if (near) add.push([x, y]);
+  }
+  for (const [x, y] of add) g.px(x, y, OUT);
+  return g;
 }
 
 // 쇠테 한 줄 — 통·여물통을 묶는다
@@ -180,25 +210,28 @@ function forge(f) {
   // ② 쇠 후드와 연통 — 먼저 그리고 돌로 덮는다 (아궁이가 앞이다)
   for (let y = 10; y <= 17; y++) {
     const inset = Math.round((17 - y) * 0.55);
-    g.rect(5 + inset, y, 18 - inset, y, IR[2]);
-    g.px(5 + inset, y, IR[1]);
-    g.px(18 - inset, y, IR[3]);
+    g.rect(5 + inset, y, 18 - inset, y, IR[3]);
+    g.px(5 + inset, y, IR[2]);
+    g.px(18 - inset, y, IR[4]);
   }
-  g.rect(10, 2, 14, 10, IR[2]);
-  g.vline(10, 2, 10, IR[1]);
-  g.vline(14, 2, 10, IR[3]);
-  g.hline(9, 15, 2, IR[1]);          // 연통 갓
-  g.hline(9, 15, 3, IR[3]);
+  g.rect(10, 2, 14, 10, IR[3]);
+  g.vline(10, 2, 10, IR[2]);
+  g.vline(14, 2, 10, IR[4]);
+  g.hline(9, 15, 2, IR[2]);          // 연통 갓
+  g.hline(9, 15, 3, IR[4]);
   for (let y = 4; y <= 9; y++) if (h(y, f, 11) < 0.3) g.px(12, y, IR[3]);
   // ① 돌 아궁이
-  stonework(g, 3, 20, 17, 28, 5);
-  g.hline(3, 20, 17, ST[0]);         // 상판 — 위를 보는 면
-  g.hline(3, 20, 18, ST[2]);
-  g.hline(3, 20, 28, ST[6]);         // 밑동
+  stonework(g, 3, 20, 17, 28, 5, FG);
+  g.hline(3, 20, 17, FG[0]);         // 상판 — 위를 보는 면
+  g.hline(3, 20, 18, FG[2]);
+  g.hline(3, 20, 28, FG[5]);         // 밑동
   // 아가리 — 안쪽은 그을려 새까맣다
-  g.rect(8, 20, 15, 27, ST[7]);
+  g.rect(8, 20, 15, 27, [26, 18, 16]);
   g.hline(8, 15, 20, OUT);
-  g.px(8, 20, ST[6]); g.px(15, 20, ST[6]);
+  g.px(8, 20, FG[5]); g.px(15, 20, FG[5]);
+  // 아가리 둘레는 불빛에 물든다 — 그을린 돌 위의 벌건 테
+  for (let y = 21; y <= 26; y++) { g.px(7, y, FG[1]); g.px(16, y, FG[1]); }
+  g.px(7, 24, FI[4]); g.px(16, 24, FI[4]);
   // 숯불 — 아가리 바닥에 깔린다. 장마다 벌겋고 어둡고
   for (let x = 8; x <= 15; x++) {
     const v = h(x, f, 17);
@@ -210,8 +243,11 @@ function forge(f) {
   flame(g, 11 + (f % 2), 26, 11 + (f % 3), f, 0);
   flame(g, 13, 27, 7 + ((f + 1) % 3), f, 2.4);
   // 아가리에서 새어 나온 빛이 돌 상판을 물들인다
-  for (let x = 8; x <= 15; x++) if (h(x, f, 23) < 0.5) g.px(x, 19, FI[4]);
-  return g;
+  for (let x = 7; x <= 16; x++) {
+    if (h(x, f, 23) < 0.6) g.px(x, 19, FI[4]);
+    if (h(x, f, 29) < 0.3) g.px(x, 18, FI[4]);
+  }
+  return outline(g);
 }
 
 // ---- 모루 ----
@@ -236,7 +272,7 @@ function anvil() {
   g.hline(4, 11, 10, IR[4]);
   g.px(12, 4, IR[1]);                // 꽁무니의 각진 구멍 자리
   g.px(11, 5, IR[4]);
-  return g;
+  return outline(g);
 }
 
 // ---- 숫돌 ----
@@ -259,7 +295,7 @@ function grindstone() {
   g.hline(2, 14, 12, W[5]);
   g.hline(2, 14, 11, W[3]);
   g.px(14, 7, IR[2]); g.px(15, 8, IR[2]); g.px(15, 9, IR[3]);   // 손잡이
-  return g;
+  return outline(g);
 }
 
 // ---- 장작더미 ----
@@ -282,7 +318,7 @@ function logpile() {
                 [5, 7, 3], [11, 7, 4], [16, 7, 3],
                 [8, 3, 3], [13, 4, 3]];
   for (const [x, y, r] of rows) put(x, y, r * 0.62, x + y);
-  return g;
+  return outline(g);
 }
 
 // ---- 여물통 ----
@@ -306,7 +342,7 @@ function trough(wet) {
   }
   hoop(g, 4, 5, 7); hoop(g, 14, 15, 7);
   g.hline(1, 18, 11, W[6]);
-  return g;
+  return outline(g);
 }
 
 // ---- 볏단 ----
@@ -339,7 +375,7 @@ function hay() {
     g.vline(bx, 4, 12, W[4]);
     g.vline(bx + 1, 4, 12, W[5]);
   }
-  return g;
+  return outline(g);
 }
 
 // ---- 그물 말리는 틀 ----
@@ -364,7 +400,7 @@ function netrack() {
     g.disc(x, 18, 1.4, 1.2, W[2]);
     g.px(x, 17, W[1]);
   }
-  return g;
+  return outline(g);
 }
 
 // ---- 통 ----
@@ -384,7 +420,7 @@ function barrel() {
   for (let x = 3; x <= 10; x++) if (h(x, 1, 61) < 0.4) g.px(x, 3, W[1]);
   hoop(g, 1, 12, 6); hoop(g, 1, 12, 13);
   g.hline(3, 10, 16, W[6]);
-  return g;
+  return outline(g);
 }
 
 // ---- 화단 ----
@@ -406,7 +442,7 @@ function planter() {
     }
   }
   g.hline(1, 18, 12, W[6]);
-  return g;
+  return outline(g);
 }
 
 // ---- 손수레 ----
@@ -429,7 +465,7 @@ function cart() {
       g.px(cx + Math.cos(t) * 1.8, 12 + Math.sin(t) * 1.8, W[5]);
     }
   }
-  return g;
+  return outline(g);
 }
 
 // ---- 책 무더기 ----
@@ -449,7 +485,7 @@ function bookstack() {
   g.rect(4, 1, 9, 2, PAPER[0]);        // 맨 위 펼쳐 둔 책
   g.hline(4, 9, 3, PAPER[2]);
   g.px(6, 2, PAPER[2]); g.px(7, 2, PAPER[2]);
-  return g;
+  return outline(g);
 }
 
 // ---- 표본 선반 ----
@@ -471,7 +507,7 @@ function specimen() {
   jar(4, 14, [168, 120, 200]); jar(9, 14, AQUA[0]);
   g.px(13, 13, ST[2]); g.px(14, 14, ST[4]);   // 돌 표본 한 점
   g.px(13, 14, ST[3]);
-  return g;
+  return outline(g);
 }
 
 // ---- 내보내기 ----
