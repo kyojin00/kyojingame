@@ -217,29 +217,70 @@ function outline(g) {
 // 그건 깊은 윗면이 아니라 그냥 밝은 벽이다.
 function topFace(g, x0, x1, yFront, pal, depth) {
   const t = pal || W;
-  const d = depth || 7;
+  const d = depth || 9;
+  const dk = i => t[Math.min(t.length - 1, i)];
   for (let k = d; k >= 1; k--) {
-    // 뒤로 갈수록 **또렷하게** 좁아지고 어두워진다. 완만하게 줄이면
-    // 「깊은 윗면」이 아니라 그냥 밝은 벽이다 — 각이 안 올라간다
-    // **좁아지는 데도 한도가 있다.** 줄마다 꼬박꼬박 좁혔더니 열두 칸짜리
-    // 궤짝이 일곱 줄 만에 봉긋한 덩어리가 됐다 — 네모가 아니라 두건이었다.
-    // 폭의 오분의 일까지만 좁힌다
-    const maxIn = Math.max(0, Math.floor((x1 - x0) / 5));
-    const inset = Math.min(maxIn, Math.round((k - 1) * 0.7));
-    var tone = t[0];
-    if (k >= d) tone = t[2];                   // 제일 먼 줄
-    else if (k >= d - 1) tone = t[1];
+    // **좁아지는 폭은 줄 수가 아니라 물건 폭이 정한다.**
+    //
+    // 줄마다 꼬박꼬박 한 칸씩 좁혔더니, 깊은 면일수록 뒤가 반토막이 나서
+    // 「위에서 본 판」이 아니라 **치마**가 됐다. 뒤로 가서 좁아지는 건
+    // 원근이지 원뿔이 아니다 — 맨 뒤에서 폭의 13%쯤이면 충분하다.
+    const inset = Math.round((k / d) * (x1 - x0) * 0.20);
+    // 그리고 **한 면 안에서도 톤이 흐른다.** 맨 뒤 두 줄만 어둡게 했더니
+    // 나머지가 통짜 밝은 띠라서, 눕는 면이 아니라 밝게 칠한 벽으로 보였다.
+    // 앞에서 뒤로 네 단을 흘리면 면이 저 혼자 멀어진다
+    const f = (d - k) / Math.max(1, d - 1);    // 0(제일 먼 줄) ~ 1(제일 앞줄)
+    const tone = f < 0.14 ? dk(3) : (f < 0.34 ? dk(2) : (f < 0.56 ? dk(1) : t[0]));
     g.hline(x0 + inset, x1 - inset, yFront - k, tone);
   }
-  g.px(x1, yFront - 1, t[1]);                  // 오른쪽 모서리
+  g.px(x1, yFront - 1, dk(1));                 // 오른쪽 모서리
   // **앞 모서리** — 윗면과 정면이 꺾이는 자리에 한 줄 진하게 긋는다.
   // 이 한 줄이 없으면 밝은 띠 하나로 뭉개져서, 윗면을 그려 놓고도
   // 「위에서 본다」가 안 읽힌다. 두 면은 **선으로** 갈린다
-  g.hline(x0, x1, yFront, t[5]);
+  g.hline(x0, x1, yFront, dk(5));
 }
 
 
-// 쇠테 한 줄 — 통·여물통을 묶는다
+// 돌을 깐 윗면 — topFace 와 같은 면이지만 **줄눈이 있다.**
+//
+// 열네 줄짜리 상판을 민 색으로 깔았더니 화로 위에 매끈한 흰 판이 얹혔다.
+// 넓은 면일수록 재질이 없으면 종잇장이 된다. 정면 벽이 돌인데 윗면만
+// 민 색이면 두 면이 다른 물건이 된다 — 눕는 면에도 같은 돌을 깐다.
+//
+// 줄눈은 **뒤로 갈수록 촘촘해진다.** 같은 간격으로 그으면 면이 누워 있지
+// 않고 서 있는 것처럼 보인다 — 줄 간격이 곧 기울기다 (기와 켜와 같은 규칙).
+function stoneTop(g, x0, x1, yFront, pal, depth) {
+  const t = pal || ST;
+  const d = depth || 9;
+  const dk = i => t[Math.min(t.length - 1, i)];
+  const cx = (x0 + x1) / 2, full = Math.max(1, x1 - x0);
+  const seam = new Set();
+  let gap = 4.2, at = 0;
+  while (at < d) { at += Math.max(1, Math.round(gap)); seam.add(at); gap *= 0.74; }
+  for (let k = d; k >= 1; k--) {
+    const inset = Math.round((k / d) * full * 0.20);
+    const f = (d - k) / Math.max(1, d - 1);
+    const base = f < 0.14 ? 3 : (f < 0.34 ? 2 : (f < 0.56 ? 1 : 0));
+    const a = x0 + inset, b = x1 - inset;
+    const shrink = Math.max(0.2, (b - a) / full);
+    for (let x = a; x <= b; x++) {
+      // 소실점 기준으로 되돌린 좌표 — 뒤로 가도 줄눈이 **같은 돌에** 이어진다
+      const u = Math.round((x - cx) / shrink) + 400;
+      const r = h(Math.floor(u / 5), k, 51);
+      let i = base;
+      // 줄눈은 **정면보다 얕게** 판다. 정면과 같은 깊이로 팠더니 윗면이
+      // 어두워져서 두 면의 밝기가 붙어 버렸다 — 벽에 가로줄을 그은 꼴이다
+      if (r < 0.20) i -= 1; else if (r > 0.78) i += 1;
+      if (seam.has(k)) i += 1;                 // 켜 줄눈 (가로)
+      if (u % 5 === 0) i += 1;                 // 세로 줄눈
+      g.px(x, yFront - k, dk(Math.max(0, i)));
+    }
+  }
+  g.px(x1, yFront - 1, dk(1));
+  g.hline(x0, x1, yFront, dk(5));              // **앞 모서리**
+}
+
+
 function hoop(g, x0, x1, y) {
   g.hline(x0, x1, y, IR[1]);
   g.hline(x0, x1, y + 1, IR[3]);
@@ -365,18 +406,27 @@ function forge(f) {
   // 아니라 **상판**이다. 굴뚝은 상판 **뒤쪽**(화면에서 위)에서 올라온다 —
   // 그래야 상판의 앞 절반이 굴뚝 앞에 그대로 남아서, 대장장이가 물건을
   // 올려 두는 넓은 면으로 읽힌다.
+  // **상판은 받침보다 내밀어야 한다.**
+  //
+  // 윗면과 정면의 폭이 같으면, 톤을 아무리 갈라도 두 면이 한 장의 벽으로
+  // 붙어 버린다. 두 칸을 내밀고 그 밑에 그늘 한 줄을 깔면 — 부엌 조리대의
+  // 앞턱과 같은 이치로 — 윗면이 정면 위에 **얹혀** 있는 게 보인다.
   const BX0 = 5, BX1 = 38, DECK = 44;             // 상판 앞모서리
-  for (let y = DECK + 1; y <= 60; y++) towerRow(g, BX0, BX1, y, 5, 0);
-  g.hline(BX0, BX1, 60, ST[7]);                   // 밑동
-  topFace(g, BX0, BX1, DECK, ST, 10);             // 상판 — 열 줄, 뒤로 물러난다
-  for (let x = BX0 + 2; x <= BX1 - 2; x++)        // 흩어진 재와 부스러기
+  const WX0 = BX0 + 2, WX1 = BX1 - 2;             // 받침 벽 (상판보다 안쪽)
+  for (let y = DECK + 1; y <= 60; y++) towerRow(g, WX0, WX1, y, 5, 0);
+  g.hline(WX0, WX1, 60, ST[7]);                   // 밑동
+  g.hline(WX0, WX1, DECK + 1, ST[7]);             // 앞턱 밑 그늘
+  stoneTop(g, BX0, BX1, DECK, ST, 14);            // 상판 — 열네 줄, 뒤로 물러난다
+  for (let x = BX0 + 3; x <= BX1 - 3; x++)        // 흩어진 재와 부스러기
     if (h(x, 0, 71) < 0.34) g.px(x, DECK - 1 - (x % 4), ST[5]);
 
   // ---- 굴뚝 — 위로 갈수록 좁아진다 ----
   //
   // 곧은 통은 파이프고, 좁아지는 것이 굴뚝이다. 발도 너무 벌리면 안 된다 —
   // 상판을 덮어 버리면 애써 열 줄 잡은 윗면이 다시 띠가 된다
-  const CY0 = 14, CY1 = 33;
+  // 굴뚝 발을 위로 올릴수록 상판이 더 보인다 — 상판 윗면은 열네 줄을
+  // 잡아 두었지만, 굴뚝이 뒤쪽 네 줄을 덮으면 열 줄만 남는다
+  const CY0 = 14, CY1 = 29;
   for (let y = CY0; y <= CY1; y++) {
     const t = (y - CY0) / (CY1 - CY0);            // 0(위) ~ 1(아래)
     const half = Math.round(8 + t * 2);           // 반폭 8 -> 10
@@ -394,14 +444,15 @@ function forge(f) {
   // 맨 위로 한 번 벌어지고, **속이 뚫린 것이 위에서 보인다.** 구멍 하나가
   // 굴뚝을 기둥에서 통으로 바꾼다 — 집 굴뚝에 쓴 규칙과 같은 규칙이다.
   const KX0 = 10, KX1 = 33, KY = 9;               // 갓 앞모서리
-  for (let y = KY + 1; y <= KY + 4; y++) towerRow(g, KX0, KX1, y, 7, 0);
-  topFace(g, KX0, KX1, KY, ST, 8);                // 갓 윗면 — 여덟 줄
+  for (let y = KY + 1; y <= KY + 3; y++) towerRow(g, KX0, KX1, y, 7, 0);
+  stoneTop(g, KX0, KX1, KY, ST, 10);              // 갓 윗면 — 열 줄
   // 연기 구멍 — 위에서 내려다보므로 **구멍의 안쪽 벽**까지 보인다.
   // 가로줄 하나로 그으면 구멍이 아니라 그림자 자국이다
   g.rect(15, 3, 28, 7, [26, 20, 18]);
   g.hline(15, 28, 3, ST[5]);                      // 저쪽 안벽 (빛이 조금 든다)
   g.hline(15, 28, 4, ST[7]);
   g.px(15, 7, ST[6]); g.px(28, 7, ST[6]);         // 아가리 앞턱
+  g.px(14, 4, ST[6]); g.px(29, 4, ST[6]);
 
   // ---- 아치 아가리 ----
   //
@@ -488,8 +539,10 @@ function forge(f) {
 // 갈라지고, 쇠테는 **앞으로 돌아 나오면서 끝이 어두워진다.** 통줄로
 // 그으면 테가 아니라 통에 칠한 줄무늬가 된다.
 function anvil() {
-  const g = new P(32, 32);
-  g.ground(16, 30, 13, 2.6);
+  // 판을 두 줄 늘렸다. 면을 일곱 줄로 눕히고 나니 허리가 두 줄밖에
+  // 안 남아서, 모루가 굽 위에 바로 얹힌 꼴이었다
+  const g = new P(32, 34);
+  g.ground(16, 32, 13, 2.6);
 
   // ---- 그루터기 — **자른 면이 타원으로 보인다** ----
   //
@@ -497,12 +550,12 @@ function anvil() {
   // 네모난 궤짝이었다. 위에서 내려다본 원기둥의 자른 면은 **타원**이고,
   // 그 타원의 앞쪽 호가 곧 윗면과 옆면을 가르는 선이다. 직선으로 자르면
   // 각도가 아무리 높아도 상자로 읽힌다.
-  const SX0 = 5, SX1 = 26, SBOT = 30;
+  const SX0 = 5, SX1 = 26, SBOT = 32;
   const SCX = (SX0 + SX1) / 2, SRX = (SX1 - SX0) / 2;
   // 타원을 너무 크게 잡으면 통나무가 아니라 **팬케이크**가 된다. 자른 면과
   // 껍질 옆면이 둘 다 보여야 원기둥이다 — 타원은 위로 올려 붙이고 옆면에
   // 열 줄을 남긴다
-  const SCY = 20.5, SRY = 3.6;                    // 타원 중심과 세로 반지름
+  const SCY = 22.0, SRY = 4.4;                    // 타원 중심과 세로 반지름
   // 톱으로 켠 속살. 처음 잡은 값은 마당에서 제일 밝은 면이 되어 버려서
   // 그루터기가 아니라 접시로 보였다 — 한 단씩 내렸다
   const CUT = [[190, 160, 116], [164, 134, 92], [138, 110, 74]];
@@ -518,15 +571,16 @@ function anvil() {
       }
     }
   // 나이테 — **끊긴 원호**여야 한다. 통줄로 그으면 나무가 아니라 도마다
-  for (const r of [0.42, 0.72]) {
-    for (let a2 = 0; a2 < 64; a2++) {
-      const th = (a2 / 64) * Math.PI * 2;
+  for (const r of [0.40, 0.70]) {
+    for (let a2 = 0; a2 < 96; a2++) {
+      const th = (a2 / 96) * Math.PI * 2;
       const x = Math.round(SCX + Math.cos(th) * SRX * r);
       const y = Math.round(SCY + Math.sin(th) * SRY * r);
-      if (h(x, y, 131) < 0.45) g.px(x, y, CUT[2]);
+      // 호는 **이어져야** 한다. 반쯤 지우면 나이테가 아니라 모래가 된다
+      if (h(x >> 1, y, 131) < 0.82) g.px(x, y, CUT[1]);
     }
   }
-  g.px(15, 21, W[4]); g.px(16, 21, W[4]);         // 고갱이
+  g.px(15, 22, W[4]); g.px(16, 22, W[4]);         // 고갱이
   // 껍질의 세로 결 — 옆면에만
   for (let x = SX0; x <= SX1; x++) {
     const v = h(x, 0, 133);
@@ -543,7 +597,7 @@ function anvil() {
   g.hline(SX0 + 1, SX1 - 1, SBOT, W[6]);          // 밑동
   // 쇠테 둘 — **가운데가 밝고 양 끝이 어둡다.** 그래야 통을 돌아 나온다.
   // 한 줄만 두른다. 두 줄씩 둘렀더니 옆면 절반이 쇠라 쇠통으로 보였다
-  for (const hy of [25, 29]) {
+  for (const hy of [27, 31]) {
     for (let x = SX0; x <= SX1; x++) {
       const dx = (x - SCX) / SRX, dy = (hy - SCY) / SRY;
       if (Math.abs(dx) > 1.0 || dx * dx + dy * dy <= 1.0) continue;
@@ -563,18 +617,19 @@ function anvil() {
   // 「살짝 기울인 옆모습」이었다. 다섯 줄로 눕히고 정면을 두 줄로 깎으면
   // 두들기는 면이 화면을 향해 열린다 — 그게 내려다보는 각이다.
   const BX0 = 10, BX1 = 25;                       // 몸통 좌우
-  const FACE = 6;                                 // 면의 **앞 모서리** 줄
-  // 굽 — 퍼진 발. 윗면이 두 줄 보인다
-  g.hline(12, 23, 14, IR[1]);
-  g.hline(11, 24, 15, IR[0]);
-  g.rect(11, 16, 24, 17, IR[3]);
-  g.hline(11, 24, 18, IR[4]);
-  g.px(11, 16, IR[2]); g.px(12, 16, IR[2]);       // 왼쪽 = 빛
+  const FACE = 8;                                 // 면의 **앞 모서리** 줄
+  // 굽 — 퍼진 발. 윗면이 **세 줄** 보이고 정면은 두 줄이다
+  g.hline(13, 22, 16, IR[2]);
+  g.hline(12, 23, 17, IR[1]);
+  g.hline(11, 24, 18, IR[0]);
+  g.rect(11, 19, 24, 19, IR[3]);
+  g.hline(11, 24, 20, IR[4]);
+  g.px(11, 19, IR[2]); g.px(12, 19, IR[2]);       // 왼쪽 = 빛
   for (let x = 10; x <= 25; x++)                  // 그루터기에 드리운 그림자
-    if (h(x, 2, 137) < 0.82) g.px(x + 1, 19, CUT[2]);
+    if (h(x, 2, 137) < 0.82) g.px(x + 1, 21, CUT[2]);
   // 허리 — 잘록하다. 위아래가 넓고 가운데가 좁다
-  for (let y = FACE + 3; y <= 13; y++) {
-    const t = Math.abs(y - 11) / 2.5;             // 0(가운데) ~ 1(위아래)
+  for (let y = FACE + 3; y <= 15; y++) {
+    const t = Math.abs(y - 13) / 2.5;             // 0(가운데) ~ 1(위아래)
     const w = 3 + Math.round(t * 2);
     g.rect(17 - w, y, 17 + w, y, IR[3]);
     g.px(17 - w, y, IR[2]); g.px(17 - w + 1, y, IR[2]);
@@ -584,16 +639,19 @@ function anvil() {
   g.hline(BX0, BX1, FACE + 1, IR[3]);
   g.hline(BX0 + 1, BX1 - 1, FACE + 2, IR[4]);
   g.px(BX0, FACE + 1, IR[2]);
-  // 면 — 다섯 줄. 뒤로 갈수록 좁아지고 한 단 어둡다
-  g.hline(BX0 + 4, BX1 - 3, FACE - 5, IR[2]);
-  g.hline(BX0 + 2, BX1 - 2, FACE - 4, IR[2]);
+  // 면 — **일곱 줄.** 두들기는 면은 모루에서 제일 넓은 면이고, 내려다보는
+  // 각에서는 그 면이 화면을 향해 열린다. 뒤로 갈수록 좁아지고 한 단 어둡다
+  g.hline(BX0 + 4, BX1 - 3, FACE - 7, IR[3]);
+  g.hline(BX0 + 3, BX1 - 3, FACE - 6, IR[2]);
+  g.hline(BX0 + 2, BX1 - 2, FACE - 5, IR[2]);
+  g.hline(BX0 + 1, BX1 - 1, FACE - 4, IR[1]);
   g.hline(BX0 + 1, BX1 - 1, FACE - 3, IR[1]);
   g.hline(BX0, BX1, FACE - 2, IR[0]);
   g.hline(BX0, BX1, FACE - 1, IR[0]);
   g.hline(BX0, BX1, FACE, IR[4]);                 // **앞 모서리**
   // 뿔 — 열 칸을 가서 한 점으로 모인다. 위아래가 같이 좁아져야 원뿔이다.
   // 중심선 하나에 반높이를 매달면 끝에서 반드시 한 줄로 모인다
-  const HCY = FACE - 2.0;
+  const HCY = FACE - 3.0;
   for (let x = BX0 - 1; x >= 0; x--) {
     const t = (BX0 - x) / BX0;                    // 0(몸통) ~ 1(끝)
     // 끝으로 갈수록 **천천히** 가늘어진다. 곧게 줄였더니 송곳이 됐다
@@ -604,14 +662,14 @@ function anvil() {
         : (bot > top && y <= top ? IR[1] : IR[0]));
   }
   // 꽁무니 — 뿔 반대쪽은 뭉툭하게 잘리고 **한 단 낮다**
-  g.rect(BX1 + 1, FACE - 3, 29, FACE + 1, IR[2]);
-  g.hline(BX1 + 1, 29, FACE - 3, IR[1]);
+  g.rect(BX1 + 1, FACE - 5, 29, FACE + 1, IR[2]);
+  g.hline(BX1 + 1, 29, FACE - 5, IR[1]);
   g.hline(BX1 + 1, 29, FACE + 1, IR[4]);
-  g.vline(29, FACE - 2, FACE, IR[3]);
+  g.vline(29, FACE - 4, FACE, IR[3]);
   // 구멍 둘 — 면에 뚫려 있으니 **안쪽 벽**이 한 줄 보인다
-  g.rect(20, FACE - 3, 21, FACE - 1, [30, 30, 36]);
-  g.hline(20, 21, FACE - 3, IR[3]);
-  g.px(23, FACE - 2, [30, 30, 36]); g.px(23, FACE - 3, IR[3]);
+  g.rect(20, FACE - 4, 21, FACE - 2, [30, 30, 36]);
+  g.hline(20, 21, FACE - 4, IR[3]);
+  g.px(23, FACE - 3, [30, 30, 36]); g.px(23, FACE - 4, IR[3]);
   // 두들긴 자국 — 면 한복판이 반들반들하다
   for (let x = BX0 + 1; x <= 19; x++)
     for (const y of [FACE - 2, FACE - 1])
@@ -621,16 +679,16 @@ function anvil() {
   //
   // 망치를 면 위에 얹어 보았더니 실루엣의 제일 중요한 자리를 가려서
   // 모루가 다시 「판때기」가 됐다. 연장은 그루터기 위에 둔다
-  g.rect(17, 20, 19, 20, IR[2]);                  // 망치 머리
-  g.hline(17, 19, 19, IR[0]);
-  g.hline(17, 19, 21, IR[4]);
-  g.hline(20, 24, 20, W[2]); g.hline(20, 24, 21, W[4]);   // 자루
-  g.vline(27, 22, 29, IR[3]); g.vline(28, 23, 29, IR[2]); // 세워 둔 집게
-  g.px(26, 21, IR[1]); g.px(27, 21, IR[1]); g.px(28, 22, IR[1]);
+  g.rect(17, 23, 19, 23, IR[2]);                  // 망치 머리
+  g.hline(17, 19, 22, IR[0]);
+  g.hline(17, 19, 24, IR[4]);
+  g.hline(20, 24, 23, W[2]); g.hline(20, 24, 24, W[4]);   // 자루
+  g.vline(27, 24, 31, IR[3]); g.vline(28, 25, 31, IR[2]); // 세워 둔 집게
+  g.px(26, 23, IR[1]); g.px(27, 23, IR[1]); g.px(28, 24, IR[1]);
   // 튄 쇠비늘과 부스러기
-  g.px(2, 11, FI[3]); g.px(0, 13, FI[4]); g.px(30, 13, FI[4]);
+  g.px(2, 13, FI[3]); g.px(0, 15, FI[4]); g.px(30, 15, FI[4]);
   for (let x = 6; x <= 25; x++)
-    if (h(x, 4, 141) < 0.22) g.px(x, 31, IR[4]);
+    if (h(x, 4, 141) < 0.22) g.px(x, 33, IR[4]);
   // ---- 발치 흙탕물 ----
   //
   // 화로와 **같은 자국**이다. 나무는 돌 사다리(ST)가 아니므로 여기서만
