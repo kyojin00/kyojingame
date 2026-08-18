@@ -985,9 +985,13 @@ const PLOT_DECOR := {
 			# **쇠 부리는 것끼리 한자리에 모은다.** 화로 · 그 앞의 모루 ·
 			# 곁의 작업대 · 담금질통. 마당에 고르게 흩어 놓으면 물건은
 			# 있는데 「일하는 자리」가 없다
+			#
+			# 모루는 **집 그림 밖으로** 내려 놓는다. 예전 자리(6,4)에서는
+			# 뿔 끝이 집 오른쪽 벽을 파고들었다 — 판이 38칸(두 칸 반)으로
+			# 커지면서 왼쪽 끝이 x 5.8 까지 뻗은 탓이다.
 			[Vector2i(7, 1), "deco_forge"],
-			[Vector2i(6, 4), "deco_anvil"], [Vector2i(9, 5), "deco_toolrack"],
-			[Vector2i(7, 7), "deco_trough"],
+			[Vector2i(8, 6), "deco_anvil"], [Vector2i(4, 8), "deco_toolrack"],
+			[Vector2i(8, 8), "deco_trough"],
 			[Vector2i(-4, 4), "deco_weaponrack"],
 			[Vector2i(-5, -4), "deco_logpile"], [Vector2i(-5, 0), "deco_crate"],
 			[Vector2i(-4, 7), "deco_logpile"], [Vector2i(-2, 7), "deco_crate"],
