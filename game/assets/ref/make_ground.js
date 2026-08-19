@@ -1480,6 +1480,26 @@ for (const [name, isLand, paint, vars, rows] of KIND) {
 }
 
 ['n', 's', 'w', 'e'].forEach((d, i) => save('path_edge_' + d, cobbleEdge(i).render()));
+
+// 연석 — **길 안쪽** 가장자리의 어두운 한 단. 길이 끝나는 자리가 접혀
+// 내려가는 골이다. 남쪽(아래) 변은 그늘이 지는 쪽이라 한 단 더 짙다.
+// 자로 그은 통줄이면 테두리 액자가 되므로 드문드문 이가 빠진다
+function pathCurb(dir) {
+  const g = new T();
+  const put = (i, k, c) => {
+    if (dir === 0) g.px(i, k, c);
+    else if (dir === 1) g.px(i, N - 1 - k, c);
+    else if (dir === 2) g.px(k, i, c);
+    else g.px(N - 1 - k, i, c);
+  };
+  const deep = dir === 1;                       // 남쪽 변 = 그늘
+  for (let i = 0; i < N; i++) {
+    if (h(i, dir, 95) < 0.88) put(i, 0, STONE[deep ? 6 : 5]);
+    if (h(i, dir, 97) < (deep ? 0.55 : 0.35)) put(i, 1, STONE[deep ? 5 : 4]);
+  }
+  return g;
+}
+['n', 's', 'w', 'e'].forEach((d, i) => save('path_curb_' + d, pathCurb(i).render()));
 save('soil_dry', soil(false).render());
 save('soil_wet', soil(true).render());
 

@@ -438,6 +438,7 @@ const TEXTURE_NAMES := [
 	# 물(water_<깊이>_<판>_<장>)과 경계 아틀라스(edge_*)는 이름이
 	# 규칙적이라 _load_textures가 훑는다
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
+	"path_curb_n", "path_curb_s", "path_curb_w", "path_curb_e",
 	"dock_edge_n", "dock_edge_s", "dock_edge_w", "dock_edge_e",
 ]
 
@@ -3418,6 +3419,17 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 		# 길은 얼룩을 **크게** 잡는다. 여섯 칸으로 잡았더니 길 한 토막이
 		# 통째로 밝고 다음 토막이 통째로 어두워, 포장을 이어 붙인 꼴이었다
 		_dc_base[ci] = tex["path_%d" % _patch_variant(x, y, 5, 9)]
+		# **연석** — 길이 끝나는 자리에 어두운 가장자리 한 단. 이게 없으면
+		# 길이 「깔린 것」이 아니라 흙에 번진 얼룩이다. 참고 맵의 길이
+		# 입체적으로 읽히는 건 무늬가 아니라 이 경계 단 덕이다
+		if gn != K_PATH:
+			el.append(tex["path_curb_n"])
+		if gs != K_PATH:
+			el.append(tex["path_curb_s"])
+		if gw != K_PATH:
+			el.append(tex["path_curb_w"])
+		if gek != K_PATH:
+			el.append(tex["path_curb_e"])
 	elif ground == "yard":
 		# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
 		_dc_base[ci] = tex["yard_%d" % _patch_variant(x, y, 11, 5)]

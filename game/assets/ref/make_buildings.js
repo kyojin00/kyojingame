@@ -2092,10 +2092,39 @@ const KINDS = {
     props: [['notice', -12], ['bench', -26], ['planter', 14]] },
 };
 
+// 접지 그림자 — **집이 땅을 누르는 자국.**
+//
+// 참고 맵의 물건들이 땅에 「서 있는」 건 그림자 덕이다. 밑변 바로 아래로
+// 반투명한 어둠이 서너 줄 깔리고 좌우로 조금 번진다 — 이게 없으면
+// 어떤 집이든 종이 인형처럼 뜬다. 마당 살림(P.ground)과 같은 규칙을
+// 건물에도 편다. 밑변에서 멀수록 옅어진다.
+function groundShadow(im) {
+  const W2 = im.width, H2 = im.height;
+  const opaque = (x, y) => x >= 0 && x < W2 && y >= 0 && y < H2
+    && im.data[(y * W2 + x) * 4 + 3] > 128;
+  // 밑변 찾기 — 각 열에서 제일 아래 불투명 픽셀
+  for (let x = 0; x < W2; x++) {
+    let base = -1;
+    for (let y = H2 - 1; y >= 0; y--) if (opaque(x, y)) { base = y; break; }
+    if (base < 0 || base < H2 * 0.7) continue;             // 허공 장식은 건너뛴다
+    for (let k = 1; k <= 8; k++) {
+      const y = base + k;
+      if (y >= H2 || opaque(x, y)) continue;
+      const a = Math.max(0, 96 - k * 11);
+      const i = (y * W2 + x) * 4;
+      if (im.data[i + 3] > 0) continue;
+      im.data[i] = 30; im.data[i + 1] = 26; im.data[i + 2] = 34;
+      im.data[i + 3] = a;
+    }
+  }
+  return im;
+}
+
 let n = 0;
 for (const [name, spec] of Object.entries(KINDS)) {
   const tag = STYLE === 'soft' ? '' : STYLE + '_';
-  fs.writeFileSync(OUT + PRE + tag + name + '.png', PNG.sync.write(build(spec).render()));
+  fs.writeFileSync(OUT + PRE + tag + name + '.png',
+    PNG.sync.write(groundShadow(build(spec).render())));
   n++;
 }
 console.log(`건물 ${n}채 — ${FW}x${FH} (논리 ${GW}x${GH} · 화면에서 도트 2px)`);
