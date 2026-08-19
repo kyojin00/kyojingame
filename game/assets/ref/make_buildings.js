@@ -373,54 +373,50 @@ function brickCourse(g) {
 // 잡고, 이음매 자리를 켜마다 흔들어 크기가 들쭉날쭉하게 한다.
 // 귀퉁이 네 점을 줄눈색으로 깎으면 돌이 둥글어진다 — 이 둥긂이 손맛이다.
 // 톤은 뭉치 단위: 대부분 기본색으로 조용히 두고 드문드문 밝은/어두운 돌
-// 드문 돌 — chunky 벽. **벽을 돌로 다 채우지 않는다.**
+// 막돌 벽 — chunky. **화로(make_props.rubble)와 같은 보로노이.**
 //
-// 격자로 쌓으면 벽돌담이고, 큰 돌로 쌓아도 그물이었다. 손으로 찍은
-// 돌벽은 **평평한 회벽에 돌 몇 덩이가 박혀 있는 것**이다 — 면이
-// 조용해야 박힌 돌이 보인다. 돌은 둥근 덩이: 속 한 색, 왼윗귀 빛
-// 한 획, 오른밑에 그늘 선.
-function sparseStones(g) {
-  // 바탕부터 평평하게 — 벽 픽셀을 전부 기본 돌색으로 누른다
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
-    if ('kKi'.includes(g.d[y][x])) g.px(x, y, 'k');
-  const CELL = 10;                                     // 돌 하나가 사는 칸
-  for (let cy = 0; cy < Math.ceil(GH / CELL); cy++)
-    for (let cx = 0; cx < Math.ceil(GW / CELL); cx++) {
-      if (hash(cx * 13 + 4, cy * 17 + 9) > 0.72) continue;   // 빈 칸도 있다
-      const w = 5 + Math.floor(hash(cx, cy) * 4);      // 돌 폭 5~8
-      const hh = 3 + Math.floor(hash(cy, cx) * 2);     // 돌 높이 3~4
-      const ox = cx * CELL + 1 + Math.floor(hash(cx * 3, cy * 7) * (CELL - w - 2));
-      const oy = cy * CELL + 1 + Math.floor(hash(cx * 7, cy * 3) * (CELL - hh - 2));
-      // 벽 위에 온전히 앉는 돌만 — 창·문·테두리에 걸치면 버린다
-      let fits = true;
-      for (let y = oy - 1; y <= oy + hh + 1 && fits; y++)
-        for (let x = ox - 1; x <= ox + w + 1; x++)
-          if (g.d[y] === undefined || g.d[y][x] !== 'k') { fits = false; break; }
-      if (!fits) continue;
-      const tone = hash(cx * 5 + 1, cy * 5 + 2) < 0.4 ? 'i' : 'k';
-      for (let y = oy; y < oy + hh; y++) for (let x = ox; x < ox + w; x++) {
-        // 귀퉁이 네 점은 비워 둥글린다
-        const corner = (x === ox || x === ox + w - 1) && (y === oy || y === oy + hh - 1);
-        if (!corner) g.px(x, y, tone);
-      }
-      g.hline(ox + 1, ox + w - 2, oy + hh - 1, 'K');   // 밑그늘
-      for (let y = oy + 1; y < oy + hh - 1; y++) g.px(ox + w - 1, y, 'K');
-      g.hline(ox + 1, ox + 2, oy, LIGHTEN[tone] || 'i');   // 왼윗귀 빛 한 획
+// 벽만 회벽에 드문 돌로 두었더니, 곁의 막돌 화로와 딴 재료가 됐다.
+// 같은 마당의 돌은 같은 채석장에서 나온다 — 씨앗점을 흩뿌리고 픽셀마다
+// 가장 가까운 씨앗을 찾아, 돌 하나하나가 다각형 덩이가 되게 쌓는다.
+//   줄눈  첫째·둘째 씨앗까지의 거리가 비슷한 골 (v5)
+//   낯빛  돌마다 한 색 (v1~v4), 윗변 한 줄이 밝다
+//   크기  RC2=7 — 창·문 사이 벽 폭이 돌 두어 개는 되는 크기
+const RC2 = 7;
+function wallSeed(ci, cj) {
+  return [ci * RC2 + 1 + hash(ci * 7 + 1, cj * 3 + 5) * (RC2 - 2),
+          cj * RC2 + 1 + hash(ci * 3 + 4, cj * 7 + 2) * (RC2 - 2)];
+}
+function rubbleWall(g) {
+  const stone = new Set(['k', 'K', 'i']);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (!stone.has(g.d[y][x])) continue;
+    const ci0 = Math.floor(x / RC2), cj0 = Math.floor(y / RC2);
+    let d1 = 1e9, d2 = 1e9, id = 0;
+    for (let cj = cj0 - 1; cj <= cj0 + 1; cj++) for (let ci = ci0 - 1; ci <= ci0 + 1; ci++) {
+      const sp = wallSeed(ci, cj);
+      const dx = x - sp[0], dy = (y - sp[1]) * 1.4;
+      const d = dx * dx + dy * dy;
+      if (d < d1) { d2 = d1; d1 = d; id = ci * 131 + cj * 61; }
+      else if (d < d2) d2 = d;
     }
-  // 잔자갈 — 큰 돌 사이에 낀 두 칸짜리 조약돌. 큰 것만 심으면 성기다
-  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 2; x++) {
-    if (hash(x * 7 + 3, y * 11 + 6) > 0.010) continue;
-    if (g.d[y][x] !== 'k' || g.d[y][x + 1] !== 'k' || g.d[y + 1][x] !== 'k') continue;
-    g.px(x, y, 'i'); g.px(x + 1, y, 'k');
-    g.px(x, y + 1, 'K'); g.px(x + 1, y + 1, 'K');
+    const gap = Math.sqrt(d2) - Math.sqrt(d1);
+    if (gap < 1.15) { g.px(x, y, 'v5'); continue; }
+    const rc = hash(id, 17);
+    let t = 2;
+    if (rc < 0.24) t -= 1; else if (rc > 0.78) t += 1;
+    g.px(x, y, 'v' + Math.max(0, Math.min(4, t)));
   }
-  // 잔 점 — 벽에 낀 때. 아주 드물게
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
-    if (g.d[y][x] === 'k' && hash(x * 3 + 2, y * 5 + 4) < 0.015)
-      g.px(x, y, 'K');
+  // 윗변 빛 — 줄눈 바로 아래 한 줄
+  for (let y = 1; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = g.d[y][x];
+    if (typeof c !== 'string' || c[0] !== 'v' || c === 'v5') continue;
+    if (g.d[y - 1][x] !== 'v5') continue;
+    const t = parseInt(c[1]);
+    if (t > 0) g.px(x, y, 'v' + (t - 1));
+  }
 }
 
-// 목재 — 세로로 긴 결// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
+// 목재 — 세로로 긴 결// 목재 — 세로로 긴 결// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
 function woodGrain(g) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = g.d[y][x];
@@ -478,7 +474,7 @@ function roughen(g) {
   ditherFace(g, ['i', 'k', 'K'], 0, GROUND);            // 벽돌
   ditherFace(g, ['x', 'w', 'W'], 0, GROUND);            // 석재 테두리
   shingles(g);          // 기와는 사다리 톤으로 한 장씩
-  if (CHUNKY) sparseStones(g); else brickCourse(g);
+  if (CHUNKY) rubbleWall(g); else brickCourse(g);
   wallPatches(g, 0, GROUND);
   woodGrain(g);
   weather(g);           // 흘러내린 줄 · 밑동 흙탕물
@@ -784,8 +780,10 @@ function bargeBoard(g, x0, x1, top, base) {
 // 두 채가 맞닿은 것으로 보인다.
 function wall(g, x0, x1, y0, y1, plinth, skip) {
   g.rect(x0, y0, x1, y1, WB);
-  if (WALL === 'brick') {
-    for (let y = y0 + 1; y < y1 - 3; y += 6) {             // 귀돌
+  if (WALL === 'brick' && !CHUNKY) {
+    // 귀돌 — 막돌 벽(chunky)에는 안 넣는다. 크림색 블록이 막돌 위에 떠서
+    // 「벽에 붙인 스티커」가 됐다
+    for (let y = y0 + 1; y < y1 - 3; y += 6) {
       if (skip !== 'left') g.rect(x0, y, x0 + 2, y + 2, 'w');
       if (skip !== 'right') g.rect(x1 - 2, y, x1, y + 2, 'w');
     }
@@ -1756,7 +1754,9 @@ function build(spec) {
   resetRoof();
 
   // ---- 재료와 비례를 spec 에서 갈아 끼운다 ----
-  CHUNKY = !!spec.chunky;
+  // 대장간에서 실험한 chunky 가 **기본**이 됐다 — 큰 기와, 막돌 벽,
+  // 비늘단 처마, 조용한 면. 한 채만 새 그림체면 그 한 채가 떠 보인다
+  CHUNKY = spec.chunky !== false;
   TW = CHUNKY ? 8 : 5;
   TH = CHUNKY ? 4 : 3;
   const rp = ROOF_PAL[spec.roofPal || 'clay'];
@@ -1771,6 +1771,12 @@ function build(spec) {
   else { PAL.g = [72, 148, 200]; PAL.G = [36, 84, 140]; PAL.e = [168, 216, 248]; }
   const wp = WALL_PAL[spec.wallPal || 'brick'];
   PAL.k = wp.k; PAL.K = wp.K; PAL.i = wp.i;
+  // 막돌 사다리 (v0 밝음 ~ v4 어두움, v5 줄눈) — 벽 색 세 칸을 축으로
+  // 사이를 메운다. 화로(rubble)와 같은 손이 되려면 단 수가 같아야 한다
+  const mixv = (a2, b2, t2) => a2.map((v, i2) => Math.round(v * (1 - t2) + b2[i2] * t2));
+  PAL.v0 = mixv(wp.i, [255, 255, 255], 0.25);
+  PAL.v1 = wp.i; PAL.v2 = mixv(wp.i, wp.k, 0.5); PAL.v3 = wp.k;
+  PAL.v4 = mixv(wp.k, wp.K, 0.55); PAL.v5 = wp.K;
   // 굴뚝은 **지붕에서 색을 받는다.**
   //
   // 벽 색에서 뽑았더니, 지붕이 집마다 갈리는데 굴뚝만 늘 벽 색이라
@@ -1979,7 +1985,7 @@ const KINDS = {
 
   // 대장간 — 망치 간판. 화구 위 벽이 그을리고 불똥이 튄다. 벽에는
   // 망치·집게·편자, 앞에는 모루·담금질통·석탄더미. 옆에 작업 곁채
-  house_smith: { chunky: true,
+  house_smith: {
     sign: true, icon: 'hammer', hang: true, roofPal: 'ironblue',
     wallPal: 'stonewarm', chim: 'big', chimneyX: 38, smoke: true, forge: true,
     lean: 'right', ivy: 0, soot: true, hang2: 'smith',
