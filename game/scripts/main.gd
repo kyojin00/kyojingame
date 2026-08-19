@@ -1889,6 +1889,41 @@ func _hash01(x: int, y: int) -> float:
 	return float(h) / 4294967295.0
 
 
+# 큰 얼룩 — **여러 칸에 걸친 낮은 주파수 잡음.**
+#
+# 바닥 장(variant)을 칸마다 백색 잡음으로 골라 왔다. 세 장이 잘게 섞이니
+# 넓은 들판은 결국 세 장의 평균, 곧 통짜 한 색이었다 — 가까이서 보면
+# 어지럽고 멀리서 보면 밋밋한, 제일 나쁜 조합이다.
+#
+# 참고 그림(스타듀)의 땅이 살아 보이는 건 장이 예뻐서가 아니라 **얼룩의
+# 크기** 때문이다. 밝은 자리와 그늘진 자리가 대여섯 칸에 걸쳐 번갈아 난다.
+# 격자점에서만 잡음을 뽑고 사이를 부드럽게 이으면(smoothstep) 그 크기가
+# 나온다. 장 자체의 톤은 make_ground.js 에서 갈라 두었다.
+func _patch01(x: int, y: int, seed: int, cell: int) -> float:
+	var fx := float(x) / float(cell)
+	var fy := float(y) / float(cell)
+	var x0 := int(floor(fx))
+	var y0 := int(floor(fy))
+	var tx := fx - float(x0)
+	var ty := fy - float(y0)
+	tx = tx * tx * (3.0 - 2.0 * tx)
+	ty = ty * ty * (3.0 - 2.0 * ty)
+	var a := _hash01(x0 * 31 + seed, y0 * 17 + seed)
+	var b := _hash01((x0 + 1) * 31 + seed, y0 * 17 + seed)
+	var c := _hash01(x0 * 31 + seed, (y0 + 1) * 17 + seed)
+	var d := _hash01((x0 + 1) * 31 + seed, (y0 + 1) * 17 + seed)
+	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), ty)
+
+
+# 얼룩에서 장 번호를 뽑는다. 얼룩만 쓰면 경계가 매끈한 등고선으로 드러나
+# 「지도의 색칠」처럼 보이므로, 칸마다 잔 잡음을 조금 섞어 가장자리를 허문다.
+func _patch_variant(x: int, y: int, seed: int, cell: int) -> int:
+	var v: float = _patch01(x, y, seed, cell) * 0.80 + _hash01(x * 7 + seed, y * 3) * 0.20
+	if v < 0.37:
+		return 0
+	return 1 if v < 0.68 else 2
+
+
 # ---- 통행/타겟 ----
 
 # ---- 걸을 수 있는 땅 ----
@@ -3380,12 +3415,14 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 	elif ground == "soil":
 		kind = DC_SOIL
 	elif ground == "path":
-		_dc_base[ci] = tex["path_%d" % (int(_hash01(x * 7, y * 3) * 3.0) % 3)]
+		# 길은 얼룩을 **크게** 잡는다. 여섯 칸으로 잡았더니 길 한 토막이
+		# 통째로 밝고 다음 토막이 통째로 어두워, 포장을 이어 붙인 꼴이었다
+		_dc_base[ci] = tex["path_%d" % _patch_variant(x, y, 5, 9)]
 	elif ground == "yard":
 		# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
-		_dc_base[ci] = tex["yard_%d" % (int(_hash01(x * 9, y * 5) * 3.0) % 3)]
+		_dc_base[ci] = tex["yard_%d" % _patch_variant(x, y, 11, 5)]
 	else:
-		_dc_base[ci] = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
+		_dc_base[ci] = tex[grass_prefix + str(_patch_variant(x, y, 3, 7))]
 		# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
 		# 길 쪽에서 자갈이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다
 		if gn == K_PATH:

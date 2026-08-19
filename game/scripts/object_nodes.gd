@@ -292,6 +292,16 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		var spr: Sprite2D = node.get_child(0)
 		if kind == "tree":
 			spr.flip_h = m._hash01(pos.x * 3 + 5, pos.y * 11 + 7) > 0.5  # 좌우 변형
+			# 그루마다 낯빛이 조금 다르다 — 같은 그림을 좌우로 뒤집는 것만으로는
+			# 숲이 「한 나무의 복사」로 읽힌다. 참고 그림(스타듀)의 숲이 우거져
+			# 보이는 건 그루마다 볕을 받은 정도가 달라서다. 셋 중 하나를
+			# 아주 옅게 그늘지게, 하나를 아주 옅게 볕바래게 물들인다.
+			# (modulate 는 통째로 곱해지므로 폭을 크게 주면 병든 나무가 된다)
+			var tint := int(m._hash01(pos.x * 7 + 1, pos.y * 13 + 3) * 3.0) % 3
+			if tint == 1:
+				spr.self_modulate = Color(0.93, 0.96, 0.90)
+			elif tint == 2:
+				spr.self_modulate = Color(1.05, 1.03, 0.94)
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
 		if kind == "deco_fountain":
