@@ -552,7 +552,9 @@ function soften(g) {
 // 정면 벽(37칸)의 절반쯤 — 이제 눈이 이걸 「지붕」으로 읽는다.
 // 열세 칸은 「두껍다」, 스물네 칸은 「길다」, 서른여섯 칸은 **「뻗어 있다」**이다.
 // 앞 지붕(마흔 칸)과 거의 맞먹는 길이라, 지붕이 몸통 뒤로 한참 이어진다.
-const DEPTH = 36;
+// 몸이 낮아진 만큼 뒤로 눕는 깊이도 서른으로 — 36이면 지붕 윗면이
+// 몸통의 두 배라 다시 「지붕만 있는 집」이 된다
+const DEPTH = 30;
 
 // 그리고 **멀어질수록 좁아진다.**
 //
@@ -1796,9 +1798,12 @@ function build(spec) {
 
   const wide = spec.w || 0, st = spec.storey || 0;         // 폭 가감 / 층높이 가감
   X0 = CX - 30 - wide; X1 = CX + 30 + wide;
-  MID = GROUND - 22 - st;                                  // 1층 천장
-  EAVE = MID - 22 - st + (spec.eave || 0);                 // 2층 천장 = 처마
-  RIDGE = EAVE - 40 - (spec.pitch || 0);                   // +면 더 뾰족
+  // **낮고 넓적하게.** 층고 22+22, 지붕 40으로 지은 집은 폭 90에 키
+  // 120이 넘는 탑이었다 — 참고 맵(스타듀)의 집은 키가 폭과 엇비슷하다.
+  // 1층 20, 2층은 다락으로 14, 지붕 34: 같은 집인데 앉은 자세가 낮아진다
+  MID = GROUND - 20 - st;                                  // 1층 천장
+  EAVE = MID - 14 - st + (spec.eave || 0);                 // 다락 천장 = 처마
+  RIDGE = EAVE - 34 - (spec.pitch || 0);                   // +면 더 뾰족
 
   // ---- 몸통 ----
   wall(g, X0, X1, MID, GROUND);                            // 1층
@@ -1823,19 +1828,19 @@ function build(spec) {
   const wh = (spec.awning ? 10 : 12) + Math.round(st * 0.7);   // 층이 높으면 창도 크다
   archWin(g, CX - 13 - bw, wy, bw, wh, !spec.bigWin && !spec.awning);
   archWin(g, CX + 14, wy, bw, wh, !spec.bigWin && !spec.awning);
-  if (spec.win3) {                                          // 여관 — 2층 창이 셋
-    const h2 = 13 + Math.round(st * 0.7);
-    archWin(g, CX - 31, EAVE + 6, 11, h2, false);
-    archWin(g, CX - 5, EAVE + 6, 11, h2, false);
-    archWin(g, CX + 21, EAVE + 6, 11, h2, false);
+  if (spec.win3) {                                          // 여관 — 다락 창이 셋
+    const h2 = 9 + Math.round(st * 0.5);
+    archWin(g, CX - 31, EAVE + 3, 11, h2, false);
+    archWin(g, CX - 5, EAVE + 3, 11, h2, false);
+    archWin(g, CX + 21, EAVE + 3, 11, h2, false);
   } else {
-    archWin(g, CX - 24, EAVE + 6, 12, 13 + Math.round(st * 0.7), false);
-    archWin(g, CX + 13, EAVE + 6, 12, 13 + Math.round(st * 0.7), false);
+    archWin(g, CX - 24, EAVE + 3, 12, 9 + Math.round(st * 0.5), false);
+    archWin(g, CX + 13, EAVE + 3, 12, 9 + Math.round(st * 0.5), false);
   }
 
   // ---- 문 ----
-  if (spec.forge) forge(g, CX, 19, 27, GROUND);
-  else archDoor(g, CX, 15, 25, GROUND);
+  if (spec.forge) forge(g, CX, 19, 24, GROUND);
+  else archDoor(g, CX, 15, 22, GROUND);
   if (spec.awning) awning(g, X0 + 2, X1 - 2, MID + 2);
 
   // ---- 지붕 ----
@@ -1921,7 +1926,7 @@ function build(spec) {
   }
   if (spec.flag) flag(g, X1 + JUT + 5, GROUND);
   if (spec.sign) sign(g, CX, spec.icon);
-  if (spec.hang) hangSign(g, X1 + JUT - 14, MID - 22, spec.icon);
+  if (spec.hang) hangSign(g, X1 + JUT - 14, MID - 10, spec.icon);   // 다락 벽 가운데
   if (spec.baskets) baskets(g, CX - 22, CX + 22, MID + 11);
   // 연장·약초는 **처마 밑에** 건다. 벽은 창과 문으로 이미 꽉 차서 걸 데가
   // 없었다 — 실제로도 이런 건 처마 밑에 매단다
