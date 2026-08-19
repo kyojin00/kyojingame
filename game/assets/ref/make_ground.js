@@ -159,31 +159,39 @@ function cobble(seed) {
   // 그리고 **알 크기도 흔든다.** 네 칸짜리만 깔면 아무리 톤을 흔들어도
   // 격자가 그대로 읽힌다 — 다섯에 하나쯤은 오른쪽 줄눈을 지워 여덟 칸짜리
   // 넓은 돌로 만든다. 포장은 자로 잰 것이 아니다
-  const CW = 4, CH = 4;
+  // **알을 키운다** — 4x4 잔알에 알마다 톤을 흔들었더니 길이 온통
+  // 자글거려서, chunky 로 바꾼 대장간과 딴 그림이 됐다. 건물 돌벽과
+  // 같은 자(8x4 넓적돌)로 재고, 톤은 뭉치 단위로만 흔든다.
+  // 타일이 16칸이라 알의 자는 16을 나눠야 한다 (8x4 ✔) — 안 나누면
+  // 타일 경계에서 줄눈이 어긋나 격자가 도로 드러난다
+  const CW = 8, CH = 4;
   const PSHIFT = [1, 0, -1][((seed % 3) + 3) % 3];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const course = Math.floor(y / CH);
     const u = x + (course % 2) * (CW / 2);
     const col = Math.floor(u / CW);
+    const rc = h(col >> 1, course >> 1, seed);              // 뭉치의 낯빛
+    let i = 2 + Math.floor(rc * 2.4);
     const r = h(col, course, seed);
-    // 톤 갈이는 **알마다 반쯤만** 먹인다. 장 전체를 통으로 한 단 올렸더니
-    // 광장에 밝은 포장과 어두운 포장을 이어 붙인 것처럼 보였다 — 돌 사다리
-    // 한 단이 스무 단위라 통으로 옮기면 딴 재료가 된다
-    let i = 1 + Math.floor(r * 4.0);                        // 알마다 톤이 다르다
+    if (r < 0.10) i -= 1; else if (r > 0.92) i += 1;        // 드문 한 알 악센트
     if (h(col, course, seed + 31) < 0.55) i += PSHIFT;
     const ry = y % CH, rx = ((u % CW) + CW) % CW;
-    const wide = h(col, course, seed + 23) < 0.22;          // 이웃과 붙은 넓은 돌
+    const wide = h(col, course, seed + 23) < 0.18;          // 이웃과 붙은 넓은 돌
     if (ry === 0) i -= 1;                                   // 윗줄 = 빛
-    if (ry === CH - 1) i += 2;                              // 아랫줄 = 가로 줄눈
-    if (rx === CW - 1 && !wide) i += 2;                     // 오른줄 = 세로 줄눈
+    // 줄눈은 **바닥을 친다** — 돌색에 +2 만 하면 밝은 돌 옆 줄눈이 옅어서
+    // 이끼도 못 앉고 돌이 안 갈라진다. 다섯 단 밑으로는 내려가게 한다
+    if (ry === CH - 1) i = Math.max(i + 2, 5);              // 아랫줄 = 가로 줄눈
+    if (rx === CW - 1 && !wide) i = Math.max(i + 2, 5);     // 오른줄 = 세로 줄눈
+    // 둥근 귀퉁이 — 줄눈 옆 한 점씩. 이 점이 넓적돌을 손으로 깎은 돌로 만든다
+    if ((ry === 0 || ry === CH - 2) && rx === CW - 2 && !wide) i += 1;
     // 밟혀 닳은 알 — 가운데가 유난히 밝다
-    if (ry === 1 && rx === 1 && h(col, course, seed + 5) < 0.30) i -= 2;
+    if (ry === 1 && rx >= 2 && rx <= 4 && h(col, course, seed + 5) < 0.30) i -= 1;
     // 금 간 알
-    if (ry === 1 && rx === 2 && h(col, course, seed + 7) < 0.20) i += 3;
+    if (ry === 1 && rx === 5 && h(col, course, seed + 7) < 0.16) i += 3;
     g.px(x, y, STONE[clamp(i, 0, 7)]);
     // 빠진 알 — 흙이 드러난 자리. 이게 있어야 깔아 놓기만 한 길이 아니라
     // 밟고 다닌 길이 된다
-    if (h(col, course, seed + 9) < 0.10)
+    if (h(col, course, seed + 9) < 0.08)
       g.px(x, y, EARTH[2 + (h(x, y, seed + 3) < 0.4 ? 1 : 0)]);
   }
   // 줄눈에 낀 이끼 — 어두운 줄눈 자리에만, 덩어리로

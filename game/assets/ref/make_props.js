@@ -255,8 +255,8 @@ function stoneTop(g, x0, x1, yFront, pal, depth) {
   const dk = i => t[Math.min(t.length - 1, i)];
   const cx = (x0 + x1) / 2, full = Math.max(1, x1 - x0);
   const seam = new Set();
-  let gap = 4.2, at = 0;
-  while (at < d) { at += Math.max(1, Math.round(gap)); seam.add(at); gap *= 0.74; }
+  let gap = 5.5, at = 0;                         // 큰 돌(켜 5)에 맞춘 간격
+  while (at < d) { at += Math.max(1, Math.round(gap)); seam.add(at); gap *= 0.72; }
   for (let k = d; k >= 1; k--) {
     const inset = Math.round((k / d) * full * 0.20);
     const f = (d - k) / Math.max(1, d - 1);
@@ -266,13 +266,14 @@ function stoneTop(g, x0, x1, yFront, pal, depth) {
     for (let x = a; x <= b; x++) {
       // 소실점 기준으로 되돌린 좌표 — 뒤로 가도 줄눈이 **같은 돌에** 이어진다
       const u = Math.round((x - cx) / shrink) + 400;
-      const r = h(Math.floor(u / 5), k, 51);
-      let i = base;
+      // 돌 하나의 낯빛 — 뭉치 단위로만 흔든다 (towerRow 와 같은 규칙).
       // 줄눈은 **정면보다 얕게** 판다. 정면과 같은 깊이로 팠더니 윗면이
       // 어두워져서 두 면의 밝기가 붙어 버렸다 — 벽에 가로줄을 그은 꼴이다
-      if (r < 0.20) i -= 1; else if (r > 0.78) i += 1;
+      const r = h(Math.floor(u / TCW), k, 51);
+      let i = base;
+      if (r < 0.16) i -= 1; else if (r > 0.86) i += 1;
       if (seam.has(k)) i += 2;                 // 켜 줄눈 (가로)
-      if (u % 5 === 0) i += 1;                 // 세로 줄눈
+      if (u % TCW === 0) i += 1;               // 세로 줄눈
       g.px(x, yFront - k, dk(Math.max(0, i)));
     }
   }
@@ -331,37 +332,34 @@ function flame(g, cx, base, hgt, f, seed) {
   }
 }
 
-// 돌탑 한 켜 — 왼쪽은 빛, 오른쪽 두 칸은 돌아간 면
+// 돌탑 한 켜 — **건물의 boulderCourse 와 같은 큰 돌.**
+//
+// 4x3 잔돌로 쌓았더니 화로만 자글거려서, chunky 로 바꾼 대장간 본채와
+// 딴 그림이 됐다. 같은 자로 잰다: 돌 8~10 x 5, 이음매 자리는 켜마다
+// 흔들리고, 귀퉁이 네 점을 줄눈색으로 깎아 돌이 둥글다.
+// 톤은 뭉치 단위로만 — 사람 손은 균일한 난수를 못 찍는다.
+const TCW = 9, TCH = 5;
 function towerRow(g, x0, x1, y, seed, lift) {
   for (let x = x0; x <= x1; x++) {
-    const course = Math.floor(y / 3);
-    const col = Math.floor((x + (course % 2) * 2) / 4);
-    // **한 장씩 색이 달라야 쌓은 것으로 보인다.** 두 단만 흔들었더니
-    // 돌탑이 매끈한 회색 덩어리라 옆의 돌집 벽과 재질이 달라 보였다.
-    // 건물 벽돌(brickCourse)과 같은 폭으로 흔들고, 드문드문 이가 빠진다
-    const r = h(col, course, seed), r2 = h(course * 3 + 1, col * 5 + 2, seed);
-    // 밑값을 2에서 3으로 내렸다. 곁의 돌집 벽은 화면에서 밝기 101인데
-    // 화로는 126이라 마당 흙(127)과 **같은 밝기**였다 — 색만 회색이고
-    // 밝기로는 바닥에서 안 떨어지니, 붙지도 서지도 못한 채 떠 보였다.
-    // 줄눈도 한 단 더 깊게 판다. 벽이 어두운 건 돌색이 아니라 줄눈 탓이다
+    const course = Math.floor(y / TCH);
+    const u = x + (course % 2) * (TCW >> 1);
+    const col = Math.floor(u / TCW);
+    const ru = ((u % TCW) + TCW) % TCW, ry = y % TCH;
+    const sm = 1 + Math.floor(h(col * 7 + 3, course * 5 + 1, seed) * 3.0);
+    const rc = h(col, course, seed);                 // 돌 하나의 낯빛
     let i = 3 + lift;
-    if (r < 0.14) i -= 1; else if (r < 0.38) i += 0;
-    else if (r > 0.88) i += 2; else if (r > 0.62) i += 1;
-    if (r2 < 0.06) i += 2;                        // 이 빠진 돌
-    if (y % 3 === 0) i -= 1;                      // 켜 윗줄 = 빛
-    if (y % 3 === 2) i += 2;                      // 켜 아랫줄 = 줄눈
-    if ((x + (course % 2) * 2) % 4 === 3) i += 2; // 세로 줄눈
-    if (x <= x0 + 1) i -= 1;                      // 왼쪽 = 빛을 받는 면
-    if (x >= x1 - 2) i += 2;                      // 오른쪽 = 돌아간 면
+    if (rc < 0.15) i -= 1; else if (rc > 0.86) i += 1;
+    const atSeam = ru === sm || ru === sm + TCW - 1; // 좌우 이음매
+    if (ry === TCH - 1 || atSeam) i = 6;             // 줄눈
+    else if (ry === 0) i -= 1;                       // 윗변 = 빛
+    else if ((ry === 1 || ry === TCH - 2)
+        && (ru === sm + 1 || ru === sm + TCW - 2)) i = 6;   // 둥근 귀퉁이
+    if (x <= x0 + 1) i -= 1;                         // 왼쪽 = 빛을 받는 면
+    if (x >= x1 - 2) i += 2;                         // 오른쪽 = 돌아간 면
     g.px(x, y, ST[clamp(i, 0, 7)]);
   }
 }
 
-// 돌에 앉는 세월 — 건물의 weather()·moss() 와 같은 세 가지.
-//   ① 흘러내린 줄   빗물이 지나간 자리가 세로로 짙게 남는다
-//   ② 밑동 흙탕물   비가 땅에 튀어 아래 한 뼘이 늘 지저분하다.
-//                   마당 흙빛이 섞여야 돌이 **땅에 붙는다**
-//   ③ 이끼          해가 덜 드는 왼쪽 아래 줄눈에 덩어리로
 // 마당 흙이 튄 색 — **바닥 그림(make_ground.js)의 EARTH 사다리 그대로.**
 // 눈대중으로 「갈색쯤」을 잡으면 화로 발치만 딴 흙이 된다
 const GRIME = [[112, 88, 64], [92, 70, 50], [72, 54, 38]];
@@ -387,12 +385,9 @@ function weatherStone(g, seed) {
   }
   // ② 밑동 흙탕물 — **물건을 땅에 붙이는 건 그림자가 아니라 이것이다.**
   //
-  // 비가 마당 흙을 튀겨 아래 한 뼘을 늘 더럽힌다. 발치가 마당과 같은
-  // 흙빛으로 물들어야 돌탑이 「놓인 것」이 아니라 「서 있던 것」이 된다.
-  // 잔 확률로 뿌리면 후추가 되므로, 큰 칸(2x2)으로 자리를 먼저 정한다.
-  //
-  // 이끼는 안 넣는다 — 늘 불이 도는 물건이라 초록이 끼면 버려둔 폐허로
-  // 보였다. 실제로 넣어 봤더니 발치에 초록 딱지가 붙은 꼴이었다.
+  // 비가 마당 흙을 튀겨 아래 한 뼘을 늘 더럽힌다. 잔 확률로 뿌리면
+  // 후추가 되므로, 큰 칸(2x2)으로 자리를 먼저 정한다.
+  // 이끼는 안 넣는다 — 늘 불이 도는 물건이라 폐허로 보였다.
   const B = 13;
   for (let y = g.h - B; y < g.h; y++) for (let x = 0; x < g.w; x++) {
     if (!isStone(g.d[y][x])) continue;
