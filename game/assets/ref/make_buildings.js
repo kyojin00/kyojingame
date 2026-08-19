@@ -295,19 +295,23 @@ function shingles(g) {
     const r = hash(col, row), r2 = hash(row * 3 + 1, col * 5 + 2);
     let i = Math.round(t * 5.4);
     if (CHUNKY) {
-      // 톤은 **뭉치(2x2장) 단위**로만 흔든다. 장마다 흔들면 자글거린다
-      const rc = hash(col >> 1, row >> 1);
-      i += rc < 0.16 ? 1 : (rc > 0.88 ? -1 : 0);
-      if (r < 0.04) i += 2;                              // 드문 한 장짜리 악센트
-      if (at(x, y - 1) !== row) i -= 1;                  // 윗변 (빛)
-      if (at(x, y + 1) !== row) {
-        i += 2;                                          // 아랫변 (겹침 턱)
-        // **비늘 귀퉁이** — 밑변에서 이음매 옆 한 칸을 한 단 더 어둡게.
-        // 이 두 점이 기와 밑변을 둥글려 「비늘로 얹었다」가 된다
-        const ru = ((u % TW) + TW) % TW;
-        if (ru === 1 || ru === TW - 1) i += 1;
+      // **다 그리지 않는다.** 기와를 한 장도 빠짐없이 격자로 그렸더니
+      // 어떤 색을 입혀도 「기계가 채운 무늬」였다. 손으로 찍은 지붕은
+      // 면을 평평하게 비워 두고, 드문드문 몇 획으로만 기와를 **암시**한다 —
+      // 획은 켜의 자에 맞춰 눕고, 서너 장에 한 획이면 충분하다.
+      const ru = ((u % TW) + TW) % TW;
+      const isBottom = at(x, y + 1) !== row;
+      if (r < 0.30) {
+        // 이 장은 획을 얻는다 — 밑변에 짧은 어두운 획 (2~5칸)
+        const len = 2 + Math.floor(hash(col * 5 + 2, row * 7 + 3) * 4);
+        if (isBottom && ru >= 1 && ru <= len) i += 2;
+      } else if (r > 0.90) {
+        // 드문 밝은 획 — 윗변에
+        if (at(x, y - 1) !== row && ru >= 2 && ru <= 4) i -= 1;
       }
-      if (u % TW === 0) i += 2;                          // 세로 이음매
+      // 아주 드문 한 장짜리 톤 악센트 (뭉치 아님 — 손이 놓친 자리)
+      const r3 = hash(col * 11 + 5, row * 3 + 8);
+      if (r3 < 0.05) i += 1;
     } else {
       i += (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
       // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
@@ -366,32 +370,47 @@ function brickCourse(g) {
 // 잡고, 이음매 자리를 켜마다 흔들어 크기가 들쭉날쭉하게 한다.
 // 귀퉁이 네 점을 줄눈색으로 깎으면 돌이 둥글어진다 — 이 둥긂이 손맛이다.
 // 톤은 뭉치 단위: 대부분 기본색으로 조용히 두고 드문드문 밝은/어두운 돌
-const BW2 = 8, BH2 = 5;
-function boulderCourse(g) {
-  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-    const c = g.d[y][x];
-    if (!'kKi'.includes(c)) continue;
-    const course = Math.floor(y / BH2);
-    const u = x + (course % 2) * (BW2 >> 1);
-    const col = Math.floor(u / BW2);
-    const ru = ((u % BW2) + BW2) % BW2, ry = y % BH2;
-    // 이 돌의 낯빛 — 돌 하나에 한 색. **속에는 잡음을 안 찍는다.**
-    // 속이 평평해야 선(줄눈)이 돌을 만든다 — 길 자갈과 같은 규칙이다
-    const rc = hash(col * 3 + 1, course * 9 + 4);
-    let base = 'k';
-    if (rc < 0.20) base = 'i';
-    else if (rc > 0.84) base = DARKEN['k'] || 'K';
-    // 세로 줄눈은 **한 칸이면 된다** — 돌의 왼끝 하나만
-    const sm = Math.floor(hash(col * 7 + 3, course * 5 + 1) * 2.0);
-    const isSeam = ry === BH2 - 1 || ru === sm
-      || (ry === 0 && ru === sm + 1);              // 둥근 귀퉁이
-    if (isSeam) g.px(x, y, 'K');
-    else if (ry === 0) g.px(x, y, LIGHTEN[base] || 'i');   // 윗줄 = 빛
-    else g.px(x, y, base);
-  }
+// 드문 돌 — chunky 벽. **벽을 돌로 다 채우지 않는다.**
+//
+// 격자로 쌓으면 벽돌담이고, 큰 돌로 쌓아도 그물이었다. 손으로 찍은
+// 돌벽은 **평평한 회벽에 돌 몇 덩이가 박혀 있는 것**이다 — 면이
+// 조용해야 박힌 돌이 보인다. 돌은 둥근 덩이: 속 한 색, 왼윗귀 빛
+// 한 획, 오른밑에 그늘 선.
+function sparseStones(g) {
+  // 바탕부터 평평하게 — 벽 픽셀을 전부 기본 돌색으로 누른다
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
+    if ('kKi'.includes(g.d[y][x])) g.px(x, y, 'k');
+  const CELL = 12;                                     // 돌 하나가 사는 칸
+  for (let cy = 0; cy < Math.ceil(GH / CELL); cy++)
+    for (let cx = 0; cx < Math.ceil(GW / CELL); cx++) {
+      if (hash(cx * 13 + 4, cy * 17 + 9) > 0.62) continue;   // 빈 칸도 많다
+      const w = 5 + Math.floor(hash(cx, cy) * 4);      // 돌 폭 5~8
+      const hh = 3 + Math.floor(hash(cy, cx) * 2);     // 돌 높이 3~4
+      const ox = cx * CELL + 1 + Math.floor(hash(cx * 3, cy * 7) * (CELL - w - 2));
+      const oy = cy * CELL + 1 + Math.floor(hash(cx * 7, cy * 3) * (CELL - hh - 2));
+      // 벽 위에 온전히 앉는 돌만 — 창·문·테두리에 걸치면 버린다
+      let fits = true;
+      for (let y = oy - 1; y <= oy + hh + 1 && fits; y++)
+        for (let x = ox - 1; x <= ox + w + 1; x++)
+          if (g.d[y] === undefined || g.d[y][x] !== 'k') { fits = false; break; }
+      if (!fits) continue;
+      const tone = hash(cx * 5 + 1, cy * 5 + 2) < 0.4 ? 'i' : 'k';
+      for (let y = oy; y < oy + hh; y++) for (let x = ox; x < ox + w; x++) {
+        // 귀퉁이 네 점은 비워 둥글린다
+        const corner = (x === ox || x === ox + w - 1) && (y === oy || y === oy + hh - 1);
+        if (!corner) g.px(x, y, tone);
+      }
+      g.hline(ox + 1, ox + w - 2, oy + hh - 1, 'K');   // 밑그늘
+      for (let y = oy + 1; y < oy + hh - 1; y++) g.px(ox + w - 1, y, 'K');
+      g.hline(ox + 1, ox + 2, oy, LIGHTEN[tone] || 'i');   // 왼윗귀 빛 한 획
+    }
+  // 잔 점 — 벽에 낀 때. 아주 드물게
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
+    if (g.d[y][x] === 'k' && hash(x * 3 + 2, y * 5 + 4) < 0.015)
+      g.px(x, y, 'K');
 }
 
-// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
+// 목재 — 세로로 긴 결// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
 function woodGrain(g) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = g.d[y][x];
@@ -449,7 +468,7 @@ function roughen(g) {
   ditherFace(g, ['i', 'k', 'K'], 0, GROUND);            // 벽돌
   ditherFace(g, ['x', 'w', 'W'], 0, GROUND);            // 석재 테두리
   shingles(g);          // 기와는 사다리 톤으로 한 장씩
-  if (CHUNKY) boulderCourse(g); else brickCourse(g);
+  if (CHUNKY) sparseStones(g); else brickCourse(g);
   wallPatches(g, 0, GROUND);
   woodGrain(g);
   weather(g);           // 흘러내린 줄 · 밑동 흙탕물
@@ -597,7 +616,11 @@ function extrude(g) {
         if (!isRoof || g.d[ny][nx] !== '.') continue;
         // 뒤로 누운 면도 **같은 기와**다. 켜 번호를 앞 지붕에서 이어 받고,
         // 톤 사다리의 밝은 몫(BACK_LO~BACK_HI)을 깊이에 따라 나눠 쓴다
-        roofT[ny][nx] = BACK_LO + (BACK_HI - BACK_LO) * (i / DEPTH);
+        // chunky 는 윗면을 한 단 누른다 — 맨 밝은 단을 평평하게 비우니
+        // 지붕이 아니라 쌓인 눈이었다. 밝되 색이 있는 단에서 시작한다
+        const bl = CHUNKY ? BACK_LO + 0.12 : BACK_LO;
+        const bh = CHUNKY ? BACK_HI + 0.10 : BACK_HI;
+        roofT[ny][nx] = bl + (bh - bl) * (i / DEPTH);
         roofRow[ny][nx] = FRONT_ROWS + [...COURSE].filter(v => v <= i).length;
       }
     }
@@ -1192,13 +1215,19 @@ function chimney(g, x, top, base, far, w) {
     const u = xx + ((row % 2) ? (TW >> 1) : 0);
     const col = Math.floor(u / TW);
     const r = hash(col * 3 + 7, row * 5 + 1);
-    // 왼쪽이 빛, 오른쪽 두 줄이 그늘 — 각진 기둥의 기본은 그대로 두고
-    // 그 위에 장마다의 얼룩을 얹는다
+    // 왼쪽이 빛, 오른쪽 두 줄이 그늘 — 각진 기둥의 기본
     let i = xx === x ? 0 : (xx >= x1 - 1 ? 3 : 1);
-    if (r < 0.22) i += 1; else if (r > 0.80) i -= 1;
-    if (Math.floor((base - (y - 1)) / TH) !== row) i -= 1;   // 윗변 (빛)
-    if (Math.floor((base - (y + 1)) / TH) !== row) i += 1;   // 아랫변 (겹침 턱)
-    if (u % TW === 0) i += 1;                                // 세로 이음매
+    if (CHUNKY) {
+      // 평평한 기둥에 **드문 획**만 — 지붕·벽과 같은 그림체
+      const isBottom = Math.floor((base - (y + 1)) / TH) !== row;
+      const ru = ((u % TW) + TW) % TW;
+      if (r < 0.30 && isBottom && ru >= 1 && ru <= 4) i += 1;
+    } else {
+      if (r < 0.22) i += 1; else if (r > 0.80) i -= 1;
+      if (Math.floor((base - (y - 1)) / TH) !== row) i -= 1;   // 윗변 (빛)
+      if (Math.floor((base - (y + 1)) / TH) !== row) i += 1;   // 아랫변 (겹침 턱)
+      if (u % TW === 0) i += 1;                                // 세로 이음매
+    }
     P(xx, y, LAD[Math.max(0, Math.min(3, i))]);
   }
 

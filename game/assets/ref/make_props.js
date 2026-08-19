@@ -266,14 +266,12 @@ function stoneTop(g, x0, x1, yFront, pal, depth) {
     for (let x = a; x <= b; x++) {
       // 소실점 기준으로 되돌린 좌표 — 뒤로 가도 줄눈이 **같은 돌에** 이어진다
       const u = Math.round((x - cx) / shrink) + 400;
-      // 돌 하나의 낯빛 — 뭉치 단위로만 흔든다 (towerRow 와 같은 규칙).
-      // 줄눈은 **정면보다 얕게** 판다. 정면과 같은 깊이로 팠더니 윗면이
-      // 어두워져서 두 면의 밝기가 붙어 버렸다 — 벽에 가로줄을 그은 꼴이다
+      // **다 그리지 않는다** — 윗면도 평평하게 두고 드문 획만.
+      // 획은 켜 줄에서만, 서너 돌에 하나
       const r = h(Math.floor(u / TCW), k, 51);
       let i = base;
-      if (r < 0.16) i -= 1; else if (r > 0.86) i += 1;
-      if (seam.has(k)) i += 2;                 // 켜 줄눈 (가로)
-      if (u % TCW === 0) i += 1;               // 세로 줄눈
+      const ru = ((u % TCW) + TCW) % TCW;
+      if (r < 0.30 && seam.has(k) && ru >= 1 && ru <= 4) i += 1;
       g.px(x, yFront - k, dk(Math.max(0, i)));
     }
   }
@@ -345,20 +343,48 @@ function towerRow(g, x0, x1, y, seed, lift) {
     const u = x + (course % 2) * (TCW >> 1);
     const col = Math.floor(u / TCW);
     const ru = ((u % TCW) + TCW) % TCW, ry = y % TCH;
-    // 이 돌의 낯빛 — 돌 하나에 한 색. 속은 평평하게 (길 자갈과 같은 규칙)
-    const rc = h(col, course, seed);
-    let base = 3 + lift + (rc < 0.26 ? -1 : (rc > 0.80 ? 1 : 0));
+    // **다 그리지 않는다** — 평평한 돌벽에 드문 획만. 본채와 같은 그림체
+    let base = 3 + lift;
     if (x <= x0 + 1) base -= 1;                    // 왼쪽 = 빛을 받는 면
     else if (x >= x1 - 2) base += 2;               // 오른쪽 = 돌아간 면
-    base = clamp(base, 1, 5);
-    // 세로 줄눈은 한 칸 — 돌의 왼끝 하나만
-    const sm = Math.floor(h(col * 7 + 3, course * 5 + 1, seed) * 2.0);
-    const isSeam = ry === TCH - 1 || ru === sm
-      || (ry === 0 && ru === sm + 1);              // 둥근 귀퉁이
-    if (isSeam) g.px(x, y, ST[6]);
-    else if (ry === 0) g.px(x, y, ST[clamp(base - 1, 0, 7)]);   // 윗줄 = 빛
-    else g.px(x, y, ST[base]);
+    const r = h(col, course, seed);
+    if (r < 0.28 && ry === TCH - 1 && ru >= 1 && ru <= 4) base += 1;   // 드문 획
+    if (h(x * 3 + 1, y * 5 + 2, seed + 7) < 0.012) base += 2;          // 잔 점
+    g.px(x, y, ST[clamp(base, 0, 7)]);
   }
+}
+
+// 박힌 돌 — 평평한 돌벽에 돌 몇 덩이. 본채 sparseStones 와 같은 규칙.
+// 온전히 돌벽 위에 앉는 자리에만 놓는다 (아가리·불·그을음을 피한다)
+function scatterStones(g, seed) {
+  const onST = (x, y) => {
+    const c = g.get(x, y);
+    if (!c || c.length > 3) return false;
+    for (const t of ST) if (t === c) return true;
+    return false;
+  };
+  const CELL = 11;
+  for (let cy = 0; cy < Math.ceil(g.h / CELL); cy++)
+    for (let cx = 0; cx < Math.ceil(g.w / CELL); cx++) {
+      if (h(cx * 13 + 4, cy * 17 + 9, seed) > 0.55) continue;
+      const w = 4 + Math.floor(h(cx, cy, seed) * 3);
+      const hh = 3 + Math.floor(h(cy, cx, seed) * 2);
+      const ox = cx * CELL + 1 + Math.floor(h(cx * 3, cy * 7, seed) * Math.max(1, CELL - w - 2));
+      const oy = cy * CELL + 1 + Math.floor(h(cx * 7, cy * 3, seed) * Math.max(1, CELL - hh - 2));
+      let fits = true;
+      for (let y = oy - 1; y <= oy + hh && fits; y++)
+        for (let x = ox - 1; x <= ox + w; x++)
+          if (!onST(x, y)) { fits = false; break; }
+      if (!fits) continue;
+      const tone = h(cx * 5 + 1, cy * 5 + 2, seed) < 0.4 ? 2 : 3;
+      for (let y = oy; y < oy + hh; y++) for (let x = ox; x < ox + w; x++) {
+        const corner = (x === ox || x === ox + w - 1) && (y === oy || y === oy + hh - 1);
+        if (!corner) g.px(x, y, ST[tone]);
+      }
+      g.hline(ox + 1, ox + w - 2, oy + hh - 1, ST[6]);   // 밑그늘
+      for (let y = oy + 1; y < oy + hh - 1; y++) g.px(ox + w - 1, y, ST[6]);
+      g.hline(ox + 1, ox + 2, oy, ST[tone - 2]);          // 왼윗귀 빛 한 획
+    }
 }
 
 // 마당 흙이 튄 색 — **바닥 그림(make_ground.js)의 EARTH 사다리 그대로.**
@@ -520,6 +546,7 @@ function forge(f) {
   // 비바람 자국을 다 갖고 있는데 화로만 갓 쌓은 새 돌탑이면, 같은 재료를
   // 쓰고도 혼자 새것으로 뜬다
   weatherStone(g, f);
+  scatterStones(g, 5);                            // 박힌 돌 몇 덩이 — 본채와 같은 손
   return outline(g);
 }
 

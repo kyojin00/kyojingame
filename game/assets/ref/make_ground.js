@@ -159,50 +159,50 @@ function cobble(seed) {
   // 그리고 **알 크기도 흔든다.** 네 칸짜리만 깔면 아무리 톤을 흔들어도
   // 격자가 그대로 읽힌다 — 다섯에 하나쯤은 오른쪽 줄눈을 지워 여덟 칸짜리
   // 넓은 돌로 만든다. 포장은 자로 잰 것이 아니다
-  // **돌 한 알을 손으로 그린다.**
+  // **다 그리지 않는다 — 평평한 자갈밭에 돌 몇 덩이.**
   //
-  // 줄눈을 아래·오른쪽에만 긋는 「벽돌 쌓기」로 두 번 갔다가 두 번 다
-  // 벽돌담이 됐다. 손으로 찍은 포장은 다르다 — 알 하나하나가 **사방으로
-  // 어두운 줄눈에 둘러싸인 둥근 덩어리**고, 속은 평평하며, 윗줄에만
-  // 빛이 한 줄 얹힌다. 선이 알을 만들고, 평평함이 조용함을 만든다.
-  //
-  // 알의 자는 16을 나눠야 타일 경계에서 줄눈이 안 어긋난다 (8x4 ✔)
-  const CW = 8, CH = 4;
-  const PSHIFT = [1, 0, -1][((seed % 3) + 3) % 3];
+  // 알을 격자로 다 그리는 길(벽돌담)과 사방 줄눈(그물)을 둘 다 지나서
+  // 남은 답이다. 손으로 찍은 길은 바탕이 조용한 자갈밭이고, 그 위에
+  // 도드라진 돌 몇 덩이만 손으로 놓는다 — 본채 벽(sparseStones)과
+  // 같은 규칙이다.
+  // 장의 밝기를 통째로 올리내리면 (PSHIFT +-1) 이웃 타일과의 경계가
+  // 세로줄로 드러난다. 밝기 대신 **어두운 얼룩의 비율**을 흔든다 —
+  // 같은 두 톤인데 장마다 섞임새만 달라서 경계가 안 보인다
+  const MIXSHIFT = [0.12, 0.0, -0.12][((seed % 3) + 3) % 3];
+  // ① 바탕 — 낮은 주파수 두 톤. 얼룩이 서너 칸에 걸친다
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const course = Math.floor(y / CH);
-    const u = x + (course % 2) * (CW / 2);
-    const col = Math.floor(u / CW);
-    const ry = y % CH, rx = ((u % CW) + CW) % CW;
-    // 이 알의 낯빛 — 알 하나에 한 색. 속에는 잡음을 안 찍는다
-    const rc = h(col, course, seed);
-    let base = 2 + (rc < 0.30 ? 0 : (rc < 0.72 ? 1 : 2));
-    if (h(col >> 1, course >> 1, seed + 31) < 0.5) base += PSHIFT;
-    base = clamp(base, 1, 4);
-    // 알의 꼴 — 좌우 끝을 켜마다 한 칸씩 흔들어 크기가 들쭉날쭉하게
-    // 세로 줄눈은 **한 칸이면 된다** — 알의 왼끝 하나만. 오른끝까지 그으면
-    // 이웃 알의 왼끝과 겹쳐 줄눈이 두 칸이 되고, 길이 아니라 그물이 된다
-    const sm = Math.floor(h(col * 7 + 3, course * 5 + 1, seed) * 2.0);
-    const isSeam = ry === CH - 1 || rx === sm
-      // 둥근 귀퉁이 — 윗줄에서 줄눈 옆 한 칸을 같이 깎는다
-      || (ry === 0 && rx === sm + 1);
-    if (isSeam) {
-      g.px(x, y, STONE[6]);                       // 줄눈 = 어두운 한 색
-    } else if (ry === 0) {
-      g.px(x, y, STONE[clamp(base - 1, 0, 7)]);   // 윗줄 = 빛
-    } else {
-      g.px(x, y, STONE[base]);                    // 속은 평평하다
+    const t = h(x >> 2, y >> 2, seed) * 0.55 + h(x >> 1, y >> 1, seed + 9) * 0.30
+      + h(x, y, seed + 17) * 0.15;
+    g.px(x, y, STONE[t < 0.42 + MIXSHIFT ? 3 : 2]);
+  }
+  // ② 도드라진 돌 — 두어 덩이. 타일 가장자리를 밟지 않아야 이음매가 안 보인다
+  for (let k = 0; k < 3; k++) {
+    if (h(k * 7 + 1, seed, 21) > 0.80) continue;
+    const w = 4 + Math.floor(h(k, seed, 22) * 3);          // 폭 4~6
+    const hh = 3 + Math.floor(h(seed, k, 23) * 2);         // 높이 3~4
+    const ox = 1 + Math.floor(h(k * 3, seed, 24) * (N - w - 2));
+    const oy = 1 + Math.floor(h(seed, k * 3, 25) * (N - hh - 2));
+    const tone = h(k, seed, 26) < 0.4 ? 1 : 2;
+    for (let y = oy; y < oy + hh; y++) for (let x = ox; x < ox + w; x++) {
+      const corner = (x === ox || x === ox + w - 1) && (y === oy || y === oy + hh - 1);
+      if (!corner) g.px(x, y, STONE[tone]);
     }
-    // 빠진 알 — 흙이 드러난 자리. 드물게
-    if (h(col, course, seed + 9) < 0.06 && !isSeam)
-      g.px(x, y, EARTH[2 + (h(x, y, seed + 3) < 0.4 ? 1 : 0)]);
+    for (let x = ox + 1; x <= ox + w - 2; x++) g.px(x, oy + hh - 1, STONE[5]);   // 밑그늘
+    for (let y = oy + 1; y < oy + hh - 1; y++) g.px(ox + w - 1, y, STONE[5]);
+    g.px(ox + 1, oy, STONE[clamp(tone - 1, 0, 7)]);        // 왼윗귀 빛
+    g.px(ox + 2, oy, STONE[clamp(tone - 1, 0, 7)]);
+  }
+  // ③ 잔 점과 흙 — 아주 드물게. 바탕이 조용해야 돌이 보인다
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const r = h(x * 3 + 1, y * 5 + 2, seed + 29);
+    if (r < 0.02) g.px(x, y, STONE[5]);
+    else if (r > 0.988) g.px(x, y, EARTH[2]);
   }
   // 줄눈에 낀 이끼 — 어두운 줄눈 자리에만, 덩어리로
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const c = g.get(x, y);
     if (c !== STONE[5] && c !== STONE[6] && c !== STONE[7] && !EARTH.includes(c)) continue;
-    // 줄눈이 사방으로 이어진 지금은 0.20 이면 온 길이 초록 점박이가 된다
-    if (h(x >> 1, y >> 1, seed + 11) > 0.09) continue;
+    if (h(x >> 1, y >> 1, seed + 11) > 0.12) continue;
     g.px(x, y, MOSS[h(x, y, seed + 13) < 0.5 ? 1 : 2]);
   }
   return g;
