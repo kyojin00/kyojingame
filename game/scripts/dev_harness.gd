@@ -7134,14 +7134,19 @@ func _album_tick() -> void:
 	var ids: Array = m.VILLAGE_PLOTS.keys()
 	var slot := int(_shot_frames / ALBUM_HOLD)
 	var beat := _shot_frames % ALBUM_HOLD
-	if slot > ids.size():
+	if slot > ids.size() + 1:
 		get_tree().quit()
 		return
-	# 마지막 한 장은 **광장**이다 — 부지가 아니라 그 사이의 한복판
-	var plaza := slot == ids.size()
-	var pid := "plaza" if plaza else str(ids[slot])
+	# 마지막 두 장은 **광장**이다 — 부지가 아니라 그 사이의 한복판.
+	# 맨 끝 한 장은 밤 광장: 등불 빛무리와 어둠이 어떻게 앉는지 본다
+	var plaza := slot >= ids.size()
+	var night := slot == ids.size() + 1
+	var pid := ("plaza_night" if night else "plaza") if plaza else str(ids[slot])
 	var a: Vector2i = m.PLAZA.get_center() - Vector2i(2, 2) if plaza \
 		else (m.VILLAGE_PLOTS[pid].anchor as Vector2i)
+	if night and beat == 2:
+		GameData.minutes = int(21.5 * 60.0)
+		m.daycycle._update_night()
 	if beat == 1:
 		m.dialog.close()
 		# 문 칸 위에 세우면 가게 문이 열려 대화창이 사진을 덮는다 — 마당 아래로
@@ -7160,6 +7165,8 @@ func _album_tick() -> void:
 		# 자리를 옮길 때마다 몇 개씩 조용히 사라졌다 — 밭흙 위라서, 옆문
 		# 자리라서. 사진만 봐서는 무엇이 빠졌는지 알 수가 없다
 		var miss := []
+		if night:
+			return
 		for entry: Array in (m.PLOT_DECOR.get(pid, {}) as Dictionary).get("props", []):
 			var t: Vector2i = a + (entry[0] as Vector2i)
 			var have := m.objects.has(t)

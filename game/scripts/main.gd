@@ -109,6 +109,7 @@ var obj_nodes: Dictionary = {}  # Vector2i -> Node2D (설치/제거 가능한 �
 var tex: Dictionary = {}
 var world: Node2D
 var overlay: Node2D  # 건물보다 앞에 그리는 안내 텍스트/화살표/날씨 레이어
+var glow: Node2D     # 밤 어둠(CanvasModulate) **밖**에서 그리는 등불 빛무리
 var player: Node2D
 var hud: CanvasLayer
 var shop: CanvasLayer
@@ -1329,6 +1330,20 @@ func _ready() -> void:
 	overlay.z_index = 100
 	overlay.draw.connect(renderer._draw_overlay)
 	add_child(overlay)
+
+	# 등불 빛무리 — CanvasModulate(밤)는 같은 캔버스의 그림을 전부
+	# 어둡게 눌러서, overlay에 아무리 밝게 그려도 같이 꺼진다.
+	# **딴 CanvasLayer**에 얹으면 어둠이 못 미친다. follow_viewport로
+	# 세계 좌표를 그대로 쓴다 (HUD보다 밑, 세계보다 위)
+	var glow_layer := CanvasLayer.new()
+	glow_layer.name = "GlowLayer"
+	glow_layer.layer = 1
+	glow_layer.follow_viewport_enabled = true
+	add_child(glow_layer)
+	glow = Node2D.new()
+	glow.name = "Glow"
+	glow.draw.connect(renderer._draw_glows)
+	glow_layer.add_child(glow)
 
 	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
@@ -2795,6 +2810,7 @@ func _process(delta: float) -> void:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	_starve_process(delta)
 	renderer._update_particles(delta)
+	renderer._update_ambient(delta)
 	daycycle._update_night_mobs(delta)
 	objnode._update_tree_fade()
 	story._update_u_intro()
@@ -2810,6 +2826,7 @@ func _process(delta: float) -> void:
 		_perf_tick(delta)
 	queue_redraw()
 	overlay.queue_redraw()
+	glow.queue_redraw()
 	if _shot_path != "":
 		harness._debug_tick()
 
@@ -3088,6 +3105,14 @@ const PARTICLE_DEFS := {
 	# 쓰러진 나무가 땅에 닿을 때 이는 흙먼지 (옆으로 낮게 퍼진다)
 	"dust": {"c": Color(0.74, 0.68, 0.54), "n": 14, "up": -12.0, "g": 18.0,
 		"drift": 34.0, "size": 2.0, "life": 1.6},
+	# 가을 잎 — 앰비언트 낙엽의 가을 옷
+	"leaf_fall": {"c": Color(0.85, 0.52, 0.2), "n": 9, "up": -10.0, "g": 14.0,
+		"drift": 22.0, "size": 2.0, "life": 2.6, "sway": 26.0},
+	# 발걸음 — 잔디에선 풀잎, 흙·자갈·모래에선 먼지가 인다
+	"step_grass": {"c": Color(0.44, 0.7, 0.3), "n": 3, "up": -20.0, "g": 85.0,
+		"drift": 12.0, "life": 0.8},
+	"step_dust": {"c": Color(0.72, 0.64, 0.5), "n": 3, "up": -12.0, "g": 26.0,
+		"drift": 10.0, "size": 1.6, "life": 0.9},
 }
 
 

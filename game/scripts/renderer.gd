@@ -13,6 +13,169 @@ extends Node
 
 var m: KyojinMain    # main.gd
 
+# ---- 살아 있는 마을 (앰비언트) ----
+#
+# 정적인 화면과 살아 있는 화면의 차이는 **아무도 시키지 않은 움직임**이다:
+# 구름 그림자가 땅 위를 지나가고, 나무에서 잎이 한두 장 떨어지고,
+# 걸음마다 발밑에서 잔것이 인다. 셋 다 게임 규칙에는 손대지 않는다.
+#
+# 검증(KYOJIN_SHOT)에서는 끈다 — 무작위 픽셀이 어서션을 흔들면 안 된다.
+# 앨범(KYOJIN_ALBUM)은 사람 눈으로 보는 사진이니 켠 채로 찍는다.
+var _ambient_on := true
+var _cloud_tex: Texture2D = null
+var _amb_leaf_cd := 0.0
+var _step_accum := 0.0
+var _last_player_pos := Vector2.ZERO
+const CLOUD_CELL := Vector2(560.0, 430.0)   # 구름 하나가 사는 칸
+const CLOUD_WIND := Vector2(8.0, 3.2)       # 초당 흐르는 속도 (세계 px)
+
+
+func _ready() -> void:
+	_ambient_on = OS.get_environment("KYOJIN_SHOT") == "" \
+		or OS.get_environment("KYOJIN_ALBUM") != ""
+	# 구름 그림자 원판 — 가장자리로 갈수록 옅어지는 둥근 얼룩 한 장
+	var img := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	for y in 96:
+		for x in 96:
+			var d := Vector2(x - 48, y - 48).length() / 46.0
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			a = a * a * (3.0 - 2.0 * a)
+			img.set_pixel(x, y, Color(1, 1, 1, a * a))
+	_cloud_tex = ImageTexture.create_from_image(img)
+
+
+# 화면이 보고 있는 세계 사각형
+func _view_rect() -> Rect2:
+	var inv: Transform2D = m.overlay.get_canvas_transform().affine_inverse()
+	var vp: Vector2 = m.get_viewport().get_visible_rect().size
+	var o: Vector2 = inv * Vector2.ZERO
+	return Rect2(o, (inv * vp) - o)
+
+
+# 구름 그림자 — 칸마다 구름이 하나 살거나 안 살고, 바람에 실려 흐른다.
+# 자리는 해시로 굳혀 두므로 같은 구름이 늘 같은 꼴로 온다
+func _draw_clouds() -> void:
+	if not _ambient_on or _cloud_tex == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	var view := _view_rect().grow(340.0)
+	var off: Vector2 = CLOUD_WIND * m.weather_time
+	var c0x := floori((view.position.x + off.x) / CLOUD_CELL.x) - 1
+	var c1x := floori((view.end.x + off.x) / CLOUD_CELL.x) + 1
+	var c0y := floori((view.position.y + off.y) / CLOUD_CELL.y) - 1
+	var c1y := floori((view.end.y + off.y) / CLOUD_CELL.y) + 1
+	for cy in range(c0y, c1y + 1):
+		for cx in range(c0x, c1x + 1):
+			var r0 := m._hash01(cx * 7 + 3, cy * 11 + 5)
+			if r0 < 0.42:
+				continue                       # 빈 하늘도 많다
+			var pos := Vector2(
+				(cx + m._hash01(cx, cy)) * CLOUD_CELL.x,
+				(cy + m._hash01(cy * 3 + 1, cx * 5 + 2)) * CLOUD_CELL.y) - off
+			var sc := 2.0 + m._hash01(cx * 13 + 1, cy * 17 + 4) * 1.6
+			var size := Vector2(96.0 * sc * 1.7, 96.0 * sc)
+			var a := 0.065 + 0.05 * m._hash01(cx * 5 + 2, cy * 3 + 7)
+			# 그늘은 남보라로 기운다 — 회색 그늘은 때가 된다
+			m.overlay.draw_texture_rect(_cloud_tex,
+				Rect2(pos - size * 0.5, size), false,
+				Color(0.10, 0.10, 0.22, a))
+			# 같은 구름의 작은 짝 — 덩어리가 둘이어야 구름 꼴이 난다
+			var pos2 := pos + Vector2(size.x * 0.34, size.y * 0.18)
+			m.overlay.draw_texture_rect(_cloud_tex,
+				Rect2(pos2 - size * 0.30, size * 0.6), false,
+				Color(0.10, 0.10, 0.22, a * 0.8))
+
+
+# ---- 밤 등불 빛무리 ----
+#
+# 밤(CanvasModulate)이 짙어질수록 가로등·창가에 따뜻한 빛무리가 살아난다.
+# 등불 자리는 프레임마다 온 objects를 뒤지면 비싸니 몇 초에 한 번 모은다
+var _lamp_cache: Array = []
+var _lamp_cache_cd := 0.0
+
+func _draw_glows() -> void:
+	if m.night == null or m.player == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	# 어둠의 깊이 — 밤 색이 어두울수록 빛무리가 짙어진다
+	var dark := 1.0 - m.night.color.v
+	if dark < 0.18 or _cloud_tex == null:
+		return
+	var a := clampf((dark - 0.18) / 0.5, 0.0, 1.0)
+	var view := _view_rect().grow(160.0)
+	for lp: Vector2 in _lamp_cache:
+		if not view.has_point(lp):
+			continue
+		var size := Vector2(210, 210)
+		m.glow.draw_texture_rect(_cloud_tex, Rect2(lp - size * 0.5, size), false,
+			Color(1.0, 0.72, 0.32, 0.22 * a))
+		m.glow.draw_texture_rect(_cloud_tex, Rect2(lp - size * 0.25, size * 0.5), false,
+			Color(1.0, 0.85, 0.5, 0.18 * a))
+
+
+func _refresh_lamp_cache() -> void:
+	_lamp_cache.clear()
+	for pos: Vector2i in m.objects:
+		var k := String(m.objects[pos].kind)
+		if k == "deco_lamp":
+			# 불알은 기둥 위에 있다 — 칸 가운데보다 위
+			_lamp_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE - 14))
+		elif k == "deco_forge":
+			_lamp_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE + 20))
+
+
+# 앰비언트 한 틱 — main._process가 매 프레임 부른다
+func _update_ambient(delta: float) -> void:
+	_lamp_cache_cd -= delta
+	if _lamp_cache_cd <= 0.0:
+		_lamp_cache_cd = 4.0
+		_refresh_lamp_cache()
+	if not _ambient_on or m.player == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	# ① 나무에서 잎이 진다 — 화면 안 무작위 칸을 찔러 나무를 찾는다
+	_amb_leaf_cd -= delta
+	if _amb_leaf_cd <= 0.0:
+		_amb_leaf_cd = randf_range(0.55, 1.2)
+		if GameData.season_key() != "winter":
+			var view := _view_rect()
+			var tx0 := maxi(0, int(view.position.x / m.TILE))
+			var ty0 := maxi(0, int(view.position.y / m.TILE))
+			var tx1 := mini(m.MAP_W - 1, int(view.end.x / m.TILE))
+			var ty1 := mini(m.WORLD_H - 1, int(view.end.y / m.TILE))
+			for attempt in 14:
+				var pos := Vector2i(randi_range(tx0, tx1), randi_range(ty0, ty1))
+				var obj: Variant = m.objects.get(pos)
+				if obj == null or String(obj.kind) != "tree":
+					continue
+				var leaf := "leaf_fall" if GameData.season_key() == "fall" else "leaf"
+				spawn_burst(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE - 30),
+					leaf, 0.25, 16.0)
+				break
+	# ② 발걸음 — 일정 거리마다 바닥에 맞는 잔것이 인다
+	var dmove := m.player.position.distance_to(_last_player_pos)
+	_last_player_pos = m.player.position
+	if dmove > 0.05 and dmove < 60.0:
+		_step_accum += dmove
+	if _step_accum >= 30.0:
+		_step_accum = 0.0
+		var t := m.player_tile()
+		if t.y >= 0 and t.y < m.WORLD_H and t.x >= 0 and t.x < m.MAP_W:
+			var gk: String = m.grid[t.y][t.x].ground
+			var pk := ""
+			if gk == "grass" or gk == "":
+				pk = "step_grass"
+			elif gk in ["yard", "soil", "path", "sand"]:
+				pk = "step_dust"
+			if pk != "":
+				spawn_burst(m.player.position + Vector2(0, 4), pk, 1.0, 4.0)
+
 
 func _draw_building_signs() -> void:
 	var f: Font = m.UI_FONT_SMALL
@@ -147,6 +310,7 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 
 
 func _draw_overlay() -> void:
+	_draw_clouds()   # 구름 그림자가 제일 밑 — 안내 표시를 어둡게 하면 안 된다
 	# 길라잡이 화살표는 없앴다 — 퀘스트 목표 문구와 길 자체로 안내한다
 	_draw_festival()
 	_draw_greenhouse()
