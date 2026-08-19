@@ -354,6 +354,7 @@ function brickRow(g, x0, x1, y, seed, lift) {
     if (rc > 0.90) i += 2;                          // 몹시 그은 장
     if (x <= x0 + 1) i -= 1;                        // 왼쪽 = 빛
     else if (x >= x1 - 1) i += 2;                   // 오른쪽 = 돌아간 면
+    if (ry === 0 && ru > 0) i -= 1;                 // 장의 윗변 = 빛 (도드라진다)
     if (ry === BKH - 1 || ru === 0) i = 4 + (lift > 0 ? 1 : 0);   // 줄눈
     if (h(col * 5 + 2, course * 7 + 3, seed) < 0.05) i = 4;       // 이 빠진 장
     g.px(x, y, FG[clamp(i, 0, 6)]);
@@ -443,6 +444,19 @@ function forge(f) {
     const half = Math.round(7 + t * 2) + jag(y, 47);   // 반폭 7 -> 9, 들쭉날쭉
     brickRow(g, FCX - half, FCX + half, y, 7, 1);       // 윗동은 한 단 더 그을었다
   }
+  // 쇠테 — 가마 굴뚝은 불길에 터지지 말라고 쇠띠를 둘러 조인다.
+  // 가운데가 밝고 양 끝이 어두워야 통을 돌아 나온다. 대갈못 다섯
+  {
+    const hy = CY1 - 5;
+    const bx0 = FCX - 9, bx1 = FCX + 9;
+    for (let x = bx0; x <= bx1; x++) {
+      const t = Math.abs(x - FCX) / 9.0;
+      g.px(x, hy, IR[t > 0.84 ? 4 : (t > 0.5 ? 3 : 2)]);
+      g.px(x, hy + 1, IR[t > 0.84 ? 4 : 3]);
+    }
+    for (let x = bx0 + 2; x <= bx1 - 2; x += 4) g.px(x, hy, IR[1]);
+    g.hline(bx0, bx1, hy + 2, FG[5]);                    // 띠 밑 그늘
+  }
   // 굴뚝 발이 상판에 닿는 자리 — 두 줄 그늘이 있어야 「꽂혀 있다」가 된다.
   // 상판 위에 드리운 그림자니 **오른쪽으로 번진다** (빛은 왼쪽 위에서 온다)
   for (let x = FCX - 9; x <= FCX + 9; x++) {
@@ -476,12 +490,30 @@ function forge(f) {
     const cut = dy < 0 ? Math.round(AR - Math.sqrt(Math.max(0, AR * AR - dy * dy))) : 0;
     for (let x = MX0 + cut; x <= MX1 - cut; x++) g.px(x, y, [24, 16, 14]);
   }
-  // 아치 테두리 — 쐐기돌을 둘러 박았다
-  for (let y = MY0 - 1; y <= MY1; y++) {
-    const dy = y - (MY0 + AR);
-    const cut = dy < 0 ? Math.round(AR - Math.sqrt(Math.max(0, AR * AR - dy * dy))) : 0;
-    g.px(MX0 + cut - 1, y, FG[1]);
-    g.px(MX1 - cut + 1, y, FG[5]);
+  // 아치 테두리 — **방사형 쐐기벽돌.** 한 줄 띠로 둘렀을 때는 구멍에
+  // 테를 그린 것이었다. 가마 아가리는 쐐기꼴 벽돌이 부챗살로 돌아가며
+  // 아치를 받친다 — 세 칸짜리 링을 각도로 갈라 장마다 색을 달리하고
+  // 장 사이에 줄눈을 박는다
+  {
+    const acx = (MX0 + MX1) / 2, acy = MY0 + AR;
+    for (let y = MY0 - 4; y <= MY1; y++) for (let x = MX0 - 4; x <= MX1 + 4; x++) {
+      const dx = x - acx, dy = y - acy;
+      if (dy > 0) continue;                              // 위 반원만
+      // 아가리가 좌우로 넓으니 가로만 눌러 타원 반지름으로 잰다
+      const rr = Math.sqrt(dx * dx * 0.72 + dy * dy);
+      if (rr < AR - 0.2 || rr > AR + 2.6) continue;
+      const a2 = Math.atan2(-dy, dx);                    // 0(오른쪽) ~ PI(왼쪽)
+      const wedge = Math.floor(a2 / (Math.PI / 9));      // 쐐기 아홉 장
+      const joint = Math.abs(a2 / (Math.PI / 9) - wedge - 0.5) > 0.40;
+      let t = 1 + Math.floor(h(wedge, 3, 91) * 2.0);
+      if (a2 > Math.PI * 0.55) t -= 1;                   // 왼쪽 = 빛
+      if (joint) t = 5;                                  // 장 사이 줄눈
+      g.px(x, y, FG[clamp(t, 0, 6)]);
+    }
+    // 이맛돌 — 아치 꼭대기 한가운데, 반 칸 도드라진다
+    g.rect(Math.round(acx) - 1, MY0 - 5, Math.round(acx) + 1, MY0 - 2, FG[1]);
+    g.px(Math.round(acx) - 1, MY0 - 5, FG[0]);
+    g.px(Math.round(acx) + 1, MY0 - 2, FG[4]);
   }
   // 그을음 — 아가리 위로 검게 번진다. **정면에만.** 그을음은 아가리에서
   // 올라온 연기가 벽에 앉은 것이다 — 눕는 면(상판)이 아니라 선 면에만 앉는다
@@ -515,6 +547,27 @@ function forge(f) {
     const sx = FCX + Math.round(Math.sin(i * 2.1 + f * 1.3) * 6);
     const sy = 5 - ((i * 3 + f * 2) % 5);
     g.px(sx, sy, i % 2 === 0 ? FI[1] : FI[2]);
+  }
+  // ---- 살림의 흔적 ----
+  //
+  // 가마 곁에는 쓰던 것이 놓여 있어야 한다 — 물건이 이야기를 만든다
+  // 부지깽이 — 오른쪽 벽에 비스듬히 기대 있다
+  for (let k = 0; k < 9; k++) g.px(40 + (k >> 2), 48 + k, IR[k < 2 ? 1 : 3]);
+  g.px(40, 47, IR[0]); g.px(41, 47, IR[1]);       // 고리 손잡이
+  // 재무더기 — 아가리 왼쪽 앞. 쓸어 낸 재가 쌓여 있다
+  for (let k = 0; k < 3; k++)
+    g.hline(7 + k, 13 - k, 66 - k, ST[k === 2 ? 1 : (k === 1 ? 2 : 3)]);
+  g.px(9, 62, ST[2]); g.px(11, 63, ST[4]);        // 흩어진 재
+  g.px(8, 66, FG[5]);
+  // 연기 — 아가리 위로 몽글몽글. 장(f)마다 자리가 흔들려 살아 움직인다
+  {
+    const SMO = [[206, 200, 196], [174, 168, 166]];
+    for (let i = 0; i < 3; i++) {
+      const sx = FCX - 3 + ((f * 2 + i * 3) % 7);
+      const sy = 2 - ((f + i) % 3);
+      g.px(sx, sy, SMO[i % 2]); g.px(sx + 1, sy, SMO[(i + 1) % 2]);
+      if (i === 0) g.px(sx, sy - 1, SMO[1]);
+    }
   }
   // ---- 발치 ----
   g.rect(0, 61, 4, 66, FG[3]);                    // 굴러 떨어진 벽돌

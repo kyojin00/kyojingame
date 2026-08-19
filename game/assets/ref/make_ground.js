@@ -192,11 +192,23 @@ function cobble(seed) {
     g.px(ox + 1, oy, STONE[clamp(tone - 1, 0, 7)]);        // 왼윗귀 빛
     g.px(ox + 2, oy, STONE[clamp(tone - 1, 0, 7)]);
   }
-  // ③ 잔 점과 흙 — 아주 드물게. 바탕이 조용해야 돌이 보인다
+  // ③ 잔자갈 — 도드라진 돌 사이의 두 칸짜리 조약돌. 한 점보다 잘 읽힌다
+  for (let k = 0; k < 5; k++) {
+    const ox = 1 + Math.floor(h(k * 5 + 2, seed, 27) * (N - 3));
+    const oy = 1 + Math.floor(h(seed, k * 5 + 2, 28) * (N - 2));
+    g.px(ox, oy, STONE[1]); g.px(ox + 1, oy, STONE[3]);
+    g.px(ox, oy + 1, STONE[5]);
+  }
+  // ④ 잔 점과 흙, 삐져나온 풀잎 — 아주 드물게. 바탕이 조용해야 돌이 보인다
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const r = h(x * 3 + 1, y * 5 + 2, seed + 29);
     if (r < 0.02) g.px(x, y, STONE[5]);
     else if (r > 0.988) g.px(x, y, EARTH[2]);
+  }
+  for (let k = 0; k < 2; k++) {
+    const ox = 1 + Math.floor(h(k * 9 + 4, seed, 33) * (N - 2));
+    const oy = 2 + Math.floor(h(seed, k * 9 + 4, 34) * (N - 3));
+    g.px(ox, oy, MOSS[1]); g.px(ox + (k % 2 ? 1 : -1), oy - 1, MOSS[0]);
   }
   // 줄눈에 낀 이끼 — 어두운 줄눈 자리에만, 덩어리로
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {

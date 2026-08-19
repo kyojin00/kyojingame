@@ -301,17 +301,20 @@ function shingles(g) {
       // 획은 켜의 자에 맞춰 눕고, 서너 장에 한 획이면 충분하다.
       const ru = ((u % TW) + TW) % TW;
       const isBottom = at(x, y + 1) !== row;
-      if (r < 0.30) {
+      if (r < 0.34) {
         // 이 장은 획을 얻는다 — 밑변에 짧은 어두운 획 (2~5칸)
         const len = 2 + Math.floor(hash(col * 5 + 2, row * 7 + 3) * 4);
         if (isBottom && ru >= 1 && ru <= len) i += 2;
-      } else if (r > 0.90) {
+      } else if (r > 0.88) {
         // 드문 밝은 획 — 윗변에
         if (at(x, y - 1) !== row && ru >= 2 && ru <= 4) i -= 1;
       }
-      // 아주 드문 한 장짜리 톤 악센트 (뭉치 아님 — 손이 놓친 자리)
+      // 갈아 끼운 기와 — 아주 드문 장은 **통째로** 톤이 다르다. 지붕을
+      // 오래 쓰면 깨진 자리에 새 기와를 끼우고, 그 한 장이 도드라진다
       const r3 = hash(col * 11 + 5, row * 3 + 8);
-      if (r3 < 0.05) i += 1;
+      if (r3 < 0.030) i += 2;
+      else if (r3 < 0.065) i += 1;
+      else if (r3 > 0.985) i -= 1;
     } else {
       i += (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
       // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
@@ -380,10 +383,10 @@ function sparseStones(g) {
   // 바탕부터 평평하게 — 벽 픽셀을 전부 기본 돌색으로 누른다
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
     if ('kKi'.includes(g.d[y][x])) g.px(x, y, 'k');
-  const CELL = 12;                                     // 돌 하나가 사는 칸
+  const CELL = 10;                                     // 돌 하나가 사는 칸
   for (let cy = 0; cy < Math.ceil(GH / CELL); cy++)
     for (let cx = 0; cx < Math.ceil(GW / CELL); cx++) {
-      if (hash(cx * 13 + 4, cy * 17 + 9) > 0.62) continue;   // 빈 칸도 많다
+      if (hash(cx * 13 + 4, cy * 17 + 9) > 0.72) continue;   // 빈 칸도 있다
       const w = 5 + Math.floor(hash(cx, cy) * 4);      // 돌 폭 5~8
       const hh = 3 + Math.floor(hash(cy, cx) * 2);     // 돌 높이 3~4
       const ox = cx * CELL + 1 + Math.floor(hash(cx * 3, cy * 7) * (CELL - w - 2));
@@ -404,6 +407,13 @@ function sparseStones(g) {
       for (let y = oy + 1; y < oy + hh - 1; y++) g.px(ox + w - 1, y, 'K');
       g.hline(ox + 1, ox + 2, oy, LIGHTEN[tone] || 'i');   // 왼윗귀 빛 한 획
     }
+  // 잔자갈 — 큰 돌 사이에 낀 두 칸짜리 조약돌. 큰 것만 심으면 성기다
+  for (let y = 1; y < GH - 1; y++) for (let x = 1; x < GW - 2; x++) {
+    if (hash(x * 7 + 3, y * 11 + 6) > 0.010) continue;
+    if (g.d[y][x] !== 'k' || g.d[y][x + 1] !== 'k' || g.d[y + 1][x] !== 'k') continue;
+    g.px(x, y, 'i'); g.px(x + 1, y, 'k');
+    g.px(x, y + 1, 'K'); g.px(x + 1, y + 1, 'K');
+  }
   // 잔 점 — 벽에 낀 때. 아주 드물게
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++)
     if (g.d[y][x] === 'k' && hash(x * 3 + 2, y * 5 + 4) < 0.015)
