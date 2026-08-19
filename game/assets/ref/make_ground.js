@@ -1049,33 +1049,36 @@ function trailPx(g, x, y, s, nax, nay, i, seed) {
 //   n     면의 높이. 무늬가 면 안에서 어디쯤인지 가늠하는 데 쓴다
 function rockFace(g, x, y, drop, n, i, seed) {
   const k = Math.round(drop * Math.max(1, n - 1));
-  // 바위는 **세로로 쪼개진다.** 벽돌처럼 가로 켜로 쌓았더니 벼랑이 아니라
-  // 정원 담장이 됐다. 다만 기둥마다 톤을 크게 흔들면 이번엔 나무 울타리가
-  // 된다 — 결은 은근히 두고, 몇 자리에만 깊은 틈과 가로 선반을 넣는다.
-  // 바위는 고른 결이 아니라 **몇 개의 큰 사건**으로 읽힌다
-  const v = (h(i, 0, 52 + seed) - 0.5) * 0.9 + (h(Math.floor(i / 4), 0, 53 + seed) - 0.5) * 0.9;
-  // 위는 더 밝게, 발치는 더 어둡게. **높이는 명암차로 읽힌다** — 면을 두
-  // 칸으로 늘려 놓고 톤 폭이 그대로면 늘어난 만큼 밋밋해질 뿐이다
-  let t = 2.2 + drop * 3.4 + v;
-  // 갈라진 틈 — 위에서 아래까지 곧게 뚫리면 기둥이 선 담장이 된다.
-  // 시작과 끝을 자리마다 달리해 **조각조각** 갈라지게 한다
-  if (h(i, 0, 54 + seed) < 0.17) {
-    const c0 = Math.floor(h(i, 1, 79 + seed) * n * 0.55);
-    if (k >= c0 && k <= c0 + 1 + Math.floor(h(i, 2, 80 + seed) * n * 0.5)) t += 2.0;
+  // **벼랑도 막돌이다.** 세로 결로 그렸더니 벼랑이 아니라 잿빛 널판 담이
+  // 됐다 — 마을의 벽·화로·길이 전부 막돌(보로노이)로 간 뒤에는 벼랑만
+  // 딴 손이었다. 같은 규칙: 씨앗점에서 제일 가까운 돌덩이가 그 픽셀의
+  // 주인이고, 첫째·둘째 씨앗의 거리가 비슷한 자리가 돌 틈이다.
+  const RC3 = 6;
+  const seedAt = (ci, cj) => [ci * RC3 + 1 + h(ci * 7 + 1, cj * 3 + 5, 52 + seed) * (RC3 - 2),
+                              cj * RC3 + 1 + h(ci * 3 + 4, cj * 7 + 2, 53 + seed) * (RC3 - 2)];
+  const ci0 = Math.floor(i / RC3), cj0 = Math.floor(k / RC3);
+  let d1 = 1e9, d2 = 1e9, id = 0;
+  for (let cj = cj0 - 1; cj <= cj0 + 1; cj++) for (let ci = ci0 - 1; ci <= ci0 + 1; ci++) {
+    const sp = seedAt(ci, cj);
+    const dx = i - sp[0], dy = (k - sp[1]) * 1.3;      // 돌은 가로로 눕는다
+    const d = dx * dx + dy * dy;
+    if (d < d1) { d2 = d1; d1 = d; id = ci * 131 + cj * 61; }
+    else if (d < d2) d2 = d;
   }
-  // 큰 덩이의 명암 — 어디는 볕을 받고 어디는 그늘에 든다. 이게 없으면
-  // 면 전체가 한 색이라 콘크리트가 된다
-  t += (h(Math.floor(i / 9), 0, 81 + seed) - 0.5) * 0.9;
-  // 무늬층 — 가로로 눕는 켜. 세로 결만 있으면 나무 판자로 보인다
-  t += (h(Math.floor((k + Math.floor(i / 7)) / 3), 0, 68 + seed) - 0.5) * 0.9;
-  // 바위 선반 — 자리마다 높이가 다르고, 없는 데도 있다
-  const sh = h(Math.floor(i / 5), 0, 64 + seed);
-  const shelf = sh < 0.62 ? 2 + Math.floor(sh * 1.6 * Math.max(1, n - 5)) : -9;
-  if (k === shelf) t -= 1.2;                                  // 윗면이 빛을 받는다
-  else if (k === shelf + 1) t += 0.9;                         // 그 밑은 그늘
-  if (drop > 0.82) t += 0.7;                                  // 발치는 그늘에 잠긴다
-  if (k === 0) t = 7.4;                                       // 위에서 드리우는 그늘
-  else if (k <= 2) t -= 1.0;                                  // 볕이 닿는 윗면
+  const gap = Math.sqrt(d2) - Math.sqrt(d1);
+  let t;
+  if (gap < 1.1) {
+    t = 6.2;                                           // 돌 틈
+  } else {
+    const rc = h(id, 17, 54 + seed);
+    t = 3.0 + (rc < 0.26 ? -1 : (rc > 0.80 ? 1 : 0));
+    // 높이는 명암차로 읽힌다 — 위는 볕, 발치는 그늘
+    t += drop * 1.8;
+    // 틈 바로 아래 한 줄은 밝다 — 돌의 윗변
+    if (gap < 2.4) t -= 0.6;
+  }
+  if (k === 0) t = 7.4;                                // 마루에서 드리우는 그늘
+  else if (k <= 2) t -= 1.0;                           // 볕이 닿는 윗머리
   g.px(x, y, STONE[clamp(Math.round(t), 0, 7)]);
   // 마루에서 늘어진 이끼 — 낱알로 뿌리면 자글거리니 **포기로** 앉힌다.
   // 이게 있어야 바위가 땅에서 솟은 것으로 보인다
