@@ -159,46 +159,50 @@ function cobble(seed) {
   // 그리고 **알 크기도 흔든다.** 네 칸짜리만 깔면 아무리 톤을 흔들어도
   // 격자가 그대로 읽힌다 — 다섯에 하나쯤은 오른쪽 줄눈을 지워 여덟 칸짜리
   // 넓은 돌로 만든다. 포장은 자로 잰 것이 아니다
-  // **알을 키운다** — 4x4 잔알에 알마다 톤을 흔들었더니 길이 온통
-  // 자글거려서, chunky 로 바꾼 대장간과 딴 그림이 됐다. 건물 돌벽과
-  // 같은 자(8x4 넓적돌)로 재고, 톤은 뭉치 단위로만 흔든다.
-  // 타일이 16칸이라 알의 자는 16을 나눠야 한다 (8x4 ✔) — 안 나누면
-  // 타일 경계에서 줄눈이 어긋나 격자가 도로 드러난다
+  // **돌 한 알을 손으로 그린다.**
+  //
+  // 줄눈을 아래·오른쪽에만 긋는 「벽돌 쌓기」로 두 번 갔다가 두 번 다
+  // 벽돌담이 됐다. 손으로 찍은 포장은 다르다 — 알 하나하나가 **사방으로
+  // 어두운 줄눈에 둘러싸인 둥근 덩어리**고, 속은 평평하며, 윗줄에만
+  // 빛이 한 줄 얹힌다. 선이 알을 만들고, 평평함이 조용함을 만든다.
+  //
+  // 알의 자는 16을 나눠야 타일 경계에서 줄눈이 안 어긋난다 (8x4 ✔)
   const CW = 8, CH = 4;
   const PSHIFT = [1, 0, -1][((seed % 3) + 3) % 3];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const course = Math.floor(y / CH);
     const u = x + (course % 2) * (CW / 2);
     const col = Math.floor(u / CW);
-    const rc = h(col >> 1, course >> 1, seed);              // 뭉치의 낯빛
-    let i = 2 + Math.floor(rc * 2.4);
-    const r = h(col, course, seed);
-    if (r < 0.10) i -= 1; else if (r > 0.92) i += 1;        // 드문 한 알 악센트
-    if (h(col, course, seed + 31) < 0.55) i += PSHIFT;
     const ry = y % CH, rx = ((u % CW) + CW) % CW;
-    const wide = h(col, course, seed + 23) < 0.18;          // 이웃과 붙은 넓은 돌
-    if (ry === 0) i -= 1;                                   // 윗줄 = 빛
-    // 줄눈은 **바닥을 친다** — 돌색에 +2 만 하면 밝은 돌 옆 줄눈이 옅어서
-    // 이끼도 못 앉고 돌이 안 갈라진다. 다섯 단 밑으로는 내려가게 한다
-    if (ry === CH - 1) i = Math.max(i + 2, 5);              // 아랫줄 = 가로 줄눈
-    if (rx === CW - 1 && !wide) i = Math.max(i + 2, 5);     // 오른줄 = 세로 줄눈
-    // 둥근 귀퉁이 — 줄눈 옆 한 점씩. 이 점이 넓적돌을 손으로 깎은 돌로 만든다
-    if ((ry === 0 || ry === CH - 2) && rx === CW - 2 && !wide) i += 1;
-    // 밟혀 닳은 알 — 가운데가 유난히 밝다
-    if (ry === 1 && rx >= 2 && rx <= 4 && h(col, course, seed + 5) < 0.30) i -= 1;
-    // 금 간 알
-    if (ry === 1 && rx === 5 && h(col, course, seed + 7) < 0.16) i += 3;
-    g.px(x, y, STONE[clamp(i, 0, 7)]);
-    // 빠진 알 — 흙이 드러난 자리. 이게 있어야 깔아 놓기만 한 길이 아니라
-    // 밟고 다닌 길이 된다
-    if (h(col, course, seed + 9) < 0.08)
+    // 이 알의 낯빛 — 알 하나에 한 색. 속에는 잡음을 안 찍는다
+    const rc = h(col, course, seed);
+    let base = 2 + (rc < 0.30 ? 0 : (rc < 0.72 ? 1 : 2));
+    if (h(col >> 1, course >> 1, seed + 31) < 0.5) base += PSHIFT;
+    base = clamp(base, 1, 4);
+    // 알의 꼴 — 좌우 끝을 켜마다 한 칸씩 흔들어 크기가 들쭉날쭉하게
+    // 세로 줄눈은 **한 칸이면 된다** — 알의 왼끝 하나만. 오른끝까지 그으면
+    // 이웃 알의 왼끝과 겹쳐 줄눈이 두 칸이 되고, 길이 아니라 그물이 된다
+    const sm = Math.floor(h(col * 7 + 3, course * 5 + 1, seed) * 2.0);
+    const isSeam = ry === CH - 1 || rx === sm
+      // 둥근 귀퉁이 — 윗줄에서 줄눈 옆 한 칸을 같이 깎는다
+      || (ry === 0 && rx === sm + 1);
+    if (isSeam) {
+      g.px(x, y, STONE[6]);                       // 줄눈 = 어두운 한 색
+    } else if (ry === 0) {
+      g.px(x, y, STONE[clamp(base - 1, 0, 7)]);   // 윗줄 = 빛
+    } else {
+      g.px(x, y, STONE[base]);                    // 속은 평평하다
+    }
+    // 빠진 알 — 흙이 드러난 자리. 드물게
+    if (h(col, course, seed + 9) < 0.06 && !isSeam)
       g.px(x, y, EARTH[2 + (h(x, y, seed + 3) < 0.4 ? 1 : 0)]);
   }
   // 줄눈에 낀 이끼 — 어두운 줄눈 자리에만, 덩어리로
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const c = g.get(x, y);
     if (c !== STONE[5] && c !== STONE[6] && c !== STONE[7] && !EARTH.includes(c)) continue;
-    if (h(x >> 1, y >> 1, seed + 11) > 0.20) continue;
+    // 줄눈이 사방으로 이어진 지금은 0.20 이면 온 길이 초록 점박이가 된다
+    if (h(x >> 1, y >> 1, seed + 11) > 0.09) continue;
     g.px(x, y, MOSS[h(x, y, seed + 13) < 0.5 ? 1 : 2]);
   }
   return g;

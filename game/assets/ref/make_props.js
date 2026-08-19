@@ -345,18 +345,19 @@ function towerRow(g, x0, x1, y, seed, lift) {
     const u = x + (course % 2) * (TCW >> 1);
     const col = Math.floor(u / TCW);
     const ru = ((u % TCW) + TCW) % TCW, ry = y % TCH;
-    const sm = 1 + Math.floor(h(col * 7 + 3, course * 5 + 1, seed) * 3.0);
-    const rc = h(col, course, seed);                 // 돌 하나의 낯빛
-    let i = 3 + lift;
-    if (rc < 0.15) i -= 1; else if (rc > 0.86) i += 1;
-    const atSeam = ru === sm || ru === sm + TCW - 1; // 좌우 이음매
-    if (ry === TCH - 1 || atSeam) i = 6;             // 줄눈
-    else if (ry === 0) i -= 1;                       // 윗변 = 빛
-    else if ((ry === 1 || ry === TCH - 2)
-        && (ru === sm + 1 || ru === sm + TCW - 2)) i = 6;   // 둥근 귀퉁이
-    if (x <= x0 + 1) i -= 1;                         // 왼쪽 = 빛을 받는 면
-    if (x >= x1 - 2) i += 2;                         // 오른쪽 = 돌아간 면
-    g.px(x, y, ST[clamp(i, 0, 7)]);
+    // 이 돌의 낯빛 — 돌 하나에 한 색. 속은 평평하게 (길 자갈과 같은 규칙)
+    const rc = h(col, course, seed);
+    let base = 3 + lift + (rc < 0.26 ? -1 : (rc > 0.80 ? 1 : 0));
+    if (x <= x0 + 1) base -= 1;                    // 왼쪽 = 빛을 받는 면
+    else if (x >= x1 - 2) base += 2;               // 오른쪽 = 돌아간 면
+    base = clamp(base, 1, 5);
+    // 세로 줄눈은 한 칸 — 돌의 왼끝 하나만
+    const sm = Math.floor(h(col * 7 + 3, course * 5 + 1, seed) * 2.0);
+    const isSeam = ry === TCH - 1 || ru === sm
+      || (ry === 0 && ru === sm + 1);              // 둥근 귀퉁이
+    if (isSeam) g.px(x, y, ST[6]);
+    else if (ry === 0) g.px(x, y, ST[clamp(base - 1, 0, 7)]);   // 윗줄 = 빛
+    else g.px(x, y, ST[base]);
   }
 }
 

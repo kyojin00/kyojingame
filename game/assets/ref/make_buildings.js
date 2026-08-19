@@ -361,7 +361,6 @@ function brickCourse(g) {
 // 톤은 뭉치 단위: 대부분 기본색으로 조용히 두고 드문드문 밝은/어두운 돌
 const BW2 = 8, BH2 = 5;
 function boulderCourse(g) {
-  const seam = (col, course) => 1 + Math.floor(hash(col * 7 + 3, course * 5 + 1) * 3.0);
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = g.d[y][x];
     if (!'kKi'.includes(c)) continue;
@@ -369,18 +368,19 @@ function boulderCourse(g) {
     const u = x + (course % 2) * (BW2 >> 1);
     const col = Math.floor(u / BW2);
     const ru = ((u % BW2) + BW2) % BW2, ry = y % BH2;
-    const sm = seam(col, course);                        // 이 돌의 오른 이음매 자리
-    const r = hash(col * 3 + 1, course * 9 + 4);
-    let t = 'k';
-    if (r < 0.14) t = 'i';                               // 밝은 돌 하나
-    else if (r > 0.86) t = DARKEN['k'] || 'K';
-    const atSeam = ru === sm || ru === sm + BW2 - 1;     // 좌우 이음매
-    if (ry === BH2 - 1 || atSeam) t = 'K';               // 줄눈
-    else if (ry === 0) t = LIGHTEN[t] || 'i';            // 윗변 = 빛
-    // 귀퉁이를 깎는다 — 줄눈 바로 옆 + 켜의 첫/끝 줄
-    else if ((ry === 1 || ry === BH2 - 2)
-        && (ru === sm + 1 || ru === sm + BW2 - 2)) t = 'K';
-    g.px(x, y, t);
+    // 이 돌의 낯빛 — 돌 하나에 한 색. **속에는 잡음을 안 찍는다.**
+    // 속이 평평해야 선(줄눈)이 돌을 만든다 — 길 자갈과 같은 규칙이다
+    const rc = hash(col * 3 + 1, course * 9 + 4);
+    let base = 'k';
+    if (rc < 0.20) base = 'i';
+    else if (rc > 0.84) base = DARKEN['k'] || 'K';
+    // 세로 줄눈은 **한 칸이면 된다** — 돌의 왼끝 하나만
+    const sm = Math.floor(hash(col * 7 + 3, course * 5 + 1) * 2.0);
+    const isSeam = ry === BH2 - 1 || ru === sm
+      || (ry === 0 && ru === sm + 1);              // 둥근 귀퉁이
+    if (isSeam) g.px(x, y, 'K');
+    else if (ry === 0) g.px(x, y, LIGHTEN[base] || 'i');   // 윗줄 = 빛
+    else g.px(x, y, base);
   }
 }
 
