@@ -513,7 +513,9 @@ func _build_levels() -> void:
 					continue
 				if m.grid[sy][lx].ground == "water" or _lamp_hides_stairs(lx, sy):
 					continue
-				m.objects[Vector2i(lx, sy)] = {"kind": "deco_stonelamp", "hp": 0}
+				# 석등은 뺐다 — 잿빛 돌기둥이 마을 그림체와 따로 놀았다.
+				# 계단 곁은 나무 등불이 지킨다
+				m.objects[Vector2i(lx, sy)] = {"kind": "deco_lamp", "hp": 0}
 				_no_spawn_rect(lx, sy, lx, sy, 1)
 				break
 	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
@@ -1121,7 +1123,7 @@ func _build_village() -> void:
 		for sx: int in [ha.x, ha.x + 4]:
 			var st := Vector2i(sx, sy)
 			if not m.objects.has(st):
-				m.objects[st] = {"kind": "deco_stonelamp", "hp": 0}
+				m.objects[st] = {"kind": "deco_lamp", "hp": 0}
 	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
 	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다).

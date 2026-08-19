@@ -1018,9 +1018,9 @@ const PLOT_DECOR := {
 		"props": [
 			[Vector2i(-5, -4), "deco_specimen"], [Vector2i(7, -4), "deco_specimen"],
 			[Vector2i(-4, 4), "deco_specimen"], [Vector2i(8, 4), "deco_planter"],
-			[Vector2i(-1, 4), "deco_stonelamp"], [Vector2i(5, 4), "deco_stonelamp"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
 			[Vector2i(-4, 7), "deco_planter"], [Vector2i(6, 7), "deco_planter"],
-			[Vector2i(-5, 8), "deco_stonelamp"], [Vector2i(9, 8), "deco_stonelamp"],
+			[Vector2i(-5, 8), "deco_planter"], [Vector2i(9, 8), "deco_lamp"],
 		],
 	},
 	# ── 마을회관 ── 평상과 등불, 새겨 놓은 돌
@@ -1041,9 +1041,9 @@ const PLOT_DECOR := {
 		"props": [
 			[Vector2i(-5, -2), "deco_bookstack"], [Vector2i(7, -4), "deco_bookstack"],
 			[Vector2i(-4, 4), "deco_bench"], [Vector2i(8, 4), "deco_bench"],
-			[Vector2i(-1, 4), "deco_stonelamp"], [Vector2i(5, 4), "deco_stonelamp"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
 			[Vector2i(-4, 7), "deco_bookstack"], [Vector2i(6, 7), "deco_bookstack"],
-			[Vector2i(-5, 8), "deco_stonelamp"], [Vector2i(9, 8), "deco_stonelamp"],
+			[Vector2i(-5, 8), "deco_planter"], [Vector2i(9, 8), "deco_lamp"],
 		],
 	},
 	# ── 수산시장 ── 널판 마당과 모래 · 그물 말리는 틀 · 물통
