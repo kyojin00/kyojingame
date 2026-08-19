@@ -294,6 +294,7 @@ const TEXTURE_NAMES := [
 	# 돌계단을 따라 늘어선 석등 (ref/make_landmarks.js).
 	# 마을 광장의 가로등(deco_lamp)과 이름이 겹치지 않게 한다
 	"deco_stonelamp_0",
+	"forage_branch",
 	# 마당에 **세워 두는 살림** (ref/make_props.js).
 	#
 	# 예전에는 여기에 광석·못·천 같은 **가방 아이콘**을 놓았다. 그건 32px
@@ -606,7 +607,7 @@ const REGIONS := [
 	# ---- 원래 있던 땅 (마을 · 농장 둘레) ----
 	# 예전부터 있던 남동쪽 깊은 숲 — 넓어진 만큼 남쪽으로 늘렸다
 	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40 + NORTH_PAD, 52, 24),
-		"tree": 0.30, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.24, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
 	# 옛 표지판 너머 첫 땅. 줄 맞춰 심긴 사과나무 — 사람 손이 닿았던 자리다
 	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8 + NORTH_PAD, 48, 26),
 		"tree": 0.9, "rock": 0.0, "ground": "", "grid": 4, "pond": 0.0},
@@ -623,7 +624,7 @@ const REGIONS := [
 	# 나무는 NATURE_CLEAR(가로 4칸)에 걸려 아무리 올려도 6%쯤에서 포화된다 —
 	# 그래서 「더 깊다」는 바위로 낸다 (바위는 두 칸 간격이라 훨씬 촘촘하다)
 	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70 + NORTH_PAD, 62, 24),
-		"tree": 0.34, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.28, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
 
 	# ---- 네 배로 넓히며 붙인 땅 ----
 	#
@@ -634,10 +635,10 @@ const REGIONS := [
 
 	# 폭포골 — 물소리가 나는 골짜기. 젖은 땅이라 웅덩이가 흩어져 있다
 	{"id": "falls", "name": "폭포골", "rect": Rect2i(238, 6 + NORTH_PAD, 66, 52),
-		"tree": 0.24, "rock": 0.14, "ground": "", "grid": 0, "pond": 0.05},
+		"tree": 0.20, "rock": 0.14, "ground": "", "grid": 0, "pond": 0.05},
 	# 자작나무 언덕 — 훤한 숲. 나무는 많은데 바닥이 밝아 어둡지 않다
 	{"id": "birch", "name": "자작나무 언덕", "rect": Rect2i(316, 4 + NORTH_PAD, 60, 46),
-		"tree": 0.52, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.44, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
 	# 붉은바위 벌판 — 마른 흙땅. 돌무지 언덕이 여기 있다.
 	#
 	# 바닥이 **자갈(path)** 이었다. 그런데 자갈 타일도 벼랑면도 같은 돌
@@ -1839,7 +1840,7 @@ const DOT_PROPS := ["deco_forge", "deco_anvil",
 	"deco_logpile", "deco_trough", "deco_feedbox", "deco_hay", "deco_netrack",
 	"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen",
 	"deco_crate", "deco_sack", "deco_toolrack",
-	"deco_weaponrack"]
+	"deco_weaponrack", "forage_branch"]
 
 # 오브젝트가 실제로 막는 크기(픽셀). 기준 칸(32px) 밖으로 얼마나 더 넓히는지다.
 # 그림이 타일보다 훨씬 크기 때문에, 칸 하나만 막으면 캐릭터가 나무 밑동/바위 속으로
@@ -1860,6 +1861,7 @@ const OBJECT_PAD := {
 	"searock": Vector2(10, 8),
 	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
+	"forage_branch": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
 	"board": Vector2(3, 2), "sign": Vector2(3, 2),
 	# 석등(계단 옆)은 마을 광장의 가로등(deco_lamp)과 **다른 물건**이다.
@@ -2280,6 +2282,7 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 # 채집·벌목·채광 대상이 되는 것들
 const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
+	"forage_branch",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic", "old_book"]
 

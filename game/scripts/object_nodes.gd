@@ -174,6 +174,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["fence_%d" % fence_mask(pos)]
 		"sprinkler":
 			texture = m.tex["sprinkler"]
+		"forage_branch":
+			texture = m.tex["forage_branch"]
 		"forage_berry":
 			texture = m.tex["forage_berry"]
 		"forage_herb":

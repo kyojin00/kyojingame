@@ -1133,7 +1133,31 @@ function toolrack() {
 
 
 // ---- 내보내기 ----
+// 떨어진 가지 — 주우면 목재가 된다. 나무 밑에 떨어져 있는 잔가지라
+// 한 칸짜리다: 비스듬한 굵은 가지 하나 + 갈라진 잔가지 둘 + 잎 몇 장.
+// 물건이 작을수록 실루엣이 이름을 말해야 한다 — 갈라짐이 곧 「가지」다
+function branch() {
+  const g = new P(22, 14);
+  g.ground(11, 12, 9, 2.0);
+  // 굵은 가지 — 왼아래에서 오른위로
+  for (let k = 0; k < 14; k++) {
+    const x = 3 + k, y = 10 - (k >> 1);
+    g.px(x, y, W[3]); g.px(x, y + 1, W[5]);
+    if (k % 4 === 0) g.px(x, y, W[2]);              // 결
+  }
+  g.px(2, 11, W[4]); g.px(2, 12, W[6]);             // 부러진 밑동
+  g.px(3, 12, W[5]);
+  // 갈라진 잔가지 둘
+  for (let k = 0; k < 4; k++) g.px(9 + k, 7 - k, W[4]);
+  for (let k = 0; k < 3; k++) g.px(14 + k, 8 + (k >> 1), W[4]);
+  // 아직 붙어 있는 잎 몇 장
+  g.px(12, 3, LEAF[1]); g.px(13, 3, LEAF[0]); g.px(13, 2, LEAF[0]);
+  g.px(17, 4, LEAF[1]); g.px(18, 5, LEAF[2]);
+  return outline(g);
+}
+
 const OUTS = {};
+OUTS['forage_branch'] = branch().render();
 for (let f = 0; f < 4; f++) OUTS['deco_forge_' + f] = forge(f).render();
 OUTS['deco_anvil'] = anvil().render();
 OUTS['deco_weaponrack'] = weaponrack().render();

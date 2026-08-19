@@ -1231,12 +1231,16 @@ func _plant_village_greenery() -> void:
 			var h := m._hash01(x * 3 + 11, y * 5 + 7)
 			# 덩어리로 난다 (world_gen 의 흩뿌리기와 같은 결)
 			var clump: float = clampf(_vnoise(x, y, 14, 23) * 2.2, 0.0, 2.2)
-			if h < 0.26 * clump:
+			# 나무는 조금 성기게 — 0.26이면 마을이 숲에 잠겼다
+			if h < 0.17 * clump:
 				if _nature_clear(pos, "tree"):
 					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
-			elif h < 0.26 * clump + 0.03:
+			elif h < 0.17 * clump + 0.03:
 				if _nature_clear(pos, "rock"):
 					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
+			elif h < 0.40 and h >= 0.37:
+				# 떨어진 가지 — 주우면 목재. 나무 사이에 드문드문
+				m.objects[pos] = {"kind": "forage_branch", "hp": 0}
 			elif h < 0.42:
 				# 풀숲 — 걸어 다니는 데 걸리지 않는 잔것.
 				# **채집물(forage_*)은 심지 않는다.** 그건 하루 상한이 있는
@@ -2025,11 +2029,13 @@ func _place_forage(pos: Vector2i, with_node := true) -> void:
 	# 다만 **북쪽 산자락**(MOUNTAIN_Y 위)에서는 민들레가 절반쯤 돋는다 —
 	# 산에서만 볼 수 있는 노란 꽃이다.
 	var roll := randf()
-	var kind := "forage_berry" if roll < 0.5 \
-		else ("forage_herb" if roll < 0.8 else "weed")
+	var kind := "forage_berry" if roll < 0.45 \
+		else ("forage_herb" if roll < 0.72 \
+		else ("forage_branch" if roll < 0.85 else "weed"))
 	if pos.y <= m.MOUNTAIN_Y:
 		kind = "forage_dandelion" if roll < 0.5 \
-			else ("forage_herb" if roll < 0.7 else "weed")
+			else ("forage_herb" if roll < 0.65 \
+			else ("forage_branch" if roll < 0.8 else "weed"))
 	if with_node:
 		m.objnode._place_object(pos, kind, 0)
 	else:

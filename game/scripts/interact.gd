@@ -303,6 +303,20 @@ func interact() -> void:
 		if String(obj.kind).begins_with("forage_") or String(obj.kind) == "weed":
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
+			if fid == "forage_branch":
+				# 떨어진 가지 — 주우면 **목재**다. 목재는 가방(items)이 아니라
+				# 자원 주머니(GameData.wood)로 들어가므로 여기서 따로 처리한다.
+				# 도감에도 안 오른다 — 재료지 채집물이 아니다
+				var got_w := GameData.beach_pick_count()
+				m.toolwork.gain_skill("beach", 3.0)
+				GameData.wood += got_w
+				Sound.play_sfx("sfx_harvest")
+				m.renderer.spawn_particles(t, "sparkle")
+				m.hud.show_message("떨어진 가지를 주웠다. 목재 x%d" % got_w)
+				if Net.is_host():
+					m.netsync._broadcast_area(t)
+					m.netsync._broadcast_stats()
+				return
 			if fid == "weed":
 				GameData.queue_respawn("weed")   # 3~5일 뒤 다른 빈자리에서
 			if fid in ["weed", "forage_herb"]:
