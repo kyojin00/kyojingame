@@ -241,7 +241,16 @@ const ROUGH = parseFloat((process.argv.find(a => a.startsWith('--rough=')) || ''
 // 그걸 톤 사다리 q0..q7 에 얹으면 앞 지붕과 뒤로 누운 면이 한 줄기로 이어진다.
 const ROOF_GLYPH = new Set(['r', 'R', 'l', 'Mn', 'M', 'M2', 'M3']);
 const ROOF_Q = new Set(['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']);
-const TH = 3;                    // 한 켜의 높이 (앞 지붕)
+// **손으로 찍은 느낌은 「큰 조각 + 조용한 면」이다.**
+//
+// 지금 그림이 인위적으로 보이는 이유를 참고 그림(스타듀) 옆에 놓고 재 보니
+// 색이 아니라 **잡음의 크기**였다. 우리는 기와 한 장·돌 한 장마다 톤을
+// 흔들어 온 면이 고르게 자글거리고, 참고 그림은 조각이 크고 면이 조용한
+// 대신 얼룩이 서너 장씩 뭉쳐 다닌다 — 사람 손은 균일한 난수를 못 찍는다.
+// chunky 모드: 조각을 키우고(기와 8x4 · 돌 8~10x5), 톤은 **뭉치 단위**로만
+// 흔들고, 기와 밑변 귀퉁이를 둥글려 비늘처럼 얹는다. 일단 대장간만 쓴다.
+let CHUNKY = false;
+let TH = 3;                      // 한 켜의 높이 (앞 지붕)
 // **윗면이 제일 밝다.** 오래 「멀수록 어둡다」로 두었더니 뒤로 누운 면이
 // 지붕 위에 드리운 커다란 그늘로 보여서, 그림이 위에서 본 게 아니라
 // 정면 입면도에 어두운 배경을 깐 꼴이었다. 하늘을 가장 넓게 받는 면은
@@ -257,7 +266,7 @@ const FRONT_LO = 0.46, FRONT_HI = 0.74;
 let FRONT_ROWS = 0;              // 앞 지붕의 켜 수 (뒤 켜 번호가 여기서 이어진다)
 let roofT = null;                // 셀마다 0~1 (처마 -> 용마루), -1 이면 지붕 아님
 let roofRow = null;              // 셀마다 기와 켜 번호
-const TW = 5;                    // 한 장의 폭
+let TW = 5;                      // 한 장의 폭
 
 function resetRoof() {
   roofT = Array.from({ length: GH }, () => new Float32Array(GW).fill(-1));
@@ -277,13 +286,29 @@ function shingles(g) {
     // 한 단만 흔들었더니 지붕이 너무 성해 보였다. 오래 쓴 지붕은 장마다
     // 색이 제법 다르고, 드문드문 이가 빠져 있다.
     const r = hash(col, row), r2 = hash(row * 3 + 1, col * 5 + 2);
-    let i = Math.round(t * 5.4)
-      + (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
-    // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
-    if (r2 < 0.055 && at(x, y + 1) !== row) i += 3;
-    if (at(x, y - 1) !== row) i -= 1;                    // 윗변 (빛)
-    if (at(x, y + 1) !== row) i += 2;                    // 아랫변 (겹침 턱)
-    if (u % TW === 0) i += 2;                            // 세로 이음매
+    let i = Math.round(t * 5.4);
+    if (CHUNKY) {
+      // 톤은 **뭉치(2x2장) 단위**로만 흔든다. 장마다 흔들면 자글거린다
+      const rc = hash(col >> 1, row >> 1);
+      i += rc < 0.16 ? 1 : (rc > 0.88 ? -1 : 0);
+      if (r < 0.04) i += 2;                              // 드문 한 장짜리 악센트
+      if (at(x, y - 1) !== row) i -= 1;                  // 윗변 (빛)
+      if (at(x, y + 1) !== row) {
+        i += 2;                                          // 아랫변 (겹침 턱)
+        // **비늘 귀퉁이** — 밑변에서 이음매 옆 한 칸을 한 단 더 어둡게.
+        // 이 두 점이 기와 밑변을 둥글려 「비늘로 얹었다」가 된다
+        const ru = ((u % TW) + TW) % TW;
+        if (ru === 1 || ru === TW - 1) i += 1;
+      }
+      if (u % TW === 0) i += 2;                          // 세로 이음매
+    } else {
+      i += (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
+      // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
+      if (r2 < 0.055 && at(x, y + 1) !== row) i += 3;
+      if (at(x, y - 1) !== row) i -= 1;                  // 윗변 (빛)
+      if (at(x, y + 1) !== row) i += 2;                  // 아랫변 (겹침 턱)
+      if (u % TW === 0) i += 2;                          // 세로 이음매
+    }
     g.px(x, y, 'q' + Math.max(0, Math.min(7, i)));
   }
 }
@@ -325,6 +350,36 @@ function brickCourse(g) {
     if (r2 < 0.05) t = 'K';                    // 이 빠진 장
     // 줄눈 — 가로 한 줄 + 세로 이음매. 회반죽이 벽돌보다 어둡게 패인다
     if (y % BH === BH - 1 || u % BW === 0) t = 'K';
+    g.px(x, y, t);
+  }
+}
+
+// 큰 돌 쌓기 — chunky 모드의 벽. 참고 그림의 돌탑은 여섯 칸짜리 벽돌이
+// 아니라 **주먹만 한 돌**이 한 층에 서너 개다. 켜 높이 5, 폭 8~10으로
+// 잡고, 이음매 자리를 켜마다 흔들어 크기가 들쭉날쭉하게 한다.
+// 귀퉁이 네 점을 줄눈색으로 깎으면 돌이 둥글어진다 — 이 둥긂이 손맛이다.
+// 톤은 뭉치 단위: 대부분 기본색으로 조용히 두고 드문드문 밝은/어두운 돌
+const BW2 = 8, BH2 = 5;
+function boulderCourse(g) {
+  const seam = (col, course) => 1 + Math.floor(hash(col * 7 + 3, course * 5 + 1) * 3.0);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = g.d[y][x];
+    if (!'kKi'.includes(c)) continue;
+    const course = Math.floor(y / BH2);
+    const u = x + (course % 2) * (BW2 >> 1);
+    const col = Math.floor(u / BW2);
+    const ru = ((u % BW2) + BW2) % BW2, ry = y % BH2;
+    const sm = seam(col, course);                        // 이 돌의 오른 이음매 자리
+    const r = hash(col * 3 + 1, course * 9 + 4);
+    let t = 'k';
+    if (r < 0.14) t = 'i';                               // 밝은 돌 하나
+    else if (r > 0.86) t = DARKEN['k'] || 'K';
+    const atSeam = ru === sm || ru === sm + BW2 - 1;     // 좌우 이음매
+    if (ry === BH2 - 1 || atSeam) t = 'K';               // 줄눈
+    else if (ry === 0) t = LIGHTEN[t] || 'i';            // 윗변 = 빛
+    // 귀퉁이를 깎는다 — 줄눈 바로 옆 + 켜의 첫/끝 줄
+    else if ((ry === 1 || ry === BH2 - 2)
+        && (ru === sm + 1 || ru === sm + BW2 - 2)) t = 'K';
     g.px(x, y, t);
   }
 }
@@ -387,7 +442,7 @@ function roughen(g) {
   ditherFace(g, ['i', 'k', 'K'], 0, GROUND);            // 벽돌
   ditherFace(g, ['x', 'w', 'W'], 0, GROUND);            // 석재 테두리
   shingles(g);          // 기와는 사다리 톤으로 한 장씩
-  brickCourse(g);
+  if (CHUNKY) boulderCourse(g); else brickCourse(g);
   wallPatches(g, 0, GROUND);
   woodGrain(g);
   weather(g);           // 흘러내린 줄 · 밑동 흙탕물
@@ -1649,6 +1704,9 @@ function build(spec) {
   resetRoof();
 
   // ---- 재료와 비례를 spec 에서 갈아 끼운다 ----
+  CHUNKY = !!spec.chunky;
+  TW = CHUNKY ? 8 : 5;
+  TH = CHUNKY ? 4 : 3;
   const rp = ROOF_PAL[spec.roofPal || 'clay'];
   for (let i = 0; i < 8; i++) PAL['q' + i] = rp[i];
   // 기와를 얹기 **전** 색(r/R/l)과 뒤 지붕색도 같은 사다리에서 뽑는다.
@@ -1869,7 +1927,8 @@ const KINDS = {
 
   // 대장간 — 망치 간판. 화구 위 벽이 그을리고 불똥이 튄다. 벽에는
   // 망치·집게·편자, 앞에는 모루·담금질통·석탄더미. 옆에 작업 곁채
-  house_smith: { sign: true, icon: 'hammer', hang: true, roofPal: 'soot',
+  house_smith: { chunky: true,
+    sign: true, icon: 'hammer', hang: true, roofPal: 'soot',
     wallPal: 'stone', chim: 'big', chimneyX: 38, smoke: true, forge: true,
     lean: 'right', ivy: 0, soot: true, hang2: 'smith',
     props: [['anvil', 26], ['trough', -16], ['coal', 40]] },
