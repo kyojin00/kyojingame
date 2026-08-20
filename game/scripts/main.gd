@@ -1834,6 +1834,9 @@ const OBJECT_SCALES := {
 	# 크게, 대신 드물게 — 잔 나무가 우글거리면 배경이 되고, 큰 나무가
 	# 드문드문 서야 한 그루 한 그루가 물건이 된다
 	"tree": 3.4, "rock": 2.2, "bigrock": 4.4, "cave": 2.2, "worldtree": 2.6,
+	# 온천·전망대 — 배율이 없어서 0.5배(한 칸짜리)로 그려졌다. 새 그림은
+	# 도트 한 칸 = 화면 2px 로 그렸으므로 2.0이라야 자가 맞는다
+	"onsen": 2.0, "old_lookout": 2.0,
 	"barn": 1.0, "forage_berry": 1.7, "forage_herb": 1.7, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
@@ -3203,6 +3206,7 @@ var _cam_shake_amp := 0.0
 # 지나갈 수 없게 된다 (한 칸짜리 통로가 다 막힌다). 그래서 범위는 그대로 두고,
 # **가리는 동안만 반투명**하게 해서 플레이어가 언제나 보이게 한다.
 const FADE_KINDS := ["tree", "bigrock", "cave", "worldtree", "barn",
+	"onsen", "old_lookout", "stall",
 	"deco_fountain", "deco_lamp", "house", "art_block",
 	# 랜드마크는 화면 열두 칸이 넘는다 — 뒤로 걸어 들어가면 주인공이
 	# 통째로 사라지므로 반드시 비쳐야 한다

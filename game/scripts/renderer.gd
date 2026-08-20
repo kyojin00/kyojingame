@@ -61,7 +61,8 @@ func _ready() -> void:
 # 노드에 자식을 끼우지 않는 이유: 온 코드가 「자식 0번 = 스프라이트」로
 # 잡고 있어서, 그 사이에 그림자를 끼우면 전부 흔들린다.
 var _obj_shadow_tex: Texture2D = null
-const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree", "cave"]
+const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree",
+	"cave", "stall", "old_lookout"]
 
 func _draw_object_shadows() -> void:
 	if _obj_shadow_tex == null or m.player == null:
@@ -84,9 +85,12 @@ func _draw_object_shadows() -> void:
 		if spr.texture == null:
 			continue
 		# 폭은 그 그루의 화면 폭을 따른다 — 캐노피와 거의 같게, 바위는 조금 넓게
-		# (바위는 밑동의 흙무더기가 그림자 안쪽을 가리므로 밖으로 비어져 나와야 보인다)
-		var w: float = spr.texture.get_width() * spr.scale.x \
-			* (0.95 if kind == "tree" or kind == "bent_tree" else 1.25)
+		# (바위는 밑동의 흙무더기가 그림자 안쪽을 가리므로 밖으로 비어져 나와야 보인다),
+		# 구조물(동굴·노점·전망대)은 밑변 폭보다 조금 안쪽으로
+		var wk := 0.95 if kind == "tree" or kind == "bent_tree" \
+			else (1.25 if kind == "rock" or kind == "bigrock" or kind == "searock" \
+			else 0.85)
+		var w: float = spr.texture.get_width() * spr.scale.x * wk
 		if kind == "tree" and int(od.get("hp", m.TREE_HP)) < m.TREE_HP:
 			w *= 0.4                       # 잎을 잃은 나무는 그림자도 준다
 		var sz := Vector2(w, w * 0.36)

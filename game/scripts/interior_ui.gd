@@ -930,11 +930,23 @@ func _draw_furniture(f: Dictionary) -> void:
 	_obj_xform(_furn_anchor(f))
 	match String(f.id):
 		"rug":
-			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.45, 0.6, 0.42))
+			# 민무늬 두 겹은 색종이다 — 테두리 띠, 직조 결, 네 귀 매듭
+			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.4, 0.55, 0.38))
 			canvas.draw_rect(Rect2(p + Vector2(4, 4), Vector2(w - 8, h - 8)), Color(0.52, 0.68, 0.48))
+			var wy2 := p.y + 8.0
+			while wy2 < p.y + h - 6.0:
+				canvas.draw_rect(Rect2(p.x + 6, wy2, w - 12, 1), Color(0.45, 0.6, 0.42))
+				wy2 += 6.0
+			for cnr: Vector2 in [Vector2(2, 2), Vector2(w - 4, 2),
+					Vector2(2, h - 4), Vector2(w - 4, h - 4)]:
+				canvas.draw_rect(Rect2(p + cnr, Vector2(2, 2)), Color(0.3, 0.42, 0.3))
 		"table":
-			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.52, 0.36, 0.22))
-			canvas.draw_rect(Rect2(p + Vector2(4, 4), Vector2(w - 8, h - 8)), Color(0.6, 0.43, 0.26))
+			# 상판은 빛을 받고 옆면은 그늘진다 — 밑에는 접지 그림자
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 3), Color(0, 0, 0, 0.16))
+			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.46, 0.31, 0.19))
+			canvas.draw_rect(Rect2(p, Vector2(w, h - 5)), Color(0.6, 0.43, 0.26))
+			canvas.draw_rect(Rect2(p, Vector2(w, 3)), Color(0.68, 0.5, 0.31))
+			canvas.draw_rect(Rect2(p.x + 6, p.y + 9, w - 12, 1), Color(0.52, 0.36, 0.22))
 		"chair":
 			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.45, 0.3, 0.18))
 			canvas.draw_rect(Rect2(p + Vector2(2, 2), Vector2(w - 4, 5)), Color(0.55, 0.38, 0.22))

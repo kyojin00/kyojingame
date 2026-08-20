@@ -493,9 +493,19 @@ func _draw_room() -> void:
 	# 계산대 앞 깔개 — 손님이 서는 자리를 알려 준다
 	var rug := Rect2(348, 320, 264, 96) if room_id != "general" \
 		else Rect2(C.position.x - 16, C.end.y + 10, C.size.x + 32, 52)
-	canvas.draw_rect(rug, Color(0.62, 0.26, 0.24, 0.55))
-	canvas.draw_rect(rug.grow(-8), Color(0.75, 0.38, 0.32, 0.5))
-	canvas.draw_rect(rug, Color(0.35, 0.16, 0.14, 0.5), false, 2.0)
+	# 민무늬 사각형은 색종이다 — 테두리 띠, 직조 결, 네 귀 매듭
+	canvas.draw_rect(rug, Color(0.55, 0.23, 0.21, 0.9))
+	canvas.draw_rect(rug.grow(-6), Color(0.68, 0.33, 0.28, 0.9))
+	var ry := rug.position.y + 12.0
+	while ry < rug.end.y - 9.0:
+		canvas.draw_rect(Rect2(rug.position.x + 10, ry, rug.size.x - 20, 1),
+			Color(0.55, 0.23, 0.21, 0.6))
+		ry += 9.0
+	canvas.draw_rect(rug, Color(0.33, 0.14, 0.13, 0.8), false, 2.0)
+	for c4: Vector2 in [rug.position + Vector2(4, 4),
+			Vector2(rug.end.x - 8, rug.position.y + 4),
+			Vector2(rug.position.x + 4, rug.end.y - 8), rug.end - Vector2(8, 8)]:
+		canvas.draw_rect(Rect2(c4, Vector2(4, 4)), Color(0.85, 0.66, 0.42))
 
 	_draw_deco(str(d.deco), wall)
 	if room_id == "general":
