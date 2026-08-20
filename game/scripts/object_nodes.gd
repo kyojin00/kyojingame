@@ -339,6 +339,11 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 				spr.self_modulate = Color(1.05, 1.03, 0.94)
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
+		if kind == "tree":
+			# 격자 깨기 — 숲의 나무가 행렬로 서면 벽지가 된다. 그루마다
+			# 몇 픽셀씩 어긋나야 숲이다. 판정 칸은 그대로 — 그림만 옮긴다
+			spr.offset.x += (m._hash01(pos.x * 11 + 2, pos.y * 17 + 5) - 0.5) * 8.0
+			spr.offset.y += (m._hash01(pos.x * 13 + 4, pos.y * 19 + 7) - 0.5) * 4.0
 		if kind == "deco_fountain":
 			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
 		elif kind == "auction":

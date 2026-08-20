@@ -61,7 +61,7 @@ func _ready() -> void:
 # 노드에 자식을 끼우지 않는 이유: 온 코드가 「자식 0번 = 스프라이트」로
 # 잡고 있어서, 그 사이에 그림자를 끼우면 전부 흔들린다.
 var _obj_shadow_tex: Texture2D = null
-const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree"]
+const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree", "cave"]
 
 func _draw_object_shadows() -> void:
 	if _obj_shadow_tex == null or m.player == null:
@@ -90,11 +90,17 @@ func _draw_object_shadows() -> void:
 		if kind == "tree" and int(od.get("hp", m.TREE_HP)) < m.TREE_HP:
 			w *= 0.4                       # 잎을 잃은 나무는 그림자도 준다
 		var sz := Vector2(w, w * 0.36)
+		# 그림자는 **그림의 실제 자리**를 따른다 — 나무는 격자를 깨려고
+		# 그루마다 몇 픽셀씩 어긋나 있으므로, 칸이 아니라 스프라이트의
+		# 한가운데·밑변에서 잰다.
+		var cx: float = node.position.x \
+			+ (spr.offset.x + spr.texture.get_width() / 2.0) * spr.scale.x
+		var by: float = node.position.y \
+			+ (spr.offset.y + spr.texture.get_height()) * spr.scale.y
 		# 중심을 밑변보다 **아래로** — 위에서 내려다보는 화면에서는 캐노피가
 		# 제 그림자의 위쪽을 다 가린다. 아래로 고여야 눈에 보인다
 		m.shadows.draw_texture_rect(_obj_shadow_tex,
-			Rect2(node.position + Vector2(m.TILE / 2.0 - sz.x / 2.0, -sz.y * 0.28), sz),
-			false)
+			Rect2(Vector2(cx - sz.x / 2.0, by - sz.y * 0.28), sz), false)
 
 
 # 화면이 보고 있는 세계 사각형
