@@ -1232,10 +1232,10 @@ func _plant_village_greenery() -> void:
 			# 덩어리로 난다 (world_gen 의 흩뿌리기와 같은 결)
 			var clump: float = clampf(_vnoise(x, y, 14, 23) * 2.2, 0.0, 2.2)
 			# 나무는 조금 성기게 — 0.26이면 마을이 숲에 잠겼다
-			if h < 0.17 * clump:
+			if h < 0.12 * clump:
 				if _nature_clear(pos, "tree"):
 					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
-			elif h < 0.17 * clump + 0.03:
+			elif h < 0.12 * clump + 0.03:
 				if _nature_clear(pos, "rock"):
 					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
 			elif h < 0.40 and h >= 0.37:

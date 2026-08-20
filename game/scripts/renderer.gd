@@ -93,7 +93,13 @@ func _draw_clouds() -> void:
 # 밤(CanvasModulate)이 짙어질수록 가로등·창가에 따뜻한 빛무리가 살아난다.
 # 등불 자리는 프레임마다 온 objects를 뒤지면 비싸니 몇 초에 한 번 모은다
 var _lamp_cache: Array = []
+var _anvil_cache: Array = []
 var _lamp_cache_cd := 0.0
+var _glint_cd := 0.0
+var _spark_cd := 0.0
+# 새 — 풀밭에 앉아 모이를 쪼다가, 다가가면 날아오른다
+var _birds: Array = []
+var _bird_cd := 4.0
 
 func _draw_glows() -> void:
 	if m.night == null or m.player == null:
@@ -119,6 +125,7 @@ func _draw_glows() -> void:
 
 func _refresh_lamp_cache() -> void:
 	_lamp_cache.clear()
+	_anvil_cache.clear()
 	for pos: Vector2i in m.objects:
 		var k := String(m.objects[pos].kind)
 		if k == "deco_lamp":
@@ -126,6 +133,8 @@ func _refresh_lamp_cache() -> void:
 			_lamp_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE - 14))
 		elif k == "deco_forge":
 			_lamp_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE + 20))
+		elif k == "deco_anvil":
+			_anvil_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE + 2))
 
 
 # 앰비언트 한 틱 — main._process가 매 프레임 부른다
@@ -175,6 +184,108 @@ func _update_ambient(delta: float) -> void:
 				pk = "step_dust"
 			if pk != "":
 				spawn_burst(m.player.position + Vector2(0, 4), pk, 1.0, 4.0)
+	# ③ 물가 반짝임 — 화면 안 물 칸에서 해가 부서진다
+	_glint_cd -= delta
+	if _glint_cd <= 0.0:
+		_glint_cd = randf_range(0.25, 0.6)
+		var view := _view_rect()
+		var tx0 := maxi(0, int(view.position.x / m.TILE))
+		var ty0 := maxi(0, int(view.position.y / m.TILE))
+		var tx1 := mini(m.MAP_W - 1, int(view.end.x / m.TILE))
+		var ty1 := mini(m.WORLD_H - 1, int(view.end.y / m.TILE))
+		for attempt in 10:
+			var wx := randi_range(tx0, tx1)
+			var wy := randi_range(ty0, ty1)
+			if m.grid[wy][wx].ground != "water":
+				continue
+			spawn_burst(Vector2(wx * m.TILE + randf_range(4, 28),
+				wy * m.TILE + randf_range(4, 28)), "glint", 1.0, 2.0)
+			break
+	# ④ 망치질 불티 — 모루 곁에 사람이 있으면 이따금 튄다
+	_spark_cd -= delta
+	if _spark_cd <= 0.0:
+		_spark_cd = randf_range(1.6, 3.2)
+		for ap: Vector2 in _anvil_cache:
+			if not _view_rect().grow(60.0).has_point(ap):
+				continue
+			var someone := m.player.position.distance_to(ap) < 110.0
+			if not someone:
+				for mn in m.npcs:
+					if mn.visible and mn.position.distance_to(ap) < 110.0:
+						someone = true
+						break
+			if someone:
+				spawn_burst(ap + Vector2(0, -14), "spark", 1.0, 3.0)
+			break
+	# ⑤ 새 — 풀밭에 두어 마리 내려앉고, 다가가면 날아오른다
+	_update_birds(delta)
+
+
+# ---- 새 ----
+#
+# 파티클로는 안 된다 — 새는 **반응**해야 산다. 앉아서 콕콕 쪼다가
+# 사람이 다가오면 푸드덕 날아오르는 것, 그 한 박자가 생동감의 전부다.
+func _update_birds(delta: float) -> void:
+	_bird_cd -= delta
+	var view := _view_rect()
+	if _bird_cd <= 0.0 and _birds.size() < 3:
+		_bird_cd = randf_range(5.0, 9.0)
+		# 화면 가장자리 쪽 풀밭에 내려앉는다 (한복판이면 바로 쫓겨난다)
+		var tx0 := maxi(0, int(view.position.x / m.TILE))
+		var ty0 := maxi(0, int(view.position.y / m.TILE))
+		var tx1 := mini(m.MAP_W - 1, int(view.end.x / m.TILE))
+		var ty1 := mini(m.WORLD_H - 1, int(view.end.y / m.TILE))
+		for attempt in 12:
+			var bx := randi_range(tx0, tx1)
+			var by := randi_range(ty0, ty1)
+			var g0: String = m.grid[by][bx].ground
+			if (g0 != "grass" and g0 != "") or m.objects.has(Vector2i(bx, by)):
+				continue
+			var bp := Vector2(bx * m.TILE + 16, by * m.TILE + 16)
+			if m.player.position.distance_to(bp) < 140.0:
+				continue
+			_birds.append({"p": bp, "v": Vector2.ZERO, "state": "ground",
+				"t": randf_range(4.0, 9.0), "phase": randf() * TAU,
+				"tint": randf() < 0.5})
+			break
+	var alive: Array = []
+	for b in _birds:
+		b.t -= delta
+		b.phase += delta * (14.0 if b.state == "fly" else 3.0)
+		if b.state == "ground":
+			# 가끔 한 발짝 총총
+			if randf() < delta * 0.8:
+				b.p += Vector2(randf_range(-6, 6), randf_range(-3, 3))
+			# 사람이 다가오면 날아오른다
+			if m.player.position.distance_to(b.p) < 74.0 or b.t <= 0.0:
+				b.state = "fly"
+				b.t = 2.6
+				b.v = Vector2(randf_range(-40, 40), -randf_range(90, 130))
+		else:
+			b.p += b.v * delta
+			b.v.x *= 1.0 + delta * 0.4
+		if b.state == "fly" and b.t <= 0.0:
+			continue
+		alive.append(b)
+	_birds = alive
+
+
+# 새 그리기 — 몸통 한 점, 날개 두 점. 날 때는 날개가 퍼덕인다
+func _draw_birds() -> void:
+	for b in _birds:
+		var body := Color(0.32, 0.3, 0.38) if b.tint else Color(0.55, 0.42, 0.3)
+		var wing := Color(0.2, 0.19, 0.26) if b.tint else Color(0.4, 0.3, 0.2)
+		var p: Vector2 = b.p
+		if b.state == "ground":
+			var peck := 1.0 if fmod(b.phase, 2.4) < 0.4 else 0.0
+			m.overlay.draw_rect(Rect2(p + Vector2(-2, -3), Vector2(5, 3)), body)
+			m.overlay.draw_rect(Rect2(p + Vector2(2, -4 + peck * 2.0), Vector2(2, 2)), body)
+			m.overlay.draw_rect(Rect2(p + Vector2(-1, -4), Vector2(3, 2)), wing)
+		else:
+			var flap := sin(b.phase) * 3.0
+			m.overlay.draw_rect(Rect2(p + Vector2(-1, -2), Vector2(4, 2)), body)
+			m.overlay.draw_rect(Rect2(p + Vector2(-4, -2 - flap), Vector2(3, 2)), wing)
+			m.overlay.draw_rect(Rect2(p + Vector2(3, -2 - flap), Vector2(3, 2)), wing)
 
 
 func _draw_building_signs() -> void:
@@ -344,6 +455,7 @@ func _draw_overlay() -> void:
 				else:
 					_draw_question(mn.position + Vector2(0, -124))
 
+	_draw_birds()
 	for pt in m.particles:
 		var s: float = float(pt.size)
 		m.overlay.draw_rect(Rect2(pt.p, Vector2(s, s)), pt.c)

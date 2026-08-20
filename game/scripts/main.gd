@@ -608,7 +608,7 @@ const REGIONS := [
 	# ---- 원래 있던 땅 (마을 · 농장 둘레) ----
 	# 예전부터 있던 남동쪽 깊은 숲 — 넓어진 만큼 남쪽으로 늘렸다
 	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40 + NORTH_PAD, 52, 24),
-		"tree": 0.24, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.20, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
 	# 옛 표지판 너머 첫 땅. 줄 맞춰 심긴 사과나무 — 사람 손이 닿았던 자리다
 	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8 + NORTH_PAD, 48, 26),
 		"tree": 0.9, "rock": 0.0, "ground": "", "grid": 4, "pond": 0.0},
@@ -625,7 +625,7 @@ const REGIONS := [
 	# 나무는 NATURE_CLEAR(가로 4칸)에 걸려 아무리 올려도 6%쯤에서 포화된다 —
 	# 그래서 「더 깊다」는 바위로 낸다 (바위는 두 칸 간격이라 훨씬 촘촘하다)
 	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70 + NORTH_PAD, 62, 24),
-		"tree": 0.28, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.24, "rock": 0.22, "ground": "", "grid": 0, "pond": 0.0},
 
 	# ---- 네 배로 넓히며 붙인 땅 ----
 	#
@@ -636,10 +636,10 @@ const REGIONS := [
 
 	# 폭포골 — 물소리가 나는 골짜기. 젖은 땅이라 웅덩이가 흩어져 있다
 	{"id": "falls", "name": "폭포골", "rect": Rect2i(238, 6 + NORTH_PAD, 66, 52),
-		"tree": 0.20, "rock": 0.14, "ground": "", "grid": 0, "pond": 0.05},
+		"tree": 0.17, "rock": 0.12, "ground": "", "grid": 0, "pond": 0.05},
 	# 자작나무 언덕 — 훤한 숲. 나무는 많은데 바닥이 밝아 어둡지 않다
 	{"id": "birch", "name": "자작나무 언덕", "rect": Rect2i(316, 4 + NORTH_PAD, 60, 46),
-		"tree": 0.44, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.38, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
 	# 붉은바위 벌판 — 마른 흙땅. 돌무지 언덕이 여기 있다.
 	#
 	# 바닥이 **자갈(path)** 이었다. 그런데 자갈 타일도 벼랑면도 같은 돌
@@ -1801,8 +1801,10 @@ const BUILDING_KINDS := ["house", "art_block", "barn", "barn_block"]
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
 const OBJECT_SCALES := {
 	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
-	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
-	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
+	# 크게, 대신 드물게 — 잔 나무가 우글거리면 배경이 되고, 큰 나무가
+	# 드문드문 서야 한 그루 한 그루가 물건이 된다
+	"tree": 3.4, "rock": 2.2, "bigrock": 4.4, "cave": 2.2, "worldtree": 2.6,
+	"barn": 1.0, "forage_berry": 1.7, "forage_herb": 1.7, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)
@@ -1840,7 +1842,7 @@ func spawn_blocked(x: int, y: int) -> bool:
 	return no_spawn[y * MAP_W + x] != 0
 
 
-const TREE_DX := 4   # 가로로 4칸 이내이면서
+const TREE_DX := 5   # 가로로 5칸 이내이면서 (나무가 커진 만큼 간격도)
 const TREE_DY := 2   # 세로로 2칸 이내면 겹쳐 보인다 -> 금지
 const NATURE_CLEAR := {
 	"tree": 4, "bigrock": 3, "rock": 2, "forage_berry": 2, "forage_herb": 2,
@@ -3113,6 +3115,12 @@ const PARTICLE_DEFS := {
 		"drift": 12.0, "life": 0.8},
 	"step_dust": {"c": Color(0.72, 0.64, 0.5), "n": 3, "up": -12.0, "g": 26.0,
 		"drift": 10.0, "size": 1.6, "life": 0.9},
+	# 물가 반짝임 — 해가 물결에 부서지는 흰 점
+	"glint": {"c": Color(0.95, 0.99, 1.0), "n": 2, "up": -6.0, "g": 0.0,
+		"drift": 4.0, "life": 1.1},
+	# 망치질 불티 — 모루에서 튄다. 빠르고 무겁게 떨어진다
+	"spark": {"c": Color(1.0, 0.72, 0.25), "n": 7, "up": -55.0, "g": 210.0,
+		"drift": 40.0, "life": 0.8},
 }
 
 

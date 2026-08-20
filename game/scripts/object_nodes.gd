@@ -100,6 +100,32 @@ func _spawn_objects() -> void:
 	m.story._apply_story_visibility()
 
 
+# ---- 나무 흔들림 ----
+#
+# 바람은 GDScript가 아니라 **셰이더**가 분다. 나무가 수백 그루라
+# 프레임마다 스크립트로 흔들면 그 값이 다 CPU 비용인데, 정점 셰이더는
+# 공짜다. 우듬지(UV.y 위쪽)만 사인파로 밀고 밑동은 못 박는다.
+# 위상은 나무의 세계 좌표에서 뽑아 그루마다 어긋난다.
+var _sway_mat: ShaderMaterial = null
+
+func _sway_material() -> ShaderMaterial:
+	if _sway_mat != null:
+		return _sway_mat
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+void vertex() {
+	float ph = MODEL_MATRIX[3].x * 0.043 + MODEL_MATRIX[3].y * 0.029;
+	float k = clamp(1.0 - UV.y * 1.35, 0.0, 1.0);   // 우듬지만
+	VERTEX.x += (sin(TIME * 1.15 + ph) + 0.4 * sin(TIME * 2.3 + ph * 1.7))
+		* 1.7 * k * k;
+}
+"""
+	_sway_mat = ShaderMaterial.new()
+	_sway_mat.shader = sh
+	return _sway_mat
+
+
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var offset := Vector2(0, -64)
 	var texture: Texture2D
@@ -366,10 +392,14 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 			spr.texture = m.tex["tree_13"]  # 일부 나무에만 사과 3개
 		else:
 			spr.texture = m.tex["tree_01"]  # 완전히 자란 기본 나무
+		# 온전한 나무만 바람에 흔들린다 — 그루터기가 흔들리면 무섭다
+		spr.material = _sway_material() if lie == 0.0 else null
 	elif hp == 2:
 		spr.texture = m.tex["tree_06"]
+		spr.material = null
 	else:
 		spr.texture = m.tex["tree_09"]
+		spr.material = null
 
 
 func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> void:
