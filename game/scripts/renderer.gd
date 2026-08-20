@@ -42,6 +42,59 @@ func _ready() -> void:
 			a = a * a * (3.0 - 2.0 * a)
 			img.set_pixel(x, y, Color(1, 1, 1, a * a))
 	_cloud_tex = ImageTexture.create_from_image(img)
+	# 자연물 접지 그림자 원판 — 미리 눌러 놓은 타원. 남보라 (회색은 회색이 아니다)
+	var sim := Image.create(64, 24, false, Image.FORMAT_RGBA8)
+	for y in 24:
+		for x in 64:
+			var d := Vector2((x - 32) / 30.0, (y - 12) / 11.0).length()
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			a = a * a * (3.0 - 2.0 * a)
+			sim.set_pixel(x, y, Color(0.10, 0.08, 0.18, a * 0.52))
+	_obj_shadow_tex = ImageTexture.create_from_image(sim)
+
+
+# ---- 자연물의 접지 그림자 ----
+#
+# 나무·바위는 여태 그림자 없이 떠 있었다 — 밑동의 풀숲 몇 포기로는 땅을
+# 못 딛는다. 세계보다 밑에 깔린 레이어(main.shadows)에 부드러운 타원을
+# 한 장씩 그리면 화면의 모든 나무가 단번에 땅으로 내려앉는다.
+# 노드에 자식을 끼우지 않는 이유: 온 코드가 「자식 0번 = 스프라이트」로
+# 잡고 있어서, 그 사이에 그림자를 끼우면 전부 흔들린다.
+var _obj_shadow_tex: Texture2D = null
+const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree"]
+
+func _draw_object_shadows() -> void:
+	if _obj_shadow_tex == null or m.player == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	var view := _view_rect().grow(96.0)
+	for pos: Vector2i in m.obj_nodes:
+		var od: Dictionary = m.objects.get(pos, {})
+		var kind: String = str(od.get("kind", ""))
+		if not kind in OBJ_SHADOW_KINDS:
+			continue
+		var node: Node2D = m.obj_nodes[pos]
+		if not is_instance_valid(node) or not view.has_point(node.position):
+			continue
+		if node.get_child_count() == 0:
+			continue
+		var spr: Sprite2D = node.get_child(0)
+		if spr.texture == null:
+			continue
+		# 폭은 그 그루의 화면 폭을 따른다 — 캐노피와 거의 같게, 바위는 조금 넓게
+		# (바위는 밑동의 흙무더기가 그림자 안쪽을 가리므로 밖으로 비어져 나와야 보인다)
+		var w: float = spr.texture.get_width() * spr.scale.x \
+			* (0.95 if kind == "tree" or kind == "bent_tree" else 1.25)
+		if kind == "tree" and int(od.get("hp", m.TREE_HP)) < m.TREE_HP:
+			w *= 0.4                       # 잎을 잃은 나무는 그림자도 준다
+		var sz := Vector2(w, w * 0.36)
+		# 중심을 밑변보다 **아래로** — 위에서 내려다보는 화면에서는 캐노피가
+		# 제 그림자의 위쪽을 다 가린다. 아래로 고여야 눈에 보인다
+		m.shadows.draw_texture_rect(_obj_shadow_tex,
+			Rect2(node.position + Vector2(m.TILE / 2.0 - sz.x / 2.0, -sz.y * 0.28), sz),
+			false)
 
 
 # 화면이 보고 있는 세계 사각형
@@ -675,6 +728,7 @@ func _draw_weather() -> void:
 			var sy := fposmod(m._hash01(i, 2) * full_h + m.weather_time * 280.0, full_h) - 5.0
 			m.overlay.draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy),
 				Color(0.72, 0.82, 1.0, 0.5), 1.0)
+		_draw_rain_splashes(34)
 	elif w == GameData.WEATHER_SNOW:
 		for i in 240:
 			var sx := fposmod(m._hash01(i, 1) * full_w + sin(m.weather_time * 1.5 + i) * 12.0, full_w)
@@ -690,6 +744,7 @@ func _draw_weather() -> void:
 		var flash := fposmod(m.weather_time, 5.2)
 		if flash < 0.18:
 			m.overlay.draw_rect(_camera_rect(), Color(1, 1, 1, 0.45 * (1.0 - flash / 0.18)))
+		_draw_rain_splashes(58)
 	elif w == GameData.WEATHER_FOG:
 		# 가장자리로 갈수록 짙어지는 안개 (가까운 곳만 또렷하다)
 		var view2 := _camera_rect()
@@ -725,3 +780,24 @@ func _draw_weather() -> void:
 func _camera_rect() -> Rect2:
 	var half := Vector2(960.0, 540.0) / (2.0 * m.CAMERA_ZOOM)
 	return Rect2(m.player.position - half, half * 2.0)
+
+
+# 빗방울이 닿는 자리 — 바닥에 잠깐 퍼지는 잔물결 고리.
+# 하늘에서 내리는 줄만 있고 바닥이 조용하면 비가 「화면 앞 유리」에
+# 내리는 것처럼 보인다. 닿는 자리가 있어야 비가 세계 안에 내린다.
+# 상태 없이 시간·해시로만 계산한다 — 고리마다 제 주기를 돌고 끝나면
+# 다른 자리에서 다시 시작한다
+func _draw_rain_splashes(count: int) -> void:
+	var view := _camera_rect()
+	for i in count:
+		var ph: float = m.weather_time * 2.4 + m._hash01(i, 8) * 7.0
+		var cyc := int(ph)
+		var t := ph - float(cyc)
+		var px: float = view.position.x + m._hash01(i * 3 + cyc, 9) * view.size.x
+		var py: float = view.position.y + m._hash01(cyc * 7 + i, 10) * view.size.y
+		var r: float = 1.5 + t * 4.5
+		var a: float = (1.0 - t) * 0.38
+		m.overlay.draw_set_transform(Vector2(px, py), 0.0, Vector2(1.0, 0.45))
+		m.overlay.draw_arc(Vector2.ZERO, r, 0.0, TAU, 10,
+			Color(0.85, 0.92, 1.0, a), 1.0)
+	m.overlay.draw_set_transform(Vector2.ZERO)

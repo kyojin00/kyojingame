@@ -328,39 +328,55 @@ function grass(season, variant) {
   //    잔디 쪽으로 당겨 섞는다 — 풀 사이로 비치는 흙은 그만큼 죽어 보인다
   // 흙빛을 더 많이 섞었더니 들판에 **분홍 점**이 흩뿌려졌다 — 초록 위의
   // 붉은 흙은 아무리 어두워도 눈에 띈다. 잔디 쪽으로 더 당겨 섞는다
-  const soilTone = k => p.base.map((v, j) => Math.round(v * 0.62 + EARTH[k][j] * 0.38));
+  // …라고 두 번을 당겼는데도 화면에서는 **분홍 물방울무늬**로 남았다.
+  // 점 하나는 안 보여도 들판에 수백 개가 깔리면 무늬가 된다 — 더 당기고
+  // (풀 78%), 반도 줄인다. 흙은 「비치는」 것이지 「찍히는」 것이 아니다
+  const soilTone = k => p.base.map((v, j) => Math.round(v * 0.78 + EARTH[k][j] * 0.22));
   const s1 = soilTone(1), s2 = soilTone(2);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    if (h(x >> 1, (y >> 1) + 40, variant) > 0.022) continue;
+    if (h(x >> 1, (y >> 1) + 40, variant) > 0.011) continue;
     g.px(x, y, season === 'winter' ? p.lo : (h(x, y, 5) < 0.5 ? s1 : s2));
   }
-  // ③ 포기 — 다섯. 많이 심을수록 타일이 「무늬」로 기억된다
-  for (let i = 0; i < 5; i++) {
+  // ③ 포기 — **둘만.** 다섯을 심었더니 화면에서는 칸마다 포기가 다섯이라,
+  //    들판 전체가 쉴 새 없는 무늬가 됐다 (스타듀의 들판은 대부분 조용한
+  //    평면이고 장식이 드물다 — 다 그리지 않는다). 무대는 비어 있어야
+  //    그 위의 나무와 사람이 산다
+  for (let i = 0; i < 2; i++) {
     const ox = Math.floor(h(i, variant, 1) * N);
     const oy = Math.floor(h(variant, i, 2) * N);
     tuft(g, ox, oy, p, h(i, i + variant, 6) < 0.4);
   }
-  // ③-b 홑잎 — 포기가 못 되는 **잎 한두 장**. 포기만 다섯이면 그 다섯이
-  //     무늬로 기억되지만, 그 사이를 홑잎이 메우면 「풀밭」이 된다.
-  //     포기와 달리 밑동(dark)을 안 찍는다 — 검은 점이 늘면 얼룩이 된다
-  for (let i = 0; i < 9; i++) {
+  // ③-b 홑잎 — 포기 사이를 잇는 잎 한두 장. 이것도 넷이면 족하다.
+  //     끝 색은 hi 로 — tip(제일 밝은 노랑기)을 아홉 장씩 뿌렸더니
+  //     들판에 노란 점이 흩뿌려진 것처럼 보였다
+  for (let i = 0; i < 4; i++) {
     const ox = Math.floor(h(i + 50, variant, 12) * N);
     const oy = Math.floor(h(variant, i + 50, 13) * N);
     const len = 1 + Math.floor(h(i, variant + 3, 14) * 2);
     const lean = h(i, variant, 15) < 0.5 ? -1 : 1;
     for (let k = 1; k <= len; k++)
-      g.px(ox + (k === len ? lean : 0), oy - k, k === len ? p.tip : p.hi);
+      g.px(ox + (k === len ? lean : 0), oy - k,
+        k === len && h(i, variant, 16) < 0.3 ? p.tip : p.hi);
   }
-  // ④ 잔돌 하나 — 바닥에 굴러다니는 것. 풀만 있는 땅은 없다
-  {
+  // ④ 잔돌 하나 — 바닥에 굴러다니는 것. 풀만 있는 땅은 없다.
+  //    단 **세 장 중 한 장에만.** 장마다 박았더니 모래빛 점이 칸마다
+  //    돌아와, 들판이 물방울무늬가 됐다 — 분홍 점의 범인은 흙이 아니라
+  //    이 돌이었다 (돌은 모래빛이니까)
+  //    그리고 꽃과 같은 처방을 **두 배로** — 같은 변형은 들판에 수백 번
+  //    반복되므로, 변형마다 붙는 장식은 패턴 거리에서 안 보여야 한다.
+  //    풀에 묻힌 돌 (바탕 62%), 덩어리 대신 대각 두 점
+  if (variant === 2) {
     const ox = Math.floor(h(variant + 20, 7, 8) * N), oy = Math.floor(h(7, variant + 20, 9) * N);
-    g.px(ox, oy, STONE[2]); g.px(ox + 1, oy, STONE[1]);
-    g.px(ox, oy + 1, STONE[4]); g.px(ox + 1, oy + 1, STONE[3]);
+    const st = k => mixc(STONE[k], p.base, 0.62);
+    g.px(ox, oy, st(2)); g.px(ox + 1, oy + 1, st(4));
   }
-  // ⑤ 꽃 — 세 장 중 한 장에만, 그것도 한 송이. 꽃은 **드물어야** 눈에 띈다
+  // ⑤ 꽃 — 세 장 중 한 장에만, 그것도 한 송이. 색은 **바탕에 섞어** 눕힌다.
+  //    순색 세 점을 찍었더니 변형 1이 깔린 자리마다 분홍 점이 박혀,
+  //    들판이 물방울무늬 벽지가 됐다 — 꽃은 가까이 봐야 꽃이고
+  //    멀리서는 바탕이 살짝 밝은 자리여야 한다
   if (variant === 1) {
     const ox = Math.floor(h(40, variant, 4) * N), oy = Math.floor(h(variant, 40, 5) * N);
-    const c = p.bloom[season === 'spring' ? 0 : 1];
+    const c = mixc(p.base, p.bloom[season === 'spring' ? 0 : 1], 0.55);
     g.px(ox, oy, c); g.px(ox + 1, oy, c); g.px(ox, oy - 1, c);
     g.px(ox, oy + 1, p.dark);                               // 꽃대
   }

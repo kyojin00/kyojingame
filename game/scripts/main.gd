@@ -108,6 +108,7 @@ var obj_nodes: Dictionary = {}  # Vector2i -> Node2D (설치/제거 가능한 �
 
 var tex: Dictionary = {}
 var world: Node2D
+var shadows: Node2D  # 자연물 접지 그림자 — 세계보다 밑에 깔리는 레이어
 var overlay: Node2D  # 건물보다 앞에 그리는 안내 텍스트/화살표/날씨 레이어
 var glow: Node2D     # 밤 어둠(CanvasModulate) **밖**에서 그리는 등불 빛무리
 var player: Node2D
@@ -1319,6 +1320,14 @@ func _ready() -> void:
 
 	night = CanvasModulate.new()
 	add_child(night)
+
+	# 자연물의 접지 그림자 — 나무·바위는 여태 그림자 없이 떠 있었다.
+	# 세계(world)보다 **먼저** 붙는 형제라 언제나 모든 것의 밑에 깔린다.
+	# 무엇을 어디에 그릴지는 renderer._draw_object_shadows 가 정한다
+	shadows = Node2D.new()
+	shadows.name = "Shadows"
+	shadows.draw.connect(renderer._draw_object_shadows)
+	add_child(shadows)
 
 	world = Node2D.new()
 	world.name = "World"
@@ -2858,6 +2867,7 @@ func _process(delta: float) -> void:
 		_p = _pm("HUD", _p)
 		_perf_tick(delta)
 	queue_redraw()
+	shadows.queue_redraw()
 	overlay.queue_redraw()
 	glow.queue_redraw()
 	if _shot_path != "":
