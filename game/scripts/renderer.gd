@@ -62,7 +62,10 @@ func _ready() -> void:
 # 잡고 있어서, 그 사이에 그림자를 끼우면 전부 흔들린다.
 var _obj_shadow_tex: Texture2D = null
 const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree",
-	"cave", "stall", "old_lookout"]
+	"cave", "stall", "old_lookout",
+	# 게시판·표지판·팻말 — 다리가 가늘어 그림자가 없으면 어느 바닥에서든
+	# 떠 보인다. 부드러운 타원 하나가 이들을 그 바닥 위에 세운다
+	"board", "auction", "sign", "housesite", "plotsite", "home_sign", "homeplot"]
 
 func _draw_object_shadows() -> void:
 	if _obj_shadow_tex == null or m.player == null:

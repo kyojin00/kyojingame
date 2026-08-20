@@ -33,6 +33,23 @@ function rect(p, x0, y0, w, h, c) {
   for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) dot(p, x, y, c);
 }
 
+// 윤곽선 — 마을의 모든 것이 어두운 따뜻한 선으로 둘려 있는데 게시판만
+// 맨살이라 바닥 위에 떠 보였다. 도트 격자에서 몸에 붙은 빈 칸을 두른다
+// (반투명 발밑 그림자에는 안 두른다 — 그림자에 테가 지면 웅덩이가 된다)
+const LINE = [44, 34, 28];
+function outline(p) {
+  const gw = p.width / 2, gh = p.height / 2;
+  const alphaAt = (x, y) => (x < 0 || y < 0 || x >= gw || y >= gh)
+    ? 0 : p.data[((y * 2) * p.width + x * 2) * 4 + 3];
+  const add = [];
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+    if (alphaAt(x, y) !== 0) continue;
+    for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+      if (alphaAt(x + ax, y + ay) >= 200) { add.push([x, y]); break; }
+  }
+  for (const [x, y] of add) dot(p, x, y, LINE);
+}
+
 // ---- 의뢰 게시판: 다리 둘 + 넓은 코르크판 + 종이 쪽지 ----
 {
   const p = img(176, 128);                       // 도트 격자 88x64
@@ -69,7 +86,8 @@ function rect(p, x0, y0, w, h, c) {
   // 지붕 널 (비 가림)
   rect(p, 2, 2, 84, 4, WOOD_D);
   rect(p, 2, 2, 84, 2, WOOD_L);
-  // 발밑 그림자
+  outline(p);
+  // 발밑 그림자 — 윤곽선 뒤에 (그림자에 테가 지면 웅덩이가 된다)
   rect(p, 8, 60, 74, 2, SHADOW);
   fs.writeFileSync(OUT + 'board_quest.png', PNG.sync.write(p));
   console.log('board_quest.png 176x128');
@@ -106,7 +124,8 @@ function rect(p, x0, y0, w, h, c) {
   rect(p, 30, 38, 12, 10, PAPER);
   rect(p, 32, 41, 8, 1, [110, 100, 96]);
   rect(p, 32, 44, 6, 1, [110, 100, 96]);
-  // 발밑 그림자
+  outline(p);
+  // 발밑 그림자 — 윤곽선 뒤에
   rect(p, 22, 62, 28, 2, SHADOW);
   fs.writeFileSync(OUT + 'board_unlock.png', PNG.sync.write(p));
   console.log('board_unlock.png 144x136');
