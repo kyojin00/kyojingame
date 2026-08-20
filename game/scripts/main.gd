@@ -1345,6 +1345,25 @@ func _ready() -> void:
 	glow.draw.connect(renderer._draw_glows)
 	glow_layer.add_child(glow)
 
+	# 비네트 — 화면 귀퉁이가 아주 살짝 어둡다. 시선이 한복판으로 모이고
+	# 화면에 「렌즈」가 생긴다. 정적인 그림 한 장이라 비용이 없다
+	var vin_img := Image.create(192, 108, false, Image.FORMAT_RGBA8)
+	for vy in 108:
+		for vx in 192:
+			var d := Vector2((vx - 96) / 96.0, (vy - 54) / 54.0).length()
+			var va := clampf(d - 0.62, 0.0, 1.0)
+			vin_img.set_pixel(vx, vy, Color(0.03, 0.03, 0.07, va * va * 0.34))
+	var vin_layer := CanvasLayer.new()
+	vin_layer.name = "VignetteLayer"
+	vin_layer.layer = 2
+	add_child(vin_layer)
+	var vin := TextureRect.new()
+	vin.texture = ImageTexture.create_from_image(vin_img)
+	vin.stretch_mode = TextureRect.STRETCH_SCALE
+	vin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vin_layer.add_child(vin)
+
 	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
 	player.position = Vector2(START_TILE.x * TILE + 16, START_TILE.y * TILE + 16)

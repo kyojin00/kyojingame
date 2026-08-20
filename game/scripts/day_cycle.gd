@@ -288,10 +288,32 @@ func _next_day(passed_out: bool) -> void:
 
 
 func _update_night() -> void:
-	# 가로등이 없는 마을 — 해가 지면 정말로 캄캄해진다
-	var start := 18.0 * 60.0
-	var a := clampf((GameData.minutes - start) / (6.0 * 60.0), 0.0, 1.0)
-	var c := Color(1, 1, 1).lerp(Color(0.16, 0.15, 0.26), a)
+	# 하루의 색 온도 — 시계가 아니라 **빛**이 시간을 말한다.
+	# 낮이 순백이고 밤만 파란 세계는 형광등 방이다. 해가 뜨고 질 때
+	# 화면이 금빛으로 물들어야 같은 마을이 하루에 몇 번씩 딴 얼굴이 된다.
+	var hr := GameData.minutes / 60.0
+	const NIGHT := Color(0.16, 0.15, 0.26)     # 깊은 밤 (남보라)
+	const DAWN := Color(1.0, 0.87, 0.76)       # 동틀 녘 (연한 금빛)
+	const DAY := Color(1, 1, 1)
+	const GOLD := Color(1.0, 0.88, 0.68)       # 골든아워 (해질 녘 주황)
+	const DUSK := Color(0.72, 0.55, 0.62)      # 노을 끝 (분홍보라)
+	var c: Color
+	if hr < 5.0:
+		c = NIGHT
+	elif hr < 6.5:
+		c = NIGHT.lerp(DAWN, (hr - 5.0) / 1.5)
+	elif hr < 8.0:
+		c = DAWN.lerp(DAY, (hr - 6.5) / 1.5)
+	elif hr < 16.5:
+		c = DAY
+	elif hr < 18.0:
+		c = DAY.lerp(GOLD, (hr - 16.5) / 1.5)
+	elif hr < 19.5:
+		c = GOLD.lerp(DUSK, (hr - 18.0) / 1.5)
+	elif hr < 22.0:
+		c = DUSK.lerp(NIGHT, (hr - 19.5) / 2.5)
+	else:
+		c = NIGHT
 	if m.weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]:
 		c *= Color(0.78, 0.8, 0.88)  # 비 오는 날은 어둑하게
 	elif m.weather_now() == GameData.WEATHER_FOG:

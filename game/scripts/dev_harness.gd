@@ -7134,18 +7134,23 @@ func _album_tick() -> void:
 	var ids: Array = m.VILLAGE_PLOTS.keys()
 	var slot := int(_shot_frames / ALBUM_HOLD)
 	var beat := _shot_frames % ALBUM_HOLD
-	if slot > ids.size() + 1:
+	if slot > ids.size() + 2:
 		get_tree().quit()
 		return
-	# 마지막 두 장은 **광장**이다 — 부지가 아니라 그 사이의 한복판.
-	# 맨 끝 한 장은 밤 광장: 등불 빛무리와 어둠이 어떻게 앉는지 본다
+	# 마지막 석 장은 **광장**이다 — 낮 · 골든아워 · 밤.
+	# 하루의 색 온도와 등불 빛무리가 어떻게 앉는지 한 벌로 본다
 	var plaza := slot >= ids.size()
-	var night := slot == ids.size() + 1
-	var pid := ("plaza_night" if night else "plaza") if plaza else str(ids[slot])
+	var dusk := slot == ids.size() + 1
+	var night := slot == ids.size() + 2
+	var pid := "plaza" if plaza else str(ids[slot])
+	if dusk:
+		pid = "plaza_dusk"
+	elif night:
+		pid = "plaza_night"
 	var a: Vector2i = m.PLAZA.get_center() - Vector2i(2, 2) if plaza \
 		else (m.VILLAGE_PLOTS[pid].anchor as Vector2i)
-	if night and beat == 2:
-		GameData.minutes = int(21.5 * 60.0)
+	if (dusk or night) and beat == 2:
+		GameData.minutes = int((17.6 if dusk else 21.5) * 60.0)
 		m.daycycle._update_night()
 	if beat == 1:
 		m.dialog.close()
