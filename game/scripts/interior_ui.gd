@@ -985,7 +985,7 @@ func _draw_furniture(f: Dictionary) -> void:
 				var sy := 3.0 + shelf * 7.0
 				KyojinMain.dot_rect(canvas, p, 2, sy, w / 2.0 - 3, 5, Color(0.22, 0.15, 0.09))
 				for b in 4:
-					var bh := [4.0, 3.0, 4.0, 3.5][(b + shelf) % 4]
+					var bh: float = [4.0, 3.0, 4.0, 3.5][(b + shelf) % 4]
 					KyojinMain.dot_rect(canvas, p, 3.0 + b * 3.5, sy + 5.0 - bh, 2.5, bh,
 						[Color(0.66, 0.32, 0.28), Color(0.34, 0.48, 0.64),
 						Color(0.46, 0.6, 0.38), Color(0.76, 0.64, 0.38)][(b + shelf) % 4])
