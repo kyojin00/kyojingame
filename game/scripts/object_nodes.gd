@@ -188,7 +188,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -100)
 		"old_barn":
 			texture = m.tex["barn"]    # 방치된 옛 헛간 (메인 스토리 17)
-			offset = Vector2(0, -160)
+			# 헛간 그림이 마을 판형(552줄)으로 커졌다 — 밑변이 옛 그림
+			# (352줄, 오프셋 -160)과 같은 자리에 오도록 높이에서 잰다
+			offset = Vector2(0, 192 - texture.get_height())
 		"old_lookout":
 			texture = m.tex["old_lookout"]   # 옛 전망대 (메인 스토리 18)
 			offset = Vector2(0, -100)

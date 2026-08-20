@@ -137,6 +137,9 @@ const WALL_PAL = {
   stonewarm: { k: [178, 168, 148], K: [120, 110, 96], i: [216, 206, 186] },
   pale:  { k: [198,192,174], K: [134,128,114], i: [230,226,210] },
   warm:  { k: [190,136,90], K: [128,86,58], i: [222,170,122] },
+  // 헛간의 빨강 — 페인트를 칠한 널이라 채도가 높다. 크림색 테두리와
+  // 짝을 이루는 고전적인 붉은 헛간의 색
+  barnred: { k: [178, 64, 50], K: [118, 40, 32], i: [210, 94, 72] },
 };
 
 class G {
@@ -474,7 +477,10 @@ function roughen(g) {
   ditherFace(g, ['i', 'k', 'K'], 0, GROUND);            // 벽돌
   ditherFace(g, ['x', 'w', 'W'], 0, GROUND);            // 석재 테두리
   shingles(g);          // 기와는 사다리 톤으로 한 장씩
-  if (CHUNKY) rubbleWall(g); else brickCourse(g);
+  // 칠한 널(plankk)은 k/K/i 를 널 무늬로 쓰므로 막돌 패스를 건너뛴다 —
+  // 안 그러면 붉은 페인트가 붉은 막돌이 된다
+  if (CHUNKY && WALL !== 'plankk') rubbleWall(g);
+  else if (!CHUNKY) brickCourse(g);
   wallPatches(g, 0, GROUND);
   woodGrain(g);
   weather(g);           // 흘러내린 줄 · 밑동 흙탕물
@@ -683,6 +689,9 @@ function setWall(kind) {
   WD = kind === 'stucco' ? 'W' : (kind === 'plank' ? 'T' : 'K');
   // 회벽·널판에 크림색 테두리를 두르면 벽에 묻힌다. 그럴 땐 진한 목재로
   FRAME = kind === 'brick' ? 'w' : 'T';
+  // 칠한 널(plankk) — 널판인데 색은 벽 팔레트에서 받는다 (붉은 헛간).
+  // 빨강 위의 테두리는 크림색이라야 「페인트와 트림」으로 읽힌다
+  if (kind === 'plankk') { WB = 'k'; WD = 'K'; FRAME = 'w'; }
 }
 
 
@@ -793,6 +802,10 @@ function wall(g, x0, x1, y0, y1, plinth, skip) {
     // 널판 — 세로로 널을 대고 이음매마다 어두운 줄. 헛간의 벽이다
     for (let x = x0; x <= x1; x += 5) g.vline(x, y0, y1, 'T');
     for (let x = x0 + 1; x <= x1; x += 5) g.vline(x, y0, y1, 'u');
+  } else if (WALL === 'plankk') {
+    // 칠한 널 — 이음매는 어둡게, 그 옆은 빛을. 색은 벽 팔레트(k/K/i)
+    for (let x = x0; x <= x1; x += 5) g.vline(x, y0, y1, 'K');
+    for (let x = x0 + 1; x <= x1; x += 5) g.vline(x, y0, y1, 'i');
   } else {
     g.vline(x0 + 1, y0 + 1, y1 - 1, 't');                  // 기둥
     g.vline(x1 - 1, y0 + 1, y1 - 1, 't');
@@ -978,6 +991,36 @@ function archDoor(g, cx, w, h, GROUND) {
   // 문지방 돌
   g.rect(x0 - 2, GROUND - 1, x0 + w + 1, GROUND, 'S');
   g.hline(x0 - 2, x0 + w + 1, GROUND - 1, 's');
+}
+
+
+// 헛간의 두짝문 — 수레가 드나드는 폭에, 문짝마다 크림색 X 버팀대.
+// 이 X 하나가 건물을 「헛간」으로 만든다 (윤곽만으로 이름이 나와야 한다)
+function barnDoors(g, cx, w, h, GROUND) {
+  const x0 = cx - Math.floor(w / 2), y0 = GROUND - h, x1 = x0 + w - 1;
+  g.rect(x0 - 1, y0 - 1, x1 + 1, GROUND, 'w');             // 크림색 문틀
+  g.rect(x0 + 1, y0 + 1, x1 - 1, GROUND, 't');
+  plankFace(g, x0 + 1, x1 - 1, y0 + 1, GROUND - 1);
+  // 문짝마다 X — 대각선은 두 칸 두께라야 빨강 위에서 읽힌다
+  for (const side of [0, 1]) {
+    const a = x0 + 1 + side * ((w - 2) >> 1);
+    const b = side ? x1 - 1 : x0 + ((w - 2) >> 1);
+    const dw = b - a, dh = GROUND - 1 - (y0 + 1);
+    for (let i = 0; i <= dh; i++) {
+      const t = i / dh;
+      const xa = Math.round(a + t * (dw - 1)), xb = Math.round(b - 1 - t * (dw - 1));
+      g.px(xa, y0 + 1 + i, 'w'); g.px(xa + 1, y0 + 1 + i, 'W');
+      g.px(xb, y0 + 1 + i, 'w'); g.px(xb + 1, y0 + 1 + i, 'W');
+    }
+    g.hline(a, b, y0 + 1, 'w');                            // 위아래 가로대
+    g.hline(a, b, GROUND - 1, 'w');
+  }
+  g.vline(cx, y0 + 1, GROUND, 'T');                        // 가운데 틈
+  g.rect(cx - 4, y0 + (h >> 1), cx - 3, y0 + (h >> 1) + 1, 'y');   // 손잡이
+  g.rect(cx + 3, y0 + (h >> 1), cx + 4, y0 + (h >> 1) + 1, 'y');
+  // 문지방 돌
+  g.rect(x0 - 2, GROUND - 1, x1 + 2, GROUND, 'S');
+  g.hline(x0 - 2, x1 + 2, GROUND - 1, 's');
 }
 
 
@@ -1840,6 +1883,7 @@ function build(spec) {
 
   // ---- 문 ----
   if (spec.forge) forge(g, CX, 19, 24, GROUND);
+  else if (spec.barnDoor) barnDoors(g, CX, 34, 26, GROUND);
   else archDoor(g, CX, 15, 22, GROUND);
   if (spec.awning) awning(g, X0 + 2, X1 - 2, MID + 2);
 
@@ -1904,8 +1948,10 @@ function build(spec) {
   }
 
   // ---- 살림 ----
-  lantern(g, CX - 13, MID + 8);
-  lantern(g, CX + 9, MID + 8);
+  if (!spec.barnDoor) {                                    // 헛간 문에는 등이 없다
+    lantern(g, CX - 13, MID + 8);
+    lantern(g, CX + 9, MID + 8);
+  }
   for (const [kind, at] of (spec.props || [])) {
     const px = at < 0 ? X0 - JUT + at : X1 + JUT + at;     // 음수=왼쪽 밖, 양수=오른쪽 밖
     if (kind === 'planter') planter(g, px, GROUND - 1);
@@ -2101,6 +2147,17 @@ const KINDS = {
     gable: 'loft', vane: true, dormer: true, lit: true, ivy: 2, steps: true,
     flag: true, sign: true, icon: 'sprout',
     props: [['notice', -12], ['bench', -26], ['planter', 14]] },
+
+  // 농장의 축사 — 마을에서 홀로 옛 그림체(뿌연 잡음 널판)로 남아 있던
+  // 마지막 건물. 붉게 칠한 널벽에 크림색 트림, 수레가 드나드는 X자
+  // 두짝문, 지붕엔 다락문 — 실루엣과 색만으로 「헛간」이 나와야 한다.
+  // 지붕은 잿빛(slate) — 빨강 벽이 주인공이다. 판은 다른 집과 같은
+  // 기본 판 — 납작했던 몸집 자체가 이질감의 절반이었다.
+  // (make_barn.js 는 이 항목으로 대체됐다)
+  barn: { w: 10, pitch: -8, storey: 2,
+    wall: 'plankk', wallPal: 'barnred', roofPal: 'slate',
+    gable: 'loft', barnDoor: true, vane: true, ivy: 1,
+    props: [['hay', -14], ['barrel', 3]] },
 };
 
 // 접지 그림자 — **집이 땅을 누르는 자국.**
