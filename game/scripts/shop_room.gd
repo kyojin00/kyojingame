@@ -403,26 +403,49 @@ func _draw_room() -> void:
 	var wall: Color = d.wall
 	var f: Font = main.UI_FONT
 
-	# ---- 벽 ----
-	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, FLOOR_TOP - ROOM.position.y)),
-		wall)
-	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, 10)), wall.darkened(0.4))
+	# ---- 벽 — 가로로 켠 널. 방마다 제 색은 유지하고 결만 같게 ----
+	#
+	# 한 색으로 칠한 벽은 상자 안이다 (집 안과 같은 규칙). 널 한 단마다
+	# 낯빛이 조금씩 다르고, 단 사이에 골이 지고, 골 밑이 빛을 받는다
+	var ly := ROOM.position.y
+	var lrow := 0
+	while ly < FLOOR_TOP - 12:
+		var lh := minf(14.0, FLOOR_TOP - 12 - ly)
+		var lt: float = (main._hash01(lrow * 7 + 3, 23) - 0.5) * 0.14
+		var lc: Color = wall.lightened(lt) if lt >= 0.0 else wall.darkened(-lt)
+		canvas.draw_rect(Rect2(ROOM.position.x, ly, ROOM.size.x, lh), lc)
+		canvas.draw_rect(Rect2(ROOM.position.x, ly + lh - 2, ROOM.size.x, 2),
+			wall.darkened(0.36))                             # 단 사이 골
+		canvas.draw_rect(Rect2(ROOM.position.x, ly, ROOM.size.x, 1),
+			wall.lightened(0.14))                            # 골 밑 윗변 빛
+		var kx: float = ROOM.position.x + 10.0 \
+			+ main._hash01(lrow * 3 + 1, 29) * (ROOM.size.x - 20.0)
+		canvas.draw_rect(Rect2(kx, ly + 4, 3, 3), wall.darkened(0.4))   # 옹이
+		ly += lh
+		lrow += 1
+	canvas.draw_rect(Rect2(ROOM.position, Vector2(ROOM.size.x, 8)), wall.darkened(0.42))
 	# 벽 아래 굽도리 — 벽과 바닥의 경계를 또렷하게
 	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP - 12, ROOM.size.x, 12),
 		wall.darkened(0.22))
 	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP - 12, ROOM.size.x, 3),
 		wall.lightened(0.18))
 
-	# 창문 두 개 (좌우 대칭)
+	# 창문 두 개 (좌우 대칭) — 틀 윗변에 빛, 밑에 창턱
 	for wx in [ROOM.position.x + 74.0, ROOM.end.x - 194.0]:
 		var wr := Rect2(wx, 96, 120, 40)
 		canvas.draw_rect(wr.grow(4), wall.darkened(0.45))
+		canvas.draw_rect(Rect2(wr.position.x - 4, wr.position.y - 4, wr.size.x + 8, 2),
+			wall.lightened(0.16))                            # 틀 윗변 빛
 		canvas.draw_rect(wr, Color(0.55, 0.72, 0.85))
 		canvas.draw_rect(Rect2(wr.position, Vector2(wr.size.x, 12)), Color(0.68, 0.82, 0.92))
 		canvas.draw_rect(Rect2(wr.get_center().x - 2, wr.position.y, 4, wr.size.y),
 			wall.darkened(0.4))
 		canvas.draw_rect(Rect2(wr.position.x, wr.get_center().y - 2, wr.size.x, 4),
 			wall.darkened(0.4))
+		canvas.draw_rect(Rect2(wr.position.x - 8, wr.end.y + 4, wr.size.x + 16, 5),
+			wall.darkened(0.28))                             # 창턱
+		canvas.draw_rect(Rect2(wr.position.x - 8, wr.end.y + 4, wr.size.x + 16, 1),
+			wall.lightened(0.2))
 
 	# 가운데 간판 (주인은 그 아래 계산대 뒤에 선다)
 	# 잡화점(마트)은 간판을 뗐다 — 선반 팻말이 그 역할을 한다
@@ -435,25 +458,36 @@ func _draw_room() -> void:
 		canvas.draw_string(f, Vector2(sign_rect.get_center().x - tw / 2.0, 122),
 			str(d.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1, 0.9, 0.6))
 
-	# ---- 바닥 ----
+	# ---- 바닥 — 널판. 체커보드는 게임판이지 방바닥이 아니다 ----
 	var floor_c: Color = d.floor
 	var y := FLOOR_TOP
 	var row := 0
 	while y < ROOM.end.y:
-		var h := minf(16.0, ROOM.end.y - y)
-		var x := ROOM.position.x
-		var col := 0
-		while x < ROOM.end.x:
-			var w := minf(24.0, ROOM.end.x - x)
-			canvas.draw_rect(Rect2(x, y, w, h),
-				floor_c if (row + col) % 2 == 0 else floor_c.darkened(0.08))
-			x += w
-			col += 1
+		var h := minf(14.0, ROOM.end.y - y)
+		var seam := ROOM.position.x + (24.0 if row % 2 == 0 else 56.0)
+		var px := ROOM.position.x
+		var si := 0
+		while px < ROOM.end.x:
+			var nx := minf(seam + si * 64.0, ROOM.end.x)
+			var ft: float = (main._hash01(row * 5 + 1, si * 7 + 2) - 0.5) * 0.12
+			var fc: Color = floor_c.lightened(ft) if ft >= 0.0 else floor_c.darkened(-ft)
+			canvas.draw_rect(Rect2(px, y, nx - px, h), fc)
+			px = nx
+			si += 1
+		var s2 := seam
+		while s2 < ROOM.end.x:
+			canvas.draw_rect(Rect2(s2, y, 1, h), floor_c.darkened(0.26))   # 이음매
+			canvas.draw_rect(Rect2(s2 - 2, y + 2, 1, 1), floor_c.darkened(0.42))  # 못
+			s2 += 64.0
+		canvas.draw_rect(Rect2(ROOM.position.x, y + h - 1, ROOM.size.x, 1),
+			floor_c.darkened(0.15))                          # 널 사이 가는 골
 		y += h
 		row += 1
-	# 벽 그림자 (바닥 위쪽을 살짝 어둡게 — 실내 느낌)
-	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP, ROOM.size.x, 14),
-		Color(0, 0, 0, 0.16))
+	# 벽이 바닥에 드리운 그늘 — 두 겹으로 부드럽게
+	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP, ROOM.size.x, 8),
+		Color(0.08, 0.06, 0.1, 0.26))
+	canvas.draw_rect(Rect2(ROOM.position.x, FLOOR_TOP + 8, ROOM.size.x, 5),
+		Color(0.08, 0.06, 0.1, 0.12))
 
 	var C := _counter()
 	# 계산대 앞 깔개 — 손님이 서는 자리를 알려 준다

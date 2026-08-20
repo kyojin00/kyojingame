@@ -423,6 +423,8 @@ const TEXTURE_NAMES := [
 	"bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
+	"cave_floor_0", "cave_floor_1", "cave_floor_2",
+	"cave_wall_0", "cave_wall_1", "cave_wall_2",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"icon_spear", "icon_sword", "arrow", "desk", "recipe",

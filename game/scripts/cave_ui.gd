@@ -890,18 +890,34 @@ func _draw_minimap() -> void:
 func _draw_cave() -> void:
 	# 여기서부터 그리는 것은 모두 카메라 기준 + ZOOM 배 (+ 피격 흔들림)
 	canvas.draw_set_transform(VIEW / 2.0 - cam * ZOOM + shake_off, 0.0, Vector2(ZOOM, ZOOM))
-	# 바닥
-	canvas.draw_rect(Rect2(OX, OY, GW * TS, GH * TS),
-		Color(0.16, 0.24, 0.18) if worldtree else Color(0.22, 0.19, 0.24))
-	for y in GH:
-		for x in GW:
-			if (x + y * 3) % 7 == 0:
-				canvas.draw_rect(Rect2(OX + x * TS + 6, OY + y * TS + 8, 2, 2),
-					Color(0.17, 0.15, 0.19))
+	# ---- 바닥과 벽 — 지상과 같은 문법의 타일 ----
+	#
+	# 민무늬 판에 바깥 바위 그림을 격자로 찍던 시절에는 동굴만 디버그
+	# 방처럼 보였다. 남보라 돌바닥(장 셋)에 보로노이 막돌 벽(장 셋),
+	# 세계나무 동굴은 같은 그림에 초록빛만 입힌다.
+	# **보이는 칸만** 그린다 — 판이 100x58이라 다 그리면 육천 장이다
+	var tint := Color(0.74, 1.0, 0.82) if worldtree else Color(1, 1, 1)
+	var half := VIEW * 0.5 / ZOOM
+	var cx0 := maxi(0, int((cam.x - half.x - OX) / TS) - 1)
+	var cx1 := mini(GW - 1, int((cam.x + half.x - OX) / TS) + 1)
+	var cy0 := maxi(0, int((cam.y - half.y - OY) / TS) - 1)
+	var cy1 := mini(GH - 1, int((cam.y + half.y - OY) / TS) + 1)
+	for y in range(cy0, cy1 + 1):
+		for x in range(cx0, cx1 + 1):
+			var fv := int(main._hash01(x * 7 + 1, y * 5 + 2) * 3.0) % 3
+			canvas.draw_texture_rect(main.tex["cave_floor_%d" % fv],
+				Rect2(Vector2(OX + x * TS, OY + y * TS), Vector2(TS, TS)), false, tint)
 	# 벽/광석/상자/계단/입구
 	for pos: Vector2i in walls:
-		canvas.draw_texture_rect(main.tex["rock"],
-			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)
+		if pos.x < cx0 or pos.x > cx1 or pos.y < cy0 or pos.y > cy1:
+			continue
+		var wv := int(main._hash01(pos.x * 11 + 3, pos.y * 13 + 6) * 3.0) % 3
+		canvas.draw_texture_rect(main.tex["cave_wall_%d" % wv],
+			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false, tint)
+		# 벽이 바닥에 드리운 그늘 — 벽 밑칸이 트여 있으면 한 뼘 어둡다
+		if pos.y < GH - 1 and not walls.has(pos + Vector2i(0, 1)):
+			canvas.draw_rect(Rect2(OX + pos.x * TS, OY + (pos.y + 1) * TS, TS, 5.0),
+				Color(0.05, 0.04, 0.09, 0.42))
 	for pos: Vector2i in ores:
 		canvas.draw_texture_rect(main.tex["ore_node"],
 			Rect2(Vector2(OX + pos.x * TS, OY + pos.y * TS), Vector2(TS, TS)), false)

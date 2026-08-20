@@ -1502,9 +1502,83 @@ function edgeTile(code, isLand, paint, vr, hh) {
 }
 
 
+// ---- 동굴 ----
+//
+// 동굴은 여태 민무늬 보라 판에 바깥 바위(rock) 그림을 격자로 찍은
+// 디버그 방이었다. 바닥·벽을 지상과 같은 문법으로 —
+//   바닥   남보라 어둠 (회색은 회색이 아니다). 낮은 주파수 두 톤에
+//          장식은 드물게 — 무대는 조용해야 광석과 몬스터가 산다
+//   벽     켜켜이 쌓인 막돌. 켜마다 반 칸 어긋나고, 알의 윗변이 빛을
+//          받고 밑은 어둠에 잠긴다 — 지상의 자갈길과 같은 자
+const CAVE = [[104, 96, 122], [84, 77, 100], [68, 62, 82], [54, 49, 66],
+              [43, 39, 53], [33, 30, 42], [24, 22, 32]];
+function caveFloor(v) {
+  const g = new T();
+  const MIX = [0.12, 0, -0.12][v % 3];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const t = h(x >> 2, y >> 2, 90) * 0.5 + h(x >> 1, y >> 1, 91) * 0.35
+      + h(x, y, 92) * 0.15;
+    g.px(x, y, CAVE[t < 0.45 + MIX ? 5 : 4]);
+  }
+  // 잔돌 한 쌍 — 세 장 중 한 장에만, 바탕에 반쯤 묻혀서
+  if (v === 1) {
+    const ox = Math.floor(h(21, v, 93) * N), oy = Math.floor(h(v, 21, 94) * N);
+    g.px(ox, oy, CAVE[2]); g.px(ox + 1, oy, CAVE[3]);
+    g.px(ox, oy + 1, CAVE[6]);
+  }
+  // 갈라진 금 — 다른 한 장에만, 두 점만 연하게.
+  // 넉 점을 제일 어두운 단으로 그었더니 장이 깔릴 때마다 대각선이
+  // 되풀이돼 바닥 전체에 빗금 무늬가 떴다 (잔디의 잔돌과 같은 병)
+  if (v === 2) {
+    const cx = Math.floor(h(31, v, 95) * N), cy = Math.floor(h(v, 31, 96) * N);
+    g.px(cx, cy, CAVE[6]); g.px(cx + 1, cy + 1, CAVE[6]);
+  }
+  return g;
+}
+function caveWall(v) {
+  // 정연한 벽돌은 「지은 벽」이다 — 갱도의 바위는 막돌 보로노이로.
+  // 화로(make_props)에서 검증한 자와 같다: 씨앗을 흔들린 격자에 놓고,
+  // 두 씨앗의 거리 차가 작은 곳이 줄눈, 칸마다 낯빛이 다르고,
+  // 줄눈 바로 아래가 빛을 받는다. 씨앗 격자를 4로 잡으면 16칸에
+  // 딱 감겨 이음매가 없다
+  const g = new T(), RC3 = 4, GC = N / RC3;
+  const seedAt = (ci, cj) => {
+    const wi = ((ci % GC) + GC) % GC, wj = ((cj % GC) + GC) % GC;
+    return [ci * RC3 + h(wi * 3 + 1, wj * 7 + v, 101) * (RC3 - 1),
+            cj * RC3 + h(wj * 5 + 2, wi * 11 + v, 102) * (RC3 - 1),
+            wi * 131 + wj * 61];
+  };
+  const wrap = d => { d = ((d % N) + N) % N; return d > N / 2 ? d - N : d; };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const ci0 = Math.floor(x / RC3), cj0 = Math.floor(y / RC3);
+    let d1 = 1e9, d2 = 1e9, id = 0;
+    for (let cj = cj0 - 1; cj <= cj0 + 1; cj++)
+      for (let ci = ci0 - 1; ci <= ci0 + 1; ci++) {
+        const sp = seedAt(ci, cj);
+        const dx = wrap(x - sp[0]), dy = wrap(y - sp[1]) * 1.3;
+        const d = dx * dx + dy * dy;
+        if (d < d1) { d2 = d1; d1 = d; id = sp[2]; }
+        else if (d < d2) d2 = d;
+      }
+    if (Math.sqrt(d2) - Math.sqrt(d1) < 1.05) { g.px(x, y, CAVE[6]); continue; }
+    const rc = h(id, v, 103);
+    g.px(x, y, CAVE[rc < 0.26 ? 2 : (rc < 0.8 ? 3 : 4)]);
+  }
+  // 줄눈 바로 아래 윗변 빛 — 이 한 줄이 돌을 「쌓인 것」으로 만든다
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const c = g.get(x, y);
+    if (c === CAVE[6] || g.get(x, y - 1) !== CAVE[6]) continue;
+    const t = CAVE.indexOf(c);
+    if (t > 1) g.px(x, y, CAVE[t - 1]);
+  }
+  return g;
+}
+
 // ---- 뽑기 ----
 for (const s of Object.keys(SEASON))
   for (let v = 0; v < 3; v++) save(`grass_${s}_${v}`, grass(s, v).render());
+for (let v = 0; v < 3; v++) save('cave_floor_' + v, caveFloor(v).render());
+for (let v = 0; v < 3; v++) save('cave_wall_' + v, caveWall(v).render());
 // 길과 마당도 판을 셋씩. 한 장만 깔면 닳은 자국이 같은 자리마다 찍혀
 // 바닥에 격자가 뜬다 (자갈은 줄눈이 이어져야 하므로 **배치는 그대로** 두고
 // 알의 톤·닳음만 흔든다)
