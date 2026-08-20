@@ -364,6 +364,42 @@ function grass(season, variant) {
     g.px(ox, oy, c); g.px(ox + 1, oy, c); g.px(ox, oy - 1, c);
     g.px(ox, oy + 1, p.dark);                               // 꽃대
   }
+  // ⑥ 계절의 바닥 — 색만 바꾸면 「누런 봄」일 뿐이다. 계절은 바닥에
+  //    **놓인 것**으로 읽힌다: 가을엔 낙엽이 구르고, 겨울엔 눈이
+  //    두덩이로 쌓인다. 둘 다 드물게 — 크게 대신 드물게.
+  if (season === 'fall') {
+    // 낙엽 — 2px 한 장. 붉은 것과 주홍이 섞이고, 가끔 밑에 그늘 한 점
+    const LEAF = [[202, 118, 52], [172, 84, 46], [216, 158, 72]];
+    for (let i = 0; i < 6; i++) {
+      if (h(i + 70, variant, 21) < 0.5) continue;           // 장마다 두엇만
+      const ox = Math.floor(h(i + 70, variant, 22) * (N - 2));
+      const oy = 1 + Math.floor(h(variant, i + 70, 23) * (N - 2));
+      const c = LEAF[Math.floor(h(i, variant + 70, 24) * 3)];
+      g.px(ox, oy, c); g.px(ox + 1, oy, c);
+      if (h(i, variant, 25) < 0.45)
+        g.px(ox + 1, oy + 1, c.map(v => Math.round(v * 0.72)));
+    }
+  } else if (season === 'winter') {
+    // 눈 두덩 — 바람이 몰아 놓은 자리. 등성이는 희고 밑에 그늘 한 줄
+    for (let i = 0; i < 2; i++) {
+      if (h(i + 80, variant, 26) < 0.45) continue;
+      const ox = 2 + Math.floor(h(i + 80, variant, 27) * (N - 12));
+      const oy = 3 + Math.floor(h(variant, i + 80, 28) * (N - 7));
+      const w = 5 + Math.floor(h(i, variant + 80, 29) * 4);
+      for (let dx = 0; dx < w; dx++) {
+        const edge = dx === 0 || dx === w - 1;
+        g.px(ox + dx, oy, edge ? p.hi : p.tip);
+        if (!edge) g.px(ox + dx, oy - 1, p.hi);
+        g.px(ox + dx, oy + 1, p.dark);                      // 밑그늘이 두덩을 띄운다
+      }
+    }
+    // 눈 반짝임 — 볕에 한두 점
+    for (let i = 0; i < 3; i++) {
+      if (h(i + 90, variant, 30) < 0.55) continue;
+      g.px(Math.floor(h(i + 90, variant, 31) * N),
+        Math.floor(h(variant, i + 90, 32) * N), [252, 253, 255]);
+    }
+  }
   return g;
 }
 
@@ -783,6 +819,20 @@ function water(frame, lv, vr) {
     const t = 4.5 + lv * 0.42;
     for (let k = 0; k < len; k++) g.px(ox + k, oy, ramp(WATER, t + (i % 2) * 0.5));
     g.px(ox - 1, oy, ramp(WATER, t + 1.5));
+    // 물결의 머리 — 빛을 받는 쪽. 줄 끝에 한 톤 밝은 점이 물결의
+    // 방향을 만든다 (꼬리는 어둡고 머리는 밝다)
+    g.px(ox + len, oy, ramp(WATER, t - 1.0));
+  }
+  // 물비늘 — 수면이 볕을 되쏘는 한두 점. 두 장에서 자리가 달라
+  // 저절로 깜빡인다. 얕은 물에만 — 깊은 물에 흰 점은 별이 뜬 것 같다
+  if (lv < 4) {
+    for (let i = 0; i < 2; i++) {
+      if (h(i + 41 + s, frame + 3, 88) < 0.4) continue;
+      const ox = Math.floor(h(i + 41 + s, frame, 89) * (N - 1));
+      const oy = Math.floor(h(frame, i + 41 + s, 90) * N);
+      g.px(ox, oy, mixc(FOAM, WATER[2], 0.3));
+      g.px(ox + 1, oy, ramp(WATER, 3.4));                   // 꼬리는 밝은 물빛
+    }
   }
   // 물속에 비치는 바닥 — 모래톱과 조약돌, 수초 한 포기.
   // 깊을수록 물빛에 더 섞여 형체만 남다가 결국 안 보인다

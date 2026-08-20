@@ -1928,6 +1928,18 @@ func _hash01(x: int, y: int) -> float:
 	return float(h) / 4294967295.0
 
 
+# ---- 발밑 그림자 ----
+#
+# 사람·짐승의 접지 그림자. 딱딱한 검정 네모는 「붙인 스티커」로 보인다 —
+# 가장자리가 옅은 타원 두 겹이라야 발이 땅을 딛는다. 빛깔은 검정이 아니라
+# 남보라다 (회색은 회색이 아니다 — 그늘은 하늘빛을 받는다).
+static func draw_ground_shadow(ci: CanvasItem, half_w: float, half_h: float) -> void:
+	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, half_h / half_w))
+	ci.draw_circle(Vector2.ZERO, half_w, Color(0.10, 0.08, 0.18, 0.13))
+	ci.draw_circle(Vector2.ZERO, half_w * 0.62, Color(0.10, 0.08, 0.18, 0.14))
+	ci.draw_set_transform(Vector2.ZERO)
+
+
 # 큰 얼룩 — **여러 칸에 걸친 낮은 주파수 잡음.**
 #
 # 바닥 장(variant)을 칸마다 백색 잡음으로 골라 왔다. 세 장이 잘게 섞이니

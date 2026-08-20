@@ -36,7 +36,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	# 발밑 그림자
-	draw_rect(Rect2(-4, -2, 8, 3), Color(0, 0, 0, 0.22))
+	KyojinMain.draw_ground_shadow(self, 5.0, 1.8)
 
 
 func _process(delta: float) -> void:

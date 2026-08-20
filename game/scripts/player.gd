@@ -415,9 +415,9 @@ func _swing_visual() -> void:
 func _draw() -> void:
 	# 발밑 그림자. 말을 타면 말 몸통만큼 넓어진다
 	if GameData.riding:
-		draw_rect(Rect2(-26, -4, 52, 9), Color(0, 0, 0, 0.22))
+		KyojinMain.draw_ground_shadow(self, 27.0, 5.0)
 	else:
-		draw_rect(Rect2(-10, -3, 20, 6), Color(0, 0, 0, 0.22))
+		KyojinMain.draw_ground_shadow(self, 11.0, 3.4)
 	# 도구 잔상 — 날 끝이 지나간 자취를 옅게 이어 그린다.
 	# 빠른 구간에서만 자취가 벌어지므로, 내리치는 순간에만 눈에 띈다.
 	if _trail.size() >= 2:

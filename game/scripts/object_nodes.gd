@@ -106,6 +106,12 @@ func _spawn_objects() -> void:
 # 프레임마다 스크립트로 흔들면 그 값이 다 CPU 비용인데, 정점 셰이더는
 # 공짜다. 우듬지(UV.y 위쪽)만 사인파로 밀고 밑동은 못 박는다.
 # 위상은 나무의 세계 좌표에서 뽑아 그루마다 어긋난다.
+#
+# **아주 약하게.** 숲에서는 화면 대부분이 우듬지라, 진폭을 크게 주면
+# 걸을 때 화면 전체가 울렁여 멀미가 난다. 눈 둘 곳(주인공)은 곧게
+# 가는데 배경 전부가 물결치면 뇌가 「내가 흔들린다」로 읽는 탓이다.
+# 꼭대기 한 뼘만, 천천히, 한 파장으로만 민다 — 멈춰 서서 보면 살아
+# 있고, 걸을 때는 눈에 걸리지 않는 정도.
 var _sway_mat: ShaderMaterial = null
 
 func _sway_material() -> ShaderMaterial:
@@ -116,9 +122,8 @@ func _sway_material() -> ShaderMaterial:
 shader_type canvas_item;
 void vertex() {
 	float ph = MODEL_MATRIX[3].x * 0.043 + MODEL_MATRIX[3].y * 0.029;
-	float k = clamp(1.0 - UV.y * 1.35, 0.0, 1.0);   // 우듬지만
-	VERTEX.x += (sin(TIME * 1.15 + ph) + 0.4 * sin(TIME * 2.3 + ph * 1.7))
-		* 1.7 * k * k;
+	float k = clamp(1.0 - UV.y * 1.8, 0.0, 1.0);   // 꼭대기 한 뼘만
+	VERTEX.x += sin(TIME * 0.55 + ph) * 0.55 * k * k;
 }
 """
 	_sway_mat = ShaderMaterial.new()
