@@ -587,25 +587,52 @@ func _draw_shelves() -> void:
 		canvas.draw_rect(Rect2(r.position, Vector2(r.size.x, 7)), Color(0.68, 0.52, 0.32))
 		canvas.draw_rect(Rect2(r.position.x, r.position.y + 30, r.size.x, 5),
 			Color(0.4, 0.29, 0.17))
-		# 얹힌 물건 — 카테고리마다 다르게
+		# 얹힌 물건 — 색 네모가 아니라 **물건**. 도트 자(2px)를 타고,
+		# 윤곽선을 두르고, 윗변이 빛을 받는다 — 세계의 살림과 같은 손
+		var o := r.position
 		match cat:
 			"seed":
 				for j in 3:
-					var sx := r.position.x + 12 + j * 30.0
-					canvas.draw_rect(Rect2(sx, r.position.y + 12, 18, 14), Color(0.82, 0.68, 0.4))
-					canvas.draw_rect(Rect2(sx + 5, r.position.y + 8, 8, 5), Color(0.4, 0.7, 0.35))
+					var sx := 6.0 + j * 15.0
+					# 씨앗 자루 — 묶인 목, 볼록한 몸, 삐져나온 싹
+					KyojinMain.dot_panel(canvas, o, sx, 7, 8, 7, Color(0.78, 0.62, 0.36))
+					KyojinMain.dot_rect(canvas, o, sx, 7, 8, 1, Color(0.88, 0.74, 0.48))
+					KyojinMain.dot_rect(canvas, o, sx + 2, 5, 4, 2, Color(0.62, 0.48, 0.28))
+					KyojinMain.dot_rect(canvas, o, sx + 2, 6, 4, 1, Color(0.45, 0.34, 0.2))
+					KyojinMain.dot_rect(canvas, o, sx + 3, 3, 1, 2, Color(0.36, 0.6, 0.3))
+					KyojinMain.dot_rect(canvas, o, sx + 4, 2, 2, 2, Color(0.48, 0.74, 0.38))
 			"life":
-				canvas.draw_rect(Rect2(r.position.x + 12, r.position.y + 9, 6, 18), Color(0.6, 0.44, 0.24))
-				canvas.draw_rect(Rect2(r.position.x + 9, r.position.y + 22, 12, 6), Color(0.85, 0.75, 0.5))
-				canvas.draw_rect(Rect2(r.position.x + 40, r.position.y + 12, 16, 14), Color(0.7, 0.82, 0.9))
-				canvas.draw_rect(Rect2(r.position.x + 70, r.position.y + 10, 14, 16), Color(0.85, 0.6, 0.5))
+				# 빗자루(눕힌) · 파란 물병 · 붉은 단지
+				KyojinMain.dot_panel(canvas, o, 5, 5, 2, 10, Color(0.6, 0.44, 0.24))
+				KyojinMain.dot_panel(canvas, o, 4, 12, 4, 3, Color(0.85, 0.74, 0.44))
+				KyojinMain.dot_rect(canvas, o, 4, 12, 4, 1, Color(0.93, 0.84, 0.56))
+				KyojinMain.dot_panel(canvas, o, 21, 8, 6, 7, Color(0.42, 0.62, 0.78))
+				KyojinMain.dot_rect(canvas, o, 23, 5, 2, 3, Color(0.42, 0.62, 0.78))
+				KyojinMain.dot_rect(canvas, o, 22, 9, 1, 3, Color(0.72, 0.86, 0.94))
+				KyojinMain.dot_panel(canvas, o, 36, 7, 7, 8, Color(0.72, 0.42, 0.34))
+				KyojinMain.dot_rect(canvas, o, 37, 7, 5, 1, Color(0.84, 0.56, 0.44))
+				KyojinMain.dot_rect(canvas, o, 37, 5, 5, 2, Color(0.5, 0.3, 0.24))
 			"tool":
-				canvas.draw_rect(Rect2(r.position.x + 12, r.position.y + 16, 22, 10), Color(0.55, 0.55, 0.6))
-				canvas.draw_rect(Rect2(r.position.x + 46, r.position.y + 10, 8, 16), Color(0.72, 0.72, 0.78))
-				canvas.draw_rect(Rect2(r.position.x + 68, r.position.y + 12, 20, 12), Color(0.75, 0.65, 0.45))
+				# 눕힌 망치 · 세운 낫 · 못 상자
+				KyojinMain.dot_panel(canvas, o, 5, 10, 10, 2, Color(0.55, 0.4, 0.24))
+				KyojinMain.dot_panel(canvas, o, 12, 7, 4, 5, Color(0.6, 0.6, 0.68))
+				KyojinMain.dot_rect(canvas, o, 12, 7, 4, 1, Color(0.78, 0.78, 0.84))
+				KyojinMain.dot_panel(canvas, o, 24, 4, 2, 11, Color(0.55, 0.4, 0.24))
+				KyojinMain.dot_rect(canvas, o, 26, 4, 4, 2, Color(0.7, 0.7, 0.76))
+				KyojinMain.dot_rect(canvas, o, 29, 6, 2, 2, Color(0.7, 0.7, 0.76))
+				KyojinMain.dot_panel(canvas, o, 36, 9, 8, 6, Color(0.62, 0.46, 0.28))
+				KyojinMain.dot_rect(canvas, o, 36, 9, 8, 1, Color(0.74, 0.58, 0.36))
+				for nj in 3:
+					KyojinMain.dot_rect(canvas, o, 37.0 + nj * 2.5, 10, 1, 1, Color(0.72, 0.72, 0.78))
 			_:
-				canvas.draw_rect(Rect2(r.position.x + 14, r.position.y + 10, 12, 16), Color(0.9, 0.55, 0.6))
-				canvas.draw_rect(Rect2(r.position.x + 44, r.position.y + 14, 18, 12), Color(0.6, 0.7, 0.85))
+				# 세워 꽂힌 책 두 권 + 묶인 두루마리
+				KyojinMain.dot_panel(canvas, o, 7, 5, 4, 10, Color(0.68, 0.34, 0.3))
+				KyojinMain.dot_rect(canvas, o, 8, 7, 2, 1, Color(0.85, 0.7, 0.45))
+				KyojinMain.dot_panel(canvas, o, 12, 6, 4, 9, Color(0.36, 0.5, 0.66))
+				KyojinMain.dot_rect(canvas, o, 13, 8, 2, 1, Color(0.85, 0.7, 0.45))
+				KyojinMain.dot_panel(canvas, o, 28, 9, 10, 5, Color(0.88, 0.82, 0.68))
+				KyojinMain.dot_rect(canvas, o, 28, 9, 10, 1, Color(0.95, 0.91, 0.8))
+				KyojinMain.dot_rect(canvas, o, 32, 9, 2, 5, Color(0.62, 0.32, 0.28))
 		# 팻말 (카테고리 이름)
 		var label: String = "[%s]" % SHELVES[i][1]
 		var lw: float = f.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x

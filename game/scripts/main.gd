@@ -1954,6 +1954,26 @@ static func draw_ground_shadow(ci: CanvasItem, half_w: float, half_h: float) -> 
 	ci.draw_set_transform(Vector2.ZERO)
 
 
+# ---- 도트 자 ----
+#
+# 실내의 가구·진열 상품도 **세계와 같은 격자**를 탄다. 화면 2px = 도트
+# 한 칸. 세계는 도트인데 실내 살림만 매끈한 벡터 사각형이면, 색을 아무리
+# 맞춰도 다른 게임의 그림이다 — 어색함의 뿌리가 이것이었다.
+const DOT := 2.0
+const DOT_LINE := Color(0.17, 0.13, 0.11)   # 세계의 윤곽선과 같은 어두운 따뜻한 선
+
+static func dot_rect(ci: CanvasItem, o: Vector2, x: float, y: float,
+		w: float, h: float, c: Color) -> void:
+	ci.draw_rect(Rect2(o.x + x * DOT, o.y + y * DOT, w * DOT, h * DOT), c)
+
+
+# 윤곽선 두른 판 — 몸통을 한 번에. 속은 fill, 테는 LINE
+static func dot_panel(ci: CanvasItem, o: Vector2, x: float, y: float,
+		w: float, h: float, fill: Color) -> void:
+	dot_rect(ci, o, x - 1, y - 1, w + 2, h + 2, DOT_LINE)
+	dot_rect(ci, o, x, y, w, h, fill)
+
+
 # 큰 얼룩 — **여러 칸에 걸친 낮은 주파수 잡음.**
 #
 # 바닥 장(variant)을 칸마다 백색 잡음으로 골라 왔다. 세 장이 잘게 섞이니

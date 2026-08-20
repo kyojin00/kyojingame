@@ -948,33 +948,62 @@ func _draw_furniture(f: Dictionary) -> void:
 			canvas.draw_rect(Rect2(p, Vector2(w, 3)), Color(0.68, 0.5, 0.31))
 			canvas.draw_rect(Rect2(p.x + 6, p.y + 9, w - 12, 1), Color(0.52, 0.36, 0.22))
 		"chair":
-			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.45, 0.3, 0.18))
-			canvas.draw_rect(Rect2(p + Vector2(2, 2), Vector2(w - 4, 5)), Color(0.55, 0.38, 0.22))
+			# 등받이 살 둘 + 앉는 판(윗변 빛) + 다리 — 도트 자를 탄다
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 3), Color(0, 0, 0, 0.16))
+			KyojinMain.dot_panel(canvas, p, 1, 1, w / 2.0 - 1, h / 2.0 - 1, Color(0.5, 0.34, 0.2))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 1, 3, Color(0.62, 0.43, 0.25))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 1, 1, Color(0.7, 0.5, 0.3))
+			KyojinMain.dot_rect(canvas, p, 3, 5, 1, h / 2.0 - 6, Color(0.4, 0.27, 0.16))
+			KyojinMain.dot_rect(canvas, p, w / 2.0 - 4, 5, 1, h / 2.0 - 6, Color(0.4, 0.27, 0.16))
 		"chest":
-			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.5, 0.33, 0.18))
-			canvas.draw_rect(Rect2(p.x, p.y + 10, w, 3), Color(0.85, 0.7, 0.3))
+			# 나무 궤 — 뚜껑이 빛을 받고, 쇠 띠와 자물쇠가 박힌다
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 3), Color(0, 0, 0, 0.16))
+			KyojinMain.dot_panel(canvas, p, 1, 1, w / 2.0 - 1, h / 2.0 - 1, Color(0.52, 0.35, 0.2))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 1, 4, Color(0.64, 0.46, 0.27))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 1, 1, Color(0.72, 0.54, 0.33))
+			KyojinMain.dot_rect(canvas, p, 1, 5, w / 2.0 - 1, 1, Color(0.38, 0.26, 0.15))
+			KyojinMain.dot_rect(canvas, p, 3, 1, 1, h / 2.0 - 1, Color(0.32, 0.3, 0.32))
+			KyojinMain.dot_rect(canvas, p, w / 2.0 - 4, 1, 1, h / 2.0 - 1, Color(0.32, 0.3, 0.32))
+			KyojinMain.dot_rect(canvas, p, w / 4.0 - 1, 5, 2, 3, Color(0.85, 0.7, 0.3))
+			KyojinMain.dot_rect(canvas, p, w / 4.0 - 1, 7, 2, 1, Color(0.6, 0.47, 0.2))
 		"plant":
-			canvas.draw_rect(Rect2(p.x + 4, p.y + h - 8, w - 8, 8), Color(0.65, 0.4, 0.25))
-			canvas.draw_rect(Rect2(p.x + 2, p.y + 2, w - 4, h - 10), Color(0.3, 0.6, 0.3))
-			canvas.draw_rect(Rect2(p.x + 5, p.y, w - 10, 6), Color(0.38, 0.7, 0.35))
+			# 잎 세 덩이 — 위가 밝고 밑이 어둡다. 화분엔 테와 흙
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 3), Color(0, 0, 0, 0.16))
+			KyojinMain.dot_panel(canvas, p, 3, h / 2.0 - 5, w / 2.0 - 6, 4, Color(0.6, 0.38, 0.24))
+			KyojinMain.dot_rect(canvas, p, 3, h / 2.0 - 5, w / 2.0 - 6, 1, Color(0.72, 0.48, 0.3))
+			KyojinMain.dot_rect(canvas, p, 4, h / 2.0 - 4, w / 2.0 - 8, 1, Color(0.3, 0.2, 0.13))
+			KyojinMain.dot_panel(canvas, p, 2, 3, w / 2.0 - 4, h / 2.0 - 9, Color(0.28, 0.52, 0.28))
+			KyojinMain.dot_rect(canvas, p, 3, 1, w / 2.0 - 7, 3, Color(0.4, 0.68, 0.35))
+			KyojinMain.dot_rect(canvas, p, 4, 0, 2, 1, Color(0.52, 0.78, 0.42))
+			KyojinMain.dot_rect(canvas, p, w / 2.0 - 6, 0, 2, 1, Color(0.52, 0.78, 0.42))
 		"bookshelf":
-			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.45, 0.3, 0.18))
+			# 책장 — 틀에 윤곽, 칸은 어둡고, 책은 키가 들쭉날쭉
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 3), Color(0, 0, 0, 0.16))
+			KyojinMain.dot_panel(canvas, p, 1, 1, w / 2.0 - 1, h / 2.0 - 1, Color(0.48, 0.32, 0.19))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 1, 1, Color(0.6, 0.42, 0.25))
 			for shelf in 3:
-				var sy := p.y + 6 + shelf * 14.0
-				canvas.draw_rect(Rect2(p.x + 3, sy, w - 6, 9), Color(0.3, 0.2, 0.12))
+				var sy := 3.0 + shelf * 7.0
+				KyojinMain.dot_rect(canvas, p, 2, sy, w / 2.0 - 3, 5, Color(0.22, 0.15, 0.09))
 				for b in 4:
-					canvas.draw_rect(Rect2(p.x + 4 + b * 7.0, sy + 1, 5, 8),
-						[Color(0.7, 0.35, 0.3), Color(0.35, 0.5, 0.7),
-						Color(0.5, 0.65, 0.4), Color(0.8, 0.7, 0.4)][b])
+					var bh := [4.0, 3.0, 4.0, 3.5][(b + shelf) % 4]
+					KyojinMain.dot_rect(canvas, p, 3.0 + b * 3.5, sy + 5.0 - bh, 2.5, bh,
+						[Color(0.66, 0.32, 0.28), Color(0.34, 0.48, 0.64),
+						Color(0.46, 0.6, 0.38), Color(0.76, 0.64, 0.38)][(b + shelf) % 4])
 		"lamp":
-			canvas.draw_rect(Rect2(p.x + 4, p.y + 8, 4, h - 10), Color(0.4, 0.3, 0.2))
-			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 2, 8, 2), Color(0.35, 0.25, 0.16))
-			canvas.draw_rect(Rect2(p.x, p.y, w, 9), Color(1, 0.85, 0.5))
-			canvas.draw_rect(Rect2(p.x + 2, p.y + 2, w - 4, 5), Color(1, 0.95, 0.75))
+			# 갓이 빛나고 그 빛무리가 둘레에 앉는다
+			canvas.draw_circle(Vector2(p.x + w / 2.0, p.y + 5), w * 0.9,
+				Color(1.0, 0.85, 0.5, 0.10))
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 2), Color(0, 0, 0, 0.16))
+			KyojinMain.dot_panel(canvas, p, w / 4.0 - 1, 5, 2, h / 2.0 - 6, Color(0.38, 0.28, 0.18))
+			KyojinMain.dot_panel(canvas, p, w / 4.0 - 2, h / 2.0 - 2, 4, 1, Color(0.32, 0.23, 0.15))
+			KyojinMain.dot_panel(canvas, p, 0, 0, w / 2.0, 4, Color(0.98, 0.82, 0.46))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 2, 2, Color(1.0, 0.94, 0.7))
 		"small_table":
-			canvas.draw_rect(Rect2(p, Vector2(w, h - 6)), Color(0.55, 0.38, 0.24))
-			canvas.draw_rect(Rect2(p.x + 3, p.y + h - 6, 4, 6), Color(0.42, 0.28, 0.17))
-			canvas.draw_rect(Rect2(p.x + w - 7, p.y + h - 6, 4, 6), Color(0.42, 0.28, 0.17))
+			canvas.draw_rect(Rect2(p.x + 2, p.y + h - 1, w - 4, 3), Color(0, 0, 0, 0.16))
+			KyojinMain.dot_panel(canvas, p, 1, 1, w / 2.0 - 1, h / 2.0 - 4, Color(0.56, 0.39, 0.24))
+			KyojinMain.dot_rect(canvas, p, 1, 1, w / 2.0 - 1, 1, Color(0.68, 0.5, 0.31))
+			KyojinMain.dot_panel(canvas, p, 2, h / 2.0 - 3, 2, 3, Color(0.42, 0.28, 0.17))
+			KyojinMain.dot_panel(canvas, p, w / 2.0 - 4, h / 2.0 - 3, 2, 3, Color(0.42, 0.28, 0.17))
 		"heart_rug":
 			# 노점 퀘스트 보상 — 연분홍 러그에 큰 하트
 			canvas.draw_rect(Rect2(p, Vector2(w, h)), Color(0.93, 0.78, 0.8))
