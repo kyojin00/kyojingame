@@ -100,18 +100,21 @@ function head(g, dir, style, bob, blink) {
       g.rect(12, Y(13), 12, Y(14), SKIN_L); g.rect(19, Y(13), 19, Y(14), SKIN_L);
     }
     g.px(9, Y(17), CHEEK); g.px(22, Y(17), CHEEK);
+    g.rect(23, Y(11), 23, Y(16), SKIN_D);          // 오른볼 그늘 — 얼굴이 둥글어진다
     g.hline(15, 16, Y(19), MOUTH);
   } else if (dir === 'side') {
-    if (blink) g.hline(17, 19, Y(15), EYE);
+    if (blink) g.hline(17, 20, Y(15), EYE);
     else {
-      g.rect(18, Y(12), 19, Y(12), EYE); g.rect(17, Y(13), 19, Y(15), EYE);
+      g.rect(18, Y(12), 20, Y(12), EYE);           // 윗줄이 한 칸 길다 — 속눈썹
+      g.rect(17, Y(13), 19, Y(15), EYE);
       g.rect(18, Y(16), 19, Y(16), EYE);
       g.rect(18, Y(13), 18, Y(14), SKIN_L);
     }
-    g.px(15, Y(17), CHEEK);
-    g.px(23, Y(14), SKIN);                          // 코
-    g.px(23, Y(15), SKIN_D);
+    g.px(15, Y(17), CHEEK); g.px(16, Y(17), CHEEK);
+    g.px(23, Y(14), SKIN); g.px(24, Y(15), SKIN);   // 콧등과 둥근 코끝
+    g.px(23, Y(15), SKIN); g.px(23, Y(16), SKIN_D);
     g.px(21, Y(19), MOUTH);
+    g.px(20, Y(21), SKIN_D);                        // 턱선
   }
   hair(g, dir, style, bob);
 }
@@ -140,11 +143,12 @@ function hair(g, dir, style, bob) {
       g.hline(11, 18, Y(3), HAIR_L); g.hline(12, 16, Y(4), HAIR_L);
       g.px(14, Y(7), HAIR_D); g.px(19, Y(6), HAIR_D);
     } else if (dir === 'side') {
-      g.rect(8, Y(10), 16, Y(11), HAIR);           // 앞머리단(옆) — 눈 앞까지
-      g.px(17, Y(11), HAIR);
+      g.rect(8, Y(10), 15, Y(11), HAIR);           // 앞머리단(옆)
+      g.px(16, Y(11), HAIR); g.px(17, Y(12), HAIR);   // 눈가로 쓸리는 사선단
       g.rect(8, Y(10), 11, Y(16), HAIR);           // 뒤통수 덩이
-      g.rect(8, Y(16), 9, Y(18), HAIR_D);
-      g.hline(11, 17, Y(3), HAIR_L);
+      g.rect(8, Y(12), 9, Y(17), HAIR_D);          // 뒷결은 그늘
+      g.rect(8, Y(17), 9, Y(18), HAIR_D);
+      g.hline(11, 17, Y(3), HAIR_L); g.hline(13, 16, Y(4), HAIR_L);  // 빛 호
       g.px(10, Y(8), HAIR_D);
     } else {
       g.rect(8, Y(10), 23, Y(16), HAIR);
@@ -165,10 +169,11 @@ function hair(g, dir, style, bob) {
       g.px(13, Y(6), HAIR_D); g.px(19, Y(5), HAIR_D);
     } else if (dir === 'side') {
       g.rect(8, Y(10), 15, Y(11), HAIR);
+      g.px(16, Y(11), HAIR); g.px(17, Y(12), HAIR);
       g.rect(8, Y(10), 11, Y(15), HAIR);
       g.px(7, Y(8), HAIR); g.px(7, Y(12), HAIR);   // 뒤로 뻗친 결
-      g.hline(11, 16, Y(3), HAIR_L);
-      g.px(9, Y(14), HAIR_D);
+      g.rect(8, Y(12), 9, Y(15), HAIR_D);
+      g.hline(11, 16, Y(3), HAIR_L); g.hline(13, 15, Y(4), HAIR_L);
     } else {
       g.rect(8, Y(10), 23, Y(15), HAIR);
       g.hline(11, 18, Y(3), HAIR_L);
@@ -187,10 +192,13 @@ function hair(g, dir, style, bob) {
       g.px(8, Y(18), HAIR_L); g.px(23, Y(20), HAIR_L);
       g.px(14, Y(7), HAIR_D); g.px(19, Y(6), HAIR_D);
     } else if (dir === 'side') {
-      g.rect(8, Y(10), 16, Y(11), HAIR);
+      g.rect(8, Y(10), 15, Y(11), HAIR);
+      g.px(16, Y(11), HAIR); g.px(17, Y(12), HAIR);
       g.rect(7, Y(9), 11, Y(26), HAIR);            // 뒤로 흘러내린 머리
+      g.rect(7, Y(12), 8, Y(22), HAIR_D);          // 뒷결 그늘
       g.rect(7, Y(24), 11, Y(26), HAIR_D);
-      g.hline(11, 16, Y(3), HAIR_L); g.px(8, Y(17), HAIR_L);
+      g.hline(11, 16, Y(3), HAIR_L); g.hline(13, 15, Y(4), HAIR_L);
+      g.px(10, Y(18), HAIR_L);                     // 흘러내린 결의 빛
     } else {
       g.rect(8, Y(10), 23, Y(18), HAIR);
       g.rect(9, Y(18), 22, Y(28), HAIR);           // 등으로 흘러내린 머리
@@ -237,8 +245,10 @@ function body(g, dir, bob, legL, legR, sideStep) {
     g.rect(12, Y(25), 19, Y(30), SHIRT);
     g.rect(14, Y(24), 17, Y(24), SHIRT_L);
     g.rect(13, Y(31), 18, Y(32), SHIRT_D);         // 허리 잘록
+    g.rect(12, Y(25), 12, Y(30), SHIRT_D);         // 등쪽 그늘 (뒤가 어둡다)
     g.rect(12, 33, 19, 36, PANTS);
     g.hline(13, 18, 33, PANTS_L);
+    g.rect(12, 34, 12, 36, PANTS_D);
     const f = 15 + sideStep, b = 13 - sideStep;
     g.rect(b - 1, 37, b + 2, 42, PANTS_D);
     g.rect(f - 1, 37, f + 2, 42, PANTS);
@@ -251,13 +261,16 @@ function body(g, dir, bob, legL, legR, sideStep) {
     g.rect(11, Y(25), 20, Y(30), SHIRT);
     g.rect(13, Y(24), 18, Y(24), SHIRT_L);
     g.rect(12, Y(31), 19, Y(32), SHIRT_D);         // 허리 잘록
+    g.rect(20, Y(26), 20, Y(30), SHIRT_D);         // 오른 그늘 기둥 — 빛은 왼쪽 위
     if (dir === 'down') { g.px(15, Y(27), SHIRT_D); g.px(15, Y(30), SHIRT_D); }
     g.rect(11, 33, 20, 36, PANTS);                 // 엉덩이 (34행이 이 안)
     g.hline(12, 19, 33, PANTS_L);
+    g.rect(20, 34, 20, 36, PANTS_D);
     for (const [x0, x1, lift] of [[11, 14, legL], [17, 20, legR]]) {
       g.rect(x0, 37 - lift, x1, 42 - lift, PANTS);
-      g.px(x1, 38 - lift, PANTS_D);
+      g.rect(x1, 37 - lift, x1, 42 - lift, PANTS_D);   // 다리 오른 그늘
       g.rect(x0, 43 - lift, x1, 46 - lift, SHOE);
+      g.px(x1, 44 - lift, SHOE_D);
       g.hline(x0 + 1, x1 - 1, 47 - lift, SHOE_D);  // 밑단은 안쪽만 — 둥근 발
     }
   }
