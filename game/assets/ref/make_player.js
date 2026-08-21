@@ -67,117 +67,136 @@ class D {
 
 // ---- 머리 (dir: down/up/side · style · bob: 걸을 때 몸이 까딱이는 칸) ----
 //
-// 머리는 y(2+bob)..21+bob. 얼굴 폭 x9..22. 2등신의 절반이 이 머리다.
+// 머리 y(4+bob)..22. 폭 x8..23 — 몸보다 넉넉히 넓다 (2등신의 얼굴이
+// 그림의 절반이다). **이마는 좁게** — 앞머리가 눈썹 자리까지 내려와야
+// 아기 같은 비율이 되고, 눈은 크게 — 세로 네 칸의 눈이 생김새를 정한다.
 function head(g, dir, style, bob, blink) {
   const Y = y => y + bob;
-  // 민머리든 아니든 **두상**은 같다 — 피부로 먼저 빚는다
-  g.rect(10, Y(4), 21, Y(6), SKIN);
-  g.rect(11, Y(3), 20, Y(3), SKIN);
-  g.rect(9, Y(6), 22, Y(18), SKIN);
-  g.rect(10, Y(19), 21, Y(20), SKIN);
-  g.rect(11, Y(21), 20, Y(21), SKIN_D);            // 턱 그늘
-  if (dir !== 'up') {
-    g.rect(11, Y(3), 18, Y(4), SKIN_L);            // 정수리가 빛을 받는다 (민머리)
-  }
+  // 두상 — 계단식 3단 깎기로 둥글게. 턱은 더 좁혀 갸름하게
+  g.rect(12, Y(4), 19, Y(4), SKIN);
+  g.rect(11, Y(5), 20, Y(5), SKIN);
+  g.rect(10, Y(6), 21, Y(6), SKIN);
+  g.rect(9, Y(7), 22, Y(7), SKIN);
+  g.rect(8, Y(8), 23, Y(17), SKIN);
+  g.rect(9, Y(18), 22, Y(19), SKIN);
+  g.rect(10, Y(20), 21, Y(20), SKIN);
+  g.rect(12, Y(21), 19, Y(21), SKIN);
+  g.rect(13, Y(22), 18, Y(22), SKIN_D);            // 좁은 턱 그늘
+  if (style === 'new_boy' && dir !== 'up')
+    g.rect(12, Y(4), 18, Y(6), SKIN_L);            // 민머리 정수리 빛
   // 귀
-  if (dir === 'down') { g.rect(8, Y(12), 8, Y(14), SKIN); g.px(8, Y(13), SKIN_D);
-    g.rect(23, Y(12), 23, Y(14), SKIN); g.px(23, Y(13), SKIN_D); }
-  if (dir === 'side') { g.rect(13, Y(13), 14, Y(15), SKIN_D); g.px(13, Y(14), SKIN); }
-  // 얼굴 — 눈·눈썹·볼·입 (up 은 뒤통수라 없다)
+  if (dir === 'down') { g.rect(7, Y(13), 7, Y(15), SKIN); g.px(7, Y(14), SKIN_D);
+    g.rect(24, Y(13), 24, Y(15), SKIN); g.px(24, Y(14), SKIN_D); }
+  if (dir === 'side') { g.rect(12, Y(14), 13, Y(16), SKIN_D); g.px(12, Y(15), SKIN); }
+  // 얼굴 — 눈은 **타원**이다. 네모 눈이 못난 인상의 절반이었다.
+  // 위아래가 한 칸 좁고 가운데가 넓은 3-4-3, 빛점은 위 안쪽에 두 칸
   if (dir === 'down') {
-    if (blink) { g.hline(12, 14, Y(13), EYE); g.hline(17, 19, Y(13), EYE); }
+    if (blink) { g.hline(11, 13, Y(15), EYE); g.hline(18, 20, Y(15), EYE); }
     else {
-      g.rect(12, Y(11), 13, Y(14), EYE); g.rect(18, Y(11), 19, Y(14), EYE);
-      g.px(12, Y(11), SKIN_L); g.px(18, Y(11), SKIN_L);    // 눈의 흰 점
+      g.rect(12, Y(12), 13, Y(12), EYE); g.rect(11, Y(13), 13, Y(15), EYE);
+      g.rect(12, Y(16), 13, Y(16), EYE);
+      g.rect(18, Y(12), 19, Y(12), EYE); g.rect(18, Y(13), 20, Y(15), EYE);
+      g.rect(18, Y(16), 19, Y(16), EYE);
+      g.rect(12, Y(13), 12, Y(14), SKIN_L); g.rect(19, Y(13), 19, Y(14), SKIN_L);
     }
-    g.hline(12, 14, Y(9), BROW); g.hline(17, 19, Y(9), BROW);
-    g.px(10, Y(15), CHEEK); g.px(21, Y(15), CHEEK);
-    g.hline(15, 16, Y(18), MOUTH);
+    g.px(9, Y(17), CHEEK); g.px(22, Y(17), CHEEK);
+    g.hline(15, 16, Y(19), MOUTH);
   } else if (dir === 'side') {
-    if (blink) g.hline(18, 20, Y(13), EYE);
-    else { g.rect(18, Y(11), 19, Y(14), EYE); g.px(18, Y(11), SKIN_L); }
-    g.hline(17, 20, Y(9), BROW);
-    g.px(16, Y(15), CHEEK);
-    g.px(22, Y(13), SKIN);                          // 코
-    g.px(22, Y(14), SKIN_D);
-    g.px(21, Y(18), MOUTH);
+    if (blink) g.hline(17, 19, Y(15), EYE);
+    else {
+      g.rect(18, Y(12), 19, Y(12), EYE); g.rect(17, Y(13), 19, Y(15), EYE);
+      g.rect(18, Y(16), 19, Y(16), EYE);
+      g.rect(18, Y(13), 18, Y(14), SKIN_L);
+    }
+    g.px(15, Y(17), CHEEK);
+    g.px(23, Y(14), SKIN);                          // 코
+    g.px(23, Y(15), SKIN_D);
+    g.px(21, Y(19), MOUTH);
   }
   hair(g, dir, style, bob);
 }
 
-// 머리 모양 — 민머리는 아무것도 안 얹는다 (recolor 가 머리색 줄을 흐리는 근거)
+// 머리 모양 — 앞머리가 눈썹 자리(11행)까지 내려온다. 이마가 좁아야
+// 아기 같은 비율이 된다. 민머리는 아무것도 안 얹는다
 function hair(g, dir, style, bob) {
   const Y = y => y + bob;
   if (style === 'new_boy') return;
+  // 공통 뚜껑 — 두상을 따라 둥글게
+  const cap = () => {
+    g.rect(12, Y(2), 19, Y(2), HAIR);
+    g.rect(11, Y(3), 20, Y(3), HAIR);
+    g.rect(10, Y(4), 21, Y(4), HAIR);
+    g.rect(9, Y(5), 22, Y(6), HAIR);
+    g.rect(8, Y(7), 23, Y(9), HAIR);
+  };
   if (style === 'hair_short') {
-    // 짧은 단발 — 이마와 옆을 감싸는 바가지
-    g.rect(10, Y(3), 21, Y(7), HAIR); g.rect(11, Y(2), 20, Y(2), HAIR);
-    g.rect(9, Y(5), 9, Y(12), HAIR); g.rect(22, Y(5), 22, Y(12), HAIR);
+    cap();
     if (dir === 'down') {
-      g.hline(11, 20, Y(8), HAIR);                 // 앞머리단
-      g.px(13, Y(9), HAIR); g.px(17, Y(9), HAIR); g.px(20, Y(9), HAIR);
-      g.hline(11, 17, Y(3), HAIR_L); g.hline(12, 15, Y(4), HAIR_L);
-      g.px(14, Y(6), HAIR_D); g.px(18, Y(5), HAIR_D);
-      g.rect(9, Y(12), 9, Y(14), HAIR_D); g.rect(22, Y(12), 22, Y(14), HAIR_D);
+      g.rect(8, Y(10), 23, Y(10), HAIR);
+      g.hline(9, 22, Y(11), HAIR);                 // 앞머리단 — 눈 바로 위
+      for (const fx of [10, 14, 17, 21]) g.px(fx, Y(12), HAIR);  // 삐죽단
+      g.rect(8, Y(11), 8, Y(15), HAIR); g.rect(23, Y(11), 23, Y(15), HAIR);
+      g.rect(8, Y(15), 8, Y(16), HAIR_D); g.rect(23, Y(15), 23, Y(16), HAIR_D);
+      g.hline(11, 18, Y(3), HAIR_L); g.hline(12, 16, Y(4), HAIR_L);
+      g.px(14, Y(7), HAIR_D); g.px(19, Y(6), HAIR_D);
     } else if (dir === 'side') {
-      g.rect(9, Y(5), 12, Y(13), HAIR);            // 뒤통수 덩이
-      g.rect(9, Y(13), 10, Y(16), HAIR_D);
-      g.hline(13, 19, Y(8), HAIR);                 // 앞머리단(옆)
-      g.px(20, Y(8), HAIR);
+      g.rect(8, Y(10), 16, Y(11), HAIR);           // 앞머리단(옆) — 눈 앞까지
+      g.px(17, Y(11), HAIR);
+      g.rect(8, Y(10), 11, Y(16), HAIR);           // 뒤통수 덩이
+      g.rect(8, Y(16), 9, Y(18), HAIR_D);
       g.hline(11, 17, Y(3), HAIR_L);
-      g.px(11, Y(6), HAIR_D);
-    } else {                                       // up — 뒤통수 전부
-      g.rect(9, Y(5), 22, Y(15), HAIR);
+      g.px(10, Y(8), HAIR_D);
+    } else {
+      g.rect(8, Y(10), 23, Y(16), HAIR);
       g.hline(11, 18, Y(3), HAIR_L); g.hline(12, 17, Y(4), HAIR_L);
-      g.px(14, Y(8), HAIR_D); g.px(18, Y(10), HAIR_D);
-      g.rect(9, Y(14), 22, Y(15), HAIR_D);
+      g.px(14, Y(9), HAIR_D); g.px(18, Y(12), HAIR_D);
+      g.rect(8, Y(15), 23, Y(16), HAIR_D);
     }
   } else if (style === 'hair_spiky') {
-    // 삐죽 머리 — 정수리에서 밖으로 뻗치는 결
-    g.rect(10, Y(3), 21, Y(6), HAIR); g.rect(11, Y(2), 20, Y(2), HAIR);
-    for (const [sx, sy] of [[11, 1], [14, 0], [17, 0], [20, 1]]) {
+    cap();
+    for (const [sx, sy] of [[10, 1], [13, 0], [16, 0], [19, 1], [22, 2]]) {
       g.px(sx, Y(sy), HAIR); g.px(sx + 1, Y(sy + 1), HAIR);
     }
-    g.rect(9, Y(4), 9, Y(9), HAIR); g.rect(22, Y(4), 22, Y(9), HAIR);
     if (dir === 'down') {
-      g.hline(11, 20, Y(7), HAIR);
-      g.px(12, Y(8), HAIR); g.px(16, Y(8), HAIR); g.px(19, Y(8), HAIR);
-      g.hline(12, 16, Y(3), HAIR_L); g.px(15, Y(1), HAIR_L);
-      g.px(13, Y(5), HAIR_D); g.px(18, Y(4), HAIR_D);
+      g.rect(8, Y(10), 23, Y(10), HAIR);
+      g.hline(9, 22, Y(11), HAIR);
+      for (const fx of [9, 12, 15, 18, 21]) g.px(fx, Y(12), HAIR);   // 뾰족단
+      g.hline(12, 17, Y(3), HAIR_L); g.px(15, Y(1), HAIR_L);
+      g.px(13, Y(6), HAIR_D); g.px(19, Y(5), HAIR_D);
     } else if (dir === 'side') {
-      g.rect(9, Y(4), 12, Y(12), HAIR);
-      g.px(8, Y(6), HAIR); g.px(8, Y(9), HAIR);    // 뒤로 뻗친 결
-      g.hline(13, 18, Y(7), HAIR);
+      g.rect(8, Y(10), 15, Y(11), HAIR);
+      g.rect(8, Y(10), 11, Y(15), HAIR);
+      g.px(7, Y(8), HAIR); g.px(7, Y(12), HAIR);   // 뒤로 뻗친 결
       g.hline(11, 16, Y(3), HAIR_L);
-      g.px(10, Y(11), HAIR_D);
+      g.px(9, Y(14), HAIR_D);
     } else {
-      g.rect(9, Y(4), 22, Y(14), HAIR);
+      g.rect(8, Y(10), 23, Y(15), HAIR);
       g.hline(11, 18, Y(3), HAIR_L);
-      g.px(13, Y(7), HAIR_D); g.px(17, Y(9), HAIR_D);
-      g.rect(9, Y(13), 22, Y(14), HAIR_D);
+      g.px(13, Y(8), HAIR_D); g.px(18, Y(11), HAIR_D);
+      g.rect(8, Y(14), 23, Y(15), HAIR_D);
     }
   } else {                                         // player_f — 긴 머리
-    g.rect(10, Y(3), 21, Y(7), HAIR); g.rect(11, Y(2), 20, Y(2), HAIR);
-    g.rect(8, Y(5), 9, Y(24), HAIR); g.rect(22, Y(5), 23, Y(24), HAIR);  // 어깨까지
-    g.rect(8, Y(23), 9, Y(24), HAIR_D); g.rect(22, Y(23), 23, Y(24), HAIR_D);
+    cap();
+    g.rect(7, Y(8), 8, Y(26), HAIR); g.rect(23, Y(8), 24, Y(26), HAIR);
+    g.rect(7, Y(25), 8, Y(26), HAIR_D); g.rect(23, Y(25), 24, Y(26), HAIR_D);
     if (dir === 'down') {
-      g.hline(11, 20, Y(8), HAIR);
-      g.px(12, Y(9), HAIR); g.px(15, Y(9), HAIR); g.px(19, Y(9), HAIR);
-      g.hline(11, 17, Y(3), HAIR_L); g.hline(12, 15, Y(4), HAIR_L);
-      g.px(9, Y(16), HAIR_L); g.px(22, Y(18), HAIR_L);   // 늘어진 결의 빛
-      g.px(14, Y(6), HAIR_D); g.px(18, Y(5), HAIR_D);
-    } else if (dir === 'side') {
-      g.rect(9, Y(5), 12, Y(14), HAIR);
-      g.rect(8, Y(8), 11, Y(24), HAIR);            // 뒤로 흘러내린 머리
-      g.rect(8, Y(22), 11, Y(24), HAIR_D);
-      g.hline(13, 19, Y(8), HAIR);
-      g.hline(11, 16, Y(3), HAIR_L); g.px(9, Y(15), HAIR_L);
-    } else {
-      g.rect(9, Y(5), 22, Y(17), HAIR);
-      g.rect(10, Y(17), 21, Y(26), HAIR);          // 등으로 흘러내린 머리
-      g.rect(10, Y(24), 21, Y(26), HAIR_D);
+      g.rect(8, Y(10), 23, Y(10), HAIR);
+      g.hline(9, 22, Y(11), HAIR);
+      for (const fx of [11, 15, 20]) g.px(fx, Y(12), HAIR);
       g.hline(11, 18, Y(3), HAIR_L); g.hline(12, 16, Y(4), HAIR_L);
-      g.px(13, Y(10), HAIR_D); g.px(18, Y(13), HAIR_D);
+      g.px(8, Y(18), HAIR_L); g.px(23, Y(20), HAIR_L);
+      g.px(14, Y(7), HAIR_D); g.px(19, Y(6), HAIR_D);
+    } else if (dir === 'side') {
+      g.rect(8, Y(10), 16, Y(11), HAIR);
+      g.rect(7, Y(9), 11, Y(26), HAIR);            // 뒤로 흘러내린 머리
+      g.rect(7, Y(24), 11, Y(26), HAIR_D);
+      g.hline(11, 16, Y(3), HAIR_L); g.px(8, Y(17), HAIR_L);
+    } else {
+      g.rect(8, Y(10), 23, Y(18), HAIR);
+      g.rect(9, Y(18), 22, Y(28), HAIR);           // 등으로 흘러내린 머리
+      g.rect(9, Y(26), 22, Y(28), HAIR_D);
+      g.hline(11, 18, Y(3), HAIR_L); g.hline(12, 16, Y(4), HAIR_L);
+      g.px(13, Y(11), HAIR_D); g.px(18, Y(14), HAIR_D);
     }
   }
 }
@@ -198,47 +217,48 @@ function arm(g, sx, sy, fx, fy, edged) {
   }
   for (let k = 0; k <= n; k++) {
     const x = sx + (fx - sx) * k / n, y = sy + (fy - sy) * k / n;
-    const c = k < n * 0.45 ? SHIRT : SKIN;
+    const c = k < n * 0.34 ? SHIRT : SKIN;
     g.rect(x - 1, y, x + 1, y + 1, c);
   }
   g.rect(fx - 1, fy, fx + 1, fy + 1, SKIN);
-  g.hline(fx - 1, fx + 1, fy + 2, SKIN_D);
+  g.px(fx, fy + 2, SKIN_D);
 }
 
-// ---- 몸통·다리 (dir · bob · legs: [왼발 올림, 오른발 올림] 0~2 · sideStep) ----
+// ---- 몸통·다리 (dir · bob · legs · sideStep) ----
+//
+// 몸통은 머리보다 **네 칸 좁다** (x11..20). 머리가 크고 몸이 좁아야
+// 2등신이 귀엽게 선다. 어깨는 한 칸 물러나고, 다리는 허리(34행)
+// 아래에서 곧장 갈라진다 — 바지 통짜 상자는 다리가 아니다.
 function body(g, dir, bob, legL, legR, sideStep) {
   const Y = y => y + bob;
   if (dir === 'side') {
-    // 옆 — 폭이 좁다. 셔츠 x11..19
-    g.rect(11, Y(22), 19, Y(33), SHIRT);
-    g.rect(11, Y(22), 19, Y(23), SHIRT_L);
-    g.rect(11, Y(32), 19, Y(33), SHIRT_D);
-    // 바지 — 허리(34행)에 걸친다. 다리는 앞뒤로 벌어진다 (sideStep -2..2)
-    g.rect(11, 34, 19, 37, PANTS);
-    g.hline(11, 19, 34, PANTS_L);
-    const f = 15 + sideStep, b = 13 - sideStep;      // 앞다리 x, 뒷다리 x
-    g.rect(b - 1, 38, b + 2, 43, PANTS_D);           // 뒷다리
-    g.rect(f - 1, 38, f + 2, 43, PANTS);             // 앞다리
-    g.rect(b - 2, 44, b + 3, 46, SHOE_D);
-    g.rect(f - 2, 44, f + 3, 47, SHOE);
-    g.hline(f - 2, f + 3, 47, SHOE_D);
+    g.rect(14, Y(23), 17, Y(23), SHIRT);
+    g.rect(13, Y(24), 18, Y(24), SHIRT);
+    g.rect(12, Y(25), 19, Y(30), SHIRT);
+    g.rect(14, Y(24), 17, Y(24), SHIRT_L);
+    g.rect(13, Y(31), 18, Y(32), SHIRT_D);         // 허리 잘록
+    g.rect(12, 33, 19, 36, PANTS);
+    g.hline(13, 18, 33, PANTS_L);
+    const f = 15 + sideStep, b = 13 - sideStep;
+    g.rect(b - 1, 37, b + 2, 42, PANTS_D);
+    g.rect(f - 1, 37, f + 2, 42, PANTS);
+    g.rect(b - 1, 43, b + 2, 45, SHOE_D);
+    g.rect(f - 1, 43, f + 2, 46, SHOE);
+    g.hline(f, f + 1, 47, SHOE_D);
   } else {
-    // 앞·뒤 — 셔츠 x10..21
-    g.rect(10, Y(22), 21, Y(33), SHIRT);
-    g.rect(10, Y(22), 21, Y(23), SHIRT_L);
-    g.rect(10, Y(32), 21, Y(33), SHIRT_D);
-    if (dir === 'down') {                            // 앞섶 단추
-      g.px(15, Y(26), SHIRT_D); g.px(15, Y(29), SHIRT_D);
-    }
-    // 바지 (34..41) + 가랑이 골
-    g.rect(10, 34, 21, 41, PANTS);
-    g.hline(10, 21, 34, PANTS_L);
-    g.rect(15, 36, 16, 41, PANTS_D);
-    // 다리·장화 — 올린 발은 장화가 위로 들린다
-    for (const [x0, x1, lift] of [[10, 14, legL], [17, 21, legR]]) {
-      g.rect(x0, 42 - lift, x1, 43 - lift, PANTS);
-      g.rect(x0, 44 - lift, x1, 46 - lift, SHOE);
-      g.hline(x0, x1, 47 - lift, SHOE_D);
+    g.rect(13, Y(23), 18, Y(23), SHIRT);           // 어깨 2단 경사
+    g.rect(12, Y(24), 19, Y(24), SHIRT);
+    g.rect(11, Y(25), 20, Y(30), SHIRT);
+    g.rect(13, Y(24), 18, Y(24), SHIRT_L);
+    g.rect(12, Y(31), 19, Y(32), SHIRT_D);         // 허리 잘록
+    if (dir === 'down') { g.px(15, Y(27), SHIRT_D); g.px(15, Y(30), SHIRT_D); }
+    g.rect(11, 33, 20, 36, PANTS);                 // 엉덩이 (34행이 이 안)
+    g.hline(12, 19, 33, PANTS_L);
+    for (const [x0, x1, lift] of [[11, 14, legL], [17, 20, legR]]) {
+      g.rect(x0, 37 - lift, x1, 42 - lift, PANTS);
+      g.px(x1, 38 - lift, PANTS_D);
+      g.rect(x0, 43 - lift, x1, 46 - lift, SHOE);
+      g.hline(x0 + 1, x1 - 1, 47 - lift, SHOE_D);  // 밑단은 안쪽만 — 둥근 발
     }
   }
 }
@@ -264,11 +284,11 @@ function frame(style, dir, kind, i) {
     body(g, dir, lean, 0, 0, 0);
     head(g, dir, style, lean, false);
     if (dir === 'side') {
-      arm(g, 14, 24 + lean, FIST[0], FIST[1], true); // 보이는 팔 하나
+      arm(g, 15, 25 + lean, FIST[0], FIST[1], true); // 보이는 팔 하나
     } else {
       // 두 손 모아 쥔다 — 주먹 자리에 양팔이 모인다
-      arm(g, 11, 24 + lean, FIST[0], FIST[1]);
-      arm(g, 20, 24 + lean, FIST[0] + 1, FIST[1]);
+      arm(g, 12, 25 + lean, FIST[0], FIST[1]);
+      arm(g, 19, 25 + lean, FIST[0] + 1, FIST[1]);
     }
   } else {
     const legL = kind === 'walk' ? [0, 1, 2, 0, 0, 0][i] : 0;
@@ -278,12 +298,12 @@ function frame(style, dir, kind, i) {
     head(g, dir, style, bob, kind === 'blink');
     if (dir === 'side') {
       const sw = kind === 'walk' ? [0, -2, -3, 0, 2, 3][i] : 0;   // 팔은 다리와 반대로
-      arm(g, 14, 24 + bob, 14 + sw, 31 + bob, true);
+      arm(g, 15, 25 + bob, 15 + sw, 32 + bob, true);
     } else {
       const swL = kind === 'walk' ? -legR : 0;       // 왼팔은 오른발과 함께
       const swR = kind === 'walk' ? -legL : 0;
-      arm(g, 8, 24 + bob, 7, 31 + bob + swL);
-      arm(g, 22, 24 + bob, 23, 31 + bob + swR);
+      arm(g, 9, 25 + bob, 8, 32 + bob + swL);
+      arm(g, 22, 25 + bob, 23, 32 + bob + swR);
     }
   }
   g.outline();
