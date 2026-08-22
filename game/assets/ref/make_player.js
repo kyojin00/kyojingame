@@ -16,6 +16,12 @@
 // 실행:  node make_player.js            -> ref/proposed_*.png
 //        node make_player.js --install  -> sprites/ 에 넣는다
 const fs = require('fs'), { PNG } = require('pngjs');
+// **보류** — 유저가 원본 캐릭터를 선택했다 (2026-08). 이 생성기를 돌려도
+// 게임에는 안 들어간다. 정말 갈아끼우려면 --force 를 붙일 것.
+if (process.argv.includes('--install') && !process.argv.includes('--force')) {
+  console.log('보류 중 — 유저가 원본 캐릭터를 선택했다. --install 은 --force 와 함께만 동작한다.');
+  process.exit(0);
+}
 const REF = __dirname + '/';
 const SPR = __dirname + '/../sprites/';
 const INSTALL = process.argv.includes('--install');
