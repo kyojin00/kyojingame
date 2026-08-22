@@ -101,16 +101,39 @@ const BOOK = [[200, 62, 48], [72, 148, 200], [84, 156, 60], [200, 150, 60]];
 const OUT = [32, 24, 28];
 const SHADOW = [30, 26, 34, 78];
 
+// ---- 마당 살림의 **덩치** ----
+//
+// 살림은 도트 격자에 그리고 한 도트를 4px로 찍는다 — 화면에서 0.5배로
+// 얹으니 도트 하나가 2px, 사람·집·바닥과 같은 자다. 문제는 **격자가
+// 작았다**는 것: 자루가 18x14칸(화면 36x28px)이면 키 96px인 사람 옆에서
+// 발치의 돌멩이만 하다. 마당에 내놓은 짐은 사람 허리께는 와야 짐이다.
+//
+// 도트를 크게 찍으면(3px) 세계와 자가 어긋나므로, **격자 자체를 키운다.**
+// 그리는 코드는 그대로 두고 P가 한 칸을 K칸으로 펴서 받는다 — 칸을 정확히
+// 나눠 덮으므로 틈도 겹침도 없다. 화로·모루는 이미 크게 그려 뒀으니 뺀다.
+let PK = 1;
+
 class P {
   constructor(w, hh) {
-    this.w = w; this.h = hh;
-    this.d = Array.from({ length: hh }, () => new Array(w).fill(null));
+    this.K = PK;
+    this.w = Math.round(w * PK); this.h = Math.round(hh * PK);
+    this.d = Array.from({ length: this.h }, () => new Array(this.w).fill(null));
+  }
+  // 격자 좌표 그대로 찍는다 (윤곽선·마무리 패스가 쓴다)
+  raw(x, y, c) {
+    if (!c) return;
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+    this.d[y][x] = c;
   }
   px(x, y, c) {
     if (!c) return;
     x = Math.round(x); y = Math.round(y);
-    if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
-    this.d[y][x] = c;
+    if (this.K === 1) { this.raw(x, y, c); return; }
+    // 한 칸이 차지할 자리를 반올림 경계로 잘라 덮는다 (틈 없는 타일링)
+    const K = this.K;
+    const x0 = Math.round(x * K), x1 = Math.round((x + 1) * K) - 1;
+    const y0 = Math.round(y * K), y1 = Math.round((y + 1) * K) - 1;
+    for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) this.raw(xx, yy, c);
   }
   get(x, y) {
     if (x < 0 || y < 0 || x >= this.w || y >= this.h) return null;
@@ -194,7 +217,7 @@ function outline(g) {
     }
     if (near) add.push([x, y]);
   }
-  for (const [x, y] of add) g.px(x, y, OUT);
+  for (const [x, y] of add) g.raw(x, y, OUT);
   return g;
 }
 
@@ -1063,30 +1086,49 @@ function crate() {
 // 궤짝만 늘어놓으면 마당이 네모투성이가 된다. 자루는 **둥글고 늘어져**
 // 있어서, 같은 짐인데도 옆에 놓으면 둘 다 살아난다
 function sack() {
-  const g = new P(18, 14);
-  g.ground(9, 12, 8, 1.6);
-  // 동그란 덩어리 셋으로 그렸더니 허연 얼룩 하나로 뭉쳤다. 자루는 **서
-  // 있는 것**이다 — 아래로 벌어지는 배와, 오므려 묶은 목이 있어야 한다
-  const one = (x0, x1, top, seed) => {
-    const cx = Math.round((x0 + x1) / 2);
-    for (let y = top; y <= 12; y++) {
-      const t = (y - top) / (12 - top);
-      const w = Math.round((x1 - x0) / 2 * (0.44 + t * 0.56));
+  // ---- 마대 자루 ----
+  //
+  // 궤짝만 늘어놓으면 마당이 네모투성이가 된다. 자루는 **둥글고 늘어져**
+  // 있어서, 같은 짐인데도 옆에 놓으면 둘 다 살아난다.
+  //
+  // 작은 격자(18x14)를 기계로 늘렸더니 배의 곡선이 계단으로 부서져
+  // 「네모 탑 둘」이 됐다 — 둥근 것은 **큰 격자에 직접** 그려야 한다.
+  // 25x20칸에 다시 그린다: 아래로 벌어지는 배, 오므려 묶은 목, 흘러
+  // 내리는 주름, 바닥에 눌려 퍼진 밑동.
+  const g = new P(25, 20);
+  const one = (cx, top, hw, seed) => {
+    const base = 18;
+    for (let y = top; y <= base; y++) {
+      const t = (y - top) / (base - top);
+      const sm = t * t * (3 - 2 * t);                   // 부드럽게 벌어진다
+      let w = Math.round(hw * (0.34 + sm * 0.66));
+      if (y === base) w -= 1;                           // 밑동은 한 칸 오므린다
       for (let x = cx - w; x <= cx + w; x++) {
         let c = SACK[1];
-        if (x <= cx - w + 1) c = SACK[0];          // 왼쪽 = 빛
-        if (x >= cx + w - 1) c = SACK[2];          // 오른쪽 = 그늘
-        if (y >= 12) c = SACK[3];                  // 밑변 턱
+        if (x <= cx - w + 1) c = SACK[0];               // 왼쪽 = 빛
+        else if (x >= cx + w - 1) c = SACK[2];          // 오른쪽 = 그늘
+        if (y >= base - 1) c = SACK[3];                 // 눌린 밑동
         g.px(x, y, c);
       }
-      if (h(y, seed, 93) < 0.35) g.px(cx - 1, y, SACK[2]);   // 주름
+      // 주름 — 목에서 배로 흘러내린다. 두 칸 걸러 한 줄
+      if (y > top + 2 && y < base - 1 && (y - top) % 3 === 1)
+        g.px(cx - Math.round(w * 0.3), y, SACK[2]);
+      if (y > top + 3 && (y - top) % 4 === 2)
+        g.px(cx + Math.round(w * 0.45), y, SACK[3]);
     }
-    g.rect(cx - 1, top - 2, cx + 1, top - 1, SACK[2]);       // 오므린 목
-    g.hline(cx - 2, cx + 2, top - 1, W[4]);                  // 새끼줄
-    g.px(cx, top - 3, SACK[0]);
+    // 오므려 묶은 목 — 자루를 자루로 만드는 자리
+    g.rect(cx - 2, top - 3, cx + 2, top - 1, SACK[2]);
+    g.rect(cx - 2, top - 3, cx - 1, top - 1, SACK[1]);
+    g.hline(cx - 3, cx + 3, top - 2, W[4]);             // 새끼줄
+    g.px(cx - 3, top - 1, W[5]); g.px(cx + 3, top - 1, W[5]);
+    g.rect(cx - 1, top - 5, cx + 1, top - 4, SACK[1]);  // 여민 아가리
+    g.px(cx - 1, top - 5, SACK[0]);
+    if (h(cx, seed, 93) < 0.6) g.px(cx + 2, top - 4, SACK[2]);
   };
-  one(1, 8, 6, 3);
-  one(10, 17, 5, 9);
+  g.ground(7, 18, 7, 2.0);
+  g.ground(17, 18, 6, 1.8);
+  one(7, 8, 6, 3);
+  one(17, 6, 5, 9);
   return outline(g);
 }
 
@@ -1160,9 +1202,10 @@ const OUTS = {};
 OUTS['forage_branch'] = branch().render();
 for (let f = 0; f < 4; f++) OUTS['deco_forge_' + f] = forge(f).render();
 OUTS['deco_anvil'] = anvil().render();
+PK = 1.4;                    // 여기서부터 마당 살림 — 격자를 키운다
 OUTS['deco_weaponrack'] = weaponrack().render();
 OUTS['deco_crate'] = crate().render();
-OUTS['deco_sack'] = sack().render();
+PK = 1; OUTS['deco_sack'] = sack().render(); PK = 1.4;   // 자루는 제 격자로 그린다
 OUTS['deco_toolrack'] = toolrack().render();
 OUTS['deco_logpile'] = logpile().render();
 OUTS['deco_trough'] = trough(true).render();
@@ -1173,6 +1216,7 @@ OUTS['deco_planter'] = planter().render();
 OUTS['deco_cart'] = cart().render();
 OUTS['deco_bookstack'] = bookstack().render();
 OUTS['deco_specimen'] = specimen().render();
+PK = 1;
 
 // 미리보기 — 잔디 위에 게임과 같은 크기(0.5배)로 늘어놓는다
 function preview() {

@@ -105,9 +105,11 @@ func _draw_object_shadows() -> void:
 		var by: float = node.position.y \
 			+ (spr.offset.y + spr.texture.get_height()) * spr.scale.y
 		# 중심을 밑변보다 **아래로** — 위에서 내려다보는 화면에서는 캐노피가
-		# 제 그림자의 위쪽을 다 가린다. 아래로 고여야 눈에 보인다
+		# 제 그림자의 위쪽을 다 가린다. 아래로 고여야 눈에 보인다.
+		# 그리고 **오른쪽으로 조금** — 빛은 왼쪽 위에서 온다 (집·살림과 같은
+		# 해). 그림자가 한 방향으로 눕지 않으면 저마다 딴 해를 쬔 것이 된다
 		m.shadows.draw_texture_rect(_obj_shadow_tex,
-			Rect2(Vector2(cx - sz.x / 2.0, by - sz.y * 0.28), sz), false)
+			Rect2(Vector2(cx - sz.x / 2.0 + sz.x * 0.06, by - sz.y * 0.28), sz), false)
 
 
 # 화면이 보고 있는 세계 사각형

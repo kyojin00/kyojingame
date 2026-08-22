@@ -3908,8 +3908,38 @@ func _draw() -> void:
 			else:
 				draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 					Color(1, 1, 1, 0.6), false, 1.0)
+	_draw_map_rim(x0, y0, x1, y1)
 	if perf_show:
 		_perf["draw"] = Time.get_ticks_usec() - _t0
+
+
+# ---- 맵의 가장자리 ----
+#
+# 맵 밖은 어두운 숲으로 채운다 (OUT_TINT). 그런데 그 어둠이 맵 변에서
+# **면도날처럼 끊겼다** — 화면을 가로지르는 곧은 선 하나가 「여기가
+# 렌더러의 끝」이라고 말한다. 숲은 그렇게 끝나지 않는다.
+#
+# 안쪽으로 서너 칸에 걸쳐 어둠을 흘려 넣는다. 나무 그늘이 들판으로
+# 번지는 것이고, 화면의 네 변은 그저 「더 깊은 숲」이 된다.
+const RIM_DEPTH := 4          # 어둠이 스며드는 깊이 (칸)
+const RIM_DARK := Color(0.05, 0.09, 0.06)
+
+func _draw_map_rim(x0: int, y0: int, x1: int, y1: int) -> void:
+	var ts := float(TILE)
+	for d in RIM_DEPTH:
+		# 바깥일수록 짙다. 한 겹이 옅어야 계단이 아니라 번짐으로 보인다
+		var a: float = 0.30 * pow(1.0 - float(d) / float(RIM_DEPTH), 1.7)
+		var c := Color(RIM_DARK.r, RIM_DARK.g, RIM_DARK.b, a)
+		if x0 <= d and d < x1:                       # 서쪽
+			draw_rect(Rect2(d * ts, y0 * ts, ts, (y1 - y0) * ts), c)
+		var rx := MAP_W - 1 - d
+		if x0 <= rx and rx < x1:                     # 동쪽
+			draw_rect(Rect2(rx * ts, y0 * ts, ts, (y1 - y0) * ts), c)
+		if y0 <= d and d < y1:                       # 북쪽
+			draw_rect(Rect2(x0 * ts, d * ts, (x1 - x0) * ts, ts), c)
+		var by := MAP_H - 1 - d
+		if y0 <= by and by < y1:                     # 남쪽
+			draw_rect(Rect2(x0 * ts, by * ts, (x1 - x0) * ts, ts), c)
 		_pm("그리기", _t0)
 
 

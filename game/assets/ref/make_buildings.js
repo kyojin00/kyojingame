@@ -2170,17 +2170,27 @@ function groundShadow(im) {
   const W2 = im.width, H2 = im.height;
   const opaque = (x, y) => x >= 0 && x < W2 && y >= 0 && y < H2
     && im.data[(y * W2 + x) * 4 + 3] > 128;
-  // 밑변 찾기 — 각 열에서 제일 아래 불투명 픽셀
+  // 빛은 **왼쪽 위**에서 온다 (사람·살림과 같은 해). 그러니 집의 그림자는
+  // 밑변 아래로 곧게 깔리는 게 아니라 **오른쪽 아래로 드리운다.**
+  // 곧은 그림자는 「밑에 깔아 둔 회색 띠」로 보이고, 기운 그림자라야
+  // 집이 땅을 누르는 무게가 생긴다.
+  const DEEP = 11;                        // 드리우는 길이 (px)
+  const SKEW = 0.55;                      // 한 줄 내려갈 때 오른쪽으로 미는 정도
+  const base = new Int32Array(W2).fill(-1);
   for (let x = 0; x < W2; x++) {
-    let base = -1;
-    for (let y = H2 - 1; y >= 0; y--) if (opaque(x, y)) { base = y; break; }
-    if (base < 0 || base < H2 * 0.7) continue;             // 허공 장식은 건너뛴다
-    for (let k = 1; k <= 8; k++) {
-      const y = base + k;
-      if (y >= H2 || opaque(x, y)) continue;
-      const a = Math.max(0, 96 - k * 11);
-      const i = (y * W2 + x) * 4;
-      if (im.data[i + 3] > 0) continue;
+    for (let y = H2 - 1; y >= 0; y--) if (opaque(x, y)) { base[x] = y; break; }
+    if (base[x] < H2 * 0.7) base[x] = -1;                  // 허공 장식은 건너뛴다
+  }
+  for (let x = 0; x < W2; x++) {
+    if (base[x] < 0) continue;
+    for (let k = 1; k <= DEEP; k++) {
+      const y = base[x] + k;
+      const sx = x + Math.round(k * SKEW);                 // 기울어 눕는다
+      if (y >= H2 || sx >= W2 || opaque(sx, y)) continue;
+      // 끝으로 갈수록 옅다. 곡선으로 잦아들어야 끝선이 안 보인다
+      const a = Math.round(104 * Math.pow(1 - k / (DEEP + 1), 1.5));
+      const i = (y * W2 + sx) * 4;
+      if (im.data[i + 3] >= a) continue;                   // 이미 짙으면 둔다
       im.data[i] = 30; im.data[i + 1] = 26; im.data[i + 2] = 34;
       im.data[i + 3] = a;
     }

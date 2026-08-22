@@ -205,17 +205,22 @@ function cobble(seed) {
     if (r < 0.02) g.px(x, y, STONE[5]);
     else if (r > 0.988) g.px(x, y, EARTH[2]);
   }
+  // 삐져나온 풀잎 — **길의 이끼는 들판의 초록이 아니다.**
+  // 순 이끼색으로 찍었더니 칸마다 형광 초록 점이 박혀, 광장이 이끼밭으로
+  // 보였다. 돌빛에 반쯤 물들이면 「돌 틈에 낀 것」이 된다
+  const damp = c => mixc(c, STONE[3], 0.42);
   for (let k = 0; k < 2; k++) {
+    if (h(k, seed, 35) < 0.45) continue;                 // 두 장 중 한 장에만
     const ox = 1 + Math.floor(h(k * 9 + 4, seed, 33) * (N - 2));
     const oy = 2 + Math.floor(h(seed, k * 9 + 4, 34) * (N - 3));
-    g.px(ox, oy, MOSS[1]); g.px(ox + (k % 2 ? 1 : -1), oy - 1, MOSS[0]);
+    g.px(ox, oy, damp(MOSS[1])); g.px(ox + (k % 2 ? 1 : -1), oy - 1, damp(MOSS[0]));
   }
-  // 줄눈에 낀 이끼 — 어두운 줄눈 자리에만, 덩어리로
+  // 줄눈에 낀 이끼 — 어두운 줄눈 자리에만, 덩어리로. 드물게(7%)
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const c = g.get(x, y);
     if (c !== STONE[5] && c !== STONE[6] && c !== STONE[7] && !EARTH.includes(c)) continue;
-    if (h(x >> 1, y >> 1, seed + 11) > 0.12) continue;
-    g.px(x, y, MOSS[h(x, y, seed + 13) < 0.5 ? 1 : 2]);
+    if (h(x >> 1, y >> 1, seed + 11) > 0.07) continue;
+    g.px(x, y, damp(MOSS[h(x, y, seed + 13) < 0.5 ? 1 : 2]));
   }
   return g;
 }
@@ -480,81 +485,80 @@ const STRAW = [[196, 170, 108], [166, 140, 84], [132, 108, 62]];
 
 function yard(v) {
   const g = new T(), p = SEASON.spring, s = v * 13;
-  // ① 바탕 — 큰 결 · 중간 결 · 잔 결을 겹쳐 섞는다.
-  //    예전엔 두 겹뿐이라 4x4 네모 얼룩이 그대로 보였다 (마당에 바둑판이
-  //    떴다). 세 겹을 다른 비율로 섞으면 어디서 칸이 끊기는지 안 보인다.
-  //    톤도 두 단에서 **네 단**으로 늘렸다 — 다진 흙은 평평한 색이 아니라
-  //    밟힌 자리와 안 밟힌 자리가 얼룩덜룩한 땅이다
-  //    그리고 **장마다 바탕 톤이 다르다** — 잔디와 같은 규칙이다.
-  //    마당 한 판이 통짜 갈색 네모로 보이던 건 세 장이 다 같은 밝기라
-  //    어떻게 섞어도 평균이 한 색이었기 때문이다
-  const YSHIFT = [1, 0, -1][v % 3];
-  // 잔 결(1px)의 몫을 반으로 줄였다 — 마당이 넓게 깔리면 잔 결이 그대로
-  // 지글거리는 소음이 된다. 얼룩은 큰 결이 만들고 잔 결은 거들 뿐
+  // ---- 마당은 **무늬가 아니라 면**이다 ----
+  //
+  // 장마다 열세 가지(밝은 자리·발자국·금·잔돌·지푸라기·풀포기)를 다
+  // 얹었더니, 세 장이 돌아가며 깔리는 마당 전체가 얼룩덜룩한 위장무늬가
+  // 됐다. 집도 울타리도 그 위에 뜬다.
+  //
+  // 잔디에서 배운 것을 그대로 — **바탕은 조용하게, 자국은 장마다 한 가지만.**
+  //   바탕   세 단만 (EARTH 1~3). 다섯 단을 쓰면 그 폭이 곧 얼룩이다
+  //   자국   장 0 발자국 · 장 1 잔돌과 금 · 장 2 지푸라기와 풀포기
+  // 밟힌 흙은 평평하다. 평평해야 그 위의 것이 산다.
+  const YSHIFT = [0.06, 0, -0.06][v % 3];   // 밝기가 아니라 **섞임새**를 흔든다
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const t = h(x >> 2, y >> 2, 60) * 0.38 + h(x >> 1, y >> 1, 61) * 0.47
-      + h(x, y, 62) * 0.15;
-    const i = (t < 0.22 ? 3 : (t < 0.50 ? 2 : (t < 0.84 ? 1 : 0))) + YSHIFT;
-    g.px(x, y, EARTH[clamp(i, 0, EARTH.length - 1)]);
+    const t = h(x >> 2, y >> 2, 60 + v * 5) * 0.44 + h(x >> 1, y >> 1, 61 + v * 5) * 0.42
+      + h(x, y, 62 + v * 5) * 0.14;
+    const i = t < 0.34 + YSHIFT ? 3 : (t < 0.74 + YSHIFT ? 2 : 1);
+    g.px(x, y, EARTH[i]);
   }
-  // ② 반들반들 다져진 자리 — 사람이 늘 밟고 다니는 목. 넓게 한두 군데.
-  //    이게 있어야 흙이 「깔린 것」이 아니라 「닳은 것」으로 보인다
-  for (let i = 0; i < 2; i++) {
-    const cx = h(i + s, 11, 70) * N, cy = h(11, i + s, 71) * N;
-    const rx = 3 + h(i, s, 72) * 3, ry = 2 + h(s, i, 73) * 2;
+  // 반들반들 다져진 자리 — 사람이 늘 밟고 다니는 목. **한 군데만**,
+  // 그것도 한 단만 밝게. 이게 있어야 흙이 깔린 게 아니라 닳은 것이 된다
+  {
+    const cx = h(s, 11, 70) * N, cy = h(11, s, 71) * N;
+    const rx = 4 + h(0, s, 72) * 3, ry = 3 + h(s, 0, 73) * 2;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
       const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
       if (d > 1) continue;
-      if (d > 0.45 && h(x, y, 74) < 0.55) continue;     // 가장자리는 흩어 놓는다
-      // 한복판만 훤하다. 덩어리 전부를 제일 밝은 단으로 깔았더니 마당에
-      // 흰 얼룩이 규칙적으로 떠서 타일 자리가 그대로 드러났다
-      g.px(x, y, EARTH[d > 0.35 ? 1 : 0]);
+      if (d > 0.5 && h(x, y, 74) < 0.6) continue;        // 가장자리는 흩어 놓는다
+      g.px(x, y, EARTH[1]);
     }
   }
-  // ③ 발자국 — 뒤꿈치가 깊고 앞이 얕다. 파인 자리는 어둡고 **파낸 흙이
-  //    앞쪽에 밀려** 한 단 밝게 도드라진다. 그냥 어두운 선 하나로는
-  //    자국이 아니라 긁힌 자국이었다
-  //    …그리고 **둘로 줄인다.** 잔디의 교훈과 같다 — 장마다 넷씩 찍으면
-  //    마당 전체가 쉴 새 없는 무늬가 된다
-  for (let i = 0; i < 2; i++) {
-    const ox = Math.floor(h(i + s, 3, 63) * N), oy = Math.floor(h(3, i + s, 64) * N);
-    const len = 2 + Math.floor(h(i + s, i, 65) * 3);
-    // 뒤꿈치를 제일 어두운 단(EARTH[5])으로 찍었더니 마당 전체에 검은
-    // 점이 흩뿌려져 자국이 아니라 때가 됐다. 한 단 올린다
-    g.px(ox, oy, EARTH[4]);                              // 뒤꿈치
-    for (let k = 1; k <= len; k++) g.px(ox + k, oy, EARTH[4 - (k === len ? 1 : 0)]);
-    g.px(ox, oy - 1, EARTH[1]); g.px(ox + 1, oy - 1, EARTH[0]);   // 밀린 흙
-  }
-  // ④ 마른 흙이 갈라진 금 — 짧게 꺾이며 끊긴다. 곧게 그으면 흠집이 된다
-  for (let i = 0; i < 2; i++) {
-    let cx = Math.floor(h(i + s + 5, 13, 75) * N), cy = Math.floor(h(13, i + s + 5, 76) * N);
+  if (v === 0) {
+    // 발자국 — 뒤꿈치가 깊고 앞이 얕다. 파낸 흙이 앞쪽에 밀려 도드라진다
+    for (let i = 0; i < 2; i++) {
+      const ox = Math.floor(h(i + s, 3, 63) * N), oy = Math.floor(h(3, i + s, 64) * N);
+      const len = 2 + Math.floor(h(i + s, i, 65) * 3);
+      g.px(ox, oy, EARTH[4]);
+      for (let k = 1; k <= len; k++) g.px(ox + k, oy, EARTH[4 - (k === len ? 1 : 0)]);
+      g.px(ox, oy - 1, EARTH[1]); g.px(ox + 1, oy - 1, EARTH[0]);   // 밀린 흙
+    }
+  } else if (v === 1) {
+    // 흙에 박힌 잔돌 — 윗변은 빛, 아랫변은 턱, 둘레는 눌린 흙
+    for (let i = 0; i < 2; i++) {
+      const ox = Math.floor(h(i + 9 + s, 5, 66) * N), oy = Math.floor(h(5, i + 9 + s, 67) * N);
+      const st = k2 => mixc(STONE[k2], EARTH[2], 0.35);  // 흙에 묻힌 돌빛
+      g.px(ox, oy, st(2)); g.px(ox + 1, oy, st(3));
+      g.px(ox, oy + 1, st(5));
+      g.px(ox - 1, oy + 1, EARTH[4]);                    // 돌 밑에 진 그늘
+    }
+    // 마른 흙이 갈라진 금 — 짧게 꺾이며 끊긴다. 하나만
+    let cx = Math.floor(h(s + 5, 13, 75) * N), cy = Math.floor(h(13, s + 5, 76) * N);
     for (let k = 0; k < 5; k++) {
-      if (h(cx, cy, 77) < 0.25) break;                   // 금은 끊긴다
+      if (h(cx, cy, 77) < 0.3) break;
       g.px(cx, cy, EARTH[4]);
       if (h(cx, cy, 78) < 0.45) cy += h(cx, cy, 79) < 0.5 ? 1 : -1;
       cx += 1;
     }
+  } else {
+    // 지푸라기 — 두 오라기. 헛간 앞이든 가게 앞이든 마당에는 늘 있다
+    for (let i = 0; i < 2; i++) {
+      const ox = Math.floor(h(i + 40 + s, 9, 81) * N), oy = Math.floor(h(9, i + 40 + s, 82) * N);
+      const dy = h(i, s, 83) < 0.5 ? 0 : 1;
+      const dust = c => mixc(c, EARTH[2], 0.4);         // 마당의 지푸라기는 먼지를 쓴다
+      g.px(ox, oy, dust(STRAW[1])); g.px(ox + 1, oy, dust(STRAW[0]));
+      g.px(ox + 2, oy + dy, dust(STRAW[1])); g.px(ox + 3, oy + dy, dust(STRAW[2]));
+    }
+    // 밟히고도 살아남은 풀 — **마당의 풀은 들판의 풀이 아니다.**
+    // 잔디 색 그대로 심었더니 세 칸에 하나씩 선명한 초록이 박혀
+    // 흙마당이 얼룩무늬가 됐다. 밟히고 마른 풀은 흙빛으로 물든다
+    // (바탕 45% 섞기), 포기가 아니라 잎 두어 장으로
+    const dry = c => mixc(c, EARTH[2], 0.45);
+    const gx = Math.floor(h(30 + s, 7, 68) * N), gy = Math.floor(h(7, 30 + s, 69) * N);
+    g.px(gx, gy, dry(p.dark));
+    g.px(gx - 1, gy - 1, dry(p.hi)); g.px(gx + 1, gy - 1, dry(p.hi));
+    g.px(gx, gy - 2, dry(p.hi));
   }
-  // ⑤ 흙에 박힌 잔돌 — 윗변은 빛, 아랫변은 턱, 둘레는 눌린 흙.
-  //    이 세 부분이 있어야 「얹어 놓은 점」이 아니라 「박힌 돌」이 된다
-  //    돌도 **둘만** — 넷이면 세 장이 돌아가며 깔릴 때 자갈밭이 된다
-  for (let i = 0; i < 2; i++) {
-    const ox = Math.floor(h(i + 9 + s, 5, 66) * N), oy = Math.floor(h(5, i + 9 + s, 67) * N);
-    g.px(ox, oy, STONE[2]); g.px(ox + 1, oy, STONE[3]);
-    g.px(ox, oy + 1, STONE[5]);
-    if (h(i, s, 80) < 0.5) g.px(ox + 1, oy + 1, STONE[4]);
-    g.px(ox - 1, oy + 1, EARTH[4]);                      // 돌 밑에 진 그늘
-  }
-  // ⑥ 지푸라기 — 두어 오라기. 헛간 앞이든 가게 앞이든 마당에는 늘 있다
-  for (let i = 0; i < 3; i++) {
-    const ox = Math.floor(h(i + 40 + s, 9, 81) * N), oy = Math.floor(h(9, i + 40 + s, 82) * N);
-    const dy = h(i, s, 83) < 0.5 ? 0 : 1;
-    g.px(ox, oy, STRAW[1]); g.px(ox + 1, oy, STRAW[0]);
-    g.px(ox + 2, oy + dy, STRAW[1]); g.px(ox + 3, oy + dy, STRAW[2]);
-  }
-  // ⑦ 밟히고도 살아남은 풀 두 포기 — 이게 있어야 흙바닥이 아니라 마당이다
-  for (let i = 0; i < 2; i++)
-    tuft(g, Math.floor(h(i + 30 + s, 7, 68) * N), Math.floor(h(7, i + 30 + s, 69) * N), p, false);
   return g;
 }
 
@@ -1015,12 +1019,27 @@ function beachPx(g, x, y, s, nax, nay, i, seed, fill) {
 // 파고들지, 자로 자른 듯 끊기지 않는다. 물가와 같은 자를 쓰되 층은
 // 둘뿐이다 — 젖은 둑도 돌벽도 없으니까.
 function spill(P, key) {
+  // 흙(모래)이 풀밭으로 **흘러드는** 자리.
+  //
+  // 예전엔 물가 두 칸을 제일 밝은 단으로 통째로 채웠다 — 마당 둘레마다
+  // 밝은 테가 둘려서, 흙과 풀이 섞이는 게 아니라 **종이를 오려 붙인**
+  // 꼴이 됐다. 경계는 선이 아니라 띠다:
+  //   속(s<1)    마당 몸통과 같은 톤으로 꽉 (테가 안 생긴다)
+  //   테(1~2)    네 칸에 하나쯤 구멍 — 가장자리가 닳아 해진다
+  //   바깥(2~8)  알갱이가 성기게, 멀어질수록 드물고 어둡게
   return function (g, x, y, s, nax, nay, i, seed) {
-    if (s < 2) { g.px(x, y, ramp(P, 1.0)); return; }          // 깎인 귀퉁이까지 통으로
+    if (s < 1) { g.px(x, y, P[2]); return; }
+    if (s < 2) {                                             // 해진 테
+      if (h(x, y, key + seed + 3) > 0.24) g.px(x, y, P[2]);
+      else if (h(x, y, key + seed + 7) > 0.5) g.px(x, y, P[3]);
+      return;
+    }
     const k = Math.floor(s);
-    // 안으로 갈수록 성기게 — 끝은 알갱이 몇 개만 풀 사이에 남는다
-    if (k < 7 && h(x, y, key + seed) > 0.08 + (k - 2) * 0.21)
-      g.px(x, y, P[k < 4 ? 1 : 2]);
+    if (k > 8) return;
+    // 멀수록 드물다 — 곡선으로 잦아들어야 띠의 끝이 안 보인다
+    const keep = 0.72 * Math.pow(1.0 - (k - 2) / 7.0, 1.6);
+    if (h(x, y, key + seed) > keep) return;
+    g.px(x, y, P[k < 4 ? 2 : 3]);                            // 멀리 갈수록 어둡다
   };
 }
 
@@ -1125,32 +1144,43 @@ function rockFace(g, x, y, drop, n, i, seed) {
   const k = Math.round(drop * Math.max(1, n - 1));
   // **벼랑은 사람이 쌓은 게 아니다.** 막돌(보로노이)로 갈아 봤더니 온
   // 마을이 축대에 둘러싸인 요새가 됐다 — 돌쌓기는 벽·화로처럼 사람 손이
-  // 닿은 곳의 말이고, 언덕은 **땅이 잘린 단면**이다. 흙 벼랑:
-  //   지층   가로로 눕는 띠. 층마다 낯빛이 조금 다르고 경계는 굽이친다
+  // 닿은 곳의 말이고, 언덕은 **땅이 잘린 단면**이다.
+  //
+  // 지층이 지층으로 읽히려면 **띠가 넓고 경계가 또렷해야** 한다.
+  // 층을 세 줄로 얇게 썰고 톤을 크게 흔들었더니, 가로 띠가 아니라
+  // 진흙 얼룩이 됐다 (경계·물길·층톤이 서로 섞여 다 뭉갰다). 다시:
+  //   띠     네 줄로 넓게. 층마다 낯빛은 **반 단**만 다르다
+  //   경계   위는 그늘 골 한 줄, 그 아래는 볕 받는 윗변 한 줄 — 두 줄이
+  //          한 짝이다. 이 짝이 있어야 흙이 켜켜이 쌓인 것으로 보인다
   //   바위   드문드문 박힌 돌덩이 — 흙에 묻힌 것이라 둘레가 눌린다
-  //   풀     마루에서 드리운 풀포기와 뿌리
-  const wob = Math.round((h(Math.floor(i / 7), 0, 52 + seed) - 0.5) * 3.0);
-  const layer = Math.floor((k + wob) / 3);
-  let t = 1.3 + drop * 2.4;
-  t += (h(layer, 0, 53 + seed) - 0.5) * 1.1;              // 층마다 낯빛
-  // 지층 경계 — 경계 줄은 그늘 골, 바로 아래는 볕 받는 윗변
-  if ((k + wob) % 3 === 0 && h(i, layer, 54 + seed) < 0.75) t += 1.0;
-  else if ((k + wob) % 3 === 1) t -= 0.4;
-  // 세로 물길 — 빗물이 흘러내린 자국. 드물게, 위에서 아래로
-  if (h(i, 0, 56 + seed) < 0.10 && k >= 2) t += 0.8;
-  if (k === 0) t = 5.4;                                   // 마루에서 드리우는 그늘
-  else if (k <= 2) t -= 0.8;                              // 볕이 닿는 윗머리
+  //   풀     마루에서 드리운 풀포기
+  const wob = Math.round((h(Math.floor(i / 6), 0, 52 + seed) - 0.5) * 2.4);
+  const kk = k + wob;
+  const layer = Math.floor(kk / 4);
+  let t = 1.6 + drop * 2.0;
+  t += (h(layer, 0, 53 + seed) - 0.5) * 0.55;             // 층마다 반 단
+  const inLayer = ((kk % 4) + 4) % 4;
+  if (inLayer === 0) t += 0.9;                            // 경계 그늘 골
+  else if (inLayer === 1) t -= 0.7;                       // 바로 아래는 볕 받는 윗변
+  if (k === 0) t = 5.2;                                   // 마루에서 드리우는 그늘
+  else if (k === 1) t = 1.0;                              // 벼랑 머리는 훤하다
   g.px(x, y, EARTH[clamp(Math.round(t), 0, EARTH.length - 1)]);
-  // 박힌 바위 — 대여섯 칸에 하나. 2x2 덩이로, 윗변이 밝다
+  // 박힌 바위 — 대여섯 칸에 하나. 2x2 덩이로, 윗변이 밝다.
+  // 흙에 묻힌 돌이라 흙빛을 섞는다 — 순 회색 돌은 벼랑에서 튄다
   const bi = Math.floor(i / 5), bk = Math.floor(k / 4);
-  if (h(bi, bk, 57 + seed) < 0.16 && k > 1) {
+  if (h(bi, bk, 57 + seed) < 0.15 && k > 1) {
     const ri = ((i % 5) + 5) % 5, rk = ((k % 4) + 4) % 4;
     if (ri >= 1 && ri <= 2 && rk >= 1 && rk <= 2) {
-      g.px(x, y, STONE[rk === 1 ? 3 : 5]);
-      if (ri === 1 && rk === 1) g.px(x, y, STONE[2]);
+      const emb = c => mixc(c, EARTH[3], 0.3);
+      g.px(x, y, emb(STONE[rk === 1 ? 3 : 5]));
+      if (ri === 1 && rk === 1) g.px(x, y, emb(STONE[2]));
     }
   }
-  // 마루에서 늘어진 풀 — 낱알로 뿌리면 자글거리니 **포기로** 앉힌다.
+  // 벼랑 밑에 무너져 쌓인 흙 — **잘린 면은 밑동이 흩어진다.** 칼로 자른
+  // 듯 끝나면 벽이지 벼랑이 아니다. 맨 아랫줄 한둘을 무너뜨린다
+  if (k >= n - 2 && h(Math.floor(i / 2), k, 64 + seed) < 0.5)
+    g.px(x, y, EARTH[k === n - 1 ? 2 : 3]);
+  // 마루에서 늘어진 풀 — 낱알로 뿌리면 자글자글하니 **포기로** 앉힌다.
   // 이게 있어야 벼랑이 땅에서 잘린 것으로 보인다
   if (k >= 1 && k <= 5 && h(Math.floor(i / 2), 0, 55 + seed) < 0.30
     && h(i, k, 63 + seed) < 0.68 - k * 0.09) g.px(x, y, MOSS[k < 3 ? 1 : 2]);
