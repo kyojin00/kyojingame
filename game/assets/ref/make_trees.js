@@ -59,6 +59,8 @@ const BARK = [[156, 126, 90], [128, 100, 68], [104, 78, 52], [82, 60, 40],
               [60, 43, 29], [42, 30, 21]];
 const OUT = [26, 22, 26];        // 윤곽선 — 살림·건물과 같은 차가운 먹색
 const FRUIT = [[226, 66, 52], [176, 38, 34], [248, 148, 120]];
+// 이끼 — 잎보다 누렇고 탁하다. 잎색을 그대로 쓰면 줄기에 잎이 붙은 꼴이다
+const MOSS = [[132, 156, 78], [104, 128, 60], [76, 96, 46]];
 const SHADOW = [30, 26, 34, 78];
 
 class T {
@@ -162,12 +164,40 @@ function trunk(g, cx, yTop, yBase, wTop, wBase, seed, lean) {
       if (groove && u > 0.2 && u < 0.86) i += (h(Math.round(x - bend), y >> 2, seed + 1) < 0.75 ? 2 : 1);
       g.px(x, y, BARK[clamp(i, 0, 5)]);
     }
+    // **껍질은 세로 골만으로는 부족하다.** 골만 그으면 나무가 아니라
+    // 골함석 기둥이다. 참나무든 느티나무든 껍질은 세로 골이 가로 금에
+    // 끊겨 **비늘판**을 이룬다 — 그 판 하나하나가 나무의 나이다.
+    // 가로 금은 대여섯 줄마다 한 줄, 그것도 통으로가 아니라 끊어서.
+    if (y % 6 === (Math.abs(yTop) % 6)) {
+      for (let x = x0 + 1; x < x1; x++) {
+        if (h(x, y, seed + 4) > 0.42) continue;
+        const u = (x - x0) / Math.max(1, x1 - x0);
+        if (u < 0.12 || u > 0.9) continue;
+        g.px(x, y, BARK[4]);
+        if (h(x, y, seed + 5) < 0.4) g.px(x, y - 1, BARK[1]);   // 금 위는 빛
+      }
+    }
     // 옹이 하나 — 줄기 가운데쯤에
     if (y === yTop + Math.round((yBase - yTop) * 0.62)) {
       const kx = Math.round(cx + bend + w * 0.12);
       g.disc(kx, y, 2.2, 1.6, BARK[4]);
       g.disc(kx, y, 1.1, 0.8, BARK[5]);
       g.px(kx - 1, y - 1, BARK[2]);
+    }
+  }
+  // 이끼 — 해가 안 드는 **북쪽(그림에서는 오른쪽 아래)**에 낀다.
+  // 나무를 「거기 오래 서 있던 것」으로 만드는 건 이 한 줌이다
+  for (let y = yTop + Math.round((yBase - yTop) * 0.45); y <= yBase - 2; y++) {
+    const t = (y - yTop) / Math.max(1, yBase - yTop);
+    const w = wTop + (wBase - wTop) * Math.pow(t, 2.6)
+      + (yBase - y < 6 ? (6 - (yBase - y)) * 0.9 : 0);
+    const bend = Math.sin(t * 2.0) * ln;
+    const x1 = Math.round(cx + bend + w / 2);
+    for (let k = 0; k < 3; k++) {
+      const x = x1 - k;
+      if (h(x, y >> 1, seed + 6) > 0.34 - k * 0.09) continue;
+      g.px(x, y, k === 0 ? MOSS[1] : MOSS[2]);
+      if (h(x, y, seed + 7) < 0.3) g.px(x, y - 1, MOSS[0]);
     }
   }
   // 뿌리 — 땅으로 뻗어 나간 세 갈래. 나무를 땅에 **박아** 준다
@@ -178,6 +208,42 @@ function trunk(g, cx, yTop, yBase, wTop, wBase, seed, lean) {
       g.px(x, y, BARK[3]);
       g.px(x, y + 1, BARK[5]);
       if (k < rw - 2) g.px(x, y - 1, BARK[2]);
+    }
+  }
+}
+
+
+// ---- 밑동에 쌓인 것 ----
+//
+// 나무 밑동이 잔디에 그냥 꽂혀 있으면 「심어 놓은 모형」이다. 오래 선
+// 나무 밑에는 늘 **떨군 잎과 잔가지**가 쌓이고, 그 둘레에만 풀이 웃자란다.
+// 접지 그늘이 「닿아 있다」를 말한다면 이건 「오래 있었다」를 말한다.
+function litter(g, cx, base, seed) {
+  for (let i = 0; i < 14; i++) {                       // 떨군 잎
+    const a = Math.PI * 2 * h(i, 1, seed + 81);
+    const r = 6 + h(1, i, seed + 82) * 12;
+    const x = Math.round(cx + Math.cos(a) * r);
+    const y = Math.round(base - 1 + Math.sin(a) * r * 0.26);
+    const c = [LEAF[5], LEAF_SHADE[5], [126, 104, 58]][i % 3];
+    g.px(x, y, c);
+    if (h(i, 2, seed + 83) < 0.5) g.px(x + 1, y, c);
+  }
+  for (let i = 0; i < 4; i++) {                        // 잔가지 — 두 칸 두께
+    const x = Math.round(cx + (h(i, 3, seed + 84) - 0.5) * 30);
+    const y = base + (h(3, i, seed + 85) < 0.5 ? 0 : 1);
+    const len = 3 + Math.floor(h(i, 4, seed + 86) * 3);
+    for (let k = 0; k < len; k++) {
+      g.px(x + k, y, BARK[2]);
+      g.px(x + k, y + 1, BARK[4]);
+    }
+  }
+  for (let i = 0; i < 7; i++) {                        // 밑동에 웃자란 풀
+    const x = Math.round(cx + (h(i, 5, seed + 87) - 0.5) * 24);
+    const hgt = 2 + Math.floor(h(i, 6, seed + 88) * 3);
+    for (let k = 0; k < hgt; k++)
+      g.px(x, base - 1 - k, k === hgt - 1 ? LEAF[1] : LEAF[3]);
+    if (h(i, 7, seed + 89) < 0.5) {
+      g.px(x + 1, base - 2, LEAF[2]); g.px(x - 1, base - 2, LEAF[4]);
     }
   }
 }
@@ -246,6 +312,70 @@ function canopy(g, blobs, seed, opts) {
     // 온도 — 왼위(볕)는 노랗게, 오른아래(그늘)는 푸르게. 가운데는 기본
     const lad = glob < -0.42 ? LEAF_SUN : (glob > 0.46 ? LEAF_SHADE : LEAF);
     g.px(x, y, lad[clamp(i, 0, 7)]);
+  }
+  // ①-b **잎 뭉치 안에도 잎 뭉치가 있다.**
+  //
+  // 큰 뭉치 예닐곱으로 부피는 났는데, 뭉치 하나하나가 여전히 매끈한 면이라
+  // 가까이 보면 초록 언덕이었다. 실제 나무의 잎은 **두 겹으로 뭉친다** —
+  // 큰 가지마다 덩어리가 앉고, 그 덩어리 안에 잔가지마다 손바닥만 한
+  // 잎 뭉치가 다시 앉는다.
+  //
+  // 잔 뭉치는 다섯 칸쯤이다. 격자를 흔들어 보로노이로 나누고, 뭉치마다
+  // 왼위를 한 단 밝게 오른아래를 한 단 어둡게, 경계는 한 단 더 어둡게.
+  // **난수가 아니라 덩어리**라야 잡음이 아니라 결이 된다.
+  {
+    const C = 5;
+    const cell = (ci, cj) => [
+      ci * C + h(ci, cj, seed + 61) * (C - 1),
+      cj * C + h(cj, ci, seed + 63) * (C - 1)];
+    const snap = new Map();
+    const at = (ci, cj) => {
+      const k = ci * 8191 + cj;
+      if (!snap.has(k)) snap.set(k, cell(ci, cj));
+      return snap.get(k);
+    };
+    const buf = [];
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+      const c0 = g.get(x, y);
+      if (!isLeafRaw(c0)) continue;
+      const ci = Math.floor(x / C), cj = Math.floor(y / C);
+      let bd = 9e9, sd = 9e9, bx2 = 0, by2 = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const [px2, py2] = at(ci + di, cj + dj);
+        const d = (x - px2) ** 2 + (y - py2) ** 2;
+        if (d < bd) { sd = bd; bd = d; bx2 = px2; by2 = py2; }
+        else if (d < sd) sd = d;
+      }
+      let sh = 0;
+      const t2 = ((x - bx2) * 0.55 + (y - by2) * 0.85) / C;
+      sh += Math.round(t2 * 1.9);
+      // 잔 뭉치의 경계 — 두 거리가 비슷하면 잎과 잎 사이의 골
+      if (Math.sqrt(sd) - Math.sqrt(bd) < 0.9) sh += 1;
+      if (sh === 0) continue;
+      buf.push([x, y, c0, sh]);
+    }
+    for (const [x, y, c0, sh] of buf) {
+      const lad = LEAF_SUN.indexOf(c0) >= 0 ? LEAF_SUN
+        : (LEAF_SHADE.indexOf(c0) >= 0 ? LEAF_SHADE : LEAF);
+      const idx = Math.max(LEAF.indexOf(c0), LEAF_SUN.indexOf(c0), LEAF_SHADE.indexOf(c0));
+      g.px(x, y, lad[clamp(idx + sh, 0, 7)]);
+    }
+  }
+  // ①-c **볕이 든 자리 — 잎 몇 뭉치는 통째로 반짝인다.**
+  // 명암이 고르게 흐르기만 하면 그림자 그린 공이다. 나무가 살아 보이는 건
+  // 잎 사이로 새어 든 볕이 **몇 군데만** 환하게 얹히기 때문이다
+  for (let k = 0; k < 12; k++) {
+    const ang = Math.PI * (1.02 + h(k, 6, seed + 65) * 0.76);
+    const rr = 0.34 + h(k, 7, seed + 67) * 0.52;
+    const sx = Math.round(o.cx + Math.cos(ang) * o.rw * rr);
+    const sy = Math.round(o.cy + Math.sin(ang) * o.rh * rr);
+    for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++) {
+      const c0 = g.get(sx + dx, sy + dy);
+      if (!isLeafRaw(c0)) continue;
+      const idx = Math.max(LEAF.indexOf(c0), LEAF_SUN.indexOf(c0), LEAF_SHADE.indexOf(c0));
+      g.px(sx + dx, sy + dy, LEAF_SUN[clamp(idx - 2, 0, 7)]);
+    }
+    g.px(sx + 1, sy - 1, LEAF_SUN[0]);
   }
   // ② 하늘 구멍 — 잎 사이로 하늘이 비친다. 없으면 초록 반죽이다
   for (let k = 0; k < holes; k++) {
@@ -345,6 +475,49 @@ function canopy(g, blobs, seed, opts) {
 }
 
 
+// ---- 실루엣 밖으로 뻗은 잎 가지 ----
+//
+// 윤곽을 아무리 울퉁불퉁하게 해도 그건 「덩어리의 가장자리」다. 나무의
+// 윤곽이 살아 있는 건 잔가지 끝의 잎이 **한 뭉치씩** 삐져나오기 때문이다.
+//
+// 다만 **윤곽선을 두른 뒤에** 얹어야 한다. 먼저 얹었더니 한 칸짜리 잎마다
+// 검은 테가 통째로 둘려서, 나무가 아니라 **가시 돋친 밤송이**가 됐다.
+// 그리고 한 칸이 아니라 두세 칸 뭉치라야 잎으로 보인다.
+function sprigs(g, o, seed) {
+  for (let k = 0; k < 20; k++) {
+    const ang = Math.PI * 2 * h(k, 11, seed + 71);
+    let sx = o.cx + Math.cos(ang) * o.rw * 0.99;
+    let sy = o.cy + Math.sin(ang) * o.rh * 0.99;
+    let tries = 0;
+    while (!isLeafRaw(g.get(Math.round(sx), Math.round(sy))) && tries < 10) {
+      sx -= Math.cos(ang) * 1.2; sy -= Math.sin(ang) * 1.2; tries++;
+    }
+    if (tries >= 10) continue;
+    const dark = Math.sin(ang) > 0.15;
+    const lad = dark ? LEAF_SHADE : LEAF_SUN;
+    const px2 = Math.round(sx + Math.cos(ang) * 2.2);
+    const py2 = Math.round(sy + Math.sin(ang) * 2.2);
+    // 두 칸짜리 잎 뭉치 — 가운데가 밝고 아랫변이 그늘이다
+    for (let dy = 0; dy <= 1; dy++) for (let dx = 0; dx <= 1; dx++) {
+      const x = px2 + dx, y = py2 + dy;
+      if (x < 1 || y < 1 || x >= g.w - 1 || y >= g.h - 1) continue;
+      g.px(x, y, lad[dy ? 5 : 3]);
+    }
+    if (h(k, 13, seed + 77) < 0.55) {
+      const x2 = px2 + Math.round(-Math.sin(ang) * 2);
+      const y2 = py2 + Math.round(Math.cos(ang) * 2);
+      g.px(x2, y2, lad[4]); g.px(x2 + 1, y2, lad[3]);
+    }
+    // 잎을 매단 잔가지 — 잎 뭉치와 몸통을 잇는다
+    for (let t = 1; t < 3; t++) {
+      const x = Math.round(sx + Math.cos(ang) * t);
+      const y = Math.round(sy + Math.sin(ang) * t);
+      g.px(x, y, BARK[3]);
+    }
+  }
+}
+
+
 // ---- 가지 ----
 // 잎 뭉치 사이로 굵은 가지 끝이 한두 개 보여야 「잎이 가지에 달렸다」가 된다
 function branch(g, x0, y0, dx, dy, len, thick) {
@@ -389,19 +562,25 @@ function fullTree(v) {
     [cx, SPEC.top + 8, W * 0.4, 9],
   ];
   if (v === 2) B.push([cx - W * 0.72, SPEC.top + 34, W * 0.3, 8]);
-  canopy(g, B, seed, { holes: 3, limbs: [
+  const opt = { holes: 3, limbs: [
     [cx - 2, SPEC.top + 40, -0.9, -0.75, 12],
     [cx + 3, SPEC.top + 42, 0.85, -0.8, 11],
     [cx, SPEC.top + 38, 0.15, -1, 10],
-  ] });
-  return outline(g);
+  ] };
+  canopy(g, B, seed, opt);
+  outline(g);
+  // **윤곽선 뒤에** 얹는 것들 — 한 칸짜리 잎과 잔가지는 테를 두르면
+  // 잎이 아니라 검은 가시가 된다
+  sprigs(g, opt, seed);
+  litter(g, cx, 78, seed);
+  return g;
 }
 
 
 // ---- 열매 나무 ----
 // 다 자란 나무에 사과 셋. 잎 그늘 속이 아니라 **가장자리**에 달려야 보인다
 function appleTree() {
-  const g = fullTreeRaw(0, 220);
+  const g = fullTreeRaw(0, 220);   // 이미 윤곽선과 잔가지까지 마친 나무
   const spots = [[24, 34], [55, 30], [40, 47]];
   for (const [ax, ay] of spots) {
     g.disc(ax, ay, 3.0, 2.8, FRUIT[1]);
@@ -409,9 +588,18 @@ function appleTree() {
     g.disc(ax - 1, ay - 1, 1.0, 0.9, FRUIT[2]);
     g.px(ax, ay - 3, BARK[3]);                 // 꼭지
     g.px(ax + 1, ay - 3, LEAF[2]);
+    // 사과에는 제 테를 두른다 — 잎 속에 묻히면 붉은 얼룩이 된다
+    for (let a2 = 0; a2 < 22; a2++) {
+      const t = a2 / 22 * Math.PI * 2;
+      const x = Math.round(ax + Math.cos(t) * 3.4), y = Math.round(ay + Math.sin(t) * 3.2);
+      if (!g.get(x, y) || FRUIT.indexOf(g.get(x, y)) < 0) g.px(x, y, OUT);
+    }
   }
-  return outline(g);
+  return g;
 }
+const ARaw = { holes: 2, limbs: [
+  [39, 46, -0.9, -0.75, 11], [44, 48, 0.85, -0.8, 10],
+] };
 function fullTreeRaw(v, seedBase) {
   const g = new T();
   const seed = seedBase;
@@ -425,9 +613,10 @@ function fullTreeRaw(v, seedBase) {
     [cx, 21, W * 0.62, 14], [cx - W * 0.52, 28, W * 0.48, 12],
     [cx + W * 0.52, 27, W * 0.5, 12.5], [cx - W * 0.26, 37, W * 0.46, 11],
     [cx + W * 0.3, 38, W * 0.44, 10.5], [cx, 14, W * 0.4, 9],
-  ], seed, { holes: 2, limbs: [
-    [cx - 2, 46, -0.9, -0.75, 11], [cx + 3, 48, 0.85, -0.8, 10],
-  ] });
+  ], seed, ARaw);
+  outline(g);
+  sprigs(g, ARaw, seedBase);
+  litter(g, cx, 78, seedBase);
   return g;
 }
 
@@ -442,11 +631,15 @@ function youngTree() {
   ground(g, cx + 1, 78, 9, 2.4, seed);
   trunk(g, cx, 46, 78, 4, 7, seed, 2.4);
   branch(g, cx - 2, 52, -1, -0.9, 5, 1);
+  const yo = { holes: 1 };
   canopy(g, [
     [cx, 40, 13, 9], [cx - 9, 47, 10, 8], [cx + 10, 46, 10, 8],
     [cx, 32, 9, 7],
-  ], seed, { holes: 1 });
-  return outline(g);
+  ], seed, yo);
+  outline(g);
+  sprigs(g, yo, seed);
+  litter(g, cx, 78, seed);
+  return g;
 }
 
 
@@ -462,9 +655,11 @@ function choppedTree(stage) {
     branch(g, cx - 3, 48, -1, -0.7, 11, 2);
     branch(g, cx + 3, 51, 1, -0.8, 10, 2);
     branch(g, cx, 44, 0.2, -1, 8, 2);
+    const co = { holes: 2 };
     canopy(g, [
       [cx - 12, 30, 14, 11], [cx + 13, 27, 13, 10], [cx - 2, 20, 11, 9],
-    ], seed, { holes: 2 });
+    ], seed, co);
+    g._co = co;
     // 떨어지는 잎 몇 장
     for (let i = 0; i < 7; i++) {
       const x = 12 + Math.round(h(i, 1, seed) * 58);
@@ -495,7 +690,10 @@ function choppedTree(stage) {
     g.disc(cx + 12, 71, 2.4, 2.0, LEAF[3]);
     g.disc(cx + 11, 70, 1.4, 1.2, LEAF[1]);
   }
-  return outline(g);
+  outline(g);
+  if (g._co) sprigs(g, g._co, seed);
+  litter(g, cx, 78, seed);
+  return g;
 }
 
 
