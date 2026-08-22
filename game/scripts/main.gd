@@ -4078,8 +4078,34 @@ func _draw_open_sea(vx0: int, vx1: int, vy1: int) -> void:
 		var f0: float = clampf((d0 - SEA_HAZE_FROM) / SEA_HAZE_FULL, 0.0, 1.0)
 		draw_rect(Rect2(x0, float(ty) * ts, ww, ts),
 			Color(SEA_AIR.r, SEA_AIR.g, SEA_AIR.b, sqrt(f0) * 0.66))
-	# ② 흰 물결 — 멀수록 잘고 성기다. 가로로 눕는 짧은 획이라야 물결이고
-	#    점으로 뿌리면 그건 비 오는 화면이다
+	# ② **너울** — 바다가 잔물결뿐이면 그건 물웅덩이지 바다가 아니다.
+	#    바다에는 크게 굽이치는 이랑이 있고, 그 이랑이 멀어질수록 촘촘해진다
+	#    (그 간격이 곧 거리다 — 기와 켜와 같은 규칙).
+	#    이랑 하나는 두 줄이다: 마루의 밝은 등과 골의 그늘.
+	# (GDScript 에는 맨 중괄호 블록이 없다 — 그건 사전 리터럴로 읽힌다)
+	var sw_y: float = float(SEA_Y0) * ts + ts * 1.2
+	var sw_gap: float = ts * 1.35
+	var sw_k := 0
+	while sw_y < float(vy1) * ts:
+		var dd: float = sw_y / ts - float(SEA_Y0)
+		var fa: float = clampf(1.0 - dd / 30.0, 0.12, 1.0)
+		var seg := 12.0
+		var sx: float = floor(x0 / seg) * seg
+		while sx < x0 + ww:
+			# 이랑은 곧지 않다 — 길게 굽이친다 (사인 둘을 겹쳐 되풀이를 감춘다)
+			var wob: float = sin(sx / (ts * 7.0) + float(sw_k) * 1.7) * 3.2 \
+				+ sin(sx / (ts * 2.3) + float(sw_k) * 0.6) * 1.6
+			draw_rect(Rect2(sx, sw_y + wob, seg, 2.0),
+				Color(1, 1, 1, 0.10 * fa))
+			draw_rect(Rect2(sx, sw_y + wob + 2.0, seg, 3.0),
+				Color(0.06, 0.12, 0.22, 0.16 * fa))
+			sx += seg
+		sw_gap *= 0.93                      # 멀수록 촘촘해진다
+		sw_y += maxf(sw_gap, 7.0)
+		sw_k += 1
+	# ③ 흰 물결 — 멀수록 잘고 성기다. 가로로 눕는 짧은 획이라야 물결이고
+	#    점으로 뿌리면 그건 비 오는 화면이다. 한 획은 **두 줄**이다 —
+	#    부서지는 흰 마루와 그 밑의 그늘. 흰 줄만 그으면 종잇조각이 뜬다
 	for ty in range(maxi(SEA_Y0, 0), vy1):
 		var d: float = float(ty - SEA_Y0)
 		if d < 1.0:
@@ -4091,13 +4117,36 @@ func _draw_open_sea(vx0: int, vx1: int, vy1: int) -> void:
 				continue
 			var w: float = (6.0 - minf(d * 0.12, 3.5)) * 2.0
 			var ox: float = _hash01(tx * 7 + 1, ty * 3 + 6) * (ts - w)
-			var oy: float = _hash01(tx * 5 + 4, ty * 11 + 2) * (ts - 4.0)
+			var oy: float = _hash01(tx * 5 + 4, ty * 11 + 2) * (ts - 6.0)
 			draw_rect(Rect2(tx * ts + ox, ty * ts + oy, w, 2.0),
-				Color(1, 1, 1, a * 0.55))
-			if _hash01(tx * 3 + 8, ty * 7 + 1) < 0.4:
-				draw_rect(Rect2(tx * ts + ox + w * 0.4, ty * ts + oy + 2.0,
-					w * 0.6, 2.0), Color(1, 1, 1, a * 0.3))
-	# ③ 먼 섬 셋 — 안개에 반쯤 잠긴 실루엣. 바다가 어딘가로 이어진다는 표시.
+				Color(1, 1, 1, a * 0.62))
+			draw_rect(Rect2(tx * ts + ox + 2.0, ty * ts + oy + 2.0, w - 2.0, 2.0),
+				Color(0.06, 0.12, 0.22, a * 0.24))
+			# 부서진 자락 — 마루 앞으로 흩어지는 거품 두어 점
+			if _hash01(tx * 3 + 8, ty * 7 + 1) < 0.45:
+				draw_rect(Rect2(tx * ts + ox + w * 0.5, ty * ts + oy - 2.0,
+					w * 0.4, 2.0), Color(1, 1, 1, a * 0.34))
+	# ④ **윤슬** — 해가 물에 부서지는 길. 바다를 바다로 만드는 마지막 한 겹이다.
+	#    낮에만, 그것도 한 줄기만 — 온 바다가 반짝이면 그건 유리다
+	var hr: float = GameData.hour_now()
+	if hr > 7.0 and hr < 18.0:
+		var gx: float = float(MAP_W) * 0.5 * ts        # 해는 남중한다 (세계 한가운데)
+		for ty2 in range(maxi(SEA_Y0, 0), vy1):
+			var d2: float = float(ty2 - SEA_Y0)
+			if d2 < 1.0:
+				continue
+			var spread: float = ts * (1.6 + d2 * 0.42)  # 멀수록 넓게 퍼진다
+			var ga: float = clampf(0.34 - d2 * 0.009, 0.05, 0.34)
+			for i in 4:
+				var jx: float = (_hash01(ty2 * 5 + i, 77) - 0.5) * spread * 2.0
+				if absf(jx) > spread:
+					continue
+				var gw: float = 4.0 + _hash01(i, ty2 * 3 + 2) * 8.0
+				draw_rect(Rect2(gx + jx, float(ty2) * ts
+					+ _hash01(i * 7, ty2) * (ts - 3.0), gw, 2.0),
+					Color(1.0, 0.98, 0.88,
+						ga * (1.0 - absf(jx) / spread) * 0.9))
+	# ⑤ 먼 섬 셋 — 안개에 반쯤 잠긴 실루엣. 바다가 어딘가로 이어진다는 표시.
 	#    **회색으로 흐리면 섬이 아니라 콘크리트 둔덕이다** (능선에서 배운 것과
 	#    같다). 섬은 숲이다 — 초록을 지키고, 물가에 모래 한 줄을 두르고,
 	#    등성이에 나무 혹을 얹는다
@@ -4131,9 +4180,32 @@ func _draw_open_sea(vx0: int, vx1: int, vy1: int) -> void:
 				draw_rect(Rect2(x, cy, step, sw), sand)
 				draw_rect(Rect2(x, cy + sw, step, ts * 0.16), sand.darkened(0.16))
 			x += step
+		# 등성이의 나무 — 섬을 **숲 덮인 섬**으로 만드는 것. 매끈한 초록
+		# 돔은 언덕 도안이지 섬이 아니다. 다만 멀리 있으니 한 그루씩이
+		# 아니라 **덩어리 몇 개**로만
+		var nt: int = 3 + int(_hash01(int(isl[0]), 7) * 3.0)
+		for ti in nt:
+			var tu: float = (_hash01(int(isl[0]) + ti, 23) - 0.5) * 1.5
+			var tx2: float = cx + tu * w2 * 0.5
+			var tyy: float = cy - hh * sqrt(maxf(0.0, 1.0 - tu * tu))
+			var tr: float = ts * (0.22 + _hash01(ti, int(isl[0])) * 0.16)
+			draw_rect(Rect2(tx2 - tr, tyy - tr * 1.5, tr * 2.0, tr * 1.6),
+				col.darkened(0.16))
+			draw_rect(Rect2(tx2 - tr * 0.7, tyy - tr * 1.7, tr * 1.2, tr * 0.7),
+				col.lightened(0.10))
 		# 섬 그림자가 물에 비친다 — 밑변 바로 아래 한 줄
 		draw_rect(Rect2(cx - w2 * 0.5, cy + ts * 0.54, w2, ts * 0.5),
 			Color(0.10, 0.16, 0.26, 0.20 * (1.0 - f)))
+		# 곁의 바위섬 — 큰 섬 하나만 있으면 그건 「놓아 둔 모형」이다.
+		# 곁에 작은 것이 하나 있어야 바다에 흩어진 땅으로 읽힌다
+		var rx2: float = cx + w2 * (0.72 if int(isl[0]) % 2 == 0 else -0.72)
+		var ry2: float = cy + ts * (0.6 + _hash01(int(isl[0]), 31) * 1.2)
+		var rr: float = ts * 0.5
+		draw_rect(Rect2(rx2 - rr, ry2 - rr * 0.9, rr * 2.0, rr * 0.9),
+			col.darkened(0.10))
+		draw_rect(Rect2(rx2 - rr * 0.6, ry2 - rr * 1.1, rr * 1.2, rr * 0.4),
+			col.lightened(0.14))
+		draw_rect(Rect2(rx2 - rr, ry2, rr * 2.0, rr * 0.3), sand)
 
 # 먼 섬 — [x칸, 바다 시작에서 몇 칸 남쪽, 폭칸, 높이칸].
 # 셋뿐이다: 바다를 섬으로 채우면 그건 바다가 아니라 군도다
@@ -4162,12 +4234,16 @@ const ISLANDS := [[74, 11, 13, 2.2], [212, 15, 18, 2.6], [352, 9, 10, 1.8]]
 # **안쪽과 이어지는 숲 바닥**으로 두고, 능선은 그 너머에서 시작한다.
 const RIDGE_NEAR_Y := -6.5
 const RIDGE_FAR_Y := -10.5
+const RIDGE_SKY_Y := -14.5     # 제일 먼 마루 — 거의 하늘이다
 # **회색으로 흐리면 능선이 아니라 콘크리트 바닥이다.** 하늘빛(HAZE)이
 # 워낙 탁해서 거기에 섞을수록 초록이 죽는다 — 처음에 두 겹을 다 그렇게
 # 섞었더니 마을 북쪽이 통째로 「포장한 광장」이 됐다. 능선은 **숲**이다:
 # 가까운 마루는 초록을 지키고, 먼 마루만 하늘빛으로 물러난다.
 const RIDGE_NEAR := Color(0.35, 0.49, 0.36)
 const RIDGE_FAR := Color(0.57, 0.67, 0.65)
+# 세 번째 겹 — 하늘빛에 거의 다 녹았다. 두 겹은 「앞과 뒤」지만
+# 세 겹이라야 「점점 멀어진다」가 된다
+const RIDGE_SKY := Color(0.70, 0.78, 0.82)
 const SKY_FAR := Color(0.80, 0.86, 0.88)
 
 # 굽이치는 마루선 — 성긴 격자의 난수를 부드럽게 이어 뽑는다.
@@ -4191,35 +4267,71 @@ func _draw_far_ridges(vx0: int, vx1: int, vy0: int) -> void:
 	var top_y := float(vy0) * ts
 	# ① 제일 먼 곳은 하늘이다. 잔디 무늬가 지평선까지 이어지면 그건
 	#    「끝없는 벽지」지 먼 데가 아니다
-	draw_rect(Rect2(x0, top_y, x1 - x0, (RIDGE_FAR_Y + 2.0) * ts - top_y), SKY_FAR)
+	draw_rect(Rect2(x0, top_y, x1 - x0, (RIDGE_SKY_Y + 2.0) * ts - top_y), SKY_FAR)
 	var step := 8.0                         # 마루를 8px 기둥으로 세운다 (도트 4칸)
-	# ② 능선 두 겹 — 먼 것부터. **띠로 눕히고 바닥은 다음 겹이 받는다.**
-	#    마루에서 맵 변까지 통으로 채웠더니 슬래브 한 장이 됐다
-	for k in 2:
-		var far := k == 0
-		var by: float = (RIDGE_FAR_Y if far else RIDGE_NEAR_Y) * ts
-		var amp: float = (1.8 if far else 2.4) * ts
-		var span: float = (19.0 if far else 12.0) * ts
-		var col: Color = RIDGE_FAR if far else RIDGE_NEAR
-		var seed: int = 41 if far else 77
-		# 바닥 — 먼 능선은 가까운 마루께까지, 가까운 능선은 맵 변 바로 위까지
-		var foot: float = -6.0 * ts if far else -3.0 * ts
+	# ② 능선 **세 겹** — 먼 것부터. **띠로 눕히고 바닥은 다음 겹이 받는다.**
+	#    마루에서 맵 변까지 통으로 채웠더니 슬래브 한 장이 됐다.
+	#    두 겹은 「앞과 뒤」지만 세 겹이라야 「점점 멀어진다」가 된다
+	for k in 3:
+		var by: float = [RIDGE_SKY_Y, RIDGE_FAR_Y, RIDGE_NEAR_Y][k] * ts
+		var amp: float = [1.4, 1.8, 2.4][k] * ts
+		var span: float = [25.0, 19.0, 12.0][k] * ts
+		var col: Color = [RIDGE_SKY, RIDGE_FAR, RIDGE_NEAR][k]
+		var seed: int = [23, 41, 77][k]
+		var bump: float = [3.0, 4.0, 7.0][k]
+		# 바닥 — 다음 겹의 마루께까지. 겹끼리 맞물려 두께가 생긴다
+		var foot: float = [-9.5, -6.0, -3.0][k] * ts
 		var x: float = floor(x0 / step) * step
+		var kk := 0
 		while x < x1:
 			var top: float = by + _ridge_line(x, span, amp, seed)
 			# 숲으로 덮인 마루라 능선이 **잘게 울퉁불퉁하다.** 매끈한 곡선은
 			# 산이 아니라 언덕 도안이다 — 나무 한 그루만 한 요철을 얹는다
-			top += (_hash01(int(x / step), seed + 5) - 0.5) * (4.0 if far else 7.0)
+			top += (_hash01(kk, seed + 5) - 0.5) * bump
 			draw_rect(Rect2(x, top, step, foot - top), col)
 			draw_rect(Rect2(x, top, step, 4.0), col.lightened(0.14))
+			# **산비탈에도 골이 있다.** 통짜로 칠하면 색종이를 오려 붙인
+			# 꼴이다. 다만 기둥마다 난수로 밝기를 흔들었더니 이번에는
+			# **바코드**가 됐다 — 골짜기는 한 기둥 폭이 아니라 대여섯 기둥
+			# 폭이다. 마루선과 같은 부드러운 잡음으로 넓게 흘려야 산이 된다
+			var vv: float = _ridge_line(x, span * 0.42, 1.0, seed + 31)
+			if vv < -0.16:
+				draw_rect(Rect2(x, top + 4.0, step, (foot - top) * 0.75),
+					col.darkened(0.10))
+			elif vv > 0.18:
+				draw_rect(Rect2(x, top + 4.0, step, (foot - top) * 0.55),
+					col.lightened(0.06))
 			x += step
+			kk += 1
 		# 마루 밑에 고인 안개 — 두 겹 사이를 갈라 주는 것이 이 한 줄이다.
-		# 없으면 두 능선이 한 덩어리로 붙어 깊이가 사라진다
-		var mist: float = 0.24 if far else 0.13
+		# 없으면 능선들이 한 덩어리로 붙어 깊이가 사라진다
+		var mist: float = [0.30, 0.24, 0.13][k]
 		for b2 in 3:
 			var bh: float = 1.1 * ts
 			draw_rect(Rect2(x0, foot - bh * float(b2 + 1), x1 - x0, bh),
 				Color(SKY_FAR.r, SKY_FAR.g, SKY_FAR.b, mist * (1.0 - float(b2) * 0.32)))
+	# ③ 하늘에 뜬 구름 — 지평선 위가 통짜 하늘색이면 그건 색종이다.
+	#    길게 눕는 띠 몇 장. 흘러가지 않는다 (배경은 조용해야 한다)
+	for ci in 5:
+		var cwx: float = (float(ci) * 137.0 + 40.0) * ts
+		# 화면을 따라 되풀이한다 — 세계 밖이라 자리를 굳혀 둘 데가 없다
+		var period: float = 137.0 * 5.0 * ts
+		cwx = fmod(cwx - x0, period)
+		if cwx < 0.0:
+			cwx += period
+		cwx += x0
+		if cwx > x1 + ts * 20.0:
+			continue
+		var cwy: float = (RIDGE_SKY_Y - 2.0 - float(ci % 3) * 2.2) * ts
+		if cwy < top_y:
+			continue
+		var cww: float = ts * (9.0 + float(ci % 4) * 5.0)
+		var cha: float = 0.34 - float(ci % 3) * 0.07
+		draw_rect(Rect2(cwx, cwy, cww, ts * 0.5), Color(1, 1, 1, cha))
+		draw_rect(Rect2(cwx + cww * 0.18, cwy - ts * 0.34, cww * 0.6, ts * 0.4),
+			Color(1, 1, 1, cha * 0.8))
+		draw_rect(Rect2(cwx - ts * 0.6, cwy + ts * 0.34, cww * 0.8, ts * 0.3),
+			Color(1, 1, 1, cha * 0.5))
 
 
 # ---- 맵의 가장자리 ----
