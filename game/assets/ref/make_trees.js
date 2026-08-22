@@ -45,6 +45,14 @@ const mix = (a, b, t) => a.map((v, i) => Math.round(v * (1 - t) + b[i] * t));
 // 예전 나무는 누런 올리브(48,72,26)라 새로 그린 잔디 위에서 혼자 떠 있었다.
 const LEAF = [[152, 208, 100], [122, 182, 78], [96, 158, 62], [76, 134, 52],
               [58, 112, 44], [44, 90, 38], [32, 68, 32], [22, 48, 26]];
+// **볕을 받은 잎은 노랗고 그늘의 잎은 푸르다.** 한 사다리로만 칠했더니
+// 명암은 있는데 온도가 없어서, 잎이 초록 찰흙처럼 보였다. 밝은 쪽은
+// 노란 기를, 어두운 쪽은 푸른 기를 섞은 사다리를 하나씩 더 둔다 —
+// 같은 초록 줄기에서 갈라져 나오므로 나무는 여전히 한 그루다
+const LEAF_SUN = [[186, 224, 104], [154, 200, 84], [124, 176, 66], [100, 152, 56],
+                  [78, 128, 48], [60, 104, 40], [44, 80, 34], [30, 58, 28]];
+const LEAF_SHADE = [[124, 188, 104], [98, 162, 84], [74, 138, 68], [56, 116, 58],
+                    [42, 96, 50], [32, 78, 42], [22, 58, 34], [16, 42, 28]];
 // 껍질 — 건물 목재(주황빛 켠 나무)와 다르다. 살아 있는 나무의 껍질은
 // 잿빛이 돈다. 켠 널과 선 나무가 같은 색이면 둘 다 가짜로 보인다
 const BARK = [[156, 126, 90], [128, 100, 68], [104, 78, 52], [82, 60, 40],
@@ -184,6 +192,9 @@ function trunk(g, cx, yTop, yBase, wTop, wBase, seed, lean) {
 //
 // 그래서 뭉치의 목록을 먼저 만들고, 칸마다 **어느 뭉치에 속하는지**와
 // **그 뭉치의 중심에서 어느 쪽인지**를 물어 톤을 정한다.
+const isLeafRaw = c => c && c.length < 4
+  && (LEAF.indexOf(c) >= 0 || LEAF_SUN.indexOf(c) >= 0 || LEAF_SHADE.indexOf(c) >= 0);
+
 function canopy(g, blobs, seed, opts) {
   const o = opts || {};
   const holes = o.holes === undefined ? 3 : o.holes;
@@ -232,7 +243,9 @@ function canopy(g, blobs, seed, opts) {
     // 잔 흔들림 — 넓은 면이 통짜로 보이지 않을 만큼만 (한 단의 3분의 1)
     if (h(x, y, seed + 11) < 0.10) i += 1;
     else if (h(x, y, seed + 13) < 0.08) i -= 1;
-    g.px(x, y, LEAF[clamp(i, 0, 7)]);
+    // 온도 — 왼위(볕)는 노랗게, 오른아래(그늘)는 푸르게. 가운데는 기본
+    const lad = glob < -0.42 ? LEAF_SUN : (glob > 0.46 ? LEAF_SHADE : LEAF);
+    g.px(x, y, lad[clamp(i, 0, 7)]);
   }
   // ② 하늘 구멍 — 잎 사이로 하늘이 비친다. 없으면 초록 반죽이다
   for (let k = 0; k < holes; k++) {
@@ -261,8 +274,61 @@ function canopy(g, blobs, seed, opts) {
     g.px(x, y, LEAF[h(i, 9, seed + 35) < 0.35 ? 0 : 1]);
     if (h(i, 10, seed + 37) < 0.5) g.px(x + 1, y, LEAF[1]);
   }
-  // ④ 잎 끝 — 실루엣 바깥으로 잎 몇 장이 삐져나온다. 매끈한 윤곽은 풍선이다
-  const isLeaf = c => c && c.length < 4 && LEAF.indexOf(c) >= 0;
+  // ④ **뭉치의 어깨에 얹히는 잔 잎 덩어리.** 뭉치를 매끈한 타원으로 두면
+  //    잎이 아니라 비눗방울이다. 볕을 받는 왼위 호를 따라 작은 덩어리를
+  //    몇 개 얹어 실루엣을 울퉁불퉁하게 만든다 — 이것이 「잎이 뭉쳐 자란
+  //    모양」이고, 멀리서도 나무를 나무로 만드는 것은 이 윤곽이다
+  for (let bi = 0; bi < blobs.length; bi++) {
+    const [bx, by, rx, ry] = blobs[bi];
+    const n = 3 + Math.floor(h(bi, 2, seed + 51) * 3);
+    for (let k = 0; k < n; k++) {
+      const ang = Math.PI * (0.92 + h(bi * 5 + k, 3, seed + 53) * 0.86);
+      const px2 = bx + Math.cos(ang) * rx * 0.94;
+      const py2 = by + Math.sin(ang) * ry * 0.94;
+      const rr = 2.2 + h(bi + k, 4, seed + 55) * 2.2;
+      // 덩어리도 **나무 전체의 빛**을 따른다. 다 밝게 얹었더니 아래쪽
+      // 그늘까지 환해져서, 부피가 있던 잎이 다시 평평한 초록 판이 됐다
+      const gb = ((px2 - o.cx) / Math.max(1, o.rw)) * 0.5
+        + ((py2 - o.cy) / Math.max(1, o.rh)) * 0.9;
+      const lad = gb < -0.42 ? LEAF_SUN : (gb > 0.46 ? LEAF_SHADE : LEAF);
+      const base = 2 + Math.round(gb * 1.6);
+      for (let y = Math.floor(py2 - rr); y <= Math.ceil(py2 + rr); y++)
+        for (let x = Math.floor(px2 - rr); x <= Math.ceil(px2 + rr); x++) {
+          const d2 = ((x - px2) / rr) ** 2 + ((y - py2) / (rr * 0.9)) ** 2;
+          if (d2 > 1) continue;
+          const t2 = ((x - px2) / rr) * 0.6 + ((y - py2) / rr) * 0.8;
+          g.px(x, y, lad[clamp(base + Math.round(t2 * 2.2), 0, 7)]);
+        }
+    }
+  }
+  // ⑤ **가지가 잎 사이로 보인다.** 잎만 얹으면 초록 덩어리가 줄기 위에
+  //    떠 있다. 뭉치 사이의 골을 따라 굵은 가지 끝이 한둘 비쳐야
+  //    「잎이 가지에 달렸다」가 된다
+  if (o.limbs) for (const [lx, ly, ldx, ldy, llen] of o.limbs) {
+    let cxx = lx, cyy = ly;
+    for (let k = 0; k < llen; k++) {
+      const w = Math.max(0, Math.round(2.2 * (1 - k / llen)));
+      for (let i2 = -w; i2 <= w; i2++)
+        g.px(cxx + i2, cyy, BARK[i2 < 0 ? 2 : 4]);
+      cxx += ldx; cyy += ldy;
+    }
+  }
+  // ⑥ **잎이 제 그늘을 드리운다.** 잎 덩어리의 맨 아랫자락은 위의 잎이
+  //    해를 가려 늘 어둡다. 이 한 겹이 없으면 잎이 통째로 떠 보인다
+  for (let x = 0; x < g.w; x++) {
+    let last = -1;
+    for (let y = 0; y < g.h; y++) if (isLeafRaw(g.get(x, y))) last = y;
+    if (last < 0) continue;
+    for (let k = 0; k < 3; k++) {
+      const c = g.get(x, last - k);
+      if (!isLeafRaw(c)) continue;
+      const lad = LEAF_SHADE;
+      const idx = Math.max(LEAF.indexOf(c), LEAF_SUN.indexOf(c), LEAF_SHADE.indexOf(c));
+      g.px(x, last - k, lad[clamp(idx + (k === 0 ? 2 : 1), 0, 7)]);
+    }
+  }
+  // ⑦ 잎 끝 — 실루엣 바깥으로 잎 몇 장이 삐져나온다. 매끈한 윤곽은 풍선이다
+  const isLeaf = isLeafRaw;
   for (let y = 1; y < g.h - 1; y++) for (let x = 1; x < g.w - 1; x++) {
     if (g.get(x, y)) continue;
     let n = 0;
@@ -323,7 +389,11 @@ function fullTree(v) {
     [cx, SPEC.top + 8, W * 0.4, 9],
   ];
   if (v === 2) B.push([cx - W * 0.72, SPEC.top + 34, W * 0.3, 8]);
-  canopy(g, B, seed, { holes: 3 });
+  canopy(g, B, seed, { holes: 3, limbs: [
+    [cx - 2, SPEC.top + 40, -0.9, -0.75, 12],
+    [cx + 3, SPEC.top + 42, 0.85, -0.8, 11],
+    [cx, SPEC.top + 38, 0.15, -1, 10],
+  ] });
   return outline(g);
 }
 
@@ -355,7 +425,9 @@ function fullTreeRaw(v, seedBase) {
     [cx, 21, W * 0.62, 14], [cx - W * 0.52, 28, W * 0.48, 12],
     [cx + W * 0.52, 27, W * 0.5, 12.5], [cx - W * 0.26, 37, W * 0.46, 11],
     [cx + W * 0.3, 38, W * 0.44, 10.5], [cx, 14, W * 0.4, 9],
-  ], seed, { holes: 2 });
+  ], seed, { holes: 2, limbs: [
+    [cx - 2, 46, -0.9, -0.75, 11], [cx + 3, 48, 0.85, -0.8, 10],
+  ] });
   return g;
 }
 

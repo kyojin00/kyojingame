@@ -278,6 +278,13 @@ let roofT = null;                // 셀마다 0~1 (처마 -> 용마루), -1 이�
 let roofRow = null;              // 셀마다 기와 켜 번호
 let TW = 5;                      // 한 장의 폭
 
+// 켜의 경계는 **자로 그은 듯 곧으면 안 된다.**
+//
+// 기와는 서까래에 한 장씩 얹는 것이라, 백 년 된 지붕의 켜는 한 칸씩
+// 처지고 들린다. 켜 선이 지붕을 가로질러 한 픽셀도 안 어긋나면 그건
+// 얹은 기와가 아니라 **찍어 낸 골함석**이다. 두 칸마다 한 줄씩 흔든다.
+function tileWob(x) { return hash(x >> 1, 77) < 0.28 ? 1 : 0; }
+
 function resetRoof() {
   roofT = Array.from({ length: GH }, () => new Float32Array(GW).fill(-1));
   roofRow = Array.from({ length: GH }, () => new Int16Array(GW).fill(-1));
@@ -298,26 +305,44 @@ function shingles(g) {
     const r = hash(col, row), r2 = hash(row * 3 + 1, col * 5 + 2);
     let i = Math.round(t * 5.4);
     if (CHUNKY) {
-      // **다 그리지 않는다.** 기와를 한 장도 빠짐없이 격자로 그렸더니
-      // 어떤 색을 입혀도 「기계가 채운 무늬」였다. 손으로 찍은 지붕은
-      // 면을 평평하게 비워 두고, 드문드문 몇 획으로만 기와를 **암시**한다 —
-      // 획은 켜의 자에 맞춰 눕고, 서너 장에 한 획이면 충분하다.
+      // ---- 기와는 **켜로 읽힌다** ----
+      //
+      // 「다 그리지 않는다」를 지붕에까지 밀어붙였더니(서너 장에 한 획),
+      // 지붕이 주황색 벌판에 녹슨 얼룩이 앉은 꼴이 됐다. 그 규칙은 **수백
+      // 번 반복되는 바닥 타일**의 것이다 — 한 장뿐인 큰 면에서는 반대다.
+      // 지붕을 지붕으로 만드는 건 **가로로 줄줄이 겹친 켜**고, 그 켜가
+      // 안 보이면 어떤 색을 입혀도 천막이다.
+      //
+      // 한 켜는 세 부분이다 (기와 한 장의 단면이 그렇다):
+      //   윗변  윗장 밑으로 들어가는 자리 — 한 단 밝다 (빛을 받는 능선)
+      //   몸    장마다 조금씩 다른 톤
+      //   밑변  아랫장 위에 얹히는 턱 — 두 단 어둡다 (겹침 그늘)
+      // 세로 이음매는 **켜의 아래 절반에만** 긋는다. 위아래로 통으로 그으면
+      // 격자가 되어 그물을 씌운 꼴이 된다.
       const ru = ((u % TW) + TW) % TW;
       const isBottom = at(x, y + 1) !== row;
-      if (r < 0.34) {
-        // 이 장은 획을 얻는다 — 밑변에 짧은 어두운 획 (2~5칸)
-        const len = 2 + Math.floor(hash(col * 5 + 2, row * 7 + 3) * 4);
-        if (isBottom && ru >= 1 && ru <= len) i += 2;
-      } else if (r > 0.88) {
-        // 드문 밝은 획 — 윗변에
-        if (at(x, y - 1) !== row && ru >= 2 && ru <= 4) i -= 1;
-      }
+      const isTop = at(x, y - 1) !== row;
+      if (isBottom) i += 2;                         // 겹침 턱
+      else if (isTop) i -= 1;                       // 빛 받는 윗변
+      if (ru === 0 && !isTop) i += 1;               // 세로 이음매 (아래 절반)
+      if (ru === 1 && isBottom) i += 1;             // 이음매 옆의 그늘
+      // **지붕에도 옆에서 빛이 든다.** 켜만 그으면 지붕이 평평한 판이다 —
+      // 해가 왼쪽 위에 있으니 왼쪽 비탈이 한 단 밝고 오른쪽이 한 단 어둡다.
+      // 이 한 단이 지붕에 부피를 준다 (사람·살림·나무와 같은 해다)
+      const lat = (x - CX) / Math.max(1, GW * 0.42);
+      if (lat < -0.55) i -= 1;
+      else if (lat > 0.55) i += 1;
+      // 장마다 낯빛이 조금 다르다. 오래 쓴 지붕은 한 장 한 장 색이 다르다
+      if (r < 0.18) i += 1;
+      else if (r > 0.86) i -= 1;
       // 갈아 끼운 기와 — 아주 드문 장은 **통째로** 톤이 다르다. 지붕을
       // 오래 쓰면 깨진 자리에 새 기와를 끼우고, 그 한 장이 도드라진다
       const r3 = hash(col * 11 + 5, row * 3 + 8);
-      if (r3 < 0.030) i += 2;
-      else if (r3 < 0.065) i += 1;
-      else if (r3 > 0.985) i -= 1;
+      if (r3 < 0.028) i += 2;
+      else if (r3 < 0.060) i += 1;
+      else if (r3 > 0.986) i -= 2;
+      // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다. 아주 드물게
+      if (r2 < 0.020 && isBottom && ru >= 1 && ru <= 2) i += 3;
     } else {
       i += (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
       // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
@@ -736,7 +761,7 @@ function roof(g, x0, x1, top, base) {
     for (let x = a; x <= b; x++) {
       if (x < 0 || x >= GW) continue;
       roofT[top + i][x] = FRONT_LO + (FRONT_HI - FRONT_LO) * (i / h);
-      roofRow[top + i][x] = Math.floor((base - (top + i)) / TH);
+      roofRow[top + i][x] = Math.floor((base - (top + i) + tileWob(x)) / TH);
     }
   }
   FRONT_ROWS = Math.floor((base - top) / TH) + 1;
@@ -1563,7 +1588,7 @@ function roofToneAt(y) {
 function markRoof(x, y, t, base) {
   if (y < 0 || y >= GH || x < 0 || x >= GW) return;
   roofT[y][x] = t;
-  roofRow[y][x] = Math.floor((base - y) / TH);
+  roofRow[y][x] = Math.floor((base - y + tileWob(x)) / TH);
 }
 
 // 지붕창 — 지붕에서 튀어나온 작은 박공. 실루엣에 혹이 하나 생겨서
@@ -1844,8 +1869,13 @@ function build(spec) {
   // **낮고 넓적하게.** 층고 22+22, 지붕 40으로 지은 집은 폭 90에 키
   // 120이 넘는 탑이었다 — 참고 맵(스타듀)의 집은 키가 폭과 엇비슷하다.
   // 1층 20, 2층은 다락으로 14, 지붕 34: 같은 집인데 앉은 자세가 낮아진다
-  MID = GROUND - 20 - st;                                  // 1층 천장
-  EAVE = MID - 14 - st + (spec.eave || 0);                 // 다락 천장 = 처마
+  // **벽에 숨 쉴 자리를 준다.** 1층 20 · 다락 14로 지었더니 벽이 서른넉
+  // 줄인데 그 안에 차양 · 진열창 · 매단 바구니 · 간판 · 창턱 물건이 다
+  // 들어가서, 한 덩어리로 뭉개져 무엇 하나 안 읽혔다. 지붕이 크다는 건
+  // 좋은데 벽이 **띠**가 되면 그건 지붕에 굽도리를 댄 것이지 집이 아니다.
+  // 여섯 줄을 벽에 돌려준다 (집이 화면에서 열두 픽셀 높아진다).
+  MID = GROUND - 24 - st;                                  // 1층 천장
+  EAVE = MID - 18 - st + (spec.eave || 0);                 // 다락 천장 = 처마
   RIDGE = EAVE - 34 - (spec.pitch || 0);                   // +면 더 뾰족
 
   // ---- 몸통 ----
