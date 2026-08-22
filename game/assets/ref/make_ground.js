@@ -462,44 +462,66 @@ function grass(season, variant) {
 function soil(wet) {
   const g = new T(), o = wet ? 2 : 0;                       // 젖으면 두 단 짙다
   const C = i => EARTH[clamp(i + o, 0, EARTH.length - 1)];
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const r = y % 4;                                        // 이랑 한 칸 = 4줄
-    let c = C(1);
-    // 이랑을 통줄로 그으면 벽돌담이 된다. **절반쯤만** 긋고 나머지는
-    // 흙덩이에 맡긴다 — 갈아엎은 땅에 자로 잰 줄은 없다
-    const jag = h(x, y >> 2, wet ? 5 : 6);
-    if (r === 0 && jag > 0.35) c = C(0);                    // 마루
-    else if (r === 2 && jag > 0.45) c = C(2);               // 고랑
-    if (x % 4 === 1 && r !== 0 && h(x, y, 7) > 0.4) c = C(2);   // 호미 자국
-    const v = h(x >> 1, y >> 1, wet ? 2 : 1);
-    if (v > 0.78) { c = C(0); if (g.get(x, y + 1)) g.px(x, y + 1, C(3)); }
-    else if (v < 0.14) c = C(3);                            // 파인 자리
-    g.px(x, y, c);
+  const half = (a, b) => a.map((c, j) => Math.round((c + b[j]) / 2));
+  // ---- 갈아엎은 흙은 무늬가 아니라 **톤**이다 ----
+  //
+  // 네 판을 헤맸다. 이랑을 또렷이 그을수록 밭이 **널빤지 궤짝**이 됐다.
+  //   1판 잔 난수      — 사포
+  //   2판 통줄 이랑    — 골함석
+  //   3판 끊은 이랑+테두리 두 줄 — 궤짝
+  //   4판 끊은 이랑+테두리 한 줄 — 벽돌 줄눈
+  // 공통된 잘못은 하나다. **가로선을 타일 폭만큼 길게 그은 것.** 선이
+  // 타일을 가로지르면 그 길이가 곧 타일의 폭을 폭로한다 — 잔디에서 배운
+  // 것과 같은 함정인데 밭에서 또 밟았다.
+  //
+  // 답은 마당흙과 같다. 갈아엎은 자리가 마당보다 **어둡고 곱다**는 톤
+  // 하나가 「여긴 갈았다」를 다 말한다. 이랑은 짧은 획 몇 개로 거들 뿐.
+  const BASE = C(3);                                        // 뒤집힌 속흙 — 어둡다
+  const DK1 = half(BASE, C(4)), DK2 = C(4), LT = half(BASE, C(2)), LT2 = C(2);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, BASE);
+  const clod = (ox, oy, c, vert) => {
+    g.px(ox, oy, c);
+    if (vert) g.px(ox, oy + 1, c); else g.px(ox + 1, oy, c);
+  };
+  const sd = wet ? 40 : 0;
+  for (let i = 0; i < 34; i++) {                            // 뒤집힌 덩이의 그늘
+    const ox = Math.floor(h(i, sd + 1, 71) * N), oy = Math.floor(h(sd + 1, i, 72) * N);
+    const c = h(i, sd, 74) < 0.3 ? DK2 : DK1;
+    clod(ox, oy, c, h(i, sd, 78) < 0.45);
+    if (h(i, sd, 73) < 0.28) g.px(ox + 1, oy + 1, c);       // 더러는 2x2
   }
-  if (wet) {                                                // 물기 — 고랑에 고인다
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++)
-      if (y % 4 === 2 && h(x, y, 9) < 0.30) g.px(x, y, EARTH[5]);
+  for (let i = 0; i < 20; i++) {                            // 볕 받은 덩이 윗면
+    const ox = Math.floor(h(i + 30, sd + 2, 75) * N), oy = Math.floor(h(sd + 2, i + 30, 76) * N);
+    clod(ox, oy, h(i, sd, 77) < 0.25 ? LT2 : LT, h(i, sd, 79) < 0.45);
+  }
+  // 이랑의 자취 — **세 칸짜리 획**으로만. 네 줄마다 한 줄에 얹되 줄을
+  // 다 채우지 않는다. 결은 느껴지고 줄은 안 보이는 만큼만
+  for (let i = 0; i < 11; i++) {
+    const ox = Math.floor(h(i, sd + 5, 81) * N);
+    const ry = Math.floor(h(sd + 5, i, 82) * 4) * 4 + 1;    // 4줄 주기, 타일 끝을 비켜서
+    const len = 2 + Math.floor(h(i, sd, 83) * 2);
+    for (let k = 0; k < len; k++) g.px(ox + k, ry, LT);     // 마루 윗변
+    for (let k = 0; k < len; k++) if (h(ox + k, ry, 84) < 0.7) g.px(ox + k, ry + 2, DK1);
+  }
+  if (wet) {                                                // 물기 — 파인 자리에 고인다
+    for (let i = 0; i < 7; i++) {
+      const ox = Math.floor(h(i, 61, 85) * N), oy = Math.floor(h(61, i, 86) * N);
+      g.px(ox, oy, EARTH[5]); g.px(ox + 1, oy, EARTH[5]);
+      if (h(i, 0, 87) < 0.5) g.px(ox, oy + 1, EARTH[5]);
+    }
   }
 
   // ---- 한 칸으로 보이게 ----
   //
-  // 밭은 잔디·길과 다르다. 저 둘은 **면**이라 이어져야 하지만, 밭은
-  // 호미로 **한 칸씩** 가는 것이다. 이음매 없이 깔면 갈아엎은 자리가
-  // 통째로 한 덩어리가 되어, 어디까지 갈았는지 안 보인다.
-  //
-  // 그래서 테두리를 준다 — 파 올린 흙이 칸 가장자리에 둔덕으로 남는다:
-  //   위·왼쪽  밝다 (빛을 받는 둔덕)
-  //   아래·오른쪽 어둡다 (그늘진 둔덕과 그 밑 골)
+  // 밭은 **한 칸씩** 가는 것이라 칸이 보여야 한다. 다만 선을 그으면 줄눈이
+  // 된다. 그으는 대신 **가장자리를 한 단 어둡게 눌러** 준다 — 파 올린 흙이
+  // 칸 가장자리에서 살짝 꺼진 것. 반은 빼먹어 선이 되지 않게
   for (let i = 0; i < N; i++) {
-    const jag = k => h(i, k, wet ? 21 : 22) < 0.72;         // 가장자리도 들쭉날쭉
-    if (jag(0)) { g.px(i, 0, C(0)); g.px(0, i, C(0)); }
-    if (jag(1)) { g.px(i, 1, C(1)); g.px(1, i, C(1)); }
-    if (jag(2)) { g.px(i, N - 1, C(4)); g.px(N - 1, i, C(4)); }
-    if (jag(3)) { g.px(i, N - 2, C(3)); g.px(N - 2, i, C(3)); }
+    if (h(i, 2, sd + 21) < 0.55) g.px(i, N - 1, DK1);
+    if (h(i, 3, sd + 21) < 0.55) g.px(N - 1, i, DK1);
   }
   return g;
 }
-
 
 // ---- 마당 ----
 //
@@ -690,24 +712,34 @@ const SAND = [[240, 226, 190], [226, 208, 166], [208, 186, 140],
               [186, 162, 116], [160, 136, 94], [132, 110, 74]];
 
 function sandTile(v) {
+  // ---- 모래는 **바람이 남긴 물결**이다 ----
+  //
+  // 잔결을 값잡음으로 깔고 그 위에 조약돌·조개·해초를 흩었더니, 모래밭이
+  // 검은 얼룩투성이가 됐다 — 밝은 바탕 위의 어두운 점은 무엇이든 때로
+  // 보인다. 모래는 거의 흰 면이고, 그 위에 **바람 물결**이 가로로 눕는다.
+  //   바탕   거의 평평 (반 단만 흔든다)
+  //   물결   두세 칸짜리 가로 획. 이것이 모래를 모래로 만든다
+  //   잔것   조약돌 하나, 조개 하나 — 모래빛에 묻혀야 한다
   const g = new T();
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    // 물결이 남긴 잔결 — 가로로 길게 눕는다. 등방성 잡음은 사포가 된다
-    const w = vnoise(x, y * 2 + v, 41 + v, 4) * 0.65 + vnoise(x, y, 42 + v, 2) * 0.35;
-    g.px(x, y, ramp(SAND, 1 + (w - 0.5) * 2.2));
+  const half = (a, b) => a.map((c, j) => Math.round((c + b[j]) / 2));
+  const BASE = [half(SAND[0], SAND[1]), SAND[1], half(SAND[1], SAND[2])][v % 3];
+  const RIP = half(BASE, SAND[3]), LT = half(BASE, SAND[0]);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, BASE);
+  for (let i = 0; i < 22; i++) {                             // 바람 물결
+    const ox = Math.floor(h(i, v * 3 + 1, 71) * N), oy = Math.floor(h(v * 3 + 1, i, 72) * N);
+    const len = 3 + Math.floor(h(i, v, 73) * 3);
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, RIP);
+    if (h(i, v, 74) < 0.4) for (let k = 1; k < len - 1; k++) g.px(ox + k, oy - 1, LT);
   }
-  for (let i = 0; i < 3; i++) {                              // 쓸려 온 조약돌
-    const ox = Math.floor(h(i + 3, v, 43) * N), oy = Math.floor(h(v, i + 3, 44) * N);
-    g.px(ox, oy, STONE[2]); g.px(ox + 1, oy, STONE[3]); g.px(ox, oy + 1, STONE[4]);
+  {                                                          // 쓸려 온 조약돌 하나
+    const ox = Math.floor(h(3, v, 43) * N), oy = Math.floor(h(v, 3, 44) * N);
+    const st = k => mixc(STONE[k], BASE, 0.45);              // 모래에 묻힌 돌
+    g.px(ox, oy, st(2)); g.px(ox + 1, oy, st(3)); g.px(ox, oy + 1, st(4));
   }
   if (v !== 1) {                                             // 조개 한 알
     const ox = Math.floor(h(v + 7, 2, 45) * N), oy = Math.floor(h(2, v + 7, 46) * N);
     g.px(ox, oy, [250, 240, 232]); g.px(ox + 1, oy, [236, 214, 206]);
-    g.px(ox, oy + 1, [214, 186, 178]); g.px(ox + 1, oy + 1, [236, 214, 206]);
-  }
-  for (let i = 0; i < 2; i++) {                              // 마른 해초 한 가닥
-    const ox = Math.floor(h(i + 11, v, 47) * N), oy = Math.floor(h(v, i + 11, 48) * N);
-    for (let k = 0; k < 3; k++) g.px(ox + k, oy + (k === 1 ? 1 : 0), SAND[5]);
+    g.px(ox, oy + 1, [222, 196, 188]); g.px(ox + 1, oy + 1, [240, 222, 214]);
   }
   return g;
 }
@@ -879,55 +911,57 @@ const smooth = t => t * t * (3 - 2 * t);
 // **같은 자리마다 똑같이** 찍혀 물 위에 바둑판이 뜬다. 바탕색을 아무리
 // 부드럽게 이어도 이건 안 없어진다. 잔디를 세 판 그린 것과 같은 이유다.
 function water(frame, lv, vr) {
+  // ---- 물은 **가로로 눕는 잔물결**이다 ----
+  //
+  // 바탕에 값잡음을 깔고 흰 점을 흩고 바닥(모래·조약돌·수초)까지 비추게
+  // 했더니, 얕은 물이 **TV 노이즈**가 됐다 — 파란 면에 흰 점이 흩뿌려지면
+  // 눈은 그것을 물이 아니라 잡음으로 읽는다. 물이 물로 보이는 건 잔물결이
+  // **가로로 눕고 두 장 사이에서 자리를 옮기기** 때문이다.
+  //   바탕   깊이만 말한다. 거의 평평
+  //   잔물결 두세 칸 가로 획. 장마다 자리가 달라 흐르는 것으로 보인다
+  //   빛     물결 머리에 한 칸 밝게 (여기가 수면이 꺾이는 자리)
+  //   바닥   얕은 물에만, 형체만 남게 아주 옅게
   const g = new T();
   const s = vr * 17;
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, baseWater(x, y, lv));
-  // 잔물결 — 가로로 짧게 그은 줄. 두 장이 서로 어긋나야 물이 흐른다.
-  // 밝기는 **반 단**만 올린다. 한 단을 통째로 올렸더니 줄이 도드라져
-  // 타일마다 같은 무늬가 도는 게 그대로 보였다
-  for (let i = 0; i < 4; i++) {
+  const base = baseWater(0, 0, lv);                          // 이 깊이의 대표색
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // 아주 낮은 주파수로만 흔든다 — 여기서 무늬를 만들면 타일이 드러난다
+    const t = waterTone(x, y, lv) * 0.25 + (5 + lv * 0.42) * 0.75;
+    g.px(x, y, ramp(WATER, t));
+  }
+  const tone = 5 + lv * 0.42;
+  // 물결은 **성기게, 옅게**. 촘촘하고 대비가 세면 그게 곧 잡음이다
+  const RIP = ramp(WATER, tone + 0.6), LT = ramp(WATER, tone - 0.7);
+  for (let i = 0; i < 9; i++) {
     const ox = Math.floor(h(i, frame + s, 53) * N);
     const oy = Math.floor(h(frame + s, i, 54) * N);
     const len = 2 + Math.floor(h(i, i + frame + s, 55) * 3);
-    const t = 4.5 + lv * 0.42;
-    for (let k = 0; k < len; k++) g.px(ox + k, oy, ramp(WATER, t + (i % 2) * 0.5));
-    g.px(ox - 1, oy, ramp(WATER, t + 1.5));
-    // 물결의 머리 — 빛을 받는 쪽. 줄 끝에 한 톤 밝은 점이 물결의
-    // 방향을 만든다 (꼬리는 어둡고 머리는 밝다)
-    g.px(ox + len, oy, ramp(WATER, t - 1.0));
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, RIP);     // 물결 골
+    g.px(ox + len, oy, LT);                                  // 물결 머리 — 빛
+    if (h(i, frame, 56) < 0.35) g.px(ox - 1, oy, LT);
   }
-  // 물비늘 — 수면이 볕을 되쏘는 한두 점. 두 장에서 자리가 달라
-  // 저절로 깜빡인다. 얕은 물에만 — 깊은 물에 흰 점은 별이 뜬 것 같다
-  if (lv < 4) {
-    for (let i = 0; i < 2; i++) {
-      if (h(i + 41 + s, frame + 3, 88) < 0.4) continue;
-      const ox = Math.floor(h(i + 41 + s, frame, 89) * (N - 1));
-      const oy = Math.floor(h(frame, i + 41 + s, 90) * N);
-      g.px(ox, oy, mixc(FOAM, WATER[2], 0.3));
-      g.px(ox + 1, oy, ramp(WATER, 3.4));                   // 꼬리는 밝은 물빛
-    }
+  // 물비늘 — 얕은 물에만 한 점. 두 장에서 자리가 달라 저절로 깜빡인다
+  if (lv < 3 && h(s + frame, 41, 88) > 0.72) {
+    const ox = Math.floor(h(41 + s, frame, 89) * (N - 1));
+    const oy = Math.floor(h(frame, 41 + s, 90) * N);
+    g.px(ox, oy, mixc(FOAM, WATER[2], 0.62));
+    g.px(ox + 1, oy, ramp(WATER, tone - 1.6));
   }
-  // 물속에 비치는 바닥 — 모래톱과 조약돌, 수초 한 포기.
-  // 깊을수록 물빛에 더 섞여 형체만 남다가 결국 안 보인다
-  const mix = Math.min(0.94, 0.80 + lv * 0.05);
-  for (let i = 0; i < (lv < 3 ? 3 : 0); i++) {
-    const ox = Math.floor(h(i + 11 + s, frame, 81) * N), oy = Math.floor(h(frame, i + 11 + s, 82) * N);
+  // 물 밑에 비치는 바닥 — **아주 얕은 곳에만**, 형체만. 잔돌과 수초를
+  // 알알이 비췄더니 그게 곧 잡음이었다
+  const mix = 0.9;
+  if (lv === 0) {
+    const ox = Math.floor(h(11 + s, frame, 81) * N), oy = Math.floor(h(frame, 11 + s, 82) * N);
     for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 3; dx++)
       if (h(ox + dx, oy + dy, 83) < 0.7) g.px(ox + dx, oy + dy, thru(EARTH[1], mix));
-  }
-  for (let i = 0; i < (lv === 0 ? 4 : (lv < 3 ? 2 : 0)); i++) {
-    const ox = Math.floor(h(i + 21 + s, 5, 84) * N), oy = Math.floor(h(5, i + 21 + s, 85) * N);
-    g.px(ox, oy, thru(STONE[2], mix - 0.02)); g.px(ox + 1, oy, thru(STONE[3], mix - 0.02));
-    g.px(ox, oy + 1, thru(STONE[4], mix));
-  }
-  for (let i = 0; i < (lv === 0 ? 2 : (lv < 2 ? 1 : 0)); i++) {  // 수초
-    const ox = Math.floor(h(i + 31 + s, 7, 86) * N), oy = Math.floor(h(7, i + 31 + s, 87) * N);
-    for (const [dx, len] of [[-1, 2], [0, 3], [1, 2]])
-      for (let k = 0; k <= len; k++)
-        g.px(ox + dx, oy - k, thru(SEASON.summer[k === len ? 'tip' : 'base'], 0.72));
+    const wx = Math.floor(h(31 + s, 7, 86) * N), wy = Math.floor(h(7, 31 + s, 87) * N);
+    for (const [dx, len2] of [[-1, 2], [0, 3], [1, 2]])
+      for (let k = 0; k <= len2; k++)
+        g.px(wx + dx, wy - k, thru(SEASON.summer[k === len2 ? 'tip' : 'base'], 0.86));
   }
   return g;
 }
+
 
 // ---- 물가 ----
 //
