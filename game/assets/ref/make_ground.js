@@ -170,11 +170,21 @@ function cobble(seed) {
   // 같은 두 톤인데 장마다 섞임새만 달라서 경계가 안 보인다
   const MIXSHIFT = [0.12, 0.0, -0.12][((seed % 3) + 3) % 3];
   // ① 바탕 — 낮은 주파수 두 톤. 얼룩이 서너 칸에 걸친다
-  // 잔디·마당과 같은 처방 — 1픽셀 잡음을 버리고 감기는 값잡음 두 겹.
-  // 자갈밭은 닳은 데와 덜 닳은 데가 덩어리로 나뉘지, 알알이 튀지 않는다
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const t = vnoise(x, y, seed + 41, 8) * 0.6 + vnoise(x, y, seed + 47, 4) * 0.4;
-    g.px(x, y, STONE[t < 0.44 + MIXSHIFT ? 3 : 2]);
+  // 잔디·마당과 같은 처방 — 픽셀 난수(사포)도, 부드러운 얼룩(줄무늬)도
+  // 아니고 **짧은 획**이다. 자갈길의 결은 수레바퀴와 발이 끌고 간 자국이다
+  const half2 = (a, b) => a.map((c, j) => Math.round((c + b[j]) / 2));
+  const PB = [half2(STONE[2], STONE[3]), STONE[3], half2(STONE[3], STONE[4])][((seed / 5) | 0) % 3];
+  const PD = half2(PB, STONE[5]), PL = half2(PB, STONE[1]);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, PB);
+  for (let i = 0; i < 22; i++) {
+    const ox = Math.floor(h(i, seed + 1, 71) * N), oy = Math.floor(h(seed + 1, i, 72) * N);
+    const len = 2 + Math.floor(h(i, seed, 73) * 3);
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, PD);
+  }
+  for (let i = 0; i < 14; i++) {
+    const ox = Math.floor(h(i + 30, seed + 2, 75) * N), oy = Math.floor(h(seed + 2, i + 30, 76) * N);
+    const len = 1 + Math.floor(h(i, seed, 77) * 3);
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, PL);
   }
   // ② 도드라진 돌 — 두어 덩이. 타일 가장자리를 밟지 않아야 이음매가 안 보인다
   for (let k = 0; k < 3; k++) {
@@ -312,22 +322,38 @@ function grass(season, variant) {
     p.base.map((c, j) => Math.round((c + p.hi[j]) / 2)),   // 4 제일 볕 드는 단
   ];
 
-  // ---- ① 바탕은 **잡음이 아니라 볕과 그늘이다** ----
+  // ---- ① 바탕은 **잡음도 얼룩도 아니고 결이다** ----
   //
-  // 픽셀마다 난수를 굴려 톤을 고르면 그건 디더고, 디더는 화면에서
-  // 자글거리는 카펫이 된다 — 아무리 톤 폭을 좁혀도 「평평한 초록 종이」를
-  // 못 벗는다. 들판이 살아 보이는 건 **손바닥만 한 볕과 그늘**이 번갈아
-  // 눕기 때문이다.
+  // 두 번 틀렸다. 픽셀마다 난수를 굴리면 디더가 되어 사포처럼 자글거리고,
+  // 반대로 부드러운 값잡음으로 손바닥만 한 얼룩을 깔았더니 — 한 장이
+  // 수백 번 반복되므로 **그 얼룩이 통째로 반복되어** 들판에 사선 줄무늬가
+  // 떴다. 타일 안의 큰 무늬는 타일의 크기를 폭로한다.
   //
-  // 그래서 1픽셀 잡음을 버리고 **감기는 값잡음 두 겹**(8칸·4칸)만 쓴다.
-  // 격자점 사이를 이어 붙이므로 톤이 덩어리로 뭉치고, 타일 끝에서 감기니
-  // 이음매도 없다. 장마다 문턱을 밀어 몇 칸에 걸친 큰 얼룩까지 생긴다.
-  const SHIFT = [-0.05, 0, 0.05][variant % 3];
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const v = vnoise(x, y, 31 + variant * 3, 8) * 0.64
-      + vnoise(x, y, 37 + variant * 3, 4) * 0.36 + SHIFT;
-    const i = v < 0.36 ? 1 : (v < 0.50 ? 2 : (v < 0.68 ? 3 : 4));
-    g.px(x, y, lad[i]);
+  // 답은 **짧은 획**이다. 잔디는 잎이 눕는 결이지 명암의 덩어리가 아니다.
+  // 두세 칸짜리 가로 획을 성기게 눕히면, 획 하나하나는 결로 읽히고 크기가
+  // 작아 반복이 안 보인다. 바탕 톤은 거의 평평하게 두고(한 단), 넓은
+  // 얼룩은 **장을 고르는 쪽**(main._patch01)이 몇 칸에 걸쳐 만든다.
+  // 장마다 바탕 톤이 다르되 **반 단씩만** — 사다리 한 단을 통째로 옮기면
+  // 세 장의 차이가 네모난 판으로 드러난다. 넓은 얼룩은 장을 고르는 쪽이
+  // 몇 칸에 걸쳐 만들어 주므로, 여기서는 그 씨앗만 뿌리면 된다
+  const half = (a, b) => a.map((c, j) => Math.round((c + b[j]) / 2));
+  const BASE = [half(lad[1], lad[2]), lad[2], half(lad[2], lad[3])][variant % 3];
+  const DK1 = half(BASE, lad[1]), DK2 = half(BASE, lad[0]), LT = half(BASE, lad[4]);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, BASE);
+  // 어두운 결 — 잎이 겹쳐 그늘진 자리. 두세 칸 가로 획
+  for (let i = 0; i < 26; i++) {
+    const ox = Math.floor(h(i, variant * 3 + 1, 71) * N);
+    const oy = Math.floor(h(variant * 3 + 1, i, 72) * N);
+    const len = 2 + Math.floor(h(i, variant, 73) * 2);
+    const c = h(i, variant, 74) < 0.32 ? DK2 : DK1;         // 더 짙은 획도 섞인다
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, c);
+  }
+  // 볕 받은 결 — 그보다 드물게, 더 짧게
+  for (let i = 0; i < 12; i++) {
+    const ox = Math.floor(h(i + 30, variant * 3 + 2, 75) * N);
+    const oy = Math.floor(h(variant * 3 + 2, i + 30, 76) * N);
+    const len = 1 + Math.floor(h(i, variant, 77) * 2);
+    for (let k = 0; k < len; k++) g.px(ox + k, oy, LT);
   }
 
   // ---- ② 포기는 **뿌리 그늘**이 있어야 땅에 앉는다 ----
@@ -499,14 +525,30 @@ function yard(v) {
   //   바탕   세 단만 (EARTH 1~3). 다섯 단을 쓰면 그 폭이 곧 얼룩이다
   //   자국   장 0 발자국 · 장 1 잔돌과 금 · 장 2 지푸라기와 풀포기
   // 밟힌 흙은 평평하다. 평평해야 그 위의 것이 산다.
-  // 바탕은 **잡음이 아니라 밟힌 자국이다** — 잔디와 같은 처방. 픽셀마다
-  // 난수를 굴리면 디더가 되고, 디더는 흙이 아니라 사포다. 감기는 값잡음
-  // 두 겹으로 다져진 데와 파인 데가 덩어리로 눕는다
-  const YSHIFT = [0.06, 0, -0.06][v % 3];   // 밝기가 아니라 **섞임새**를 흔든다
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const t = vnoise(x, y, 60 + v * 3, 8) * 0.62 + vnoise(x, y, 66 + v * 3, 4) * 0.38;
-    const i = t < 0.36 + YSHIFT ? 3 : (t < 0.72 + YSHIFT ? 2 : 1);
-    g.px(x, y, EARTH[i]);
+  // 바탕은 **잡음도 얼룩도 아니고 결이다** — 잔디와 같은 처방.
+  // 픽셀 난수는 사포가 되고, 부드러운 얼룩은 타일째 반복되어 줄무늬가
+  // 된다. 짧은 가로 획이라야 결로 읽히고 반복이 안 보인다.
+  // 밟힌 흙의 결은 신발이 끌린 자국이다
+  const half = (a, b) => a.map((c, j) => Math.round((c + b[j]) / 2));
+  const BASE = [half(EARTH[1], EARTH[2]), EARTH[2], half(EARTH[2], EARTH[3])][v % 3];
+  const DK1 = half(BASE, EARTH[3]), DK2 = half(BASE, EARTH[4]), LT = half(BASE, EARTH[0]);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) g.px(x, y, BASE);
+  // 다만 **흙의 결은 가로줄이 아니다.** 잔디처럼 긴 가로 획을 눕혔더니
+  // 마당이 나뭇결 판때기가 됐다 — 밟힌 흙에 결은 없고 **잔 흙덩이와
+  // 파인 자리**가 있다. 두 칸짜리 덩이를 가로세로 섞어 흩는다
+  const clod = (ox, oy, c, vert) => {
+    g.px(ox, oy, c);
+    if (vert) g.px(ox, oy + 1, c); else g.px(ox + 1, oy, c);
+  };
+  for (let i = 0; i < 30; i++) {                          // 흙덩이 그늘
+    const ox = Math.floor(h(i, v * 3 + 1, 71) * N), oy = Math.floor(h(v * 3 + 1, i, 72) * N);
+    const c = h(i, v, 74) < 0.28 ? DK2 : DK1;
+    clod(ox, oy, c, h(i, v, 78) < 0.45);
+    if (h(i, v, 73) < 0.3) g.px(ox + 1, oy + 1, c);       // 더러는 2x2 덩이
+  }
+  for (let i = 0; i < 18; i++) {                          // 볕에 마른 자리
+    const ox = Math.floor(h(i + 30, v * 3 + 2, 75) * N), oy = Math.floor(h(v * 3 + 2, i + 30, 76) * N);
+    clod(ox, oy, LT, h(i, v, 79) < 0.45);
   }
   // 반들반들 다져진 자리 — 사람이 늘 밟고 다니는 목. **한 군데만**,
   // 그것도 한 단만 밝게. 이게 있어야 흙이 깔린 게 아니라 닳은 것이 된다
