@@ -3911,6 +3911,7 @@ func _draw() -> void:
 	_draw_map_rim(x0, y0, x1, y1)
 	if perf_show:
 		_perf["draw"] = Time.get_ticks_usec() - _t0
+		_pm("그리기", _t0)
 
 
 # ---- 맵의 가장자리 ----
@@ -3940,7 +3941,6 @@ func _draw_map_rim(x0: int, y0: int, x1: int, y1: int) -> void:
 		var by := MAP_H - 1 - d
 		if y0 <= by and by < y1:                     # 남쪽
 			draw_rect(Rect2(x0 * ts, by * ts, (x1 - x0) * ts, ts), c)
-		_pm("그리기", _t0)
 
 
 # ---- F3: 한 프레임이 어디서 몇 밀리초를 쓰는가 ----
