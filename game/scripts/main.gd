@@ -1779,8 +1779,11 @@ func apply_appearance() -> void:
 # 색이 옅어지고 푸르러지는 것 — 대기 원근이다. 맵 변에서 멀어질수록
 # 숲을 이 흐림빛(HAZE)으로 녹인다. 그러면 끝이 「막힌 데」가 아니라
 # 「더 가 볼 수 없을 만큼 먼 데」가 된다.
-const OUT_TINT := Color(0.46, 0.52, 0.46)
-const OUT_TREE_TINT := Color(0.38, 0.45, 0.40)
+# 맵 변 **바로 밖**은 안쪽과 거의 같아야 한다. 0.46으로 눌러 두었더니 변에서
+# 밝기가 뚝 떨어져, 안개를 아무리 곱게 깔아도 그 한 줄이 「여기가 끝」이라고
+# 말했다. 경계는 밝기로 긋는 게 아니라 **거리로** 그어야 한다
+const OUT_TINT := Color(0.88, 0.92, 0.88)
+const OUT_TREE_TINT := Color(0.80, 0.86, 0.82)
 const HAZE := Color(0.72, 0.80, 0.86)      # 먼 하늘빛 — 푸르고 옅다
 const HAZE_FULL := 26.0                    # 몇 칸 밖에서 흐림이 다 차는가
 
@@ -3825,7 +3828,14 @@ func _draw() -> void:
 				continue
 			put.call(out_grass, g3[int(_hash01(x, y) * 3.0) % 3],
 				Vector2(x * TILE, y * TILE))
-			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다
+			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다.
+			# 다만 **맵 변에서 열 칸까지만.** 사십 칸 밖까지 나무를 세우면
+			# 그건 「끝없는 숲」이 아니라 「끝없는 벽지」다. 가까운 숲 한 뼘
+			# 너머로는 능선과 안개가 맡는다 (_draw_far_ridges)
+			var od: float = maxf(maxf(-float(x), float(x - (MAP_W - 1))),
+				maxf(-float(y), float(y - (MAP_H - 1))))
+			if od > 8.0:
+				continue
 			if x % 3 == 0 and y % 2 == 0 and _hash01(x * 5 + 1, y * 7 + 3) < 0.55:
 				out_trees.append(Vector2(x * TILE, y * TILE))
 
@@ -3908,6 +3918,8 @@ func _draw() -> void:
 	for t: Texture2D in out_grass:
 		for at: Vector2 in out_grass[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false, _out_tint(at, OUT_TINT))
+	# 먼 능선 — 바깥 잔디 **뒤**, 바깥 나무 **앞**에 얹는다
+	_draw_far_ridges(vx0, vx1, vy0)
 	if not out_trees.is_empty():
 		var ot: Texture2D = tex["tree_01"]
 		# 배율은 **그림 크기에서 되짚는다.** 1.5로 박아 두었더니, 나무 판을
@@ -3991,6 +4003,88 @@ func _draw() -> void:
 	if perf_show:
 		_perf["draw"] = Time.get_ticks_usec() - _t0
 		_pm("그리기", _t0)
+
+
+# ---- 세계 너머의 능선 ----
+#
+# 안개로 숲을 녹여 「끝이 멀다」까지는 왔는데, 그 너머가 여전히 **아무것도
+# 없는 옅은 초록**이었다. 거리를 말하려면 **거리에 무언가가 있어야** 한다 —
+# 멀어서 흐릿할 뿐이지 텅 빈 것이 아니다.
+#
+# 그래서 세계의 북쪽 위로 능선 두 겹을 눕힌다. 위에서 내려다보는 화면에서
+# **화면 위쪽이 곧 먼 곳**이라, 지평선은 북쪽에만 선다 (좌우·남쪽에 세우면
+# 산이 옆으로 누운 꼴이 된다).
+#
+#   가까운 능선  숲빛이 남아 있고 마루가 굵게 굽이친다
+#   먼 능선      거의 하늘빛. 마루가 잘고 길게 눕는다
+#
+# 두 겹인 것이 핵심이다. 한 겹이면 그건 「하늘을 가린 벽」이고,
+# 겹이 둘이면 그 사이의 공기가 곧 **깊이**가 된다.
+# 마루의 평균 높이 (칸, 맵 위쪽이 음수).
+#
+# 능선을 맵 변 코앞까지 끌어내렸더니, 변 바로 밖이 통째로 회록색 슬래브가
+# 되어 「안쪽은 잔디, 바깥은 포장」으로 갈렸다. 변 바로 밖 서너 칸은
+# **안쪽과 이어지는 숲 바닥**으로 두고, 능선은 그 너머에서 시작한다.
+const RIDGE_NEAR_Y := -6.5
+const RIDGE_FAR_Y := -10.5
+# **회색으로 흐리면 능선이 아니라 콘크리트 바닥이다.** 하늘빛(HAZE)이
+# 워낙 탁해서 거기에 섞을수록 초록이 죽는다 — 처음에 두 겹을 다 그렇게
+# 섞었더니 마을 북쪽이 통째로 「포장한 광장」이 됐다. 능선은 **숲**이다:
+# 가까운 마루는 초록을 지키고, 먼 마루만 하늘빛으로 물러난다.
+const RIDGE_NEAR := Color(0.35, 0.49, 0.36)
+const RIDGE_FAR := Color(0.57, 0.67, 0.65)
+const SKY_FAR := Color(0.80, 0.86, 0.88)
+
+# 굽이치는 마루선 — 성긴 격자의 난수를 부드럽게 이어 뽑는다.
+# 사인 곡선을 쓰면 산이 아니라 물결이 되고, 칸마다 난수를 쓰면 톱니가 된다
+func _ridge_line(tx: float, span: float, amp: float, seed: int) -> float:
+	var u: float = tx / span
+	var i: int = int(floor(u))
+	var f: float = u - float(i)
+	f = f * f * (3.0 - 2.0 * f)
+	var a: float = _hash01(i, seed)
+	var b: float = _hash01(i + 1, seed)
+	return (a + (b - a) * f - 0.5) * amp
+
+
+func _draw_far_ridges(vx0: int, vx1: int, vy0: int) -> void:
+	if vy0 >= -1:
+		return                              # 북쪽 하늘이 화면에 없다
+	var ts := float(TILE)
+	var x0 := float(vx0) * ts
+	var x1 := float(vx1) * ts
+	var top_y := float(vy0) * ts
+	# ① 제일 먼 곳은 하늘이다. 잔디 무늬가 지평선까지 이어지면 그건
+	#    「끝없는 벽지」지 먼 데가 아니다
+	draw_rect(Rect2(x0, top_y, x1 - x0, (RIDGE_FAR_Y + 2.0) * ts - top_y), SKY_FAR)
+	var step := 8.0                         # 마루를 8px 기둥으로 세운다 (도트 4칸)
+	# ② 능선 두 겹 — 먼 것부터. **띠로 눕히고 바닥은 다음 겹이 받는다.**
+	#    마루에서 맵 변까지 통으로 채웠더니 슬래브 한 장이 됐다
+	for k in 2:
+		var far := k == 0
+		var by: float = (RIDGE_FAR_Y if far else RIDGE_NEAR_Y) * ts
+		var amp: float = (1.8 if far else 2.4) * ts
+		var span: float = (19.0 if far else 12.0) * ts
+		var col: Color = RIDGE_FAR if far else RIDGE_NEAR
+		var seed: int = 41 if far else 77
+		# 바닥 — 먼 능선은 가까운 마루께까지, 가까운 능선은 맵 변 바로 위까지
+		var foot: float = -6.0 * ts if far else -3.0 * ts
+		var x: float = floor(x0 / step) * step
+		while x < x1:
+			var top: float = by + _ridge_line(x, span, amp, seed)
+			# 숲으로 덮인 마루라 능선이 **잘게 울퉁불퉁하다.** 매끈한 곡선은
+			# 산이 아니라 언덕 도안이다 — 나무 한 그루만 한 요철을 얹는다
+			top += (_hash01(int(x / step), seed + 5) - 0.5) * (4.0 if far else 7.0)
+			draw_rect(Rect2(x, top, step, foot - top), col)
+			draw_rect(Rect2(x, top, step, 4.0), col.lightened(0.14))
+			x += step
+		# 마루 밑에 고인 안개 — 두 겹 사이를 갈라 주는 것이 이 한 줄이다.
+		# 없으면 두 능선이 한 덩어리로 붙어 깊이가 사라진다
+		var mist: float = 0.24 if far else 0.13
+		for b2 in 3:
+			var bh: float = 1.1 * ts
+			draw_rect(Rect2(x0, foot - bh * float(b2 + 1), x1 - x0, bh),
+				Color(SKY_FAR.r, SKY_FAR.g, SKY_FAR.b, mist * (1.0 - float(b2) * 0.32)))
 
 
 # ---- 맵의 가장자리 ----
