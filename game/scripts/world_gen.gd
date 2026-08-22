@@ -982,6 +982,7 @@ func _build_hamlets() -> void:
 		# 같은 이유다 — 그림은 뒤이어 _spawn_objects 가 세운다.
 		for entry2: Array in h.houses:
 			_place_building_tiles(entry2[0])
+			_house_yard(entry2[0], String(entry2[1]))
 
 		# 마을 한복판 — 다져진 흙 마당. 여기서 사람들이 만난다
 		for y2 in range(h.square.y - 2, h.square.y + 3):
@@ -1104,12 +1105,15 @@ func _build_village() -> void:
 	# 집은 처음부터 서 있고, 오래 비워 둬서 낡았을 뿐이다. 플레이어가 할 일은
 	# 짓는 것이 아니라 **보수**다 (village_ui._open_build_dialog).
 	_place_building_tiles(m.HOME_ANCHOR)
+	_house_yard(m.HOME_ANCHOR, "home")
 	# 이장의 거처 — 처음부터 있는 집 (마을의 유일한 지붕)
 	m.objects[m.CHIEF_HUT] = {"kind": "chief_hut", "hp": 0}
 	# 그림이 덮는 칸을 막는다. 안 막으면 512x552 짜리 집 안으로 걸어
 	# 들어가진다 (예전 오두막은 한 칸짜리라 이럴 일이 없었다).
 	# 문 칸만 남겨 둔다 — 거기서 이장을 부른다.
 	_block_under_art(m.CHIEF_ART, Rect2i(m.CHIEF_HUT.x, m.CHIEF_HUT.y, 1, 1))
+	# 이장 거처의 기준점은 문 칸에서 되짚는다 (CHIEF_HUT = door_tile(anchor))
+	_house_yard(m.CHIEF_HUT - Vector2i(2, 3), "chief")
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	# 경매 게시판 — 다른 농장 사람들과 사고파는 장터로 이어진다
 	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
@@ -1491,6 +1495,63 @@ func _plot_props(anchor: Vector2i, pid: String) -> void:
 		if _is_plot_gateway(t):
 			continue      # 드나드는 목은 무엇으로도 막지 않는다
 		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
+		_scuff(t, str(entry[1]))
+
+
+# ---- 가게가 아닌 집에도 마당을 편다 ----
+#
+# main.HOUSE_DECOR 를 보고 집 둘레에 살림 두어 가지를 내놓는다.
+# 자리가 이미 차 있거나 물·바위 위면 그 하나만 건너뛴다.
+func _house_yard(anchor: Vector2i, key: String) -> void:
+	for entry: Array in m.HOUSE_DECOR.get(key, []):
+		var t: Vector2i = anchor + (entry[0] as Vector2i)
+		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+			continue
+		if m.objects.has(t):
+			continue
+		if m.grid[t.y][t.x].ground not in ["grass", "yard", "path", "sand", "soil"]:
+			continue
+		if m.ROAD.has_point(t) or m.PLAZA.has_point(t) or _on_village_road(t):
+			continue
+		if t == m.door_tile(anchor) or t == m.door_tile(anchor) + Vector2i(0, 1):
+			continue      # 문 앞은 비워 둔다
+		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
+		_scuff(t, str(entry[1]))
+
+
+# ---- 물건이 놓인 자리는 풀이 죽는다 ----
+#
+# 살림을 잔디 위에 그냥 세웠더니 「그냥 위에 얹어 놓은 것 같다」는 말을
+# 들었다. 그림자를 아무리 곱게 깔아도 그렇다 — 그림자는 **빛**의 일이고,
+# 물건이 거기 **오래 있었다**는 것은 **땅**이 말한다.
+#
+# 궤짝 하나가 한 계절만 놓여 있어도 그 밑의 풀은 죽고, 둘레는 드나들며
+# 밟혀 흙이 드러난다. 그 한 뼘의 다진 흙(yard)이 물건을 땅에 앉힌다.
+# 자로 잰 네모가 아니라 둥근 얼룩이고, 가장자리는 들쭉날쭉해야 한다.
+func _scuff(t: Vector2i, kind: String) -> void:
+	if not kind.begins_with("deco_"):
+		return                              # 울타리·풀 따위는 땅을 다지지 않는다
+	# 큰 물건일수록 넓게 밟힌다
+	var big := kind in ["deco_forge", "deco_weaponrack", "deco_cart",
+		"deco_netrack", "deco_specimen", "deco_toolrack"]
+	var rx: float = 2.1 if big else 1.5
+	var ry: float = 1.5 if big else 1.1
+	for y in range(t.y - 2, t.y + 3):
+		for x in range(t.x - 3, t.x + 4):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue                    # 이미 깐 바닥은 건드리지 않는다
+			var p := Vector2i(x, y)
+			if m.ROAD.has_point(p) or m.PLAZA.has_point(p) or _on_village_road(p):
+				continue
+			var d: float = pow((x - t.x) / rx, 2.0) + pow((y - t.y + 0.25) / ry, 2.0)
+			if d > 1.0:
+				continue
+			# 가장자리는 확률로 뺀다 — 둥근 자국도 자로 그으면 접시가 된다
+			if d > 0.34 and m._hash01(x * 13 + 7, y * 17 + 11) < (d - 0.34) * 1.45:
+				continue
+			m.grid[y][x].ground = "yard"
 
 
 # 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,
@@ -1644,6 +1705,7 @@ func _spawn_forest_house() -> void:
 	# 한 번도 돌지 않았다 (길은 오래전부터 없었다). 죽은 줄을 걷어낸다.
 	_fill_building(a)
 	m.objects.erase(m.door_tile(a))
+	_house_yard(a, "forest")
 	m.queue_redraw()
 
 
@@ -1670,6 +1732,7 @@ func _spawn_alch_house() -> void:
 				m.grid[y2][x2].ground = "path"
 	_fill_building(a)
 	m.objects.erase(m.door_tile(a))
+	_house_yard(a, "alch")
 	m.queue_redraw()
 
 
@@ -2128,6 +2191,7 @@ func _migrate_farm_layout() -> void:
 			m.objects.erase(p)
 	if GameData.barn_built:
 		m.objects[m.BARN_POS] = {"kind": "barn", "hp": 0}
+		_house_yard(m.BARN_POS, "barn")
 		_block_barn_art()
 		# 새 축사 그림 자리에 서 있던 세이브라면 밖으로 꺼내 준다 (갇히지 않게)
 		if not m.is_passable(m.player_tile()):

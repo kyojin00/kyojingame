@@ -545,11 +545,91 @@ const OBJ_DEFAULT := Color(0.5, 0.4, 0.3)
 const OBJ_COL := {
 	"tree": Color(0.15, 0.35, 0.14), "rock": Color(0.5, 0.5, 0.56),
 	"bigrock": Color(0.44, 0.44, 0.5), "searock": Color(0.38, 0.38, 0.44),
-	"house": Color(0.66, 0.3, 0.23), "art_block": Color(0.66, 0.3, 0.23),
+	"house": Color(0.72, 0.62, 0.5), "art_block": Color(0.66, 0.6, 0.5),
+	"chief_hut": Color(0.72, 0.62, 0.5), "barn": Color(0.72, 0.62, 0.5),
 	"board": Color(0.95, 0.8, 0.35), "sign": Color(0.95, 0.8, 0.35),
 	"auction": Color(0.95, 0.8, 0.35), "plotsite": Color(0.9, 0.75, 0.4),
 	"homeplot": Color(0.9, 0.75, 0.4), "fence": Color(0.6, 0.45, 0.28),
 }
+
+
+# ---- 지도를 「그림」으로 ----
+#
+# 지도가 칸마다 색을 찍은 **도표**였다. 참고로 받은 지도(스타듀)가 한눈에
+# 읽히는 까닭은 정보가 많아서가 아니라, 세상에 있는 것이 **작은 그림**으로
+# 그려져 있어서다 — 나무는 나무 모양, 집은 지붕과 문이 있는 집 모양.
+#
+# 세 가지를 지킨다.
+#   ① 윤곽선   그림마다 검은 테를 두른다. 테가 없으면 바탕에 스민다
+#   ② 두 톤    잎도 벽도 밝은 면과 그늘 두 단. 한 색은 색종이다
+#   ③ 한 채는 한 번  집은 5x4칸인데 칸마다 그리면 지붕 스무 장이 겹친다
+const INK := Color(0.10, 0.09, 0.12)
+# 지붕색 — 마을이 한 가지 색이면 집이 아니라 무늬가 된다. 자리로 고른다
+const ROOFS := [Color(0.78, 0.29, 0.22), Color(0.62, 0.34, 0.24),
+	Color(0.36, 0.44, 0.56), Color(0.44, 0.52, 0.34), Color(0.70, 0.46, 0.22)]
+
+
+func _is_house(x: int, y: int) -> bool:
+	return str(main.objects.get(Vector2i(x, y), {}).get("kind", "")) in \
+		["house", "art_block"]
+
+
+# 나무 한 그루 — 밑동 위에 잎 두 겹. 그루마다 크기와 자리를 조금씩 흔든다
+func _mini_tree(at: Vector2, cs: float, pos: Vector2i) -> void:
+	var jx: float = (main._hash01(pos.x * 7 + 1, pos.y * 11 + 3) - 0.5) * cs * 0.34
+	var jy: float = (main._hash01(pos.x * 13 + 5, pos.y * 17 + 2) - 0.5) * cs * 0.22
+	var r: float = cs * (0.44 + main._hash01(pos.x * 5 + 9, pos.y * 3 + 7) * 0.16)
+	var c := Vector2(at.x + cs * 0.5 + jx, at.y + cs * 0.44 + jy)
+	# **멀리서는 싸게 그린다.** 한 그루에 여섯 번씩 부르면 화면에 삼천 그루가
+	# 뜨는 배율에서 한 프레임이 무너진다 — 작아서 어차피 안 보일 것은 안 그린다
+	if cs < 8.0:
+		canvas.draw_circle(c, r, INK)
+		canvas.draw_circle(c - Vector2(r * 0.16, r * 0.2), r * 0.78,
+			Color(0.24, 0.47, 0.21))
+		return
+	# 밑동 — 잎보다 먼저. 잎이 밑동의 어깨를 덮어야 한 그루가 된다
+	canvas.draw_rect(Rect2(c.x - cs * 0.13, c.y, cs * 0.26, cs * 0.62), INK)
+	canvas.draw_rect(Rect2(c.x - cs * 0.09, c.y, cs * 0.18, cs * 0.56),
+		Color(0.36, 0.24, 0.15))
+	canvas.draw_circle(c, r, INK)
+	canvas.draw_circle(c, r - maxf(1.0, cs * 0.09), Color(0.16, 0.36, 0.17))
+	canvas.draw_circle(c - Vector2(r * 0.22, r * 0.26), r * 0.62,
+		Color(0.28, 0.53, 0.24))
+	canvas.draw_circle(c - Vector2(r * 0.34, r * 0.38), r * 0.28,
+		Color(0.40, 0.66, 0.31))
+
+
+# 집 한 채 — 벽 위에 박공 지붕, 문 하나 창 하나. 테를 두른다
+func _mini_house(p: Vector2, w: float, h: float, pos: Vector2i) -> void:
+	var roof: Color = ROOFS[int(main._hash01(pos.x * 3 + 2, pos.y * 5 + 1) * 5.0) % 5]
+	var wall := Color(0.88, 0.82, 0.68)
+	var bx: float = p.x + w * 0.14
+	var bw: float = w * 0.72
+	var by: float = p.y + h * 0.44
+	var bh: float = h * 0.56
+	canvas.draw_rect(Rect2(bx - 1.0, by - 1.0, bw + 2.0, bh + 2.0), INK)
+	canvas.draw_rect(Rect2(bx, by, bw, bh), wall)
+	canvas.draw_rect(Rect2(bx, by + bh * 0.62, bw, bh * 0.38),
+		wall.darkened(0.16))
+	# 지붕 — 처마가 벽보다 넓게 나온다. 그래야 얹힌 것으로 보인다
+	var apex := Vector2(p.x + w * 0.5, p.y + h * 0.04)
+	var le := Vector2(p.x + w * 0.03, by + h * 0.04)
+	var re := Vector2(p.x + w * 0.97, by + h * 0.04)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		apex + Vector2(0, -2), le + Vector2(-2, 2), re + Vector2(2, 2)]), INK)
+	canvas.draw_colored_polygon(PackedVector2Array([apex, le, re]), roof)
+	canvas.draw_colored_polygon(PackedVector2Array([
+		apex, le, Vector2(p.x + w * 0.5, by + h * 0.04)]), roof.lightened(0.14))
+	# 문과 창
+	var dw: float = maxf(1.0, w * 0.13)
+	canvas.draw_rect(Rect2(p.x + w * 0.5 - dw * 0.5, by + bh - bh * 0.52,
+		dw, bh * 0.52), Color(0.34, 0.22, 0.14))
+	if w >= 26.0:
+		var ww: float = w * 0.1
+		canvas.draw_rect(Rect2(bx + bw * 0.16, by + bh * 0.24, ww, ww),
+			Color(0.55, 0.74, 0.82))
+		canvas.draw_rect(Rect2(bx + bw * 0.84 - ww, by + bh * 0.24, ww, ww),
+			Color(0.55, 0.74, 0.82))
 
 
 # 마지막으로 한 장 그리는 데 걸린 시간(us). 하네스가 이 값으로
@@ -592,7 +672,7 @@ func _draw_map() -> void:
 	# 건물은 몸통 위에 얹힌 지붕. 멀리서 볼 때(칸이 7px 미만)는 어차피
 	# 점만 하니 굽힌 색으로 충분하다.
 	var cs := _cell
-	if cs >= 7.0:
+	if cs >= 4.5:
 		for pos: Vector2i in main.objects:
 			if pos.x < x0 or pos.x >= x1 or pos.y < y0 or pos.y >= y1:
 				continue
@@ -602,28 +682,40 @@ func _draw_map() -> void:
 			var at := Vector2(_ox + pos.x * cs, _oy + pos.y * cs)
 			match kind:
 				"tree":
-					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.15, cs + 0.5, cs * 0.85),
-						Color(0.13, 0.31, 0.13))
-					canvas.draw_rect(Rect2(at.x + cs * 0.15, at.y + cs * 0.1,
-						cs * 0.6, cs * 0.45), Color(0.24, 0.47, 0.2))
+					_mini_tree(at, cs, pos)
 				"rock", "bigrock":
-					var big: float = 1.0 if kind == "bigrock" else 0.82
-					canvas.draw_rect(Rect2(at.x + cs * (1.0 - big) * 0.5,
-						at.y + cs * (1.0 - big) * 0.5, cs * big, cs * big),
-						Color(0.46, 0.46, 0.52))
-					canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.15,
-						cs * 0.45, cs * 0.3), Color(0.68, 0.68, 0.74))
-				"house", "art_block":
-					canvas.draw_rect(Rect2(at, Vector2(cs + 0.5, cs + 0.5)),
-						Color(0.76, 0.68, 0.56))
-					canvas.draw_rect(Rect2(at.x, at.y, cs + 0.5, maxf(1.0, cs * 0.45)),
-						Color(0.66, 0.27, 0.21))
+					var big: float = 1.15 if kind == "bigrock" else 0.9
+					var rc := Vector2(at.x + cs * 0.5, at.y + cs * 0.55)
+					canvas.draw_circle(rc, cs * 0.5 * big, INK)
+					canvas.draw_circle(rc, cs * 0.5 * big - 1.0, Color(0.46, 0.46, 0.52))
+					canvas.draw_circle(rc - Vector2(cs * 0.12, cs * 0.14),
+						cs * 0.26 * big, Color(0.68, 0.68, 0.74))
+				"house":
+					# 한 채는 5x4칸이다. **왼위 모서리에서만** 한 번 그린다 —
+					# 칸마다 그리면 마을이 지붕 스무 장 겹친 덩어리가 된다
+					if _is_house(pos.x - 1, pos.y) or _is_house(pos.x, pos.y - 1):
+						continue
+					_mini_house(at, cs * 5.0, cs * 4.0, pos)
+				"chief_hut", "barn":
+					_mini_house(at - Vector2(cs * 2.0, cs * 3.0),
+						cs * 5.5, cs * 4.5, pos)
 				"board", "sign", "auction", "plotsite", "homeplot":
-					canvas.draw_rect(Rect2(at.x + cs * 0.2, at.y + cs * 0.2,
-						cs * 0.6, cs * 0.6), Color(0.95, 0.8, 0.35))
+					var sp := Vector2(at.x + cs * 0.5, at.y + cs * 0.35)
+					canvas.draw_rect(Rect2(sp.x - cs * 0.34, sp.y - cs * 0.3,
+						cs * 0.68, cs * 0.6), INK)
+					canvas.draw_rect(Rect2(sp.x - cs * 0.26, sp.y - cs * 0.22,
+						cs * 0.52, cs * 0.44), Color(0.95, 0.8, 0.35))
+					canvas.draw_rect(Rect2(sp.x - cs * 0.08, sp.y + cs * 0.3,
+						cs * 0.16, cs * 0.5), Color(0.42, 0.28, 0.16))
 				"fence":
-					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.3, cs + 0.5,
-						maxf(1.0, cs * 0.4)), Color(0.6, 0.45, 0.28))
+					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.34, cs + 0.5,
+						maxf(1.0, cs * 0.3)), Color(0.45, 0.32, 0.19))
+					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.38, cs + 0.5,
+						maxf(1.0, cs * 0.18)), Color(0.66, 0.5, 0.31))
+				"cave":
+					var cc := Vector2(at.x + cs * 0.5, at.y + cs * 0.5)
+					canvas.draw_circle(cc, cs * 0.62, Color(0.36, 0.34, 0.38))
+					canvas.draw_circle(cc + Vector2(0, cs * 0.12), cs * 0.34, INK)
 
 	# 동물/NPC (보이는 지역만)
 	var dot: float = maxf(3.0, _cell * 0.5)

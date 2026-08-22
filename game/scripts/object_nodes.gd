@@ -137,7 +137,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	match kind:
 		"tree":
 			texture = m.tex["tree_01"]  # 실제 상태별 텍스처는 _refresh_tree_sprite가 결정
-			offset = Vector2(0, -100)
+			# 밑동을 칸 밑변보다 **일곱 화면px 위**에 둔다. 예전에는 -100 을
+			# 그대로 박아 뒀는데, 그림 크기가 바뀌면 나무가 땅에 파묻힌다 —
+			# 그림에서 재야 어떤 판을 써도 발이 같은 자리에 놓인다
+			offset = Vector2(0, -texture.get_height() - 14.0)
 		"rock":
 			texture = m.tex["rock"]
 		"bigrock":
@@ -303,10 +306,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var node := _make_object(texture, Vector2(pos.x * m.TILE, (pos.y + 1) * m.TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = m.OBJECT_SCALES.get(kind, 1.0) / m.OBJECT_TEX_DENSITY
-	if kind == "tree":
-		# 크기 편차는 5칸 간격 안에서 겹치지 않는 범위까지만 (숲에서는 덩어리감을 준다)
-		sc *= 0.82 + m._hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.26
-	elif kind == "rock":
+	if kind == "rock":
 		# 큰 돌과 작은 돌이 섞이도록
 		sc *= 0.65 + m._hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
 	elif kind == "searock":
@@ -344,6 +344,24 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 몇 픽셀씩 어긋나야 숲이다. 판정 칸은 그대로 — 그림만 옮긴다
 			spr.offset.x += (m._hash01(pos.x * 11 + 2, pos.y * 17 + 5) - 0.5) * 8.0
 			spr.offset.y += (m._hash01(pos.x * 13 + 4, pos.y * 19 + 7) - 0.5) * 4.0
+		elif kind in m.DOT_PROPS or kind == "deco_bench":
+			# ---- 마당 살림도 자로 잰 듯 서면 안 된다 ----
+			#
+			# 살림을 칸 한복판에 정확히 세웠더니 마당이 **바둑판**이 됐다 —
+			# 「그냥 위에 얹어 놓은 것 같다」가 이것이다. 사람이 내려놓은
+			# 물건은 칸에 맞춰 놓이지 않는다. 몇 픽셀씩 어긋나야 놓인 것이다.
+			#
+			# 세로는 가로의 절반만 흔든다. 세로로 크게 흔들면 앞뒤 순서(y정렬)와
+			# 어긋나서, 뒤에 있는 물건이 앞으로 튀어나온 것처럼 보인다.
+			# 문 앞 등불은 뺀다 — 그건 살림이 아니라 문의 일부라, 한 쌍이
+			# 나란해야 문이 된다. 어긋나면 한쪽이 삐뚤어진 집으로 보인다.
+			spr.offset.x += (m._hash01(pos.x * 23 + 7, pos.y * 29 + 3) - 0.5) * 22.0
+			spr.offset.y += (m._hash01(pos.x * 31 + 5, pos.y * 37 + 9) - 0.5) * 9.0
+			# 좌우 뒤집기 — 같은 그림이 마당마다 서면 복사한 티가 난다.
+			# 글씨도 얼굴도 없는 살림이라 뒤집어도 어색하지 않다
+			if kind in ["deco_crate", "deco_sack", "deco_logpile", "deco_hay",
+					"deco_trough", "deco_feedbox", "deco_bookstack"]:
+				spr.flip_h = m._hash01(pos.x * 41 + 1, pos.y * 43 + 6) > 0.5
 		if kind == "deco_fountain":
 			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
 		elif kind == "auction":
@@ -363,6 +381,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		# 깊은 숲은 뒤로 물러나고 벨 수 있는 나무만 앞으로 나온다.
 		if bool(od.get("fixed", false)):
 			(node.get_child(0) as Sprite2D).modulate = DEEP_WOOD
+		_refresh_tree_sprite(pos)   # 그루마다 다른 나무를 고른다 (tree_01/02/03)
 	elif m.LANDMARK_FRAMES.has(kind):
 		m.landmark_sprites.append([node.get_child(0), kind])
 	m.world.add_child(node)
@@ -403,7 +422,10 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 		elif m.objects[pos].get("apple", false):
 			spr.texture = m.tex["tree_13"]  # 일부 나무에만 사과 3개
 		else:
-			spr.texture = m.tex["tree_01"]  # 완전히 자란 기본 나무
+			# 다 자란 나무 **세 그루** 중 하나. 크기를 흔들어 변화를 주던
+			# 방식은 도트 크기를 망가뜨렸다 — 이제 그림 자체를 달리한다
+			spr.texture = m.tex[["tree_01", "tree_02", "tree_03"][
+				int(m._hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 3.0) % 3]]
 		# 온전한 나무만 바람에 흔들린다 — 그루터기가 흔들리면 무섭다
 		spr.material = _sway_material() if lie == 0.0 else null
 	elif hp == 2:

@@ -285,6 +285,9 @@ const TEXTURE_NAMES := [
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
+	# 다 자란 나무는 **세 그루**다 (make_trees.js). 한 그루를 좌우로 뒤집고
+	# 낯빛만 바꾸는 것으로는 스무 그루가 서면 복사한 티가 난다
+	"tree_02", "tree_03",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	# 고장마다 하나씩 선 「엄청 큰 것」 (ref/make_landmarks.js).
 	# 여러 장씩이다 — 물이 흐르고 잎이 흔들린다 (LANDMARK_FRAMES)
@@ -1815,7 +1818,14 @@ const OBJECT_SCALES := {
 	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
 	# 크게, 대신 드물게 — 잔 나무가 우글거리면 배경이 되고, 큰 나무가
 	# 드문드문 서야 한 그루 한 그루가 물건이 된다
-	"tree": 3.4, "rock": 2.2, "bigrock": 4.4, "cave": 2.2, "worldtree": 2.6,
+	# 나무는 **도트 밀도로 못 박는다** (1.0 / 2.0 = 0.5배).
+	#
+	# 예전에는 96px 그림을 1.7배로 늘여 썼다. 그 바람에 픽셀 하나가 화면에서
+	# 1.7px — 집도 사람도 살림도 다 2px 인데 나무만 어긋났고, 그루마다 배율을
+	# 흔들기까지 해서 같은 나무가 3.4px 도 되고 1.7px 도 됐다. 화면에서 제일
+	# 큰 물건이 제일 흐린 물건이었다. 이제 82x82칸(화면 164px)에 제 밀도로
+	# 그리고 배율은 건드리지 않는다 (make_trees.js).
+	"tree": 1.0, "rock": 2.2, "bigrock": 4.4, "cave": 2.2, "worldtree": 2.6,
 	# 온천·전망대 — 배율이 없어서 0.5배(한 칸짜리)로 그려졌다. 새 그림은
 	# 도트 한 칸 = 화면 2px 로 그렸으므로 2.0이라야 자가 맞는다
 	"onsen": 2.0, "old_lookout": 2.0,
@@ -1833,6 +1843,32 @@ const OBJECT_SCALES := {
 	"gem": 1.8, "recipe": 1.8, "glow_shroom": 1.9, "spring_water": 1.9,
 	"sludge": 1.9,
 }
+# ---- 가게가 아닌 집의 마당 ----
+#
+# 아홉 가게에는 마당(PLOT_DECOR)이 있는데 나머지 집들은 잔디 위에 그냥
+# 얹혀 있었다 — 우리집도, 이장의 거처도, 폭포골·큰나무숲의 집들도, 축사도.
+# 그 집들이 「모형」으로 보인 까닭이 이것이다: **사람이 사는 집 둘레에는
+# 살림이 나와 있다.**
+#
+# 가게 마당과 다른 점이 둘 있다.
+#   ① 장사 물건이 아니라 **살림**이다 — 장작, 물통, 화분, 궤짝
+#   ② 종류마다 하나씩, 그것도 두세 가지면 족하다. 가게가 아니니까
+#
+# 좌표는 집 기준점(anchor)에서 잰다. 집 그림이 x -1~+5 · y -2~+3 을 덮으므로
+# 그 밖에만 놓는다 — 안에 두면 지붕에 먹힌다.
+const HOUSE_DECOR := {
+	"home":   [[Vector2i(-3, 4), "deco_logpile"], [Vector2i(6, 4), "deco_planter"]],
+	"chief":  [[Vector2i(-3, 5), "deco_logpile"], [Vector2i(7, 4), "deco_planter"]],
+	"mill":   [[Vector2i(-3, 4), "deco_sack"], [Vector2i(6, 4), "deco_crate"]],
+	"creek":  [[Vector2i(-3, 4), "deco_trough"], [Vector2i(6, 4), "deco_logpile"]],
+	"cabin":  [[Vector2i(-3, 4), "deco_logpile"], [Vector2i(6, 4), "deco_crate"]],
+	"shade":  [[Vector2i(-3, 4), "deco_bench"], [Vector2i(6, 4), "deco_planter"]],
+	"barn":   [[Vector2i(-4, 2), "deco_hay"], [Vector2i(4, 2), "deco_feedbox"]],
+	"forest": [[Vector2i(-3, 4), "deco_logpile"]],
+	"alch":   [[Vector2i(-3, 4), "deco_specimen"], [Vector2i(6, 4), "deco_planter"]],
+}
+
+
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
 #
 # 나무는 "옆으로 나란히" 있을 때만 그림이 지저분하게 겹친다.
