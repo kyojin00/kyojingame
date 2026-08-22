@@ -61,6 +61,8 @@ const OUT = [26, 22, 26];        // 윤곽선 — 살림·건물과 같은 차�
 const FRUIT = [[226, 66, 52], [176, 38, 34], [248, 148, 120]];
 // 이끼 — 잎보다 누렇고 탁하다. 잎색을 그대로 쓰면 줄기에 잎이 붙은 꼴이다
 const MOSS = [[132, 156, 78], [104, 128, 60], [76, 96, 46]];
+// 흙 — 나무 밑에 드러난 땅. 잔디보다 붉고 탁하되 밭흙(밭 타일)과 같은 줄기다
+const SOIL = [[118, 94, 68], [96, 76, 56], [72, 56, 42]];
 const SHADOW = [30, 26, 34, 78];
 
 class T {
@@ -206,36 +208,128 @@ function trunk(g, cx, yTop, yBase, wTop, wBase, seed, lean) {
       if (h(x, y, seed + 7) < 0.3) g.px(x, y - 1, MOSS[0]);
     }
   }
-  // 뿌리 — 땅으로 뻗어 나간 세 갈래. 나무를 땅에 **박아** 준다
-  for (const [rx, rw] of [[-1, 5], [1, 4], [-1, 8]]) {
-    const sx = Math.round(cx + rx * (wBase / 2 - 1));
-    for (let k = 0; k < rw; k++) {
-      const x = sx + rx * k, y = yBase - Math.floor(k * 0.35);
-      g.px(x, y, BARK[3]);
-      g.px(x, y + 1, BARK[5]);
-      if (k < rw - 2) g.px(x, y - 1, BARK[2]);
-    }
-  }
+  roots(g, cx, yBase, wBase, seed, ln);
 }
 
 
-// ---- 밑동에 쌓인 것 ----
+// ---- 뿌리목 ----
 //
-// 나무 밑동이 잔디에 그냥 꽂혀 있으면 「심어 놓은 모형」이다. 오래 선
-// 나무 밑에는 늘 **떨군 잎과 잔가지**가 쌓이고, 그 둘레에만 풀이 웃자란다.
-// 접지 그늘이 「닿아 있다」를 말한다면 이건 「오래 있었다」를 말한다.
+// 예전 뿌리는 밑동에서 옆으로 그은 **한 칸짜리 선 세 줄**이었다. 굵기가 없으니
+// 뿌리가 아니라 바닥에 댄 널이고, 셋 다 바깥으로 갈수록 **위로** 기어올라가서
+// 나무가 땅을 밟은 게 아니라 담벼락에 기대 선 꼴이었다.
+//
+// 실제 뿌리목은 이렇게 보인다 —
+//   ① 사방으로 벌어진다   비스듬히 내려다보는 그림이므로, **앞으로 오는**
+//                        뿌리는 화면에서 내려가고 뒤로 가는 뿌리는 살짝
+//                        올라가되 짧게 잘린다. 다 같은 높이로 그으면 십자다
+//   ② 굵기가 있다         등은 볕을 받아 밝고 배는 땅에 닿아 어둡다.
+//                        이 두 줄이 있어야 바닥에 **솟은 것**으로 읽힌다
+//   ③ 끝이 사라진다       뿌리는 잘리지 않는다. 흙 속으로 들어간다 —
+//                        끝 사분의 일을 성글게 끊어 파묻는다
+//   ④ 흙을 밀어낸다       뿌리 배 밑으로 한 줄, 눌린 흙의 그늘
+function roots(g, cx, yBase, wBase, seed, lean) {
+  const bx = cx + Math.sin(2.0) * (lean || 0);        // 밑동은 t=1 지점
+  const half = wBase / 2 + 4.0;
+  // [방향, 화면에서 내려가는 칸, 길이, 밑동 굵기]
+  // 뒤(-)로 가는 것을 먼저 깔아야 앞(+)의 뿌리가 그 위로 올라탄다
+  // 뿌리는 **흙자리 안에서 끝나야** 한다. 흙 밖으로 삐져나간 끝은 검은
+  // 윤곽선을 그대로 두르고 있어서, 좌우로 이어 붙으면 밑동이 아니라
+  // 통나무를 깔아 놓은 꼴이 된다 (한 번 그렇게 그렸다가 고쳤다)
+  const R = [
+    [-1, -1.4, 8, 2.2], [1, -1.8, 7, 2.0],
+    [-1, 0.6, 11, 3.6], [1, 1.0, 12, 3.8],
+    [-1, 2.2, 7, 2.1], [1, 2.4, 8, 2.3],
+  ];
+  R.forEach((r, i) => {
+    const dir = r[0], drop = r[1], len = r[2], th0 = r[3];
+    const ph = h(i, 9, seed + 61) * 6.0;
+    for (let k = 0; k <= len; k++) {
+      const t = k / len;
+      const x = bx + dir * (half - 4.0 + k);
+      const y = yBase + drop * Math.pow(t, 1.4) + Math.sin(t * 2.6 + ph) * 0.7;
+      // 굵기를 매끈하게 줄이면 뿌리가 아니라 **깎아 놓은 원뿔**이다.
+      // 한 칸씩 들쭉날쭉해야 나무가 자라면서 굵어진 자국으로 읽힌다
+      const th = th0 * Math.pow(1 - t, 0.75) * (0.84 + h(k, i, seed + 63) * 0.32);
+      if (t > 0.74 && h(k, i, seed + 62) > 1.28 - t) continue;   // 흙에 묻히는 끝
+      const top = Math.round(y - th), bot = Math.round(y + th * 0.34);
+      for (let yy = top; yy <= bot; yy++) {
+        const u = bot === top ? 0.5 : (yy - top) / (bot - top);
+        let c = BARK[3];
+        if (u < 0.30) c = (dir < 0 ? BARK[0] : BARK[1]);   // 등 — 볕은 왼쪽에서
+        else if (u < 0.62) c = BARK[2];
+        else if (u > 0.86) c = BARK[4];               // 배 — 땅에 닿은 그늘
+        g.px(x, yy, c);
+      }
+    }
+  });
+}
+
+
+// ---- 밑동 ----
+//
+// 나무 밑동이 잔디에 그냥 꽂혀 있으면 「심어 놓은 모형」이다. 오래 선 나무
+// 밑에는 늘 **드러난 흙**이 있고, 그 위로 떨군 잎과 잔가지가 쌓이며,
+// 흙과 잔디의 경계에만 풀이 웃자란다. 접지 그늘이 「닿아 있다」를 말한다면
+// 이 넷은 「오래 있었다」를 말한다.
+//
+// 흙은 **반쯤 비치게** 깐다. 불투명하게 칠하면 잔디 위에 붙인 갈색 딱지가
+// 되고, 게임이 실시간으로 까는 접지 그늘이 흙 위를 지나가지 못해 밑동만
+// 혼자 환해진다. 비쳐야 그늘과 흙이 한 장으로 겹친다.
+// 그리고 **이미 그려진 칸은 건드리지 않는다** — 그래야 흙이 뿌리 사이만
+// 메워서, 따로 맞출 것 없이 뿌리 모양을 그대로 따라간다.
+const RX = 18, RY = 3.5, SK = 1.4;                  // 흙자리 — 반지름과 기울기
+
 function litter(g, cx, base, seed) {
-  for (let i = 0; i < 14; i++) {                       // 떨군 잎
-    const a = Math.PI * 2 * h(i, 1, seed + 81);
-    const r = 6 + h(1, i, seed + 82) * 12;
-    const x = Math.round(cx + Math.cos(a) * r);
-    const y = Math.round(base - 1 + Math.sin(a) * r * 0.26);
-    const c = [LEAF[5], LEAF_SHADE[5], [126, 104, 58]][i % 3];
-    g.px(x, y, c);
-    if (h(i, 2, seed + 83) < 0.5) g.px(x + 1, y, c);
+  // ① 드러난 흙
+  for (let y = base - 4; y <= base + 3; y++)
+    for (let x = cx - RX - 3; x <= cx + RX + 3; x++) {
+      const d = ((x - cx - SK) / RX) ** 2 + ((y - base - 0.2) / RY) ** 2;
+      if (d > 1.0) continue;
+      // 흙 속에 잠긴 윤곽선은 **먹색에서 흙색으로** 바꾼다. 뿌리는 흙 위에
+      // 놓인 물건이 아니라 흙에 묻힌 것이라, 검은 테를 두르면 밑동이
+      // 시커먼 얼룩이 된다 — 테는 지우지 말고 흙빛으로 낮춘다
+      if (g.get(x, y) === OUT) { g.px(x, y, SOIL[2]); continue; }
+      if (g.get(x, y)) continue;
+      if (d > 0.40 && h(x, y, seed + 71) < d * 0.80) continue;   // 가장자리를 허문다
+      const v = h(x, y >> 1, seed + 72);
+      const c = d < 0.32 ? (v < 0.52 ? SOIL[2] : SOIL[1])
+        : (v < 0.36 ? SOIL[1] : SOIL[0]);
+      g.px(x, y, [c[0], c[1], c[2], 222]);
+    }
+  // 줄기가 흙에 닿는 자리 — 어두운 골 한 겹. 이게 없으면 줄기가 흙 위에
+  // 세워 놓은 것처럼 보인다. 파묻힌 것과 얹힌 것의 차이는 이 한 겹이다
+  for (let y = base - 2; y <= base + 2; y++)
+    for (let x = cx - 14; x <= cx + 14; x++) {
+      const d = ((x - cx - SK) / 9.5) ** 2 + ((y - base - 0.2) / 2.2) ** 2;
+      if (d > 1.0) continue;
+      const cur = g.get(x, y);
+      if (cur && cur.length < 4) continue;
+      if (h(x, y, seed + 75) < 0.18) continue;
+      g.px(x, y, [34, 26, 22, d < 0.45 ? 116 : 64]);
+    }
+  // 흙에 박힌 잔돌 둘 — 크기 대비를 준다
+  for (let i = 0; i < 2; i++) {
+    const x = Math.round(cx + (h(i, 11, seed + 73) - 0.5) * RX * 1.5);
+    const y = Math.round(base + 0.5 + h(11, i, seed + 74) * 2.0);
+    if (g.get(x, y) && g.get(x, y).length < 4) continue;
+    g.px(x, y, [128, 122, 118, 235]); g.px(x + 1, y, [104, 98, 96, 235]);
+    g.px(x, y + 1, [72, 68, 68, 235]); g.px(x + 1, y + 1, [72, 68, 68, 235]);
   }
-  for (let i = 0; i < 4; i++) {                        // 잔가지 — 두 칸 두께
-    const x = Math.round(cx + (h(i, 3, seed + 84) - 0.5) * 30);
+  // ② 떨군 잎 — 흙 위에 더 많이, 잔디 쪽으로 갈수록 성글게
+  for (let i = 0; i < 20; i++) {
+    const a = Math.PI * 2 * h(i, 1, seed + 81);
+    const rr = 5 + h(1, i, seed + 82) * (RX + 3);
+    const x = Math.round(cx + SK + Math.cos(a) * rr);
+    const y = Math.round(base + Math.sin(a) * rr * 0.27);
+    if (rr > RX * 0.85 && h(i, 12, seed + 92) < 0.45) continue;
+    const c = [LEAF[5], LEAF_SHADE[5], [126, 104, 58], [148, 118, 62]][i % 4];
+    g.px(x, y, c);
+    if (h(i, 2, seed + 83) < 0.6) g.px(x + 1, y, c);
+    if (h(i, 13, seed + 93) < 0.3) g.px(x, y + 1, [c[0] * 0.7 | 0, c[1] * 0.7 | 0, c[2] * 0.7 | 0]);
+  }
+  // ③ 잔가지 — 두 칸 두께에, 흙자리 안에
+  for (let i = 0; i < 4; i++) {
+    const x = Math.round(cx + (h(i, 3, seed + 84) - 0.5) * RX * 1.6);
     const y = base + (h(3, i, seed + 85) < 0.5 ? 0 : 1);
     const len = 3 + Math.floor(h(i, 4, seed + 86) * 3);
     for (let k = 0; k < len; k++) {
@@ -243,14 +337,22 @@ function litter(g, cx, base, seed) {
       g.px(x + k, y + 1, BARK[4]);
     }
   }
-  for (let i = 0; i < 7; i++) {                        // 밑동에 웃자란 풀
-    const x = Math.round(cx + (h(i, 5, seed + 87) - 0.5) * 24);
+  // ④ 흙 언저리에 돋은 풀 — 한 칸짜리 세로 획은 풀이 아니라 철사다.
+  //    두세 칸으로 벌어진 **포기**여야 풀로 읽힌다. 흙과 잔디의 경계에만 둔다
+  for (let i = 0; i < 12; i++) {
+    const a = Math.PI * (0.03 + 0.94 * h(i, 5, seed + 87));      // 앞쪽 반원
+    const rr = RX * (0.92 + h(5, i, seed + 90) * 0.26);
+    const x = Math.round(cx + SK + Math.cos(a) * rr);
+    const y = Math.round(base + 0.2 + Math.sin(a) * RY * 0.80);
     const hgt = 2 + Math.floor(h(i, 6, seed + 88) * 3);
+    const sun = h(i, 8, seed + 91) < 0.34;
     for (let k = 0; k < hgt; k++)
-      g.px(x, base - 1 - k, k === hgt - 1 ? LEAF[1] : LEAF[3]);
-    if (h(i, 7, seed + 89) < 0.5) {
-      g.px(x + 1, base - 2, LEAF[2]); g.px(x - 1, base - 2, LEAF[4]);
-    }
+      g.px(x, y - k, k === hgt - 1 ? (sun ? LEAF_SUN[2] : LEAF[2]) : LEAF[4]);
+    const sh = Math.max(1, hgt - 1);
+    g.px(x - 1, y - sh + 1, LEAF[3]);
+    g.px(x + 1, y - sh + 1, LEAF_SHADE[3]);
+    g.px(x - 1, y, LEAF[5]);
+    g.px(x + 1, y, LEAF[5]);
   }
 }
 
@@ -727,7 +829,9 @@ function bareTree() {
   grow(cx + 2, 41, -Math.PI / 2 - 0.28, 13, 3.4, 0);
   grow(cx - 2, 46, -Math.PI / 2 + 0.34, 12, 3.0, 0);
   grow(cx + 5, 50, -Math.PI / 2 + 0.75, 10, 2.4, 1);
-  return outline(g);
+  outline(g);
+  litter(g, cx, 78, seed);        // 잎을 떨군 나무일수록 밑동에 쌓인 게 많다
+  return g;
 }
 
 
