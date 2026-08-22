@@ -429,6 +429,31 @@ var _bake_age := 999.0
 var _bake_dirty := true     # 지도를 열 때마다 켜진다 (그 사이 세상이 달라졌다)
 var bake_us := 0            # 마지막으로 한 장 굽는 데 걸린 시간 (하네스가 본다)
 
+# ---- 지도에 얹는 **작은 그림**의 자리 ----
+#
+# 참고 지도(스타듀)가 「그 게임의 지도」로 보이는 까닭은 나무가 나무 모양,
+# 집이 집 모양으로 그려져 있어서다. 그런데 세계에는 나무가 만 그루가 넘어,
+# 한 그루씩 그리면 한 프레임에 이만 번을 그리게 된다.
+#
+# 지도는 **census 가 아니라 삽화**다. 세 칸씩 묶어 그 안에 무엇이 있었는지만
+# 남기고, 묶음 하나에 그림 하나를 얹는다. 숲의 **밀도**는 그대로 읽히면서
+# 그리는 횟수는 아홉 분의 일이 된다. 굽는 김에 같이 만들어 둔다.
+# 몇 칸을 한 그림으로 묶는가. 셋이면 한 장에 1만 1천us, 넷이면 9천5백 —
+# 한도가 8천이라 다섯으로 묶는다. 세계를 통째로 펼친 배율에서도 도장이
+# 삼천 개면 되고, 그래도 숲은 숲으로 읽힌다 (지도는 census 가 아니다)
+const ICO_K := 5
+const ICO_NONE := 0
+const ICO_TREE := 1
+const ICO_ROCK := 2
+const ICO_FENCE := 3
+const ICO_SIGN := 4
+const ICO_CAVE := 5
+var _ico := PackedByteArray()
+var _ico_w := 0
+var _ico_h := 0
+var _houses: Array = []     # 건물 왼위 모서리 (한 채는 한 번만 그린다)
+const STAMP_NAME := ["", "tree", "rock", "", "sign", "cave"]
+
 
 # 지금 다시 구워야 하는가.
 #
@@ -471,7 +496,9 @@ func _bake() -> void:
 	var fg := int(FOG.g * 255.0)
 	var fb := int(FOG.b * 255.0)
 	# 계절 잔디 바탕 (아래 빠른 갈래가 쓴다)
-	var gbase := Color(0.3, 0.5, 0.26)
+	# 바탕 초록을 한 단 올린다. 삽화 지도는 **밝다** — 어두운 초록 위에
+	# 어두운 나무 도장을 찍으면 숲이 얼룩으로 뭉개진다
+	var gbase := Color(0.38, 0.60, 0.31)
 	if season == GameData.WINTER:
 		gbase = Color(0.82, 0.85, 0.9)
 	elif season == GameData.FALL:
@@ -520,17 +547,45 @@ func _bake() -> void:
 				buf[i + 2] = int(c.b * 255.0)
 			i += 3
 	# 지형지물은 그 칸 색을 덮어쓴다 (가까이 가면 위에 생김새를 얹는다)
+	_ico_w = (w + ICO_K - 1) / ICO_K
+	_ico_h = (h + ICO_K - 1) / ICO_K
+	_ico.resize(_ico_w * _ico_h)
+	_ico.fill(ICO_NONE)
+	_houses.clear()
 	for pos: Vector2i in main.objects:
 		if not r.has_point(pos):
 			continue
 		if _vis_idx[pos.y * main.MAP_W + pos.x] != 1 \
 				or not GameData.is_explored_tile(pos.x, pos.y):
 			continue
-		var c2: Color = OBJ_COL.get(str(main.objects[pos].kind), OBJ_DEFAULT)
+		var k2: String = str(main.objects[pos].kind)
+		var c2: Color = OBJ_COL.get(k2, OBJ_DEFAULT)
 		var j := ((pos.y - oy) * w + (pos.x - ox)) * 3
 		buf[j] = int(c2.r * 255.0)
 		buf[j + 1] = int(c2.g * 255.0)
 		buf[j + 2] = int(c2.b * 255.0)
+		# 얹을 그림의 자리 — 세 칸 묶음마다 하나
+		var code := ICO_NONE
+		match k2:
+			"tree": code = ICO_TREE
+			"rock", "bigrock", "searock": code = ICO_ROCK
+			"fence": code = ICO_FENCE
+			"board", "sign", "auction", "plotsite", "homeplot": code = ICO_SIGN
+			"cave": code = ICO_CAVE
+			"house", "chief_hut", "barn":
+				# 한 채는 5x4칸이다. **왼위 모서리에서만** 한 번 담는다 —
+				# 칸마다 담으면 마을이 지붕 스무 장 겹친 덩어리가 된다
+				if k2 == "house":
+					if not (_is_house(pos.x - 1, pos.y) or _is_house(pos.x, pos.y - 1)):
+						_houses.append(pos)
+				else:
+					_houses.append(pos - Vector2i(2, 3))
+		if code == ICO_NONE:
+			continue
+		var bi: int = ((pos.y - oy) / ICO_K) * _ico_w + (pos.x - ox) / ICO_K
+		# 나무가 다른 것을 이긴다 — 숲은 숲으로 읽혀야 한다
+		if _ico[bi] == ICO_NONE or code == ICO_TREE:
+			_ico[bi] = code
 	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGB8, buf)
 	# 튜토리얼에서 세계로 넘어가면 그림의 크기가 통째로 달라진다 — 그때는 새로 만든다
 	if _tex == null or _tex.get_width() != w or _tex.get_height() != h:
@@ -597,6 +652,89 @@ func _mini_tree(at: Vector2, cs: float, pos: Vector2i) -> void:
 		Color(0.28, 0.53, 0.24))
 	canvas.draw_circle(c - Vector2(r * 0.34, r * 0.38), r * 0.28,
 		Color(0.40, 0.66, 0.31))
+
+
+# ---- 멀리서 볼 때 쓰는 **그림 도장** ----
+#
+# 세 칸 묶음마다 draw_circle 로 나무를 그렸더니 한 장에 2만 4천us 가 나왔다
+# (한도 8천). 원은 그릴 때마다 다각형으로 잘게 쪼개지는데, 화면에 도장이
+# 팔천 개면 그 쪼개기가 팔천 번이다.
+#
+# 그림은 어차피 다 똑같다 — **한 번 구워 두고 도장처럼 찍는다.**
+# 텍스처 사각형 하나는 꼭짓점 넷이라, 같은 텍스처끼리 묶여 나간다.
+var _stamp := {}
+
+
+func _stamp_of(name: String) -> ImageTexture:
+	if _stamp.has(name):
+		return _stamp[name]
+	var n := 24
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var c := Vector2(n * 0.5, n * 0.44)
+	var put := func(p: Vector2, r: float, col: Color) -> void:
+		for y in range(maxi(0, int(p.y - r) - 1), mini(n, int(p.y + r) + 2)):
+			for x in range(maxi(0, int(p.x - r) - 1), mini(n, int(p.x + r) + 2)):
+				if Vector2(x + 0.5, y + 0.5).distance_to(p) <= r:
+					img.set_pixel(x, y, col)
+	match name:
+		"tree":
+			# 밑동 — 잎보다 먼저. 잎이 어깨를 덮어야 한 그루가 된다
+			for y in range(int(c.y), n - 2):
+				for x in range(int(c.x) - 2, int(c.x) + 2):
+					img.set_pixel(x, y, INK)
+			for y in range(int(c.y), n - 3):
+				for x in range(int(c.x) - 1, int(c.x) + 1):
+					img.set_pixel(x, y, Color(0.36, 0.24, 0.15))
+			put.call(c, n * 0.42, INK)
+			put.call(c, n * 0.36, Color(0.16, 0.36, 0.17))
+			put.call(c - Vector2(n * 0.08, n * 0.09), n * 0.24, Color(0.28, 0.53, 0.24))
+			put.call(c - Vector2(n * 0.13, n * 0.14), n * 0.11, Color(0.40, 0.66, 0.31))
+		"rock":
+			put.call(c, n * 0.40, INK)
+			put.call(c, n * 0.34, Color(0.46, 0.46, 0.52))
+			put.call(c - Vector2(n * 0.09, n * 0.10), n * 0.16, Color(0.68, 0.68, 0.74))
+		"sign":
+			for y in range(4, 15):
+				for x in range(5, 19):
+					img.set_pixel(x, y, INK if (y < 6 or y > 12 or x < 7 or x > 16)
+						else Color(0.95, 0.8, 0.35))
+			for y in range(15, n - 2):
+				for x in range(11, 13):
+					img.set_pixel(x, y, Color(0.42, 0.28, 0.16))
+		"cave":
+			put.call(c, n * 0.44, INK)
+			put.call(c, n * 0.38, Color(0.40, 0.38, 0.42))
+			put.call(c + Vector2(0, n * 0.10), n * 0.20, Color(0.08, 0.07, 0.10))
+	var t := ImageTexture.create_from_image(img)
+	_stamp[name] = t
+	return t
+
+
+# 바위 · 표지판 · 동굴 — 나무·집과 같은 규칙(테 + 두 톤)으로
+func _mini_rock(at: Vector2, cs: float) -> void:
+	var rc := Vector2(at.x + cs * 0.5, at.y + cs * 0.55)
+	canvas.draw_circle(rc, cs * 0.46, INK)
+	canvas.draw_circle(rc, cs * 0.46 - maxf(1.0, cs * 0.08), Color(0.46, 0.46, 0.52))
+	canvas.draw_circle(rc - Vector2(cs * 0.11, cs * 0.13), cs * 0.24,
+		Color(0.68, 0.68, 0.74))
+
+
+func _mini_sign(at: Vector2, cs: float) -> void:
+	var sp := Vector2(at.x + cs * 0.5, at.y + cs * 0.35)
+	canvas.draw_rect(Rect2(sp.x - cs * 0.34, sp.y - cs * 0.3,
+		cs * 0.68, cs * 0.6), INK)
+	canvas.draw_rect(Rect2(sp.x - cs * 0.24, sp.y - cs * 0.2,
+		cs * 0.48, cs * 0.4), Color(0.95, 0.8, 0.35))
+	canvas.draw_rect(Rect2(sp.x - cs * 0.08, sp.y + cs * 0.3,
+		maxf(1.0, cs * 0.16), cs * 0.5), Color(0.42, 0.28, 0.16))
+
+
+func _mini_cave(at: Vector2, cs: float) -> void:
+	var cc := Vector2(at.x + cs * 0.5, at.y + cs * 0.5)
+	canvas.draw_circle(cc, cs * 0.6, INK)
+	canvas.draw_circle(cc, cs * 0.6 - maxf(1.0, cs * 0.1), Color(0.4, 0.38, 0.42))
+	canvas.draw_circle(cc + Vector2(0, cs * 0.14), cs * 0.3, Color(0.08, 0.07, 0.1))
 
 
 # 집 한 채 — 벽 위에 박공 지붕, 문 하나 창 하나. 테를 두른다
@@ -672,7 +810,13 @@ func _draw_map() -> void:
 	# 건물은 몸통 위에 얹힌 지붕. 멀리서 볼 때(칸이 7px 미만)는 어차피
 	# 점만 하니 굽힌 색으로 충분하다.
 	var cs := _cell
-	if cs >= 4.5:
+	# ---- 얹는 그림 ----
+	#
+	# 가까이 볼 때는 물건 하나하나에 생김새를 얹고, 멀리서 볼 때는 **세 칸
+	# 묶음**(_ico)에 하나씩 얹는다. 지도는 census 가 아니라 삽화라, 숲의
+	# 밀도만 읽히면 나무 만 그루를 다 그릴 이유가 없다.
+	var wr2 := _world()
+	if cs >= 7.0:
 		for pos: Vector2i in main.objects:
 			if pos.x < x0 or pos.x >= x1 or pos.y < y0 or pos.y >= y1:
 				continue
@@ -684,38 +828,71 @@ func _draw_map() -> void:
 				"tree":
 					_mini_tree(at, cs, pos)
 				"rock", "bigrock":
-					var big: float = 1.15 if kind == "bigrock" else 0.9
-					var rc := Vector2(at.x + cs * 0.5, at.y + cs * 0.55)
-					canvas.draw_circle(rc, cs * 0.5 * big, INK)
-					canvas.draw_circle(rc, cs * 0.5 * big - 1.0, Color(0.46, 0.46, 0.52))
-					canvas.draw_circle(rc - Vector2(cs * 0.12, cs * 0.14),
-						cs * 0.26 * big, Color(0.68, 0.68, 0.74))
-				"house":
-					# 한 채는 5x4칸이다. **왼위 모서리에서만** 한 번 그린다 —
-					# 칸마다 그리면 마을이 지붕 스무 장 겹친 덩어리가 된다
-					if _is_house(pos.x - 1, pos.y) or _is_house(pos.x, pos.y - 1):
-						continue
-					_mini_house(at, cs * 5.0, cs * 4.0, pos)
-				"chief_hut", "barn":
-					_mini_house(at - Vector2(cs * 2.0, cs * 3.0),
-						cs * 5.5, cs * 4.5, pos)
+					_mini_rock(at, cs * (1.15 if kind == "bigrock" else 0.9))
 				"board", "sign", "auction", "plotsite", "homeplot":
-					var sp := Vector2(at.x + cs * 0.5, at.y + cs * 0.35)
-					canvas.draw_rect(Rect2(sp.x - cs * 0.34, sp.y - cs * 0.3,
-						cs * 0.68, cs * 0.6), INK)
-					canvas.draw_rect(Rect2(sp.x - cs * 0.26, sp.y - cs * 0.22,
-						cs * 0.52, cs * 0.44), Color(0.95, 0.8, 0.35))
-					canvas.draw_rect(Rect2(sp.x - cs * 0.08, sp.y + cs * 0.3,
-						cs * 0.16, cs * 0.5), Color(0.42, 0.28, 0.16))
+					_mini_sign(at, cs)
 				"fence":
 					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.34, cs + 0.5,
 						maxf(1.0, cs * 0.3)), Color(0.45, 0.32, 0.19))
 					canvas.draw_rect(Rect2(at.x, at.y + cs * 0.38, cs + 0.5,
 						maxf(1.0, cs * 0.18)), Color(0.66, 0.5, 0.31))
 				"cave":
-					var cc := Vector2(at.x + cs * 0.5, at.y + cs * 0.5)
-					canvas.draw_circle(cc, cs * 0.62, Color(0.36, 0.34, 0.38))
-					canvas.draw_circle(cc + Vector2(0, cs * 0.12), cs * 0.34, INK)
+					_mini_cave(at, cs)
+	elif _ico_w > 0:
+		var k := float(ICO_K)
+		var bx0: int = maxi(0, (x0 - wr2.position.x) / ICO_K)
+		var bx1: int = mini(_ico_w, (x1 - wr2.position.x) / ICO_K + 1)
+		var by0: int = maxi(0, (y0 - wr2.position.y) / ICO_K)
+		var by1: int = mini(_ico_h, (y1 - wr2.position.y) / ICO_K + 1)
+		var ics: float = cs * k
+		# **더 줄여야 할 때가 있다.** 배율을 끝까지 줄이면 묶음이 육천 개가
+		# 넘는다. 그때는 한 칸씩 건너뛰고 도장을 그만큼 키운다 — 덮는 넓이가
+		# 같으니 숲의 밀도는 그대로고, 그리는 횟수만 사분의 일이 된다
+		var stride := 1
+		if (bx1 - bx0) * (by1 - by0) > 3400:
+			stride = 2
+		ics *= stride
+		for by in range(by0, by1, stride):
+			var row: int = by * _ico_w
+			for bx in range(bx0, bx1, stride):
+				var code: int = _ico[row + bx]
+				if code == ICO_NONE:
+					continue
+				var tp := Vector2i(wr2.position.x + bx * ICO_K,
+					wr2.position.y + by * ICO_K)
+				var at2 := Vector2(_ox + tp.x * cs, _oy + tp.y * cs)
+				# **바위는 안 찍는다.** 세계에 흩어진 돌이 나무보다 많아서,
+				# 도장을 찍었더니 지도가 통째로 **회색 자갈밭**이 됐다 —
+				# 마을도 숲도 그 밑에 묻혔다. 돌은 굽힌 바탕색으로 족하고,
+				# 생김새는 가까이 들여다볼 때(칸 7px 이상)만 얹는다
+				if code == ICO_ROCK:
+					continue
+				if code == ICO_FENCE:
+					canvas.draw_rect(Rect2(at2.x, at2.y + ics * 0.36,
+						ics, maxf(1.0, ics * 0.22)), Color(0.5, 0.36, 0.21))
+					continue
+				var st: ImageTexture = _stamp_of(STAMP_NAME[code])
+				# 도장마다 조금씩 크기와 자리를 흔든다 — 자로 잰 듯 찍으면
+				# 숲이 아니라 바둑판이다
+				var jj: float = main._hash01(tp.x * 7 + 1, tp.y * 11 + 3)
+				var sz: float = ics * (0.98 + jj * 0.3)
+				# 낯빛도 그루마다 조금씩 — 통짜 초록은 잔디밭이지 숲이 아니다
+				var tint := Color(1, 1, 1)
+				if code == ICO_TREE:
+					var v: float = main._hash01(tp.x * 19 + 4, tp.y * 23 + 8)
+					tint = Color(0.90 + v * 0.24, 0.92 + v * 0.2, 0.86 + v * 0.24)
+				canvas.draw_texture_rect(st, Rect2(
+					at2.x + (ics - sz) * 0.5 + (jj - 0.5) * ics * 0.22,
+					at2.y + (ics - sz) * 0.5 + (main._hash01(tp.x * 13 + 5,
+						tp.y * 17 + 2) - 0.5) * ics * 0.16,
+					sz, sz), false, tint)
+	# 집은 **배율과 상관없이** 그린다. 마을이 열 채뿐이라 값이 싸고,
+	# 지붕 열 장이 보여야 지도가 「우리 마을」이 된다
+	for a2: Vector2i in _houses:
+		if a2.x < x0 - 6 or a2.x >= x1 + 6 or a2.y < y0 - 6 or a2.y >= y1 + 6:
+			continue
+		_mini_house(Vector2(_ox + a2.x * cs, _oy + a2.y * cs),
+			maxf(14.0, cs * 5.0), maxf(12.0, cs * 4.0), a2)
 
 	# 동물/NPC (보이는 지역만)
 	var dot: float = maxf(3.0, _cell * 0.5)
