@@ -1313,6 +1313,11 @@ func _ready() -> void:
 	# 무엇을 어디에 그릴지는 renderer._draw_object_shadows 가 정한다
 	shadows = Node2D.new()
 	shadows.name = "Shadows"
+	# **가까운 픽셀로 늘린다.** 그늘 원판은 64x24짜리인데 나무 밑에서는
+	# 156x56로 늘어난다 — 기본 필터(선형)로 늘리면 세 단으로 끊어 놓은
+	# 농도가 도로 뭉개져 매끈한 에어브러시 얼룩이 된다. 세계의 모든 그림이
+	# nearest 인데 그늘 한 겹만 부드러우면, 그 한 겹이 딴 게임의 것이다
+	shadows.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	shadows.draw.connect(renderer._draw_object_shadows)
 	add_child(shadows)
 
@@ -1765,9 +1770,30 @@ func apply_appearance() -> void:
 			tex["pc_" + sfx] = ImageTexture.create_from_image(img)
 
 
-# 맵 밖 배경 색조 (어두운 숲처럼 보이게)
-const OUT_TINT := Color(0.42, 0.47, 0.42)
-const OUT_TREE_TINT := Color(0.34, 0.4, 0.35)
+# ---- 맵 밖 ----
+#
+# 세계의 끝을 **벽**으로 막으면 「여기가 렌더러의 끝」이라고 말하는 꼴이다.
+# 어두운 숲 한 겹으로 채워 두었더니 화면 위쪽이 통째로 검은 띠였다.
+#
+# 세계는 벽이 아니라 **거리**로 끝나야 한다. 멀어질수록 대기가 끼어들어
+# 색이 옅어지고 푸르러지는 것 — 대기 원근이다. 맵 변에서 멀어질수록
+# 숲을 이 흐림빛(HAZE)으로 녹인다. 그러면 끝이 「막힌 데」가 아니라
+# 「더 가 볼 수 없을 만큼 먼 데」가 된다.
+const OUT_TINT := Color(0.46, 0.52, 0.46)
+const OUT_TREE_TINT := Color(0.38, 0.45, 0.40)
+const HAZE := Color(0.72, 0.80, 0.86)      # 먼 하늘빛 — 푸르고 옅다
+const HAZE_FULL := 26.0                    # 몇 칸 밖에서 흐림이 다 차는가
+
+
+# 맵 변에서 얼마나 멀리 나갔는지로 흐림을 섞는다
+func _out_tint(at: Vector2, base: Color) -> Color:
+	var tx: float = at.x / float(TILE)
+	var ty: float = at.y / float(TILE)
+	var d: float = maxf(maxf(-tx, tx - float(MAP_W - 1)),
+		maxf(-ty, ty - float(MAP_H - 1)))
+	var f: float = clampf(d / HAZE_FULL, 0.0, 1.0)
+	# 가까이는 그대로, 멀리 갈수록 빠르게 흐려진다 (제곱근으로 당긴다)
+	return base.lerp(HAZE, sqrt(f) * 0.86)
 
 
 # 맵 끝에서도 주인공이 화면 가운데 오도록 카메라 제한을 맵 밖까지 넉넉히 둔다
@@ -3881,15 +3907,19 @@ func _draw() -> void:
 	# 맵 바깥 (어둡게)
 	for t: Texture2D in out_grass:
 		for at: Vector2 in out_grass[t]:
-			draw_texture_rect(t, Rect2(at, tile_size), false, OUT_TINT)
+			draw_texture_rect(t, Rect2(at, tile_size), false, _out_tint(at, OUT_TINT))
 	if not out_trees.is_empty():
 		var ot: Texture2D = tex["tree_01"]
-		var osc := 1.5
+		# 배율은 **그림 크기에서 되짚는다.** 1.5로 박아 두었더니, 나무 판을
+		# 96px에서 328px로 다시 그린 순간 맵 밖 나무가 492px짜리 거인이 됐다
+		# — 화면 위쪽이 통째로 나무 밑동 벽이었다. 맵 안 나무가 0.5배이므로
+		# 바깥은 그보다 조금 작게(0.44) 두어 「멀리 있는 숲」으로 물러난다
+		var osc := 0.44
 		var osize: Vector2 = ot.get_size() * osc
 		for at: Vector2 in out_trees:
 			draw_texture_rect(ot, Rect2(
 				Vector2(at.x + 16 - osize.x / 2.0, at.y + TILE - osize.y), osize),
-				false, OUT_TREE_TINT)
+				false, _out_tint(at, OUT_TREE_TINT))
 	# 바탕 -> 길 가장자리 -> 작물
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
@@ -3978,7 +4008,9 @@ func _draw_map_rim(x0: int, y0: int, x1: int, y1: int) -> void:
 	var ts := float(TILE)
 	for d in RIM_DEPTH:
 		# 바깥일수록 짙다. 한 겹이 옅어야 계단이 아니라 번짐으로 보인다
-		var a: float = 0.30 * pow(1.0 - float(d) / float(RIM_DEPTH), 1.7)
+		# **0.30은 액자였다.** 바깥의 어두운 숲과 이 어둠이 겹쳐, 화면 네 변에
+		# 검은 테를 두른 꼴이 됐다. 나무 그늘이 들판으로 번지는 정도면 족하다
+		var a: float = 0.15 * pow(1.0 - float(d) / float(RIM_DEPTH), 1.7)
 		var c := Color(RIM_DARK.r, RIM_DARK.g, RIM_DARK.b, a)
 		if x0 <= d and d < x1:                       # 서쪽
 			draw_rect(Rect2(d * ts, y0 * ts, ts, (y1 - y0) * ts), c)
