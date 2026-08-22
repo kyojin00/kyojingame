@@ -141,12 +141,19 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 그대로 박아 뒀는데, 그림 크기가 바뀌면 나무가 땅에 파묻힌다 —
 			# 그림에서 재야 어떤 판을 써도 발이 같은 자리에 놓인다
 			offset = Vector2(0, -texture.get_height() - 14.0)
-		"rock":
-			texture = m.tex["rock"]
+		"rock", "searock":
+			# 바위 셋 중 하나를 자리 해시로 고른다. 예전에는 **한 그림을
+			# 배율만 흔들어** 썼는데, 그러면 같은 돌이 자리마다 다른 도트
+			# 크기로 서고 (나무에서 이미 겪은 함정) 크게 뜬 돌은 흐려진다.
+			# 크기가 아니라 **다른 돌**로 변화를 준다.
+			texture = m.tex[["rock", "rock_02", "rock_03"][
+				int(m._hash01(pos.x * 13 + 2, pos.y * 7 + 5) * 3.0) % 3]]
+			# 그림 밑 여섯 도트는 흙자리다 — 돌이 땅에 닿는 줄은 그보다 위다
+			offset = Vector2(0, 24.0 - texture.get_height())
 		"bigrock":
-			texture = m.tex["rock"]  # 같은 바위 그림을 크게 그린다 (퀘스트 5)
-		"searock":
-			texture = m.tex["rock"]  # 남쪽 바위 능선 — 캘 수 없는 바위 벽
+			# 큰 바위는 작은 바위를 늘인 것이 아니라 **다른 돌**이다 (퀘스트 5)
+			texture = m.tex["rock_big"]
+			offset = Vector2(0, 24.0 - texture.get_height())
 		"housesite":
 			# 집터·구역 해금 게시판 — 지붕 얹은 파란 현판 (의뢰 게시판과 다르다)
 			texture = m.tex["board_unlock"]
@@ -306,13 +313,7 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var node := _make_object(texture, Vector2(pos.x * m.TILE, (pos.y + 1) * m.TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = m.OBJECT_SCALES.get(kind, 1.0) / m.OBJECT_TEX_DENSITY
-	if kind == "rock":
-		# 큰 돌과 작은 돌이 섞이도록
-		sc *= 0.65 + m._hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
-	elif kind == "searock":
-		# 능선 바위도 크기를 조금씩 다르게 — 벽이 자로 잰 듯 보이지 않게
-		sc *= 0.85 + m._hash01(pos.x * 7 + 2, pos.y * 3 + 8) * 0.3
-	elif kind == "chief_hut":
+	if kind == "chief_hut":
 		# 이장의 거처는 낡은 오두막·새 집 둘 다 **우리 도트 밀도**로 그렸다.
 		# 그림 한 도트가 4px이라 0.5배로 얹어야 화면에서 2px이 되고, 그래야
 		# 사람·다른 집과 도트 크기가 맞는다.
@@ -337,6 +338,15 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 				spr.self_modulate = Color(0.93, 0.96, 0.90)
 			elif tint == 2:
 				spr.self_modulate = Color(1.05, 1.03, 0.94)
+		elif kind == "rock" or kind == "searock":
+			# 셋을 좌우로도 뒤집어 여섯 꼴로 쓴다. 돌은 나무보다 자주 붙어
+			# 서므로(능선·광맥) 세 꼴만으로는 금세 되풀이가 보인다
+			spr.flip_h = m._hash01(pos.x * 17 + 4, pos.y * 5 + 9) > 0.5
+			var rt := int(m._hash01(pos.x * 23 + 6, pos.y * 29 + 2) * 3.0) % 3
+			if rt == 1:
+				spr.self_modulate = Color(0.94, 0.95, 0.96)
+			elif rt == 2:
+				spr.self_modulate = Color(1.04, 1.02, 0.98)
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
 		if kind == "tree":

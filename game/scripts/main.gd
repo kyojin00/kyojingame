@@ -321,7 +321,8 @@ const TEXTURE_NAMES := [
 	"deco_weaponrack",
 	# 고장의 작은 마을 집 (ref/make_buildings.js)
 	"house_mill", "house_creek", "house_cabin", "house_shade",
-	"rock", "house", "fence", "sprinkler", "board", "sign",
+	"rock", "rock_02", "rock_03", "rock_big",
+	"house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
 	"icon_letter", "old_book",
 	# 제작 재료·결과물 그림 — 제작대(책상) 창이 글자 대신 이 그림으로 말한다
@@ -1854,11 +1855,16 @@ const OBJECT_SCALES := {
 	# 흔들기까지 해서 같은 나무가 3.4px 도 되고 1.7px 도 됐다. 화면에서 제일
 	# 큰 물건이 제일 흐린 물건이었다. 이제 82x82칸(화면 164px)에 제 밀도로
 	# 그리고 배율은 건드리지 않는다 (make_trees.js).
-	"tree": 1.0, "rock": 2.2, "bigrock": 4.4, "cave": 2.2, "worldtree": 2.6,
+	# 바위도 나무와 같이 **도트 밀도로 못 박는다** (1.0 / 2.0 = 0.5배).
+	# 예전에는 64x64 그림 하나를 0.72~1.38배로 흔들어 썼다. 그 바람에 바위만
+	# 한 픽셀이 화면에서 0.72px 도 되고 1.38px 도 됐고, 같은 돌이 자리마다
+	# 다른 해상도로 섰다. 이제 크기를 흔드는 대신 **다른 돌 셋**을 그려 두고
+	# 자리 해시로 골라 쓴다 (make_rocks.js · object_nodes.gd).
+	"tree": 1.0, "rock": 1.0, "bigrock": 1.0, "cave": 2.2, "worldtree": 2.6,
 	# 온천·전망대 — 배율이 없어서 0.5배(한 칸짜리)로 그려졌다. 새 그림은
 	# 도트 한 칸 = 화면 2px 로 그렸으므로 2.0이라야 자가 맞는다
 	"onsen": 2.0, "old_lookout": 2.0,
-	"barn": 1.0, "forage_berry": 1.7, "forage_herb": 1.7, "searock": 2.3,
+	"barn": 1.0, "forage_berry": 1.7, "forage_herb": 1.7, "searock": 1.0,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)

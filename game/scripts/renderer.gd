@@ -123,6 +123,10 @@ func _draw_object_shadows() -> void:
 			+ (spr.offset.x + spr.texture.get_width() / 2.0) * spr.scale.x
 		var by: float = node.position.y \
 			+ (spr.offset.y + spr.texture.get_height()) * spr.scale.y
+		# 바위 그림은 밑 여섯 도트가 **흙자리**다 (make_rocks.js). 그림의
+		# 밑변에서 재면 그늘이 돌보다 한참 아래로 내려간다 — 돌이 닿는 줄에서 잰다
+		if kind == "rock" or kind == "bigrock" or kind == "searock":
+			by -= 24.0 * spr.scale.y
 		# 중심을 밑변보다 **아래로** — 위에서 내려다보는 화면에서는 캐노피가
 		# 제 그림자의 위쪽을 다 가린다. 아래로 고여야 눈에 보인다.
 		# 그리고 **오른쪽으로 조금** — 빛은 왼쪽 위에서 온다 (집·살림과 같은
