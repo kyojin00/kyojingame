@@ -170,10 +170,11 @@ function cobble(seed) {
   // 같은 두 톤인데 장마다 섞임새만 달라서 경계가 안 보인다
   const MIXSHIFT = [0.12, 0.0, -0.12][((seed % 3) + 3) % 3];
   // ① 바탕 — 낮은 주파수 두 톤. 얼룩이 서너 칸에 걸친다
+  // 잔디·마당과 같은 처방 — 1픽셀 잡음을 버리고 감기는 값잡음 두 겹.
+  // 자갈밭은 닳은 데와 덜 닳은 데가 덩어리로 나뉘지, 알알이 튀지 않는다
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const t = h(x >> 2, y >> 2, seed) * 0.55 + h(x >> 1, y >> 1, seed + 9) * 0.30
-      + h(x, y, seed + 17) * 0.15;
-    g.px(x, y, STONE[t < 0.42 + MIXSHIFT ? 3 : 2]);
+    const t = vnoise(x, y, seed + 41, 8) * 0.6 + vnoise(x, y, seed + 47, 4) * 0.4;
+    g.px(x, y, STONE[t < 0.44 + MIXSHIFT ? 3 : 2]);
   }
   // ② 도드라진 돌 — 두어 덩이. 타일 가장자리를 밟지 않아야 이음매가 안 보인다
   for (let k = 0; k < 3; k++) {
@@ -304,95 +305,100 @@ function tuft(g, x, y, p, big) {
 
 function grass(season, variant) {
   const p = SEASON[season], g = new T();
-  // ① 바탕 — 2x2 잔 얼룩 위에 4x4 큰 결. 톤 폭은 **좁게**.
-  //    32px 타일이 수백 번 반복되므로, 여기서 대비를 주면 그게 그대로
-  //    격자무늬가 된다. 무대가 튀면 배우가 안 보인다
-  //    다만 **결이 세 겹**은 돼야 한다. 두 겹으로 칠했더니 4x4 네모
-  //    얼룩이 그대로 보여서, 들판이 초록 체크무늬로 깔렸다.
   const mid = p.base.map((c, j) => Math.round((c + p.lo[j]) / 2));
-  // **장마다 바탕 톤이 다르다.** 세 장을 다 같은 밝기로 그려 놓고 칸마다
-  // 아무거나 골라 깔았더니, 아무리 여러 장을 섞어도 들판은 결국 한 색이었다.
-  // 참고 그림(스타듀)의 땅이 살아 보이는 건 장이 예뻐서가 아니라 **몇 칸에
-  // 걸친 얼룩**이 있어서다 — 그늘진 자리와 볕 드는 자리가 손바닥만 하게
-  // 번갈아 나온다. 여기서 톤을 갈라 두고, 고르는 쪽(main._patch01)에서
-  // 낮은 주파수로 뽑으면 그 얼룩이 생긴다.
   const lad = [
     p.lo.map((c, j) => Math.round((c + p.dark[j]) / 2)),   // 0 제일 그늘진 단
     p.lo, mid, p.base,
     p.base.map((c, j) => Math.round((c + p.hi[j]) / 2)),   // 4 제일 볕 드는 단
   ];
-  const SHIFT = [-1, 0, 1][variant % 3];
+
+  // ---- ① 바탕은 **잡음이 아니라 볕과 그늘이다** ----
+  //
+  // 픽셀마다 난수를 굴려 톤을 고르면 그건 디더고, 디더는 화면에서
+  // 자글거리는 카펫이 된다 — 아무리 톤 폭을 좁혀도 「평평한 초록 종이」를
+  // 못 벗는다. 들판이 살아 보이는 건 **손바닥만 한 볕과 그늘**이 번갈아
+  // 눕기 때문이다.
+  //
+  // 그래서 1픽셀 잡음을 버리고 **감기는 값잡음 두 겹**(8칸·4칸)만 쓴다.
+  // 격자점 사이를 이어 붙이므로 톤이 덩어리로 뭉치고, 타일 끝에서 감기니
+  // 이음매도 없다. 장마다 문턱을 밀어 몇 칸에 걸친 큰 얼룩까지 생긴다.
+  const SHIFT = [-0.05, 0, 0.05][variant % 3];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const v = h(x >> 2, y >> 2, variant) * 0.38 + h(x >> 1, y >> 1, variant + 9) * 0.42
-      + h(x, y, variant + 17) * 0.20;
-    const i = (v < 0.30 ? 1 : (v < 0.56 ? 2 : 3)) + SHIFT;
-    g.px(x, y, lad[clamp(i, 0, 4)]);
+    const v = vnoise(x, y, 31 + variant * 3, 8) * 0.64
+      + vnoise(x, y, 37 + variant * 3, 4) * 0.36 + SHIFT;
+    const i = v < 0.36 ? 1 : (v < 0.50 ? 2 : (v < 0.68 ? 3 : 4));
+    g.px(x, y, lad[i]);
   }
-  // ② 흙이 드러난 자리 — 풀만 빽빽하면 양탄자가 되지만, **아주 드물게**.
-  //    10%로 뿌렸더니 들판이 녹슨 카펫이 됐다. 색도 순 흙빛이 아니라
-  //    잔디 쪽으로 당겨 섞는다 — 풀 사이로 비치는 흙은 그만큼 죽어 보인다
-  // 흙빛을 더 많이 섞었더니 들판에 **분홍 점**이 흩뿌려졌다 — 초록 위의
-  // 붉은 흙은 아무리 어두워도 눈에 띈다. 잔디 쪽으로 더 당겨 섞는다
-  // …라고 두 번을 당겼는데도 화면에서는 **분홍 물방울무늬**로 남았다.
-  // 점 하나는 안 보여도 들판에 수백 개가 깔리면 무늬가 된다 — 더 당기고
-  // (풀 78%), 반도 줄인다. 흙은 「비치는」 것이지 「찍히는」 것이 아니다
+
+  // ---- ② 포기는 **뿌리 그늘**이 있어야 땅에 앉는다 ----
+  //
+  // 잎만 그린 포기는 바닥에 붙인 스티커다. 밑동에 그늘 두어 칸을 깔면
+  // 그 순간 포기가 땅을 딛는다 — 나무·집에 그림자를 준 것과 같은 규칙을
+  // 풀 한 포기에도 편다. 잎은 부챗살로 벌어지고, **바깥 잎은 그늘지고
+  // 안쪽 잎이 볕을 받는다** (덩이의 앞뒤가 생긴다).
+  // 잎을 길게 뽑고 휘게 했더니 **가는 대각선 막대**가 됐다 — 한 칸 굵기
+  // 잎이 다섯 줄을 가면 그건 풀이 아니라 그어 놓은 선이다. 짧고 **서로
+  // 붙은** 잎이라야 한 덩이로 읽힌다. 큰 포기도 네 줄을 안 넘긴다.
+  const clump = (cx, cy, big, seed) => {
+    const put = (dx, dy, c) => g.px(cx + dx, cy + dy, c);
+    put(0, 0, lad[0]); put(1, 0, lad[0]); put(-1, 0, lad[1]);   // 뿌리 그늘
+    put(0, 1, lad[1]);
+    const B = p.hi, D = p.base;
+    const T = h(cx, cy, seed) < 0.4 ? p.tip : p.hi;             // 볕 받은 끝
+    put(-1, -1, B); put(0, -1, B); put(1, -1, B);               // 밑동 잎
+    put(0, -2, B); put(0, -3, T);                               // 가운데 잎
+    put(-1, -2, h(cx + 1, cy, seed + 1) < 0.75 ? D : null);
+    put(1, -2, h(cx, cy + 1, seed + 2) < 0.75 ? T : null);
+    if (big) {
+      put(-2, -1, D); put(2, -1, D);                            // 바깥 잎
+      put(-2, -2, h(cx, cy, seed + 3) < 0.6 ? D : null);
+      put(2, -2, h(cx, cy, seed + 4) < 0.6 ? B : null);
+      put(-2, 0, lad[1]); put(2, 0, lad[1]);
+    }
+  };
+  clump(Math.floor(h(0, variant, 1) * N), Math.floor(h(variant, 0, 2) * N),
+    true, variant + 3);
+  clump(Math.floor(h(1, variant, 4) * N), Math.floor(h(variant, 1, 5) * N),
+    false, variant + 9);
+
+  // ③ 그늘진 잎 — **밝은 홑점은 격자를 만든다.**
+  //
+  // 잎 끝을 볕색으로 한 점씩 흩었더니, 칸마다 같은 자리에 밝은 점이
+  // 박혀 들판에 대각선 격자가 떴다 (한 장이 수백 번 반복되므로 그
+  // 한 점이 곧 무늬다). 밝은 점은 눈이 먼저 찾고, 찾은 것끼리 줄을
+  // 잇는다. 그래서 홑잎은 **바탕보다 어둡게** — 그늘에 누운 잎은
+  // 도드라지지 않으면서 바탕에 결을 준다
+  for (let i = 0; i < 4; i++) {
+    const ox = Math.floor(h(i + 50, variant, 12) * N);
+    const oy = Math.floor(h(variant, i + 50, 13) * N);
+    const len = 1 + Math.floor(h(i, variant + 3, 14) * 2);
+    const lean = h(i, variant, 15) < 0.5 ? -1 : 1;
+    for (let k = 0; k <= len; k++)
+      g.px(ox + (k === len ? lean : 0), oy - k, lad[k === len ? 1 : 0]);
+  }
+
+  // ④ 흙이 비치는 자리 — 풀만 빽빽하면 양탄자다. 잔디 쪽으로 당겨 섞고
+  //    아주 드물게 (점 하나는 안 보여도 들판에 수백 개면 무늬가 된다)
   const soilTone = k => p.base.map((v, j) => Math.round(v * 0.78 + EARTH[k][j] * 0.22));
   const s1 = soilTone(1), s2 = soilTone(2);
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     if (h(x >> 1, (y >> 1) + 40, variant) > 0.011) continue;
     g.px(x, y, season === 'winter' ? p.lo : (h(x, y, 5) < 0.5 ? s1 : s2));
   }
-  // ③ 포기 — **둘만.** 다섯을 심었더니 화면에서는 칸마다 포기가 다섯이라,
-  //    들판 전체가 쉴 새 없는 무늬가 됐다 (스타듀의 들판은 대부분 조용한
-  //    평면이고 장식이 드물다 — 다 그리지 않는다). 무대는 비어 있어야
-  //    그 위의 나무와 사람이 산다
-  for (let i = 0; i < 2; i++) {
-    const ox = Math.floor(h(i, variant, 1) * N);
-    const oy = Math.floor(h(variant, i, 2) * N);
-    tuft(g, ox, oy, p, h(i, i + variant, 6) < 0.4);
-  }
-  // ③-b 홑잎 — 포기 사이를 잇는 잎 한두 장. 이것도 넷이면 족하다.
-  //     끝 색은 hi 로 — tip(제일 밝은 노랑기)을 아홉 장씩 뿌렸더니
-  //     들판에 노란 점이 흩뿌려진 것처럼 보였다
-  for (let i = 0; i < 4; i++) {
-    const ox = Math.floor(h(i + 50, variant, 12) * N);
-    const oy = Math.floor(h(variant, i + 50, 13) * N);
-    const len = 1 + Math.floor(h(i, variant + 3, 14) * 2);
-    const lean = h(i, variant, 15) < 0.5 ? -1 : 1;
-    for (let k = 1; k <= len; k++)
-      g.px(ox + (k === len ? lean : 0), oy - k,
-        k === len && h(i, variant, 16) < 0.3 ? p.tip : p.hi);
-  }
-  // ④ 잔돌 하나 — 바닥에 굴러다니는 것. 풀만 있는 땅은 없다.
-  //    단 **세 장 중 한 장에만.** 장마다 박았더니 모래빛 점이 칸마다
-  //    돌아와, 들판이 물방울무늬가 됐다 — 분홍 점의 범인은 흙이 아니라
-  //    이 돌이었다 (돌은 모래빛이니까)
-  //    그리고 꽃과 같은 처방을 **두 배로** — 같은 변형은 들판에 수백 번
-  //    반복되므로, 변형마다 붙는 장식은 패턴 거리에서 안 보여야 한다.
-  //    풀에 묻힌 돌 (바탕 62%), 덩어리 대신 대각 두 점
-  if (variant === 2) {
-    const ox = Math.floor(h(variant + 20, 7, 8) * N), oy = Math.floor(h(7, variant + 20, 9) * N);
-    const st = k => mixc(STONE[k], p.base, 0.62);
-    g.px(ox, oy, st(2)); g.px(ox + 1, oy + 1, st(4));
-  }
-  // ⑤ 꽃 — 세 장 중 한 장에만, 그것도 한 송이. 색은 **바탕에 섞어** 눕힌다.
-  //    순색 세 점을 찍었더니 변형 1이 깔린 자리마다 분홍 점이 박혀,
-  //    들판이 물방울무늬 벽지가 됐다 — 꽃은 가까이 봐야 꽃이고
-  //    멀리서는 바탕이 살짝 밝은 자리여야 한다
+
+  // ⑤ 꽃 — 세 장 중 한 장에만, 그것도 한 송이. 바탕에 섞어 눕힌다
   if (variant === 1) {
     const ox = Math.floor(h(40, variant, 4) * N), oy = Math.floor(h(variant, 40, 5) * N);
     const c = mixc(p.base, p.bloom[season === 'spring' ? 0 : 1], 0.55);
     g.px(ox, oy, c); g.px(ox + 1, oy, c); g.px(ox, oy - 1, c);
     g.px(ox, oy + 1, p.dark);                               // 꽃대
   }
-  // ⑥ 계절의 바닥 — 색만 바꾸면 「누런 봄」일 뿐이다. 계절은 바닥에
-  //    **놓인 것**으로 읽힌다: 가을엔 낙엽이 구르고, 겨울엔 눈이
-  //    두덩이로 쌓인다. 둘 다 드물게 — 크게 대신 드물게.
+
+  // ⑥ 계절의 바닥 — 색만 바꾸면 「누런 봄」일 뿐이다
   if (season === 'fall') {
-    // 낙엽 — 2px 한 장. 붉은 것과 주홍이 섞이고, 가끔 밑에 그늘 한 점
     const LEAF = [[202, 118, 52], [172, 84, 46], [216, 158, 72]];
     for (let i = 0; i < 6; i++) {
-      if (h(i + 70, variant, 21) < 0.5) continue;           // 장마다 두엇만
+      if (h(i + 70, variant, 21) < 0.5) continue;
       const ox = Math.floor(h(i + 70, variant, 22) * (N - 2));
       const oy = 1 + Math.floor(h(variant, i + 70, 23) * (N - 2));
       const c = LEAF[Math.floor(h(i, variant + 70, 24) * 3)];
@@ -401,7 +407,6 @@ function grass(season, variant) {
         g.px(ox + 1, oy + 1, c.map(v => Math.round(v * 0.72)));
     }
   } else if (season === 'winter') {
-    // 눈 두덩 — 바람이 몰아 놓은 자리. 등성이는 희고 밑에 그늘 한 줄
     for (let i = 0; i < 2; i++) {
       if (h(i + 80, variant, 26) < 0.45) continue;
       const ox = 2 + Math.floor(h(i + 80, variant, 27) * (N - 12));
@@ -411,10 +416,9 @@ function grass(season, variant) {
         const edge = dx === 0 || dx === w - 1;
         g.px(ox + dx, oy, edge ? p.hi : p.tip);
         if (!edge) g.px(ox + dx, oy - 1, p.hi);
-        g.px(ox + dx, oy + 1, p.dark);                      // 밑그늘이 두덩을 띄운다
+        g.px(ox + dx, oy + 1, p.dark);
       }
     }
-    // 눈 반짝임 — 볕에 한두 점
     for (let i = 0; i < 3; i++) {
       if (h(i + 90, variant, 30) < 0.55) continue;
       g.px(Math.floor(h(i + 90, variant, 31) * N),
@@ -495,11 +499,13 @@ function yard(v) {
   //   바탕   세 단만 (EARTH 1~3). 다섯 단을 쓰면 그 폭이 곧 얼룩이다
   //   자국   장 0 발자국 · 장 1 잔돌과 금 · 장 2 지푸라기와 풀포기
   // 밟힌 흙은 평평하다. 평평해야 그 위의 것이 산다.
+  // 바탕은 **잡음이 아니라 밟힌 자국이다** — 잔디와 같은 처방. 픽셀마다
+  // 난수를 굴리면 디더가 되고, 디더는 흙이 아니라 사포다. 감기는 값잡음
+  // 두 겹으로 다져진 데와 파인 데가 덩어리로 눕는다
   const YSHIFT = [0.06, 0, -0.06][v % 3];   // 밝기가 아니라 **섞임새**를 흔든다
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const t = h(x >> 2, y >> 2, 60 + v * 5) * 0.44 + h(x >> 1, y >> 1, 61 + v * 5) * 0.42
-      + h(x, y, 62 + v * 5) * 0.14;
-    const i = t < 0.34 + YSHIFT ? 3 : (t < 0.74 + YSHIFT ? 2 : 1);
+    const t = vnoise(x, y, 60 + v * 3, 8) * 0.62 + vnoise(x, y, 66 + v * 3, 4) * 0.38;
+    const i = t < 0.36 + YSHIFT ? 3 : (t < 0.72 + YSHIFT ? 2 : 1);
     g.px(x, y, EARTH[i]);
   }
   // 반들반들 다져진 자리 — 사람이 늘 밟고 다니는 목. **한 군데만**,
