@@ -3776,7 +3776,12 @@ func _draw() -> void:
 	var x0 := maxi(0, vx0)
 	var y0 := maxi(0, vy0)
 	var x1 := mini(MAP_W, vx1)
-	var y1 := mini(MAP_H, vy1)
+	# **세계는 WORLD_H 에서 끝난다.** 격자는 MAP_H 까지 있지만 그 아래는
+	# 세계 밖에 따로 붙여 둔 튜토리얼 공간이라, 바닷가에 서서 남쪽을 보면
+	# 바다 일곱 줄 너머로 **잔디밭**이 펼쳐졌다 — 바다 건너 들판인 셈이다.
+	# 그 아래는 그리지 않고 바깥(바다)에 맡긴다
+	var south: int = MAP_H if GameData.tutorial_space else WORLD_H
+	var y1 := mini(south, vy1)
 
 	var grass_prefix := "grass_" + GameData.season_key() + "_"
 	var tile_size := Vector2(TILE, TILE)
@@ -3818,13 +3823,25 @@ func _draw() -> void:
 	# 맵 바깥: 화면 가장자리가 비지 않도록 어두운 숲을 깔아 둔다.
 	# (카메라 제한을 풀어 주인공을 항상 화면 가운데 두기 위한 배경)
 	var out_grass := {}
+	var out_sea := {}
 	var out_trees: Array[Vector2] = []
 	# 잔디 판 셋은 미리 꺼내 둔다 — 칸마다 글자를 붙여 사전을 뒤질 일이 아니다
 	var g3: Array[Texture2D] = [tex[grass_prefix + "0"], tex[grass_prefix + "1"],
 		tex[grass_prefix + "2"]]
+	# 먼바다 판 — 제일 깊은 단(WATER_LV - 1) 셋. 물결 판을 나눠 써야
+	# 넓은 바다에 같은 잔물결이 바둑판으로 찍히지 않는다
+	var deep: Array[Texture2D] = []
+	for vr in 3:
+		deep.append(_water_tex[((WATER_LV - 1) * 3 + vr) * 2 + water_frame])
 	for y in range(vy0, vy1):
 		for x in range(vx0, vx1):
-			if x >= 0 and y >= 0 and x < MAP_W and y < MAP_H:
+			if x >= 0 and y >= 0 and x < MAP_W and y < south:
+				continue
+			# **남쪽 밖은 바다다.** 세계의 남쪽 끝이 바다인데 그 너머를
+			# 잔디로 깔면 「바다 건너 들판」이 된다
+			if y >= SEA_Y0 and not GameData.tutorial_space:
+				put.call(out_sea, deep[int(_hash01(x * 3 + 1, y * 5 + 2) * 3.0) % 3],
+					Vector2(x * TILE, y * TILE))
 				continue
 			put.call(out_grass, g3[int(_hash01(x, y) * 3.0) % 3],
 				Vector2(x * TILE, y * TILE))
@@ -3918,6 +3935,9 @@ func _draw() -> void:
 	for t: Texture2D in out_grass:
 		for at: Vector2 in out_grass[t]:
 			draw_texture_rect(t, Rect2(at, tile_size), false, _out_tint(at, OUT_TINT))
+	for t: Texture2D in out_sea:
+		for at: Vector2 in out_sea[t]:
+			draw_texture_rect(t, Rect2(at, tile_size), false, _sea_tint(at))
 	# 먼 능선 — 바깥 잔디 **뒤**, 바깥 나무 **앞**에 얹는다
 	_draw_far_ridges(vx0, vx1, vy0)
 	if not out_trees.is_empty():
@@ -3999,10 +4019,125 @@ func _draw() -> void:
 			else:
 				draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 					Color(1, 1, 1, 0.6), false, 1.0)
+	# 먼바다 — **세계 안 타일을 다 그린 뒤에** 덧칠한다. 바깥 칸에만 얹었더니
+	# 세계의 남쪽 변에서 물빛이 뚝 갈려 「여기가 끝」이라고 말했다
+	if not out_sea.is_empty() or vy1 > SEA_Y0 + 2:
+		_draw_open_sea(vx0, vx1, vy1)
 	_draw_map_rim(x0, y0, x1, y1)
 	if perf_show:
 		_perf["draw"] = Time.get_ticks_usec() - _t0
 		_pm("그리기", _t0)
+
+
+# ---- 먼바다 ----
+#
+# 세계의 남쪽 끝은 바다다. 그런데 그 바다가 맵 변에서 뚝 끊기고 그 아래로
+# **잔디밭**이 펼쳐져 있었다 — 바닷가에 서서 남쪽을 보면 「바다 건너 들판」
+# 이었다. 격자는 MAP_H 까지 있지만 WORLD_H 아래는 세계 밖에 따로 붙여 둔
+# 튜토리얼 공간이라, 그 자리를 잔디로 채우고 있었던 것이다.
+#
+# 바다는 벽으로 끝나지 않는다. 북쪽 숲이 능선과 안개로 물러나듯,
+# 바다는 **깊어지다가 안개에 잠긴다.**
+#   가까운 바다  물빛 그대로
+#   중간         한 단 짙게 (깊어진다)
+#   먼 바다      하늘빛에 녹는다 (수평선 대신 안개)
+const SEA_DEEP := Color(0.62, 0.74, 0.90)   # 깊은 물 — 조금 어둡고 푸르다
+# 안개는 **세계 안에서부터** 시작한다. 남쪽 변에서 시작하면 그 한 줄이
+# 그대로 경계선이 된다 — 경계를 지우려고 까는 안개가 경계를 긋는 꼴이다
+const SEA_HAZE_FROM := 2.0
+const SEA_HAZE_FULL := 30.0                 # 몇 칸 밖에서 안개가 다 차는가
+# 바다 위의 안개는 하늘의 것보다 **푸르고 밝다** — 잿빛으로 깔면 물이
+# 뿌예지는 게 아니라 물 위에 회색 판을 덮은 꼴이 된다
+const SEA_AIR := Color(0.74, 0.84, 0.92)
+
+# **바다에는 색조(modulate)로 안개를 못 끼운다.** 색조는 곱셈이라,
+# 밝은 잔디에 하늘빛을 곱하면 뿌예지지만 검푸른 물에 곱하면 그냥 **검어진다**.
+# 실제로 그렇게 됐다 — 세계 남쪽 밖이 통째로 먹빛 구덩이였다.
+# 물빛은 그대로 두고, 안개는 **위에 덧칠**한다 (_draw_open_sea 가 한다).
+func _sea_tint(at: Vector2) -> Color:
+	var d: float = at.y / float(TILE) - float(SEA_Y0)
+	var deep: float = clampf((d - SEA_HAZE_FROM) / 10.0, 0.0, 1.0)
+	return Color(1, 1, 1).lerp(SEA_DEEP, deep * 0.5)
+
+
+# 먼바다에 얹는 것 — 흰 물결과 섬 하나.
+#
+# 안개만 깔면 그건 「비어 있는 먼 데」다. 북쪽 능선에서 배운 것과 같다:
+# **거리에 무언가가 있어야 거리가 된다.** 다만 바다에 있는 것은 능선이
+# 아니라 물결과 섬이다.
+func _draw_open_sea(vx0: int, vx1: int, vy1: int) -> void:
+	var ts := float(TILE)
+	var x0 := float(vx0) * ts
+	var ww := float(vx1 - vx0) * ts
+	# ① 안개 — **줄마다 한 겹씩 덧칠한다.** 멀수록 짙어져 물빛을 지운다.
+	#    색조로 곱하면 검어지지만 위에 덧칠하면 진짜로 뿌예진다
+	for ty in range(maxi(SEA_Y0, 0), vy1):
+		var d0: float = float(ty - SEA_Y0)
+		if d0 < SEA_HAZE_FROM:
+			continue
+		var f0: float = clampf((d0 - SEA_HAZE_FROM) / SEA_HAZE_FULL, 0.0, 1.0)
+		draw_rect(Rect2(x0, float(ty) * ts, ww, ts),
+			Color(SEA_AIR.r, SEA_AIR.g, SEA_AIR.b, sqrt(f0) * 0.66))
+	# ② 흰 물결 — 멀수록 잘고 성기다. 가로로 눕는 짧은 획이라야 물결이고
+	#    점으로 뿌리면 그건 비 오는 화면이다
+	for ty in range(maxi(SEA_Y0, 0), vy1):
+		var d: float = float(ty - SEA_Y0)
+		if d < 1.0:
+			continue
+		var dens: float = clampf(0.34 - d * 0.010, 0.05, 0.34)
+		var a: float = clampf(0.62 - d * 0.016, 0.10, 0.62)
+		for tx in range(vx0, vx1):
+			if _hash01(tx * 13 + 5, ty * 17 + 9) > dens:
+				continue
+			var w: float = (6.0 - minf(d * 0.12, 3.5)) * 2.0
+			var ox: float = _hash01(tx * 7 + 1, ty * 3 + 6) * (ts - w)
+			var oy: float = _hash01(tx * 5 + 4, ty * 11 + 2) * (ts - 4.0)
+			draw_rect(Rect2(tx * ts + ox, ty * ts + oy, w, 2.0),
+				Color(1, 1, 1, a * 0.55))
+			if _hash01(tx * 3 + 8, ty * 7 + 1) < 0.4:
+				draw_rect(Rect2(tx * ts + ox + w * 0.4, ty * ts + oy + 2.0,
+					w * 0.6, 2.0), Color(1, 1, 1, a * 0.3))
+	# ③ 먼 섬 셋 — 안개에 반쯤 잠긴 실루엣. 바다가 어딘가로 이어진다는 표시.
+	#    **회색으로 흐리면 섬이 아니라 콘크리트 둔덕이다** (능선에서 배운 것과
+	#    같다). 섬은 숲이다 — 초록을 지키고, 물가에 모래 한 줄을 두르고,
+	#    등성이에 나무 혹을 얹는다
+	for isl in ISLANDS:
+		var cx: float = float(isl[0]) * ts
+		var cy: float = float(SEA_Y0 + int(isl[1])) * ts
+		if cy > float(vy1) * ts + ts * 2.0:
+			continue
+		var w2: float = float(isl[2]) * ts
+		var hh: float = float(isl[3]) * ts
+		var f: float = clampf(float(isl[1]) / SEA_HAZE_FULL, 0.0, 1.0)
+		# 바다 위의 안개는 하늘빛보다 조금 푸르다
+		var air := SEA_AIR
+		var col: Color = Color(0.21, 0.35, 0.26).lerp(air, 0.22 + sqrt(f) * 0.42)
+		var sand: Color = Color(0.80, 0.74, 0.58).lerp(air, 0.30 + sqrt(f) * 0.40)
+		var step := 8.0
+		var x: float = cx - w2 * 0.5
+		while x < cx + w2 * 0.5:
+			var u: float = (x - cx) / (w2 * 0.5)          # -1 .. 1
+			var top: float = cy - hh * sqrt(maxf(0.0, 1.0 - u * u))
+			# 섬의 등성이도 매끈하면 접시다 — 나무 한 그루만 한 혹을 얹는다
+			top += (_hash01(int(x / step), 91 + int(isl[0])) - 0.5) * 7.0
+			draw_rect(Rect2(x, top, step, cy - top), col)
+			draw_rect(Rect2(x, top, step, 3.0), col.lightened(0.16))
+			# 물가 — 섬이 물에 닿는 자리는 모래다. 이 한 줄이 「섬」을 만든다.
+			# 다만 곧은 막대로 그으면 **배**가 된다 — 굽이치게, 그리고
+			# 양 끝은 물에 잠겨 가늘어지게
+			var sw: float = ts * 0.34 * sqrt(maxf(0.0, 1.0 - u * u * 0.82))
+			sw += (_hash01(int(x / step), 55 + int(isl[0])) - 0.5) * 4.0
+			if sw > 1.0:
+				draw_rect(Rect2(x, cy, step, sw), sand)
+				draw_rect(Rect2(x, cy + sw, step, ts * 0.16), sand.darkened(0.16))
+			x += step
+		# 섬 그림자가 물에 비친다 — 밑변 바로 아래 한 줄
+		draw_rect(Rect2(cx - w2 * 0.5, cy + ts * 0.54, w2, ts * 0.5),
+			Color(0.10, 0.16, 0.26, 0.20 * (1.0 - f)))
+
+# 먼 섬 — [x칸, 바다 시작에서 몇 칸 남쪽, 폭칸, 높이칸].
+# 셋뿐이다: 바다를 섬으로 채우면 그건 바다가 아니라 군도다
+const ISLANDS := [[74, 11, 13, 2.2], [212, 15, 18, 2.6], [352, 9, 10, 1.8]]
 
 
 # ---- 세계 너머의 능선 ----
