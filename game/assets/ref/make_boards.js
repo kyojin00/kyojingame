@@ -87,8 +87,9 @@ function outline(p) {
   rect(p, 2, 2, 84, 4, WOOD_D);
   rect(p, 2, 2, 84, 2, WOOD_L);
   outline(p);
-  // 발밑 그림자 — 윤곽선 뒤에 (그림자에 테가 지면 웅덩이가 된다)
-  rect(p, 8, 60, 74, 2, SHADOW);
+  // 발밑 그림자는 **굽지 않는다.** 여기 두 줄짜리 네모를 깔아 뒀는데,
+  // 게임이 실시간으로 까는 타원 그늘(renderer._draw_object_shadows)과
+  // 겹쳐 「그늘 위에 놓인 검은 막대」가 됐다. 그늘은 한 곳에서만 깐다
   fs.writeFileSync(OUT + 'board_quest.png', PNG.sync.write(p));
   console.log('board_quest.png 176x128');
 }
@@ -125,8 +126,7 @@ function outline(p) {
   rect(p, 32, 41, 8, 1, [110, 100, 96]);
   rect(p, 32, 44, 6, 1, [110, 100, 96]);
   outline(p);
-  // 발밑 그림자 — 윤곽선 뒤에
-  rect(p, 22, 62, 28, 2, SHADOW);
+  // 발밑 그림자는 굽지 않는다 (게임이 실시간으로 깐다)
   fs.writeFileSync(OUT + 'board_unlock.png', PNG.sync.write(p));
   console.log('board_unlock.png 144x136');
 }

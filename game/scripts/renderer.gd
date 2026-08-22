@@ -42,14 +42,33 @@ func _ready() -> void:
 			a = a * a * (3.0 - 2.0 * a)
 			img.set_pixel(x, y, Color(1, 1, 1, a * a))
 	_cloud_tex = ImageTexture.create_from_image(img)
-	# 자연물 접지 그림자 원판 — 미리 눌러 놓은 타원. 남보라 (회색은 회색이 아니다)
+	# ---- 자연물 접지 그림자 원판 ----
+	#
+	# 예전에는 가장자리로 갈수록 매끈하게 옅어지는 **에어브러시 얼룩**이었다.
+	# 도트로 그린 세계 한복판에 부드러운 그러데이션 하나만 있어도 그것만
+	# 딴 그림이 된다 — 나무는 도트인데 그림자는 3D 게임의 것이었다.
+	#
+	# 살림·나무에 구워 넣은 그림자와 **같은 규칙**으로 다시 만든다.
+	#   ① 세 단   안(짙다) · 중간 · 가장자리(옅다). 단이 있어야 도트다
+	#   ② 기울기  해가 왼쪽 위에 있으니 오른쪽으로 밀어 눕힌다
+	#   ③ 허문 테 제일 바깥 단은 절반만 찍는다 — 매끈한 타원 테두리가
+	#             보이면 그 순간 「깔아 둔 판」이 된다
 	var sim := Image.create(64, 24, false, Image.FORMAT_RGBA8)
+	sim.fill(Color(0, 0, 0, 0))
 	for y in 24:
 		for x in 64:
-			var d := Vector2((x - 32) / 30.0, (y - 12) / 11.0).length()
-			var a := clampf(1.0 - d, 0.0, 1.0)
-			a = a * a * (3.0 - 2.0 * a)
-			sim.set_pixel(x, y, Color(0.10, 0.08, 0.18, a * 0.52))
+			var d := Vector2((x - 32 - 3.0) / 29.0, (y - 12) / 11.0).length()
+			if d > 1.0:
+				continue
+			var a := 0.16
+			if d <= 0.44:
+				a = 0.42
+			elif d <= 0.76:
+				a = 0.29
+			# 테를 허문다 — 자리로 굳힌 난수라 매번 같은 꼴이 나온다
+			if d > 0.82 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.45:
+				continue
+			sim.set_pixel(x, y, Color(0.10, 0.08, 0.18, a))
 	_obj_shadow_tex = ImageTexture.create_from_image(sim)
 
 

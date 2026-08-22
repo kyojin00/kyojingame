@@ -119,7 +119,13 @@ function outline(g) {
   return g;
 }
 
-// 접지 그늘 — 살림(make_props.P.ground)과 같은 세 단 · 오른쪽으로 눕는 타원
+// ---- 접지 그늘은 **굽지 않는다** ----
+//
+// 나무에도 그늘을 구워 넣었더니, 게임이 실시간으로 까는 그늘
+// (renderer._draw_object_shadows)과 겹쳐 **두 겹**이 됐다. 게다가 나무는
+// 그루마다 몇 픽셀씩 어긋나 서고 도끼질에 잎이 줄어드는데, 구운 그늘은
+// 그림에 붙어 있어 그 둘 다를 못 따라간다. 그늘은 게임 쪽 한 곳에서만
+// 깐다 — 이 함수는 남겨 두되 아무도 부르지 않는다.
 function ground(g, cx, cy, rx, ry, seed) {
   const skew = rx * 0.20;
   const A = [[0.42, 108], [0.74, 74], [1.0, 42]];
@@ -540,7 +546,6 @@ function fullTree(v) {
   const g = new T();
   const seed = 100 + v * 31;
   const cx = 41;
-  ground(g, cx + 2, 78, 15, 3.4, seed);
   // 그루마다 다른 골격 — 우듬지 높이, 벌어진 폭, 줄기의 휨
   const SPEC = [
     { top: 6, wide: 30, lean: 1.6, trunkTop: 40 },
@@ -604,7 +609,6 @@ function fullTreeRaw(v, seedBase) {
   const g = new T();
   const seed = seedBase;
   const cx = 41;
-  ground(g, cx + 2, 78, 15, 3.4, seed);
   trunk(g, cx, 42, 78, 7, 13, seed, 1.2);
   branch(g, cx - 3, 48, -1, -0.7, 9, 2);
   branch(g, cx + 3, 51, 1, -0.8, 8, 2);
@@ -628,7 +632,6 @@ function youngTree() {
   const g = new T();
   const seed = 300;
   const cx = 41;
-  ground(g, cx + 1, 78, 9, 2.4, seed);
   trunk(g, cx, 46, 78, 4, 7, seed, 2.4);
   branch(g, cx - 2, 52, -1, -0.9, 5, 1);
   const yo = { holes: 1 };
@@ -650,7 +653,6 @@ function choppedTree(stage) {
   const seed = 400 + stage * 17;
   const cx = 41;
   if (stage === 0) {                            // 반쯤 남은 잎
-    ground(g, cx + 2, 78, 13, 3.0, seed);
     trunk(g, cx, 42, 78, 7, 13, seed, 1.2);
     branch(g, cx - 3, 48, -1, -0.7, 11, 2);
     branch(g, cx + 3, 51, 1, -0.8, 10, 2);
@@ -667,7 +669,6 @@ function choppedTree(stage) {
       g.px(x, y, LEAF[3]); g.px(x + 1, y, LEAF[5]);
     }
   } else {                                       // 그루터기 — 잘린 면이 보인다
-    ground(g, cx + 2, 78, 11, 2.8, seed);
     trunk(g, cx, 58, 78, 12, 15, seed, 0.4);
     // 잘린 면 — 타원이다. 가로 직선으로 자르면 네모난 궤짝이 된다
     const ty = 58;
@@ -704,7 +705,6 @@ function bareTree() {
   const g = new T();
   const seed = 500;
   const cx = 41;
-  ground(g, cx + 3, 78, 13, 3.0, seed);
   trunk(g, cx, 40, 78, 8, 14, seed, 3.2);
   const grow = (x, y, ang, len, thick, depth) => {
     let cxx = x, cyy = y;

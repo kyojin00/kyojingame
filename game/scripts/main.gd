@@ -1965,11 +1965,42 @@ func _hash01(x: int, y: int) -> float:
 # 사람·짐승의 접지 그림자. 딱딱한 검정 네모는 「붙인 스티커」로 보인다 —
 # 가장자리가 옅은 타원 두 겹이라야 발이 땅을 딛는다. 빛깔은 검정이 아니라
 # 남보라다 (회색은 회색이 아니다 — 그늘은 하늘빛을 받는다).
+# 매끈한 원 두 겹으로는 **에어브러시 얼룩**이다 — 도트로 그린 세계에서
+# 그것만 딴 그림이 된다. 살림·나무·자연물에 쓰는 것과 같은 규칙으로 짠다:
+#   ① 세 단   안(짙다) · 중간 · 가장자리(옅다)
+#   ② 기울기  해가 왼쪽 위에 있으니 오른쪽으로 밀어 눕힌다
+#   ③ 허문 테 제일 바깥 단은 자리에 따라 절반만 찍는다
+# 그리는 것은 **도트 한 칸(화면 2px)짜리 네모**다. 원을 그리면 가장자리가
+# 세계의 격자와 어긋나 그 한 겹만 매끄러워진다.
 static func draw_ground_shadow(ci: CanvasItem, half_w: float, half_h: float) -> void:
-	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, half_h / half_w))
-	ci.draw_circle(Vector2.ZERO, half_w, Color(0.10, 0.08, 0.18, 0.13))
-	ci.draw_circle(Vector2.ZERO, half_w * 0.62, Color(0.10, 0.08, 0.18, 0.14))
-	ci.draw_set_transform(Vector2.ZERO)
+	var col := Color(0.10, 0.08, 0.18)
+	var skew: float = half_w * 0.18
+	var y0: int = int(floor(-half_h / DOT)) - 1
+	var y1: int = int(ceil(half_h / DOT)) + 1
+	var x0: int = int(floor((-half_w - skew) / DOT)) - 1
+	var x1: int = int(ceil((half_w + skew) / DOT)) + 1
+	for gy in range(y0, y1 + 1):
+		for gx in range(x0, x1 + 1):
+			var px: float = gx * DOT
+			var py: float = gy * DOT
+			var d := Vector2((px - skew) / half_w, py / half_h).length()
+			if d > 1.0:
+				continue
+			var a := 0.10
+			if d <= 0.44:
+				a = 0.26
+			elif d <= 0.76:
+				a = 0.18
+			if d > 0.82 and _shadow_jitter(gx, gy) < 0.45:
+				continue
+			ci.draw_rect(Rect2(px, py, DOT, DOT), Color(col.r, col.g, col.b, a))
+
+
+# 그림자 테를 허무는 난수. 자리로 굳혀 두므로 걸어도 테가 자글거리지 않는다
+static func _shadow_jitter(x: int, y: int) -> float:
+	var n: int = (x * 73856093) ^ (y * 19349663) ^ 0x9E3779B9
+	n = (n ^ (n >> 13)) & 0x7FFFFFFF
+	return float((n * 1274126177) & 0x7FFFFFFF) / 2147483647.0
 
 
 # ---- 도트 자 ----

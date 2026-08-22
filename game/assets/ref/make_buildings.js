@@ -2217,8 +2217,12 @@ function groundShadow(im) {
       const y = base[x] + k;
       const sx = x + Math.round(k * SKEW);                 // 기울어 눕는다
       if (y >= H2 || sx >= W2 || opaque(sx, y)) continue;
-      // 끝으로 갈수록 옅다. 곡선으로 잦아들어야 끝선이 안 보인다
-      const a = Math.round(104 * Math.pow(1 - k / (DEEP + 1), 1.5));
+      // 끝으로 갈수록 옅다. 다만 **매끈하게** 잦아들면 에어브러시 얼룩이라,
+      // 도트로 그린 집 밑에 그것만 딴 그림이 된다 — 살림·나무·사람에 쓰는
+      // 것과 같이 **세 단**으로 끊고, 제일 바깥 단은 절반만 찍어 테를 허문다
+      const f = 1 - k / (DEEP + 1);
+      const a = f > 0.66 ? 104 : (f > 0.36 ? 72 : 40);
+      if (f <= 0.36 && hash(x * 7 + 3, y * 11 + 5) < 0.45) continue;
       const i = (y * W2 + sx) * 4;
       if (im.data[i + 3] >= a) continue;                   // 이미 짙으면 둔다
       im.data[i] = 30; im.data[i + 1] = 26; im.data[i + 2] = 34;
