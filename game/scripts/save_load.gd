@@ -217,6 +217,30 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.story8_phase = "done"
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
+	# 사회(직업·자리·대범함…) — 빈 그릇 위에 저장된 값만 덮는다.
+	# 열쇠가 늘어도 옛 세이브가 깨지지 않고, 모르는 열쇠는 그냥 지나간다
+	GameData.me = GameData.fresh_me()
+	for mk in d.get("me", {}):
+		GameData.me[str(mk)] = d.me[mk]
+	# ---- 저장은 하는데 **읽지 않던** 여덟 개 ----
+	#
+	# build_save 는 이것들을 꼬박꼬박 적어 왔고 멀티 동기화(apply_stats)도
+	# 읽는데, 정작 저장 불러오기만 건너뛰고 있었다. 그래서 끄고 켤 때마다
+	#   · 연인·배우자가 없던 일이 되고 (dating / spouse)
+	#   · 평생 수확·광물 기록과 도감 완성이 지워지고 (crops_harvested /
+	#     minerals_found / collections_done)
+	#   · 기억 조각과 엔딩 본 표시가 되돌아갔다 (memory_given / ending_seen)
+	# 결혼해 놓고 하루 자고 오면 남이 되어 있었다는 뜻이다.
+	GameData.dating = str(d.get("dating", ""))
+	GameData.spouse = str(d.get("spouse", ""))
+	GameData.spouse_gift_day = int(d.get("spouse_gift_day", 0))
+	GameData.collections_done = d.get("collections_done", [])
+	GameData.ending_seen = bool(d.get("ending_seen", false))
+	GameData.memory_given = bool(d.get("memory_given", false))
+	for k in d.get("crops_harvested", {}):
+		GameData.crops_harvested[str(k)] = int(d.crops_harvested[k])
+	for k in d.get("minerals_found", {}):
+		GameData.minerals_found[str(k)] = bool(d.minerals_found[k])
 	GameData.recipe_items = d.get("recipe_items", {})
 	# 발견 기록과 배운 레시피 — 저장에는 실려 있었는데 읽는 쪽이 없어서
 	# 재로드 때 백필로만 어림잡던 구멍을 메웠다 (처음 얻은 날, 배운

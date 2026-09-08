@@ -53,6 +53,11 @@ var _t := 0.0
 var _hold := -1.0                 # 100% 를 채운 뒤 기다리는 시간 (음수면 아직)
 var _held := 0.0
 var _done := false                # 다 지었다 — 이제 100까지 채운다
+# 화면이 없는 판(자동 검증·전용 서버)에서는 이 화면이 보여 줄 것이 없다.
+# 그런데 「차오르는 시간」과 「다 찬 뒤 멈춰 두는 시간」은 그대로 흘러서,
+# 보는 사람도 없는 막대 때문에 검증 시퀀스가 통째로 수백 프레임 밀린다.
+# 그런 판에서는 기다리지 않는다 — 뜨자마자 다 찬 것으로 친다
+var _silent := false
 
 
 # 이미 떠 있으면 그것을 쓰고, 없으면 만들어 붙인다
@@ -105,6 +110,7 @@ static func finish(tree: SceneTree, hold := 2.0) -> void:
 
 func _ready() -> void:
 	layer = 200
+	_silent = DisplayServer.get_name() == "headless"
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_c = Control.new()
 	_c.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -120,7 +126,7 @@ func aim(text: String, ratio: float) -> void:
 
 
 func is_at_target() -> bool:
-	return _ratio >= _target - 0.005
+	return _silent or _ratio >= _target - 0.005
 
 
 # 세계를 짓는 **도중**에 부른다. 여기서는 프레임이 안 돌기 때문에
@@ -147,6 +153,9 @@ func done(hold: float) -> void:
 	_target = 1.0
 	_hold = hold
 	_msg = "마을이 다 지어졌다"
+	if _silent:
+		queue_free()                  # 보여 줄 화면이 없다 — 붙잡아 둘 이유도 없다
+		return
 	get_tree().paused = true          # 뒤에서 게임이 먼저 굴러가지 않게
 
 

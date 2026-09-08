@@ -51,6 +51,14 @@ var _bench_t0 := 0
 # 재는 동안에는 시퀀스를 멈춘다.
 var _perf_probe := false
 
+# 저장에는 적지만 **일부러 읽지 않는** 열쇠 (SAVEKEYS_OK 의 예외).
+# 여기 이름을 올릴 때는 왜 안 읽어도 되는지 한 줄로 남길 것.
+const SAVE_WRITE_ONLY := [
+	"grid", "objects", "animals",       # 세계 — _apply_save 가 따로 푼다
+	"player_x", "player_y",             # 사람 자리 — 위와 같다
+	"grid_w", "grid_h",                 # 세계 크기 — 다시 지을 때 정해진다
+]
+
 
 func _debug_tick() -> void:
 	if _perf_probe:
@@ -265,6 +273,79 @@ func _debug_tick() -> void:
 		# 방향이 바뀌는 데 한 프레임이 필요하다. 바로 찍으면 앞모습 대신
 		# 직전 뒷모습이 걸린다 (실제로 그랬다)
 		206: _save_shot("_boy_front.png")
+		201:
+			# ---- 장부가 맞는가 ----
+			#
+			# `produce` 는 총량이고 `produce_silver`/`produce_gold` 는 그
+			# **부분집합**이다 (add_produce 참고). 그런데 상점 판매는 셋을
+			# 서로소로 여겨 총량을 일반가로 다 팔고 은·금을 또 팔았다 —
+			# 딸기 다섯(은둘·금하나)이 여섯 개 값이 아니라 아홉 개 값이었다.
+			#
+			# 세율도 봉급도 예산도 전부 이 숫자 위에 선다. 그래서 여기서
+			# **적어 놓은 값과 손에 들어온 돈이 한 푼도 안 틀리는지** 못박는다.
+			# 이 줄이 깨지면 그 위의 모든 수치가 거짓이다.
+			#
+			# 연구소 개량(단계마다 +8%)도 함께 건다. 예전엔 값을 적어 두는
+			# 쪽만 개량을 곱하고 파는 쪽은 안 곱해서, 돈과 광석을 들여 올린
+			# 개량이 수입을 한 푼도 못 올리고 있었다.
+			m.shop.open("sell", ["buy", "sell"], "장부 검산")   # _rebuild 가 붙을 창
+			var _eco_id := "strawberry"
+			var _eco_breed_keep: int = GameData.breed_level
+			GameData.breed_level = 2                # 판매가 +16%
+			GameData.produce[_eco_id] = 0
+			GameData.produce_silver[_eco_id] = 0
+			GameData.produce_gold[_eco_id] = 0
+			for _q in [0, 0, 1, 1, 2]:              # 일반2 · 은2 · 금1
+				GameData.add_produce(_eco_id, _q)
+			# 개당 값을 손으로 센 것과 맞춰 본다 (crop_unit_price 자기 자신과
+			# 비교하면 아무것도 검사하지 않는 셈이 된다)
+			var _eco_raw: float = float(GameData.CROPS[_eco_id].sell_price) * 1.16
+			var _eco_hand: int = 2 * int(_eco_raw) + 2 * int(_eco_raw * 1.25) \
+				+ int(_eco_raw * 1.5)
+			var _eco_want: int = GameData.produce_sell_value(_eco_id)
+			var _eco_max: int = m.shop._sell_qty_max("crop", _eco_id)
+			var _eco_panel: int = m.shop._sell_qty_value("crop", _eco_id, _eco_max)
+			var _eco_before: int = GameData.money
+			m.shop.sell_mult = 1.0
+			m.shop._on_sell(_eco_id, _eco_max)
+			var _eco_got: int = GameData.money - _eco_before
+			# 판 뒤에는 셋 다 0 이어야 한다 (남으면 다음 날 또 팔린다)
+			var _eco_empty: bool = int(GameData.produce[_eco_id]) == 0 \
+				and int(GameData.produce_silver.get(_eco_id, 0)) == 0 \
+				and int(GameData.produce_gold.get(_eco_id, 0)) == 0
+			m.shop.close()
+			GameData.breed_level = _eco_breed_keep
+			print("ECON_BASE_OK=", _eco_got == _eco_want and _eco_panel == _eco_want
+				and _eco_want == _eco_hand and _eco_max == 5 and _eco_empty,
+				" 받은돈=", _eco_got, " 셈한값=", _eco_want,
+				" 손셈=", _eco_hand, " 패널합계=", _eco_panel,
+				" 팔수있는수=", _eco_max, " 비었나=", _eco_empty)
+		207:
+			# ---- 담아만 두고 읽지 않는 열쇠가 있는가 ----
+			#
+			# build_save 는 백 몇 개를 꼬박꼬박 적는데, _apply_save 가 그중
+			# **여덟 개를 읽지 않고 있었다.** 결혼해 놓고 하루 자고 오면
+			# 남이 되어 있었고, 평생 수확 기록과 도감 완성이 지워졌다.
+			#
+			# 백 개를 눈으로 맞추는 일은 또 틀린다. 그래서 기계가 맞춘다 —
+			# 적은 열쇠 하나하나가 불러오기 코드 어딘가에 이름으로 나오는지
+			# 본다. 새 열쇠를 넣고 읽는 쪽을 잊으면 여기서 걸린다.
+			var _sk_saved: Dictionary = GameData.build_save([], Vector2.ZERO)
+			var _sk_src := ""
+			var _sk_f := FileAccess.open("res://scripts/save_load.gd", FileAccess.READ)
+			if _sk_f != null:
+				_sk_src = _sk_f.get_as_text()
+				_sk_f.close()
+			var _sk_miss: Array = []
+			for _sk_k: String in _sk_saved.keys():
+				if _sk_k in SAVE_WRITE_ONLY:
+					continue
+				if not (_sk_src.contains("\"%s\"" % _sk_k)
+						or _sk_src.contains("d.%s" % _sk_k)):
+					_sk_miss.append(_sk_k)
+			print("SAVEKEYS_OK=", _sk_miss.is_empty() and _sk_src != "",
+				" 적어만 두고 안 읽는 열쇠=", _sk_miss,
+				" 담는 열쇠=", _sk_saved.size(), "개")
 		205:
 			_send_key_release(KEY_S)
 			_send_key_press(KEY_D)                     # 옆모습 걷기 확인

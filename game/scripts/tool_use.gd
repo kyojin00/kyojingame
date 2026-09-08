@@ -127,13 +127,15 @@ func _try_harvest(t: Vector2i) -> bool:
 	var quality := GameData.roll_quality(GameData.total_luck())
 	GameData.add_produce(cid, quality)
 	GameData.today_harvest += 1
+	# 여기 적히는 값도 잡화점이 실제로 세는 값이어야 한다 (개량 단계 포함)
+	var qprice: int = GameData.crop_unit_price(cid, quality)
 	match quality:
 		2:
-			m.hud.show_message("금빛 %s 수확! (판매가 %dG)" % [def.name, int(def.sell_price * 1.5)])
+			m.hud.show_message("금빛 %s 수확! (판매가 %dG)" % [def.name, qprice])
 		1:
-			m.hud.show_message("은빛 %s 수확! (판매가 %dG)" % [def.name, int(def.sell_price * 1.25)])
+			m.hud.show_message("은빛 %s 수확! (판매가 %dG)" % [def.name, qprice])
 		_:
-			m.hud.show_message("%s 수확! (판매가 %dG)" % [def.name, def.sell_price])
+			m.hud.show_message("%s 수확! (판매가 %dG)" % [def.name, qprice])
 	cell.crop_id = ""
 	cell.crop_day = 0.0
 	cell.half_fed = false

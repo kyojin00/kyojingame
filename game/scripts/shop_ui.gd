@@ -495,8 +495,8 @@ func _rebuild() -> void:
 			if gold > 0:
 				qtxt += " · 금 %d" % gold
 			grid.add_child(_mk_sell_cell("mature_" + id, str(def.name), count,
-				int(def.sell_price * sell_mult),
-				int(GameData.produce_sell_value(id) * sell_mult),
+				GameData.crop_unit_price(id, 0, sell_mult),
+				GameData.produce_sell_value(id, sell_mult),
 				qtxt, _open_sell_picker.bind("crop", id, str(def.name))))
 			last_sell_cells += 1
 		for id in GameData.ITEM_IDS:
@@ -723,20 +723,31 @@ func _on_buy(id: String) -> void:
 # qty -1 = 전량 (옛 호출·멀티 호환). 부분 판매는 일반 -> 은 -> 금 순으로
 # 내놓는다 — 값비싼 품질이 마지막까지 가방에 남는다.
 func _on_sell(id: String, qty := -1) -> void:
-	var def: Dictionary = GameData.CROPS[id]
 	var left: int = qty if qty >= 0 else 999999
 	var amount := 0
-	var take_n: int = mini(int(GameData.produce[id]), left)
-	amount += take_n * int(def.sell_price * sell_mult)
-	GameData.produce[id] = int(GameData.produce[id]) - take_n
+	# **produce 는 총량이고 은·금은 그 부분집합이다** (add_produce 참고 —
+	# 수확할 때마다 produce 를 올리고, 품질본이면 은/금을 **덧붙여** 센다).
+	#
+	# 여기서는 셋을 서로소로 여겨 총량을 일반가로 다 팔고 은·금을 또 팔았다.
+	# 딸기 다섯(은둘·금하나)이 여섯 개 값이 아니라 **아홉 개 값**이 됐다 —
+	# 은·금이 섞일수록 심해서 1.5배, 1.7배까지 갔다. 돈이 복사되고 있었다.
+	#
+	# 값은 GameData.crop_unit_price() 하나로만 묻는다 — 진열대에 적힌 값,
+	# 수량 패널의 합계, 실제로 손에 들어오는 돈이 전부 같은 함수에서 나온다
+	var silver: int = int(GameData.produce_silver.get(id, 0))
+	var gold: int = int(GameData.produce_gold.get(id, 0))
+	var take_n: int = mini(int(GameData.produce[id]) - silver - gold, left)
+	amount += take_n * GameData.crop_unit_price(id, 0, sell_mult)
 	left -= take_n
-	var take_s: int = mini(int(GameData.produce_silver.get(id, 0)), left)
-	amount += take_s * int(def.sell_price * 1.25 * sell_mult)
-	GameData.produce_silver[id] = int(GameData.produce_silver.get(id, 0)) - take_s
+	var take_s: int = mini(silver, left)
+	amount += take_s * GameData.crop_unit_price(id, 1, sell_mult)
+	GameData.produce_silver[id] = silver - take_s
 	left -= take_s
-	var take_g: int = mini(int(GameData.produce_gold.get(id, 0)), left)
-	amount += take_g * int(def.sell_price * 1.5 * sell_mult)
-	GameData.produce_gold[id] = int(GameData.produce_gold.get(id, 0)) - take_g
+	var take_g: int = mini(gold, left)
+	amount += take_g * GameData.crop_unit_price(id, 2, sell_mult)
+	GameData.produce_gold[id] = gold - take_g
+	# 총량은 셋을 합친 만큼 준다 (부분집합 규약을 지킨다)
+	GameData.produce[id] = int(GameData.produce[id]) - take_n - take_s - take_g
 	Sound.play_sfx("sfx_coin")
 	GameData.money += amount
 	GameData.today_earned += amount
@@ -917,8 +928,7 @@ var _qty_title: Label = null
 
 func _sell_qty_max(kind: String, id: String) -> int:
 	if kind == "crop":
-		return int(GameData.produce[id]) + int(GameData.produce_silver.get(id, 0)) \
-			+ int(GameData.produce_gold.get(id, 0))
+		return int(GameData.produce[id])   # 이미 은·금을 포함한 총량이다
 	return int(GameData.items[id])
 
 
@@ -926,17 +936,19 @@ func _sell_qty_max(kind: String, id: String) -> int:
 func _sell_qty_value(kind: String, id: String, qty: int) -> int:
 	if kind == "item":
 		return int(GameData.ITEMS[id].sell * sell_mult) * qty
-	var def: Dictionary = GameData.CROPS[id]
 	var left := qty
 	var amount := 0
-	var take_n: int = mini(int(GameData.produce[id]), left)
-	amount += take_n * int(def.sell_price * sell_mult)
+	# _on_sell 과 **같은 차례·같은 값**으로 센다 (일반 -> 은 -> 금).
+	# 예전엔 여기도 총량을 일반가로 세어, 패널에 뜨는 합계까지 부풀었다
+	var silver: int = int(GameData.produce_silver.get(id, 0))
+	var gold: int = int(GameData.produce_gold.get(id, 0))
+	var take_n: int = mini(int(GameData.produce[id]) - silver - gold, left)
+	amount += take_n * GameData.crop_unit_price(id, 0, sell_mult)
 	left -= take_n
-	var take_s: int = mini(int(GameData.produce_silver.get(id, 0)), left)
-	amount += take_s * int(def.sell_price * 1.25 * sell_mult)
+	var take_s: int = mini(silver, left)
+	amount += take_s * GameData.crop_unit_price(id, 1, sell_mult)
 	left -= take_s
-	amount += mini(int(GameData.produce_gold.get(id, 0)), left) \
-		* int(def.sell_price * 1.5 * sell_mult)
+	amount += mini(gold, left) * GameData.crop_unit_price(id, 2, sell_mult)
 	return amount
 
 

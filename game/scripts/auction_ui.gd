@@ -172,6 +172,11 @@ func _on_claimed(count: int, gold: int) -> void:
 		_status = "받아 갈 대금이 없다."
 	else:
 		GameData.money += gold
+		# 장터에서 팔린 대금도 **그날 번 돈**이다. 여기만 빠져 있어서
+		# 하루 정산과 과세표준에 경매 수입이 잡히지 않았다.
+		# (금고 입출금은 건드리지 않는다 — 제 주머니끼리 옮기는 것이라
+		#  수입으로 세면 넣었다 뺐다로 돈을 찍게 된다)
+		GameData.today_earned += gold
 		Sound.play_sfx("sfx_coin")
 		_status = "%d건 대금 %dG를 받았다!" % [count, gold]
 		_sync("", "", 0, 0, gold)
@@ -646,8 +651,10 @@ func _base_of(cat: String, id: String, quality: int) -> int:
 		"seed":
 			return int(GameData.CROPS[id].seed_price) if GameData.CROPS.has(id) else 1
 		"produce":
-			var mult: int = [1, 2, 3][clampi(quality, 0, 2)]
-			return int(GameData.CROPS[id].sell_price) * mult \
+			# 「잡화점 기준값」이라 적어 놓고 은 2배·금 3배로 세고 있었다 —
+			# 잡화점이 실제로 쳐 주는 값은 1.25배·1.5배다. 기준값이라면
+			# 그 기준과 같아야 한다 (값을 매길 폭은 0.5~10배로 여전히 넓다)
+			return GameData.crop_unit_price(id, quality) \
 				if GameData.CROPS.has(id) else 1
 		"tool":
 			return 300 * maxi(1, quality)
@@ -671,9 +678,8 @@ func _stock_entries() -> Array:
 			var n: int = [total - silver - gold, silver, gold][q]
 			if n <= 0:
 				continue
-			var mult: int = [1, 2, 3][q]      # 은빛·금빛은 잡화점에서도 더 쳐 준다
 			out.append({"cat": "produce", "id": id, "q": q, "n": n,
-				"base": int(GameData.CROPS[id].sell_price) * mult})
+				"base": GameData.crop_unit_price(id, q)})
 	for id: String in GameData.CROP_IDS:            # 씨앗
 		var ns: int = int(GameData.seeds.get(id, 0))
 		if ns > 0:

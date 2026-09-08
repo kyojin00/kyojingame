@@ -838,24 +838,27 @@ func _item_entries() -> Array:
 					% int(GameData.CROPS[id].grow_days)})
 	for id in GameData.CROP_IDS:
 		var def: Dictionary = GameData.CROPS[id]
-		var n := int(GameData.produce[id])
+		# **produce 는 총량이고 은·금은 그 부분집합이다.** 여기서는 총량을
+		# 그대로 「일반」으로 적고 은·금을 또 적어서, 딸기 다섯(은둘·금하나)이
+		# 소지품에는 여덟 개로 보였다. 일반 = 총량 - 은 - 금
+		var ns := int(GameData.produce_silver.get(id, 0))
+		var ng := int(GameData.produce_gold.get(id, 0))
+		var n: int = int(GameData.produce[id]) - ns - ng
 		if n > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id, "name": str(def.name),
-				"count": n, "sell": int(def.sell_price),
+				"count": n, "sell": GameData.crop_unit_price(id, 0),
 				"tip": "%s x%d" % [def.name, n],
 				"desc": "마을 잡화점(판매 탭)에 팔 수 있다"})
-		var ns := int(GameData.produce_silver.get(id, 0))
 		if ns > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id,
 				"name": "%s (은)" % def.name, "count": ns,
-				"sell": int(def.sell_price * 1.25), "color": Color(0.85, 0.88, 0.95),
+				"sell": GameData.crop_unit_price(id, 1), "color": Color(0.85, 0.88, 0.95),
 				"tip": "%s (은품질) x%d" % [def.name, ns],
 				"desc": "은품질 — 일반보다 비싸게 팔린다 (1.25배)"})
-		var ng := int(GameData.produce_gold.get(id, 0))
 		if ng > 0:
 			out.append({"tab": "crop", "icon": "mature_" + id,
 				"name": "%s (금)" % def.name, "count": ng,
-				"sell": int(def.sell_price * 1.5), "color": Color(1.0, 0.88, 0.45),
+				"sell": GameData.crop_unit_price(id, 2), "color": Color(1.0, 0.88, 0.45),
 				"tip": "%s (금품질) x%d" % [def.name, ng],
 				"desc": "금품질 — 최고 품질! 가장 비싸게 팔린다 (1.5배)"})
 	for id in GameData.ITEM_IDS:

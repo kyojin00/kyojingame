@@ -117,6 +117,7 @@ func _next_day(passed_out: bool) -> void:
 	# 한숨 자고 나면 속이 조금은 든든하다 (완전히 차지는 않는다)
 	GameData.hunger = maxf(GameData.hunger, GameData.HUNGER_WAKE_MIN)
 	GameData.reset_daily()
+	GameData.society_new_day()   # 봉급·세금·수배가 붙을 자리 (아직 빈 채다)
 	m._perf_day["farm"] = Time.get_ticks_usec() - _t
 	_t = Time.get_ticks_usec()
 	m.worldgen._advance_tree_growth()

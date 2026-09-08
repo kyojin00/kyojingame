@@ -134,8 +134,16 @@ const HUNGER_LOW := 25.0          # 이 아래면 배가 고프다는 신호
 const SAVE_PATH := "user://kyojin_farm_save.json"
 
 # ---- 개발/테스트용 치트 (출시 전에 DEV_MODE를 false로 되돌린다) ----
-# 켜져 있으면 새 게임 시작 시 소지금과 기본 아이템을 잔뜩 들고 시작한다.
+# 켜져 있으면 개발용 단축키(F3·F6~F10)와 스토리 건너뛰기가 열린다.
 const DEV_MODE := true
+# **지갑은 따로 잠근다.**
+#
+# 세금·봉급·예산이 이 위에 서기 시작하면, 시작 소지금 1억은 그 모든
+# 숫자를 무의미하게 만든다 — 세율을 아무리 만져도 체감이 없으면 그건
+# 경제가 아니라 그냥 적혀 있는 글자다. 그래서 시작 지갑만 떼어 껐다.
+# 손으로 만져 볼 때는 F10(dev_fill_stock)이 돈까지 같이 채워 주고,
+# 검증 하네스는 필요한 자리마다 money 를 직접 꽂는다.
+const DEV_RICH := false
 const DEV_MONEY := 100000000
 const DEV_STOCK := 10000        # 목재·석재·씨앗·아이템 개수
 const START_MONEY := 200        # 출시용 시작 소지금 — 씨앗 몇 줌이 전부다
@@ -391,8 +399,7 @@ func load_settings() -> void:
 
 var day := 1
 var minutes := DAY_START
-# 개발용 시작 자금 (출시 전 500으로 되돌릴 것!)
-var money := DEV_MONEY if DEV_MODE else START_MONEY
+var money := DEV_MONEY if (DEV_MODE and DEV_RICH) else START_MONEY
 var energy := ENERGY_MAX
 var hunger := HUNGER_MAX
 var hunger_open := false     # 배고픔 해금 (스토리 3의 씨앗 퀘스트에서 열린다)
@@ -406,6 +413,18 @@ var produce_gold := {}
 var wood := 0
 var stone := 0
 var tool_level := {"hoe": 1, "water": 1, "axe": 1, "pickaxe": 1}
+
+# ---- 나 (사회) ----
+#
+# **아직 빈 그릇이다.** 직업·자리·대범함·전과가 들어올 자리를 미리 파 둔다.
+#
+# 미리 파는 이유는 세이브다. 나중에 통째로 새로 넣으면 그날까지 저장해 둔
+# 세이브가 전부 「그런 칸 없음」이 되고, 그걸 메우는 백필 코드가 또 붙는다.
+# 지금 빈 사전 하나를 넣어 두면 그때는 값만 채우면 된다.
+#
+# 읽을 때는 fresh_me() 위에 덮어씌운다 — 나중에 열쇠가 늘어도 옛 세이브가
+# 깨지지 않고, 모르는 열쇠는 그대로 지나간다.
+var me := fresh_me()
 
 # 설치물 비용
 const FENCE_COST_WOOD := 1
@@ -4815,14 +4834,40 @@ func consume_produce(id: String, n: int) -> void:
 		normal += 1
 
 
+# 품질 배수 — 은은 1.25배, 금은 1.5배
+const QUALITY_MULT := [1.0, 1.25, 1.5]
+
+
+# **작물 한 개 값. 파는 곳도 값을 적어 두는 곳도 전부 이 함수를 지난다.**
+#
+# 예전엔 곳마다 따로 셌다. 그래서 세 가지가 어긋나 있었다:
+#   ① 진열대는 「합쳐서 내림」, 실제 판매는 「개당 내림」 — 딸기 다섯에
+#      450G 이라 적어 놓고 448G 을 줬다. 두 푼이지만 장부는 장부다
+#   ② 연구소 개량(단계마다 +8%)은 여기서만 곱해졌다. 실제로 파는 쪽은
+#      곱하지 않아서, **돈과 광석을 들여 올린 개량이 수입을 한 푼도
+#      못 올리고 있었다**. 마을 안내판은 「판매가 +N%」라고 적혀 있는데
+#   ③ 경매장의 「잡화점 기준값」은 은 2배·금 3배로 세고 있었다 —
+#      잡화점이 실제로 쳐 주는 값(1.25/1.5배)과 다른 숫자였다
+#
+# 세금도 봉급도 예산도 전부 이 숫자 위에 선다. 값을 묻는 길은 하나뿐이다.
+func crop_unit_price(id: String, quality := 0, mult := 1.0) -> int:
+	if not CROPS.has(id):
+		return 0
+	return int(CROPS[id].sell_price * breed_price_mult()
+		* float(QUALITY_MULT[clampi(quality, 0, 2)]) * mult)
+
+
 # 보유 전량 판매 가치 (은 1.25배 / 금 1.5배)
-func produce_sell_value(id: String) -> int:
-	# 연구소 개량 단계만큼 값이 오른다
-	var price: int = int(CROPS[id].sell_price * breed_price_mult())
+#
+# `produce` 는 총량이고 `produce_silver`/`produce_gold` 는 그 **부분집합**이다
+# (add_produce 참고). 일반 = 총량 - 은 - 금.
+func produce_sell_value(id: String, mult := 1.0) -> int:
 	var silver := int(produce_silver.get(id, 0))
 	var gold := int(produce_gold.get(id, 0))
 	var normal: int = int(produce[id]) - silver - gold
-	return int(normal * price + silver * price * 1.25 + gold * price * 1.5)
+	return normal * crop_unit_price(id, 0, mult) \
+		+ silver * crop_unit_price(id, 1, mult) \
+		+ gold * crop_unit_price(id, 2, mult)
 
 
 # 재료 보유량 (작물이면 수확물, 아니면 아이템)
@@ -5812,6 +5857,29 @@ func dev_fill_stock(n: int = DEV_STOCK) -> void:
 	# 한꺼번에 터져서 정작 보려던 것을 덮어 버린다.
 
 
+# 새 인물의 사회적 신원 — 아무것도 아닌 사람으로 시작한다
+func fresh_me() -> Dictionary:
+	return {
+		"job": "",           # 맡은 일 (빈 값이면 그냥 농사꾼)
+		"seat": "",          # 마을에서 앉은 자리 (이장·서기·순경…)
+		"region": "rural",   # 사는 곳 — 지방(rural) / 도심(urban)
+		"boldness": 0,       # 대범함 — 못 할 짓의 문턱
+		"heat": 0,           # 경찰이 나를 얼마나 보고 있나
+		"record": [],        # 전과
+		"licenses": [],      # 딴 자격
+	}
+
+
+# 하루가 넘어갈 때 사회가 도는 자리 (day_cycle 이 부른다).
+#
+# **지금은 아무것도 하지 않는다.** 봉급·세금·수배가 붙을 곳을 하루 흐름
+# 안에 먼저 뚫어 둔다 — 나중에 넣을 때 하루가 넘어가는 코드를 다시
+# 헤집지 않으려고.
+func society_new_day() -> void:
+	if not me.has("heat"):
+		me = fresh_me()      # 옛 세이브 — 그릇부터 갖춘다
+
+
 func fresh_tutorial() -> Dictionary:
 	var t := {"active": true}
 	for pair in TUTORIAL_ORDER:
@@ -6089,6 +6157,9 @@ func item_display_name(id: String) -> String:
 	return id
 
 
+# 도감·의뢰 보상이 보는 **표에 적힌 값**. 연구소 개량은 여기 안 탄다 —
+# 마을 안내판이 약속한 것은 「판매가 +N%」이지, 이웃이 부탁하며 얹어 주는
+# 삯까지 오른다는 말이 아니다. 파는 값은 crop_unit_price 가 따로 센다.
 func item_value(id: String) -> int:
 	if CROPS.has(id):
 		return int(CROPS[id].sell_price)
@@ -6258,7 +6329,7 @@ func reset_daily() -> void:
 func reset_all() -> void:
 	day = 1
 	minutes = DAY_START
-	money = DEV_MONEY if DEV_MODE else START_MONEY
+	money = DEV_MONEY if (DEV_MODE and DEV_RICH) else START_MONEY
 	energy = ENERGY_MAX
 	hunger = HUNGER_MAX
 	hunger_open = false
@@ -6419,6 +6490,7 @@ func reset_all() -> void:
 	zones_open = []
 	arrivals = []
 	npc_greeted = []
+	me = fresh_me()
 	recipe_items = {}
 	tracked_pick = ""
 	respawn_queue = []
@@ -6835,6 +6907,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"hall_projects": hall_projects, "hall_meet_day": hall_meet_day,
 		"hall_feat_noticed": hall_feat_noticed,
 		"arrivals": arrivals, "npc_greeted": npc_greeted,
+		"me": me,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
@@ -6961,9 +7034,16 @@ func apply_stats(d: Dictionary) -> void:
 		if q.is_empty():
 			quest = {}
 		else:
+			# 의뢰는 **crop 이 아니라 item** 이다 (make_daily_quest 참고 —
+			# 작물만이 아니라 물고기·광물·요리도 붙는다). q.crop 을 읽고
+			# 있었으므로 호스트가 의뢰를 받아 둔 상태에서 손님이 들어오면
+			# 그 자리에서 죽었다. kind·label 도 같이 넘긴다 — 안 그러면
+			# quest_line()·village_ui 가 읽을 것이 없다
 			quest = {
-				"crop": q.crop, "qty": int(q.qty),
-				"reward": int(q.reward), "accepted": bool(q.accepted),
+				"item": str(q.get("item", "")), "kind": str(q.get("kind", "")),
+				"label": str(q.get("label", "")), "qty": int(q.get("qty", 0)),
+				"reward": int(q.get("reward", 0)),
+				"accepted": bool(q.get("accepted", false)),
 			}
 
 
