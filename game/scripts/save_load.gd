@@ -378,6 +378,7 @@ func _apply_save(d: Dictionary) -> void:
 	for c in d.get("explored", []):
 		GameData.explored[Vector2i(int(c[0]), int(c[1]))] = true
 	GameData.trees_chopped = int(d.get("trees_chopped", 0))
+	GameData.things_built = int(d.get("things_built", 0))
 	GameData.u_intro_state = int(d.get("u_intro", 0))
 	GameData.story_rock_state = int(d.get("rock_state", 0))
 	GameData.story_gates_left = int(d.get("gates_left", 0))

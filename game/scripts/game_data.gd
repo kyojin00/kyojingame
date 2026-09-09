@@ -3471,6 +3471,7 @@ func desk_tick(delta: float) -> void:
 			discover(tid)
 		discover(str(job.id))
 		desk_done_pending.append(str(def.name))
+		things_built += 1
 	desk_queue = still
 
 
@@ -3702,6 +3703,7 @@ func player_up_tex(is_moving: bool, _suffix: String, t: float) -> String:
 
 # 벌목 누적 횟수 (스토리 중 15그루째에 우체부가 능력치 창을 알려준다)
 var trees_chopped := 0
+var things_built := 0            # 제작대에서 완성한 수 — 자유직 「목수」(S3c)의 문턱
 # U키 능력치 안내 단계: 0=대기 / 1=대사 완료(U 누르기 대기) / 2=창 열어봄 / 3=완료
 var u_intro_state := 0
 # 숲길을 막고 선 나무 중 아직 베지 않은 그루 수 (얼마나 더 파야 하는지 표시)
@@ -6050,6 +6052,71 @@ const INSTITUTIONS := {
 		"jobs": ["township_clerk", "forest_ranger"],
 		"slice": 2,
 	},
+	# 마을 자치회(S3c) — 부녀회장·청년회장·서당 훈장. 명예직(무보수), 회관 창구에서 이장이 추천한다.
+	# 위에는 언제나 이장(head) — 자리 셋이라 ranks 가 넷이다
+	"assoc": {
+		"name": "마을 자치회",
+		"region": "kyojin",
+		"room": "hall",
+		"head": "chief",
+		"ranks": ["women_head", "youth_head", "tutor", "head"],
+		"player_max": "tutor",
+		"skill": "",
+		"books": 0,
+		"job": "youth_head",
+		"jobs": ["women_head", "youth_head", "village_tutor"],
+		"slice": 3,
+	},
+	# 고장 점원 넷(S3c) — 방(room)이 없다: 「일자리 이야기」도 「근무」도 그 사람 앞 대화다.
+	# 고장 사람은 첫 인사 목록에 없어도 늘 제자리에 있으므로 can_hire_job 이 따로 연다
+	"mill": {
+		"name": "물레방앗간",
+		"region": "brookside",
+		"room": "",
+		"head": "miller",
+		"ranks": ["hand", "owner"],
+		"player_max": "hand",
+		"skill": "farm",
+		"books": 0,
+		"job": "miller_hand",
+		"slice": 3,
+	},
+	"dyeworks": {
+		"name": "물들이터",
+		"region": "brookside",
+		"room": "",
+		"head": "dyer",
+		"ranks": ["hand", "owner"],
+		"player_max": "hand",
+		"skill": "beach",
+		"books": 0,
+		"job": "dyer_hand",
+		"slice": 3,
+	},
+	"sawmill": {
+		"name": "톱질터",
+		"region": "treeshade",
+		"room": "",
+		"head": "sawyer",
+		"ranks": ["hand", "owner"],
+		"player_max": "hand",
+		"skill": "forest",
+		"books": 0,
+		"job": "sawyer_hand",
+		"slice": 3,
+	},
+	"loom": {
+		"name": "솜이네 베틀",
+		"region": "kyojin",
+		"room": "",
+		"head": "weaver",
+		"ranks": ["hand", "owner"],
+		"player_max": "hand",
+		"skill": "farm",
+		"books": 0,
+		"job": "weaver_hand",
+		"slice": 3,
+	},
 }
 
 # 직업 14 — 점원 6(kind "clerk") + 자유직 8(kind "free").
@@ -7299,6 +7366,453 @@ const JOBS := {
 		"stat": "mob_kills",
 		"slice": 1,
 	},
+	# ---- 명예직 셋(S3c) — 무보수. 돈이 아니라 부름과 「보이는 것」이 몫이다 ----
+	"women_head": {
+		"name": "부녀회장",
+		"kind": "honor",
+		"inst": "assoc",
+		"rank": "women_head",
+		"boss": "chief",
+		"wage": 0,
+		"known_at": 14,
+		"skill": "",
+		"books": 0,
+		"req_rep": 60,
+		"req_aff": 50,
+		"slice": 3,
+		"calls": {
+			"stranger": "부녀회 새 사람",
+			"known": "부녀회장 양반",
+			"master": "우리 부녀회장",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔나. 부녀회는 말보다 발일세. 누구 집에 무슨 일 있는지 먼저 알게.",
+				"새 회장, 오늘은 누구네를 돌 텐가. 명부는 창구에 있네.",
+			],
+			"known": [
+				"부녀회장 양반, 솜이네가 요즘 조용하더군. 한번 들러 보게.",
+				"부녀회장 양반 덕에 마을이 덜 외롭네. 고맙네.",
+			],
+			"master": [
+				"우리 부녀회장 왔구먼. 자네 없으면 누가 사람을 챙기겠나.",
+				"우리 부녀회장, 오늘도 한 집 돌고 오게. 내가 차 끓여 두지.",
+			],
+		},
+		"hire": {
+			"ask": "이장님, 부녀회장 자리를 맡고 싶습니다. 사람 챙기는 일이라면.",
+			"refuse_aff": "자네를 아직 잘 모르네. 나하고 좀 더 지내고 말하세.",
+			"refuse_rep": "부녀회장은 마을이 먼저 미는 자리일세. 아직 그 말이 안 도네.",
+			"refuse_record": "전과가 있는 사람한테 남의 집 문을 두드리게 할 순 없네.",
+			"refuse_busy": "일자리가 있는 사람은 못 맡네. 부녀회는 온 하루가 남의 일이야.",
+			"refuse_skill": "손이 아직 서툴러. 좀 더 해 보고 오게.",
+			"accept": "그래, 자네가 맡게. 봉급은 없네. 대신 마을이 자넬 부를 걸세.",
+			"first_day": "첫날일세. 창구에 살림 명부를 뒀네. 오래 못 본 집부터 돌게.",
+			"resign_ask": "이장님, 부녀회장 자리를 내려놓겠습니다.",
+			"resign_reply": "그러게. 자네가 돈 집들은 기억할 걸세. 고마웠네.",
+			"fired": "이레를 안 보였어. 사람 챙기는 자리를 비워 둘 순 없네. 내려놓게.",
+		},
+		"loop": [
+			{
+				"customer": "florist",
+				"setup": "해솔이 회관 문 앞에서 서성인다. 「부녀회에서… 저희 집도 봐 주나요?」",
+				"choices": [
+					["오늘 저녁에 들르겠다고 한다", "해솔: 정말요? 꽃차 끓여 둘게요. 아무도 안 온 지 오래라.", 1],
+					["무슨 일인지 먼저 묻는다", "해솔: 별일은 아니에요. 그냥… 사람이 그리웠어요.", 0],
+					["명부에 이름만 적는다", "해솔: 아, 네. 바쁘시죠. 그럼 다음에…", -1],
+				],
+			},
+			{
+				"customer": "weaver",
+				"setup": "솜이가 베 한 필을 들고 왔다. 「누구 집에 필요한 데 없을까요?」",
+				"choices": [
+					["연화네에 보내자고 한다", "솜이: 솔이 옷 지으면 되겠네요. 잘 됐다. 고마워요.", 1],
+					["회관 창고에 두자고 한다", "솜이: 창고요… 네. 누구든 쓰면 좋죠.", 0],
+					["값을 쳐 주겠다고 한다", "솜이: 팔려고 가져온 게 아닌데요. 조금 서운하네요.", -1],
+				],
+			},
+		],
+	},
+	"youth_head": {
+		"name": "청년회장",
+		"kind": "honor",
+		"inst": "assoc",
+		"rank": "youth_head",
+		"boss": "chief",
+		"wage": 0,
+		"known_at": 14,
+		"skill": "forest",
+		"skill_lv": 3,
+		"boldness": 35,
+		"books": 0,
+		"req_rep": 60,
+		"req_aff": 50,
+		"slice": 3,
+		"calls": {
+			"stranger": "청년회 새 사람",
+			"known": "회장 양반",
+			"master": "우리 회장님",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔나. 청년회장은 밤에 마을을 도는 자리일세. 등불은 없네.",
+				"새 회장, 어젯밤은 조용했나. 자네 발소리만 났으면 된 걸세.",
+			],
+			"known": [
+				"회장 양반, 어젯밤 잡화점 뒷문은 봤나. 만수가 걱정하더군.",
+				"회장 양반 덕에 밤이 덜 무섭다고들 하네.",
+			],
+			"master": [
+				"우리 회장님 왔구먼. 자네가 도는 밤엔 나도 잠을 자네.",
+				"우리 회장님, 오늘 밤도 부탁하네. 마을이 자네를 믿네.",
+			],
+		},
+		"hire": {
+			"ask": "이장님, 청년회장을 맡고 싶습니다. 밤길이 무섭지 않습니다.",
+			"refuse_aff": "자네를 아직 잘 모르네. 나하고 좀 더 지내고 말하세.",
+			"refuse_rep": "청년회장은 마을이 먼저 미는 자리일세. 아직 그 말이 안 도네.",
+			"refuse_record": "전과가 있는 사람한테 밤 마을을 맡길 순 없네.",
+			"refuse_busy": "일자리가 있는 사람은 못 맡네. 밤을 도는 사람은 낮에 쉬어야 해.",
+			"refuse_skill": "나무를 베어 본 손이라야 울력을 시키네. 도끼부터 익히게.",
+			"refuse_bold": "밤이 무섭지 않다고 했나. 자네 눈은 아직 그렇게 말하지 않네.",
+			"accept": "그래, 자네가 맡게. 봉급은 없네. 밤 아홉 시부터 세 군데를 돌게.",
+			"first_day": "첫밤일세. 분수, 잡화점 앞, 우체국 앞. 아침에 나한테 보고하게.",
+			"resign_ask": "이장님, 청년회장 자리를 내려놓겠습니다.",
+			"resign_reply": "그러게. 밤은 다시 박 순경 혼자 돌겠구먼. 고마웠네.",
+			"fired": "이레째 밤을 안 돌았어. 청년회장 자리를 비워 둘 순 없네. 내려놓게.",
+		},
+		"watch": {
+			"report": [
+				"수고했네. 어젯밤 마을이 조용했던 건 자네 발소리 덕일세.",
+				"세 군데 다 돌았구먼. 이런 밤이 쌓여서 마을이 되는 걸세.",
+			],
+		},
+		"loop": [],
+	},
+	"village_tutor": {
+		"name": "서당 훈장",
+		"kind": "honor",
+		"inst": "assoc",
+		"rank": "tutor",
+		"boss": "chief",
+		"wage": 0,
+		"known_at": 14,
+		"skill": "",
+		"books": 6,
+		"req_rep": 40,
+		"req_aff": 30,
+		"slice": 3,
+		"calls": {
+			"stranger": "서당 새 사람",
+			"known": "훈장 {ho}",
+			"master": "우리 훈장님",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔나. 서당은 회관 구석 책상 하나일세. 아이들은 자네가 모으게.",
+				"새 훈장, 글은 천천히 가르치게. 급하면 아이들이 도망가네.",
+			],
+			"known": [
+				"훈장 왔구먼. 솔이가 제 이름을 쓰더군. 자네가 가르쳤나.",
+				"훈장, 오늘도 한 사람 앉히게. 글 아는 사람이 느는 게 마을일세.",
+			],
+			"master": [
+				"우리 훈장님 왔네. 자네 덕에 이 마을에 글소리가 나네.",
+				"우리 훈장님, 나도 한 자 배워 볼까 하네. 늦었나.",
+			],
+		},
+		"hire": {
+			"ask": "이장님, 회관에 서당을 열고 싶습니다. 책은 좀 읽었습니다.",
+			"refuse_aff": "자네를 아직 잘 모르네. 나하고 좀 더 지내고 말하세.",
+			"refuse_rep": "훈장은 마을이 믿는 사람이라야 하네. 아직은 아닐세.",
+			"refuse_record": "전과가 있는 사람한테 아이들을 맡길 순 없네.",
+			"refuse_busy": "일자리가 있는 사람은 못 맡네. 서당은 낮을 통째로 먹네.",
+			"refuse_skill": "책을 여섯 권은 읽고 오게. 서하한테 가면 되네.",
+			"accept": "그래, 열게. 봉급은 없네. 대신 아이들이 자넬 훈장이라 부를 걸세.",
+			"first_day": "첫날일세. 오늘은 한 사람만 앉히게. 이름 쓰는 것부터.",
+			"resign_ask": "이장님, 서당을 닫겠습니다.",
+			"resign_reply": "그러게. 배운 글은 안 지워지네. 고마웠네.",
+			"fired": "이레째 서당이 비었어. 아이들이 기다리다 갔네. 내려놓게.",
+		},
+		"loop": [
+			{
+				"customer": "forest_girl",
+				"setup": "솔이가 붓을 거꾸로 쥐고 앉았다. 「훈장님, 제 이름부터요!」",
+				"choices": [
+					["손을 잡고 한 획씩 같이 쓴다", "솔이: 됐다! 이게 나예요. 엄마한테 보여 줄래요.", 1],
+					["먼저 붓 쥐는 법부터 고친다", "솔이: 이렇게요? 어렵다… 그래도 해 볼게요.", 0],
+					["오늘은 보고만 있으라고 한다", "솔이: 보기만요? 저도 쓰고 싶은데… 알겠어요.", -1],
+				],
+			},
+			{
+				"customer": "farmer",
+				"setup": "순돌이 머쓱하게 들어온다. 「어른도 되나. 장부를 내 손으로 적고 싶어서.」",
+				"choices": [
+					["숫자부터 가르친다", "순돌: 열, 스물… 이제 감자 자루를 셀 수 있겠네. 고맙네.", 1],
+					["자기 이름부터 쓰게 한다", "순돌: 이름이라… 좋네. 내 이름을 내가 쓰는 게 처음일세.", 0],
+					["아이들 시간이라 내일 오라 한다", "순돌: 그런가. 그럼… 내일 오지. 미안하이.", -1],
+				],
+			},
+		],
+	},
+	# ---- 고장 점원 넷(S3c) — 방 없는 일터. 일급 80, 미니루프는 그 사람 앞 대화 ----
+	"miller_hand": {
+		"name": "방앗간 일꾼",
+		"kind": "clerk",
+		"inst": "mill",
+		"rank": "hand",
+		"boss": "miller",
+		"wage": 80,
+		"known_at": 14,
+		"skill": "farm",
+		"books": 0,
+		"slice": 3,
+		"calls": {
+			"stranger": "방앗간 새 사람",
+			"known": "방앗간 {ho}",
+			"master": "우리 방앗간 사람",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔나. 물레는 쉬지 않네. 자네도 쉬지 말게.",
+				"새 사람, 밀은 마른 것부터 넣게. 젖으면 맷돌이 미끄러지네.",
+			],
+			"known": [
+				"방앗간 사람 왔구먼. 오늘 물이 세니 두 자루는 더 빻겠네.",
+				"자네 손이 맷돌에 익었어. 소리만 들어도 알겠네.",
+			],
+			"master": [
+				"우리 방앗간 사람 왔네. 이제 자네가 물레 소리를 아는구먼.",
+				"우리 방앗간 사람 없으면 나 혼자 밤새 빻아야 하네.",
+			],
+		},
+		"hire": {
+			"ask": "수길 어른, 방앗간에서 일하고 싶습니다. 밀은 좀 압니다.",
+			"refuse_aff": "자네를 아직 잘 모르네. 물소리나 몇 번 더 듣고 오게.",
+			"refuse_skill": "밭을 모르는 손은 밀도 모르네. 농사가 좀 익거든 오게.",
+			"refuse_busy": "딴 데 이름이 올라 있잖나. 맷돌은 두 손이 다 필요하네.",
+			"accept": "그래. 내일 아침 아홉 시에 물레 앞으로 오게. 늦으면 물이 먼저 가네.",
+			"first_day": "첫날일세. 자루를 받고, 빻고, 이름을 적게. 순서는 그것뿐이야.",
+			"resign_ask": "수길 어른, 방앗간 일은 그만두겠습니다.",
+			"resign_reply": "그러게. 물레는 자네 없이도 돌지만, 소리는 좀 달라지겠지.",
+			"fired": "이레를 안 왔어. 물레는 기다려 주지 않네. 이제 안 와도 되네.",
+		},
+		"loop": [
+			{
+				"customer": "brook",
+				"setup": "도담이 젖은 밀 자루를 메고 왔다. 「비를 맞았는데… 되나요?」",
+				"choices": [
+					["말려서 내일 빻자고 한다", "수길: 옳지. 젖은 밀은 맷돌을 먹네. 자네가 나보다 낫구먼.", 1],
+					["그냥 빻아 준다", "수길: 맷돌 소리가 다르잖나. 다음엔 말려 오라 하게.", -1],
+					["반만 빻고 반은 말린다", "도담: 반이라도 오늘 빵을 굽겠네요. 고마워요.", 0],
+				],
+			},
+			{
+				"customer": "dyer",
+				"setup": "윤슬이 빈 자루를 들고 왔다. 「가루 한 되만요. 물감 풀에 쓰려고요.」",
+				"choices": [
+					["값을 받고 한 되를 준다", "윤슬: 네, 값은 여기요. 물감이 잘 서겠어요.", 0],
+					["이웃이라 그냥 준다", "수길: 인심은 좋네만 장부는 내가 맞추네. 다음엔 받게.", -1],
+					["가루 대신 겨를 권한다", "윤슬: 겨요? 아, 풀에는 겨가 더 낫겠네요. 고마워요.", 1],
+				],
+			},
+		],
+	},
+	"dyer_hand": {
+		"name": "물들이터 일꾼",
+		"kind": "clerk",
+		"inst": "dyeworks",
+		"rank": "hand",
+		"boss": "dyer",
+		"wage": 80,
+		"known_at": 14,
+		"skill": "beach",
+		"books": 0,
+		"slice": 3,
+		"calls": {
+			"stranger": "물들이터 새 사람",
+			"known": "물감 {ho}",
+			"master": "우리 물감쟁이",
+		},
+		"boss_calls": {
+			"stranger": [
+				"오셨어요. 손이 파래질 거예요. 그게 이 일이에요.",
+				"새 사람, 오늘은 쪽물이에요. 천은 세 번 담갔다 꺼내요.",
+			],
+			"known": [
+				"물감 사람 왔네요. 어제 그 천, 색이 곱게 섰어요.",
+				"손이 아직 파랗네요. 물들이터 사람 티가 나요.",
+			],
+			"master": [
+				"우리 물감쟁이 왔다. 이제 색은 눈으로 봐도 알죠?",
+				"우리 물감쟁이 없으면 붉은 물은 저 혼자 못 내요.",
+			],
+		},
+		"hire": {
+			"ask": "윤슬 씨, 물들이터에서 일하고 싶어요. 풀 캐는 건 익숙해요.",
+			"refuse_aff": "아직 서로 잘 모르잖아요. 물소리나 더 듣고 와요.",
+			"refuse_skill": "물감은 풀에서 나요. 채집이 손에 익거든 다시 와요.",
+			"refuse_busy": "다른 데서 일하고 있잖아요. 물감은 손이 두 개 다 필요해요.",
+			"accept": "좋아요. 내일 아홉 시에 개울가로 와요. 소매는 걷고요.",
+			"first_day": "첫날이에요. 오늘은 물만 끓여요. 색은 내일부터.",
+			"resign_ask": "윤슬 씨, 물들이터 일은 그만둘게요.",
+			"resign_reply": "그래요. 손에 든 물은 한 달은 가요. 그동안은 우리 사람이에요.",
+			"fired": "이레를 안 왔어요. 물은 식으면 못 써요. 이제 안 와도 돼요.",
+		},
+		"loop": [
+			{
+				"customer": "brook",
+				"setup": "도담이 하얀 천을 들고 왔다. 「물고기 색으로 물들여 줄 수 있어요?」",
+				"choices": [
+					["쪽물 위에 노랑을 한 번 얹는다", "윤슬: 어머, 은어 색이네요. 그 생각을 어떻게 했어요?", 1],
+					["쪽물만 곱게 낸다", "도담: 파랗긴 한데… 물고기는 아니네요. 그래도 고마워요.", 0],
+					["그런 색은 없다고 한다", "윤슬: 없긴요. 물감은 섞으라고 있는 거예요.", -1],
+				],
+			},
+			{
+				"customer": "beekeep",
+				"setup": "꿀비가 밀랍 한 덩이를 내민다. 「이걸로 무늬를 낼 수 있대서요.」",
+				"choices": [
+					["밀랍으로 무늬를 막고 물들인다", "꿀비: 벌집 무늬다! 우리 벌들이 좋아하겠어요.", 1],
+					["밀랍은 값으로 치고 그냥 물들인다", "꿀비: 아… 무늬는요? 다음에 해 주실래요?", -1],
+					["윤슬 씨에게 물어보고 한다", "윤슬: 잘 물었어요. 밀랍은 뜨거우면 녹아요. 같이 해요.", 0],
+				],
+			},
+		],
+	},
+	"sawyer_hand": {
+		"name": "톱질터 일꾼",
+		"kind": "clerk",
+		"inst": "sawmill",
+		"rank": "hand",
+		"boss": "sawyer",
+		"wage": 80,
+		"known_at": 14,
+		"skill": "forest",
+		"skill_lv": 2,
+		"books": 0,
+		"slice": 3,
+		"calls": {
+			"stranger": "톱질터 새 사람",
+			"known": "톱질꾼 {ho}",
+			"master": "우리 톱질꾼",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔군. 톱은 밀 때 힘주는 게 아니야. 당길 때야.",
+				"새 사람, 큰나무는 쳐다보지도 마. 여기 규칙이야.",
+			],
+			"known": [
+				"톱질꾼 왔네. 어제 켠 판이 곧더군. 손이 붙었어.",
+				"톱질꾼, 오늘은 소나무야. 진이 많으니 톱날 자주 닦아.",
+			],
+			"master": [
+				"우리 톱질꾼 왔어. 이제 톱 소리만 들어도 자네인 줄 알아.",
+				"우리 톱질꾼 없으면 나 혼자 켜다 허리 나가.",
+			],
+		},
+		"hire": {
+			"ask": "동백 어른, 톱질터에서 일하고 싶습니다. 나무는 좀 베어 봤습니다.",
+			"refuse_aff": "누군지도 모르는 사람한테 톱을 맡기나. 더 보고 말하지.",
+			"refuse_skill": "도끼도 안 익은 손이 톱을 잡아. 나무부터 더 베고 와.",
+			"refuse_busy": "딴 데 이름이 올라 있잖아. 톱은 두 팔이 다 필요해.",
+			"accept": "그래. 내일 아침 아홉 시. 장갑은 내가 주지.",
+			"first_day": "첫날이야. 오늘은 톱날만 갈아. 켜는 건 내일부터.",
+			"resign_ask": "동백 어른, 톱질터 일은 그만두겠습니다.",
+			"resign_reply": "그래. 톱은 두고 가. 손에 밴 소리는 가져가고.",
+			"fired": "이레를 안 왔어. 톱은 녹슬어. 이제 안 와도 돼.",
+		},
+		"loop": [
+			{
+				"customer": "teller",
+				"setup": "글샘이 널빤지 하나를 부탁한다. 「이야기 판을 세우려고요. 얇게요.」",
+				"choices": [
+					["결 따라 얇게 켠다", "글샘: 가볍다! 이 판 위에 오늘 밤 이야기를 걸게요.", 1],
+					["튼튼하게 두껍게 켠다", "글샘: 무겁네요… 그래도 오래는 가겠어요.", 0],
+					["널빤지는 안 판다고 한다", "동백: 이웃 부탁을 그렇게 자르나. 내가 켜 줄게.", -1],
+				],
+			},
+			{
+				"customer": "beekeep",
+				"setup": "꿀비가 벌통 판을 재러 왔다. 「벌들이 좁다고 웅웅대요.」",
+				"choices": [
+					["치수를 재서 같은 판을 넷 켠다", "꿀비: 딱 맞아요. 벌들이 오늘 밤은 조용하겠네요.", 1],
+					["남은 판을 그냥 준다", "꿀비: 크기가 다르면 바람이 들어요… 다시 잴게요.", -1],
+					["동백 어른에게 넘긴다", "동백: 벌통은 내가 켜지. 자네는 옆에서 봐 둬.", 0],
+				],
+			},
+		],
+	},
+	"weaver_hand": {
+		"name": "베틀 일꾼",
+		"kind": "clerk",
+		"inst": "loom",
+		"rank": "hand",
+		"boss": "weaver",
+		"wage": 80,
+		"known_at": 14,
+		"skill": "farm",
+		"books": 0,
+		"slice": 3,
+		"calls": {
+			"stranger": "베틀 새 사람",
+			"known": "베틀 {ho}",
+			"master": "우리 베틀 사람",
+		},
+		"boss_calls": {
+			"stranger": [
+				"오셨어요. 베틀은 소리로 배워요. 오늘은 듣기만 해요.",
+				"새 사람, 북은 던지는 게 아니라 건네는 거예요.",
+			],
+			"known": [
+				"베틀 사람 왔네요. 어제 짠 데가 고르더라고요.",
+				"베틀 사람, 오늘은 무명이에요. 실이 잘 끊기니 천천히.",
+			],
+			"master": [
+				"우리 베틀 사람 왔다. 이제 북 소리가 둘이 나요.",
+				"우리 베틀 사람 없으면 이 필은 겨울까지 못 끝내요.",
+			],
+		},
+		"hire": {
+			"ask": "솜이 씨, 베틀 일을 배우고 싶어요. 밭일 하던 손이라 느리진 않아요.",
+			"refuse_aff": "아직 서로 잘 모르잖아요. 좀 더 이야기하고 나서요.",
+			"refuse_skill": "실은 밭에서 와요. 농사가 좀 더 익거든 다시 와요.",
+			"refuse_busy": "다른 데서 일하고 있잖아요. 베틀은 하루를 다 먹어요.",
+			"accept": "좋아요. 내일 아홉 시에 우리 집으로 와요. 북은 제가 드릴게요.",
+			"first_day": "첫날이에요. 오늘은 실만 걸어요. 짜는 건 내일부터.",
+			"resign_ask": "솜이 씨, 베틀 일은 그만둘게요.",
+			"resign_reply": "그래요. 짜던 필은 제가 마저 할게요. 고마웠어요.",
+			"fired": "이레를 안 왔어요. 실이 다 늘어졌어요. 이제 안 와도 돼요.",
+		},
+		"loop": [
+			{
+				"customer": "forest_mom",
+				"setup": "연화가 솔이 치수를 적어 왔다. 「겨울 옷감을 한 필만요.」",
+				"choices": [
+					["두툼한 무명으로 짠다", "연화: 따뜻하겠네요. 솔이가 올겨울은 안 떨겠어요.", 1],
+					["얇은 삼베로 짠다", "연화: 삼베는… 여름 것 아닌가요? 겨울인데.", -1],
+					["솜이 씨에게 고르게 한다", "솜이: 무명이죠. 잘 물었어요. 같이 걸어요.", 0],
+				],
+			},
+			{
+				"customer": "florist",
+				"setup": "해솔이 꽃물 든 실타래를 가져왔다. 「이걸로 띠 하나 짤 수 있을까요?」",
+				"choices": [
+					["꽃무늬를 넣어 띠를 짠다", "해솔: 어머, 꽃이 피었네요. 축제 때 두를게요.", 1],
+					["민무늬로 짠다", "해솔: 예쁘긴 한데… 꽃물 든 실이 아깝네요.", 0],
+					["띠는 안 짠다고 한다", "솜이: 띠는 반나절이면 돼요. 이웃 부탁은 받아요.", -1],
+				],
+			},
+		],
+	},
+	# 자유직 목수(S3c) — 제작대에서 완성한 것이 마흔이면 불린다
+	"carpenter": {
+		"name": "목수",
+		"kind": "free",
+		"inst": "",
+		"stat": "things_built",
+		"slice": 3,
+	},
 }
 
 # 자유직 문턱 8 — stat 값(사전이면 합)이 need 를 넘으면 불린다. 여럿이면 value/need 비율 최대(D16).
@@ -7367,6 +7881,14 @@ const FREE_TITLES := {
 		"known_m": "동굴꾼 총각",
 		"known_f": "동굴꾼 처자",
 		"master": "우리 마을 동굴꾼",
+	},
+	"carpenter": {
+		"name": "목수",
+		"stat": "things_built",
+		"need": 40,
+		"known_m": "목수 총각",
+		"known_f": "목수 처자",
+		"master": "우리 마을 목수",
 	},
 }
 
@@ -8077,6 +8599,9 @@ const SOCIETY_NOTES := {
 	"shop_sold": "어제 좌판에서 %d개가 팔렸다 — %dG. 좌판 금고에 있다.",
 	"shop_none": "어제 좌판에는 손님이 없었다. 값이 비싼가, 물건이 낯선가.",
 	"shop_frozen": "밀린 세금으로 좌판이 영업정지다. 세금부터 내자.",
+	# ---- 자치회(S3c) ----
+	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
+	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
 }
 
 # 마음 카드 — [[문턱, 이름, 설명]] · stats_ui 가 이름을 글줄로, 설명을 툴팁으로 쓴다.
@@ -8250,6 +8775,8 @@ func fresh_me() -> Dictionary:
 		"charged": {}, "jail_out_day": -99,
 		# 순경(S2b) — 오늘 순찰의 진행과 검거 실적, 사건마다 물어본 사람
 		"patrol_day": 0, "patrol_idx": 0, "arrests": 0, "case_asked": {},
+		# 자치회(S3c) — 부녀회장이 오늘 찾아간 집
+		"visit_day": 0,
 		# 자기 상점(S3)
 		"shop_own": {}, "shop_stock": {}, "shop_ledger": [],
 	}
@@ -9457,6 +9984,12 @@ func society_new_day(stats: Array, ko := false) -> void:
 		_note(str(SOCIETY_NOTES.wanted))
 	# 순회 재판(S2c) — 구류 하루, 기소, 재판일
 	_court_tick()
+	# 자치회(S3c) — 청년회장의 어젯밤: 세 군데를 다 돌았으면 보고를, 안 돌았으면 빠진 밤을 적는다
+	if str(me.job) == "youth_head" and day > int(me.job_since_day):
+		if int(me.patrol_day) == day - 1 and int(me.patrol_idx) >= 3:
+			_note(str(SOCIETY_NOTES.watch_done))
+		elif int(me.job_since_day) < day - 1:
+			_note(str(SOCIETY_NOTES.watch_missed))
 	# ⑨ 이장이 찾아온다 — 어제 신고된 일
 	if council_pending():
 		_note(str(SOCIETY_NOTES.meeting_summon))
@@ -10213,6 +10746,7 @@ func reset_all() -> void:
 	has_bed = true
 	explored = {}
 	trees_chopped = 0
+	things_built = 0
 	u_intro_state = 0
 	story_rock_state = 0
 	story_gates_left = 0
@@ -10602,7 +11136,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
-		"trees_chopped": trees_chopped,
+		"trees_chopped": trees_chopped, "things_built": things_built,
 		"u_intro": u_intro_state,
 		"rock_state": story_rock_state,
 		"gates_left": story_gates_left,

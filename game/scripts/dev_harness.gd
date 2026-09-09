@@ -6175,6 +6175,179 @@ func _debug_tick() -> void:
 			GameData.home_plots = plots_md
 			GameData.story4_phase = s4_md
 			_s2_restore(k_md)
+		395:
+			# ---- 자치회(S3c) — 명예직 목록·심사·청년회장의 야경·아침 보고·야경 명부·부녀회장의 살림 명부 ----
+			var k_ho := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			var cop_ho := _s2_police_setup()
+			GameData.day = 40
+			var keep_min_ho := GameData.minutes
+			GameData.minutes = 10 * 60
+			m.society._open_township_jobs()
+			var jl: Array = _btn_texts()
+			m.dialog.close()
+			var list_ok: bool = "청년회장 — 명예직, 무보수" in jl and "부녀회장 — 명예직, 무보수" in jl \
+				and "서당 훈장 — 명예직, 무보수" in jl
+			# 심사 — 평판 60 · 이장 호감 50 · 대범함 35 · 벌목 Lv3
+			GameData.aff_add("chief", 50 - GameData.aff("chief"))
+			GameData.me.reputation.kyojin = 30
+			GameData.me.boldness_base = 40
+			GameData.skills["forest"].lv = 3
+			var rep_refuse: String = m.society.can_hire_job("youth_head")
+			GameData.me.reputation.kyojin = 60
+			GameData.aff_add("chief", 30 - GameData.aff("chief"))
+			var aff_refuse: String = m.society.can_hire_job("youth_head")
+			GameData.aff_add("chief", 50 - GameData.aff("chief"))
+			var review_ok: bool = rep_refuse.contains("미는 자리") and aff_refuse.contains("잘 모르") \
+				and m.society.can_hire_job("youth_head") == ""
+			m.society.hire_job("youth_head")
+			m.dialog.close()
+			var hire_ok: bool = str(GameData.me.job) == "youth_head" \
+				and GameData.seat_of("assoc", "youth_head") == "player" and int(GameData.JOBS.youth_head.wage) == 0
+			# 야경 — 21시가 되면 저절로 시작, 세 군데를 찍으면 끝, 대범함이 오른다
+			GameData.day += 1
+			GameData.minutes = 21 * 60 + 30
+			m.story_cutscene = false
+			var bold_before := float(GameData.me.boldness_state)
+			# 앞 검사(지도)가 지도 창을 연 채 두었다 — 야경은 창이 다 닫혀야 찍힌다(ui_open)
+			var map_keep_ho: bool = m.map_ui.visible
+			m.map_ui.visible = false
+			m.society._patrol_tick()
+			var start_ok: bool = m.society.patrol_active() and m.hud._guide_on \
+				and int(GameData.me.patrol_day) == GameData.day
+			var pos_ho: Vector2 = m.player.position
+			for pt9: Vector2i in m.society.watch_points():
+				m.player.position = Vector2(pt9.x * m.TILE + 16, pt9.y * m.TILE + 16)
+				m.society._patrol_tick()
+			m.player.position = pos_ho
+			var walk_ok: bool = m.society.patrol_done_today() and not m.hud._guide_on \
+				and float(GameData.me.boldness_state) > bold_before
+			# 다음날 아침 — 결산 줄, 창구의 「야경 보고」가 근무를 인정한다. 봉급은 없다
+			GameData.day += 1
+			GameData.minutes = 10 * 60
+			GameData.society_new_day([0, 0, 0])
+			var n_ho := GameData.society_note()
+			m.story_cutscene = true
+			m.society.open_township()
+			var tb: Array = _btn_texts()
+			m.dialog.close()
+			m.society.watch_report()
+			m.dialog.close()
+			var report_ok: bool = n_ho.contains("세 군데") and "야경 보고" in tb and "야경 명부" in tb \
+				and int(GameData.me.perf) == 1 and int(GameData.me.wage_pending) == 0 \
+				and GameData.worked_on(GameData.day)
+			m.society._watch_roster()
+			var roster_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("박 순경")
+			m.dialog.close()
+			# 부녀회장 — 오래 못 본 정착민을 알고, 하루 한 집 찾아간다(이탈이 멈춘다)
+			m.society.resign()
+			m.dialog.close()
+			GameData.me.job_history = []
+			GameData.me.reputation.kyojin = 60
+			m.society.hire_job("women_head")
+			m.dialog.close()
+			GameData.day += 1
+			GameData.settlers = ["florist"]
+			if not GameData.npc_greeted.has("florist"):
+				GameData.npc_greeted.append("florist")
+			GameData.npc_last_talk["florist"] = GameData.day - 10
+			m.society._women_roster()
+			var wb: Array = _btn_texts()
+			m.dialog.close()
+			var aff_fl := GameData.aff("florist")
+			m.society._women_visit("florist")
+			m.dialog.close()
+			var women_ok: bool = ("찾아간다 — " + str(GameData.npc_def("florist").name)) in wb \
+				and int(GameData.npc_last_talk.florist) == GameData.day and GameData.aff("florist") == aff_fl + 3 \
+				and int(GameData.me.visit_day) == GameData.day
+			print("HONOR_OK=", list_ok and review_ok and hire_ok and start_ok and walk_ok and report_ok
+				and roster_ok and women_ok,
+				" 목록=", list_ok, " 심사=", review_ok, " 채용=", hire_ok, " 야경시작=", start_ok,
+				" 세곳=", walk_ok, " 보고=", report_ok, " 명부=", roster_ok, " 부녀회=", women_ok)
+			GameData.minutes = keep_min_ho
+			m.map_ui.visible = map_keep_ho
+			_s2_police_teardown(cop_ho)
+			_s2_restore(k_ho)
+		396:
+			# ---- 고장 점원(S3c) — 방 없는 일터: 수길 앞 대화에서 일자리 이야기·근무·봉급 ----
+			var k_hc := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			GameData.day = 40
+			var keep_min_hc := GameData.minutes
+			GameData.minutes = 10 * 60
+			GameData.aff_add("miller", 25 - GameData.aff("miller"))
+			GameData.skills["farm"].lv = 2
+			var ch_m: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("miller", ch_m)
+			var offer_ok := false
+			for c1 in ch_m:
+				if str(c1[0]) == "일자리 이야기":
+					offer_ok = true
+			var open_ok: bool = m.society.can_hire_job("miller_hand") == ""   # 고장 사람은 첫 인사 없이도 열려 있다
+			m.society.hire_job("miller_hand")
+			m.dialog.close()
+			GameData.day += 1
+			var ch_m2: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("miller", ch_m2)
+			var work_choice := false
+			var no_offer := true
+			for c2 in ch_m2:
+				if str(c2[0]) == "근무":
+					work_choice = true
+				if str(c2[0]) == "일자리 이야기":
+					no_offer = false
+			m.society.work_start("")
+			var enc_ok: bool = m.dialog.visible and m.dialog._seq.size() >= 1
+			m.society.work_pick(0)
+			m.dialog.close()
+			var work_ok: bool = int(GameData.me.perf) == 1 and int(GameData.me.wage_pending) == 80 \
+				and GameData.worked_on(GameData.day)
+			var ch_m3: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("miller", ch_m3)
+			var done_gray := false
+			for c3 in ch_m3:
+				if str(c3[0]) == "… 근무":
+					done_gray = true
+			print("HAMLET_CLERK_OK=", offer_ok and open_ok and work_choice and no_offer and enc_ok and work_ok and done_gray,
+				" 일자리이야기=", offer_ok, " 열림=", open_ok, " 근무선택지=", work_choice and no_offer,
+				" 손님=", enc_ok, " 근무=", work_ok, " 하루한번=", done_gray)
+			GameData.minutes = keep_min_hc
+			_s2_restore(k_hc)
+		397:
+			# ---- 자유직 목수(S3c) — 제작대 완성 수가 마흔이면 「목수」로 불린다 ----
+			var k_cp := _s2_keep()
+			var tb_keep := GameData.things_built
+			var dq_keep: Array = GameData.desk_queue.duplicate(true)
+			var bin_keep := int(GameData.items.get("trash_bin", 0))
+			_s2_fresh_gov()
+			GameData.desk_queue = [{"id": "trash_bin", "left": 0.1}]
+			GameData.desk_tick(1.0)
+			var count_ok: bool = GameData.things_built == tb_keep + 1 and GameData.desk_queue.is_empty()
+			GameData.desk_done_pending.clear()
+			GameData.items["trash_bin"] = bin_keep
+			# 문턱 — 다른 자유직 통계를 비우고 마흔을 채우면 목수
+			GameData.trees_chopped = 0
+			GameData.rocks_mined = 0
+			GameData.fish_caught = {}
+			GameData.recipes_cooked = {}
+			GameData.forage_caught = {}
+			GameData.mob_kills = {}
+			GameData.crops_harvested = {}
+			GameData.animals_now = 0
+			GameData.things_built = 39
+			var not_yet: bool = GameData.free_title_of() != "carpenter"
+			GameData.things_built = 40
+			var title_cp: Dictionary = GameData.player_title("merchant")
+			# 만수 호감이 70이면 「우리 마을 목수」(free_master)로 불린다 — 둘 다 목수다
+			var title_ok: bool = GameData.free_title_of() == "carpenter" \
+				and str(title_cp.cls) in ["free_known", "free_master"] and str(title_cp.text).contains("목수")
+			print("CARPENTER_OK=", count_ok and not_yet and title_ok, " 셈=", count_ok, " 문턱전=", not_yet,
+				" 호칭=", title_ok, "(", title_cp.text, ")")
+			GameData.things_built = tb_keep
+			GameData.desk_queue = dq_keep
+			_s2_restore(k_cp)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

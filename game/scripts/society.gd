@@ -196,8 +196,10 @@ func can_hire_job(job_id: String) -> String:
 	if job.is_empty() or idef.is_empty():
 		return "그런 자리는 없네."
 	var head := str(idef.get("head", ""))
-	var office := str(job.get("kind", "")) == "office"
-	if (not GameData.tax_open()) if office else (not GameData.npc_open(head)):
+	var office := str(job.get("kind", "")) in ["office", "honor"]   # 명예직(S3c)도 창구·평판·전과를 본다
+	# 고장 사람(S3c)은 첫 인사 목록에 없어도 늘 제자리에 있다 — 그 일터는 언제나 열려 있다
+	var head_here: bool = GameData.npc_open(head) or head in m.HAMLET_NPC_IDS
+	if (not GameData.tax_open()) if office else (not head_here):
 		return "가게부터 열어야지."
 	if GameData.seat_of(inst, str(job.get("rank", ""))) != "":
 		return "자리가 안 비었네."
@@ -208,7 +210,7 @@ func can_hire_job(job_id: String) -> String:
 	var hist: Array = GameData.me.get("job_history", [])
 	if not hist.is_empty() and GameData.day - int(hist[-1].get("to", 0)) < 7:
 		return "그만둔 지 이레도 안 됐잖나."
-	if GameData.aff(head) < 20:
+	if GameData.aff(head) < int(job.get("req_aff", 20)):
 		return str(lines.get("refuse_aff", "아직 자네를 잘 몰라서 말이야."))
 	if office:
 		var rep: Dictionary = GameData.me.get("reputation", {})
@@ -254,6 +256,11 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 				gray("일자리 이야기", "손님은 이 마을 일에 끼지 않는다."))
 		else:
 			choices.insert(choices.size() - 1, ["일자리 이야기", open_job_talk.bind(inst)])
+	# 방 없는 일터(고장 점원 S3c) — 계산대가 없으니 근무·봉급·사직이 그 사람 앞 대화에 선다
+	var my_inst := GameData.job_inst()
+	if not guest and my_inst != "" and owner_inst(nid) == my_inst \
+			and str(_inst_def(my_inst).get("room", "")) == "":
+		_talk_work_choices(choices)
 	# ② 이장 — 성격 질문 · 마을 회의 · 봉사
 	if nid == "chief":
 		if _me_int("boldness_base", -1) == -1 and GameData.story_phase == "done":
@@ -997,19 +1004,32 @@ func open_township() -> void:
 			btns.append(gray(lbl_x, "그만한 돈이 없다. 인지세일세."))
 		else:
 			btns.append([lbl_x, expunge])
-	var employed := GameData.job_inst() == "township"
+	var employed := GameData.job_inst() in ["township", "assoc"]
 	if employed:
-		if can_work("hall") == "":
+		var my_job := str(GameData.me.get("job", ""))
+		if my_job == "youth_head":
+			# 청년회장(S3c) — 근무는 어젯밤의 야경이고, 아침의 보고가 그것을 인정한다
+			if GameData.worked_on(GameData.day):
+				btns.append(gray("야경 보고", "오늘 보고는 끝났다."))
+			elif watch_done_yesterday():
+				btns.append(["야경 보고", watch_report])
+			else:
+				btns.append(gray("야경 보고", "어젯밤 세 군데를 다 돌지 않았다."))
+			btns.append(["야경 명부", _watch_roster])
+		elif can_work("hall") == "":
 			btns.append(["근무", work_start.bind("hall")])
-		var wl := _wage_lines(_job())
-		if GameData.wage_frozen():
-			btns.append(gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
-		elif _me_int("wage_pending") <= 0:
-			btns.append(gray("봉급 받기", str(wl.get("nothing", "받을 게 없다."))))
-		elif GameData.day < _me_int("wage_day"):
-			btns.append(gray("봉급 받기", str(wl.get("not_yet", "봉급날은 아직이다."))))
-		else:
-			btns.append(["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
+		if my_job == "women_head":
+			btns.append(["살림 명부", _women_roster])
+		if int(_job().get("wage", 0)) > 0:
+			var wl := _wage_lines(_job())
+			if GameData.wage_frozen():
+				btns.append(gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
+			elif _me_int("wage_pending") <= 0:
+				btns.append(gray("봉급 받기", str(wl.get("nothing", "받을 게 없다."))))
+			elif GameData.day < _me_int("wage_day"):
+				btns.append(gray("봉급 받기", str(wl.get("not_yet", "봉급날은 아직이다."))))
+			else:
+				btns.append(["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
 		btns.append(["그만두겠습니다", resign])
 	elif str(GameData.me.get("job", "")) == "":
 		btns.append(["일하고 싶습니다", _open_township_jobs])
@@ -1076,16 +1096,19 @@ func _open_township_jobs() -> void:
 		return
 	m.dialog.close()
 	var btns: Array = []
-	for jid in _inst_def("township").get("jobs", []):
-		var job: Dictionary = GameData.JOBS.get(str(jid), {})
-		if job.is_empty():
-			continue
-		var taken := GameData.seat_of("township", str(job.get("rank", ""))) != ""
-		var label := "%s — 일급 %dG" % [str(job.get("name", jid)), int(job.get("wage", 0))]
-		if taken:
-			btns.append(gray(label, "그 자리는 비어 있지 않네."))
-		else:
-			btns.append([label, open_job_talk_job.bind(str(jid), open_township)])
+	# 기관직(면사무소) 뒤에 명예직(자치회, S3c) — 무보수라 일급 대신 「명예직」이라 적는다
+	for inst_j: String in ["township", "assoc"]:
+		for jid in _inst_def(inst_j).get("jobs", []):
+			var job: Dictionary = GameData.JOBS.get(str(jid), {})
+			if job.is_empty():
+				continue
+			var taken := GameData.seat_of(inst_j, str(job.get("rank", ""))) != ""
+			var label := ("%s — 명예직, 무보수" % str(job.get("name", jid))) if int(job.get("wage", 0)) <= 0 \
+				else "%s — 일급 %dG" % [str(job.get("name", jid)), int(job.get("wage", 0))]
+			if taken:
+				btns.append(gray(label, "그 자리는 비어 있지 않네."))
+			else:
+				btns.append([label, open_job_talk_job.bind(str(jid), open_township)])
 	btns.append(["돌아가기", open_township])
 	m.dialog.open(_npc_name("chief"), "어느 일을 하고 싶은가.", btns, _portrait("chief"))
 
@@ -1133,7 +1156,11 @@ func after_new_day() -> void:
 # 광장 남쪽 · 게시판 앞 · 서쪽 어귀 (NORTH_PAD 를 더한 실제 칸). 막힌 칸이면 가장 가까운 빈 칸
 const PATROL_SPOTS := [Vector2i(78, 37), Vector2i(82, 27), Vector2i(62, 33)]
 const PATROL_NAMES := ["광장 남쪽", "게시판 앞", "서쪽 어귀"]
+# 청년회장의 야경(S3c) — 광장 분수 · 잡화점 앞 · 우체국 앞. 21시부터, 등불 없이
+const WATCH_NAMES := ["광장 분수", "잡화점 앞", "우체국 앞"]
+const WATCH_HOUR := 21.0
 var _patrol_pts: Array = []
+var _watch_pts: Array = []
 var _arrest_t := 0.0
 
 
@@ -1145,23 +1172,64 @@ func patrol_points() -> Array:
 	return _patrol_pts
 
 
+func watch_points() -> Array:
+	if _watch_pts.is_empty():
+		var spots: Array = [
+			Vector2i(m.FOUNTAIN.position.x + 1, m.FOUNTAIN.end.y + 1),
+			m.door_tile(m.VILLAGE_PLOTS["general"].anchor) + Vector2i(0, 1),
+			m.door_tile(m.VILLAGE_PLOTS["post"].anchor) + Vector2i(0, 1),
+		]
+		for sp: Vector2i in spots:
+			var t: Vector2i = m.nearest_open_tile(sp)
+			_watch_pts.append(t if t.x >= 0 else sp)
+	return _watch_pts
+
+
 func _is_constable() -> bool:
 	return str(GameData.me.get("job", "")) == "constable"
 
 
-# 오늘 순찰이 진행 중인가(시작했고 아직 세 곳을 다 못 찍었다)
+func _is_youth() -> bool:
+	return str(GameData.me.get("job", "")) == "youth_head"
+
+
+# 지금 직업이 발로 찍는 지점들 — 순경은 낮 순찰, 청년회장은 밤 야경. 아니면 빈 배열
+func _spots() -> Array:
+	if _is_constable():
+		return patrol_points()
+	if _is_youth():
+		return watch_points()
+	return []
+
+
+func _spot_names() -> Array:
+	return WATCH_NAMES if _is_youth() else PATROL_NAMES
+
+
+# 오늘 순찰(야경)이 진행 중인가(시작했고 아직 세 곳을 다 못 찍었다)
 func patrol_active() -> bool:
-	return _is_constable() and _me_int("patrol_day") == GameData.day and _me_int("patrol_idx") < 3
+	return not _spots().is_empty() and _me_int("patrol_day") == GameData.day and _me_int("patrol_idx") < 3
 
 
 func patrol_done_today() -> bool:
 	return _me_int("patrol_day") == GameData.day and _me_int("patrol_idx") >= 3
 
 
+# 청년회장의 어젯밤 — 세 군데를 다 돌았나(아침 보고의 조건)
+func watch_done_yesterday() -> bool:
+	return _me_int("patrol_day") == GameData.day - 1 and _me_int("patrol_idx") >= 3
+
+
 func _patrol_tick() -> void:
+	# 야경은 저절로 시작된다 — 21시가 되면 청년회장의 발밑에 첫 핀이 선다(이장은 자고 있다)
+	if _is_youth() and GameData.hour_now() >= WATCH_HOUR and _me_int("patrol_day") != GameData.day \
+			and GameData.day >= _me_int("job_since_day") and not m.ui_open():
+		GameData.me["patrol_day"] = GameData.day
+		GameData.me["patrol_idx"] = 0
+		_guide_patrol(0)
 	if not patrol_active() or m.ui_open():
 		return
-	var pts := patrol_points()
+	var pts := _spots()
 	var idx := _me_int("patrol_idx")
 	var goal: Vector2i = pts[idx]
 	var pt: Vector2i = m.player_tile()
@@ -1172,11 +1240,14 @@ func _patrol_tick() -> void:
 			_guide_patrol(idx)
 		else:
 			m.hud.clear_guide()
+			if _is_youth():
+				GameData.bold_add(3.0, "night")   # 등불 없는 마을을 돈 밤 — 대범함(하루 상한 안에서)
 
 
 func _guide_patrol(idx: int) -> void:
-	var t: Vector2i = patrol_points()[idx]
-	m.hud.set_guide(Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16), "순찰 %s" % PATROL_NAMES[idx])
+	var t: Vector2i = _spots()[idx]
+	m.hud.set_guide(Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16),
+		"%s %s" % ["야경" if _is_youth() else "순찰", _spot_names()[idx]])
 
 
 func _officer_node() -> Node2D:
@@ -1974,3 +2045,112 @@ func _stand_close() -> void:
 	m.queue_redraw()
 	m.dialog.open("", "좌판을 거뒀다. 마당이 조용하다.", [["대화 끝", null]])
 	m.saveio.save_now()
+
+
+# ---- 자치회 · 고장 점원 (S3c) ----
+#
+# 명예직은 봉급이 없다 — 몫은 부름(호칭)과 「보이는 것」이다. 청년회장은 밤에 세 군데를 돌고
+# 아침에 이장에게 보고하며 어젯밤 밖에 있던 사람을 안다. 부녀회장은 오래 못 본 집을 알고
+# 찾아간다(이탈을 막는 손). 훈장은 회관 책상에서 글을 가르친다(근무 미니루프).
+# 고장 점원은 방이 없어 그 사람 앞 대화가 계산대다.
+
+# 아침 보고 — 어젯밤 야경이 곧 근무. 실적·평판만 오르고 봉급은 없다
+func watch_report() -> void:
+	if Net.is_guest() or not _is_youth() or not watch_done_yesterday() \
+			or GameData.worked_on(GameData.day):
+		return
+	m.dialog.close()
+	var job := _job()
+	_me_add("perf", 1)
+	_log_work("work", "assoc", 1)
+	if _me_int("perf") % 5 == 0:
+		_rep_add(1)
+	var lines: Array = job.get("watch", {}).get("report", ["수고했네."])
+	m.dialog.open(_npc_name("chief"), str(lines[posmod(GameData.day, lines.size())]),
+		[["대화 끝", open_township]], _portrait("chief"))
+	m.saveio.save_now()
+
+
+# 야경 명부 — 밤에 밖에 있는 사람들. 마을에서 밤을 아는 사람은 청년회장뿐이다(sees)
+func _watch_roster() -> void:
+	m.dialog.close()
+	var body := "어젯밤 밖에 있던 사람.\n"
+	var rows: Array = []
+	for nid in GameData.NIGHT_OWLS:
+		var sid := str(nid)
+		if sid == "officer_park":
+			rows.append("· 박 순경 — 자정까지 순찰")
+		elif GameData.npc_greeted.has(sid) and GameData.NPCS.has(sid):
+			rows.append("· %s — %d시까지 밖에" % [_npc_name(sid), int(GameData.NIGHT_OWLS[sid]) / 60])
+	if int(GameData.me.get("night_out_day", 0)) == GameData.day - 1:
+		rows.append("· 나 — 밤길 %d분" % int(GameData.me.get("night_out_min", 0.0)))
+	body += "\n".join(PackedStringArray(rows)) if not rows.is_empty() else "아무도 없었다."
+	m.dialog.open("야경 명부", body, [["돌아가기", open_township]])
+
+
+# 오래 말을 못 붙인 정착민 — 이레 넘게 대화가 없으면 떠날 마음이 생긴다(LEAVE). 부녀회장이 본다
+func _neglected() -> Array:
+	var out: Array = []
+	for nid in GameData.settlers:
+		var sid := str(nid)
+		if not GameData.NPCS.has(sid):
+			continue
+		if GameData.day - int(GameData.npc_last_talk.get(sid, 0)) >= GameData.NEGLECT_DAYS:
+			out.append(sid)
+	return out
+
+
+func _women_roster() -> void:
+	m.dialog.close()
+	var lonely := _neglected()
+	var body := "오래 못 본 집.\n"
+	if lonely.is_empty():
+		body += "요즘은 다들 얼굴을 봤다."
+	else:
+		for sid: String in lonely:
+			body += "· %s — %s째 말이 없다\n" % [_npc_name(sid),
+				GameData.days_kor(mini(10, GameData.day - int(GameData.npc_last_talk.get(sid, 0))))]
+	var btns: Array = []
+	if not lonely.is_empty():
+		var first := str(lonely[0])
+		if _me_int("visit_day") == GameData.day:
+			btns.append(gray("찾아간다 — %s" % _npc_name(first), "오늘은 한 집 돌았다."))
+		else:
+			btns.append(["찾아간다 — %s" % _npc_name(first), _women_visit.bind(first)])
+	btns.append(["돌아가기", open_township])
+	m.dialog.open("살림 명부", body, btns)
+
+
+# 찾아간다 — 하루 한 집. 그 집의 「마지막 대화」가 오늘이 되고 호감이 조금 오른다(이탈이 멈춘다)
+func _women_visit(nid: String) -> void:
+	if Net.is_guest() or str(GameData.me.get("job", "")) != "women_head" \
+			or _me_int("visit_day") == GameData.day:
+		return
+	m.dialog.close()
+	GameData.npc_last_talk[nid] = GameData.day
+	GameData.aff_add(nid, 3)
+	GameData.me["visit_day"] = GameData.day
+	m.dialog.open(_npc_name(nid), "…와 줬네요. 아무도 안 오는 줄 알았어요. 차 한잔 하고 가요.",
+		[["대화 끝", null]], _portrait(nid))
+	m.saveio.save_now()
+
+
+# 방 없는 일터의 대화 선택지 — 계산대(counter_menu)와 같은 세 줄
+func _talk_work_choices(choices: Array) -> void:
+	var job := _job()
+	var why := can_work("")
+	if why == "":
+		choices.insert(choices.size() - 1, ["근무", work_start.bind("")])
+	else:
+		choices.insert(choices.size() - 1, gray("근무", why))
+	if int(job.get("wage", 0)) > 0:
+		var wl := _wage_lines(job)
+		if GameData.wage_frozen():
+			choices.insert(choices.size() - 1, gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
+		elif _me_int("wage_pending") <= 0:
+			choices.insert(choices.size() - 1, gray("봉급 받기", str(wl.get("nothing", "받을 게 없다."))))
+		elif GameData.day < _me_int("wage_day"):
+			choices.insert(choices.size() - 1, gray("봉급 받기", str(wl.get("not_yet", "봉급날은 아직이다."))))
+		else:
+			choices.insert(choices.size() - 1, ["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
+	choices.insert(choices.size() - 1, ["그만두겠습니다", resign])
