@@ -41,75 +41,8 @@ func _build_house() -> void:
 	m.saveio.save_now()
 
 
-# ---- 상점 터 (메인 스토리 2 첫 퀘스트: 재료를 모아 마을의 첫 상점을 짓는다) ----
-func _open_shop_site_dialog() -> void:
-	if GameData.village_built.has("general"):
-		return
-	if GameData.story2_phase == "":
-		# 아직 이장의 부탁을 받기 전이다 (스토리 1 진행 중)
-		m.dialog.open("상점 터", "낡은 게시판이 서 있다.\n「상점이 들어설 자리」라고 적혀 있다.",
-			[["닫기", null]])
-		return
-	m.dialog.open("상점 터",
-		"이장이 말한 상점 자리다.\n재료를 모아 마을의 첫 상점을 세우자.\n\n필요 재료: 목재 %d (보유 %d) · 돌 %d (보유 %d)" %
-			[GameData.SHOP_BUILD_WOOD, GameData.wood,
-			GameData.SHOP_BUILD_STONE, GameData.stone], [
-		["상점 짓기", _build_shop],
-		["닫기", null],
-	])
-
-
-func _build_shop() -> void:
-	if GameData.village_built.has("general"):
-		return
-	if GameData.wood < GameData.SHOP_BUILD_WOOD \
-			or GameData.stone < GameData.SHOP_BUILD_STONE:
-		m.dialog.set_body("재료가 부족하다...\n(보유: 목재 %d/%d · 돌 %d/%d)\n나무를 베고 바위를 캐서 모으자." %
-			[GameData.wood, GameData.SHOP_BUILD_WOOD,
-			GameData.stone, GameData.SHOP_BUILD_STONE])
-		return
-	GameData.wood -= GameData.SHOP_BUILD_WOOD
-	GameData.stone -= GameData.SHOP_BUILD_STONE
-	GameData.village_built.append("general")
-	m.objnode._remove_object(m.door_tile(m.VILLAGE_PLOTS["general"].anchor))
-	m.worldgen._fill_building(m.VILLAGE_PLOTS["general"].anchor, "general")
-	# 만수는 오늘 밤 이삿짐을 옮기고, **내일** 직접 인사하러 온다.
-	# 인사를 나눠야 상점 문이 열린다 (이주 NPC 공통 규칙)
-	if not GameData.npc_greeted.has("merchant"):
-		GameData.arrivals.append({"id": "merchant", "day": GameData.day})
-	Sound.play_sfx("sfx_place")
-	m.hud.event_toast("상점 완성!")
-	m.dialog.set_body("마을의 첫 상점이 세워졌다!\n주인 만수는 내일 이사 와서 인사하러 온다고 한다.")
-	m.dialog.set_buttons([["좋아!", null]])
-	if GameData.story2_phase == "shop":
-		GameData.story2_phase = "fisher"
-		m.hud.show_message("상점이 생겼다!\n...그런데 낚싯대를 멘 사람이 마을로 오고 있다는 소문이 돈다.", 6.0)
-	m.queue_redraw()
-	m.saveio.save_now()
-
-
-func _next_village_build() -> String:
-	for pid in m.VILLAGE_BUILD_ORDER:
-		if GameData.village_built.has(pid):
-			continue
-		# 마을회관은 메인 스토리 9 — 이장의 부탁(주민 초대)을 받고
-		# 주민 10명을 모아야 지을 수 있다 (마을 성장의 정점)
-		if pid == "hall" and GameData.story9_phase != "build":
-			continue
-		# 우체국은 메인 스토리 3의 마지막 퀘스트 — 이장의 이야기를 들어야 한다
-		if pid == "post" and GameData.move_quest != "postbuild":
-			continue
-		# 도서관은 메인 스토리 6에서 사서와 이야기를 마쳐야 지을 수 있다
-		if pid == "library" and GameData.story6_phase != "build":
-			continue
-		# 목장 상회는 메인 스토리 8에서 목동·이장과 이야기를 마쳐야 지을 수 있다
-		if pid == "ranch" and GameData.story8_phase != "build":
-			continue
-		# 파출소는 회관이 열린 뒤 — 정부가 있어야 법도 있다(사회 S2b)
-		if pid == "inn" and GameData.story9_phase != "done":
-			continue
-		return pid
-	return ""
+# (마을 건물은 처음부터 다 서 있다 — 「마을 발전 이야기」·건물 짓기는 없앴다.
+#  건물 주인도 첫날부터 있다. 회관만 스토리 9 의 개관식으로 문을 연다)
 
 
 # 마을 확장(메인 스토리 4 이후) — 버려진 옛 마을 구역을 순서대로 되살린다.
@@ -148,82 +81,6 @@ func _unlock_zone(zid: String) -> void:
 	m.hud.event_toast("마을 확장!")
 	m.hud.show_message("%s를 되살렸다! 마을이 넓어졌다. (지도 M)" %
 		str(GameData.VILLAGE_ZONES[zid].name), 6.0)
-	m.queue_redraw()
-	m.saveio.save_now()
-
-
-func _open_village_build_dialog() -> void:
-	var pid := _next_village_build()
-	if pid == "":
-		if not GameData.village_built.has("hall"):
-			m.dialog.open("마을 발전",
-				"지금 지을 수 있는 건물은 다 세웠네.\n\n남은 건 마을회관뿐인데... 회관은 마을 사람이\n"
-				+ "%d명은 넘어야 의미가 있지. (지금 %d명)\n주민이 더 늘면 다시 이야기함세." %
-					[GameData.HALL_RESIDENTS, m.village_residents()],
-				[["알겠습니다", null]])
-			return
-		m.dialog.open("마을 발전",
-			"지금 지을 수 있는 건물은 다 세웠네.\n마을이 제법 그럴듯해졌구먼!",
-			[["좋군요!", null]])
-		return
-	var plot: Dictionary = m.VILLAGE_PLOTS[pid]
-	var cost: Array = m.VILLAGE_BUILD_COST[pid]
-	m.dialog.open("마을 발전 — %s" % plot.name,
-		"%s(을)를 지을 자리는 이미 비워 두었네.\n재료만 모아 오면 마을 사람들과 함께 세우겠네.\n\n필요 재료: 목재 %d (보유 %d) · 석재 %d (보유 %d)" %
-			[plot.name, cost[0], GameData.wood, cost[1], GameData.stone], [
-		["%s 짓기" % plot.name, _build_village_building.bind(pid)],
-		["나중에", null],
-	])
-
-
-func _build_village_building(pid: String) -> void:
-	var plot: Dictionary = m.VILLAGE_PLOTS[pid]
-	var cost: Array = m.VILLAGE_BUILD_COST[pid]
-	if GameData.village_built.has(pid):
-		return  # 이미 세운 건물 — 버튼을 또 눌러도 재료가 사라지지 않는다
-	if GameData.wood < int(cost[0]) or GameData.stone < int(cost[1]):
-		m.dialog.set_body("재료가 아직 부족하네...\n\n목재 %d/%d · 석재 %d/%d" %
-			[GameData.wood, cost[0], GameData.stone, cost[1]])
-		return
-	GameData.wood -= int(cost[0])
-	GameData.stone -= int(cost[1])
-	GameData.village_built.append(pid)
-	if pid == "general":
-		m.objnode._remove_object(m.door_tile(plot.anchor))  # 상점 터 게시판 철거
-		if GameData.story2_phase == "shop":
-			GameData.story2_phase = "fisher"   # 이장 경로로 지어도 이야기는 이어진다
-	m.worldgen._fill_building(plot.anchor, pid)
-	# 주인이 있는 건물은 바로 영업하지 않는다 — 다음 날 주인이 직접
-	# 찾아와 첫 인사를 나눈 뒤부터 문을 연다 (이주 NPC 공통 규칙)
-	var owner := str(m.VILLAGE_NPC.get(pid, ""))
-	var greet_note := ""
-	if pid == "library":
-		# 사서는 이미 마을에 와 있다 (스토리 6 방문객) — 이사 대기열 없이
-		# 도서관 앞의 서하에게 직접 말을 걸면 정착 이야기가 이어진다
-		greet_note = "\n사서 선생이 벌써 도서관 앞을 서성이는구먼 — 말을 걸어 보게."
-	elif pid == "ranch":
-		# 목동도 이미 마을에 와 있다 (스토리 8 방문객) — 보라에게 말을 걸면
-		# 정착 이야기가 이어진다
-		greet_note = "\n목동 아가씨가 벌써 상회 앞에서 들떠 있구먼 — 말을 걸어 보게."
-	elif pid == "post":
-		# 우체부 아저씨가 돌아온다 — 스토리 3의 마지막 장면.
-		# 다른 건물과 달리 「오늘 안에」 온다 (기다리던 재회니까)
-		if GameData.move_quest == "postbuild":
-			GameData.move_quest = "postgreet"
-		if not GameData.npc_greeted.has("postman"):
-			GameData.arrivals.append({"id": "postman", "day": GameData.day - 1})
-		greet_note = "\n우체부 그 친구를 불렀네. 곧 인사하러 올 걸세."
-	elif pid == "hall":
-		# 마을회관 — 개관식은 접수대에서 이장과 (메인 스토리 9의 끝맺음)
-		greet_note = "\n내일부터 낮에는 내가 회관을 지키겠네.\n접수대로 와 주게 — 개관식을 해야지!"
-	elif owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
-		GameData.arrivals.append({"id": owner, "day": GameData.day})
-		greet_note = "\n내일쯤 주인이 자네한테 인사하러 올 걸세."
-	m.npcmgr._sync_village_npcs()
-	Sound.play_sfx("sfx_place")
-	m.hud.event_toast("%s 완공!" % plot.name)
-	m.dialog.set_body("%s(이)가 세워졌네!\n마을이 조금씩 살아나는구먼.%s" % [plot.name, greet_note])
-	m.dialog.set_buttons([["좋군요!", null]])
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -521,8 +378,6 @@ func _talk_to(npc: Node2D) -> void:
 	# 그전에는 하트·호감도·선물 없이 담백한 인사만 나눈다
 	if not GameData.affinity_open:
 		var plain_choices: Array = [["대화 끝", null]]
-		if npc.id == "chief" and GameData.story_phase == "done":
-			plain_choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
 		if npc.id == "chief" and GameData.story4_phase == "done":
 			plain_choices.insert(0, ["마을 확장 이야기", _open_zone_dialog])
 		if npc.id == "chief" and GameData.plot3_quest in ["make", "report"]:
@@ -568,9 +423,6 @@ func _talk_to(npc: Node2D) -> void:
 		["선물하기", _open_gift_picker.bind(npc.id)],
 		["대화 끝", null],
 	]
-	# 이장은 마을 발전(빈 부지에 건물 세우기)을 맡고 있다
-	if npc.id == "chief" and GameData.story_phase == "done":
-		choices.insert(0, ["마을 발전 이야기", _open_village_build_dialog])
 	# 마을 확장(스토리 4 이후) — 버려진 구역을 재료를 들여 되살린다
 	if npc.id == "chief" and GameData.story4_phase == "done":
 		choices.insert(0, ["마을 확장 이야기", _open_zone_dialog])

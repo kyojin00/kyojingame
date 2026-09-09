@@ -194,10 +194,8 @@ func _sync_village_npcs() -> void:
 		if not GameData.village_built.has(pid):
 			continue
 		var nid: String = m.VILLAGE_NPC[pid]
-		if nid == "fisher" and GameData.fisher_quest == "":
-			continue  # 낚시꾼은 황금잉어 소문을 듣고 뒤늦게 온다 (상점 완공 뒤 퀘스트)
-		if nid != "fisher" and not GameData.npc_greeted.has(nid):
-			continue  # 이사 온 다음 날 첫 인사를 나눠야 마을에 자리 잡는다
+		if not GameData.npc_greeted.has(nid):
+			continue  # 첫 인사를 나눠야 마을에 자리 잡는다 (건물 주인은 첫날부터 인사한 셈)
 		var found := false
 		for n in m.npcs:
 			if n.id == nid:

@@ -880,9 +880,17 @@ const VILLAGE_BUILD_COST := {   # [목재, 석재]
 }
 
 
-# 마을 주민 수 (플레이어 포함) — 이장 새 집·마을회관 해금 기준
+# 마을 주민 수 (플레이어 포함) — 이장 새 집·마을회관 해금 기준.
+# 고장 사람(물소리·나무그늘)은 제 고장에 사는 사람이라 **교진 주민 수에 안 든다**
+# (NPC_KIND 의 약속). 예전엔 npcs 를 통째로 세어 여섯이 공짜로 들어가 있었다 —
+# 회관의 점진 해금(12·15·20명)이 실제보다 한참 일찍 열렸다
 func village_residents() -> int:
-	return npcs.size() + 1
+	var n := 1
+	for npc in npcs:
+		if str(npc.id) in HAMLET_NPC_IDS:
+			continue
+		n += 1
+	return n
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 	"ranch": "rancher", "fish": "fisher", "library": "librarian",

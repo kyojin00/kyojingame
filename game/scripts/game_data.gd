@@ -1002,12 +1002,18 @@ var player_name := ""
 var farm_name := ""
 var village_name := ""
 
-# 마을 발전: 처음 마을에는 건물이 하나도 없다 (플레이어의 집만 스토리로 열린다).
-# 상점은 메인 스토리 2에서 직접 짓고, 나머지는 이장의 「마을 발전 이야기」로
-# 재료를 모아 하나씩 세운다. (건물 id는 main.gd의 VILLAGE_PLOTS 키)
+# 마을 건물은 **처음부터 다 서 있다**. 예전엔 재료를 모아 하나씩 지었는데(상점은
+# 스토리 2, 나머지는 이장의 「마을 발전 이야기」) 그 짓기가 이야기의 흐름을 자꾸
+# 끊었다 — 사람을 만나러 가는 길에 목재 서른을 세고 있었다. 이제 건물도 주인도
+# 첫날부터 있고, 이야기는 「짓는다」가 아니라 「그 사람을 만난다」로 흐른다.
+# (회관만은 문을 닫아 두었다가 주민이 모이면 개관식으로 연다 — 스토리 9)
+# 건물 id는 main.gd의 VILLAGE_PLOTS 키. village_built 는 세이브 호환·개발 F7 때문에 남는다
 const ALL_VILLAGE_PLOTS := ["post", "general", "lab", "smith", "ranch", "inn",
 	"library", "fish", "hall"]
-var village_built: Array = []
+var village_built: Array = ALL_VILLAGE_PLOTS.duplicate()
+# 첫날부터 마을에 있는 건물 주인들 — 첫 인사 없이도 가게가 열려 있다(npc_open)
+const START_GREETED := ["merchant", "blacksmith", "postman", "librarian", "rancher",
+	"fisher", "officer_park"]
 
 # ---- 이장 거처 · 마을 성장 ----
 #
@@ -1040,15 +1046,8 @@ var story2_phase := ""
 func story2_objective_short() -> String:
 	match story2_phase:
 		"shop":
-			# 목표는 한 호흡에 읽히게 — 조작키도 괄호도 없다.
-			#
-			# 다만 **재료만은 세어 준다.** 이장이 「목재 30에 돌 20」이라고
-			# 한 번 말하고 마는데, 지금 얼마나 모았는지는 어디에도 안 나온다 —
-			# 다 모았는지 알 방법이 게시판까지 걸어가 보는 것뿐이었다.
-			# 「— 」 뒤는 트래커가 세는 자리다 (알림은 앞부분만 본다)
-			return "상점을 세우자 — 목재 %d/%d · 돌 %d/%d" % [
-				mini(wood, SHOP_BUILD_WOOD), SHOP_BUILD_WOOD,
-				mini(stone, SHOP_BUILD_STONE), SHOP_BUILD_STONE]
+			# 옛 세이브에만 남는 단계(상점 짓기) — 로드가 fisher 로 옮기므로 보통은 안 온다
+			return "분수 앞의 낚시꾼을 만나자."
 		"farm_talk":
 			return "이장과 대화하자."
 		"farm":
@@ -1433,7 +1432,7 @@ func move_seed_planted() -> void:
 # 정상적으로 장사(생활)를 시작한다. 앞으로 이주해 오는 모든 NPC 공통.
 # (낚시꾼은 자기 퀘스트로 이미 인사를 나누는 특수 경로 — 여기 안 탄다)
 var arrivals: Array = []      # [{"id": npc_id, "day": 확정된 날}] — 방문 대기열
-var npc_greeted: Array = []   # 첫 인사를 마친 NPC id — 이때부터 영업/일과
+var npc_greeted: Array = START_GREETED.duplicate()   # 첫 인사를 마친 NPC id — 이때부터 영업/일과. 건물 주인은 첫날부터
 
 # ---- 자연물 리젠 ----
 # 나무/돌/잡초를 캐서 없애면 그 자리가 아니라, 3~5일 뒤(자원마다 랜덤)
@@ -3210,8 +3209,8 @@ func fisher_objective_short() -> String:
 
 
 # 집: 스토리 1 완료 후 마을 서쪽 집터에 직접 짓는다 (0=집터 / 1=집 / 2=확장)
-var house_lv := 0
-var has_bed := false  # 침대는 직접 제작해야 잠을 잘 수 있다
+var house_lv := 1     # 할아버지의 집은 처음부터 서 있다(짓기 없음)
+var has_bed := true   # 할아버지가 쓰던 낡은 침대(bed_lv 0)가 남아 있다
 
 # ---- 제작대 (책상) ----
 #
@@ -9735,7 +9734,7 @@ func reset_all() -> void:
 	hall_feat_noticed = []
 	zones_open = []
 	arrivals = []
-	npc_greeted = []
+	npc_greeted = START_GREETED.duplicate()
 	me = fresh_me()
 	society_v = 1   # 사회 세계 키(S1) — 자리·지갑도 새로
 	seats = {}
@@ -9757,7 +9756,7 @@ func reset_all() -> void:
 	shop_seeds = ["wheat", "corn"]
 	recipe_pending = []
 	story2_phase = ""
-	village_built = []
+	village_built = ALL_VILLAGE_PLOTS.duplicate()
 	if DEV_MODE and OS.get_environment("KYOJIN_SHOT") != "":
 		# 검증 하네스 전용: 기본 아이템을 잔뜩 들고 시작한다.
 		# 보통 새 게임은 (DEV_MODE라도) 가방이 완전히 비어 있다 —
@@ -9789,8 +9788,8 @@ func reset_all() -> void:
 	tree_regrow = []
 	# 마을은 무건물로 시작한다 — village_built는 위(스토리 절)에서 이미 []다.
 	# (여기서 ALL을 다시 채우던 옛 줄이 남아 초기 마을에 건물이 다 서 있었다)
-	house_lv = 0
-	has_bed = false
+	house_lv = 1
+	has_bed = true
 	explored = {}
 	trees_chopped = 0
 	u_intro_state = 0

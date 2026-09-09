@@ -306,15 +306,28 @@ func _apply_save(d: Dictionary) -> void:
 		if GameData.move_quest == "done" \
 				and "explorer" not in GameData.npc_greeted:
 			GameData.npc_greeted.append("explorer")
-	# 여관 시절에 inn 부지를 세워 둔 세이브(사회 S2b 이전): 그 건물은 이제 파출소인데 부임하는
-	# 사람이 없다 — 박 순경을 도착 대기열에 태워 다음 아침 인사하러 오게 한다
-	if GameData.village_built.has("inn") and not GameData.npc_greeted.has("officer_park"):
-		var has_cop := false
-		for a3 in GameData.arrivals:
-			if str(a3.id) == "officer_park":
-				has_cop = true
-		if not has_cop:
-			GameData.arrivals.append({"id": "officer_park", "day": GameData.day - 1})
+	# ---- 짓기가 있던 시절의 세이브 ----
+	# 마을 건물과 주인은 이제 처음부터 다 있다. 옛 세이브는 건물이 비어 있거나 이야기가
+	# 「짓기」 단계에 멈춰 있을 수 있다 — 건물을 세우고, 주인은 인사한 것으로 치고(찾아오는
+	# 대기열에서 뺀다), 짓기 단계는 그다음 단계로 옮긴다
+	for pid2: String in GameData.ALL_VILLAGE_PLOTS:
+		if not GameData.village_built.has(pid2):
+			GameData.village_built.append(pid2)
+	for owner2: String in GameData.START_GREETED:
+		if not GameData.npc_greeted.has(owner2):
+			GameData.npc_greeted.append(owner2)
+		for i2 in range(GameData.arrivals.size() - 1, -1, -1):
+			if str(GameData.arrivals[i2].get("id", "")) == owner2:
+				GameData.arrivals.remove_at(i2)
+	if GameData.house_lv < 1:
+		GameData.house_lv = 1
+		GameData.has_bed = true
+	if GameData.story2_phase == "shop":
+		GameData.story2_phase = "fisher"
+	if GameData.move_quest in ["build", "postbuild"] and GameData.move_quest == "postbuild":
+		GameData.move_quest = "postgreet"
+	if GameData.fisher_quest == "" and GameData.story2_phase in ["farm_talk", "farm", "cook", "done"]:
+		GameData.fisher_quest = "done"   # 바닷길 이야기를 이미 지난 세이브
 	# 인사만 남기고 저장한 세이브: 재민이 다시 찾아오도록 대기열에 태운다
 	if GameData.move_quest == "greet":
 		var has_ex := false

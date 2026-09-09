@@ -339,7 +339,8 @@ func interact() -> void:
 			m.village._open_build_dialog()
 			return
 		if obj.kind == "plotsite":
-			m.village._open_shop_site_dialog()
+			# 옛 세이브에만 남은 상점 터 팻말 — 상점은 이제 처음부터 서 있다
+			m.dialog.open("상점 터", "낡은 게시판이 서 있다. 상점은 광장 북쪽에 있다.", [["닫기", null]])
 			return
 		if obj.kind == "stall":
 			m.village.open_stall()

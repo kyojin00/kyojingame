@@ -1032,8 +1032,11 @@ func _build_village() -> void:
 
 	_make_village_gate()
 
-	# 집터(스토리 1 완료 후 직접 짓는다) + 광장 게시판 + 최소한의 장식
-	m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
+	# 할아버지의 집 — 처음부터 서 있다(짓기 없음). 옛 세이브(house_lv 0)에만 집터 표지판
+	if GameData.house_lv >= 1:
+		_place_building_tiles(m.HOME_ANCHOR)
+	else:
+		m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
 	# 이장의 거처 — 처음부터 있는 집 (마을의 유일한 지붕)
 	m.objects[m.CHIEF_HUT] = {"kind": "chief_hut", "hp": 0}
 	# 그림이 덮는 칸을 막는다. 안 막으면 512x552 짜리 집 안으로 걸어

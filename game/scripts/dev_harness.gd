@@ -97,7 +97,7 @@ func _debug_tick() -> void:
 			print("TUTSPACE_OK=", tut_out and tut_walk and no_village and map_tut,
 				" 세계밖=", tut_out, " 숲길통행=", tut_walk,
 				" 마을차단=", no_village, " 지도격리=", map_tut)
-			# 새 게임 초기 마을: 건물 0채 + NPC는 이장뿐이어야 한다
+			# 새 게임 초기 마을: 건물은 다 서 있고(짓기 없음) 주인들도 첫날부터 있다
 			var houses := 0
 			for hp in m.objects:
 				if String(m.objects[hp].kind) == "house":
@@ -105,14 +105,20 @@ func _debug_tick() -> void:
 			var nids: Array = []
 			for n2 in m.npcs:
 				nids.append(n2.id)
+			nids.sort()
 			var hut0: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
 				== "chief_hut" and GameData.chief_house_lv == 0
 			# 새 게임에는 낡은 표지판이 서 있고, 동쪽 확장 구역은 잠겨 있다
 			var zone0: bool = str(m.objects.get(m.OLD_SIGN, {}).get("kind", "")) == "sign" \
 				and GameData.story4_phase == "" \
-				and not GameData.is_tile_owned(105, 10) and not m.is_passable(Vector2i(105, 10))
-			print("VILLAGE_INIT_OK=", GameData.village_built.is_empty()
-				and houses == 0 and nids == ["chief"] and hut0 and zone0,
+				and not GameData.is_tile_owned(105, 10 + m.NORTH_PAD) \
+				and not m.is_passable(Vector2i(105, 10 + m.NORTH_PAD))   # 동쪽 확장 구역 안의 칸(NORTH_PAD 포함)
+			var owners_here := true
+			for own9: String in GameData.START_GREETED:
+				if own9 not in nids:
+					owners_here = false
+			print("VILLAGE_INIT_OK=", GameData.village_built.size() == GameData.ALL_VILLAGE_PLOTS.size()
+				and houses >= 9 * 20 and "chief" in nids and owners_here and hut0 and zone0,
 				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids,
 				" 이장오두막=", hut0, " 동쪽구역잠김=", zone0)
 		elif m.story._story_snapped and not _tut_map_snapped and m.story._story_t >= 3.6:
@@ -244,12 +250,7 @@ func _debug_tick() -> void:
 		181: _save_shot("_stats.png")
 		183:
 			m.stats_ui.close()
-			GameData.wood = 999                        # 마을 발전(건설) 확인
-			GameData.stone = 999
-			m.village._build_village_building("post")
-			m.village._build_village_building("general")
-			m.village._build_village_building("smith")
-			m.dialog.close()
+			m.dialog.close()                            # 건물은 처음부터 다 서 있다
 			m.player.position = Vector2(74 * m.TILE + 16, 11 * m.TILE + 16)
 			m.player.dir = "up"
 		186: _save_shot("_village2.png")
@@ -782,7 +783,12 @@ func _debug_tick() -> void:
 			var hut_ok: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
 				== "chief_hut" and GameData.chief_house_lv == 0
 			var res0: int = m.village_residents()
-			var res_ok: bool = res0 == m.npcs.size() + 1
+			# 고장 사람 여섯은 교진 주민이 아니다 — 세지 않는다 (main.village_residents)
+			var hamlet_n := 0
+			for nh in m.npcs:
+				if str(nh.id) in m.HAMLET_NPC_IDS:
+					hamlet_n += 1
+			var res_ok: bool = res0 == m.npcs.size() + 1 - hamlet_n
 			# 새 집 업그레이드 (아침 훅과 같은 조건·코드)
 			var can_up: bool = GameData.chief_house_lv == 0 \
 				and res0 >= GameData.CHIEF_HOUSE_RESIDENTS
@@ -791,21 +797,18 @@ func _debug_tick() -> void:
 			m.objnode._place_object(m.CHIEF_HUT, "chief_hut", 0)
 			var up_ok: bool = can_up and GameData.chief_house_lv == 1 \
 				and str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) == "chief_hut"
-			# 마을회관: 스토리 9(주민 초대)를 밟지 않으면 목록에서 빠진다
-			GameData.village_built.erase("hall")
+			# 마을회관: 서 있지만 스토리 9(주민 초대)를 밟기 전엔 문이 닫혀 있다
 			var keep_s9: String = GameData.story9_phase
 			GameData.story9_phase = ""
-			var gate_before: bool = m.village._next_village_build() != "hall"
+			var gate_before: bool = not GameData.hall_feature_open("office") \
+				and GameData.story9_objective_short() == ""
 			var dummies: Array = []                 # 임시 주민을 10명 초과까지 채운다
 			while m.village_residents() <= GameData.HALL_RESIDENTS:
 				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
 				dummies.append(m.npcs[m.npcs.size() - 1])
-			GameData.story9_phase = "build"         # 스토리 9의 건설 단계
+			GameData.story9_phase = "build"         # 스토리 9의 개관식 단계
 			var gate_after: bool = m.village_residents() > GameData.HALL_RESIDENTS \
-				and m.village._next_village_build() == "hall"
-			GameData.wood += 120
-			GameData.stone += 80
-			m.village._build_village_building("hall")
+				and GameData.story9_objective_short().contains("접수대")
 			GameData.story9_phase = keep_s9
 			var hall_ok: bool = GameData.village_built.has("hall") \
 				and str(m.objects.get(m.VILLAGE_PLOTS["hall"].anchor,
@@ -1020,10 +1023,8 @@ func _debug_tick() -> void:
 			GameData.move_quest = ""
 			GameData.forest_quest = ""
 			GameData.affinity_open = false
-			# 샌드박스는 마을 건물을 다 세워 두었다 — 우체국만 도로 헐고
-			# 이야기로 다시 짓는다 (3장의 마지막 퀘스트)
+			# 우체국은 처음부터 서 있다 — 3장의 마지막 퀘스트는 우체부에게 인사하러 가는 것
 			var k_built3: Array = GameData.village_built.duplicate()
-			GameData.village_built.erase("post")
 			GameData.move_house = Vector2i(-999, -999)
 			GameData.move_day = GameData.day - 1
 			for n0 in m.npcs.duplicate():          # 샌드박스가 미리 깔아 둔 재민 제거
@@ -1120,26 +1121,17 @@ func _debug_tick() -> void:
 			var post_q: bool = GameData.move_quest == "post" \
 				and GameData.quest_npc_marks().get("chief", "") == "!"
 
-			# ── 3-③ 「마을에 우체국을」 — 3장의 마지막 퀘스트
-			var post_gated: bool = m.village._next_village_build() != "post"
+			# ── 3-③ 「우체국의 우체부 아저씨에게」 — 3장의 마지막 퀘스트 (우체국은 서 있다)
+			var post_gated: bool = GameData.move_quest == "post"
 			m.story._start_move_post_dialog()
 			m.dialog.skip_seq()
 			m.dialog.close()
-			var post_open: bool = GameData.move_quest == "postbuild" \
-				and m.village._next_village_build() == "post"
-			var pcost: Array = m.VILLAGE_BUILD_COST["post"]
-			GameData.wood += int(pcost[0])
-			GameData.stone += int(pcost[1])
-			m.village._build_village_building("post")
-			m.dialog.close()
+			var post_open: bool = GameData.move_quest == "postgreet"
 			var built_post: bool = GameData.village_built.has("post") \
-				and GameData.move_quest == "postgreet" \
 				and str(m.objects.get(m.VILLAGE_PLOTS["post"].anchor, {})
 					.get("kind", "")) == "house"
-			var post_arrival := false
-			for a2: Dictionary in GameData.arrivals:
-				if str(a2.id) == "postman":
-					post_arrival = true
+			# 우체부는 첫날부터 마을에 있다 — 찾아오는 대기열 없이 우체국에서 만난다
+			var post_arrival: bool = GameData.move_quest == "postgreet" and GameData.arrivals.is_empty()
 			m.story._start_postman_settle_dialog()
 			var post_talk: bool = m.dialog.visible
 			m.dialog.skip_seq()                    # 재회 인사 끝 -> 3장 완결
@@ -2246,13 +2238,11 @@ func _debug_tick() -> void:
 					visitor = true
 			m.story._end_rancher_visit()
 			var s8_ask: bool = GameData.story8_phase == "ask"
-			GameData.village_built = ["post", "general", "smith", "library"]
-			var gated8: bool = m.village._next_village_build() != "ranch"
+			var gated8: bool = GameData.story8_objective_short() == "이장과 상의하자."
 			m.story._end_ranch_chief()
 			var s8_build: bool = GameData.story8_phase == "build" \
-				and m.village._next_village_build() == "ranch"
+				and GameData.story8_objective_short() == "보라와 대화하자."
 			GameData.npc_greeted.erase("rancher")
-			GameData.village_built.append("ranch")
 			m.story._end_ranch_done()
 			var s8_done: bool = GameData.story8_phase == "done" \
 				and GameData.npc_greeted.has("rancher")
@@ -2489,7 +2479,6 @@ func _debug_tick() -> void:
 			# 회의 20명) + 창고 루팅·쓰레기 수거·기부·프로젝트·회의 효과
 			m.dialog.close()
 			var k9_aff: Dictionary = GameData.affinity.duplicate()
-			GameData.village_built.erase("hall")
 			GameData.story9_phase = ""
 			GameData.story8_phase = "done"
 			m.story._story9_update(0.016)
@@ -2499,7 +2488,7 @@ func _debug_tick() -> void:
 			m.dialog.skip_seq()
 			var s9_invite: bool = GameData.story9_phase == "invite" \
 				and GameData.story9_objective_short() != "" \
-				and m.village._next_village_build() != "hall"
+				and not GameData.hall_feature_open("office")
 			# 주민이 10명(플레이어 제외)을 넘어가면 건설 단계가 절로 열린다
 			var s9_dummies: Array = []
 			while m.village_residents() <= GameData.HALL_RESIDENTS:
@@ -2507,10 +2496,7 @@ func _debug_tick() -> void:
 				s9_dummies.append(m.npcs[m.npcs.size() - 1])
 			m.story._story9_update(0.016)
 			var s9_build: bool = GameData.story9_phase == "build" \
-				and m.village._next_village_build() == "hall"
-			GameData.wood += 120
-			GameData.stone += 80
-			m.village._build_village_building("hall")
+				and GameData.story9_objective_short().contains("접수대")
 			m.dialog.close()
 			# 개관식 — 회관 접수대(room_action)에서 이장과 이야기해야 끝난다
 			m.village.room_action("hall")
@@ -2519,6 +2505,9 @@ func _debug_tick() -> void:
 			var s9_done: bool = GameData.story9_phase == "done"
 			m.dialog.close()
 			# 점진 해금 — 지금 주민 11명: 명부는 열리고 창고(12명)부터는 잠김
+			# 점진 해금은 주민 수만 본다 — 앞선 검사가 띄운 해금 안내(hall_feat_noticed)는 잠시 치운다
+			var k9_noticed: Array = GameData.hall_feat_noticed.duplicate()
+			GameData.hall_feat_noticed = []
 			var s9_lock: bool = not GameData.hall_feature_open("store") \
 				and not GameData.hall_feature_open("project") \
 				and not GameData.hall_feature_open("meet") \
@@ -2590,6 +2579,7 @@ func _debug_tick() -> void:
 				dmy9.queue_free()
 			m.story._story9_update(0.016)
 			GameData.affinity = k9_aff
+			GameData.hall_feat_noticed = k9_noticed
 			m.hud._toast_queue.clear()
 			print("STORY9_OK=", s9_ask and s9_invite and s9_build and s9_rite
 				and s9_done and s9_lock and s9_store_open and s9_meet_open
@@ -5366,9 +5356,19 @@ func _debug_tick() -> void:
 			# ② 사람 앞에서: F는 말을 걸고, E는 말을 걸지 않는다
 			var talk_npc: Node2D = null
 			for n_t in m.npcs:
-				if n_t.visible:
-					talk_npc = n_t
-					break
+				if not n_t.visible:
+					continue
+				# 그 사람 위 칸에 건물·물건이 있으면 E 가 그걸 열어 버린다 — 앞이 빈 사람으로
+				var above := Vector2i(int(n_t.position.x / m.TILE), int(n_t.position.y / m.TILE) - 1)
+				if m.objects.has(above) or not m.is_passable(above):
+					continue
+				talk_npc = n_t
+				break
+			if talk_npc == null:
+				for n_t2 in m.npcs:
+					if n_t2.visible:
+						talk_npc = n_t2
+						break
 			var talk_ok := false
 			var e_silent := false
 			var t_pos: Vector2 = m.player.position
@@ -6754,17 +6754,10 @@ func _debug_tick() -> void:
 			var talk := m.dialog.visible
 			m.dialog.close()
 			m.story._end_home_greet()
-			var shop_q: bool = GameData.story2_phase == "shop" \
-				and GameData.story2_objective_short() != ""
-			# 상점 건설 (재료를 채우고 상점 터 게시판 흐름으로)
-			GameData.village_built.erase("general")
-			GameData.wood = 100
-			GameData.stone = 100
-			m.village._open_shop_site_dialog()
-			m.village._build_shop()
-			m.dialog.close()
+			# 상점은 처음부터 서 있다 — 이장 대화가 끝나면 곧장 낚시꾼(바닷길)이다
+			var shop_q: bool = GameData.story2_phase == "fisher"
 			var shop_built: bool = GameData.village_built.has("general") \
-				and GameData.story2_phase == "fisher"
+				and GameData.npc_greeted.has("merchant")
 			# 바닷길이 열린 뒤(SEA_OK에서 검사) 이장이 호미를 준다
 			GameData.story2_phase = "farm_talk"
 			GameData.unlocked_tools.erase("hoe")
@@ -6959,7 +6952,6 @@ func _debug_tick() -> void:
 			GameData.story6_phase = ""
 			GameData.old_book_stored = false
 			GameData.items["old_book"] = 0
-			GameData.village_built.erase("library")
 			GameData.npc_greeted.erase("librarian")
 			GameData.forest_quest = "done"
 			m.story._story6_update(0.1)
@@ -6998,20 +6990,14 @@ func _debug_tick() -> void:
 			m.story._start_librarian_book_dialog()
 			m.dialog.close()
 			m.story._end_librarian_book()
-			# 도서관은 스토리가 build에 닿기 전에는 발전 목록에 안 나온다
+			# 도서관은 처음부터 서 있다 — 이장이 사서에게 맡기고, 사서에게 가면 정착한다
 			var keep6_built: Array = GameData.village_built.duplicate()
-			GameData.village_built = ["post", "general", "smith", "ranch", "fish"]
-			var gated: bool = m.village._next_village_build() != "library"
+			var gated: bool = GameData.story6_objective_short() == "이장에게 사서 이야기를 전하자."
 			m.story._start_book_chief2_dialog()
 			m.dialog.close()
 			m.story._end_book_chief2()
 			var build_open: bool = GameData.story6_phase == "build" \
-				and m.village._next_village_build() == "library"
-			GameData.wood += 90
-			GameData.stone += 50
-			m.village._open_village_build_dialog()
-			m.village._build_village_building("library")
-			m.dialog.close()
+				and GameData.story6_objective_short().contains("사서에게")
 			var built: bool = GameData.village_built.has("library")
 			m.story._start_library_done_dialog()
 			m.dialog.close()
