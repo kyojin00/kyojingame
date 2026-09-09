@@ -568,8 +568,21 @@ func open_town_sign() -> void:
 		[["닫기", null]])
 
 
-func open_market_stall(_t: Vector2i) -> void:
-	m.dialog.open("장터 점포", "빈 점포다. 차양만 걸려 있다.\n읍에 사람이 차면 장이 선다.", [["닫기", null]])
+# 장터 점포(S4d) — 상인이 점포 앞에 서 있는 시간엔 내 물건을 도심 값(×1.1)에 판다
+func open_market_stall(t: Vector2i) -> void:
+	var owner := ""
+	for id in GameData.gen_npcs:
+		var g: Dictionary = GameData.gen_npcs[id]
+		if bool(g.get("here", false)) and int(g.get("stall", -1)) >= 0 \
+				and m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] == t:
+			owner = str(id)
+	if owner != "" and m.npcmgr.npc_place_now(owner) == "stall":
+		m.shop.open("sell", ["sell"], "%s의 점포" % GameData.npc_name(owner), "", GameData.TOWN_SELL_MULT)
+		return
+	if owner != "":
+		m.dialog.open("장터 점포", "%s의 점포다. 지금은 자리에 없다." % GameData.npc_name(owner), [["닫기", null]])
+		return
+	m.dialog.open("장터 점포", "빈 점포다. 차양만 걸려 있다.", [["닫기", null]])
 
 
 func _open_town_room_dialog() -> void:

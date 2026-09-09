@@ -804,7 +804,7 @@ func _debug_tick() -> void:
 			# 고장 사람 여섯과 읍 사람 아홉(S4c)은 교진 주민이 아니다 — 세지 않는다 (main.village_residents)
 			var hamlet_n := 0
 			for nh in m.npcs:
-				if str(nh.id) in m.HAMLET_NPC_IDS or str(nh.id) in m.TOWN_NPC_IDS:
+				if str(nh.id) in m.HAMLET_NPC_IDS or str(nh.id) in m.TOWN_NPC_IDS or GameData.gen_npcs.has(str(nh.id)):
 					hamlet_n += 1
 			var res_ok: bool = res0 == m.npcs.size() + 1 - hamlet_n
 			# 새 집 업그레이드 (아침 훅과 같은 조건·코드)
@@ -6560,7 +6560,8 @@ func _debug_tick() -> void:
 			var res_tn := m.village_residents()
 			var count_tn := 1
 			for n_tn in m.npcs:
-				if str(n_tn.id) not in m.HAMLET_NPC_IDS and str(n_tn.id) not in m.TOWN_NPC_IDS:
+				if str(n_tn.id) not in m.HAMLET_NPC_IDS and str(n_tn.id) not in m.TOWN_NPC_IDS \
+						and not GameData.gen_npcs.has(str(n_tn.id)):
 					count_tn += 1
 			var people_ok: bool = here_tn == 9 and placed_tn == 9 and tex_tn == 9 and res_tn == count_tn \
 				and GameData.npc_kind("judge_suh") == "town"
@@ -6613,6 +6614,115 @@ func _debug_tick() -> void:
 			GameData.items["egg"] = eggs_tn - 2
 			GameData.minutes = keep_min_tn
 			_s2_restore(k_tn)
+		402:
+			# ---- 생성 NPC·읍 사건(S4d) — 씨앗 하나의 열다섯·도트·대사·장터·이주·순경→검사→판사의 길 ----
+			var k_gn := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			var keep_min_gn := GameData.minutes
+			GameData.ensure_gen_npcs()
+			# 앞 검사들의 아침(계절 첫날)이 주택가 사람을 이미 데려왔을 수 있다 — 첫날 상태로 되돌린다
+			for gid0 in GameData.gen_npcs:
+				var g0: Dictionary = GameData.gen_npcs[gid0]
+				g0["here"] = str(g0.get("role", "")) == "merchant"
+				g0["since"] = 0
+			var g1: Dictionary = GameData.gen_npcs.get("g1", {})
+			var name1 := str(g1.get("name", ""))
+			var names_gn := {}
+			for gid in GameData.gen_npcs:
+				names_gn[str(GameData.gen_npcs[gid].name)] = true
+			var det_ok: bool = str(GameData.gen_make(1).name) == name1 and names_gn.size() == GameData.GEN_COUNT \
+				and GameData.gen_here("merchant").size() == 7 and GameData.gen_here("resident").is_empty()
+			m.npcmgr._sync_town_npcs()
+			var node_ok: bool = _npc_node("g1") != null and m.tex.has("npc_g1_down_0") and m.tex.has("npc_g7_portrait_normal") \
+				and m.TOWN_RECT.grow(2).has_point(m.npcmgr.npc_place_tile("g1", "stall"))
+			var line_ok: bool = GameData.npc_line("g1") != "" and GameData.npc_kind("g1") == "gen" \
+				and str(GameData.npc_def("g1").get("name", "")) == name1
+			var aff0_gn := GameData.aff("g1")
+			GameData.aff_add("g1", 5)
+			var aff_ok: bool = GameData.aff("g1") == aff0_gn + 5
+			# 장터 — 상인이 점포 앞인 시간엔 도심 값으로 파는 창이 열린다
+			GameData.minutes = 10 * 60
+			m.village.open_market_stall(m.TOWN_STALLS[0])
+			var market_ok: bool = m.shop.visible and is_equal_approx(float(m.shop.sell_mult), GameData.TOWN_SELL_MULT)
+			m.shop.visible = false
+			# 이주 — 계절 첫날 둘(읍 예산이 3,000 은 있어야)
+			_s2_fresh_gov()
+			GameData.gov_budget["town"] = 20000
+			GameData.day = 29
+			GameData.society_new_day([0, 0, 0])
+			var n_gn := GameData.society_note()
+			var arrive_ok: bool = n_gn.contains("새 얼굴") and GameData.gen_here("resident").size() == 2
+			# 읍 사건 — 사흘 주기. g1 을 가장 탐욕스럽게 두고, 순경이 잡아 넘길 때까지 아침을 돌린다
+			GameData.cases = []
+			GameData.npc_greed_adj["g1"] = 1.0
+			GameData.seat_rows("prosecution")["prosecutor"][0] = "player"
+			GameData.me.job = "prosecutor"
+			GameData.me.rank = "prosecutor"
+			GameData.me.job_since_day = 29
+			var charged_gn: Dictionary = {}
+			var crime_day := -1
+			for dd_gn in range(30, 44):
+				GameData.day = dd_gn
+				GameData.society_new_day([0, 0, 0])
+				var n_gn2 := GameData.society_note()
+				if crime_day < 0 and n_gn2.contains("장터에 도둑"):
+					crime_day = dd_gn
+				var c_gn := GameData.town_case_for("prosecutor")
+				if not c_gn.is_empty():
+					charged_gn = c_gn
+					break
+			var crime_ok: bool = crime_day == 30 and not charged_gn.is_empty() and str(charged_gn.suspect) == "g1" \
+				and str(charged_gn.region) == "town"
+			# 검사 — 책상의 진짜 서류가 손글 미니루프보다 먼저다. 기소하면 판사에게 간다
+			var cid_gn := int(charged_gn.get("id", 0))
+			m.society.work_start("prosecution")
+			var desk_ok: bool = m.dialog.visible and m.dialog._seq.size() >= 1
+			m.society.case_pick(cid_gn, "indict")
+			m.dialog.close()
+			var indict_ok: bool = str(charged_gn.stage) == "indicted" and int(GameData.me.perf) == 1 \
+				and int(GameData.me.wage_pending) == 250
+			# 판사 — 다음날, 같은 사건이 법원 책상에 있다. 법정형이면 벌금이 읍 예산으로
+			GameData.seat_clear_player()
+			GameData.seat_rows("court")["judge"][0] = "player"
+			GameData.me.job = "judge"
+			GameData.me.rank = "judge"
+			GameData.day += 1
+			GameData.society_new_day([0, 0, 0])
+			var n_gn3 := GameData.society_note()
+			var bench_wait: bool = n_gn3.contains("법원에") and str(charged_gn.stage) == "indicted"
+			var fine_gn: int = mini(GameData.wallet_of("g1"), GameData.NPC_FINE)
+			var town_before := int(GameData.gov_budget.town)
+			m.society.work_start("court")
+			var bench_ok: bool = m.dialog.visible
+			m.society.case_pick(cid_gn, "full")
+			m.dialog.close()
+			var verdict_ok: bool = bench_wait and str(charged_gn.stage) == "closed" and str(charged_gn.closed_by) == "verdict" \
+				and int(GameData.gov_budget.town) == town_before + fine_gn and int(GameData.me.wage_pending) == 250 + 300
+			# 부장의 길 — 내가 아니면 사흘 안에 검찰과 법원이 알아서 닫는다
+			GameData.seat_clear_player()
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.cases = [{"id": 900, "crime": "burglary", "day": GameData.day - 2, "suspect": "g2", "victim": "g3",
+				"witness": "g4", "evidence": 1, "stage": "open", "closed_by": "", "deadline": GameData.day + 28,
+				"region": "town", "heat": 1, "charged_day": 0, "indicted_day": 0}]
+			var auto_by := ""
+			for dd_gn2 in range(GameData.day + 1, GameData.day + 14):
+				GameData.day = dd_gn2
+				GameData.society_new_day([0, 0, 0])
+				GameData.society_note()
+				if str(GameData.cases[0].stage) == "closed":
+					auto_by = str(GameData.cases[0].closed_by)
+					break
+			var auto_ok: bool = auto_by in ["verdict", "dropped"]
+			print("GEN_NPC_OK=", det_ok and node_ok and line_ok and aff_ok and market_ok and arrive_ok and crime_ok
+				and desk_ok and indict_ok and bench_ok and verdict_ok and auto_ok,
+				" 결정=", det_ok, "(", name1, ")", " 노드=", node_ok, " 대사=", line_ok, " 호감=", aff_ok, " 장터=", market_ok,
+				" 이주=", arrive_ok, " 사건=", crime_ok, "(", crime_day, ")", " 책상=", desk_ok, " 기소=", indict_ok,
+				" 법정=", bench_ok, " 판결=", verdict_ok, " 부장=", auto_ok, "(", auto_by, ")")
+			GameData.minutes = keep_min_gn
+			_s2_restore(k_gn)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
@@ -8253,6 +8363,8 @@ func _s2_keep() -> Dictionary:
 		"village_built": GameData.village_built.duplicate(), "arrivals": GameData.arrivals.duplicate(true),
 		"cases": GameData.cases.duplicate(true), "case_seq": GameData.case_seq,
 		"greed_adj": GameData.npc_greed_adj.duplicate(), "settlers": GameData.settlers.duplicate(),
+		# 갈뫼읍(S4d)
+		"gen_seed": GameData.gen_seed, "gen_npcs": GameData.gen_npcs.duplicate(true),
 	}
 	return k
 
@@ -8278,6 +8390,8 @@ func _s2_restore(k: Dictionary) -> void:
 	GameData.case_seq = s2.case_seq
 	GameData.npc_greed_adj = s2.greed_adj
 	GameData.settlers = s2.settlers
+	GameData.gen_seed = s2.gen_seed
+	GameData.gen_npcs = s2.gen_npcs
 	m.hud.clear_guide()
 	_soc_restore(k)
 

@@ -1421,8 +1421,8 @@ func mail_new_day() -> Array:
 		mail_out.remove_at(i)
 		if not NPCS.has(nid):
 			continue
-		var nm := str(NPCS[nid].name)
-		mail_store("%s의 답장" % nm, str(NPCS[nid].get("reply_letter",
+		var nm := npc_name(nid)
+		mail_store("%s의 답장" % nm, str(npc_def(nid).get("reply_letter",
 			"『편지 잘 받았어요.\n덕분에 하루가 환했습니다. 또 써 주세요.』")))
 		aff_set(nid, aff(nid) + MAIL_REPLY_AFF)
 		came.append(nm)
@@ -6010,7 +6010,7 @@ var gifted_today: Array[String] = []   # 오늘 선물한 상대 (하루 한 번
 
 # 오늘이 이 사람 생일인가
 func is_birthday(npc_id: String) -> bool:
-	var b: Array = NPCS[npc_id].get("birthday", [])
+	var b: Array = npc_def(npc_id).get("birthday", [])
 	return b.size() == 2 and int(b[0]) == season() and int(b[1]) == day_in_season()
 
 
@@ -6024,7 +6024,7 @@ func season_list(crop_id: String) -> String:
 
 
 func days_to_birthday(npc_id: String) -> int:
-	var b: Array = NPCS[npc_id].get("birthday", [])
+	var b: Array = npc_def(npc_id).get("birthday", [])
 	if b.size() != 2 or int(b[0]) != season():
 		return -1
 	return int(b[1]) - day_in_season()
@@ -6032,7 +6032,7 @@ func days_to_birthday(npc_id: String) -> int:
 
 # 선물이 얼마나 오르는가. 표에 없으면 그냥 반갑다.
 func gift_value(npc_id: String, item_id: String) -> int:
-	var def: Dictionary = NPCS[npc_id]
+	var def: Dictionary = npc_def(npc_id)
 	var base := 8
 	if item_id in def.get("loves", []):
 		base = 30
@@ -6056,7 +6056,9 @@ func npc_gender(npc_id: String) -> String:
 # 거기 있는 것과 기본 대사를 **함께** 후보에 넣는다. 좁은 것만 쓰면
 # 같은 계절 내내 같은 말을 하고, 기본만 쓰면 갈래를 나눈 뜻이 없어진다.
 func npc_line(npc_id: String) -> String:
-	var def: Dictionary = NPCS[npc_id]
+	if gen_npcs.has(npc_id):
+		return gen_line(npc_id)   # 생성 NPC(S4d) — 성격이 대사를 고른다
+	var def: Dictionary = npc_def(npc_id)
 	var pool: Array = []
 	if spouse == npc_id:
 		pool += def.get("married", [])
@@ -9104,6 +9106,14 @@ const SOCIETY_NOTES := {
 	"shop_sold": "어제 좌판에서 %d개가 팔렸다 — %dG. 좌판 금고에 있다.",
 	"shop_none": "어제 좌판에는 손님이 없었다. 값이 비싼가, 물건이 낯선가.",
 	"shop_frozen": "밀린 세금으로 좌판이 영업정지다. 세금부터 내자.",
+	# ---- 읍(S4d) ----
+	"town_arrive": "갈뫼읍 주택가에 새 얼굴이 왔다 — %s.",
+	"town_crime": "갈뫼읍 장터에 도둑이 들었다고 한다 — %s네 점포.",
+	"town_charged": "읍 순경이 %s를 잡았다. 서류가 검찰청으로 갔다.",
+	"town_desk": "검찰청 책상에 %s 사건이 올라와 있다. 내 서류다.",
+	"town_bench": "법원에 %s 사건이 올라와 있다. 내 판결이다.",
+	"town_verdict": "읍 법원이 %s에게 벌금을 물렸다 — %dG.",
+	"town_dropped": "검찰이 %s 사건을 불기소로 닫았다.",
 	# ---- 자치회(S3c) ----
 	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
 	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
@@ -9174,6 +9184,54 @@ const BURGLARY_P := 0.30           # 빈집 문을 따는 기본 확률 — thef
 const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 넘김 일곱 번, 밭은 마른다)
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
 const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
+# ---- 생성 NPC · 읍 사건(S4d, 헌법 §8.3·§6.7) ----
+const GEN_COUNT := 15               # 장터 상인 7 + 주택가 주민 8
+const GEN_MERCHANTS := 7
+const GEN_ARRIVE_PER_SEASON := 2    # 계절 첫날 주택가에 오는 수(빈 집이 있을 때)
+const GEN_SURNAMES := ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오"]
+const GEN_SYL_M := ["한", "율", "찬", "결", "온", "솔", "재", "도", "빈", "우", "산", "겸"]
+const GEN_SYL_F := ["아", "연", "서", "윤", "하", "별", "나", "은", "소", "미", "유", "채"]
+const GEN_SYL_S := ["람", "결", "빛", "온", "누", "리", "슬", "예", "진", "영", "현", "수"]
+const GEN_TRAITS := ["warm", "snitch", "greed", "strict", "night"]
+const GEN_LOVES_POOL := ["egg", "milk", "dish_bread", "dish_soup", "forage_berry", "forage_herb", "fish_carp",
+	"wheat", "potato", "gem", "ore", "flour", "dish_pie", "strawberry", "fish_trout", "dish_jam"]
+const GEN_HATES_POOL := ["sludge", "forage_trash", "weed", "bat", "slime"]
+# 팔레트 여덟 — 옷과 머리(make_settlers.js 의 규칙을 실행 중에 같은 판 위에 건다)
+const GEN_PALETTES := [
+	[Color(0.36, 0.42, 0.62), Color(0.16, 0.12, 0.1)], [Color(0.62, 0.36, 0.3), Color(0.3, 0.2, 0.12)],
+	[Color(0.34, 0.5, 0.36), Color(0.08, 0.08, 0.1)], [Color(0.58, 0.5, 0.28), Color(0.42, 0.3, 0.16)],
+	[Color(0.46, 0.34, 0.5), Color(0.5, 0.5, 0.52)], [Color(0.3, 0.42, 0.5), Color(0.2, 0.14, 0.1)],
+	[Color(0.62, 0.52, 0.42), Color(0.1, 0.08, 0.08)], [Color(0.4, 0.3, 0.26), Color(0.62, 0.56, 0.5)],
+]
+# 장터 점포의 종류(상인 일곱) — 파는 사람이 있는 점포에선 내 물건을 도심 값(×1.1)에 판다
+const GEN_STALL_KINDS := ["farm", "fish", "forest", "cook", "beach", "ranch", "mine"]
+const GEN_SCHEDULE := {
+	"merchant": [[6, "home"], [9, "stall"], [13, "square"], [14, "stall"], [19, "home"]],
+	"resident": [[6, "home"], [10, "square"], [16, "home"]],
+}
+# 대사 뱅크 — 성격 하나가 1.2 를 넘으면 그 갈래가 붙고, 아니면 공통뿐. {title} {name} 만 쓴다
+const GEN_LINES := {
+	"common": [
+		"읍은 처음이신가요. 길이 다 자갈이라 발이 편해요.",
+		"교진 사람이죠? 얼굴이 밭 사람이에요.",
+		"장터는 아홉 시부터예요. 그 전엔 다들 국을 먹죠.",
+		"군수님이 오늘도 도장을 찍고 있겠죠.",
+		"버스가 다니면 좋겠어요. 교진까지 걸으면 한나절이라.",
+		"밤엔 경찰서 쪽 길로 다녀요. 등불이 거기만 있어요.",
+	],
+	"warm": ["{title}, 오셨어요. 얼굴 보니 좋네요.", "뭐 필요한 거 있으면 말해요. 있는 건 나눠요."],
+	"snitch": ["어제 장터에서 누가 남의 자루를 만지더라고요. 봤어요.", "경찰서에 아는 순경이 있어요. 뭐든 다 말해요."],
+	"greed": ["값은 값이에요. 정은 정이고.", "남는 게 있어야 장사죠. 깎지 말아요."],
+	"strict": ["줄은 줄대로 서요. 읍은 규칙이 있어요.", "약속 시간은 지켜요. 늦으면 안 받아요."],
+	"night": ["밤이 좋아요. 읍이 조용해지거든요.", "열 시 넘어 장터에 서 있는 건 저뿐이에요."],
+	"morning": ["아침 국 드셨어요? 식당이 열었어요."],
+	"night_hour": ["이 시간엔 다들 여관 쪽이에요."],
+}
+const TOWN_CRIME_PERIOD := 3        # 읍 사건 주기(일) — 상인이 셋은 있어야 생긴다
+const TOWN_CATCH_DAYS := 2          # 신고 이틀 뒤 읍 순경이 잡는다
+const TOWN_CATCH_P := 0.8
+const TOWN_DESK_DAYS := 3           # 검사·판사가 플레이어면 사흘 기다려 주고, 그 뒤엔 부장이 처리한다
+const TOWN_SELL_MULT := 1.1         # 장터 점포에서 내 물건을 파는 값 — 도심 값
 # ---- 버스(S4b) ----
 const BUS_FARE := 50
 const FENCE_RATE := 0.5             # 장물아비(S4c)가 쳐 주는 값 — 제값의 반
@@ -9232,7 +9290,7 @@ var society_v := 1        # 사회 하위 시스템의 세이브 판 — 옛 세
 var seats := {}           # {inst: {rank: [npc id / "player" / ""]}} — 「자리가 진실이다」(헌법 §0.1)
 var npc_wallet := {}      # {nid: int} 소매치기가 건드린 지갑만 — 없는 사람은 wallet_of 가 계절 시드로 정한다
 # 정부(S2a) — 사업비 저금통. 인건비 계정은 없다(공무원 봉급은 도 교부금, 어떤 장부에도 안 적힌다)
-var gov_budget := {"kyojin": 2000}   # {region: int}
+var gov_budget := {"kyojin": 2000, "town": 20000}   # {region: int} — 읍 예산(S4d)은 판결 벌금이 쌓인다
 var gov_done: Array = []             # 완공한 공공사업 id
 var gov_building := ""               # 착공해 다음 계절 첫날 완공되는 사업 id ("" = 없음)
 var gov_tax_season := 0              # 이번 계절 플레이어가 낸 세금(장부 한 줄의 재료)
@@ -9241,6 +9299,10 @@ var tax_seize_due := 0               # 오늘 아침 압류할 액수(society.af
 # 갈뫼읍(S4b) — 입구 팻말을 읽으면 발견(지도에 이름이 붙는다). 주택 예약은 S4d(생성 NPC 이주)가 쓴다
 var town_open := false
 var town_homes: Array = []
+# 생성 NPC(S4d) — 읍의 모르는 얼굴. 씨앗 하나에서 결정적으로 태어난다(이름·성격·팔레트·취향).
+# 세이브엔 {id: {here, since}} 만 적고 나머지는 씨앗으로 다시 짓는다
+var gen_seed := 0
+var gen_npcs := {}
 # 파출소(S2b) — NPC 사건. 헌법 §6.7: 확률이 아니라 결정적 주기, 플레이어 없이도 닫힌다
 var cases: Array = []                # [{id, crime, day, suspect, victim, witness, evidence, stage, closed_by, deadline}]
 var case_seq := 0
@@ -9431,10 +9493,14 @@ func wallet_of(nid: String) -> int:
 func npc_def(id: String) -> Dictionary:
 	if NPCS.has(id):
 		return NPCS[id]
+	if gen_npcs.has(id):
+		return gen_npcs[id]          # 생성 NPC(S4d) — 읍의 모르는 얼굴
 	return COURT_NPCS.get(id, {})   # 순회 판사·검사 — 주민이 아니라 NPCS 밖에 산다(S2c)
 
 
 func npc_kind(id: String) -> String:
+	if gen_npcs.has(id):
+		return "gen"
 	return str(NPC_KIND.get(id, "core"))
 
 
@@ -9454,7 +9520,9 @@ func rep_add(d: int) -> void:
 
 func aff_add(id: String, d: int) -> void:
 	if not affinity.has(id):
-		return
+		if not gen_npcs.has(id):
+			return
+		aff_set(id, 0)   # 생성 NPC(S4d)의 호감도는 처음 만질 때 생긴다
 	affinity[id] = clampi(aff(id) + d, 0, 100)
 
 
@@ -10060,6 +10128,8 @@ func _case_close_tick() -> void:
 			c["closed_by"] = "expired"
 			_note(str(SOCIETY_NOTES.case_expired) % victim)
 			continue
+		if str(c.get("region", "")) == "town":
+			continue   # 읍 사건은 읍 순경·검찰·법원의 길(_town_case_tick)로 간다
 		if age >= NPC_CATCH_DAYS and age % NPC_CATCH_DAYS == 0 and police_open():
 			if _case_roll(cid, age) < NPC_CATCH_P:
 				_case_convict(c, "officer")
@@ -10078,6 +10148,252 @@ func _case_convict(c: Dictionary, by: String) -> void:
 	var sname := str(npc_def(sid).get("name", sid))
 	var vname := str(npc_def(str(c.get("victim", ""))).get("name", ""))
 	_note(str(SOCIETY_NOTES.case_mine if by == "player" else SOCIETY_NOTES.case_caught) % [sname, vname])
+
+
+# ---- 생성 NPC (S4d) ----
+
+# 목장주 도트 판의 옷(겨자·보랏빛)과 머리(갈색)를 두 색으로 물들인다 — make_settlers.js 의 판정 그대로.
+# 살빛은 건드리지 않는다
+func gen_recolor(img: Image, cloth: Color, hair: Color) -> void:
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a <= 0.0:
+				continue
+			var r := int(c.r * 255.0)
+			var g := int(c.g * 255.0)
+			var b := int(c.b * 255.0)
+			var skin: bool = r > 185 and g > 130 and b > 95 and r >= g and g >= b - 10
+			if skin:
+				continue
+			var mustard: bool = r > 130 and g > 95 and b < 130 and r > b + 45 and g > b + 20
+			var purple: bool = b > r + 10 and b > g + 20 and r > 40
+			var brown: bool = not mustard and r > b + 18 and r >= g and r < 200 and g < 150
+			var lum := (float(r) + float(g) + float(b)) / (3.0 * 255.0)
+			if mustard or purple:
+				img.set_pixel(x, y, Color(cloth.r * (0.5 + lum), cloth.g * (0.5 + lum), cloth.b * (0.5 + lum), c.a))
+			elif brown:
+				img.set_pixel(x, y, Color(hair.r * (0.5 + lum), hair.g * (0.5 + lum), hair.b * (0.5 + lum), c.a))
+
+
+func gen_hash(idx: int, salt: String) -> int:
+	return posmod(hash("%d|%d|%s" % [gen_seed, idx, salt]), 1000003)
+
+
+# 씨앗 하나에서 한 사람 — 같은 씨앗·번호면 언제나 같은 사람이다
+func gen_make(idx: int, reroll := 0) -> Dictionary:
+	var id := "g%d" % idx
+	var female: bool = gen_hash(idx, "sex") % 2 == 0
+	var first: Array = GEN_SYL_F if female else GEN_SYL_M
+	var name := "%s %s%s" % [GEN_SURNAMES[gen_hash(idx, "sur%d" % reroll) % GEN_SURNAMES.size()],
+		first[gen_hash(idx, "n1%d" % reroll) % first.size()], GEN_SYL_S[gen_hash(idx, "n2%d" % reroll) % GEN_SYL_S.size()]]
+	var traits := {}
+	for t in GEN_TRAITS:
+		traits[t] = 0.5 + float(gen_hash(idx, "t_" + str(t)) % 11) / 10.0   # 0.5 ~ 1.5
+	var loves: Array = []
+	var likes: Array = []
+	var pool: Array = GEN_LOVES_POOL.duplicate()
+	for k in 5:
+		var pick := str(pool[gen_hash(idx, "lv%d" % k) % pool.size()])
+		pool.erase(pick)
+		if k < 2:
+			loves.append(pick)
+		else:
+			likes.append(pick)
+	var role := "merchant" if idx <= GEN_MERCHANTS else "resident"
+	return {
+		"id": id, "idx": idx, "name": name, "gender": "f" if female else "m", "romance": false,
+		"palette": gen_hash(idx, "pal") % GEN_PALETTES.size(), "traits": traits,
+		"loves": loves, "likes": likes, "hates": [GEN_HATES_POOL[gen_hash(idx, "ht") % GEN_HATES_POOL.size()]],
+		"greed": traits["greed"], "role": role,
+		"stall": (idx - 1) if role == "merchant" else -1, "kind": GEN_STALL_KINDS[(idx - 1) % GEN_STALL_KINDS.size()],
+		"home": (idx - GEN_MERCHANTS - 1) if role == "resident" else -1,
+		"here": role == "merchant", "since": 0, "lines": [],
+	}
+
+
+# 열다섯을 다 짓는다(이미 있으면 그대로). 새 게임은 씨앗부터. saved 가 있으면 here·since 만 덮는다
+func ensure_gen_npcs(saved: Variant = null) -> void:
+	if gen_seed == 0:
+		gen_seed = maxi(1, randi() % 1000000)
+	for i in range(1, GEN_COUNT + 1):
+		var id := "g%d" % i
+		if not gen_npcs.has(id):
+			# 이름이 겹치면 다시 굴린다(헌법 §8.3 중복 재굴림) — 손글 이름과도, 앞 번호와도
+			var g := gen_make(i)
+			for k in range(1, 6):
+				if not _gen_name_taken(str(g.name)):
+					break
+				g = gen_make(i, k)
+			gen_npcs[id] = g
+		if saved is Dictionary and saved.has(id) and saved[id] is Dictionary:
+			gen_npcs[id]["here"] = bool(saved[id].get("here", gen_npcs[id]["here"]))
+			gen_npcs[id]["since"] = int(saved[id].get("since", 0))
+
+
+func _gen_name_taken(name: String) -> bool:
+	for id in gen_npcs:
+		if str(gen_npcs[id].get("name", "")) == name:
+			return true
+	for id in NPCS:
+		if str(NPCS[id].get("name", "")) == name:
+			return true
+	return false
+
+
+func gen_save_rows() -> Dictionary:
+	var out := {}
+	for id in gen_npcs:
+		out[id] = {"here": bool(gen_npcs[id].get("here", false)), "since": int(gen_npcs[id].get("since", 0))}
+	return out
+
+
+# 지금 읍에 있는 생성 NPC — 역할을 주면 그 역할만
+func gen_here(role := "") -> Array:
+	var out: Array = []
+	for id in gen_npcs:
+		var g: Dictionary = gen_npcs[id]
+		if bool(g.get("here", false)) and (role == "" or str(g.get("role", "")) == role):
+			out.append(str(id))
+	return out
+
+
+func gen_trait(id: String, t: String) -> float:
+	return float(gen_npcs.get(id, {}).get("traits", {}).get(t, 1.0))
+
+
+# 성격이 고른 대사 — 1.2 를 넘는 갈래가 붙는다. 하루 안에서는 같은 줄(날짜·번호 해시)
+func gen_line(id: String) -> String:
+	var pool: Array = GEN_LINES.common.duplicate()
+	for t in GEN_TRAITS:
+		if gen_trait(id, t) >= 1.2 and GEN_LINES.has(t):
+			pool += GEN_LINES[t]
+	var h := hour_now()
+	if h < 9.0:
+		pool += GEN_LINES.morning
+	elif h >= 19.0:
+		pool += GEN_LINES.night_hour
+	var idx := int(gen_npcs.get(id, {}).get("idx", 0))
+	var line := str(pool[posmod(hash("%d|%d|%d" % [day, idx, int(h)]), pool.size())])
+	return line.format({"title": player_title(id).text, "name": player_name})
+
+
+# 계절 첫날 — 빈 집이 있으면 주택가에 둘이 온다(읍 예산이 3,000 은 있어야 한다)
+func _town_arrive_tick() -> void:
+	if day_in_season() != 1 or int(gov_budget.get("town", 0)) < 3000:
+		return
+	var came: Array = []
+	for i in range(GEN_MERCHANTS + 1, GEN_COUNT + 1):
+		if came.size() >= GEN_ARRIVE_PER_SEASON:
+			break
+		var g: Dictionary = gen_npcs.get("g%d" % i, {})
+		if g.is_empty() or bool(g.get("here", false)):
+			continue
+		g["here"] = true
+		g["since"] = day
+		came.append(str(g.get("name", "")))
+	if not came.is_empty():
+		_note(str(SOCIETY_NOTES.town_arrive) % " · ".join(PackedStringArray(came)))
+
+
+# 읍 사건 — 사흘마다 한 건, 상인이 셋은 있을 때. 범인은 탐욕이 가장 큰 사람(열린 사건이 없는)
+func _town_crime_tick() -> void:
+	var here := gen_here()
+	if here.size() < 3 or day % TOWN_CRIME_PERIOD != 0:
+		return
+	for c in cases:
+		if str(c.get("region", "")) == "town" and str(c.get("stage", "")) in ["open", "charged", "indicted"]:
+			return   # 읍 사건은 한 번에 하나
+	var suspect := ""
+	var best := 0.0
+	for id in here:
+		var gr := gen_trait(str(id), "greed") + float(npc_greed_adj.get(str(id), 0.0))
+		if gr > best:
+			best = gr
+			suspect = str(id)
+	if suspect == "" or best < 1.1:
+		return
+	var others: Array = []
+	for id in here:
+		if str(id) != suspect:
+			others.append(str(id))
+	var victim := str(others[posmod(day * 7 + case_seq, others.size())])
+	var witness := str(others[posmod(day * 13 + case_seq + 1, others.size())])
+	case_seq += 1
+	cases.append({"id": case_seq, "crime": "burglary", "day": day, "suspect": suspect, "victim": victim,
+		"witness": witness, "evidence": 1, "stage": "open", "closed_by": "", "deadline": day + CASE_TTL,
+		"region": "town", "heat": 1, "charged_day": 0, "indicted_day": 0})
+	while cases.size() > CASE_MAX:
+		cases.pop_front()
+	_note(str(SOCIETY_NOTES.town_crime) % npc_name(victim))
+
+
+# 읍 사건의 길 — 순경 검거(이틀, 0.8) → 검찰(플레이어 검사면 사흘 기다린다) → 법원(플레이어 판사면 사흘)
+func _town_case_tick() -> void:
+	for c in cases:
+		if not (c is Dictionary) or str(c.get("region", "")) != "town":
+			continue
+		var stage := str(c.get("stage", ""))
+		var cid := int(c.get("id", 0))
+		var sname := npc_name(str(c.get("suspect", "")))
+		if stage == "open":
+			var age: int = day - int(c.get("day", 0))
+			if age >= TOWN_CATCH_DAYS and _case_roll(cid, age) < TOWN_CATCH_P:
+				c["stage"] = "charged"
+				c["charged_day"] = day
+				c["evidence"] = int(c.get("evidence", 0)) + 1
+				_note(str(SOCIETY_NOTES.town_charged) % sname)
+		elif stage == "charged":
+			if str(me.get("job", "")) == "prosecutor" and day - int(c.get("charged_day", 0)) < TOWN_DESK_DAYS:
+				_note(str(SOCIETY_NOTES.town_desk) % sname)
+				continue
+			if day > int(c.get("charged_day", 0)):
+				town_case_indict(c, "pros_min", int(c.get("evidence", 0)) >= NEED_EVIDENCE)
+		elif stage == "indicted":
+			if str(me.get("job", "")) == "judge" and day - int(c.get("indicted_day", 0)) < TOWN_DESK_DAYS:
+				_note(str(SOCIETY_NOTES.town_bench) % sname)
+				continue
+			if day > int(c.get("indicted_day", 0)):
+				town_case_verdict(c, "judge_suh", "full")
+
+
+# 기소/불기소 — 검사(플레이어 또는 민 부장)의 손. 보완수사는 흔적 +0.5 로 charged 에 남는다
+func town_case_indict(c: Dictionary, by: String, indict: bool) -> void:
+	var sname := npc_name(str(c.get("suspect", "")))
+	if indict:
+		c["stage"] = "indicted"
+		c["indicted_day"] = day
+	else:
+		c["stage"] = "closed"
+		c["closed_by"] = "dropped"
+		_note(str(SOCIETY_NOTES.town_dropped) % sname)
+
+
+# 판결 — 판사(플레이어 또는 서 부장)의 손. 무죄 / 경감(벌금 반) / 법정형(벌금). 벌금은 읍 예산으로
+func town_case_verdict(c: Dictionary, by: String, kind: String) -> void:
+	var sid := str(c.get("suspect", ""))
+	c["stage"] = "closed"
+	c["closed_by"] = "acquitted" if kind == "acquit" else "verdict"
+	if kind == "acquit":
+		return
+	var fine: int = NPC_FINE if kind == "full" else NPC_FINE / 2
+	var w := wallet_of(sid)
+	fine = mini(w, fine)
+	npc_wallet[sid] = w - fine
+	gov_budget["town"] = int(gov_budget.get("town", 0)) + fine
+	npc_greed_adj[sid] = float(npc_greed_adj.get(sid, 0.0)) - 0.1
+	_note(str(SOCIETY_NOTES.town_verdict) % [npc_name(sid), fine])
+
+
+# 검사·판사의 책상에 올라온 읍 사건 — 없으면 {}
+func town_case_for(job: String) -> Dictionary:
+	var want := "charged" if job == "prosecutor" else ("indicted" if job == "judge" else "")
+	if want == "":
+		return {}
+	for c in cases:
+		if c is Dictionary and str(c.get("region", "")) == "town" and str(c.get("stage", "")) == want:
+			return c
+	return {}
 
 
 # ---- 순회 재판 (S2c) ----
@@ -10517,6 +10833,11 @@ func society_new_day(stats: Array, ko := false) -> void:
 		_note(str(SOCIETY_NOTES.wanted))
 	# 순회 재판(S2c) — 구류 하루, 기소, 재판일
 	_court_tick()
+	# 갈뫼읍(S4d) — 주택가 이주(계절 첫날), 읍 사건과 그 길
+	ensure_gen_npcs()
+	_town_arrive_tick()
+	_town_crime_tick()
+	_town_case_tick()
 	# 자치회(S3c) — 청년회장의 어젯밤: 세 군데를 다 돌았으면 보고를, 안 돌았으면 빠진 밤을 적는다
 	if str(me.job) == "youth_head" and day > int(me.job_since_day):
 		if int(me.patrol_day) == day - 1 and int(me.patrol_idx) >= 3:
@@ -11225,7 +11546,7 @@ func reset_all() -> void:
 	me = fresh_me()
 	society_v = 1   # 사회 세계 키(S1) — 자리·지갑도 새로
 	seats = {}
-	gov_budget = {"kyojin": 2000}
+	gov_budget = {"kyojin": 2000, "town": 20000}
 	gov_done = []
 	gov_building = ""
 	gov_tax_season = 0
@@ -11233,6 +11554,8 @@ func reset_all() -> void:
 	tax_seize_due = 0
 	town_open = false
 	town_homes = []
+	gen_seed = 0
+	gen_npcs = {}
 	cases = []
 	case_seq = 0
 	npc_greed_adj = {}
@@ -11669,6 +11992,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"gov_budget": gov_budget, "gov_done": gov_done, "gov_building": gov_building,
 		"gov_tax_season": gov_tax_season, "gov_log": gov_log,
 		"town_open": town_open, "town_homes": town_homes,
+		"gen_seed": gen_seed, "gen_npcs": gen_save_rows(),
 		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

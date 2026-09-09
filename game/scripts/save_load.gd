@@ -237,7 +237,8 @@ func _apply_save(d: Dictionary) -> void:
 			GameData.npc_wallet[str(wk)] = int(wallet_in[wk])
 	# 정부(S2a) — 옛 세이브엔 없어 예산 2,000 · 사업 없음으로 시작한다
 	var gb: Variant = d.get("gov_budget", {})
-	GameData.gov_budget = {"kyojin": int(gb.get("kyojin", 2000)) if gb is Dictionary else 2000}
+	GameData.gov_budget = {"kyojin": int(gb.get("kyojin", 2000)) if gb is Dictionary else 2000,
+		"town": int(gb.get("town", 20000)) if gb is Dictionary else 20000}
 	var gd: Variant = d.get("gov_done", [])
 	GameData.gov_done = []
 	if gd is Array:
@@ -247,6 +248,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.gov_tax_season = int(d.get("gov_tax_season", 0))
 	var gl: Variant = d.get("gov_log", [])
 	GameData.gov_log = gl if gl is Array else []
+	# 생성 NPC(S4d) — 씨앗으로 다시 짓고 here·since 만 세이브에서
+	GameData.gen_seed = int(d.get("gen_seed", 0))
+	GameData.gen_npcs = {}
+	GameData.ensure_gen_npcs(d.get("gen_npcs", {}))
 	# 갈뫼읍(S4b) — 발견 여부와 주택 예약
 	GameData.town_open = bool(d.get("town_open", false))
 	var th: Variant = d.get("town_homes", [])
@@ -258,11 +263,14 @@ func _apply_save(d: Dictionary) -> void:
 	if cs is Array:
 		for c in cs:
 			if c is Dictionary:
+				# 읍 사건(S4d)의 region·heat·charged_day·indicted_day 까지 — 수는 int 로
 				GameData.cases.append({"id": int(c.get("id", 0)), "crime": str(c.get("crime", "")),
 					"day": int(c.get("day", 0)), "suspect": str(c.get("suspect", "")),
 					"victim": str(c.get("victim", "")), "witness": str(c.get("witness", "")),
 					"evidence": int(c.get("evidence", 0)), "stage": str(c.get("stage", "closed")),
-					"closed_by": str(c.get("closed_by", "")), "deadline": int(c.get("deadline", 0))})
+					"closed_by": str(c.get("closed_by", "")), "deadline": int(c.get("deadline", 0)),
+					"region": str(c.get("region", "kyojin")), "heat": int(c.get("heat", 1)),
+					"charged_day": int(c.get("charged_day", 0)), "indicted_day": int(c.get("indicted_day", 0))})
 	GameData.case_seq = int(d.get("case_seq", 0))
 	GameData.npc_greed_adj = {}
 	var ga: Variant = d.get("npc_greed_adj", {})

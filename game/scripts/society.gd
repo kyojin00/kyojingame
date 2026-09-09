@@ -560,6 +560,11 @@ func work_start(room_id := "") -> void:
 	if why != "":
 		m.dialog.open(_npc_name(head), why, [["알겠습니다", null]], _portrait(head))
 		return
+	# 읍 사건(S4d) — 검사·판사의 책상에 진짜 서류가 있으면 손글 미니루프보다 그것이 먼저다
+	var real: Dictionary = GameData.town_case_for(job_id_now())
+	if not real.is_empty():
+		_work_real_case(real)
+		return
 	var enc := _encounter()
 	if enc.is_empty():
 		return
@@ -2195,4 +2200,94 @@ func sell_stolen() -> void:
 	GameData.today_earned += got
 	GameData.bold_add(1.0)
 	m.dialog.open(_npc_name("fence_gu"), str(fl.ok) % got, [["대화 끝", null]], _portrait("fence_gu"))
+	m.saveio.save_now()
+
+
+# ---- 읍 사건 위의 검사·판사 (S4d) ----
+#
+# 손글 미니루프는 연습이고, 이것이 진짜다: 읍 순경이 잡아 넘긴 사건이 검사의 책상에, 검사가
+# 기소한 사건이 판사의 책상에 오른다. 사흘 안에 손대지 않으면 부장이 대신 처리한다(GameData._town_case_tick)
+
+func job_id_now() -> String:
+	return str(GameData.me.get("job", ""))
+
+
+func _work_real_case(c: Dictionary) -> void:
+	var job := _job()
+	var head := str(job.get("boss", ""))
+	var cid := int(c.get("id", 0))
+	var sname := GameData.npc_name(str(c.get("suspect", "")))
+	var vname := GameData.npc_name(str(c.get("victim", "")))
+	var ev := int(c.get("evidence", 0))
+	var pages: Array = []
+	if job_id_now() == "prosecutor":
+		pages.append({"text": "%s네 점포 사건. 피의자 %s. 흔적 %d — 문턱은 %d." % [vname, sname, ev, GameData.NEED_EVIDENCE],
+			"choices": [
+				["기소한다", case_pick.bind(cid, "indict")],
+				["불기소한다", case_pick.bind(cid, "drop")],
+				["보완수사를 지시한다", case_pick.bind(cid, "probe")],
+			]})
+	else:
+		pages.append({"text": "피고 %s. %s네 점포에 들었다. 흔적 %d." % [sname, vname, ev],
+			"choices": [
+				["무죄", case_pick.bind(cid, "acquit")],
+				["경감 — 벌금 절반", case_pick.bind(cid, "lenient")],
+				["법정형 — 벌금", case_pick.bind(cid, "full")],
+			]})
+	m.dialog.open_seq(_npc_name(head), _portrait(head), pages)
+
+
+# 근무 한 번의 몫 — 실적·일급·근무 기록·평판(work_pick 과 같은 셈)
+func _work_credit(inst: String, pick: int) -> void:
+	_me_add("perf", 1)
+	if not GameData.wage_frozen():
+		_me_add("wage_pending", int(_job().get("wage", GameData.CLERK_WAGE)))
+	_log_work("work", inst, pick)
+	if _me_int("perf") % 5 == 0:
+		_rep_add(1)
+
+
+func case_pick(cid: int, kind: String) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var c := GameData.case_by_id(cid)
+	if c.is_empty() or str(c.get("region", "")) != "town":
+		return
+	var job := _job()
+	var head := str(job.get("boss", ""))
+	var sid := str(c.get("suspect", ""))
+	var ev := int(c.get("evidence", 0))
+	var line := ""
+	match kind:
+		"indict":
+			GameData.town_case_indict(c, "player", true)
+			line = "기소했네. 판사가 볼 걸세." if ev >= GameData.NEED_EVIDENCE else "흔적이 모자란 기소일세. 판사가 돌려보낼지도 모르네."
+			GameData.aff_add(head, 1 if ev >= GameData.NEED_EVIDENCE else -1)
+		"drop":
+			GameData.town_case_indict(c, "player", false)
+			GameData.aff_add(sid, 5)
+			line = "덮은 건 아니겠지. 흔적을 다시 보게." if ev >= GameData.NEED_EVIDENCE else "그래. 문턱에 못 미치면 안 하는 걸세."
+			GameData.aff_add(head, -1 if ev >= GameData.NEED_EVIDENCE else 1)
+		"probe":
+			c["evidence"] = ev + 1
+			line = "보완수사일세. 순경이 하루 더 돌겠네."
+		"acquit":
+			GameData.town_case_verdict(c, "player", "acquit")
+			GameData.aff_add(sid, 10)
+			line = "무죄라. 흔적이 둘인데." if ev >= GameData.NEED_EVIDENCE else "그래. 흔적 하나로는 못 가두네."
+			GameData.aff_add(head, -1 if ev >= GameData.NEED_EVIDENCE else 1)
+		"lenient":
+			GameData.town_case_verdict(c, "player", "lenient")
+			GameData.aff_add(sid, 3)
+			line = "경감일세. 반은 갚고 반은 마음으로 갚겠지."
+		"full":
+			GameData.town_case_verdict(c, "player", "full")
+			GameData.aff_add(sid, -5)
+			line = "법정형일세. 무겁지만 맞네." if ev >= GameData.NEED_EVIDENCE else "흔적 하나에 법정형인가. 무겁네."
+			GameData.aff_add(head, 1 if ev >= GameData.NEED_EVIDENCE else -1)
+		_:
+			return
+	_work_credit(str(job.get("inst", "")), 0)
+	m.dialog.open(_npc_name(head), line, [["대화 끝", null]], _portrait(head))
 	m.saveio.save_now()

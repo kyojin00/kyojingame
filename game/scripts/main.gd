@@ -929,7 +929,8 @@ const VILLAGE_BUILD_COST := {   # [목재, 석재]
 func village_residents() -> int:
 	var n := 1
 	for npc in npcs:
-		if str(npc.id) in HAMLET_NPC_IDS or str(npc.id) in TOWN_NPC_IDS:
+		# 고장 사람·읍 손글·읍 생성 NPC(S4d)는 교진 주민이 아니다
+		if str(npc.id) in HAMLET_NPC_IDS or str(npc.id) in TOWN_NPC_IDS or GameData.gen_npcs.has(str(npc.id)):
 			continue
 		n += 1
 	return n

@@ -55,6 +55,8 @@ func npc_place_now(npc_id: String) -> String:
 		if hh >= 9.0 and hh < 17.0:
 			return "hallwork"
 	var plan: Array = m.NPC_SCHEDULE.get(npc_id, [])
+	if plan.is_empty() and GameData.gen_npcs.has(npc_id):
+		plan = GameData.GEN_SCHEDULE.get(str(GameData.gen_npcs[npc_id].get("role", "")), [])   # 생성 NPC(S4d)
 	if plan.is_empty():
 		return ""
 	var hour := GameData.minutes / 60.0
@@ -88,10 +90,18 @@ func _hamlet_tile(npc_id: String, place: String) -> Vector2i:
 	return h.square
 
 
-# 읍 사람(S4c)이 갈 자리 — 집도 일터도 제 관청이고, 낮엔 장터 앞이다
+# 읍 사람(S4c)이 갈 자리 — 집도 일터도 제 관청이고, 낮엔 장터 앞이다.
+# 생성 NPC(S4d): 상인은 제 점포 앞·여관, 주택가 주민은 제 집
 func _town_tile(npc_id: String, place: String) -> Vector2i:
 	if place == "square":
 		return m.TOWN_SQUARE
+	if GameData.gen_npcs.has(npc_id):
+		var g: Dictionary = GameData.gen_npcs[npc_id]
+		if place == "stall" and int(g.get("stall", -1)) >= 0:
+			return m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] + Vector2i(0, 1)
+		if int(g.get("home", -1)) >= 0:
+			return m.door_tile(m.TOWN_HOMES[int(g.home) % m.TOWN_HOMES.size()]) + Vector2i(0, 1)
+		return m.door_tile(m.TOWN_PLOTS["town_inn"].anchor) + Vector2i(-1 - int(g.get("idx", 0)) % 3, 1)
 	var plot := str(m.TOWN_OF.get(npc_id, ""))
 	if m.TOWN_PLOTS.has(plot):
 		var d: Vector2i = m.door_tile(m.TOWN_PLOTS[plot].anchor) + Vector2i(0, 1)
@@ -103,7 +113,7 @@ func _town_tile(npc_id: String, place: String) -> Vector2i:
 
 func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	var t := Vector2i(-999, -999)
-	if m.TOWN_OF.has(npc_id):
+	if m.TOWN_OF.has(npc_id) or GameData.gen_npcs.has(npc_id):
 		t = _town_tile(npc_id, place)
 		if m.is_passable(t):
 			return t
@@ -209,10 +219,32 @@ func _sync_hamlet_npcs() -> void:
 			_spawn_npc(nid, m.door_tile(entry2[0]) + Vector2i(0, 1), box)
 
 
-# 읍 손글 아홉(S4c) — 고장 사람처럼 조건 없이 처음부터 제자리에 있다. 어슬렁 범위는 읍 안
+# 생성 NPC 의 도트(S4d) — 목장주 판 위에 팔레트를 건다(make_settlers.js 와 같은 규칙, 실행 중에).
+# 세이브의 씨앗을 안 뒤에 굽는다 — 그래서 _load_textures 가 아니라 여기다
+const GEN_FRAMES := ["down_0", "down_1", "up_0", "up_1", "side_0", "side_1", "portrait_normal", "portrait_happy"]
+
+
+func bake_gen_sprites() -> void:
+	for id in GameData.gen_npcs:
+		if m.tex.has("npc_%s_down_0" % id):
+			continue
+		var pal: Array = GameData.GEN_PALETTES[int(GameData.gen_npcs[id].get("palette", 0)) % GameData.GEN_PALETTES.size()]
+		for sfx: String in GEN_FRAMES:
+			var base: Texture2D = m.tex.get("npc_rancher_" + sfx)
+			if base == null:
+				continue
+			var img: Image = base.get_image().duplicate()
+			GameData.gen_recolor(img, pal[0], pal[1])
+			m.tex["npc_%s_%s" % [id, sfx]] = ImageTexture.create_from_image(img)
+
+
+# 읍 손글 아홉(S4c)과 읍에 와 있는 생성 NPC(S4d) — 조건 없이 제자리에 있다. 어슬렁 범위는 읍 안
 func _sync_town_npcs() -> void:
 	var box: Rect2i = m.TOWN_RECT.grow(3)
-	for nid: String in m.TOWN_NPC_IDS:
+	GameData.ensure_gen_npcs()
+	bake_gen_sprites()
+	var want: Array = m.TOWN_NPC_IDS + GameData.gen_here()
+	for nid: String in want:
 		var found := false
 		for n in m.npcs:
 			if n.id == nid:
@@ -220,7 +252,8 @@ func _sync_town_npcs() -> void:
 				break
 		if found:
 			continue
-		_spawn_npc(nid, _town_tile(nid, "work"), box)
+		var spot: Vector2i = _town_tile(nid, "stall" if GameData.gen_npcs.has(nid) else "work")
+		_spawn_npc(nid, spot, box)
 
 
 func _sync_village_npcs() -> void:
