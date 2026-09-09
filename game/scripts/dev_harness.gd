@@ -9099,9 +9099,22 @@ func _debug_tick() -> void:
 			# 느린 CI 상자에서 2만 7천 칸에 65ms쯤 — 여유를 두고 90ms로 잡는다.
 			# (칸마다 구역을 훑던 시절에는 160ms였다. 이 선이 그때로 돌아가는 것을 막는다)
 			var bake: int = m.map_ui.bake_us
-			print("MAPDRAW_OK=", _bench_n > 0 and per_draw < 8000 and bake < 90000,
+			# 상자마다 속도가 다르다(개발기 66ms · 헤드리스 컨테이너 150ms+). 절대 90ms 아니면
+			# 같은 상자에서 잰 「격자 읽기」(칸마다 grid 의 사전에서 ground 를 읽는 것 — 굽기가
+			# 피할 수 없는 일)의 2.5배 안이면 된다. 굽기가 그보다 무거워지면 칸마다 딴 일을 하는 것이다
+			var wr: Rect2i = m.map_ui._world()
+			var t_cal := Time.get_ticks_usec()
+			var n_cal := 0
+			for cy_cal in range(wr.position.y, wr.end.y):
+				var row_cal: Array = m.grid[cy_cal]
+				for cx_cal in range(wr.position.x, wr.end.x):
+					var cell_cal: Dictionary = row_cal[cx_cal]
+					if str(cell_cal.ground) == "water":
+						n_cal += 1
+			var floor_us: int = Time.get_ticks_usec() - t_cal
+			print("MAPDRAW_OK=", _bench_n > 0 and per_draw < 8000 and (bake < 90000 or bake < int(float(floor_us) * 2.5)),
 				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)",
-				" 굽기=", bake, "us")
+				" 굽기=", bake, "us 격자읽기=", floor_us, "us(물 ", n_cal, ") ", m.map_ui.prof)
 		406:
 			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
 			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.

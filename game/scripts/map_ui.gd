@@ -379,6 +379,8 @@ const REGION_TINT := {
 var _reg_idx := PackedByteArray()
 var _reg_cols: Array[Color] = []
 var _reg_plain := PackedByteArray()   # 지역 번호별로 1 = 덧칠할 풀빛이 없다
+const _GKEY := {"grass": 0, "sand": 1, "dock": 2, "path": 3}   # 미리 구운 바탕색의 자리(그 밖의 땅은 잔디 취급)
+var prof := {}                         # 마지막 굽기의 토막별 시간(하네스 MAPDRAW 가 읽는다)
 
 
 func _build_region_index() -> void:
@@ -476,9 +478,26 @@ func _bake() -> void:
 		gbase = Color(0.82, 0.85, 0.9)
 	elif season == GameData.FALL:
 		gbase = Color(0.62, 0.5, 0.3)
-	var gr := int(gbase.r * 255.0)
-	var gg := int(gbase.g * 255.0)
-	var gb := int(gbase.b * 255.0)
+	# 지역 × 땅(잔디·모래·부두·자갈)의 바탕색을 미리 구워 둔다 — 칸의 6할이 지역빛 있는 잔디·자갈이라
+	# 칸마다 _ground_color 를 부르면 그 호출이 굽기의 대부분이다. 물(해안선)·밭(젖음)만 느린 갈래로
+	var nreg: int = _reg_cols.size()
+	var pr := PackedByteArray()
+	var pg := PackedByteArray()
+	var pb := PackedByteArray()
+	pr.resize(nreg * 4)
+	pg.resize(nreg * 4)
+	pb.resize(nreg * 4)
+	var gbases: Array = [gbase, Color(0.85, 0.77, 0.55), Color(0.55, 0.38, 0.22), Color(0.72, 0.62, 0.44)]
+	for reg in nreg:
+		var tint: Color = _reg_cols[reg]
+		for gi in 4:
+			var bc: Color = gbases[gi]
+			if tint.a > 0.0:
+				bc = bc.lerp(Color(tint.r, tint.g, tint.b), tint.a)
+			# 잡음(±11)을 더해도 0~255 를 안 넘도록 바탕을 안쪽으로 눌러 둔다 — 칸마다 clamp 를 안 한다
+			pr[reg * 4 + gi] = clampi(int(bc.r * 255.0), 12, 243)
+			pg[reg * 4 + gi] = clampi(int(bc.g * 255.0), 12, 243)
+			pb[reg * 4 + gi] = clampi(int(bc.b * 255.0), 12, 243)
 	var ck: int = GameData.EXPLORE_CHUNK
 	var i := 0
 	# 탐사 여부는 **청크 단위**다 (4x4). 칸마다 묻지 않고 줄마다 한 번씩 모아 둔다
@@ -486,6 +505,9 @@ func _bake() -> void:
 	var chunk_ok := PackedByteArray()
 	chunk_ok.resize((ox + w) / ck - cx0 + 2)
 	var last_cy := -999
+	var _p_cells0 := Time.get_ticks_usec()
+	var _p_slow := 0
+	var _p_fog := 0
 	for y in h:
 		var wy: int = oy + y
 		var cy: int = wy / ck
@@ -496,29 +518,48 @@ func _bake() -> void:
 					Vector2i(cx0 + cxi, cy)) else 0
 		var base: int = wy * main.MAP_W
 		var grow: Array = main.grid[wy]
-		for x in w:
+		var x := 0
+		while x < w:
 			var wx: int = ox + x
-			if chunk_ok[wx / ck - cx0] != 1 or _vis_idx[base + wx] != 1:
+			# 안 가 본 청크는 네 칸을 한 번에 안개로 — 칸마다 청크를 묻지 않는다
+			if chunk_ok[wx / ck - cx0] != 1:
+				var run: int = mini(ck - (wx % ck), w - x)
+				for _r in run:
+					buf[i] = fr
+					buf[i + 1] = fg
+					buf[i + 2] = fb
+					i += 3
+				_p_fog += run
+				x += run
+				continue
+			if _vis_idx[base + wx] != 1:
 				buf[i] = fr
 				buf[i + 1] = fg
 				buf[i + 2] = fb
 				i += 3
+				_p_fog += 1
+				x += 1
 				continue
 			var cell: Dictionary = grow[wx]
-			var nn: int = int(_noise[base + wx]) - 128
-			# 지역빛 없는 맨 잔디가 지도의 대부분이다 — 그 칸은 함수를 부르지 않고
-			# 계절 바탕에 흔들림만 더한다 (2만 7천 번의 함수 호출이 몇 백 번이 된다)
-			if cell.ground == "grass" and _reg_plain[_reg_idx[base + wx]] == 1:
-				buf[i] = clampi(gr + nn * 23 / 255, 0, 255)
-				buf[i + 1] = clampi(gg + nn * 23 / 255, 0, 255)
-				buf[i + 2] = clampi(gb + nn * 23 / 255, 0, 255)
-			else:
+			var g: String = cell.ground
+			if g == "water" or g == "soil":
+				# 해안선(이웃 칸)·젖은 밭은 칸을 봐야 한다 — 이 둘만 함수를 부른다
+				_p_slow += 1
 				var c: Color = _ground_color(cell, wx, wy, season,
-					float(nn) / 255.0)
+					(float(_noise[base + wx]) - 128.0) / 255.0)
 				buf[i] = int(c.r * 255.0)
 				buf[i + 1] = int(c.g * 255.0)
 				buf[i + 2] = int(c.b * 255.0)
+			else:
+				var k: int = _reg_idx[base + wx] * 4 + int(_GKEY.get(g, 0))
+				var dn: int = (int(_noise[base + wx]) - 128) * 23 / 255
+				buf[i] = pr[k] + dn
+				buf[i + 1] = pg[k] + dn
+				buf[i + 2] = pb[k] + dn
 			i += 3
+			x += 1
+	var _p_cells := Time.get_ticks_usec() - _p_cells0
+	var _p_obj0 := Time.get_ticks_usec()
 	# 지형지물은 그 칸 색을 덮어쓴다 (가까이 가면 위에 생김새를 얹는다)
 	for pos: Vector2i in main.objects:
 		if not r.has_point(pos):
@@ -531,6 +572,8 @@ func _bake() -> void:
 		buf[j] = int(c2.r * 255.0)
 		buf[j + 1] = int(c2.g * 255.0)
 		buf[j + 2] = int(c2.b * 255.0)
+	prof = {"cells_us": _p_cells, "obj_us": Time.get_ticks_usec() - _p_obj0, "slow": _p_slow, "fog": _p_fog,
+		"cells": w * h, "objects": main.objects.size(), "setup_us": _p_cells0 - bt0}
 	var img := Image.create_from_data(w, h, false, Image.FORMAT_RGB8, buf)
 	# 튜토리얼에서 세계로 넘어가면 그림의 크기가 통째로 달라진다 — 그때는 새로 만든다
 	if _tex == null or _tex.get_width() != w or _tex.get_height() != h:
