@@ -6390,15 +6390,15 @@ const INSTITUTIONS := {
 	},
 	# ---- 갈뫼읍 기관 여덟(S4c) — 맨 윗자리는 손글 고정, 플레이어는 그 아래. 「판사가 되어 본다」는 여기 ----
 	"county": {"name": "군청", "region": "town", "room": "county", "head": "mayor_kang",
-		"ranks": ["clerk", "head"], "player_max": "clerk", "skill": "", "books": 0, "job": "county_clerk", "slice": 4},
+		"ranks": ["clerk", "senior", "head"], "player_max": "clerk", "skill": "", "books": 0, "job": "county_clerk", "slice": 4},
 	"police_station": {"name": "경찰서", "region": "town", "room": "police", "head": "chief_ha",
-		"ranks": ["constable", "head"], "player_max": "constable", "skill": "combat", "books": 0, "job": "", "slice": 4},
+		"ranks": ["constable", "senior", "head"], "player_max": "constable", "skill": "combat", "books": 0, "job": "", "slice": 4},
 	"court": {"name": "법원", "region": "town", "room": "court", "head": "judge_suh",
 		"ranks": ["judge", "head"], "player_max": "judge", "skill": "", "books": 12, "job": "judge", "slice": 4},
 	"prosecution": {"name": "검찰청", "region": "town", "room": "prosecution", "head": "pros_min",
 		"ranks": ["prosecutor", "head"], "player_max": "prosecutor", "skill": "", "books": 12, "job": "prosecutor", "slice": 4},
 	"clinic": {"name": "보건소", "region": "town", "room": "clinic", "head": "doctor_oh",
-		"ranks": ["nurse", "head"], "player_max": "nurse", "skill": "cook", "books": 0, "job": "nurse", "slice": 4},
+		"ranks": ["nurse", "senior", "head"], "player_max": "nurse", "skill": "cook", "books": 0, "job": "nurse", "slice": 4},
 	"bank": {"name": "신협", "region": "town", "room": "bank", "head": "manager_baek",
 		"ranks": ["teller", "head"], "player_max": "teller", "skill": "", "books": 0, "job": "", "slice": 4},
 	"town_inn": {"name": "여관", "region": "town", "room": "town_inn", "head": "innkeeper_ok",
@@ -8101,6 +8101,9 @@ const JOBS := {
 		"rank": "clerk",
 		"boss": "mayor_kang",
 		"wage": 120,
+		# 승진(S4h) — 근속 56일 · 민원 20 · 주사 자리 공석 · 군수 호감도 50
+		"promote": {"rank": "senior", "name": "군청 주사", "wage": 180, "goal": 20,
+			"calls": {"stranger": "군청 새 주사", "known": "주사 양반", "master": "우리 주사"}},
 		"known_at": 14,
 		"skill": "",
 		"books": 3,
@@ -8153,6 +8156,9 @@ const JOBS := {
 		"rank": "nurse",
 		"boss": "doctor_oh",
 		"wage": 130,
+		# 승진(S4h) — 근속 56일 · 왕진 20 · 의사 자리 공석 · 소장 호감도 50 · 요리 Lv5
+		"promote": {"rank": "senior", "name": "보건소 의사", "wage": 200, "goal": 20, "req_skill": ["cook", 5],
+			"calls": {"stranger": "보건소 새 의사", "known": "의사 양반", "master": "우리 의사"}},
 		"known_at": 14,
 		"skill": "cook",
 		"skill_lv": 2,
@@ -9171,6 +9177,10 @@ const SOCIETY_NOTES := {
 	"town_skipped": "읍 법원에 서지 않았다. 거른 재판은 가중된다.",
 	"town_convicted": "읍 법원이 나에게 형을 내렸다. 읍이 그 얼굴을 기억할 것이다.",
 	"prison_out": "84일 만에 교도소를 나왔다. 밭은 말라 있었다. 마을이 그 얼굴을 기억할 것이다.",
+	# ---- 기관 직원·전근·승진(S4h) ----
+	"staff_transfer": "%s이 전근 갔다. %s의 자리가 비었다.",
+	"staff_arrive": "%s이 왔다. %s의 빈자리에 앉았다.",
+	"promoted": "아침에 위에서 불렀다. 오늘부터 %s다.",
 	# ---- 자치회(S3c) ----
 	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
 	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
@@ -9244,10 +9254,24 @@ const PRISON_MINE_XP_DAY := 1.0    # 노역 — 돌 깨기 하루치의 절반�
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
 const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
 # ---- 생성 NPC · 읍 사건(S4d, 헌법 §8.3·§6.7) ----
-const GEN_COUNT := 18               # 장터 상인 7 + 주택가 주민 8 + 읍 순경 3(S4f)
+const GEN_COUNT := 23               # 장터 상인 7 + 주택가 주민 8 + 읍 순경 3(S4f) + 기관 직원 5(S4h)
 const GEN_MERCHANTS := 7
 const GEN_HOMES := 8
 const GEN_CONSTABLES := 3           # 읍 순경 — 6~24시 세 교대, 수배 중엔 셋이 협공한다
+# 기관 직원(S4h) — 손글 우두머리 아래의 가운데 자리(주사·경위·의사)와 판검사의 옆자리(slot 1).
+# 맨 아랫자리는 늘 플레이어 몫으로 비워 둔다(헌법 §1.3). 4~8계절마다 전근으로 자리를 비운다
+const GEN_STAFF := [
+	{"inst": "county", "rank": "senior", "title": "주사", "slot": 0},
+	{"inst": "police_station", "rank": "senior", "title": "경위", "slot": 0},
+	{"inst": "clinic", "rank": "senior", "title": "의사", "slot": 0},
+	{"inst": "court", "rank": "judge", "title": "판사", "slot": 1},
+	{"inst": "prosecution", "rank": "prosecutor", "title": "검사", "slot": 1},
+]
+const TRANSFER_MIN_SEASONS := 4     # 이만큼 앉아 있어야 전근 후보
+const TRANSFER_SPAN := 5            # 주기 4 + 해시 % 5 = 4~8계절
+const TRANSFER_BACK_SEASONS := 2    # 빈자리가 이만큼 비어 있으면 새 사람이 온다
+const PROMOTE_DAYS := 56            # 승진 ① 근속
+const PROMOTE_AFF := 50             # 승진 ④ 직속 상급자 호감도
 const GEN_UNIFORM := [Color(0.22, 0.26, 0.42), Color(0.12, 0.1, 0.1)]   # 순경 제복(감색)·머리
 # ---- 읍 수배·유치(S4f, 헌법 §6.3) ----
 const TOWN_WANTED_DAYS := 7         # 읍 순경이 나를 쫓는 날수 — 지나면 잊는다
@@ -9276,6 +9300,7 @@ const GEN_STALL_KINDS := ["farm", "fish", "forest", "cook", "beach", "ranch", "m
 const GEN_SCHEDULE := {
 	"merchant": [[6, "home"], [9, "stall"], [13, "square"], [14, "stall"], [19, "home"]],
 	"resident": [[6, "home"], [10, "square"], [16, "home"]],
+	"staff": [[6, "home"], [9, "work"], [18, "home"]],
 }
 # 대사 뱅크 — 성격 하나가 1.2 를 넘으면 그 갈래가 붙고, 아니면 공통뿐. {title} {name} 만 쓴다
 const GEN_LINES := {
@@ -9294,6 +9319,14 @@ const GEN_LINES := {
 	"night": ["밤이 좋아요. 읍이 조용해지거든요.", "열 시 넘어 장터에 서 있는 건 저뿐이에요."],
 	"morning": ["아침 국 드셨어요? 식당이 열었어요."],
 	"night_hour": ["이 시간엔 다들 여관 쪽이에요."],
+	# 기관 직원(S4h) — 이 뱅크만. 자리 얘기뿐이다
+	"staff": [
+		"아홉 시에 문을 열고 여섯 시에 닫소. 그 사이가 내 자리요.",
+		"우두머리는 안 바뀌오. 바뀌는 건 우리 같은 사람이오.",
+		"전근이 오면 가는 거요. 관청 사람은 짐이 가볍소.",
+		"아랫자리는 비워 두라는 게 위의 뜻이오. 누가 오려나.",
+		"서류는 글씨가 반이오. 도장은 위에서 찍고.",
+	],
 	# 읍 순경(S4f) — 성격 갈래 없이 이 뱅크만. 교대마다 얼굴이 바뀐다
 	"constable": [
 		"순찰 중이오. 볼일 없으면 지나가시오.",
@@ -9755,7 +9788,7 @@ func player_title(nid: String) -> Dictionary:
 		text = "그 일 있던 사람"
 	# 5 직함 — 근속이 known_at(14일)을 넘어야 직함으로 불린다(D5). 호감 70이면 「우리 점원」
 	if cls == "" and job != "" and JOBS.has(job) and job_days() >= int(JOBS[job].get("known_at", 14)):
-		var calls: Dictionary = JOBS[job].get("calls", {})
+		var calls: Dictionary = job_calls(job)
 		cls = "office"
 		text = str(calls.get("master", "") if a >= 70 else calls.get("known", "")).format({"ho": honor()})
 	# 6 전직 — 그만둔 지 이레 안이거나, 호감 70인 사람은 계속 「전 …」
@@ -9785,7 +9818,7 @@ func player_title(nid: String) -> Dictionary:
 	if cls == "":
 		cls = "stranger"
 		if JOBS.has(job):
-			text = str(JOBS[job].get("calls", {}).get("stranger", "")).format({"ho": honor()})
+			text = str(job_calls(job).get("stranger", "")).format({"ho": honor()})
 		else:
 			text = "새로 온 사람" if day < 28 else "젊은이"
 	return {"cls": cls, "text": text, "wary": wary}
@@ -10311,9 +10344,14 @@ func gen_make(idx: int, reroll := 0) -> Dictionary:
 			loves.append(pick)
 		else:
 			likes.append(pick)
-	var role := "merchant" if idx <= GEN_MERCHANTS else ("resident" if idx <= GEN_MERCHANTS + GEN_HOMES else "constable")
+	var role := "merchant" if idx <= GEN_MERCHANTS else ("resident" if idx <= GEN_MERCHANTS + GEN_HOMES \
+		else ("constable" if idx <= GEN_MERCHANTS + GEN_HOMES + GEN_CONSTABLES else "staff"))
+	var staff_i := idx - GEN_MERCHANTS - GEN_HOMES - GEN_CONSTABLES - 1
 	if role == "constable":
 		name = "%s 순경" % GEN_SURNAMES[gen_hash(idx, "sur%d" % reroll) % GEN_SURNAMES.size()]   # 읍 사람은 직함 앞에 성 하나
+	elif role == "staff":
+		name = "%s %s" % [GEN_SURNAMES[gen_hash(idx, "sur%d" % reroll) % GEN_SURNAMES.size()],
+			str(GEN_STAFF[staff_i % GEN_STAFF.size()].title)]
 	return {
 		"id": id, "idx": idx, "name": name, "gender": "f" if female else "m", "romance": false,
 		"palette": gen_hash(idx, "pal") % GEN_PALETTES.size(), "traits": traits,
@@ -10322,6 +10360,7 @@ func gen_make(idx: int, reroll := 0) -> Dictionary:
 		"stall": (idx - 1) if role == "merchant" else -1, "kind": GEN_STALL_KINDS[(idx - 1) % GEN_STALL_KINDS.size()],
 		"home": (idx - GEN_MERCHANTS - 1) if role == "resident" else -1,
 		"shift": (idx - GEN_MERCHANTS - GEN_HOMES - 1) if role == "constable" else -1,
+		"staff": staff_i if role == "staff" else -1, "reroll": reroll, "away_until": 0,
 		"here": role != "resident", "since": 0, "lines": [],
 	}
 
@@ -10333,16 +10372,143 @@ func ensure_gen_npcs(saved: Variant = null) -> void:
 	for i in range(1, GEN_COUNT + 1):
 		var id := "g%d" % i
 		if not gen_npcs.has(id):
-			# 이름이 겹치면 다시 굴린다(헌법 §8.3 중복 재굴림) — 손글 이름과도, 앞 번호와도
-			var g := gen_make(i)
-			for k in range(1, 6):
-				if not _gen_name_taken(str(g.name)):
-					break
-				g = gen_make(i, k)
-			gen_npcs[id] = g
+			var base := 0
+			if saved is Dictionary and saved.has(id) and saved[id] is Dictionary:
+				base = int(saved[id].get("reroll", 0))   # 전근 뒤 온 새 사람(S4h)은 저장된 굴림 번호 그대로
+			gen_npcs[id] = _gen_fresh(i, base, saved is Dictionary and saved.has(id))
 		if saved is Dictionary and saved.has(id) and saved[id] is Dictionary:
 			gen_npcs[id]["here"] = bool(saved[id].get("here", gen_npcs[id]["here"]))
 			gen_npcs[id]["since"] = int(saved[id].get("since", 0))
+			gen_npcs[id]["away_until"] = int(saved[id].get("away_until", 0))
+	_gen_seats_sync()
+
+
+# 이름이 겹치면 다시 굴린다(헌법 §8.3 중복 재굴림) — 손글 이름과도, 앞 번호와도.
+# exact 면 저장된 번호를 그대로 믿는다(불러올 때 — 앞 번호들의 굴림이 그때와 같으므로 겹치지 않는다)
+func _gen_fresh(idx: int, base: int, exact := false) -> Dictionary:
+	var g := gen_make(idx, base)
+	if exact:
+		return g
+	for k in range(base + 1, base + 6):
+		if not _gen_name_taken(str(g.name)):
+			break
+		g = gen_make(idx, k)
+	return g
+
+
+# 기관 직원(S4h)의 자리 — 여기 있는 직원은 제 자리에 앉고, 떠난 직원의 자리는 빈다.
+# 판검사의 옆자리(slot 1)는 배열을 늘려 만든다 — [0]은 늘 플레이어 몫이다
+func _gen_seats_sync() -> void:
+	for id in gen_npcs:
+		var st := staff_of(id)
+		if st.is_empty():
+			continue
+		var rows := seat_rows(str(st.inst))
+		var rank := str(st.rank)
+		if not rows.has(rank):
+			continue
+		var arr: Array = rows[rank]
+		var slot := int(st.slot)
+		while arr.size() <= slot:
+			arr.append("")
+		if bool(gen_npcs[id].get("here", false)):
+			if str(arr[slot]) == "":
+				arr[slot] = id
+		elif str(arr[slot]) == id:
+			arr[slot] = ""
+
+
+func staff_of(id: String) -> Dictionary:
+	var g: Dictionary = gen_npcs.get(id, {})
+	if str(g.get("role", "")) != "staff":
+		return {}
+	return GEN_STAFF[int(g.get("staff", 0)) % GEN_STAFF.size()]
+
+
+# 전근(S4h, 계절 첫날) — 넉 계절은 앉아 있던 직원이 자리별 주기(4~8)에 걸리면 떠난다: 자리가 빈다.
+# 두 계절 뒤에도 그 자리가 비어 있으면 새 얼굴이 와서 앉는다(플레이어가 앉았으면 오지 않는다)
+func _transfer_tick() -> void:
+	if day_in_season() != 1 or not town_open:
+		return
+	var sn := season_no()
+	for id in gen_npcs:
+		var st := staff_of(id)
+		if st.is_empty():
+			continue
+		var g: Dictionary = gen_npcs[id]
+		var idx := int(g.get("idx", 0))
+		var rows := seat_rows(str(st.inst))
+		var arr: Array = rows.get(str(st.rank), [])
+		var slot := int(st.slot)
+		var inst_name := str(INSTITUTIONS[str(st.inst)].name)
+		if bool(g.get("here", false)):
+			var tenure := sn - season_no(maxi(1, int(g.get("since", 0))))
+			var period := TRANSFER_MIN_SEASONS + gen_hash(idx, "tp") % TRANSFER_SPAN
+			if tenure >= TRANSFER_MIN_SEASONS and (sn + gen_hash(idx, "tx")) % period == 0:
+				g["here"] = false
+				g["away_until"] = sn + TRANSFER_BACK_SEASONS
+				if arr.size() > slot and str(arr[slot]) == id:
+					arr[slot] = ""
+				_note(str(SOCIETY_NOTES.staff_transfer) % [str(g.get("name", "")), inst_name])
+		elif int(g.get("away_until", 0)) > 0 and sn >= int(g.get("away_until", 0)):
+			if arr.size() > slot and str(arr[slot]) != "":
+				g["away_until"] = sn + TRANSFER_BACK_SEASONS   # 자리가 찼다(플레이어) — 다음에 다시 본다
+				continue
+			var ng := _gen_fresh(idx, int(g.get("reroll", 0)) + 1)
+			ng["here"] = true
+			ng["since"] = day
+			gen_npcs[id] = ng
+			while arr.size() <= slot:
+				arr.append("")
+			arr[slot] = id
+			_note(str(SOCIETY_NOTES.staff_arrive) % [str(ng.get("name", "")), inst_name])
+
+
+# 승진(S4h, 헌법 §7.3) — 네 조건 전부: 근속 56일 · 실적 goal · 윗자리 공석 · 직속 상급자 호감도 50.
+# 자리를 옮기는 것이 승진이다(me.rank 는 그 그림자). 직업 id 는 그대로, 봉급·호칭은 promote 의 것
+func _promotion_tick() -> void:
+	var job := str(me.get("job", ""))
+	var jd: Dictionary = JOBS.get(job, {})
+	var pr: Dictionary = jd.get("promote", {})
+	if pr.is_empty() or str(me.get("rank", "")) != str(jd.get("rank", "")):
+		return
+	if job_days() < PROMOTE_DAYS or int(me.get("perf", 0)) < int(pr.get("goal", 999)):
+		return
+	if aff(str(jd.get("boss", ""))) < PROMOTE_AFF:
+		return
+	var req: Array = pr.get("req_skill", [])
+	if req.size() == 2 and int(skills.get(str(req[0]), {}).get("lv", 0)) < int(req[1]):
+		return
+	var inst := str(jd.get("inst", ""))
+	var up := str(pr.get("rank", ""))
+	if seat_of(inst, up) != "":
+		return
+	var rows := seat_rows(inst)
+	var low: Array = rows.get(str(jd.get("rank", "")), [])
+	for i in low.size():
+		if str(low[i]) == "player":
+			low[i] = ""
+	rows[up][0] = "player"
+	me["rank"] = up
+	me["perf"] = 0
+	_note(str(SOCIETY_NOTES.promoted) % str(pr.get("name", up)))
+
+
+# 지금 자리의 봉급·호칭 — 승진한 자리면 promote 의 것
+func job_wage() -> int:
+	var jd: Dictionary = JOBS.get(str(me.get("job", "")), {})
+	var pr: Dictionary = jd.get("promote", {})
+	if not pr.is_empty() and str(me.get("rank", "")) == str(pr.get("rank", "")):
+		return int(pr.get("wage", jd.get("wage", CLERK_WAGE)))
+	return int(jd.get("wage", CLERK_WAGE))
+
+
+func job_calls(job: String) -> Dictionary:
+	var jd: Dictionary = JOBS.get(job, {})
+	var pr: Dictionary = jd.get("promote", {})
+	if not pr.is_empty() and str(me.get("rank", "")) == str(pr.get("rank", "")):
+		return pr.get("calls", jd.get("calls", {}))
+	return jd.get("calls", {})
 
 
 func _gen_name_taken(name: String) -> bool:
@@ -10358,7 +10524,8 @@ func _gen_name_taken(name: String) -> bool:
 func gen_save_rows() -> Dictionary:
 	var out := {}
 	for id in gen_npcs:
-		out[id] = {"here": bool(gen_npcs[id].get("here", false)), "since": int(gen_npcs[id].get("since", 0))}
+		out[id] = {"here": bool(gen_npcs[id].get("here", false)), "since": int(gen_npcs[id].get("since", 0)),
+			"reroll": int(gen_npcs[id].get("reroll", 0)), "away_until": int(gen_npcs[id].get("away_until", 0))}
 	return out
 
 
@@ -10382,6 +10549,8 @@ func gen_line(id: String) -> String:
 	var h := hour_now()
 	if constable_shift(id) >= 0:
 		pool = GEN_LINES.constable.duplicate()   # 순경은 제 뱅크뿐 — 성격 갈래도 시간 갈래도 없다
+	elif not staff_of(id).is_empty():
+		pool = GEN_LINES.staff.duplicate()
 	else:
 		for t in GEN_TRAITS:
 			if gen_trait(id, t) >= 1.2 and GEN_LINES.has(t):
@@ -11086,6 +11255,7 @@ func society_new_day(stats: Array, ko := false) -> void:
 	elif seat_job == "" and str(me.job) != "":
 		me.job = ""
 		me.rank = ""
+	_promotion_tick()   # 기관 직원·승진(S4h) — 자리가 옮겨지면 rank 도 따라간다
 	# ③ 계절 첫날 — 지난 계절 수입을 넘기고 지갑을 새로 시드한다
 	if day_in_season() == 1:
 		me.season_earned_prev = int(me.season_earned)
@@ -11201,6 +11371,7 @@ func society_new_day(stats: Array, ko := false) -> void:
 	# 갈뫼읍(S4d) — 주택가 이주(계절 첫날), 읍 사건과 그 길
 	ensure_gen_npcs()
 	_town_arrive_tick()
+	_transfer_tick()
 	_town_crime_tick()
 	_town_case_tick()
 	# 자치회(S3c) — 청년회장의 어젯밤: 세 군데를 다 돌았으면 보고를, 안 돌았으면 빠진 밤을 적는다

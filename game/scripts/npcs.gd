@@ -104,6 +104,11 @@ func _town_tile(npc_id: String, place: String) -> Vector2i:
 			if place == "chase" or place == "beat":
 				return m.TOWN_BEATS[(int(GameData.hour_now()) + int(g.get("shift", 0))) % m.TOWN_BEATS.size()]
 			return m.door_tile(m.TOWN_PLOTS["police"].anchor) + Vector2i(0, 1)
+		var st: Dictionary = GameData.staff_of(npc_id)
+		if not st.is_empty() and place == "work":
+			# 기관 직원(S4h) — 제 관청 문 옆(우두머리는 문 앞 한가운데에 선다)
+			var room := str(GameData.INSTITUTIONS[str(st.inst)].room)
+			return m.door_tile(m.TOWN_PLOTS[room].anchor) + Vector2i(-1 - int(st.slot), 1)
 		if place == "stall" and int(g.get("stall", -1)) >= 0:
 			return m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] + Vector2i(0, 1)
 		if int(g.get("home", -1)) >= 0:
@@ -262,7 +267,7 @@ func _sync_town_npcs() -> void:
 		if found:
 			continue
 		var spot: Vector2i = _town_tile(nid, "beat" if GameData.constable_shift(nid) >= 0
-			else ("stall" if GameData.gen_npcs.has(nid) else "work"))
+			else ("stall" if GameData.gen_npcs.has(nid) and GameData.staff_of(nid).is_empty() else "work"))
 		_spawn_npc(nid, spot, box)
 
 

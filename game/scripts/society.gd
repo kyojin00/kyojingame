@@ -634,7 +634,7 @@ func work_pick(i: int) -> void:
 	# 일급은 직업표대로(점원 80 · 서기 100 · 감시원 110). 여섯 주 밀린 세금이면 봉급이
 	# 멈춘다 — 근무는 인정되고(결근이 아니다) 몫만 적히지 않는다(헌법 §2.3 직위해제)
 	if not GameData.wage_frozen():
-		_me_add("wage_pending", int(job.get("wage", GameData.CLERK_WAGE)))
+		_me_add("wage_pending", GameData.job_wage())   # 승진한 자리면 그 자리의 봉급(S4h)
 	_log_work("work", inst, i)
 	GameData.aff_add(customer, 1)
 	# 정답은 없다 — 다만 주인과의 사이는 조금 오르내린다 (§7.3 「직장 정치」)
@@ -1442,7 +1442,7 @@ func patrol_report() -> void:
 	m.dialog.close()
 	var job := _job()
 	var night: bool = GameData.hour_now() >= 19.0
-	var wage := int(job.get("wage", GameData.CLERK_WAGE)) + (int(job.get("night_bonus", 0)) if night else 0)
+	var wage := GameData.job_wage() + (int(job.get("night_bonus", 0)) if night else 0)
 	_me_add("perf", 1)
 	if not GameData.wage_frozen():
 		_me_add("wage_pending", wage)
@@ -2324,7 +2324,7 @@ func _work_real_case(c: Dictionary) -> void:
 func _work_credit(inst: String, pick: int) -> void:
 	_me_add("perf", 1)
 	if not GameData.wage_frozen():
-		_me_add("wage_pending", int(_job().get("wage", GameData.CLERK_WAGE)))
+		_me_add("wage_pending", GameData.job_wage())
 	_log_work("work", inst, pick)
 	if _me_int("perf") % 5 == 0:
 		_rep_add(1)

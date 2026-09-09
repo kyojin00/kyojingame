@@ -7073,6 +7073,121 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_pr
 			GameData.minutes = keep_min_pr
 			_s2_restore(k_pr)
+		219:
+			# ---- 기관 직원·전근·승진(S4h) — 다섯 자리, 자리 정합, 4~8계절 전근, 두 계절 뒤 새 얼굴, 승진 네 조건 ----
+			var k_st := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_st := GameData.minutes
+			var keep_town_st: bool = GameData.town_open
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.cases = []
+			GameData.seats = {}
+			GameData.gen_npcs = {}
+			GameData.ensure_gen_npcs()
+			for gid_st in GameData.gen_npcs:
+				GameData.gen_npcs[gid_st]["here"] = str(GameData.gen_npcs[gid_st].get("role", "")) != "resident"
+				GameData.gen_npcs[gid_st]["since"] = 1
+			GameData._gen_seats_sync()
+			GameData.minutes = 10 * 60
+			m.story_cutscene = true
+			# ① 다섯 직원 — 「성 직함」, 제 자리에 앉아 있고 아랫자리(플레이어 몫)는 비어 있다
+			var staff_st := GameData.gen_here("staff")
+			var five_ok: bool = staff_st.size() == 5
+			var seat_ok := true
+			var senior_id := ""
+			for sid_st in staff_st:
+				var st_d: Dictionary = GameData.staff_of(sid_st)
+				var nm_st := str(GameData.npc_name(sid_st))
+				five_ok = five_ok and nm_st.ends_with(" " + str(st_d.title))
+				var rows_st: Dictionary = GameData.seat_rows(str(st_d.inst))
+				var arr_st: Array = rows_st.get(str(st_d.rank), [])
+				seat_ok = seat_ok and arr_st.size() > int(st_d.slot) and str(arr_st[int(st_d.slot)]) == sid_st
+				if str(st_d.inst) == "county":
+					senior_id = sid_st
+			seat_ok = seat_ok and GameData.seat_of("court", "judge") == "" and GameData.seat_of("county", "clerk") == "" \
+				and GameData.seat_of("county", "senior") == senior_id
+			m.npcmgr._sync_town_npcs()
+			var county_door: Vector2i = m.door_tile(m.TOWN_PLOTS["county"].anchor)
+			var work_st: Vector2i = m.npcmgr.npc_place_tile(senior_id, "work")
+			var place_ok: bool = _npc_node(senior_id) != null and (work_st - county_door).length() <= 3.0 \
+				and m.npcmgr.npc_place_now(senior_id) == "work" and GameData.npc_line(senior_id) != ""
+			# ② 전근 — 넉 계절 뒤부터 자리별 주기에 걸리는 계절 첫날. 자리가 비고 사람은 떠난다
+			var g_st: Dictionary = GameData.gen_npcs[senior_id]
+			var name0_st := str(g_st.name)
+			var gone_season := -1
+			var n_tr := ""
+			for sn_st in range(4, 14):
+				GameData.day = sn_st * 28 + 1
+				GameData.society_new_day([0, 0, 0])
+				n_tr = GameData.society_note()
+				if not bool(GameData.gen_npcs[senior_id].here):
+					gone_season = sn_st
+					break
+			var gone_ok: bool = gone_season >= 4 and gone_season <= 11 and n_tr.contains("전근") \
+				and GameData.seat_of("county", "senior") == "" \
+				and int(GameData.gen_npcs[senior_id].away_until) == gone_season + 2
+			# 두 계절 뒤 새 얼굴 — 같은 번호, 다른 굴림, 자리에 앉는다
+			GameData.day = (gone_season + 2) * 28 + 1
+			GameData.society_new_day([0, 0, 0])
+			var n_ar := GameData.society_note()
+			var back_ok: bool = bool(GameData.gen_npcs[senior_id].here) and n_ar.contains("빈자리") \
+				and GameData.seat_of("county", "senior") == senior_id \
+				and int(GameData.gen_npcs[senior_id].reroll) == int(g_st.reroll) + 1 \
+				and str(GameData.gen_npcs[senior_id].name).ends_with(" 주사")
+			# 저장 행 — 굴림 번호가 남아 다시 지어도 같은 사람이다
+			var rows_saved := GameData.gen_save_rows()
+			var keep_gen := GameData.gen_npcs
+			GameData.gen_npcs = {}
+			GameData.ensure_gen_npcs(rows_saved)
+			var load_ok: bool = str(GameData.gen_npcs[senior_id].name) == str(keep_gen[senior_id].name) \
+				and GameData.seat_of("county", "senior") == senior_id
+			# ③ 승진 — 서기로 앉아 근속 60일·민원 20·군수 호감 50. 주사 자리가 차 있으면 안 되고, 비면 된다
+			GameData.day += 3
+			var rows_c: Dictionary = GameData.seat_rows("county")
+			rows_c["clerk"][0] = "player"
+			GameData.me.job = "county_clerk"
+			GameData.me.rank = "clerk"
+			GameData.me.job_since_day = GameData.day - 60
+			GameData.me.perf = 20
+			GameData.aff_set("mayor_kang", 50)
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var blocked_ok: bool = str(GameData.me.rank) == "clerk" and GameData.job_wage() == 120
+			# 주사가 전근 갔다(자리 비움, 돌아오지 않게)
+			GameData.gen_npcs[senior_id]["here"] = false
+			GameData.gen_npcs[senior_id]["away_until"] = 999
+			GameData._gen_seats_sync()
+			GameData.aff_set("mayor_kang", 49)
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var aff_block: bool = str(GameData.me.rank) == "clerk"
+			GameData.aff_set("mayor_kang", 50)
+			GameData.day += 1
+			GameData.society_new_day([0, 0, 0])
+			var n_pm := GameData.society_note()
+			var promo_ok: bool = str(GameData.me.rank) == "senior" and GameData.seat_of("county", "senior") == "player" \
+				and str(rows_c["clerk"][0]) == "" and n_pm.contains("군청 주사") and GameData.job_wage() == 180 \
+				and str(GameData.me.job) == "county_clerk" \
+				and str(GameData.player_title("mayor_kang").text).contains("주사")
+			# 다음 아침에도 자리가 진실 — rank 가 그대로다
+			GameData.day += 1
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var stay_ok: bool = str(GameData.me.rank) == "senior" and str(GameData.me.job) == "county_clerk"
+			print("STAFF_OK=", five_ok and seat_ok and place_ok and gone_ok and back_ok and load_ok and blocked_ok
+				and aff_block and promo_ok and stay_ok,
+				" 다섯=", five_ok, " 자리=", seat_ok, "(", senior_id, " ", name0_st, ")", " 근무자리=", place_ok,
+				" 전근=", gone_ok, "(", gone_season, ")", " 새얼굴=", back_ok, "(", GameData.gen_npcs[senior_id].name, ")",
+				" 저장=", load_ok, " 자리참=", blocked_ok, " 호감막힘=", aff_block, " 승진=", promo_ok, " 유지=", stay_ok)
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.town_open = keep_town_st
+			GameData.minutes = keep_min_st
+			_s2_restore(k_st)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
