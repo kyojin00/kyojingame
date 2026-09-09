@@ -116,8 +116,13 @@ func _wage_lines(job: Dictionary) -> Dictionary:
 	return w if w is Dictionary else {}
 
 
-func _rep_add(d: int) -> void:
-	GameData.rep_add(d)
+func _rep_add(d: int, region := "kyojin") -> void:
+	GameData.rep_add(d, region)
+
+
+# 지금 서 있는 땅 — 읍 안이면 "town", 아니면 "kyojin"(고장도 교진의 법이다)
+func region_here() -> String:
+	return "town" if m.TOWN_RECT.grow(4).has_point(m.player_tile()) else "kyojin"
 
 
 func _me_int(key: String, d := 0) -> int:
@@ -140,7 +145,10 @@ func _roll(roll: float) -> float:
 # 목격자 한 사람이 이장에게 가는가 — 나를 좋아할수록 덜 간다 (하한 25%)
 func _tells(wid: String) -> bool:
 	var r: float = force_report if force_report >= 0.0 else randf()
-	return r < 0.4 * maxf(0.25, 1.0 - float(GameData.aff(wid)) / 200.0)
+	# 읍은 본 사람이 곧 신고다(0.8, 헌법 §6.2) — 생성 NPC 는 제 snitch 만큼 더·덜
+	var base := 0.8 if region_here() == "town" else 0.4
+	var snitch := GameData.gen_trait(wid, "snitch") if GameData.gen_npcs.has(wid) else 1.0
+	return r < base * snitch * maxf(0.25, 1.0 - float(GameData.aff(wid)) / 200.0)
 
 
 # 근무 일지 — 상한을 넘으면 가장 오래된 근무·독서를 지운다. 「보이는 것」을 봤다는
@@ -824,7 +832,7 @@ func _remember(kind: String, target: String, witnesses: Array, value: int,
 		reported: bool, heat := 1) -> void:
 	var mems: Array = GameData.me.get("memories", [])
 	mems.append({
-		"day": GameData.day, "kind": kind, "heat": heat, "region": "kyojin",
+		"day": GameData.day, "kind": kind, "heat": heat, "region": region_here(),
 		"witnesses": witnesses.duplicate(), "forgiven": false, "target": target,
 		"value": value, "reported_day": GameData.day if reported else 0, "settled": "",
 	})
@@ -838,6 +846,8 @@ func _remember(kind: String, target: String, witnesses: Array, value: int,
 # 신고됐는데 아직 매듭짓지 않은 기억 중 가장 오래된 것
 func _pending_mem() -> Dictionary:
 	for mem: Dictionary in GameData.me.get("memories", []):
+		if str(mem.get("region", "")) == "town":
+			continue   # 읍 일은 경찰서로 간다(S4f)
 		if int(mem.get("reported_day", 0)) > 0 and str(mem.get("settled", "")) == "":
 			return mem
 	return {}
@@ -1269,23 +1279,37 @@ func _officer_node() -> Node2D:
 	return null
 
 
-# 박 순경이 내 곁에 2초 — 체포. 실내·가게 안·연출 중에는 잡지 않는다(문 앞에서 기다린다)
+# 지금 나를 쫓는 순경들 — 박 순경(교진 수배, 또는 heat 3 의 읍 수배)과 읍 순경 셋(읍 수배)
+func _cops_after_me() -> Array:
+	var out: Array = []
+	if not GameData.wanted_active():
+		return out
+	for n in m.npcs:
+		if n.visible and not n.scripted and GameData.society_place(str(n.id)) == "chase":
+			out.append(n)
+	return out
+
+
+# 순경이 내 곁에 2초 — 체포. 실내·가게 안·연출 중에는 잡지 않는다(문 앞에서 기다린다)
 func _arrest_tick(delta: float) -> void:
-	if not GameData.wanted_active() or m.ui_open() or not GameData.police_open():
+	if not GameData.wanted_active() or m.ui_open():
 		_arrest_t = 0.0
 		return
-	var cop := _officer_node()
-	if cop == null or not cop.visible:
+	var near: Node2D = null
+	for cop in _cops_after_me():
+		if (cop.position - m.player.position).length() <= GameData.ARREST_TILES * float(m.TILE):
+			near = cop
+			break
+	if near == null:
 		_arrest_t = 0.0
 		return
-	var d: float = (cop.position - m.player.position).length()
-	if d <= GameData.ARREST_TILES * float(m.TILE):
-		_arrest_t += delta
-		if _arrest_t >= GameData.ARREST_SECONDS:
-			_arrest_t = 0.0
+	_arrest_t += delta
+	if _arrest_t >= GameData.ARREST_SECONDS:
+		_arrest_t = 0.0
+		if GameData.town_wanted_active():
+			arrest_town(str(near.id), false)
+		else:
 			arrest(false)
-	else:
-		_arrest_t = 0.0
 
 
 # 체포(surrender=false) 또는 자수(true) — 즉결: 벌금이거나 사흘 봉사
@@ -1605,26 +1629,55 @@ func burglary(nid: String, roll := -1.0) -> void:
 
 # 피고석 — 재판일에 회관에서. 판사가 열고, 검사가 읽고, 내가 답한다
 func open_trial() -> void:
-	if Net.is_guest() or not GameData.charged_active() or not GameData.is_court_day():
+	if Net.is_guest() or not GameData.charged_active() or not GameData.is_court_day() \
+			or str(GameData.me.charged.get("court", "")) == "town":
 		return
+	_trial_open()
+
+
+# 법정의 문장 — 읍 법원(court_town)에 있는 키는 그것을, 없으면 순회 재판의 것을
+func _cl(key: String) -> String:
+	var ch: Dictionary = GameData.me.get("charged", {})
+	if str(ch.get("court", "")) == "town":
+		var ct := _lines("court_town")
+		if ct.has(key):
+			return str(ct[key])
+	return str(_lines("court").get(key, ""))
+
+
+func _bench() -> String:
+	return "judge_suh" if str(GameData.me.get("charged", {}).get("court", "")) == "town" else "judge_yoon"
+
+
+func _bar() -> String:
+	return "pros_min" if str(GameData.me.get("charged", {}).get("court", "")) == "town" else "prosecutor_han"
+
+
+func _trial_open() -> void:
 	m.dialog.close()
 	var cl := _lines("court")
 	var ch: Dictionary = GameData.me.charged
-	var pros := _npc_name("prosecutor_han")
+	var pros := _npc_name(_bar())
+	var kind := str(ch.get("kind", "burglary"))
+	var charge: String = str(Dictionary(cl.get("charge_kind", {})).get(kind, cl.charge))
 	var pages: Array = [
-		{"text": str(cl.open)},
-		{"text": str(cl.charge) % [_npc_name(str(ch.get("target", ""))), int(ch.get("seen", 1))],
-			"name": pros, "portrait": _portrait("prosecutor_han")},
+		{"text": _cl("open")},
+		{"text": charge % [_npc_name(str(ch.get("target", ""))), int(ch.get("seen", 1))],
+			"name": pros, "portrait": _portrait(_bar())},
 	]
 	if int(ch.get("skips", 0)) > 0:
 		pages.append({"text": str(cl.charge_skips) % int(ch.get("skips", 0)),
-			"name": pros, "portrait": _portrait("prosecutor_han")})
+			"name": pros, "portrait": _portrait(_bar())})
+	if bool(ch.get("bribe", false)):
+		pages.append({"text": str(cl.charge_bribe), "name": pros, "portrait": _portrait(_bar())})
+	if bool(ch.get("surrender", false)):
+		pages.append({"text": str(cl.charge_surrender), "name": pros, "portrait": _portrait(_bar())})
 	pages.append({"text": str(cl.ask), "choices": [
 		[str(cl.admit_choice), trial_pick.bind("admit")],
 		[str(cl.deny_choice), trial_pick.bind("deny")],
 		[str(cl.plea_choice), trial_pick.bind("plea")],
 	]})
-	m.dialog.open_seq(_npc_name("judge_yoon"), _portrait("judge_yoon"), pages)
+	m.dialog.open_seq(_npc_name(_bench()), _portrait(_bench()), pages)
 
 
 # 판결 — 단계 = heat + 거른 재판 + 전과 − (평판 40) − (인정) − (사정, 평판 20) + (부인, 본 사람 있음).
@@ -1635,9 +1688,13 @@ func trial_pick(kind: String) -> void:
 	m.dialog.close()
 	var cl := _lines("court")
 	var ch: Dictionary = GameData.me.charged
-	var pros := _npc_name("prosecutor_han")
-	var rep := int(GameData.me.reputation.kyojin)
-	var tier: int = int(ch.get("heat", 2)) + int(ch.get("skips", 0))
+	var pros := _npc_name(_bar())
+	var town := str(ch.get("court", "")) == "town"
+	var region := "town" if town else "kyojin"
+	var rep := int(GameData.me.reputation.get(region, 0))
+	# 단계 = heat + 거른 재판 + 뇌물 − 자수(형 절반) + 전과 − 평판 40 …
+	var tier: int = int(ch.get("heat", 2)) + int(ch.get("skips", 0)) \
+		+ (1 if bool(ch.get("bribe", false)) else 0) - (1 if bool(ch.get("surrender", false)) else 0)
 	var pages: Array = []
 	if GameData.record_unexpunged():
 		tier += 1
@@ -1656,7 +1713,7 @@ func trial_pick(kind: String) -> void:
 			else:
 				tier += 1
 				pages.append({"text": str(cl.deny_strong) % int(ch.get("seen", 1)),
-					"name": pros, "portrait": _portrait("prosecutor_han")})
+					"name": pros, "portrait": _portrait(_bar())})
 		"plea":
 			if rep >= 20:
 				tier -= 1
@@ -1680,48 +1737,57 @@ func trial_pick(kind: String) -> void:
 		tier = clampi(tier, 1, 3)
 		var value: int = maxi(int(ch.get("value", 0)), 20)
 		var fine := 0
-		var rec := {"day": GameData.day, "crime": str(ch.get("kind", "burglary")), "court": "circuit",
+		var rec := {"day": GameData.day, "crime": str(ch.get("kind", "burglary")), "court": region if town else "circuit",
 			"verdict": "fine", "sentence": 0, "served": 0, "served_day": 0, "expunged": false}
 		match tier:
 			1:
 				fine = maxi(GameData.FINE_MIN, value * GameData.FINE_MULT)
-				pages.append({"text": str(cl.verdict_fine) % fine})
+				pages.append({"text": _cl("verdict_fine") % fine})
 			2:
 				fine = maxi(GameData.FINE_MIN * 2, value * 5)
 				rec.verdict = "service"
 				rec.sentence = 7
-				pages.append({"text": str(cl.verdict_service) % [fine, GameData.days_kor(7)]})
+				pages.append({"text": _cl("verdict_service") % [fine, GameData.days_kor(7)]})
 			_:
 				jail = true
 				rec.verdict = "jail"
 				rec.sentence = GameData.JAIL_DAYS
 				rec.served = GameData.JAIL_DAYS
 				rec.served_day = GameData.day + GameData.JAIL_DAYS
-				pages.append({"text": str(cl.verdict_jail)})
+				pages.append({"text": _cl("verdict_jail")})
 		if fine > 0:
-			_fine_bill(fine)
+			_fine_bill(fine, region)
 		var recs: Array = GameData.me.get("record", [])
 		recs.append(rec)
 		GameData.me["record"] = recs
 		if not mem.is_empty():
 			mem["settled"] = "convicted"
 			mem["forgiven"] = true
-		_rep_add(-15)
+		_rep_add(-15, region)
 		GameData.bold_add(-5.0)
+	# 읍 법원(S4f)이면 사건 장부도 닫는다 — 판사·검사의 책상에서 사라진다
+	if town:
+		for c in GameData.cases:
+			if c is Dictionary and int(c.get("id", -1)) == int(ch.get("case_id", -2)):
+				c["stage"] = "closed"
+				c["closed_by"] = "acquitted" if acquit else "court"
+		if not acquit:
+			GameData._note(str(GameData.SOCIETY_NOTES.town_convicted))
 	GameData.me["charged"] = {}
 	if jail:
-		pages[-1]["choices"] = [[str(cl.follow), serve_jail.bind(GameData.JAIL_DAYS)]]
+		pages[-1]["choices"] = [[_cl("follow"), serve_jail.bind(GameData.JAIL_DAYS, region)]]
 	else:
 		pages[-1]["choices"] = [[str(cl.leave), null]]
-	m.dialog.open_seq(_npc_name("judge_yoon"), _portrait("judge_yoon"), pages)
+	m.dialog.open_seq(_npc_name(_bench()), _portrait(_bench()), pages)
 	m.saveio.save_now()
 
 
 # 벌금은 고지서다 — 돈은 창구 앞 E 로만(헌법 §0.3). 세금과 같은 목록·같은 체납 사다리
-func _fine_bill(fine: int) -> void:
+func _fine_bill(fine: int, region := "kyojin") -> void:
 	var bills: Array = GameData.me.get("tax_bills", [])
 	bills.append({"season": GameData.season_no(), "day": GameData.day, "income": 0, "property": 0,
-		"total": fine, "paid": 0, "due_day": GameData.day + GameData.TAX_DUE_DAYS - 1, "kind": "fine"})
+		"total": fine, "paid": 0, "due_day": GameData.day + GameData.TAX_DUE_DAYS - 1, "kind": "fine",
+		"region": region})
 	while bills.size() > GameData.TAX_BILLS_MAX:
 		bills.pop_front()
 	GameData.me["tax_bills"] = bills
@@ -1729,16 +1795,19 @@ func _fine_bill(fine: int) -> void:
 
 # 구류 — 하루 넘김을 days 번. 밭은 마르고, 결근은 쌓이고(이레면 자리를 잃는다), 고지서 기한은
 # 그만큼 미뤄진다(복역 중 체납 정지). 이레 뒤 파출소 문 앞에서 깬다. 마지막 아침 결산이 남는다
-func serve_jail(days: int) -> void:
+func serve_jail(days: int, region := "kyojin", kind := "jail") -> void:
 	if Net.is_guest():
 		return
 	m.dialog.close()
 	if m.shop_room.visible:
 		m.shop_room.close()
-	GameData.jail_begin(days)
+	GameData.jail_begin(days, kind)
 	for i in days:
 		m.daycycle._next_day(false)
-	if GameData.village_built.has("inn"):
+	if region == "town":
+		var tt: Vector2i = m.door_tile(m.TOWN_PLOTS["police"].anchor) + Vector2i(0, 1)
+		m.player.position = Vector2(tt.x * m.TILE + 16, tt.y * m.TILE + 16)
+	elif GameData.village_built.has("inn"):
 		var t: Vector2i = m.door_tile(m.VILLAGE_PLOTS["inn"].anchor) + Vector2i(0, 1)
 		m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
 	m.saveio.save_now()
@@ -2373,3 +2442,128 @@ func town_repay(amount: int) -> void:
 	m.dialog.open(_npc_name("manager_baek"), "받았네. %dG 이 줄었어. 장부는 거짓말을 안 하네." % paid,
 		[["대화 끝", null]], _portrait("manager_baek"))
 	m.saveio.save_now()
+
+
+# ---- 읍 순경·유치·뇌물 (S4f, 헌법 §6.3) ----
+#
+# 읍의 신고는 회의가 아니라 곧장 경찰서다. 아침에 수배가 걸리면 순경 셋이 여섯 시부터 정류장·관청
+# 거리·장터에서 협공한다(읍 밖으로는 안 나온다 — 정류장을 막는 게 그들의 일이다). 곁에 2초면 체포:
+# 순순히 가면 유치 사흘 → 검찰 → 읍 법원, 돈을 내밀면(대범함 40, 500G) 순경의 snitch 만큼 굴린다.
+# 실패한 뇌물은 같은 사건에 얹혀 가중된다. 자수는 경찰서 창구에서 — 형이 한 단계 가볍다.
+
+func _pl(key: String) -> String:
+	return str(_lines("police_town").get(key, ""))
+
+
+func arrest_town(cop: String, surrender: bool) -> void:
+	if Net.is_guest() or not GameData.town_wanted_active():
+		return
+	m.dialog.close()
+	var w: Dictionary = GameData.me.wanted
+	if surrender:
+		m.dialog.open(_npc_name("chief_ha"), _pl("surrender"),
+			[[_pl("surrender_choice"), town_detain.bind(true)]], _portrait("chief_ha"))
+		return
+	var text := _pl("caught").format({"victim": _npc_name(str(w.get("target", "")))})
+	var choices: Array = [[_pl("follow_choice"), town_detain.bind(false)]]
+	# 뇌물 — 문턱 아래면 선택지 자체가 없다(헌법 §5.2 「선택지 없음」)
+	if _me_int("boldness_base", -1) >= 0 and GameData.boldness() >= int(GameData.GATE.get("bribe", 40)):
+		if GameData.money >= GameData.BRIBE_COST:
+			choices.append([_pl("bribe_choice") % GameData.BRIBE_COST, bribe.bind(cop)])
+		else:
+			choices.append(gray(_pl("bribe_choice") % GameData.BRIBE_COST, "그만한 돈이 없다."))
+	m.dialog.open(_npc_name(cop), text, choices, _portrait(cop))
+
+
+# 뇌물 — 성공 0.3 × (2 − snitch) / 1.5. 성공: 수배 끝, 기억은 「덮였다」. 실패: 돈은 압수(읍 예산),
+# 같은 사건에 뇌물이 얹히고(heat +2) 유치로 간다
+func bribe(cop: String, roll := -1.0) -> void:
+	if Net.is_guest() or not GameData.town_wanted_active() or GameData.money < GameData.BRIBE_COST:
+		return
+	m.dialog.close()
+	GameData.money -= GameData.BRIBE_COST
+	GameData.today_spent += GameData.BRIBE_COST
+	var w: Dictionary = GameData.me.wanted
+	var p: float = GameData.BRIBE_P * (2.0 - GameData.gen_trait(cop, "snitch")) / 1.5
+	if _roll(roll) < p:
+		GameData._settle_mem(int(w.get("day", 0)), str(w.get("target", "")), "bribed")
+		GameData.me["wanted"] = {}
+		GameData.bold_add(3.0)
+		GameData.aff_add(cop, 5)
+		m.dialog.open(_npc_name(cop), _pl("bribe_ok"), [["자리를 뜬다", null]], _portrait(cop))
+		m.saveio.save_now()
+		return
+	GameData.gov_budget["town"] = int(GameData.gov_budget.get("town", 0)) + GameData.BRIBE_COST
+	w["bribe"] = true
+	w["heat"] = int(w.get("heat", 1)) + 2
+	_remember("bribe", cop, [cop], GameData.BRIBE_COST, true, 2)
+	GameData.me.memories[-1]["settled"] = "charged"
+	GameData.bold_add(-3.0)
+	m.dialog.open(_npc_name(cop), _pl("bribe_fail"),
+		[[_pl("follow_choice"), town_detain.bind(false)]], _portrait(cop))
+
+
+# 유치 사흘 — 하루 넘김 셋(밭은 마른다), 경찰서 문 앞에서 깬다. 서류는 사건 장부로: 검찰이 다음날 본다
+func town_detain(surrender: bool) -> void:
+	if Net.is_guest() or not GameData.town_wanted_active():
+		return
+	_detain_book(surrender)
+	serve_jail(GameData.TOWN_DETAIN_DAYS, "town", "detain")
+	m.dialog.open("경찰서", _pl("detained"), [["나선다", null]])
+
+
+# 유치의 장부 몫 — 수배를 사건으로 옮긴다(하루 넘김은 serve_jail 의 몫이라 하네스는 이것만 부른다)
+func _detain_book(surrender: bool) -> void:
+	var w: Dictionary = GameData.me.wanted
+	GameData._settle_mem(int(w.get("day", 0)), str(w.get("target", "")), "charged")
+	GameData.case_seq += 1
+	GameData.cases.append({"id": GameData.case_seq, "crime": str(w.get("kind", "")), "day": int(w.get("day", 0)),
+		"suspect": "player", "victim": str(w.get("target", "")), "witness": "", "evidence": int(w.get("seen", 1)) + 1,
+		"stage": "charged", "closed_by": "", "deadline": GameData.day + GameData.CASE_TTL, "region": "town",
+		"heat": int(w.get("heat", 1)), "charged_day": GameData.day + GameData.TOWN_DETAIN_DAYS - 1, "indicted_day": 0,
+		"surrender": surrender, "bribe": bool(w.get("bribe", false)), "skips": 0,
+		"seen": int(w.get("seen", 1)), "others": int(w.get("others", 0)), "value": int(w.get("value", 0))})
+	while GameData.cases.size() > GameData.CASE_MAX:
+		GameData.cases.pop_front()
+	GameData.me["wanted"] = {}
+	_rep_add(-2 if surrender else -5, "town")
+
+
+# 경찰서 창구 — 수배 중이면 자수, 내 사건이 있으면 그 자리, 아니면 서장의 한마디
+func police_town_counter() -> bool:
+	if Net.is_guest():
+		return false
+	if GameData.town_wanted_active():
+		arrest_town("chief_ha", true)
+		return true
+	var c := GameData.town_my_case()
+	if c.is_empty():
+		return false
+	var key := "desk_indicted" if str(c.get("stage", "")) == "indicted" else "desk_charged"
+	m.dialog.open(_npc_name("chief_ha"), _pl(key), [["대화 끝", null]], _portrait("chief_ha"))
+	return true
+
+
+# 법원 창구 — 기소된 내가 서면 재판이 열린다(재판일을 기다리지 않는다: 읍 법원은 날마다 앉아 있다)
+func court_town_counter() -> bool:
+	if Net.is_guest():
+		return false
+	var c := GameData.town_my_case()
+	if c.is_empty():
+		return false
+	if str(c.get("stage", "")) != "indicted":
+		m.dialog.open(_npc_name("judge_suh"), _pl("court_wait"), [["대화 끝", null]], _portrait("judge_suh"))
+		return true
+	m.dialog.close()
+	open_town_trial(c)
+	return true
+
+
+func open_town_trial(c: Dictionary) -> void:
+	GameData.me["charged"] = {"day": int(c.get("day", 0)), "kind": str(c.get("crime", "")),
+		"target": str(c.get("victim", "")), "value": int(c.get("value", 0)), "others": int(c.get("others", 0)),
+		"seen": int(c.get("seen", 1)), "heat": int(c.get("heat", 1)), "court_day": GameData.day,
+		"skips": int(c.get("skips", 0)), "since": GameData.day, "court": "town", "case_id": int(c.get("id", 0)),
+		"surrender": bool(c.get("surrender", false)), "bribe": bool(c.get("bribe", false))}
+	_trial_open()
+

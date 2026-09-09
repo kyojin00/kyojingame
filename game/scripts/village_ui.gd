@@ -595,6 +595,11 @@ func _open_town_room_dialog() -> void:
 	if m.shop_room.room_id == "bank":
 		m.society.town_bank_menu()
 		return
+	# 읍 순경(S4f) — 경찰서 창구는 자수·내 서류, 법원 창구는 기소된 나의 피고석
+	if m.shop_room.room_id == "police" and m.society.police_town_counter():
+		return
+	if m.shop_room.room_id == "court" and m.society.court_town_counter():
+		return
 	if keeper != "" and GameData.NPCS.has(keeper):
 		# 우두머리의 한마디 — 채용·근무는 society.counter_menu 가 먼저 가로챈다(자격이 있을 때)
 		m.dialog.open(GameData.npc_name(keeper), GameData.npc_line(keeper), [["대화 끝", null]],

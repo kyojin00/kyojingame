@@ -97,6 +97,13 @@ func _town_tile(npc_id: String, place: String) -> Vector2i:
 		return m.TOWN_SQUARE
 	if GameData.gen_npcs.has(npc_id):
 		var g: Dictionary = GameData.gen_npcs[npc_id]
+		if str(g.get("role", "")) == "constable":
+			# 읍 순경(S4f) — 쫓을 땐 내 발밑(읍 안에 있을 때만), 교대면 시각+교대의 구역, 아니면 서 문 앞
+			if place == "chase" and m.TOWN_RECT.grow(4).has_point(m.player_tile()):
+				return m.player_tile()
+			if place == "chase" or place == "beat":
+				return m.TOWN_BEATS[(int(GameData.hour_now()) + int(g.get("shift", 0))) % m.TOWN_BEATS.size()]
+			return m.door_tile(m.TOWN_PLOTS["police"].anchor) + Vector2i(0, 1)
 		if place == "stall" and int(g.get("stall", -1)) >= 0:
 			return m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] + Vector2i(0, 1)
 		if int(g.get("home", -1)) >= 0:
@@ -229,6 +236,8 @@ func bake_gen_sprites() -> void:
 		if m.tex.has("npc_%s_down_0" % id):
 			continue
 		var pal: Array = GameData.GEN_PALETTES[int(GameData.gen_npcs[id].get("palette", 0)) % GameData.GEN_PALETTES.size()]
+		if str(GameData.gen_npcs[id].get("role", "")) == "constable":
+			pal = GameData.GEN_UNIFORM   # 제복은 하나다 — 얼굴이 아니라 옷으로 알아본다
 		for sfx: String in GEN_FRAMES:
 			var base: Texture2D = m.tex.get("npc_rancher_" + sfx)
 			if base == null:
@@ -252,7 +261,8 @@ func _sync_town_npcs() -> void:
 				break
 		if found:
 			continue
-		var spot: Vector2i = _town_tile(nid, "stall" if GameData.gen_npcs.has(nid) else "work")
+		var spot: Vector2i = _town_tile(nid, "beat" if GameData.constable_shift(nid) >= 0
+			else ("stall" if GameData.gen_npcs.has(nid) else "work"))
 		_spawn_npc(nid, spot, box)
 
 

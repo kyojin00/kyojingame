@@ -8952,6 +8952,35 @@ const SOCIETY_LINES := {
 		"docket_none": "오늘은 넘어온 사건이 없다. 마을이 조용했군.",
 		"docket_close": "이것으로 오늘 재판을 닫는다.",
 		"expunge_ok": "말소했네. 장부에서 지웠어. 마을도 곧 잊을 걸세.",
+		# 죄목별 공소 — 빈집 말고도 피고석에 서는 길이 생겼다(S4f)
+		"charge_kind": {
+			"pickpocket": "피고는 %s의 주머니를 털었습니다. 본 사람이 %d명입니다.",
+			"shelf": "피고는 %s의 가게 선반에서 물건을 훔쳤습니다. 본 사람이 %d명입니다.",
+		},
+		"charge_surrender": "자수한 피고입니다. 참작을 구합니다.",
+		"charge_bribe": "피고는 순경에게 돈을 내밀었습니다. 가중을 구합니다.",
+	},
+	# 읍 법원(S4f) — 순회 재판과 같은 자리, 다른 문장. 없는 키는 court 의 것을 쓴다
+	"court_town": {
+		"open": "갈뫼읍 법원, 개정한다. 피고는 앞으로.",
+		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 면사무소에 내게.",
+		"verdict_service": "벌금 %dG 에 봉사 %s. 교진 회관에서 채우게.",
+		"verdict_jail": "구류 이레. 순경이 데려간다.",
+		"follow": "순경을 따라간다",
+	},
+	# 읍 순경(S4f) — 협공·체포·뇌물·자수·유치. {victim} 은 피해자 이름
+	"police_town": {
+		"caught": "거기 서. {victim} 일로 찾고 있었다. 경찰서로 가지.",
+		"follow_choice": "순순히 따라간다",
+		"bribe_choice": "돈을 내민다 — %dG",
+		"bribe_ok": "…돈이 사라졌다. 오늘은 못 본 걸로 하지. 다음엔 없다.",
+		"bribe_fail": "뇌물이냐. 돈은 압수다. 그것도 같이 적겠다.",
+		"surrender": "제 발로 왔군. 유치는 사흘. 형은 절반으로 쓰겠다.",
+		"surrender_choice": "따라간다",
+		"desk_charged": "네 서류는 검찰청에 가 있다. 곧 부를 거다.",
+		"desk_indicted": "법원이 너를 부른다. 법원 창구에 서라.",
+		"detained": "사흘 뒤 경찰서 문이 열렸다. 서류는 검찰청으로 갔다.",
+		"court_wait": "순경이 넘긴 서류를 검찰이 보고 있다. 아직 부르지 않는다.",
 	},
 	# 장물아비(S4c) — 여관 뒷방 구씨. 훔친 것만 반값에 산다
 	"fence": {
@@ -9123,6 +9152,14 @@ const SOCIETY_NOTES := {
 	"town_debt2": "읍 빚이 이만 냥을 넘었다. 밤 순찰이 줄었다 — 도둑이 잦아진다.",
 	"town_debt3": "읍 빚이 삼만 냥을 넘었다. 순경 자리가 비고 주택가 이주가 멈췄다.",
 	"town_debt0": "읍이 빚을 다 갚았다. 군수가 다시 사업을 본다.",
+	# ---- 읍 순경(S4f) ----
+	"town_wanted": "읍 순경들이 나를 찾는다. %s 일을 본 사람이 있었다.",
+	"town_wanted_daily": "읍 순경 셋이 정류장·관청 거리·장터에 서 있다. 나를 찾는 눈이다.",
+	"town_forgot": "이레가 지났다. 읍 순경들이 나를 잊었다.",
+	"detain_out": "사흘 만에 경찰서를 나왔다. 서류는 검찰청에 가 있다.",
+	"town_indicted": "검찰청이 나를 기소했다. 읍 법원이 부른다 — 법원 창구에 서면 열린다.",
+	"town_skipped": "읍 법원에 서지 않았다. 거른 재판은 가중된다.",
+	"town_convicted": "읍 법원이 나에게 형을 내렸다. 읍이 그 얼굴을 기억할 것이다.",
 	# ---- 자치회(S3c) ----
 	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
 	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
@@ -9153,7 +9190,7 @@ const ABSENT_FIRE := 7        # 이레 결근 — 해고(평판 −8)
 const MEMORY_MAX := 60        # memories 상한(오래된 것부터)
 const WORK_LOG_MAX := 12      # work_log 상한 — 「오늘/어제」만 보면 되므로 짧다
 const SEEN_DAYS := [28, 56, 84]   # heat 1/2/3+ 기억이 살아 있는 날수(헌법 §4.2 seen)
-const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45, "burglary": 35}   # boldness() 문턱(헌법 §5.2)
+const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45, "burglary": 35, "bribe": 40}   # boldness() 문턱(헌법 §5.2)
 const SERVICE_LAST_HOUR := 17.0   # 봉사는 17시 전에만 — 시계를 되감지 않으려고(D14)
 
 # ---- 세금·예산(S2a, 헌법 §2) ----
@@ -9194,8 +9231,17 @@ const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 �
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
 const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
 # ---- 생성 NPC · 읍 사건(S4d, 헌법 §8.3·§6.7) ----
-const GEN_COUNT := 15               # 장터 상인 7 + 주택가 주민 8
+const GEN_COUNT := 18               # 장터 상인 7 + 주택가 주민 8 + 읍 순경 3(S4f)
 const GEN_MERCHANTS := 7
+const GEN_HOMES := 8
+const GEN_CONSTABLES := 3           # 읍 순경 — 6~24시 세 교대, 수배 중엔 셋이 협공한다
+const GEN_UNIFORM := [Color(0.22, 0.26, 0.42), Color(0.12, 0.1, 0.1)]   # 순경 제복(감색)·머리
+# ---- 읍 수배·유치(S4f, 헌법 §6.3) ----
+const TOWN_WANTED_DAYS := 7         # 읍 순경이 나를 쫓는 날수 — 지나면 잊는다
+const TOWN_DETAIN_DAYS := 3         # 경찰서 유치 — 그 뒤 서류가 검찰청으로 간다
+const TOWN_TRIAL_DAYS := 3          # 기소 뒤 이만큼 법원에 안 서면 거른 것(가중)
+const BRIBE_COST := 500
+const BRIBE_P := 0.3                # 뇌물 성공 = 0.3 × (2 − 순경 snitch) / 1.5
 const GEN_ARRIVE_PER_SEASON := 2    # 계절 첫날 주택가에 오는 수(빈 집이 있을 때)
 const GEN_SURNAMES := ["김", "이", "박", "최", "정", "강", "조", "윤", "장", "임", "한", "오"]
 const GEN_SYL_M := ["한", "율", "찬", "결", "온", "솔", "재", "도", "빈", "우", "산", "겸"]
@@ -9235,6 +9281,15 @@ const GEN_LINES := {
 	"night": ["밤이 좋아요. 읍이 조용해지거든요.", "열 시 넘어 장터에 서 있는 건 저뿐이에요."],
 	"morning": ["아침 국 드셨어요? 식당이 열었어요."],
 	"night_hour": ["이 시간엔 다들 여관 쪽이에요."],
+	# 읍 순경(S4f) — 성격 갈래 없이 이 뱅크만. 교대마다 얼굴이 바뀐다
+	"constable": [
+		"순찰 중이오. 볼일 없으면 지나가시오.",
+		"밤엔 장터 쪽이 어둡소. 등불 밑으로 다니시오.",
+		"교진 박 순경이 내 선배요. 자주 오가지.",
+		"서장님은 아침마다 일지를 읽소. 빠지면 안 되오.",
+		"정류장·관청 거리·장터. 셋을 도는 게 하루요.",
+		"읍은 본 사람만 아오. 그래서 우리가 서 있는 거요.",
+	],
 }
 const TOWN_CRIME_PERIOD := 3        # 읍 사건 주기(일) — 상인이 셋은 있어야 생긴다
 const TOWN_CATCH_DAYS := 2          # 신고 이틀 뒤 읍 순경이 잡는다
@@ -9384,7 +9439,7 @@ func fresh_me() -> Dictionary:
 		"boldness_base": -1, "boldness_state": 0.0, "bold_days_up": 0, "bold_days_quiet": 0,
 		# 범죄·구속
 		"theft_xp": 0.0, "night_out_min": 0.0, "stolen": {}, "wanted": {}, "night_out_day": 0,
-		"jail_days_left": 0, "sentence": {}, "home_region": "kyojin",
+		"jail_days_left": 0, "sentence": {}, "home_region": "kyojin", "jail_kind": "",
 		# 순회 재판(S2c) — 걸린 기소 하나(재판일까지 자택 대기), 출소한 날(호칭 jailed 이레)
 		"charged": {}, "jail_out_day": -99,
 		# 순경(S2b) — 오늘 순찰의 진행과 검거 실적, 사건마다 물어본 사람
@@ -9546,11 +9601,11 @@ func aff(id: String) -> int:
 
 # 호감도 쓰기는 전부 여기로 — 모르는 id 는 조용히 지나가고 0..100 을 넘지 않는다.
 # 교진 평판 — 모든 오르내림은 이 한 줄을 지난다(society.gd 의 _rep_add 도 여기로 온다)
-func rep_add(d: int) -> void:
+func rep_add(d: int, region := "kyojin") -> void:
 	var rep: Variant = me.get("reputation", {})
 	if not (rep is Dictionary):
 		rep = {"kyojin": 0, "town": 0}
-	rep["kyojin"] = int(rep.get("kyojin", 0)) + d
+	rep[region] = int(rep.get(region, 0)) + d
 	me["reputation"] = rep
 
 
@@ -9810,6 +9865,8 @@ func council_pending() -> bool:
 	for mem in me.get("memories", []):
 		if not (mem is Dictionary):
 			continue
+		if str(mem.get("region", "")) == "town":
+			continue   # 읍 일은 이장이 아니라 경찰서가 맡는다(S4f)
 		var rd := int(mem.get("reported_day", 0))
 		if rd > 0 and rd < day and str(mem.get("settled", "")) == "":
 			return true
@@ -9936,11 +9993,16 @@ func pay_tax() -> int:
 		return 0
 	money -= due
 	today_spent += due
+	var town_part := 0   # 읍 법원 벌금(S4f)은 읍 예산으로 — 창구는 하나라도 돈은 제 장부로
 	for b in unpaid_bills():
+		if str(b.get("region", "kyojin")) == "town":
+			town_part += int(b.get("total", 0)) - int(b.get("paid", 0))
 		b["paid"] = int(b.get("total", 0))
 	me["tax_paid_season"] = season_no()
 	me["arrears"] = {"amount": 0, "weeks": 0}
-	gov_budget["kyojin"] = int(gov_budget.get("kyojin", 0)) + due
+	gov_budget["kyojin"] = int(gov_budget.get("kyojin", 0)) + due - town_part
+	if town_part > 0:
+		gov_budget["town"] = int(gov_budget.get("town", 0)) + town_part
 	gov_tax_season += due
 	items["tax_receipt"] = int(items.get("tax_receipt", 0)) + 1
 	aff_add("chief", 2)
@@ -10236,7 +10298,9 @@ func gen_make(idx: int, reroll := 0) -> Dictionary:
 			loves.append(pick)
 		else:
 			likes.append(pick)
-	var role := "merchant" if idx <= GEN_MERCHANTS else "resident"
+	var role := "merchant" if idx <= GEN_MERCHANTS else ("resident" if idx <= GEN_MERCHANTS + GEN_HOMES else "constable")
+	if role == "constable":
+		name = "%s 순경" % GEN_SURNAMES[gen_hash(idx, "sur%d" % reroll) % GEN_SURNAMES.size()]   # 읍 사람은 직함 앞에 성 하나
 	return {
 		"id": id, "idx": idx, "name": name, "gender": "f" if female else "m", "romance": false,
 		"palette": gen_hash(idx, "pal") % GEN_PALETTES.size(), "traits": traits,
@@ -10244,7 +10308,8 @@ func gen_make(idx: int, reroll := 0) -> Dictionary:
 		"greed": traits["greed"], "role": role,
 		"stall": (idx - 1) if role == "merchant" else -1, "kind": GEN_STALL_KINDS[(idx - 1) % GEN_STALL_KINDS.size()],
 		"home": (idx - GEN_MERCHANTS - 1) if role == "resident" else -1,
-		"here": role == "merchant", "since": 0, "lines": [],
+		"shift": (idx - GEN_MERCHANTS - GEN_HOMES - 1) if role == "constable" else -1,
+		"here": role != "resident", "since": 0, "lines": [],
 	}
 
 
@@ -10301,14 +10366,17 @@ func gen_trait(id: String, t: String) -> float:
 # 성격이 고른 대사 — 1.2 를 넘는 갈래가 붙는다. 하루 안에서는 같은 줄(날짜·번호 해시)
 func gen_line(id: String) -> String:
 	var pool: Array = GEN_LINES.common.duplicate()
-	for t in GEN_TRAITS:
-		if gen_trait(id, t) >= 1.2 and GEN_LINES.has(t):
-			pool += GEN_LINES[t]
 	var h := hour_now()
-	if h < 9.0:
-		pool += GEN_LINES.morning
-	elif h >= 19.0:
-		pool += GEN_LINES.night_hour
+	if constable_shift(id) >= 0:
+		pool = GEN_LINES.constable.duplicate()   # 순경은 제 뱅크뿐 — 성격 갈래도 시간 갈래도 없다
+	else:
+		for t in GEN_TRAITS:
+			if gen_trait(id, t) >= 1.2 and GEN_LINES.has(t):
+				pool += GEN_LINES[t]
+		if h < 9.0:
+			pool += GEN_LINES.morning
+		elif h >= 19.0:
+			pool += GEN_LINES.night_hour
 	var idx := int(gen_npcs.get(id, {}).get("idx", 0))
 	var line := str(pool[posmod(hash("%d|%d|%d" % [day, idx, int(h)]), pool.size())])
 	return line.format({"title": player_title(id).text, "name": player_name})
@@ -10319,7 +10387,7 @@ func _town_arrive_tick() -> void:
 	if day_in_season() != 1 or int(gov_budget.get("town", 0)) < 3000:
 		return
 	var came: Array = []
-	for i in range(GEN_MERCHANTS + 1, GEN_COUNT + 1):
+	for i in range(GEN_MERCHANTS + 1, GEN_MERCHANTS + GEN_HOMES + 1):
 		if came.size() >= town_arrive_per_season():
 			break
 		var g: Dictionary = gen_npcs.get("g%d" % i, {})
@@ -10334,7 +10402,7 @@ func _town_arrive_tick() -> void:
 
 # 읍 사건 — 사흘마다 한 건, 상인이 셋은 있을 때. 범인은 탐욕이 가장 큰 사람(열린 사건이 없는)
 func _town_crime_tick() -> void:
-	var here := gen_here()
+	var here := gen_here("merchant") + gen_here("resident")   # 순경은 훔치지도 털리지도 않는다
 	if here.size() < 3 or day % town_crime_period() != 0:
 		return
 	for c in cases:
@@ -10380,12 +10448,22 @@ func _town_case_tick() -> void:
 				c["evidence"] = int(c.get("evidence", 0)) + 1
 				_note(str(SOCIETY_NOTES.town_charged) % sname)
 		elif stage == "charged":
-			if str(me.get("job", "")) == "prosecutor" and day - int(c.get("charged_day", 0)) < TOWN_DESK_DAYS:
+			var mine := str(c.get("suspect", "")) == "player"   # 내 사건은 내 책상에 오르지 않는다(S4f)
+			if not mine and str(me.get("job", "")) == "prosecutor" and day - int(c.get("charged_day", 0)) < TOWN_DESK_DAYS:
 				_note(str(SOCIETY_NOTES.town_desk) % sname)
 				continue
 			if day > int(c.get("charged_day", 0)):
 				town_case_indict(c, "pros_min", int(c.get("evidence", 0)) >= NEED_EVIDENCE)
+				if mine and str(c.get("stage", "")) == "indicted":
+					_note(str(SOCIETY_NOTES.town_indicted))
 		elif stage == "indicted":
+			if str(c.get("suspect", "")) == "player":
+				# 피고석은 내가 서야 열린다 — 사흘을 넘기면 거른 재판(가중), 다시 사흘
+				if day - int(c.get("indicted_day", 0)) >= TOWN_TRIAL_DAYS:
+					c["skips"] = int(c.get("skips", 0)) + 1
+					c["indicted_day"] = day
+					_note(str(SOCIETY_NOTES.town_skipped))
+				continue
 			if str(me.get("job", "")) == "judge" and day - int(c.get("indicted_day", 0)) < TOWN_DESK_DAYS:
 				_note(str(SOCIETY_NOTES.town_bench) % sname)
 				continue
@@ -10427,9 +10505,96 @@ func town_case_for(job: String) -> Dictionary:
 	if want == "":
 		return {}
 	for c in cases:
-		if c is Dictionary and str(c.get("region", "")) == "town" and str(c.get("stage", "")) == want:
+		if c is Dictionary and str(c.get("region", "")) == "town" and str(c.get("stage", "")) == want \
+				and str(c.get("suspect", "")) != "player":
 			return c
 	return {}
+
+
+# 나를 피고로 둔 읍 사건 — 유치 뒤 검찰(charged) 또는 법원(indicted). 없으면 {}
+func town_my_case() -> Dictionary:
+	for c in cases:
+		if c is Dictionary and str(c.get("region", "")) == "town" and str(c.get("suspect", "")) == "player" \
+				and str(c.get("stage", "")) in ["charged", "indicted"]:
+			return c
+	return {}
+
+
+# ---- 읍 순경(S4f) — 세 교대, 수배, 잊음 ----
+
+func constable_shift(id: String) -> int:
+	var g: Dictionary = gen_npcs.get(id, {})
+	if str(g.get("role", "")) != "constable":
+		return -1
+	return int(g.get("shift", 0))
+
+
+# 6~12 / 12~18 / 18~24 의 세 교대. 수배 중엔 여섯 시부터 셋이 다 나온다(협공).
+# 긴축 2 부터 밤 교대가 없고(읍 밤 목격자 0), 긴축 3 은 아침 교대뿐(순경 자리 하나가 빈 셈)
+func constable_on_duty(id: String) -> bool:
+	var sh := constable_shift(id)
+	if sh < 0:
+		return false
+	var h := hour_now()
+	if h < 6.0:
+		return false
+	if town_wanted_active() and festival_today().is_empty():
+		return true
+	var lv := town_austerity()
+	if lv >= 3 and sh >= 1:
+		return false
+	if lv >= 2 and sh == 2:
+		return false
+	return int((h - 6.0) / 6.0) == sh
+
+
+func constable_off_duty(id: String) -> bool:
+	return constable_shift(id) >= 0 and not constable_on_duty(id)
+
+
+func wanted_region() -> String:
+	return str(me.get("wanted", {}).get("region", "kyojin")) if wanted_active() else ""
+
+
+func town_wanted_active() -> bool:
+	return wanted_region() == "town"
+
+
+# 읍의 신고는 회의가 아니라 곧장 경찰서다(헌법 §6.3) — 신고 다음날 아침 수배가 걸리고, 이레면 잊는다
+func _town_wanted_tick() -> void:
+	if not town_open:
+		return
+	if town_wanted_active():
+		var w: Dictionary = me.wanted
+		if day - int(w.get("since", day)) >= TOWN_WANTED_DAYS:
+			_settle_mem(int(w.get("day", 0)), str(w.get("target", "")), "escaped")
+			me["wanted"] = {}
+			_note(str(SOCIETY_NOTES.town_forgot))
+	if wanted_active() or not town_my_case().is_empty():
+		return   # 한 번에 하나 — 유치·재판 중엔 새 수배가 걸리지 않는다
+	for mem in me.get("memories", []):
+		if not (mem is Dictionary) or str(mem.get("region", "")) != "town" or str(mem.get("settled", "")) != "":
+			continue
+		var rd := int(mem.get("reported_day", 0))
+		if rd <= 0 or rd >= day:
+			continue
+		var wit: Array = mem.get("witnesses", [])
+		var target := str(mem.get("target", ""))
+		mem["settled"] = "wanted"
+		mem["settled_day"] = day
+		me["wanted"] = {"day": int(mem.get("day", 0)), "kind": str(mem.get("kind", "")), "target": target,
+			"value": int(mem.get("value", 0)), "fine": 0, "since": day, "region": "town",
+			"heat": int(mem.get("heat", 1)), "seen": wit.size(), "others": wit.size() - (1 if target in wit else 0)}
+		_note(str(SOCIETY_NOTES.town_wanted) % npc_name(target))
+		break
+
+
+func _settle_mem(mday: int, target: String, how: String) -> void:
+	for mem in me.get("memories", []):
+		if mem is Dictionary and int(mem.get("day", -1)) == mday and str(mem.get("target", "")) == target:
+			mem["settled"] = how
+			mem["settled_day"] = day
+			return
 
 
 # ---- 순회 재판 (S2c) ----
@@ -10497,8 +10662,9 @@ func expunge_records() -> int:
 
 # 구류가 시작되는 순간의 장부 — 남은 날수를 적고, 안 낸 고지서 기한을 그만큼 미룬다(복역 중
 # 체납 정지). 하루를 실제로 넘기는 일은 society.serve_jail 이 한다(세계를 든 쪽)
-func jail_begin(days: int) -> void:
+func jail_begin(days: int, kind := "jail") -> void:
 	me["jail_days_left"] = days
+	me["jail_kind"] = kind
 	for b in unpaid_bills():
 		b["due_day"] = int(b.get("due_day", 0)) + days
 
@@ -10637,13 +10803,17 @@ func _court_tick() -> void:
 	if int(me.get("jail_days_left", 0)) > 0:
 		me.jail_days_left = int(me.jail_days_left) - 1
 		if int(me.jail_days_left) == 0:
-			me.jail_out_day = day
-			_note(str(SOCIETY_NOTES.jail_out))
+			if str(me.get("jail_kind", "")) == "detain":
+				_note(str(SOCIETY_NOTES.detain_out))   # 유치는 형이 아니다 — 호칭도 안 붙는다
+			else:
+				me.jail_out_day = day
+				_note(str(SOCIETY_NOTES.jail_out))
+			me.jail_kind = ""
 	if not police_open():
 		return
 	if not charged_active():
 		for mem in me.memories:
-			if int(mem.get("heat", 1)) < 2 or str(mem.get("settled", "")) != "":
+			if int(mem.get("heat", 1)) < 2 or str(mem.get("settled", "")) != "" or str(mem.get("region", "")) == "town":
 				continue
 			var rd := int(mem.get("reported_day", 0))
 			if rd <= 0 or rd >= day:
@@ -10659,7 +10829,9 @@ func _court_tick() -> void:
 				"court_day": cd, "skips": 0, "since": day}
 			_note(str(SOCIETY_NOTES.charged) % [str(npc_def(target).get("name", target)), court_day_label(cd)])
 			break
-	if charged_active():
+	if charged_active() and str(me.charged.get("court", "")) == "town":
+		me.charged = {}   # 읍 재판을 열어 놓고 자리를 떴다 — 사건 장부가 남아 있으니 다시 서면 된다(S4f)
+	elif charged_active():
 		var ch: Dictionary = me.charged
 		var cd := int(ch.get("court_day", 0))
 		if day == cd and int(ch.get("since", 0)) != day:
@@ -10816,12 +10988,20 @@ func society_place(id: String) -> String:
 			and hour_now() >= 9.0 and hour_now() < SERVICE_LAST_HOUR:
 		return "meeting"   # 마을 회의도, 네 주 밀린 세금 얘기도 같은 자리에서 기다린다
 	if id == "officer_park":
-		# 수배 중이면 나를 쫓는다(6~24시, 축제 아닌 날). 아니면 저녁엔 야간 순찰
-		if wanted_active() and festival_today().is_empty() and hour_now() >= 6.0:
+		# 수배 중이면 나를 쫓는다(6~24시, 축제 아닌 날). 읍 수배는 heat 3 부터만 교진까지 온다
+		if wanted_active() and festival_today().is_empty() and hour_now() >= 6.0 \
+				and (wanted_region() == "kyojin" or int(me.wanted.get("heat", 1)) >= 3):
 			return "chase"
 		if is_evening():
 			return "patrol"
 		return ""
+	if constable_shift(id) >= 0:
+		# 읍 순경(S4f) — 교대면 제 구역, 수배 중이면 셋이 쫓는다(읍 밖으로는 안 나간다), 아니면 서 안
+		if not constable_on_duty(id):
+			return "station"
+		if town_wanted_active() and festival_today().is_empty():
+			return "chase"
+		return "beat"
 	if night_owl(id) and is_evening():
 		match id:
 			"musician":
@@ -10985,8 +11165,9 @@ func society_new_day(stats: Array, ko := false) -> void:
 	# 파출소(S2b) — NPC 사건이 생기고 닫힌다. 수배 중이면 아침마다 한 줄
 	_npc_crime_tick()
 	_case_close_tick()
+	_town_wanted_tick()
 	if wanted_active():
-		_note(str(SOCIETY_NOTES.wanted))
+		_note(str(SOCIETY_NOTES.town_wanted_daily if town_wanted_active() else SOCIETY_NOTES.wanted))
 	# 순회 재판(S2c) — 구류 하루, 기소, 재판일
 	_court_tick()
 	# 갈뫼읍(S4d) — 주택가 이주(계절 첫날), 읍 사건과 그 길

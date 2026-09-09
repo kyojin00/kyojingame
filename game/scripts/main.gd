@@ -850,6 +850,8 @@ const TOWN_OF := {
 const TOWN_NPC_IDS := ["mayor_kang", "chief_ha", "judge_suh", "pros_min", "doctor_oh", "manager_baek",
 	"innkeeper_ok", "cook_jang", "fence_gu"]
 const TOWN_SQUARE := Vector2i(272, 113)          # 장터 앞 — 읍 사람들이 낮에 모이는 자리
+# 읍 순경의 세 구역(S4f) — 정류장(bus_tiles.town 옆) · 관청 거리(경찰서 앞길) · 장터. 시각+교대로 돈다
+const TOWN_BEATS := [Vector2i(246, 100), Vector2i(264, 97), Vector2i(272, 113)]
 # 사회(S2b~)가 데려오는 사람들 — 고장 사람과 같은 도트 판(make_settlers.js)에서 색만 갈아 낀다
 # 순회 판사·검사(S2c)는 NPC 노드 없이 초상·도트만 싣는다 — 주민 수에 들지 않는다
 const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]

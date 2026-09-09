@@ -1861,7 +1861,8 @@ func _debug_tick() -> void:
 					" 건너뛴 축제=", skipped)
 		229:
 			# ④ NIGHT_OK — 21시에 밖에 남는 사람은 NIGHT_OWLS 뿐이고(교집합 비교, 임시 스폰 없음,
-			# D12), 22시가 넘으면 그들도 들어간다. 자리는 society_place 가 준다(악사 광장·강태 부두)
+			# D12), 22시가 넘으면 그들도 들어간다. 자리는 society_place 가 준다(악사 광장·강태 부두).
+			# 읍의 밤 교대 순경(S4f)은 24시까지 밖이 맞다 — 밤 사람과 같은 줄에 센다
 			m.dialog.close()
 			var kp: Dictionary = _soc_keep()
 			GameData.minutes = 21.0 * 60.0
@@ -1872,13 +1873,13 @@ func _debug_tick() -> void:
 			for n2 in m.npcs:
 				if n2.scripted:
 					continue
-				if str(n2.id) in GameData.NIGHT_OWLS:
+				if str(n2.id) in GameData.NIGHT_OWLS or GameData.constable_on_duty(str(n2.id)):
 					owls.append(str(n2.id))
 				if n2.visible:
 					vis.append(str(n2.id))
 			owls.sort()
 			vis.sort()
-			var same: bool = owls == vis and vis.size() <= 3
+			var same: bool = owls == vis and vis.size() <= 4
 			var place_ok := true
 			if "musician" in owls:
 				place_ok = place_ok and m.npcmgr.npc_place_now("musician") == "plaza"
@@ -6811,6 +6812,179 @@ func _debug_tick() -> void:
 			GameData.me.job = ""
 			GameData.me.rank = ""
 			_s2_restore(k_tb)
+		404:
+			# ---- 읍 순경·유치·뇌물(S4f) — 세 교대·협공·체포·뇌물·자수·유치 사흘·검찰·읍 법원·잊음 ----
+			var k_tp := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_tp := GameData.minutes
+			var keep_pos_tp: Vector2 = m.player.position
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.ensure_gen_npcs()
+			for gid_tp in GameData.gen_npcs:
+				GameData.gen_npcs[gid_tp]["here"] = str(GameData.gen_npcs[gid_tp].get("role", "")) != "resident"
+			GameData.gov_budget["town"] = 5000
+			GameData.gov_debt = {"town": 0}
+			GameData.town_austerity_lv = 0
+			GameData.cases = []
+			GameData.case_seq = 0
+			GameData.day = 50
+			m.story_cutscene = true
+			# ① 순경 셋 — 「성 순경」(박 순경은 아니다), 제복 도트, 교대(6·12·18시), 긴축 2 면 밤 교대 없음
+			var cops_tp := GameData.gen_here("constable")
+			var names_ok: bool = cops_tp.size() == 3
+			var by_shift := {}
+			for cid_tp in cops_tp:
+				var nm_tp := str(GameData.npc_name(cid_tp))
+				names_ok = names_ok and nm_tp.ends_with(" 순경") and nm_tp != "박 순경"
+				by_shift[GameData.constable_shift(cid_tp)] = cid_tp
+			names_ok = names_ok and by_shift.has(0) and by_shift.has(1) and by_shift.has(2)
+			var s0_tp := str(by_shift.get(0, ""))
+			var s1_tp := str(by_shift.get(1, ""))
+			var s2_tp := str(by_shift.get(2, ""))
+			m.npcmgr._sync_town_npcs()
+			GameData.minutes = 8 * 60
+			var shift_ok: bool = GameData.constable_on_duty(s0_tp) and not GameData.constable_on_duty(s1_tp) \
+				and GameData.society_place(s0_tp) == "beat" and GameData.society_place(s1_tp) == "station" \
+				and m.TOWN_RECT.grow(2).has_point(m.npcmgr.npc_place_tile(s0_tp, "beat"))
+			GameData.minutes = 20 * 60
+			shift_ok = shift_ok and GameData.constable_on_duty(s2_tp) and GameData.society_place(s2_tp) == "beat" \
+				and GameData.society_place(s0_tp) == "station"
+			GameData.gov_debt = {"town": 25000}   # 긴축 2 — 밤 순찰 중지
+			var aust_ok: bool = not GameData.constable_on_duty(s2_tp) and GameData.society_place(s2_tp) == "station"
+			GameData.gov_debt = {"town": 0}
+			var node_ok: bool = _npc_node(s0_tp) != null and m.tex.has("npc_%s_down_0" % s0_tp) \
+				and GameData.npc_line(s0_tp) != "" and not GameData.npc_line(s0_tp).contains("장사")
+			# ② 읍의 신고는 회의가 아니다 — 다음날 아침 수배, 순경 셋이 쫓고 박 순경은 heat 3 부터
+			m.player.position = Vector2(m.TOWN_SQUARE.x * m.TILE + 16, m.TOWN_SQUARE.y * m.TILE + 16)
+			var region_ok: bool = m.society.region_here() == "town"
+			GameData.me.boldness_base = 45
+			GameData.me.memories = [{"day": 49, "kind": "pickpocket", "heat": 1, "region": "town",
+				"witnesses": ["g1", "g2"], "forgiven": false, "target": "g1", "value": 30,
+				"reported_day": 49, "settled": "", "settled_day": 0}]
+			var council_no: bool = not GameData.council_pending()
+			GameData.society_new_day([0, 0, 0])
+			var n_tp := GameData.society_note()
+			var wanted_ok: bool = GameData.town_wanted_active() and n_tp.contains("읍 순경") \
+				and str(GameData.me.memories[0].settled) == "wanted" and not GameData.charged_active()
+			GameData.minutes = 10 * 60
+			var chase_ok: bool = GameData.society_place(s1_tp) == "chase" and GameData.society_place(s2_tp) == "chase" \
+				and GameData.society_place("officer_park") != "chase" \
+				and m.npcmgr.npc_place_tile(s1_tp, "chase") == m.player_tile()
+			# 읍 밖(교진 광장) — 구역을 지킬 뿐 따라 나오지 않는다. 앞 검사가 나를 읍에 남겨 뒀을 수 있어 자리를 박는다
+			m.player.position = Vector2(74 * m.TILE + 16, (13 + m.NORTH_PAD) * m.TILE + 16)
+			var hold_tile: Vector2i = m.npcmgr.npc_place_tile(s1_tp, "chase")
+			var hold_ok: bool = hold_tile != m.player_tile() and m.TOWN_RECT.grow(2).has_point(hold_tile)
+			m.player.position = Vector2(m.TOWN_SQUARE.x * m.TILE + 16, m.TOWN_SQUARE.y * m.TILE + 16)
+			GameData.me.wanted["heat"] = 3
+			var heat_ok: bool = GameData.society_place("officer_park") == "chase"
+			GameData.me.wanted["heat"] = 1
+			# ③ 체포 — 순경이 곁에 2초. 대범함 45·돈 1,000 이면 「돈을 내민다」가 선다
+			GameData.money = 1000
+			var cop_tp: Node2D = _npc_node(s1_tp)
+			cop_tp.visible = true
+			cop_tp.position = m.player.position + Vector2(20, 0)
+			m.story_cutscene = false
+			m.dialog.close()
+			m.society._arrest_tick(1.1)
+			var not_yet_tp: bool = not m.dialog.visible
+			m.society._arrest_tick(1.1)
+			var caught_ok: bool = not_yet_tp and m.dialog.visible \
+				and str(m.dialog.title_label.text) == GameData.npc_name(s1_tp) and "돈을 내민다 — 500G" in _btn_texts()
+			m.story_cutscene = true
+			# ④ 뇌물 성공 — 수배 끝, 기억은 「덮였다」, 돈 −500
+			m.society.bribe(s1_tp, 0.0)
+			var bribe_ok: bool = not GameData.wanted_active() and GameData.money == 500 \
+				and str(GameData.me.memories[0].settled) == "bribed"
+			m.dialog.close()
+			# ⑤ 뇌물 실패 — 돈은 압수(읍 예산), 같은 사건에 뇌물이 얹혀 heat +2, 뇌물 기억
+			GameData.me.wanted = {"day": 49, "kind": "pickpocket", "target": "g1", "value": 30, "fine": 0,
+				"since": 50, "region": "town", "heat": 1, "seen": 2, "others": 1}
+			GameData.money = 1000
+			var budget_tp := int(GameData.gov_budget.town)
+			m.society.bribe(s1_tp, 0.99)
+			var fail_ok: bool = GameData.town_wanted_active() and int(GameData.me.wanted.heat) == 3 \
+				and bool(GameData.me.wanted.bribe) and GameData.money == 500 \
+				and int(GameData.gov_budget.town) == budget_tp + 500 \
+				and str(GameData.me.memories[-1].kind) == "bribe" and str(GameData.me.memories[-1].settled) == "charged"
+			m.dialog.close()
+			# ⑥ 자수 — 경찰서 창구가 서장의 「유치는 사흘」. 장부: 수배 → 내 사건(charged), 검사 책상엔 안 오른다
+			GameData.me.wanted = {"day": 49, "kind": "pickpocket", "target": "g1", "value": 30, "fine": 0,
+				"since": 50, "region": "town", "heat": 1, "seen": 2, "others": 1}
+			var sur_dialog_tp: bool = m.society.police_town_counter() and m.dialog.visible \
+				and str(m.dialog.title_label.text) == GameData.npc_name("chief_ha") and "따라간다" in _btn_texts()
+			m.dialog.close()
+			var rep_tp := int(GameData.me.reputation.town)
+			m.society._detain_book(true)
+			var c_tp: Dictionary = GameData.cases[-1]
+			var book_ok: bool = sur_dialog_tp and not GameData.wanted_active() and str(c_tp.suspect) == "player" \
+				and str(c_tp.stage) == "charged" and bool(c_tp.surrender) and int(c_tp.charged_day) == 52 \
+				and int(GameData.me.reputation.town) == rep_tp - 2 and GameData.town_case_for("prosecutor").is_empty() \
+				and str(GameData.me.memories[0].settled) == "charged"
+			# 유치 아침 셋 — jail_kind detain 은 호칭이 안 붙고, 셋째 아침에 검찰이 기소한다
+			GameData.jail_begin(3, "detain")
+			var summons_ok := false
+			for dd_tp in range(51, 54):
+				GameData.day = dd_tp
+				GameData.society_new_day([0, 0, 0])
+				var nd_tp := GameData.society_note()
+				if dd_tp == 53:
+					summons_ok = nd_tp.contains("사흘 만에") and nd_tp.contains("기소") \
+						and str(c_tp.stage) == "indicted" and int(GameData.me.jail_days_left) == 0 \
+						and int(GameData.me.jail_out_day) != 53 and not GameData.wanted_active()
+			# 사흘을 거르면 가중 — skips 1
+			for dd2_tp in range(54, 57):
+				GameData.day = dd2_tp
+				GameData.society_new_day([0, 0, 0])
+			var n_sk := GameData.society_note()
+			var skip_ok: bool = int(c_tp.skips) == 1 and n_sk.contains("거른") and int(c_tp.indicted_day) == 56
+			# ⑦ 읍 법원 — 법원 창구에 서면 열린다(재판일 무관). 자수는 참작. 인정 → 벌금 고지서(읍 몫)
+			m.dialog.close()
+			var trial_open_tp: bool = m.society.court_town_counter() and m.dialog.visible \
+				and str(m.dialog.title_label.text) == GameData.npc_name("judge_suh") and m.dialog._seq.size() >= 4 \
+				and str(m.dialog._seq[0].text).contains("갈뫼읍") and str(m.dialog._seq[1].text).contains("주머니") \
+				and str(GameData.me.charged.get("court", "")) == "town"
+			var bills_tp: int = GameData.me.get("tax_bills", []).size()
+			m.society.trial_pick("admit")
+			var last_tp := str(m.dialog._seq[-1].text)
+			var bill_tp: Dictionary = GameData.me.tax_bills[-1] if GameData.me.tax_bills.size() > bills_tp else {}
+			var verdict_ok: bool = trial_open_tp and last_tp.contains("벌금") and int(bill_tp.get("total", 0)) == 200 \
+				and str(bill_tp.get("region", "")) == "town" and str(c_tp.stage) == "closed" \
+				and str(c_tp.closed_by) == "court" and not GameData.charged_active() \
+				and str(GameData.me.record[-1].court) == "town" and int(GameData.me.reputation.town) == rep_tp - 2 - 15
+			m.dialog.close()
+			# 벌금은 면사무소 창구로, 돈은 읍 예산으로
+			GameData.money = 1000
+			var kb_tp := int(GameData.gov_budget.kyojin)
+			var tb_tp := int(GameData.gov_budget.town)
+			var paid_tp := GameData.pay_tax()
+			var pay_ok: bool = paid_tp == 200 and int(GameData.gov_budget.town) == tb_tp + 200 \
+				and int(GameData.gov_budget.kyojin) == kb_tp
+			# ⑧ 이레면 잊는다 — 수배가 풀리고 기억은 「달아났다」
+			GameData.me.memories.append({"day": 50, "kind": "shelf", "heat": 1, "region": "town",
+				"witnesses": ["g3"], "forgiven": false, "target": "g3", "value": 20,
+				"reported_day": 50, "settled": "wanted", "settled_day": 51})
+			GameData.me.wanted = {"day": 50, "kind": "shelf", "target": "g3", "value": 20, "fine": 0,
+				"since": 50, "region": "town", "heat": 1, "seen": 1, "others": 0}
+			GameData.day = 57
+			GameData.society_new_day([0, 0, 0])
+			var n_fg := GameData.society_note()
+			var forgot_ok: bool = not GameData.wanted_active() and n_fg.contains("잊었다") \
+				and str(GameData.me.memories[-1].settled) == "escaped"
+			print("TOWN_POLICE_OK=", names_ok and shift_ok and aust_ok and node_ok and region_ok and council_no
+				and wanted_ok and chase_ok and hold_ok and heat_ok and caught_ok and bribe_ok and fail_ok
+				and book_ok and summons_ok and skip_ok and verdict_ok and pay_ok and forgot_ok,
+				" 순경=", names_ok, "(", s0_tp, "·", s1_tp, "·", s2_tp, ")", " 교대=", shift_ok, " 긴축=", aust_ok,
+				" 노드=", node_ok, " 읍땅=", region_ok, " 회의없음=", council_no, " 수배=", wanted_ok,
+				" 협공=", chase_ok, " 구역=", hold_ok, " heat3=", heat_ok, " 체포=", caught_ok,
+				" 뇌물=", bribe_ok, " 뇌물실패=", fail_ok, " 자수유치=", book_ok, " 기소=", summons_ok,
+				" 거름=", skip_ok, " 판결=", verdict_ok, " 납부=", pay_ok, " 잊음=", forgot_ok)
+			m.player.position = keep_pos_tp
+			GameData.minutes = keep_min_tp
+			_s2_restore(k_tp)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

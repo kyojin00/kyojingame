@@ -282,7 +282,11 @@ func _apply_save(d: Dictionary) -> void:
 					"evidence": int(c.get("evidence", 0)), "stage": str(c.get("stage", "closed")),
 					"closed_by": str(c.get("closed_by", "")), "deadline": int(c.get("deadline", 0)),
 					"region": str(c.get("region", "kyojin")), "heat": int(c.get("heat", 1)),
-					"charged_day": int(c.get("charged_day", 0)), "indicted_day": int(c.get("indicted_day", 0))})
+					"charged_day": int(c.get("charged_day", 0)), "indicted_day": int(c.get("indicted_day", 0)),
+					# 내가 피고인 읍 사건(S4f) — 자수·뇌물·거른 재판·본 사람·물건값
+					"surrender": bool(c.get("surrender", false)), "bribe": bool(c.get("bribe", false)),
+					"skips": int(c.get("skips", 0)), "seen": int(c.get("seen", 0)),
+					"others": int(c.get("others", 0)), "value": int(c.get("value", 0))})
 	GameData.case_seq = int(d.get("case_seq", 0))
 	GameData.npc_greed_adj = {}
 	var ga: Variant = d.get("npc_greed_adj", {})
