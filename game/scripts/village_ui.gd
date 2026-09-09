@@ -577,7 +577,7 @@ func open_market_stall(t: Vector2i) -> void:
 				and m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] == t:
 			owner = str(id)
 	if owner != "" and m.npcmgr.npc_place_now(owner) == "stall":
-		m.shop.open("sell", ["sell"], "%s의 점포" % GameData.npc_name(owner), "", GameData.TOWN_SELL_MULT)
+		m.shop.open("sell", ["sell"], "%s의 점포" % GameData.npc_name(owner), "", GameData.town_sell_mult())
 		return
 	if owner != "":
 		m.dialog.open("장터 점포", "%s의 점포다. 지금은 자리에 없다." % GameData.npc_name(owner), [["닫기", null]])
@@ -588,6 +588,13 @@ func open_market_stall(t: Vector2i) -> void:
 func _open_town_room_dialog() -> void:
 	var d: Dictionary = m.shop_room.ROOMS.get(m.shop_room.room_id, {})
 	var keeper := str(d.get("keeper", ""))
+	# 읍 살림(S4e) — 군청 창구엔 읍 장부가, 신협 창구엔 기채·상환이 있다
+	if m.shop_room.room_id == "county":
+		m.society.open_town_ledger()
+		return
+	if m.shop_room.room_id == "bank":
+		m.society.town_bank_menu()
+		return
 	if keeper != "" and GameData.NPCS.has(keeper):
 		# 우두머리의 한마디 — 채용·근무는 society.counter_menu 가 먼저 가로챈다(자격이 있을 때)
 		m.dialog.open(GameData.npc_name(keeper), GameData.npc_line(keeper), [["대화 끝", null]],

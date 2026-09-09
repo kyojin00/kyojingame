@@ -248,6 +248,18 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.gov_tax_season = int(d.get("gov_tax_season", 0))
 	var gl: Variant = d.get("gov_log", [])
 	GameData.gov_log = gl if gl is Array else []
+	# 읍 살림(S4e)
+	var gdt: Variant = d.get("gov_debt", {})
+	GameData.gov_debt = {"town": int(gdt.get("town", 0)) if gdt is Dictionary else 0}
+	var tl: Variant = d.get("town_log", [])
+	GameData.town_log = tl if tl is Array else []
+	GameData.town_building = str(d.get("town_building", ""))
+	GameData.town_done = []
+	var tdn: Variant = d.get("town_done", [])
+	if tdn is Array:
+		for pid_t in tdn:
+			GameData.town_done.append(str(pid_t))
+	GameData.town_austerity_lv = int(d.get("town_austerity_lv", 0))
 	# 생성 NPC(S4d) — 씨앗으로 다시 짓고 here·since 만 세이브에서
 	GameData.gen_seed = int(d.get("gen_seed", 0))
 	GameData.gen_npcs = {}

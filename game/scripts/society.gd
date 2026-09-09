@@ -2291,3 +2291,85 @@ func case_pick(cid: int, kind: String) -> void:
 	_work_credit(str(job.get("inst", "")), 0)
 	m.dialog.open(_npc_name(head), line, [["대화 끝", null]], _portrait(head))
 	m.saveio.save_now()
+
+
+# ---- 읍 살림 (S4e) — 군청 장부 · 신협 기채 ----
+#
+# 읍 예산은 군수가 건다. 나는 군청 서기로 신협에서 빚을 낼 수 있고, 그 빚이 긴축을 부른다 —
+# 「망한 읍의 서장」은 내가 만든 결과로만 있다. 장부는 누구나 본다(군청 게시)
+
+func open_town_ledger() -> void:
+	m.dialog.close()
+	var budget := int(GameData.gov_budget.get("town", 0))
+	var debt := int(GameData.gov_debt.get("town", 0))
+	var body := "읍 예산 %dG · 빚 %dG · 인구 %d명\n" % [budget, debt, GameData.town_population()]
+	var lv := GameData.town_austerity()
+	if lv > 0:
+		body += "긴축 %d단계 — %s\n" % [lv, ["", "사업 중단", "밤 순찰 축소", "순경 감원·이주 중지"][lv]]
+	if GameData.town_building != "":
+		body += "공사 중: 「%s」\n" % str(GameData.town_project(GameData.town_building).get("name", ""))
+	var nxt := GameData.town_next_project()
+	if not nxt.is_empty():
+		body += "다음 사업: 「%s」 %dG\n" % [str(nxt.name), int(nxt.cost)]
+	if not GameData.town_done.is_empty():
+		var names: Array = []
+		for pid in GameData.town_done:
+			names.append(str(GameData.town_project(str(pid)).get("name", pid)))
+		body += "다 된 것: %s\n" % " · ".join(PackedStringArray(names))
+	var logs: Array = GameData.town_log
+	if not logs.is_empty():
+		body += "\n계절 장부"
+		for i in range(maxi(0, logs.size() - 3), logs.size()):
+			var r: Dictionary = logs[i]
+			body += "\n· 교부금 +%d · 장부세 +%d · 운영비 −%d" % [int(r.get("grant", 0)), int(r.get("levy", 0)), int(r.get("ops", 0))]
+			if int(r.get("interest", 0)) > 0:
+				body += " · 이자 %d · 상환 %d" % [int(r.get("interest", 0)), int(r.get("repay", 0))]
+			if str(r.get("project", "")) != "":
+				body += " · 「%s」 착공" % str(GameData.town_project(str(r.project)).get("name", ""))
+	m.dialog.open("읍 장부", body, [["나간다", null]])
+
+
+func _is_county_clerk() -> bool:
+	return str(GameData.me.get("job", "")) == "county_clerk"
+
+
+func town_bank_menu() -> void:
+	m.dialog.close()
+	var debt := int(GameData.gov_debt.get("town", 0))
+	var body := "읍 빚 %dG. 계절 이자 %d%%, 흑자의 반으로 갚는다." % [debt, int(GameData.TOWN_INTEREST * 100.0)]
+	var btns: Array = []
+	var lbl := "읍 기채 — %dG" % GameData.TOWN_LOAN
+	if Net.is_guest():
+		btns.append(gray(lbl, "손님은 이 마을 일에 끼지 않는다."))
+	elif not _is_county_clerk():
+		btns.append(gray(lbl, "기채는 군청 서기가 청하는 걸세."))
+	else:
+		btns.append([lbl, town_borrow])
+	if debt > 0:
+		var pay: int = mini(debt, int(GameData.gov_budget.get("town", 0)))
+		if _is_county_clerk() and pay > 0:
+			btns.append(["읍 빚 갚기 — %dG" % pay, town_repay.bind(pay)])
+		else:
+			btns.append(gray("읍 빚 갚기", "군청 서기가 예산으로 갚는 걸세."))
+	btns.append(["대화 끝", null])
+	m.dialog.open(_npc_name("manager_baek"), body, btns, _portrait("manager_baek"))
+
+
+func town_borrow() -> void:
+	if Net.is_guest() or not _is_county_clerk():
+		return
+	m.dialog.close()
+	GameData.town_borrow()
+	m.dialog.open(_npc_name("manager_baek"), "빌려 주지. %dG 은 읍 예산으로 갔네. 이자는 계절마다일세." % GameData.TOWN_LOAN,
+		[["대화 끝", null]], _portrait("manager_baek"))
+	m.saveio.save_now()
+
+
+func town_repay(amount: int) -> void:
+	if Net.is_guest() or not _is_county_clerk():
+		return
+	m.dialog.close()
+	var paid := GameData.town_repay(amount)
+	m.dialog.open(_npc_name("manager_baek"), "받았네. %dG 이 줄었어. 장부는 거짓말을 안 하네." % paid,
+		[["대화 끝", null]], _portrait("manager_baek"))
+	m.saveio.save_now()

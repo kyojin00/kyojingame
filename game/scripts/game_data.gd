@@ -9114,6 +9114,15 @@ const SOCIETY_NOTES := {
 	"town_bench": "법원에 %s 사건이 올라와 있다. 내 판결이다.",
 	"town_verdict": "읍 법원이 %s에게 벌금을 물렸다 — %dG.",
 	"town_dropped": "검찰이 %s 사건을 불기소로 닫았다.",
+	# ---- 읍 살림(S4e) ----
+	"town_season": "읍 살림 — 수입 %dG, 지출 %dG. 읍 예산 %dG.",
+	"town_start": "군수가 「%s」 공사를 걸었다.",
+	"town_done": "읍의 「%s」이 다 됐다. %s",
+	"town_interest": "읍 빚에 이자가 붙었다 — %dG. 흑자의 반으로 %dG 갚았다.",
+	"town_debt1": "읍 빚이 만 냥을 넘었다. 군수가 사업을 멈췄다.",
+	"town_debt2": "읍 빚이 이만 냥을 넘었다. 밤 순찰이 줄었다 — 도둑이 잦아진다.",
+	"town_debt3": "읍 빚이 삼만 냥을 넘었다. 순경 자리가 비고 주택가 이주가 멈췄다.",
+	"town_debt0": "읍이 빚을 다 갚았다. 군수가 다시 사업을 본다.",
 	# ---- 자치회(S3c) ----
 	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
 	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
@@ -9232,6 +9241,27 @@ const TOWN_CATCH_DAYS := 2          # 신고 이틀 뒤 읍 순경이 잡는다
 const TOWN_CATCH_P := 0.8
 const TOWN_DESK_DAYS := 3           # 검사·판사가 플레이어면 사흘 기다려 주고, 그 뒤엔 부장이 처리한다
 const TOWN_SELL_MULT := 1.1         # 장터 점포에서 내 물건을 파는 값 — 도심 값
+# ---- 읍 살림(S4e, 헌법 §2.4) — 계절 첫날 한 번. 인건비 계정은 없다(도 교부금), 사업비만 저금통 ----
+const TOWN_GRANT := 6000
+const TOWN_LEVY_PER_HEAD := 60      # 읍 인구(손글 9 + 와 있는 생성 NPC) 한 사람당
+const TOWN_OPS := {"police": 1200, "clinic": 600, "court": 300, "prosecution": 300}
+const TOWN_LAMP_OPS := 10           # 가로등 하나당
+const TOWN_LOAN := 5000             # 신협 기채 한 번
+const TOWN_INTEREST := 0.05         # 계절 이자
+const TOWN_REPAY_RATE := 0.5        # 흑자의 절반은 저절로 갚는다
+const TOWN_AUSTERITY := [10000, 20000, 30000]   # 긴축 1·2·3 의 빚 문턱
+# 읍 사업 — 군수가 예산이 차면 건다(긴축 1부터 멈춘다). 효과는 읍 사건·장터·이주의 수치다
+const TOWN_PROJECTS := [
+	{"id": "lamps2", "name": "가로등 증설", "cost": 2000,
+		"desc": "장터와 주택가 골목까지 등불을 건다. 도둑이 뜸해진다.",
+		"done": "읍 골목이 밤에도 환하다."},
+	{"id": "market", "name": "장터 확장", "cost": 5000,
+		"desc": "장터 차양을 넓힌다. 점포에서 내 물건값이 오른다.",
+		"done": "장터가 넓어졌다. 값을 조금 더 쳐 준다."},
+	{"id": "homes", "name": "주택가 손보기", "cost": 8000,
+		"desc": "빈집을 손본다. 계절마다 오는 사람이 는다.",
+		"done": "주택가가 깔끔해졌다. 새 얼굴이 더 온다."},
+]
 # ---- 버스(S4b) ----
 const BUS_FARE := 50
 const FENCE_RATE := 0.5             # 장물아비(S4c)가 쳐 주는 값 — 제값의 반
@@ -9299,6 +9329,12 @@ var tax_seize_due := 0               # 오늘 아침 압류할 액수(society.af
 # 갈뫼읍(S4b) — 입구 팻말을 읽으면 발견(지도에 이름이 붙는다). 주택 예약은 S4d(생성 NPC 이주)가 쓴다
 var town_open := false
 var town_homes: Array = []
+# 읍 살림(S4e) — 빚·장부·사업. 긴축 단계는 빚이 정하고, 바뀐 아침에만 한 줄
+var gov_debt := {"town": 0}
+var town_log: Array = []
+var town_building := ""
+var town_done: Array = []
+var town_austerity_lv := 0
 # 생성 NPC(S4d) — 읍의 모르는 얼굴. 씨앗 하나에서 결정적으로 태어난다(이름·성격·팔레트·취향).
 # 세이브엔 {id: {here, since}} 만 적고 나머지는 씨앗으로 다시 짓는다
 var gen_seed := 0
@@ -10278,13 +10314,13 @@ func gen_line(id: String) -> String:
 	return line.format({"title": player_title(id).text, "name": player_name})
 
 
-# 계절 첫날 — 빈 집이 있으면 주택가에 둘이 온다(읍 예산이 3,000 은 있어야 한다)
+# 계절 첫날 — 빈 집이 있으면 주택가에 둘이 온다(읍 예산이 3,000 은 있어야 한다. 긴축 3이면 아무도)
 func _town_arrive_tick() -> void:
 	if day_in_season() != 1 or int(gov_budget.get("town", 0)) < 3000:
 		return
 	var came: Array = []
 	for i in range(GEN_MERCHANTS + 1, GEN_COUNT + 1):
-		if came.size() >= GEN_ARRIVE_PER_SEASON:
+		if came.size() >= town_arrive_per_season():
 			break
 		var g: Dictionary = gen_npcs.get("g%d" % i, {})
 		if g.is_empty() or bool(g.get("here", false)):
@@ -10299,7 +10335,7 @@ func _town_arrive_tick() -> void:
 # 읍 사건 — 사흘마다 한 건, 상인이 셋은 있을 때. 범인은 탐욕이 가장 큰 사람(열린 사건이 없는)
 func _town_crime_tick() -> void:
 	var here := gen_here()
-	if here.size() < 3 or day % TOWN_CRIME_PERIOD != 0:
+	if here.size() < 3 or day % town_crime_period() != 0:
 		return
 	for c in cases:
 		if str(c.get("region", "")) == "town" and str(c.get("stage", "")) in ["open", "charged", "indicted"]:
@@ -10338,7 +10374,7 @@ func _town_case_tick() -> void:
 		var sname := npc_name(str(c.get("suspect", "")))
 		if stage == "open":
 			var age: int = day - int(c.get("day", 0))
-			if age >= TOWN_CATCH_DAYS and _case_roll(cid, age) < TOWN_CATCH_P:
+			if age >= TOWN_CATCH_DAYS and _case_roll(cid, age) < town_catch_p():
 				c["stage"] = "charged"
 				c["charged_day"] = day
 				c["evidence"] = int(c.get("evidence", 0)) + 1
@@ -10475,6 +10511,124 @@ func court_docket() -> Array:
 				and str(c.get("closed_by", "")) in ["officer", "player"] and day - int(c.get("day", 0)) <= 14:
 			out.append(c)
 	return out
+
+
+# ---- 읍 살림 (S4e) ----
+
+func town_population() -> int:
+	return 9 + gen_here().size()   # 손글 아홉 + 와 있는 생성 NPC
+
+
+func town_ops_cost() -> int:
+	var n := 0
+	for k in TOWN_OPS:
+		n += int(TOWN_OPS[k])
+	return n + 12 * TOWN_LAMP_OPS
+
+
+# 긴축 단계 0~3 — 빚이 정한다. 긴축은 읍에만, 내가 빌린 만큼만
+func town_austerity() -> int:
+	var debt := int(gov_debt.get("town", 0))
+	var lv := 0
+	for th in TOWN_AUSTERITY:
+		if debt > int(th):
+			lv += 1
+	return lv
+
+
+func town_crime_period() -> int:
+	var p := TOWN_CRIME_PERIOD
+	if "lamps2" in town_done:
+		p += 1
+	if town_austerity() >= 2:
+		p -= 1
+	return maxi(2, p)
+
+
+func town_catch_p() -> float:
+	return 0.5 if town_austerity() >= 3 else TOWN_CATCH_P
+
+
+func town_sell_mult() -> float:
+	return TOWN_SELL_MULT + (0.1 if "market" in town_done else 0.0)
+
+
+func town_arrive_per_season() -> int:
+	if town_austerity() >= 3:
+		return 0
+	return GEN_ARRIVE_PER_SEASON + (1 if "homes" in town_done else 0)
+
+
+func town_next_project() -> Dictionary:
+	for p in TOWN_PROJECTS:
+		if str(p.id) in town_done or str(p.id) == town_building:
+			continue
+		return p
+	return {}
+
+
+func town_project(pid: String) -> Dictionary:
+	for p in TOWN_PROJECTS:
+		if str(p.id) == pid:
+			return p
+	return {}
+
+
+# 계절 첫날 — 이자 → 수입·운영비 → 흑자의 반으로 상환 → 사업 완공·착공(긴축이면 멈춤) → 장부·긴축 줄
+func town_season() -> void:
+	var debt := int(gov_debt.get("town", 0))
+	var interest := int(float(debt) * TOWN_INTEREST)
+	debt += interest
+	var grant := TOWN_GRANT
+	var levy := town_population() * TOWN_LEVY_PER_HEAD
+	var ops := town_ops_cost()
+	var surplus := grant + levy - ops
+	gov_budget["town"] = int(gov_budget.get("town", 0)) + surplus
+	var repay := 0
+	if debt > 0 and surplus > 0:
+		repay = mini(debt, int(float(surplus) * TOWN_REPAY_RATE))
+		repay = mini(repay, int(gov_budget.get("town", 0)))
+		gov_budget["town"] = int(gov_budget.get("town", 0)) - repay
+		debt -= repay
+	gov_debt["town"] = debt
+	var row := {"season": season_no(), "grant": grant, "levy": levy, "ops": ops, "interest": interest,
+		"repay": repay, "project": ""}
+	if town_building != "":
+		var done := town_project(town_building)
+		town_done.append(town_building)
+		town_building = ""
+		_note(str(SOCIETY_NOTES.town_done) % [str(done.get("name", "")), str(done.get("done", ""))])
+	var nxt := town_next_project()
+	if not nxt.is_empty() and town_austerity() < 1 and int(gov_budget.get("town", 0)) >= int(nxt.cost):
+		gov_budget["town"] = int(gov_budget.get("town", 0)) - int(nxt.cost)
+		town_building = str(nxt.id)
+		row["project"] = town_building
+		_note(str(SOCIETY_NOTES.town_start) % str(nxt.name))
+	town_log.append(row)
+	while town_log.size() > 8:
+		town_log.pop_front()
+	_note(str(SOCIETY_NOTES.town_season) % [grant + levy, ops, int(gov_budget.get("town", 0))])
+	if interest > 0:
+		_note(str(SOCIETY_NOTES.town_interest) % [interest, repay])
+	var lv := town_austerity()
+	if lv != town_austerity_lv:
+		_note(str(SOCIETY_NOTES["town_debt%d" % lv]))
+		town_austerity_lv = lv
+
+
+# 신협 기채 — 군청 서기(플레이어)가 청한다. 빚은 계절 이자 5%, 흑자의 반으로 저절로 갚는다
+func town_borrow() -> void:
+	gov_budget["town"] = int(gov_budget.get("town", 0)) + TOWN_LOAN
+	gov_debt["town"] = int(gov_debt.get("town", 0)) + TOWN_LOAN
+
+
+func town_repay(amount: int) -> int:
+	var pay: int = mini(amount, mini(int(gov_debt.get("town", 0)), int(gov_budget.get("town", 0))))
+	if pay <= 0:
+		return 0
+	gov_budget["town"] = int(gov_budget.get("town", 0)) - pay
+	gov_debt["town"] = int(gov_debt.get("town", 0)) - pay
+	return pay
 
 
 # 아침의 재판 자리(society_new_day 가 부른다) — ① 구류 하루 ② 어제 신고된 heat 2 는 기소
@@ -10739,6 +10893,8 @@ func society_new_day(stats: Array, ko := false) -> void:
 					_note(str(SOCIETY_NOTES.tax_bill) % int(bill.total))
 				else:
 					_note(str(SOCIETY_NOTES.tax_free))
+		# 읍 살림(S4e) — 읍은 처음부터 있으니 창구와 무관하게 계절마다 돈다
+		town_season()
 	# 체납 사다리 — 매일 아침, 넘는 문턱에서만 한 번씩. 구류 중엔 멈춘다(「나라가 먹여 주는 동안은
 	# 세금 없다」 — serve_jail 이 고지서 기한도 그만큼 미룬다)
 	if tax_open() and int(me.get("jail_days_left", 0)) <= 0:
@@ -11556,6 +11712,11 @@ func reset_all() -> void:
 	town_homes = []
 	gen_seed = 0
 	gen_npcs = {}
+	gov_debt = {"town": 0}
+	town_log = []
+	town_building = ""
+	town_done = []
+	town_austerity_lv = 0
 	cases = []
 	case_seq = 0
 	npc_greed_adj = {}
@@ -11993,6 +12154,8 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"gov_tax_season": gov_tax_season, "gov_log": gov_log,
 		"town_open": town_open, "town_homes": town_homes,
 		"gen_seed": gen_seed, "gen_npcs": gen_save_rows(),
+		"gov_debt": gov_debt, "town_log": town_log, "town_building": town_building, "town_done": town_done,
+		"town_austerity_lv": town_austerity_lv,
 		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

@@ -400,6 +400,9 @@ func _debug_tick() -> void:
 			# 회귀 검사: 커다란 바위 사이의 한 칸 틈은 계속 지나갈 수 있어야 한다
 			# (퀘스트 5에서 바위 하나를 캐면 그 자리로 빠져나간다)
 			var gap := Vector2i(20, 40)
+			# 잡초·나물은 날마다 아무 풀밭에나 다시 돋는다 — 그날 마침 틈 칸에 돋으면
+			# 바위 틈과 상관없이 막히므로, 틈 칸 자체는 비우고 잰다
+			m.objects.erase(gap)
 			m.objects[gap + Vector2i(0, -1)] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			m.objects[gap + Vector2i(0, 1)] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			print("BIGROCK_GAP_OK=", m.is_passable_px(
@@ -6495,8 +6498,8 @@ func _debug_tick() -> void:
 			GameData.minutes = 11 * 60
 			m.actions._enter_building("county")
 			var room_ok: bool = m.shop_room.visible and m.shop_room.room_id == "county"
-			m.village.room_action("town")   # 우두머리(강 군수)의 한마디 — 채용 자격이 없을 때의 창구
-			var counter_ok: bool = m.dialog.visible and str(m.dialog.title_label.text) == "강 군수"
+			m.village.room_action("town")   # 군청 창구는 누구에게나 읍 장부를 펼친다 (S4e)
+			var counter_ok: bool = m.dialog.visible and str(m.dialog.title_label.text) == "읍 장부"
 			m.dialog.close()
 			m.shop_room.close()
 			# 버스 — 개통 전엔 팻말뿐, 개통 뒤 50G 에 반 시간, 19시 뒤엔 없다, 평판 −40 이면 거부
@@ -6645,15 +6648,20 @@ func _debug_tick() -> void:
 			# 장터 — 상인이 점포 앞인 시간엔 도심 값으로 파는 창이 열린다
 			GameData.minutes = 10 * 60
 			m.village.open_market_stall(m.TOWN_STALLS[0])
-			var market_ok: bool = m.shop.visible and is_equal_approx(float(m.shop.sell_mult), GameData.TOWN_SELL_MULT)
+			var market_ok: bool = m.shop.visible and is_equal_approx(float(m.shop.sell_mult), GameData.town_sell_mult())
 			m.shop.visible = false
-			# 이주 — 계절 첫날 둘(읍 예산이 3,000 은 있어야)
+			# 이주 — 계절 첫날 둘(읍 예산이 3,000 은 있어야). 앞 검사들의 계절이 읍 사업을 다 끝냈을 수 있어 되돌린다
 			_s2_fresh_gov()
 			GameData.gov_budget["town"] = 20000
+			GameData.gov_debt = {"town": 0}
+			GameData.town_done = []
+			GameData.town_building = ""
+			GameData.town_austerity_lv = 0
 			GameData.day = 29
 			GameData.society_new_day([0, 0, 0])
 			var n_gn := GameData.society_note()
-			var arrive_ok: bool = n_gn.contains("새 얼굴") and GameData.gen_here("resident").size() == 2
+			var arrive_ok: bool = n_gn.contains("새 얼굴") \
+				and GameData.gen_here("resident").size() == GameData.town_arrive_per_season()
 			# 읍 사건 — 사흘 주기. g1 을 가장 탐욕스럽게 두고, 순경이 잡아 넘길 때까지 아침을 돌린다
 			GameData.cases = []
 			GameData.npc_greed_adj["g1"] = 1.0
@@ -6723,6 +6731,86 @@ func _debug_tick() -> void:
 				" 법정=", bench_ok, " 판결=", verdict_ok, " 부장=", auto_ok, "(", auto_by, ")")
 			GameData.minutes = keep_min_gn
 			_s2_restore(k_gn)
+		403:
+			# ---- 읍 살림(S4e) — 계절 결산·사업·기채·이자·자동 상환·긴축 사다리 ----
+			var k_tb := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			GameData.ensure_gen_npcs()
+			for gid_tb in GameData.gen_npcs:
+				GameData.gen_npcs[gid_tb]["here"] = str(GameData.gen_npcs[gid_tb].get("role", "")) == "merchant"
+			GameData.gov_budget["town"] = 20000
+			GameData.gov_debt = {"town": 0}
+			GameData.town_log = []
+			GameData.town_building = ""
+			GameData.town_done = []
+			GameData.town_austerity_lv = 0
+			GameData.cases = []
+			# 첫 계절 — 교부금 6,000 + 장부세 (9 + 7) × 60 − 운영비 2,520 = +4,440. 가로등 증설(2,000)이 바로 선다.
+			# 장부세는 결산 시점의 인구(이주 전)로 센다
+			var pop_tb := GameData.town_population()
+			GameData.day = 29
+			GameData.society_new_day([0, 0, 0])
+			var n_tb := GameData.society_note()
+			var income_tb: int = 6000 + pop_tb * 60
+			var budget1_tb := int(GameData.gov_budget.town)
+			var season1_ok: bool = pop_tb == 16 and budget1_tb == 20000 + income_tb - 2520 - 2000 \
+				and GameData.town_building == "lamps2" and n_tb.contains("읍 살림") and n_tb.contains("가로등 증설") \
+				and GameData.town_log.size() == 1 and int(GameData.town_log[0].ops) == 2520 \
+				and int(GameData.town_log[0].levy) == pop_tb * 60
+			# 둘째 계절 — 완공, 사건 주기 4일. 계절마다 둘씩 왔으니 인구 20
+			GameData.day = 57
+			GameData.society_new_day([0, 0, 0])
+			var n_tb2 := GameData.society_note()
+			var done_ok: bool = "lamps2" in GameData.town_done and GameData.town_crime_period() == 4 \
+				and n_tb2.contains("다 됐다") and GameData.town_population() == 20
+			# 기채 — 군청 서기만. 5,000 이 예산과 빚에 같이 붙는다
+			m.society.town_bank_menu()
+			var gray_ok: bool = "… 읍 기채 — 5000G" in _btn_texts()
+			m.dialog.close()
+			GameData.me.job = "county_clerk"
+			GameData.me.rank = "clerk"
+			var budget_tb := int(GameData.gov_budget.town)
+			m.society.town_borrow()
+			m.dialog.close()
+			var loan_ok: bool = int(GameData.gov_debt.town) == 5000 and int(GameData.gov_budget.town) == budget_tb + 5000
+			# 셋째 계절 — 이자 250, 흑자(6,000 + 인구 × 60 − 2,520)의 반을 상환
+			var pop3_tb := GameData.town_population()
+			GameData.day = 85
+			GameData.society_new_day([0, 0, 0])
+			var n_tb3 := GameData.society_note()
+			var repay_tb: int = mini(5250, int(float(6000 + pop3_tb * 60 - 2520) * 0.5))
+			var debt3_tb := int(GameData.gov_debt.town)
+			var debt_ok: bool = debt3_tb == 5250 - repay_tb and n_tb3.contains("이자가 붙었다") \
+				and int(GameData.town_log[-1].interest) == 250 and int(GameData.town_log[-1].repay) == repay_tb
+			# 긴축 — 빚 25,000 이면 2단계: 사업 멈춤, 사건 주기 3(가로등 +1, 긴축 −1). 35,000 이면 3: 검거 0.5, 이주 0
+			GameData.gov_debt["town"] = 25000
+			var aust2: bool = GameData.town_austerity() == 2 and GameData.town_crime_period() == 3 \
+				and GameData.town_arrive_per_season() == 2 and is_equal_approx(GameData.town_catch_p(), 0.8)
+			GameData.gov_debt["town"] = 35000
+			var aust3: bool = GameData.town_austerity() == 3 and is_equal_approx(GameData.town_catch_p(), 0.5) \
+				and GameData.town_arrive_per_season() == 0
+			GameData.town_building = ""
+			GameData.gov_budget["town"] = 30000
+			GameData.day = 113
+			GameData.society_new_day([0, 0, 0])
+			var n_tb4 := GameData.society_note()
+			var freeze_ok: bool = GameData.town_building == "" and n_tb4.contains("삼만") \
+				and GameData.town_austerity_lv == 3
+			# 갚기 — 서기가 예산으로. 빚이 만 냥 아래로 내려오면 다음 계절 사업이 다시 선다
+			var paid_tb := GameData.town_repay(int(GameData.gov_debt.town) - 5000)
+			var repay_ok: bool = paid_tb > 0 and int(GameData.gov_debt.town) == 5000 and GameData.town_austerity() == 0
+			m.society.open_town_ledger()
+			var ledger_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("읍 예산")
+			m.dialog.close()
+			print("TOWN_BUDGET_OK=", season1_ok and done_ok and gray_ok and loan_ok and debt_ok and aust2 and aust3
+				and freeze_ok and repay_ok and ledger_ok,
+				" 첫계절=", season1_ok, "(인구 ", pop_tb, " 예산 ", budget1_tb, ")", " 완공=", done_ok,
+				" 서기만=", gray_ok, " 기채=", loan_ok, " 이자상환=", debt_ok, "(", debt3_tb, ")",
+				" 긴축2=", aust2, " 긴축3=", aust3, " 멈춤=", freeze_ok, " 갚기=", repay_ok, " 장부=", ledger_ok)
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			_s2_restore(k_tb)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
@@ -8365,6 +8453,9 @@ func _s2_keep() -> Dictionary:
 		"greed_adj": GameData.npc_greed_adj.duplicate(), "settlers": GameData.settlers.duplicate(),
 		# 갈뫼읍(S4d)
 		"gen_seed": GameData.gen_seed, "gen_npcs": GameData.gen_npcs.duplicate(true),
+		"gov_debt": GameData.gov_debt.duplicate(), "town_log": GameData.town_log.duplicate(true),
+		"town_building": GameData.town_building, "town_done": GameData.town_done.duplicate(),
+		"town_aust": GameData.town_austerity_lv,
 	}
 	return k
 
@@ -8392,6 +8483,11 @@ func _s2_restore(k: Dictionary) -> void:
 	GameData.settlers = s2.settlers
 	GameData.gen_seed = s2.gen_seed
 	GameData.gen_npcs = s2.gen_npcs
+	GameData.gov_debt = s2.gov_debt
+	GameData.town_log = s2.town_log
+	GameData.town_building = s2.town_building
+	GameData.town_done = s2.town_done
+	GameData.town_austerity_lv = s2.town_aust
 	m.hud.clear_guide()
 	_soc_restore(k)
 
