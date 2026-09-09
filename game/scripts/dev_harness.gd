@@ -801,10 +801,10 @@ func _debug_tick() -> void:
 			var hut_ok: bool = str(m.objects.get(m.CHIEF_HUT, {}).get("kind", "")) \
 				== "chief_hut" and GameData.chief_house_lv == 0
 			var res0: int = m.village_residents()
-			# 고장 사람 여섯은 교진 주민이 아니다 — 세지 않는다 (main.village_residents)
+			# 고장 사람 여섯과 읍 사람 아홉(S4c)은 교진 주민이 아니다 — 세지 않는다 (main.village_residents)
 			var hamlet_n := 0
 			for nh in m.npcs:
-				if str(nh.id) in m.HAMLET_NPC_IDS:
+				if str(nh.id) in m.HAMLET_NPC_IDS or str(nh.id) in m.TOWN_NPC_IDS:
 					hamlet_n += 1
 			var res_ok: bool = res0 == m.npcs.size() + 1 - hamlet_n
 			# 새 집 업그레이드 (아침 훅과 같은 조건·코드)
@@ -6495,8 +6495,8 @@ func _debug_tick() -> void:
 			GameData.minutes = 11 * 60
 			m.actions._enter_building("county")
 			var room_ok: bool = m.shop_room.visible and m.shop_room.room_id == "county"
-			m.village.room_action("town")
-			var counter_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("사람이 없다")
+			m.village.room_action("town")   # 우두머리(강 군수)의 한마디 — 채용 자격이 없을 때의 창구
+			var counter_ok: bool = m.dialog.visible and str(m.dialog.title_label.text) == "강 군수"
 			m.dialog.close()
 			m.shop_room.close()
 			# 버스 — 개통 전엔 팻말뿐, 개통 뒤 50G 에 반 시간, 19시 뒤엔 없다, 평판 −40 이면 거부
@@ -6538,6 +6538,81 @@ func _debug_tick() -> void:
 			GameData.minutes = keep_min_tw
 			m.map_ui.visible = map_keep_tw
 			_s2_restore(k_tw)
+		401:
+			# ---- 갈뫼읍 사람들(S4c) — 손글 아홉·자리·창구 채용·판사의 근무·장물아비 ----
+			var k_tn := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			var keep_min_tn := GameData.minutes
+			# 아홉이 제자리에 있고, 주민 수엔 안 들고, 그림이 실려 있다
+			var here_tn := 0
+			var placed_tn := 0
+			var tex_tn := 0
+			for nid_tn: String in m.TOWN_NPC_IDS:
+				if _npc_node(nid_tn) != null:
+					here_tn += 1
+				if m.TOWN_RECT.grow(2).has_point(m.npcmgr.npc_place_tile(nid_tn, "work")) \
+						and m.TOWN_RECT.grow(2).has_point(m.npcmgr.npc_place_tile(nid_tn, "square")):
+					placed_tn += 1
+				if m.tex.has("npc_%s_down_0" % nid_tn) and m.tex.has("npc_%s_portrait_normal" % nid_tn):
+					tex_tn += 1
+			var res_tn := m.village_residents()
+			var count_tn := 1
+			for n_tn in m.npcs:
+				if str(n_tn.id) not in m.HAMLET_NPC_IDS and str(n_tn.id) not in m.TOWN_NPC_IDS:
+					count_tn += 1
+			var people_ok: bool = here_tn == 9 and placed_tn == 9 and tex_tn == 9 and res_tn == count_tn \
+				and GameData.npc_kind("judge_suh") == "town"
+			# 창구 — 법원 계산대: 자격이 안 되면 창구 메뉴가 안 뜨고, 되면 「일자리 이야기」
+			_s2_fresh_gov()
+			GameData.day = 40
+			GameData.minutes = 10 * 60
+			GameData.aff_add("judge_suh", 40 - GameData.aff("judge_suh"))
+			GameData.me.reputation.kyojin = 50
+			GameData.me.books_read = 5
+			var book_refuse: String = m.society.can_hire_job("judge")
+			GameData.me.books_read = 12
+			m.story_cutscene = false   # 계산대 메뉴는 연출 중엔 안 뜬다
+			var menu_ok: bool = book_refuse.contains("열두 권") and m.society.can_hire_job("judge") == "" \
+				and m.society.counter_menu("court") and "일자리 이야기" in _btn_texts()
+			m.dialog.close()
+			m.society.hire_job("judge")
+			m.dialog.close()
+			var hire_tn: bool = str(GameData.me.job) == "judge" and GameData.seat_of("court", "judge") == "player" \
+				and str(GameData.player_title("merchant").cls) != "office"   # 근속 14일 전엔 아직 판사님이 아니다
+			# 다음날 법정 — 피고 하나, 판결 셋 중 하나, 일급 300
+			GameData.day += 1
+			m.society.work_start("court")
+			var bench_ok: bool = m.dialog.visible and m.dialog._seq.size() >= 1
+			m.society.work_pick(0)
+			m.dialog.close()
+			var work_tn: bool = int(GameData.me.perf) == 1 and int(GameData.me.wage_pending) == 300 \
+				and GameData.worked_on(GameData.day)
+			GameData.day += 14
+			var title_tn: bool = str(GameData.player_title("merchant").text).contains("판사님")   # 만수가 70이면 「우리 판사님」
+			# 장물아비 — 훔친 달걀 둘, 반값. 팔고 나면 장물이 없다
+			GameData.items["egg"] = int(GameData.items.get("egg", 0)) + 2
+			GameData.me.stolen = {"egg": 2}
+			var ch_f: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("fence_gu", ch_f)
+			var fence_choice := false
+			for c_f in ch_f:
+				if str(c_f[0]) == "물건 넘기기":
+					fence_choice = true
+			var money_tn := GameData.money
+			var eggs_tn := int(GameData.items.egg)
+			m.society.sell_stolen()
+			m.dialog.close()
+			var fence_ok: bool = fence_choice and GameData.money == money_tn + 24 and int(GameData.items.egg) == eggs_tn - 2 \
+				and GameData.me.stolen.is_empty()
+			print("TOWN_NPC_OK=", people_ok and menu_ok and hire_tn and bench_ok and work_tn and title_tn and fence_ok,
+				" 사람=", people_ok, "(", here_tn, " 자리 ", placed_tn, " 그림 ", tex_tn, " 주민 ", res_tn, "/", count_tn, ")",
+				" 창구=", menu_ok, "(", book_refuse, ")", " 채용=", hire_tn, " 법정=", bench_ok, " 근무=", work_tn,
+				" 호칭=", title_tn, " 장물=", fence_ok)
+			GameData.items["egg"] = eggs_tn - 2
+			GameData.minutes = keep_min_tn
+			_s2_restore(k_tn)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

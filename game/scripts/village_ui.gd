@@ -573,8 +573,14 @@ func open_market_stall(_t: Vector2i) -> void:
 
 
 func _open_town_room_dialog() -> void:
-	var name := str(m.shop_room.ROOMS.get(m.shop_room.room_id, {}).get("name", "창구"))
-	m.dialog.open(name, "창구는 열려 있는데 앉은 사람이 없다.\n읍에 사람이 오면 여기서 일을 본다.", [["나간다", null]])
+	var d: Dictionary = m.shop_room.ROOMS.get(m.shop_room.room_id, {})
+	var keeper := str(d.get("keeper", ""))
+	if keeper != "" and GameData.NPCS.has(keeper):
+		# 우두머리의 한마디 — 채용·근무는 society.counter_menu 가 먼저 가로챈다(자격이 있을 때)
+		m.dialog.open(GameData.npc_name(keeper), GameData.npc_line(keeper), [["대화 끝", null]],
+			m.tex.get("npc_%s_portrait_normal" % keeper))
+		return
+	m.dialog.open(str(d.get("name", "창구")), "창구는 열려 있는데 앉은 사람이 없다.", [["나간다", null]])
 
 
 func open_bus_stop(t: Vector2i) -> void:

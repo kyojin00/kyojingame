@@ -836,6 +836,20 @@ const TOWN_LAMPS := [Vector2i(248, 98), Vector2i(270, 98), Vector2i(292, 98), Ve
 # 정류장 — 교진 북쪽 어귀와 읍 서쪽 입구. 실제 칸은 세계를 지을 때 가장 가까운 빈 칸으로 잡는다(bus_tiles)
 const BUS_STOPS := {"kyojin": Vector2i(76, 4 + NORTH_PAD), "town": Vector2i(245, 100)}
 var bus_tiles := {}
+# 읍 손글 아홉(S4c) — 관청마다 우두머리 하나, 여관 뒷방의 장물아비 하나. 고장 사람처럼 m.npcs 에 살되
+# 주민 수에는 안 든다(TOWN_NPC_IDS). 그림은 고장 사람과 같은 도트 판에서 색만 갈아 낀다
+const TOWN_NPC := {
+	"county": "mayor_kang", "police": "chief_ha", "court": "judge_suh", "prosecution": "pros_min",
+	"clinic": "doctor_oh", "bank": "manager_baek", "town_inn": "innkeeper_ok", "diner": "cook_jang",
+}
+const TOWN_OF := {
+	"mayor_kang": "county", "chief_ha": "police", "judge_suh": "court", "pros_min": "prosecution",
+	"doctor_oh": "clinic", "manager_baek": "bank", "innkeeper_ok": "town_inn", "cook_jang": "diner",
+	"fence_gu": "town_inn",
+}
+const TOWN_NPC_IDS := ["mayor_kang", "chief_ha", "judge_suh", "pros_min", "doctor_oh", "manager_baek",
+	"innkeeper_ok", "cook_jang", "fence_gu"]
+const TOWN_SQUARE := Vector2i(272, 113)          # 장터 앞 — 읍 사람들이 낮에 모이는 자리
 # 사회(S2b~)가 데려오는 사람들 — 고장 사람과 같은 도트 판(make_settlers.js)에서 색만 갈아 낀다
 # 순회 판사·검사(S2c)는 NPC 노드 없이 초상·도트만 싣는다 — 주민 수에 들지 않는다
 const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]
@@ -915,7 +929,7 @@ const VILLAGE_BUILD_COST := {   # [목재, 석재]
 func village_residents() -> int:
 	var n := 1
 	for npc in npcs:
-		if str(npc.id) in HAMLET_NPC_IDS:
+		if str(npc.id) in HAMLET_NPC_IDS or str(npc.id) in TOWN_NPC_IDS:
 			continue
 		n += 1
 	return n
@@ -960,6 +974,16 @@ const NPC_SCHEDULE := {
 	# ---- 고장 사람들 ----
 	# plaza 는 교진 마을 광장이라 여기 사람들은 안 간다. 대신 제 마을
 	# 한복판(square)에 모인다 — 하루가 제 고장 안에서 돈다
+	# 읍 사람들(S4c) — 관청에서 일하고 점심엔 장터 앞에 모인다. 장물아비는 낮에만 장터를 어슬렁댄다
+	"mayor_kang":   [[6, "home"], [9, "work"], [13, "square"], [14, "work"], [19, "home"]],
+	"chief_ha":     [[6, "home"], [8, "work"], [12, "square"], [13, "work"], [19, "home"]],
+	"judge_suh":    [[6, "home"], [9, "work"], [13, "square"], [15, "work"], [19, "home"]],
+	"pros_min":     [[6, "home"], [9, "work"], [12, "square"], [13, "work"], [19, "home"]],
+	"doctor_oh":    [[6, "home"], [9, "work"], [14, "square"], [15, "work"], [19, "home"]],
+	"manager_baek": [[6, "home"], [9, "work"], [13, "square"], [14, "work"], [19, "home"]],
+	"innkeeper_ok": [[6, "work"], [11, "square"], [12, "work"], [19, "home"]],
+	"cook_jang":    [[6, "work"], [10, "square"], [11, "work"], [19, "home"]],
+	"fence_gu":     [[6, "home"], [10, "square"], [17, "home"]],
 	"miller":     [[6, "work"], [12, "square"], [14, "work"], [19, "home"]],
 	"dyer":       [[7, "work"], [11, "square"], [13, "work"], [19, "home"]],
 	"brook":      [[8, "square"], [10, "falls"], [15, "square"], [18, "home"]],
@@ -1399,7 +1423,7 @@ func _load_textures() -> void:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
 	# 고장 마을 사람들 — 여덟 장씩(걷기 6 + 초상 2)이라 이름을 하나씩
 	# 적으면 표만 마흔여덟 줄이 된다. 표에서 따라간다
-	for nid: String in HAMLET_NPC_IDS + SOCIETY_NPC_IDS:
+	for nid: String in HAMLET_NPC_IDS + SOCIETY_NPC_IDS + TOWN_NPC_IDS:
 		for sfx: String in ["down_0", "down_1", "up_0", "up_1", "side_0", "side_1",
 				"portrait_normal", "portrait_happy"]:
 			var nn := "npc_%s_%s" % [nid, sfx]

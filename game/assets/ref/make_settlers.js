@@ -109,6 +109,52 @@ const SETTLERS = {
     hair:  (r, g, b) => [Math.round(r * 0.18 + 6), Math.round(g * 0.18 + 6), Math.round(b * 0.20 + 10)],
     uniform: (r, g, b) => [Math.round(r * 0.26 + 30), Math.round(g * 0.26 + 30), Math.round(b * 0.28 + 34)],
   },
+  // -- 갈뫼읍 손글 아홉(S4c) --
+  mayor_kang: {      // 강 군수 — 갈색 양복 / 반백
+    cloth: (r, g, b) => [Math.round(r * 0.42 + 40), Math.round(g * 0.34 + 26), Math.round(b * 0.26 + 14)],
+    hair:  (r, g, b) => [Math.round(r * 0.55 + 70), Math.round(g * 0.55 + 70), Math.round(b * 0.55 + 74)],
+    uniform: (r, g, b) => [Math.round(r * 0.42 + 40), Math.round(g * 0.34 + 26), Math.round(b * 0.26 + 14)],
+  },
+  chief_ha: {        // 하 서장 — 짙은 남색 제복 / 짧은 회색
+    cloth: (r, g, b) => [Math.round(r * 0.16 + 8), Math.round(g * 0.22 + 16), Math.round(b * 0.46 + 50)],
+    hair:  (r, g, b) => [Math.round(r * 0.45 + 50), Math.round(g * 0.45 + 52), Math.round(b * 0.45 + 56)],
+    uniform: (r, g, b) => [Math.round(r * 0.16 + 8), Math.round(g * 0.22 + 16), Math.round(b * 0.46 + 50)],
+  },
+  judge_suh: {       // 서 부장판사 — 검은 법복 / 흰머리
+    cloth: (r, g, b) => [Math.round(r * 0.12 + 6), Math.round(g * 0.12 + 6), Math.round(b * 0.14 + 10)],
+    hair:  (r, g, b) => [Math.round(r * 0.7 + 110), Math.round(g * 0.7 + 110), Math.round(b * 0.7 + 112)],
+    uniform: (r, g, b) => [Math.round(r * 0.12 + 6), Math.round(g * 0.12 + 6), Math.round(b * 0.14 + 10)],
+  },
+  pros_min: {        // 민 부장검사 — 자줏빛 양복 / 검은 머리
+    cloth: (r, g, b) => [Math.round(r * 0.36 + 44), Math.round(g * 0.18 + 10), Math.round(b * 0.34 + 40)],
+    hair:  (r, g, b) => [Math.round(r * 0.16 + 6), Math.round(g * 0.16 + 6), Math.round(b * 0.18 + 10)],
+    uniform: (r, g, b) => [Math.round(r * 0.36 + 44), Math.round(g * 0.18 + 10), Math.round(b * 0.34 + 40)],
+  },
+  doctor_oh: {       // 오 소장 — 흰 가운 / 갈색 머리
+    cloth: (r, g, b) => [Math.min(255, Math.round(r * 0.5 + 130)), Math.min(255, Math.round(g * 0.5 + 132)), Math.min(255, Math.round(b * 0.5 + 136))],
+    hair:  (r, g, b) => [Math.round(r * 0.5 + 40), Math.round(g * 0.42 + 24), Math.round(b * 0.34 + 12)],
+    uniform: (r, g, b) => [Math.min(255, Math.round(r * 0.5 + 130)), Math.min(255, Math.round(g * 0.5 + 132)), Math.min(255, Math.round(b * 0.5 + 136))],
+  },
+  manager_baek: {    // 백 지점장 — 회청색 양복 / 검은 머리
+    cloth: (r, g, b) => [Math.round(r * 0.3 + 34), Math.round(g * 0.34 + 40), Math.round(b * 0.42 + 52)],
+    hair:  (r, g, b) => [Math.round(r * 0.18 + 8), Math.round(g * 0.18 + 8), Math.round(b * 0.2 + 12)],
+    uniform: (r, g, b) => [Math.round(r * 0.3 + 34), Math.round(g * 0.34 + 40), Math.round(b * 0.42 + 52)],
+  },
+  innkeeper_ok: {    // 옥이 주모 — 붉은 앞치마 / 검은 머리
+    cloth: (r, g, b) => [Math.min(255, Math.round(r * 0.7 + 70)), Math.round(g * 0.3 + 20), Math.round(b * 0.3 + 22)],
+    hair:  (r, g, b) => [Math.round(r * 0.16 + 6), Math.round(g * 0.16 + 6), Math.round(b * 0.18 + 10)],
+    uniform: (r, g, b) => [Math.min(255, Math.round(r * 0.7 + 70)), Math.round(g * 0.3 + 20), Math.round(b * 0.3 + 22)],
+  },
+  cook_jang: {       // 장씨 — 하얀 앞치마에 회색 / 검은 머리
+    cloth: (r, g, b) => [Math.round(r * 0.5 + 90), Math.round(g * 0.5 + 90), Math.round(b * 0.5 + 92)],
+    hair:  (r, g, b) => [Math.round(r * 0.16 + 6), Math.round(g * 0.16 + 6), Math.round(b * 0.18 + 10)],
+    uniform: (r, g, b) => [Math.round(r * 0.5 + 90), Math.round(g * 0.5 + 90), Math.round(b * 0.5 + 92)],
+  },
+  fence_gu: {        // 구씨 — 검정에 가까운 갈색 / 덥수룩한 회색
+    cloth: (r, g, b) => [Math.round(r * 0.2 + 18), Math.round(g * 0.16 + 12), Math.round(b * 0.12 + 8)],
+    hair:  (r, g, b) => [Math.round(r * 0.4 + 40), Math.round(g * 0.4 + 40), Math.round(b * 0.4 + 42)],
+    uniform: (r, g, b) => [Math.round(r * 0.2 + 18), Math.round(g * 0.16 + 12), Math.round(b * 0.12 + 8)],
+  },
 };
 // ONLY=아이디 로 한 사람만 다시 뽑는다 — 나머지는 이미 sprites/ 에 있는 그대로 둔다
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;

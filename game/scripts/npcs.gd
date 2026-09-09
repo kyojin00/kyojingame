@@ -88,8 +88,30 @@ func _hamlet_tile(npc_id: String, place: String) -> Vector2i:
 	return h.square
 
 
+# 읍 사람(S4c)이 갈 자리 — 집도 일터도 제 관청이고, 낮엔 장터 앞이다
+func _town_tile(npc_id: String, place: String) -> Vector2i:
+	if place == "square":
+		return m.TOWN_SQUARE
+	var plot := str(m.TOWN_OF.get(npc_id, ""))
+	if m.TOWN_PLOTS.has(plot):
+		var d: Vector2i = m.door_tile(m.TOWN_PLOTS[plot].anchor) + Vector2i(0, 1)
+		if npc_id == "fence_gu":
+			d += Vector2i(2, 0)   # 장물아비는 여관 문 옆 그늘에 선다
+		return d
+	return m.TOWN_SQUARE
+
+
 func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	var t := Vector2i(-999, -999)
+	if m.TOWN_OF.has(npc_id):
+		t = _town_tile(npc_id, place)
+		if m.is_passable(t):
+			return t
+		for d0: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0),
+				Vector2i(-1, 0), Vector2i(0, 2), Vector2i(2, 0), Vector2i(-2, 0)]:
+			if m.is_passable(t + d0):
+				return t + d0
+		return t
 	if m.HAMLET_OF.has(npc_id):
 		t = _hamlet_tile(npc_id, place)
 		if m.is_passable(t):
@@ -187,8 +209,23 @@ func _sync_hamlet_npcs() -> void:
 			_spawn_npc(nid, m.door_tile(entry2[0]) + Vector2i(0, 1), box)
 
 
+# 읍 손글 아홉(S4c) — 고장 사람처럼 조건 없이 처음부터 제자리에 있다. 어슬렁 범위는 읍 안
+func _sync_town_npcs() -> void:
+	var box: Rect2i = m.TOWN_RECT.grow(3)
+	for nid: String in m.TOWN_NPC_IDS:
+		var found := false
+		for n in m.npcs:
+			if n.id == nid:
+				found = true
+				break
+		if found:
+			continue
+		_spawn_npc(nid, _town_tile(nid, "work"), box)
+
+
 func _sync_village_npcs() -> void:
 	_sync_hamlet_npcs()
+	_sync_town_npcs()
 	# 건물이 생기면 그 건물의 주인이 마을에 나타난다 (없는 건물의 주인은 아직 없다)
 	for pid: String in m.VILLAGE_NPC:
 		if not GameData.village_built.has(pid):

@@ -292,6 +292,13 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 	# 순경(S2b) — 열린 사건의 피해자·목격자에게 「사건 이야기」, 용의자에게 「검거한다」
 	if nid != "chief" and not guest:
 		_case_choices(nid, choices)
+	# 장물아비(S4c) — 훔친 것이 가방에 있으면 반값에 넘긴다. 그가 아니면 아무 데도 못 판다
+	if nid == "fence_gu" and not guest:
+		var fl: Dictionary = GameData.SOCIETY_LINES.fence
+		if stolen_value() > 0:
+			choices.insert(choices.size() - 1, [str(fl.choice), sell_stolen])
+		else:
+			choices.insert(choices.size() - 1, gray(str(fl.choice), str(fl.gray)))
 
 
 # 하루 첫 대화의 첫마디 — 호칭이 NPC 의 입으로 나오는 자리 (헌법 §0.4).
@@ -2154,3 +2161,38 @@ func _talk_work_choices(choices: Array) -> void:
 		else:
 			choices.insert(choices.size() - 1, ["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
 	choices.insert(choices.size() - 1, ["그만두겠습니다", resign])
+
+
+# ---- 장물아비 (S4c) ----
+
+# 가방에 남아 있는 장물의 값 — me.stolen 은 훔친 수, 가진 수와 작은 쪽만 장물이다
+func stolen_value() -> int:
+	var total := 0
+	var stolen: Dictionary = GameData.me.get("stolen", {})
+	for id in stolen:
+		var n: int = mini(int(stolen[id]), int(GameData.items.get(id, 0)))
+		if n > 0:
+			total += n * int(float(GameData.item_value(str(id))) * GameData.FENCE_RATE)
+	return total
+
+
+func sell_stolen() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var fl: Dictionary = GameData.SOCIETY_LINES.fence
+	var got := stolen_value()
+	if got <= 0:
+		m.dialog.open(_npc_name("fence_gu"), str(fl.none), [["대화 끝", null]], _portrait("fence_gu"))
+		return
+	var stolen: Dictionary = GameData.me.get("stolen", {})
+	for id in stolen.keys():
+		var n: int = mini(int(stolen[id]), int(GameData.items.get(id, 0)))
+		if n > 0:
+			GameData.items[id] = int(GameData.items[id]) - n
+	GameData.me["stolen"] = {}
+	GameData.money += got
+	GameData.today_earned += got
+	GameData.bold_add(1.0)
+	m.dialog.open(_npc_name("fence_gu"), str(fl.ok) % got, [["대화 끝", null]], _portrait("fence_gu"))
+	m.saveio.save_now()
