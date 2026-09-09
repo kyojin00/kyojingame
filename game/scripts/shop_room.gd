@@ -191,7 +191,7 @@ func _closing_kick() -> void:
 	var kname := "주인"
 	var portrait: Texture2D = null
 	if GameData.NPCS.has(keeper):
-		kname = str(GameData.NPCS[keeper].name)
+		kname = GameData.npc_name(keeper)
 		portrait = main.tex.get("npc_%s_portrait_happy" % keeper)
 	main.dialog.open_seq(kname, portrait, [
 		{"text": "「아이고, 벌써 여섯 시네.」"},

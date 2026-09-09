@@ -207,11 +207,11 @@ func _build_stat_lines() -> Array:
 	var best_npc := ""
 	var best_aff := -1
 	for nid in g.NPCS:
-		var a := int(g.affinity[nid])
+		var a := g.aff(nid)
 		aff_total += a
 		if a > best_aff:
 			best_aff = a
-			best_npc = str(g.NPCS[nid].name)
+			best_npc = g.npc_name(nid)
 	var prog: Dictionary = g.note_progress()
 	var arrive := g.date_text(g.arrive_day) if g.arrive_day > 0 else "1년 봄 1일"
 	var out: Array = [
@@ -300,10 +300,10 @@ func _start_credits() -> void:
 		if GameData.npc_greeted.has(nid) or _npc_in_town(nid):
 			order.append(nid)
 	for nid: String in order:
-		var aff := int(GameData.affinity[nid])
+		var aff := GameData.aff(nid)
 		var line: String = str(MEMORY_LINES.get(nid, "")) if aff >= 50 \
 			else str(GENERIC_LINES.get(nid, "「고마웠어!」"))
-		_cards.append({"name": str(GameData.NPCS[nid].name),
+		_cards.append({"name": GameData.npc_name(nid),
 			"tex": "npc_%s_portrait_%s" % [nid, "happy" if aff >= 50 else "normal"],
 			"line": line})
 	# 떠났던 사람도 배웅하러 돌아온다 — 우체부 아저씨

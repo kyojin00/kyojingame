@@ -251,7 +251,7 @@ func _debug_tick() -> void:
 		172:
 			m.quest_ui.close()
 			GameData.crops_harvested = {"potato": 3, "carrot": 1}
-			GameData.affinity["merchant"] = 60
+			GameData.aff_set("merchant", 60)
 			# 도감 격자가 「얻은 것/못 얻은 것」을 갈라 그리는지 보이게 몇 개 심는다
 			GameData.discover("potato")
 			GameData.discover("carrot")
@@ -1238,10 +1238,10 @@ func _debug_tick() -> void:
 			# ---- 스토리 5 이후: 호감도 5에서 연화가 문을 연다 ----
 			var k_aff5 := int(GameData.affinity.get("forest_mom", 0))
 			GameData.forest_trust = ""
-			GameData.affinity["forest_mom"] = GameData.FOREST_TRUST_AFF - 1
+			GameData.aff_set("forest_mom", GameData.FOREST_TRUST_AFF - 1)
 			m.story._forest_trust_update(0.016)
 			var trust_gate: bool = GameData.forest_trust == ""
-			GameData.affinity["forest_mom"] = GameData.FOREST_TRUST_AFF
+			GameData.aff_set("forest_mom", GameData.FOREST_TRUST_AFF)
 			m.story._forest_trust_update(0.016)
 			var trust_open: bool = GameData.forest_trust == "invited" \
 				and GameData.quest_npc_marks().get("forest_mom", "") == "!" \
@@ -1258,7 +1258,7 @@ func _debug_tick() -> void:
 					girl_meet = true
 			var trust_done: bool = GameData.forest_trust == "done" \
 				and trust_txt.contains("솔이") and girl_meet
-			GameData.affinity["forest_mom"] = k_aff5
+			GameData.aff_set("forest_mom", k_aff5)
 			GameData.day -= 2
 			print("FOREST_OK=", found_q and ask_q and house_ok and mom_ok
 				and girl_ok and party_ok and meet and no_girl and back_q
@@ -1288,12 +1288,12 @@ func _debug_tick() -> void:
 			m.dialog.close()
 			GameData.items["weed"] = 3
 			var money_m: int = GameData.money
-			var aff_m := int(GameData.affinity["forest_mom"])
+			var aff_m := GameData.aff("forest_mom")
 			m.village._mom_quest_turnin("_test")
 			var served: bool = GameData.mom_quest == "" \
 				and "_test" in GameData.mom_quests_done \
 				and GameData.money == money_m + 120 \
-				and int(GameData.affinity["forest_mom"]) == aff_m + 4 \
+				and GameData.aff("forest_mom") == aff_m + 4 \
 				and int(GameData.items["weed"]) == 0
 			var no_more: bool = GameData.mom_next_quest().is_empty()   # 표를 다 비웠다
 			m.dialog.close()
@@ -1904,9 +1904,9 @@ func _debug_tick() -> void:
 			m.dialog.close()
 			var kp: Dictionary = _soc_keep()
 			var pats: Array = ["GameData.NPCS" + "[", "NPC_KIND" + "[", "affinity" + "["]
-			var baseline := {"day_cycle": 1, "ending_ui": 3, "game_data": 11, "net_sync": 2,
-				"note_ui": 2, "save_load": 2, "shop_room": 1, "story": 25, "tool_use": 1,
-				"village_ui": 29}
+			# S4a 리팩터 뒤의 기준선 — game_data 는 접근자 구현(aff_add·aff_set)·초기화·로드 넷 + 규율 주석 한 줄,
+			# save_load 는 세이브 사전(d.affinity)을 읽는 둘. 나머지 파일은 0 이어야 한다
+			var baseline := {"game_data": 5, "save_load": 2}
 			var counts := {}
 			var over: Array = []
 			for fn in DirAccess.get_files_at("res://scripts"):
@@ -2401,8 +2401,8 @@ func _debug_tick() -> void:
 			var k_move := GameData.move_quest
 			var k_sl := int(GameData.items["settle_letter"])
 			var k_fl := int(GameData.items["farewell_letter"])
-			var k_aff_f := int(GameData.affinity["farmer"])
-			var k_aff_d := int(GameData.affinity["foodie"])
+			var k_aff_f := GameData.aff("farmer")
+			var k_aff_d := GameData.aff("foodie")
 			m.dialog.close()
 			# ① 분류 — 필수/일반/특수
 			var kinds: bool = GameData.settler_kind("chief") == "core" \
@@ -2448,16 +2448,16 @@ func _debug_tick() -> void:
 			var trio_open: bool = m.dialog.visible
 			m.dialog.close()
 			m.village._trio_pick("foodie")
-			var trio_aff: bool = int(GameData.affinity["foodie"]) == k_aff_d + 6
+			var trio_aff: bool = GameData.aff("foodie") == k_aff_d + 6
 			# ④ 이탈 — 「이사 가고 싶다」 대화에서 붙잡으면 남는다
 			GameData.settler_leaving = "farmer"
 			m.story.start_leaving_dialog("farmer")
 			var leave_open: bool = m.dialog.visible
 			m.dialog.close()
-			var aff_before := int(GameData.affinity["farmer"])
+			var aff_before := GameData.aff("farmer")
 			m.story._leave_persuade("farmer")
 			var persuaded: bool = GameData.settler_leaving == "" \
-				and int(GameData.affinity["farmer"]) == aff_before + 15
+				and GameData.aff("farmer") == aff_before + 15
 			# 말없이 떠나면 빈 집과 작별 편지가 남는다
 			m.story._settler_depart("farmer", true)
 			var gone: bool = "farmer" not in GameData.settlers \
@@ -2486,8 +2486,8 @@ func _debug_tick() -> void:
 			GameData.move_quest = k_move
 			GameData.items["settle_letter"] = k_sl
 			GameData.items["farewell_letter"] = k_fl
-			GameData.affinity["farmer"] = k_aff_f
-			GameData.affinity["foodie"] = k_aff_d
+			GameData.aff_set("farmer", k_aff_f)
+			GameData.aff_set("foodie", k_aff_d)
 			print("SETTLER_OK=", kinds and no_alch and accepted and arrived
 				and spawned and trio_near and trio_open and trio_aff
 				and leave_open and persuaded and gone and fw_read and no_horn,
@@ -2570,15 +2570,15 @@ func _debug_tick() -> void:
 			GameData.wood += 40
 			GameData.stone += 20
 			GameData.money += 2000
-			var s9_aff0 := int(GameData.affinity["chief"])
+			var s9_aff0 := GameData.aff("chief")
 			m.village._do_hall_project("lamps")
 			var s9_proj: bool = GameData.hall_projects.has("lamps") \
-				and int(GameData.affinity["chief"]) == s9_aff0 + 3
+				and GameData.aff("chief") == s9_aff0 + 3
 			# 마을 회의 — 간식 나눔 가결 효과 (온 주민 호감도 +4)
 			GameData.money += 800
-			var s9_aff1 := int(GameData.affinity["chief"])
+			var s9_aff1 := GameData.aff("chief")
 			m.village._meet_apply("snack")
-			var s9_meet: bool = int(GameData.affinity["chief"]) == s9_aff1 + 4
+			var s9_meet: bool = GameData.aff("chief") == s9_aff1 + 4
 			# 새 일반 주민 7명 — 풀 10명·프로필·호감도·도트 8장씩
 			var s9_pool: bool = GameData.SETTLER_POOL.size() == 10
 			var s9_tex := true
@@ -2701,7 +2701,7 @@ func _debug_tick() -> void:
 			# 노트 20%를 확실히 넘겨 둔다 (핵심 주민 호감도 + 수확 기록)
 			for aid: String in GameData.NPCS:
 				if GameData.settler_kind(aid) == "core":
-					GameData.affinity[aid] = 100
+					GameData.aff_set(aid, 100)
 			for cid2: String in GameData.CROP_IDS:
 				GameData.crops_harvested[cid2] = \
 					maxi(1, int(GameData.crops_harvested.get(cid2, 0)))
@@ -2776,14 +2776,14 @@ func _debug_tick() -> void:
 			var k12_crops: Dictionary = GameData.crops_harvested.duplicate()
 			# ① 조건 게이트 — 호감도 3단계 주민 5명이 안 되면 시작되지 않는다
 			for a12: String in GameData.affinity:
-				GameData.affinity[a12] = 0
+				GameData.aff_set(a12, 0)
 			m.story._story12_update(0.016)
 			var s12_wait: bool = GameData.story12_phase == "" \
 				and not GameData.story12_ready()
 			# 노트 40%와 친구 5명을 채운다 (핵심 주민 호감도 + 수확 기록)
 			for a13: String in GameData.NPCS:
 				if GameData.settler_kind(a13) == "core":
-					GameData.affinity[a13] = 100
+					GameData.aff_set(a13, 100)
 			for c12: String in GameData.CROP_IDS:
 				GameData.crops_harvested[c12] = \
 					maxi(1, int(GameData.crops_harvested.get(c12, 0)))
@@ -2999,11 +2999,11 @@ func _debug_tick() -> void:
 			m.dialog.close()
 			# ⑤ 투호 미니게임 — 상금 + 첫 참가 때 온 주민 호감도
 			var money14: int = GameData.money
-			var aff14: int = int(GameData.affinity["chief"])
+			var aff14: int = GameData.aff("chief")
 			m.story._fest_toss()
 			var s14_toss: bool = GameData.story14_toss \
 				and GameData.money >= money14 \
-				and int(GameData.affinity["chief"]) == aff14 + 2
+				and GameData.aff("chief") == aff14 + 2
 			m.dialog.close()
 			# ⑥ 마무리 — 캘린더 해금
 			m.story._start_fest_end_dialog()
@@ -3127,7 +3127,7 @@ func _debug_tick() -> void:
 			var k16_aff: Dictionary = GameData.affinity.duplicate()
 			for a16: String in GameData.NPCS:
 				if GameData.settler_kind(a16) == "core":
-					GameData.affinity[a16] = 100
+					GameData.aff_set(a16, 100)
 			for c16: String in GameData.CROP_IDS:
 				GameData.crops_harvested[c16] = \
 					maxi(1, int(GameData.crops_harvested.get(c16, 0)))
@@ -3299,7 +3299,7 @@ func _debug_tick() -> void:
 			for rc18: String in GameData.RECIPE_IDS:
 				GameData.recipes_cooked[rc18] = maxi(1, int(GameData.recipes_cooked.get(rc18, 0)))
 			for a18: String in GameData.NPCS:
-				GameData.affinity[a18] = 100
+				GameData.aff_set(a18, 100)
 			GameData.minerals_found["ore"] = true
 			GameData.minerals_found["gem"] = true
 			var s18_note: bool = GameData.note_progress().ratio >= GameData.STORY18_NOTE
@@ -3497,7 +3497,7 @@ func _debug_tick() -> void:
 			for rc20: String in GameData.RECIPE_IDS:
 				GameData.recipes_cooked[rc20] = maxi(1, int(GameData.recipes_cooked.get(rc20, 0)))
 			for a20: String in GameData.NPCS:
-				GameData.affinity[a20] = 100
+				GameData.aff_set(a20, 100)
 			GameData.minerals_found["ore"] = true
 			GameData.minerals_found["gem"] = true
 			var k20_for: Dictionary = GameData.forage_caught.duplicate()
@@ -3638,8 +3638,8 @@ func _debug_tick() -> void:
 			# 집터에 집 짓기 -> 다시 말 걸기 -> 수납 상자 레시피
 			m.dialog.close()
 			# ① 이름 — 상점 상인 만수 · 낚시꾼 용식
-			var name_ok: bool = str(GameData.NPCS["merchant"].name) == "만수" \
-				and str(GameData.NPCS["fisher"].name) == "용식"
+			var name_ok: bool = GameData.npc_name("merchant") == "만수" \
+				and GameData.npc_name("fisher") == "용식"
 			# ② 바닷길을 연 지 3일 — 그전에는 나오지 않는다
 			GameData.fisher_quest = "done"
 			GameData.sea_open = true
@@ -3910,7 +3910,7 @@ func _debug_tick() -> void:
 					if str(q8.get(key8, "")).contains("부엌"):
 						no_kitchen_word = false
 			for nid8: String in GameData.NPCS:
-				var nd8: Dictionary = GameData.NPCS[nid8]
+				var nd8: Dictionary = GameData.npc_def(nid8)
 				for key9: String in ["greet", "secret50", "secret100"]:
 					if str(nd8.get(key9, "")).contains("부엌"):
 						no_kitchen_word = false
@@ -4222,8 +4222,8 @@ func _debug_tick() -> void:
 			m.inventory_ui.close()
 
 			# ── ① 이름
-			var names_ok: bool = str(GameData.NPCS["explorer"].name) == "재민" \
-				and str(GameData.NPCS["postman"].name) == "우체부 아저씨" \
+			var names_ok: bool = GameData.npc_name("explorer") == "재민" \
+				and GameData.npc_name("postman") == "우체부 아저씨" \
 				and str(GameData.NPC_KIND.get("postman", "")) == "core" \
 				and str(m.VILLAGE_NPC.get("post", "")) == "postman" \
 				and m.NPC_SCHEDULE.has("postman") \
@@ -4780,7 +4780,7 @@ func _debug_tick() -> void:
 			GameData.mail_sent_day = k_msent
 			GameData.money = k_money_m
 			GameData.village_built = k_built_m
-			GameData.affinity["chief"] = aff_m
+			GameData.aff_set("chief", aff_m)
 
 			# ── ③ 고가치 경제 — 벌이는 얇아지고 돈은 무거워진다
 			var econ_ok: bool = GameData.START_MONEY <= 200 \
@@ -5375,22 +5375,32 @@ func _debug_tick() -> void:
 					e_ok = true
 			var bind_ok: bool = f_ok and e_ok \
 				and GameData.key_label("talk") == "F"
-			# ② 사람 앞에서: F는 말을 걸고, E는 말을 걸지 않는다
+			# ② 사람 앞에서: F는 말을 걸고, E는 말을 걸지 않는다.
+			# 사람이 어디 서 있느냐에 따라 E 가 문·물건을 열어 버리므로(S4a 지터로 걸음 시각이 달라진다)
+			# 아무나 하나를 빈 풀밭으로 옮겨 놓고 잰다 — 위 칸까지 비어 있는 자리
 			var talk_npc: Node2D = null
 			for n_t in m.npcs:
-				if not n_t.visible:
-					continue
-				# 그 사람 위 칸에 건물·물건이 있으면 E 가 그걸 열어 버린다 — 앞이 빈 사람으로
-				var above := Vector2i(int(n_t.position.x / m.TILE), int(n_t.position.y / m.TILE) - 1)
-				if m.objects.has(above) or not m.is_passable(above):
-					continue
-				talk_npc = n_t
-				break
-			if talk_npc == null:
-				for n_t2 in m.npcs:
-					if n_t2.visible:
-						talk_npc = n_t2
+				if n_t.visible:
+					talk_npc = n_t
+					break
+			var npc_keep_pos := Vector2.ZERO
+			if talk_npc != null:
+				npc_keep_pos = talk_npc.position
+				var base_t := Vector2i(m.START_TILE.x, m.START_TILE.y + 3)
+				var spot_t := Vector2i(-1, -1)
+				for dy_t in range(0, 14):
+					for dx_t in range(-8, 9):
+						var c_t := base_t + Vector2i(dx_t, dy_t)
+						var up_t := c_t + Vector2i(0, -1)
+						if m.is_passable(c_t) and m.is_passable(up_t) and not m.objects.has(c_t) and not m.objects.has(up_t) \
+								and m.actions._door_kind_at(c_t) == "" and m.actions._door_kind_at(up_t) == "" \
+								and m.actions._building_kind_at(c_t) == "" and m.actions._building_kind_at(up_t) == "":
+							spot_t = c_t
+							break
+					if spot_t.x >= 0:
 						break
+				if spot_t.x >= 0:
+					talk_npc.position = Vector2(spot_t.x * m.TILE + 16, spot_t.y * m.TILE + 16)
 			var talk_ok := false
 			var e_silent := false
 			var t_pos: Vector2 = m.player.position
@@ -5405,6 +5415,7 @@ func _debug_tick() -> void:
 				m.dialog.close()
 				m.actions.interact()           # 같은 자리에서 E
 				e_silent = not m.dialog.visible
+				talk_npc.position = npc_keep_pos
 			# ③ 아무도 없으면 F는 false를 돌려준다 (그래야 말 타기로 넘어간다)
 			m.player.position = Vector2(m.START_TILE.x * m.TILE + 16,
 				(m.START_TILE.y + 3) * m.TILE + 16)
@@ -6348,6 +6359,78 @@ func _debug_tick() -> void:
 			GameData.things_built = tb_keep
 			GameData.desk_queue = dq_keep
 			_s2_restore(k_cp)
+		398:
+			# ---- 성능 3종(S4a) — 일과 지터·길찾기 프레임 예산·거리 LOD. 예순 명을 더 세우고 한 프레임을 잰다 ----
+			var k_pf := _soc_keep()
+			m.dialog.close()
+			var keep_min_pf := GameData.minutes
+			var map_keep_pf: bool = m.map_ui.visible
+			m.map_ui.visible = false
+			m.story_cutscene = false
+			# 프레임 예산 — 한 프레임에 길찾기 둘까지(아직 이 프레임에 아무도 길을 안 찾았다 — 부모가 먼저 돈다)
+			var slots: Array = [m.npcmgr.path_slot(), m.npcmgr.path_slot(), m.npcmgr.path_slot()]
+			var slot_ok: bool = slots[0] and slots[1] and not slots[2]
+			var far_pf: Vector2i = m.nearest_open_tile(m.HAMLETS.brookside.square)   # 물소리 마을 — 나에게서 200칸 넘게
+			var spawned_pf: Array = []
+			for i in 60:
+				var nid_pf := str(GameData.SETTLER_POOL[i % GameData.SETTLER_POOL.size()])
+				m.npcmgr._spawn_npc(nid_pf, far_pf + Vector2i(i % 8, i / 8))
+				spawned_pf.append(m.npcs[-1])
+			# 지터 — 자리가 바뀐 시각(순돌은 10시 광장)에 제 몫의 분만큼 늦게 움직이고, 스무 분 뒤엔 모두 제자리다
+			GameData.minutes = 8 * 60 + 30
+			for n in spawned_pf:
+				n._process(0.016)
+			GameData.minutes = 8 * 60 + 59
+			for n in spawned_pf:
+				n._process(0.016)
+			# 거리 LOD — 물소리 마을에서 교진 일터까지는 200칸이 넘는다: 지터가 풀린 뒤(8시 59분) 자리가 있는 사람은 길을 안 찾고 목적지에 섰다
+			var with_dest := 0
+			var teleported := 0
+			for n in spawned_pf:
+				if n.dest.x == -999:
+					continue
+				with_dest += 1
+				var nt := Vector2i(int(floor(n.position.x / m.TILE)), int(floor(n.position.y / m.TILE)))
+				if nt == n.dest and n.route.is_empty():
+					teleported += 1
+			var lod_ok: bool = with_dest > 0 and teleported == with_dest
+			var farmer_pf: Node2D = null
+			var jit_set := {}
+			for n in spawned_pf:
+				jit_set[int(n._jitter_min)] = true
+				if farmer_pf == null and str(n.id) == "farmer":
+					farmer_pf = n
+			GameData.minutes = 10 * 60
+			for n in spawned_pf:
+				n._process(0.016)
+			var jit_farmer := int(farmer_pf._jitter_min) if farmer_pf != null else 0
+			var delay_ok: bool = jit_farmer == 0 or str(farmer_pf.place) == "home"
+			var jit_ok: bool = jit_set.size() >= 3 and delay_ok
+			for jv in jit_set:
+				jit_ok = jit_ok and int(jv) >= 0 and int(jv) <= 20
+			GameData.minutes = 10 * 60 + 21
+			for n in spawned_pf:
+				n._process(0.016)
+			var all_moved := true
+			for n in spawned_pf:
+				if str(n.place) != m.npcmgr.npc_place_now(str(n.id)):
+					all_moved = false
+			# 한 프레임 — 모든 NPC 를 한 번씩 돌린 시간
+			var t0_pf := Time.get_ticks_usec()
+			for n in m.npcs:
+				n._process(0.016)
+			var frame_us := Time.get_ticks_usec() - t0_pf
+			var frame_ok: bool = frame_us < 50000
+			print("NPC_PERF_OK=", jit_ok and all_moved and lod_ok and slot_ok and frame_ok,
+				" 지터=", jit_ok, "(순돌 ", jit_farmer, "분 지터값 ", jit_set.size(), "종)",
+				" 21분뒤=", all_moved, " LOD=", lod_ok, "(", teleported, "/", with_dest, ")", " 예산=", slot_ok,
+				" 프레임=", frame_ok, "(", frame_us, "us, NPC ", m.npcs.size(), ")")
+			for n in spawned_pf:
+				m.npcs.erase(n)
+				n.queue_free()
+			GameData.minutes = keep_min_pf
+			m.map_ui.visible = map_keep_pf
+			_soc_restore(k_pf)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
@@ -6953,7 +7036,7 @@ func _debug_tick() -> void:
 			# 선물 취향 · 생일 · 연애 단계
 			GameData.dating = ""
 			GameData.spouse = ""
-			GameData.affinity["merchant"] = 0
+			GameData.aff_set("merchant", 0)
 			var loved := GameData.gift_value("merchant", "strawberry")     # loves
 			var liked := GameData.gift_value("merchant", "potato")         # likes
 			var plain := GameData.gift_value("merchant", "ore")            # 표에 없음
@@ -6989,7 +7072,7 @@ func _debug_tick() -> void:
 			# 대사가 갈래대로 늘었는가 (넉 줄 돌려막기로 되돌아가면 잡힌다)
 			var line_total := 0
 			for nid: String in GameData.NPCS:
-				var d: Dictionary = GameData.NPCS[nid]
+				var d: Dictionary = GameData.npc_def(nid)
 				line_total += (d.lines as Array).size()
 				for k in ["season", "weather"]:
 					for kk in d.get(k, {}):

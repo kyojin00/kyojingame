@@ -316,6 +316,24 @@ const PATH_BUDGET_MIN := 3000
 const PATH_BUDGET_MAX := 12000
 const BIG_G := 1 << 30
 var _path_opened := 0        # 마지막으로 펼친 칸 수 (검증·F3용)
+# 길찾기 프레임 예산(S4a 성능 ②) — 한 프레임에 둘까지. 셋째부터는 다음 프레임에 —
+# 부른 쪽(npc._update_schedule)이 짧게 기다렸다 다시 온다. 아흔 명이 같은 시각에
+# 길을 찾아도 한 프레임이 튀지 않는다(최악 24,000 pop ≈ 30~50ms 가 한 프레임에 겹치지 않게)
+const PATH_PER_FRAME := 2
+var _path_frame := -1
+var _path_calls := 0
+
+
+func path_slot() -> bool:
+	var f: int = Engine.get_process_frames()
+	if f != _path_frame:
+		_path_frame = f
+		_path_calls = 0
+	if _path_calls >= PATH_PER_FRAME:
+		return false
+	_path_calls += 1
+	return true
+
 
 const PATH_DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0),
 	Vector2i(0, 1), Vector2i(0, -1)]

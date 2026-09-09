@@ -2666,7 +2666,7 @@ func _start_movein_dialog(nid: String) -> void:
 	if nid == "postman" and GameData.move_quest == "postgreet":
 		_start_postman_settle_dialog()
 		return
-	var def: Dictionary = GameData.NPCS[nid]
+	var def: Dictionary = GameData.npc_def(nid)
 	var bname := "가게"
 	for pid: String in m.VILLAGE_NPC:
 		if str(m.VILLAGE_NPC[pid]) == nid:
@@ -2714,7 +2714,7 @@ func _end_movein(nid: String) -> void:
 			GameData.arrivals.remove_at(i)
 			break
 	m.npcmgr._sync_village_npcs()
-	m.hud.event_toast("%s이(가) 마을에 자리 잡았다!" % GameData.NPCS[nid].name)
+	m.hud.event_toast("%s이(가) 마을에 자리 잡았다!" % GameData.npc_name(nid))
 	m.saveio.save_now()
 
 
@@ -3472,7 +3472,7 @@ const HAT_CLUES := {
 
 
 func _start_hat_clue_dialog(nid: String) -> void:
-	var nm := str(GameData.NPCS[nid].name)
+	var nm := GameData.npc_name(nid)
 	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid),
 		HAT_CLUES[nid].duplicate(), _end_hat_clue.bind(nid))
 
@@ -3607,7 +3607,7 @@ func story12_hear(nid: String) -> void:
 		return
 	var idx := mini(GameData.story12_heard.size(), ALCH_RUMORS.size() - 1)
 	GameData.story12_heard.append(nid)
-	var nm := str(GameData.NPCS[nid].name)
+	var nm := GameData.npc_name(nid)
 	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid), [
 		{"text": str(ALCH_RUMORS[idx])},
 	], _end_alch_rumor)
@@ -3768,7 +3768,7 @@ func story13_hear(nid: String) -> void:
 		return
 	var idx := mini(GameData.story13_heard.size(), SEA_TALES.size() - 1)
 	GameData.story13_heard.append(nid)
-	var nm := str(GameData.NPCS[nid].name)
+	var nm := GameData.npc_name(nid)
 	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid), [
 		{"text": str(SEA_TALES[idx])},
 	], _end_sea_tale)
@@ -3913,7 +3913,7 @@ func story14_prep_greet(nid: String) -> bool:
 	if GameData.story14_phase != "prep" or nid in GameData.story14_greet:
 		return false
 	GameData.story14_greet.append(nid)
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_happy" % nid,
 			m.tex.get("npc_%s_portrait_normal" % nid)),
 		[{"text": str(PREP_LINES.get(nid, PREP_LINE_DEFAULT))}])
@@ -3958,7 +3958,7 @@ const FEST_LINE_DEFAULT := "「이런 날이 오다니! 이 마을로 오길 잘
 func story14_fest_greet(nid: String) -> bool:
 	if GameData.story14_phase != "fest" or GameData.day < GameData.story14_fest_day:
 		return false
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_happy" % nid,
 			m.tex.get("npc_%s_portrait_normal" % nid)),
 		[{"text": str(FEST_LINES.get(nid, FEST_LINE_DEFAULT))}])
@@ -3997,7 +3997,7 @@ func _fest_toss() -> void:
 		GameData.story14_toss = true
 		for n in m.npcs:
 			if GameData.affinity.has(n.id):
-				GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 2
+				GameData.aff_add(n.id, 2)
 		body += "\n\n(다 같이 웃고 떠들었다 — 온 주민 호감도 +2)"
 	m.dialog.open("투호 던지기", body, [["즐거웠다", open_fest_day_dialog]])
 	m.saveio.save_now()
@@ -4227,7 +4227,7 @@ func story16_hear(nid: String) -> void:
 		return
 	var idx := mini(GameData.story16_heard.size(), FARM_TALES.size() - 1)
 	GameData.story16_heard.append(nid)
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_normal" % nid),
 		[{"text": str(FARM_TALES[idx])}], _end_farm_tale)
 
@@ -4332,7 +4332,7 @@ func story17_hear(nid: String) -> void:
 		return
 	var idx := mini(GameData.story17_heard.size(), BARN_TALES.size() - 1)
 	GameData.story17_heard.append(nid)
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_normal" % nid),
 		[{"text": str(BARN_TALES[idx])}], _end_barn_tale)
 
@@ -4453,7 +4453,7 @@ func story18_hear(nid: String) -> void:
 		return
 	var idx := mini(GameData.story18_heard.size(), HILL_TALES.size() - 1)
 	GameData.story18_heard.append(nid)
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_normal" % nid),
 		[{"text": str(HILL_TALES[idx])}], _end_hill_tale)
 
@@ -4934,9 +4934,9 @@ func _place_home_sign(anchor: Vector2i, door: Vector2i) -> void:
 func home_sign_dialog(t: Vector2i) -> void:
 	var owner := _home_sign_owner(t)
 	if owner != "":
-		m.dialog.open("%s의 집" % str(GameData.NPCS[owner].name),
+		m.dialog.open("%s의 집" % GameData.npc_name(owner),
 			"문패에 이름이 걸려 있다.\n지금은 %s이(가) 사는 집이다."
-				% str(GameData.NPCS[owner].name), [["닫기", null]])
+				% GameData.npc_name(owner), [["닫기", null]])
 		return
 	var btns: Array = []
 	if GameData.fisher_home == "build":
@@ -5000,7 +5000,7 @@ func _end_fisher_home_reward() -> void:
 		and not GameData.recipe_items.has(GameData.JAM_ID)
 	if jam_new:
 		GameData.give_recipe(GameData.JAM_ID)
-	GameData.affinity["fisher"] = mini(100, int(GameData.affinity["fisher"]) + 15)
+	GameData.aff_add("fisher", 15)
 	Sound.play_sfx("sfx_coin")
 	m.hud.event_toast("수납 상자 레시피를 배웠다!")
 	if jam_new:
@@ -5055,7 +5055,7 @@ func story20_show_page(nid: String) -> void:
 	if nid not in GameData.STORY20_TELL:
 		return
 	GameData.story20_told.append(nid)
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_normal" % nid),
 		LAST_PAGE_LINES[nid], _end_last_page_talk)
 
@@ -5215,7 +5215,7 @@ const ONSEN_LINE_DEFAULT := "「온천 좋다~ 이런 게 있었는지도 몰랐
 
 func onsen_npc_line(nid: String) -> void:
 	var lines: Array = ONSEN_LINES.get(nid, [ONSEN_LINE_DEFAULT])
-	m.dialog.open_seq(str(GameData.NPCS[nid].name),
+	m.dialog.open_seq(GameData.npc_name(nid),
 		m.tex.get("npc_%s_portrait_happy" % nid,
 			m.tex.get("npc_%s_portrait_normal" % nid)),
 		[{"text": str(lines[randi() % lines.size()])}])
@@ -5281,7 +5281,7 @@ func _settler_update(_delta: float) -> void:
 			GameData.npc_greeted.append(nid)
 		GameData.npc_last_talk[nid] = GameData.day
 		m.npcmgr._sync_village_npcs()
-		m.hud.event_toast("%s이(가) 마을에 이사 왔다!" % GameData.NPCS[nid].name)
+		m.hud.event_toast("%s이(가) 마을에 이사 왔다!" % GameData.npc_name(nid))
 		m.saveio.save_now()
 	# ② 이사 신청 편지 — 하루 한 번만 굴린다 (들어올 자리가 있어야)
 	if GameData.settler_offer == "" and GameData.settler_arrive == "" \
@@ -5306,7 +5306,7 @@ func _settler_update(_delta: float) -> void:
 		for nid2: String in GameData.settlers.duplicate():
 			if GameData.settler_leaving == nid2:
 				continue
-			var aff := int(GameData.affinity[nid2])
+			var aff := GameData.aff(nid2)
 			if aff >= GameData.SAFE_AFF:
 				continue   # 마음이 깊으면 떠날 생각을 하지 않는다
 			var neglected: bool = GameData.day \
@@ -5330,7 +5330,7 @@ func open_settle_letter() -> void:
 		GameData.items["settle_letter"] = 0
 		return
 	var body: String = str(SETTLE_LETTERS.get(nid, "『마을에서 살고 싶습니다.』"))
-	m.dialog.open("이사 신청 편지 — %s" % GameData.NPCS[nid].name, body, [
+	m.dialog.open("이사 신청 편지 — %s" % GameData.npc_name(nid), body, [
 		["이사를 수락한다", _settle_accept],
 		["정중히 거절한다", _settle_decline],
 		["나중에 정한다", null],
@@ -5366,13 +5366,13 @@ func _settle_accept() -> void:
 	GameData.items["settle_letter"] = 0
 	GameData.settler_offer = ""
 	# 수락한 편지는 우체국 보관함에 남는다
-	_store_letter("이사 신청 편지 — %s" % GameData.NPCS[nid].name,
+	_store_letter("이사 신청 편지 — %s" % GameData.npc_name(nid),
 		str(SETTLE_LETTERS.get(nid, "『마을에서 살고 싶습니다.』")))
 	GameData.settler_homes[nid] = [anchor.x, anchor.y]
 	GameData.settler_arrive = nid
 	GameData.settler_arrive_day = GameData.day
 	Sound.play_sfx("sfx_place")
-	m.hud.event_toast("이사 수락 — 내일 %s이(가) 온다!" % GameData.NPCS[nid].name)
+	m.hud.event_toast("이사 수락 — 내일 %s이(가) 온다!" % GameData.npc_name(nid))
 	m.queue_redraw()
 	m.saveio.save_now()
 
@@ -5387,7 +5387,7 @@ func _settle_decline() -> void:
 
 # 「이사를 가고 싶다」 — 떠나려는 주민의 속마음 (붙잡을 수 있다)
 func start_leaving_dialog(nid: String) -> void:
-	var nm := str(GameData.NPCS[nid].name)
+	var nm := GameData.npc_name(nid)
 	m.dialog.open_seq(nm, m.tex.get("npc_%s_portrait_normal" % nid), [
 		{"text": "「...저기, 할 말이 있어.」"},
 		{"text": "「요즘 마을 생활이 영 겉도는 것 같아서...\n나, 이사를 가 볼까 해.」"},
@@ -5401,11 +5401,11 @@ func start_leaving_dialog(nid: String) -> void:
 func _leave_persuade(nid: String) -> void:
 	m.dialog.close()
 	GameData.settler_leaving = ""
-	GameData.affinity[nid] = int(GameData.affinity[nid]) + 15
+	GameData.aff_add(nid, 15)
 	GameData.npc_last_talk[nid] = GameData.day
 	Sound.play_sfx("sfx_heart")
 	m.hud.show_message("%s이(가) 조금 놀란 얼굴로... 이내 배시시 웃었다. (호감도 +15)\n앞으로 자주 들여다보자 — 마음이 식으면 또 떠나고 싶어진다."
-		% GameData.NPCS[nid].name, 6.0)
+		% GameData.npc_name(nid), 6.0)
 	m.saveio.save_now()
 
 
@@ -5427,7 +5427,7 @@ func _settler_depart(nid: String, silent: bool) -> void:
 		if n.id == nid:
 			m.npcs.erase(n)
 			n.queue_free()
-	var nm := str(GameData.NPCS[nid].name)
+	var nm := GameData.npc_name(nid)
 	if silent:
 		GameData.items["farewell_letter"] = \
 			int(GameData.items["farewell_letter"]) + 1

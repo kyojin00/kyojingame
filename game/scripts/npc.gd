@@ -21,6 +21,13 @@ var dest := Vector2i(-999, -999)   # 그 장소의 타일
 var route: Array = []        # 남은 길 (월드 좌표)
 var _route_cd := 0.0         # 길찾기 재시도 간격
 var scripted := false        # 스토리 연출이 직접 움직인다 — 일과·배회 정지
+# 성능(S4a) — 일과 지터: 자리가 바뀐 뒤 사람마다 0~20 게임분을 기다렸다 움직인다(같은 시각에
+# 온 마을이 한꺼번에 길을 찾지 않게). 거리 LOD: 아무 플레이어에게서 맨해튼 80칸 밖이면 길을
+# 안 찾고 목적지에 옮겨 선다(보이지 않는 걸음은 계산하지 않는다)
+const LOD_TILES := 80
+var _jitter_min := -1
+var _pending_place := ""
+var _pending_at := -1.0
 
 
 func _ready() -> void:
@@ -90,6 +97,14 @@ func _update_schedule() -> void:
 	if want == "":
 		return
 	if want != place:
+		# 지터 — 자리가 바뀐 순간부터 제 몫의 분을 기다린다. 시계가 되감기면(새벽) 바로 간다
+		if _jitter_min < 0:
+			_jitter_min = posmod(hash(id), 21)
+		if _pending_place != want:
+			_pending_place = want
+			_pending_at = GameData.minutes
+		if GameData.minutes >= _pending_at and GameData.minutes - _pending_at < float(_jitter_min):
+			return
 		place = want
 		dest = main.npcmgr.npc_place_tile(id, place)
 		_route_cd = 0.0
@@ -105,6 +120,16 @@ func _update_schedule() -> void:
 		return
 	if _route_cd > 0.0:
 		return
+	# 거리 LOD — 아무 플레이어에게서도 80칸 밖이면 걷지 않고 목적지에 선다(쫓는 중은 예외)
+	if place != "chase" and _far_from_players(t):
+		position = Vector2(dest.x * ts + ts / 2.0, dest.y * ts + ts / 2.0)
+		route = []
+		moving = false
+		return
+	# 프레임 예산 — 이 프레임의 길찾기 몫이 찼으면 다음 프레임에
+	if not main.npcmgr.path_slot():
+		_route_cd = 0.05
+		return
 	_route_cd = 2.0   # 길이 막혀 있으면 잠시 뒤 다시 시도한다
 	var p: Array = main.npcmgr._tile_path(t, dest)
 	if p.is_empty():
@@ -116,6 +141,19 @@ func _update_schedule() -> void:
 	route = p
 	target = route.pop_front()
 	moving = true
+
+
+# 이 칸이 모든 플레이어(나·같이 노는 사람들)에게서 LOD 거리 밖인가
+func _far_from_players(t: Vector2i) -> bool:
+	var pt: Vector2i = main.player_tile()
+	if absi(t.x - pt.x) + absi(t.y - pt.y) <= LOD_TILES:
+		return false
+	for pid in main.remote_players:
+		var rp: Node2D = main.remote_players[pid]
+		var rt := Vector2i(int(floor(rp.position.x / main.TILE)), int(floor(rp.position.y / main.TILE)))
+		if absi(t.x - rt.x) + absi(t.y - rt.y) <= LOD_TILES:
+			return false
+	return true
 
 
 # 목적지 둘레를 어슬렁거린다 (타일 크기는 main.TILE 기준)

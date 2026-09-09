@@ -484,8 +484,8 @@ func _rebuild_story() -> void:
 	_line("")
 	_head("[주민 이야기]")
 	for npc_id in GameData.NPCS:
-		var def2: Dictionary = GameData.NPCS[npc_id]
-		var aff := int(GameData.affinity[npc_id])
+		var def2: Dictionary = GameData.npc_def(npc_id)
+		var aff := GameData.aff(npc_id)
 		# 생일과 취향 — 취향은 좀 친해져야 알게 된다
 		var head_bits: Array[String] = []
 		var b: Array = def2.get("birthday", [])

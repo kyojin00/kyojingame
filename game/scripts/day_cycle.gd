@@ -321,7 +321,7 @@ func _spouse_morning() -> String:
 	var sid := GameData.spouse
 	if sid == "" or not GameData.NPCS.has(sid):
 		return ""
-	var def: Dictionary = GameData.NPCS[sid]
+	var def: Dictionary = GameData.npc_def(sid)
 	var lines: Array = def.get("married", [])
 	var line: String = str(lines[randi() % lines.size()]) if not lines.is_empty() else "잘 잤어?"
 	var out := "%s: \"%s\"" % [def.name, line]

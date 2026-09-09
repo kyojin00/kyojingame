@@ -1424,7 +1424,7 @@ func mail_new_day() -> Array:
 		var nm := str(NPCS[nid].name)
 		mail_store("%s의 답장" % nm, str(NPCS[nid].get("reply_letter",
 			"『편지 잘 받았어요.\n덕분에 하루가 환했습니다. 또 써 주세요.』")))
-		affinity[nid] = mini(int(affinity.get(nid, 0)) + MAIL_REPLY_AFF, 100)
+		aff_set(nid, aff(nid) + MAIL_REPLY_AFF)
 		came.append(nm)
 	return came
 # 쓰레기통(무인 판매함) 판매 배율 — 24시간 아무 때나 파는 대신 제값의 80%
@@ -1919,7 +1919,7 @@ const STORY12_MATS := {"crystal": 2, "forage_herb": 5, "fish_crucian": 3}
 func story12_friends() -> int:
 	var n := 0
 	for nid in affinity:
-		if int(affinity[nid]) >= STORY12_AFF_LV:
+		if aff(nid) >= STORY12_AFF_LV:
 			n += 1
 	return n
 
@@ -4605,9 +4605,9 @@ func note_progress() -> Dictionary:
 		if str(NPC_KIND.get(npc_id, "core")) != "core":
 			continue
 		total += 2  # 호감도 50 / 100 이야기
-		if int(affinity[npc_id]) >= 50:
+		if aff(npc_id) >= 50:
 			filled += 1
-		if int(affinity[npc_id]) >= 100:
+		if aff(npc_id) >= 100:
 			filled += 1
 	for fid in FORAGE_IDS + BUG_IDS:
 		total += 1
@@ -5793,7 +5793,7 @@ func npc_line(npc_id: String) -> String:
 		pool += def.get("married", [])
 	elif dating == npc_id:
 		pool += def.get("dating", [])
-	var aff := int(affinity[npc_id])
+	var aff := aff(npc_id)
 	if aff >= 70:
 		pool += def.get("aff70", [])
 	if aff >= 30:
@@ -8942,6 +8942,18 @@ func aff_add(id: String, d: int) -> void:
 	affinity[id] = clampi(aff(id) + d, 0, 100)
 
 
+# 호감도를 값으로 놓는다 — 아는 사람만(NPCS·COURT 밖 id 는 무시). 0..100 (S4a 접근자)
+func aff_set(id: String, v: int) -> void:
+	if not affinity.has(id) and npc_def(id).is_empty():
+		return
+	affinity[id] = clampi(v, 0, 100)
+
+
+# 이름 — 모르는 id 면 id 그대로(크래시 대신 글자). NPCS[id].name 직접 첨자를 대신한다(S4a)
+func npc_name(id: String) -> String:
+	return str(npc_def(id).get("name", id))
+
+
 # 「총각/처자」 — 성별은 플레이어 gender 로만 가른다.
 func honor() -> String:
 	return "처자" if gender == "f" else "총각"
@@ -10218,7 +10230,7 @@ func grandpa_count(kind: String) -> int:
 		"best_affinity":
 			var best := 0
 			for k in affinity:
-				best = maxi(best, int(affinity[k]))
+				best = maxi(best, aff(k))
 			return best
 		"note_percent":
 			var p: Dictionary = note_progress()
@@ -10317,7 +10329,7 @@ func grandpa_line() -> String:
 
 
 func merchant_discount() -> bool:
-	return int(affinity["merchant"]) >= 50
+	return aff("merchant") >= 50
 
 
 func seed_price(id: String) -> int:

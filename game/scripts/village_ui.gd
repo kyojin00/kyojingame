@@ -103,8 +103,8 @@ func _chat_buddy(npc: Node2D) -> Variant:
 
 
 func _start_trio_dialog(a: Node2D, b: Node2D) -> void:
-	var an := str(GameData.NPCS[a.id].name)
-	var bn := str(GameData.NPCS[b.id].name)
+	var an := GameData.npc_name(a.id)
+	var bn := GameData.npc_name(b.id)
 	GameData.npc_last_talk[b.id] = GameData.day
 	var topic: Dictionary = GameData.TRIO_TOPICS[randi() % GameData.TRIO_TOPICS.size()]
 	var q: String = str(topic.q).replace("%B", bn)
@@ -122,10 +122,10 @@ func _start_trio_dialog(a: Node2D, b: Node2D) -> void:
 
 func _trio_pick(win_id: String) -> void:
 	m.dialog.close()
-	GameData.affinity[win_id] = int(GameData.affinity[win_id]) + 6
+	GameData.aff_add(win_id, 6)
 	Sound.play_sfx("sfx_heart")
 	m.hud.show_message("%s이(가) 신나서 맞장구쳤다! (호감도 +6)"
-		% GameData.NPCS[win_id].name, 4.0)
+		% GameData.npc_name(win_id), 4.0)
 	m.saveio.save_now()
 
 
@@ -365,7 +365,7 @@ func _talk_to(npc: Node2D) -> void:
 				_trio_pairs.append(pk)
 				_start_trio_dialog(npc, buddy)
 				return
-	var def: Dictionary = GameData.NPCS[npc.id]
+	var def: Dictionary = GameData.npc_def(npc.id)
 	# 봄 꽃놀이: 말을 건 사람을 하나씩 세어 둔다 (호감도 해금과 무관)
 	if GameData.festival_open() and str(GameData.festival_today().id) == "flower" \
 			and not GameData.fest_greeted.has(npc.id):
@@ -392,10 +392,10 @@ func _talk_to(npc: Node2D) -> void:
 	var first_today: bool = not npc.talked_today
 	if not npc.talked_today:
 		npc.talked_today = true
-		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
+		GameData.aff_add(npc.id, 2)
 	# 계절·날씨·시간대·호감도·연애 단계에 맞는 대사를 고른다 (game_data.npc_line)
 	var line: String = GameData.npc_line(npc.id)
-	var aff := mini(int(GameData.affinity[npc.id]), 100)
+	var aff := mini(GameData.aff(npc.id), 100)
 	# 호감도가 오르면 비밀 이야기(할아버지의 과거)가 섞여 나온다
 	if aff >= 100 and def.has("secret100") and randf() < 0.4:
 		line = def.secret100
@@ -632,7 +632,7 @@ func _open_mail_send(page: int) -> void:
 	var btns: Array = []
 	for i in range(page * MAIL_PAGE, mini((page + 1) * MAIL_PAGE, ids.size())):
 		var nid: String = str(ids[i])
-		btns.append([str(GameData.NPCS[nid].name), _send_mail.bind(nid)])
+		btns.append([GameData.npc_name(nid), _send_mail.bind(nid)])
 	if page + 1 < pages:
 		btns.append(["다음 장", _open_mail_send.bind(page + 1)])
 	if page > 0:
@@ -658,7 +658,7 @@ func _send_mail(nid: String) -> void:
 	GameData.today_spent += GameData.MAIL_SEND_COST
 	GameData.mail_sent_day = GameData.day
 	GameData.mail_out.append({"npc": nid, "day": GameData.day})
-	var nm: String = str(GameData.NPCS[nid].name)
+	var nm: String = GameData.npc_name(nid)
 	GameData.mail_store("%s에게 보낸 편지" % nm,
 		"『잘 지내고 있나요.\n요즘 우리 마을은 아침 공기가 참 좋습니다.\n"
 			+ "언제 한번 천천히 이야기 나눠요.』\n\n(우체부 아저씨가 도장을 꾹 눌러 주었다)")
@@ -722,7 +722,7 @@ func _open_hall_roster(page: int) -> void:
 		for n in m.npcs:
 			if GameData.settler_kind(n.id) != kind or not GameData.NPCS.has(n.id):
 				continue
-			var def: Dictionary = GameData.NPCS[n.id]
+			var def: Dictionary = GameData.npc_def(n.id)
 			var aff := mini(int(GameData.affinity.get(n.id, 0)), 100)
 			var mark := ""
 			if GameData.spouse == n.id:
@@ -785,7 +785,7 @@ func _open_fest_prep_dialog() -> void:
 	var btns: Array = []
 	for t: Dictionary in GameData.FEST_TASKS:
 		var tid := str(t.id)
-		var who: String = str(GameData.NPCS[str(t.npc)].name)
+		var who: String = GameData.npc_name(str(t.npc))
 		var have: int = GameData.fest_have(str(t.kind))
 		if tid in GameData.story14_tasks:
 			body += "\n★ %s — 완료! (%s와 함께)" % [str(t.name), who]
@@ -903,7 +903,7 @@ func _do_hall_project(pid: String) -> void:
 	# 마을이 좋아지면 다들 기뻐한다 — 온 주민의 마음이 조금씩 따뜻해진다
 	for n in m.npcs:
 		if GameData.affinity.has(n.id):
-			GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 3
+			GameData.aff_add(n.id, 3)
 	Sound.play_sfx("sfx_place")
 	m.hud.event_toast("「%s」 완성!" % str(p.name))
 	m.hud.show_message("마을 사람들과 함께 「%s」을(를) 끝냈다!\n다들 무척 기뻐한다. (온 주민 호감도 +3)"
@@ -995,14 +995,14 @@ func _meet_apply(agenda: String) -> void:
 					m.objnode._remove_object(t)
 			for n in m.npcs:
 				if GameData.affinity.has(n.id):
-					GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 2
+					GameData.aff_add(n.id, 2)
 			m.queue_redraw()
 		"snack":
 			GameData.money -= 800
 			GameData.today_spent += 800
 			for n in m.npcs:
 				if GameData.affinity.has(n.id):
-					GameData.affinity[n.id] = int(GameData.affinity[n.id]) + 4
+					GameData.aff_add(n.id, 4)
 	Sound.play_sfx("sfx_catch")
 
 
@@ -1015,7 +1015,7 @@ func _open_expel_picker() -> void:
 		return
 	var btns: Array = []
 	for nid: String in GameData.settlers:
-		btns.append(["%s (♥%d)" % [GameData.NPCS[nid].name,
+		btns.append(["%s (♥%d)" % [GameData.npc_name(nid),
 			int(GameData.affinity.get(nid, 0))], _meet_expel_vote.bind(nid)])
 	btns.append(["그만두기", _open_hall_meeting_dialog])
 	m.dialog.open("주민 퇴출 안건", "무거운 안건이다...\n누구를 올릴까?", btns)
@@ -1034,7 +1034,7 @@ func _meet_expel_vote(nid: String) -> void:
 		else:
 			no += 1
 	GameData.hall_meet_day = GameData.day
-	var nm := str(GameData.NPCS[nid].name)
+	var nm := GameData.npc_name(nid)
 	if yes > no:
 		m.story._settler_depart(nid, false)
 		m.dialog.open("마을 회의 — 투표 결과",
@@ -1237,7 +1237,7 @@ func _submit_dish() -> void:
 	GameData.items[rid] = int(GameData.items[rid]) - 1
 	# 요리를 나누면 모두와 조금씩 가까워진다
 	for nid: String in GameData.affinity:
-		GameData.affinity[nid] = mini(int(GameData.affinity[nid]) + 3, 100)
+		GameData.aff_add(nid, 3)
 	_finish_festival(1.0, "%s를 나눠 먹었다! 모두와 조금 가까워졌다." % GameData.ITEMS[rid].name)
 
 
@@ -1254,7 +1254,7 @@ func _finish_festival(bonus := 1.0, extra := "") -> void:
 	# 봄 꽃놀이는 인사를 나눈 만큼 모두와 가까워진다
 	if str(f.id) == "flower":
 		for nid: String in GameData.affinity:
-			GameData.affinity[nid] = mini(int(GameData.affinity[nid]) + 5, 100)
+			GameData.aff_add(nid, 5)
 	Sound.play_sfx("sfx_catch")
 	m.hud.event_toast(str(f.name))
 	m.hud.reward_toast("%dG" % money, m.tex["icon_coin"])
@@ -1268,7 +1268,7 @@ func _finish_festival(bonus := 1.0, extra := "") -> void:
 
 func _npc_portrait(npc_id: String, happy := false) -> Texture2D:
 	# 호감도 50+ 또는 선물 직후엔 웃는 얼굴
-	var expr := "happy" if (happy or int(GameData.affinity[npc_id]) >= 50) else "normal"
+	var expr := "happy" if (happy or GameData.aff(npc_id) >= 50) else "normal"
 	return m.tex["npc_%s_portrait_%s" % [npc_id, expr]]
 
 
@@ -1349,7 +1349,7 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 	if gift_name == "":
 		m.dialog.set_body("그건 이제 가지고 있지 않다...")
 		return
-	var before := int(GameData.affinity[npc_id])
+	var before := GameData.aff(npc_id)
 	if Net.is_guest():
 		m.netsync._req_gift.rpc_id(1, npc_id, kind, item_id)  # 호스트가 차감/가산 후 전파
 
@@ -1359,7 +1359,7 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 		return
 
 	var gain := GameData.gift_value(npc_id, item_id)
-	GameData.affinity[npc_id] = clampi(before + gain, 0, 100)
+	GameData.aff_set(npc_id, clampi(before + gain, 0, 100))
 	GameData.gifted_today.append(npc_id)
 	Sound.play_sfx("sfx_heart")
 	if Net.is_host():
@@ -1375,8 +1375,8 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 	else:
 		body = "%s을(를) 선물했다. 고맙다고 한다. ♥" % gift_name
 	if GameData.is_birthday(npc_id):
-		body = "오늘은 %s의 생일이다!\n" % str(GameData.NPCS[npc_id].name) + body + "  (생일 3배!)"
-	var after := int(GameData.affinity[npc_id])
+		body = "오늘은 %s의 생일이다!\n" % GameData.npc_name(npc_id) + body + "  (생일 3배!)"
+	var after := GameData.aff(npc_id)
 	if before < 50 and after >= 50:
 		if npc_id == "merchant":
 			body += "\n\n[특전 해금] 만수의 씨앗 10% 할인!"
@@ -1384,7 +1384,7 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 			body += "\n\n[특전 해금] 용식의 낚시 비법! 판정 구간 확대!"
 		else:
 			body += "\n\n[친밀] 이제 속 이야기를 들려준다."
-	if bool(GameData.NPCS[npc_id].get("romance", false)):
+	if bool(GameData.npc_def(npc_id).get("romance", false)):
 		if before < 60 and after >= 60:
 			body += "\n\n(꽃다발을 건네면 마음을 물어볼 수 있을 것 같다.)"
 		elif GameData.dating == npc_id and after >= 100 and GameData.spouse == "":
@@ -1394,7 +1394,7 @@ func _give_gift(npc_id: String, kind: String, item_id: String) -> void:
 
 # 꽃다발 -> 연인, 청혼 반지 -> 배우자. 각각 한 사람뿐이고 되돌릴 수 없다.
 func _romance_gift(npc_id: String, item_id: String, aff: int) -> void:
-	var def: Dictionary = GameData.NPCS[npc_id]
+	var def: Dictionary = GameData.npc_def(npc_id)
 	var name := str(def.name)
 	m.dialog.set_portrait(_npc_portrait(npc_id, true))
 	if not bool(def.get("romance", false)):
@@ -1415,7 +1415,7 @@ func _romance_gift(npc_id: String, item_id: String, aff: int) -> void:
 			m.dialog.set_body("%s은(는) 고개를 저었다.\n\"...너, 다른 사람이 있잖아.\"" % name)
 			return
 		GameData.dating = npc_id
-		GameData.affinity[npc_id] = mini(aff + 10, 100)
+		GameData.aff_set(npc_id, mini(aff + 10, 100))
 		Sound.play_sfx("sfx_heart")
 		m.dialog.set_body("%s에게 꽃다발을 건넸다.\n\n\"...받을게. 오래 기다렸어.\"\n\n[연인이 되었다]" % name)
 	else:
@@ -1490,7 +1490,7 @@ func _turn_in_quest() -> void:
 	GameData.consume_ingredient(iid, int(q.qty))
 	GameData.money += int(q.reward)
 	GameData.today_earned += int(q.reward)
-	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
+	GameData.aff_add("merchant", 5)
 	Sound.play_sfx("sfx_coin")
 	m.hud.reward_toast("%dG" % int(q.reward), m.tex["icon_coin"])
 	m.dialog.set_body("납품 완료! %dG를 받았다. 내일 새 의뢰가 올라온다." % int(q.reward))
@@ -1603,7 +1603,7 @@ func _merchant_errand_turnin() -> void:
 		return
 	GameData.wood -= GameData.STALL_WOOD
 	GameData.items["forage_shell"] = have_s - GameData.STALL_SHELLS
-	GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 8
+	GameData.aff_add("merchant", 8)
 	GameData.merchant_errand = "done"
 	GameData.roll_stall_hours()
 	m.worldgen._place_stall()
@@ -1812,8 +1812,7 @@ func _mom_quest_turnin(qid: String) -> void:
 		GameData.today_earned += int(q.money)
 		m.hud.reward_toast("%dG" % int(q.money), m.tex["icon_coin"])
 	if int(q.get("affinity", 0)) > 0:
-		GameData.affinity["forest_mom"] = int(GameData.affinity["forest_mom"]) \
-			+ int(q.affinity)
+		GameData.aff_add("forest_mom", int(q.affinity))
 	GameData.mom_quests_done.append(qid)
 	GameData.mom_quest = ""
 	Sound.play_sfx("sfx_heart")

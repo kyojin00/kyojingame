@@ -502,7 +502,7 @@ func _req_gift(npc_id: String, kind: String, item_id: String) -> void:
 		GameData.items[item_id] -= 1
 	else:
 		return
-	GameData.affinity[npc_id] = int(GameData.affinity[npc_id]) + 10
+	GameData.aff_add(npc_id, 10)
 	_broadcast_stats()
 
 
@@ -520,7 +520,7 @@ func _req_quest(op: String) -> void:
 		if GameData.ingredient_count(iid) >= int(q.qty):
 			GameData.consume_ingredient(iid, int(q.qty))
 			GameData.money += int(q.reward)
-			GameData.affinity["merchant"] = int(GameData.affinity["merchant"]) + 5
+			GameData.aff_add("merchant", 5)
 			GameData.quest = {}
 	_broadcast_stats()
 

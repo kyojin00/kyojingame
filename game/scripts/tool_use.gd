@@ -483,7 +483,7 @@ func use_tool() -> void:
 					m.pending_fish = GameData.pick_fish()
 					# 용식 호감도 50+ 특전: 판정 구간 25% 확대
 					var zone: float = float(m.pending_fish.zone)
-					if int(GameData.affinity["fisher"]) >= 50:
+					if GameData.aff("fisher") >= 50:
 						zone *= 1.25
 					# 값이 나갈수록 손맛이 맵다 — 판매가에 비례해
 					# 초록 판정 바가 확 좁아지고 커서가 훨씬 빨라진다
