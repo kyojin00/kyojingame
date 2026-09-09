@@ -6119,6 +6119,98 @@ func _debug_tick() -> void:
 				" 청구=", ready_ok, " 말소=", done_ok)
 			_s2_police_teardown(cop_ex)
 			_s2_restore(k_ex)
+		273:
+			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
+			var k_sh := _s2_keep()
+			var items_sh: Dictionary = GameData.items.duplicate()
+			var prod_sh: Dictionary = GameData.produce.duplicate()
+			var ps_sh: Dictionary = GameData.produce_silver.duplicate()
+			var pg_sh: Dictionary = GameData.produce_gold.duplicate()
+			m.dialog.close()
+			_s2_fresh_gov()
+			GameData.money = 1000
+			GameData.day = 40                                  # 계절 2 의 12일 — 첫날 고지서와 겹치지 않게
+			GameData.skills["farm"].lv = 3
+			GameData.skills["fish"].lv = 1
+			# 허가 창구 — 농산물전은 열리고 어물전은 회색(숙련)
+			m.society.open_shop_permit()
+			var kinds_sh: Array = _btn_texts()
+			m.dialog.close()
+			var kinds_ok: bool = "농산물전 — 밭에서 난 것" in kinds_sh and "… 어물전 — 낚은 것" in kinds_sh
+			var budget_sh := int(GameData.gov_budget.kyojin)
+			m.society._permit("farm")
+			m.dialog.close()
+			var t_sh: Vector2i = m.society._stand_tile()
+			var permit_ok: bool = GameData.shop_open() and GameData.money == 500 \
+				and int(GameData.gov_budget.kyojin) == budget_sh + 500 and t_sh.x >= 0 \
+				and str(m.objects.get(t_sh, {}).get("kind", "")) == "shop_stand" \
+				and GameData.shop_permit_why() != ""
+			# 올리기 — 밀 5 제값(35) · 달걀 3 비싸게(37). 가방에서 그만큼 빠진다
+			GameData.produce["wheat"] = int(GameData.produce.get("wheat", 0)) + 8
+			GameData.items["egg"] = int(GameData.items.get("egg", 0)) + 3
+			var wheat_before := int(GameData.produce["wheat"])
+			m.society._stand_put_do("wheat", 5, "fair")
+			m.society._stand_put_do("egg", 3, "dear")
+			m.dialog.close()
+			var st_sh: Dictionary = GameData.me.shop_stock
+			var put_ok: bool = int(GameData.produce["wheat"]) == wheat_before - 5 \
+				and int(st_sh.get("wheat", {}).get("qty", 0)) == 5 and int(st_sh.get("wheat", {}).get("price", 0)) == 35 \
+				and int(st_sh.get("egg", {}).get("qty", 0)) == 3 and int(st_sh.get("egg", {}).get("price", 0)) == 37
+			# 정산 — 손님이 다 산다고 고정: 손님 수만큼 팔리고, 돈은 금고에 남는다
+			GameData.shop_force_p = 1.0
+			GameData.day += 1
+			var cust_sh := GameData.shop_customers(GameData.day - 1)
+			GameData.society_new_day([0, 0, 0])
+			var n_sh := GameData.society_note()
+			GameData.shop_force_p = -1.0
+			var led_sh: Dictionary = GameData.me.shop_ledger[-1]
+			var left_sh := 0
+			for id_sh in GameData.me.shop_stock:
+				left_sh += int(GameData.me.shop_stock[id_sh].qty)
+			var sold_sh := int(led_sh.sold)
+			var settle_ok: bool = sold_sh == mini(cust_sh, 8) and left_sh == 8 - sold_sh \
+				and int(GameData.me.shop_own.till) == int(led_sh.gold) and int(led_sh.gold) > 0 \
+				and n_sh.contains("팔렸다")
+			# 금고 — 좌판 앞에서 받아야 내 돈이다
+			var money_sh := GameData.money
+			m.society._stand_collect()
+			m.dialog.close()
+			var till_ok: bool = GameData.money == money_sh + int(led_sh.gold) and int(GameData.me.shop_own.till) == 0
+			# 매출세 — 계절 첫날 고지서에 28일 매출의 5% 한 줄(정산보다 먼저 계산된다)
+			GameData.day = 57                                  # 계절 3 의 1일
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var bill_sh: Dictionary = GameData.me.tax_bills[-1]
+			var tax_ok: bool = int(bill_sh.get("sales", -1)) == int(float(int(led_sh.gold)) * 0.05) \
+				and int(bill_sh.get("season", -1)) == 2
+			# 영업정지 — 여섯 주 밀린 고지서가 있으면 손님이 와도 팔지 않는다
+			GameData.me.tax_bills = [{"season": 0, "day": 1, "income": 0, "property": 0, "sales": 0,
+				"total": 100, "paid": 0, "due_day": GameData.day - 45}]
+			GameData.me.shop_stock = {"wheat": {"qty": 3, "price": 35}}
+			GameData.shop_force_p = 1.0
+			GameData.day += 1
+			GameData.society_new_day([0, 0, 0])
+			var n_sh2 := GameData.society_note()
+			GameData.shop_force_p = -1.0
+			var frozen_ok: bool = GameData.wage_frozen() and n_sh2.contains("영업정지") \
+				and int(GameData.me.shop_stock.wheat.qty) == 3
+			# 폐업 — 물건은 가방으로, 좌판은 사라진다
+			var wheat_bag := int(GameData.produce["wheat"])
+			m.society._stand_close()
+			m.dialog.close()
+			var close_ok: bool = not GameData.shop_open() and int(GameData.produce["wheat"]) == wheat_bag + 3 \
+				and not m.objects.has(t_sh) and GameData.me.shop_stock.is_empty()
+			print("SHOP_OK=", kinds_ok and permit_ok and put_ok and settle_ok and till_ok and tax_ok and frozen_ok and close_ok,
+				" 종류=", kinds_ok, " 허가=", permit_ok, t_sh, " 올리기=", put_ok, " 정산=", settle_ok,
+				"(손님 ", cust_sh, " 팔림 ", sold_sh, " ", int(led_sh.gold), "G)", " 금고=", till_ok,
+				" 매출세=", tax_ok, "(", int(bill_sh.get("sales", -1)), ")", " 영업정지=", frozen_ok, " 폐업=", close_ok)
+			if m.objects.has(t_sh):
+				m.objnode._remove_object(t_sh)
+			GameData.items = items_sh
+			GameData.produce = prod_sh
+			GameData.produce_silver = ps_sh
+			GameData.produce_gold = pg_sh
+			_s2_restore(k_sh)
 		252:
 			# 집 꾸미기 — 깔려 있는 러그를 집어 옮길 수 있어야 한다.
 			# 예전에는 안내에 **집는 키가 적혀 있지 않아** 「깔려 있는데

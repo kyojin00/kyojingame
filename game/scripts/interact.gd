@@ -345,6 +345,9 @@ func interact() -> void:
 		if obj.kind == "stall":
 			m.village.open_stall()
 			return
+		if obj.kind == "shop_stand":
+			m.society.open_stand()   # 내 좌판(사회 S3a) — 올리고, 내리고, 돈을 받는다
+			return
 		if obj.kind == "trash_bin":
 			m.village.open_trash_bin(t)
 			return

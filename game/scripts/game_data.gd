@@ -8033,6 +8033,10 @@ const SOCIETY_NOTES := {
 	"convicted": "유죄였다. 마을이 그 판결을 들었다.",
 	"acquitted": "무죄였다. 그래도 본 사람은 본 것이다.",
 	"jail_out": "이레 만에 파출소를 나왔다. 마을이 그 일을 기억할 것이다.",
+	# ---- 자기 상점(S3a) ----
+	"shop_sold": "어제 좌판에서 %d개가 팔렸다 — %dG. 좌판 금고에 있다.",
+	"shop_none": "어제 좌판에는 손님이 없었다. 값이 비싼가, 물건이 낯선가.",
+	"shop_frozen": "밀린 세금으로 좌판이 영업정지다. 세금부터 내자.",
 }
 
 # 마음 카드 — [[문턱, 이름, 설명]] · stats_ui 가 이름을 글줄로, 설명을 툴팁으로 쓴다.
@@ -8100,6 +8104,29 @@ const BURGLARY_P := 0.30           # 빈집 문을 따는 기본 확률 — thef
 const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 넘김 일곱 번, 밭은 마른다)
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
 const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
+# ---- 자기 상점(S3a, 헌법 §7.4) ----
+# 면사무소 「상점 허가」 500G + 그 종류의 숙련 Lv3 + 평판 0 이상 + 일자리 없음. 자리는 집 마당
+# 좌판(shop_stand) 하나 — 건물도 실내도 없다(짓기 없음). 손님은 아침 결산이 보낸다: 하루 4~7명,
+# 값이 쌀수록·아끼는 물건일수록·좌판 종류에 맞을수록 산다. 판 돈은 좌판 금고(till)에 쌓이고
+# E 로 받는다(돈은 창구에서만). 매출세는 지난 28일 매출의 5%(고지서 한 줄)
+const SHOP_PERMIT_COST := 500
+const SHOP_SKILL_LV := 3
+const SHOP_STOCK_KINDS := 8                 # 좌판에 올릴 수 있는 물건 가짓수
+const SHOP_LEDGER_DAYS := 28
+const SALES_TAX_RATE := 0.05
+const SHOP_CUSTOMERS := [4, 7]              # 하루 손님(교진)
+const SHOP_PRICE_TIERS := {"cheap": 0.8, "fair": 1.0, "dear": 1.5}
+const SHOP_TIER_NAMES := {"cheap": "싸게", "fair": "제값", "dear": "비싸게"}
+const SHOP_KINDS := {
+	"farm": {"name": "농산물전", "skill": "farm", "desc": "밭에서 난 것"},
+	"fish": {"name": "어물전", "skill": "fish", "desc": "낚은 것"},
+	"forest": {"name": "산나물전", "skill": "forest", "desc": "산에서 캔 것"},
+	"mine": {"name": "광석상", "skill": "mine", "desc": "굴에서 캔 것"},
+	"cook": {"name": "밥집", "skill": "cook", "desc": "만든 음식"},
+	"beach": {"name": "갯것전", "skill": "beach", "desc": "바닷가에서 주운 것"},
+	"ranch": {"name": "축산물전", "skill": "ranch", "desc": "가축이 낸 것"},
+	"combat": {"name": "무기 노점", "skill": "combat", "desc": "동굴에서 얻은 것"},
+}
 # 재판정의 두 사람 — 읍에서 오는 순회 손글이라 NPCS 에 없다(주민도 명부도 생일도 아니다).
 # npc_def 가 여기로 떨어지므로 이름·초상은 같은 길로 나온다. 스프라이트는 SOCIETY_NPC_IDS 가 싣는다
 const COURT_NPCS := {
@@ -8143,6 +8170,7 @@ var animals_now := 0                              # 가축 수 — society._proc
 var _society_notes: Array = []                    # 아침 결산에 덧붙일 줄들 — society_note() 가 한 번에 비운다
 var _title_mark := ""                             # 이장 기준 호칭 cls 의 기준선 — 바뀐 아침에만 한 줄(D9)
 var _bold_today := {"cave": 0.0, "night": 0.0}    # 오늘 오른 대범함 — BOLD_CAP 의 하루 상한을 센다
+var shop_force_p := -1.0                          # 하네스가 좌판 손님의 구매 확률을 고정한다(0 이상이면)
 
 # me 안 목록 원소의 모양 — _apply_me 가 이 위에 같은 이름만 덮고 int 칸을 int() 로 되돌린다(D21).
 # JSON 은 속까지 모든 수를 float 로 읽으므로, 원소를 만드는 쪽이 아니라 읽는 쪽이 모양을 안다.
@@ -8152,6 +8180,7 @@ const ME_RECORD := {"day": 0, "crime": "", "court": "village", "verdict": "servi
 	"served": 0, "served_day": 0, "expunged": false}
 const ME_WORK := {"day": 0, "kind": "work", "inst": "", "pick": 0}
 const ME_JOB_HIST := {"inst": "", "rank": "", "job": "", "from": 0, "to": 0, "reason": "quit"}
+const ME_LEDGER := {"day": 0, "sold": 0, "gold": 0}   # 좌판 하루 장부(S3a)
 
 
 # 새 인물의 사회적 신원 — 아무것도 아닌 사람으로 시작한다(헌법 §9.2 + S1 신규 키 셋).
@@ -8221,6 +8250,18 @@ func _apply_me(src: Variant) -> Dictionary:
 	for id in out.stolen.keys():
 		st[id] = int(out.stolen[id])
 	out.stolen = st
+	# 좌판(S3a) — 재고의 수·값, 금고, 장부 줄까지 int 로
+	var stock := {}
+	for id in out.shop_stock.keys():
+		var row: Variant = out.shop_stock[id]
+		if row is Dictionary:
+			stock[id] = {"qty": int(row.get("qty", 0)), "price": int(row.get("price", 0))}
+	out.shop_stock = stock
+	if not out.shop_own.is_empty():
+		out.shop_own = {"kind": str(out.shop_own.get("kind", "")), "since": int(out.shop_own.get("since", 0)),
+			"till": int(out.shop_own.get("till", 0)), "x": int(out.shop_own.get("x", -1)),
+			"y": int(out.shop_own.get("y", -1))}
+	out.shop_ledger = _apply_rows(out.shop_ledger, ME_LEDGER)
 	return out
 
 
@@ -8661,9 +8702,12 @@ func issue_tax_bill() -> Dictionary:
 	var earned := int(me.get("season_earned_prev", 0))
 	var income := int(float(earned) * TAX_INCOME_RATE) if earned > TAX_FREE_INCOME else 0
 	var property := house_lv * TAX_PROPERTY_HOUSE + animals_now * TAX_PROPERTY_ANIMAL
-	var total := income + property
+	# 매출세(S3a) — 좌판 28일 매출의 5%. 좌판이 없으면 0
+	var sales_sum := shop_ledger_sum(SHOP_LEDGER_DAYS)
+	var sales := int(float(sales_sum) * SALES_TAX_RATE)
+	var total := income + property + sales
 	var b := {"season": season_no(), "day": day, "income": income, "property": property,
-		"total": total, "paid": 0, "due_day": day + TAX_DUE_DAYS - 1}
+		"sales": sales, "total": total, "paid": 0, "due_day": day + TAX_DUE_DAYS - 1}
 	var bills: Array = me.get("tax_bills", [])
 	bills.append(b)
 	while bills.size() > TAX_BILLS_MAX:
@@ -8675,8 +8719,11 @@ func issue_tax_bill() -> Dictionary:
 		body += "지난 계절 수입 %dG — 면세 기준(%dG) 아래라\n이번 계절 세금은 없습니다.\n\n— 교진 면사무소" \
 			% [earned, TAX_FREE_INCOME]
 	else:
-		body += "소득세 %dG (지난 계절 수입 %dG)\n재산세 %dG (집 %d단계 · 가축 %d마리)\n합계 %dG\n\n" \
-			% [income, earned, property, house_lv, animals_now, total]
+		body += "소득세 %dG (지난 계절 수입 %dG)\n재산세 %dG (집 %d단계 · 가축 %d마리)\n" \
+			% [income, earned, property, house_lv, animals_now]
+		if sales > 0:
+			body += "매출세 %dG (좌판 28일 매출 %dG)\n" % [sales, sales_sum]
+		body += "합계 %dG\n\n" % total
 		body += "납부 기한: 이 계절 %d일까지, 면사무소 창구.\n기한을 넘기면 주마다 5%%가 붙습니다.\n\n— 교진 면사무소" \
 			% TAX_DUE_DAYS
 	mail_store("납세 고지서", body)
@@ -9055,6 +9102,145 @@ func _court_tick() -> void:
 		_note(str(SOCIETY_NOTES.court_visit))
 
 
+# ---- 자기 상점 (S3a) ----
+
+func shop_open() -> bool:
+	var so: Variant = me.get("shop_own", {})
+	return so is Dictionary and not so.is_empty()
+
+
+# 물건이 어느 좌판 종류의 것인가 — 맞지 않는 좌판에서는 반만 팔린다(농산물전의 생선)
+func goods_kind(id: String) -> String:
+	if CROPS.has(id):
+		return "farm"
+	if id.begins_with("fish_"):
+		return "fish"
+	if id.begins_with("dish_") or id == "flour":
+		return "cook"
+	if id in ["forage_berry", "forage_herb", "forage_dandelion", "weed", "herb_leaf"]:
+		return "forest"
+	if id in ["forage_shell", "forage_coral", "forage_glass", "forage_relic", "bait"]:
+		return "beach"
+	if id in ["ore", "gem", "star_shard", "crystal", "star_ore"]:
+		return "mine"
+	if id in ["egg", "milk", "golden_egg"]:
+		return "ranch"
+	if id in ["slime", "bat", "ghost", "treant", "arrow", "ghost_essence"]:
+		return "combat"
+	return ""
+
+
+func goods_name(id: String) -> String:
+	if CROPS.has(id):
+		return str(CROPS[id].name)
+	return str(ITEMS.get(id, {}).get("name", id))
+
+
+# 허가를 받을 수 있나 — "" 면 된다. 종류별 숙련은 open_shop_permit 이 따로 잰다
+func shop_permit_why() -> String:
+	if not tax_open():
+		return "면사무소가 열려야 하네."
+	if shop_open():
+		return "좌판은 하나뿐일세."
+	if str(me.get("job", "")) != "":
+		return "일자리가 있는 사람은 안 되네. 하나만 하게."
+	if int(me.get("reputation", {}).get("kyojin", 0)) < 0:
+		return "마을에 자네 얘기가 좋지 않네. 그 전엔 허가 못 하네."
+	if money < SHOP_PERMIT_COST:
+		return "인지세 %dG 이 있어야 하네." % SHOP_PERMIT_COST
+	return ""
+
+
+func shop_ledger_sum(days: int) -> int:
+	var n := 0
+	for row in me.get("shop_ledger", []):
+		if row is Dictionary and day - int(row.get("day", 0)) <= days:
+			n += int(row.get("gold", 0))
+	return n
+
+
+# 오늘 손님 수 — 날짜로 정해진다. 평판 40 이면 ×1.2
+func shop_customers(d: int) -> int:
+	var n: int = int(SHOP_CUSTOMERS[0]) + posmod(hash("shop|%d" % d), int(SHOP_CUSTOMERS[1]) - int(SHOP_CUSTOMERS[0]) + 1)
+	if int(me.get("reputation", {}).get("kyojin", 0)) >= 40:
+		n = int(float(n) * 1.2 + 0.5)
+	return n
+
+
+# 값의 비율로 정하는 구매 확률 — 0.8 이하 0.7 / 1.0 에 0.5 / 1.5 이상 0.2, 사이는 직선
+func shop_buy_p(ratio: float) -> float:
+	if ratio <= 0.8:
+		return 0.7
+	if ratio <= 1.0:
+		return 0.7 - (ratio - 0.8) / 0.2 * 0.2
+	if ratio >= 1.5:
+		return 0.2
+	return 0.5 - (ratio - 1.0) / 0.5 * 0.3
+
+
+# 아침 정산(society_new_day) — 어제 좌판. 손님마다 물건 하나를 고르고 값·취향·종류로 산다.
+# 판 돈은 금고(till)로, 장부는 28일. 밀린 세금 6주면 영업정지(팔지 않는다)
+func _shop_settle() -> void:
+	if not shop_open():
+		return
+	var stock: Dictionary = me.get("shop_stock", {})
+	var ids: Array = []
+	for id in stock.keys():
+		if int(stock[id].get("qty", 0)) > 0:
+			ids.append(id)
+	if ids.is_empty():
+		return
+	if wage_frozen():
+		_note(str(SOCIETY_NOTES.shop_frozen))
+		return
+	var kind := str(me.shop_own.get("kind", ""))
+	var pool: Array = []
+	for nid in npc_greeted:
+		if NPCS.has(str(nid)):
+			pool.append(str(nid))
+	if pool.is_empty():
+		return
+	var yday := day - 1
+	var sold := 0
+	var gold := 0
+	for i in shop_customers(yday):
+		if ids.is_empty():
+			break
+		var nid := str(pool[posmod(hash("cust|%d|%d" % [yday, i]), pool.size())])
+		var id := str(ids[posmod(hash("goods|%d|%d" % [yday, i]), ids.size())])
+		var row: Dictionary = stock[id]
+		var base := maxi(1, item_value(id))
+		var p := shop_buy_p(float(row.get("price", base)) / float(base))
+		var d := npc_def(nid)
+		if id in Array(d.get("loves", [])) or id in Array(d.get("likes", [])):
+			p *= 1.5
+		if goods_kind(id) != kind:
+			p *= 0.5
+		p = clampf(p, 0.05, 0.9)
+		if shop_force_p >= 0.0:
+			p = shop_force_p
+		var roll := float(posmod(hash("buy|%d|%d" % [yday, i]), 1000)) / 1000.0
+		if roll < p:
+			row["qty"] = int(row.get("qty", 0)) - 1
+			sold += 1
+			gold += int(row.get("price", base))
+			if int(row["qty"]) <= 0:
+				ids.erase(id)
+	for id in stock.keys():
+		if int(stock[id].get("qty", 0)) <= 0:
+			stock.erase(id)
+	var ledger: Array = me.get("shop_ledger", [])
+	ledger.append({"day": yday, "sold": sold, "gold": gold})
+	while ledger.size() > SHOP_LEDGER_DAYS:
+		ledger.pop_front()
+	me["shop_ledger"] = ledger
+	if sold > 0:
+		me.shop_own["till"] = int(me.shop_own.get("till", 0)) + gold
+		_note(str(SOCIETY_NOTES.shop_sold) % [sold, gold])
+	else:
+		_note(str(SOCIETY_NOTES.shop_none))
+
+
 func society_place(id: String) -> String:
 	if id == "chief" and (council_pending() or tax_dun_active()) and festival_today().is_empty() \
 			and hour_now() >= 9.0 and hour_now() < SERVICE_LAST_HOUR:
@@ -9141,6 +9327,8 @@ func society_new_day(stats: Array, ko := false) -> void:
 	# 세금 없다」 — serve_jail 이 고지서 기한도 그만큼 미룬다)
 	if tax_open() and int(me.get("jail_days_left", 0)) <= 0:
 		_tax_step_daily()
+	# 좌판(S3a) — 어제 손님. 돈은 금고에 남는다(받으러 가야 수입이다)
+	_shop_settle()
 	# ④ 어제 번 돈
 	if stats.size() > 1:
 		me.season_earned += int(stats[1])

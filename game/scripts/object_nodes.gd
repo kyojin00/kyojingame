@@ -183,6 +183,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 바깥에 설치한 무인 판매함 (E로 연다)
 			texture = m.tex["trash_bin"]
 			offset = Vector2(0, -texture.get_height())
+		"shop_stand":
+			# 내 좌판(사회 S3a) — 만수의 노점 그림을 빌려 초록 차양으로 물들인다
+			texture = m.tex["stall"]
+			offset = Vector2(0, -texture.get_height())
 		"weed":
 			# 서 있을 때는 풀숲, 주우면 묶음(weed)이 인벤토리에 들어간다
 			texture = m.tex["weed_plant"]
@@ -257,6 +261,8 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
 		elif kind == "auction":
 			spr.modulate = Color(1.15, 1.0, 0.62)  # 경매 게시판은 금빛
+		elif kind == "shop_stand":
+			spr.modulate = Color(0.78, 1.05, 0.82)  # 내 좌판은 초록 차양 — 만수의 노점과 구별
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
@@ -554,7 +560,7 @@ func _tick_landmarks() -> void:
 const STREAM_W := 34      # 좌우 (화면 반폭 15칸 + 여유)
 const STREAM_H := 26      # 위아래
 const KEEP_ALWAYS := ["house", "chief_hut", "barn", "barn_block", "art_block",
-	"cave", "worldtree", "onsen", "stall", "board", "auction", "sign",
+	"cave", "worldtree", "onsen", "stall", "shop_stand", "board", "auction", "sign",
 	"housesite", "plotsite", "home_sign", "homeplot", "old_lookout", "old_barn",
 	"landmark_greattree", "landmark_falls", "deco_cairn", "deco_wheel",
 	"deco_fountain", "horse", "old_book", "seed_sprout", "carved_stone",

@@ -1477,7 +1477,7 @@ const OBJECT_SCALES := {
 	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
 	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
-	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
+	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6, "shop_stand": 2.6,
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)
 	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,

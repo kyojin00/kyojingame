@@ -982,6 +982,11 @@ func open_township() -> void:
 		else:
 			btns.append(gray("%s 내기 — %dG" % [what, due], "그만한 돈이 없다. 모아서 오자."))
 	btns.append(["예산 장부", _open_ledger])
+	# 상점 허가(S3a) — 인지세 500. 좌판은 하나, 일자리와 겸하지 않는다
+	if not GameData.shop_open():
+		var why_s := GameData.shop_permit_why()
+		var lbl_s := "상점 허가 — %dG" % GameData.SHOP_PERMIT_COST
+		btns.append(gray(lbl_s, why_s) if why_s != "" else [lbl_s, open_shop_permit])
 	# 전과 말소(S2c) — 인지세. 형이 끝나고 스무여드레 조용히 지낸 뒤에만, 이유는 창구가 말한다
 	if GameData.record_unexpunged():
 		var why_x := GameData.can_expunge()
@@ -1690,4 +1695,282 @@ func expunge() -> void:
 	GameData.expunge_records()
 	_rep_add(10)
 	m.dialog.open(_npc_name("chief"), str(_lines("court").expunge_ok), [["대화 끝", null]], _portrait("chief"))
+	m.saveio.save_now()
+
+
+# ---- 자기 상점 · 좌판 (S3a) ----
+#
+# 면사무소에서 허가를 받으면 집 마당에 좌판이 선다(짓기 없음 — 그날 바로). 물건을 올리고
+# 값을 매기면 아침 결산이 손님을 보낸다(GameData._shop_settle). 판 돈은 금고에 쌓이고
+# 좌판 앞 E 로 받는다 — 돈은 창구에서만. 폐업하면 물건은 가방으로, 좌판은 사라진다.
+
+const STAND_PAGE := 6
+const STAND_YARD := Vector2i(6, 3)   # 집 앵커에서 — 집 오른쪽 앞마당
+
+
+func open_shop_permit() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var why := GameData.shop_permit_why()
+	if why != "":
+		m.dialog.open(_npc_name("chief"), why, [["알겠습니다", open_township]], _portrait("chief"))
+		return
+	var btns: Array = []
+	for kid in GameData.SHOP_KINDS:
+		var kd: Dictionary = GameData.SHOP_KINDS[kid]
+		var lbl := "%s — %s" % [str(kd.name), str(kd.desc)]
+		var need := int(GameData.SHOP_SKILL_LV)
+		if GameData.skill_lv(str(kd.skill)) < need:
+			btns.append(gray(lbl, "%s 숙련이 %d은 돼야 하네. 지금 %d일세." \
+				% [str(GameData.SKILLS.get(str(kd.skill), {}).get("name", kd.skill)), need, GameData.skill_lv(str(kd.skill))]))
+		else:
+			btns.append([lbl, _permit.bind(kid)])
+	btns.append(["돌아가기", open_township])
+	m.dialog.open(_npc_name("chief"), "무슨 좌판을 낼 텐가. 인지세는 %dG일세." % GameData.SHOP_PERMIT_COST,
+		btns, _portrait("chief"))
+
+
+# 허가 — 인지세는 예산으로, 좌판은 마당에 바로 선다
+func _permit(kind: String) -> void:
+	if Net.is_guest() or GameData.shop_permit_why() != "" or not GameData.SHOP_KINDS.has(kind):
+		return
+	m.dialog.close()
+	var t: Vector2i = m.nearest_open_tile(m.HOME_ANCHOR + STAND_YARD)
+	if t.x < 0:
+		m.dialog.open(_npc_name("chief"), "마당에 좌판 놓을 자리가 없네.", [["알겠습니다", null]], _portrait("chief"))
+		return
+	GameData.money -= GameData.SHOP_PERMIT_COST
+	GameData.today_spent += GameData.SHOP_PERMIT_COST
+	GameData.gov_budget["kyojin"] = int(GameData.gov_budget.get("kyojin", 0)) + GameData.SHOP_PERMIT_COST
+	GameData.me["shop_own"] = {"kind": kind, "since": GameData.day, "till": 0, "x": t.x, "y": t.y}
+	GameData.me["shop_stock"] = {}
+	m.objnode._place_object(t, "shop_stand", 0)
+	m.queue_redraw()
+	m.dialog.open(_npc_name("chief"), "허가했네. 마당에 좌판을 세워 두게. 손님은 마을이 보내지.",
+		[["대화 끝", null]], _portrait("chief"))
+	m.saveio.save_now()
+
+
+func _stand_tile() -> Vector2i:
+	var so: Dictionary = GameData.me.get("shop_own", {})
+	return Vector2i(int(so.get("x", -1)), int(so.get("y", -1)))
+
+
+# 좌판 앞 E
+func open_stand() -> void:
+	m.dialog.close()
+	if not GameData.shop_open():
+		m.dialog.open("좌판", "주인 없는 좌판이다.", [["닫기", null]])
+		return
+	var so: Dictionary = GameData.me.shop_own
+	var kd: Dictionary = GameData.SHOP_KINDS.get(str(so.get("kind", "")), {})
+	var stock: Dictionary = GameData.me.get("shop_stock", {})
+	var body := "%s의 %s.\n" % [_my_name(), str(kd.get("name", "좌판"))]
+	if stock.is_empty():
+		body += "좌판이 비어 있다."
+	else:
+		body += "진열:"
+		for id in stock:
+			body += " %s ×%d(%dG) ·" % [GameData.goods_name(str(id)), int(stock[id].qty), int(stock[id].price)]
+		body = body.trim_suffix(" ·")
+	var till := int(so.get("till", 0))
+	if till > 0:
+		body += "\n금고에 %dG 이 있다." % till
+	if Net.is_guest():
+		m.dialog.open("좌판", body, [["닫기", null]])
+		return
+	var btns: Array = []
+	if till > 0:
+		btns.append(["돈 받기 — %dG" % till, _stand_collect])
+	btns.append(["물건 올리기", _stand_put.bind(0)])
+	if not stock.is_empty():
+		btns.append(["물건 내리기", _stand_take.bind(0)])
+	btns.append(["장부", _stand_ledger])
+	btns.append(["폐업", _stand_close_ask])
+	btns.append(["닫기", null])
+	m.dialog.open("좌판", body, btns)
+
+
+func _stand_collect() -> void:
+	if Net.is_guest() or not GameData.shop_open():
+		return
+	var till := int(GameData.me.shop_own.get("till", 0))
+	if till <= 0:
+		return
+	GameData.money += till
+	GameData.today_earned += till
+	GameData.me.shop_own["till"] = 0
+	Sound.play_sfx("sfx_coin")
+	m.saveio.save_now()
+	open_stand()
+
+
+# 올릴 수 있는 것 — 가진 작물(수확물)과 값 있는 물건
+func _stand_goods() -> Array:
+	var out: Array = []
+	for id in GameData.produce:
+		if int(GameData.produce[id]) > 0 and GameData.CROPS.has(id):
+			out.append(str(id))
+	for id in GameData.items:
+		if int(GameData.items[id]) > 0 and int(GameData.ITEMS.get(id, {}).get("sell", 0)) > 0:
+			out.append(str(id))
+	return out
+
+
+func _stand_put(page: int) -> void:
+	m.dialog.close()
+	var goods := _stand_goods()
+	var stock: Dictionary = GameData.me.get("shop_stock", {})
+	if goods.is_empty():
+		m.dialog.open("좌판", "올릴 물건이 없다.", [["돌아가기", open_stand]])
+		return
+	var pages := maxi(1, int(ceil(goods.size() / float(STAND_PAGE))))
+	page = clampi(page, 0, pages - 1)
+	var btns: Array = []
+	for i in range(page * STAND_PAGE, mini((page + 1) * STAND_PAGE, goods.size())):
+		var id := str(goods[i])
+		var have: int = int(GameData.produce[id]) if GameData.CROPS.has(id) else int(GameData.items[id])
+		var lbl := "%s ×%d — 제값 %dG" % [GameData.goods_name(id), have, GameData.item_value(id)]
+		if stock.size() >= GameData.SHOP_STOCK_KINDS and not stock.has(id):
+			btns.append(gray(lbl, "좌판이 좁다. 가짓수는 %d까지다." % GameData.SHOP_STOCK_KINDS))
+		else:
+			btns.append([lbl, _stand_put_pick.bind(id)])
+	if page + 1 < pages:
+		btns.append(["다음 장", _stand_put.bind(page + 1)])
+	if page > 0:
+		btns.append(["앞 장", _stand_put.bind(page - 1)])
+	btns.append(["돌아가기", open_stand])
+	m.dialog.open("물건 올리기 (%d/%d장)" % [page + 1, pages], "무엇을 올릴까.", btns)
+
+
+func _stand_put_pick(id: String) -> void:
+	m.dialog.close()
+	var have: int = int(GameData.produce.get(id, 0)) if GameData.CROPS.has(id) else int(GameData.items.get(id, 0))
+	if have <= 0:
+		_stand_put(0)
+		return
+	var base := GameData.item_value(id)
+	var btns: Array = []
+	for qty in [5, have]:
+		if qty > have or (qty == have and have == 5 and btns.size() > 0):
+			continue
+		for tier in ["cheap", "fair", "dear"]:
+			var price := maxi(1, int(float(base) * float(GameData.SHOP_PRICE_TIERS[tier])))
+			btns.append(["%s %d개 · %s %dG" % [GameData.goods_name(id), mini(qty, have),
+				str(GameData.SHOP_TIER_NAMES[tier]), price], _stand_put_do.bind(id, mini(qty, have), tier)])
+	btns.append(["돌아가기", _stand_put.bind(0)])
+	m.dialog.open("물건 올리기", "%s — 제값 %dG. 몇 개를 얼마에 올릴까." % [GameData.goods_name(id), base], btns)
+
+
+func _stand_put_do(id: String, qty: int, tier: String) -> void:
+	if Net.is_guest() or not GameData.shop_open() or qty <= 0:
+		return
+	m.dialog.close()
+	var have: int = int(GameData.produce.get(id, 0)) if GameData.CROPS.has(id) else int(GameData.items.get(id, 0))
+	qty = mini(qty, have)
+	if qty <= 0:
+		return
+	var stock: Dictionary = GameData.me.get("shop_stock", {})
+	if stock.size() >= GameData.SHOP_STOCK_KINDS and not stock.has(id):
+		return
+	if GameData.CROPS.has(id):
+		GameData.consume_produce(id, qty)
+	else:
+		GameData.items[id] = int(GameData.items[id]) - qty
+	var price := maxi(1, int(float(GameData.item_value(id)) * float(GameData.SHOP_PRICE_TIERS.get(tier, 1.0))))
+	var row: Dictionary = stock.get(id, {"qty": 0, "price": price})
+	row["qty"] = int(row.get("qty", 0)) + qty
+	row["price"] = price   # 새로 매긴 값이 전체에 붙는다
+	stock[id] = row
+	GameData.me["shop_stock"] = stock
+	Sound.play_sfx("sfx_place")
+	m.saveio.save_now()
+	open_stand()
+
+
+func _stand_take(page: int) -> void:
+	m.dialog.close()
+	var stock: Dictionary = GameData.me.get("shop_stock", {})
+	var ids: Array = stock.keys()
+	if ids.is_empty():
+		open_stand()
+		return
+	var pages := maxi(1, int(ceil(ids.size() / float(STAND_PAGE))))
+	page = clampi(page, 0, pages - 1)
+	var btns: Array = []
+	for i in range(page * STAND_PAGE, mini((page + 1) * STAND_PAGE, ids.size())):
+		var id := str(ids[i])
+		btns.append(["%s ×%d 내리기" % [GameData.goods_name(id), int(stock[id].qty)], _stand_take_do.bind(id)])
+	if page + 1 < pages:
+		btns.append(["다음 장", _stand_take.bind(page + 1)])
+	if page > 0:
+		btns.append(["앞 장", _stand_take.bind(page - 1)])
+	btns.append(["돌아가기", open_stand])
+	m.dialog.open("물건 내리기", "무엇을 거둘까.", btns)
+
+
+func _stand_take_do(id: String) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	_stand_return(id)
+	m.saveio.save_now()
+	open_stand()
+
+
+# 좌판의 물건 하나를 가방으로 — 작물은 보통 품질로 돌아온다(올릴 때 낮은 품질부터 나갔다)
+func _stand_return(id: String) -> void:
+	var stock: Dictionary = GameData.me.get("shop_stock", {})
+	if not stock.has(id):
+		return
+	var qty := int(stock[id].get("qty", 0))
+	if GameData.CROPS.has(id):
+		GameData.produce[id] = int(GameData.produce.get(id, 0)) + qty
+	else:
+		GameData.items[id] = int(GameData.items.get(id, 0)) + qty
+	stock.erase(id)
+	GameData.me["shop_stock"] = stock
+
+
+func _stand_ledger() -> void:
+	m.dialog.close()
+	var ledger: Array = GameData.me.get("shop_ledger", [])
+	var body := ""
+	if ledger.is_empty():
+		body = "아직 장부에 적힌 날이 없다."
+	else:
+		var start := maxi(0, ledger.size() - 7)
+		for i in range(start, ledger.size()):
+			var row: Dictionary = ledger[i]
+			body += "%d일째 — %d개, %dG\n" % [int(row.day), int(row.sold), int(row.gold)]
+	var sum28 := GameData.shop_ledger_sum(GameData.SHOP_LEDGER_DAYS)
+	body += "\n28일 매출 %dG — 다음 고지서의 매출세 %dG" % [sum28, int(float(sum28) * GameData.SALES_TAX_RATE)]
+	m.dialog.open("좌판 장부", body, [["돌아가기", open_stand]])
+
+
+func _stand_close_ask() -> void:
+	m.dialog.close()
+	m.dialog.open("폐업", "좌판을 거둘까. 물건은 가방으로 돌아오고, 허가는 사라진다.",
+		[["거둔다", _stand_close], ["아니다", open_stand]])
+
+
+func _stand_close() -> void:
+	if Net.is_guest() or not GameData.shop_open():
+		return
+	m.dialog.close()
+	var stock: Dictionary = GameData.me.get("shop_stock", {})
+	for id in stock.keys():
+		_stand_return(str(id))
+	var till := int(GameData.me.shop_own.get("till", 0))
+	if till > 0:
+		GameData.money += till
+		GameData.today_earned += till
+	var t := _stand_tile()
+	if t.x >= 0 and str(m.objects.get(t, {}).get("kind", "")) == "shop_stand":
+		m.objnode._remove_object(t)
+	GameData.me["shop_own"] = {}
+	GameData.me["shop_stock"] = {}
+	m.queue_redraw()
+	m.dialog.open("", "좌판을 거뒀다. 마당이 조용하다.", [["대화 끝", null]])
 	m.saveio.save_now()
