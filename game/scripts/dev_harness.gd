@@ -7188,6 +7188,161 @@ func _debug_tick() -> void:
 			GameData.town_open = keep_town_st
 			GameData.minutes = keep_min_st
 			_s2_restore(k_st)
+		216:
+			# ---- 대면 범죄(S5a) — 부재/회색 게이트, 강도(즉시 기소), 주먹다짐(승·패), 살인(본 사람 유무), 살인 재판 ----
+			var k_vi := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_vi := GameData.minutes
+			var keep_pos_vi: Vector2 = m.player.position
+			_s2_fresh_gov()
+			var cop_vi := _s2_police_setup()
+			GameData.town_open = true
+			GameData.ensure_gen_npcs()
+			for gid_vi in GameData.gen_npcs:
+				GameData.gen_npcs[gid_vi]["here"] = str(GameData.gen_npcs[gid_vi].get("role", "")) != "resident"
+			GameData.dead = []
+			GameData.npc_down = {}
+			GameData.cases = []
+			GameData.day = 50
+			GameData.minutes = 10 * 60
+			m.story_cutscene = true
+			for sid_vi in ["farmer", "foodie"]:
+				if not GameData.settlers.has(sid_vi):
+					GameData.settlers.append(sid_vi)
+			# 교진 광장 — 사람들에게서 떨어져(목격자 0) 선다
+			m.player.position = Vector2(20 * m.TILE + 16, 40 * m.TILE + 16)
+			# ① 게이트 — 54 는 줄이 없고, 55 는 강도·주먹만, 75 는 살인까지. 핵심(만수)은 회색, 순경도 회색
+			var vl_vi: Dictionary = GameData.SOCIETY_LINES.violence
+			GameData.me.boldness_base = 54
+			var ch54: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("farmer", ch54)
+			var lab54: Array = []
+			for c54: Array in ch54:
+				lab54.append(str(c54[0]))
+			var absent_ok: bool = not (str(vl_vi.rob_choice) in lab54) and not (str(vl_vi.murder_choice) in lab54)
+			GameData.me.boldness_base = 55
+			var ch55: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("farmer", ch55)
+			var lab55: Array = []
+			for c55: Array in ch55:
+				lab55.append(str(c55[0]))
+			var gate55_ok: bool = str(vl_vi.rob_choice) in lab55 and str(vl_vi.assault_choice) in lab55 \
+				and not (str(vl_vi.murder_choice) in lab55)
+			GameData.me.boldness_base = 80
+			var ch80: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("farmer", ch80)
+			var lab80: Array = []
+			for c80: Array in ch80:
+				lab80.append(str(c80[0]))
+			var chm: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("merchant", chm)
+			var core_gray := false
+			for cm: Array in chm:
+				if str(cm[0]) == "… " + str(vl_vi.rob_choice):
+					core_gray = true   # 회색 줄은 「… 」 접두다
+			var gate75_ok: bool = str(vl_vi.murder_choice) in lab80 and core_gray \
+				and not GameData.victim_ok("merchant") and not GameData.victim_ok(GameData.gen_here("constable")[0]) \
+				and GameData.victim_ok("farmer") and GameData.victim_ok("g1")
+			# ② 강도 — 순돌의 주머니 80. 돈은 오고 평판 −10, 호감 −40, 기억 heat 3, 다음날 기소(피해자 진술 = 목격)
+			GameData.npc_wallet["farmer"] = 80
+			GameData.money = 100
+			GameData.aff_set("farmer", 60)   # 호감은 0 에서 잘리므로 여유를 둔다
+			GameData.aff_set("foodie", 60)
+			var rep_vi := int(GameData.me.reputation.kyojin)
+			var aff_vi := GameData.aff("farmer")
+			m.society.rob("farmer")
+			var mem_r: Dictionary = GameData.me.memories[-1]
+			var rob_ok: bool = GameData.money == 180 and GameData.wallet_of("farmer") == 0 \
+				and int(GameData.me.reputation.kyojin) == rep_vi - 10 and GameData.aff("farmer") == aff_vi - 40 \
+				and str(mem_r.kind) == "robbery" and int(mem_r.heat) == 3 and int(mem_r.reported_day) == 50 \
+				and m.dialog.visible and str(m.dialog._seq[0].text).contains("80G")
+			m.dialog.close()
+			GameData.day = 51
+			GameData.society_new_day([0, 0, 0])
+			var n_vi := GameData.society_note()
+			var charged_r: bool = GameData.charged_active() and str(GameData.me.charged.kind) == "robbery" \
+				and int(GameData.me.charged.others) == 1 and n_vi.contains("기소")
+			GameData.me.charged = {}
+			GameData.me.memories[-1]["settled"] = "acquitted"
+			# ③ 주먹다짐 — 이기면(굴림 0) 상대가 이틀 눕고, 지면(굴림 0.99) 기력 −40. 둘 다 heat 2 신고
+			var aff_f := GameData.aff("foodie")
+			m.society.assault("foodie", 0.0)
+			var win_ok: bool = GameData.npc_is_down("foodie") and int(GameData.npc_down.foodie) == 53 \
+				and GameData.aff("foodie") == aff_f - 40 and str(GameData.me.memories[-1].kind) == "assault" \
+				and int(GameData.me.memories[-1].heat) == 2 and str(m.dialog._seq[0].text).contains("주저앉")
+			m.dialog.close()
+			GameData.me.memories[-1]["settled"] = "acquitted"
+			GameData.energy = 100.0
+			m.society.assault("foodie", 0.99)
+			var lose_ok: bool = GameData.energy == 60.0 and str(m.dialog._seq[0].text).contains("얻어맞")
+			m.dialog.close()
+			GameData.me.memories[-1]["settled"] = "acquitted"
+			GameData.npc_down = {}
+			# ④ 살인 — 본 사람 없이(g1): 죽은 이 명단, 읍에서 사라짐, 기억은 신고 없음(reported_day 0)
+			m.npcmgr._sync_town_npcs()
+			var g1_node := _npc_node("g1")
+			m.society.murder("g1")
+			var quiet_ok: bool = "g1" in GameData.dead and not bool(GameData.gen_npcs.g1.here) \
+				and _npc_node("g1") == null and str(GameData.me.memories[-1].kind) == "murder" \
+				and int(GameData.me.memories[-1].reported_day) == 0 and int(GameData.me.memories[-1].heat) == 5 \
+				and not GameData.victim_ok("g1") and m.dialog._seq.size() == 1
+			m.dialog.close()
+			# 본 사람 있음(g2, 순돌이 곁에서 봤다): 신고 100%, 정착민 호감 −30, 평판 −20, 결산 「죽었다」
+			var farmer_node := _npc_node("farmer")
+			var spawned_farmer := false
+			if farmer_node == null:
+				m.npcmgr._spawn_npc("farmer", m.player_tile() + Vector2i(1, 0))
+				farmer_node = m.npcs[m.npcs.size() - 1]
+				spawned_farmer = true
+			farmer_node.visible = true
+			farmer_node.position = m.player.position + Vector2(24, 0)
+			GameData.aff_set("farmer", 60)
+			var aff_f2 := GameData.aff("farmer")
+			rep_vi = int(GameData.me.reputation.kyojin)
+			m.society.murder("g2")
+			var seen_ok: bool = "g2" in GameData.dead and int(GameData.me.memories[-1].reported_day) == 51 \
+				and "farmer" in GameData.me.memories[-1].witnesses and GameData.aff("farmer") == aff_f2 - 30 \
+				and int(GameData.me.reputation.kyojin) == rep_vi - 20 and m.dialog._seq.size() >= 2
+			m.dialog.close()
+			GameData.day = 52
+			GameData.society_new_day([0, 0, 0])
+			var n_mu := GameData.society_note()
+			var known_ok: bool = n_mu.contains("죽었다") and GameData.charged_active() \
+				and str(GameData.me.charged.kind) == "murder" and int(GameData.me.charged.heat) == 5
+			# 주택가 이주는 죽은 이를 데려오지 않는다
+			GameData.gen_npcs["g8"]["here"] = false
+			GameData.dead.append("g8")
+			GameData.gov_budget["town"] = 5000
+			GameData.day = 57
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var no_return: bool = not bool(GameData.gen_npcs.g8.here)
+			# ⑤ 살인 재판 — 인정해도 징역이다(참작 없음), 전과 murder → 호칭 「살인자」
+			GameData.me.charged = {"day": 51, "kind": "murder", "target": "g2", "value": 100, "others": 1,
+				"seen": 1, "heat": 5, "court_day": 57, "skips": 0, "since": 57, "court": "town", "case_id": 0,
+				"surrender": false, "bribe": false}
+			m.society.trial_pick("admit")
+			var last_vi := str(m.dialog._seq[-1].text)
+			var trial_ok: bool = last_vi.contains("징역") and str(GameData.me.record[-1].crime) == "murder" \
+				and str(GameData.me.record[-1].verdict) == "prison" \
+				and str(GameData.player_title("chief").cls) == "murderer"
+			m.dialog.close()
+			print("VIOLENCE_OK=", absent_ok and gate55_ok and gate75_ok and rob_ok and charged_r and win_ok and lose_ok
+				and quiet_ok and seen_ok and known_ok and no_return and trial_ok,
+				" 부재=", absent_ok, " 55=", gate55_ok, " 75=", gate75_ok, " 강도=", rob_ok, " 기소=", charged_r,
+				" 승=", win_ok, " 패=", lose_ok, " 조용한살인=", quiet_ok, " 본살인=", seen_ok, " 소문=", known_ok,
+				" 불귀=", no_return, " 재판=", trial_ok)
+			if spawned_farmer:
+				_s2_police_teardown(farmer_node)
+			if g1_node != null:
+				pass   # 이미 지워졌다 — murder 가 노드를 정리한다
+			_s2_police_teardown(cop_vi)
+			m.player.position = keep_pos_vi
+			GameData.minutes = keep_min_vi
+			_s2_restore(k_vi)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
@@ -8833,6 +8988,9 @@ func _s2_keep() -> Dictionary:
 		"gov_debt": GameData.gov_debt.duplicate(), "town_log": GameData.town_log.duplicate(true),
 		"town_building": GameData.town_building, "town_done": GameData.town_done.duplicate(),
 		"town_aust": GameData.town_austerity_lv,
+		# 대면 범죄(S5a)
+		"dead": GameData.dead.duplicate(), "npc_down": GameData.npc_down.duplicate(),
+		"settler_homes": GameData.settler_homes.duplicate(true), "empty_houses": GameData.empty_houses.duplicate(true),
 	}
 	return k
 
@@ -8865,6 +9023,10 @@ func _s2_restore(k: Dictionary) -> void:
 	GameData.town_building = s2.town_building
 	GameData.town_done = s2.town_done
 	GameData.town_austerity_lv = s2.town_aust
+	GameData.dead = s2.dead
+	GameData.npc_down = s2.npc_down
+	GameData.settler_homes = s2.settler_homes
+	GameData.empty_houses = s2.empty_houses
 	m.hud.clear_guide()
 	_soc_restore(k)
 

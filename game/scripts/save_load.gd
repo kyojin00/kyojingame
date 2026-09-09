@@ -288,6 +288,17 @@ func _apply_save(d: Dictionary) -> void:
 					"skips": int(c.get("skips", 0)), "seen": int(c.get("seen", 0)),
 					"others": int(c.get("others", 0)), "value": int(c.get("value", 0))})
 	GameData.case_seq = int(d.get("case_seq", 0))
+	# 대면 범죄(S5a) — 죽은 이와 누운 이
+	GameData.dead = []
+	var dead_in: Variant = d.get("dead", [])
+	if dead_in is Array:
+		for dk in dead_in:
+			GameData.dead.append(str(dk))
+	GameData.npc_down = {}
+	var down_in: Variant = d.get("npc_down", {})
+	if down_in is Dictionary:
+		for nk in down_in:
+			GameData.npc_down[str(nk)] = int(down_in[nk])
 	GameData.npc_greed_adj = {}
 	var ga: Variant = d.get("npc_greed_adj", {})
 	if ga is Dictionary:

@@ -57,8 +57,8 @@ func _process(delta: float) -> void:
 			and GameData.fisher_quest in ["meet", "follow", "open"]) \
 		and not GameData.night_owl(id) \
 		and not GameData.constable_on_duty(id)   # 밤 사람은 22시까지, 밤 교대 순경은 24시까지 밖에 남는다
-	if GameData.constable_off_duty(id):
-		home_time = true   # 비번 순경은 경찰서 안 — 보이지도, 보지도 않는다(S4f)
+	if GameData.constable_off_duty(id) or GameData.npc_is_down(id):
+		home_time = true   # 비번 순경은 경찰서 안, 맞아 누운 사람은 집 안 — 보이지도, 보지도 않는다
 	if visible == home_time:
 		visible = not home_time
 	if home_time:

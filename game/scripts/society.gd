@@ -297,6 +297,20 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 		else:
 			choices.insert(choices.size() - 1,
 				gray(label, str(theft.get("pickpocket_gray", "손이 안 나간다"))))
+		# 대면 범죄(S5a) — 문턱 아래면 줄 자체가 없다(부재, 헌법 §5.2). 손이 안 가는 사람은 회색
+		var vl: Dictionary = GameData.SOCIETY_LINES.violence
+		var bold := GameData.boldness()
+		if bold >= int(GameData.GATE.get("violence", 55)):
+			var acts: Array = [[str(vl.rob_choice), rob.bind(nid)], [str(vl.assault_choice), assault.bind(nid)]]
+			if bold >= int(GameData.GATE.get("murder", 75)):
+				acts.append([str(vl.murder_choice), murder.bind(nid)])
+			for act: Array in acts:
+				if guest:
+					choices.insert(choices.size() - 1, gray(str(act[0]), "손님은 이 마을 일에 끼지 않는다."))
+				elif not GameData.victim_ok(nid):
+					choices.insert(choices.size() - 1, gray(str(act[0]), str(vl.no_target)))
+				else:
+					choices.insert(choices.size() - 1, act)
 	# 순경(S2b) — 열린 사건의 피해자·목격자에게 「사건 이야기」, 용의자에게 「검거한다」
 	if nid != "chief" and not guest:
 		_case_choices(nid, choices)
@@ -1722,6 +1736,9 @@ func trial_pick(kind: String) -> void:
 				pages.append({"text": str(cl.plea_no)})
 		_:
 			return
+	if str(ch.get("kind", "")) == "murder" and not acquit:
+		tier = maxi(tier, 5)   # 살인(S5a) — 인정·사정·평판으로도 징역 아래로 내려가지 않는다
+		pages.append({"text": str(cl.murder_no_mercy)})
 	# 그 일의 기억 — 판결이 매듭이다
 	var mem: Dictionary = {}
 	for cand: Dictionary in GameData.me.get("memories", []):
@@ -1781,7 +1798,7 @@ func trial_pick(kind: String) -> void:
 				c["stage"] = "closed"
 				c["closed_by"] = "acquitted" if acquit else "court"
 		if not acquit:
-			GameData._note(str(GameData.SOCIETY_NOTES.town_convicted))
+			GameData.note_later(str(GameData.SOCIETY_NOTES.town_convicted))
 	# 법정의 문장·판사는 기소를 비우기 전에 읽는다 — 비운 뒤엔 순회 재판의 것으로 돌아간다
 	var follow := _cl("follow")
 	var bench := _bench()
@@ -2669,11 +2686,127 @@ func serve_sentence() -> void:
 				cell.dead = true
 				break
 	GameData.society_new_day([0, 0, 0])
-	GameData._note(str(GameData.SOCIETY_NOTES.prison_out))
+	GameData.note_later(str(GameData.SOCIETY_NOTES.prison_out))
 	if m.shop_room.visible:
 		m.shop_room.close()
 	var t: Vector2i = m.door_tile(m.TOWN_PLOTS["prison"].anchor) + Vector2i(0, 1)
 	m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
 	m.dialog.open("교도소", _pr("out"), [[_pr("out_choice"), null]])
+	m.saveio.save_now()
+
+
+# ---- 대면 범죄 (S5a, 헌법 §5.2·§6.1) ----
+#
+# 강도·주먹다짐·살인은 굴림이 없다 — 마주 서 있으면 언제나 성립한다. 문제는 뒤다: 피해자의 진술이
+# 곧 목격이라(facing_others) 강도·폭행은 다음날 반드시 기소되고, 살인은 본 사람이 있으면 100%,
+# 없으면 아무 데도 없던 일이 된다(완전범죄). 손이 가는 사람은 정착민과 읍의 생성 NPC 뿐.
+
+func _vl(key: String) -> String:
+	return str(_lines("violence").get(key, ""))
+
+
+func _facing_ok(nid: String, gate: String) -> bool:
+	return not Net.is_guest() and _me_int("boldness_base", -1) != -1 \
+		and GameData.boldness() >= int(GameData.GATE.get(gate, 55)) and GameData.victim_ok(nid)
+
+
+func _witness_page(witnesses: Array, line: String) -> Dictionary:
+	var wid := str(witnesses[0])
+	return {"text": line, "name": _npc_name(wid), "portrait": _portrait(wid)}
+
+
+# 강도 — 소지금 전부. 즉시 평판 −10, 호감 −40, 대범함 +4. 피해자가 본 사람이라 신고는 확정
+func rob(nid: String) -> void:
+	if not _facing_ok(nid, "violence"):
+		return
+	m.dialog.close()
+	var witnesses := _witnesses(nid)
+	var take: int = GameData.wallet_of(nid)
+	GameData.npc_wallet[nid] = 0
+	GameData.money += take
+	GameData.today_earned += take
+	GameData.bold_add(4.0)
+	GameData.aff_add(nid, -40)
+	_rep_add(-GameData.ROBBERY_REP, region_here())
+	_remember("robbery", nid, [nid] + witnesses, maxi(take, 50), true, 3)
+	var pages: Array = [{"text": (_vl("rob_ok") % take) if take > 0 else _vl("rob_empty")},
+		{"text": _vl("rob_victim"), "name": _npc_name(nid), "portrait": _portrait(nid)}]
+	if not witnesses.is_empty():
+		pages.append(_witness_page(witnesses, str(GameData.SOCIETY_LINES.theft.witness[posmod(GameData.day, 3)])))
+	pages[-1]["choices"] = [[_vl("leave"), null]]
+	m.dialog.open_seq("", null, pages)
+	m.saveio.save_now()
+
+
+# 주먹다짐 — 이길 확률 0.45 + 전투 Lv × 0.06. 이기면 상대가 이틀 눕고(대범함 +3), 지면 기력 −40
+func assault(nid: String, roll := -1.0) -> void:
+	if not _facing_ok(nid, "violence"):
+		return
+	m.dialog.close()
+	var witnesses := _witnesses(nid)
+	var p: float = clampf(GameData.FIGHT_P_BASE + GameData.FIGHT_P_LV * float(GameData.skills.get("combat", {}).get("lv", 0)), 0.2, 0.9)
+	var pages: Array = []
+	if _roll(roll) < p:
+		GameData.npc_down[nid] = GameData.day + GameData.ASSAULT_DOWN_DAYS
+		GameData.bold_add(3.0)
+		GameData.aff_add(nid, -40)
+		GameData.note_later(str(GameData.SOCIETY_NOTES.assault_down) % _npc_name(nid))
+		pages.append({"text": _vl("assault_win")})
+	else:
+		GameData.energy = maxf(0.0, GameData.energy - 40.0)
+		GameData.bold_add(1.0)
+		GameData.aff_add(nid, -20)
+		pages.append({"text": _vl("assault_lose")})
+	_remember("assault", nid, [nid] + witnesses, 50, true, 2)
+	pages.append({"text": _vl("assault_victim"), "name": _npc_name(nid), "portrait": _portrait(nid)})
+	if not witnesses.is_empty():
+		pages.append(_witness_page(witnesses, str(GameData.SOCIETY_LINES.theft.witness[posmod(GameData.day, 3)])))
+	pages[-1]["choices"] = [[_vl("leave"), null]]
+	m.dialog.open_seq("", null, pages)
+	m.saveio.save_now()
+
+
+# 살인 — 사람이 사라진다. 정착민은 집이 비고(편지는 없다), 생성 NPC 는 돌아오지 않는다.
+# 본 사람이 있으면 마을이 안다(정착민 호감 −30, 평판 −20, heat 5 신고). 없으면 아무 데도 없던 일
+func murder(nid: String) -> void:
+	if not _facing_ok(nid, "murder"):
+		return
+	m.dialog.close()
+	var witnesses := _witnesses(nid)
+	var name := _npc_name(nid)
+	GameData.dead.append(nid)
+	if GameData.gen_npcs.has(nid):
+		GameData.gen_npcs[nid]["here"] = false
+		GameData.gen_npcs[nid]["away_until"] = 0
+		GameData._gen_seats_sync()
+	else:
+		GameData.settlers.erase(nid)
+		if GameData.settler_leaving == nid:
+			GameData.settler_leaving = ""
+		if GameData.settler_homes.has(nid):
+			GameData.empty_houses.append(GameData.settler_homes[nid])
+			GameData.settler_homes.erase(nid)
+	if GameData.spouse == nid:
+		GameData.spouse = ""
+	if GameData.dating == nid:
+		GameData.dating = ""
+	for n in m.npcs.duplicate():
+		if str(n.id) == nid:
+			m.npcs.erase(n)
+			n.queue_free()
+	GameData.bold_add(5.0)
+	var seen := not witnesses.is_empty()
+	_remember("murder", nid, witnesses, 100, seen, 5)
+	var pages: Array = [{"text": _vl("murder_done")}]
+	if seen:
+		_rep_add(-GameData.MURDER_REP, region_here())
+		for sid in GameData.settlers:
+			GameData.aff_add(str(sid), -GameData.MURDER_AFF_HIT)
+		GameData.note_later(str(GameData.SOCIETY_NOTES.murder_known) % name)
+		pages.append(_witness_page(witnesses, _vl("murder_witness")))
+	else:
+		GameData.note_later(str(GameData.SOCIETY_NOTES.murder_quiet) % name)
+	pages[-1]["choices"] = [[_vl("leave"), null]]
+	m.dialog.open_seq("", null, pages)
 	m.saveio.save_now()
 

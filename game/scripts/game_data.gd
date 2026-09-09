@@ -8963,7 +8963,11 @@ const SOCIETY_LINES := {
 		"charge_kind": {
 			"pickpocket": "피고는 %s의 주머니를 털었습니다. 본 사람이 %d명입니다.",
 			"shelf": "피고는 %s의 가게 선반에서 물건을 훔쳤습니다. 본 사람이 %d명입니다.",
+			"robbery": "피고는 %s의 돈을 힘으로 빼앗았습니다. 본 사람이 %d명입니다.",
+			"assault": "피고는 %s을 때렸습니다. 본 사람이 %d명입니다.",
+			"murder": "피고는 %s을 죽였습니다. 본 사람이 %d명입니다.",
 		},
+		"murder_no_mercy": "사람을 죽인 피고다. 참작은 없다.",
 		"charge_surrender": "자수한 피고입니다. 참작을 구합니다.",
 		"charge_bribe": "피고는 순경에게 돈을 내밀었습니다. 가중을 구합니다.",
 	},
@@ -8983,6 +8987,22 @@ const SOCIETY_LINES := {
 		"out_choice": "문을 나선다",
 		"closed": "교도소 문은 안에서만 열린다. 볼일 없으면 지나가라.",
 		"seat_lost": "자리는 구속되는 날 비었다 — 전직 %s.",
+	},
+	# 대면 범죄(S5a) — 강도·주먹다짐·살인. 성공률은 없다: 문제는 뒤다
+	"violence": {
+		"rob_choice": "돈을 내놓으라 한다",
+		"assault_choice": "주먹을 휘두른다",
+		"murder_choice": "끝을 낸다",
+		"no_target": "이 사람에게는 손이 안 간다",
+		"rob_ok": "주머니를 뒤집었다 — %dG. 상대는 눈을 못 맞췄다.",
+		"rob_empty": "주머니가 비어 있었다. 손만 더럽혔다.",
+		"rob_victim": "…내 돈. 그쪽이 가져갔지. 다 말할 거요.",
+		"assault_win": "주먹이 먼저 닿았다. 상대가 주저앉았다.",
+		"assault_lose": "주먹이 빗나갔다. 얻어맞고 물러섰다.",
+		"assault_victim": "…얼굴은 기억해 뒀소. 순경한테 갈 거요.",
+		"murder_done": "끝났다. 손이 떨리지 않았다.",
+		"murder_witness": "…봤어요. 다 봤어요. 사람 살려!",
+		"leave": "자리를 뜬다",
 	},
 	# 읍 순경(S4f) — 협공·체포·뇌물·자수·유치. {victim} 은 피해자 이름
 	"police_town": {
@@ -9181,6 +9201,10 @@ const SOCIETY_NOTES := {
 	"staff_transfer": "%s이 전근 갔다. %s의 자리가 비었다.",
 	"staff_arrive": "%s이 왔다. %s의 빈자리에 앉았다.",
 	"promoted": "아침에 위에서 불렀다. 오늘부터 %s다.",
+	# ---- 대면 범죄(S5a) ----
+	"assault_down": "%s이 다쳐 누웠다. 이틀은 안 보일 것이다.",
+	"murder_known": "%s이 죽었다. 마을이 그것을 안다.",
+	"murder_quiet": "%s이 보이지 않는다. 아무도 이유를 모른다.",
 	# ---- 자치회(S3c) ----
 	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
 	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
@@ -9211,7 +9235,16 @@ const ABSENT_FIRE := 7        # 이레 결근 — 해고(평판 −8)
 const MEMORY_MAX := 60        # memories 상한(오래된 것부터)
 const WORK_LOG_MAX := 12      # work_log 상한 — 「오늘/어제」만 보면 되므로 짧다
 const SEEN_DAYS := [28, 56, 84]   # heat 1/2/3+ 기억이 살아 있는 날수(헌법 §4.2 seen)
-const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45, "burglary": 35, "bribe": 40}   # boldness() 문턱(헌법 §5.2)
+const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45, "burglary": 35, "bribe": 40,
+	"violence": 55, "murder": 75}   # boldness() 문턱(헌법 §5.2) — 강도·주먹다짐 55, 살인 75 는 회색이 아니라 부재
+# ---- 대면 범죄(S5a, 헌법 §6.1) — 강도·폭행·살인은 언제나 성립하고 문제는 뒤(목격·신고)다 ----
+const FACING_CRIMES := ["robbery", "assault", "murder"]   # 피해자의 진술이 곧 목격 1.0
+const ASSAULT_DOWN_DAYS := 2       # 맞은 사람은 이틀 누워 있다(안 보인다)
+const ROBBERY_REP := 10            # 강도는 즉시 평판 −10
+const MURDER_REP := 20             # 본 사람이 있는 살인 — 즉시 −20, 정착민 호감 −30
+const MURDER_AFF_HIT := 30
+const FIGHT_P_BASE := 0.45         # 주먹다짐 이길 확률 = 0.45 + 전투 Lv × 0.06 (0.2~0.9)
+const FIGHT_P_LV := 0.06
 const SERVICE_LAST_HOUR := 17.0   # 봉사는 17시 전에만 — 시계를 되감지 않으려고(D14)
 
 # ---- 세금·예산(S2a, 헌법 §2) ----
@@ -9444,10 +9477,13 @@ var gen_npcs := {}
 var cases: Array = []                # [{id, crime, day, suspect, victim, witness, evidence, stage, closed_by, deadline}]
 var case_seq := 0
 var npc_greed_adj := {}              # {nid: float} 유죄마다 −0.1 (하한 0.5)
+var dead: Array = []                 # 내 손에 죽은 사람들(S5a) — 정착민은 집이 비고, 생성 NPC 는 돌아오지 않는다
+var npc_down := {}                   # {nid: 이날까지 누워 있다} — 주먹다짐에 진 사람
 
 # 런타임 — 저장하지 않는다.
 var animals_now := 0                              # 가축 수 — society._process 가 0.5초마다 채운다(목장주 호칭 재료)
 var _society_notes: Array = []                    # 아침 결산에 덧붙일 줄들 — society_note() 가 한 번에 비운다
+var _society_later: Array = []                    # 낮에 생긴 일 — 다음 아침 결산의 맨 앞에 선다(society_new_day 가 옮긴다)
 var _title_mark := ""                             # 이장 기준 호칭 cls 의 기준선 — 바뀐 아침에만 한 줄(D9)
 var _bold_today := {"cave": 0.0, "night": 0.0}    # 오늘 오른 대범함 — BOLD_CAP 의 하루 상한을 센다
 var shop_force_p := -1.0                          # 하네스가 좌판 손님의 구매 확률을 고정한다(0 이상이면)
@@ -10573,7 +10609,7 @@ func _town_arrive_tick() -> void:
 		if came.size() >= town_arrive_per_season():
 			break
 		var g: Dictionary = gen_npcs.get("g%d" % i, {})
-		if g.is_empty() or bool(g.get("here", false)):
+		if g.is_empty() or bool(g.get("here", false)) or ("g%d" % i) in dead:
 			continue
 		g["here"] = true
 		g["since"] = day
@@ -10693,6 +10729,27 @@ func town_case_for(job: String) -> Dictionary:
 	return {}
 
 
+# 피고 말고 본 사람의 수 — 대면 범죄(강도·폭행)는 피해자의 진술이 곧 목격이라 피해자도 센다
+func facing_others(mem: Dictionary) -> int:
+	var wit: Array = mem.get("witnesses", [])
+	if str(mem.get("kind", "")) in FACING_CRIMES:
+		return wit.size()
+	return wit.size() - (1 if str(mem.get("target", "")) in wit else 0)
+
+
+# 손이 가는 사람(S5a) — 정착민(SETTLER_POOL)과 읍의 생성 NPC 뿐. 핵심·고장·특수·순경·죽은 이는 아니다
+func victim_ok(id: String) -> bool:
+	if id in dead:
+		return false
+	if gen_npcs.has(id):
+		return constable_shift(id) < 0 and bool(gen_npcs[id].get("here", false))
+	return npc_kind(id) == "normal" and id in settlers
+
+
+func npc_is_down(id: String) -> bool:
+	return int(npc_down.get(id, 0)) > day
+
+
 # 나를 피고로 둔 읍 사건 — 유치 뒤 검찰(charged) 또는 법원(indicted). 없으면 {}
 func town_my_case() -> Dictionary:
 	for c in cases:
@@ -10766,7 +10823,7 @@ func _town_wanted_tick() -> void:
 		mem["settled_day"] = day
 		me["wanted"] = {"day": int(mem.get("day", 0)), "kind": str(mem.get("kind", "")), "target": target,
 			"value": int(mem.get("value", 0)), "fine": 0, "since": day, "region": "town",
-			"heat": int(mem.get("heat", 1)), "seen": wit.size(), "others": wit.size() - (1 if target in wit else 0)}
+			"heat": int(mem.get("heat", 1)), "seen": wit.size(), "others": facing_others(mem)}
 		_note(str(SOCIETY_NOTES.town_wanted) % npc_name(target))
 		break
 
@@ -11019,7 +11076,7 @@ func _court_tick() -> void:
 			mem["settled_day"] = day
 			var wit: Array = mem.get("witnesses", [])
 			var target := str(mem.get("target", ""))
-			var others := wit.size() - (1 if target in wit else 0)
+			var others := facing_others(mem)
 			var cd := next_court_day(day - 1)
 			me.charged = {"day": int(mem.get("day", 0)), "kind": str(mem.get("kind", "")), "target": target,
 				"value": int(mem.get("value", 0)), "others": others, "seen": wit.size(), "heat": int(mem.get("heat", 2)),
@@ -11229,6 +11286,12 @@ func _note(line: String) -> void:
 		_society_notes.append(line)
 
 
+# 낮의 사건(판결·주먹다짐·살인·출소)은 아침의 그릇이 비워진 뒤에 생긴다 — 다음 아침으로 넘긴다
+func note_later(line: String) -> void:
+	if line != "":
+		_society_later.append(line)
+
+
 # 하루가 넘어갈 때 사회가 도는 자리 (day_cycle 이 부른다). ko = 기력 소진으로 기절했나(D15 —
 # 26시 강제 취침은 아니다). 순서 ①~⑫ 는 계약서 §4 그대로이고, note 는 SOCIETY_NOTES 에서만.
 func society_new_day(stats: Array, ko := false) -> void:
@@ -11237,7 +11300,8 @@ func society_new_day(stats: Array, ko := false) -> void:
 		return
 	# ② 그릇부터 갖추고, 「자리가 진실」로 직업을 정합한다
 	me = _apply_me(me)
-	_society_notes = []
+	_society_notes = _society_later.duplicate()   # 어제 낮의 일이 오늘 아침의 첫 줄이다
+	_society_later = []
 	if not JOBS.has(str(me.get("job", ""))):
 		me.job = ""
 		me.rank = ""
@@ -12100,6 +12164,8 @@ func reset_all() -> void:
 	cases = []
 	case_seq = 0
 	npc_greed_adj = {}
+	dead = []
+	npc_down = {}
 	npc_wallet = {}
 	recipe_items = {}
 	tracked_pick = ""
@@ -12537,6 +12603,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"gov_debt": gov_debt, "town_log": town_log, "town_building": town_building, "town_done": town_done,
 		"town_austerity_lv": town_austerity_lv,
 		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
+		"dead": dead, "npc_down": npc_down,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped, "things_built": things_built,
