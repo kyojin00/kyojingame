@@ -3745,6 +3745,7 @@ const ITEMS := {
 	# 온천 복구 (메인 스토리 15) — 수맥을 뚫는 쐐기와 솟아난 물의 표본
 	"rock_wedge": {"name": "착암 쐐기", "sell": 0},
 	"spring_water": {"name": "샘물 표본", "sell": 0},
+	"tax_receipt": {"name": "납세 영수증", "sell": 0},   # 팔 수 없다(sell 0 → 판매 목록 제외). 냈다는 증거
 	"bouquet": {"name": "꽃다발", "sell": 0},
 	# 부품 — 제작대에서 가구를 만들 때 쓴다. 못·천·밧줄은 잡화점, 경첩은 대장간
 	"nail": {"name": "못", "sell": 5},
@@ -3854,7 +3855,7 @@ const FISH_IDS := ["fish_crucian", "fish_minnow", "fish_loach", "fish_bitterling
 	"fish_eel", "fish_snakehead", "fish_crab", "fish_salmon", "fish_rainbow",
 	"fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish", "fish_stormjack",
 	"fish_moonfish", "fish_starcarp", "fish_ghost", "fish_golden", "fish_king", "fish_dragon"]
-const ITEM_IDS := ["egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
+const ITEM_IDS := ["tax_receipt", "egg", "milk", "fish_crucian", "fish_minnow", "fish_loach",
 	"fish_bitterling", "fish_carp", "fish_sweetfish", "fish_trout", "fish_mandarin",
 	"fish_catfish", "fish_eel", "fish_snakehead", "fish_crab", "fish_salmon",
 	"fish_rainbow", "fish_smelt", "fish_icecarp", "fish_lenok", "fish_mistfish",
@@ -5943,6 +5944,22 @@ const INSTITUTIONS := {
 		"job": "mail_carrier",
 		"slice": 1,
 	},
+	# 면사무소(S2) — 회관 창구. 이장이 면장을 겸한다(읍이 열리기 전까지).
+	# 아래 자리가 둘(서기·감시원)이라 ranks 가 셋이다 — seat_rows 는 마지막 랭크만 주인으로 시드한다.
+	# job 은 「일자리 이야기」의 기본값이고, jobs 가 이 창구에서 들어갈 수 있는 직업 전부다
+	"township": {
+		"name": "면사무소",
+		"region": "kyojin",
+		"room": "hall",
+		"head": "chief",
+		"ranks": ["clerk", "ranger", "head"],
+		"player_max": "ranger",
+		"skill": "",
+		"books": 0,
+		"job": "township_clerk",
+		"jobs": ["township_clerk", "forest_ranger"],
+		"slice": 2,
+	},
 }
 
 # 직업 14 — 점원 6(kind "clerk") + 자유직 8(kind "free").
@@ -6641,6 +6658,291 @@ const JOBS := {
 			"line": "이건 당신한테만 보여 줘요. 누가 뭘 읽는지… 광장에선 말하지 말고요.",
 		},
 		"absent_warn": "사흘째 안 왔어요. 반납함이 넘쳐요. …내일은 와요.",
+	},
+	# ---- 기관직(S2) — 면사무소 창구에서 들어간다. 봉급도 그 창구에서 받는다(헌법 §2.5).
+	# req: rep(kyojin) ≥ 20 · 미말소 전과 0 · 직업별 숙련. 채용 대사·거절 사유는 이장이 말한다
+	"township_clerk": {
+		"name": "면 서기",
+		"kind": "office",
+		"inst": "township",
+		"rank": "clerk",
+		"boss": "chief",
+		"wage": 100,
+		"known_at": 14,
+		"skill": "",
+		"books": 0,
+		"req_rep": 20,
+		"slice": 2,
+		"calls": {
+			"stranger": "면사무소 새 사람",
+			"known": "서기 양반",
+			"master": "우리 서기",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔구먼. 장부는 펜보다 무겁네. 오늘도 한 장씩 넘기세.",
+				"새 사람, 도장은 힘으로 찍는 게 아닐세. 자리에 앉게.",
+			],
+			"known": [
+				"서기 양반 왔는가. 오늘 민원은 셋일세. 차부터 한잔 하게.",
+				"서기 양반, 어제 그 장부 자네가 맞춰 놓은 거 봤네. 잘했어.",
+			],
+			"master": [
+				"우리 서기 왔구먼. 늙은이는 이제 도장만 찍으면 되겠어.",
+				"우리 서기, 자네 없으면 이 면사무소는 문 닫아야 하네.",
+			],
+		},
+		"hire": {
+			"ask": "이장님, 면사무소에서 일하고 싶습니다. 장부라면 자신 있어요.",
+			"refuse_aff": "면사무소 일은 마을 사람 일일세. 자넬 좀 더 알고 나서 보세.",
+			"refuse_skill": "장부는 배우면 되네. 그보다 사람 됨됨이가 먼저야. 좀 더 두고 보세.",
+			"refuse_rep": "마을에 자네 얘기가 좀 더 좋게 돌아야 하네. 그때 다시 오게.",
+			"refuse_record": "전과가 있는 사람한테 공무를 맡길 수는 없네. 미안하이.",
+			"refuse_busy": "자넨 벌써 딴 데 이름이 올라 있잖나. 공무는 한 몸으로 하는 걸세.",
+			"accept": "그래. 내일 아침 아홉 시에 회관으로 오게. 도장은 내가 찍어 두지.",
+			"first_day": "첫날일세. 민원은 사람 얘기야. 장부보다 얼굴을 먼저 보게.",
+			"resign_ask": "이장님, 면사무소 일은 여기까지 하겠습니다. 감사했습니다.",
+			"resign_reply": "그리하게. 자네가 맞춘 장부는 오래 갈 걸세. 수고했네.",
+			"fired": "이레일세. 창구를 비워 둔 채로는 못 두네. 자리는 거두겠네.",
+		},
+		"loop": [
+			{
+				"customer": "farmer",
+				"setup": "순돌이 밭 경계 문제로 왔다. 「덕구네 울타리가 한 뼘 넘어왔네.」",
+				"choices": [
+					[
+						"측량 장부를 펴고 경계를 그대로 읽어 준다",
+						"이장: 장부대로 했구먼. 그게 서기 일일세. 순돌이도 수긍했지.",
+						1,
+					],
+					[
+						"한 뼘쯤은 서로 봐 주라고 달랜다",
+						"순돌: 한 뼘이 열 뼘 되는 걸세, 아무렴. 그래도 알았네.",
+						0,
+					],
+					[
+						"덕구를 불러 다음에 다시 오라고 한다",
+						"이장: 미루면 두 사람 다 다시 와야 하네. 오늘 끝냈어야지.",
+						-1,
+					],
+				],
+			},
+			{
+				"customer": "merchant",
+				"setup": "만수가 장부를 들고 왔다. 「재산세 그거, 가게 창고까지 세는 거야?」",
+				"choices": [
+					[
+						"창고는 집이 아니라고 규정을 읽어 준다",
+						"만수: 그럼 됐어! 역시 물어보길 잘했네. 다음에 씨앗 하나 줄게.",
+						1,
+					],
+					[
+						"모르겠으니 이장에게 물어보라고 한다",
+						"이장: 그건 자네가 답할 수 있는 거였네. 규정집 다시 읽게.",
+						-1,
+					],
+					[
+						"세는 게 맞다고 대충 답한다",
+						"만수: 진짜? …그럼 창고 좀 줄여야겠네. 확실한 거지?",
+						0,
+					],
+				],
+			},
+			{
+				"customer": "florist",
+				"setup": "봄이가 도장을 받으러 왔다. 「꽃밭 옆에 작은 화분 가게를 내고 싶어요.」",
+				"choices": [
+					[
+						"허가 절차를 순서대로 적어 준다",
+						"봄이: 이렇게 적어 주니 하나도 안 무섭네요. 고마워요!",
+						1,
+					],
+					[
+						"도장부터 찍어 준다",
+						"이장: 서류 없이 도장부터 찍으면 나중에 서기가 곤란해지네.",
+						-1,
+					],
+					[
+						"지금은 상점 허가가 안 열렸다고 알려 준다",
+						"봄이: 그렇군요… 그럼 열리면 제일 먼저 올게요.",
+						0,
+					],
+				],
+			},
+			{
+				"customer": "postman",
+				"setup": "덕구가 이사 서류를 들고 왔다. 「고장 사람 하나가 교진으로 오고 싶다네.」",
+				"choices": [
+					[
+						"빈 집터가 있는지 장부로 확인해 준다",
+						"이장: 집터부터 보는 게 맞네. 자네 장부가 마을을 지키는 걸세.",
+						1,
+					],
+					[
+						"사람이 늘면 좋다고 바로 받는다",
+						"덕구: 반가운 마음은 알겠네만 집이 없으면 어디서 자나.",
+						0,
+					],
+					[
+						"이장 결재를 받아 오라고 돌려보낸다",
+						"이장: 그건 서기 선에서 볼 수 있는 일이었네. 나까지 올 것 없어.",
+						-1,
+					],
+				],
+			},
+		],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 도 교부금이라 마을 장부에선 안 나가네. 받게.",
+			"nothing": "근무한 날이 없구먼. 봉급은 나온 날에만 적히는 걸세.",
+			"not_yet": "봉급날은 아직일세. 장부에 이레마다라고 적혀 있잖나.",
+		},
+		"sees": {
+			"what": "예산 장부 — 마을 예산의 실수치와 다음 사업까지 남은 돈",
+			"line": "우리 서기니까 보여 주는 걸세. 이게 마을 예산 장부야. 남한텐 말 말게.",
+		},
+		"absent_warn": "사흘째 창구가 비었네. 민원 온 사람들이 그냥 돌아갔어. 내일은 오게.",
+	},
+	"forest_ranger": {
+		"name": "산림감시원",
+		"kind": "office",
+		"inst": "township",
+		"rank": "ranger",
+		"boss": "chief",
+		"wage": 110,
+		"known_at": 14,
+		"skill": "forest",
+		"skill_lv": 4,
+		"books": 0,
+		"req_rep": 20,
+		"slice": 2,
+		"calls": {
+			"stranger": "견습 감시원",
+			"known": "감시원 양반",
+			"master": "우리 감시원",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔구먼. 견습이라도 숲은 자네를 벌써 아네. 오늘도 돌고 오게.",
+				"새 감시원, 숲 지도는 접지 말고 펴서 들게. 접으면 길을 잃어.",
+			],
+			"known": [
+				"감시원 양반 왔는가. 어제 솔숲에서 연기 봤다는 말이 있었네.",
+				"감시원 양반, 동백이가 자네 얘기를 하더군. 깐깐하다고. 칭찬일세.",
+			],
+			"master": [
+				"우리 감시원 왔구먼. 자네가 돌고 온 숲은 조용하네.",
+				"우리 감시원, 늙은이는 이제 숲 걱정은 안 하네. 자네가 있으니.",
+			],
+		},
+		"hire": {
+			"ask": "이장님, 숲을 지키는 일을 하고 싶습니다. 도끼질은 할 만큼 했어요.",
+			"refuse_aff": "숲을 맡기려면 사람을 알아야 하네. 자넨 아직 낯설어.",
+			"refuse_skill": "도끼질이 아직 서툴러. 나무를 알아야 숲을 세지. 더 베고 오게.",
+			"refuse_rep": "숲을 맡기려면 마을이 자넬 믿어야 하네. 아직은 아닐세.",
+			"refuse_record": "전과가 있는 사람한테 숲을 맡길 수는 없네. 미안하이.",
+			"refuse_busy": "자넨 벌써 딴 데 이름이 올라 있잖나. 숲은 한 몸으로 지키는 걸세.",
+			"accept": "그래. 내일 아침 아홉 시에 회관으로 오게. 숲 지도는 내가 주지.",
+			"first_day": "첫날일세. 숲은 베는 사람이 아니라 세는 사람이 지키는 걸세.",
+			"resign_ask": "이장님, 숲 지키는 일은 여기까지 하겠습니다. 감사했습니다.",
+			"resign_reply": "그리하게. 자네가 센 나무는 그대로 서 있을 걸세. 수고했네.",
+			"fired": "이레일세. 숲을 비워 둔 채로는 못 두네. 지도는 돌려주게.",
+		},
+		"loop": [
+			{
+				"customer": "sawyer",
+				"setup": "동백이 그루터기 셋을 두고 왔다. 「내가 벤 거요. 이장 허가는 받았소.」",
+				"choices": [
+					[
+						"허가 장부와 맞춰 보고 정상으로 적는다",
+						"이장: 장부와 맞춰 봤구먼. 동백이는 허가 없이 안 베네. 잘했어.",
+						1,
+					],
+					[
+						"허가증을 보여 달라고 한다",
+						"동백: 허가증? 이장 말이 허가지. 젊은 사람이 깐깐하구먼.",
+						0,
+					],
+					[
+						"묻지 않고 그냥 넘어간다",
+						"이장: 장부에 안 적으면 다음 사람이 그걸 무허가로 보네. 적게.",
+						-1,
+					],
+				],
+			},
+			{
+				"customer": "herbalist",
+				"setup": "유하가 약초 밭 경계를 묻는다. 「깊은 숲 안쪽은 캐도 되는 건가요?」",
+				"choices": [
+					[
+						"큰나무 둘레 다섯 걸음은 남기라고 일러 준다",
+						"유하: 다섯 걸음이요. 적어 둘게요. 숲도 쉬어야 하니까요.",
+						1,
+					],
+					[
+						"어디든 캐도 된다고 한다",
+						"이장: 큰나무 둘레는 비워 두는 게 마을 규칙일세. 다시 일러 주게.",
+						-1,
+					],
+					[
+						"이장에게 물어보라고 한다",
+						"유하: 그럼 다음에요. 오늘은 그냥 돌아갈게요.",
+						0,
+					],
+				],
+			},
+			{
+				"customer": "explorer",
+				"setup": "재민이 뛰어왔다. 「솔숲에서 연기 봤어! 애들이 불장난하는 거 같아!」",
+				"choices": [
+					[
+						"곧장 솔숲으로 가서 불씨를 밟아 끈다",
+						"이장: 불은 늦으면 숲 하나가 없어지네. 바로 간 게 맞았어.",
+						1,
+					],
+					[
+						"재민에게 물 한 통 들고 같이 가자고 한다",
+						"재민: 좋아, 나도 갈래! 근데 물통 무겁다…",
+						0,
+					],
+					[
+						"애들 장난이니 두고 본다",
+						"이장: 불장난을 두고 본 감시원은 없네. 다음엔 바로 가게.",
+						-1,
+					],
+				],
+			},
+			{
+				"customer": "carpenter",
+				"setup": "덕구가 목재를 부탁한다. 「지붕 고칠 나무가 모자라. 큰나무 하나면 되는데.」",
+				"choices": [
+					[
+						"큰나무는 안 되고 벌목장 나무를 안내한다",
+						"이장: 큰나무는 마을 것도 내 것도 아닐세. 잘 막았어.",
+						1,
+					],
+					[
+						"딱 하나만 허가해 준다",
+						"이장: 큰나무는 한 그루도 안 되네. 감시원이 그걸 몰라서야.",
+						-1,
+					],
+					[
+						"이장 허가를 받아 오라고 한다",
+						"덕구: 허가라… 알겠네. 이장님한테 가 보지.",
+						0,
+					],
+				],
+			},
+		],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 숲 세는 값은 도에서 나오네. 받게.",
+			"nothing": "순찰 나간 날이 없구먼. 봉급은 나간 날에만 적히는 걸세.",
+			"not_yet": "봉급날은 아직일세. 이레마다라고 말했잖나.",
+		},
+		"sees": {
+			"what": "숲의 장부 — 어느 그루터기가 허가받은 것이고 어디가 무허가인지",
+			"line": "우리 감시원한테는 이걸 주지. 허가 장부야. 그루터기마다 이름이 있네.",
+		},
+		"absent_warn": "사흘째 숲을 안 돌았네. 그루터기가 셋 늘었어. 내일은 나가게.",
 	},
 	"mail_carrier": {
 		"name": "우체국 배달원",
@@ -7544,6 +7846,15 @@ const SOCIETY_NOTES := {
 	"rumor": "마을에 내 이야기가 돈다. 누가 먼저 말했는지는 모른다.",
 	"forgiven": "어제 일은 갚았다. 그 사람이 다시 예전처럼 불렀다.",
 	"rep_wary": "요즘 사람들이 나를 보면 먼저 눈을 피한다.",
+	# ---- 세금·예산(S2a) ----
+	"tax_bill": "납세 고지서가 왔다 — %dG. 이레 안에 면사무소로 가야 한다.",
+	"tax_free": "이번 계절 세금은 없다. 지난 계절 수입이 적었다.",
+	"tax_dun": "독촉장이 왔다. 밀린 세금에 이자가 붙기 시작했다.",
+	"tax_chief": "이장이 세금 이야기로 찾아온다고 한다. 마을에 말이 돌겠지.",
+	"tax_freeze": "체납으로 봉급이 멈췄다. 자리는 아직 남아 있다.",
+	"tax_seized": "밀린 세금을 대신 가져갔다 — %s.",
+	"gov_start": "마을 예산으로 「%s」 공사가 시작됐다.",
+	"gov_done": "「%s」이 다 됐다. %s",
 }
 
 # 마음 카드 — [[문턱, 이름, 설명]] · stats_ui 가 이름을 글줄로, 설명을 툴팁으로 쓴다.
@@ -7571,12 +7882,49 @@ const SEEN_DAYS := [28, 56, 84]   # heat 1/2/3+ 기억이 살아 있는 날수(�
 const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45}   # boldness() 문턱(헌법 §5.2)
 const SERVICE_LAST_HOUR := 17.0   # 봉사는 17시 전에만 — 시계를 되감지 않으려고(D14)
 
+# ---- 세금·예산(S2a, 헌법 §2) ----
+#
+# 세금은 「내러 가는 행위」다 — 자동 차감은 압류 하나뿐이다. 정부는 면사무소 창구가
+# 열린 계절(story9 done)부터 있다. 그 전엔 세율 0: 정부가 없으면 세금도 없다.
+const TAX_FREE_INCOME := 2000      # 지난 계절 수입이 이 아래면 소득세 0
+const TAX_INCOME_RATE := 0.10      # 넘으면 전액의 10%(봉급 포함 — 공무원이 세금 안 내면 누가 내나)
+const TAX_PROPERTY_HOUSE := 100    # 재산세: 집 단계당
+const TAX_PROPERTY_ANIMAL := 20    #          가축 한 마리당
+const TAX_DUE_DAYS := 7            # 계절 1~7일 납부
+const ARREARS_RATE := 0.05         # 체납 주당 단리
+const ARREARS_CAP := 0.50          # 가산 상한
+const ARREARS_DUN_WEEK := 2        # 독촉장
+const ARREARS_CHIEF_WEEK := 4      # 이장이 먼저 말을 건다 · rep −5
+const ARREARS_FREEZE_WEEK := 6     # 봉급 정지(자리는 남는다)
+const ARREARS_SEIZE_WEEK := 8      # 압류: 회관 창고 → 가축 → 소지금 · rep −15
+const TAX_BILLS_MAX := 6           # 고지서 보관 수
+const GOV_GRANT := 2000                     # 계절 교부금(고정) — 교진 예산은 절대 마이너스가 안 된다
+const GOV_LEVY_PER_RESIDENT := 30           # NPC 장부세: (주민 − 1) × 30
+const GOV_OPS := {"police_box": 300, "clinic_box": 300}   # 운영비 — 그 건물이 서 있을 때만(S2b)
+# 공공사업 — 예산이 비용에 닿으면 이장이 다음 사업을 건다(착공 즉시 차감), 다음 계절 첫날 완공.
+# 둘 다 눈에 보이는 결과다 — 「내가 낸 세금이 등불이 되고 길이 된다」. 순경·의사 자리는 S2b 가 뒤에 잇는다
+const GOV_PROJECTS := [
+	{"id": "lights", "name": "밤길 등불", "cost": 500,
+		"desc": "마을 길목마다 등불을 건다. 밤이 덜 어둡다.",
+		"done": "밤이 조금 덜 어둡다."},
+	{"id": "paving", "name": "마을 길 포장", "cost": 5000,
+		"desc": "마을 안 자갈길을 고르게 다진다. 길 위에서는 걸음이 빠르다.",
+		"done": "자갈길 위에서는 걸음이 한결 가볍다."},
+]
+
 # ---- 사회: 상태 ----
 
 # 세계 키 — 호스트 권위, build_save 한 줄로 게스트에 자동 전파된다(헌법 §9.1).
 var society_v := 1        # 사회 하위 시스템의 세이브 판 — 옛 세이브엔 없어 0, 그러면 전부 기본값
 var seats := {}           # {inst: {rank: [npc id / "player" / ""]}} — 「자리가 진실이다」(헌법 §0.1)
 var npc_wallet := {}      # {nid: int} 소매치기가 건드린 지갑만 — 없는 사람은 wallet_of 가 계절 시드로 정한다
+# 정부(S2a) — 사업비 저금통. 인건비 계정은 없다(공무원 봉급은 도 교부금, 어떤 장부에도 안 적힌다)
+var gov_budget := {"kyojin": 2000}   # {region: int}
+var gov_done: Array = []             # 완공한 공공사업 id
+var gov_building := ""               # 착공해 다음 계절 첫날 완공되는 사업 id ("" = 없음)
+var gov_tax_season := 0              # 이번 계절 플레이어가 낸 세금(장부 한 줄의 재료)
+var gov_log: Array = []              # 계절 장부 [{season, grant, levy, tax, ops, project}] ≤ 8 — 서기의 「예산 장부」
+var tax_seize_due := 0               # 오늘 아침 압류할 액수(society.after_new_day 가 집행하고 0 으로)
 
 # 런타임 — 저장하지 않는다.
 var animals_now := 0                              # 가축 수 — society._process 가 0.5초마다 채운다(목장주 호칭 재료)
@@ -7692,12 +8040,13 @@ func seat_rows(inst: String) -> Dictionary:
 	if not (rows is Dictionary):
 		rows = {}
 		seats[inst] = rows
-	var defaults := [[""], [str(d.get("head", ""))]]
-	for i in 2:
+	# 마지막 랭크가 주인(고정), 그 아래는 전부 공석으로 시드한다 — 면사무소(S2)처럼
+	# 아래 자리가 둘인 기관도 같은 규칙이다
+	for i in ranks.size():
 		var r := str(ranks[i])
 		var cur: Variant = rows.get(r)
 		if not (cur is Array) or cur.is_empty():
-			rows[r] = defaults[i].duplicate()
+			rows[r] = [str(d.get("head", ""))] if i == ranks.size() - 1 else [""]
 	# 랭크 밖의 키나 Array 아닌 값은 버린다 — society_new_day ② 의 `"player" in rows[r]` 와
 	# seat_clear_player 가 손댄 세이브의 수 하나에 걸려 매일 아침 ③~⑫ 를 통째로 건너뛰지 않게.
 	# 정상 경로는 두 랭크 키 아래 Array 만 쓰므로 여기서 지워지는 건 남이 손댄 것뿐이다
@@ -7752,6 +8101,15 @@ func aff(id: String) -> int:
 
 
 # 호감도 쓰기는 전부 여기로 — 모르는 id 는 조용히 지나가고 0..100 을 넘지 않는다.
+# 교진 평판 — 모든 오르내림은 이 한 줄을 지난다(society.gd 의 _rep_add 도 여기로 온다)
+func rep_add(d: int) -> void:
+	var rep: Variant = me.get("reputation", {})
+	if not (rep is Dictionary):
+		rep = {"kyojin": 0, "town": 0}
+	rep["kyojin"] = int(rep.get("kyojin", 0)) + d
+	me["reputation"] = rep
+
+
 func aff_add(id: String, d: int) -> void:
 	if not affinity.has(id):
 		return
@@ -8010,10 +8368,249 @@ func service_pending() -> Dictionary:
 
 # 사회가 NPC 에게 주는 자리 — npcs.gd 의 사회 분기가 부른다. 축제 > 사회(plan §7)는 여기
 # 시간 조건으로 지킨다: 회의는 축제 없는 날 09~17시만, 밤 사람은 저녁 뒤만(축제는 18시 종료).
+# ---- 세금·예산 (S2a) ----
+
+# 정부가 있는가 — 면사무소 창구(회관, story9 done)가 열린 뒤부터. 그 전엔 세금도 예산도 없다
+func tax_open() -> bool:
+	return story9_phase == "done"
+
+
+# 절대 계절 번호(0부터) — 고지서·납부 기록이 「어느 계절 것」인지 셀 때
+func season_no(d := day) -> int:
+	return (d - 1) / DAYS_PER_SEASON
+
+
+# 아직 안 낸 고지서들 — 오래된 것이 앞
+func unpaid_bills() -> Array:
+	var out: Array = []
+	for b in me.get("tax_bills", []):
+		if b is Dictionary and int(b.get("paid", 0)) < int(b.get("total", 0)):
+			out.append(b)
+	return out
+
+
+# 고지서 하나의 체납 주 — 납부 기한 다음날부터 이레마다 한 주. 기한 안이면 0
+func bill_weeks(b: Dictionary) -> int:
+	var over: int = day - int(b.get("due_day", 0))
+	return 0 if over <= 0 else (over - 1) / 7 + 1
+
+
+# 고지서 하나를 오늘 내면 얼마인가 — 원금 + 주당 5% 단리, 상한 50%
+func bill_due(b: Dictionary) -> int:
+	var total := int(b.get("total", 0))
+	var extra := minf(ARREARS_RATE * float(bill_weeks(b)), ARREARS_CAP)
+	return total + int(float(total) * extra)
+
+
+# 밀린 세금 전부 — 오늘 창구에서 낼 액수
+func tax_due_total() -> int:
+	var n := 0
+	for b in unpaid_bills():
+		n += bill_due(b)
+	return n
+
+
+# 기한이 지난 고지서만 — 압류는 「밀린」 것만 걷는다(그날 아침 막 나온 고지서는 아직 밀린 게 아니다)
+func overdue_bills() -> Array:
+	var out: Array = []
+	for b in unpaid_bills():
+		if bill_weeks(b) >= 1:
+			out.append(b)
+	return out
+
+
+# 가장 오래 밀린 주 수 — 독촉·이장·봉급 정지·압류의 사다리는 이 수를 본다
+func arrears_weeks() -> int:
+	var w := 0
+	for b in unpaid_bills():
+		w = maxi(w, bill_weeks(b))
+	return w
+
+
+# 체납으로 봉급이 멈췄나(여섯 주째, 자리는 남는다)
+func wage_frozen() -> bool:
+	return arrears_weeks() >= ARREARS_FREEZE_WEEK
+
+
+# 이장이 세금 얘기로 먼저 말을 거는가(네 주째)
+func tax_dun_active() -> bool:
+	return arrears_weeks() >= ARREARS_CHIEF_WEEK
+
+
+# 계절 첫날 고지서 — 소득세(지난 계절 수입 2,000 초과분 10%) + 재산세(집 단계 100 · 가축 20).
+# 0원이어도 편지는 온다(「이번 계절 세금은 없다」) — 정부가 있다는 것을 계절마다 한 번 느낀다
+func issue_tax_bill() -> Dictionary:
+	var earned := int(me.get("season_earned_prev", 0))
+	var income := int(float(earned) * TAX_INCOME_RATE) if earned > TAX_FREE_INCOME else 0
+	var property := house_lv * TAX_PROPERTY_HOUSE + animals_now * TAX_PROPERTY_ANIMAL
+	var total := income + property
+	var b := {"season": season_no(), "day": day, "income": income, "property": property,
+		"total": total, "paid": 0, "due_day": day + TAX_DUE_DAYS - 1}
+	var bills: Array = me.get("tax_bills", [])
+	bills.append(b)
+	while bills.size() > TAX_BILLS_MAX:
+		bills.pop_front()
+	me["tax_bills"] = bills
+	var body := "『%s %d년 %s 납세 고지서』\n\n" % [village_name if village_name != "" else "교진",
+		(day - 1) / (DAYS_PER_SEASON * 4) + 1, season_name()]
+	if total <= 0:
+		body += "지난 계절 수입 %dG — 면세 기준(%dG) 아래라\n이번 계절 세금은 없습니다.\n\n— 교진 면사무소" \
+			% [earned, TAX_FREE_INCOME]
+	else:
+		body += "소득세 %dG (지난 계절 수입 %dG)\n재산세 %dG (집 %d단계 · 가축 %d마리)\n합계 %dG\n\n" \
+			% [income, earned, property, house_lv, animals_now, total]
+		body += "납부 기한: 이 계절 %d일까지, 면사무소 창구.\n기한을 넘기면 주마다 5%%가 붙습니다.\n\n— 교진 면사무소" \
+			% TAX_DUE_DAYS
+	mail_store("납세 고지서", body)
+	return b
+
+
+# 창구에서 낸다 — 밀린 것 전부, 가산 포함. 돌아오는 값은 낸 액수(0 이면 낼 것이 없다)
+func pay_tax() -> int:
+	var due := tax_due_total()
+	if due <= 0 or money < due:
+		return 0
+	money -= due
+	today_spent += due
+	for b in unpaid_bills():
+		b["paid"] = int(b.get("total", 0))
+	me["tax_paid_season"] = season_no()
+	me["arrears"] = {"amount": 0, "weeks": 0}
+	gov_budget["kyojin"] = int(gov_budget.get("kyojin", 0)) + due
+	gov_tax_season += due
+	items["tax_receipt"] = int(items.get("tax_receipt", 0)) + 1
+	aff_add("chief", 2)
+	rep_add(2)
+	return due
+
+
+# 체납 사다리 — 매일 아침. 문턱을 「넘는 순간」에만 한 번씩 일어난다(me.arrears.weeks 가 지난 값)
+func _tax_step_daily() -> void:
+	var bills := unpaid_bills()
+	var ar: Dictionary = me.get("arrears", {"amount": 0, "weeks": 0})
+	if bills.is_empty():
+		me["arrears"] = {"amount": 0, "weeks": 0}
+		return
+	var was := int(ar.get("weeks", 0))
+	var now_w := arrears_weeks()
+	me["arrears"] = {"amount": tax_due_total(), "weeks": now_w}
+	if now_w == was:
+		return
+	if was < ARREARS_DUN_WEEK and now_w >= ARREARS_DUN_WEEK:
+		mail_store("독촉장", "『독촉장』\n\n밀린 세금이 %dG 입니다.\n주마다 5%%가 더 붙습니다. 면사무소로 오십시오.\n\n— 교진 면사무소"
+			% tax_due_total())
+		_note(str(SOCIETY_NOTES.tax_dun))
+	if was < ARREARS_CHIEF_WEEK and now_w >= ARREARS_CHIEF_WEEK:
+		rep_add(-5)
+		_note(str(SOCIETY_NOTES.tax_chief))
+	if was < ARREARS_FREEZE_WEEK and now_w >= ARREARS_FREEZE_WEEK and str(me.get("job", "")) != "":
+		_note(str(SOCIETY_NOTES.tax_freeze))
+	if was < ARREARS_SEIZE_WEEK and now_w >= ARREARS_SEIZE_WEEK:
+		# 압류 — 유일한 자동 차감. 무엇을 가져갈지는 세계(가축)를 만질 수 있는 society 가
+		# 같은 아침에 집행한다(after_new_day). 여기서는 액수만 적어 둔다 — 기한 지난 것만
+		var due := 0
+		for b in overdue_bills():
+			due += bill_due(b)
+		tax_seize_due = due
+
+
+# 압류 집행의 마무리 — society.after_new_day 가 창고·가축·소지금에서 걷은 뒤 부른다.
+# 밀린 고지서는 전부 낸 것으로 치고(강제로), 평판이 크게 깎인다
+func tax_seized(taken: String) -> void:
+	for b in overdue_bills():
+		b["paid"] = int(b.get("total", 0))
+	me["arrears"] = {"amount": tax_due_total(), "weeks": arrears_weeks()}
+	tax_seize_due = 0
+	rep_add(-15)
+	_note(str(SOCIETY_NOTES.tax_seized) % taken)
+
+
+# 회관 창고에서 값어치만큼 걷는다 — 돌아오는 값은 [걷은 값어치, "이름 x개 · …"]
+func seize_from_store(due: int) -> Array:
+	var got := 0
+	var parts: Array = []
+	for iid in hall_stock.keys():
+		if got >= due:
+			break
+		var n := int(hall_stock[iid])
+		var v := maxi(1, item_value(str(iid)))
+		var take := mini(n, int(ceil(float(due - got) / float(v))))
+		if take <= 0:
+			continue
+		hall_stock[iid] = n - take
+		if int(hall_stock[iid]) <= 0:
+			hall_stock.erase(iid)
+		got += take * v
+		parts.append("%s %d개" % [str(ITEMS.get(iid, {}).get("name", iid)), take])
+	return [got, " · ".join(PackedStringArray(parts))]
+
+
+# 다음에 걸 공공사업 — 완공·착공한 것 다음 순서. 없으면 {}
+func gov_next_project() -> Dictionary:
+	for p in GOV_PROJECTS:
+		var pid := str(p.id)
+		if pid in gov_done or pid == gov_building:
+			continue
+		return p
+	return {}
+
+
+func gov_project(pid: String) -> Dictionary:
+	for p in GOV_PROJECTS:
+		if str(p.id) == pid:
+			return p
+	return {}
+
+
+# 운영비 — 서 있는 건물만 낸다(S2a 에는 아직 없다)
+func gov_ops_cost() -> int:
+	var n := 0
+	for b in GOV_OPS:
+		if village_built.has(b):
+			n += int(GOV_OPS[b])
+	return n
+
+
+# 계절 첫날의 예산 — 교부금 + 장부세 − 운영비, 그 뒤 공사 완공·착공.
+# 이장이 건다: 예산이 비용에 닿으면 다음 사업을 그 자리에서 착공(차감), 다음 계절 첫날 완공
+func gov_season() -> void:
+	var grant := GOV_GRANT
+	var levy := maxi(0, residents_now - 1) * GOV_LEVY_PER_RESIDENT
+	var ops := gov_ops_cost()
+	gov_budget["kyojin"] = int(gov_budget.get("kyojin", 0)) + grant + levy - ops
+	var row := {"season": season_no(), "grant": grant, "levy": levy, "tax": gov_tax_season,
+		"ops": ops, "project": ""}
+	gov_tax_season = 0
+	if gov_building != "":
+		var done := gov_project(gov_building)
+		gov_done.append(gov_building)
+		gov_building = ""
+		_note(str(SOCIETY_NOTES.gov_done) % [str(done.get("name", "")), str(done.get("done", ""))])
+	var nxt := gov_next_project()
+	if not nxt.is_empty() and int(gov_budget.get("kyojin", 0)) >= int(nxt.cost):
+		gov_budget["kyojin"] = int(gov_budget.get("kyojin", 0)) - int(nxt.cost)
+		gov_building = str(nxt.id)
+		row["project"] = gov_building
+		_note(str(SOCIETY_NOTES.gov_start) % str(nxt.name))
+	gov_log.append(row)
+	while gov_log.size() > 8:
+		gov_log.pop_front()
+
+
+# 공공사업의 효과 — 길 포장이 되면 자갈길 위에서 걸음이 빠르다(player.gd 가 읽는다)
+func path_speed_mult() -> float:
+	return 1.2 if "paving" in gov_done else 1.0
+
+
+# 밤의 가장 어두운 색 — 등불이 걸리면 조금 덜 어둡다(day_cycle._update_night 가 읽는다)
+func night_dark_color() -> Color:
+	return Color(0.24, 0.23, 0.35) if "lights" in gov_done else Color(0.16, 0.15, 0.26)
+
+
 func society_place(id: String) -> String:
-	if id == "chief" and council_pending() and festival_today().is_empty() \
+	if id == "chief" and (council_pending() or tax_dun_active()) and festival_today().is_empty() \
 			and hour_now() >= 9.0 and hour_now() < SERVICE_LAST_HOUR:
-		return "meeting"
+		return "meeting"   # 마을 회의도, 네 주 밀린 세금 얘기도 같은 자리에서 기다린다
 	if night_owl(id) and is_evening():
 		match id:
 			"musician":
@@ -8075,6 +8672,19 @@ func society_new_day(stats: Array, ko := false) -> void:
 		me.season_earned_prev = int(me.season_earned)
 		me.season_earned = 0
 		npc_wallet = {}
+		# 정부(S2a) — 창구가 열린 뒤부터. 예산이 먼저 돌고(지난 계절 세금이 장부에 오른다),
+		# 그다음 새 고지서가 온다. 복역 중에는 고지서가 없다(「나라가 먹여 주는 동안은 세금 없다」)
+		if tax_open():
+			gov_season()
+			if int(me.get("jail_days_left", 0)) <= 0:
+				var bill := issue_tax_bill()
+				if int(bill.total) > 0:
+					_note(str(SOCIETY_NOTES.tax_bill) % int(bill.total))
+				else:
+					_note(str(SOCIETY_NOTES.tax_free))
+	# 체납 사다리 — 매일 아침, 넘는 문턱에서만 한 번씩
+	if tax_open():
+		_tax_step_daily()
 	# ④ 어제 번 돈
 	if stats.size() > 1:
 		me.season_earned += int(stats[1])
@@ -8858,6 +9468,12 @@ func reset_all() -> void:
 	me = fresh_me()
 	society_v = 1   # 사회 세계 키(S1) — 자리·지갑도 새로
 	seats = {}
+	gov_budget = {"kyojin": 2000}
+	gov_done = []
+	gov_building = ""
+	gov_tax_season = 0
+	gov_log = []
+	tax_seize_due = 0
 	npc_wallet = {}
 	recipe_items = {}
 	tracked_pick = ""
@@ -9286,6 +9902,9 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"society_v": society_v,
 		"seats": seats,
 		"npc_wallet": npc_wallet,
+		# 정부(S2a)
+		"gov_budget": gov_budget, "gov_done": gov_done, "gov_building": gov_building,
+		"gov_tax_season": gov_tax_season, "gov_log": gov_log,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,

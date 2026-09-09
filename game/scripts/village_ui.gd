@@ -835,6 +835,11 @@ func _open_hall_dialog() -> void:
 		btns.append(["공동 프로젝트", _open_hall_project_dialog])
 	if GameData.hall_feature_open("meet"):
 		btns.append(["마을 회의", _open_hall_meeting_dialog])
+	# 면사무소 창구(S2a) — 세금·예산·기관직. 회관이 열린 날부터 정부가 있다(헌법 §2.2).
+	# 게스트는 조용히 죽는 단추가 아니라 회색 안내가 뜬다(D19 규약)
+	if GameData.hall_feature_open("office"):
+		btns.append(m.society.gray("면사무소 창구", "손님은 이 마을 일에 끼지 않는다.")
+			if Net.is_guest() else ["면사무소 창구", m.society.open_township])
 	btns.append(["나가기", null])
 	m.dialog.open("마을회관", body, btns)
 

@@ -235,6 +235,19 @@ func _apply_save(d: Dictionary) -> void:
 	if typeof(wallet_in) == TYPE_DICTIONARY:
 		for wk in wallet_in:
 			GameData.npc_wallet[str(wk)] = int(wallet_in[wk])
+	# 정부(S2a) — 옛 세이브엔 없어 예산 2,000 · 사업 없음으로 시작한다
+	var gb: Variant = d.get("gov_budget", {})
+	GameData.gov_budget = {"kyojin": int(gb.get("kyojin", 2000)) if gb is Dictionary else 2000}
+	var gd: Variant = d.get("gov_done", [])
+	GameData.gov_done = []
+	if gd is Array:
+		for pid in gd:
+			GameData.gov_done.append(str(pid))
+	GameData.gov_building = str(d.get("gov_building", ""))
+	GameData.gov_tax_season = int(d.get("gov_tax_season", 0))
+	var gl: Variant = d.get("gov_log", [])
+	GameData.gov_log = gl if gl is Array else []
+	GameData.tax_seize_due = 0
 	GameData.society_v = 1   # 메모리의 상태는 이제 현재 판이다
 	# ---- 저장은 하는데 **읽지 않던** 여덟 개 ----
 	#

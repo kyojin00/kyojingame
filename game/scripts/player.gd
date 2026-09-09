@@ -450,6 +450,12 @@ func _process(delta: float) -> void:
 			* GameData.perk_speed_mult() * GameData.hunger_speed_mult()
 		if GameData.riding:
 			mult *= GameData.HORSE_SPEED_MULT
+		# 마을 길 포장(예산 사업)이 되면 자갈길 위에서 걸음이 빠르다 — 세금이 길이 된 것
+		if GameData.path_speed_mult() > 1.0:
+			var pt := Vector2i(int(position.x) / main.TILE, int(position.y) / main.TILE)
+			if pt.y >= 0 and pt.y < main.MAP_H and pt.x >= 0 and pt.x < main.MAP_W \
+					and str(main.grid[pt.y][pt.x].ground) == "path":
+				mult *= GameData.path_speed_mult()
 		v = v * SPEED * mult * delta
 		var before := position
 		# 이미 끼어 있으면(설치물 등) 충돌을 무시하고 빠져나올 수 있게 한다

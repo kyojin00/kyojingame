@@ -242,6 +242,7 @@ func _next_day(passed_out: bool) -> void:
 	# 사회의 아침 — 결근·봉급·대범함·회의·호칭. 회관(스토리 9) if 블록 **밖**이라
 	# 스토리 9 전에도 매일 돈다. 저장 앞에 두어 오늘 아침의 상태가 세이브에 담긴다
 	GameData.society_new_day(stats, ko)
+	m.society.after_new_day()   # 압류(여덟 주 밀린 세금) — 가축은 세계를 든 쪽이 걷는다
 
 	_t = Time.get_ticks_usec()
 	m.saveio.save_now()
@@ -302,7 +303,8 @@ func _update_night() -> void:
 	# 가로등이 없는 마을 — 해가 지면 정말로 캄캄해진다
 	var start := 18.0 * 60.0
 	var a := clampf((GameData.minutes - start) / (6.0 * 60.0), 0.0, 1.0)
-	var c := Color(1, 1, 1).lerp(Color(0.16, 0.15, 0.26), a)
+	# 밤길 등불(마을 예산 사업)이 걸리면 조금 덜 어둡다 — 내가 낸 세금이 눈에 보이는 자리
+	var c := Color(1, 1, 1).lerp(GameData.night_dark_color(), a)
 	if m.weather_now() in [GameData.WEATHER_RAIN, GameData.WEATHER_STORM]:
 		c *= Color(0.78, 0.8, 0.88)  # 비 오는 날은 어둑하게
 	elif m.weather_now() == GameData.WEATHER_FOG:

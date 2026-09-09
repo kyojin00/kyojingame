@@ -5555,6 +5555,197 @@ func _debug_tick() -> void:
 			print("COOKGUIDE_OK=", cook_shown and cook_set and cleared and deliver_set,
 				" 목표뜸=", cook_shown, " 요리로체크=", cook_set,
 				" 목표사라짐=", cleared, " 전달로도닫힘=", deliver_set)
+		253:
+			# ---- 세금(S2a) — 고지서·납부·체납 사다리·압류 ----
+			#
+			# 세금은 「내러 가는 행위」다. 계절 첫날 고지서가 편지로 오고(소득세 2,000 초과분
+			# 10% + 재산세 집 100·가축 20), 창구에서 내면 마을 예산이 되고, 안 내면 여덟 주
+			# 사다리(독촉장 → 이장 → 봉급 정지 → 압류)를 탄다. 전부 하루 넘김만으로 굴린다
+			var k_tax := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			GameData.house_lv = 2
+			GameData.animals_now = 3
+			GameData.me.season_earned = 5000
+			GameData.day = 57                                  # 계절 셋째의 첫날
+			GameData.society_new_day([0, 0, 0])
+			m.society.after_new_day()
+			var b1: Dictionary = GameData.me.tax_bills[-1] if not GameData.me.tax_bills.is_empty() else {}
+			var bill_ok: bool = int(b1.get("income", 0)) == 500 and int(b1.get("property", 0)) == 260 \
+				and int(b1.get("total", 0)) == 760 and int(b1.get("due_day", 0)) == 63
+			var mail_ok: bool = not GameData.mail_box.is_empty() \
+				and str(GameData.mail_box[-1].title) == "납세 고지서"
+			var n1 := GameData.society_note()
+			var note_ok: bool = n1.contains("760") and n1.contains("밤길 등불")
+			# 예산: 2000 + 교부금 2000 + 장부세 19×30 − 등불 착공 500
+			var budget_ok: bool = int(GameData.gov_budget.kyojin) == 4070 and GameData.gov_building == "lights"
+			# 납부 — 창구의 「세금 내기」
+			GameData.money = 1000
+			var aff0 := GameData.aff("chief")
+			var rep0 := int(GameData.me.reputation.kyojin)
+			var rc0 := int(GameData.items.get("tax_receipt", 0))
+			m.society._pay_tax()
+			var paid_ok: bool = GameData.money == 240 and int(b1.get("paid", 0)) == 760 \
+				and int(GameData.gov_budget.kyojin) == 4830 \
+				and int(GameData.items.get("tax_receipt", 0)) == rc0 + 1 \
+				and GameData.aff("chief") == aff0 + 2 and int(GameData.me.reputation.kyojin) == rep0 + 2 \
+				and GameData.tax_due_total() == 0 and m.dialog.visible
+			m.dialog.close()
+			# 체납 — 다음 계절 고지서(수입 3000 → 소득세 300 + 재산세 260 = 560)를 안 낸다
+			GameData.me.season_earned = 3000
+			GameData.day = 85
+			GameData.society_new_day([0, 0, 0])
+			m.society.after_new_day()
+			var n2 := GameData.society_note()
+			var b2: Dictionary = GameData.me.tax_bills[-1]
+			# 등불 완공 → 예산 4830 + 2570 = 7400 ≥ 5000 → 포장 착공 → 2400
+			var season2_ok: bool = int(b2.get("total", 0)) == 560 and "lights" in GameData.gov_done \
+				and GameData.gov_building == "paving" and int(GameData.gov_budget.kyojin) == 2400 \
+				and n2.contains("밤길 등불") and n2.contains("마을 길 포장") \
+				and GameData.night_dark_color() != Color(0.16, 0.15, 0.26)
+			GameData.day = 92                                  # 기한(91) 다음날 — 1주째
+			GameData.society_new_day([0, 0, 0])
+			var w1_ok: bool = GameData.arrears_weeks() == 1 and GameData.bill_due(b2) == 588 \
+				and int(GameData.me.arrears.weeks) == 1
+			var mails0 := GameData.mail_box.size()
+			GameData.day = 99                                  # 2주째 — 독촉장
+			GameData.society_new_day([0, 0, 0])
+			var dun_ok: bool = GameData.arrears_weeks() == 2 and GameData.mail_box.size() == mails0 + 1 \
+				and str(GameData.mail_box[-1].title) == "독촉장" and GameData.society_note().contains("독촉장")
+			rep0 = int(GameData.me.reputation.kyojin)
+			GameData.day = 113                                 # 4주째(계절 첫날이기도 하다 — 새 고지서 260)
+			GameData.society_new_day([0, 0, 0])
+			m.society.after_new_day()
+			var keep_min_t := GameData.minutes
+			GameData.minutes = 10 * 60
+			var chief_ok: bool = GameData.arrears_weeks() == 4 and int(GameData.me.reputation.kyojin) == rep0 - 5 \
+				and GameData.society_place("chief") == "meeting" \
+				and m.society.talk_opener("chief", true).contains("세금") \
+				and GameData.gov_done.has("paving") and GameData.path_speed_mult() > 1.0
+			GameData.minutes = keep_min_t
+			GameData.day = 127                                 # 6주째 — 봉급 정지
+			GameData.society_new_day([0, 0, 0])
+			var freeze_ok: bool = GameData.arrears_weeks() == 6 and GameData.wage_frozen()
+			# 압류 — 창고(광석 5) → 가축(닭 한 마리, 내가 심은 것) → 소지금 순서
+			GameData.hall_stock = {"ore": 5}
+			var animals0 := m.animals.size()
+			m.farming.spawn_animal("chicken")
+			GameData.money = 5000
+			var due_before := 0
+			GameData.day = 141                                 # 8주째
+			GameData.society_new_day([0, 0, 0])
+			due_before = GameData.tax_seize_due
+			m.society.after_new_day()
+			var ore_v := GameData.item_value("ore")
+			var store_got := 5 * ore_v
+			var money_take: int = maxi(0, due_before - store_got - 800)
+			var n3 := GameData.society_note()
+			# 기한 지난 둘(560×1.4 + 260×1.2 = 1096)만 걷는다 — 오늘 아침 나온 고지서(260)는 남는다
+			var seize_ok: bool = due_before == 1096 and not GameData.hall_stock.has("ore") \
+				and m.animals.size() == animals0 and GameData.money == 5000 - money_take \
+				and GameData.tax_due_total() == 260 and GameData.arrears_weeks() == 0 \
+				and not GameData.wage_frozen() and int(GameData.me.reputation.kyojin) == rep0 - 5 - 15 \
+				and n3.contains("대신 가져갔다") and n3.contains("닭")
+			print("TAX_OK=", bill_ok and mail_ok and note_ok and budget_ok and paid_ok and season2_ok
+				and w1_ok and dun_ok and chief_ok and freeze_ok and seize_ok,
+				" 고지서=", bill_ok, " 편지=", mail_ok, " 결산=", note_ok, " 예산=", budget_ok,
+				" 납부=", paid_ok, " 둘째계절=", season2_ok, " 1주=", w1_ok, " 독촉장=", dun_ok,
+				" 이장=", chief_ok, " 봉급정지=", freeze_ok, " 압류=", seize_ok,
+				"(", due_before, "G: 창고 ", store_got, " · 닭 800 · 돈 ", money_take, ")")
+			_s2_restore(k_tax)
+		254:
+			# ---- 마을 예산(S2a) — 세금 0 으로 여덟 계절 ----
+			#
+			# 헌법 §2.4 검산: 교부금 2,000 + 장부세 (20−1)×30 = 2,570/계절, 운영비 0(파출소·진료소
+			# 아직 없음). 예산은 절대 마이너스가 안 되고, 첫 사업은 첫 계절에 착공, 두 사업이 다
+			# 끝난 뒤에는 계절마다 2,570 씩 쌓인다 — 「내가 낸 세금이 길이 된다」의 바닥
+			var k_gov := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			GameData.house_lv = 0
+			GameData.animals_now = 0
+			var neg := false
+			var starts: Array = []
+			var dones: Array = []
+			for i in 8:
+				GameData.day = 29 + 28 * i
+				GameData.society_new_day([0, 0, 0])
+				m.society.after_new_day()
+				GameData.society_note()
+				if int(GameData.gov_budget.kyojin) < 0:
+					neg = true
+				starts.append(GameData.gov_building)
+				dones.append(GameData.gov_done.duplicate())
+			var first_ok: bool = starts[0] == "lights" and dones[1].has("lights")
+			var paving_ok: bool = starts[1] == "paving" and dones[2].has("paving") and starts[2] == ""
+			# 포장 착공(둘째 계절 뒤 1640)으로부터 여섯 계절 × 2570
+			var end_ok: bool = int(GameData.gov_budget.kyojin) == 1640 + 2570 * 6
+			var log_ok: bool = GameData.gov_log.size() == 8 and int(GameData.gov_log[-1].levy) == 570 \
+				and int(GameData.gov_log[0].grant) == 2000
+			var free_ok: bool = GameData.me.tax_bills.size() == 6 \
+				and int(GameData.me.tax_bills[-1].total) == 0 and GameData.tax_due_total() == 0
+			print("SOCIETY_BUDGET_OK=", not neg and first_ok and paving_ok and end_ok and log_ok and free_ok,
+				" 마이너스없음=", not neg, " 첫사업=", first_ok, " 포장=", paving_ok,
+				" 여덟계절뒤=", end_ok, "(", int(GameData.gov_budget.kyojin), ")",
+				" 장부=", log_ok, " 면세=", free_ok)
+			_s2_restore(k_gov)
+		255:
+			# ---- 면사무소 기관직(S2a) — 채용 심사·근무·봉급·체납 정지 ----
+			var k_tw := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			GameData.aff_add("chief", 20 - GameData.aff("chief"))
+			GameData.me.reputation.kyojin = 10
+			var rep_refuse: String = m.society.can_hire_job("township_clerk")
+			GameData.me.reputation.kyojin = 20
+			var skill_refuse: String = m.society.can_hire_job("forest_ranger")   # forest Lv4 가 없다
+			var clerk_can: String = m.society.can_hire_job("township_clerk")
+			var review_ok: bool = rep_refuse.contains("좋게") and skill_refuse.contains("도끼질") and clerk_can == ""
+			# 광장의 이장 대화에는 「일자리 이야기」가 없다 — 기관직은 창구에서
+			var plaza: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("chief", plaza)
+			var plaza_ok := true
+			for c in plaza:
+				if str(c[0]).contains("일자리"):
+					plaza_ok = false
+			m.society.hire_job("township_clerk")
+			m.dialog.close()
+			var hire_ok: bool = str(GameData.me.job) == "township_clerk" \
+				and GameData.seat_of("township", "clerk") == "player" \
+				and GameData.seat_of("township", "ranger") == "" \
+				and GameData.seat_of("township", "head") == "chief"
+			GameData.day += 1
+			var keep_min_w := GameData.minutes
+			GameData.minutes = 10 * 60
+			var where_ok: bool = m.society.can_work("hall") == "" and m.society.can_work("general") != ""
+			m.society.open_township()
+			var labels := _btn_texts()
+			var counter_ok: bool = m.dialog.visible and "근무" in labels and "그만두겠습니다" in labels
+			m.society.work_start("hall")
+			var loop_ok: bool = m.dialog.visible and m.dialog._seq.size() >= 1
+			m.society.work_pick(0)
+			m.dialog.close()
+			var work_ok: bool = int(GameData.me.perf) == 1 and int(GameData.me.wage_pending) == 100
+			# 체납 여섯 주 — 근무는 인정되고 몫만 안 적힌다
+			GameData.me.tax_bills = [{"season": 0, "day": 1, "income": 100, "property": 0,
+				"total": 100, "paid": 0, "due_day": GameData.day - 50}]
+			GameData.day += 1
+			var frozen_ok: bool = GameData.wage_frozen()
+			m.society.work_start("hall")
+			m.society.work_pick(1)
+			m.dialog.close()
+			frozen_ok = frozen_ok and int(GameData.me.perf) == 2 and int(GameData.me.wage_pending) == 100
+			GameData.money = 1000
+			m.society._pay_tax()
+			m.dialog.close()
+			var thaw_ok: bool = not GameData.wage_frozen() and GameData.tax_due_total() == 0
+			GameData.minutes = keep_min_w
+			print("TOWNSHIP_OK=", review_ok and plaza_ok and hire_ok and where_ok and counter_ok
+				and loop_ok and work_ok and frozen_ok and thaw_ok,
+				" 심사=", review_ok, " 광장에없음=", plaza_ok, " 채용=", hire_ok, " 일터=", where_ok,
+				" 창구=", counter_ok, labels, " 미니루프=", loop_ok, " 근무=", work_ok,
+				" 봉급정지=", frozen_ok, " 완납=", thaw_ok)
+			_s2_restore(k_tw)
 		252:
 			# 집 꾸미기 — 깔려 있는 러그를 집어 옮길 수 있어야 한다.
 			# 예전에는 안내에 **집는 키가 적혀 있지 않아** 「깔려 있는데
@@ -7100,6 +7291,62 @@ func _soc_restore(k: Dictionary) -> void:
 	m.society.force_roll = -1.0
 	m.society.force_report = -1.0
 	m.dialog.close()
+
+
+# S2a(세금·예산) 검사가 만지는 것까지 — _soc_keep 위에 얹는다
+func _s2_keep() -> Dictionary:
+	var k := _soc_keep()
+	k["s2"] = {
+		"story9": GameData.story9_phase, "house_lv": GameData.house_lv,
+		"hall_stock": GameData.hall_stock.duplicate(), "mail_box": GameData.mail_box.duplicate(true),
+		"receipt": int(GameData.items.get("tax_receipt", 0)),
+		"gov_budget": GameData.gov_budget.duplicate(), "gov_done": GameData.gov_done.duplicate(),
+		"gov_building": GameData.gov_building, "gov_tax": GameData.gov_tax_season,
+		"gov_log": GameData.gov_log.duplicate(true), "residents": GameData.residents_now,
+		"today_spent": GameData.today_spent, "animals_n": m.animals.size(),
+	}
+	return k
+
+
+func _s2_restore(k: Dictionary) -> void:
+	var s2: Dictionary = k.s2
+	GameData.story9_phase = s2.story9
+	GameData.house_lv = s2.house_lv
+	GameData.hall_stock = s2.hall_stock
+	GameData.mail_box = s2.mail_box
+	GameData.items["tax_receipt"] = s2.receipt
+	GameData.gov_budget = s2.gov_budget
+	GameData.gov_done = s2.gov_done
+	GameData.gov_building = s2.gov_building
+	GameData.gov_tax_season = s2.gov_tax
+	GameData.gov_log = s2.gov_log
+	GameData.residents_now = s2.residents
+	GameData.today_spent = s2.today_spent
+	GameData.tax_seize_due = 0
+	_soc_restore(k)
+
+
+# 정부 검사의 공통 출발점 — 창구 열림 · 예산 새로 · 주민 스물
+func _s2_fresh_gov() -> void:
+	GameData.me = GameData.fresh_me()
+	GameData.story9_phase = "done"
+	GameData.gov_budget = {"kyojin": 2000}
+	GameData.gov_done = []
+	GameData.gov_building = ""
+	GameData.gov_tax_season = 0
+	GameData.gov_log = []
+	GameData.tax_seize_due = 0
+	GameData.residents_now = 20
+	GameData.hall_stock = {}
+	m.story_cutscene = true
+
+
+func _btn_texts() -> Array:
+	var out: Array = []
+	for c in m.dialog.buttons_box.get_children():
+		if c is Button:
+			out.append(str(c.text))
+	return out
 
 
 func _npc_node(nid: String) -> Node2D:

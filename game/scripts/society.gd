@@ -112,9 +112,7 @@ func _wage_lines(job: Dictionary) -> Dictionary:
 
 
 func _rep_add(d: int) -> void:
-	var rep: Dictionary = GameData.me.get("reputation", {})
-	rep["kyojin"] = int(rep.get("kyojin", 0)) + d
-	GameData.me["reputation"] = rep
+	GameData.rep_add(d)
 
 
 func _me_int(key: String, d := 0) -> int:
@@ -176,34 +174,51 @@ func owner_inst(nid: String) -> String:
 	return ""
 
 
-# 채용이 되는가 — 빈 문자열이면 된다, 아니면 주인이 거절하는 말.
-# 순서가 뜻이다: 손님·문 안 연 가게·자리·겸업·대기·호감·손·책 (D6, 부록 §3)
+# 채용이 되는가 — 빈 문자열이면 된다, 아니면 주인이 거절하는 말. 점원은 기관의 기본 직업이다
 func can_hire(inst: String) -> String:
+	return can_hire_job(str(_inst_def(inst).get("job", "")))
+
+
+# 직업 하나의 채용 판정. 순서가 뜻이다: 손님·문 안 연 가게·자리·겸업·대기·호감·평판·전과·손·책
+# (D6, 부록 §3). 기관직(kind office)은 헌법 §7.1 대로 rep ≥ 20 과 미말소 전과 0 을 더 본다 —
+# 면사무소 창구는 story9 가 끝나야 열려 있다(npc_open 이 아니라 tax_open)
+func can_hire_job(job_id: String) -> String:
 	if Net.is_guest():
 		return "손님은 안 쓰네."
+	var job: Dictionary = GameData.JOBS.get(job_id, {})
+	var inst := str(job.get("inst", ""))
 	var idef := _inst_def(inst)
-	if idef.is_empty():
+	if job.is_empty() or idef.is_empty():
 		return "그런 자리는 없네."
 	var head := str(idef.get("head", ""))
-	var ranks: Array = idef.get("ranks", ["", ""])
-	if not GameData.npc_open(head):
+	var office := str(job.get("kind", "")) == "office"
+	if (not GameData.tax_open()) if office else (not GameData.npc_open(head)):
 		return "가게부터 열어야지."
-	if GameData.seat_of(inst, str(ranks[0])) != "":
+	if GameData.seat_of(inst, str(job.get("rank", ""))) != "":
 		return "자리가 안 비었네."
+	var lines: Dictionary = job.get("hire", {})
 	if str(GameData.me.get("job", "")) != "":
-		return _hire_line(inst, "refuse_busy")
-	# 그만둔 지 이레 안 — refuse_busy(「이미 다른 데서 일하잖아」)는 무직자에게 사실과
-	# 어긋나므로 계약서 문구로 말한다(부록 §3 을 그에 맞게 고쳤다)
+		return str(lines.get("refuse_busy", "일자리는 하나만 갖게."))
+	# 그만둔 지 이레 안 — refuse_busy(「이미 다른 데서 일하잖아」)는 무직자에게 사실과 어긋난다
 	var hist: Array = GameData.me.get("job_history", [])
 	if not hist.is_empty() and GameData.day - int(hist[-1].get("to", 0)) < 7:
 		return "그만둔 지 이레도 안 됐잖나."
 	if GameData.aff(head) < 20:
-		return _hire_line(inst, "refuse_aff")
-	var skill := str(idef.get("skill", ""))
-	if skill != "" and GameData.skill_lv(skill) < 2:
-		return _hire_line(inst, "refuse_skill")
-	if int(idef.get("books", 0)) > _me_int("books_read"):
-		return _hire_line(inst, "refuse_skill")
+		return str(lines.get("refuse_aff", "아직 자네를 잘 몰라서 말이야."))
+	if office:
+		var rep: Dictionary = GameData.me.get("reputation", {})
+		if int(rep.get("kyojin", 0)) < int(job.get("req_rep", 20)):
+			return str(lines.get("refuse_rep", "마을에 자네 얘기가 좀 더 좋게 돌아야 하네."))
+		# 미말소 전과 — 마을 회의(court village)의 봉사 판결은 전과로 안 본다(직업 설계서)
+		for rec in GameData.me.get("record", []):
+			if rec is Dictionary and not bool(rec.get("expunged", false)) \
+					and str(rec.get("court", "")) != "village":
+				return str(lines.get("refuse_record", "전과가 있는 사람한테는 못 맡기네."))
+	var skill := str(job.get("skill", ""))
+	if skill != "" and GameData.skill_lv(skill) < int(job.get("skill_lv", 2)):
+		return str(lines.get("refuse_skill", "손이 아직 서툴러. 좀 더 해 보고 오게."))
+	if int(job.get("books", 0)) > _me_int("books_read"):
+		return str(lines.get("refuse_skill", "책 세 권은 읽고 오게."))
 	return ""
 
 
@@ -220,6 +235,10 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 	# 「나도 서 보고 싶어」 하고 「자리가 안 비었네」를 듣는 꼴이 된다. 사직은 계산대(counter_menu)에 있다
 	var inst := owner_inst(nid)
 	if inst != "" and GameData.job_inst() == inst:
+		inst = ""
+	# 기관직(면사무소)은 광장이 아니라 창구에서 「일하고 싶습니다」다(헌법 §7.1) — 이장의 광장
+	# 대화에는 끼우지 않는다. 회의·봉사·성격 질문이 이미 이장의 몫이다
+	if inst != "" and str(_inst_def(inst).get("room", "")) == "hall":
 		inst = ""
 	if inst != "":
 		if guest:
@@ -262,6 +281,9 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 func talk_opener(nid: String, first_today: bool) -> String:
 	if not first_today or not GameData.affinity_open or Net.is_guest():
 		return ""
+	# 네 주 밀린 세금 — 이장의 첫마디는 인사가 아니라 독촉이다(헌법 §2.3, 하루 한 번)
+	if nid == "chief" and GameData.tax_dun_active():
+		return "자네, 세금 얘기 좀 하세. 마을이 보고 있네. 면사무소로 오게."
 	# 사흘째 결근한 날, 주인의 첫마디는 인사가 아니라 걱정이다 (부록 §3 — 하루 한 번)
 	var job := _job()
 	if not job.is_empty() and str(job.get("boss", "")) == nid \
@@ -319,44 +341,62 @@ func pick_bold(v: int) -> void:
 
 # ---- 채용·사직 ----
 
-# 「일자리 이야기」 — 내가 먼저 묻고(hire.ask) 주인이 답한다. 거절 사유는 can_hire 가 고른다
+# 「일자리 이야기」 — 기관의 기본 직업(점원)으로. 면사무소는 직업이 둘이라 open_job_talk_job 으로 간다
 func open_job_talk(inst: String) -> void:
+	open_job_talk_job(str(_inst_def(inst).get("job", "")))
+
+
+# 내가 먼저 묻고(hire.ask) 주인이 답한다. 거절 사유는 can_hire_job 이 고른다.
+# back 이 있으면 거절·보류 뒤 그 창으로 돌아간다(면사무소 창구)
+func open_job_talk_job(job_id: String, back := Callable()) -> void:
 	if Net.is_guest():
 		return
 	m.dialog.close()
-	var head := str(_inst_def(inst).get("head", ""))
-	var ask := _hire_line(inst, "ask")
+	var job: Dictionary = GameData.JOBS.get(job_id, {})
+	var head := str(job.get("boss", ""))
+	var lines: Dictionary = job.get("hire", {})
+	var ask := str(lines.get("ask", ""))
 	var pages: Array = []
 	if ask != "":
 		pages.append({"text": ask, "name": _my_name(), "portrait": null})
-	var why := can_hire(inst)
+	var why := can_hire_job(job_id)
+	var later: Variant = back if back.is_valid() else null
 	if why != "":
-		pages.append({"text": why, "choices": [["알겠습니다", null]]})
+		pages.append({"text": why, "choices": [["알겠습니다", later]]})
 	else:
-		pages.append({"text": _hire_line(inst, "accept"), "choices": [
-			["하겠습니다", hire.bind(inst)],
-			["생각해 보겠습니다", null],
+		pages.append({"text": str(lines.get("accept", "내일 아침 나오게.")), "choices": [
+			["하겠습니다", hire_job.bind(job_id)],
+			["생각해 보겠습니다", later],
 		]})
 	m.dialog.open_seq(_npc_name(head), _portrait(head), pages)
 
 
 # 자리가 진실이다(헌법 §0.1) — seats 에 "player" 를 앉히는 것이 채용이고, me.job 은 그 그림자
 func hire(inst: String) -> void:
+	hire_job(str(_inst_def(inst).get("job", "")))
+
+
+func hire_job(job_id: String) -> void:
 	if Net.is_guest():
 		return
 	m.dialog.close()
-	var idef := _inst_def(inst)
-	var ranks: Array = idef.get("ranks", ["", ""])
+	var job: Dictionary = GameData.JOBS.get(job_id, {})
+	if job.is_empty():
+		return
+	var inst := str(job.get("inst", ""))
+	var rank := str(job.get("rank", ""))
 	var rows: Dictionary = GameData.seat_rows(inst)
-	rows[str(ranks[0])][0] = "player"
-	GameData.me["job"] = str(idef.get("job", ""))
-	GameData.me["rank"] = str(ranks[0])
+	if not rows.has(rank) or not (rows[rank] is Array) or rows[rank].is_empty():
+		return
+	rows[rank][0] = "player"
+	GameData.me["job"] = job_id
+	GameData.me["rank"] = rank
 	GameData.me["job_since_day"] = GameData.day + 1      # 내일 아침부터
 	GameData.me["wage_day"] = GameData.day + 8           # 첫 봉급날 = 첫 근무 이레 뒤
 	GameData.me["perf"] = 0
 	GameData.me["absent_days"] = 0
 	GameData.me["wage_pending"] = 0
-	var head := str(idef.get("head", ""))
+	var head := str(job.get("boss", ""))
 	m.dialog.open(_npc_name(head), "그래. 늦지 말게.", [["대화 끝", null]], _portrait(head))
 	m.saveio.save_now()
 
@@ -376,11 +416,11 @@ func resign() -> void:
 		GameData.money += paid
 		GameData.today_earned += paid
 		GameData.me["wage_pending"] = 0
-	var ranks: Array = _inst_def(inst).get("ranks", ["", ""])
+	var rank := str(job.get("rank", ""))
 	var rows: Dictionary = GameData.seat_rows(inst)
-	if rows.has(str(ranks[0])) and rows[str(ranks[0])].size() > 0 \
-			and str(rows[str(ranks[0])][0]) == "player":
-		rows[str(ranks[0])][0] = ""
+	if rows.has(rank) and rows[rank] is Array and rows[rank].size() > 0 \
+			and str(rows[rank][0]) == "player":
+		rows[rank][0] = ""
 	var hist: Array = GameData.me.get("job_history", [])
 	hist.append({"inst": inst, "rank": str(GameData.me.get("rank", "")),
 		"job": str(GameData.me.get("job", "")),
@@ -402,13 +442,14 @@ func resign() -> void:
 
 # ---- 근무·봉급 (방 안 계산대) ----
 
-# 지금 이 방에서 근무할 수 있는가 — 빈 문자열이면 된다
-func can_work() -> String:
+# 지금 이 방에서 근무할 수 있는가 — 빈 문자열이면 된다. room_id 를 안 주면 지금 들어가 있는 가게
+func can_work(room_id := "") -> String:
 	if Net.is_guest():
 		return "손님은 일하지 않는다."
 	if str(GameData.me.get("job", "")) == "":
 		return "맡은 일이 없다."
-	if GameData.job_inst() != m.shop_room.room_id:
+	var here := room_id if room_id != "" else str(m.shop_room.room_id)
+	if str(_inst_def(GameData.job_inst()).get("room", "")) != here:
 		return "여긴 내 일터가 아니다."
 	if GameData.day < _me_int("job_since_day"):
 		return "내일부터다."
@@ -449,7 +490,9 @@ func counter_menu(room_id: String) -> bool:
 		if can_work() == "":
 			btns.append(["근무", work_start])
 		var wl := _wage_lines(_job())
-		if _me_int("wage_pending") <= 0:
+		if GameData.wage_frozen():
+			btns.append(gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
+		elif _me_int("wage_pending") <= 0:
 			btns.append(gray("봉급 받기", str(wl.get("nothing", "받을 게 없다."))))
 		elif GameData.day < _me_int("wage_day"):
 			btns.append(gray("봉급 받기", str(wl.get("not_yet", "봉급날은 아직이다."))))
@@ -481,13 +524,13 @@ func _encounter() -> Dictionary:
 
 # 「근무」 — 손님 한 사람을 맞는 미니루프 하나. 시계도 돈도 여기서는 안 움직인다;
 # 몫은 wage_pending 에 적립되고 봉급날 주인 앞에서 받는다 (D4)
-func work_start() -> void:
+func work_start(room_id := "") -> void:
 	if Net.is_guest():
 		return
 	m.dialog.close()
 	var job := _job()
 	var head := str(job.get("boss", ""))
-	var why := can_work()
+	var why := can_work(room_id)
 	if why != "":
 		m.dialog.open(_npc_name(head), why, [["알겠습니다", null]], _portrait(head))
 		return
@@ -549,7 +592,10 @@ func work_pick(i: int) -> void:
 	var pick: Array = picks[i]
 	var customer := str(enc.get("customer", head))
 	_me_add("perf", 1)
-	_me_add("wage_pending", GameData.CLERK_WAGE)
+	# 일급은 직업표대로(점원 80 · 서기 100 · 감시원 110). 여섯 주 밀린 세금이면 봉급이
+	# 멈춘다 — 근무는 인정되고(결근이 아니다) 몫만 적히지 않는다(헌법 §2.3 직위해제)
+	if not GameData.wage_frozen():
+		_me_add("wage_pending", int(job.get("wage", GameData.CLERK_WAGE)))
 	_log_work("work", inst, i)
 	GameData.aff_add(customer, 1)
 	# 정답은 없다 — 다만 주인과의 사이는 조금 오르내린다 (§7.3 「직장 정치」)
@@ -568,7 +614,7 @@ func collect_wage() -> void:
 	if Net.is_guest():
 		return
 	m.dialog.close()
-	if not wage_ready():
+	if not wage_ready() or GameData.wage_frozen():
 		return
 	var job := _job()
 	var head := str(job.get("boss", ""))
@@ -864,3 +910,174 @@ func serve_day() -> void:
 		m.dialog.open(_npc_name("chief"), "고맙네. %s째구먼." % GameData.days_kor(served),
 			[["대화 끝", null]], _portrait("chief"))
 	m.saveio.save_now()
+
+
+# ---- 면사무소 창구 (회관 · S2a) ----
+#
+# 세금은 「내러 가는 행위」다(헌법 §2.2) — 고지서는 편지로 오고, 돈은 여기 창구에서 E 로만
+# 나간다. 이장이 면장을 겸한다(읍이 열리기 전까지). 기관직(서기·감시원)의 채용·근무·봉급도
+# 이 창구다 — 점원이 주인 계산대에서 하는 일을 공무원은 면사무소에서 한다.
+
+func open_township() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var due := GameData.tax_due_total()
+	var body := ""
+	if due > 0:
+		var w := GameData.arrears_weeks()
+		if w == 0:
+			# 아직 기한 안 — 밀린 게 아니라 「이번 계절 것」이다
+			var last: Dictionary = GameData.unpaid_bills()[-1]
+			body += "이번 계절 세금 %dG — 기한은 이 계절 %d일까지\n" \
+				% [due, (int(last.get("due_day", GameData.day)) - 1) % GameData.DAYS_PER_SEASON + 1]
+		else:
+			body += "밀린 세금 %dG — 체납 %d주째, 이자가 붙었다\n" % [due, w]
+	elif int(GameData.me.get("tax_paid_season", -1)) == GameData.season_no():
+		body += "이번 계절 세금은 냈다. 영수증이 있다.\n"
+	else:
+		body += "낼 세금이 없다.\n"
+	var nxt := GameData.gov_next_project()
+	if GameData.gov_building != "":
+		body += "「%s」 공사 중 — 다음 계절 첫날 다 된다." \
+			% str(GameData.gov_project(GameData.gov_building).get("name", ""))
+	elif not nxt.is_empty():
+		body += "다음 사업: 「%s」 — %s" % [str(nxt.name), str(nxt.desc).split("\n")[0]]
+		if _is_clerk_here():
+			body += "\n마을 예산 %dG / 필요 %dG" % [int(GameData.gov_budget.get("kyojin", 0)), int(nxt.cost)]
+		else:
+			body += "\n예산이 모이는 중이다."
+	else:
+		body += "계획한 사업은 다 끝났다. 예산은 다음 계획을 기다린다."
+	var btns: Array = []
+	if due > 0:
+		if GameData.money >= due:
+			btns.append(["세금 내기 — %dG" % due, _pay_tax])
+		else:
+			btns.append(gray("세금 내기 — %dG" % due, "그만한 돈이 없다. 모아서 오자."))
+	btns.append(["예산 장부", _open_ledger])
+	var employed := GameData.job_inst() == "township"
+	if employed:
+		if can_work("hall") == "":
+			btns.append(["근무", work_start.bind("hall")])
+		var wl := _wage_lines(_job())
+		if GameData.wage_frozen():
+			btns.append(gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
+		elif _me_int("wage_pending") <= 0:
+			btns.append(gray("봉급 받기", str(wl.get("nothing", "받을 게 없다."))))
+		elif GameData.day < _me_int("wage_day"):
+			btns.append(gray("봉급 받기", str(wl.get("not_yet", "봉급날은 아직이다."))))
+		else:
+			btns.append(["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
+		btns.append(["그만두겠습니다", resign])
+	elif str(GameData.me.get("job", "")) == "":
+		btns.append(["일하고 싶습니다", _open_township_jobs])
+	btns.append(["돌아가기", m.village._open_hall_dialog])
+	m.dialog.open("면사무소 창구", body, btns, _portrait("chief"))
+
+
+func _is_clerk_here() -> bool:
+	return str(GameData.me.get("job", "")) == "township_clerk"
+
+
+func _pay_tax() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var paid := GameData.pay_tax()
+	if paid <= 0:
+		open_township()
+		return
+	Sound.play_sfx("sfx_coin")
+	m.dialog.open(_npc_name("chief"),
+		"고맙네. 이 돈이 등불이 되고 길이 되는 걸세. 영수증은 챙겨 두게.",
+		[["돌아가기", open_township], ["대화 끝", null]], _portrait("chief"))
+	m.saveio.save_now()
+
+
+# 예산 장부 — 실수치는 면 서기만 본다(그 직업이 보는 것). 남한테는 사업 이름만
+func _open_ledger() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	if not _is_clerk_here():
+		m.dialog.open(_npc_name("chief"),
+			"장부는 서기가 보는 걸세. 자네한텐 다음 사업 이름만 말해 주지.",
+			[["돌아가기", open_township]], _portrait("chief"))
+		return
+	var body := "마을 예산: %dG\n" % int(GameData.gov_budget.get("kyojin", 0))
+	var nxt := GameData.gov_next_project()
+	if GameData.gov_building != "":
+		body += "공사 중: 「%s」\n" % str(GameData.gov_project(GameData.gov_building).get("name", ""))
+	if not nxt.is_empty():
+		body += "다음 사업: 「%s」 %dG — 남은 돈 %dG\n" % [str(nxt.name), int(nxt.cost),
+			maxi(0, int(nxt.cost) - int(GameData.gov_budget.get("kyojin", 0)))]
+	if not GameData.gov_done.is_empty():
+		var names: Array = []
+		for pid in GameData.gov_done:
+			names.append(str(GameData.gov_project(str(pid)).get("name", pid)))
+		body += "다 된 것: %s\n" % " · ".join(PackedStringArray(names))
+	var logs: Array = GameData.gov_log
+	if not logs.is_empty():
+		body += "\n계절 장부"
+		for i in range(maxi(0, logs.size() - 4), logs.size()):
+			var r: Dictionary = logs[i]
+			body += "\n· 교부금 +%d · 장부세 +%d · 세금 +%d · 운영비 −%d" \
+				% [int(r.get("grant", 0)), int(r.get("levy", 0)), int(r.get("tax", 0)), int(r.get("ops", 0))]
+			if str(r.get("project", "")) != "":
+				body += " · 「%s」 착공" % str(GameData.gov_project(str(r.project)).get("name", ""))
+	m.dialog.open("예산 장부", body, [["돌아가기", open_township]])
+
+
+# 「일하고 싶습니다」 — 면사무소의 두 자리 중 하나를 고른다. 거절 사유는 이장이 말한다
+func _open_township_jobs() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var btns: Array = []
+	for jid in _inst_def("township").get("jobs", []):
+		var job: Dictionary = GameData.JOBS.get(str(jid), {})
+		if job.is_empty():
+			continue
+		var taken := GameData.seat_of("township", str(job.get("rank", ""))) != ""
+		var label := "%s — 일급 %dG" % [str(job.get("name", jid)), int(job.get("wage", 0))]
+		if taken:
+			btns.append(gray(label, "그 자리는 비어 있지 않네."))
+		else:
+			btns.append([label, open_job_talk_job.bind(str(jid), open_township)])
+	btns.append(["돌아가기", open_township])
+	m.dialog.open(_npc_name("chief"), "어느 일을 하고 싶은가.", btns, _portrait("chief"))
+
+
+# ---- 압류 집행 (하루 넘김 직후, day_cycle 이 부른다) ----
+#
+# 여덟 주 밀린 세금은 마을이 대신 가져간다 — 유일한 자동 차감(헌법 §2.3).
+# 회관 창고 → 가축 → 소지금 순서. GameData 는 가축 노드를 못 만지므로 세계를 든 여기서 집행한다
+func after_new_day() -> void:
+	if Net.is_guest() or GameData.tax_seize_due <= 0:
+		return
+	var due: int = GameData.tax_seize_due
+	var got := 0
+	var parts: Array = []
+	var st: Array = GameData.seize_from_store(due)
+	got += int(st[0])
+	if str(st[1]) != "":
+		parts.append(str(st[1]))
+	var taken_animals := {}
+	while got < due and not m.animals.is_empty():
+		var a: Node2D = m.animals[-1]
+		var kind := str(a.type)
+		m.animals.erase(a)
+		a.queue_free()
+		got += int(GameData.ANIMALS.get(kind, {}).get("price", 500))
+		taken_animals[kind] = int(taken_animals.get(kind, 0)) + 1
+	GameData.animals_now = m.animals.size()
+	for kind in taken_animals:
+		parts.append("%s %d마리" % [str(GameData.ANIMALS.get(kind, {}).get("name", kind)), int(taken_animals[kind])])
+	if got < due:
+		var take: int = mini(GameData.money, due - got)
+		if take > 0:
+			GameData.money -= take
+			got += take
+			parts.append("소지금 %dG" % take)
+	GameData.tax_seized(" · ".join(PackedStringArray(parts)) if not parts.is_empty() else "가져갈 것이 없었다")
