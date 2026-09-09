@@ -1173,6 +1173,7 @@ func after_new_day() -> void:
 	if Net.is_guest():
 		return
 	m.npcmgr.sync_gen_nodes()   # 이주·전근·죽음으로 바뀐 읍 얼굴 — 온 사람은 세우고 간 사람은 치운다
+	_grudge_trample()           # 앙갚음(S5j) — 어젯밤 누가 밭을 뒤집었다
 	if GameData.tax_seize_due <= 0:
 		return
 	var due: int = GameData.tax_seize_due
@@ -1355,6 +1356,27 @@ func on_room_closed() -> void:
 	cop.route = []
 	cop.moving = false
 	m.hud.show_message(_pl("door_cop"), 2.5)
+
+
+# 밤 밭 서리 — 자라던 작물 세 포기가 뽑혀 나간다(죽은 것·빈 밭은 안 센다). 아침 결산 한 줄
+func _grudge_trample() -> void:
+	var who := GameData.grudge_hit
+	if who == "":
+		return
+	GameData.grudge_hit = ""
+	var pulled := 0
+	for cell: Dictionary in m.farming.farm_cells():
+		if pulled >= GameData.GRUDGE_CROPS:
+			break
+		if str(cell.get("crop_id", "")) == "" or bool(cell.get("dead", false)):
+			continue
+		cell.crop_id = ""
+		cell.crop_day = 0.0
+		cell.dead = false
+		pulled += 1
+	if pulled > 0:
+		GameData._note(str(GameData.SOCIETY_NOTES.grudge_hit) % [_npc_name(who), pulled])
+		m.queue_redraw()
 
 
 func _cops_after_me() -> Array:

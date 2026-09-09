@@ -9432,6 +9432,9 @@ const SOCIETY_NOTES := {
 	"town_bench": "법원에 %s 사건이 올라와 있다. 내 판결이다.",
 	"town_verdict": "읍 법원이 %s에게 벌금을 물렸다 — %dG.",
 	"town_harsh": "읍 법원이 %s에게 가중을 내렸다 — 벌금 %dG. 전과가 있었다.",
+	# ---- 앙갚음·읍 소식지(S5j) ----
+	"grudge_hit": "밤새 밭에 발자국이 났다. %s의 짓이라는 말이 돈다. 작물 %d포기가 사라졌다.",
+	"town_news": "읍 소식지가 왔다. 우체국 보관함에 있다.",
 	"town_dropped": "검찰이 %s 사건을 불기소로 닫았다.",
 	# ---- 읍 살림(S4e) ----
 	"town_season": "읍 살림 — 수입 %dG, 지출 %dG. 읍 예산 %dG.",
@@ -9499,6 +9502,11 @@ const MURDER_REP := 20             # 본 사람이 있는 살인 — 즉시 −2
 const MURDER_AFF_HIT := 30
 const FIGHT_P_BASE := 0.45         # 주먹다짐 이길 확률 = 0.45 + 전투 Lv × 0.06 (0.2~0.9)
 const FIGHT_P_LV := 0.06
+# ---- 앙갚음·읍 소식지(S5j) ----
+const GRUDGE_DAYS := 7             # 가중 판결 뒤 이만큼 지나야 앙갚음할 마음이 든다
+const GRUDGE_WINDOW := 21          # 그 뒤 이만큼 안에 못 하면 잊는다
+const GRUDGE_ODDS := 5             # 날마다 1/5(헌법 §6.5 「20% 보복」)
+const GRUDGE_CROPS := 3            # 밤 밭 서리 — 작물 세 포기
 const SERVICE_LAST_HOUR := 17.0   # 봉사는 17시 전에만 — 시계를 되감지 않으려고(D14)
 
 # ---- 세금·예산(S2a, 헌법 §2) ----
@@ -9738,6 +9746,8 @@ var case_seq := 0
 var npc_greed_adj := {}              # {nid: float} 유죄마다 −0.1 (하한 0.5)
 var dead: Array = []                 # 내 손에 죽은 사람들(S5a) — 정착민은 집이 비고, 생성 NPC 는 돌아오지 않는다
 var npc_down := {}                   # {nid: 이날까지 누워 있다} — 주먹다짐에 진 사람
+var grudges: Array = []              # [{id, day}] 내가 가중을 내린 피고(S5j) — 이레 뒤부터 보름 안에 한 번 앙갚음할지 모른다
+var grudge_hit := ""                 # 어젯밤 밭을 뒤집은 사람(하루 넘김 뒤 society.after_new_day 가 비운다)
 
 # 런타임 — 저장하지 않는다.
 var animals_now := 0                              # 가축 수 — society._process 가 0.5초마다 채운다(목장주 호칭 재료)
@@ -10992,6 +11002,7 @@ func town_case_verdict(c: Dictionary, by: String, kind: String) -> void:
 	if kind == "harsh":
 		if by == "player":
 			aff_add(sid, -40)   # 가중은 기억된다(헌법 §6.5) — 내가 내린 판결일 때만 내 몫이다
+			grudges.append({"id": sid, "day": day})   # 그리고 앙갚음을 별러 둔다(S5j)
 		_note(str(SOCIETY_NOTES.town_harsh) % [npc_name(sid), fine])
 	else:
 		_note(str(SOCIETY_NOTES.town_verdict) % [npc_name(sid), fine])
@@ -11007,6 +11018,61 @@ func town_case_for(job: String) -> Dictionary:
 				and str(c.get("suspect", "")) != "player":
 			return c
 	return {}
+
+
+# 앙갚음(S5j, 헌법 §6.5 「가중 → 출소 후 20% 보복(밤 밭 서리)」) — 이레 뒤부터 날마다 1/5, 보름 안에
+# 못 하면 잊는다. 밭을 뒤집는 손은 society.after_new_day(세계를 든 쪽)가 grudge_hit 을 보고 움직인다
+func _grudge_tick() -> void:
+	if grudges.is_empty():
+		return
+	var keep: Array = []
+	for g in grudges:
+		if not (g is Dictionary):
+			continue
+		var id := str(g.get("id", ""))
+		var age: int = day - int(g.get("day", day))
+		if age < GRUDGE_DAYS:
+			keep.append(g)
+			continue
+		if age > GRUDGE_DAYS + GRUDGE_WINDOW or id in dead:
+			continue   # 잊었다 — 또는 죽었다
+		var present: bool = (gen_npcs.has(id) and bool(gen_npcs[id].get("here", false))) or id in settlers
+		if present and grudge_hit == "" and posmod(hash("grudge|%s|%d" % [id, day]), GRUDGE_ODDS) == 0:
+			grudge_hit = id
+			continue   # 한 번이면 끝이다
+		keep.append(g)
+	grudges = keep
+
+
+# 읍 소식지(S5j, plan 「나중에」의 기자 — 계절 1회 특집호) — 지난 계절의 읍 살림·새 얼굴·법원을 편지 한 통으로
+func _town_news() -> void:
+	if not town_open or town_log.is_empty():
+		return
+	var row: Dictionary = town_log[-1]
+	var prev: String = str(SEASON_NAMES[season_of_day(maxi(1, day - 1))])
+	var body := "갈뫼읍 소식 — %s호\n\n" % prev
+	body += "지난 계절 읍 살림: 교부금 %d · 장부세 %d · 운영비 %d. 남은 예산 %dG.\n" % [
+		int(row.get("grant", 0)), int(row.get("levy", 0)), int(row.get("ops", 0)), int(gov_budget.get("town", 0))]
+	if str(row.get("project", "")) != "":
+		body += "군청이 「%s」을 걸었다.\n" % str(town_project(str(row.project)).get("name", ""))
+	var lv := town_austerity()
+	if lv > 0:
+		body += "읍은 긴축 %d단계다. 빚 %dG.\n" % [lv, int(gov_debt.get("town", 0))]
+	var came: Array = []
+	for id in gen_npcs:
+		var g: Dictionary = gen_npcs[id]
+		if str(g.get("role", "")) == "resident" and bool(g.get("here", false)) \
+				and int(g.get("since", 0)) > day - DAYS_PER_SEASON - 1:
+			came.append(str(g.get("name", "")))
+	body += ("새 얼굴: %s.\n" % " · ".join(PackedStringArray(came))) if not came.is_empty() else "주택가는 조용했다.\n"
+	var closed := 0
+	for c in cases:
+		if c is Dictionary and str(c.get("region", "")) == "town" and str(c.get("stage", "")) == "closed" \
+				and day - int(c.get("day", 0)) <= DAYS_PER_SEASON:
+			closed += 1
+	body += ("읍 법원이 사건 %d건을 닫았다.\n" % closed) if closed > 0 else "법원은 조용했다.\n"
+	mail_store("갈뫼읍 소식 — %s호" % prev, body)
+	_note(str(SOCIETY_NOTES.town_news))
 
 
 # 피고 말고 본 사람의 수 — 대면 범죄(강도·폭행)는 피해자의 진술이 곧 목격이라 피해자도 센다
@@ -11642,6 +11708,10 @@ func society_new_day(stats: Array, ko := false) -> void:
 		npc_wallet = {}
 		# 정부(S2a) — 창구가 열린 뒤부터. 예산이 먼저 돌고(지난 계절 세금이 장부에 오른다),
 		# 그다음 새 고지서가 온다. 복역 중에는 고지서가 없다(「나라가 먹여 주는 동안은 세금 없다」)
+		# 읍 살림(S4e) — 읍은 처음부터 있으니 창구와 무관하게 계절마다 돈다. 소식지(S5j)는 그 결산을
+		# 싣고, 고지서보다 먼저 온다(고지서가 우체통의 맨 위여야 한다 — 하네스 TAX 가 그것을 본다)
+		town_season()
+		_town_news()
 		if tax_open():
 			gov_season()
 			if int(me.get("jail_days_left", 0)) <= 0:
@@ -11650,8 +11720,6 @@ func society_new_day(stats: Array, ko := false) -> void:
 					_note(str(SOCIETY_NOTES.tax_bill) % int(bill.total))
 				else:
 					_note(str(SOCIETY_NOTES.tax_free))
-		# 읍 살림(S4e) — 읍은 처음부터 있으니 창구와 무관하게 계절마다 돈다
-		town_season()
 	# 체납 사다리 — 매일 아침, 넘는 문턱에서만 한 번씩. 구류 중엔 멈춘다(「나라가 먹여 주는 동안은
 	# 세금 없다」 — serve_jail 이 고지서 기한도 그만큼 미룬다)
 	if tax_open() and int(me.get("jail_days_left", 0)) <= 0:
@@ -11753,6 +11821,7 @@ func society_new_day(stats: Array, ko := false) -> void:
 	_transfer_tick()
 	_town_crime_tick()
 	_town_case_tick()
+	_grudge_tick()
 	# 자치회(S3c) — 청년회장의 어젯밤: 세 군데를 다 돌았으면 보고를, 안 돌았으면 빠진 밤을 적는다
 	if str(me.job) == "youth_head" and day > int(me.job_since_day):
 		if int(me.patrol_day) == day - 1 and int(me.patrol_idx) >= 3:
@@ -12481,6 +12550,8 @@ func reset_all() -> void:
 	npc_greed_adj = {}
 	dead = []
 	npc_down = {}
+	grudges = []
+	grudge_hit = ""
 	npc_wallet = {}
 	recipe_items = {}
 	tracked_pick = ""
@@ -12918,7 +12989,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"gov_debt": gov_debt, "town_log": town_log, "town_building": town_building, "town_done": town_done,
 		"town_austerity_lv": town_austerity_lv,
 		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
-		"dead": dead, "npc_down": npc_down,
+		"dead": dead, "npc_down": npc_down, "grudges": grudges,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped, "things_built": things_built,

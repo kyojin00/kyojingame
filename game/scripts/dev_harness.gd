@@ -7610,6 +7610,122 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_po
 			GameData.minutes = keep_min_po
 			_s2_restore(k_po)
+		204:
+			# ---- 읍 소식지·앙갚음(S5j) — 계절 첫날 편지, 가중 판결 뒤 이레·1/5 의 밤 밭 서리 ----
+			var k_nw := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_nw := GameData.minutes
+			var keep_town_nw: bool = GameData.town_open
+			var keep_grudges_nw: Array = GameData.grudges.duplicate(true)
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.ensure_gen_npcs()
+			for gid_nw in GameData.gen_npcs:
+				GameData.gen_npcs[gid_nw]["here"] = str(GameData.gen_npcs[gid_nw].get("role", "")) != "resident"
+			GameData.gov_budget["town"] = 5000
+			GameData.gov_debt = {"town": 0}
+			GameData.town_log = []
+			GameData.town_building = ""
+			GameData.town_done = []
+			GameData.cases = []
+			GameData.grudges = []
+			GameData.grudge_hit = ""
+			m.story_cutscene = true
+			# ① 계절 첫날 — 결산 뒤 소식지 한 통(지난 계절 이름, 교부금·새 얼굴·법원)
+			GameData.gen_npcs["g8"]["here"] = true
+			GameData.gen_npcs["g8"]["since"] = 20
+			var mails_nw: int = GameData.mail_box.size()
+			GameData.day = 29
+			GameData.society_new_day([0, 0, 0])
+			var n_nw := GameData.society_note()
+			# 소식지는 고지서보다 먼저 오므로 맨 위가 아니다 — 제목으로 찾는다
+			var letter: Dictionary = {}
+			for ml_nw in GameData.mail_box:
+				if str(ml_nw.get("title", "")).begins_with("갈뫼읍 소식") and int(ml_nw.get("day", 0)) == 29:
+					letter = ml_nw
+			var news_ok: bool = str(letter.get("title", "")).contains("갈뫼읍 소식") and str(letter.get("title", "")).contains("봄") \
+				and str(letter.get("body", "")).contains("교부금") and str(letter.get("body", "")).contains(str(GameData.gen_npcs.g8.name)) \
+				and str(letter.get("body", "")).contains("법원은 조용했다") and n_nw.contains("소식지")
+			# ② 가중 판결 → 앙갚음 명단. 이레 뒤 해시가 맞는 아침에 밭 세 포기가 뽑힌다
+			GameData.seats = {}
+			GameData.seat_rows("court")["judge"][0] = "player"
+			GameData.me.job = "judge"
+			GameData.me.rank = "judge"
+			GameData.me.job_since_day = 1
+			GameData.case_seq = 1
+			GameData.cases = [{"id": 1, "crime": "burglary", "day": 28, "suspect": "g1", "victim": "g2", "witness": "g3",
+				"evidence": 2, "stage": "indicted", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
+				"charged_day": 28, "indicted_day": 28}]
+			GameData.npc_wallet["g1"] = 500
+			GameData.aff_set("g1", 60)
+			m.society.case_pick(1, "harsh")
+			m.dialog.close()
+			var grudge_ok: bool = GameData.grudges.size() == 1 and str(GameData.grudges[0].id) == "g1"
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.seat_clear_player()
+			# 밭 세 포기 + 하나 더(넷 중 셋만 뽑힌다)
+			var cells_nw: Array = []
+			var base_nw: Vector2i = m.player_tile() + Vector2i(0, 2)
+			for k_c in 4:
+				var ct: Vector2i = base_nw + Vector2i(k_c, 0)
+				var cc: Dictionary = m.grid[ct.y][ct.x]
+				m.objects.erase(ct)
+				cc.ground = "soil"
+				cc.crop_id = "potato"
+				cc.crop_day = 1.0
+				cc.dead = false
+				m.farming.touch(cc)
+				cells_nw.append(cc)
+			# 세계의 다른 밭은 잠시 비워 둔다(서리는 밭 목록 순서대로 세 포기) — 끝나면 되돌린다
+			var others_nw: Array = []
+			for oc: Dictionary in m.farming.farm_cells():
+				if not (oc in cells_nw) and str(oc.get("crop_id", "")) != "":
+					others_nw.append([oc, str(oc.crop_id), float(oc.get("crop_day", 0.0)), bool(oc.get("dead", false))])
+					oc.crop_id = ""
+			# 해시가 맞는 날을 미리 찾는다(결정적) — 그날 아침에 서리가 난다
+			var hit_day := -1
+			for dd_nw in range(40, 60):
+				if posmod(hash("grudge|g1|%d" % dd_nw), GameData.GRUDGE_ODDS) == 0:
+					hit_day = dd_nw
+					break
+			GameData.grudges[0]["day"] = hit_day - GameData.GRUDGE_DAYS
+			GameData.day = hit_day - 1
+			GameData.society_new_day([0, 0, 0])
+			m.society.after_new_day()
+			GameData.society_note()
+			var too_early: bool = int(cells_nw[0].get("crop_id", "") != "") == 1 and GameData.grudges.size() == 1
+			GameData.day = hit_day
+			GameData.society_new_day([0, 0, 0])
+			m.society.after_new_day()
+			var n_hit := GameData.society_note()
+			var gone := 0
+			for cc2: Dictionary in cells_nw:
+				if str(cc2.get("crop_id", "")) == "":
+					gone += 1
+			var trample_ok: bool = too_early and gone == 3 and n_hit.contains("발자국") and GameData.grudges.is_empty() \
+				and GameData.grudge_hit == ""
+			print("NEWS_OK=", news_ok and grudge_ok and trample_ok,
+				" 소식지=", news_ok, " 앙갚음명단=", grudge_ok, " 서리=", trample_ok, "(", hit_day, " 뽑힘 ", gone, ")")
+			for cc3: Dictionary in cells_nw:
+				cc3.ground = "grass"
+				cc3.crop_id = ""
+				cc3.crop_day = 0.0
+				cc3.dead = false
+			for ro: Array in others_nw:
+				var rc: Dictionary = ro[0]
+				rc.crop_id = ro[1]
+				rc.crop_day = ro[2]
+				rc.dead = ro[3]
+			m.farming.rebuild()
+			GameData.grudges = keep_grudges_nw
+			GameData.grudge_hit = ""
+			GameData.town_open = keep_town_nw
+			GameData.minutes = keep_min_nw
+			_s2_restore(k_nw)
 		208:
 			# ---- 잔가지 넷(S5h) — 낮 노역 감형, 판사의 가중(플레이어 4택·NPC 판사 전과자), 말 위 도망, 문 앞 순경 ----
 			var k_tw := _s2_keep()

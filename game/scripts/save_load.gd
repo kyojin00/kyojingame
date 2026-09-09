@@ -293,6 +293,12 @@ func _apply_save(d: Dictionary) -> void:
 	if dead_in is Array:
 		for dk in dead_in:
 			GameData.dead.append(str(dk))
+	GameData.grudges = []
+	var gr_in: Variant = d.get("grudges", [])
+	if gr_in is Array:
+		for gr in gr_in:
+			if gr is Dictionary:
+				GameData.grudges.append({"id": str(gr.get("id", "")), "day": int(gr.get("day", 0))})
 	GameData.npc_down = {}
 	var down_in: Variant = d.get("npc_down", {})
 	if down_in is Dictionary:
