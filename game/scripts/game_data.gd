@@ -8944,6 +8944,7 @@ const SOCIETY_LINES := {
 		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 면사무소에 내게.",
 		"verdict_service": "벌금 %dG 에 봉사 %s. 이장에게 빗자루를 받게.",
 		"verdict_jail": "구류 이레. 박 순경이 데려간다.",
+		"verdict_prison": "징역 84일. 잿빛 벌판의 교도소다. 순경이 데려간다.",
 		"acquit": "무죄. 피고는 돌아가도 좋다.",
 		"leave": "법정을 나선다",
 		"follow": "박 순경을 따라간다",
@@ -8967,6 +8968,15 @@ const SOCIETY_LINES := {
 		"verdict_service": "벌금 %dG 에 봉사 %s. 교진 회관에서 채우게.",
 		"verdict_jail": "구류 이레. 순경이 데려간다.",
 		"follow": "순경을 따라간다",
+	},
+	# 교도소(S4g) — 잿빛 벌판 실내. 84일은 세지 않고 건너뛴다
+	"prison": {
+		"in": "%s. 노역은 돌 깨기다. 날은 셀 필요가 없다.",
+		"serve_choice": "복역한다",
+		"out": "84일이 지났다. 밭은 말라 있었다.",
+		"out_choice": "문을 나선다",
+		"closed": "교도소 문은 안에서만 열린다. 볼일 없으면 지나가라.",
+		"seat_lost": "자리는 구속되는 날 비었다 — 전직 %s.",
 	},
 	# 읍 순경(S4f) — 협공·체포·뇌물·자수·유치. {victim} 은 피해자 이름
 	"police_town": {
@@ -9160,6 +9170,7 @@ const SOCIETY_NOTES := {
 	"town_indicted": "검찰청이 나를 기소했다. 읍 법원이 부른다 — 법원 창구에 서면 열린다.",
 	"town_skipped": "읍 법원에 서지 않았다. 거른 재판은 가중된다.",
 	"town_convicted": "읍 법원이 나에게 형을 내렸다. 읍이 그 얼굴을 기억할 것이다.",
+	"prison_out": "84일 만에 교도소를 나왔다. 밭은 말라 있었다. 마을이 그 얼굴을 기억할 것이다.",
 	# ---- 자치회(S3c) ----
 	"watch_done": "어젯밤 마을을 세 군데 돌았다. 회관에서 이장에게 보고하면 근무다.",
 	"watch_missed": "어젯밤 야경을 돌지 않았다. 마을이 캄캄한 채로 잤다.",
@@ -9228,6 +9239,8 @@ const COURT_DAYS := [7, 21]
 const CRIME_HEAT := {"pickpocket": 1, "shelf": 1, "burglary": 2}
 const BURGLARY_P := 0.30           # 빈집 문을 따는 기본 확률 — theft_p 가 손버릇·밤·목격자를 얹는다
 const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 넘김 일곱 번, 밭은 마른다)
+const PRISON_DAYS := 84            # 징역(S4g) — 하루 넘김 없이 건너뛴다(헌법 §6.6)
+const PRISON_MINE_XP_DAY := 1.0    # 노역 — 돌 깨기 하루치의 절반쯤
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
 const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
 # ---- 생성 NPC · 읍 사건(S4d, 헌법 §8.3·§6.7) ----
@@ -10667,6 +10680,21 @@ func jail_begin(days: int, kind := "jail") -> void:
 	me["jail_kind"] = kind
 	for b in unpaid_bills():
 		b["due_day"] = int(b.get("due_day", 0)) + days
+
+
+# 징역의 장부 몫(S4g) — 날은 한 번에 건너뛴다(_next_day 84번이 아니다). 고지서 기한은 그만큼
+# 미뤄지고(세금 정지), 노역 채광 경험이 쌓이고, 출소는 대범함 +5 · 호칭 jailed 이레
+func prison_skip(days: int) -> void:
+	day += days
+	for b in unpaid_bills():
+		b["due_day"] = int(b.get("due_day", 0)) + days
+	add_skill_xp("mine", PRISON_MINE_XP_DAY * days)
+	me["jail_days_left"] = 0
+	me["jail_kind"] = ""
+	me["jail_out_day"] = day
+	me["sentence"] = {}
+	bold_add(5.0)
+	minutes = DAY_START
 
 
 # 재판일에 판사가 읽는 NPC 사건 — 지난 두 주 안에 순경(또는 순경인 나)이 닫은 것

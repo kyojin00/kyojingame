@@ -1729,12 +1729,13 @@ func trial_pick(kind: String) -> void:
 				and str(cand.get("target", "")) == str(ch.get("target", "")):
 			mem = cand
 	var jail := false
+	var prison := false
 	if acquit:
 		if not mem.is_empty():
 			mem["settled"] = "acquitted"
 		pages.append({"text": str(cl.acquit)})
 	else:
-		tier = clampi(tier, 1, 3)
+		tier = clampi(tier, 1, 5)
 		var value: int = maxi(int(ch.get("value", 0)), 20)
 		var fine := 0
 		var rec := {"day": GameData.day, "crime": str(ch.get("kind", "burglary")), "court": region if town else "circuit",
@@ -1748,13 +1749,21 @@ func trial_pick(kind: String) -> void:
 				rec.verdict = "service"
 				rec.sentence = 7
 				pages.append({"text": _cl("verdict_service") % [fine, GameData.days_kor(7)]})
-			_:
+			3, 4:
 				jail = true
 				rec.verdict = "jail"
 				rec.sentence = GameData.JAIL_DAYS
 				rec.served = GameData.JAIL_DAYS
 				rec.served_day = GameData.day + GameData.JAIL_DAYS
 				pages.append({"text": _cl("verdict_jail")})
+			_:
+				# 징역(S4g) — 잿빛 벌판의 교도소. 84일을 세지 않고 건너뛴다
+				prison = true
+				rec.verdict = "prison"
+				rec.sentence = GameData.PRISON_DAYS
+				rec.served = GameData.PRISON_DAYS
+				rec.served_day = GameData.day + GameData.PRISON_DAYS
+				pages.append({"text": _cl("verdict_prison")})
 		if fine > 0:
 			_fine_bill(fine, region)
 		var recs: Array = GameData.me.get("record", [])
@@ -1773,12 +1782,17 @@ func trial_pick(kind: String) -> void:
 				c["closed_by"] = "acquitted" if acquit else "court"
 		if not acquit:
 			GameData._note(str(GameData.SOCIETY_NOTES.town_convicted))
+	# 법정의 문장·판사는 기소를 비우기 전에 읽는다 — 비운 뒤엔 순회 재판의 것으로 돌아간다
+	var follow := _cl("follow")
+	var bench := _bench()
 	GameData.me["charged"] = {}
-	if jail:
-		pages[-1]["choices"] = [[_cl("follow"), serve_jail.bind(GameData.JAIL_DAYS, region)]]
+	if prison:
+		pages[-1]["choices"] = [[follow, prison_begin.bind(region)]]
+	elif jail:
+		pages[-1]["choices"] = [[follow, serve_jail.bind(GameData.JAIL_DAYS, region)]]
 	else:
 		pages[-1]["choices"] = [[str(cl.leave), null]]
-	m.dialog.open_seq(_npc_name(_bench()), _portrait(_bench()), pages)
+	m.dialog.open_seq(_npc_name(bench), _portrait(bench), pages)
 	m.saveio.save_now()
 
 
@@ -2566,4 +2580,100 @@ func open_town_trial(c: Dictionary) -> void:
 		"skips": int(c.get("skips", 0)), "since": GameData.day, "court": "town", "case_id": int(c.get("id", 0)),
 		"surrender": bool(c.get("surrender", false)), "bribe": bool(c.get("bribe", false))}
 	_trial_open()
+
+
+# ---- 교도소 (S4g, 헌법 §6.6) ----
+#
+# 징역은 잿빛 벌판의 교도소 실내에서 시작해 실내에서 끝난다. 하루 넘김을 84번 돌리지 않는다 —
+# 날짜를 한 번에 옮기고 밭만 마르게(젖음 0, 지나온 계절의 제철 아닌 작물은 시듦) 한 뒤 사회의
+# 아침을 한 번 돈다. 자리는 구속되는 날 비고(전직), 나올 땐 대범함 +5 · 호칭 「그 일 있던 사람」 이레.
+
+func _pr(key: String) -> String:
+	return str(_lines("prison").get(key, ""))
+
+
+# 구속 — 판결의 「순경을 따라간다」. 자리부터 비우고 교도소 안으로 옮긴다
+func prison_begin(region: String) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	if m.shop_room.visible:
+		m.shop_room.close()
+	GameData.me["sentence"] = {"days": GameData.PRISON_DAYS, "region": region, "since": GameData.day}
+	var lost := _seat_release("jailed")
+	var t: Vector2i = m.door_tile(m.TOWN_PLOTS["prison"].anchor) + Vector2i(0, 1)
+	m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
+	m.shop_room.open("prison")
+	m.saveio.save_now()
+	open_prison(lost)
+
+
+# 자리를 잃는다(구속) — 좌석·직업·이력. 돌려주는 값은 잃은 직함(없으면 "")
+func _seat_release(reason: String) -> String:
+	var job := _job()
+	if job.is_empty():
+		return ""
+	var title := str(job.get("name", GameData.me.get("job", "")))
+	GameData.seat_clear_player()
+	var hist: Array = GameData.me.get("job_history", [])
+	hist.append({"inst": str(job.get("inst", "")), "rank": str(GameData.me.get("rank", "")),
+		"job": str(GameData.me.get("job", "")), "from": _me_int("job_since_day"), "to": GameData.day, "reason": reason})
+	GameData.me["job_history"] = hist
+	GameData.me["job"] = ""
+	GameData.me["rank"] = ""
+	GameData.me["wage_pending"] = 0
+	return title
+
+
+# 교도소 창구 — 형이 있으면 복역, 없으면 안에서만 열리는 문
+func open_prison(lost := "") -> void:
+	m.dialog.close()
+	var sen: Dictionary = GameData.me.get("sentence", {})
+	if Net.is_guest() or sen.is_empty():
+		m.dialog.open("교도소", _pr("closed"), [["나간다", null]])
+		return
+	var pages: Array = [{"text": _pr("in") % GameData.days_kor(int(sen.get("days", GameData.PRISON_DAYS)))}]
+	if lost != "":
+		pages.append({"text": _pr("seat_lost") % lost})
+	pages[-1]["choices"] = [[_pr("serve_choice"), serve_sentence]]
+	m.dialog.open_seq("교도소", null, pages)
+
+
+# 복역 — 건너뛰기 경로. 밭은 마르고 제철 아닌 작물은 시들며, 사회의 아침이 한 번 돈다
+func serve_sentence() -> void:
+	if Net.is_guest():
+		return
+	var sen: Dictionary = GameData.me.get("sentence", {})
+	if sen.is_empty():
+		return
+	m.dialog.close()
+	var days := int(sen.get("days", GameData.PRISON_DAYS))
+	var day0 := GameData.day
+	GameData.prison_skip(days)
+	# 밭 — 젖음은 마르고, 지나온 계절마다 제철 아닌 작물은 시든다(farm_cells 만 돈다)
+	var seasons: Array = []
+	for d in range(day0 + 1, GameData.day + 1):
+		var sn := GameData.season_of_day(d)
+		if sn not in seasons:
+			seasons.append(sn)
+	for cell: Dictionary in m.farming.farm_cells():
+		cell.watered = false
+		cell.wet_min = 0.0
+		var cid := str(cell.get("crop_id", ""))
+		if cid == "" or bool(cell.get("dead", false)) or not GameData.CROPS.has(cid):
+			continue
+		if m.village.in_greenhouse(Vector2i(int(cell.tx), int(cell.ty))):
+			continue
+		for sn in seasons:
+			if sn not in GameData.CROPS[cid].seasons:
+				cell.dead = true
+				break
+	GameData.society_new_day([0, 0, 0])
+	GameData._note(str(GameData.SOCIETY_NOTES.prison_out))
+	if m.shop_room.visible:
+		m.shop_room.close()
+	var t: Vector2i = m.door_tile(m.TOWN_PLOTS["prison"].anchor) + Vector2i(0, 1)
+	m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
+	m.dialog.open("교도소", _pr("out"), [[_pr("out_choice"), null]])
+	m.saveio.save_now()
 

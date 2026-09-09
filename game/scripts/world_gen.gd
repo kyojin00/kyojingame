@@ -184,6 +184,13 @@ func ensure_town(with_node := true) -> void:
 			_clear_wild(x, y)
 			if r.has_point(Vector2i(x, y)) and str(m.grid[y][x].ground) in ["grass", "yard"]:
 				m.grid[y][x].ground = "path"
+	# 교도소(S4g)는 잿빛 벌판에 홀로 선다 — 제 둘레만 따로 비운다
+	var pa: Vector2i = m.TOWN_PLOTS["prison"].anchor
+	_no_spawn_rect(pa.x - 2, pa.y - 2, pa.x + 6, pa.y + 5, 0)
+	for py in range(pa.y - 2, pa.y + 6):
+		for px in range(pa.x - 2, pa.x + 7):
+			if px >= 0 and py >= 0 and px < m.MAP_W and py < m.WORLD_H:
+				_clear_wild(px, py)
 	for tid: String in m.TOWN_PLOTS:
 		var a: Vector2i = m.TOWN_PLOTS[tid].anchor
 		if str(m.objects.get(a, {}).get("kind", "")) != "house":

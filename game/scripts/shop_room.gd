@@ -94,6 +94,14 @@ const ROOMS := {
 		"tab": "", "tabs": [], "action": "town",
 		"hint": "긴 복도에 창구가 늘어서 있다.",
 	},
+	# 교도소(S4g) — 사람 없는 방. 창구 E 가 곧 복역이다
+	"prison": {
+		"name": "교도소", "keeper": "",
+		"wall": Color(0.3, 0.3, 0.33), "floor": Color(0.42, 0.42, 0.45),
+		"counter": Color(0.27, 0.27, 0.3), "deco": "beds",
+		"tab": "", "tabs": [], "action": "prison",
+		"hint": "쇠창살 너머로 잿빛 벌판이 보인다.",
+	},
 	"police": {
 		"name": "경찰서", "keeper": "chief_ha",
 		"wall": Color(0.28, 0.31, 0.42), "floor": Color(0.5, 0.52, 0.58),

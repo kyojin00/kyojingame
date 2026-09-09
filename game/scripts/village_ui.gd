@@ -548,6 +548,8 @@ func room_action(kind: String) -> void:
 			_open_post_dialog()
 		"police":
 			m.society.open_police()   # 파출소 창구(사회 S2b) — 자수·출동·순찰·봉급
+		"prison":
+			m.society.open_prison()   # 교도소(S4g) — 형이 있으면 복역, 없으면 닫힌 문
 
 
 # ---- 갈뫼읍 (S4b) — 발견·정류장·장터·빈 창구 ----

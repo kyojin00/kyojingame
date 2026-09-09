@@ -6081,7 +6081,8 @@ func _debug_tick() -> void:
 			GameData.society_new_day([0, 0, 0])
 			GameData.society_note()
 			m.society.open_trial()
-			m.society.trial_pick("deny")
+			# 인정 — heat 2 + 거른 재판 1 + 전과 1 − 인정 1 = 3 구류. 부인이면 5 라 징역(S4g)이 된다
+			m.society.trial_pick("admit")
 			var jail_page: bool = m.dialog.visible and str(m.dialog._seq[-1].text).contains("구류")
 			m.dialog.close()
 			var rec_j: Dictionary = GameData.me.record[-1]
@@ -6952,6 +6953,7 @@ func _debug_tick() -> void:
 			var last_tp := str(m.dialog._seq[-1].text)
 			var bill_tp: Dictionary = GameData.me.tax_bills[-1] if GameData.me.tax_bills.size() > bills_tp else {}
 			var verdict_ok: bool = trial_open_tp and last_tp.contains("벌금") and int(bill_tp.get("total", 0)) == 200 \
+				and str(m.dialog.title_label.text) == GameData.npc_name("judge_suh") \
 				and str(bill_tp.get("region", "")) == "town" and str(c_tp.stage) == "closed" \
 				and str(c_tp.closed_by) == "court" and not GameData.charged_active() \
 				and str(GameData.me.record[-1].court) == "town" and int(GameData.me.reputation.town) == rep_tp - 2 - 15
@@ -6985,6 +6987,92 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_tp
 			GameData.minutes = keep_min_tp
 			_s2_restore(k_tp)
+		221:
+			# ---- 교도소(S4g) — 잿빛 벌판의 부지·방, 징역 판결, 구속(자리 잃음), 84일 건너뛰기, 출소 ----
+			var k_pr := _s2_keep()
+			var skills_pr: Dictionary = GameData.skills.duplicate(true)
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_pr := GameData.minutes
+			var keep_pos_pr: Vector2 = m.player.position
+			var keep_town_pr: bool = GameData.town_open   # 뒤의 읍 검사(399)가 「발견 전」에서 시작한다
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.cases = []
+			GameData.day = 60
+			GameData.minutes = 11 * 60
+			m.story_cutscene = true
+			# ① 부지 — 잿빛 벌판 안, 집 칸, 문은 교도소 문, 이름표
+			var pa_pr: Vector2i = m.TOWN_PLOTS["prison"].anchor
+			var plot_pr: bool = str(m.objects.get(pa_pr, {}).get("kind", "")) == "house" \
+				and m.actions._door_kind_at(m.door_tile(pa_pr)) == "prison" and m.obj_nodes.has(pa_pr) \
+				and str(m.BUILDING_NAMES.get("prison", "")) == "교도소"
+			var in_ashen := false
+			for reg_pr: Dictionary in m.REGIONS:
+				if str(reg_pr.id) == "ashen" and Rect2i(reg_pr.rect).has_point(pa_pr):
+					in_ashen = true
+			# 형 없이 들어가면 닫힌 문
+			m.actions._enter_building("prison")
+			var room_pr: bool = m.shop_room.visible and m.shop_room.room_id == "prison"
+			m.village.room_action("prison")
+			var closed_pr: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("안에서만")
+			m.dialog.close()
+			m.shop_room.close()
+			# ② 판결 — heat 5 에 부인(본 사람 셋)이면 징역. 자리(군청 서기)는 구속되는 날 빈다
+			GameData.me.boldness_base = 45
+			GameData.me.reputation = {"kyojin": 0, "town": 0}
+			GameData.me.job = "county_clerk"
+			GameData.me.rank = "clerk"
+			GameData.me.job_since_day = 40
+			var rows_pr: Dictionary = GameData.seat_rows("county")
+			rows_pr["clerk"][0] = "player"
+			GameData.me.charged = {"day": 59, "kind": "burglary", "target": "g1", "value": 30, "others": 2,
+				"seen": 3, "heat": 5, "court_day": 60, "skips": 0, "since": 60, "court": "town", "case_id": 0,
+				"surrender": false, "bribe": false}
+			m.society.trial_pick("deny")
+			var last_pr := str(m.dialog._seq[-1].text)
+			var rec_pr: Dictionary = GameData.me.record[-1]
+			var verdict_pr: bool = last_pr.contains("징역") and str(rec_pr.verdict) == "prison" \
+				and int(rec_pr.sentence) == 84 and str(m.dialog._seq[-1].choices[0][0]) == "순경을 따라간다"
+			m.society.prison_begin("town")
+			var sen_pr: Dictionary = GameData.me.get("sentence", {})
+			var hist_pr: Dictionary = GameData.me.job_history[-1] if GameData.me.job_history.size() > 0 else {}
+			var begin_pr: bool = int(sen_pr.get("days", 0)) == 84 and m.shop_room.visible and m.shop_room.room_id == "prison" \
+				and str(GameData.me.job) == "" and str(hist_pr.get("reason", "")) == "jailed" \
+				and str(rows_pr["clerk"][0]) != "player" and m.dialog.visible \
+				and str(m.dialog._seq[-1].choices[0][0]) == "복역한다" and str(m.dialog._seq[-1].text).contains("군청 서기")
+			# ③ 복역 — 84일 건너뛰기: 날짜·고지서 기한·노역 경험·대범함·호칭·밭
+			GameData.me.tax_bills = [{"season": 2, "day": 58, "income": 100, "property": 0, "total": 100,
+				"paid": 0, "due_day": 64, "kind": "tax"}]
+			var xp0_pr := float(GameData.skills.mine.xp)
+			var lv0_pr := int(GameData.skills.mine.lv)
+			var bold0_pr := GameData.boldness()
+			m.society.serve_sentence()
+			var out_pr: bool = GameData.day == 144 and int(GameData.me.jail_out_day) == 144 \
+				and int(GameData.me.tax_bills[0].due_day) == 64 + 84 and GameData.me.get("sentence", {}).is_empty() \
+				and (float(GameData.skills.mine.xp) > xp0_pr or int(GameData.skills.mine.lv) > lv0_pr) \
+				and GameData.boldness() == bold0_pr + 5 and str(GameData.player_title("chief").cls) == "jailed" \
+				and not m.shop_room.visible and m.dialog.visible and str(m.dialog.body_label.text).contains("84일") \
+				and "문을 나선다" in _btn_texts() and GameData.minutes == GameData.DAY_START
+			var dry_pr := true
+			for cell_pr: Dictionary in m.farming.farm_cells():
+				if bool(cell_pr.watered) or float(cell_pr.wet_min) > 0.0:
+					dry_pr = false
+			var door_pr: Vector2i = m.door_tile(pa_pr) + Vector2i(0, 1)
+			var pos_pr: bool = m.player_tile() == door_pr
+			print("PRISON_OK=", plot_pr and in_ashen and room_pr and closed_pr and verdict_pr and begin_pr and out_pr
+				and dry_pr and pos_pr,
+				" 부지=", plot_pr, "(", pa_pr, ")", " 잿빛=", in_ashen, " 방=", room_pr, " 닫힌문=", closed_pr,
+				" 판결=", verdict_pr, " 구속=", begin_pr, " 출소=", out_pr, "(", GameData.day, ")",
+				" 밭마름=", dry_pr, " 문앞=", pos_pr)
+			m.dialog.close()
+			GameData.skills = skills_pr
+			GameData.town_open = keep_town_pr
+			m.player.position = keep_pos_pr
+			GameData.minutes = keep_min_pr
+			_s2_restore(k_pr)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

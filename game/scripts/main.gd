@@ -825,6 +825,8 @@ const TOWN_PLOTS := {
 	"bank":        {"anchor": Vector2i(262, 102), "name": "신협",   "tex": "general", "tint": Color(1.0, 0.94, 0.68)},
 	"town_inn":    {"anchor": Vector2i(274, 102), "name": "여관",   "tex": "cabin",   "tint": Color(1.0, 0.9, 0.78)},
 	"diner":       {"anchor": Vector2i(286, 102), "name": "식당",   "tex": "ranch",   "tint": Color(1.0, 0.86, 0.72)},
+	# 교도소(S4g) — 읍이 아니라 잿빛 벌판 한가운데. 징역은 여기 실내에서 84일을 건너뛴다
+	"prison":      {"anchor": Vector2i(194, 158), "name": "교도소", "tex": "inn",     "tint": Color(0.6, 0.6, 0.64)},
 }
 const TOWN_STALLS := [Vector2i(252, 110), Vector2i(258, 110), Vector2i(264, 110), Vector2i(270, 110),
 	Vector2i(276, 110), Vector2i(282, 110), Vector2i(288, 110), Vector2i(294, 110)]
@@ -1023,7 +1025,7 @@ const BUILDING_NAMES := {
 	"ranch": "목장 상회", "fish": "수산시장", "hall": "마을회관",
 	# 갈뫼읍(S4b)
 	"county": "군청", "police": "경찰서", "court": "법원", "prosecution": "검찰청",
-	"clinic": "보건소", "bank": "신협", "town_inn": "여관", "diner": "식당",
+	"clinic": "보건소", "bank": "신협", "town_inn": "여관", "diner": "식당", "prison": "교도소",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 # 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
