@@ -27,6 +27,12 @@ func _spawn_npc(npc_id: String, tile: Vector2i, region := Rect2i()) -> void:
 
 
 func npc_place_now(npc_id: String) -> String:
+	# 사회가 자리를 정한 사람이 먼저다 — 이장의 마을 회의(meeting)와 밤 사람(plaza·pier).
+	# 축제 블록보다 위에 있지만 「축제 > 사회」는 society_place 안의 시간 조건이 지킨다:
+	# 회의는 축제 없는 날 9~17시만, 밤 사람은 축제가 끝난 저녁(is_evening) 이후만
+	var soc := GameData.society_place(npc_id)
+	if soc != "":
+		return soc
 	# 축제날에는 일과를 접고 다 같이 축제 자리로 모인다
 	var fest: Dictionary = GameData.festival_today()
 	if not fest.is_empty() and GameData.minutes >= GameData.FEST_START \
@@ -98,6 +104,12 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
 		"hallwork":
 			t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
+		"meeting":
+			# 이장의 마을 회의 — 회관이 있으면 회관 문 앞, 없으면 이장 집 문 앞 (D14)
+			if GameData.village_built.has("hall"):
+				t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
+			else:
+				t = m.CHIEF_HUT + Vector2i(0, 1)
 		"onsen":
 			# 온천 앞 — 셋이 겹치지 않게 한 칸씩 벌려 선다
 			var oi: int = maxi(0, ONSEN_GOERS.find(npc_id))

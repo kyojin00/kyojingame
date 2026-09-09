@@ -1,4 +1,4 @@
-# 능력치 창 (U): 그룹별 카드(숙련도/장비/착용 장비/약효/펫)로 정돈했다.
+# 능력치 창 (U): 그룹별 카드(숙련도/장비/착용 장비/약효/마음/펫)로 정돈했다.
 # 글줄을 잔뜩 늘어놓는 대신 아이콘 + 짧은 숫자, 자세한 효과는 툴팁으로.
 extends CanvasLayer
 
@@ -228,7 +228,29 @@ func _rebuild() -> void:
 		_row(pot, "", "없음 — 집 조합대에서 물약을 만들어 마셔 보자",
 			Color(0.6, 0.56, 0.7))
 
-	# ⑤ 펫
+	# ⑤ 마음 — 대범함은 숫자 없이 단계 이름만 보여 준다(헌법 §5.1). 설명은 툴팁으로.
+	# 이장이 아직 묻지 않았으면(base −1) 단계가 없다 — 어디서 알게 되는지만 일러 준다
+	var mind := _card("마음")
+	var stage: String = GameData.bold_stage()
+	if stage == "":
+		_row(mind, "", "아직 모른다 — 이장과 이야기해 보자", Color(0.6, 0.56, 0.7))
+	else:
+		var blurb := ""
+		for st in GameData.BOLD_STAGES:
+			if str(st[1]) == stage:
+				blurb = str(st[2])
+		_row(mind, "", stage, Color(0.92, 0.9, 0.96), blurb)
+	# 직업 한 줄 — JOBS 에 없는 job 은 없는 것으로 보고 건너뛴다(D22). me 는 전부 .get 으로.
+	# 채용된 날은 아직 근무 전(job_since_day 가 내일)이라 「내일부터」로 적는다
+	var jd: Dictionary = GameData.JOBS.get(str(GameData.me.get("job", "")), {})
+	if not jd.is_empty():
+		var jdays: int = GameData.job_days()
+		var since: String = "내일부터" if jdays < 0 else "%s째" % GameData.days_kor(jdays + 1)
+		var sees: Dictionary = jd.get("sees", {})
+		_row(mind, "", "요즘 하는 일: %s · %s" % [str(jd.get("name", "")), since],
+			Color(0.65, 0.85, 0.6), str(sees.get("what", "")))
+
+	# ⑥ 펫
 	var pet := _card("펫")
 	if GameData.active_pet != "":
 		var pdef: Dictionary = GameData.PETS[GameData.active_pet]

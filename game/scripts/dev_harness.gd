@@ -1543,6 +1543,419 @@ func _debug_tick() -> void:
 			for c: Node in _ui_saved:
 				(c as CanvasLayer).visible = true
 			_ui_saved.clear()
+		# ==== S1 「불리는 사람」 — 사회 검사 (226~231, 스크린샷 없음) ====
+		#
+		# society.gd 와 game_data 의 사회 블록을 재는 여섯 단계. 전부 같은 규약이다:
+		#   · _soc_keep() 으로 me·자리·지갑·호감도·숙련·작물·돈·날·시각·기력·이름·연출·
+		#     호감도 해금·자리·축제·대화 기록을 맡겨 두고, 끝에 _soc_restore() 로 전부 되돌린다.
+		#     되돌린 뒤 society_loaded() 가 호칭 기준선을 다시 잡는다 — 안 그러면 다음 아침
+		#     결산에 거짓 「사람들이 요즘 나를…」 줄이 뜬다 (D9)
+		#   · 호감도는 aff_add 로만 심고, 경계값(20·30·70) **바로 아래**로는 심지 않는다 —
+		#     _talk_to 가 하루 첫 대화에 +2 를 더하므로 28 은 30 이 되어 계급이 바뀐다
+		#   · 하루 넘김은 GameData.day += 1; society_new_day([0, 0, 0]) — day_cycle 과 같은 순서
+		#   · 선택지는 society 의 핸들러를 직접 부른다 (버튼을 누르는 대신)
+		226:
+			# ① TITLE_OK — 호칭 체인(헌법 §4.2). 열 계급이 위에서부터 첫 참으로 갈리고, 하루 첫
+			# 대화의 첫 페이지가 그 호칭을 NPC 의 입으로 말한다 (D1). 기대 첫마디는 _talk_to
+			# **전에** call_opener 로 계산한다 — 하루 안에서 결정적이라 같은 줄이어야 하고,
+			# 줄바꿈 모양은 같은 _paginate_seq 를 지나게 해 맞춘다 (_title_probe)
+			m.dialog.close()
+			var kp: Dictionary = _soc_keep()
+			var mer: Node2D = _npc_node("merchant")
+			if mer == null:
+				print("TITLE_OK=false 광장에 만수가 없다")
+				_soc_restore(kp)
+			else:
+				m.story_cutscene = true            # 곁의 주민과 삼자 대화가 되지 않게
+				GameData.fest_done = true          # 축제 인사 경로를 막는다
+				GameData.affinity_open = true
+				GameData.player_name = "하네스"
+				GameData.minutes = 10.0 * 60.0     # 온천·저녁 대사 경로를 피한다
+				GameData.kitchen_quest = "done"    # 조리대 이야기가 만수 대화를 가로채지 않게
+				# 자유직 재료를 전부 비운다 — 샌드박스의 벌목·낚시 기록이 free_known 을 먼저 만든다
+				GameData.crops_harvested = {}
+				GameData.trees_chopped = 0
+				GameData.rocks_mined = 0
+				GameData.fish_caught = {}
+				GameData.recipes_cooked = {}
+				GameData.forage_caught = {}
+				GameData.mob_kills = {}
+				GameData.animals_now = 0
+				GameData.me = GameData.fresh_me()
+				GameData.me.boldness_base = 25
+				var d: int = GameData.day
+				var fails: Array = []
+				# 10 낯선 사람 — 아무것도 아닌 사람
+				GameData.aff_add("merchant", -GameData.aff("merchant"))
+				fails.append(_title_probe(mer, "stranger"))
+				# 9 이름 — 호감 30 (35 로 심는다)
+				GameData.aff_add("merchant", 35 - GameData.aff("merchant"))
+				fails.append(_title_probe(mer, "name"))
+				# 8 자유직 — 농부 문턱(수확 100), 이름보다 먼저다
+				GameData.crops_harvested = {GameData.CROP_IDS[0]: 100}
+				fails.append(_title_probe(mer, "free_known"))
+				# 7 우리 마을 농부 양반 — 호감 70
+				GameData.aff_add("merchant", 70 - GameData.aff("merchant"))
+				fails.append(_title_probe(mer, "free_master"))
+				# 5 직함 — 근속 14일(D5). 주인의 첫마디는 boss_calls 로 간다 (부록 §2)
+				GameData.me.job = "general_clerk"
+				GameData.me.rank = "clerk"
+				GameData.me.job_since_day = d - 14
+				GameData.aff_add("merchant", 40 - GameData.aff("merchant"))
+				fails.append(_title_probe(mer, "office"))
+				GameData.aff_add("merchant", 70 - GameData.aff("merchant"))
+				var master_ok: bool = str(GameData.player_title("merchant").text) == "우리 점원"
+				# 6 전직 — 그만둔 지 이레 안
+				GameData.me.job = ""
+				GameData.me.rank = ""
+				GameData.me.job_history = [{"inst": "general", "rank": "clerk",
+					"job": "general_clerk", "from": d - 30, "to": d - 1, "reason": "quit"}]
+				GameData.aff_add("merchant", -GameData.aff("merchant"))
+				GameData.crops_harvested = {}
+				fails.append(_title_probe(mer, "ex"))
+				# 4 그 일 있던 사람
+				GameData.me.job_history = []
+				GameData.me.jail_days_left = 3
+				fails.append(_title_probe(mer, "jailed"))
+				# 3 소문의 그 사람 — heat 2 기억이 하루 지났고, 만수는 본 사람이 아니다
+				GameData.me.jail_days_left = 0
+				GameData.me.memories = [{"day": d - 1, "kind": "pickpocket", "heat": 2,
+					"witnesses": ["chief"], "forgiven": false, "settled": "", "reported_day": 0,
+					"target": "chief", "value": 20, "region": "kyojin"}]
+				fails.append(_title_probe(mer, "heard"))
+				# 2 그 사람 — 만수가 봤다. 직함을 겹쳐 놓아도 목격이 먼저다
+				GameData.me.memories[0].witnesses = ["merchant"]
+				GameData.me.memories[0].heat = 1
+				GameData.me.job = "general_clerk"
+				GameData.me.rank = "clerk"
+				GameData.me.job_since_day = d - 14
+				fails.append(_title_probe(mer, "seen"))
+				# 1 살인자 — 말소되지 않은 기록
+				GameData.me.record = [{"day": d, "crime": "murder", "court": "court",
+					"verdict": "guilty", "sentence": 0, "served": 0, "served_day": 0,
+					"expunged": false}]
+				fails.append(_title_probe(mer, "murderer"))
+				# 같은 날 두 번째 대화 — 첫마디 페이지 없이 곧장 대사와 선택지다
+				var opener0: Array = m.dialog._paginate_seq(
+					[{"text": GameData.call_opener("merchant")}])
+				mer.talked_today = true
+				m.village._talk_to(mer)
+				var seq2: Array = m.dialog._seq
+				var retalk_ok: bool = m.society.talk_opener("merchant", false) == "" \
+					and not seq2.is_empty() and seq2[-1].has("choices") \
+					and str(seq2[0].text) != str(opener0[0].text)
+				m.dialog.close()
+				var bad: Array = fails.filter(func(s: String) -> bool: return s != "")
+				_soc_restore(kp)
+				print("TITLE_OK=", bad.is_empty() and master_ok and retalk_ok,
+					" 계급=", 10 - bad.size(), "/10 어긋남=", bad,
+					" 우리점원=", master_ok, " 재대화=", retalk_ok)
+		227:
+			# ② CLERK_LOOP_OK — 채용(자리가 진실, 헌법 §0.1) → 이레 근무(몫은 적립만) → 봉급날
+			# 창구 앞에서 수령(§0.3) → 이레 결근이면 해고. 돈은 봉급을 받는 그 순간에만 움직인다
+			m.dialog.close()
+			var kp: Dictionary = _soc_keep()
+			m.story_cutscene = false           # counter_menu 는 연출 중이면 물러선다 (D2)
+			GameData.affinity_open = true
+			GameData.kitchen_quest = "done"    # 조리대 이야기가 계산대를 가로채지 않게 (D2)
+			GameData.minutes = 10.0 * 60.0
+			GameData.me = GameData.fresh_me()
+			GameData.me.boldness_base = 25
+			GameData.skills["farm"].lv = 2     # 채용 조건 농사 Lv2 — add_skill_xp 는 잠자리 알림을 남긴다
+			GameData.aff_add("merchant", 20 - GameData.aff("merchant"))
+			if not GameData.npc_greeted.has("merchant"):
+				GameData.npc_greeted.append("merchant")
+			GameData.seats = {}
+			var money0: int = GameData.money
+			var hire_day: int = GameData.day
+			var why: String = m.society.can_hire("general")
+			m.society.hire("general")
+			m.dialog.close()
+			var d0: int = int(GameData.me.job_since_day)
+			var hire_ok: bool = why == "" and str(GameData.me.job) == "general_clerk" \
+				and GameData.seat_of("general", "clerk") == "player" \
+				and d0 == hire_day + 1 and int(GameData.me.wage_day) == hire_day + 8
+			# 이레 근무 — 계산대 E 의 첫 메뉴에 「근무」가 있고, 손님 한 사람을 맞으면 그날은 끝
+			var loop_ok := true
+			var loop_why := ""
+			for i in range(1, 8):
+				GameData.day = d0 + i - 1
+				GameData.society_new_day([0, 0, 0])
+				GameData.minutes = 10.0 * 60.0
+				m.shop_room.open("general")
+				var menu: bool = m.society.counter_menu("general")
+				var has_work := false
+				for c in m.dialog.buttons_box.get_children():
+					if c is Button and not c.is_queued_for_deletion() \
+							and (c as Button).text == "근무":
+						has_work = true
+				m.dialog.close()
+				m.society.work_start()
+				var guest_shown: bool = m.dialog.visible
+				m.society.work_pick(i % 3)
+				var closed_today: bool = m.society.can_work() != ""
+				m.dialog.close()
+				m.shop_room.close()
+				if not (menu and has_work and guest_shown and closed_today):
+					loop_ok = false
+					loop_why += "%d일째(메뉴 %s·근무버튼 %s·손님 %s·마감 %s) " % [
+						i, menu, has_work, guest_shown, closed_today]
+			var log: Array = GameData.me.work_log
+			var work_ok: bool = int(GameData.me.perf) == 7 and int(GameData.me.wage_pending) == 560 \
+				and not log.is_empty() and int(log[-1].day) == d0 + 6
+			# 봉급날 아침 — 결산 한 줄(루프 밖에서 한 번만 읽는다), 그리고 주인 앞에서 받는다
+			GameData.day = d0 + 7
+			GameData.society_new_day([0, 0, 0])
+			var note: String = GameData.society_note()
+			GameData.minutes = 10.0 * 60.0
+			m.shop_room.open("general")
+			var ready: bool = m.society.wage_ready()
+			m.society.collect_wage()
+			m.dialog.close()
+			m.shop_room.close()
+			var pay_ok: bool = ready and note.contains("봉급날") and GameData.money - money0 == 560 \
+				and int(GameData.me.wage_pending) == 0 and int(GameData.me.wage_day) == d0 + 14
+			# 이레 결근 — 자리가 비고 이력에 남고 평판 −8
+			var rep0: int = int(GameData.me.reputation.kyojin)
+			for j in 7:
+				GameData.day += 1
+				GameData.society_new_day([0, 0, 0])
+			var hist: Array = GameData.me.job_history
+			var fired_ok: bool = str(GameData.me.job) == "" \
+				and GameData.seat_of("general", "clerk") == "" \
+				and not hist.is_empty() and str(hist[-1].reason) == "fired" \
+				and int(GameData.me.reputation.kyojin) == rep0 - 8
+			_soc_restore(kp)
+			print("CLERK_LOOP_OK=", hire_ok and loop_ok and work_ok and pay_ok and fired_ok,
+				" 채용=", hire_ok, "(", why, ") 근무=", loop_ok, " ", loop_why,
+				" 적립=", work_ok, " 봉급=", pay_ok, "(", note.replace("\n", " / "), ")",
+				" 해고=", fired_ok)
+		228:
+			# ③ PICKPOCKET_OK — 범죄의 파이프라인: 강제 실패 → 「그 사람」(seen) → 다음날 아침
+			# 이장이 찾아오고(meeting) → 자백 → 봉사 사흘 → 용서(seen 소멸). 이어 강제 성공 —
+			# 본 사람이 없으면 기억도 없다 (D23). 주사위는 인자로 고정한다
+			m.dialog.close()
+			var kp: Dictionary = _soc_keep()
+			var mer: Node2D = _npc_node("merchant")
+			if mer == null:
+				print("PICKPOCKET_OK=false 광장에 만수가 없다")
+				_soc_restore(kp)
+			else:
+				GameData.me = GameData.fresh_me()
+				GameData.me.boldness_base = 40
+				GameData.me.boldness_state = 0.0
+				GameData.affinity_open = true
+				m.story_cutscene = true
+				GameData.minutes = 10.0 * 60.0
+				# 목격자가 없는 자리 — 둘을 지도 구석으로 옮긴다(다른 사람에게서 일곱 칸 넘게).
+				# 자리는 _soc_keep 이 맡아 두었다
+				var far := Vector2(2 * m.TILE + 16, 2 * m.TILE + 16)
+				mer.position = far
+				m.player.position = far + Vector2(m.TILE, 0)
+				GameData.npc_wallet["merchant"] = 50
+				var d1: int = GameData.day
+				m.society.pickpocket("merchant", 1.0)      # 굴림 1.0 — 반드시 실패
+				var fail_shown: bool = m.dialog.visible
+				m.dialog.close()
+				var mems: Array = GameData.me.memories
+				var fail_ok: bool = mems.size() == 1 and str(mems[0].target) == "merchant" \
+					and str(mems[0].witnesses[0]) == "merchant" \
+					and int(mems[0].reported_day) == d1 \
+					and float(GameData.me.theft_xp) == 2.0 \
+					and float(GameData.me.boldness_state) == 1.0 \
+					and str(GameData.player_title("merchant").cls) == "seen"
+				# 다음날 아침 — 축제날이면 회의가 없으니 하루 더 넘긴다 (루프 안에서 note 를 읽지 않는다)
+				GameData.day += 1
+				GameData.society_new_day([0, 0, 0])
+				var skipped := 0
+				while not GameData.festival_today().is_empty() and skipped < 40:
+					GameData.day += 1
+					GameData.society_new_day([0, 0, 0])
+					skipped += 1
+				GameData.minutes = 10.0 * 60.0     # 회의는 09~17시 — 시각을 놓은 뒤에 묻는다
+				var meet_ok: bool = GameData.council_pending() \
+					and GameData.society_place("chief") == "meeting"
+				var note: String = GameData.society_note()
+				m.society.open_council()
+				var council_shown: bool = m.dialog.visible
+				m.society.council_pick("confessed")
+				m.dialog.close()
+				var rec: Array = GameData.me.record
+				# 실패 +1 → 아침 감쇠 0.0 → 자백 bold_add(−5) = −5.0 (⑦ 순서 고정)
+				var confess_ok: bool = not rec.is_empty() and str(rec[-1].court) == "village" \
+					and int(rec[-1].sentence) == 3 \
+					and float(GameData.me.boldness_state) == -5.0
+				for j in 3:
+					GameData.day += 1
+					GameData.society_new_day([0, 0, 0])
+					GameData.minutes = 10.0 * 60.0
+					m.society.serve_day()
+					m.dialog.close()
+				rec = GameData.me.record
+				mems = GameData.me.memories
+				var serve_ok: bool = not rec.is_empty() and int(rec[-1].served) == 3 \
+					and not mems.is_empty() and bool(mems[0].forgiven) \
+					and int(GameData.me.service_days) == 3 \
+					and str(GameData.player_title("merchant").cls) != "seen"
+				# 성공 경로 — 혼자였으니 기억이 없고, 지갑에서 그만큼만 빠진다
+				GameData.me.memories = []
+				GameData.npc_wallet["merchant"] = 50
+				m.society.force_report = 1.0
+				var money1: int = GameData.money
+				var take: int = mini(50, 10 + 3 * GameData.theft_lv())
+				m.society.pickpocket("merchant", 0.0)      # 굴림 0.0 — 반드시 성공
+				m.dialog.close()
+				var quiet := true
+				for mm in GameData.me.memories:
+					if int(mm.reported_day) > 0 or (mm.witnesses as Array).is_empty():
+						quiet = false
+				var win_ok: bool = GameData.money - money1 == take \
+					and int(GameData.npc_wallet.get("merchant", -1)) == 50 - take and quiet
+				_soc_restore(kp)
+				print("PICKPOCKET_OK=", fail_ok and fail_shown and meet_ok and note.contains("이장")
+					and council_shown and confess_ok and serve_ok and win_ok,
+					" 실패=", fail_ok, " 회의=", meet_ok, " 결산=", note.contains("이장"),
+					"(", note.replace("\n", " / "), ") 자백=", confess_ok, " 봉사=", serve_ok,
+					" 성공=", win_ok, " 건너뛴 축제=", skipped)
+		229:
+			# ④ NIGHT_OK — 21시에 밖에 남는 사람은 NIGHT_OWLS 뿐이고(교집합 비교, 임시 스폰 없음,
+			# D12), 22시가 넘으면 그들도 들어간다. 자리는 society_place 가 준다(악사 광장·강태 부두)
+			m.dialog.close()
+			var kp: Dictionary = _soc_keep()
+			GameData.minutes = 21.0 * 60.0
+			for n1 in m.npcs:
+				n1._process(0.016)
+			var owls: Array = []
+			var vis: Array = []
+			for n2 in m.npcs:
+				if n2.scripted:
+					continue
+				if str(n2.id) in GameData.NIGHT_OWLS:
+					owls.append(str(n2.id))
+				if n2.visible:
+					vis.append(str(n2.id))
+			owls.sort()
+			vis.sort()
+			var same: bool = owls == vis and vis.size() <= 3
+			var place_ok := true
+			if "musician" in owls:
+				place_ok = place_ok and m.npcmgr.npc_place_now("musician") == "plaza"
+			if "angler" in owls:
+				place_ok = place_ok and m.npcmgr.npc_place_now("angler") == "pier"
+			GameData.minutes = 22.0 * 60.0 + 1.0
+			for n3 in m.npcs:
+				n3._process(0.016)
+			var late: Array = []
+			for n4 in m.npcs:
+				if str(n4.id) in GameData.NIGHT_OWLS and n4.visible and not n4.scripted:
+					late.append(str(n4.id))
+			_soc_restore(kp)                # 시각과 보이기를 되돌린다
+			for n5 in m.npcs:
+				n5._process(0.016)          # 낮 시각으로 한 번 더 — 일과가 제자리로
+			print("NIGHT_OK=", same and place_ok and late.is_empty(),
+				" 21시 밖=", vis, " 밤사람=", owls, "(", owls.size(), "명) 자리=", place_ok,
+				" 22시 남은 밤사람=", late)
+		230:
+			# ⑤ NPC_ACCESS_OK — 규율: NPC 표·호감도의 직접 첨자(NPCS·NPC_KIND·affinity 의 [ ])는
+			# 더 늘지 않는다. 새 코드는 npc_def/npc_kind/aff/aff_add 만 쓴다(계약서 §4) —
+			# society.gd 와 player_actions.gd 는 0 이어야 한다. BASELINE 은 2026-09-09 실측:
+			#   grep -c "GameData.NPCS\[\|NPC_KIND\[\|affinity\[" scripts/*.gd   (dev_harness.gd 제외)
+			# game_data 의 11 은 첨자 10(기존 9 + aff_add) 에 그 규율을 적은 주석 한 줄이 더해진 값이다
+			# 패턴은 이어 붙여 만든다 — 이 줄이 제 검사에 걸리지 않게
+			m.dialog.close()
+			var kp: Dictionary = _soc_keep()
+			var pats: Array = ["GameData.NPCS" + "[", "NPC_KIND" + "[", "affinity" + "["]
+			var baseline := {"day_cycle": 1, "ending_ui": 3, "game_data": 11, "net_sync": 2,
+				"note_ui": 2, "save_load": 2, "shop_room": 1, "story": 25, "tool_use": 1,
+				"village_ui": 29}
+			var counts := {}
+			var over: Array = []
+			for fn in DirAccess.get_files_at("res://scripts"):
+				if not fn.ends_with(".gd") or fn == "dev_harness.gd":
+					continue
+				var src := FileAccess.open("res://scripts/" + fn, FileAccess.READ)
+				if src == null:
+					continue
+				var hits := 0
+				for line in src.get_as_text().split("\n"):
+					for p in pats:
+						if line.contains(p):
+							hits += 1
+							break
+				var key: String = fn.trim_suffix(".gd")
+				counts[key] = hits
+				if hits > int(baseline.get(key, 0)):
+					over.append("%s %d>%d" % [key, hits, int(baseline.get(key, 0))])
+			var pure_ok: bool = int(counts.get("society", -1)) == 0 \
+				and int(counts.get("player_actions", -1)) == 0
+			_soc_restore(kp)
+			print("NPC_ACCESS_OK=", over.is_empty() and pure_ok, " 초과=", over,
+				" society=", counts.get("society", -1),
+				" player_actions=", counts.get("player_actions", -1),
+				" 파일=", counts.size())
+		231:
+			# ⑥ REST_OK — 순수 함수: 잠자리 배율·손버릇 레벨·밤 사람 시각·동굴 상한·
+			# 대범함의 감쇠와 기절 순서(⑦ 고정: 감쇠 → ko −5). me 를 갈아 끼우고 며칠 넘기므로
+			# 자리·지갑도 맡겨 둔다 — 계절 첫날이면 ③ 이 지갑을 지운다
+			m.dialog.close()
+			var kp: Dictionary = _soc_keep()
+			var seats0: Dictionary = GameData.seats.duplicate(true)
+			var wallet0: Dictionary = GameData.npc_wallet.duplicate()
+			GameData.me = GameData.fresh_me()
+			GameData.me.boldness_base = 25
+			GameData.me.boldness_state = 0.0
+			# 잠자리 배율 — 어젯밤 밖에서 4시간/8시간, 어제 근무 ×0.9
+			GameData.me.night_out_day = GameData.day - 1
+			GameData.me.night_out_min = 250.0
+			var r1: float = GameData.rest_mult()
+			GameData.me.night_out_min = 500.0
+			var r2: float = GameData.rest_mult()
+			GameData.me.work_log = [{"day": GameData.day - 1, "kind": "work",
+				"inst": "general", "pick": 0}]
+			var r3: float = GameData.rest_mult()
+			var rest_ok: bool = absf(r1 - 0.75) < 0.001 and absf(r2 - 0.60) < 0.001 \
+				and absf(r3 - 0.54) < 0.001
+			# 손버릇 — 곡선만 빌린다: 205 → Lv2
+			GameData.me.theft_xp = 0.0
+			var lv1: int = GameData.theft_lv()
+			GameData.me.theft_xp = 205.0
+			var lv2: int = GameData.theft_lv()
+			var lv_ok: bool = lv1 == 1 and lv2 == 2
+			# 밤 사람 — 22시까지만
+			GameData.minutes = 20.0 * 60.0
+			var owl20: bool = GameData.night_owl("explorer")
+			GameData.minutes = 22.0 * 60.0
+			var owl22: bool = GameData.night_owl("explorer")
+			var owl_ok: bool = owl20 and not owl22
+			# 동굴 상한 — 3 + 3 은 5 에서 잘린다
+			GameData._bold_today = {"cave": 0.0, "night": 0.0}
+			GameData.bold_add(3.0, "cave")
+			GameData.bold_add(3.0, "cave")
+			var cap_ok: bool = float(GameData.me.boldness_state) == 5.0
+			# 아침 순서 — state 0 · 기절: 감쇠 0 → ko −5.0; 이어 기절 없음: −5 → −2.0
+			GameData.me.boldness_state = 0.0
+			GameData.me.work_log = []
+			GameData.society_new_day([0, 0, 0], true)
+			var st1: float = float(GameData.me.boldness_state)
+			GameData.society_new_day([0, 0, 0], false)
+			var st2: float = float(GameData.me.boldness_state)
+			var ko_ok: bool = st1 == -5.0 and st2 == -2.0
+			# 성격을 아직 안 물었으면(base −1) 대범함은 움직이지 않고 마음 카드도 비어 있다
+			GameData.me.boldness_base = -1
+			var st0: float = float(GameData.me.boldness_state)
+			GameData.bold_add(5.0)
+			var none_ok: bool = float(GameData.me.boldness_state) == st0 \
+				and GameData.bold_stage() == ""
+			GameData.me.boldness_base = 25
+			var stage_ok: bool = GameData.bold_stage() == "손이 굳지 않는"
+			_soc_restore(kp)
+			var kept_ok: bool = GameData.seats == seats0 and GameData.npc_wallet == wallet0
+			print("REST_OK=", rest_ok and lv_ok and owl_ok and cap_ok and ko_ok and none_ok
+				and stage_ok and kept_ok,
+				" 잠자리=", rest_ok, "(", r1, "/", r2, "/", r3, ") 손버릇=", lv_ok,
+				" 밤사람=", owl_ok, " 동굴상한=", cap_ok, " 기절순서=", ko_ok,
+				"(", st1, "/", st2, ") 질문전=", none_ok, " 마음카드=", stage_ok,
+				" 되돌림=", kept_ok)
 		240:
 			# 휘두르기 네 위상을 한 장씩 찍는다. 도구가 **주먹에 붙어** 따라가는지,
 			# 도트가 위상마다 제대로 바뀌는지는 수치로는 안 보이고 그림을 봐야 한다.
@@ -6539,6 +6952,112 @@ func _ride_pose(face: String) -> void:
 	m.player.moving = true
 	m.player.anim_time = 0.21
 	m.player._update_sprite()
+
+
+# ---- 사회(S1) 검사의 맡김·되돌림 (226~231) ----
+#
+# 여섯 단계는 me·자리·지갑·호감도를 통째로 갈아 끼우고 며칠씩 넘긴다. 모두 이 둘로
+# 시작하고 끝난다 — 되돌린 뒤 society_loaded() 로 호칭 기준선을 다시 잡아야 다음 아침
+# 결산에 거짓 「사람들이 요즘 나를…」 줄이 안 뜬다 (D9). 굴림 강제값도 여기서 푼다 —
+# 남겨 두면 실제 플레이의 도둑질이 굳는다.
+func _soc_keep() -> Dictionary:
+	var npc_state: Array = []
+	for n in m.npcs:
+		npc_state.append([n, n.position, n.talked_today, n.visible])
+	return {
+		"me": GameData.me.duplicate(true), "seats": GameData.seats.duplicate(true),
+		"npc_wallet": GameData.npc_wallet.duplicate(), "affinity": GameData.affinity.duplicate(),
+		"skills": GameData.skills.duplicate(true), "crops": GameData.crops_harvested.duplicate(),
+		"money": GameData.money, "day": GameData.day, "minutes": GameData.minutes,
+		"energy": GameData.energy, "player_name": GameData.player_name,
+		"story_cutscene": m.story_cutscene, "affinity_open": GameData.affinity_open,
+		"pos": m.player.position, "fest_done": GameData.fest_done,
+		"fest_greeted": GameData.fest_greeted.duplicate(),
+		"npc_last_talk": GameData.npc_last_talk.duplicate(),
+		# 그 밖에 검사가 만지는 것 — 자유직 재료·오늘 수입·첫인사 목록·조리대 이야기·사람들 자리
+		"today_earned": GameData.today_earned, "npc_greeted": GameData.npc_greeted.duplicate(),
+		"kitchen_quest": GameData.kitchen_quest, "animals_now": GameData.animals_now,
+		"trees": GameData.trees_chopped, "rocks": GameData.rocks_mined,
+		"fish": GameData.fish_caught.duplicate(), "recipes": GameData.recipes_cooked.duplicate(),
+		"forage": GameData.forage_caught.duplicate(), "mobs": GameData.mob_kills.duplicate(),
+		"npc_state": npc_state,
+	}
+
+
+func _soc_restore(k: Dictionary) -> void:
+	if m.shop_room.visible:
+		m.shop_room.close()
+	GameData.me = k.me
+	GameData.seats = k.seats
+	GameData.npc_wallet = k.npc_wallet
+	GameData.affinity = k.affinity
+	GameData.skills = k.skills
+	GameData.crops_harvested = k.crops
+	GameData.money = k.money
+	GameData.day = k.day
+	GameData.minutes = k.minutes
+	GameData.energy = k.energy
+	GameData.player_name = k.player_name
+	m.story_cutscene = k.story_cutscene
+	GameData.affinity_open = k.affinity_open
+	m.player.position = k.pos
+	GameData.fest_done = k.fest_done
+	GameData.fest_greeted = k.fest_greeted
+	GameData.npc_last_talk = k.npc_last_talk
+	GameData.today_earned = k.today_earned
+	GameData.npc_greeted = k.npc_greeted
+	GameData.kitchen_quest = k.kitchen_quest
+	GameData.animals_now = k.animals_now
+	GameData.trees_chopped = k.trees
+	GameData.rocks_mined = k.rocks
+	GameData.fish_caught = k.fish
+	GameData.recipes_cooked = k.recipes
+	GameData.forage_caught = k.forage
+	GameData.mob_kills = k.mobs
+	for st in k.npc_state:
+		var n: Node2D = st[0]
+		n.position = st[1]
+		n.talked_today = st[2]
+		n.visible = st[3]
+	# 호칭 기준선은 재료(호감도·통계·me)가 전부 제자리로 돌아온 뒤에 잡는다 (D9)
+	GameData.society_loaded()
+	m.society.force_roll = -1.0
+	m.society.force_report = -1.0
+	m.dialog.close()
+
+
+func _npc_node(nid: String) -> Node2D:
+	for n in m.npcs:
+		if str(n.id) == nid:
+			return n
+	return null
+
+
+# 호칭 상태 하나를 재 본다 — 기대 계급(cls)이 맞는지, 첫마디(call_opener)가 토큰 없이
+# 나오는지, 그리고 실제 _talk_to 의 첫 페이지가 그 첫마디인지. 빈 문자열이면 통과,
+# 아니면 어긋난 곳. 기대 첫마디도 같은 _paginate_seq 를 지나게 한다 — 두 줄을 넘는
+# 대사는 \n 으로 접히고, 아주 긴 줄은 두 페이지가 되므로 날것끼리는 비교가 안 된다
+func _title_probe(mer: Node2D, want: String) -> String:
+	var t: Dictionary = GameData.player_title("merchant")
+	if str(t.cls) != want:
+		return "%s→cls %s(%s)" % [want, t.cls, t.text]
+	var opener: String = GameData.call_opener("merchant")
+	if opener == "" or opener.contains("{"):
+		return "%s→첫마디 '%s'" % [want, opener]
+	var want_pages: Array = m.dialog._paginate_seq([{"text": opener}])
+	mer.talked_today = false
+	m.village._talk_to(mer)
+	var seq: Array = m.dialog._seq
+	var ok: bool = m.dialog.visible and seq.size() >= want_pages.size() + 1
+	for i in want_pages.size():
+		ok = ok and i < seq.size() and str(seq[i].text) == str(want_pages[i].text) \
+			and not seq[i].has("choices")
+	var shown: String = str(seq[0].text) if not seq.is_empty() else "(없음)"
+	m.dialog.close()
+	if not ok:
+		return "%s→첫 페이지 '%s' ≠ '%s'" % [want, shown.replace("\n", " "),
+			str(want_pages[0].text).replace("\n", " ")]
+	return ""
 
 
 # ---- 함께하기 검증 ----

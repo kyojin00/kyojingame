@@ -303,23 +303,38 @@ func _at_counter() -> bool:
 func _try_interact() -> bool:
 	var si := _shelf_near()
 	if si >= 0:
+		# 대범해진 사람에게는 선반 앞에 「슬쩍한다」가 먼저 뜬다 — 그 아래에서는 false 를
+		# 돌려 사려는 사람에게 클릭 하나를 더 시키지 않는다 (S1 · D13)
+		if main.society.shelf_menu(si):
+			return true
 		# 선반에서 산다 — 그 카테고리의 물건만 진열된다
 		main.shop.open("buy", ["buy"],
 			"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
 		return true
 	if _at_counter():
-		var d := _def()
-		if str(d.get("action", "")) != "":
-			main.room_action(str(d.action))   # 여관·연구소·도서관
-		elif room_id == "general":
-			# 만수에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
-			main.village.open_merchant_counter()
-		elif str(d.tab) == "":
-			main.hud.show_message(str(d.hint), 4.0)
-		else:
-			main.shop.open(str(d.tab), d.tabs, str(d.name))
+		# 이 방에 고용됐거나 채용될 수 있으면 계산대 E 는 일자리 메뉴가 먼저다 —
+		# 그 첫 버튼 「가게 일」이 counter_default 로 돌아온다. 그 밖(샌드박스 포함)에는
+		# false 라 계산대 흐름이 한 줄도 안 바뀐다 (S1 · D2)
+		if main.society.counter_menu(room_id):
+			return true
+		counter_default()
 		return true
 	return false
+
+
+# 계산대의 본래 흐름 — 여관·연구소·도서관 행동 / 만수의 인사 메뉴 / 거래창.
+# society.counter_menu 의 「가게 일」이 여기로 돌아오므로 따로 떼어 두었다 (동작 무변)
+func counter_default() -> void:
+	var d := _def()
+	if str(d.get("action", "")) != "":
+		main.room_action(str(d.action))   # 여관·연구소·도서관
+	elif room_id == "general":
+		# 만수에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
+		main.village.open_merchant_counter()
+	elif str(d.tab) == "":
+		main.hud.show_message(str(d.hint), 4.0)
+	else:
+		main.shop.open(str(d.tab), d.tabs, str(d.name))
 
 
 # 가게 안 안내 — 물건은 상호작용키(E), 사람은 대화키(F)

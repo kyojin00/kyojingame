@@ -266,6 +266,8 @@ var daycycle: KyojinDayCycle = null
 var npcmgr: KyojinNpcs = null
 # 세이브 담기/펴기 (scripts/save_load.gd)
 var saveio: KyojinSaveIO = null
+# 사회 — 채용·근무·봉급·소매치기·이장의 회의 (scripts/society.gd)
+var society: KyojinSociety = null
 # 먹기·요리·조합·아이템 얻기 (scripts/player_actions.gd)
 var doing: KyojinDoing = null
 var _weather_override := -1
@@ -979,6 +981,7 @@ func _ready() -> void:
 	npcmgr = _mount("npcs", "Npcs")
 	saveio = _mount("save_load", "SaveIO")
 	doing = _mount("player_actions", "PlayerActions")
+	society = _mount("society", "Society")
 
 	# 여기부터 몇 초쯤 화면이 굳는다 — 그동안 무엇을 하고 있는지 말해 준다.
 	# await 가 아니라 그 자리에서 다시 그리는 방식이라(loading.gd 참고),

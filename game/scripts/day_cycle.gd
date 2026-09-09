@@ -111,13 +111,16 @@ func _next_day(passed_out: bool) -> void:
 	var stats := [GameData.today_harvest, GameData.today_earned, GameData.today_spent]
 	var prev_season := GameData.season()
 	GameData.day += 1
+	# 기력 소진 기절인가 — 26시 강제 취침도 passed_out 으로 들어오지만 그건
+	# 기절이 아니다(D15). 시계를 06:00 으로 되돌리기 전에 갈라 둔다
+	var ko: bool = passed_out and GameData.minutes < GameData.DAY_END
 	GameData.minutes = GameData.DAY_START
 	# 침대가 좋을수록 잘 잔다 — 낡은 침대 70% · 나무 100% · 푹신 100%(+쓰러짐 완화)
-	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out)
+	# 어젯밤 밖에서 오래 걸었거나 일터에 나갔으면 그만큼 덜 쉰다 (rest_mult)
+	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out) * GameData.rest_mult()
 	# 한숨 자고 나면 속이 조금은 든든하다 (완전히 차지는 않는다)
 	GameData.hunger = maxf(GameData.hunger, GameData.HUNGER_WAKE_MIN)
 	GameData.reset_daily()
-	GameData.society_new_day()   # 봉급·세금·수배가 붙을 자리 (아직 빈 채다)
 	m._perf_day["farm"] = Time.get_ticks_usec() - _t
 	_t = Time.get_ticks_usec()
 	m.worldgen._advance_tree_growth()
@@ -236,6 +239,10 @@ func _next_day(passed_out: bool) -> void:
 				m.hud.show_message("주민이 %d명이 됐다! 마을회관에서\n「%s」이(가) 열렸다." % [int(feat[1]), str(feat[2])], 6.0)
 		GameData.hall_donate_morning(m.npcs.size())
 
+	# 사회의 아침 — 결근·봉급·대범함·회의·호칭. 회관(스토리 9) if 블록 **밖**이라
+	# 스토리 9 전에도 매일 돈다. 저장 앞에 두어 오늘 아침의 상태가 세이브에 담긴다
+	GameData.society_new_day(stats, ko)
+
 	_t = Time.get_ticks_usec()
 	m.saveio.save_now()
 	m._perf_day["save"] = Time.get_ticks_usec() - _t
@@ -273,11 +280,14 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n쓰러져서 기력이 절반만 회복됐다..."
 	if spouse_note != "":
 		note += "\n\n" + spouse_note
+	# 사회 줄(봉급날·결근·호칭…)은 호스트의 결산에만 — 게스트는 사회가 없으니
+	# send_new_day 의 s_body 에는 싣지 않는다 (헌법 §0: 알림은 아침 결산 한 줄)
+	var soc_tail := GameData.society_note()
 
 	var s_title := "- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()]
 	var s_body := "어제 수확: %d개\n판매 수입: +%dG\n지출: -%dG\n소지금: %dG\n%s" \
 		% [stats[0], stats[1], stats[2], GameData.money, note]
-	m.summary.open(s_title, s_body)
+	m.summary.open(s_title, s_body if soc_tail == "" else s_body + "\n\n" + soc_tail)
 	if Net.is_host():
 		m.netsync.send_new_day(m.netsync._make_snapshot_json(), s_title, s_body)
 	m.queue_redraw()

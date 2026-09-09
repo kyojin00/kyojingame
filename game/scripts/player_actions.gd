@@ -31,6 +31,8 @@ func net_auction(cat: String, id: String, qty: int, quality: int,
 
 func record_kill(mob: String) -> void:
 	GameData.mob_kills[mob] = int(GameData.mob_kills.get(mob, 0)) + 1
+	# 동굴 처치는 대범함을 조금 키운다 — 하루 +5 까지(D8). 게스트는 base −1 이라 no-op
+	GameData.bold_add(0.5, "cave")
 	GameData._check_collections()   # 「동굴 관찰자」는 처치 기록으로 찬다
 	_maybe_drop_recipe("mob")
 	if Net.is_guest():

@@ -217,11 +217,22 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.story8_phase = "done"
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
-	# 사회(직업·자리·대범함…) — 빈 그릇 위에 저장된 값만 덮는다.
-	# 열쇠가 늘어도 옛 세이브가 깨지지 않고, 모르는 열쇠는 그냥 지나간다
-	GameData.me = GameData.fresh_me()
-	for mk in d.get("me", {}):
-		GameData.me[str(mk)] = d.me[mk]
+	# 사회(직업·자리·대범함…) — _apply_me 가 빈 그릇 위에 저장된 값만 덮는다.
+	# 열쇠가 늘어도 옛 세이브가 깨지지 않고, 모르는 열쇠는 그냥 지나가며,
+	# JSON 이 float 로 돌려준 수는 int 로 되돌린다(D21). 게스트는 남의 me 를
+	# 읽지 않는다 — fresh_me 그대로라 사회 진입점이 전부 첫 줄에서 돌아간다(D18)
+	if not Net.is_guest():
+		GameData.me = GameData._apply_me(d.get("me", {}))
+	# 세계 키 — 옛 세이브엔 없어 society_v 0 · 자리와 지갑은 빈 채(전부 기본값).
+	# 손댄 세이브의 이상한 모양은 여기서 걸러 매일 아침 하루 넘김이 죽지 않게 한다
+	GameData.society_v = int(d.get("society_v", 0))
+	var seats_in: Variant = d.get("seats", {})
+	GameData.seats = seats_in if typeof(seats_in) == TYPE_DICTIONARY else {}
+	GameData.npc_wallet = {}
+	var wallet_in: Variant = d.get("npc_wallet", {})
+	if typeof(wallet_in) == TYPE_DICTIONARY:
+		for wk in wallet_in:
+			GameData.npc_wallet[str(wk)] = int(wallet_in[wk])
 	# ---- 저장은 하는데 **읽지 않던** 여덟 개 ----
 	#
 	# build_save 는 이것들을 꼬박꼬박 적어 왔고 멀티 동기화(apply_stats)도
@@ -458,6 +469,11 @@ func _apply_save(d: Dictionary) -> void:
 	# 구버전(16px 타일) 저장 좌표 환산
 	var pos_scale := float(m.TILE) / float(d.get("tile", 16))
 	m.player.position = Vector2(float(d.player[0]), float(d.player[1])) * pos_scale
+
+	# 호칭 기준선은 호감도까지 다 읽은 뒤에 잡는다 — 그 전에 잡으면 첫 아침마다 거짓 알림(D9).
+	# 자유직 통계(mob_kills·recipes_cooked·forage_caught)도 affinity 뒤에 읽히므로
+	# 그것까지 다 지난 여기, grid_cells 분기 앞이 가장 이른 안전한 자리다
+	GameData.society_loaded()
 
 	# ---- 밭 상태 ----
 	#

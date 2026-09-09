@@ -530,6 +530,8 @@ func _talk_to(npc: Node2D) -> void:
 			{"text": GameData.npc_line(npc.id), "choices": plain_choices},
 		])
 		return
+	# 하루 첫 대화인가 — 호칭 첫마디(society.talk_opener)는 그날 첫 만남에만 나온다 (D1)
+	var first_today: bool = not npc.talked_today
 	if not npc.talked_today:
 		npc.talked_today = true
 		GameData.affinity[npc.id] = int(GameData.affinity[npc.id]) + 2
@@ -575,17 +577,29 @@ func _talk_to(npc: Node2D) -> void:
 	# 축제날에는 이장이 진행을 맡는다
 	if npc.id == "chief" and GameData.festival_open():
 		choices.insert(0, ["축제 이야기", _open_festival_dialog])
+	# 사회(S1) — 일자리 이야기·이장의 질문·마을 회의·봉사·소매치기는 society 가 끼운다.
+	# 게스트에게는 회색(gray) 으로만 보이고, 호감도 콘텐츠가 열리기 전에는 아무것도 안 낀다
+	m.society.add_talk_choices(npc.id, choices)
 	# 연화의 서브 퀘스트 — 「대화 끝」 바로 위에 실제 퀘스트 이름으로 뜬다
 	var mom_q: Dictionary = {}
 	if npc.id == "forest_mom":
 		mom_q = _mom_quest_option()
 		if not mom_q.is_empty():
 			choices.insert(choices.size() - 1, [str(mom_q.label), mom_q.cb])
-	m.dialog.open_seq(title, _npc_portrait(npc.id), [
-		{"text": line, "choices": choices},
-	])
-	if not mom_q.is_empty():
-		_attach_quest_bang(str(mom_q.label))
+	# 호칭은 NPC 의 입으로 나온다(헌법 §0.4) — 하루 첫 대화면 첫마디를 **별도 페이지**로
+	# line 앞에 둔다. line 에 접두로 붙이지 않는 이유: 위의 secret50/100·memory_given 이
+	# line 을 통째로 덮어 호칭이 사라지고, 길어진 line 이 PAGE_LINES 로 갈라지면 선택지가
+	# 뒷장으로 밀린다. 별도 페이지는 line 의 페이지 수를 오늘과 똑같이 둔다 (D1).
+	# 빈 문자열이면(둘째 대화·호감도 잠김·게스트) 페이지를 만들지 않는다
+	var opener: String = m.society.talk_opener(npc.id, first_today)
+	var seq: Array = []
+	if opener != "":
+		seq.append({"text": opener})
+	# 연화의 「!」는 선택지 페이지의 버튼이 지어진 뒤에야 붙일 수 있다 — 첫 페이지가
+	# 호칭이면 즉시 부착이 빗나가므로, line 엔트리의 event 로 넘겨 society 가 한 프레임 미룬다
+	seq.append({"text": line, "choices": choices,
+		"event": m.society.on_choices_page.bind(str(mom_q.get("label", "")))})
+	m.dialog.open_seq(title, _npc_portrait(npc.id), seq)
 
 
 func in_greenhouse(t: Vector2i) -> bool:
@@ -1229,6 +1243,10 @@ func _open_library_dialog() -> void:
 	btns.append(["할아버지의 메모 찾기", _open_grandpa_memo_dialog])
 	if GameData.relics_owned() > 0:
 		btns.append(["할머니의 기록 읽기", m.story.open_grandma_records])
+	# 「책 읽기 — 하루 한 권」(S1, 헌법 §7.1 books_read 가 사서보 채용의 열쇠) —
+	# 게스트는 조용히 죽는 버튼이 아니라 회색 안내가 뜬다 (D19)
+	btns.append(m.society.gray("책 읽기 — 하루 한 권", "손님은 이 마을 일에 끼지 않는다.")
+		if Net.is_guest() else ["책 읽기 — 하루 한 권", m.society.read_book])
 	btns.append(["나가기", null])
 	m.dialog.open("도서관",
 		"나무 냄새가 나는 아담한 서가.\n서하가 책과 마을의 기록을 정리해 두었다.", btns)
