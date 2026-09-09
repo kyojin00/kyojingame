@@ -257,9 +257,16 @@ func sync_gen_nodes() -> void:
 	for n in m.npcs.duplicate():
 		var nid := str(n.id)
 		if GameData.gen_npcs.has(nid) and not bool(GameData.gen_npcs[nid].get("here", false)):
+			remove_npc(nid)
+	_sync_town_npcs()
+
+
+# 그 사람의 노드를 세계에서 치운다 — 떠남(story)·죽음(society)·전근(sync_gen_nodes)이 같이 쓴다
+func remove_npc(nid: String) -> void:
+	for n in m.npcs.duplicate():
+		if str(n.id) == nid:
 			m.npcs.erase(n)
 			n.queue_free()
-	_sync_town_npcs()
 
 
 # 읍 손글 아홉(S4c)과 읍에 와 있는 생성 NPC(S4d) — 조건 없이 제자리에 있다. 어슬렁 범위는 읍 안

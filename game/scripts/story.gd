@@ -5423,10 +5423,7 @@ func _settler_depart(nid: String, silent: bool) -> void:
 	if GameData.settler_homes.has(nid):
 		GameData.empty_houses.append(GameData.settler_homes[nid])
 		GameData.settler_homes.erase(nid)
-	for n in m.npcs.duplicate():
-		if n.id == nid:
-			m.npcs.erase(n)
-			n.queue_free()
+	m.npcmgr.remove_npc(nid)
 	var nm := GameData.npc_name(nid)
 	if silent:
 		GameData.items["farewell_letter"] = \

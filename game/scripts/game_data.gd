@@ -8561,7 +8561,6 @@ const JOBS := {
 			},
 		],
 	},
-	# 자유직 목수(S3c) — 제작대에서 완성한 것이 마흔이면 불린다
 }
 
 # 자유직 문턱 8 — stat 값(사전이면 합)이 need 를 넘으면 불린다. 여럿이면 value/need 비율 최대(D16).
@@ -10991,7 +10990,8 @@ func town_case_verdict(c: Dictionary, by: String, kind: String) -> void:
 	gov_budget["town"] = int(gov_budget.get("town", 0)) + fine
 	npc_greed_adj[sid] = float(npc_greed_adj.get(sid, 0.0)) - (0.2 if kind == "harsh" else 0.1)
 	if kind == "harsh":
-		aff_add(sid, -40)   # 가중은 기억된다(헌법 §6.5)
+		if by == "player":
+			aff_add(sid, -40)   # 가중은 기억된다(헌법 §6.5) — 내가 내린 판결일 때만 내 몫이다
 		_note(str(SOCIETY_NOTES.town_harsh) % [npc_name(sid), fine])
 	else:
 		_note(str(SOCIETY_NOTES.town_verdict) % [npc_name(sid), fine])

@@ -7615,6 +7615,7 @@ func _debug_tick() -> void:
 			var k_tw := _s2_keep()
 			var skills_tw: Dictionary = GameData.skills.duplicate(true)
 			var horse_tw: bool = GameData.has_horse
+			var horse_tile_tw: Vector2i = GameData.horse_tile
 			m.dialog.close()
 			if m.shop_room.visible:
 				m.shop_room.close()
@@ -7674,10 +7675,12 @@ func _debug_tick() -> void:
 				"evidence": 2, "stage": "indicted", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
 				"charged_day": 60, "indicted_day": 60}]
 			GameData.npc_wallet["g1"] = 500
+			GameData.aff_set("g1", 60)
 			GameData.day = 61
 			GameData.society_new_day([0, 0, 0])
 			var n_tw := GameData.society_note()
-			var npc_harsh: bool = n_tw.contains("가중") and GameData.wallet_of("g1") == 100
+			var npc_harsh: bool = n_tw.contains("가중") and GameData.wallet_of("g1") == 100 \
+				and GameData.aff("g1") == 60   # 서 부장의 가중은 내 호감이 아니다
 			GameData.npc_greed_adj = {}
 			GameData.cases = [{"id": 3, "crime": "burglary", "day": 61, "suspect": "g2", "victim": "g3", "witness": "g1",
 				"evidence": 2, "stage": "indicted", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
@@ -7728,16 +7731,17 @@ func _debug_tick() -> void:
 			print("TWIGS_OK=", labor_ok and harsh_ok and npc_harsh and npc_full and horse_ok and door_ok,
 				" 노역=", labor_ok, " 가중=", harsh_ok, " NPC가중=", npc_harsh, " NPC법정형=", npc_full,
 				" 말=", horse_ok, "(", no_mount, safe_tw, caught_tw, ")", " 문앞=", door_ok)
-			if old_obj_tw == null:
-				m.objects.erase(ht)
-			else:
-				m.objects[ht] = old_obj_tw
 			for hx in range(-3, 4):
 				for hy in range(-3, 4):
 					var hp := m.player_tile() + Vector2i(hx, hy)
 					if str(m.objects.get(hp, {}).get("kind", "")) == "horse":
-						m.objnode._remove_object(hp)
+						m.objnode._remove_object(hp)   # 내린 말(노드까지)을 먼저 치운다
+			if old_obj_tw == null:
+				m.objects.erase(ht)
+			else:
+				m.objects[ht] = old_obj_tw
 			GameData.has_horse = horse_tw
+			GameData.horse_tile = horse_tile_tw
 			GameData.riding = false
 			GameData.skills = skills_tw
 			m.player.position = keep_pos_tw

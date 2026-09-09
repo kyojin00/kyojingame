@@ -1340,11 +1340,18 @@ func _officer_node() -> Node2D:
 func on_room_closed() -> void:
 	if Net.is_guest() or not GameData.wanted_active():
 		return
-	var cops := _cops_after_me()
-	if cops.is_empty():
+	var pt := m.player_tile()
+	var cop: Node2D = null
+	for cand in _cops_after_me():
+		if (cand.region as Rect2i).has_point(pt):   # 제 관할 밖으로는 안 나온다(읍 순경은 읍 안, 박 순경은 교진)
+			cop = cand
+			break
+	if cop == null:
 		return
-	var cop: Node2D = cops[0]
-	cop.position = m.player.position + Vector2(float(m.TILE), 0.0)
+	var spot: Vector2i = m.nearest_open_tile(pt + Vector2i(1, 0))   # 문 옆 빈 칸 — 벽 속에 서지 않게
+	if spot.x < 0:
+		return
+	cop.position = Vector2(spot.x * m.TILE + 16, spot.y * m.TILE + 16)
 	cop.route = []
 	cop.moving = false
 	m.hud.show_message(_pl("door_cop"), 2.5)
@@ -1932,8 +1939,13 @@ func serve_jail(days: int, region := "kyojin", kind := "jail") -> void:
 func serve_jail_labor(region: String) -> void:
 	if Net.is_guest():
 		return
+	var days: int = GameData.JAIL_DAYS - GameData.JAIL_LABOR_OFF
+	# 전과의 「다 채운 날」도 줄어든다 — 말소 대기(EXPUNGE_DAYS)와 결산 줄이 그 날짜를 본다
+	var recs: Array = GameData.me.get("record", [])
+	if not recs.is_empty() and str(recs[-1].get("verdict", "")) == "jail":
+		recs[-1]["served_day"] = GameData.day + days
 	GameData.add_skill_xp("mine", GameData.PRISON_MINE_XP_DAY * float(GameData.JAIL_LABOR_OFF))
-	serve_jail(GameData.JAIL_DAYS - GameData.JAIL_LABOR_OFF, region)
+	serve_jail(days, region)
 
 
 # 방청 — 기소가 없는 재판일, 판사가 순경이 넘긴 사건을 읽는다(마을이 법을 본다)
@@ -2949,10 +2961,7 @@ func murder(nid: String) -> void:
 		GameData.spouse = ""
 	if GameData.dating == nid:
 		GameData.dating = ""
-	for n in m.npcs.duplicate():
-		if str(n.id) == nid:
-			m.npcs.erase(n)
-			n.queue_free()
+	m.npcmgr.remove_npc(nid)
 	GameData.bold_add(5.0)
 	var seen := not witnesses.is_empty()
 	_remember("murder", nid, witnesses, 100, seen, 5)

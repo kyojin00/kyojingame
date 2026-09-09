@@ -378,7 +378,6 @@ const REGION_TINT := {
 # 그래서 「칸 -> 지역 번호」를 한 번 만들어 두고 쓴다 (0 = 지역 밖).
 var _reg_idx := PackedByteArray()
 var _reg_cols: Array[Color] = []
-var _reg_plain := PackedByteArray()   # 지역 번호별로 1 = 덧칠할 풀빛이 없다
 const _GKEY := {"grass": 0, "sand": 1, "dock": 2, "path": 3}   # 미리 구운 바탕색의 자리(그 밖의 땅은 잔디 취급)
 var prof := {}                         # 마지막 굽기의 토막별 시간(하네스 MAPDRAW 가 읽는다)
 
@@ -394,9 +393,6 @@ func _build_region_index() -> void:
 		for y in range(maxi(0, r.position.y), mini(main.MAP_H, r.end.y)):
 			for x in range(maxi(0, r.position.x), mini(main.MAP_W, r.end.x)):
 				_reg_idx[y * main.MAP_W + x] = n
-	_reg_plain.resize(_reg_cols.size())
-	for i in _reg_cols.size():
-		_reg_plain[i] = 1 if _reg_cols[i].a == 0.0 else 0
 
 
 func _region_tint(x: int, y: int) -> Color:
