@@ -93,6 +93,9 @@ func _update_schedule() -> void:
 		place = want
 		dest = main.npcmgr.npc_place_tile(id, place)
 		_route_cd = 0.0
+	# 쫓는 중이면 목적지가 움직인다 — 길이 끝날 때마다 다시 잡는다(사회 S2b, 박 순경)
+	if place == "chase" and route.is_empty():
+		dest = main.npcmgr.npc_place_tile(id, place)
 	if dest.x == -999 or not route.is_empty():
 		return
 	var ts: int = main.TILE

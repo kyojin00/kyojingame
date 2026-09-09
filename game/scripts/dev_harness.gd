@@ -5746,6 +5746,209 @@ func _debug_tick() -> void:
 				" 창구=", counter_ok, labels, " 미니루프=", loop_ok, " 근무=", work_ok,
 				" 봉급정지=", frozen_ok, " 완납=", thaw_ok)
 			_s2_restore(k_tw)
+		256:
+			# ---- 파출소(S2b) — 부지·부임·순경 채용 심사·순찰 걷기·보고·야간 몫·야간 순찰 ----
+			var k_po := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			var cop_new := _s2_police_setup()
+			var plot_ok: bool = "inn" in m.VILLAGE_BUILD_ORDER and m.VILLAGE_BUILD_COST.has("inn") \
+				and str(m.VILLAGE_PLOTS.inn.name) == "파출소" and str(m.VILLAGE_NPC.get("inn", "")) == "officer_park" \
+				and str(m.shop_room.ROOMS.inn.keeper) == "officer_park" and str(m.shop_room.ROOMS.inn.action) == "police" \
+				and m.tex.has("npc_officer_park_portrait_normal") and m.tex.has("npc_officer_park_side_1") \
+				and GameData.police_open() and _npc_node("officer_park") != null
+			# 채용 심사 — 대범함 35 · 지네(combat Lv2) · 평판 20
+			GameData.aff_add("officer_park", 20 - GameData.aff("officer_park"))
+			GameData.me.reputation.kyojin = 20
+			GameData.me.boldness_base = 10
+			GameData.skills["combat"].lv = 2
+			var bold_refuse: String = m.society.can_hire_job("constable")
+			GameData.me.boldness_base = 40
+			GameData.skills["combat"].lv = 1
+			var skill_refuse: String = m.society.can_hire_job("constable")
+			GameData.skills["combat"].lv = 2
+			var review_ok: bool = bold_refuse.contains("밤길") and skill_refuse.contains("지네") \
+				and m.society.can_hire_job("constable") == ""
+			m.society.hire_job("constable")
+			m.dialog.close()
+			var hire_ok: bool = str(GameData.me.job) == "constable" \
+				and GameData.seat_of("police_box", "constable") == "player"
+			# 순찰 — 세 곳을 발로 찍는다. 밤 근무가 있는 직업이라 20시에도 근무다
+			GameData.day += 1
+			var keep_min_p := GameData.minutes
+			GameData.minutes = 20 * 60
+			var hours_ok: bool = m.society.can_work("inn") == "" and m.society.can_work("general") != ""
+			var pos_keep: Vector2 = m.player.position
+			m.story_cutscene = false                          # 걷기는 ui_open() 이 아닐 때만 찍힌다
+			m.society.patrol_start()
+			m.dialog.close()
+			var start_ok: bool = m.society.patrol_active() and m.hud._guide_on and int(GameData.me.patrol_idx) == 0
+			var pts: Array = m.society.patrol_points()
+			for pt9: Vector2i in pts:
+				m.player.position = Vector2(pt9.x * m.TILE + 16, pt9.y * m.TILE + 16)
+				m.society._patrol_tick()
+			var walk_ok: bool = m.society.patrol_done_today() and not m.hud._guide_on \
+				and int(GameData.me.patrol_idx) == 3
+			m.player.position = pos_keep
+			m.society.patrol_report()
+			var night_ok: bool = int(GameData.me.perf) == 1 and int(GameData.me.wage_pending) == 150 \
+				and GameData.worked_on(GameData.day) and m.dialog.visible
+			m.dialog.close()
+			# 야간 순찰 — 23시엔 박 순경만 밖에 있고, 자정이 지나면 들어간다
+			var cop: Node2D = _npc_node("officer_park")
+			GameData.minutes = 23 * 60
+			cop._process(0.016)
+			var patrol_ok: bool = cop.visible and m.npcmgr.npc_place_now("officer_park") == "patrol" \
+				and GameData.night_owl("officer_park")
+			GameData.minutes = 24 * 60 + 30
+			cop._process(0.016)
+			patrol_ok = patrol_ok and not cop.visible
+			GameData.minutes = keep_min_p
+			cop._process(0.016)
+			print("POLICE_OK=", plot_ok and review_ok and hire_ok and hours_ok and start_ok and walk_ok
+				and night_ok and patrol_ok,
+				" 부지=", plot_ok, " 심사=", review_ok, " 채용=", hire_ok, " 근무시간=", hours_ok,
+				" 순찰시작=", start_ok, " 세곳=", walk_ok, pts, " 밤보고=", night_ok, " 야간순찰=", patrol_ok)
+			_s2_police_teardown(cop_new)
+			_s2_restore(k_po)
+		257:
+			# ---- NPC 사건(S2b) — 이레마다 한 건, 순경의 흔적 둘·검거, 그리고 저절로 닫힘 ----
+			var k_cr := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			var cop_new2 := _s2_police_setup()
+			GameData.settlers = ["miner", "carpenter"]
+			for sid9: String in ["miner", "carpenter", "farmer", "merchant"]:
+				if not GameData.npc_greeted.has(sid9):
+					GameData.npc_greeted.append(sid9)
+				GameData.aff_add(sid9, -GameData.aff(sid9))
+			GameData.cases = []
+			GameData.case_seq = 0
+			GameData.day = 70                                  # 이레의 배수
+			GameData.society_new_day([0, 0, 0])
+			var n_c := GameData.society_note()
+			var c9: Dictionary = GameData.cases[0] if not GameData.cases.is_empty() else {}
+			var spawn_ok: bool = GameData.cases.size() == 1 and str(c9.get("stage", "")) == "open" \
+				and str(c9.get("suspect", "")) in ["miner", "carpenter"] \
+				and str(c9.get("victim", "")) != str(c9.get("suspect", "")) \
+				and str(c9.get("witness", "")) != str(c9.get("victim", "")) \
+				and n_c.contains("도둑이 들었다")
+			# 순경으로서 — 피해자에게 묻고, 흔적 하나로 검거하면 무고, 목격자까지 물으면 검거
+			GameData.me.job = "constable"
+			GameData.me.rank = "constable"
+			GameData.seat_rows("police_box")["constable"][0] = "player"
+			var cid9 := int(c9.get("id", 0))
+			var victim9 := str(c9.get("victim", ""))
+			var witness9 := str(c9.get("witness", ""))
+			var suspect9 := str(c9.get("suspect", ""))
+			var ch_v: Array = [["대화 끝", null]]
+			m.society.add_talk_choices(victim9, ch_v)
+			var ask_ok: bool = str(ch_v[0][0]).contains("사건 이야기")
+			m.society.case_ask(cid9, victim9)
+			m.dialog.close()
+			var ch_s: Array = [["대화 끝", null]]
+			m.society.add_talk_choices(suspect9, ch_s)
+			var arrest_choice_ok := false
+			for c10 in ch_s:
+				if str(c10[0]).contains("검거한다"):
+					arrest_choice_ok = true
+			var rep9 := int(GameData.me.reputation.kyojin)
+			m.society.case_arrest(cid9, suspect9)
+			m.dialog.close()
+			var wrong_ok: bool = str(c9.get("stage", "")) == "open" and int(GameData.me.reputation.kyojin) == rep9 - 5
+			m.society.case_ask(cid9, witness9)
+			m.dialog.close()
+			var budget9 := int(GameData.gov_budget.kyojin)
+			m.society.case_arrest(cid9, suspect9)
+			m.dialog.close()
+			var n_c2 := GameData.society_note()
+			var catch_ok: bool = str(c9.get("stage", "")) == "closed" and str(c9.get("closed_by", "")) == "player" \
+				and int(GameData.me.arrests) == 1 and int(GameData.gov_budget.kyojin) > budget9 \
+				and n_c2.contains("내가") and int(GameData.me.reputation.kyojin) == rep9 - 5 + 2 \
+				and GameData.npc_greed(suspect9) < float(GameData.npc_def(suspect9).get("greed", 1.0))
+			# 저절로 닫힘 — 다음 사건은 플레이어 없이 시효 안에 닫힌다(순경 검거든 시효든)
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.seat_clear_player()
+			GameData.day = 77
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var c11: Dictionary = GameData.cases[-1]
+			var auto_ok: bool = GameData.cases.size() == 2 and str(c11.get("stage", "")) == "open"
+			var closed_day := -1
+			for dd in range(78, 78 + 31):
+				GameData.day = dd
+				GameData.society_new_day([0, 0, 0])
+				GameData.society_note()
+				if str(c11.get("stage", "")) == "closed":
+					closed_day = dd
+					break
+			auto_ok = auto_ok and closed_day > 0 and str(c11.get("closed_by", "")) in ["officer", "expired"]
+			print("CRIME_OK=", spawn_ok and ask_ok and arrest_choice_ok and wrong_ok and catch_ok and auto_ok,
+				" 사건=", spawn_ok, "(", suspect9, "→", victim9, " 목격 ", witness9, ")",
+				" 흔적선택지=", ask_ok, " 검거선택지=", arrest_choice_ok, " 무고=", wrong_ok,
+				" 검거=", catch_ok, " 저절로닫힘=", auto_ok, "(", closed_day, " ", str(c11.get("closed_by", "")), ")")
+			_s2_police_teardown(cop_new2)
+			_s2_restore(k_cr)
+		258:
+			# ---- 수배(S2b) — 회의에서 부인하면 박 순경이 쫓고, 곁에 2초면 즉결. 자수는 절반 ----
+			var k_wa := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			var cop_new3 := _s2_police_setup()
+			GameData.day = 50                                  # 샌드박스는 1일 — 「어제 신고」가 0일이 되면 안 된다
+			GameData.me.boldness_base = 40
+			GameData.me.memories = [{"day": GameData.day - 1, "kind": "pickpocket", "heat": 1, "region": "kyojin",
+				"witnesses": ["farmer"], "forgiven": false, "target": "merchant", "value": 20,
+				"reported_day": GameData.day - 1, "settled": "", "settled_day": 0}]
+			m.story_cutscene = true
+			m.society.open_council()
+			m.society.council_pick("denied")
+			m.dialog.close()
+			var w9: Dictionary = GameData.me.wanted
+			var wanted_ok: bool = GameData.wanted_active() and int(w9.get("fine", 0)) == 200 \
+				and str(w9.get("target", "")) == "merchant"
+			GameData.day += 1
+			GameData.society_new_day([0, 0, 0])
+			var n_w := GameData.society_note()
+			var keep_min_w2 := GameData.minutes
+			GameData.minutes = 10 * 60
+			var chase_ok: bool = n_w.contains("찾고 있다") and GameData.society_place("officer_park") == "chase" \
+				and m.npcmgr.npc_place_tile("officer_park", "chase") == m.player_tile()
+			# 박 순경이 곁에 — 2초
+			var cop3: Node2D = _npc_node("officer_park")
+			cop3.visible = true
+			cop3.position = m.player.position + Vector2(20, 0)
+			m.story_cutscene = false
+			m.dialog.close()
+			m.society._arrest_tick(1.1)
+			var not_yet: bool = not m.dialog.visible
+			m.society._arrest_tick(1.1)
+			var caught_ok: bool = not_yet and m.dialog.visible and m.dialog._seq.size() >= 1
+			GameData.money = 1000
+			var budget10 := int(GameData.gov_budget.kyojin)
+			var rep10 := int(GameData.me.reputation.kyojin)
+			m.society._arrest_pick("fine", 200, false)
+			m.dialog.close()
+			var fine_ok: bool = GameData.money == 800 and int(GameData.gov_budget.kyojin) == budget10 + 200 \
+				and not GameData.wanted_active() and str(GameData.me.memories[0].settled) == "fined" \
+				and bool(GameData.me.memories[0].forgiven) and int(GameData.me.reputation.kyojin) == rep10 - 5 \
+				and GameData.society_place("officer_park") != "chase"
+			# 자수 — 다시 수배를 심고 파출소 창구로 간다
+			GameData.me.wanted = {"day": GameData.day - 2, "kind": "pickpocket", "target": "merchant",
+				"value": 20, "fine": 200, "since": GameData.day}
+			m.society.open_police()
+			var sur_dialog: bool = m.dialog.visible and str(m.dialog._seq[0].text).contains("절반")
+			rep10 = int(GameData.me.reputation.kyojin)
+			m.society._arrest_pick("fine", 100, true)
+			m.dialog.close()
+			var sur_ok: bool = sur_dialog and GameData.money == 700 and not GameData.wanted_active() \
+				and int(GameData.me.reputation.kyojin) == rep10 - 2
+			GameData.minutes = keep_min_w2
+			print("WANTED_OK=", wanted_ok and chase_ok and caught_ok and fine_ok and sur_ok,
+				" 수배=", wanted_ok, " 추적=", chase_ok, " 체포=", caught_ok, " 벌금=", fine_ok, " 자수=", sur_ok)
+			_s2_police_teardown(cop_new3)
+			_s2_restore(k_wa)
 		252:
 			# 집 꾸미기 — 깔려 있는 러그를 집어 옮길 수 있어야 한다.
 			# 예전에는 안내에 **집는 키가 적혀 있지 않아** 「깔려 있는데
@@ -7304,6 +7507,10 @@ func _s2_keep() -> Dictionary:
 		"gov_building": GameData.gov_building, "gov_tax": GameData.gov_tax_season,
 		"gov_log": GameData.gov_log.duplicate(true), "residents": GameData.residents_now,
 		"today_spent": GameData.today_spent, "animals_n": m.animals.size(),
+		# 파출소(S2b)
+		"village_built": GameData.village_built.duplicate(), "arrivals": GameData.arrivals.duplicate(true),
+		"cases": GameData.cases.duplicate(true), "case_seq": GameData.case_seq,
+		"greed_adj": GameData.npc_greed_adj.duplicate(), "settlers": GameData.settlers.duplicate(),
 	}
 	return k
 
@@ -7323,6 +7530,13 @@ func _s2_restore(k: Dictionary) -> void:
 	GameData.residents_now = s2.residents
 	GameData.today_spent = s2.today_spent
 	GameData.tax_seize_due = 0
+	GameData.village_built = s2.village_built
+	GameData.arrivals = s2.arrivals
+	GameData.cases = s2.cases
+	GameData.case_seq = s2.case_seq
+	GameData.npc_greed_adj = s2.greed_adj
+	GameData.settlers = s2.settlers
+	m.hud.clear_guide()
 	_soc_restore(k)
 
 
@@ -7338,7 +7552,31 @@ func _s2_fresh_gov() -> void:
 	GameData.tax_seize_due = 0
 	GameData.residents_now = 20
 	GameData.hall_stock = {}
+	# 샌드박스는 부지를 다 세워 두는데, 파출소·진료소 운영비(300씩)가 예산 검산에 끼면 안 된다.
+	# 복사본을 쓴다 — _s2_restore 가 원본을 되돌린다
+	GameData.village_built = GameData.village_built.duplicate()
+	GameData.village_built.erase("inn")
+	GameData.village_built.erase("lab")
 	m.story_cutscene = true
+
+
+# 파출소를 세우고 박 순경을 마을에 둔다 — 돌려주는 값은 이 검사가 새로 심은 노드(정리용)
+func _s2_police_setup() -> Node2D:
+	if not GameData.village_built.has("inn"):
+		GameData.village_built.append("inn")
+	if not GameData.npc_greeted.has("officer_park"):
+		GameData.npc_greeted.append("officer_park")
+	var cop := _npc_node("officer_park")
+	if cop != null:
+		return null
+	m.npcmgr._spawn_npc("officer_park", m.player_tile() + Vector2i(3, 0))
+	return m.npcs[m.npcs.size() - 1]
+
+
+func _s2_police_teardown(spawned: Node2D) -> void:
+	if spawned != null:
+		m.npcs.erase(spawned)
+		spawned.queue_free()
 
 
 func _btn_texts() -> Array:

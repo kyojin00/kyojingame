@@ -64,12 +64,13 @@ const ROOMS := {
 		"hint": "우체부 아저씨가 편지를 정리하고 있다.",
 	},
 	# ---- 거래 창 대신 제 나름의 기능을 가진 방들 ----
+	# 파출소(사회 S2b) — 여관 부지를 물려받았다. 뒤쪽 간이침대(beds)는 그대로 — 파출소에도 침상은 있다
 	"inn": {
-		"name": "여관", "keeper": "chief",
-		"wall": Color(0.44, 0.3, 0.3), "floor": Color(0.6, 0.44, 0.38),
-		"counter": Color(0.48, 0.32, 0.28), "deco": "beds",
-		"tab": "", "tabs": [], "action": "rest",
-		"hint": "한숨 돌리고 간다 (100G, 체력 회복)",
+		"name": "파출소", "keeper": "officer_park",
+		"wall": Color(0.3, 0.33, 0.42), "floor": Color(0.5, 0.52, 0.58),
+		"counter": Color(0.32, 0.34, 0.44), "deco": "beds",
+		"tab": "", "tabs": [], "action": "police",
+		"hint": "박 순경이 순찰 일지를 적고 있다.",
 	},
 	"lab": {
 		"name": "연구소", "keeper": "merchant",

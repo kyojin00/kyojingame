@@ -53,6 +53,9 @@ func _process(delta: float) -> void:
 	if _tick >= 0.5:
 		_tick = 0.0
 		GameData.animals_now = m.animals.size()
+	# (c) 파출소 — 내 순찰 지점 찍기, 그리고 박 순경이 나를 잡는 순간
+	_patrol_tick()
+	_arrest_tick(delta)
 
 
 # 마을 바깥 땅에 서 있는가 — 밤길 분은 여기서만 쌓인다
@@ -217,6 +220,9 @@ func can_hire_job(job_id: String) -> String:
 	var skill := str(job.get("skill", ""))
 	if skill != "" and GameData.skill_lv(skill) < int(job.get("skill_lv", 2)):
 		return str(lines.get("refuse_skill", "손이 아직 서툴러. 좀 더 해 보고 오게."))
+	# 순경은 대범함 문턱이 있다(헌법 §7.1 순경 boldness 35) — 성격을 아직 안 물었으면 0 으로 센다
+	if int(job.get("boldness", 0)) > 0 and GameData.boldness() < int(job.get("boldness", 0)):
+		return str(lines.get("refuse_bold", "밤길이 무섭지 않다고 했나. 자네 눈은 아직 아닐세."))
 	if int(job.get("books", 0)) > _me_int("books_read"):
 		return str(lines.get("refuse_skill", "책 세 권은 읽고 오게."))
 	return ""
@@ -274,6 +280,9 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 		else:
 			choices.insert(choices.size() - 1,
 				gray(label, str(theft.get("pickpocket_gray", "손이 안 나간다"))))
+	# 순경(S2b) — 열린 사건의 피해자·목격자에게 「사건 이야기」, 용의자에게 「검거한다」
+	if nid != "chief" and not guest:
+		_case_choices(nid, choices)
 
 
 # 하루 첫 대화의 첫마디 — 호칭이 NPC 의 입으로 나오는 자리 (헌법 §0.4).
@@ -454,7 +463,8 @@ func can_work(room_id := "") -> String:
 	if GameData.day < _me_int("job_since_day"):
 		return "내일부터다."
 	var h := GameData.hour_now()
-	if h < GameData.OPEN_HOUR or h >= GameData.CLOSE_HOUR:
+	var close_h: float = 24.0 if int(_job().get("night_bonus", 0)) > 0 else GameData.CLOSE_HOUR
+	if h < GameData.OPEN_HOUR or h >= close_h:
 		return "일하는 시간이 아니다."
 	if GameData.worked_on(GameData.day):
 		return "오늘 근무는 끝났다."
@@ -868,6 +878,14 @@ func council_pick(kind: String) -> void:
 			_rep_add(-5)
 			GameData.me["rumor_day"] = GameData.day
 			opt = _option("deny")
+			# 파출소가 있고 본 사람이 있으면 부인은 끝이 아니다 — 이장이 파출소로 넘긴다(헌법 §6.3).
+			# 흔적(목격 1.0)이 좀도둑의 기소 문턱(1.0)에 닿으므로 박 순경이 나를 쫓기 시작한다
+			var wit: Variant = mem.get("witnesses", [])
+			if GameData.police_open() and wit is Array and not wit.is_empty():
+				GameData.me["wanted"] = {"day": int(mem.get("day", 0)), "kind": str(mem.get("kind", "")),
+					"target": str(mem.get("target", "")), "value": int(mem.get("value", 0)),
+					"fine": maxi(GameData.FINE_MIN, int(mem.get("value", 0)) * GameData.FINE_MULT),
+					"since": GameData.day}
 		"confessed":
 			mem["settled"] = "confessed"
 			mem["settled_day"] = GameData.day
@@ -1081,3 +1099,303 @@ func after_new_day() -> void:
 			got += take
 			parts.append("소지금 %dG" % take)
 	GameData.tax_seized(" · ".join(PackedStringArray(parts)) if not parts.is_empty() else "가져갈 것이 없었다")
+
+
+# ---- 파출소 (S2b) ----
+#
+# 순경의 근무는 대화가 아니라 **걷기**다 — 세 지점을 발로 찍고 돌아와 보고한다.
+# 박 순경은 저녁에 같은 길을 돌고(밤 목격자), 수배 중인 나를 쫓는다. 체포는 즉결 —
+# 벌금(물건값 ×3, 하한 200)이거나 사흘 봉사. 자수하면 절반. 벌금은 마을 예산으로 간다.
+
+# 광장 남쪽 · 게시판 앞 · 서쪽 어귀 (NORTH_PAD 를 더한 실제 칸). 막힌 칸이면 가장 가까운 빈 칸
+const PATROL_SPOTS := [Vector2i(78, 37), Vector2i(82, 27), Vector2i(62, 33)]
+const PATROL_NAMES := ["광장 남쪽", "게시판 앞", "서쪽 어귀"]
+var _patrol_pts: Array = []
+var _arrest_t := 0.0
+
+
+func patrol_points() -> Array:
+	if _patrol_pts.is_empty():
+		for sp: Vector2i in PATROL_SPOTS:
+			var t: Vector2i = m.nearest_open_tile(sp)
+			_patrol_pts.append(t if t.x >= 0 else sp)
+	return _patrol_pts
+
+
+func _is_constable() -> bool:
+	return str(GameData.me.get("job", "")) == "constable"
+
+
+# 오늘 순찰이 진행 중인가(시작했고 아직 세 곳을 다 못 찍었다)
+func patrol_active() -> bool:
+	return _is_constable() and _me_int("patrol_day") == GameData.day and _me_int("patrol_idx") < 3
+
+
+func patrol_done_today() -> bool:
+	return _me_int("patrol_day") == GameData.day and _me_int("patrol_idx") >= 3
+
+
+func _patrol_tick() -> void:
+	if not patrol_active() or m.ui_open():
+		return
+	var pts := patrol_points()
+	var idx := _me_int("patrol_idx")
+	var goal: Vector2i = pts[idx]
+	var pt: Vector2i = m.player_tile()
+	if absi(pt.x - goal.x) <= 1 and absi(pt.y - goal.y) <= 1:
+		idx += 1
+		GameData.me["patrol_idx"] = idx
+		if idx < 3:
+			_guide_patrol(idx)
+		else:
+			m.hud.clear_guide()
+
+
+func _guide_patrol(idx: int) -> void:
+	var t: Vector2i = patrol_points()[idx]
+	m.hud.set_guide(Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16), "순찰 %s" % PATROL_NAMES[idx])
+
+
+func _officer_node() -> Node2D:
+	for n in m.npcs:
+		if str(n.id) == "officer_park":
+			return n
+	return null
+
+
+# 박 순경이 내 곁에 2초 — 체포. 실내·가게 안·연출 중에는 잡지 않는다(문 앞에서 기다린다)
+func _arrest_tick(delta: float) -> void:
+	if not GameData.wanted_active() or m.ui_open() or not GameData.police_open():
+		_arrest_t = 0.0
+		return
+	var cop := _officer_node()
+	if cop == null or not cop.visible:
+		_arrest_t = 0.0
+		return
+	var d: float = (cop.position - m.player.position).length()
+	if d <= GameData.ARREST_TILES * float(m.TILE):
+		_arrest_t += delta
+		if _arrest_t >= GameData.ARREST_SECONDS:
+			_arrest_t = 0.0
+			arrest(false)
+	else:
+		_arrest_t = 0.0
+
+
+# 체포(surrender=false) 또는 자수(true) — 즉결: 벌금이거나 사흘 봉사
+func arrest(surrender: bool) -> void:
+	if Net.is_guest() or not GameData.wanted_active():
+		return
+	m.dialog.close()
+	var w: Dictionary = GameData.me.get("wanted", {})
+	var fine := int(w.get("fine", GameData.FINE_MIN))
+	if surrender:
+		fine = maxi(1, fine / 2)
+	var target := _npc_name(str(w.get("target", "")))
+	var text := ("자수하러 왔나. 잘했네. 벌금은 절반으로 하지 — %dG. 아니면 사흘 봉사일세." % fine) if surrender \
+		else ("%s 일, 마을이 봤네. 벌금 %dG 이거나 사흘 봉사일세. 고르게." % [target, fine])
+	var pay_btn: Array = gray("벌금 %dG 을 낸다" % fine, "그만한 돈이 없다.")
+	if GameData.money >= fine:
+		pay_btn = ["벌금 %dG 을 낸다" % fine, _arrest_pick.bind("fine", fine, surrender)]
+	m.dialog.open_seq(_npc_name("officer_park"), _portrait("officer_park"), [
+		{"text": text, "choices": [pay_btn, ["사흘 봉사를 한다", _arrest_pick.bind("service", fine, surrender)]]},
+	])
+
+
+func _arrest_pick(kind: String, fine: int, surrender: bool) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var w: Dictionary = GameData.me.get("wanted", {})
+	# 그 일의 기억을 찾아 매듭짓는다 — 본 사람들이 다시 이름을 부른다(forgiven)
+	var mem: Dictionary = {}
+	for cand: Dictionary in GameData.me.get("memories", []):
+		if int(cand.get("day", -1)) == int(w.get("day", -2)) and str(cand.get("target", "")) == str(w.get("target", "")):
+			mem = cand
+	var line := ""
+	if kind == "fine":
+		if GameData.money < fine:
+			return
+		GameData.money -= fine
+		GameData.today_spent += fine
+		GameData.gov_budget["kyojin"] = int(GameData.gov_budget.get("kyojin", 0)) + fine
+		if not mem.is_empty():
+			mem["settled"] = "fined"
+			mem["forgiven"] = true
+		line = "받았네. 이 돈은 마을 예산으로 가네. 다음엔 없는 걸세."
+	else:
+		if not mem.is_empty():
+			mem["settled"] = "confessed"
+		var rec: Array = GameData.me.get("record", [])
+		rec.append({"day": GameData.day, "crime": str(w.get("kind", "")), "court": "village",
+			"verdict": "service", "sentence": 3, "served": 0, "served_day": 0, "expunged": false})
+		GameData.me["record"] = rec
+		line = "사흘일세. 이장한테 가서 빗자루를 받게. 그걸로 끝일세."
+	_rep_add(-2 if surrender else -5)
+	GameData.me["wanted"] = {}
+	m.dialog.open(_npc_name("officer_park"), line, [["대화 끝", null]], _portrait("officer_park"))
+	m.saveio.save_now()
+
+
+# ---- 파출소 창구 ----
+
+func open_police() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	if not GameData.npc_greeted.has("officer_park"):
+		m.dialog.open("파출소", "아직 아무도 없다. 부임하는 사람이 오면 문을 열 것이다.", [["나간다", null]])
+		return
+	if GameData.wanted_active():
+		arrest(true)   # 수배 중에 제 발로 왔다 — 자수
+		return
+	var body := "박 순경이 순찰 일지를 넘기고 있다.\n"
+	var opens := GameData.open_cases()
+	if opens.is_empty():
+		body += "요즘 마을은 조용하다."
+	else:
+		body += "열린 사건 %d건." % opens.size()
+	var btns: Array = []
+	var employed := GameData.job_inst() == "police_box"
+	if employed:
+		if patrol_done_today():
+			btns.append(["순찰 보고", patrol_report])
+		elif patrol_active():
+			btns.append(gray("순찰 보고", "아직 %s을 안 찍었다." % PATROL_NAMES[_me_int("patrol_idx")]))
+		elif can_work("inn") == "":
+			btns.append(["근무 — 순찰", patrol_start])
+		for c in opens:
+			var cid := int(c.get("id", 0))
+			btns.append(["출동 — %s네 도둑 (흔적 %d/%d)" % [_npc_name(str(c.get("victim", ""))),
+				int(c.get("evidence", 0)), GameData.NEED_EVIDENCE], _open_case.bind(cid)])
+		var wl := _wage_lines(_job())
+		if GameData.wage_frozen():
+			btns.append(gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
+		elif _me_int("wage_pending") <= 0:
+			btns.append(gray("봉급 받기", str(wl.get("nothing", "받을 게 없다."))))
+		elif GameData.day < _me_int("wage_day"):
+			btns.append(gray("봉급 받기", str(wl.get("not_yet", "봉급날은 아직이다."))))
+		else:
+			btns.append(["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
+		btns.append(["그만두겠습니다", resign])
+	elif str(GameData.me.get("job", "")) == "":
+		btns.append(["일하고 싶습니다", open_job_talk_job.bind("constable", open_police)])
+	btns.append(["나간다", null])
+	m.dialog.open(_npc_name("officer_park"), body, btns, _portrait("officer_park"))
+
+
+func patrol_start() -> void:
+	if Net.is_guest() or not _is_constable():
+		return
+	m.dialog.close()
+	var why := can_work("inn")
+	if why != "":
+		m.dialog.open(_npc_name("officer_park"), why, [["알겠습니다", null]], _portrait("officer_park"))
+		return
+	GameData.me["patrol_day"] = GameData.day
+	GameData.me["patrol_idx"] = 0
+	_guide_patrol(0)
+	var job := _job()
+	var pages: Array = []
+	if GameData.day == _me_int("job_since_day"):
+		pages.append({"text": str(job.get("hire", {}).get("first_day", ""))})
+	var starts: Array = job.get("patrol", {}).get("start", ["다녀오게."])
+	pages.append({"text": str(starts[posmod(GameData.day, starts.size())])})
+	m.dialog.open_seq(_npc_name("officer_park"), _portrait("officer_park"), pages)
+
+
+# 세 곳을 다 찍고 돌아왔다 — 근무 인정. 19시 뒤면 밤 몫이 붙는다
+func patrol_report() -> void:
+	if Net.is_guest() or not _is_constable() or not patrol_done_today() \
+			or GameData.worked_on(GameData.day):
+		return
+	m.dialog.close()
+	var job := _job()
+	var night: bool = GameData.hour_now() >= 19.0
+	var wage := int(job.get("wage", GameData.CLERK_WAGE)) + (int(job.get("night_bonus", 0)) if night else 0)
+	_me_add("perf", 1)
+	if not GameData.wage_frozen():
+		_me_add("wage_pending", wage)
+	_log_work("work", "police_box", 1 if night else 0)
+	if _me_int("perf") % 5 == 0:
+		_rep_add(1)
+	var lines: Array = job.get("patrol", {}).get("report", ["수고했네."])
+	var text := str(job.get("patrol", {}).get("night", "")) if night else str(lines[posmod(GameData.day, lines.size())])
+	m.dialog.open(_npc_name("officer_park"), text, [["대화 끝", null]], _portrait("officer_park"))
+	m.saveio.save_now()
+
+
+# 출동 — 사건의 흔적은 사람에게서 나온다: 피해자에게 묻고, 목격자에게 묻고, 용의자를 잡는다
+func _open_case(cid: int) -> void:
+	m.dialog.close()
+	var c := GameData.case_by_id(cid)
+	if c.is_empty():
+		return
+	var asked: Array = GameData.me.get("case_asked", {}).get(str(cid), [])
+	var body := "%s네에 도둑이 들었다.\n" % _npc_name(str(c.get("victim", "")))
+	body += "흔적 %d/%d — " % [int(c.get("evidence", 0)), GameData.NEED_EVIDENCE]
+	if asked.is_empty():
+		body += "먼저 %s에게 가서 물어보자." % _npc_name(str(c.get("victim", "")))
+	elif int(c.get("evidence", 0)) < GameData.NEED_EVIDENCE:
+		body += "누가 봤는지 마을 사람들에게 더 물어보자."
+	else:
+		body += "%s가 범인이다. 가서 검거하자." % _npc_name(str(c.get("suspect", "")))
+	m.dialog.open(_npc_name("officer_park"), body, [["알겠습니다", open_police]], _portrait("officer_park"))
+
+
+func _case_choices(nid: String, choices: Array) -> void:
+	if not _is_constable():
+		return
+	for c in GameData.open_cases():
+		var cid := int(c.get("id", 0))
+		var asked: Array = GameData.me.get("case_asked", {}).get(str(cid), [])
+		var vname := _npc_name(str(c.get("victim", "")))
+		if (nid == str(c.get("victim", "")) or nid == str(c.get("witness", ""))) and nid not in asked:
+			choices.insert(choices.size() - 1, ["사건 이야기 — %s네 도둑" % vname, case_ask.bind(cid, nid)])
+		elif nid == str(c.get("suspect", "")) and int(c.get("evidence", 0)) >= 1:
+			choices.insert(choices.size() - 1, ["검거한다 — %s네 도둑" % vname, case_arrest.bind(cid, nid)])
+
+
+func case_ask(cid: int, nid: String) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var c := GameData.case_by_id(cid)
+	if c.is_empty() or str(c.get("stage", "")) != "open":
+		return
+	var asked_all: Dictionary = GameData.me.get("case_asked", {})
+	var asked: Array = asked_all.get(str(cid), [])
+	if nid in asked:
+		return
+	asked.append(nid)
+	asked_all[str(cid)] = asked
+	GameData.me["case_asked"] = asked_all
+	c["evidence"] = int(c.get("evidence", 0)) + 1
+	var line := ""
+	if nid == str(c.get("victim", "")):
+		line = "밤에 문소리가 났어요. 창고에서 뭔가 없어졌고요. 누군지는 못 봤어요."
+	else:
+		line = "그날 밤 %s가 그 집 근처에서 서성이는 걸 봤어요. 이상하다 했죠." % _npc_name(str(c.get("suspect", "")))
+	m.dialog.open(_npc_name(nid), line, [["대화 끝", null]], _portrait(nid))
+	m.saveio.save_now()
+
+
+# 검거 — 흔적이 둘이면 성공(실적·평판 +2), 하나면 무고(평판 −5·그 사람 호감도 −10)
+func case_arrest(cid: int, nid: String) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var c := GameData.case_by_id(cid)
+	if c.is_empty() or str(c.get("stage", "")) != "open" or nid != str(c.get("suspect", "")):
+		return
+	if int(c.get("evidence", 0)) >= GameData.NEED_EVIDENCE:
+		GameData._case_convict(c, "player")
+		_me_add("arrests", 1)
+		_rep_add(2)
+		GameData.aff_add(nid, -20)
+		m.dialog.open(_npc_name(nid), "…알았소. 같이 가지. 손은 안 대도 되네.", [["파출소로 데려간다", null]], _portrait(nid))
+	else:
+		_rep_add(-5)
+		GameData.aff_add(nid, -10)
+		m.dialog.open(_npc_name(nid), "나를? 무슨 근거로! 마을 사람들이 다 보고 있네.", [["…물러선다", null]], _portrait(nid))
+	m.saveio.save_now()

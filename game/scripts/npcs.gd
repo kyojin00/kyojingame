@@ -104,6 +104,13 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
 		"hallwork":
 			t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
+		"patrol":
+			# 박 순경의 순찰 — 시각마다 세 지점(광장 남쪽·게시판 앞·서쪽 어귀)을 돈다
+			var pts: Array = m.society.patrol_points()
+			t = pts[int(GameData.hour_now()) % pts.size()]
+		"chase":
+			# 수배 중인 나를 쫓는다 — 목적지가 곧 내 발밑이다(npc.gd 가 route 마다 다시 잡는다)
+			t = m.player_tile()
 		"meeting":
 			# 이장의 마을 회의 — 회관이 있으면 회관 문 앞, 없으면 이장 집 문 앞 (D14)
 			if GameData.village_built.has("hall"):

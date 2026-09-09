@@ -2690,6 +2690,13 @@ func _start_movein_dialog(nid: String) -> void:
 			{"text": "「씨앗이든 뭐든 필요하면 들러!\n좋은 물건 잔뜩 갖다 놨으니까. 잘 부탁해~」",
 				"portrait": m.tex["npc_merchant_portrait_happy"]},
 		]
+	elif nid == "officer_park":
+		# 읍에서 내려온 선임 순경 — 해요체 인사말은 이 사람 입이 아니다
+		entries = [
+			{"text": "「교진 파출소에 부임한 박 순경일세.\n읍에서 내려왔네.」"},
+			{"text": "「문을 안 잠그는 마을이라 들었네.\n그래도 밤길은 내가 돌지.」"},
+			{"text": "「일 있으면 파출소로 오게.\n없는 게 제일 좋고.」"},
+		]
 	else:
 		entries = [
 			{"text": "「안녕하세요! 오늘부터 %s를 맡게 된\n%s라고 해요.」" % [bname, def.name]},

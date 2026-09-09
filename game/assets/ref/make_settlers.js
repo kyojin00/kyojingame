@@ -90,9 +90,20 @@ const SETTLERS = {
     cloth: (r, g, b) => [Math.round(r * 0.30 + 14), Math.round(g * 0.60 + 30), Math.round(b * 0.34 + 20)],
     hair:  (r, g, b) => [Math.round(r * 0.48 + 40), Math.round(g * 0.48 + 42), Math.round(b * 0.48 + 44)],
   },
+  // -- 사회(S2b) --
+  officer_park: {   // 박 순경 — 교진 파출소. 제복 남색 / 짧은 검은 머리
+    cloth: (r, g, b) => [Math.round(r * 0.18 + 12), Math.round(g * 0.26 + 22), Math.round(b * 0.52 + 58)],
+    hair:  (r, g, b) => [Math.round(r * 0.18 + 4), Math.round(g * 0.18 + 6), Math.round(b * 0.20 + 10)],
+    // 지금 걷기 도트의 웃옷은 보랏빛(168,120,196 계열)이라 mustard 판정에 안 걸린다 —
+    // 제복은 그 보랏빛 계열을 통째로 남색으로 넘긴다 (다른 주민은 손대지 않는다)
+    uniform: (r, g, b) => [Math.round(r * 0.30 + 10), Math.round(g * 0.38 + 20), Math.round(b * 0.42 + 50)],
+  },
 };
+// ONLY=아이디 로 한 사람만 다시 뽑는다 — 나머지는 이미 sprites/ 에 있는 그대로 둔다
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 
 for (const [nid, tf] of Object.entries(SETTLERS)) {
+  if (ONLY && !ONLY.includes(nid)) continue;
   for (const f of FRAMES) {
     const im = PNG.sync.read(fs.readFileSync(
       __dirname + `/../sprites/npc_rancher_${f}.png`));
@@ -103,7 +114,11 @@ for (const [nid, tf] of Object.entries(SETTLERS)) {
       if (skin) continue;
       const mustard = r > 130 && g > 95 && b < 130 && r > b + 45 && g > b + 20;
       const brown = !mustard && r > b + 18 && r >= g && r < 200 && g < 150;
-      if (mustard) {
+      const purple = tf.uniform && b > r + 10 && b > g + 20 && r > 40;
+      if (purple) {
+        const c = tf.uniform(r, g, b);
+        im.data[i] = c[0]; im.data[i + 1] = c[1]; im.data[i + 2] = c[2];
+      } else if (mustard) {
         const c = tf.cloth(r, g, b);
         im.data[i] = c[0]; im.data[i + 1] = c[1]; im.data[i + 2] = c[2];
       } else if (brown) {

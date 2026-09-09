@@ -811,6 +811,8 @@ const HAMLET_OF := {
 	"sawyer": "treeshade", "teller": "treeshade", "beekeep": "treeshade",
 }
 const HAMLET_NPC_IDS := ["miller", "dyer", "brook", "sawyer", "beekeep", "teller"]
+# 사회(S2b~)가 데려오는 사람들 — 고장 사람과 같은 도트 판(make_settlers.js)에서 색만 갈아 낀다
+const SOCIETY_NPC_IDS := ["officer_park"]
 
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
@@ -842,7 +844,8 @@ const VILLAGE_PLOTS := {
 	# 서쪽 줄 (서쪽 세로 길가)
 	"smith":   {"anchor": Vector2i(60, 12 + NORTH_PAD), "name": "대장간"},
 	"ranch":   {"anchor": Vector2i(60, 20 + NORTH_PAD), "name": "목장 상회"},
-	"inn":     {"anchor": Vector2i(60, 28 + NORTH_PAD), "name": "여관"},
+	# 여관 부지는 파출소가 됐다(사회 S2b) — 여관·연구소는 읍(S4)으로 간다. 그림은 house_inn 그대로
+	"inn":     {"anchor": Vector2i(60, 28 + NORTH_PAD), "name": "파출소"},
 	# 동쪽 줄 (동쪽 세로 길가)
 	"library": {"anchor": Vector2i(89, 12 + NORTH_PAD), "name": "도서관"},
 	"fish":    {"anchor": Vector2i(89, 22 + NORTH_PAD), "name": "수산시장"},
@@ -865,13 +868,15 @@ const YARD_PAD := 1
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "library", "ranch",
-	"fish", "hall"]
+	"fish", "hall", "inn"]   # inn = 파출소(회관 뒤, 사회 S2b)
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
 	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
 	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
 	"ranch": [80, 40], "fish": [100, 60], "hall": [120, 80],
 	# 도서관은 메인 스토리 6(오래된 책과 사서)에서만 열리는 건설이다
 	"library": [90, 50],
+	# 파출소(inn 부지) — 회관이 열린 뒤 이장의 「마을 발전 이야기」에서 (사회 S2b)
+	"inn": [50, 50],
 }
 
 
@@ -881,6 +886,7 @@ func village_residents() -> int:
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 	"ranch": "rancher", "fish": "fisher", "library": "librarian",
+	"inn": "officer_park",   # 파출소의 선임 순경(사회 S2b)
 	"post": "postman"}
 # ---- NPC 하루 일과 ----
 #
@@ -890,6 +896,9 @@ const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 #   [시작 시각, 장소] — 시각 순서대로 적는다
 const NPC_SCHEDULE := {
 	"chief":      [[6, "home"], [9, "board"], [12, "plaza"], [16, "board"]],
+	# 박 순경 — 파출소와 순찰 세 지점(광장 남쪽·게시판 앞·서쪽 어귀)을 오간다. 저녁 뒤는
+	# society_place 가 야간 순찰(patrol)로 잡는다 — 자정까지 밖에 있는 유일한 사람
+	"officer_park": [[6, "home"], [9, "work"], [11, "patrol"], [13, "work"], [15, "patrol"], [17, "work"]],
 	"merchant":   [[6, "home"], [9, "work"], [13, "plaza"], [15, "work"]],
 	# 우체부 — 아침 첫 배달을 돌고(광장) 낮부터 우체국을 지킨다
 	"postman":    [[6, "work"], [8, "plaza"], [10, "work"], [16, "plaza"]],
@@ -947,7 +956,7 @@ const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타�
 
 const BUILDING_NAMES := {
 	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
-	"lab": "연구소", "inn": "여관", "library": "도서관",
+	"lab": "연구소", "inn": "파출소", "library": "도서관",
 	"ranch": "목장 상회", "fish": "수산시장", "hall": "마을회관",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
@@ -1351,7 +1360,7 @@ func _load_textures() -> void:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
 	# 고장 마을 사람들 — 여덟 장씩(걷기 6 + 초상 2)이라 이름을 하나씩
 	# 적으면 표만 마흔여덟 줄이 된다. 표에서 따라간다
-	for nid: String in HAMLET_NPC_IDS:
+	for nid: String in HAMLET_NPC_IDS + SOCIETY_NPC_IDS:
 		for sfx: String in ["down_0", "down_1", "up_0", "up_1", "side_0", "side_1",
 				"portrait_normal", "portrait_happy"]:
 			var nn := "npc_%s_%s" % [nid, sfx]

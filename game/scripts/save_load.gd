@@ -248,6 +248,23 @@ func _apply_save(d: Dictionary) -> void:
 	var gl: Variant = d.get("gov_log", [])
 	GameData.gov_log = gl if gl is Array else []
 	GameData.tax_seize_due = 0
+	# 파출소(S2b) — 사건은 stage 문자열만 믿고 수는 int 로 되돌린다
+	var cs: Variant = d.get("cases", [])
+	GameData.cases = []
+	if cs is Array:
+		for c in cs:
+			if c is Dictionary:
+				GameData.cases.append({"id": int(c.get("id", 0)), "crime": str(c.get("crime", "")),
+					"day": int(c.get("day", 0)), "suspect": str(c.get("suspect", "")),
+					"victim": str(c.get("victim", "")), "witness": str(c.get("witness", "")),
+					"evidence": int(c.get("evidence", 0)), "stage": str(c.get("stage", "closed")),
+					"closed_by": str(c.get("closed_by", "")), "deadline": int(c.get("deadline", 0))})
+	GameData.case_seq = int(d.get("case_seq", 0))
+	GameData.npc_greed_adj = {}
+	var ga: Variant = d.get("npc_greed_adj", {})
+	if ga is Dictionary:
+		for gk in ga:
+			GameData.npc_greed_adj[str(gk)] = float(ga[gk])
 	GameData.society_v = 1   # 메모리의 상태는 이제 현재 판이다
 	# ---- 저장은 하는데 **읽지 않던** 여덟 개 ----
 	#
@@ -289,6 +306,15 @@ func _apply_save(d: Dictionary) -> void:
 		if GameData.move_quest == "done" \
 				and "explorer" not in GameData.npc_greeted:
 			GameData.npc_greeted.append("explorer")
+	# 여관 시절에 inn 부지를 세워 둔 세이브(사회 S2b 이전): 그 건물은 이제 파출소인데 부임하는
+	# 사람이 없다 — 박 순경을 도착 대기열에 태워 다음 아침 인사하러 오게 한다
+	if GameData.village_built.has("inn") and not GameData.npc_greeted.has("officer_park"):
+		var has_cop := false
+		for a3 in GameData.arrivals:
+			if str(a3.id) == "officer_park":
+				has_cop = true
+		if not has_cop:
+			GameData.arrivals.append({"id": "officer_park", "day": GameData.day - 1})
 	# 인사만 남기고 저장한 세이브: 재민이 다시 찾아오도록 대기열에 태운다
 	if GameData.move_quest == "greet":
 		var has_ex := false

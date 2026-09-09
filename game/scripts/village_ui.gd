@@ -105,6 +105,9 @@ func _next_village_build() -> String:
 		# 목장 상회는 메인 스토리 8에서 목동·이장과 이야기를 마쳐야 지을 수 있다
 		if pid == "ranch" and GameData.story8_phase != "build":
 			continue
+		# 파출소는 회관이 열린 뒤 — 정부가 있어야 법도 있다(사회 S2b)
+		if pid == "inn" and GameData.story9_phase != "done":
+			continue
 		return pid
 	return ""
 
@@ -689,6 +692,8 @@ func room_action(kind: String) -> void:
 				_open_hall_dialog()
 		"mail":
 			_open_post_dialog()
+		"police":
+			m.society.open_police()   # 파출소 창구(사회 S2b) — 자수·출동·순찰·봉급
 
 
 # ---- 우체국 (메인 스토리 3에서 세운다) ----

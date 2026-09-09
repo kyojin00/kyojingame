@@ -4734,6 +4734,8 @@ const NPC_KIND := {
 	# core 와 같은 취급이지만 「교진 마을 주민 수」에는 안 든다
 	"miller": "core", "dyer": "core", "brook": "core",
 	"sawyer": "core", "beekeep": "core", "teller": "core",
+	# 파출소의 선임 순경(S2b) — 건물 주인이라 core
+	"officer_park": "core",
 }
 # 일반 주민 후보 — 앞쪽일수록 먼저 편지를 보내기 쉽다 (랜덤이지만 풀 순서대로
 # 소문이 도는 셈). 전부 정착하면 최대 주민 21명 (핵심 9 + 일반 10 +
@@ -5381,7 +5383,7 @@ const NPCS := {
 	"likes": ["dish_bread", "dish_jam", "dish_punch"],
 	"hates": ["sludge", "forage_trash"],
 	},
-	"angler": {"name": "강태", "birthday": [FALL, 9], "gender": "m", "romance": false,
+	"angler": {"name": "강태", "birthday": [FALL, 9], "gender": "m", "romance": false, "greed": 1.2,
 	"lines": [
 		"물 좋다는 소문 듣고 낚싯대 하나 들고 왔지.",
 		"어제 이만~한 놈을 놓쳤다니까? 진짜라니까?",
@@ -5393,7 +5395,7 @@ const NPCS := {
 	"likes": ["fish_crucian", "bait", "dish_grilled_fish"],
 	"hates": ["sludge", "forage_trash"],
 	},
-	"miner": {"name": "바우", "birthday": [SPRING, 8], "gender": "m", "romance": false,
+	"miner": {"name": "바우", "birthday": [SPRING, 8], "gender": "m", "romance": false, "greed": 1.3,
 	"lines": [
 		"이 마을 굴, 돌이 살아 있다며? 곡괭이가 근질근질해.",
 		"돌은 거짓말을 안 해. 두드린 만큼 내준다니까.",
@@ -5417,7 +5419,7 @@ const NPCS := {
 	"likes": ["forage_berry", "forage_herb"],
 	"hates": ["sludge", "forage_trash"],
 	},
-	"carpenter": {"name": "덕구", "birthday": [SUMMER, 19], "gender": "m", "romance": false,
+	"carpenter": {"name": "덕구", "birthday": [SUMMER, 19], "gender": "m", "romance": false, "greed": 1.2,
 	"lines": [
 		"좋은 나무가 많은 마을이라 들었네. 대패질할 맛 나겠어.",
 		"못 하나도 제자리에 박혀야 집이 백 년을 가지.",
@@ -5441,7 +5443,7 @@ const NPCS := {
 	"likes": ["forage_berry", "potion_energy"],
 	"hates": ["sludge", "forage_trash"],
 	},
-	"painter": {"name": "청람", "birthday": [FALL, 21], "gender": "m", "romance": false,
+	"painter": {"name": "청람", "birthday": [FALL, 21], "gender": "m", "romance": false, "greed": 1.2,
 	"lines": [
 		"이 마을의 노을빛... 물감으로는 도저히 못 만들겠더군요.",
 		"바다 산호 색을 아세요? 세상에 그런 빨강은 또 없어요.",
@@ -5640,6 +5642,40 @@ const NPCS := {
 	"likes": ["forage_herb", "gem", "memory_piece"],
 	"hates": ["sludge", "forage_trash"],
 	},
+	# ---- 파출소가 서면 부임하는 사람 (사회 S2b) ----
+	# 읍에서 내려온 선임 순경. 말수 적고 하게체, 「규정」과 「밤길」로 말한다.
+	# 야간 순찰(19~24시)을 도는 유일한 사람 — 밤은 유리하지만 안전하지 않다(헌법 §6.2)
+	"officer_park": {"name": "박 순경", "birthday": [SPRING, 14], "gender": "m", "romance": false,
+	"lines": [
+		"규정은 사람을 묶으려고 있는 게 아닐세. 풀어 주려고 있는 거지.",
+		"밤길은 내가 도네. 자네는 자게.",
+		"이 마을은 문을 안 잠그더군. 그게 좋기도 하고, 걱정도 되고.",
+		"읍에서 내려올 때 다들 한직이라 했지. 나는 이 자리가 좋네.",
+		"잡는 게 일이 아닐세. 안 잡아도 되게 하는 게 일이지.",
+	],
+	"season": {
+		SPRING: ["봄엔 낯선 얼굴이 늘어. 다 나쁜 사람은 아니지만 눈은 두어야지."],
+		SUMMER: ["여름밤은 길어서 순찰도 길어지네."],
+		FALL: ["추수철엔 창고 문단속을 이르고 다니지."],
+		WINTER: ["눈 오는 밤은 발자국이 남아서 좋아. 내 일이 쉬워지거든."],
+	},
+	"weather": {
+		WEATHER_RAIN: ["비 오는 밤엔 사고가 없네. 다들 집에 있으니까."],
+		WEATHER_STORM: ["폭풍 치는 날은 문 두드리고 다니네. 다들 무사한지."],
+		WEATHER_FOG: ["안개 낀 밤이 제일 싫어. 열 걸음 앞도 안 보여."],
+	},
+	"morning": ["밤새 조용했네. 그게 제일 좋은 보고지."],
+	"night": ["이 시간에 밖이면 이유가 있어야 하네. 자네는 뭔가."],
+	"aff30": ["자네가 밤에 돌아다녀도 나는 안 묻네. 믿으니까.",
+		"순찰 돌다 자네 집 불 켜진 걸 보면 마음이 놓여."],
+	"aff70": ["이 마을에서 내가 믿는 사람은 이장하고 자네뿐일세.",
+		"언젠가 이 제복을 자네한테 넘길 날이 올지도 모르지."],
+	"loves": ["dish_moon_tea", "dish_soup", "lamp"],
+	"likes": ["dish_bread", "forage_berry", "egg"],
+	"hates": ["sludge", "forage_trash"],
+	"secret50": "읍에서 사람 하나를 못 잡았네. 잡았으면 살았을 사람이 하나 있었지.\n그 뒤로 밤에 잠을 못 자. 그래서 순찰을 도는 걸세.",
+	"secret100": "자네 할아버지 이야기를 읍 서장한테 들었네. 옛날에 여기 순경이었다더군.\n이 제복은 그 양반이 입던 것과 같은 색일세.",
+	},
 }
 var affinity := {"librarian": 0,
 	"merchant": 0, "fisher": 0, "blacksmith": 0, "rancher": 0, "chief": 0,
@@ -5650,7 +5686,9 @@ var affinity := {"librarian": 0,
 	"weaver": 0, "alchemist": 0,
 	# 고장의 작은 마을 사람들 — 교진 마을 밖에도 사람이 산다
 	"miller": 0, "dyer": 0, "brook": 0,
-	"sawyer": 0, "beekeep": 0, "teller": 0}
+	"sawyer": 0, "beekeep": 0, "teller": 0,
+	# 사회(S2b) — 파출소가 서면 부임한다
+	"officer_park": 0}
 # 연애 — 꽃다발을 받아 주면 연인, 반지를 받아 주면 배우자. 각각 한 사람뿐이다.
 const BOUQUET_PRICE := 800
 const RING_PRICE := 12000
@@ -5947,6 +5985,19 @@ const INSTITUTIONS := {
 	# 면사무소(S2) — 회관 창구. 이장이 면장을 겸한다(읍이 열리기 전까지).
 	# 아래 자리가 둘(서기·감시원)이라 ranks 가 셋이다 — seat_rows 는 마지막 랭크만 주인으로 시드한다.
 	# job 은 「일자리 이야기」의 기본값이고, jobs 가 이 창구에서 들어갈 수 있는 직업 전부다
+	# 파출소(S2b) — 여관 부지(inn)를 재명명했다. 선임 박 순경이 주인, 순경 한 자리
+	"police_box": {
+		"name": "파출소",
+		"region": "kyojin",
+		"room": "inn",
+		"head": "officer_park",
+		"ranks": ["constable", "senior"],
+		"player_max": "constable",
+		"skill": "combat",
+		"books": 0,
+		"job": "constable",
+		"slice": 2,
+	},
 	"township": {
 		"name": "면사무소",
 		"region": "kyojin",
@@ -6658,6 +6709,77 @@ const JOBS := {
 			"line": "이건 당신한테만 보여 줘요. 누가 뭘 읽는지… 광장에선 말하지 말고요.",
 		},
 		"absent_warn": "사흘째 안 왔어요. 반납함이 넘쳐요. …내일은 와요.",
+	},
+	# ---- 순경(S2b) — 파출소 창구에서 들어간다. 근무는 대화가 아니라 **걷기**다: 순찰 지점 셋을
+	# 발로 찍고 돌아와 보고한다. 19시 뒤에 보고하면 야간 순찰 +30. 사건이 열려 있으면 「출동」
+	"constable": {
+		"name": "순경",
+		"kind": "office",
+		"inst": "police_box",
+		"rank": "constable",
+		"boss": "officer_park",
+		"wage": 120,
+		"night_bonus": 30,
+		"known_at": 14,
+		"skill": "combat",
+		"skill_lv": 2,
+		"boldness": 35,
+		"books": 0,
+		"req_rep": 20,
+		"slice": 2,
+		"calls": {
+			"stranger": "신참 순경",
+			"known": "순경 양반",
+			"master": "우리 순경",
+		},
+		"boss_calls": {
+			"stranger": [
+				"왔나. 제복은 입는 게 아니라 지키는 걸세. 오늘도 세 군데일세.",
+				"신참, 순찰은 빨리 도는 게 아니야. 보면서 도는 거지.",
+			],
+			"known": [
+				"순경 양반 왔구먼. 어젯밤은 조용했네. 자네 덕도 있지.",
+				"순경 양반, 게시판 앞은 자네가 맡게. 나는 어귀를 돌지.",
+			],
+			"master": [
+				"우리 순경 왔네. 이제 밤길은 자네한테 맡겨도 되겠어.",
+				"우리 순경, 자네가 있어서 나도 잠을 좀 자네.",
+			],
+		},
+		"hire": {
+			"ask": "순경님, 파출소에서 일하고 싶습니다. 밤길이 무섭지 않습니다.",
+			"refuse_aff": "제복은 아는 사람한테 주는 걸세. 자넬 좀 더 봐야겠어.",
+			"refuse_skill": "지네 한 마리는 혼자 잡아야 하네. 창부터 손에 익히고 오게.",
+			"refuse_rep": "마을이 자넬 믿어야 제복이 서네. 아직은 아닐세.",
+			"refuse_record": "전과가 있는 사람한테 제복은 못 주네. 규정일세.",
+			"refuse_bold": "밤길이 무섭지 않다고 했나. 자네 눈은 아직 그렇게 말하지 않네.",
+			"refuse_busy": "자넨 벌써 딴 데 이름이 올라 있잖나. 제복은 겸직이 안 되네.",
+			"accept": "그래. 내일 아침 아홉 시에 파출소로 오게. 제복은 맞춰 두지.",
+			"first_day": "첫날일세. 순찰은 세 군데 — 광장 남쪽, 게시판 앞, 서쪽 어귀. 보고 오게.",
+			"resign_ask": "순경님, 제복을 벗겠습니다. 그동안 감사했습니다.",
+			"resign_reply": "그리하게. 제복은 두고 가게. 밤길은 다시 내가 돌지.",
+			"fired": "이레일세. 순찰을 비워 둔 채로는 못 두네. 제복을 거두겠네.",
+		},
+		"patrol": {
+			"start": ["오늘도 세 군데일세. 광장 남쪽, 게시판 앞, 서쪽 어귀. 다녀오게.",
+				"순찰은 보는 일일세. 누가 어디 서 있었는지 기억해 두게.",
+				"어귀 쪽은 낯선 얼굴이 오는 길이야. 거기부터 보고 오게."],
+			"report": ["수고했네. 조용한 보고가 제일 좋은 보고지. 몫은 적어 뒀네.",
+				"돌고 왔구먼. 오늘 몫은 장부에 올렸네.",
+				"그래, 그 정도면 됐네. 내일도 같은 길일세."],
+			"night": "밤길을 돌았구먼. 밤 몫은 서른 더 얹네. 제복이 그만한 값을 하는 걸세.",
+		},
+		"loop": [],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 제복 값은 도에서 나오네. 받게.",
+			"nothing": "순찰 보고가 없구먼. 봉급은 돈 날에만 적히는 걸세.",
+			"not_yet": "봉급날은 아직일세. 이레마다라고 했잖나.",
+		},
+		"sees": {
+			"what": "순찰 일지 — 누가 어느 집 근처를 서성였는지, 사건이 어디까지 갔는지",
+			"line": "우리 순경한테는 이걸 보여 주지. 순찰 일지야. 남이 보면 곤란한 이름이 있네.",
+		},
+		"absent_warn": "사흘째 제복이 걸려만 있네. 밤길을 나 혼자 돌았어. 내일은 오게.",
 	},
 	# ---- 기관직(S2) — 면사무소 창구에서 들어간다. 봉급도 그 창구에서 받는다(헌법 §2.5).
 	# req: rep(kyojin) ≥ 20 · 미말소 전과 0 · 직업별 숙련. 채용 대사·거절 사유는 이장이 말한다
@@ -7855,6 +7977,14 @@ const SOCIETY_NOTES := {
 	"tax_seized": "밀린 세금을 대신 가져갔다 — %s.",
 	"gov_start": "마을 예산으로 「%s」 공사가 시작됐다.",
 	"gov_done": "「%s」이 다 됐다. %s",
+	# ---- 파출소(S2b) ----
+	"crime_night": "어젯밤 %s네에 도둑이 들었다고 한다. 박 순경이 아침부터 돌고 있다.",
+	"case_caught": "박 순경이 %s를 잡았다 — %s네 도둑이었다.",
+	"case_expired": "%s네 도둑은 끝내 잡히지 않았다. 마을이 그 얘기를 그만뒀다.",
+	"case_mine": "내가 %s를 잡았다 — %s네 도둑. 마을이 봤다.",
+	"wanted": "박 순경이 나를 찾고 있다. 회의에서 부인한 그 일 때문이다.",
+	"fined": "벌금을 물었다 — %dG. 그 일은 그것으로 끝났다.",
+	"surrendered": "파출소에 자수했다. 벌금은 절반이었다. 마을이 그걸 기억할 것이다.",
 }
 
 # 마음 카드 — [[문턱, 이름, 설명]] · stats_ui 가 이름을 글줄로, 설명을 툴팁으로 쓴다.
@@ -7868,8 +7998,11 @@ const BOLD_STAGES := [
 
 # ---- 사회: 그 밖의 상수 ----
 
-const NIGHT_OWLS := ["explorer", "musician", "angler"]   # 저녁에도 밖에 남는 사람들(society_place 가 자리를 준다)
-const NIGHT_OWL_UNTIL := 22.0 * 60.0                      # 밤 사람도 22시엔 들어간다
+# 저녁에도 밖에 남는 사람들과 들어가는 시각(분). 박 순경은 야간 순찰이라 자정까지(헌법 §6.2 —
+# 밤은 유리하지만 안전하지 않다). society_place 가 저녁 자리를 준다
+const NIGHT_OWLS := {"explorer": 22 * 60, "musician": 22 * 60, "angler": 22 * 60,
+	"officer_park": 24 * 60}
+const NIGHT_OWL_UNTIL := 22.0 * 60.0                      # 옛 이름 — 셋의 기본값
 const BOLD_CAP := {"cave": 5.0, "night": 4.0}             # 하루에 오를 수 있는 대범함 — 동굴 처치 / 밤길
 const KOR_DAYS := ["하루", "이틀", "사흘", "나흘", "닷새", "엿새", "이레", "여드레", "아흐레", "열흘"]
 const CLERK_WAGE := 80        # 근무 한 번에 적립되는 몫(D4)
@@ -7898,9 +8031,21 @@ const ARREARS_CHIEF_WEEK := 4      # 이장이 먼저 말을 건다 · rep −5
 const ARREARS_FREEZE_WEEK := 6     # 봉급 정지(자리는 남는다)
 const ARREARS_SEIZE_WEEK := 8      # 압류: 회관 창고 → 가축 → 소지금 · rep −15
 const TAX_BILLS_MAX := 6           # 고지서 보관 수
+# ---- 파출소·범죄(S2b, 헌법 §6) ----
+const CASE_MAX := 20               # 사건 상한
+const CASE_TTL := 30               # 시효(일) — 지나면 조용히 닫힌다
+const NPC_CRIME_PERIOD := 7        # 교진 NPC 범죄 주기(일) — 후보가 없으면 사건이 안 생긴다
+const NPC_CATCH_DAYS := 3          # 신고 며칠 뒤 순경 검거 굴림
+const NPC_CATCH_P := 0.5           # 그 확률(야간 순찰이 있는 마을)
+const NPC_FINE := 200              # NPC 벌금 — 예산으로
+const FINE_MIN := 200              # 즉결 벌금 하한 · 물건값 ×3
+const FINE_MULT := 3
+const ARREST_TILES := 1.5          # 순경이 이 거리 안에 2초 → 체포
+const ARREST_SECONDS := 2.0
+const NEED_EVIDENCE := 2           # 검거에 필요한 흔적 수(피해자·목격자)
 const GOV_GRANT := 2000                     # 계절 교부금(고정) — 교진 예산은 절대 마이너스가 안 된다
 const GOV_LEVY_PER_RESIDENT := 30           # NPC 장부세: (주민 − 1) × 30
-const GOV_OPS := {"police_box": 300, "clinic_box": 300}   # 운영비 — 그 건물이 서 있을 때만(S2b)
+const GOV_OPS := {"inn": 300, "lab": 300}   # 운영비 — 부지(파출소 inn · 진료소 lab)가 서 있을 때만
 # 공공사업 — 예산이 비용에 닿으면 이장이 다음 사업을 건다(착공 즉시 차감), 다음 계절 첫날 완공.
 # 둘 다 눈에 보이는 결과다 — 「내가 낸 세금이 등불이 되고 길이 된다」. 순경·의사 자리는 S2b 가 뒤에 잇는다
 const GOV_PROJECTS := [
@@ -7925,6 +8070,10 @@ var gov_building := ""               # 착공해 다음 계절 첫날 완공되�
 var gov_tax_season := 0              # 이번 계절 플레이어가 낸 세금(장부 한 줄의 재료)
 var gov_log: Array = []              # 계절 장부 [{season, grant, levy, tax, ops, project}] ≤ 8 — 서기의 「예산 장부」
 var tax_seize_due := 0               # 오늘 아침 압류할 액수(society.after_new_day 가 집행하고 0 으로)
+# 파출소(S2b) — NPC 사건. 헌법 §6.7: 확률이 아니라 결정적 주기, 플레이어 없이도 닫힌다
+var cases: Array = []                # [{id, crime, day, suspect, victim, witness, evidence, stage, closed_by, deadline}]
+var case_seq := 0
+var npc_greed_adj := {}              # {nid: float} 유죄마다 −0.1 (하한 0.5)
 
 # 런타임 — 저장하지 않는다.
 var animals_now := 0                              # 가축 수 — society._process 가 0.5초마다 채운다(목장주 호칭 재료)
@@ -7965,6 +8114,8 @@ func fresh_me() -> Dictionary:
 		# 범죄·구속
 		"theft_xp": 0.0, "night_out_min": 0.0, "stolen": {}, "wanted": {}, "night_out_day": 0,
 		"jail_days_left": 0, "sentence": {}, "home_region": "kyojin",
+		# 순경(S2b) — 오늘 순찰의 진행과 검거 실적, 사건마다 물어본 사람
+		"patrol_day": 0, "patrol_idx": 0, "arrests": 0, "case_asked": {},
 		# 자기 상점(S3)
 		"shop_own": {}, "shop_stock": {}, "shop_ledger": [],
 	}
@@ -8344,7 +8495,7 @@ func theft_p(base: float, night: bool, witnesses: int) -> float:
 
 # 밤 사람 — 저녁에도 22시까지는 밖에 남는다(npc.gd 의 귀가 조건이 이걸 뺀다).
 func night_owl(id: String) -> bool:
-	return id in NIGHT_OWLS and minutes < NIGHT_OWL_UNTIL
+	return NIGHT_OWLS.has(id) and minutes < float(NIGHT_OWLS[id])
 
 
 # 신고된 기억이 아직 회의를 거치지 않았나 — 신고 다음날부터 이장이 찾아온다.
@@ -8607,10 +8758,125 @@ func night_dark_color() -> Color:
 	return Color(0.24, 0.23, 0.35) if "lights" in gov_done else Color(0.16, 0.15, 0.26)
 
 
+# ---- 파출소·사건 (S2b) ----
+
+# 파출소가 서고 박 순경이 부임했나 — 그때부터 사건이 생기고, 닫히고, 나를 쫓는다
+func police_open() -> bool:
+	return village_built.has("inn") and npc_greeted.has("officer_park")
+
+
+# 정착민의 탐욕 — NPCS.greed(없으면 1.0)에서 유죄마다 −0.1(하한 0.5)
+func npc_greed(nid: String) -> float:
+	return maxf(0.5, float(npc_def(nid).get("greed", 1.0)) + float(npc_greed_adj.get(nid, 0.0)))
+
+
+func wanted_active() -> bool:
+	var w: Variant = me.get("wanted", {})
+	return w is Dictionary and not w.is_empty()
+
+
+func open_cases() -> Array:
+	var out: Array = []
+	for c in cases:
+		if c is Dictionary and str(c.get("stage", "")) == "open":
+			out.append(c)
+	return out
+
+
+func case_by_id(cid: int) -> Dictionary:
+	for c in cases:
+		if c is Dictionary and int(c.get("id", -1)) == cid:
+			return c
+	return {}
+
+
+# 결정적 굴림 — 날짜·번호로 정해지는 0..1 (플레이어 없이도, 다시 불러와도 같은 결과)
+func _case_roll(cid: int, salt: int) -> float:
+	return float(posmod(hash("%d|%d|%d" % [day, cid, salt]), 1000)) / 1000.0
+
+
+# NPC 범죄 — 이레마다 한 건, 후보가 있을 때만(헌법 §6.7: 평화로운 마을은 결과다).
+# 범인: 정착민 중 greed ≥ 1.2 · 호감도 < 40 · 열린 사건의 용의자가 아닌 사람.
+# 피해자: 마을에 자리 잡은 다른 사람. 목격자: 또 다른 사람(순경의 두 번째 흔적)
+func _npc_crime_tick() -> void:
+	if not police_open() or day % NPC_CRIME_PERIOD != 0 or open_cases().size() >= 3:
+		return
+	var suspects: Array = []
+	for nid in settlers:
+		var sid := str(nid)
+		if npc_greed(sid) < 1.2 or aff(sid) >= 40 or not npc_greeted.has(sid):
+			continue
+		var busy := false
+		for c in open_cases():
+			if str(c.get("suspect", "")) == sid:
+				busy = true
+		if not busy:
+			suspects.append(sid)
+	if suspects.is_empty():
+		return
+	var pool: Array = []
+	for nid in npc_greeted:
+		var vid := str(nid)
+		if vid != "officer_park" and vid not in suspects and NPCS.has(vid):
+			pool.append(vid)
+	if pool.size() < 2:
+		return
+	var suspect := str(suspects[posmod(day / NPC_CRIME_PERIOD, suspects.size())])
+	var victim := str(pool[posmod(day * 7 + case_seq, pool.size())])
+	var witness := str(pool[posmod(day * 13 + case_seq + 1, pool.size())])
+	if witness == victim:
+		witness = str(pool[posmod(day * 13 + case_seq + 2, pool.size())])
+	case_seq += 1
+	cases.append({"id": case_seq, "crime": "burglary", "day": day, "suspect": suspect,
+		"victim": victim, "witness": witness, "evidence": 0, "stage": "open",
+		"closed_by": "", "deadline": day + CASE_TTL})
+	while cases.size() > CASE_MAX:
+		cases.pop_front()
+	_note(str(SOCIETY_NOTES.crime_night) % str(npc_def(victim).get("name", victim)))
+
+
+# 열린 사건이 저절로 닫히는 길 — 신고 사흘 뒤부터 사흘마다 순경이 굴리고, 시효에 닫힌다
+func _case_close_tick() -> void:
+	for c in open_cases():
+		var cid := int(c.get("id", 0))
+		var age: int = day - int(c.get("day", 0))
+		var victim := str(npc_def(str(c.get("victim", ""))).get("name", ""))
+		if day >= int(c.get("deadline", 0)):
+			c["stage"] = "closed"
+			c["closed_by"] = "expired"
+			_note(str(SOCIETY_NOTES.case_expired) % victim)
+			continue
+		if age >= NPC_CATCH_DAYS and age % NPC_CATCH_DAYS == 0 and police_open():
+			if _case_roll(cid, age) < NPC_CATCH_P:
+				_case_convict(c, "officer")
+
+
+# 유죄 — 사건을 닫고, 범인의 탐욕이 조금 줄고, 벌금이 예산으로 간다
+func _case_convict(c: Dictionary, by: String) -> void:
+	var sid := str(c.get("suspect", ""))
+	c["stage"] = "closed"
+	c["closed_by"] = by
+	npc_greed_adj[sid] = float(npc_greed_adj.get(sid, 0.0)) - 0.1
+	var w := wallet_of(sid)
+	var fine: int = mini(w, NPC_FINE)
+	npc_wallet[sid] = w - fine
+	gov_budget["kyojin"] = int(gov_budget.get("kyojin", 0)) + fine
+	var sname := str(npc_def(sid).get("name", sid))
+	var vname := str(npc_def(str(c.get("victim", ""))).get("name", ""))
+	_note(str(SOCIETY_NOTES.case_mine if by == "player" else SOCIETY_NOTES.case_caught) % [sname, vname])
+
+
 func society_place(id: String) -> String:
 	if id == "chief" and (council_pending() or tax_dun_active()) and festival_today().is_empty() \
 			and hour_now() >= 9.0 and hour_now() < SERVICE_LAST_HOUR:
 		return "meeting"   # 마을 회의도, 네 주 밀린 세금 얘기도 같은 자리에서 기다린다
+	if id == "officer_park":
+		# 수배 중이면 나를 쫓는다(6~24시, 축제 아닌 날). 아니면 저녁엔 야간 순찰
+		if wanted_active() and festival_today().is_empty() and hour_now() >= 6.0:
+			return "chase"
+		if is_evening():
+			return "patrol"
+		return ""
 	if night_owl(id) and is_evening():
 		match id:
 			"musician":
@@ -8766,6 +9032,11 @@ func society_new_day(stats: Array, ko := false) -> void:
 		_bold_today = {"cave": 0.0, "night": 0.0}
 	# ⑧ 밤길 분 — rest_mult 가 day_cycle 에서 이미 소비했다
 	me.night_out_min = 0.0
+	# 파출소(S2b) — NPC 사건이 생기고 닫힌다. 수배 중이면 아침마다 한 줄
+	_npc_crime_tick()
+	_case_close_tick()
+	if wanted_active():
+		_note(str(SOCIETY_NOTES.wanted))
 	# ⑨ 이장이 찾아온다 — 어제 신고된 일
 	if council_pending():
 		_note(str(SOCIETY_NOTES.meeting_summon))
@@ -9474,6 +9745,9 @@ func reset_all() -> void:
 	gov_tax_season = 0
 	gov_log = []
 	tax_seize_due = 0
+	cases = []
+	case_seq = 0
+	npc_greed_adj = {}
 	npc_wallet = {}
 	recipe_items = {}
 	tracked_pick = ""
@@ -9905,6 +10179,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		# 정부(S2a)
 		"gov_budget": gov_budget, "gov_done": gov_done, "gov_building": gov_building,
 		"gov_tax_season": gov_tax_season, "gov_log": gov_log,
+		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),
 		"trees_chopped": trees_chopped,
