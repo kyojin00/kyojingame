@@ -7471,6 +7471,127 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_tj
 			GameData.minutes = keep_min_tj
 			_s2_restore(k_tj)
+		212:
+			# ---- 미룬 것 정리(S5c) — 읍 벌금 창구·읍 봉사·구속 중 좌판·승진 통보·법정 모독·버스 도망 ----
+			var k_po := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_po := GameData.minutes
+			var keep_pos_po: Vector2 = m.player.position
+			var keep_town_po: bool = GameData.town_open
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.gov_budget["town"] = 1000
+			GameData.cases = []
+			GameData.day = 60
+			GameData.minutes = 10 * 60
+			m.story_cutscene = true
+			GameData.me.boldness_base = 40
+			GameData.me.reputation = {"kyojin": 0, "town": 0}
+			# ① 읍 벌금 — 군청 창구에서 낸다. 돈은 읍 예산으로, 군수가 받는다
+			GameData.me.tax_bills = [{"season": 2, "day": 59, "income": 0, "property": 0, "total": 200, "paid": 0,
+				"due_day": 65, "kind": "fine", "region": "town"}]
+			GameData.money = 1000
+			var tb_po := int(GameData.gov_budget.town)
+			m.society.open_town_ledger()
+			var pay_btn: bool = "세금·벌금 내기 — 200G" in _btn_texts()
+			m.society._pay_tax_town()
+			var pay_ok: bool = pay_btn and GameData.money == 800 and int(GameData.gov_budget.town) == tb_po + 200 \
+				and str(m.dialog.title_label.text) == GameData.npc_name("mayor_kang")
+			m.dialog.close()
+			# ② 읍 봉사 — 읍 법원의 봉사 판결은 군청 마당. 하루 한 번, 군수가 센다
+			GameData.me.record = [{"day": 59, "crime": "pickpocket", "court": "town", "verdict": "service",
+				"sentence": 7, "served": 0, "served_day": 0, "expunged": false}]
+			m.society.open_town_ledger()
+			var serve_btn: bool = "오늘 봉사" in _btn_texts()
+			m.society.serve_day("mayor_kang")
+			var serve_ok: bool = serve_btn and int(GameData.me.record[0].served) == 1 \
+				and str(m.dialog.title_label.text) == GameData.npc_name("mayor_kang")
+			m.dialog.close()
+			m.society.open_town_ledger()
+			var served_gray: bool = "… 오늘 봉사" in _btn_texts()
+			m.dialog.close()
+			# ③ 구속 중 좌판 — 손님이 오지 않는다(재고 그대로), 결산 한 줄
+			GameData.me.shop_own = {"kind": "farm", "since": 1, "till": 0, "x": 0, "y": 0}
+			GameData.me.shop_stock = {"egg": {"qty": 3, "price": 10}}
+			GameData.me.jail_days_left = 3
+			GameData.me.jail_kind = "jail"
+			GameData.day = 61
+			GameData.society_new_day([0, 0, 0])
+			var n_po := GameData.society_note()
+			var jailed_ok: bool = n_po.contains("구속 중") and int(GameData.me.shop_stock.egg.qty) == 3
+			GameData.me.jail_days_left = 0
+			GameData.me.shop_own = {}
+			GameData.me.shop_stock = {}
+			# ④ 승진 통보 — 승진한 아침, 군수의 첫마디가 통보다
+			GameData.seats = {}
+			for gid_po in GameData.gen_npcs:
+				if str(GameData.gen_npcs[gid_po].get("role", "")) == "staff":
+					GameData.gen_npcs[gid_po]["here"] = false   # 주사 자리를 비워 둔다(전근 중)
+					GameData.gen_npcs[gid_po]["away_until"] = 999
+			var rows_po: Dictionary = GameData.seat_rows("county")
+			rows_po["clerk"][0] = "player"
+			GameData.me.job = "county_clerk"
+			GameData.me.rank = "clerk"
+			GameData.me.job_since_day = 1
+			GameData.me.perf = 20
+			GameData.aff_set("mayor_kang", 50)
+			GameData.day = 62
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var pline_po := str(GameData.JOBS.county_clerk.promote.line)
+			var promo_line: bool = str(GameData.me.rank) == "senior" and int(GameData.me.promoted_day) == 62 \
+				and m.society.talk_opener("mayor_kang", true) == pline_po \
+				and m.society.talk_opener("chief_ha", true) != pline_po   # 남의 상급자는 통보하지 않는다
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.seat_clear_player()
+			# ⑤ 법정 모독 — 대범함 55 부터 넷째 선택지. 대들면 한 단계 가중, 대범함 +3, 평판 −5
+			GameData.me.record = []   # ②의 봉사 판결이 전과로 가중되지 않게
+			var ch_po := {"day": 61, "kind": "pickpocket", "target": "g1", "value": 30, "others": 1, "seen": 2,
+				"heat": 1, "court_day": 62, "skips": 0, "since": 62, "court": "town", "case_id": 0,
+				"surrender": false, "bribe": false}
+			GameData.me.charged = ch_po.duplicate()
+			m.society._trial_open()
+			var three_ok: bool = m.dialog._seq[-1].choices.size() == 3
+			m.dialog.close()
+			GameData.me.boldness_base = 60
+			m.society._trial_open()
+			var four_ok: bool = m.dialog._seq[-1].choices.size() == 4 and str(m.dialog._seq[-1].choices[3][0]) == "판사에게 대든다"
+			var bold_po := GameData.boldness()
+			var rep_po := int(GameData.me.reputation.town)
+			m.society.trial_pick("contempt")
+			var contempt_ok: bool = three_ok and four_ok and str(m.dialog._seq[-1].text).contains("봉사") \
+				and GameData.boldness() == bold_po + 3 - 5 and int(GameData.me.reputation.town) == rep_po - 5 - 15
+			m.dialog.close()
+			GameData.me.boldness_base = 40
+			# ⑥ 버스 도망 — 읍 수배 중 정류장: 대범함 30 미만이면 회색, 이상이면 탄다
+			GameData.gov_done = ["bus"]
+			GameData.me.wanted = {"day": 61, "kind": "pickpocket", "target": "g1", "value": 30, "fine": 0,
+				"since": 62, "region": "town", "heat": 1, "seen": 1, "others": 0}
+			GameData.money = 500
+			GameData.me.boldness_base = 25
+			# 샌드박스의 이 단계엔 정류장 칸이 아직 잡혀 있지 않을 수 있다 — 팻말 자리로 잠시 둔다
+			var keep_bus_po: Dictionary = m.bus_tiles.duplicate()
+			m.bus_tiles = {"kyojin": m.BUS_STOPS.kyojin, "town": m.BUS_STOPS.town}
+			m.village.open_bus_stop(m.bus_tiles.get("town", Vector2i(-1, -1)))
+			var flee_gray: bool = "… 교진행 — 50G" in _btn_texts()
+			m.dialog.close()
+			GameData.me.boldness_base = 40
+			m.village.open_bus_stop(m.bus_tiles.get("town", Vector2i(-1, -1)))
+			var flee_ok: bool = flee_gray and "교진행 — 50G" in _btn_texts()
+			m.dialog.close()
+			m.bus_tiles = keep_bus_po
+			GameData.me.wanted = {}
+			print("POLISH_OK=", pay_ok and serve_ok and served_gray and jailed_ok and promo_line and contempt_ok and flee_ok,
+				" 읍벌금=", pay_ok, " 읍봉사=", serve_ok, " 하루한번=", served_gray, " 구속좌판=", jailed_ok,
+				" 승진통보=", promo_line, " 법정모독=", contempt_ok, " 버스도망=", flee_ok)
+			GameData.town_open = keep_town_po
+			m.player.position = keep_pos_po
+			GameData.minutes = keep_min_po
+			_s2_restore(k_po)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

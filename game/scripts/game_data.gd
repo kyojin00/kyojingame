@@ -8103,6 +8103,7 @@ const JOBS := {
 		"wage": 120,
 		# 승진(S4h) — 근속 56일 · 민원 20 · 주사 자리 공석 · 군수 호감도 50
 		"promote": {"rank": "senior", "name": "군청 주사", "wage": 180, "goal": 20,
+			"line": "오늘부터 주사일세. 도장은 여전히 내가 찍네. 축하하네.",
 			"calls": {"stranger": "군청 새 주사", "known": "주사 양반", "master": "우리 주사"}},
 		"known_at": 14,
 		"skill": "",
@@ -8167,6 +8168,7 @@ const JOBS := {
 		"slice": 5,
 		# 승진 — 근속 56일 · 검거 6 · 경위 자리 공석 · 서장 호감도 50
 		"promote": {"rank": "senior", "name": "경위", "wage": 190, "goal": 6, "goal_key": "arrests",
+			"line": "오늘부터 경위일세. 구역은 순경들이 돌고 자넨 일지를 보게.",
 			"calls": {"stranger": "새 경위", "known": "경위님", "master": "우리 경위"}},
 		"calls": {"stranger": "읍의 신참 순경", "known": "순경 양반", "master": "우리 순경"},
 		"boss_calls": {
@@ -8405,6 +8407,7 @@ const JOBS := {
 		"wage": 130,
 		# 승진(S4h) — 근속 56일 · 왕진 20 · 의사 자리 공석 · 소장 호감도 50 · 요리 Lv5
 		"promote": {"rank": "senior", "name": "보건소 의사", "wage": 200, "goal": 20, "req_skill": ["cook", 5],
+			"line": "오늘부터 의사일세. 흰옷은 그대로고 책임만 는 걸세.",
 			"calls": {"stranger": "보건소 새 의사", "known": "의사 양반", "master": "우리 의사"}},
 		"known_at": 14,
 		"skill": "cook",
@@ -9193,6 +9196,8 @@ const SOCIETY_LINES := {
 		"deny_strong": "본 사람이 %d명입니다. 부인은 거짓 진술입니다.",
 		"plea_ok": "마을이 자네를 나쁘게 말하지 않더군. 참작한다.",
 		"plea_no": "사정은 누구에게나 있다. 참작할 게 못 된다.",
+		"contempt_choice": "판사에게 대든다",
+		"contempt": "법정 모독이다. 가중한다.",
 		"record": "전과가 있는 피고다. 가중한다.",
 		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 면사무소에 내게.",
 		"verdict_service": "벌금 %dG 에 봉사 %s. 이장에게 빗자루를 받게.",
@@ -9221,8 +9226,8 @@ const SOCIETY_LINES := {
 	# 읍 법원(S4f) — 순회 재판과 같은 자리, 다른 문장. 없는 키는 court 의 것을 쓴다
 	"court_town": {
 		"open": "갈뫼읍 법원, 개정한다. 피고는 앞으로.",
-		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 면사무소에 내게.",
-		"verdict_service": "벌금 %dG 에 봉사 %s. 교진 회관에서 채우게.",
+		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 군청에 내게.",
+		"verdict_service": "벌금 %dG 에 봉사 %s. 군청 마당을 쓸게.",
 		"verdict_jail": "구류 이레. 순경이 데려간다.",
 		"follow": "순경을 따라간다",
 	},
@@ -9264,6 +9269,9 @@ const SOCIETY_LINES := {
 		"desk_indicted": "법원이 너를 부른다. 법원 창구에 서라.",
 		"detained": "사흘 뒤 경찰서 문이 열렸다. 서류는 검찰청으로 갔다.",
 		"court_wait": "순경이 넘긴 서류를 검찰이 보고 있다. 아직 부르지 않는다.",
+		"bus_cop": "순경이 정류장에 서 있다. 발이 안 떨어진다.",
+		"pay_ok": "받았네. 읍 장부에 올리지. 영수증은 챙겨 두게.",
+		"serve_ok": "고맙네. %s째구먼. 마당이 훤하네.",
 	},
 	# 장물아비(S4c) — 여관 뒷방 구씨. 훔친 것만 반값에 산다
 	"fence": {
@@ -9418,6 +9426,7 @@ const SOCIETY_NOTES := {
 	"shop_sold": "어제 좌판에서 %d개가 팔렸다 — %dG. 좌판 금고에 있다.",
 	"shop_none": "어제 좌판에는 손님이 없었다. 값이 비싼가, 물건이 낯선가.",
 	"shop_frozen": "밀린 세금으로 좌판이 영업정지다. 세금부터 내자.",
+	"shop_jailed": "구속 중이라 좌판이 닫혔다. 손님이 발길을 돌렸다.",
 	# ---- 읍(S4d) ----
 	"town_arrive": "갈뫼읍 주택가에 새 얼굴이 왔다 — %s.",
 	"town_crime": "갈뫼읍 장터에 도둑이 들었다고 한다 — %s네 점포.",
@@ -9483,7 +9492,7 @@ const MEMORY_MAX := 60        # memories 상한(오래된 것부터)
 const WORK_LOG_MAX := 12      # work_log 상한 — 「오늘/어제」만 보면 되므로 짧다
 const SEEN_DAYS := [28, 56, 84]   # heat 1/2/3+ 기억이 살아 있는 날수(헌법 §4.2 seen)
 const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45, "burglary": 35, "bribe": 40,
-	"violence": 55, "murder": 75}   # boldness() 문턱(헌법 §5.2) — 강도·주먹다짐 55, 살인 75 는 회색이 아니라 부재
+	"violence": 55, "murder": 75, "flee": 30, "contempt": 55}   # boldness() 문턱(헌법 §5.2) — 55·75 는 회색이 아니라 부재
 # ---- 대면 범죄(S5a, 헌법 §6.1) — 강도·폭행·살인은 언제나 성립하고 문제는 뒤(목격·신고)다 ----
 const FACING_CRIMES := ["robbery", "assault", "murder"]   # 피해자의 진술이 곧 목격 1.0
 const ASSAULT_DOWN_DAYS := 2       # 맞은 사람은 이틀 누워 있다(안 보인다)
@@ -9772,7 +9781,7 @@ func fresh_me() -> Dictionary:
 		# 순회 재판(S2c) — 걸린 기소 하나(재판일까지 자택 대기), 출소한 날(호칭 jailed 이레)
 		"charged": {}, "jail_out_day": -99,
 		# 순경(S2b) — 오늘 순찰의 진행과 검거 실적, 사건마다 물어본 사람
-		"patrol_day": 0, "patrol_idx": 0, "arrests": 0, "case_asked": {},
+		"patrol_day": 0, "patrol_idx": 0, "arrests": 0, "case_asked": {}, "promoted_day": 0,
 		# 자치회(S3c) — 부녀회장이 오늘 찾아간 집
 		"visit_day": 0,
 		# 자기 상점(S3)
@@ -10775,6 +10784,7 @@ func _promotion_tick() -> void:
 	rows[up][0] = "player"
 	me["rank"] = up
 	me["perf"] = 0
+	me["promoted_day"] = day   # 상급자의 그날 첫마디가 통보다(society.talk_opener)
 	_note(str(SOCIETY_NOTES.promoted) % str(pr.get("name", up)))
 
 
@@ -11433,6 +11443,9 @@ func _shop_settle() -> void:
 		if int(stock[id].get("qty", 0)) > 0:
 			ids.append(id)
 	if ids.is_empty():
+		return
+	if int(me.get("jail_days_left", 0)) > 0:
+		_note(str(SOCIETY_NOTES.shop_jailed))   # 구속 중엔 좌판이 닫힌다(헌법 §6.6 「상점은 영업정지만」)
 		return
 	if wage_frozen():
 		_note(str(SOCIETY_NOTES.shop_frozen))

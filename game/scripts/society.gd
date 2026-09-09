@@ -331,8 +331,12 @@ func talk_opener(nid: String, first_today: bool) -> String:
 	# 네 주 밀린 세금 — 이장의 첫마디는 인사가 아니라 독촉이다(헌법 §2.3, 하루 한 번)
 	if nid == "chief" and GameData.tax_dun_active():
 		return "자네, 세금 얘기 좀 하세. 마을이 보고 있네. 면사무소로 오게."
-	# 사흘째 결근한 날, 주인의 첫마디는 인사가 아니라 걱정이다 (부록 §3 — 하루 한 번)
+	# 승진한 아침(S5c) — 상급자가 먼저 말을 건다(헌법 §7.3 「통보는 상급자가 먼저」)
 	var job := _job()
+	if not job.is_empty() and str(job.get("boss", "")) == nid and _me_int("promoted_day") == GameData.day \
+			and str(job.get("promote", {}).get("line", "")) != "":
+		return str(job.get("promote", {}).get("line", ""))
+	# 사흘째 결근한 날, 주인의 첫마디는 인사가 아니라 걱정이다 (부록 §3 — 하루 한 번)
 	if not job.is_empty() and str(job.get("boss", "")) == nid \
 			and _me_int("absent_days") == GameData.ABSENT_WARN:
 		return str(job.get("absent_warn", ""))
@@ -958,7 +962,7 @@ func council_pick(kind: String) -> void:
 
 
 # 「오늘 봉사」 — 하루 한 번, 기력 −20 · 시계 +60분(17시를 넘겨 되감지는 않는다, D14)
-func serve_day() -> void:
+func serve_day(boss := "chief") -> void:
 	if Net.is_guest():
 		return
 	m.dialog.close()
@@ -978,9 +982,11 @@ func serve_day() -> void:
 				mem["forgiven"] = true
 		_rep_add(3)
 		m.dialog.open("", str(GameData.SOCIETY_LINES.meeting.forgiven), [["대화 끝", null]])
-	else:
+	elif boss == "chief":
 		m.dialog.open(_npc_name("chief"), "고맙네. %s째구먼." % GameData.days_kor(served),
 			[["대화 끝", null]], _portrait("chief"))
+	else:
+		m.dialog.open(_npc_name(boss), _pl("serve_ok") % GameData.days_kor(served), [["대화 끝", null]], _portrait(boss))
 	m.saveio.save_now()
 
 
@@ -1733,11 +1739,14 @@ func _trial_open() -> void:
 		pages.append({"text": str(cl.charge_bribe), "name": pros, "portrait": _portrait(_bar())})
 	if bool(ch.get("surrender", false)):
 		pages.append({"text": str(cl.charge_surrender), "name": pros, "portrait": _portrait(_bar())})
-	pages.append({"text": str(cl.ask), "choices": [
+	var stand: Array = [
 		[str(cl.admit_choice), trial_pick.bind("admit")],
 		[str(cl.deny_choice), trial_pick.bind("deny")],
 		[str(cl.plea_choice), trial_pick.bind("plea")],
-	]})
+	]
+	if _me_int("boldness_base", -1) != -1 and GameData.boldness() >= int(GameData.GATE.get("contempt", 55)):
+		stand.append([str(cl.contempt_choice), trial_pick.bind("contempt")])   # 법정 모독(S5c) — 55 부터
+	pages.append({"text": str(cl.ask), "choices": stand})
 	m.dialog.open_seq(_npc_name(_bench()), _portrait(_bench()), pages)
 
 
@@ -1781,6 +1790,11 @@ func trial_pick(kind: String) -> void:
 				pages.append({"text": str(cl.plea_ok)})
 			else:
 				pages.append({"text": str(cl.plea_no)})
+		"contempt":
+			tier += 1
+			GameData.bold_add(3.0)
+			_rep_add(-5, region)
+			pages.append({"text": str(cl.contempt)})
 		_:
 			return
 	if str(ch.get("kind", "")) == "murder" and not acquit:
@@ -2473,7 +2487,43 @@ func open_town_ledger() -> void:
 				body += " · 이자 %d · 상환 %d" % [int(r.get("interest", 0)), int(r.get("repay", 0))]
 			if str(r.get("project", "")) != "":
 				body += " · 「%s」 착공" % str(GameData.town_project(str(r.project)).get("name", ""))
-	m.dialog.open("읍 장부", body, [["나간다", null]])
+	# 미룬 것 정리(S5c) — 읍 법원 벌금도 세금도 여기서 낸다(돈은 제 장부로), 읍 봉사는 군청 마당
+	var btns: Array = []
+	var due := GameData.tax_due_total()
+	if due > 0 and not Net.is_guest():
+		var has_fine := false
+		for fb in GameData.unpaid_bills():
+			if str(fb.get("kind", "")) == "fine":
+				has_fine = true
+		var what := "세금·벌금" if has_fine else "세금"
+		if GameData.money >= due:
+			btns.append(["%s 내기 — %dG" % [what, due], _pay_tax_town])
+		else:
+			btns.append(gray("%s 내기 — %dG" % [what, due], "그만한 돈이 없다. 모아서 오자."))
+	var rec: Dictionary = GameData.service_pending()
+	if not rec.is_empty() and str(rec.get("court", "")) == "town" and not Net.is_guest():
+		if int(rec.get("served_day", 0)) == GameData.day:
+			btns.append(gray("오늘 봉사", "오늘 몫은 했다."))
+		elif GameData.hour_now() >= GameData.SERVICE_LAST_HOUR:
+			btns.append(gray("오늘 봉사", "오늘은 늦었다. 내일 아침에 오자."))
+		else:
+			btns.append(["오늘 봉사", serve_day.bind("mayor_kang")])
+	btns.append(["나간다", null])
+	m.dialog.open("읍 장부", body, btns)
+
+
+func _pay_tax_town() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var paid := GameData.pay_tax()
+	if paid <= 0:
+		open_town_ledger()
+		return
+	Sound.play_sfx("sfx_coin")
+	m.dialog.open(_npc_name("mayor_kang"), _pl("pay_ok"),
+		[["돌아가기", open_town_ledger], ["대화 끝", null]], _portrait("mayor_kang"))
+	m.saveio.save_now()
 
 
 func _is_county_clerk() -> bool:

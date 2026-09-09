@@ -627,10 +627,15 @@ func open_bus_stop(t: Vector2i) -> void:
 		m.dialog.open("정류장", "기사가 문을 열어 주지 않는다. 마을에 도는 내 얘기 때문이다.", [["닫기", null]])
 		return
 	var btns: Array = []
-	if GameData.money >= GameData.BUS_FARE:
-		btns.append(["%s행 — %dG" % [dest_name, GameData.BUS_FARE], _bus_ride.bind(dest_key)])
+	var lbl := "%s행 — %dG" % [dest_name, GameData.BUS_FARE]
+	if here == "town" and GameData.town_wanted_active() \
+			and GameData.boldness() < int(GameData.GATE.get("flee", 30)):
+		# 도망(S5c, 헌법 §6.3) — 수배 중 버스는 대범함 30 부터. 그 아래는 정류장의 순경 앞에서 발이 안 떨어진다
+		btns.append(m.society.gray(lbl, str(GameData.SOCIETY_LINES.police_town.bus_cop)))
+	elif GameData.money >= GameData.BUS_FARE:
+		btns.append([lbl, _bus_ride.bind(dest_key)])
 	else:
-		btns.append(m.society.gray("%s행 — %dG" % [dest_name, GameData.BUS_FARE], "차비가 없다."))
+		btns.append(m.society.gray(lbl, "차비가 없다."))
 	btns.append(["닫기", null])
 	m.dialog.open("정류장", "%s행 버스가 선다. 반 시간이면 닿는다." % dest_name, btns)
 
