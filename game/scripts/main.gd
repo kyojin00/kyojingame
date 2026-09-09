@@ -812,7 +812,8 @@ const HAMLET_OF := {
 }
 const HAMLET_NPC_IDS := ["miller", "dyer", "brook", "sawyer", "beekeep", "teller"]
 # 사회(S2b~)가 데려오는 사람들 — 고장 사람과 같은 도트 판(make_settlers.js)에서 색만 갈아 낀다
-const SOCIETY_NPC_IDS := ["officer_park"]
+# 순회 판사·검사(S2c)는 NPC 노드 없이 초상·도트만 싣는다 — 주민 수에 들지 않는다
+const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]
 
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.

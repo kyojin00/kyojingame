@@ -82,6 +82,8 @@ func _npc_name(nid: String) -> String:
 
 
 func _portrait(nid: String) -> Texture2D:
+	if not GameData.affinity.has(nid):
+		return m.tex.get("npc_%s_portrait_normal" % nid)   # 순회 판사·검사(S2c) — 주민이 아니라 호감도가 없다
 	return m.village._npc_portrait(nid)
 
 
@@ -800,10 +802,10 @@ func pickpocket(nid: String, roll := -1.0) -> void:
 
 # 기억 한 줄 — 「누가 봤는가」만 적는다. 저장은 부른 쪽이 한 번에 한다
 func _remember(kind: String, target: String, witnesses: Array, value: int,
-		reported: bool) -> void:
+		reported: bool, heat := 1) -> void:
 	var mems: Array = GameData.me.get("memories", [])
 	mems.append({
-		"day": GameData.day, "kind": kind, "heat": 1, "region": "kyojin",
+		"day": GameData.day, "kind": kind, "heat": heat, "region": "kyojin",
 		"witnesses": witnesses.duplicate(), "forgiven": false, "target": target,
 		"value": value, "reported_day": GameData.day if reported else 0, "settled": "",
 	})
@@ -941,16 +943,22 @@ func open_township() -> void:
 		return
 	m.dialog.close()
 	var due := GameData.tax_due_total()
+	# 벌금 고지서(S2c 재판)는 세금과 같은 창구·같은 사다리다 — 이름만 달리 부른다
+	var has_fine := false
+	for fb in GameData.unpaid_bills():
+		if str(fb.get("kind", "")) == "fine":
+			has_fine = true
+	var what := "세금·벌금" if has_fine else "세금"
 	var body := ""
 	if due > 0:
 		var w := GameData.arrears_weeks()
 		if w == 0:
 			# 아직 기한 안 — 밀린 게 아니라 「이번 계절 것」이다
 			var last: Dictionary = GameData.unpaid_bills()[-1]
-			body += "이번 계절 세금 %dG — 기한은 이 계절 %d일까지\n" \
-				% [due, (int(last.get("due_day", GameData.day)) - 1) % GameData.DAYS_PER_SEASON + 1]
+			body += "이번 계절 %s %dG — 기한은 이 계절 %d일까지\n" \
+				% [what, due, (int(last.get("due_day", GameData.day)) - 1) % GameData.DAYS_PER_SEASON + 1]
 		else:
-			body += "밀린 세금 %dG — 체납 %d주째, 이자가 붙었다\n" % [due, w]
+			body += "밀린 %s %dG — 체납 %d주째, 이자가 붙었다\n" % [what, due, w]
 	elif int(GameData.me.get("tax_paid_season", -1)) == GameData.season_no():
 		body += "이번 계절 세금은 냈다. 영수증이 있다.\n"
 	else:
@@ -970,10 +978,20 @@ func open_township() -> void:
 	var btns: Array = []
 	if due > 0:
 		if GameData.money >= due:
-			btns.append(["세금 내기 — %dG" % due, _pay_tax])
+			btns.append(["%s 내기 — %dG" % [what, due], _pay_tax])
 		else:
-			btns.append(gray("세금 내기 — %dG" % due, "그만한 돈이 없다. 모아서 오자."))
+			btns.append(gray("%s 내기 — %dG" % [what, due], "그만한 돈이 없다. 모아서 오자."))
 	btns.append(["예산 장부", _open_ledger])
+	# 전과 말소(S2c) — 인지세. 형이 끝나고 스무여드레 조용히 지낸 뒤에만, 이유는 창구가 말한다
+	if GameData.record_unexpunged():
+		var why_x := GameData.can_expunge()
+		var lbl_x := "전과 말소 — %dG" % GameData.EXPUNGE_COST
+		if why_x != "":
+			btns.append(gray(lbl_x, why_x))
+		elif GameData.money < GameData.EXPUNGE_COST:
+			btns.append(gray(lbl_x, "그만한 돈이 없다. 인지세일세."))
+		else:
+			btns.append([lbl_x, expunge])
 	var employed := GameData.job_inst() == "township"
 	if employed:
 		if can_work("hall") == "":
@@ -1398,4 +1416,278 @@ func case_arrest(cid: int, nid: String) -> void:
 		_rep_add(-5)
 		GameData.aff_add(nid, -10)
 		m.dialog.open(_npc_name(nid), "나를? 무슨 근거로! 마을 사람들이 다 보고 있네.", [["…물러선다", null]], _portrait(nid))
+	m.saveio.save_now()
+
+
+# ---- 빈집 잠입·순회 재판·구류·전과 말소 (S2c) ----
+#
+# 남의 집 문 앞에서 시작해 피고석에서 끝나는 길. 즉결(순경)은 heat 1 까지고, 빈집(heat 2)은
+# 이장의 회의가 아니라 기소다 — 다음 재판일(계절 7·21일)까지 자택 대기, 회관에서 윤 판사가
+# 형을 정한다. 형은 셋뿐: 벌금 고지서 / 벌금 + 봉사 이레 / 구류 이레(serve_jail 이 하루를
+# 일곱 번 넘긴다 — 밭은 마른다). 돈은 여기서도 창구로만 간다: 벌금은 면사무소 고지서다.
+
+func _lines(key: String) -> Dictionary:
+	return GameData.SOCIETY_LINES.get(key, {})
+
+
+# 정착민의 집 문 앞 — 두드리거나, 몰래 들어가거나. 주인이 안에 있으면(저녁·집 시간) 손이 안 간다
+func house_door(nid: String) -> void:
+	m.dialog.close()
+	var hl := _lines("house")
+	var name := _npc_name(nid)
+	if Net.is_guest():
+		m.dialog.open("%s의 집" % name, str(hl.sign) % name, [["돌아선다", null]])
+		return
+	var owner_home: bool = GameData.is_evening() or m.npcmgr.npc_place_now(nid) == "home"
+	var sneak := str(hl.sneak_choice)
+	var sneak_btn: Array
+	if _me_int("boldness_base", -1) == -1 or GameData.boldness() < int(GameData.GATE.get("burglary", 35)):
+		sneak_btn = gray(sneak, str(hl.gray_bold))
+	elif owner_home:
+		sneak_btn = gray(sneak, str(hl.gray_home))
+	elif GameData.charged_active() or GameData.wanted_active():
+		sneak_btn = gray(sneak, str(hl.gray_court))
+	else:
+		sneak_btn = [sneak, burglary.bind(nid)]
+	m.dialog.open("%s의 집" % name, str(hl.sign) % name,
+		[[str(hl.knock_choice), _knock.bind(nid, owner_home)], sneak_btn, ["돌아선다", null]])
+
+
+func _knock(nid: String, owner_home: bool) -> void:
+	m.dialog.close()
+	var hl := _lines("house")
+	if owner_home:
+		m.dialog.open("", str(hl.knock_home) % _npc_name(nid), [["돌아선다", null]])
+	else:
+		m.dialog.open("", str(hl.knock_empty), [["돌아선다", null]])
+
+
+# 궤짝의 물건 — 주인이 아끼는 것(loves·likes) 중 하나, 날짜로 정해진다
+func _house_loot(nid: String) -> String:
+	var d := GameData.npc_def(nid)
+	var pool: Array = []
+	for iid in Array(d.get("loves", [])) + Array(d.get("likes", [])):
+		if GameData.ITEMS.has(str(iid)):
+			pool.append(str(iid))
+	if pool.is_empty():
+		return "wood"
+	return str(pool[posmod(GameData.day, pool.size())])
+
+
+# 빈집 잠입 — theft_p(0.30, 밤, 목격자). 성공: 물건 하나·손버릇 +10·대범함 +3, 본 사람이 있으면
+# 기억(heat 2). 실패: 주인이 돌아왔다 — 주인이 곧 목격자, 신고는 확정(다음날 기소)
+func burglary(nid: String, roll := -1.0) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var hl := _lines("house")
+	var witnesses := _witnesses(nid)
+	var p: float = GameData.theft_p(GameData.BURGLARY_P, GameData.is_evening(), witnesses.size())
+	var pages: Array = []
+	if _roll(roll) < p:
+		var iid := _house_loot(nid)
+		GameData.items[iid] = int(GameData.items.get(iid, 0)) + 1
+		var stolen: Dictionary = GameData.me.get("stolen", {})
+		stolen[iid] = int(stolen.get(iid, 0)) + 1
+		GameData.me["stolen"] = stolen
+		GameData.me["theft_xp"] = float(GameData.me.get("theft_xp", 0.0)) + 10.0
+		GameData.bold_add(3.0)
+		if not witnesses.is_empty():
+			var reported := false
+			for wid: String in witnesses:
+				if _tells(wid):
+					reported = true
+			_remember("burglary", nid, witnesses, maxi(GameData.item_value(iid), 20), reported, 2)
+		pages.append({"text": str(hl.ok) % str(GameData.ITEMS[iid].get("name", iid))})
+	else:
+		GameData.me["theft_xp"] = float(GameData.me.get("theft_xp", 0.0)) + 3.0
+		GameData.bold_add(1.0)
+		GameData.aff_add(nid, -15)
+		_remember("burglary", nid, [nid] + witnesses, 20, true, 2)
+		pages.append({"text": str(hl.fail)})
+		pages.append({"text": str(hl.owner_fail), "name": _npc_name(nid), "portrait": _portrait(nid)})
+	if not witnesses.is_empty():
+		var wid := str(witnesses[0])
+		pages.append({"text": str(GameData.SOCIETY_LINES.theft.witness[posmod(GameData.day, 3)]),
+			"name": _npc_name(wid), "portrait": _portrait(wid)})
+	pages[-1]["choices"] = [["자리를 뜬다", null]]
+	m.dialog.open_seq("", null, pages)
+	m.saveio.save_now()
+
+
+# 피고석 — 재판일에 회관에서. 판사가 열고, 검사가 읽고, 내가 답한다
+func open_trial() -> void:
+	if Net.is_guest() or not GameData.charged_active() or not GameData.is_court_day():
+		return
+	m.dialog.close()
+	var cl := _lines("court")
+	var ch: Dictionary = GameData.me.charged
+	var pros := _npc_name("prosecutor_han")
+	var pages: Array = [
+		{"text": str(cl.open)},
+		{"text": str(cl.charge) % [_npc_name(str(ch.get("target", ""))), int(ch.get("seen", 1))],
+			"name": pros, "portrait": _portrait("prosecutor_han")},
+	]
+	if int(ch.get("skips", 0)) > 0:
+		pages.append({"text": str(cl.charge_skips) % int(ch.get("skips", 0)),
+			"name": pros, "portrait": _portrait("prosecutor_han")})
+	pages.append({"text": str(cl.ask), "choices": [
+		[str(cl.admit_choice), trial_pick.bind("admit")],
+		[str(cl.deny_choice), trial_pick.bind("deny")],
+		[str(cl.plea_choice), trial_pick.bind("plea")],
+	]})
+	m.dialog.open_seq(_npc_name("judge_yoon"), _portrait("judge_yoon"), pages)
+
+
+# 판결 — 단계 = heat + 거른 재판 + 전과 − (평판 40) − (인정) − (사정, 평판 20) + (부인, 본 사람 있음).
+# 1 벌금 / 2 벌금 + 봉사 이레 / 3 구류 이레. 부인했는데 본 사람이 주인뿐이면 무죄(증거 부족)
+func trial_pick(kind: String) -> void:
+	if Net.is_guest() or not GameData.charged_active():
+		return
+	m.dialog.close()
+	var cl := _lines("court")
+	var ch: Dictionary = GameData.me.charged
+	var pros := _npc_name("prosecutor_han")
+	var rep := int(GameData.me.reputation.kyojin)
+	var tier: int = int(ch.get("heat", 2)) + int(ch.get("skips", 0))
+	var pages: Array = []
+	if GameData.record_unexpunged():
+		tier += 1
+		pages.append({"text": str(cl.record)})
+	if rep >= 40:
+		tier -= 1
+	var acquit := false
+	match kind:
+		"admit":
+			tier -= 1
+			pages.append({"text": str(cl.admit)})
+		"deny":
+			if int(ch.get("others", 0)) == 0:
+				acquit = true
+				pages.append({"text": str(cl.deny_weak)})
+			else:
+				tier += 1
+				pages.append({"text": str(cl.deny_strong) % int(ch.get("seen", 1)),
+					"name": pros, "portrait": _portrait("prosecutor_han")})
+		"plea":
+			if rep >= 20:
+				tier -= 1
+				pages.append({"text": str(cl.plea_ok)})
+			else:
+				pages.append({"text": str(cl.plea_no)})
+		_:
+			return
+	# 그 일의 기억 — 판결이 매듭이다
+	var mem: Dictionary = {}
+	for cand: Dictionary in GameData.me.get("memories", []):
+		if int(cand.get("day", -1)) == int(ch.get("day", -2)) \
+				and str(cand.get("target", "")) == str(ch.get("target", "")):
+			mem = cand
+	var jail := false
+	if acquit:
+		if not mem.is_empty():
+			mem["settled"] = "acquitted"
+		pages.append({"text": str(cl.acquit)})
+	else:
+		tier = clampi(tier, 1, 3)
+		var value: int = maxi(int(ch.get("value", 0)), 20)
+		var fine := 0
+		var rec := {"day": GameData.day, "crime": str(ch.get("kind", "burglary")), "court": "circuit",
+			"verdict": "fine", "sentence": 0, "served": 0, "served_day": 0, "expunged": false}
+		match tier:
+			1:
+				fine = maxi(GameData.FINE_MIN, value * GameData.FINE_MULT)
+				pages.append({"text": str(cl.verdict_fine) % fine})
+			2:
+				fine = maxi(GameData.FINE_MIN * 2, value * 5)
+				rec.verdict = "service"
+				rec.sentence = 7
+				pages.append({"text": str(cl.verdict_service) % [fine, GameData.days_kor(7)]})
+			_:
+				jail = true
+				rec.verdict = "jail"
+				rec.sentence = GameData.JAIL_DAYS
+				rec.served = GameData.JAIL_DAYS
+				rec.served_day = GameData.day + GameData.JAIL_DAYS
+				pages.append({"text": str(cl.verdict_jail)})
+		if fine > 0:
+			_fine_bill(fine)
+		var recs: Array = GameData.me.get("record", [])
+		recs.append(rec)
+		GameData.me["record"] = recs
+		if not mem.is_empty():
+			mem["settled"] = "convicted"
+			mem["forgiven"] = true
+		_rep_add(-15)
+		GameData.bold_add(-5.0)
+	GameData.me["charged"] = {}
+	if jail:
+		pages[-1]["choices"] = [[str(cl.follow), serve_jail.bind(GameData.JAIL_DAYS)]]
+	else:
+		pages[-1]["choices"] = [[str(cl.leave), null]]
+	m.dialog.open_seq(_npc_name("judge_yoon"), _portrait("judge_yoon"), pages)
+	m.saveio.save_now()
+
+
+# 벌금은 고지서다 — 돈은 창구 앞 E 로만(헌법 §0.3). 세금과 같은 목록·같은 체납 사다리
+func _fine_bill(fine: int) -> void:
+	var bills: Array = GameData.me.get("tax_bills", [])
+	bills.append({"season": GameData.season_no(), "day": GameData.day, "income": 0, "property": 0,
+		"total": fine, "paid": 0, "due_day": GameData.day + GameData.TAX_DUE_DAYS - 1, "kind": "fine"})
+	while bills.size() > GameData.TAX_BILLS_MAX:
+		bills.pop_front()
+	GameData.me["tax_bills"] = bills
+
+
+# 구류 — 하루 넘김을 days 번. 밭은 마르고, 결근은 쌓이고(이레면 자리를 잃는다), 고지서 기한은
+# 그만큼 미뤄진다(복역 중 체납 정지). 이레 뒤 파출소 문 앞에서 깬다. 마지막 아침 결산이 남는다
+func serve_jail(days: int) -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	if m.shop_room.visible:
+		m.shop_room.close()
+	GameData.jail_begin(days)
+	for i in days:
+		m.daycycle._next_day(false)
+	if GameData.village_built.has("inn"):
+		var t: Vector2i = m.door_tile(m.VILLAGE_PLOTS["inn"].anchor) + Vector2i(0, 1)
+		m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
+	m.saveio.save_now()
+
+
+# 방청 — 기소가 없는 재판일, 판사가 순경이 넘긴 사건을 읽는다(마을이 법을 본다)
+func open_docket() -> void:
+	m.dialog.close()
+	var cl := _lines("court")
+	var pages: Array = [{"text": str(cl.open)}]
+	var docket := GameData.court_docket()
+	if docket.is_empty():
+		pages.append({"text": str(cl.docket_none)})
+	else:
+		pages.append({"text": str(cl.docket_open) % docket.size()})
+		for c in docket:
+			pages.append({"text": str(cl.docket_line) % [_npc_name(str(c.get("suspect", ""))),
+				_npc_name(str(c.get("victim", ""))), GameData.NPC_FINE]})
+	pages.append({"text": str(cl.docket_close), "choices": [[str(cl.leave), null]]})
+	m.dialog.open_seq(_npc_name("judge_yoon"), _portrait("judge_yoon"), pages)
+
+
+# 전과 말소 — 면사무소 창구, 인지세 500(예산으로). 임용 심사가 다시 0 으로 센다. 평판 +10
+func expunge() -> void:
+	if Net.is_guest():
+		return
+	m.dialog.close()
+	var why := GameData.can_expunge()
+	if why == "" and GameData.money < GameData.EXPUNGE_COST:
+		why = "인지세 %dG 이 있어야 하네." % GameData.EXPUNGE_COST
+	if why != "":
+		m.dialog.open(_npc_name("chief"), why, [["알겠습니다", open_township]], _portrait("chief"))
+		return
+	GameData.money -= GameData.EXPUNGE_COST
+	GameData.today_spent += GameData.EXPUNGE_COST
+	GameData.gov_budget["kyojin"] = int(GameData.gov_budget.get("kyojin", 0)) + GameData.EXPUNGE_COST
+	GameData.expunge_records()
+	_rep_add(10)
+	m.dialog.open(_npc_name("chief"), str(_lines("court").expunge_ok), [["대화 끝", null]], _portrait("chief"))
 	m.saveio.save_now()

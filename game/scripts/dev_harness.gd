@@ -5949,6 +5949,176 @@ func _debug_tick() -> void:
 				" 수배=", wanted_ok, " 추적=", chase_ok, " 체포=", caught_ok, " 벌금=", fine_ok, " 자수=", sur_ok)
 			_s2_police_teardown(cop_new3)
 			_s2_restore(k_wa)
+		259:
+			# ---- 순회 재판(S2c) — 빈집 문 앞·잠입·발각·기소·재판일·판결(벌금/구류)·방청 ----
+			var k_ct := _s2_keep()
+			var items_ct: Dictionary = GameData.items.duplicate()
+			var homes_ct: Dictionary = GameData.settler_homes.duplicate(true)
+			m.dialog.close()
+			_s2_fresh_gov()
+			var cop_ct := _s2_police_setup()
+			# 정착민 하나에 집을 준다(노드는 안 심는다 — 잠입은 문 앞 대화로 판정된다).
+			# 나는 마을 구석에 선다: 반경 여섯 칸에 아무도 없어야 목격자 셈이 0 이다
+			GameData.settler_homes["farmer"] = [60, 60]
+			if not GameData.npc_greeted.has("farmer"):
+				GameData.npc_greeted.append("farmer")
+			m.player.position = Vector2(5 * m.TILE + 16, 5 * m.TILE + 16)
+			GameData.me.boldness_base = 40
+			GameData.day = 5                                   # 계절 5일 — 이틀 뒤(7일)가 재판일
+			var keep_min_ct := GameData.minutes
+			var away_h := 10
+			for hh in range(9, 18):
+				GameData.minutes = hh * 60
+				if m.npcmgr.npc_place_now("farmer") != "home":
+					away_h = hh
+					break
+			GameData.minutes = away_h * 60
+			# 문 앞 — 주인이 밖에 있는 낮엔 「몰래 들어간다」가 산다, 저녁엔 회색
+			m.society.house_door("farmer")
+			var door_ok: bool = m.dialog.visible and "몰래 들어간다" in _btn_texts()
+			GameData.minutes = 20 * 60
+			m.society.house_door("farmer")
+			var night_gray: bool = "… 몰래 들어간다" in _btn_texts()
+			GameData.minutes = away_h * 60
+			m.dialog.close()
+			# 잠입 성공(굴림 0) — 본 사람이 없으면 기억도 없다. 물건 하나, 손버릇 +10
+			var mem_n: int = GameData.me.memories.size()
+			m.society.burglary("farmer", 0.0)
+			m.dialog.close()
+			var loot_ok: bool = GameData.me.memories.size() == mem_n and float(GameData.me.theft_xp) >= 10.0
+			# 잠입 실패(굴림 1) — 주인이 돌아왔다: heat 2 기억, 주인이 목격자, 신고 확정
+			m.society.burglary("farmer", 1.0)
+			m.dialog.close()
+			var mem_ct: Dictionary = GameData.me.memories[-1]
+			var fail_ok: bool = int(mem_ct.heat) == 2 and int(mem_ct.reported_day) == GameData.day \
+				and "farmer" in mem_ct.witnesses
+			# 다음날 아침 — 이장의 회의가 아니라 기소. 재판은 7일
+			GameData.day += 1
+			GameData.society_new_day([0, 0, 0])
+			var n_ct := GameData.society_note()
+			# society_new_day 의 _apply_me 가 기억 그릇을 새로 짓는다 — 옛 참조는 버리고 다시 집는다
+			mem_ct = GameData.me.memories[-1]
+			var charged_ok: bool = GameData.charged_active() and n_ct.contains("기소") \
+				and not GameData.council_pending() and int(GameData.me.charged.court_day) == 7 \
+				and str(mem_ct.settled) == "charged"
+			# 재판일 아침 — 알림, 회관 첫 단추가 피고석
+			GameData.day = 7
+			GameData.society_new_day([0, 0, 0])
+			var n_ct2 := GameData.society_note()
+			m.village._open_hall_dialog()
+			var hall_btns: Array = _btn_texts()
+			m.dialog.close()
+			# 단추 목록엔 같은 프레임에 닫힌 창의 단추가 아직 남아 있다(queue_free) — 자리가 아니라 있음을 본다
+			mem_ct = GameData.me.memories[-1]
+			var court_ok: bool = GameData.is_court_day() and n_ct2.contains("순회 재판") \
+				and "★ 순회 재판 — 피고석에 선다" in hall_btns
+			# 판결 ① 인정 — heat 2 − 1 = 벌금 200 고지서(창구 「세금·벌금 내기」), 전과 circuit, 평판 −15
+			var rep_ct := int(GameData.me.reputation.kyojin)
+			var bills_n: int = GameData.me.tax_bills.size()
+			m.society.open_trial()
+			var trial_open: bool = m.dialog.visible and m.dialog._seq.size() >= 3
+			m.society.trial_pick("admit")
+			m.dialog.close()
+			var rec_ct: Dictionary = GameData.me.record[-1] if not GameData.me.record.is_empty() else {}
+			m.society.open_township()
+			var twn_btns: Array = _btn_texts()
+			m.dialog.close()
+			var fine_ok: bool = trial_open and not GameData.charged_active() \
+				and str(rec_ct.get("verdict", "")) == "fine" and str(rec_ct.get("court", "")) == "circuit" \
+				and GameData.me.tax_bills.size() == bills_n + 1 \
+				and str(GameData.me.tax_bills[-1].get("kind", "")) == "fine" \
+				and int(GameData.me.tax_bills[-1].total) == 200 \
+				and int(GameData.me.reputation.kyojin) == rep_ct - 15 and bool(mem_ct.forgiven) \
+				and ("세금·벌금 내기 — 200G" in twn_btns or "… 세금·벌금 내기 — 200G" in twn_btns)
+			# 판결 ② 재판을 거르고 부인 — 거른 1 + 전과 1 + 부인 1: 구류. 아침마다 하루 줄고, 이레째 나온다
+			GameData.me.charged = {"day": 7, "kind": "burglary", "target": "farmer", "value": 20,
+				"others": 1, "seen": 2, "heat": 2, "court_day": 21, "skips": 0, "since": 7}
+			GameData.day = 22
+			GameData.society_new_day([0, 0, 0])
+			var n_ct3 := GameData.society_note()
+			var skip_ok: bool = n_ct3.contains("가중") and int(GameData.me.charged.skips) == 1 \
+				and int(GameData.me.charged.court_day) == 35
+			GameData.day = 35
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			m.society.open_trial()
+			m.society.trial_pick("deny")
+			var jail_page: bool = m.dialog.visible and str(m.dialog._seq[-1].text).contains("구류")
+			m.dialog.close()
+			var rec_j: Dictionary = GameData.me.record[-1]
+			# 구류 장부 — 고지서 기한이 이레 미뤄지고, 아침 일곱 번이면 나온다(하루 넘김 자체는 serve_jail 의 몫)
+			var due_before := int(GameData.me.tax_bills[-1].due_day)
+			GameData.jail_begin(GameData.JAIL_DAYS)
+			var out_day := -1
+			var n_jail := ""
+			for dj in range(36, 36 + GameData.JAIL_DAYS):
+				GameData.day = dj
+				GameData.society_new_day([0, 0, 0])
+				n_jail = GameData.society_note()
+				if int(GameData.me.jail_days_left) == 0:
+					out_day = dj
+					break
+			var jail_ok: bool = jail_page and str(rec_j.verdict) == "jail" and out_day == 42 \
+				and int(GameData.me.jail_out_day) == 42 and n_jail.contains("파출소를 나왔다") \
+				and int(GameData.me.tax_bills[-1].due_day) == due_before + GameData.JAIL_DAYS \
+				and str(GameData.player_title("chief").cls) == "jailed" and not GameData.charged_active()
+			# 방청 — 기소가 없는 재판일(계절 2 의 21일 = 49일), 순경이 닫은 사건을 판사가 읽는다
+			GameData.day = 49
+			GameData.cases = [{"id": 1, "crime": "burglary", "day": 46, "suspect": "miner", "victim": "merchant",
+				"witness": "farmer", "evidence": 2, "stage": "closed", "closed_by": "officer", "deadline": 76}]
+			GameData.society_new_day([0, 0, 0])
+			var n_ct4 := GameData.society_note()
+			m.village._open_hall_dialog()
+			var hall_btns2: Array = _btn_texts()
+			m.dialog.close()
+			m.society.open_docket()
+			var read_miner := false
+			for pg in m.dialog._seq:
+				if str(pg.text).contains(GameData.npc_def("miner").name):
+					read_miner = true
+			m.dialog.close()
+			var docket_ok: bool = n_ct4.contains("윤 판사") and "순회 재판 방청" in hall_btns2 and read_miner
+			GameData.minutes = keep_min_ct
+			print("COURT_OK=", door_ok and night_gray and loot_ok and fail_ok and charged_ok and court_ok
+				and fine_ok and skip_ok and jail_ok and docket_ok,
+				" 문앞=", door_ok, " 저녁회색=", night_gray, " 잠입=", loot_ok, " 발각=", fail_ok,
+				" 기소=", charged_ok, " 재판일=", court_ok, " 벌금=", fine_ok, " 가중=", skip_ok,
+				" 구류=", jail_ok, " 방청=", docket_ok)
+			GameData.items = items_ct
+			GameData.settler_homes = homes_ct
+			_s2_police_teardown(cop_ct)
+			_s2_restore(k_ct)
+		271:
+			# ---- 전과 말소(S2c) — 면사무소 창구, 인지세 500. 형 끝 스무여드레 뒤에만, 임용 심사가 다시 0 ----
+			var k_ex := _s2_keep()
+			m.dialog.close()
+			_s2_fresh_gov()
+			var cop_ex := _s2_police_setup()
+			GameData.money = 1000
+			GameData.me.reputation.kyojin = 30
+			GameData.aff_add("chief", 30 - GameData.aff("chief"))
+			GameData.me.record = [{"day": 60, "crime": "burglary", "court": "circuit", "verdict": "fine",
+				"sentence": 0, "served": 0, "served_day": 0, "expunged": false}]
+			GameData.day = 80
+			var refuse_ex: String = m.society.can_hire_job("township_clerk")
+			m.society.open_township()
+			var early_btns: Array = _btn_texts()
+			m.dialog.close()
+			var early_ok: bool = refuse_ex.contains("전과") and "… 전과 말소 — 500G" in early_btns
+			GameData.day = 100
+			m.society.open_township()
+			var ready_ok: bool = "전과 말소 — 500G" in _btn_texts()
+			m.dialog.close()
+			var budget_ex := int(GameData.gov_budget.kyojin)
+			m.society.expunge()
+			m.dialog.close()
+			var done_ok: bool = GameData.money == 500 and int(GameData.gov_budget.kyojin) == budget_ex + 500 \
+				and bool(GameData.me.record[0].expunged) and int(GameData.me.reputation.kyojin) == 40 \
+				and not m.society.can_hire_job("township_clerk").contains("전과")
+			print("EXPUNGE_OK=", early_ok and ready_ok and done_ok, " 이르다=", early_ok, "(", refuse_ex, ")",
+				" 청구=", ready_ok, " 말소=", done_ok)
+			_s2_police_teardown(cop_ex)
+			_s2_restore(k_ex)
 		252:
 			# 집 꾸미기 — 깔려 있는 러그를 집어 옮길 수 있어야 한다.
 			# 예전에는 안내에 **집는 키가 적혀 있지 않아** 「깔려 있는데

@@ -98,6 +98,17 @@ const SETTLERS = {
     // 제복은 그 보랏빛 계열을 통째로 남색으로 넘긴다 (다른 주민은 손대지 않는다)
     uniform: (r, g, b) => [Math.round(r * 0.30 + 10), Math.round(g * 0.38 + 20), Math.round(b * 0.42 + 50)],
   },
+  // -- 순회 재판(S2c) — 읍에서 오는 두 사람. 노드 없이 초상·도트만 쓴다 --
+  judge_yoon: {      // 윤 판사 — 검은 법복 / 흰머리 섞인 회색
+    cloth: (r, g, b) => [Math.round(r * 0.14 + 8), Math.round(g * 0.14 + 8), Math.round(b * 0.16 + 12)],
+    hair:  (r, g, b) => [Math.round(r * 0.60 + 90), Math.round(g * 0.60 + 90), Math.round(b * 0.60 + 92)],
+    uniform: (r, g, b) => [Math.round(r * 0.14 + 8), Math.round(g * 0.14 + 8), Math.round(b * 0.16 + 12)],
+  },
+  prosecutor_han: {  // 한 검사 — 짙은 회색 양복 / 검은 머리
+    cloth: (r, g, b) => [Math.round(r * 0.26 + 30), Math.round(g * 0.26 + 30), Math.round(b * 0.28 + 34)],
+    hair:  (r, g, b) => [Math.round(r * 0.18 + 6), Math.round(g * 0.18 + 6), Math.round(b * 0.20 + 10)],
+    uniform: (r, g, b) => [Math.round(r * 0.26 + 30), Math.round(g * 0.26 + 30), Math.round(b * 0.28 + 34)],
+  },
 };
 // ONLY=아이디 로 한 사람만 다시 뽑는다 — 나머지는 이미 sprites/ 에 있는 그대로 둔다
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;

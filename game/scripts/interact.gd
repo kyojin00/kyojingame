@@ -432,7 +432,14 @@ func interact() -> void:
 					break
 			return
 		if obj.kind == "house":
-			_enter_building(_building_kind_at(t))
+			var bk := _building_kind_at(t)
+			if bk == "":
+				# 정착민의 집(S2c) — 마을 부지가 아닌 집은 문 앞 대화다: 두드리거나, 몰래 들어가거나
+				var owner := _settler_house_at(t)
+				if owner != "":
+					m.society.house_door(owner)
+					return
+			_enter_building(bk)
 			return
 	# 자연물: E키가 기본 상호작용 (나무=도끼 벌목, 돌=곡괭이 채광)
 	var tobj: Variant = m.objects.get(target_tile())
@@ -513,6 +520,18 @@ func nearby_animal() -> Node2D:
 		if (a.position - m.player.position).length() < PET_DIST:
 			return a
 	return null
+
+
+# 이 칸을 덮은 정착민의 집 주인 — 없으면 "". 집은 앵커에서 5×4 다(마을 부지와 같은 틀)
+func _settler_house_at(t: Vector2i) -> String:
+	for nid in GameData.settler_homes:
+		var h: Array = GameData.settler_homes[nid]
+		if h.size() < 2:
+			continue
+		var a := Vector2i(int(h[0]), int(h[1]))
+		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
+			return str(nid)
+	return ""
 
 
 func _building_kind_at(t: Vector2i) -> String:

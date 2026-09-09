@@ -697,6 +697,16 @@ func _open_hall_dialog() -> void:
 	if GameData.hall_feature_open("office"):
 		btns.append(m.society.gray("면사무소 창구", "손님은 이 마을 일에 끼지 않는다.")
 			if Net.is_guest() else ["면사무소 창구", m.society.open_township])
+	# 순회 재판(S2c) — 계절 7·21일, 윤 판사·한 검사가 회관에 온다. 기소된 나는 피고석,
+	# 아니면 방청. 게스트는 방청도 회색(사회가 없다)
+	if GameData.is_court_day():
+		body += "\n오늘은 순회 재판일 — 윤 판사와 한 검사가 와 있다."
+		if Net.is_guest():
+			btns.append(m.society.gray("순회 재판 방청", "손님은 이 마을 일에 끼지 않는다."))
+		elif GameData.charged_active():
+			btns.insert(0, ["★ 순회 재판 — 피고석에 선다", m.society.open_trial])
+		else:
+			btns.append(["순회 재판 방청", m.society.open_docket])
 	btns.append(["나가기", null])
 	m.dialog.open("마을회관", body, btns)
 

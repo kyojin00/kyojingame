@@ -7864,6 +7864,47 @@ const NPC_CALLS := {
 #   meeting        open 은 {victim} 을 npc_def(target).name 으로 치환, options[key pay/deny/confess]
 #   theft          선택지 라벨·회색 사유·성공/실패 서술문 3줄(posmod(day, 3))·목격자 한마디
 const SOCIETY_LINES := {
+	# 순회 재판(S2c) — 판사는 하오체, 검사는 합쇼체. 숫자는 % 로 채운다
+	"court": {
+		"open": "교진 순회 재판을 연다. 피고는 앞으로 나오게.",
+		"charge": "피고는 %s네 빈집에 몰래 들어갔습니다. 본 사람이 %d명입니다.",
+		"charge_skips": "재판을 %d번 거른 피고입니다. 가중을 구합니다.",
+		"ask": "피고, 할 말이 있는가.",
+		"admit_choice": "인정한다",
+		"deny_choice": "부인한다",
+		"plea_choice": "사정을 말한다",
+		"admit": "인정했으니 참작한다.",
+		"deny_weak": "본 사람이 주인뿐이다. 그것만으로는 못 묻는다. 무죄.",
+		"deny_strong": "본 사람이 %d명입니다. 부인은 거짓 진술입니다.",
+		"plea_ok": "마을이 자네를 나쁘게 말하지 않더군. 참작한다.",
+		"plea_no": "사정은 누구에게나 있다. 참작할 게 못 된다.",
+		"record": "전과가 있는 피고다. 가중한다.",
+		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 면사무소에 내게.",
+		"verdict_service": "벌금 %dG 에 봉사 %s. 이장에게 빗자루를 받게.",
+		"verdict_jail": "구류 이레. 박 순경이 데려간다.",
+		"acquit": "무죄. 피고는 돌아가도 좋다.",
+		"leave": "법정을 나선다",
+		"follow": "박 순경을 따라간다",
+		"docket_open": "오늘 재판은 순경이 넘긴 사건 %d건이다.",
+		"docket_line": "%s — %s네 도둑. 벌금 %dG.",
+		"docket_none": "오늘은 넘어온 사건이 없다. 마을이 조용했군.",
+		"docket_close": "이것으로 오늘 재판을 닫는다.",
+		"expunge_ok": "말소했네. 장부에서 지웠어. 마을도 곧 잊을 걸세.",
+	},
+	# 남의 집 문 앞(빈집 잠입) — 헌법 §6.1 「NPC_SCHEDULE 이 곧 범행 계획」
+	"house": {
+		"sign": "문패에 %s의 이름이 있다.",
+		"knock_choice": "문을 두드린다",
+		"sneak_choice": "몰래 들어간다",
+		"knock_home": "안에서 %s가 문을 열었다. 「무슨 일인가?」",
+		"knock_empty": "문을 두드렸다. 아무도 없다.",
+		"gray_home": "안에 사람이 있다.",
+		"gray_bold": "남의 집 문고리에 손이 안 간다.",
+		"gray_court": "재판이 걸려 있다. 지금은 아니다.",
+		"ok": "문이 열렸다. 궤짝에서 %s 하나를 챙겨 나왔다.",
+		"fail": "문을 따는데 등 뒤에서 발소리가 났다. 주인이다.",
+		"owner_fail": "…내 집에서 뭐 하는 건가. 이장한테 갈 걸세.",
+	},
 	"bold_question": {
 		"lead": "자네 할아버지는 낯선 사람 앞에서도 통 기죽는 법이 없었지. 자네는 어떤가?",
 		"choices": [
@@ -7984,6 +8025,14 @@ const SOCIETY_NOTES := {
 	"wanted": "박 순경이 나를 찾고 있다. 회의에서 부인한 그 일 때문이다.",
 	"fined": "벌금을 물었다 — %dG. 그 일은 그것으로 끝났다.",
 	"surrendered": "파출소에 자수했다. 벌금은 절반이었다. 마을이 그걸 기억할 것이다.",
+	# ---- 순회 재판(S2c) ----
+	"charged": "박 순경이 아침에 왔다. %s네 일로 기소됐다. 재판은 %s, 회관이다.",
+	"court_today": "오늘 순회 재판이다. 윤 판사가 회관에 와 있다. 피고석에 서야 한다.",
+	"court_skipped": "어제 재판에 나가지 않았다. 다음 재판일에 가중된다.",
+	"court_visit": "오늘 순회 재판이 열린다. 회관에 윤 판사가 와 있다.",
+	"convicted": "유죄였다. 마을이 그 판결을 들었다.",
+	"acquitted": "무죄였다. 그래도 본 사람은 본 것이다.",
+	"jail_out": "이레 만에 파출소를 나왔다. 마을이 그 일을 기억할 것이다.",
 }
 
 # 마음 카드 — [[문턱, 이름, 설명]] · stats_ui 가 이름을 글줄로, 설명을 툴팁으로 쓴다.
@@ -8011,7 +8060,7 @@ const ABSENT_FIRE := 7        # 이레 결근 — 해고(평판 −8)
 const MEMORY_MAX := 60        # memories 상한(오래된 것부터)
 const WORK_LOG_MAX := 12      # work_log 상한 — 「오늘/어제」만 보면 되므로 짧다
 const SEEN_DAYS := [28, 56, 84]   # heat 1/2/3+ 기억이 살아 있는 날수(헌법 §4.2 seen)
-const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45}   # boldness() 문턱(헌법 §5.2)
+const GATE := {"pickpocket": 20, "shelf_night": 35, "shelf_day": 45, "burglary": 35}   # boldness() 문턱(헌법 §5.2)
 const SERVICE_LAST_HOUR := 17.0   # 봉사는 17시 전에만 — 시계를 되감지 않으려고(D14)
 
 # ---- 세금·예산(S2a, 헌법 §2) ----
@@ -8042,6 +8091,21 @@ const FINE_MULT := 3
 const ARREST_TILES := 1.5          # 순경이 이 거리 안에 2초 → 체포
 const ARREST_SECONDS := 2.0
 const NEED_EVIDENCE := 2           # 검거에 필요한 흔적 수(피해자·목격자)
+# ---- 순회 재판(S2c, 헌법 §6.4~6.6) ----
+# 계절 7·21일 회관에 윤 판사·한 검사가 온다. heat 2 이상(빈집)은 이장의 회의가 아니라 기소다 —
+# 플레이어가 서는 자리는 피고석이다. 즉결(순경)은 heat 1 까지, 그 위는 판사만 형을 정한다
+const COURT_DAYS := [7, 21]
+const CRIME_HEAT := {"pickpocket": 1, "shelf": 1, "burglary": 2}
+const BURGLARY_P := 0.30           # 빈집 문을 따는 기본 확률 — theft_p 가 손버릇·밤·목격자를 얹는다
+const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 넘김 일곱 번, 밭은 마른다)
+const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
+const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
+# 재판정의 두 사람 — 읍에서 오는 순회 손글이라 NPCS 에 없다(주민도 명부도 생일도 아니다).
+# npc_def 가 여기로 떨어지므로 이름·초상은 같은 길로 나온다. 스프라이트는 SOCIETY_NPC_IDS 가 싣는다
+const COURT_NPCS := {
+	"judge_yoon": {"name": "윤 판사", "gender": "f"},
+	"prosecutor_han": {"name": "한 검사", "gender": "m"},
+}
 const GOV_GRANT := 2000                     # 계절 교부금(고정) — 교진 예산은 절대 마이너스가 안 된다
 const GOV_LEVY_PER_RESIDENT := 30           # NPC 장부세: (주민 − 1) × 30
 const GOV_OPS := {"inn": 300, "lab": 300}   # 운영비 — 부지(파출소 inn · 진료소 lab)가 서 있을 때만
@@ -8113,6 +8177,8 @@ func fresh_me() -> Dictionary:
 		# 범죄·구속
 		"theft_xp": 0.0, "night_out_min": 0.0, "stolen": {}, "wanted": {}, "night_out_day": 0,
 		"jail_days_left": 0, "sentence": {}, "home_region": "kyojin",
+		# 순회 재판(S2c) — 걸린 기소 하나(재판일까지 자택 대기), 출소한 날(호칭 jailed 이레)
+		"charged": {}, "jail_out_day": -99,
 		# 순경(S2b) — 오늘 순찰의 진행과 검거 실적, 사건마다 물어본 사람
 		"patrol_day": 0, "patrol_idx": 0, "arrests": 0, "case_asked": {},
 		# 자기 상점(S3)
@@ -8239,7 +8305,9 @@ func wallet_of(nid: String) -> int:
 # 120곳이라 표를 가르는 날 고칠 곳을 더 늘리지 않으려고.
 
 func npc_def(id: String) -> Dictionary:
-	return NPCS.get(id, {})
+	if NPCS.has(id):
+		return NPCS[id]
+	return COURT_NPCS.get(id, {})   # 순회 판사·검사 — 주민이 아니라 NPCS 밖에 산다(S2c)
 
 
 func npc_kind(id: String) -> String:
@@ -8865,6 +8933,128 @@ func _case_convict(c: Dictionary, by: String) -> void:
 	_note(str(SOCIETY_NOTES.case_mine if by == "player" else SOCIETY_NOTES.case_caught) % [sname, vname])
 
 
+# ---- 순회 재판 (S2c) ----
+
+# 오늘이 재판일인가 — 정부(창구)와 파출소가 있어야 판사가 온다
+func is_court_day(d := day) -> bool:
+	return tax_open() and police_open() and ((d - 1) % DAYS_PER_SEASON + 1) in COURT_DAYS
+
+
+# d 다음 첫 재판일(d 자신은 빼고) — 오늘 기소되면 next_court_day(day − 1) 이 오늘일 수 있다
+func next_court_day(d: int) -> int:
+	var x := d + 1
+	while not (((x - 1) % DAYS_PER_SEASON + 1) in COURT_DAYS):
+		x += 1
+	return x
+
+
+# 「이 계절 21일」 「다음 계절 7일」 — 결산 한 줄에 쓰는 날짜
+func court_day_label(d: int) -> String:
+	var when := "이 계절" if season_no(d) == season_no() else "다음 계절"
+	return "%s %d일" % [when, (d - 1) % DAYS_PER_SEASON + 1]
+
+
+func charged_active() -> bool:
+	var c: Variant = me.get("charged", {})
+	return c is Dictionary and not c.is_empty()
+
+
+# 말소되지 않은 법원 전과 — 마을 회의의 봉사(court village)는 전과가 아니다
+func record_unexpunged() -> bool:
+	for rec in me.get("record", []):
+		if rec is Dictionary and not bool(rec.get("expunged", false)) \
+				and str(rec.get("court", "")) != "village":
+			return true
+	return false
+
+
+# 전과 말소를 청구할 수 있나 — "" 면 된다, 아니면 창구가 말할 이유
+func can_expunge() -> String:
+	if not record_unexpunged():
+		return "말소할 전과가 없다."
+	if charged_active() or int(me.get("jail_days_left", 0)) > 0:
+		return "재판이 걸려 있는 동안은 안 되네."
+	var last := 0
+	for rec in me.get("record", []):
+		if not (rec is Dictionary) or bool(rec.get("expunged", false)) or str(rec.get("court", "")) == "village":
+			continue
+		if int(rec.get("served", 0)) < int(rec.get("sentence", 0)):
+			return "형을 다 채운 뒤에 오게."
+		last = maxi(last, maxi(int(rec.get("day", 0)), int(rec.get("served_day", 0))))
+	if day - last < EXPUNGE_DAYS:
+		return "형이 끝나고 %d일은 조용히 지내야 하네. %d일 남았네." % [EXPUNGE_DAYS, EXPUNGE_DAYS - (day - last)]
+	return ""
+
+
+# 법원 전과를 전부 말소한다 — 돌려주는 값은 지운 수. 기록은 남되 임용 심사가 0 으로 센다
+func expunge_records() -> int:
+	var n := 0
+	for rec in me.get("record", []):
+		if rec is Dictionary and not bool(rec.get("expunged", false)) and str(rec.get("court", "")) != "village":
+			rec["expunged"] = true
+			n += 1
+	return n
+
+
+# 구류가 시작되는 순간의 장부 — 남은 날수를 적고, 안 낸 고지서 기한을 그만큼 미룬다(복역 중
+# 체납 정지). 하루를 실제로 넘기는 일은 society.serve_jail 이 한다(세계를 든 쪽)
+func jail_begin(days: int) -> void:
+	me["jail_days_left"] = days
+	for b in unpaid_bills():
+		b["due_day"] = int(b.get("due_day", 0)) + days
+
+
+# 재판일에 판사가 읽는 NPC 사건 — 지난 두 주 안에 순경(또는 순경인 나)이 닫은 것
+func court_docket() -> Array:
+	var out: Array = []
+	for c in cases:
+		if c is Dictionary and str(c.get("stage", "")) == "closed" \
+				and str(c.get("closed_by", "")) in ["officer", "player"] and day - int(c.get("day", 0)) <= 14:
+			out.append(c)
+	return out
+
+
+# 아침의 재판 자리(society_new_day 가 부른다) — ① 구류 하루 ② 어제 신고된 heat 2 는 기소
+# ③ 재판일 알림·거른 재판 가중 ④ 기소가 없는 재판일엔 방청 안내
+func _court_tick() -> void:
+	if int(me.get("jail_days_left", 0)) > 0:
+		me.jail_days_left = int(me.jail_days_left) - 1
+		if int(me.jail_days_left) == 0:
+			me.jail_out_day = day
+			_note(str(SOCIETY_NOTES.jail_out))
+	if not police_open():
+		return
+	if not charged_active():
+		for mem in me.memories:
+			if int(mem.get("heat", 1)) < 2 or str(mem.get("settled", "")) != "":
+				continue
+			var rd := int(mem.get("reported_day", 0))
+			if rd <= 0 or rd >= day:
+				continue
+			mem["settled"] = "charged"
+			mem["settled_day"] = day
+			var wit: Array = mem.get("witnesses", [])
+			var target := str(mem.get("target", ""))
+			var others := wit.size() - (1 if target in wit else 0)
+			var cd := next_court_day(day - 1)
+			me.charged = {"day": int(mem.get("day", 0)), "kind": str(mem.get("kind", "")), "target": target,
+				"value": int(mem.get("value", 0)), "others": others, "seen": wit.size(), "heat": int(mem.get("heat", 2)),
+				"court_day": cd, "skips": 0, "since": day}
+			_note(str(SOCIETY_NOTES.charged) % [str(npc_def(target).get("name", target)), court_day_label(cd)])
+			break
+	if charged_active():
+		var ch: Dictionary = me.charged
+		var cd := int(ch.get("court_day", 0))
+		if day == cd and int(ch.get("since", 0)) != day:
+			_note(str(SOCIETY_NOTES.court_today))
+		elif day > cd:
+			ch.skips = int(ch.get("skips", 0)) + 1
+			ch.court_day = next_court_day(day - 1)
+			_note(str(SOCIETY_NOTES.court_skipped))
+	elif is_court_day() and not court_docket().is_empty():
+		_note(str(SOCIETY_NOTES.court_visit))
+
+
 func society_place(id: String) -> String:
 	if id == "chief" and (council_pending() or tax_dun_active()) and festival_today().is_empty() \
 			and hour_now() >= 9.0 and hour_now() < SERVICE_LAST_HOUR:
@@ -8947,8 +9137,9 @@ func society_new_day(stats: Array, ko := false) -> void:
 					_note(str(SOCIETY_NOTES.tax_bill) % int(bill.total))
 				else:
 					_note(str(SOCIETY_NOTES.tax_free))
-	# 체납 사다리 — 매일 아침, 넘는 문턱에서만 한 번씩
-	if tax_open():
+	# 체납 사다리 — 매일 아침, 넘는 문턱에서만 한 번씩. 구류 중엔 멈춘다(「나라가 먹여 주는 동안은
+	# 세금 없다」 — serve_jail 이 고지서 기한도 그만큼 미룬다)
+	if tax_open() and int(me.get("jail_days_left", 0)) <= 0:
 		_tax_step_daily()
 	# ④ 어제 번 돈
 	if stats.size() > 1:
@@ -9036,6 +9227,8 @@ func society_new_day(stats: Array, ko := false) -> void:
 	_case_close_tick()
 	if wanted_active():
 		_note(str(SOCIETY_NOTES.wanted))
+	# 순회 재판(S2c) — 구류 하루, 기소, 재판일
+	_court_tick()
 	# ⑨ 이장이 찾아온다 — 어제 신고된 일
 	if council_pending():
 		_note(str(SOCIETY_NOTES.meeting_summon))
