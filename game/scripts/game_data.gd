@@ -6392,7 +6392,7 @@ const INSTITUTIONS := {
 	"county": {"name": "군청", "region": "town", "room": "county", "head": "mayor_kang",
 		"ranks": ["clerk", "senior", "head"], "player_max": "clerk", "skill": "", "books": 0, "job": "county_clerk", "slice": 4},
 	"police_station": {"name": "경찰서", "region": "town", "room": "police", "head": "chief_ha",
-		"ranks": ["constable", "senior", "head"], "player_max": "constable", "skill": "combat", "books": 0, "job": "", "slice": 4},
+		"ranks": ["constable", "senior", "head"], "player_max": "constable", "skill": "combat", "books": 0, "job": "town_constable", "slice": 4},
 	"court": {"name": "법원", "region": "town", "room": "court", "head": "judge_suh",
 		"ranks": ["judge", "head"], "player_max": "judge", "skill": "", "books": 12, "job": "judge", "slice": 4},
 	"prosecution": {"name": "검찰청", "region": "town", "room": "prosecution", "head": "pros_min",
@@ -6400,11 +6400,11 @@ const INSTITUTIONS := {
 	"clinic": {"name": "보건소", "region": "town", "room": "clinic", "head": "doctor_oh",
 		"ranks": ["nurse", "senior", "head"], "player_max": "nurse", "skill": "cook", "books": 0, "job": "nurse", "slice": 4},
 	"bank": {"name": "신협", "region": "town", "room": "bank", "head": "manager_baek",
-		"ranks": ["teller", "head"], "player_max": "teller", "skill": "", "books": 0, "job": "", "slice": 4},
+		"ranks": ["teller", "head"], "player_max": "teller", "skill": "", "books": 0, "job": "teller", "slice": 4},
 	"town_inn": {"name": "여관", "region": "town", "room": "town_inn", "head": "innkeeper_ok",
-		"ranks": ["hand", "head"], "player_max": "hand", "skill": "cook", "books": 0, "job": "", "slice": 4},
+		"ranks": ["hand", "head"], "player_max": "hand", "skill": "cook", "books": 0, "job": "inn_hand", "slice": 4},
 	"diner": {"name": "식당", "region": "town", "room": "diner", "head": "cook_jang",
-		"ranks": ["hand", "head"], "player_max": "hand", "skill": "cook", "books": 0, "job": "", "slice": 4},
+		"ranks": ["hand", "head"], "player_max": "hand", "skill": "cook", "books": 0, "job": "diner_hand", "slice": 4},
 }
 
 # 직업 14 — 점원 6(kind "clerk") + 자유직 8(kind "free").
@@ -8148,6 +8148,253 @@ const JOBS := {
 				],
 			},
 		],
+	},
+	# ---- 읍 기관직 넷(S5b) — 경찰서 순경(순찰·출동·경위 승진) · 신협 창구 · 여관 일꾼 · 식당 일꾼 ----
+	"town_constable": {
+		"name": "읍 순경",
+		"kind": "office",
+		"inst": "police_station",
+		"rank": "constable",
+		"boss": "chief_ha",
+		"wage": 130,
+		"night_bonus": 30,
+		"known_at": 14,
+		"skill": "combat",
+		"skill_lv": 2,
+		"boldness": 35,
+		"books": 0,
+		"req_rep": 20,
+		"slice": 5,
+		# 승진 — 근속 56일 · 검거 6 · 경위 자리 공석 · 서장 호감도 50
+		"promote": {"rank": "senior", "name": "경위", "wage": 190, "goal": 6, "goal_key": "arrests",
+			"calls": {"stranger": "새 경위", "known": "경위님", "master": "우리 경위"}},
+		"calls": {"stranger": "읍의 신참 순경", "known": "순경 양반", "master": "우리 순경"},
+		"boss_calls": {
+			"stranger": ["왔나. 읍 제복은 세 구역일세. 정류장, 관청 거리, 장터.", "신참, 읍은 본 사람만 아네. 자네가 그 사람이 되게."],
+			"known": ["순경 양반 왔구먼. 어젯밤 장터는 조용했네.", "순경 양반, 정류장은 자네가 맡게. 버스가 사람을 부르네."],
+			"master": ["우리 순경 왔네. 읍 밤길은 자네 몫일세.", "우리 순경, 경위 자리를 생각해 두게."],
+		},
+		"hire": {
+			"ask": "서장님, 경찰서에서 일하고 싶습니다. 읍 밤길이 무섭지 않습니다.",
+			"refuse_aff": "제복은 아는 사람한테 주네. 자넬 좀 더 봐야겠어.",
+			"refuse_skill": "지네 한 마리는 혼자 잡아야 하네. 창부터 손에 익히고 오게.",
+			"refuse_rep": "교진이 자넬 믿어야 읍도 믿네. 아직은 아닐세.",
+			"refuse_record": "전과가 있는 사람한테 제복은 못 주네. 규정일세.",
+			"refuse_bold": "무섭지 않다고 했나. 자네 눈은 아직 그렇게 말하지 않네.",
+			"refuse_busy": "자넨 벌써 딴 데 이름이 올라 있잖나. 제복은 겸직이 안 되네.",
+			"accept": "그래. 내일 아침 아홉 시에 경찰서로 오게. 제복은 맞춰 두지.",
+			"first_day": "첫날일세. 순찰은 세 구역 — 정류장, 관청 거리, 장터. 보고 오게.",
+			"resign_ask": "서장님, 제복을 벗겠습니다. 그동안 감사했습니다.",
+			"resign_reply": "그리하게. 제복은 두고 가게. 읍 밤길은 순경들이 돌지.",
+			"fired": "이레일세. 구역을 비워 둔 채로는 못 두네. 제복을 거두겠네.",
+		},
+		"patrol": {
+			"start": ["오늘도 세 구역일세. 정류장, 관청 거리, 장터. 다녀오게.",
+				"순찰은 보는 일일세. 누가 어느 점포 앞에 섰는지 기억해 두게.",
+				"정류장부터 보게. 버스가 낯선 얼굴을 내려놓는 자리야."],
+			"report": ["수고했네. 조용한 보고가 제일 좋은 보고지. 몫은 적어 뒀네.",
+				"돌고 왔구먼. 오늘 몫은 장부에 올렸네.",
+				"그래, 그 정도면 됐네. 내일도 같은 구역일세."],
+			"night": "밤 구역을 돌았구먼. 밤 몫은 서른 더 얹네. 읍 밤은 그만한 값일세.",
+		},
+		"loop": [],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 제복 값은 도에서 나오네. 받게.",
+			"nothing": "순찰 보고가 없구먼. 봉급은 돈 날에만 적히는 걸세.",
+			"not_yet": "봉급날은 아직일세. 이레마다라고 했잖나.",
+		},
+		"sees": {
+			"what": "당직 일지 — 읍 사건이 어디까지 갔는지, 누가 검찰청에 넘어갔는지",
+			"line": "우리 순경한테는 이걸 보여 주지. 당직 일지야. 남이 보면 곤란한 이름이 있네.",
+		},
+		"absent_warn": "사흘째 제복이 걸려만 있네. 구역을 순경들이 대신 돌았어. 내일은 오게.",
+	},
+	"teller": {
+		"name": "신협 창구",
+		"kind": "office",
+		"inst": "bank",
+		"rank": "teller",
+		"boss": "manager_baek",
+		"wage": 110,
+		"known_at": 14,
+		"skill": "",
+		"books": 3,
+		"req_rep": 20,
+		"slice": 5,
+		"calls": {"stranger": "신협 새 사람", "known": "창구 {ho}", "master": "우리 창구"},
+		"boss_calls": {
+			"stranger": ["왔나. 신협은 숫자가 반이고 인사가 반일세.", "새 사람, 돈은 세고 또 세게. 한 번은 틀리네."],
+			"known": ["창구 왔구먼. 오늘은 예금이 셋일세.", "창구, 자네 셈이 빨라서 줄이 짧아졌네."],
+			"master": ["우리 창구 왔네. 신협 문은 자네가 여는 걸세.", "우리 창구, 지점장 자리는 내 것이지만 다음은 자네일세."],
+		},
+		"hire": {
+			"ask": "지점장님, 신협에서 일하고 싶습니다. 셈은 좀 합니다.",
+			"refuse_aff": "돈을 맡기는 자리일세. 자네를 아직 모르네.",
+			"refuse_rep": "교진 이장이 자네 얘기를 좋게 해야 하네. 아직은 아닐세.",
+			"refuse_record": "전과가 있는 사람한테 금고는 못 맡기네.",
+			"refuse_busy": "일자리가 있잖나. 창구는 온종일일세.",
+			"refuse_skill": "책을 세 권은 읽고 오게. 장부는 글일세.",
+			"accept": "그래. 내일 아홉 시에 창구 뒤로 오게. 열쇠는 내가 쥐네.",
+			"first_day": "첫날일세. 오늘은 돈을 세고 적기만 하게. 대출은 내가 보네.",
+			"resign_ask": "지점장님, 신협 일을 그만두겠습니다.",
+			"resign_reply": "그러게. 자네 셈은 장부에 남네. 고마웠네.",
+			"fired": "이레를 안 나왔어. 창구를 비워 둘 순 없네. 그만두게.",
+		},
+		"loop": [
+			{
+				"customer": "cook_jang",
+				"setup": "장 주인이 식당 매출을 예금하러 왔다. 「동전이 많소. 세어 주시오.」",
+				"choices": [
+					["같이 세고 영수증을 준다", "장 주인: 맞네. 동전은 세는 사람이 주인이지.", 1],
+					["대충 세어 장부에 적는다", "백 지점장: 셈이 틀리면 신협이 갚네. 다시 세게.", -1],
+					["지폐로 바꿔 오라고 한다", "장 주인: 동전도 돈이오. 은행이 안 받으면 누가 받소.", -1],
+				],
+			},
+			{
+				"customer": "innkeeper_ok",
+				"setup": "옥 주모가 대출 이자를 내러 왔다. 「이번 달은 조금 늦었소.」",
+				"choices": [
+					["연체 이자까지 셈해 받는다", "백 지점장: 옳지. 늦은 건 늦은 걸세. 정으로 깎지 않네.", 1],
+					["이번만 봐 준다", "백 지점장: 한 번이 두 번 되네. 창구가 정하는 게 아닐세.", -1],
+					["지점장에게 묻는다", "옥 주모: 물어보고 오시오. 나는 기다리지.", 0],
+				],
+			},
+		],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 창구 봉급은 금고에서 나오는 게 아니라 도에서 나오네.",
+			"nothing": "근무가 없구먼. 봉급은 일한 날에만 적히네.",
+			"not_yet": "봉급날은 아직일세. 이레마다일세.",
+		},
+		"sees": {
+			"what": "대출 장부 — 읍 예산이 신협에 진 빚과 이자",
+			"line": "우리 창구한테는 이걸 보여 주지. 군청이 진 빚일세. 남한테는 말하지 말게.",
+		},
+		"absent_warn": "사흘째 창구가 비었네. 줄이 문밖까지 섰어. 내일은 오게.",
+	},
+	"inn_hand": {
+		"name": "여관 일꾼",
+		"kind": "office",
+		"inst": "town_inn",
+		"rank": "hand",
+		"boss": "innkeeper_ok",
+		"wage": 90,
+		"known_at": 14,
+		"skill": "",
+		"books": 0,
+		"req_rep": 0,
+		"slice": 5,
+		"calls": {"stranger": "여관 새 사람", "known": "여관 {ho}", "master": "우리 일꾼"},
+		"boss_calls": {
+			"stranger": ["왔나. 여관은 이불이 반일세. 털고 개고, 또 털게.", "새 사람, 손님 얼굴은 묻지 말게. 묵고 가면 손님일세."],
+			"known": ["왔구먼. 오늘은 방이 셋 찼네.", "자네가 온 뒤로 이불에서 볕 냄새가 나네."],
+			"master": ["우리 일꾼 왔네. 여관은 자네가 반일세.", "우리 일꾼, 뒷방 손님은 못 본 걸로 하게. 그게 여관일세."],
+		},
+		"hire": {
+			"ask": "주모님, 여관에서 일하고 싶습니다. 힘은 씁니다.",
+			"refuse_aff": "얼굴을 좀 더 보고. 여관은 사람 보는 일일세.",
+			"refuse_rep": "손님 물건을 맡기는 자리네. 마을 얘기가 좋아야 하네.",
+			"refuse_record": "전과가 있는 사람은 손님이 싫어하네. 미안하네.",
+			"refuse_busy": "일자리가 있잖나. 여관은 새벽부터일세.",
+			"refuse_skill": "그건 괜찮네.",
+			"accept": "그래. 내일 아홉 시. 이불부터 털게.",
+			"first_day": "첫날일세. 오늘은 이불만 털게. 손님 말은 듣기만 하고.",
+			"resign_ask": "주모님, 여관 일을 그만두겠습니다.",
+			"resign_reply": "그러게. 이불 터는 소리가 그리울 걸세.",
+			"fired": "이레를 안 나왔어. 이불이 눅눅해졌네. 그만두게.",
+		},
+		"loop": [
+			{
+				"customer": "mayor_kang",
+				"setup": "강 군수가 도청 손님 방을 잡으러 왔다. 「제일 조용한 방으로.」",
+				"choices": [
+					["뒷방을 내주고 이불을 새로 깐다", "옥 주모: 옳지. 군수 손님은 여관 얼굴일세.", 1],
+					["앞방밖에 없다고 한다", "강 군수: 앞방은 버스 소리가 나네. 다시 보게.", -1],
+					["값을 먼저 말한다", "옥 주모: 값은 내가 말하네. 자넨 방을 말하게.", 0],
+				],
+			},
+			{
+				"customer": "pros_min",
+				"setup": "민 부장이 밤늦게 방을 잡았다. 「누가 나를 찾으면 없다고 하게.」",
+				"choices": [
+					["알겠다고 하고 방 번호를 적지 않는다", "옥 주모: 그게 여관일세. 못 본 손님이 있는 법이지.", 1],
+					["누가 찾느냐고 묻는다", "민 부장: 그건 묻지 않는 게 일꾼일세.", -1],
+					["장부에 이름을 적는다", "옥 주모: 장부는 내가 적네. 자넨 이불일세.", 0],
+				],
+			},
+		],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 이불값은 손님이 내고 자네 몫은 도에서 오네.",
+			"nothing": "근무가 없구먼. 봉급은 일한 날에만 적히네.",
+			"not_yet": "봉급날은 아직일세.",
+		},
+		"sees": {
+			"what": "숙박 장부 — 누가 어느 밤 읍에 묵었는지, 뒷방 손님이 누구인지",
+			"line": "우리 일꾼한테는 이걸 보여 주지. 숙박 장부야. 뒷방 이름은 못 본 걸세.",
+		},
+		"absent_warn": "사흘째 이불이 그대로일세. 내일은 오게.",
+	},
+	"diner_hand": {
+		"name": "식당 일꾼",
+		"kind": "office",
+		"inst": "diner",
+		"rank": "hand",
+		"boss": "cook_jang",
+		"wage": 90,
+		"known_at": 14,
+		"skill": "cook",
+		"skill_lv": 2,
+		"books": 0,
+		"req_rep": 0,
+		"slice": 5,
+		"calls": {"stranger": "식당 새 사람", "known": "식당 {ho}", "master": "우리 일꾼"},
+		"boss_calls": {
+			"stranger": ["왔나. 식당은 불이 반일세. 국은 내가 끓이네.", "새 사람, 손님 국그릇은 비기 전에 채우게."],
+			"known": ["왔구먼. 오늘은 국이 두 솥일세.", "자네가 온 뒤로 아침 손님이 늘었네."],
+			"master": ["우리 일꾼 왔네. 국은 이제 자네도 끓이게.", "우리 일꾼, 식당은 자네한테 물려도 되겠어."],
+		},
+		"hire": {
+			"ask": "주인님, 식당에서 일하고 싶습니다. 국은 끓입니다.",
+			"refuse_aff": "얼굴을 좀 더 보고. 부엌은 아는 사람만 들이네.",
+			"refuse_rep": "그건 괜찮네.",
+			"refuse_record": "전과가 있는 사람은 손님이 싫어하네. 미안하네.",
+			"refuse_busy": "일자리가 있잖나. 식당은 새벽부터일세.",
+			"refuse_skill": "국 하나는 끓일 줄 알아야 하네. 요리부터 익히고 오게.",
+			"accept": "그래. 내일 아홉 시. 앞치마는 걸어 두지.",
+			"first_day": "첫날일세. 오늘은 그릇만 나르게. 불은 내가 보네.",
+			"resign_ask": "주인님, 식당 일을 그만두겠습니다.",
+			"resign_reply": "그러게. 자네 국 냄새는 기억할 걸세.",
+			"fired": "이레를 안 나왔어. 국이 식었네. 그만두게.",
+		},
+		"loop": [
+			{
+				"customer": "chief_ha",
+				"setup": "하 서장이 당직 순경 셋의 아침을 시켰다. 「국 셋, 빨리.」",
+				"choices": [
+					["국을 먼저 내고 밥은 뒤에 낸다", "장 주인: 옳지. 순경은 국부터 마시네.", 1],
+					["차례대로 기다리라고 한다", "하 서장: 당직은 기다릴 시간이 없네.", -1],
+					["주인에게 넘긴다", "장 주인: 넘기는 건 일이 아닐세. 자네가 내게.", 0],
+				],
+			},
+			{
+				"customer": "judge_suh",
+				"setup": "서 부장이 점심을 남기고 일어섰다. 「오늘은 입맛이 없네.」",
+				"choices": [
+					["따뜻한 국을 새로 한 그릇 낸다", "서 부장: …고맙네. 이건 먹지.", 1],
+					["값은 그대로라고 말한다", "장 주인: 값 얘기는 내가 하네. 자넨 국을 보게.", -1],
+					["그릇을 조용히 치운다", "서 부장: 그래, 그게 좋겠네.", 0],
+				],
+			},
+		],
+		"wage_lines": {
+			"pay": "이번 주 몫일세. 국값은 손님이 내고 자네 몫은 도에서 오네.",
+			"nothing": "근무가 없구먼. 봉급은 일한 날에만 적히네.",
+			"not_yet": "봉급날은 아직일세.",
+		},
+		"sees": {
+			"what": "외상 장부 — 읍 관청 사람 누가 얼마를 달아 놓았는지",
+			"line": "우리 일꾼한테는 이걸 보여 주지. 외상 장부야. 이름은 못 본 걸세.",
+		},
+		"absent_warn": "사흘째 앞치마가 걸려만 있네. 내일은 오게.",
 	},
 	"nurse": {
 		"name": "간호사",
@@ -10237,10 +10484,11 @@ func wanted_active() -> bool:
 	return w is Dictionary and not w.is_empty()
 
 
-func open_cases() -> Array:
+func open_cases(region := "") -> Array:
 	var out: Array = []
 	for c in cases:
-		if c is Dictionary and str(c.get("stage", "")) == "open":
+		if c is Dictionary and str(c.get("stage", "")) == "open" \
+				and (region == "" or str(c.get("region", "kyojin")) == region):
 			out.append(c)
 	return out
 
@@ -10508,7 +10756,7 @@ func _promotion_tick() -> void:
 	var pr: Dictionary = jd.get("promote", {})
 	if pr.is_empty() or str(me.get("rank", "")) != str(jd.get("rank", "")):
 		return
-	if job_days() < PROMOTE_DAYS or int(me.get("perf", 0)) < int(pr.get("goal", 999)):
+	if job_days() < PROMOTE_DAYS or int(me.get(str(pr.get("goal_key", "perf")), 0)) < int(pr.get("goal", 999)):
 		return
 	if aff(str(jd.get("boss", ""))) < PROMOTE_AFF:
 		return

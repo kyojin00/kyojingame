@@ -7343,6 +7343,134 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_vi
 			GameData.minutes = keep_min_vi
 			_s2_restore(k_vi)
+		215:
+			# ---- 읍 기관직 넷(S5b) — 순경(채용·순찰·보고·출동→검찰·경위 승진) · 창구·여관·식당(채용 요건·근무) ----
+			var k_tj := _s2_keep()
+			var skills_tj: Dictionary = GameData.skills.duplicate(true)
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_tj := GameData.minutes
+			var keep_pos_tj: Vector2 = m.player.position
+			var keep_town_tj: bool = GameData.town_open
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.seats = {}
+			GameData.ensure_gen_npcs()
+			for gid_tj in GameData.gen_npcs:
+				GameData.gen_npcs[gid_tj]["here"] = str(GameData.gen_npcs[gid_tj].get("role", "")) != "resident"
+			GameData._gen_seats_sync()
+			GameData.cases = []
+			GameData.case_seq = 0
+			GameData.day = 60
+			GameData.minutes = 10 * 60
+			m.story_cutscene = true
+			GameData.me.boldness_base = 40
+			GameData.me.reputation = {"kyojin": 20, "town": 0}
+			GameData.me.books_read = 3
+			GameData.skills.combat.lv = 2
+			GameData.skills.cook.lv = 1
+			for bid_tj in ["chief_ha", "manager_baek", "innkeeper_ok", "cook_jang"]:
+				GameData.aff_set(bid_tj, 25)
+			# ① 채용 요건 — 순경·창구·여관은 열리고, 식당은 요리 Lv2 부터
+			var open_ok: bool = m.society.can_hire_job("town_constable") == "" and m.society.can_hire_job("teller") == "" \
+				and m.society.can_hire_job("inn_hand") == "" and m.society.can_hire_job("diner_hand") != ""
+			GameData.skills.cook.lv = 2
+			open_ok = open_ok and m.society.can_hire_job("diner_hand") == ""
+			GameData.me.boldness_base = 30
+			var bold_ok: bool = m.society.can_hire_job("town_constable").contains("눈")
+			GameData.me.boldness_base = 40
+			# ② 순경 — 채용, 다음날 경찰서 창구엔 「근무 — 순찰」. 세 구역을 찍고 보고하면 근무·봉급
+			m.society.hire_job("town_constable")
+			m.dialog.close()
+			GameData.day = 61
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var hired_ok: bool = str(GameData.me.job) == "town_constable" and GameData.seat_of("police_station", "constable") == "player" \
+				and GameData.job_inst() == "police_station"
+			m.story_cutscene = false
+			var menu_ok: bool = m.society.counter_menu("police") and "근무 — 순찰" in _btn_texts()
+			m.dialog.close()
+			m.story_cutscene = true
+			m.society.patrol_start()
+			var start_ok: bool = m.society.patrol_active() and m.dialog.visible and str(m.dialog._seq[-1].text).contains("순찰")
+			m.dialog.close()
+			m.story_cutscene = false   # 순찰 핀은 연출 중엔 안 돈다(ui_open)
+			for pt_tj: Vector2i in m.society.town_patrol_points():
+				m.player.position = Vector2(pt_tj.x * m.TILE + 16, pt_tj.y * m.TILE + 16)
+				m.society._patrol_tick()
+			m.story_cutscene = true
+			var walk_ok: bool = m.society.patrol_done_today() and not m.society.patrol_active()
+			m.society.patrol_report()
+			var report_ok: bool = _me_int_h("perf") == 1 and _me_int_h("wage_pending") == 130 \
+				and GameData.worked_on(61) and str(m.dialog.title_label.text) == GameData.npc_name("chief_ha")
+			m.dialog.close()
+			# ③ 출동 — 열린 읍 사건. 목격자에게 묻고(흔적 2) 검거하면 검찰청으로 간다(charged), 검거 실적 +1
+			GameData.case_seq = 1
+			GameData.cases = [{"id": 1, "crime": "burglary", "day": 60, "suspect": "g1", "victim": "g2", "witness": "g3",
+				"evidence": 1, "stage": "open", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
+				"charged_day": 0, "indicted_day": 0}]
+			var ch_g3: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("g3", ch_g3)
+			var ask_btn := false
+			for c3: Array in ch_g3:
+				if str(c3[0]).begins_with("사건 이야기"):
+					ask_btn = true
+			m.society.case_ask(1, "g3")
+			m.dialog.close()
+			m.society.case_arrest(1, "g1")
+			var c_tj: Dictionary = GameData.cases[0]
+			var arrest_ok: bool = ask_btn and str(c_tj.stage) == "charged" and int(c_tj.charged_day) == 61 \
+				and _me_int_h("arrests") == 1 and "경찰서로 데려간다" in _btn_texts()
+			m.dialog.close()
+			GameData.day = 62
+			GameData.society_new_day([0, 0, 0])
+			var n_tj := GameData.society_note()
+			var pros_ok: bool = str(c_tj.stage) == "indicted" and n_tj.contains("검찰청")
+			# ④ 경위 승진 — 근속 60 · 검거 6 · 경위 자리 공석(경위가 전근) · 서장 호감 50
+			var lt_id := GameData.seat_of("police_station", "senior")
+			GameData.gen_npcs[lt_id]["here"] = false
+			GameData.gen_npcs[lt_id]["away_until"] = 999
+			GameData._gen_seats_sync()
+			GameData.me.job_since_day = 5
+			GameData.me.arrests = 6
+			GameData.aff_set("chief_ha", 50)
+			GameData.day = 63
+			GameData.society_new_day([0, 0, 0])
+			var n_lt := GameData.society_note()
+			var promo_ok: bool = str(GameData.me.rank) == "senior" and n_lt.contains("경위") and GameData.job_wage() == 190 \
+				and GameData.seat_of("police_station", "senior") == "player"
+			# ⑤ 창구 — 사직 뒤 이레는 못 들어간다. 이레 뒤 채용·근무(손님 응대) → 실적·봉급 110
+			m.society.resign()
+			m.dialog.close()
+			var wait_ok: bool = m.society.can_hire_job("teller").contains("이레")
+			GameData.day = 71
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			m.society.hire_job("teller")
+			m.dialog.close()
+			GameData.day = 72
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			m.society.work_start("bank")
+			var enc_ok: bool = m.dialog.visible and m.dialog._seq.size() >= 1 and str(m.dialog._seq[-1].text).contains("예금")
+			m.society.work_pick(0)
+			var work_ok: bool = enc_ok and _me_int_h("perf") == 1 and _me_int_h("wage_pending") == 110 \
+				and GameData.worked_on(72) and str(GameData.me.job) == "teller"
+			m.dialog.close()
+			print("TOWN_JOBS_OK=", open_ok and bold_ok and hired_ok and menu_ok and start_ok and walk_ok and report_ok
+				and arrest_ok and pros_ok and promo_ok and wait_ok and work_ok,
+				" 요건=", open_ok, " 대범함=", bold_ok, " 채용=", hired_ok, " 창구=", menu_ok, " 순찰=", start_ok,
+				" 세구역=", walk_ok, " 보고=", report_ok, " 검거=", arrest_ok, " 검찰=", pros_ok, " 경위=", promo_ok,
+				" 이레=", wait_ok, " 창구근무=", work_ok)
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.skills = skills_tj
+			GameData.town_open = keep_town_tj
+			m.player.position = keep_pos_tj
+			GameData.minutes = keep_min_tj
+			_s2_restore(k_tj)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
@@ -9267,3 +9395,8 @@ func _mp_tick() -> void:
 			_save_shot("_mp_guest.png")
 		360:
 			get_tree().quit()
+
+
+func _me_int_h(key: String) -> int:
+	return int(GameData.me.get(key, 0))
+

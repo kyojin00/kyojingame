@@ -526,16 +526,25 @@ func counter_menu(room_id: String) -> bool:
 	if room_id == "general" and (GameData.kitchen_quest_ready()
 			or GameData.kitchen_quest in ["found", "deliver"]):
 		return false
-	if not GameData.INSTITUTIONS.has(room_id):
-		return false
-	var employed := GameData.job_inst() == room_id
-	var eligible := can_hire(room_id) == ""
+	# 방 이름과 기관 이름이 다른 곳(읍 경찰서 police ↔ police_station, S5b)은 방으로 기관을 찾는다
+	var inst_id := room_id
+	if not GameData.INSTITUTIONS.has(inst_id):
+		inst_id = ""
+		for cand in GameData.INSTITUTIONS:
+			if str(GameData.INSTITUTIONS[cand].get("room", "")) == room_id:
+				inst_id = str(cand)
+		if inst_id == "":
+			return false
+	var employed := GameData.job_inst() == inst_id
+	var eligible := can_hire(inst_id) == ""
 	if not employed and not eligible:
 		return false
-	var head := str(_inst_def(room_id).get("head", ""))
+	var head := str(_inst_def(inst_id).get("head", ""))
 	var btns: Array = [["가게 일", _counter_default]]
 	if employed:
-		if can_work() == "":
+		if _is_constable():
+			_patrol_buttons(btns)   # 읍 순경(S5b) — 근무는 순찰이고, 열린 읍 사건엔 출동한다
+		elif can_work() == "":
 			btns.append(["근무", work_start])
 		var wl := _wage_lines(_job())
 		if GameData.wage_frozen():
@@ -548,7 +557,7 @@ func counter_menu(room_id: String) -> bool:
 			btns.append(["봉급 받기 — %dG" % _me_int("wage_pending"), collect_wage])
 		btns.append(["그만두겠습니다", resign])
 	if eligible:
-		btns.append(["일자리 이야기", open_job_talk.bind(room_id)])
+		btns.append(["일자리 이야기", open_job_talk.bind(inst_id)])
 	btns.append(["그만두기", null])
 	m.dialog.open(_npc_name(head), "어, 왔나. 무슨 일이야?", btns, _portrait(head))
 	return true
@@ -1195,8 +1204,11 @@ const PATROL_NAMES := ["광장 남쪽", "게시판 앞", "서쪽 어귀"]
 # 청년회장의 야경(S3c) — 광장 분수 · 잡화점 앞 · 우체국 앞. 21시부터, 등불 없이
 const WATCH_NAMES := ["광장 분수", "잡화점 앞", "우체국 앞"]
 const WATCH_HOUR := 21.0
+# 읍 순경(S5b)의 순찰 — 읍 순경 셋이 도는 세 구역(main.TOWN_BEATS)을 나도 돈다
+const TOWN_PATROL_NAMES := ["정류장", "관청 거리", "장터"]
 var _patrol_pts: Array = []
 var _watch_pts: Array = []
+var _town_pts: Array = []
 var _arrest_t := 0.0
 
 
@@ -1221,8 +1233,26 @@ func watch_points() -> Array:
 	return _watch_pts
 
 
+func town_patrol_points() -> Array:
+	if _town_pts.is_empty():
+		for sp: Vector2i in m.TOWN_BEATS:
+			var t: Vector2i = m.nearest_open_tile(sp)
+			_town_pts.append(t if t.x >= 0 else sp)
+	return _town_pts
+
+
+# 순경인가 — 교진 파출소든 읍 경찰서든, 순찰표(patrol)가 있는 직업
 func _is_constable() -> bool:
-	return str(GameData.me.get("job", "")) == "constable"
+	return _job().has("patrol")
+
+
+func _town_cop() -> bool:
+	return str(_job().get("inst", "")) == "police_station"
+
+
+# 내 관할 — 순경의 사건은 제 땅의 것만
+func _job_region() -> String:
+	return str(_inst_def(str(_job().get("inst", ""))).get("region", "kyojin"))
 
 
 func _is_youth() -> bool:
@@ -1232,14 +1262,16 @@ func _is_youth() -> bool:
 # 지금 직업이 발로 찍는 지점들 — 순경은 낮 순찰, 청년회장은 밤 야경. 아니면 빈 배열
 func _spots() -> Array:
 	if _is_constable():
-		return patrol_points()
+		return town_patrol_points() if _town_cop() else patrol_points()
 	if _is_youth():
 		return watch_points()
 	return []
 
 
 func _spot_names() -> Array:
-	return WATCH_NAMES if _is_youth() else PATROL_NAMES
+	if _is_youth():
+		return WATCH_NAMES
+	return TOWN_PATROL_NAMES if _town_cop() else PATROL_NAMES
 
 
 # 오늘 순찰(야경)이 진행 중인가(시작했고 아직 세 곳을 다 못 찍었다)
@@ -1394,7 +1426,7 @@ func open_police() -> void:
 		arrest(true)   # 수배 중에 제 발로 왔다 — 자수
 		return
 	var body := "박 순경이 순찰 일지를 넘기고 있다.\n"
-	var opens := GameData.open_cases()
+	var opens := GameData.open_cases("kyojin")
 	if opens.is_empty():
 		body += "요즘 마을은 조용하다."
 	else:
@@ -1402,16 +1434,7 @@ func open_police() -> void:
 	var btns: Array = []
 	var employed := GameData.job_inst() == "police_box"
 	if employed:
-		if patrol_done_today():
-			btns.append(["순찰 보고", patrol_report])
-		elif patrol_active():
-			btns.append(gray("순찰 보고", "아직 %s을 안 찍었다." % PATROL_NAMES[_me_int("patrol_idx")]))
-		elif can_work("inn") == "":
-			btns.append(["근무 — 순찰", patrol_start])
-		for c in opens:
-			var cid := int(c.get("id", 0))
-			btns.append(["출동 — %s네 도둑 (흔적 %d/%d)" % [_npc_name(str(c.get("victim", ""))),
-				int(c.get("evidence", 0)), GameData.NEED_EVIDENCE], _open_case.bind(cid)])
+		_patrol_buttons(btns)
 		var wl := _wage_lines(_job())
 		if GameData.wage_frozen():
 			btns.append(gray("봉급 받기", "밀린 세금부터 내게. 그 전엔 봉급이 없네."))
@@ -1428,13 +1451,28 @@ func open_police() -> void:
 	m.dialog.open(_npc_name("officer_park"), body, btns, _portrait("officer_park"))
 
 
+func _patrol_buttons(btns: Array) -> void:
+	var room := str(_inst_def(str(_job().get("inst", ""))).get("room", "inn"))
+	if patrol_done_today():
+		btns.append(["순찰 보고", patrol_report])
+	elif patrol_active():
+		btns.append(gray("순찰 보고", "아직 %s을 안 찍었다." % _spot_names()[_me_int("patrol_idx")]))
+	elif can_work(room) == "":
+		btns.append(["근무 — 순찰", patrol_start])
+	for c in GameData.open_cases(_job_region()):
+		var cid := int(c.get("id", 0))
+		btns.append(["출동 — %s네 도둑 (흔적 %d/%d)" % [_npc_name(str(c.get("victim", ""))),
+			int(c.get("evidence", 0)), GameData.NEED_EVIDENCE], _open_case.bind(cid)])
+
+
 func patrol_start() -> void:
 	if Net.is_guest() or not _is_constable():
 		return
 	m.dialog.close()
-	var why := can_work("inn")
+	var boss := str(_job().get("boss", "officer_park"))
+	var why := can_work(str(_inst_def(str(_job().get("inst", ""))).get("room", "inn")))
 	if why != "":
-		m.dialog.open(_npc_name("officer_park"), why, [["알겠습니다", null]], _portrait("officer_park"))
+		m.dialog.open(_npc_name(boss), why, [["알겠습니다", null]], _portrait(boss))
 		return
 	GameData.me["patrol_day"] = GameData.day
 	GameData.me["patrol_idx"] = 0
@@ -1445,7 +1483,7 @@ func patrol_start() -> void:
 		pages.append({"text": str(job.get("hire", {}).get("first_day", ""))})
 	var starts: Array = job.get("patrol", {}).get("start", ["다녀오게."])
 	pages.append({"text": str(starts[posmod(GameData.day, starts.size())])})
-	m.dialog.open_seq(_npc_name("officer_park"), _portrait("officer_park"), pages)
+	m.dialog.open_seq(_npc_name(boss), _portrait(boss), pages)
 
 
 # 세 곳을 다 찍고 돌아왔다 — 근무 인정. 19시 뒤면 밤 몫이 붙는다
@@ -1460,12 +1498,13 @@ func patrol_report() -> void:
 	_me_add("perf", 1)
 	if not GameData.wage_frozen():
 		_me_add("wage_pending", wage)
-	_log_work("work", "police_box", 1 if night else 0)
+	_log_work("work", str(job.get("inst", "police_box")), 1 if night else 0)
 	if _me_int("perf") % 5 == 0:
-		_rep_add(1)
+		_rep_add(1, _job_region())
+	var boss := str(job.get("boss", "officer_park"))
 	var lines: Array = job.get("patrol", {}).get("report", ["수고했네."])
 	var text := str(job.get("patrol", {}).get("night", "")) if night else str(lines[posmod(GameData.day, lines.size())])
-	m.dialog.open(_npc_name("officer_park"), text, [["대화 끝", null]], _portrait("officer_park"))
+	m.dialog.open(_npc_name(boss), text, [["대화 끝", null]], _portrait(boss))
 	m.saveio.save_now()
 
 
@@ -1490,7 +1529,7 @@ func _open_case(cid: int) -> void:
 func _case_choices(nid: String, choices: Array) -> void:
 	if not _is_constable():
 		return
-	for c in GameData.open_cases():
+	for c in GameData.open_cases(_job_region()):
 		var cid := int(c.get("id", 0))
 		var asked: Array = GameData.me.get("case_asked", {}).get(str(cid), [])
 		var vname := _npc_name(str(c.get("victim", "")))
@@ -1533,11 +1572,19 @@ func case_arrest(cid: int, nid: String) -> void:
 	if c.is_empty() or str(c.get("stage", "")) != "open" or nid != str(c.get("suspect", "")):
 		return
 	if int(c.get("evidence", 0)) >= GameData.NEED_EVIDENCE:
-		GameData._case_convict(c, "player")
+		if str(c.get("region", "kyojin")) == "town":
+			# 읍(S5b) — 순경의 검거는 끝이 아니라 서류다: 검찰청(charged)으로 넘어간다
+			c["stage"] = "charged"
+			c["charged_day"] = GameData.day
+			c["evidence"] = int(c.get("evidence", 0)) + 1
+			GameData.note_later(str(GameData.SOCIETY_NOTES.town_charged) % _npc_name(nid))
+		else:
+			GameData._case_convict(c, "player")
 		_me_add("arrests", 1)
-		_rep_add(2)
+		_rep_add(2, str(c.get("region", "kyojin")))
 		GameData.aff_add(nid, -20)
-		m.dialog.open(_npc_name(nid), "…알았소. 같이 가지. 손은 안 대도 되네.", [["파출소로 데려간다", null]], _portrait(nid))
+		var station := "경찰서로 데려간다" if str(c.get("region", "kyojin")) == "town" else "파출소로 데려간다"
+		m.dialog.open(_npc_name(nid), "…알았소. 같이 가지. 손은 안 대도 되네.", [[station, null]], _portrait(nid))
 	else:
 		_rep_add(-5)
 		GameData.aff_add(nid, -10)
