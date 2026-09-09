@@ -1964,10 +1964,9 @@ func open_shop_permit() -> void:
 	for kid in GameData.SHOP_KINDS:
 		var kd: Dictionary = GameData.SHOP_KINDS[kid]
 		var lbl := "%s — %s" % [str(kd.name), str(kd.desc)]
-		var need := int(GameData.SHOP_SKILL_LV)
-		if GameData.skill_lv(str(kd.skill)) < need:
-			btns.append(gray(lbl, "%s 숙련이 %d은 돼야 하네. 지금 %d일세." \
-				% [str(GameData.SKILLS.get(str(kd.skill), {}).get("name", kd.skill)), need, GameData.skill_lv(str(kd.skill))]))
+		var why_k := GameData.shop_kind_why(str(kid))
+		if why_k != "":
+			btns.append(gray(lbl, why_k))
 		else:
 			btns.append([lbl, _permit.bind(kid)])
 	btns.append(["돌아가기", open_township])
@@ -1987,7 +1986,8 @@ func _permit(kind: String) -> void:
 	GameData.money -= GameData.SHOP_PERMIT_COST
 	GameData.today_spent += GameData.SHOP_PERMIT_COST
 	GameData.gov_budget["kyojin"] = int(GameData.gov_budget.get("kyojin", 0)) + GameData.SHOP_PERMIT_COST
-	GameData.me["shop_own"] = {"kind": kind, "since": GameData.day, "till": 0, "x": t.x, "y": t.y}
+	GameData.me["shop_own"] = {"kind": kind, "since": GameData.day, "till": 0, "x": t.x, "y": t.y,
+		"fee": int(GameData.SHOP_KINDS[kind].get("fee", 0))}
 	GameData.me["shop_stock"] = {}
 	m.objnode._place_object(t, "shop_stand", 0)
 	m.queue_redraw()
@@ -2011,7 +2011,10 @@ func open_stand() -> void:
 	var kd: Dictionary = GameData.SHOP_KINDS.get(str(so.get("kind", "")), {})
 	var stock: Dictionary = GameData.me.get("shop_stock", {})
 	var body := "%s의 %s.\n" % [_my_name(), str(kd.get("name", "좌판"))]
-	if stock.is_empty():
+	var service := GameData.shop_service()
+	if service:
+		body += "요금 %dG. 손님은 마을이 보낸다." % int(so.get("fee", 30))
+	elif stock.is_empty():
 		body += "좌판이 비어 있다."
 	else:
 		body += "진열:"
@@ -2027,13 +2030,34 @@ func open_stand() -> void:
 	var btns: Array = []
 	if till > 0:
 		btns.append(["돈 받기 — %dG" % till, _stand_collect])
-	btns.append(["물건 올리기", _stand_put.bind(0)])
-	if not stock.is_empty():
-		btns.append(["물건 내리기", _stand_take.bind(0)])
+	if service:
+		btns.append(["요금 정하기", _stand_fee_menu])   # 이발소(S5d) — 물건 대신 요금
+	else:
+		btns.append(["물건 올리기", _stand_put.bind(0)])
+		if not stock.is_empty():
+			btns.append(["물건 내리기", _stand_take.bind(0)])
 	btns.append(["장부", _stand_ledger])
 	btns.append(["폐업", _stand_close_ask])
 	btns.append(["닫기", null])
 	m.dialog.open("좌판", body, btns)
+
+
+func _stand_fee_menu() -> void:
+	m.dialog.close()
+	var base := int(GameData.SHOP_KINDS.get(str(GameData.me.shop_own.get("kind", "")), {}).get("fee", 30))
+	var btns: Array = []
+	for f in [int(base * 0.8), base, int(base * 1.5)]:
+		btns.append(["%dG" % f, _stand_fee.bind(f)])
+	btns.append(["돌아가기", open_stand])
+	m.dialog.open("요금", "한 사람에 얼마를 받을까. 싸면 줄이 길고 비싸면 발길이 준다.", btns)
+
+
+func _stand_fee(fee: int) -> void:
+	if Net.is_guest() or not GameData.shop_open():
+		return
+	GameData.me.shop_own["fee"] = maxi(1, fee)
+	m.saveio.save_now()
+	open_stand()
 
 
 func _stand_collect() -> void:
@@ -2185,9 +2209,10 @@ func _stand_ledger() -> void:
 		body = "아직 장부에 적힌 날이 없다."
 	else:
 		var start := maxi(0, ledger.size() - 7)
+		var unit := "명" if GameData.shop_service() else "개"
 		for i in range(start, ledger.size()):
 			var row: Dictionary = ledger[i]
-			body += "%d일째 — %d개, %dG\n" % [int(row.day), int(row.sold), int(row.gold)]
+			body += "%d일째 — %d%s, %dG\n" % [int(row.day), int(row.sold), unit, int(row.gold)]
 	var sum28 := GameData.shop_ledger_sum(GameData.SHOP_LEDGER_DAYS)
 	body += "\n28일 매출 %dG — 다음 고지서의 매출세 %dG" % [sum28, int(float(sum28) * GameData.SALES_TAX_RATE)]
 	m.dialog.open("좌판 장부", body, [["돌아가기", open_stand]])

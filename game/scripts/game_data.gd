@@ -9427,6 +9427,7 @@ const SOCIETY_NOTES := {
 	"shop_none": "어제 좌판에는 손님이 없었다. 값이 비싼가, 물건이 낯선가.",
 	"shop_frozen": "밀린 세금으로 좌판이 영업정지다. 세금부터 내자.",
 	"shop_jailed": "구속 중이라 좌판이 닫혔다. 손님이 발길을 돌렸다.",
+	"shop_served": "어제 이발소에 %d명이 다녀갔다. 금고에 %dG.",
 	# ---- 읍(S4d) ----
 	"town_arrive": "갈뫼읍 주택가에 새 얼굴이 왔다 — %s.",
 	"town_crime": "갈뫼읍 장터에 도둑이 들었다고 한다 — %s네 점포.",
@@ -9678,6 +9679,10 @@ const SHOP_KINDS := {
 	"beach": {"name": "갯것전", "skill": "beach", "desc": "바닷가에서 주운 것"},
 	"ranch": {"name": "축산물전", "skill": "ranch", "desc": "가축이 낸 것"},
 	"combat": {"name": "무기 노점", "skill": "combat", "desc": "동굴에서 얻은 것"},
+	# 부록 둘(S5d, plan 「나중에」) — 약방은 조합법 넷을 달여 본 사람만, 이발소는 물건 없이 요금을 받는다
+	# (털 깎기와 가위질은 한 손이라 목장 Lv3). 요금은 손님이 값을 따져 오갈지 정한다(shop_buy_p)
+	"potion": {"name": "약방", "skill": "", "desc": "달인 약", "brews": 4},
+	"barber": {"name": "이발소", "skill": "ranch", "desc": "머리를 깎는다", "service": true, "fee": 30},
 }
 # 재판정의 두 사람 — 읍에서 오는 순회 손글이라 NPCS 에 없다(주민도 명부도 생일도 아니다).
 # npc_def 가 여기로 떨어지므로 이름·초상은 같은 길로 나온다. 스프라이트는 SOCIETY_NPC_IDS 가 싣는다
@@ -9834,7 +9839,7 @@ func _apply_me(src: Variant) -> Dictionary:
 	if not out.shop_own.is_empty():
 		out.shop_own = {"kind": str(out.shop_own.get("kind", "")), "since": int(out.shop_own.get("since", 0)),
 			"till": int(out.shop_own.get("till", 0)), "x": int(out.shop_own.get("x", -1)),
-			"y": int(out.shop_own.get("y", -1))}
+			"y": int(out.shop_own.get("y", -1)), "fee": int(out.shop_own.get("fee", 0))}
 	out.shop_ledger = _apply_rows(out.shop_ledger, ME_LEDGER)
 	return out
 
@@ -11367,6 +11372,8 @@ func shop_open() -> bool:
 func goods_kind(id: String) -> String:
 	if CROPS.has(id):
 		return "farm"
+	if id.begins_with("potion_"):
+		return "potion"
 	if id.begins_with("fish_"):
 		return "fish"
 	if id.begins_with("dish_") or id == "flour":
@@ -11391,6 +11398,21 @@ func goods_name(id: String) -> String:
 
 
 # 허가를 받을 수 있나 — "" 면 된다. 종류별 숙련은 open_shop_permit 이 따로 잰다
+# 종류별 문턱 — 숙련 Lv3, 약방은 달여 본 조합법 넷. 빈 문자열이면 된다
+func shop_kind_why(kid: String) -> String:
+	var kd: Dictionary = SHOP_KINDS.get(kid, {})
+	if int(kd.get("brews", 0)) > 0 and alchemy_brews.size() < int(kd.get("brews", 0)):
+		return "조합법을 %d가지는 달여 봐야 하네. 지금 %d가지일세." % [int(kd.get("brews", 0)), alchemy_brews.size()]
+	var sk := str(kd.get("skill", ""))
+	if sk != "" and skill_lv(sk) < SHOP_SKILL_LV:
+		return "%s 숙련이 %d은 돼야 하네. 지금 %d일세." % [str(SKILLS.get(sk, {}).get("name", sk)), SHOP_SKILL_LV, skill_lv(sk)]
+	return ""
+
+
+func shop_service() -> bool:
+	return bool(SHOP_KINDS.get(str(me.get("shop_own", {}).get("kind", "")), {}).get("service", false))
+
+
 func shop_permit_why() -> String:
 	if not tax_open():
 		return "면사무소가 열려야 하네."
@@ -11442,7 +11464,7 @@ func _shop_settle() -> void:
 	for id in stock.keys():
 		if int(stock[id].get("qty", 0)) > 0:
 			ids.append(id)
-	if ids.is_empty():
+	if ids.is_empty() and not shop_service():
 		return
 	if int(me.get("jail_days_left", 0)) > 0:
 		_note(str(SOCIETY_NOTES.shop_jailed))   # 구속 중엔 좌판이 닫힌다(헌법 §6.6 「상점은 영업정지만」)
@@ -11460,6 +11482,17 @@ func _shop_settle() -> void:
 	var yday := day - 1
 	var sold := 0
 	var gold := 0
+	if shop_service():
+		# 이발소(S5d) — 물건이 아니라 요금이다. 손님마다 요금이 기준값(30)에 견줘 싸면 앉고 비싸면 돌아간다
+		var fee := int(me.shop_own.get("fee", 30))
+		var fp := shop_buy_p(float(fee) / float(SHOP_KINDS[kind].get("fee", 30)))
+		for i in shop_customers(yday):
+			var p2 := fp if shop_force_p < 0.0 else shop_force_p
+			if float(posmod(hash("cut|%d|%d" % [yday, i]), 1000)) / 1000.0 < p2:
+				sold += 1
+				gold += fee
+		_shop_book(yday, sold, gold, true)
+		return
 	for i in shop_customers(yday):
 		if ids.is_empty():
 			break
@@ -11486,6 +11519,11 @@ func _shop_settle() -> void:
 	for id in stock.keys():
 		if int(stock[id].get("qty", 0)) <= 0:
 			stock.erase(id)
+	_shop_book(yday, sold, gold, false)
+
+
+# 하루 장부 한 줄과 금고, 아침 한 줄 — 좌판(물건)과 이발소(손님)가 같이 쓴다
+func _shop_book(yday: int, sold: int, gold: int, service: bool) -> void:
 	var ledger: Array = me.get("shop_ledger", [])
 	ledger.append({"day": yday, "sold": sold, "gold": gold})
 	while ledger.size() > SHOP_LEDGER_DAYS:
@@ -11493,7 +11531,7 @@ func _shop_settle() -> void:
 	me["shop_ledger"] = ledger
 	if sold > 0:
 		me.shop_own["till"] = int(me.shop_own.get("till", 0)) + gold
-		_note(str(SOCIETY_NOTES.shop_sold) % [sold, gold])
+		_note(str(SOCIETY_NOTES.shop_served if service else SOCIETY_NOTES.shop_sold) % [sold, gold])
 	else:
 		_note(str(SOCIETY_NOTES.shop_none))
 

@@ -7592,6 +7592,68 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_po
 			GameData.minutes = keep_min_po
 			_s2_restore(k_po)
+		211:
+			# ---- 약방·이발소(S5d) — 조합법 넷 문턱, 물약 좌판 정산, 목장 Lv3 문턱, 요금·손님 정산 ----
+			var k_s2 := _s2_keep()
+			var skills_s2: Dictionary = GameData.skills.duplicate(true)
+			var brews_s2: Dictionary = GameData.alchemy_brews.duplicate()
+			var items_s2: Dictionary = GameData.items.duplicate()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			_s2_fresh_gov()
+			GameData.day = 60
+			GameData.money = 2000
+			m.story_cutscene = true
+			GameData.alchemy_brews = {}
+			GameData.skills.ranch.lv = 1
+			# ① 문턱 — 약방은 달여 본 조합법 넷, 이발소는 목장 Lv3
+			var gate_ok: bool = GameData.shop_kind_why("potion").contains("조합법") and GameData.shop_kind_why("barber").contains("목장")
+			GameData.alchemy_brews = {"potion_energy": 1, "potion_luck": 1, "potion_swift": 1, "potion_ember": 1}
+			GameData.skills.ranch.lv = 3
+			gate_ok = gate_ok and GameData.shop_kind_why("potion") == "" and GameData.shop_kind_why("barber") == "" \
+				and GameData.goods_kind("potion_energy") == "potion"
+			# ② 약방 — 물약 둘을 80G 에 올리고 손님이 다 사면 금고 160
+			m.society._permit("potion")
+			m.dialog.close()
+			var potion_ok: bool = str(GameData.me.shop_own.get("kind", "")) == "potion"
+			GameData.me.shop_stock = {"potion_energy": {"qty": 2, "price": 80}}
+			GameData.shop_force_p = 1.0
+			GameData.day = 61
+			GameData.society_new_day([0, 0, 0])
+			var n_s2 := GameData.society_note()
+			potion_ok = potion_ok and int(GameData.me.shop_own.till) == 160 and n_s2.contains("160") \
+				and GameData.me.shop_stock.is_empty()
+			m.society._stand_close()
+			m.dialog.close()
+			# ③ 이발소 — 물건 대신 요금. 50G 로 올리면 손님 수 × 50 이 금고에
+			m.society._permit("barber")
+			m.dialog.close()
+			var barber_ok: bool = str(GameData.me.shop_own.get("kind", "")) == "barber" and int(GameData.me.shop_own.fee) == 30
+			m.society.open_stand()
+			var menu_s2: bool = "요금 정하기" in _btn_texts() and not ("물건 올리기" in _btn_texts())
+			m.society._stand_fee(50)
+			m.dialog.close()
+			GameData.day = 62
+			GameData.society_new_day([0, 0, 0])
+			var n_b := GameData.society_note()
+			var n_cust := GameData.shop_customers(61)
+			var served_ok: bool = int(GameData.me.shop_own.fee) == 50 and int(GameData.me.shop_own.till) == n_cust * 50 \
+				and n_b.contains("이발소") and int(GameData.me.shop_ledger[-1].sold) == n_cust
+			m.society._stand_ledger()
+			var ledger_s2: bool = str(m.dialog.body_label.text).contains("명")
+			m.dialog.close()
+			m.society._stand_close()
+			m.dialog.close()
+			print("SHOP2_OK=", gate_ok and potion_ok and barber_ok and menu_s2 and served_ok and ledger_s2,
+				" 문턱=", gate_ok, " 약방=", potion_ok, " 이발소=", barber_ok, " 메뉴=", menu_s2,
+				" 손님=", served_ok, "(", n_cust, ")", " 장부=", ledger_s2)
+			GameData.shop_force_p = -1.0
+			GameData.skills = skills_s2
+			GameData.alchemy_brews = brews_s2
+			GameData.items = items_s2
+			_s2_restore(k_s2)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()
