@@ -691,6 +691,12 @@ func _draw_map() -> void:
 			continue
 		var a: Vector2i = main.VILLAGE_PLOTS[pid].anchor
 		_place_label(a.x, a.y, str(main.VILLAGE_PLOTS[pid].name))
+	# 갈뫼읍(S4b) — 입구 팻말을 읽은 뒤부터 지도에 이름이 붙는다
+	if GameData.town_open:
+		_place_label(main.TOWN_RECT.position.x + 20, main.TOWN_RECT.position.y - 4, main.TOWN_NAME)
+		for tid: String in main.TOWN_PLOTS:
+			var ta: Vector2i = main.TOWN_PLOTS[tid].anchor
+			_place_label(ta.x, ta.y, str(main.TOWN_PLOTS[tid].name))
 
 	# 옛 마을 확장 구역 (메인 스토리 4) — 표지판을 본 뒤부터 지도에 나타난다.
 	# 잠긴 구역은 빗금 테두리 + 이름, 열린 구역은 이름만 남긴다.

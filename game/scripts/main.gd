@@ -811,6 +811,31 @@ const HAMLET_OF := {
 	"sawyer": "treeshade", "teller": "treeshade", "beekeep": "treeshade",
 }
 const HAMLET_NPC_IDS := ["miller", "dyer", "brook", "sawyer", "beekeep", "teller"]
+# ---- 갈뫼읍(S4b) — 억새 벌판 한복판의 읍. 짓는 게 아니라 발견한다(HAMLETS 패턴). y 는 NORTH_PAD 포함.
+# 관청 거리 y 92 · 남쪽 줄 y 102 · 장터 y 110 · 주택 여덟 y 118. 그림은 마을·고장 집을 빌려 색만 물들인다
+const TOWN_NAME := "갈뫼읍"
+const TOWN_RECT := Rect2i(244, 90, 58, 32)      # 읍 안쪽 — 바닥은 자갈, 자연물은 나지 않는다
+const TOWN_SIGN := Vector2i(247, 100)           # 서쪽 입구 팻말 — 읽으면 「발견」(town_open)
+const TOWN_PLOTS := {
+	"county":      {"anchor": Vector2i(250, 92),  "name": "군청",   "tex": "library", "tint": Color(0.84, 0.9, 1.0)},
+	"police":      {"anchor": Vector2i(262, 92),  "name": "경찰서", "tex": "inn",     "tint": Color(0.78, 0.84, 1.0)},
+	"court":       {"anchor": Vector2i(274, 92),  "name": "법원",   "tex": "post",    "tint": Color(1.0, 0.84, 0.84)},
+	"prosecution": {"anchor": Vector2i(286, 92),  "name": "검찰청", "tex": "smith",   "tint": Color(0.92, 0.92, 0.92)},
+	"clinic":      {"anchor": Vector2i(250, 102), "name": "보건소", "tex": "lab",     "tint": Color(1.0, 1.0, 1.0)},
+	"bank":        {"anchor": Vector2i(262, 102), "name": "신협",   "tex": "general", "tint": Color(1.0, 0.94, 0.68)},
+	"town_inn":    {"anchor": Vector2i(274, 102), "name": "여관",   "tex": "cabin",   "tint": Color(1.0, 0.9, 0.78)},
+	"diner":       {"anchor": Vector2i(286, 102), "name": "식당",   "tex": "ranch",   "tint": Color(1.0, 0.86, 0.72)},
+}
+const TOWN_STALLS := [Vector2i(252, 110), Vector2i(258, 110), Vector2i(264, 110), Vector2i(270, 110),
+	Vector2i(276, 110), Vector2i(282, 110), Vector2i(288, 110), Vector2i(294, 110)]
+const TOWN_HOMES := [Vector2i(246, 118), Vector2i(253, 118), Vector2i(260, 118), Vector2i(267, 118),
+	Vector2i(274, 118), Vector2i(281, 118), Vector2i(288, 118), Vector2i(295, 118)]
+const TOWN_LAMPS := [Vector2i(248, 98), Vector2i(270, 98), Vector2i(292, 98), Vector2i(248, 108),
+	Vector2i(270, 108), Vector2i(292, 108), Vector2i(250, 115), Vector2i(272, 115), Vector2i(294, 115),
+	Vector2i(256, 123), Vector2i(276, 123), Vector2i(296, 123)]
+# 정류장 — 교진 북쪽 어귀와 읍 서쪽 입구. 실제 칸은 세계를 지을 때 가장 가까운 빈 칸으로 잡는다(bus_tiles)
+const BUS_STOPS := {"kyojin": Vector2i(76, 4 + NORTH_PAD), "town": Vector2i(245, 100)}
+var bus_tiles := {}
 # 사회(S2b~)가 데려오는 사람들 — 고장 사람과 같은 도트 판(make_settlers.js)에서 색만 갈아 낀다
 # 순회 판사·검사(S2c)는 NPC 노드 없이 초상·도트만 싣는다 — 주민 수에 들지 않는다
 const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]
@@ -969,6 +994,9 @@ const BUILDING_NAMES := {
 	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
 	"lab": "연구소", "inn": "파출소", "library": "도서관",
 	"ranch": "목장 상회", "fish": "수산시장", "hall": "마을회관",
+	# 갈뫼읍(S4b)
+	"county": "군청", "police": "경찰서", "court": "법원", "prosecution": "검찰청",
+	"clinic": "보건소", "bank": "신협", "town_inn": "여관", "diner": "식당",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 # 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
@@ -1479,7 +1507,7 @@ const OBJECT_SCALES := {
 	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
 	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
 	"forage_shell": 1.2, "forage_coral": 1.3,
-	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6, "shop_stand": 2.6,
+	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6, "shop_stand": 2.6, "market_stall": 2.6,
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)
 	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,

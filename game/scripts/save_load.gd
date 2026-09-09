@@ -247,6 +247,10 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.gov_tax_season = int(d.get("gov_tax_season", 0))
 	var gl: Variant = d.get("gov_log", [])
 	GameData.gov_log = gl if gl is Array else []
+	# 갈뫼읍(S4b) — 발견 여부와 주택 예약
+	GameData.town_open = bool(d.get("town_open", false))
+	var th: Variant = d.get("town_homes", [])
+	GameData.town_homes = th if th is Array else []
 	GameData.tax_seize_due = 0
 	# 파출소(S2b) — 사건은 stage 문자열만 믿고 수는 int 로 되돌린다
 	var cs: Variant = d.get("cases", [])
@@ -631,6 +635,8 @@ func _apply_save(d: Dictionary) -> void:
 		m.worldgen._migrate_farm_layout()
 		# 새터말(S3b)이 생기기 전 세이브 — 초원의 빈 집터 여덟을 깔아 준다(팻말 노드는 _spawn_objects 가)
 		m.worldgen.ensure_meadow_plots(false)
+		# 갈뫼읍(S4b)이 생기기 전 세이브 — 읍을 세워 준다(위에서 걷힌 가로등도 여기서 되살아난다)
+		m.worldgen.ensure_town(false)
 	# 회관 공동 프로젝트의 가로등·벤치는 위에서 걷혔다 — 완성 기록대로 되살린다
 	m.village.restore_hall_project_deco()
 	# ---- 메인 스토리 12 (숲의 연금술사) ----

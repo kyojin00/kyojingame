@@ -136,6 +136,8 @@ func _build_map() -> void:
 	# 같은 이유다)
 	_build_landmarks()
 	_build_hamlets()
+	# 갈뫼읍(S4b) — 억새 벌판의 읍. 고장처럼 처음부터 서 있다
+	ensure_town(false)
 	# 새터말(S3b) — 초원의 빈 집터 여덟. 자연물은 못박아 두고(sweep 이 치운다) 팻말만 세운다
 	ensure_meadow_plots(false)
 	# 온실 터 표지판 (농장 한켠) — 온실 자리는 자연물을 비워 둔다
@@ -167,6 +169,54 @@ func _build_map() -> void:
 	# 한 포기도 두지 않아, 새 농장의 첫날은 산딸기 한 알 없는 빈 들판이었다.
 	# (아직 화면도 주인공도 없는 시점이라 노드는 만들지 않는다)
 	_respawn_forage(false)
+
+
+# 갈뫼읍(S4b) — 억새 벌판 안쪽을 자갈로 다지고 관청 여덟·주택 여덟·장터 점포 여덟·가로등·입구 팻말·
+# 정류장을 놓는다. 자연물은 못박는다(sweep). 세계를 지을 때(with_node=false — 그림은 _spawn_objects 가)와
+# 옛 세이브를 열 때 부른다 — 둘 다 이미 있는 것은 건드리지 않는다
+func ensure_town(with_node := true) -> void:
+	var r: Rect2i = m.TOWN_RECT
+	_no_spawn_rect(r.position.x - 2, r.position.y - 2, r.end.x + 1, r.end.y + 1, 0)
+	for y in range(r.position.y - 2, r.end.y + 2):
+		for x in range(r.position.x - 2, r.end.x + 2):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.WORLD_H:
+				continue
+			_clear_wild(x, y)
+			if r.has_point(Vector2i(x, y)) and str(m.grid[y][x].ground) in ["grass", "yard"]:
+				m.grid[y][x].ground = "path"
+	for tid: String in m.TOWN_PLOTS:
+		var a: Vector2i = m.TOWN_PLOTS[tid].anchor
+		if str(m.objects.get(a, {}).get("kind", "")) != "house":
+			_place_building_tiles(a)
+	for h: Vector2i in m.TOWN_HOMES:
+		if str(m.objects.get(h, {}).get("kind", "")) != "house":
+			_place_building_tiles(h)
+	var fixtures: Array = []
+	for st: Vector2i in m.TOWN_STALLS:
+		fixtures.append([st, "market_stall"])
+	for lp: Vector2i in m.TOWN_LAMPS:
+		fixtures.append([lp, "deco_lamp"])
+	fixtures.append([m.TOWN_SIGN, "sign"])
+	m.bus_tiles = {}
+	for key in m.BUS_STOPS:
+		var want: Vector2i = m.BUS_STOPS[key]
+		var t: Vector2i = want
+		if str(m.objects.get(t, {}).get("kind", "")) != "bus_stop":
+			t = m.nearest_open_tile(want)
+		if t.x >= 0:
+			m.bus_tiles[key] = t
+			fixtures.append([t, "bus_stop"])
+	for fx: Array in fixtures:
+		var p: Vector2i = fx[0]
+		var kind := str(fx[1])
+		if str(m.objects.get(p, {}).get("kind", "")) == kind:
+			continue
+		if with_node:
+			if m.objects.has(p):
+				m.objnode._remove_object(p)
+			m.objnode._place_object(p, kind, 0)
+		else:
+			m.objects[p] = {"kind": kind, "hp": 0}
 
 
 # 새터말의 빈 집터 여덟(GameData.MEADOW_PLOTS) — 집이 안 선 자리마다 현관에 팻말을 세운다.
@@ -1358,6 +1408,11 @@ func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
 	if m.obj_nodes.has(anchor):
 		m.obj_nodes[anchor].queue_free()   # 다시 세워도 낡은 그림이 겹치지 않게
 	var tname := "house_" + kind
+	var tint := Color(1, 1, 1)
+	if m.TOWN_PLOTS.has(kind):
+		# 읍 건물(S4b)은 마을·고장 집의 그림을 빌려 색만 물들인다 — 새 그림 없이 여덟이 구별된다
+		tname = "house_" + str(m.TOWN_PLOTS[kind].tex)
+		tint = m.TOWN_PLOTS[kind].tint
 	if kind == "" or not m.tex.has(tname):
 		tname = "house"
 	# 그림은 512 폭에 0.5배로 그려 화면에서는 256(8칸)을 덮는다.
@@ -1373,6 +1428,7 @@ func _spawn_house_node(anchor: Vector2i, kind: String = "") -> void:
 	var hspr: Sprite2D = hn.get_child(0)
 	hspr.scale = Vector2(0.5, 0.5)
 	hspr.offset.x = -96.0
+	hspr.modulate = tint
 	m.obj_nodes[anchor] = hn
 	m.world.add_child(hn)
 	# 집 그림은 5x4칸보다 크게 그려진다 (양옆 1칸, 위 2칸 더 덮는다).

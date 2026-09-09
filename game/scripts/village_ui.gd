@@ -530,6 +530,8 @@ func _enter_mine(f: int) -> void:
 
 func room_action(kind: String) -> void:
 	match kind:
+		"town":
+			_open_town_room_dialog()   # 갈뫼읍(S4b) — 사람은 S4c 에 온다
 		"rest":
 			_open_inn_dialog()
 		"breed":
@@ -546,6 +548,87 @@ func room_action(kind: String) -> void:
 			_open_post_dialog()
 		"police":
 			m.society.open_police()   # 파출소 창구(사회 S2b) — 자수·출동·순찰·봉급
+
+
+# ---- 갈뫼읍 (S4b) — 발견·정류장·장터·빈 창구 ----
+#
+# 읍은 짓지 않는다. 억새 벌판에 처음부터 서 있고, 걸어가서 팻말을 읽으면 발견이다. 버스는
+# 면사무소 사업 「버스 개통」 뒤에 정류장 E 로 탄다(50G, 반 시간, 19시 뒤엔 없다 — 밤길은 걸어야
+# 하고 그건 대범함이다). 창구의 사람과 일은 S4c 가 채운다.
+
+func open_town_sign() -> void:
+	var first: bool = not GameData.town_open
+	GameData.town_open = true
+	if first:
+		m.hud.event_toast("%s 발견!" % m.TOWN_NAME)
+		m.saveio.save_now()
+	m.dialog.open(m.TOWN_NAME, "『갈뫼읍 — 군청 · 경찰서 · 법원 · 검찰청』\n" \
+		+ "관청 거리 아래로 보건소·신협·여관·식당, 그 아래가 장터다.\n"
+		+ ("교진 북쪽 어귀에서 버스가 온다." if GameData.bus_open() else "버스는 아직 없다. 교진까지 걸어야 한다."),
+		[["닫기", null]])
+
+
+func open_market_stall(_t: Vector2i) -> void:
+	m.dialog.open("장터 점포", "빈 점포다. 차양만 걸려 있다.\n읍에 사람이 차면 장이 선다.", [["닫기", null]])
+
+
+func _open_town_room_dialog() -> void:
+	var name := str(m.shop_room.ROOMS.get(m.shop_room.room_id, {}).get("name", "창구"))
+	m.dialog.open(name, "창구는 열려 있는데 앉은 사람이 없다.\n읍에 사람이 오면 여기서 일을 본다.", [["나간다", null]])
+
+
+func open_bus_stop(t: Vector2i) -> void:
+	var here := ""
+	for key in m.bus_tiles:
+		if m.bus_tiles[key] == t:
+			here = str(key)
+	var dest_key := "town" if here != "town" else "kyojin"
+	var dest_name: String = m.TOWN_NAME if dest_key == "town" else "교진"
+	if not GameData.bus_open():
+		m.dialog.open("정류장", "정류장 팻말만 서 있다. 버스는 아직이다.\n면사무소 사업 「버스 개통」 뒤에 선다.", [["닫기", null]])
+		return
+	if GameData.hour_now() >= 19.0:
+		m.dialog.open("정류장", "밤엔 버스가 없다. 걸어야 한다.", [["닫기", null]])
+		return
+	if int(GameData.me.get("reputation", {}).get("kyojin", 0)) < -40:
+		m.dialog.open("정류장", "기사가 문을 열어 주지 않는다. 마을에 도는 내 얘기 때문이다.", [["닫기", null]])
+		return
+	var btns: Array = []
+	if GameData.money >= GameData.BUS_FARE:
+		btns.append(["%s행 — %dG" % [dest_name, GameData.BUS_FARE], _bus_ride.bind(dest_key)])
+	else:
+		btns.append(m.society.gray("%s행 — %dG" % [dest_name, GameData.BUS_FARE], "차비가 없다."))
+	btns.append(["닫기", null])
+	m.dialog.open("정류장", "%s행 버스가 선다. 반 시간이면 닿는다." % dest_name, btns)
+
+
+func _bus_ride(dest_key: String) -> void:
+	m.dialog.close()
+	if GameData.money < GameData.BUS_FARE or not m.bus_tiles.has(dest_key):
+		return
+	GameData.money -= GameData.BUS_FARE
+	GameData.today_spent += GameData.BUS_FARE
+	GameData.gov_budget["kyojin"] = int(GameData.gov_budget.get("kyojin", 0)) + GameData.BUS_FARE
+	var tw := create_tween()
+	tw.tween_property(m.fade_rect, "color:a", 1.0, 0.35)
+	tw.tween_callback(_bus_arrive.bind(dest_key))
+	tw.tween_property(m.fade_rect, "color:a", 0.0, 0.35)
+
+
+# 내린다 — 정류장 앞 빈 칸, 시계는 반 시간 뒤. 하네스는 이 함수를 바로 부른다(페이드 없이)
+func _bus_arrive(dest_key: String) -> void:
+	var t: Vector2i = m.bus_tiles.get(dest_key, Vector2i(-1, -1))
+	if t.x < 0:
+		return
+	m.riding.dismount_horse()
+	var land: Vector2i = m.nearest_open_tile(t + Vector2i(0, 1))
+	if land.x < 0:
+		land = t
+	m.player.position = Vector2(land.x * m.TILE + 16, land.y * m.TILE + 16)
+	GameData.minutes += GameData.BUS_MINUTES
+	m.hud.show_message("버스가 %s에 닿았다." % (m.TOWN_NAME if dest_key == "town" else "교진"), 3.0)
+	m.queue_redraw()
+	m.saveio.save_now()
 
 
 # ---- 우체국 (메인 스토리 3에서 세운다) ----

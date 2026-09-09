@@ -57,6 +57,14 @@ func _spawn_objects() -> void:
 			var ha: Vector2i = entry[0]
 			m.objects.erase(m.door_tile(ha))
 			m.worldgen._spawn_house_node(ha, String(entry[1]))
+	# 갈뫼읍(S4b) — 관청 여덟과 주택 여덟. 고장 집처럼 처음부터 서 있다
+	for tid: String in m.TOWN_PLOTS:
+		var ta: Vector2i = m.TOWN_PLOTS[tid].anchor
+		m.objects.erase(m.door_tile(ta))
+		m.worldgen._spawn_house_node(ta, tid)
+	for th: Vector2i in m.TOWN_HOMES:
+		m.objects.erase(m.door_tile(th))
+		m.worldgen._spawn_house_node(th)
 	if GameData.house_lv >= 1:
 		m.objects.erase(m.door_tile(m.HOME_ANCHOR))
 		m.worldgen._spawn_house_node(m.HOME_ANCHOR)
@@ -187,6 +195,13 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 내 좌판(사회 S3a) — 만수의 노점 그림을 빌려 초록 차양으로 물들인다
 			texture = m.tex["stall"]
 			offset = Vector2(0, -texture.get_height())
+		"market_stall":
+			# 갈뫼읍 장터 점포(S4b) — 같은 노점 그림, 붉은 차양
+			texture = m.tex["stall"]
+			offset = Vector2(0, -texture.get_height())
+		"bus_stop":
+			# 정류장 팻말(S4b) — 표지판 그림을 파랗게
+			texture = m.tex["sign"]
 		"weed":
 			# 서 있을 때는 풀숲, 주우면 묶음(weed)이 인벤토리에 들어간다
 			texture = m.tex["weed_plant"]
@@ -263,6 +278,10 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			spr.modulate = Color(1.15, 1.0, 0.62)  # 경매 게시판은 금빛
 		elif kind == "shop_stand":
 			spr.modulate = Color(0.78, 1.05, 0.82)  # 내 좌판은 초록 차양 — 만수의 노점과 구별
+		elif kind == "market_stall":
+			spr.modulate = Color(1.1, 0.8, 0.78)    # 읍 장터는 붉은 차양
+		elif kind == "bus_stop":
+			spr.modulate = Color(0.7, 0.85, 1.2)    # 정류장은 파란 팻말
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
@@ -560,7 +579,7 @@ func _tick_landmarks() -> void:
 const STREAM_W := 34      # 좌우 (화면 반폭 15칸 + 여유)
 const STREAM_H := 26      # 위아래
 const KEEP_ALWAYS := ["house", "chief_hut", "barn", "barn_block", "art_block",
-	"cave", "worldtree", "onsen", "stall", "shop_stand", "board", "auction", "sign",
+	"cave", "worldtree", "onsen", "stall", "shop_stand", "market_stall", "bus_stop", "board", "auction", "sign",
 	"housesite", "plotsite", "home_sign", "homeplot", "old_lookout", "old_barn",
 	"landmark_greattree", "landmark_falls", "deco_cairn", "deco_wheel",
 	"deco_fountain", "horse", "old_book", "seed_sprout", "carved_stone",

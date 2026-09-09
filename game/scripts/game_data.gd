@@ -8669,6 +8669,9 @@ const BURGLARY_P := 0.30           # 빈집 문을 따는 기본 확률 — thef
 const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 넘김 일곱 번, 밭은 마른다)
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
 const EXPUNGE_DAYS := 28           # 형이 끝나고 이만큼 조용히 지내야 말소를 청구할 수 있다
+# ---- 버스(S4b) ----
+const BUS_FARE := 50
+const BUS_MINUTES := 30
 # ---- 자기 상점(S3a, 헌법 §7.4) ----
 # 면사무소 「상점 허가」 500G + 그 종류의 숙련 Lv3 + 평판 0 이상 + 일자리 없음. 자리는 집 마당
 # 좌판(shop_stand) 하나 — 건물도 실내도 없다(짓기 없음). 손님은 아침 결산이 보낸다: 하루 4~7명,
@@ -8710,6 +8713,10 @@ const GOV_PROJECTS := [
 	{"id": "paving", "name": "마을 길 포장", "cost": 5000,
 		"desc": "마을 안 자갈길을 고르게 다진다. 길 위에서는 걸음이 빠르다.",
 		"done": "자갈길 위에서는 걸음이 한결 가볍다."},
+	# 버스(S4b) — 교진 북쪽 어귀와 갈뫼읍 서쪽 입구를 잇는다. 정류장 E, 50G, 19시 뒤엔 없다
+	{"id": "bus", "name": "버스 개통", "cost": 3000,
+		"desc": "교진과 갈뫼읍 사이에 버스를 놓는다. 정류장에서 50G, 반 시간이면 닿는다.",
+		"done": "정류장에 버스가 선다. 읍이 반 시간 거리다."},
 ]
 
 # ---- 사회: 상태 ----
@@ -8725,6 +8732,9 @@ var gov_building := ""               # 착공해 다음 계절 첫날 완공되�
 var gov_tax_season := 0              # 이번 계절 플레이어가 낸 세금(장부 한 줄의 재료)
 var gov_log: Array = []              # 계절 장부 [{season, grant, levy, tax, ops, project}] ≤ 8 — 서기의 「예산 장부」
 var tax_seize_due := 0               # 오늘 아침 압류할 액수(society.after_new_day 가 집행하고 0 으로)
+# 갈뫼읍(S4b) — 입구 팻말을 읽으면 발견(지도에 이름이 붙는다). 주택 예약은 S4d(생성 NPC 이주)가 쓴다
+var town_open := false
+var town_homes: Array = []
 # 파출소(S2b) — NPC 사건. 헌법 §6.7: 확률이 아니라 결정적 주기, 플레이어 없이도 닫힌다
 var cases: Array = []                # [{id, crime, day, suspect, victim, witness, evidence, stage, closed_by, deadline}]
 var case_seq := 0
@@ -9397,6 +9407,11 @@ func gov_next_project() -> Dictionary:
 			continue
 		return p
 	return {}
+
+
+# 버스가 다니나 — 「버스 개통」 사업이 끝난 뒤(S4b)
+func bus_open() -> bool:
+	return "bus" in gov_done
 
 
 func gov_project(pid: String) -> Dictionary:
@@ -10710,6 +10725,8 @@ func reset_all() -> void:
 	gov_tax_season = 0
 	gov_log = []
 	tax_seize_due = 0
+	town_open = false
+	town_homes = []
 	cases = []
 	case_seq = 0
 	npc_greed_adj = {}
@@ -11145,6 +11162,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		# 정부(S2a)
 		"gov_budget": gov_budget, "gov_done": gov_done, "gov_building": gov_building,
 		"gov_tax_season": gov_tax_season, "gov_log": gov_log,
+		"town_open": town_open, "town_homes": town_homes,
 		"cases": cases, "case_seq": case_seq, "npc_greed_adj": npc_greed_adj,
 		"recipe_items": recipe_items, "tracked_pick": tracked_pick, "respawn_queue": respawn_queue,
 		"explored": explored.keys().map(func(c: Vector2i) -> Array: return [c.x, c.y]),

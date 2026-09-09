@@ -5710,9 +5710,11 @@ func _debug_tick() -> void:
 				starts.append(GameData.gov_building)
 				dones.append(GameData.gov_done.duplicate())
 			var first_ok: bool = starts[0] == "lights" and dones[1].has("lights")
-			var paving_ok: bool = starts[1] == "paving" and dones[2].has("paving") and starts[2] == ""
-			# 포장 착공(둘째 계절 뒤 1640)으로부터 여섯 계절 × 2570
-			var end_ok: bool = int(GameData.gov_budget.kyojin) == 1640 + 2570 * 6
+			# 셋째 사업 「버스 개통」(S4b, 3,000)은 포장 다음 계절(1640 + 2570 = 4210)에 바로 선다
+			var paving_ok: bool = starts[1] == "paving" and dones[2].has("paving") and starts[2] == "bus" \
+				and dones[3].has("bus") and starts[3] == ""
+			# 포장 착공(둘째 계절 뒤 1640)으로부터 여섯 계절 × 2570, 그 사이 버스 3,000
+			var end_ok: bool = int(GameData.gov_budget.kyojin) == 1640 + 2570 * 6 - 3000
 			var log_ok: bool = GameData.gov_log.size() == 8 and int(GameData.gov_log[-1].levy) == 570 \
 				and int(GameData.gov_log[0].grant) == 2000
 			var free_ok: bool = GameData.me.tax_bills.size() == 6 \
@@ -6431,6 +6433,111 @@ func _debug_tick() -> void:
 			GameData.minutes = keep_min_pf
 			m.map_ui.visible = map_keep_pf
 			_soc_restore(k_pf)
+		399:
+			# ---- 갈뫼읍(S4b) — 억새 벌판에 처음부터 서 있는 읍: 부지·문·방·장터·가로등·팻말·정류장·버스 ----
+			var k_tw := _s2_keep()
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			var keep_min_tw := GameData.minutes
+			var map_keep_tw: bool = m.map_ui.visible
+			m.map_ui.visible = false
+			# 부지 여덟 + 주택 여덟 — 본체는 house, 문은 밟힌다, 문의 종류가 부지 id 다
+			var plots_ok := true
+			var bad_tw: Array = []
+			for tid: String in m.TOWN_PLOTS:
+				var ta: Vector2i = m.TOWN_PLOTS[tid].anchor
+				var door_tw: Vector2i = m.door_tile(ta)
+				var body_ok: bool = str(m.objects.get(ta, {}).get("kind", "")) == "house" \
+					and str(m.objects.get(ta + Vector2i(4, 3), {}).get("kind", "")) == "house"
+				var door_ok: bool = m.is_passable(door_tw) and m.actions._door_kind_at(door_tw) == tid \
+					and m.actions._building_kind_at(ta + Vector2i(1, 1)) == tid
+				var node_ok: bool = m.obj_nodes.has(ta) and m.shop_room.has_room(tid)
+				if not (body_ok and door_ok and node_ok):
+					plots_ok = false
+					bad_tw.append([tid, body_ok, door_ok, node_ok])
+			var homes_tw := 0
+			for th: Vector2i in m.TOWN_HOMES:
+				if str(m.objects.get(th, {}).get("kind", "")) == "house" and m.is_passable(m.door_tile(th)):
+					homes_tw += 1
+			# 읍 안에는 자연물이 없고 바닥은 자갈이다
+			var wild_tw := 0
+			var gravel_tw := 0
+			var r_tw: Rect2i = m.TOWN_RECT
+			for y_tw in range(r_tw.position.y, r_tw.end.y):
+				for x_tw in range(r_tw.position.x, r_tw.end.x):
+					var p_tw := Vector2i(x_tw, y_tw)
+					if m.objects.has(p_tw) and m.worldgen._is_wild(str(m.objects[p_tw].kind)):
+						wild_tw += 1
+					if str(m.grid[y_tw][x_tw].ground) == "path":
+						gravel_tw += 1
+			var clear_ok: bool = wild_tw == 0 and gravel_tw > r_tw.size.x * r_tw.size.y / 2
+			# 장터 여덟 · 가로등 열둘 · 팻말 · 정류장 둘
+			var stalls_tw := 0
+			for st_tw: Vector2i in m.TOWN_STALLS:
+				if str(m.objects.get(st_tw, {}).get("kind", "")) == "market_stall":
+					stalls_tw += 1
+			var lamps_tw := 0
+			for lp_tw: Vector2i in m.TOWN_LAMPS:
+				if str(m.objects.get(lp_tw, {}).get("kind", "")) == "deco_lamp":
+					lamps_tw += 1
+			var fixtures_ok: bool = stalls_tw == 8 and lamps_tw == 12 \
+				and str(m.objects.get(m.TOWN_SIGN, {}).get("kind", "")) == "sign" \
+				and m.bus_tiles.has("kyojin") and m.bus_tiles.has("town") \
+				and str(m.objects.get(m.bus_tiles.kyojin, {}).get("kind", "")) == "bus_stop" \
+				and str(m.objects.get(m.bus_tiles.town, {}).get("kind", "")) == "bus_stop"
+			# 발견 — 팻말을 읽으면 town_open, 지도에 이름
+			GameData.town_open = false
+			m.village.open_town_sign()
+			var found_ok: bool = GameData.town_open and m.dialog.visible
+			m.dialog.close()
+			# 문으로 들어가면 방이 열리고, 창구 E 는 「사람이 없다」
+			GameData.minutes = 11 * 60
+			m.actions._enter_building("county")
+			var room_ok: bool = m.shop_room.visible and m.shop_room.room_id == "county"
+			m.village.room_action("town")
+			var counter_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("사람이 없다")
+			m.dialog.close()
+			m.shop_room.close()
+			# 버스 — 개통 전엔 팻말뿐, 개통 뒤 50G 에 반 시간, 19시 뒤엔 없다, 평판 −40 이면 거부
+			var gd_keep: Array = GameData.gov_done.duplicate()
+			GameData.gov_done = []
+			m.village.open_bus_stop(m.bus_tiles.kyojin)
+			var before_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("아직")
+			m.dialog.close()
+			GameData.gov_done = ["bus"]
+			GameData.money = 500
+			var pos_tw: Vector2 = m.player.position
+			m.village.open_bus_stop(m.bus_tiles.kyojin)
+			var offer_ok: bool = "갈뫼읍행 — 50G" in _btn_texts()
+			m.dialog.close()
+			var budget_tw := int(GameData.gov_budget.kyojin)
+			m.village._bus_ride("town")
+			m.village._bus_arrive("town")
+			var pt_tw: Vector2i = m.player_tile()
+			var ride_ok: bool = GameData.money == 450 and int(GameData.gov_budget.kyojin) == budget_tw + 50 \
+				and GameData.minutes == 11 * 60 + 30 and absi(pt_tw.x - m.bus_tiles.town.x) <= 2 \
+				and absi(pt_tw.y - m.bus_tiles.town.y) <= 2
+			GameData.minutes = 20 * 60
+			m.village.open_bus_stop(m.bus_tiles.town)
+			var night_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("밤")
+			m.dialog.close()
+			GameData.minutes = 11 * 60
+			GameData.me.reputation.kyojin = -50
+			m.village.open_bus_stop(m.bus_tiles.town)
+			var refuse_ok: bool = m.dialog.visible and str(m.dialog.body_label.text).contains("기사")
+			m.dialog.close()
+			print("TOWN_OK=", plots_ok and homes_tw == 8 and clear_ok and fixtures_ok and found_ok and room_ok
+				and counter_ok and before_ok and offer_ok and ride_ok and night_ok and refuse_ok,
+				" 부지=", plots_ok, bad_tw, " 주택=", homes_tw, " 비움=", clear_ok, "(자연물 ", wild_tw, " 자갈 ", gravel_tw, ")",
+				" 설치물=", fixtures_ok, "(점포 ", stalls_tw, " 등 ", lamps_tw, " 정류장 ", m.bus_tiles, ")",
+				" 발견=", found_ok, " 방=", room_ok, " 창구=", counter_ok, " 개통전=", before_ok,
+				" 승차=", offer_ok, " 도착=", ride_ok, pt_tw, " 밤=", night_ok, " 거부=", refuse_ok)
+			GameData.gov_done = gd_keep
+			m.player.position = pos_tw
+			GameData.minutes = keep_min_tw
+			m.map_ui.visible = map_keep_tw
+			_s2_restore(k_tw)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

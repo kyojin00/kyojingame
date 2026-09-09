@@ -25,6 +25,11 @@ func _draw_building_signs() -> void:
 	if GameData.house_lv >= 1:
 		_draw_name_plate(f, "우리집",
 			Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16, m.HOME_ANCHOR.y * m.TILE - 6))
+	# 갈뫼읍(S4b) — 관청 여덟의 이름표
+	for tid: String in m.TOWN_PLOTS:
+		var ta: Vector2i = m.TOWN_PLOTS[tid].anchor
+		_draw_name_plate(f, str(m.TOWN_PLOTS[tid].name),
+			Vector2((ta.x + 2) * m.TILE + 16, ta.y * m.TILE - 6))
 
 
 func _draw_name_plate(f: Font, text: String, at: Vector2) -> void:
