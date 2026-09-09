@@ -535,8 +535,9 @@ func counter_menu(room_id: String) -> bool:
 	if not GameData.INSTITUTIONS.has(inst_id):
 		inst_id = ""
 		for cand in GameData.INSTITUTIONS:
-			if str(GameData.INSTITUTIONS[cand].get("room", "")) == room_id:
-				inst_id = str(cand)
+			if str(GameData.INSTITUTIONS[cand].get("room", "")) == room_id \
+					and str(GameData.INSTITUTIONS[cand].get("region", "")) == "town":
+				inst_id = str(cand)   # 파출소(inn)·회관(hall)은 제 창구 흐름이 있다 — 읍 기관만
 		if inst_id == "":
 			return false
 	var employed := GameData.job_inst() == inst_id
@@ -1169,7 +1170,10 @@ func _open_township_jobs() -> void:
 # 여덟 주 밀린 세금은 마을이 대신 가져간다 — 유일한 자동 차감(헌법 §2.3).
 # 회관 창고 → 가축 → 소지금 순서. GameData 는 가축 노드를 못 만지므로 세계를 든 여기서 집행한다
 func after_new_day() -> void:
-	if Net.is_guest() or GameData.tax_seize_due <= 0:
+	if Net.is_guest():
+		return
+	m.npcmgr.sync_gen_nodes()   # 이주·전근·죽음으로 바뀐 읍 얼굴 — 온 사람은 세우고 간 사람은 치운다
+	if GameData.tax_seize_due <= 0:
 		return
 	var due: int = GameData.tax_seize_due
 	var got := 0
@@ -1337,7 +1341,11 @@ func _cops_after_me() -> Array:
 	if not GameData.wanted_active():
 		return out
 	for n in m.npcs:
-		if n.visible and not n.scripted and GameData.society_place(str(n.id)) == "chase":
+		if not n.visible or n.scripted:
+			continue
+		if str(n.id) != "officer_park" and GameData.constable_shift(str(n.id)) < 0:
+			continue   # 순경만 — society_place 는 이장의 회의·세금 장부까지 훑는다
+		if GameData.society_place(str(n.id)) == "chase":
 			out.append(n)
 	return out
 

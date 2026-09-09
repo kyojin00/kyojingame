@@ -8562,13 +8562,6 @@ const JOBS := {
 		],
 	},
 	# 자유직 목수(S3c) — 제작대에서 완성한 것이 마흔이면 불린다
-	"carpenter": {
-		"name": "목수",
-		"kind": "free",
-		"inst": "",
-		"stat": "things_built",
-		"slice": 3,
-	},
 }
 
 # 자유직 문턱 8 — stat 값(사전이면 합)이 need 를 넘으면 불린다. 여럿이면 value/need 비율 최대(D16).
@@ -9673,7 +9666,7 @@ const SHOP_TIER_NAMES := {"cheap": "싸게", "fair": "제값", "dear": "비싸�
 const SHOP_KINDS := {
 	"farm": {"name": "농산물전", "skill": "farm", "desc": "밭에서 난 것"},
 	"fish": {"name": "어물전", "skill": "fish", "desc": "낚은 것"},
-	"forest": {"name": "산나물전", "skill": "forest", "desc": "산에서 캔 것"},
+	"forest": {"name": "산나물전", "skill": "beach", "desc": "산에서 캔 것"},   # 채집(beach)이 숲·해변을 다 덮는다
 	"mine": {"name": "광석상", "skill": "mine", "desc": "굴에서 캔 것"},
 	"cook": {"name": "밥집", "skill": "cook", "desc": "만든 음식"},
 	"beach": {"name": "갯것전", "skill": "beach", "desc": "바닷가에서 주운 것"},
@@ -9723,7 +9716,7 @@ var gov_log: Array = []              # 계절 장부 [{season, grant, levy, tax,
 var tax_seize_due := 0               # 오늘 아침 압류할 액수(society.after_new_day 가 집행하고 0 으로)
 # 갈뫼읍(S4b) — 입구 팻말을 읽으면 발견(지도에 이름이 붙는다). 주택 예약은 S4d(생성 NPC 이주)가 쓴다
 var town_open := false
-var town_homes: Array = []
+
 # 읍 살림(S4e) — 빚·장부·사업. 긴축 단계는 빚이 정하고, 바뀐 아침에만 한 줄
 var gov_debt := {"town": 0}
 var town_log: Array = []
@@ -10339,7 +10332,7 @@ func pay_tax() -> int:
 	var town_part := 0   # 읍 법원 벌금(S4f)은 읍 예산으로 — 창구는 하나라도 돈은 제 장부로
 	for b in unpaid_bills():
 		if str(b.get("region", "kyojin")) == "town":
-			town_part += int(b.get("total", 0)) - int(b.get("paid", 0))
+			town_part += bill_due(b)   # 체납 이자도 읍 몫이다
 		b["paid"] = int(b.get("total", 0))
 	me["tax_paid_season"] = season_no()
 	me["arrears"] = {"amount": 0, "weeks": 0}
@@ -10793,6 +10786,18 @@ func _promotion_tick() -> void:
 	_note(str(SOCIETY_NOTES.promoted) % str(pr.get("name", up)))
 
 
+# 그 자리에 맞는 직업 — 한 기관에 직업이 여럿(자치회 셋, 면사무소 둘)이거나 승진 자리(promote.rank)면
+# 기관의 기본 직업이 아니라 랭크로 찾는다. 없으면 기관의 기본 직업
+func job_for_seat(inst: String, rank: String) -> String:
+	for jid in JOBS:
+		var jd: Dictionary = JOBS[jid]
+		if str(jd.get("inst", "")) != inst:
+			continue
+		if str(jd.get("rank", "")) == rank or str(jd.get("promote", {}).get("rank", "")) == rank:
+			return str(jid)
+	return str(INSTITUTIONS.get(inst, {}).get("job", ""))
+
+
 # 지금 자리의 봉급·호칭 — 승진한 자리면 promote 의 것
 func job_wage() -> int:
 	var jd: Dictionary = JOBS.get(str(me.get("job", "")), {})
@@ -11064,8 +11069,7 @@ func town_wanted_active() -> bool:
 
 # 읍의 신고는 회의가 아니라 곧장 경찰서다(헌법 §6.3) — 신고 다음날 아침 수배가 걸리고, 이레면 잊는다
 func _town_wanted_tick() -> void:
-	if not town_open:
-		return
+	# 팻말을 읽기 전이라도 읍 땅의 일은 읍의 법이 맡는다 — 순경들은 처음부터 거기 있다
 	if town_wanted_active():
 		var w: Dictionary = me.wanted
 		if day - int(w.get("since", day)) >= TOWN_WANTED_DAYS:
@@ -11610,7 +11614,7 @@ func society_new_day(stats: Array, ko := false) -> void:
 		var rows := seat_rows(inst)   # 빠진 랭크 키를 채우므로 여기서 KeyError 는 없다
 		for r in rows:
 			if rows[r] is Array and "player" in rows[r]:
-				seat_job = str(INSTITUTIONS[inst].job)
+				seat_job = job_for_seat(inst, str(r))
 				seat_rank = str(r)
 	if seat_job != "" and str(me.job) != seat_job:
 		me.job = seat_job
@@ -12452,7 +12456,7 @@ func reset_all() -> void:
 	gov_log = []
 	tax_seize_due = 0
 	town_open = false
-	town_homes = []
+
 	gen_seed = 0
 	gen_npcs = {}
 	gov_debt = {"town": 0}
@@ -12897,7 +12901,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		# 정부(S2a)
 		"gov_budget": gov_budget, "gov_done": gov_done, "gov_building": gov_building,
 		"gov_tax_season": gov_tax_season, "gov_log": gov_log,
-		"town_open": town_open, "town_homes": town_homes,
+		"town_open": town_open,
 		"gen_seed": gen_seed, "gen_npcs": gen_save_rows(),
 		"gov_debt": gov_debt, "town_log": town_log, "town_building": town_building, "town_done": town_done,
 		"town_austerity_lv": town_austerity_lv,

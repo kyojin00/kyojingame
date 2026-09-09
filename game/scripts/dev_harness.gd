@@ -6266,6 +6266,10 @@ func _debug_tick() -> void:
 			m.society.hire_job("women_head")
 			m.dialog.close()
 			GameData.day += 1
+			# 아침을 한 번 넘겨도 자리가 직업을 바꾸지 않는다(자치회는 한 기관에 직업 셋 — 랭크로 찾는다)
+			GameData.society_new_day([0, 0, 0])
+			GameData.society_note()
+			var morning_job_ok: bool = str(GameData.me.job) == "women_head" and str(GameData.me.rank) == "women_head"
 			GameData.settlers = ["florist"]
 			if not GameData.npc_greeted.has("florist"):
 				GameData.npc_greeted.append("florist")
@@ -6279,10 +6283,10 @@ func _debug_tick() -> void:
 			var women_ok: bool = ("찾아간다 — " + str(GameData.npc_def("florist").name)) in wb \
 				and int(GameData.npc_last_talk.florist) == GameData.day and GameData.aff("florist") == aff_fl + 3 \
 				and int(GameData.me.visit_day) == GameData.day
-			print("HONOR_OK=", list_ok and review_ok and hire_ok and start_ok and walk_ok and report_ok
+			print("HONOR_OK=", morning_job_ok and list_ok and review_ok and hire_ok and start_ok and walk_ok and report_ok
 				and roster_ok and women_ok,
 				" 목록=", list_ok, " 심사=", review_ok, " 채용=", hire_ok, " 야경시작=", start_ok,
-				" 세곳=", walk_ok, " 보고=", report_ok, " 명부=", roster_ok, " 부녀회=", women_ok)
+				" 세곳=", walk_ok, " 보고=", report_ok, " 명부=", roster_ok, " 부녀회=", women_ok, " 아침직업=", morning_job_ok)
 			GameData.minutes = keep_min_ho
 			m.map_ui.visible = map_keep_ho
 			_s2_police_teardown(cop_ho)
@@ -7127,14 +7131,18 @@ func _debug_tick() -> void:
 				if not bool(GameData.gen_npcs[senior_id].here):
 					gone_season = sn_st
 					break
+			m.society.after_new_day()   # 하루가 넘어간 아침의 노드 정리 — 간 사람은 치운다
 			var gone_ok: bool = gone_season >= 4 and gone_season <= 11 and n_tr.contains("전근") \
 				and GameData.seat_of("county", "senior") == "" \
-				and int(GameData.gen_npcs[senior_id].away_until) == gone_season + 2
+				and int(GameData.gen_npcs[senior_id].away_until) == gone_season + 2 \
+				and _npc_node(senior_id) == null
 			# 두 계절 뒤 새 얼굴 — 같은 번호, 다른 굴림, 자리에 앉는다
 			GameData.day = (gone_season + 2) * 28 + 1
 			GameData.society_new_day([0, 0, 0])
 			var n_ar := GameData.society_note()
+			m.society.after_new_day()   # 온 사람은 세운다
 			var back_ok: bool = bool(GameData.gen_npcs[senior_id].here) and n_ar.contains("빈자리") \
+				and _npc_node(senior_id) != null \
 				and GameData.seat_of("county", "senior") == senior_id \
 				and int(GameData.gen_npcs[senior_id].reroll) == int(g_st.reroll) + 1 \
 				and str(GameData.gen_npcs[senior_id].name).ends_with(" 주사")

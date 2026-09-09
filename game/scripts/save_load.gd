@@ -266,8 +266,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.ensure_gen_npcs(d.get("gen_npcs", {}))
 	# 갈뫼읍(S4b) — 발견 여부와 주택 예약
 	GameData.town_open = bool(d.get("town_open", false))
-	var th: Variant = d.get("town_homes", [])
-	GameData.town_homes = th if th is Array else []
+
 	GameData.tax_seize_due = 0
 	# 파출소(S2b) — 사건은 stage 문자열만 믿고 수는 int 로 되돌린다
 	var cs: Variant = d.get("cases", [])

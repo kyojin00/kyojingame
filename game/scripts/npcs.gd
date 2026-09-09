@@ -252,6 +252,16 @@ func bake_gen_sprites() -> void:
 			m.tex["npc_%s_%s" % [id, sfx]] = ImageTexture.create_from_image(img)
 
 
+# 생성 NPC 의 오고 감(계절 이주·전근·죽음)을 노드에 맞춘다 — 하루가 넘어간 아침에 society.after_new_day 가 부른다
+func sync_gen_nodes() -> void:
+	for n in m.npcs.duplicate():
+		var nid := str(n.id)
+		if GameData.gen_npcs.has(nid) and not bool(GameData.gen_npcs[nid].get("here", false)):
+			m.npcs.erase(n)
+			n.queue_free()
+	_sync_town_npcs()
+
+
 # 읍 손글 아홉(S4c)과 읍에 와 있는 생성 NPC(S4d) — 조건 없이 제자리에 있다. 어슬렁 범위는 읍 안
 func _sync_town_npcs() -> void:
 	var box: Rect2i = m.TOWN_RECT.grow(3)
