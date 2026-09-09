@@ -747,7 +747,7 @@ func _debug_tick() -> void:
 			m.dialog.close()
 			GameData.story4_phase = ""
 			GameData.zones_open = []
-			var zin := Vector2i(105, 10)          # east_north 안쪽 칸
+			var zin := Vector2i(105, 20)          # east_north 안쪽 칸 — 구역 rect 는 NORTH_PAD 를 더한 y 다
 			m.objects.erase(zin)
 			m.grid[zin.y][zin.x].ground = "grass"
 			var sign_ok: bool = str(m.objects.get(m.OLD_SIGN, {}).get("kind", "")) == "sign"
@@ -755,7 +755,7 @@ func _debug_tick() -> void:
 				and not m.is_passable(zin)
 			# 잠긴 구역에는 집터를 못 놓는다
 			GameData.items["housing_kit"] = int(GameData.items.get("housing_kit", 0)) + 1
-			var plot_deny: bool = not m.story.try_place_home_plot(Vector2i(107, 10))
+			var plot_deny: bool = not m.story.try_place_home_plot(Vector2i(107, 20))
 			# 표지판 확인 -> 이장에게 묻는 목표
 			m.story.examine_old_sign()
 			var sign_seq: bool = m.dialog.visible
@@ -772,7 +772,7 @@ func _debug_tick() -> void:
 				and GameData.zones_open.has("east_north") \
 				and GameData.is_tile_owned(zin.x, zin.y) and m.is_passable(zin)
 			# 둘째 구역은 아직 잠김 -> 「마을 확장 이야기」에서 재료로 해금
-			var lock2: bool = not GameData.is_tile_owned(105, 30)
+			var lock2: bool = not GameData.is_tile_owned(105, 40)   # east_south(y 33~)
 			var wood0: int = GameData.wood
 			GameData.wood = maxi(GameData.wood, 200)
 			GameData.stone = maxi(GameData.stone, 200)
@@ -3826,13 +3826,19 @@ func _debug_tick() -> void:
 				if free_spot:
 					break
 			var desk_block: bool = desk_hit and kit_hit and free_spot
-			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라)
+			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라) — 사방이 트인 자리에서
+			var keep_pos_sf: Vector2 = m.player.position
+			for cand_sf: Vector2i in [Vector2i(74, 11), Vector2i(74, 24), Vector2i(30, 40), Vector2i(20, 40)]:
+				if m.is_passable(cand_sf + Vector2i(0, -3)) and m.is_passable(cand_sf + Vector2i(-3, 0)):
+					m.player.position = Vector2(cand_sf.x * m.TILE + 16, cand_sf.y * m.TILE + 16)
+					break
 			var pt0 := m.player_tile()
 			var from_north := Vector2((pt0.x) * m.TILE + 16.0, (pt0.y - 8) * m.TILE + 16.0)
 			var spot_n := m.story._walk_tile_near_player(3, from_north)
 			var from_west := Vector2((pt0.x - 8) * m.TILE + 16.0, (pt0.y) * m.TILE + 16.0)
 			var spot_w := m.story._walk_tile_near_player(3, from_west)
 			var side_ok: bool = spot_n.y < pt0.y and spot_w.x < pt0.x
+			m.player.position = keep_pos_sf
 			m.hud._toast_queue.clear()
 			print("SUBFIX_OK=", chain_ok and bubble_ok and no_black_bar
 				and desk_block and side_ok,
@@ -4044,8 +4050,12 @@ func _debug_tick() -> void:
 			var k_seaday := GameData.sea_open_day
 			GameData.sea_open = false
 			m.worldgen._build_sea()
-			var sea_fixed: bool = str(m.grid[m.SEA_Y0 + 2][40].ground) == "water" \
-				and str(m.grid[m.BEACH_Y0 + 1][40].ground) == "sand" \
+			var col_sea: Array = []
+			for cy_sea in range(m.BEACH_Y0 - 3, m.WORLD_H):
+				col_sea.append(str(m.grid[cy_sea][40].ground))
+			# 해안선이 굽이친다(_build_sea 의 두 파장) — 줄 하나를 콕 집지 않고 열에서 모래 아래 물을 본다
+			var sea_fixed: bool = col_sea.has("water") and col_sea.has("sand") \
+				and col_sea.rfind("sand") < col_sea.find("water") \
 				and str(m.objects.get(m.SEA_GATE[0], {}).get("kind", "")) == "bigrock"
 			var land_before: Array = []
 			for ly in range(m.SEA_RIDGE_Y - 6, m.SEA_RIDGE_Y):
@@ -4057,7 +4067,7 @@ func _debug_tick() -> void:
 				for lx2 in range(20, 100, 7):
 					land_after.append(str(m.grid[ly2][lx2].ground))
 			var no_morph: bool = land_before == land_after \
-				and str(m.grid[m.SEA_Y0 + 2][40].ground) == "water" \
+				and str(m.grid[m.WORLD_H - 1][40].ground) == "water" \
 				and not m.objects.has(m.SEA_GATE[0]) \
 				and not m.objects.has(m.SEA_GATE[1])
 			GameData.sea_open = k_sea
@@ -4340,7 +4350,7 @@ func _debug_tick() -> void:
 				and str(shop_entry.desc).contains("\n")
 			# 목표는 짧고, 괄호도 조작키 안내도 없다
 			var shop_obj := str(shop_entry.get("obj", ""))
-			var obj_soft: bool = shop_obj == "상점을 세우자." \
+			var obj_soft: bool = shop_obj != "" and shop_obj.length() <= 20 \
 				and not shop_obj.contains("(") and not shop_obj.contains("E")
 			# 지금 떠 있는 모든 퀘스트의 목표에 내부 키(밑줄)와 재료 수치가 없다
 			var no_keys := true
@@ -5337,7 +5347,7 @@ func _debug_tick() -> void:
 				and m.region_open_at(Vector2i(gate3.x, 100))   # 벼랑길이 열려 있다
 			# 마을에서 그 자리까지 실제로 길이 이어져 있는가
 			var seen3 := {}
-			var q3: Array[Vector2i] = [Vector2i(74, 20)]
+			var q3: Array[Vector2i] = [m.nearest_open_tile(Vector2i(74, 20 + m.NORTH_PAD))]   # 마을 광장 근처 빈 칸
 			var head3 := 0
 			seen3[q3[0]] = true
 			while head3 < q3.size():
@@ -8484,7 +8494,7 @@ func _debug_tick() -> void:
 			var sea: bool = GameData.sea_open and GameData.fisher_quest == "done" \
 				and GameData.is_tool_unlocked("rod") \
 				and GameData.story2_phase == "farm_talk"
-			var ridge: bool = str(m.objects.get(Vector2i(30, m.SEA_RIDGE_Y),
+			var ridge: bool = str(m.objects.get(Vector2i(30, m.worldgen._ridge_y(30)),
 				{}).get("kind", "")) == "searock"
 			# 해안선이 굽이치므로(world_gen._build_sea) 줄 하나를 콕 집어
 			# 보면 안 된다 — 그 칸에 모래가 한 줄이라도 깔렸는지로 본다

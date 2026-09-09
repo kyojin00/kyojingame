@@ -950,10 +950,14 @@ func show_message(text: String, dur := 2.5) -> void:
 	var lines: Array = wrapped[0]
 	var w: float = minf(float(wrapped[1]), BUB_W)
 	_bub_label.text = "\n".join(lines)
-	_bub.size = Vector2(w + BUB_PAD.x * 2.0,
-		float(lines.size()) * BUB_LINE + BUB_PAD.y * 2.0)
+	# 줄 높이는 상수(15)보다 글꼴이 실제로 차지하는 높이가 크면 그쪽이다 — 라벨은 최소 크기
+	# 아래로 줄어들지 않으므로, 상수만 믿으면 글이 풍선 밑으로 3px 삐져나온다
+	var need: Vector2 = _bub_label.get_minimum_size()
+	var body_w: float = maxf(w, need.x)
+	var body_h: float = maxf(float(lines.size()) * BUB_LINE, need.y)
+	_bub.size = Vector2(body_w + BUB_PAD.x * 2.0, body_h + BUB_PAD.y * 2.0)
 	_bub_label.position = BUB_PAD
-	_bub_label.size = Vector2(w, float(lines.size()) * BUB_LINE)
+	_bub_label.size = Vector2(body_w, body_h)
 	_bub_tail.position = Vector2(_bub.size.x * 0.5, _bub.size.y - 1.0)
 	_bub_tail.queue_redraw()
 	_bub.visible = true
