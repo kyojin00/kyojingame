@@ -39,6 +39,10 @@ func toggle_ride() -> void:
 	if not GameData.has_horse:
 		m.hud.show_message("아직 말이 없다. 목장 상회에서 살 수 있다.")
 		return
+	# 수배 중의 승마는 도망이다 — 대범함 30 부터(헌법 §5.2 「도주 30」)
+	if GameData.wanted_active() and GameData.boldness() < int(GameData.GATE.get("flee", 30)):
+		m.hud.show_message(str(GameData.SOCIETY_LINES.police_town.horse_cop))
+		return
 	# 가까이 있는 말에 올라탄다 (정확히 그 칸에 서 있지 않아도 된다)
 	var t := horse_tile_near()
 	if t.x != -999:

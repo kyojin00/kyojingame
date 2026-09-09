@@ -7610,6 +7610,139 @@ func _debug_tick() -> void:
 			m.player.position = keep_pos_po
 			GameData.minutes = keep_min_po
 			_s2_restore(k_po)
+		208:
+			# ---- 잔가지 넷(S5h) — 낮 노역 감형, 판사의 가중(플레이어 4택·NPC 판사 전과자), 말 위 도망, 문 앞 순경 ----
+			var k_tw := _s2_keep()
+			var skills_tw: Dictionary = GameData.skills.duplicate(true)
+			var horse_tw: bool = GameData.has_horse
+			m.dialog.close()
+			if m.shop_room.visible:
+				m.shop_room.close()
+			m.map_ui.visible = false
+			var keep_min_tw := GameData.minutes
+			var keep_pos_tw: Vector2 = m.player.position
+			_s2_fresh_gov()
+			GameData.town_open = true
+			GameData.ensure_gen_npcs()
+			for gid_tw in GameData.gen_npcs:
+				GameData.gen_npcs[gid_tw]["here"] = str(GameData.gen_npcs[gid_tw].get("role", "")) != "resident"
+			GameData.cases = []
+			GameData.case_seq = 0
+			GameData.day = 60
+			GameData.minutes = 10 * 60
+			m.story_cutscene = true
+			GameData.me.boldness_base = 40
+			GameData.me.reputation = {"kyojin": 0, "town": 0}
+			# ① 구류 판결엔 노역 선택지 — 이레를 나흘로
+			GameData.me.charged = {"day": 59, "kind": "burglary", "target": "g1", "value": 30, "others": 1, "seen": 2,
+				"heat": 3, "court_day": 60, "skips": 0, "since": 60, "court": "town", "case_id": 0,
+				"surrender": false, "bribe": false}
+			m.society.trial_pick("deny")
+			var jail_choices: Array = m.dialog._seq[-1].get("choices", [])
+			var labor_ok: bool = str(m.dialog._seq[-1].text).contains("구류") and jail_choices.size() == 2 \
+				and str(jail_choices[1][0]).contains("노역") and GameData.JAIL_DAYS - GameData.JAIL_LABOR_OFF == 4
+			m.dialog.close()
+			GameData.me.record = []
+			# ② 판사의 가중 — 플레이어 판사의 넷째 선택지. 벌금 두 배, 피고 호감 −40, 탐욕 −0.2
+			GameData.seats = {}
+			GameData.seat_rows("court")["judge"][0] = "player"
+			GameData.me.job = "judge"
+			GameData.me.rank = "judge"
+			GameData.me.job_since_day = 1
+			GameData.case_seq = 1
+			GameData.cases = [{"id": 1, "crime": "burglary", "day": 58, "suspect": "g1", "victim": "g2", "witness": "g3",
+				"evidence": 2, "stage": "indicted", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
+				"charged_day": 58, "indicted_day": 59}]
+			GameData.npc_wallet["g1"] = 500
+			GameData.npc_greed_adj = {}
+			GameData.aff_set("g1", 60)
+			m.society._work_real_case(GameData.cases[0])
+			var four_tw: bool = m.dialog._seq[-1].get("choices", []).size() == 4
+			var tb_tw := int(GameData.gov_budget.get("town", 0))
+			m.society.case_pick(1, "harsh")
+			var c_tw: Dictionary = GameData.cases[0]
+			var harsh_ok: bool = four_tw and str(c_tw.stage) == "closed" and GameData.wallet_of("g1") == 100 \
+				and int(GameData.gov_budget.town) == tb_tw + 400 and GameData.aff("g1") == 20 \
+				and absf(float(GameData.npc_greed_adj.get("g1", 0.0)) + 0.2) < 0.001
+			m.dialog.close()
+			GameData.me.job = ""
+			GameData.me.rank = ""
+			GameData.seat_clear_player()
+			# NPC 판사(서 부장) — 전과(탐욕 조정 < 0)가 있으면 가중, 없으면 법정형
+			GameData.case_seq = 2
+			GameData.cases = [{"id": 2, "crime": "burglary", "day": 60, "suspect": "g1", "victim": "g3", "witness": "g2",
+				"evidence": 2, "stage": "indicted", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
+				"charged_day": 60, "indicted_day": 60}]
+			GameData.npc_wallet["g1"] = 500
+			GameData.day = 61
+			GameData.society_new_day([0, 0, 0])
+			var n_tw := GameData.society_note()
+			var npc_harsh: bool = n_tw.contains("가중") and GameData.wallet_of("g1") == 100
+			GameData.npc_greed_adj = {}
+			GameData.cases = [{"id": 3, "crime": "burglary", "day": 61, "suspect": "g2", "victim": "g3", "witness": "g1",
+				"evidence": 2, "stage": "indicted", "closed_by": "", "deadline": 90, "region": "town", "heat": 1,
+				"charged_day": 61, "indicted_day": 61}]
+			GameData.npc_wallet["g2"] = 500
+			GameData.day = 62
+			GameData.society_new_day([0, 0, 0])
+			var n_tw2 := GameData.society_note()
+			var npc_full: bool = not n_tw2.contains("가중") and GameData.wallet_of("g2") == 300
+			# ③ 말 위에선 손이 안 닿는다 — 수배 중 승마는 대범함 30 부터
+			m.player.position = Vector2(m.TOWN_SQUARE.x * m.TILE + 16, m.TOWN_SQUARE.y * m.TILE + 16)
+			GameData.me.wanted = {"day": 60, "kind": "pickpocket", "target": "g1", "value": 30, "fine": 0,
+				"since": 62, "region": "town", "heat": 1, "seen": 1, "others": 0}
+			m.npcmgr._sync_town_npcs()
+			var cop_id_tw: String = str(GameData.gen_here("constable")[0])
+			var cop_tw: Node2D = _npc_node(cop_id_tw)
+			cop_tw.visible = true
+			cop_tw.position = m.player.position + Vector2(20, 0)
+			GameData.has_horse = true
+			GameData.riding = false
+			var ht: Vector2i = m.player_tile() + Vector2i(1, 1)
+			var old_obj_tw: Variant = m.objects.get(ht)
+			m.objects[ht] = {"kind": "horse", "hp": 0}
+			GameData.me.boldness_base = 25
+			m.riding.toggle_ride()
+			var no_mount: bool = not GameData.riding
+			GameData.me.boldness_base = 40
+			m.riding.toggle_ride()
+			var mounted: bool = GameData.riding
+			m.story_cutscene = false
+			m.dialog.close()
+			m.society._arrest_tick(1.1)
+			m.society._arrest_tick(1.1)
+			var safe_tw: bool = mounted and not m.dialog.visible
+			m.riding.dismount_horse()
+			m.society._arrest_tick(1.1)
+			m.society._arrest_tick(1.1)
+			var caught_tw: bool = not GameData.riding and m.dialog.visible
+			m.dialog.close()
+			m.story_cutscene = true
+			var horse_ok: bool = no_mount and safe_tw and caught_tw
+			# ④ 실내에서 나오면 문 앞에 순경
+			cop_tw.position = m.player.position + Vector2(400, 0)
+			m.shop_room.open("county")
+			m.shop_room.close()
+			var door_ok: bool = (cop_tw.position - m.player.position).length() <= 1.5 * float(m.TILE)
+			GameData.me.wanted = {}
+			print("TWIGS_OK=", labor_ok and harsh_ok and npc_harsh and npc_full and horse_ok and door_ok,
+				" 노역=", labor_ok, " 가중=", harsh_ok, " NPC가중=", npc_harsh, " NPC법정형=", npc_full,
+				" 말=", horse_ok, "(", no_mount, safe_tw, caught_tw, ")", " 문앞=", door_ok)
+			if old_obj_tw == null:
+				m.objects.erase(ht)
+			else:
+				m.objects[ht] = old_obj_tw
+			for hx in range(-3, 4):
+				for hy in range(-3, 4):
+					var hp := m.player_tile() + Vector2i(hx, hy)
+					if str(m.objects.get(hp, {}).get("kind", "")) == "horse":
+						m.objnode._remove_object(hp)
+			GameData.has_horse = horse_tw
+			GameData.riding = false
+			GameData.skills = skills_tw
+			m.player.position = keep_pos_tw
+			GameData.minutes = keep_min_tw
+			_s2_restore(k_tw)
 		211:
 			# ---- 약방·이발소(S5d) — 조합법 넷 문턱, 물약 좌판 정산, 목장 Lv3 문턱, 요금·손님 정산 ----
 			var k_s2 := _s2_keep()

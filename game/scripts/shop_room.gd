@@ -291,6 +291,7 @@ func close() -> void:
 	visible = false
 	room_id = ""
 	Sound.play_sfx("sfx_place")
+	main.society.on_room_closed()   # 수배 중이면 문 앞에 순경(S5h)
 
 
 func _def() -> Dictionary:

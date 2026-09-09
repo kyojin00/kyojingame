@@ -1336,6 +1336,20 @@ func _officer_node() -> Node2D:
 
 
 # 지금 나를 쫓는 순경들 — 박 순경(교진 수배, 또는 heat 3 의 읍 수배)과 읍 순경 셋(읍 수배)
+# 실내는 피난처가 아니다 — 문을 나서면 쫓던 순경이 문 앞에 서 있다(헌법 §6.3 「문 앞에서 기다린다」)
+func on_room_closed() -> void:
+	if Net.is_guest() or not GameData.wanted_active():
+		return
+	var cops := _cops_after_me()
+	if cops.is_empty():
+		return
+	var cop: Node2D = cops[0]
+	cop.position = m.player.position + Vector2(float(m.TILE), 0.0)
+	cop.route = []
+	cop.moving = false
+	m.hud.show_message(_pl("door_cop"), 2.5)
+
+
 func _cops_after_me() -> Array:
 	var out: Array = []
 	if not GameData.wanted_active():
@@ -1352,8 +1366,8 @@ func _cops_after_me() -> Array:
 
 # 순경이 내 곁에 2초 — 체포. 실내·가게 안·연출 중에는 잡지 않는다(문 앞에서 기다린다)
 func _arrest_tick(delta: float) -> void:
-	if not GameData.wanted_active() or m.ui_open():
-		_arrest_t = 0.0
+	if not GameData.wanted_active() or m.ui_open() or GameData.riding:
+		_arrest_t = 0.0   # 말 위의 사람은 손이 안 닿는다(도망 수단, 헌법 §6.3)
 		return
 	var near: Node2D = null
 	for cop in _cops_after_me():
@@ -1875,7 +1889,8 @@ func trial_pick(kind: String) -> void:
 	if prison:
 		pages[-1]["choices"] = [[follow, prison_begin.bind(region)]]
 	elif jail:
-		pages[-1]["choices"] = [[follow, serve_jail.bind(GameData.JAIL_DAYS, region)]]
+		pages[-1]["choices"] = [[follow, serve_jail.bind(GameData.JAIL_DAYS, region)],
+			[str(cl.labor_choice), serve_jail_labor.bind(region)]]
 	else:
 		pages[-1]["choices"] = [[str(cl.leave), null]]
 	m.dialog.open_seq(_npc_name(bench), _portrait(bench), pages)
@@ -1911,6 +1926,14 @@ func serve_jail(days: int, region := "kyojin", kind := "jail") -> void:
 		var t: Vector2i = m.door_tile(m.VILLAGE_PLOTS["inn"].anchor) + Vector2i(0, 1)
 		m.player.position = Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
 	m.saveio.save_now()
+
+
+# 낮 노역(S5h, 헌법 §6.6) — 하루씩 사흘까지 줄어 이레가 나흘. 돌을 깬 만큼 채광 경험이 남는다
+func serve_jail_labor(region: String) -> void:
+	if Net.is_guest():
+		return
+	GameData.add_skill_xp("mine", GameData.PRISON_MINE_XP_DAY * float(GameData.JAIL_LABOR_OFF))
+	serve_jail(GameData.JAIL_DAYS - GameData.JAIL_LABOR_OFF, region)
 
 
 # 방청 — 기소가 없는 재판일, 판사가 순경이 넘긴 사건을 읽는다(마을이 법을 본다)
@@ -2427,6 +2450,7 @@ func _work_real_case(c: Dictionary) -> void:
 				["무죄", case_pick.bind(cid, "acquit")],
 				["경감 — 벌금 절반", case_pick.bind(cid, "lenient")],
 				["법정형 — 벌금", case_pick.bind(cid, "full")],
+				[str(_lines("court").harsh_choice), case_pick.bind(cid, "harsh")],
 			]})
 	m.dialog.open_seq(_npc_name(head), _portrait(head), pages)
 
@@ -2480,6 +2504,11 @@ func case_pick(cid: int, kind: String) -> void:
 			GameData.aff_add(sid, -5)
 			line = "법정형일세. 무겁지만 맞네." if ev >= GameData.NEED_EVIDENCE else "흔적 하나에 법정형인가. 무겁네."
 			GameData.aff_add(head, 1 if ev >= GameData.NEED_EVIDENCE else -1)
+		"harsh":
+			# 가중(S5h) — 피고는 잊지 않는다(호감 −40 은 판결 안에서). 흔적이 모자라면 부장이 눈살을 찌푸린다
+			GameData.town_case_verdict(c, "player", "harsh")
+			line = "가중이라. 그 사람은 자넬 기억할 걸세." if ev >= GameData.NEED_EVIDENCE else "흔적 하나에 가중인가. 그건 법이 아니라 성미일세."
+			GameData.aff_add(head, 0 if ev >= GameData.NEED_EVIDENCE else -2)
 		_:
 			return
 	_work_credit(str(job.get("inst", "")), 0)

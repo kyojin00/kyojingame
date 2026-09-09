@@ -9195,6 +9195,8 @@ const SOCIETY_LINES := {
 		"verdict_fine": "벌금 %dG. 고지서로 간다. 이레 안에 면사무소에 내게.",
 		"verdict_service": "벌금 %dG 에 봉사 %s. 이장에게 빗자루를 받게.",
 		"verdict_jail": "구류 이레. 박 순경이 데려간다.",
+		"labor_choice": "낮에 노역을 한다 — 나흘로 줄인다",
+		"harsh_choice": "가중 — 벌금 두 배",
 		"verdict_prison": "징역 84일. 잿빛 벌판의 교도소다. 순경이 데려간다.",
 		"acquit": "무죄. 피고는 돌아가도 좋다.",
 		"leave": "법정을 나선다",
@@ -9263,6 +9265,8 @@ const SOCIETY_LINES := {
 		"detained": "사흘 뒤 경찰서 문이 열렸다. 서류는 검찰청으로 갔다.",
 		"court_wait": "순경이 넘긴 서류를 검찰이 보고 있다. 아직 부르지 않는다.",
 		"bus_cop": "순경이 정류장에 서 있다. 발이 안 떨어진다.",
+		"horse_cop": "순경 눈앞에서 말에 오를 배짱이 없다.",
+		"door_cop": "문을 나서니 순경이 서 있다.",
 		"pay_ok": "받았네. 읍 장부에 올리지. 영수증은 챙겨 두게.",
 		"serve_ok": "고맙네. %s째구먼. 마당이 훤하네.",
 	},
@@ -9428,6 +9432,7 @@ const SOCIETY_NOTES := {
 	"town_desk": "검찰청 책상에 %s 사건이 올라와 있다. 내 서류다.",
 	"town_bench": "법원에 %s 사건이 올라와 있다. 내 판결이다.",
 	"town_verdict": "읍 법원이 %s에게 벌금을 물렸다 — %dG.",
+	"town_harsh": "읍 법원이 %s에게 가중을 내렸다 — 벌금 %dG. 전과가 있었다.",
 	"town_dropped": "검찰이 %s 사건을 불기소로 닫았다.",
 	# ---- 읍 살림(S4e) ----
 	"town_season": "읍 살림 — 수입 %dG, 지출 %dG. 읍 예산 %dG.",
@@ -9532,6 +9537,7 @@ const COURT_DAYS := [7, 21]
 const CRIME_HEAT := {"pickpocket": 1, "shelf": 1, "burglary": 2}
 const BURGLARY_P := 0.30           # 빈집 문을 따는 기본 확률 — theft_p 가 손버릇·밤·목격자를 얹는다
 const JAIL_DAYS := 7               # 구류 — 파출소에서 이레(하루 넘김 일곱 번, 밭은 마른다)
+const JAIL_LABOR_OFF := 3          # 낮 노역을 고르면 하루씩 사흘까지 줄어든다(헌법 §6.6) — 이레가 나흘
 const PRISON_DAYS := 84            # 징역(S4g) — 하루 넘김 없이 건너뛴다(헌법 §6.6)
 const PRISON_MINE_XP_DAY := 1.0    # 노역 — 돌 깨기 하루치의 절반쯤
 const EXPUNGE_COST := 500          # 전과 말소 인지세(헌법 §2.1)
@@ -10954,7 +10960,9 @@ func _town_case_tick() -> void:
 				_note(str(SOCIETY_NOTES.town_bench) % sname)
 				continue
 			if day > int(c.get("indicted_day", 0)):
-				town_case_verdict(c, "judge_suh", "full")
+				# 서 부장은 전과(유죄마다 greed −0.1)가 있는 피고에게 가중을 내린다(S5h)
+				var prior: bool = float(npc_greed_adj.get(str(c.get("suspect", "")), 0.0)) < 0.0
+				town_case_verdict(c, "judge_suh", "harsh" if prior else "full")
 
 
 # 기소/불기소 — 검사(플레이어 또는 민 부장)의 손. 보완수사는 흔적 +0.5 로 charged 에 남는다
@@ -10976,13 +10984,17 @@ func town_case_verdict(c: Dictionary, by: String, kind: String) -> void:
 	c["closed_by"] = "acquitted" if kind == "acquit" else "verdict"
 	if kind == "acquit":
 		return
-	var fine: int = NPC_FINE if kind == "full" else NPC_FINE / 2
+	var fine: int = NPC_FINE if kind == "full" else (NPC_FINE * 2 if kind == "harsh" else NPC_FINE / 2)
 	var w := wallet_of(sid)
 	fine = mini(w, fine)
 	npc_wallet[sid] = w - fine
 	gov_budget["town"] = int(gov_budget.get("town", 0)) + fine
-	npc_greed_adj[sid] = float(npc_greed_adj.get(sid, 0.0)) - 0.1
-	_note(str(SOCIETY_NOTES.town_verdict) % [npc_name(sid), fine])
+	npc_greed_adj[sid] = float(npc_greed_adj.get(sid, 0.0)) - (0.2 if kind == "harsh" else 0.1)
+	if kind == "harsh":
+		aff_add(sid, -40)   # 가중은 기억된다(헌법 §6.5)
+		_note(str(SOCIETY_NOTES.town_harsh) % [npc_name(sid), fine])
+	else:
+		_note(str(SOCIETY_NOTES.town_verdict) % [npc_name(sid), fine])
 
 
 # 검사·판사의 책상에 올라온 읍 사건 — 없으면 {}
