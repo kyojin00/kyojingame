@@ -1290,19 +1290,59 @@ const SPRINKLER_RECIPE_PRICE := 500
 # 미리 마련해 둔 빈 집터들 — [{x, y, used}]. **빈 집터가 있어야만**
 # 이주 희망 편지를 수락할 수 있다 (수락하면 첫 빈 집터에 집이 지어진다)
 var home_plots: Array = []
+# 새터말(S3b) — 너른 초원 서쪽에 처음부터 있는 빈 집터 여덟(짓기 없음). 집 5×4 에 둘레 한 칸을
+# 비운 7×6 격자. y 는 main.NORTH_PAD(12)를 더한 값이다(VILLAGE_ZONES 와 같은 이유). 장부에는
+# 집이 선 자리만 {fixed:true, used:true} 로 적힌다 — 옛 마을 너머(스토리 4)가 열려야 자리로 센다
+const MEADOW_PLOTS := [
+	Vector2i(106, 62), Vector2i(114, 62), Vector2i(122, 62), Vector2i(130, 62),
+	Vector2i(106, 70), Vector2i(114, 70), Vector2i(122, 70), Vector2i(130, 70),
+]
 
 
+# 이 앵커의 집터가 새터말인가
+func plot_fixed_at(a: Vector2i) -> bool:
+	return a in MEADOW_PLOTS
+
+
+# 새터말의 자리가 찼나 — 장부에 used 로 적혀 있으면 집이 선 것
+func meadow_plot_used(a: Vector2i) -> bool:
+	for p: Dictionary in home_plots:
+		if int(p.x) == a.x and int(p.y) == a.y and bool(p.get("used", false)):
+			return true
+	return false
+
+
+# 새터말의 집터는 옛 마을 너머(스토리 4)가 열린 뒤에야 자리로 센다 — 재민의 이사(스토리 3)는
+# 내가 마련한 집터로만 받는다. 내가 놓은 집터가 먼저, 새터말은 그다음
 func first_empty_plot() -> Vector2i:
 	for p: Dictionary in home_plots:
-		if not bool(p.get("used", false)):
+		if not bool(p.get("used", false)) and not bool(p.get("fixed", false)):
 			return Vector2i(int(p.x), int(p.y))
+	if story4_phase == "done":
+		for a: Vector2i in MEADOW_PLOTS:
+			if not meadow_plot_used(a):
+				return a
 	return Vector2i(-999, -999)
+
+
+# 집이 서는 순간 장부에 적는다 — 내 집터는 used 로, 새터말은 새 줄로
+func mark_plot_used(a: Vector2i) -> void:
+	for p: Dictionary in home_plots:
+		if int(p.x) == a.x and int(p.y) == a.y:
+			p["used"] = true
+			return
+	if plot_fixed_at(a):
+		home_plots.append({"x": a.x, "y": a.y, "used": true, "fixed": true})
 
 
 func empty_plot_count() -> int:
 	var n := 0
+	if story4_phase == "done":
+		for a: Vector2i in MEADOW_PLOTS:
+			if not meadow_plot_used(a):
+				n += 1
 	for p: Dictionary in home_plots:
-		if not bool(p.get("used", false)):
+		if not bool(p.get("used", false)) and not bool(p.get("fixed", false)):
 			n += 1
 	return n
 

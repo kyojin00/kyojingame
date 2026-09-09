@@ -117,10 +117,28 @@ func _debug_tick() -> void:
 			for own9: String in GameData.START_GREETED:
 				if own9 not in nids:
 					owners_here = false
+			# 새터말(S3b) — 초원에 빈 집터 여덟이 처음부터 있다: 장부·팻말·둘레 7×6 이 맨 풀밭.
+			# 옛 마을 너머가 닫혀 있는 동안은 자리로 세지 않는다(재민의 이사는 내 집터로만)
+			var plots8 := 0
+			var plot_bad: Array = []
+			for pa: Vector2i in GameData.MEADOW_PLOTS:
+				var listed: bool = GameData.plot_fixed_at(pa) and not GameData.meadow_plot_used(pa)
+				var sign_ok9: bool = str(m.objects.get(m.door_tile(pa), {}).get("kind", "")) == "homeplot"
+				var clear9 := true
+				for py9 in range(pa.y - 1, pa.y + 5):
+					for px9 in range(pa.x - 1, pa.x + 6):
+						var t9 := Vector2i(px9, py9)
+						if m.grid[py9][px9].ground != "grass" or (m.objects.has(t9) and t9 != m.door_tile(pa)):
+							clear9 = false
+				if listed and sign_ok9 and clear9:
+					plots8 += 1
+				else:
+					plot_bad.append([pa, listed, sign_ok9, clear9])
+			var meadow_ok: bool = plots8 == 8 and GameData.first_empty_plot().x < 0
 			print("VILLAGE_INIT_OK=", GameData.village_built.size() == GameData.ALL_VILLAGE_PLOTS.size()
-				and houses >= 9 * 20 and "chief" in nids and owners_here and hut0 and zone0,
+				and houses >= 9 * 20 and "chief" in nids and owners_here and hut0 and zone0 and meadow_ok,
 				" 건물=", GameData.village_built, " 지붕칸=", houses, " NPC=", nids,
-				" 이장오두막=", hut0, " 동쪽구역잠김=", zone0)
+				" 이장오두막=", hut0, " 동쪽구역잠김=", zone0, " 새터말=", meadow_ok, plot_bad)
 		elif m.story._story_snapped and not _tut_map_snapped and m.story._story_t >= 3.6:
 			_tut_map_snapped = true
 			m.map_ui.open()
@@ -1025,6 +1043,9 @@ func _debug_tick() -> void:
 			GameData.affinity_open = false
 			# 우체국은 처음부터 서 있다 — 3장의 마지막 퀘스트는 우체부에게 인사하러 가는 것
 			var k_built3: Array = GameData.village_built.duplicate()
+			# 스토리 3 시점엔 옛 마을 너머가 닫혀 있다 — 새터말(S3b)의 집터가 재민의 자리로 세이면 안 된다
+			var k_s4_mv := GameData.story4_phase
+			GameData.story4_phase = ""
 			GameData.move_house = Vector2i(-999, -999)
 			GameData.move_day = GameData.day - 1
 			for n0 in m.npcs.duplicate():          # 샌드박스가 미리 깔아 둔 재민 제거
@@ -1154,6 +1175,7 @@ func _debug_tick() -> void:
 				" 우체국완공=", built_post, " 우체부방문=", post_arrival,
 				" 우체부정착=", post_talk and move_done)
 			GameData.village_built = k_built3
+			GameData.story4_phase = k_s4_mv
 			GameData.day += 1                      # 하룻밤 자고 나면 발견담이 뜬다
 			m.story._forest_update(0.016)
 			var found_q: bool = GameData.forest_quest == "found" \
@@ -6119,6 +6141,40 @@ func _debug_tick() -> void:
 				" 청구=", ready_ok, " 말소=", done_ok)
 			_s2_police_teardown(cop_ex)
 			_s2_restore(k_ex)
+		394:
+			# ---- 새터말(S3b) — 초원의 빈 집터 여덟은 장부 밖에 있다: 옛 마을 너머가 열려야 자리로 센다 ----
+			var k_md := _s2_keep()
+			var plots_md: Array = GameData.home_plots.duplicate(true)
+			var s4_md := GameData.story4_phase
+			GameData.home_plots = []
+			GameData.story4_phase = ""
+			var closed_ok: bool = GameData.first_empty_plot().x < 0 and GameData.empty_plot_count() == 0
+			GameData.story4_phase = "done"
+			var a_md: Vector2i = GameData.first_empty_plot()
+			var open_ok: bool = a_md == GameData.MEADOW_PLOTS[0] and GameData.empty_plot_count() == 8 \
+				and GameData.plot_fixed_at(a_md)
+			# 내 집터가 있으면 그것이 먼저다
+			GameData.home_plots = [{"x": 20, "y": 52, "used": false}]
+			var mine_first: bool = GameData.first_empty_plot() == Vector2i(20, 52) and GameData.empty_plot_count() == 9
+			GameData.home_plots = []
+			# 집이 서면 장부에 새 줄이 생기고, 다음 자리는 그다음 앵커다
+			GameData.mark_plot_used(a_md)
+			var used_ok: bool = GameData.meadow_plot_used(a_md) and GameData.home_plots.size() == 1 \
+				and bool(GameData.home_plots[0].fixed) and GameData.first_empty_plot() == GameData.MEADOW_PLOTS[1] \
+				and GameData.empty_plot_count() == 7
+			# 팻말은 못 거둔다 — 집터도 팻말도 그대로, 가방에 집터가 생기지 않는다
+			var door_md: Vector2i = m.door_tile(GameData.MEADOW_PLOTS[1])
+			var had_sign: bool = str(m.objects.get(door_md, {}).get("kind", "")) == "homeplot"
+			var kits_md := int(GameData.items.get("housing_kit", 0))
+			m.story._pickup_home_plot(door_md)
+			var keep_ok: bool = str(m.objects.get(door_md, {}).get("kind", "")) == "homeplot" \
+				and int(GameData.items.get("housing_kit", 0)) == kits_md
+			print("MEADOW_OK=", closed_ok and open_ok and mine_first and used_ok and had_sign and keep_ok,
+				" 닫힘=", closed_ok, " 열림=", open_ok, a_md, " 내집터먼저=", mine_first, " 집섬=", used_ok,
+				" 팻말=", had_sign, " 회수불가=", keep_ok)
+			GameData.home_plots = plots_md
+			GameData.story4_phase = s4_md
+			_s2_restore(k_md)
 		273:
 			# ---- 자기 상점(S3a) — 허가·좌판·올리기·손님 정산·금고·매출세·영업정지·폐업 ----
 			var k_sh := _s2_keep()

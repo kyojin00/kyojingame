@@ -136,6 +136,8 @@ func _build_map() -> void:
 	# 같은 이유다)
 	_build_landmarks()
 	_build_hamlets()
+	# 새터말(S3b) — 초원의 빈 집터 여덟. 자연물은 못박아 두고(sweep 이 치운다) 팻말만 세운다
+	ensure_meadow_plots(false)
 	# 온실 터 표지판 (농장 한켠) — 온실 자리는 자연물을 비워 둔다
 	for gy in range(m.GREENHOUSE.position.y, m.GREENHOUSE.end.y):
 		for gx in range(m.GREENHOUSE.position.x, m.GREENHOUSE.end.x):
@@ -165,6 +167,26 @@ func _build_map() -> void:
 	# 한 포기도 두지 않아, 새 농장의 첫날은 산딸기 한 알 없는 빈 들판이었다.
 	# (아직 화면도 주인공도 없는 시점이라 노드는 만들지 않는다)
 	_respawn_forage(false)
+
+
+# 새터말의 빈 집터 여덟(GameData.MEADOW_PLOTS) — 집이 안 선 자리마다 현관에 팻말을 세운다.
+# 장부(home_plots)에는 적지 않는다(암묵의 집터 — 새 게임 초기화에도 남는다). 둘레까지 no_spawn 이라
+# 나무·돌이 나지 않는다. 세계를 지을 때(with_node=false — 노드는 _spawn_objects 가 만든다)와
+# 옛 세이브를 열 때 부른다
+func ensure_meadow_plots(with_node := true) -> void:
+	for a: Vector2i in GameData.MEADOW_PLOTS:
+		_no_spawn_rect(a.x - 1, a.y - 1, a.x + 5, a.y + 4, 0)
+		if GameData.meadow_plot_used(a):
+			continue
+		var door: Vector2i = m.door_tile(a)
+		if str(m.objects.get(door, {}).get("kind", "")) == "homeplot":
+			continue
+		if with_node:
+			if m.objects.has(door):
+				m.objnode._remove_object(door)
+			m.objnode._place_object(door, "homeplot", 0)
+		else:
+			m.objects[door] = {"kind": "homeplot", "hp": 0}
 
 
 # 그림·계단·길 위에 선 자연물을 쓸어 낸다.

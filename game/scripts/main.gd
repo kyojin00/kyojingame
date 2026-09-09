@@ -820,6 +820,8 @@ const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
 const HOME_ANCHOR := Vector2i(71, 30 + NORTH_PAD)   # 광장에서 두 칸 떨어뜨렸다
 const HOME_SITE := Vector2i(73, 30 + NORTH_PAD)  # 집터 표지판 (건물 그림 한가운데)
+# 새터말(사회 S3b)의 빈 집터 여덟은 GameData.MEADOW_PLOTS 다 — 장부(home_plots)에 적지 않는
+# 「암묵의 집터」라 새 게임 초기화(reset_all)에도 사라지지 않는다
 
 # 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
 # 표지판도 건물 이름도 표시하지 않는다. 건설된 뒤에만 실제 건물이 나타난다.

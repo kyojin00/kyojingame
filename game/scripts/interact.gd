@@ -368,17 +368,23 @@ func interact() -> void:
 			m.story.home_sign_dialog(t)   # 이 집을 누구 집으로 할까
 			return
 		if obj.kind == "homeplot":
-			# 빈 집터 팻말 — 회수하면 집터가 가방으로 돌아온다
+			# 빈 집터 팻말 — 회수하면 집터가 가방으로 돌아온다. 새터말(fixed)의 팻말은 마을 것이라 못 거둔다
 			var plot_btns: Array = []
+			var fixed_plot := GameData.plot_fixed_at(t - Vector2i(2, 3))
 			var plot_body := "새 주민을 위해 마련해 둔 빈 집터다.\n이주 희망 편지를 수락하면 여기에 집이 지어진다."
+			if fixed_plot:
+				plot_body = "새터말의 빈 집터다. 마을이 새 이웃을 위해 비워 둔 자리.\n" \
+					+ ("이주 편지를 수락하면 여기에 집이 선다." if GameData.story4_phase == "done"
+						else "옛 마을 너머가 열리면 이 자리부터 찬다.")
 			if GameData.fisher_home == "build":
 				# 용식의 부탁 — 여기에 집을 한 채 올린다 (주인은 표지판에서 정한다)
 				plot_body = "새 주민을 위해 마련해 둔 빈 집터다.\n여기에 집을 한 채 지을까?"
 				plot_btns.append(["집을 짓는다",
 					m.story.build_fisher_home.bind(t)])
-			plot_btns.append(["회수하기", m.story._pickup_home_plot.bind(t)])
+			if not fixed_plot:
+				plot_btns.append(["회수하기", m.story._pickup_home_plot.bind(t)])
 			plot_btns.append(["닫기", null])
-			m.dialog.open("빈 집터", plot_body, plot_btns)
+			m.dialog.open("새터말 집터" if fixed_plot else "빈 집터", plot_body, plot_btns)
 			return
 		if obj.kind == "board":
 			m.village._open_quest_board()

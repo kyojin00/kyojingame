@@ -2238,10 +2238,7 @@ func _try_accept_move() -> void:
 		return
 	m.dialog.close()
 	# 준비해 둔 빈 집터에 집을 짓고 이사를 진행한다
-	for p: Dictionary in GameData.home_plots:
-		if int(p.x) == plot.x and int(p.y) == plot.y:
-			p.used = true
-			break
+	GameData.mark_plot_used(plot)
 	GameData.items["move_letter"] = maxi(0, int(GameData.items.get("move_letter", 0)) - 1)
 	# 수락한 편지는 우체국 보관함으로 옮겨져 남는다
 	_store_letter("이주 희망 편지 — 재민",
@@ -2789,6 +2786,8 @@ func _end_spear_visit() -> void:
 func _pickup_home_plot(door: Vector2i) -> void:
 	m.dialog.close()
 	var a := door - Vector2i(2, 3)
+	if GameData.plot_fixed_at(a):
+		return   # 새터말의 팻말은 마을 것이다
 	for p: Dictionary in GameData.home_plots.duplicate():
 		if int(p.x) == a.x and int(p.y) == a.y and not bool(p.get("used", false)):
 			GameData.home_plots.erase(p)
@@ -5354,10 +5353,7 @@ func _settle_accept() -> void:
 			m.dialog.close()
 			m.hud.show_message("빈 집터가 없다 — 집터를 마련하면 초대할 수 있다.", 5.0)
 			return
-		for p: Dictionary in GameData.home_plots:
-			if int(p.x) == plot.x and int(p.y) == plot.y:
-				p.used = true
-				break
+		GameData.mark_plot_used(plot)
 		anchor = plot
 		m.objnode._remove_object(m.door_tile(plot))
 		for y in range(plot.y - 1, plot.y + 5):
