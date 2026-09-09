@@ -224,8 +224,10 @@ func _apply_save(d: Dictionary) -> void:
 	if not Net.is_guest():
 		GameData.me = GameData._apply_me(d.get("me", {}))
 	# 세계 키 — 옛 세이브엔 없어 society_v 0 · 자리와 지갑은 빈 채(전부 기본값).
-	# 손댄 세이브의 이상한 모양은 여기서 걸러 매일 아침 하루 넘김이 죽지 않게 한다
-	GameData.society_v = int(d.get("society_v", 0))
+	# 손댄 세이브의 이상한 모양은 여기서 걸러 매일 아침 하루 넘김이 죽지 않게 한다.
+	# 세이브의 판(d.society_v, 옛 세이브는 0)은 여기서 읽고 버린다 — 적용이 끝난 메모리의
+	# 상태는 이제 현재 판이다(아래). 옛 판을 그대로 들고 있으면 이 세션의 채용·지갑이
+	# 판 0 으로 다시 저장돼, 판으로 마이그레이션을 가르는 날 S1 세이브를 S0 로 오판한다
 	var seats_in: Variant = d.get("seats", {})
 	GameData.seats = seats_in if typeof(seats_in) == TYPE_DICTIONARY else {}
 	GameData.npc_wallet = {}
@@ -233,6 +235,7 @@ func _apply_save(d: Dictionary) -> void:
 	if typeof(wallet_in) == TYPE_DICTIONARY:
 		for wk in wallet_in:
 			GameData.npc_wallet[str(wk)] = int(wallet_in[wk])
+	GameData.society_v = 1   # 메모리의 상태는 이제 현재 판이다
 	# ---- 저장은 하는데 **읽지 않던** 여덟 개 ----
 	#
 	# build_save 는 이것들을 꼬박꼬박 적어 왔고 멀티 동기화(apply_stats)도
@@ -472,7 +475,11 @@ func _apply_save(d: Dictionary) -> void:
 
 	# 호칭 기준선은 호감도까지 다 읽은 뒤에 잡는다 — 그 전에 잡으면 첫 아침마다 거짓 알림(D9).
 	# 자유직 통계(mob_kills·recipes_cooked·forage_caught)도 affinity 뒤에 읽히므로
-	# 그것까지 다 지난 여기, grid_cells 분기 앞이 가장 이른 안전한 자리다
+	# 그것까지 다 지난 여기, grid_cells 분기 앞이 가장 이른 안전한 자리다.
+	# 목장주 호칭 재료(animals_now)는 폴링이 아니라 여기서 먼저 채운다 — society._process 는
+	# 반 초 뒤에야 도는데 _ready 안의 로드는 그 전이라, 가축이 여섯인 세이브가 부팅마다
+	# 「새로 온 사람」으로 기준선이 박혀 첫 아침 결산에 거짓 「목장주」 줄이 떴다
+	GameData.animals_now = m.animals.size()
 	GameData.society_loaded()
 
 	# ---- 밭 상태 ----

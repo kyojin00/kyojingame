@@ -157,9 +157,11 @@ func _log_work(kind: String, inst: String, pick: int) -> void:
 	GameData.me["work_log"] = log
 
 
-func _sees_shown() -> bool:
+# 그 직업의 「보이는 것」 페이지를 이미 봤나 — 직업마다 한 페이지다(부록 §3 · 팩의 sees 6줄).
+# inst 를 안 보면 잡화점에서 한 번 본 뒤 대장간 도제가 돼도 널빤지 페이지가 영영 안 뜬다
+func _sees_shown(inst: String) -> bool:
 	for w in GameData.me.get("work_log", []):
-		if str(w.get("kind", "")) == "sees":
+		if str(w.get("kind", "")) == "sees" and str(w.get("inst", "")) == inst:
 			return true
 	return false
 
@@ -190,9 +192,11 @@ func can_hire(inst: String) -> String:
 		return "자리가 안 비었네."
 	if str(GameData.me.get("job", "")) != "":
 		return _hire_line(inst, "refuse_busy")
+	# 그만둔 지 이레 안 — refuse_busy(「이미 다른 데서 일하잖아」)는 무직자에게 사실과
+	# 어긋나므로 계약서 문구로 말한다(부록 §3 을 그에 맞게 고쳤다)
 	var hist: Array = GameData.me.get("job_history", [])
 	if not hist.is_empty() and GameData.day - int(hist[-1].get("to", 0)) < 7:
-		return _hire_line(inst, "refuse_busy")
+		return "그만둔 지 이레도 안 됐잖나."
 	if GameData.aff(head) < 20:
 		return _hire_line(inst, "refuse_aff")
 	var skill := str(idef.get("skill", ""))
@@ -212,8 +216,11 @@ func add_talk_choices(nid: String, choices: Array) -> void:
 		return
 	var guest := Net.is_guest()
 	var theft: Dictionary = GameData.SOCIETY_LINES.theft
-	# ① 주인 — 일자리 이야기
+	# ① 주인 — 일자리 이야기. 내가 이미 그 자리에 앉아 있으면 끼우지 않는다 — 내 주인에게
+	# 「나도 서 보고 싶어」 하고 「자리가 안 비었네」를 듣는 꼴이 된다. 사직은 계산대(counter_menu)에 있다
 	var inst := owner_inst(nid)
+	if inst != "" and GameData.job_inst() == inst:
+		inst = ""
 	if inst != "":
 		if guest:
 			choices.insert(choices.size() - 1,
@@ -260,6 +267,17 @@ func talk_opener(nid: String, first_today: bool) -> String:
 	if not job.is_empty() and str(job.get("boss", "")) == nid \
 			and _me_int("absent_days") == GameData.ABSENT_WARN:
 		return str(job.get("absent_warn", ""))
+	# 해고된 그날, 옛 주인의 첫마디는 해고 한마디다(hire.fired — absent_warn 과 같은 규약:
+	# 그날 하루의 첫 대화 한 번. 부록은 이 줄의 자리를 정하지 않았다)
+	var hist: Array = GameData.me.get("job_history", [])
+	if not hist.is_empty() and hist[-1] is Dictionary:
+		var last: Dictionary = hist[-1]
+		if str(last.get("reason", "")) == "fired" and int(last.get("to", 0)) == GameData.day:
+			var old_job: Dictionary = GameData.JOBS.get(str(last.get("job", "")), {})
+			if str(old_job.get("boss", "")) == nid:
+				var fired := str(old_job.get("hire", {}).get("fired", ""))
+				if fired != "":
+					return fired
 	return GameData.call_opener(nid)
 
 
@@ -482,7 +500,7 @@ func work_start() -> void:
 		pages.append({"text": str(job.get("hire", {}).get("first_day", "")),
 			"name": _npc_name(head), "portrait": _portrait(head)})
 	# 주인이 나를 「우리 점원」이라 부르게 된 날, 그 직업만 보는 것을 한 번 보여 준다
-	if GameData.aff(head) >= 70 and not _sees_shown():
+	if GameData.aff(head) >= 70 and not _sees_shown(str(job.get("inst", ""))):
 		var sees: Dictionary = job.get("sees", {})
 		if str(sees.get("line", "")) != "":
 			pages.append({"text": str(sees.line),
@@ -584,21 +602,21 @@ func read_book() -> void:
 
 # ---- 잡화점 선반 (좀도둑) ----
 
-# 선반 E 를 가로챈다 — 대범함이 소매치기 문턱(20)에 닿은 사람에게만 「슬쩍한다」가
-# 보인다(45 미만이면 회색으로 이유를 말한다). 그 아래에서는 false 를 돌려 기존
-# 구매 흐름이 그대로다 — 사려는 사람에게 클릭 하나를 더 시키지 않으려고
+# 선반 E 를 가로챈다 — 대범함이 낮 좀도둑 문턱(45)에 닿은 사람에게만 「슬쩍한다」가
+# 보인다(계약서 §5·D13). 그 아래에서는 false 를 돌려 기존 구매 흐름이 그대로다 —
+# 선반은 씨앗·레시피를 사는 가장 잦은 길이라, 사려는 사람에게 클릭 하나를 더 시키지
+# 않으려고(「보통이죠」25 로 시작한 사람이 선반마다 「물건 보기」를 한 번 더 누르던 것).
+# shelf_gray_day 는 shoplift 몸통의 guard 가 말한다
 func shelf_menu(si: int) -> bool:
 	if Net.is_guest():
 		return false
 	if _me_int("boldness_base", -1) == -1 \
-			or GameData.boldness() < int(GameData.GATE.get("pickpocket", 20)):
+			or GameData.boldness() < int(GameData.GATE.get("shelf_day", 45)):
 		return false
 	var theft: Dictionary = GameData.SOCIETY_LINES.theft
 	var label := str(theft.get("shelf_choice", "슬쩍한다"))
 	var steal: Array
-	if GameData.boldness() < int(GameData.GATE.get("shelf_day", 45)):
-		steal = gray(label, str(theft.get("shelf_gray_day", "손이 안 나간다")))
-	elif si == 0:
+	if si == 0:
 		steal = [label, shoplift.bind(si)]
 	else:
 		steal = gray(label, "손댈 것이 없다.")   # 씨앗 선반만 손이 닿는다 (D13)
@@ -794,17 +812,19 @@ func council_pick(kind: String) -> void:
 			GameData.money -= pay
 			mem["forgiven"] = true
 			mem["settled"] = "paid"
-			mem["settled_day"] = GameData.day   # 다음날 아침 「어제 일은 갚았다」 줄의 재료
+			mem["settled_day"] = GameData.day   # 다음날 아침 outcome·「어제 일은 갚았다」 줄의 재료
 			_rep_add(-3)
 			GameData.aff_add(str(mem.get("target", "")), 2)
 			opt = _option("pay")
 		"denied":
 			mem["settled"] = "denied"
+			mem["settled_day"] = GameData.day
 			_rep_add(-5)
 			GameData.me["rumor_day"] = GameData.day
 			opt = _option("deny")
 		"confessed":
 			mem["settled"] = "confessed"
+			mem["settled_day"] = GameData.day
 			var rec: Array = GameData.me.get("record", [])
 			rec.append({"day": GameData.day, "crime": str(mem.get("kind", "")),
 				"court": "village", "verdict": "service", "sentence": 3,

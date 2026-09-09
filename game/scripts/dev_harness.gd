@@ -1672,9 +1672,15 @@ func _debug_tick() -> void:
 			m.society.hire("general")
 			m.dialog.close()
 			var d0: int = int(GameData.me.job_since_day)
+			# 고용된 채 광장의 내 주인에게 「일자리 이야기」가 끼지 않는다(사직은 계산대에)
+			var own_ch: Array = [["대화 끝", null]]
+			m.society.add_talk_choices("merchant", own_ch)
+			var own_boss_ok: bool = own_ch.filter(
+				func(c: Array) -> bool: return str(c[0]).contains("일자리")).is_empty()
 			var hire_ok: bool = why == "" and str(GameData.me.job) == "general_clerk" \
 				and GameData.seat_of("general", "clerk") == "player" \
-				and d0 == hire_day + 1 and int(GameData.me.wage_day) == hire_day + 8
+				and d0 == hire_day + 1 and int(GameData.me.wage_day) == hire_day + 8 \
+				and own_boss_ok
 			# 이레 근무 — 계산대 E 의 첫 메뉴에 「근무」가 있고, 손님 한 사람을 맞으면 그날은 끝
 			var loop_ok := true
 			var loop_why := ""
@@ -1721,15 +1727,21 @@ func _debug_tick() -> void:
 				GameData.day += 1
 				GameData.society_new_day([0, 0, 0])
 			var hist: Array = GameData.me.job_history
+			# 해고 당일: 옛 주인의 첫마디는 hire.fired, 다시 묻는 채용은 「그만둔 지 이레도…」
+			var fired_line: String = m.society.talk_opener("merchant", true)
+			var fired_line_ok: bool = fired_line != "" \
+				and fired_line == str(GameData.JOBS.general_clerk.hire.fired)
+			var wait_ok: bool = m.society.can_hire("general").contains("이레")
 			var fired_ok: bool = str(GameData.me.job) == "" \
 				and GameData.seat_of("general", "clerk") == "" \
 				and not hist.is_empty() and str(hist[-1].reason) == "fired" \
-				and int(GameData.me.reputation.kyojin) == rep0 - 8
+				and int(GameData.me.reputation.kyojin) == rep0 - 8 \
+				and fired_line_ok and wait_ok
 			_soc_restore(kp)
 			print("CLERK_LOOP_OK=", hire_ok and loop_ok and work_ok and pay_ok and fired_ok,
 				" 채용=", hire_ok, "(", why, ") 근무=", loop_ok, " ", loop_why,
 				" 적립=", work_ok, " 봉급=", pay_ok, "(", note.replace("\n", " / "), ")",
-				" 해고=", fired_ok)
+				" 해고=", fired_ok, "(첫마디 ", fired_line_ok, " 대기 ", wait_ok, ")")
 		228:
 			# ③ PICKPOCKET_OK — 범죄의 파이프라인: 강제 실패 → 「그 사람」(seen) → 다음날 아침
 			# 이장이 찾아오고(meeting) → 자백 → 봉사 사흘 → 용서(seen 소멸). 이어 강제 성공 —
@@ -1785,18 +1797,30 @@ func _debug_tick() -> void:
 				var confess_ok: bool = not rec.is_empty() and str(rec[-1].court) == "village" \
 					and int(rec[-1].sentence) == 3 \
 					and float(GameData.me.boldness_state) == -5.0
+				# 자백 다음날 아침은 option.outcome 한 줄(부록 §4)이고 「봉사하는 날」은 겹치지
+				# 않는다; 그 다음 아침부터는 「봉사하는 날」이 뜬다 (첫 봉사 전에도)
+				var outcome_note := ""
+				var serve_note := ""
 				for j in 3:
 					GameData.day += 1
 					GameData.society_new_day([0, 0, 0])
+					if j == 0:
+						outcome_note = GameData.society_note()
+					elif j == 1:
+						serve_note = GameData.society_note()
 					GameData.minutes = 10.0 * 60.0
 					m.society.serve_day()
 					m.dialog.close()
+				var outcome_ok: bool = outcome_note.contains("사흘") \
+					and not outcome_note.contains("봉사하는 날") \
+					and serve_note.contains("봉사하는 날")
 				rec = GameData.me.record
 				mems = GameData.me.memories
 				var serve_ok: bool = not rec.is_empty() and int(rec[-1].served) == 3 \
 					and not mems.is_empty() and bool(mems[0].forgiven) \
 					and int(GameData.me.service_days) == 3 \
-					and str(GameData.player_title("merchant").cls) != "seen"
+					and str(GameData.player_title("merchant").cls) != "seen" \
+					and outcome_ok
 				# 성공 경로 — 혼자였으니 기억이 없고, 지갑에서 그만큼만 빠진다
 				GameData.me.memories = []
 				GameData.npc_wallet["merchant"] = 50
@@ -1816,7 +1840,8 @@ func _debug_tick() -> void:
 					and council_shown and confess_ok and serve_ok and win_ok,
 					" 실패=", fail_ok, " 회의=", meet_ok, " 결산=", note.contains("이장"),
 					"(", note.replace("\n", " / "), ") 자백=", confess_ok, " 봉사=", serve_ok,
-					" 성공=", win_ok, " 건너뛴 축제=", skipped)
+					"(다음날 ", outcome_note.replace("\n", " / "), ") 성공=", win_ok,
+					" 건너뛴 축제=", skipped)
 		229:
 			# ④ NIGHT_OK — 21시에 밖에 남는 사람은 NIGHT_OWLS 뿐이고(교집합 비교, 임시 스폰 없음,
 			# D12), 22시가 넘으면 그들도 들어간다. 자리는 society_place 가 준다(악사 광장·강태 부두)
@@ -1948,14 +1973,65 @@ func _debug_tick() -> void:
 				and GameData.bold_stage() == ""
 			GameData.me.boldness_base = 25
 			var stage_ok: bool = GameData.bold_stage() == "손이 굳지 않는"
+			# 세이브 왕복 — arrears 속의 수도 int 로 돌아온다(D21 목록의 빈틈)
+			var ar: Dictionary = GameData._apply_me({"arrears": {"amount": 3.0, "weeks": 1.0}}).arrears
+			var arrears_ok: bool = ar.amount is int and int(ar.amount) == 3 and ar.weeks is int
+			# 호칭 알림은 호감도 해금 뒤에만 — 기준선을 일부러 어긋나게 두고 두 번 넘긴다
+			GameData.affinity_open = false
+			GameData._title_mark = "probe"
+			GameData.society_new_day([0, 0, 0])
+			var quiet_note: String = GameData.society_note()
+			GameData.affinity_open = true
+			GameData._title_mark = "probe"
+			GameData.society_new_day([0, 0, 0])
+			var loud_note: String = GameData.society_note()
+			var gate_ok: bool = not quiet_note.contains("이렇게 부른다") \
+				and loud_note.contains("이렇게 부른다")
+			# 손댄 seats — 랭크 밖 키·Array 아닌 값은 seat_rows 가 지우고 아래의 아침들이 죽지 않는다(자리가 진실 — 이 자리가 me.job 을 정한다)
+			GameData.seats = {"general": {"clerk": ["player"], "owner": ["merchant"], "extra": 5}}
+			var rows: Dictionary = GameData.seat_rows("general")
+			var seat_ok: bool = not rows.has("extra") and GameData.seat_of("general", "clerk") == "player"
+			# 봉급날은 이레마다 돌아오고(안 받아도), 세 주치를 넘긴 몫은 그 아침에 사라진다(D4)
+			GameData.me.job = "general_clerk"
+			GameData.me.rank = "clerk"
+			GameData.me.job_since_day = GameData.day - 30
+			GameData.me.wage_day = GameData.day - 21
+			GameData.me.wage_pending = 2000
+			GameData.society_new_day([0, 0, 0])
+			var wnote: String = GameData.society_note()
+			var wage_ok: bool = int(GameData.me.wage_day) == GameData.day \
+				and int(GameData.me.wage_pending) == GameData.WAGE_CAP \
+				and wnote.contains(str(GameData.SOCIETY_NOTES.wage_lost)) \
+				and wnote.contains("봉급날")
+			GameData.me.wage_day = GameData.day - 3      # 봉급날 사이 — 굴리지도 알리지도 않는다
+			GameData.society_new_day([0, 0, 0])
+			var wnote2: String = GameData.society_note()
+			wage_ok = wage_ok and int(GameData.me.wage_day) == GameData.day - 3 \
+				and not wnote2.contains("봉급날")
+			# 「보이는 것」 페이지는 직업마다 한 번 — 잡화점에서 봤어도 대장간 것은 따로
+			GameData.me.work_log = [{"day": GameData.day - 1, "kind": "sees", "inst": "general", "pick": 0}]
+			var sees_ok: bool = m.society._sees_shown("general") and not m.society._sees_shown("smith")
+			# 선반 메뉴는 낮 좀도둑 문턱(45)부터 — 그 아래는 구매창이 바로 뜬다
+			GameData.me.boldness_state = 0.0
+			GameData.me.boldness_base = 25
+			var shelf_low: bool = m.society.shelf_menu(0)
+			m.dialog.close()
+			GameData.me.boldness_base = 45
+			var shelf_high: bool = m.society.shelf_menu(0)
+			m.dialog.close()
+			var shelf_ok: bool = not shelf_low and shelf_high
+			var v_ok: bool = GameData.society_v == 1   # 메모리의 판은 언제나 현재 판
 			_soc_restore(kp)
 			var kept_ok: bool = GameData.seats == seats0 and GameData.npc_wallet == wallet0
 			print("REST_OK=", rest_ok and lv_ok and owl_ok and cap_ok and ko_ok and none_ok
-				and stage_ok and kept_ok,
+				and stage_ok and kept_ok and arrears_ok and seat_ok and gate_ok and wage_ok
+				and sees_ok and shelf_ok and v_ok,
 				" 잠자리=", rest_ok, "(", r1, "/", r2, "/", r3, ") 손버릇=", lv_ok,
 				" 밤사람=", owl_ok, " 동굴상한=", cap_ok, " 기절순서=", ko_ok,
 				"(", st1, "/", st2, ") 질문전=", none_ok, " 마음카드=", stage_ok,
-				" 되돌림=", kept_ok)
+				" 되돌림=", kept_ok, " 왕복int=", arrears_ok, " 자리정리=", seat_ok,
+				" 호칭게이트=", gate_ok, " 봉급날=", wage_ok, "(", wnote.replace("\n", " / "), ")",
+				" 보이는것=", sees_ok, " 선반문턱=", shelf_ok, " 판=", v_ok)
 		240:
 			# 휘두르기 네 위상을 한 장씩 찍는다. 도구가 **주먹에 붙어** 따라가는지,
 			# 도트가 위상마다 제대로 바뀌는지는 수치로는 안 보이고 그림을 봐야 한다.

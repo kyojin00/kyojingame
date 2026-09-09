@@ -7644,6 +7644,11 @@ func _apply_me(src: Variant) -> Dictionary:
 	if not (rep is Dictionary):
 		rep = {}
 	out.reputation = {"kyojin": int(rep.get("kyojin", 0)), "town": int(rep.get("town", 0))}
+	# arrears 도 같은 이유로 — 세금(S2)이 `amount % n` 이나 첨자로 쓰는 날 float 가 걸린다
+	var ar: Variant = out.arrears
+	if not (ar is Dictionary):
+		ar = {}
+	out.arrears = {"amount": int(ar.get("amount", 0)), "weeks": int(ar.get("weeks", 0))}
 	out.memories = _apply_rows(out.memories, ME_MEMORY)
 	out.record = _apply_rows(out.record, ME_RECORD)
 	out.work_log = _apply_rows(out.work_log, ME_WORK)
@@ -7693,6 +7698,12 @@ func seat_rows(inst: String) -> Dictionary:
 		var cur: Variant = rows.get(r)
 		if not (cur is Array) or cur.is_empty():
 			rows[r] = defaults[i].duplicate()
+	# 랭크 밖의 키나 Array 아닌 값은 버린다 — society_new_day ② 의 `"player" in rows[r]` 와
+	# seat_clear_player 가 손댄 세이브의 수 하나에 걸려 매일 아침 ③~⑫ 를 통째로 건너뛰지 않게.
+	# 정상 경로는 두 랭크 키 아래 Array 만 쓰므로 여기서 지워지는 건 남이 손댄 것뿐이다
+	for k in rows.keys():
+		if not (str(k) in ranks) or not (rows[k] is Array):
+			rows.erase(k)
 	return rows
 
 
@@ -7708,6 +7719,8 @@ func seat_clear_player() -> void:
 	for inst in INSTITUTIONS:
 		var rows := seat_rows(inst)
 		for r in rows:
+			if not (rows[r] is Array):
+				continue
 			var arr: Array = rows[r]
 			for i in arr.size():
 				if str(arr[i]) == "player":
@@ -8048,7 +8061,7 @@ func society_new_day(stats: Array, ko := false) -> void:
 	for inst in INSTITUTIONS:
 		var rows := seat_rows(inst)   # 빠진 랭크 키를 채우므로 여기서 KeyError 는 없다
 		for r in rows:
-			if "player" in rows[r]:
+			if rows[r] is Array and "player" in rows[r]:
 				seat_job = str(INSTITUTIONS[inst].job)
 				seat_rank = str(r)
 	if seat_job != "" and str(me.job) != seat_job:
@@ -8090,13 +8103,22 @@ func society_new_day(stats: Array, ko := false) -> void:
 			rep.kyojin = int(rep.get("kyojin", 0)) - 8
 			_note(str(SOCIETY_NOTES.fired))
 			job = ""
-	# ⑥ 봉급날 — 주인은 세 주치까지만 맡아 둔다. 돈은 창구 앞 E 로만(헌법 §0.3)
-	if job != "" and day == int(me.wage_day):
-		if int(me.wage_pending) > WAGE_CAP:
-			me.wage_pending = WAGE_CAP
-			_note(str(SOCIETY_NOTES.wage_lost))
-		if int(me.wage_pending) > 0:
-			_note(str(SOCIETY_NOTES.wage_paid))
+	# ⑥ 봉급날 — 주인은 세 주치까지만 맡아 둔다. 돈은 창구 앞 E 로만(헌법 §0.3).
+	# 봉급날은 받았든 안 받았든 이레마다 돌아온다. wage_day 는 수령(collect_wage)에서만
+	# 앞으로 갔으므로, 봉급날 창구를 안 들르면 그날에 멈춘 채 `day == wage_day` 가 두 번
+	# 다시 참이 되지 않아 상한도 「봉급날이다」 줄도 첫 한 번뿐이었다(D4 가 죽은 길).
+	# 여기서 오늘까지 이레씩 굴려 둔다 — wage_ready(day >= wage_day)·counter_menu 는 그대로 참
+	if job != "":
+		var wd := int(me.wage_day)
+		while wd + 7 <= day:
+			wd += 7
+		me.wage_day = wd
+		if day == wd:
+			if int(me.wage_pending) > WAGE_CAP:
+				me.wage_pending = WAGE_CAP
+				_note(str(SOCIETY_NOTES.wage_lost))
+			if int(me.wage_pending) > 0:
+				_note(str(SOCIETY_NOTES.wage_paid))
 	# ⑦ 대범함 — base < 0 이면 통째로 건너뛴다(성격을 아직 안 물었다).
 	# 순서 고정(D15·검증 반영 2차 11): (가) 감쇠 → (나) ko −5 → (다) 흔들림 → (라) 일일 상한 리셋.
 	# 뜻: 밤사이 가라앉은 뒤에 기절이 얹힌다. 셈:
@@ -8137,23 +8159,43 @@ func society_new_day(stats: Array, ko := false) -> void:
 	# ⑨ 이장이 찾아온다 — 어제 신고된 일
 	if council_pending():
 		_note(str(SOCIETY_NOTES.meeting_summon))
-	# ⑩ 봉사 — 하는 중이면 아침마다, 어제 다 채웠으면 「끝났다」
+	# 회의의 다음날 — 어제 고른 답의 결과 한 줄(부록 §4 「다음날 아침 note = option.outcome」).
+	# 자백은 이 줄이 「이장에게 가야 한다」를 알리는 유일한 통로다(헌법 §0 — 결산 한 줄) —
+	# 없으면 자백 다음날 결산이 침묵했다. 같은 날 여러 건을 매듭지어도 같은 줄은 한 번만
+	var confessed_yesterday := false
+	var outcomes: Array = []
+	for mem in me.memories:
+		if int(mem.get("settled_day", 0)) != day - 1:
+			continue
+		var key := str(mem.get("settled", ""))
+		if key == "confessed":
+			confessed_yesterday = true
+		var line := _meeting_outcome(key)
+		if line != "" and not (line in outcomes):
+			outcomes.append(line)
+	for ol in outcomes:
+		_note(str(ol))
+	# ⑩ 봉사 — 남아 있는 아침마다(첫 봉사 전에도 — 미루면 미룰수록 알려야 한다), 어제 다
+	# 채웠으면 「끝났다」. 자백 다음날은 위의 outcome 줄이 이미 사흘을 말했으니 겹치지 않는다
 	var pend := service_pending()
-	if not pend.is_empty() and int(pend.get("served", 0)) > 0:
+	if not pend.is_empty() and not confessed_yesterday:
 		_note(str(SOCIETY_NOTES.service_day))
 	for rec in me.record:
 		if int(rec.get("served", 0)) >= int(rec.get("sentence", 0)) and int(rec.get("served_day", 0)) == day - 1:
 			_note(str(SOCIETY_NOTES.service_done))
-	# 회의의 다음날 — 부인했으면 소문, 배상했으면 용서
+	# 부인했으면 소문, 배상했으면 용서(부록 §5) — outcome 줄에 이어 붙는다
 	if int(me.rumor_day) == day - 1:
 		_note(str(SOCIETY_NOTES.rumor))
 	for mem in me.memories:
 		if str(mem.get("settled", "")) == "paid" and int(mem.get("settled_day", 0)) == day - 1:
 			_note(str(SOCIETY_NOTES.forgiven))
 			break
-	# ⑪ 호칭 구간 — 이장 기준으로만(도배 방지). 기준선은 society_loaded() 가 심는다(D9)
+	# ⑪ 호칭 구간 — 이장 기준으로만(도배 방지). 기준선은 society_loaded() 가 심는다(D9).
+	# 호칭은 호감도 해금 뒤에만 들리므로(talk_opener 가 그 전엔 "") 알림도 그때부터 —
+	# 해금 전에 벌목 150 그루로 「벌목꾼」이 됐다고 알리면 아무도 그렇게 안 부르는 호칭을
+	# 알리는 셈이다(헌법 §0.4). 기준선은 매일 갱신해 해금 첫 아침에 몰아서 알리지 않는다
 	var c := str(player_title("chief").cls)
-	if _title_mark != "" and c != _title_mark:
+	if affinity_open and _title_mark != "" and c != _title_mark:
 		_note(str(SOCIETY_NOTES.title_changed).format({"title": player_title("chief").text}))
 	_title_mark = c
 	# 평판이 처음 −20 아래로 내려간 아침 — 한 번만
@@ -8173,6 +8215,18 @@ func society_new_day(stats: Array, ko := false) -> void:
 		if cut < 0:
 			break
 		me.work_log.remove_at(cut)
+
+
+# 회의에서 고른 답(memories.settled: paid/denied/confessed)의 다음날 아침 줄 — 표는
+# SOCIETY_LINES.meeting.options 의 key(pay/deny/confess)로 적혀 있어 여기서 잇는다
+func _meeting_outcome(settled: String) -> String:
+	var key := str({"paid": "pay", "denied": "deny", "confessed": "confess"}.get(settled, ""))
+	if key == "":
+		return ""
+	for o in SOCIETY_LINES.meeting.options:
+		if o is Dictionary and str(o.get("key", "")) == key:
+			return str(o.get("outcome", ""))
+	return ""
 
 
 # 아침 결산에 덧붙일 사회 줄 — 한 번 읽으면 비운다(하네스는 루프 밖에서 정확히 한 번 읽는다).
@@ -8854,6 +8908,9 @@ func reset_all() -> void:
 	story_gates_left = 0
 	tool_slots = default_tool_slots()
 	reset_daily()
+	# 가축 수는 society._process 의 폴링이 반 초 뒤에야 채우는 런타임 값이라, 가축 많은 게임을
+	# 하다가 새 게임을 시작하면 옛 수가 남아 기준선이 「목장주」로 박힌다 — 여기서 먼저 0 으로
+	animals_now = 0
 	# 호칭 기준선은 호감도까지 다 읽은 뒤에 잡는다 — 그 전에 잡으면 첫 아침마다 거짓 알림(D9).
 	# 위의 trees_chopped 같은 자유직 통계가 0 이 된 다음이어야 해서 맨 끝이다.
 	society_loaded()
