@@ -21,9 +21,34 @@ func _spawn_npc(npc_id: String, tile: Vector2i, region := Rect2i()) -> void:
 	# 어슬렁거릴 범위. 고장 사람은 제 마을 둘레를 돈다 —
 	# 교진 마을 구역을 주면 지도 반대편까지 걸어가려 든다
 	n.region = region if region.size.x > 0 else m.VILLAGE_REGION
+	tile = free_tile_near(tile)   # 같은 자리에 이미 누가 서 있으면 곁 칸에
 	n.position = Vector2(tile.x * m.TILE + 16, tile.y * m.TILE + 16)
 	m.npcs.append(n)
 	m.world.add_child(n)
+
+
+# 그 칸에 사람이 없으면 그 칸, 있으면 둘레(반경 2) 중 밟을 수 있는 빈 칸.
+# 세 사람을 한 칸에 세워 두면 한 사람처럼 보인다 — 나타날 때부터 흩어 놓는다
+func free_tile_near(tile: Vector2i) -> Vector2i:
+	if not _tile_has_npc(tile):
+		return tile
+	for r in range(1, 3):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var t := tile + Vector2i(dx, dy)
+				if m.is_passable(t) and not _tile_has_npc(t):
+					return t
+	return tile
+
+
+func _tile_has_npc(t: Vector2i) -> bool:
+	var c := Vector2(t.x * m.TILE + 16, t.y * m.TILE + 16)
+	for n in m.npcs:
+		if n.visible and n.position.distance_to(c) < 14.0:
+			return true
+	return false
 
 
 func npc_place_now(npc_id: String) -> String:

@@ -89,9 +89,34 @@ func _process(delta: float) -> void:
 			position += step
 	else:
 		wait -= delta
-		if wait <= 0.0:
-			_pick_target()
+		# 남과 포개져 서 있으면 기다리지 않고 빈 칸으로 비켜선다. 연출이 여럿을
+		# 한자리에 풀어 놓거나(숲길 일행·찾아온 손님), 같은 자리를 목적지로 둔
+		# 사람들이 닿는 순간이 그렇다 — 그대로 두면 한 칸에 셋이 겹쳐 한 사람처럼 보인다
+		if wait <= 0.0 or _crowded() != null:
+			_pick_target(_crowded() != null)
 	_update_sprite()
+
+
+# 내 자리에 포개져 선 다른 사람 (18px 안). 연출이 붙잡고 있는 사람은 비켜 주지 않는다
+func _crowded() -> Node2D:
+	for n in main.npcs:
+		if n == self or not n.visible or n.scripted:
+			continue
+		if n.position.distance_to(position) < 18.0:
+			return n
+	return null
+
+
+# 그 칸에 다른 사람이 서 있거나 그리로 오는 중인가
+func _tile_taken(t: Vector2i) -> bool:
+	var ts: int = main.TILE
+	var c := Vector2(t.x * ts + ts / 2.0, t.y * ts + ts / 2.0)
+	for n in main.npcs:
+		if n == self or not n.visible:
+			continue
+		if n.position.distance_to(c) < 14.0 or (n.moving and n.target.distance_to(c) < 1.0):
+			return true
+	return false
 
 
 # 시간대가 바뀌면 새 목적지로 길을 잡는다
@@ -160,29 +185,42 @@ func _far_from_players(t: Vector2i) -> bool:
 
 
 # 목적지 둘레를 어슬렁거린다 (타일 크기는 main.TILE 기준)
-func _pick_target() -> void:
+func _pick_target(unstack := false) -> void:
 	var ts: int = main.TILE
 	var t := Vector2i(int(floor(position.x / ts)), int(floor(position.y / ts)))
 	var dirs := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 	dirs.shuffle()
-	for d: Vector2i in dirs:
-		# 한 번에 1~3칸씩 이어서 걷는다 (가다 서다 하는 모습이 자연스럽다)
-		var n := t
-		var steps := 0
-		for i in randi_range(1, 3):
-			var nx: Vector2i = n + d
-			if not region.has_point(nx) or not main.is_passable(nx):
-				break
-			# 일과 목적지가 있으면 그 둘레를 벗어나지 않는다
-			if dest.x != -999 and (absi(nx.x - dest.x) > main.NPC_WANDER
-					or absi(nx.y - dest.y) > main.NPC_WANDER):
-				break
-			n = nx
-			steps += 1
-		if steps > 0:
-			target = Vector2(n.x * ts + ts / 2.0, n.y * ts + ts / 2.0)
-			moving = true
-			return
+	# 비켜설 때는 포개진 사람의 반대쪽부터 본다
+	if unstack:
+		var other: Node2D = _crowded()
+		if other != null:
+			var away: Vector2 = position - other.position
+			dirs.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+				return Vector2(a).dot(away) > Vector2(b).dot(away))
+	# 비켜설 자리는 어슬렁 반경 밖이라도 좋다 — 못 비키면 계속 겹쳐 있는 것보다 낫다
+	for loose in ([false, true] if unstack else [false]):
+		for d: Vector2i in dirs:
+			# 한 번에 1~3칸씩 이어서 걷는다 (가다 서다 하는 모습이 자연스럽다)
+			var n := t
+			var steps := 0
+			for i in randi_range(1, 3):
+				var nx: Vector2i = n + d
+				if not region.has_point(nx) or not main.is_passable(nx):
+					break
+				# 일과 목적지가 있으면 그 둘레를 벗어나지 않는다
+				if not loose and dest.x != -999 and (absi(nx.x - dest.x) > main.NPC_WANDER
+						or absi(nx.y - dest.y) > main.NPC_WANDER):
+					break
+				n = nx
+				steps += 1
+			# 끝 칸에 남이 서 있으면(오는 중이면) 한 칸 덜 간다
+			while steps > 0 and _tile_taken(n):
+				n -= d
+				steps -= 1
+			if steps > 0:
+				target = Vector2(n.x * ts + ts / 2.0, n.y * ts + ts / 2.0)
+				moving = true
+				return
 	wait = 0.6
 
 
