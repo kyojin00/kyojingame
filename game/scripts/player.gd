@@ -116,9 +116,9 @@ const SWING_HAND_DOT := {
 	# 앞·뒷모습은 옆으로 쓸지 않고 **앞으로** 내리친다(원근). 앞모습은 팔이
 	# 닿는 왼쪽 옆에서 그대로 내리 긋고(가운데까지 억지로 안 끌고 간다),
 	# 뒷모습은 정수리 너머 저편으로 넘어가 주먹이 머리에 가려진다.
-	"side": [Vector2(-19, -57), Vector2(-21, -71), Vector2(23, -65), Vector2(19, -25), Vector2(17, -37)],
+	"side": [Vector2(-19, -57), Vector2(-22, -71), Vector2(23, -65), Vector2(19, -25), Vector2(17, -37)],
 	"down": [Vector2(-21, -53), Vector2(-25, -71), Vector2(-29, -53), Vector2(-13, -29), Vector2(-21, -49)],
-	"up": [Vector2(21, -57), Vector2(21, -73), Vector2(9, -89), Vector2(3, -77), Vector2(21, -63)],
+	"up": [Vector2(21, -57), Vector2(21, -73), Vector2(9, -90), Vector2(3, -77), Vector2(21, -63)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
