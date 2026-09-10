@@ -111,7 +111,9 @@ BROW = [
 
 
 def face(c, blink=False):
-    ex_l, ex_r, ey = 26, 84, 44
+    # 두 눈 사이는 **한 눈 너비**쯤이 귀엽다. 머리통(x 27~101) 가장자리에 붙여
+    # 놨더니 눈 사이가 41칸(머리 너비의 55%)이나 벌어져 얼빠진 얼굴이 됐다
+    ex_l, ex_r, ey = 38, 72, 44
     if blink:
         for x0 in (ex_l, ex_r):
             for k, row in enumerate(('ee............ee', '.eeeeeeeeeeeeee.', '..eeeeeeeeeeee..')):
@@ -125,8 +127,8 @@ def face(c, blink=False):
     for x in range(58, 70):                           # 입 — 살짝 웃는 선
         c.px(x, 78, 'm')
     c.px(57, 77, 'm'); c.px(70, 77, 'm')
-    c.rect(33, 69, 40, 73, 'r')                       # 볼터치 — 얼굴 안쪽
-    c.rect(88, 69, 95, 73, 'r')
+    c.rect(31, 70, 39, 74, 'r')                       # 볼터치 — 눈 바깥 아래
+    c.rect(89, 70, 97, 74, 'r')
 
 
 def hair_front(c):
@@ -327,8 +329,8 @@ def side(c):
             if c.at(x, y) == 's':
                 c.px(x, y, 'S')
     c.ell(cx - 12, HEAD_CY - 14, 16, 12, 'H')
-    c.stamp(EYE, cx + 10, 46)
-    c.stamp(BROW, cx + 12, 37)
+    c.stamp(EYE, cx + 12, 46)
+    c.stamp(BROW, cx + 14, 37)
     for x in range(cx + 18, cx + 26):
         c.px(x, 78, 'm')
     c.px(cx + 17, 77, 'm')
@@ -409,7 +411,6 @@ def build_down():
     c = C()
     body_front(c)
     c.ell(HEAD_CX, HEAD_CY, HEAD_RX, HEAD_RY, 's')
-    c.ell(HEAD_CX - 8, HEAD_CY - 14, 20, 14, 'H')
     for y in range(HEAD_CY - 6, HEAD_CY + HEAD_RY):                # 오른쪽 그늘
         for x in range(HEAD_CX + HEAD_RX - 6, HEAD_CX + HEAD_RX + 1):
             if c.at(x, y) == 's':
