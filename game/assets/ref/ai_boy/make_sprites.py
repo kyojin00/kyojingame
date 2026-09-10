@@ -583,6 +583,174 @@ def add_long(g, view, head_bot):
         _back_hair_up(g, head_bot, head_bot + 18, 38, 0.4, 3, round_end=8)
 
 
+# ---------------------------------------------------------------- 여자 새로 그리기
+#
+# 남자 그림에 머리만 얹으면 **같은 사람이 가발을 쓴 것**으로 보인다. 참고 그림
+# (assets/ref/f3_front.png)의 소녀를 모티브로, 머리·윗도리·치마를 다시 그린다:
+#   · 머리 — 삐죽한 더벅머리를 깎아 **머리통에 붙는 둥근 단발**로. 옆에 묶은
+#            머리 한 다발, 정수리에 안테나 한 가닥
+#   · 윗도리 — 블라우스 위에 **조끼**(셔츠 그늘색 판) + 허리띠
+#   · 아래 — 허리에서 퍼지는 **짧은 주름치마**, 맨다리, 부츠
+# 골격(자세·팔다리 위치)만 남자 그림에서 가져온다 — 도트를 찍는 사람도 같은
+# 골격 위에 다른 사람을 그린다.
+
+
+def _hair_cells(g):
+    return {(x, y) for y in range(g.h) for x in range(g.w) if _is(g.d[y][x], HAIR_CH)}
+
+
+def _erode_spikes(g, passes=4, keep=13):
+    """삐죽 솟은 가닥을 깎는다 — 5x5 안에 머리카락이 keep 칸 미만이면 뾰족한 끝이다."""
+    H = _hair_cells(g)
+    for _ in range(passes):
+        out = set()
+        for (x, y) in H:
+            n = sum(1 for dx in range(-2, 3) for dy in range(-2, 3)
+                    if (x + dx, y + dy) in H)
+            if n >= keep:
+                out.add((x, y))
+        if out == H:
+            break
+        H = out
+    return H
+
+
+def _smooth_mask(cells, rounds=2):
+    """가장자리를 둥글린다 — 이웃 여덟 중 다섯 이상이 안이면 넣고, 셋 이하면 뺀다."""
+    for _ in range(rounds):
+        xs = [x for x, _ in cells]; ys = [y for _, y in cells]
+        box = range(min(xs) - 2, max(xs) + 3), range(min(ys) - 2, max(ys) + 3)
+        out = set()
+        for x in box[0]:
+            for y in box[1]:
+                n = sum(1 for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                        if (dx or dy) and (x + dx, y + dy) in cells)
+                if ((x, y) in cells and n >= 4) or ((x, y) not in cells and n >= 6):
+                    out.add((x, y))
+        cells = out
+    return cells
+
+
+def _wipe(g, cells):
+    """그 칸들과, 그 칸에만 붙어 있던 윤곽선을 지운다."""
+    for c in cells:
+        g.px(c[0], c[1], None)
+    for _ in range(2):
+        drop = []
+        for y in range(g.h):
+            for x in range(g.w):
+                if g.d[y][x] != 'O':
+                    continue
+                if not any(g.at(x + dx, y + dy) not in (None, 'O')
+                           for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                    drop.append((x, y))
+        for x, y in drop:
+            g.px(x, y, None)
+
+
+def female_head(g, view):
+    """더벅머리를 둥근 단발로 깎고, 옆으로 묶은 머리와 안테나 한 가닥을 얹는다."""
+    old = _hair_cells(g)
+    if not old:
+        return
+    cap = _smooth_mask(_erode_spikes(g), 2)
+    if not cap:
+        return
+    _wipe(g, old - cap)
+    xs = [x for x, _ in cap]; ys = [y for _, y in cap]
+    hx0, hx1, hy0, hy1 = min(xs), max(xs), min(ys), max(ys)
+    add = set(cap)
+    rows = {}
+    for (x, y) in cap:
+        rows.setdefault(y, []).append(x)
+    cols = {}
+    for (x, y) in cap:
+        cols.setdefault(x, []).append(y)
+
+    def extent(y):
+        """그 줄에서 머리통이 차지하는 (왼끝, 오른끝) — 아래로 벗어나면 맨 아랫줄."""
+        r = rows.get(min(y, hy1))
+        while r is None and y > hy0:
+            y -= 1
+            r = rows.get(y)
+        return (min(r), max(r)) if r else (hx0, hx1)
+
+    # 귀 옆으로 흘러내리는 머리 — 머리통 **가장자리에 붙여서** 턱선까지.
+    # (머리 상자 끝에 맞춰 놨더니 둥근 머리통에서 떨어져 막대가 떠 있었다)
+    start = hy1 - 8
+    jaw = hy1 + 13
+    for d in (-1, 1):
+        for y in range(start, jaw + 1):
+            t = (y - start) / max(1, jaw - start)
+            wdt = max(2, int(round(7 - 4 * t * t)))
+            xa, xb = extent(y)
+            edge = xa if d < 0 else xb
+            for k in range(wdt):
+                add.add((edge + d * k - d * 1, y))
+    # 옆으로 묶은 머리 한 다발 (화면 오른쪽) — 귀 높이에서 시작해 밖으로 흐른다
+    py0 = hy0 + (hy1 - hy0) * 2 // 3
+    for y in range(py0, py0 + 20):
+        t = (y - py0) / 19.0
+        wdt = max(2, int(round(9 * (1 - 0.5 * t))))
+        _, xb = extent(y)
+        cxp = xb + 1 + int(round(3 * t))
+        for k in range(wdt):
+            add.add((cxp - k, y))
+    if view != 'up':                            # 정수리 안테나 — 머리통 꼭대기에 붙인다
+        ax = (hx0 + hx1) // 2 - 1
+        atop = min(cols.get(ax, [hy0]))
+        for k in range(4):
+            add.add((ax, atop - 1 - k))
+    draw_lock(g, add - cap, light=-1)
+    for (x, y) in cap:                          # 깎인 자리의 결은 그대로 둔다
+        if g.d[y][x] is None:
+            g.px(x, y, 'h')
+    _close_outline(g)
+
+
+def add_vest(g, view):
+    """블라우스 위에 조끼 — 셔츠 그늘색 판을 가슴 가운데에 두고 허리띠를 두른다.
+    소매와 깃은 밝은 채로 남아 「조끼를 껴입었다」로 읽힌다."""
+    shirt = [(x, y) for y in range(g.h) for x in range(g.w) if _is(g.d[y][x], 'bLB')]
+    if not shirt:
+        return
+    comp = max(_components(shirt), key=len)
+    xs = [x for x, _ in comp]; ys = [y for _, y in comp]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    rows = {}
+    for (x, y) in comp:
+        rows.setdefault(y, []).append(x)
+    top = y0 + max(2, (y1 - y0) // 5)
+    vest = set()
+    for y in range(top, y1 + 1):
+        r = rows.get(y)
+        if not r:
+            continue
+        xa, xb = min(r), max(r)
+        w = xb - xa
+        inset = max(1, round(w * (0.30 if view == 'side' else 0.22)))
+        for x in range(xa + inset, xb - inset + 1):
+            if _is(g.at(x, y), 'bLB'):
+                vest.add((x, y))
+    # **조끼는 어둡게, 블라우스는 밝게.** 조끼만 한 단 어둡게 칠했더니 같은 파랑
+    # 안에서 명암 차이로만 남아 「좀 짙은 셔츠」로 보였다. 소매·깃을 밝은 칸으로
+    # 올려 두 겹(블라우스 위에 조끼)으로 읽히게 한다
+    for (x, y) in comp:
+        c = g.at(x, y)
+        if (x, y) in vest:
+            g.px(x, y, 'B')
+        elif c == 'b':
+            g.px(x, y, 'L')
+        elif c == 'B':
+            g.px(x, y, 'b')
+    for y in (y1 - 1, y1):                      # 허리띠
+        r = rows.get(y)
+        if r:
+            for x in range(min(r), max(r) + 1):
+                if _is(g.at(x, y), 'bLB'):
+                    g.px(x, y, 'B')
+
+
 # ---------------------------------------------------------------- 여자 차림
 #
 # 머리만 길게 얹으면 게임 화면 크기에서 남녀가 안 갈린다 — 머리는 스물몇 픽셀인데
@@ -605,12 +773,12 @@ def add_skirt(g, view):
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
     cx = (x0 + x1) / 2.0
     waist = (x1 - x0 + 1) * 0.78          # 허리는 반바지보다 좁게
-    hem_y = y1 + 5                        # 반바지보다 다섯 줄 길게 — 밑단이 확실히 보이게
+    hem_y = y1 + 2                        # 반바지보다 두 줄만 길게 — 참고 그림처럼 짧게
     span = max(1, hem_y - y0)
     skirt = set()
     for y in range(y0, hem_y + 1):
         t = (y - y0) / span
-        hw = (waist / 2.0) + t * t * (x1 - x0) * 0.42      # 아래로 갈수록 벌어진다
+        hw = (waist / 2.0) + t * t * (x1 - x0) * 0.58      # 아래로 갈수록 확 벌어진다
         for x in range(int(round(cx - hw)), int(round(cx + hw)) + 1):
             if not (0 <= x < g.w and 0 <= y < g.h):
                 continue
@@ -723,15 +891,17 @@ def build_set(prefix, style, deco):
         for key, sname in srcs.items():
             if sname not in cache:
                 g, head_bot, boxes = load_frame(d, sname)
-                if deco is not None:
+                if style == 'long':
+                    female_head(g, d)
+                    add_vest(g, d)
+                    add_skirt(g, d)
+                    if d != 'up':
+                        add_lashes(g, d, boxes)
+                elif deco is not None:
                     if style == 'spiky':
                         deco(g, d)
                     else:
                         deco(g, d, head_bot)
-                if style == 'long':
-                    add_skirt(g, d)
-                    if d != 'up':
-                        add_lashes(g, d, boxes)
                 cache[sname] = (g, boxes)
             g, boxes = cache[sname]
             images['%s_%s' % (d, key)] = g.render()
