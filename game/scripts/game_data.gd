@@ -8629,6 +8629,16 @@ const FREE_TITLES := {
 		"known_f": "목장주 처자",
 		"master": "우리 마을 목장주",
 	},
+	# 잠수부(S6b) — 해변의 드문 것(산호 조각·고대 조각)만 센다. 채집 숙련이 오를수록 잘 나온다
+	"diver": {
+		"name": "잠수부",
+		"stat": "forage_caught",
+		"ids": ["forage_coral", "forage_relic"],
+		"need": 10,
+		"known_m": "잠수부 총각",
+		"known_f": "잠수부 처자",
+		"master": "우리 마을 잠수부",
+	},
 	"herbalist": {
 		"name": "약초꾼",
 		"stat": "forage_caught",

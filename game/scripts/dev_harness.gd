@@ -6420,6 +6420,18 @@ func _debug_tick() -> void:
 			print("ORCHARD_OK=", sapling_ok and dry_grow and regrow_ok and orchard_title and farmer_first,
 				" 묘목=", sapling_ok, " 물없이=", dry_grow, " 따도남음=", regrow_ok, " 호칭=", orchard_title, "(", title_or.text, ")",
 				" 농부먼저=", farmer_first)
+			# ---- 잠수부(S6b) — 산호·고대 조각 열이면 잠수부. 조개 마흔은 약초꾼(여든)에 못 미친다
+			GameData.crops_harvested = {}
+			GameData.forage_caught = {"forage_shell": 40, "forage_coral": 6, "forage_relic": 4}
+			var title_dv: Dictionary = GameData.player_title("merchant")
+			var diver_ok: bool = GameData.free_title_of() == "diver" and str(title_dv.text).contains("잠수부")
+			GameData.forage_caught = {"forage_shell": 40, "forage_coral": 6, "forage_relic": 3}
+			var diver_no: bool = GameData.free_title_of() == ""
+			GameData.forage_caught = {"forage_herb": 100, "forage_coral": 10}
+			var herb_first: bool = GameData.free_title_of() == "herbalist"   # 110/80 > 10/10
+			print("DIVER_OK=", diver_ok and diver_no and herb_first, " 호칭=", diver_ok, "(", title_dv.text, ")",
+				" 문턱전=", diver_no, " 약초꾼먼저=", herb_first)
+			GameData.forage_caught = {}
 			oc.ground = keep_oc.ground
 			oc.crop_id = keep_oc.crop_id
 			oc.crop_day = keep_oc.crop_day
