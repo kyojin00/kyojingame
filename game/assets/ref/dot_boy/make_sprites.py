@@ -3,19 +3,32 @@
 # 굵은 도트로 **코드가 직접 그린다** (앞 세대들은 AI 시트를 잘라 썼다).
 #
 # 논리 해상도 32x48 을 4배로 키워 게임 규격 128x192 에 꼭 맞춘다.
-# (처음엔 21x32의 6배였는데, 도트가 1.5배 촘촘해지며 얼굴·옷 디테일이
-# 들어갈 자리가 생겼다.) 발바닥은 논리 47행 = 실제 188~191행,
-# 게임의 FOOT_Y(190) 안에 들어간다.
+# 이 굵기는 마을 사람(32x48 도트를 2배로) 과 같은 도트 밀도다 — 게임이
+# 카메라 0.56배 · 최근접 필터로 그리므로, 이보다 가는 도트는 화면에서
+# 한 줄씩 빠지며 걸을 때 지글거린다. 예쁘게 만드는 일은 **도트를 늘리는
+# 게 아니라 같은 칸 안에서 모양을 잘 잡는 일**이다.
 #
-# 귀여운 비율: 돔형 머리 16x18(키의 40%쯤) + 몸통 10행 + 짧은 다리.
+# 2판(이 파일): 머리를 18x17 로 키우고 얼굴을 다시 그렸다.
+#   · 눈 4x5 — 검은 테 안에 흰 반짝이·갈색 홍채. 눈썹은 갈색 한 줄.
+#   · 코 한 점, 작은 입, 눈 밑 볼터치.
+#   · 옆모습 — 이마·코·턱이 실루엣으로 읽히고, 눈은 얼굴선에서 한 칸 뒤.
+#     귀는 뒤통수 쪽에 그늘로 그린다.
+#   · 머리 모양은 **덧그림(overlay)** 으로 얹는다 — 민머리 위에 앞머리
+#     (끝이 갈라진 가닥) · 옆머리 · 뒷머리를 씌운다. 긴 머리는 어깨를
+#     지나 가슴께까지 내려온다.
+#   · 걷기 — 앞·뒷모습도 다리를 모으는 칸에서 몸이 한 칸 떠오른다.
 #
-# 프레임: 방향(down/side/up)마다 idle 1장 + walk 5장 + swing 5장.
-# 걷기 5장은 사인 곡선을 5등분한 위상 [0, +3, +2, -2, -3] 으로 다리를 놓아
-# 마지막 장에서 첫 장으로 매끄럽게 이어진다 (게임이 int(t*8)%5 로 돌린다).
+# 발바닥은 논리 47행 = 실제 188~191행, 게임의 FOOT_Y(190) 안에 들어간다.
+# 몸통 자리(셔츠 22행 · 허리 34행)는 그대로다 — player.gd 의 SWING_WAIST
+# (136 = 34x4) 와 HORSE_POSE 의 자르는 줄이 여기에 묶여 있다.
+#
+# 프레임: 방향(down/side/up)마다 idle 1장 + walk 6장 + swing 5장,
+# 앞·옆은 눈 감은 blink 1장.
 #
 # 실행:  python3 make_sprites.py     (Pillow 필요)
 # 출력:  이 폴더에 프레임 png + preview_*.png(필름 스트립) + anim_*.gif,
-#        그리고 ../../sprites/ 에 new_boy_* 이름으로 설치.
+#        그리고 ../../sprites/ 에 new_boy_* / hair_short_* / hair_spiky_* /
+#        player_f_* 이름으로 설치.
 #        끝에 찍히는 SWING_HAND_DOT 값을 player.gd 에 옮겨 적는다.
 import math
 import os
@@ -28,13 +41,16 @@ GW, GH = 32, 48          # 논리 캔버스 (가로 한가운데 = 15.5)
 FW, FH = 128, 192        # 게임 스프라이트 규격
 PAD_X = (FW - GW * SCALE) // 2
 
+# 색은 **game_data.gd 의 표와 한 벌**이다. 게임이 실행 중에 이 값을 정확히
+# 찾아 바꿔 입히므로(recolor_player_image) 한 값이라도 어긋나면 그 칸은
+# 옷을 못 갈아입는다. 윤곽선·눈·눈썹·반짝이·먼 신발은 표에 없어 늘 그대로다.
 PAL = {
     'O': (54, 33, 26),      # 윤곽선
     's': (243, 159, 138),   # 살결 (참고 그림처럼 분홍기가 돈다)
     'S': (213, 116, 98),    # 살결 그늘
     'H': (250, 192, 170),   # 살결 하이라이트
-    'e': (66, 32, 30),      # 눈망울
-    'i': (136, 70, 42),     # 홍채 반사 (눈 아래쪽의 따뜻한 갈색)
+    'e': (66, 32, 30),      # 눈망울·눈 테
+    'i': (136, 70, 42),     # 홍채 · 눈썹 (따뜻한 갈색)
     'w': (246, 242, 234),   # 눈 반짝이
     'r': (235, 128, 114),   # 볼터치
     'm': (170, 84, 66),     # 입
@@ -44,7 +60,7 @@ PAL = {
     'p': (134, 88, 46),     # 바지
     'P': (98, 62, 32),      # 바지 그늘
     'q': (158, 108, 58),    # 바지 밝은 면
-    'h': (118, 72, 40),     # 머리카락 (여자)
+    'h': (118, 72, 40),     # 머리카락
     'j': (152, 100, 56),    # 머리카락 밝은 면
     'g': (86, 52, 30),      # 머리카락 그늘
     'k': (82, 53, 33),      # 신발
@@ -61,28 +77,18 @@ PAL = {
 # 180도에 눈금이 없다. 여섯이면 60도라 둘 다 눈금에 놓인다.
 WALK = 6
 
-# 다리 한 짝이 한 바퀴 도는 동안 겪는 **여섯 자세**를 관절 자리로 직접
-# 적는다. 예전엔 보폭 한 값에서 골반·무릎·발을 비율로 뽑아 썼는데, 그러면
-# 세 관절이 늘 한 직선 위에 놓여 **무릎이 영영 안 굽는다**. 여섯 칸 중
-# 넷이 곧은 막대 두 개였던 게 그래서다.
+# 다리 한 짝이 한 바퀴 도는 동안 겪는 **여섯 자세**를 뼈 길이를 못 박고
+# **각도**로 적는다. 허벅지와 정강이는 언제나 같은 길이고, 그리는 것도
+# 축에 수직으로 두께를 재어 긋는다. 그러면 어느 각도에서도 길이도 두께도
+# 그대로다. (자리로 적으면 접는 칸에서 다리가 오그라든다.)
 #
 # 사람 무릎은 한 방향으로만 굽는다 — 뒤꿈치가 엉덩이 쪽으로 온다. 그래서
 # 허공을 지나는 다리는 **무릎이 앞으로, 발은 그 뒤 밑에** 접히고, 뒤로
-# 뻗은 다리는 발이 무릎보다 더 뒤로 간다. 이 두 가지를 지키면 걸음이
-# 사람 걸음으로 보인다.
-#
-# 자세를 **관절 자리**로 적지 않는다. 자리로 적으면 접는 칸에서 무릎이
-# 골반 쪽으로 당겨져 다리가 짧아지고, 비스듬한 줄을 가로로 채우니 두께도
-# 얇아진다 — 굽힐 때마다 다리가 오그라들었다.
-#
-# 뼈 길이를 못 박고 **각도**로 적는다. 허벅지와 정강이는 언제나 같은
-# 길이고, 그리는 것도 축에 수직으로 두께를 재어 긋는다. 그러면 어느
-# 각도에서도 길이도 두께도 그대로다.
+# 뻗은 다리는 발이 무릎보다 더 뒤로 간다.
 #
 # (골반이 앞으로 나간 칸, 허벅지 각도°, 무릎 굽힘°, 발 각도)
 #   허벅지 각도  + 앞으로 / - 뒤로 (수직에서 잰다)
-#   무릎 굽힘    늘 0 이상 — 사람 무릎은 한 방향으로만 굽는다.
-#                정강이 각도 = 허벅지 각도 - 굽힘
+#   무릎 굽힘    늘 0 이상. 정강이 각도 = 허벅지 각도 - 굽힘
 #   발 각도      +1 발끝 들림(뒤꿈치로 딛는다) · 0 평평 · -1 뒤꿈치 들림
 LEG_L = 4.5                # 허벅지·정강이 뼈 길이 (둘이 같다)
 LEG = [
@@ -95,19 +101,20 @@ LEG = [
 ]
 LEG_LAG = WALK // 2        # 먼 다리는 반 바퀴 뒤 — 표를 세 칸 밀어 쓴다
 
+
 # 몸이 오르내리는 양은 **적지 않고 다리에서 나온다**. 벌린 다리는 아래로
 # 덜 뻗으니 골반이 내려앉아야 발이 땅에 닿고, 모은 다리는 길게 뻗으니
 # 골반이 올라간다. 발짝마다 한 번씩, 한 바퀴에 두 번 오르내린다.
-def _leg_depth(ph):
-    """골반에서 발목까지 **아래로** 뻗은 깊이."""
-    _, th, flex, _ = LEG[ph % WALK]
+def _leg_depth(spec):
+    """골반에서 발목까지 **아래로** 뻗은 깊이. spec = LEG 표의 한 줄."""
+    _, th, flex, _ = spec
     return LEG_L * (math.cos(math.radians(th))
                     + math.cos(math.radians(th - flex)))
 
 
-def _joints(ph, hip_y):
+def _joints(spec, hip_y):
     """(골반x, 무릎x, 무릎y, 발목x, 발목y, 발각도) — 골반을 원점 삼아."""
-    hipo, th, flex, tilt = LEG[ph % WALK]
+    hipo, th, flex, tilt = spec
     a1, a2 = math.radians(th), math.radians(th - flex)
     kx = hipo + LEG_L * math.sin(a1)
     ky = hip_y + LEG_L * math.cos(a1)
@@ -118,58 +125,41 @@ def _joints(ph, hip_y):
 
 def hip_row_at(phase, sq=0):
     """그 칸에서 골반이 놓이는 줄 — 더 깊이 뻗은 발이 땅에 닿게 맞춘다."""
-    d = max(_leg_depth(phase), _leg_depth(phase + LEG_LAG))
+    d = max(_leg_depth(LEG[phase % WALK]), _leg_depth(LEG[(phase + LEG_LAG) % WALK]))
     return GROUND - 2 - d + sq
 
 
-BOB = [0] * WALK           # 걷기는 hip_row_at 이 대신한다 (정지·휘두르기용 자리)
+# 앞·뒷모습의 몸 오르내림. 옆모습은 다리 각도에서 저절로 나오지만 앞뒤는
+# 다리가 나란해 그 값이 없다 — 다리를 모으는 「통과」 칸(2·5)에서 한 칸
+# 떠오르게 적어 둔다. 이게 없으면 다리만 젓는 종이 인형이다.
+BOB = [0, 0, -1, 0, 0, -1]
 
 # **골반이 함께 흔들리는 양.** 다리만 젓고 허리가 붙박이면 인형에 다리를
 # 달아 흔드는 꼴이 된다. 사람은 앞으로 나가는 다리 쪽으로 골반이 따라
 # 밀리고, 딛는 순간 그 위에 체중이 얹히며 도로 끌려온다.
-# 가까운 다리가 앞으로 나갈수록 +, 뒤로 갈수록 −.
 HIP = [1, 1, 0, -1, -1, 0]
 
 # 옆모습 팔이 앞으로 나간 양 — 가까운 다리와 반대로.
-# 팔은 한 바퀴 내내 수직에 머무르지 않는다. 곧게 내려온 팔은 「서 있는
-# 사람」이고, 걷는 사람의 팔은 늘 어딘가로 가는 중이다.
 ARM = [-5, -2, 1, 5, 2, -1]
 
 # 정면·뒷모습에서 통과 칸에 **허공을 지나가는 다리**.
 #   +1 = 화면 왼쪽 다리, -1 = 오른쪽 다리, 0 = 둘 다 딛고 있다
-# 정면은 보폭이 안 보이니 들어 올린 발이 걸음을 말해 주는 유일한 단서다.
 PASS = [0, 0, -1, 0, 0, 1]
-# 정면·뒷모습 보폭. 옆모습만큼 크게 벌릴 이유가 없고, 정면은 보폭을
-# 들어 올리는 양으로만 표현하는데 그 상한이 3이라 큰 값은 서로 같아진다.
+# 정면·뒷모습 보폭. 옆모습만큼 크게 벌릴 이유가 없다.
 STRIDE_F = [3, 2, 0, -3, -2, 0]
 
-# 세로 배치 (bob 적용 전 기준 행). 몸통 12행 + 다리 14행 — 처음(10+12)보다
-# 1.2배쯤 길다. 몸통이 짧으면 거기 묶인 팔도 짧아져 머리만 큰 비율이 된다.
-# 발바닥(GROUND)은 게임이 잡은 자리라 못 움직인다. 그래서 **윗몸을 통째로
-# 내려** 다리를 줄인다 — 머리·몸통 크기는 그대로 두고 다리만 14행에서
-# 11행이 된다. 머리가 커 보이는 쪽이 이 그림체에 맞는다.
-BODY_DROP = 3            # 예전 자리에서 내려온 칸 수 (다리가 그만큼 짧아진다)
-# 겨드랑이 — 팔과 몸이 갈라지는 줄 (셔츠 윗줄에서 몇 칸 아래인가).
-# 어깨 바로 밑에서 갈라지면 팔이 목에 붙은 것처럼 보인다. 두 칸쯤 더
-# 내려 어깨-윗팔을 한 덩어리로 두면 어깨가 넓어 보이고 자세가 편안해진다.
-ARMPIT = 4
-# 목 길이 — 머리와 셔츠 사이에 몇 줄을 둘까.
-# 1이면 머리가 어깨에 바로 얹혀 목이 없는 인형처럼 보인다. 목이 보여야
-# 머리가 「몸 위에 얹힌 것」이 되고, 걸을 때 머리가 따로 흔들려 보인다.
-# 셔츠 자리는 그대로 두고 **머리를 그만큼 위로 올려** 자리를 낸다.
-# 3줄은 이 그림체에 비해 목이 길어 보였다 — 2줄이면 턱 밑 그늘 한 줄과
-# 살결 한 줄로, 「목이 있다」만 딱 읽힌다.
-NECK_H = 2
-# 팔이 붙는 열. 몸판이 10~21열(12칸)이고 팔이 3칸이라, 예전에는 7열과
-# 22열에 붙여 어깨 끝이 7~24열 = **18칸**이었다. 머리가 14칸인데 어깨가
-# 18칸이면 위가 좁고 아래가 벌어진 삼각형이 된다.
-# 한 칸씩 안으로 들여 16칸으로 — 어깨가 머리보다 조금 넓은 정도가 된다.
-ARM_L = 8
+# 세로 배치. 머리 17행 + 목 2행 + 몸통 12행 + 다리 11행 = 발바닥 47행.
+# 발바닥(GROUND)과 몸통 자리는 게임이 잡은 자리라 못 움직인다.
+ARMPIT = 4               # 겨드랑이 — 팔과 몸이 갈라지는 줄 (셔츠 윗줄에서)
+NECK_H = 2               # 목 길이 — 「목이 있다」만 딱 읽히는 두 줄
+ARM_L = 8                # 팔이 붙는 열 (어깨 끝 8~23열 = 16칸, 머리 18칸)
 ARM_R = 21
-HEAD_Y = 2 + BODY_DROP   # 머리 꼭대기 (두상 16행)
-SHIRT_Y = 19 + BODY_DROP # 셔츠 위 (목은 그 한 행 위)
-HIP_Y = 31 + BODY_DROP   # 바지 위 (엉덩이 띠 3행)
-LEG_Y = 34 + BODY_DROP   # 다리 기둥 시작
+HEAD_TOP = 3             # 머리 그림 0행이 놓이는 줄 (턱 19행)
+HEAD_X = 7               # 18칸 머리 그림의 왼쪽 열 (가운데 15.5)
+HEAD_W, HEAD_H = 18, 17
+SHIRT_Y = 22             # 셔츠 위 (목은 그 두 행 위)
+HIP_Y = 34               # 바지 위 (엉덩이 띠 3행) = player.gd SWING_WAIST/4
+LEG_Y = 37               # 다리 기둥 시작
 GROUND = 47              # 디딘 발바닥 행
 
 
@@ -229,211 +219,289 @@ class G:
 
 
 # ------------------------------------------------------------------- 머리
-# 방향마다 한 장을 그려 두고 bob 만큼 통째로 내린다. 폭 16 (열 8~23),
-# 높이 18 (행 4~21) — 돔형 대두. 민머리라 정수리에 하이라이트 층을 얹는다.
+# 방향마다 한 장. 18칸 x 17줄 — 둥근 대두. 윤곽선까지 그림에 넣는다
+# (outline()은 빠진 데만 채운다). 눈은 5x4 아몬드꼴 진한 눈망울 — 윗줄은
+# 속눈썹 선이라 바깥쪽이 두껍고 안쪽으로 갈수록 짧아지며, 아랫줄은 두 칸으로
+# 좁아진다. 왼쪽 위에 흰 반짝이 한 점, 셋째 줄은 따뜻한 갈색 반사.
+# (세로로 긴 타원도 해 봤는데 눈이 너무 땡그래 보였다 — 가로가 세로보다
+#  넓어야 눈매가 생긴다.)
+# (검은 테 안에 갈색을 채운 고리 모양도 해 봤는데 물안경처럼 보였다 —
+#  이 크기에서는 눈망울이 통째로 어두워야 눈으로 읽힌다.)
+# 눈썹은 갈색 한 줄, 코는 두 눈 사이 아래 그늘 한 점, 입은 두 칸,
+# 볼터치는 눈 바로 밑 바깥쪽.
+# 빛은 왼쪽 위에서 온다 — 오른쪽 끝 열(16)이 그늘.
 #
-# 눈: 4x5 눈망울 — 위아래 모서리를 둥글리고, 위에 흰 반짝이 두 점,
-# 아래에 따뜻한 홍채 반사 두 점. 입은 고양이 입(ω), 양 볼에 볼터치.
+# 눈 자리(닫힌 눈·속눈썹을 만들 때 쓴다): 앞모습 8~11행 2~6열·10~14열,
+# 옆모습 8~11행 11~14열. 옆모습 귀는 9~11행 3~5열의 둥근 테.
 
 HEAD_DOWN = [
-    "....OOOOOOOO....",
-    "..OOssssssssOO..",
-    ".OssHHHHHHHHssO.",
-    ".OsHHHHHHHHHHsO.",
-    "OsssHHHHHHHHsssO",
-    "OsssssssssssssSO",
-    "OsssssssssssssSO",
-    "Oss" "eee" "ssss" "eee" "sSO",
-    "Osss" "ew" "ssss" "we" "ssSO",
-    "Osss" "ee" "ssss" "ee" "ssSO",
-    "Osss" "ei" "ssss" "ie" "ssSO",
-    "OrrssssssssssrrO",
-    ".Osssss" "mm" "sssssO.",
-    ".OssssssssssssO.",
-    "..OssssssssssO..",
-    "...OOssssssOO...",
+    "......OOOOOO......",
+    "....OOssssssOO....",
+    "...OssHHHHHHssO...",
+    "..OssHHHHHHHHssO..",
+    ".OssHHHHHHHHHHssO.",
+    ".OsssHHHHHHHHsssO.",
+    "OsssssssssssssssSO",
+    "OssiiisssssiiissSO",
+    "O" "s" "eeee" "s" "sss" "s" "eeee" "s" "S" "O",
+    "O" "s" "eweee" "sss" "eweee" "s" "S" "O",
+    "O" "s" "eiiie" "sss" "eiiie" "s" "S" "O",
+    "O" "sss" "ee" "ss" "S" "ss" "ee" "sss" "S" "O",
+    "O" "sssssss" "S" "sssssss" "SO",
+    "O" "s" "rr" "sssssssss" "rr" "s" "SO",
+    ".OssssssmmsssssSO.",
+    "..OssssssssssSSO..",
+    "....OOOOOOOOOO....",
 ]
 
-HEAD_SIDE = [   # 오른쪽을 본다
-    "....OOOOOOOO....",
-    "..OOssssssssOO..",
-    ".OSsHHHHHHHHssO.",
-    ".OSHHHHHHHHHHsO.",
-    "OSssHHHHHHHHsssO",
-    "OSsssssssssssssO",
-    "OSsssssssssssssO",
-    "OSsssssss" "eee" "sssO",
-    "OSsssssss" "ew" "ssssO",
-    "OSsssssss" "ee" "ssssO",
-    "OSsssssss" "ei" "sssss",
-    "OSssssrrsssssss" "S",
-    ".OSsssssss" "mm" "ssO.",
-    ".OssssssssssssO.",
-    "..O" "sssssssssss" "O.",
-    "...OO" "ssssssss" "O..",
+HEAD_SIDE = [   # 오른쪽을 본다. 뒤통수(왼쪽)가 그늘, 이마·코·턱이 앞(오른쪽)
+    "....OOOOOOOO......",
+    "..OOssssssssOO....",
+    ".OSssHHHHHHssO....",
+    ".OSsHHHHHHHHssO...",
+    "OSssHHHHHHHHHssO..",
+    "OSsssHHHHHHHHsssO.",
+    "OSssssssssssssssO.",
+    "OSssssssssssiiisO.",
+    "OS" "sssssssss" "eeee" "s" "O.",
+    "OS" "ss" "OO" "sssss" "ewee" "s" "O.",
+    "OS" "s" "O" "sS" "sssss" "eiie" "ss" "O",
+    "OS" "ss" "OO" "sssss" "s" "ee" "ss" "S" "O",
+    "OSsssssssssssssSO.",
+    ".OSssrrssssssssmO.",
+    "..OSssssssssssSO..",
+    "...OSsssssssSO....",
+    "....OOOOOOOOO.....",
 ]
 
 HEAD_UP = [
-    "....OOOOOOOO....",
-    "..OOssssssssOO..",
-    ".OssHHHHHHHHssO.",
-    ".OsHHHHHHHHHHsO.",
-    "OsssHHHHHHHHsssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OssssssssssssssO",
-    "OSssssssssssssSO",
-    ".OSssssssssssSO.",
-    ".OSssssssssssSO.",
-    "..OSssssssssSO..",
-    "...OOSSSSSSOO...",
+    "......OOOOOO......",
+    "....OOssssssOO....",
+    "...OssHHHHHHssO...",
+    "..OssHHHHHHHHssO..",
+    ".OssHHHHHHHHHHssO.",
+    ".OsssHHHHHHHHsssO.",
+    "OsssssssssssssssSO",
+    "OsssssssssssssssSO",
+    "OsssssssssssssssSO",
+    "OsssssssssssssssSO",
+    "OsssssssssssssssSO",
+    "OSssssssssssssssSO",
+    "OSSssssssssssssSSO",
+    ".OSSssssssssssSSO.",
+    ".OSSSssssssssSSSO.",
+    "..OSSSssssssSSSO..",
+    "....OOOOOOOOOO....",
 ]
 
-HEAD_X = 9               # 머리를 한 둘레 깎은 만큼 한 칸 안으로 (아래 shrink_head)
+for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
+    assert len(_art) == HEAD_H and all(len(r) == HEAD_W for r in _art), \
+        [(i, len(r)) for i, r in enumerate(_art) if len(r) != HEAD_W]
+
+# 눈 자리 — (행0, 행1, 열0, 열1)
+EYES_DOWN = [(8, 11, 2, 6), (8, 11, 10, 14)]
+EYES_SIDE = [(8, 11, 11, 14)]
 
 
-# ---- 머리 한 둘레 깎기 ----
-#
-# 두상은 16x16으로 그려 두고, 쓸 때 **폭 14 · 높이 15**로 깎는다.
-# 원본을 16으로 두는 이유: 머리 모양(_hairify)이 열 번호로 머리카락을
-# 얹는데, 원본을 줄이면 그 번호가 전부 어긋난다.
-#
-# 어디를 깎나:
-#   가로 — 2열과 13열 (눈 바로 바깥의 민 살결). 좌우 한 칸씩이라 얼굴은
-#          가운데에 그대로 남고, 눈 사이 간격도 안 변한다.
-#          **1열·14열은 건드리면 안 된다** — 거기에 얼굴 옆면의 그늘(S)이
-#          들어 있다. 처음에 그 두 열을 깎았더니 옆 그늘이 통째로 사라져
-#          두상이 납작한 판때기처럼 보였다.
-#   세로 — 5행 (눈 위 이마의 민 살결 한 줄). 6행과 똑같은 줄이라
-#          지워도 표 안 난다.
-# 턱은 제자리에 두어야 목과 안 벌어지므로, 그린 자리를 한 줄 내린다.
-HEAD_TRIM_COLS = (2, 13)
-HEAD_TRIM_ROW = 5
-_SHRUNK = {}
+def _put(art, dots, c):
+    out = [list(r) for r in art]
+    for r, x in dots:
+        out[r][x] = c
+    return [''.join(r) for r in out]
 
 
-# 깎고 난 두상(14x15)의 **둥근 테두리**. 줄마다 가운데(6.5)에서 몇 칸까지
-# 살결을 남길지 적어 둔다. 이 표 밖은 지운다 (윤곽선은 outline이 다시 두른다).
-#
-# 표가 없을 때는 정수리 바로 아래에서 폭이 8 -> 12 -> 14로 두 칸씩 뛰어
-# 이마 양옆에 각이 졌고, 턱도 12칸으로 뚝 끊겨 네모난 인상이었다.
-# 위아래를 한 칸씩 더 깎아 주면 같은 크기인데도 훨씬 둥글게 읽힌다.
-# 턱은 정수리보다 **한 칸씩 더 빨리** 좁아진다. 위아래를 똑같이 두면
-# 마지막 줄이 8칸 그대로 남아 밑이 평평한 사각턱이 된다.
-# 아래로 갈수록 12 -> 10 -> 8 -> 6으로 좁혀 턱 끝을 둥글게 만든다.
-HEAD_ROUND = [3.5, 5.0, 6.0, 6.0, 7.0,
-              7.0, 7.0, 7.0, 7.0, 7.0, 7.0,
-              6.0, 5.0, 4.0, 3.0]
-
-# 긴머리(여자) 두상은 **표를 따로 쓴다**. 위 표는 민머리 턱선에 맞춘 것이라
-# 마지막 네 줄을 12 -> 10 -> 8 -> 6으로 확 좁히는데, 긴머리는 그 자리에
-# 턱이 아니라 **귀 옆으로 내려오는 머리채**가 있다. 같은 표를 쓰면 머리채가
-# 턱 옆에서 잘려 나가고, 그 아래 어깨 머리채만 남아 **허공에 뜬 덩어리**로
-# 보였다 (뒷모습은 뒤통수가 잘록해졌다가 다시 벌어져 호리병 모양이 됐다).
-# 그래서 여기서는 폭을 거의 안 줄이고, 턱 모양은 그림 자체에 그려 넣는다.
-HEAD_ROUND_F = [3.5, 5.0, 6.0, 6.0, 7.0,
-                7.0, 7.0, 7.0, 7.0, 7.0, 7.0,
-                6.0, 6.0, 6.0, 6.0]
+def closed_eyes(art, boxes, lids):
+    """눈 뜬 머리에서 깜빡임(눈 감은) 머리를 만든다 — 눈 자리를 살결로
+    지우고 아래로 굽은 속눈썹 선만 남긴다. 눈썹은 그대로."""
+    out = [list(r) for r in art]
+    for r0, r1, c0, c1 in boxes:
+        for r in range(r0, r1 + 1):
+            for x in range(c0, c1 + 1):
+                out[r][x] = 's'
+    for r, x in lids:
+        out[r][x] = 'e'
+    return [''.join(r) for r in out]
 
 
-def shrink_head(art):
-    key = tuple(art)
-    if key not in _SHRUNK:
-        # 16행짜리는 민머리·짧은머리, 그보다 긴 것은 머리채가 달린 긴머리다.
-        table = HEAD_ROUND_F if len(art) > 16 else HEAD_ROUND
-        c0, c1 = HEAD_TRIM_COLS
-        rows = [r[:c0] + r[c0 + 1:c1] + r[c1 + 1:]
-                for i, r in enumerate(art) if i != HEAD_TRIM_ROW]
-        mid = (len(rows[0]) - 1) / 2.0
-        out = []
-        for i, r in enumerate(rows):
-            hw = table[i] if i < len(table) else 7.0
-            out.append(''.join(cc if abs(x - mid) <= hw else '.'
-                               for x, cc in enumerate(r)))
-        _SHRUNK[key] = out
-    return _SHRUNK[key]
+LIDS_DOWN = [(10, 2), (11, 3), (11, 4), (11, 5), (10, 6),
+             (10, 10), (11, 11), (11, 12), (11, 13), (10, 14)]
+LIDS_SIDE = [(10, 11), (11, 12), (11, 13), (10, 14)]
+
+# 여자 얼굴 — 같은 얼굴에 아래 바깥 모서리 속눈썹 한 점씩 (옆모습은 앞머리
+# 쪽으로 한 칸 더 뻗은 윗속눈썹). 그것만으로 눈매가 또렷해진다.
+FACE_DOWN_F = _put(HEAD_DOWN, [(11, 2), (11, 14)], 'e')
+FACE_SIDE_F = _put(HEAD_SIDE, [(8, 15), (11, 11)], 'e')
 
 
-def closed_eyes(art):
-    """눈 뜬 머리에서 깜빡임(눈 감은) 머리를 만든다 — 눈 두 줄은 살결로
-    지우고 맨 아랫줄만 감은 속눈썹 선으로 남긴다. 눈썹은 그대로."""
-    out = list(art)
-    for r, mp in ((8, {'e': 's', 'w': 's', 'i': 's'}),
-                  (9, {'e': 's', 'w': 's', 'i': 's'}),
-                  (10, {'i': 'e', 'w': 'e'})):
-        out[r] = ''.join(mp.get(c, c) for c in art[r])
+# ------------------------------------------------- 머리 모양 (덧그림)
+# 민머리 위에 얹는다. '.' 는 비쳐 보인다. dy 는 그림 0행이 머리 0행에서
+# 몇 줄 위에 놓이는가 — 머리 위로 부푼 만큼 음수.
+# 정수리 왼쪽 위에 밝은 면(j), 끝자락·그늘 쪽에 어두운 면(g).
+
+HAIR_SHORT = {
+    'down': (-1, [
+        ".....hhhhhhhh.....",
+        "...hhhhhhhhhhhh...",
+        "..hhhhjjjjhhhhhh..",
+        ".hhhjjjjjjhhhhhhh.",
+        ".hhhjjjjjhhhhhhhh.",
+        "hhhhjjjhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "ghh.....h......hhg",
+        "gh..............hg",
+        "g................g",
+    ]),
+    'side': (-1, [
+        "...hhhhhhhhh......",
+        "..hhhhhhhhhhhh....",
+        ".hhhhjjjjjhhhhhh..",
+        "hhhhjjjjjjhhhhhhh.",
+        "hhhhjjjjjhhhhhhhh.",
+        "hhhhjjjhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "ghhhhhhhhhhhhhhhhh",
+        "gghhhhhhh...h...h.",
+        "gghhhhh...........",
+        "gghh..............",
+        "ggh...............",
+        "ggh...............",
+        "gg................",
+        ".g................",
+    ]),
+    'up': (-1, [
+        ".....hhhhhhhh.....",
+        "...hhhhhhhhhhhh...",
+        "..hhhhjjjjjhhhhh..",
+        ".hhhjjjjjjjhhhhhh.",
+        ".hhhjjjjjjhhhhhhh.",
+        "hhhhjjjjhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "ghhhhhhhhhhhhhhhhg",
+        "gghhhhhhhhhhhhhhgg",
+        ".gghhhhhhhhhhhhgg.",
+        ".g.ghhhhhhhhhhg.g.",
+        "....gg..gg..gg....",
+    ]),
+}
+
+# 삐죽 머리 = 짧은 머리 + 정수리에서 솟은 가닥 두 줄 (+ 옆으로 삐친 가닥)
+SPIKES = {
+    'down': ["...h....h.....h...",
+             "..hhh.hhhhhhhh.hh."],
+    'side': ["..h...h...h.......",
+             ".hhh.hhhhhhhhh.h.."],
+    'up':   ["...h....h....h....",
+             "..hhh.hhhhhhhh.hh."],
+}
+
+
+def spiky(short):
+    out = {}
+    for d, (dy, art) in short.items():
+        rows = SPIKES[d] + list(art[1:])       # 부푼 첫 줄을 가닥 줄로 바꾼다
+        out[d] = (dy - 1, rows)
     return out
 
 
-HEAD_DOWN_BLINK = closed_eyes(HEAD_DOWN)
-HEAD_SIDE_BLINK = closed_eyes(HEAD_SIDE)
+HAIR_SPIKY = spiky(HAIR_SHORT)
 
+# 긴 머리(여자) — 앞머리는 가운데가 갈라진 가닥, 옆머리가 귀를 덮고 어깨를
+# 지나 가슴께(머리 아래 7줄 = 셔츠 4줄째)까지 내려온다. 뒷모습은 등을
+# 덮는 머리채가 아래로 갈수록 좁아진다.
+HAIR_LONG = {
+    'down': (-1, [
+        ".....hhhhhhhh.....",
+        "...hhhhhhhhhhhh...",
+        "..hhhhjjjjjhhhhh..",
+        ".hhhjjjjjjjhhhhhh.",
+        ".hhhjjjjjjhhhhhhh.",
+        "hhhhjjjjhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhh.h.......h..hhh",
+        "hh..............hh",
+        "hh..............hh",
+        "hh..............hh",
+        "hh..............hh",
+        "hh..............hh",
+        "hh..............hh",
+        "hh..............hh",
+        "hhh............hhh",
+        "hhh............hhh",
+        "ghhh..........hhhg",
+        "ghhh..........hhhg",
+        "ghhh..........hhhg",
+        ".ghh..........hhg.",
+        ".ghh..........hhg.",
+        "..gg..........gg..",
+        "..g............g..",
+    ]),
+    'side': (-1, [
+        "...hhhhhhhhh......",
+        "..hhhhhhhhhhhh....",
+        ".hhhhjjjjjhhhhhh..",
+        "hhhhjjjjjjhhhhhhh.",
+        "hhhhjjjjjhhhhhhhh.",
+        "hhhhjjjhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhh..h...h.",
+        "hhhhhhh...........",
+        "hhhhhhh...........",
+        "hhhhhh............",
+        "hhhhhh............",
+        "hhhhhh............",
+        "hhhhhh............",
+        "hhhhhh............",
+        "hhhhhh............",
+        "hhhhhh............",
+        "ghhhhh............",
+        "ghhhhh............",
+        "ghhhh.............",
+        "gghhh.............",
+        ".ghh..............",
+        ".gg...............",
+        "..g...............",
+    ]),
+    'up': (-1, [
+        ".....hhhhhhhh.....",
+        "...hhhhhhhhhhhh...",
+        "..hhhhjjjjjhhhhh..",
+        ".hhhjjjjjjjhhhhhh.",
+        ".hhhjjjjjjhhhhhhh.",
+        "hhhhjjjjhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhjhhhhhhhjhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "hhhhhhhhhhhhhhhhhh",
+        "ghhhhhhhhhhhhhhhhg",
+        "ghhhhhhhhhhhhhhhhg",
+        ".ghhhhhhhhhhhhhhg.",
+        ".ghhhhhhhhhhhhhhg.",
+        "..ghhhhhhhhhhhhg..",
+        "..gghhhhhhhhhhgg..",
+        "...ggghhhhhhggg...",
+        "....gggggggggg....",
+    ]),
+}
 
-# ------------------------------------------------- 머리 스타일 (외형 템플릿)
-# 민머리 그림에 머리카락을 심어 「짧은 머리」「삐죽 머리」를 만든다.
-# 게임의 외형 선택(타이틀 새로 시작)이 이 세트들 중에서 고른다.
-
-def _hairify(row, lo, hi, to='h'):
-    """row의 lo..hi 칸 중 살결(s/S/H)만 머리카락으로 바꾼다."""
-    return ''.join(to if lo <= i <= hi and c in 'sSH' else c
-                   for i, c in enumerate(row))
-
-
-def add_hair(spiky):
-    """(down, side, up) 민머리 -> 짧은 머리. spiky면 정수리에 삐죽 가닥."""
-    down = list(HEAD_DOWN)
-    side = list(HEAD_SIDE)
-    up = list(HEAD_UP)
-    # 앞모습: 정수리~이마(1~5줄) + 구레나룻(6~7줄 바깥 한 칸)
-    for r in range(1, 6):
-        down[r] = _hairify(down[r], 0, 15)
-    down[2] = _hairify(down[2], 5, 9, 'j')       # 윗머리에 빛
-    down[3] = _hairify(down[3], 5, 8, 'j')
-    for r in (6, 7):
-        down[r] = _hairify(down[r], 1, 1, 'g') if r == 6 else down[r]
-        down[r] = _hairify(down[r], 14, 14, 'g')
-    down[6] = _hairify(down[6], 1, 1, 'g')
-    # 옆모습(오른쪽 보기): 정수리(1~5줄) + 뒤통수(왼쪽 열, 11줄까지)
-    for r in range(1, 6):
-        side[r] = _hairify(side[r], 0, 15)
-    side[2] = _hairify(side[2], 5, 9, 'j')
-    side[3] = _hairify(side[3], 5, 8, 'j')
-    for r in range(6, 12):                       # 뒤통수-목덜미
-        side[r] = _hairify(side[r], 1, 2 if r < 9 else 1, 'g')
-    side[6] = _hairify(side[6], 3, 4)            # 뒤통수 윗머리 볼륨
-    side[7] = _hairify(side[7], 3, 3)
-    # 뒷모습: 뒤통수 전체(1~10줄), 11줄에 목덜미 그늘
-    for r in range(1, 11):
-        up[r] = _hairify(up[r], 0, 15)
-    up[2] = _hairify(up[2], 5, 10, 'j')
-    up[3] = _hairify(up[3], 5, 9, 'j')
-    up[9] = _hairify(up[9], 0, 15, 'g')
-    up[10] = _hairify(up[10], 0, 15, 'g')
-    if spiky:
-        # 정수리 위로 삐죽 솟은 가닥 — 윤곽선은 outline()이 둘러 준다
-        for art in (down, side, up):
-            art[0] = ''.join('h' if i in (5, 8, 11) else c
-                             for i, c in enumerate(art[0]))
-    return down, side, up
-
-
-HEADS_SHORT = add_hair(False)
-HEADS_SPIKY = add_hair(True)
-# 깜빡임 머리는 한 번만 만들어 돌려쓴다 — head()가 귀를 그릴지 그림의
-# **동일성**(is)으로 판단하므로, 매번 새로 만들면 귀가 사라진다.
-HEADS_SHORT_BLINK = (closed_eyes(HEADS_SHORT[0]), closed_eyes(HEADS_SHORT[1]))
-HEADS_SPIKY_BLINK = (closed_eyes(HEADS_SPIKY[0]), closed_eyes(HEADS_SPIKY[1]))
-
-# 귀를 그릴 머리 그림 목록 (여자는 머리카락이 귀를 덮으므로 없다)
-EARS_DOWN = [HEAD_DOWN, HEAD_DOWN_BLINK,
-             HEADS_SHORT[0], HEADS_SHORT_BLINK[0],
-             HEADS_SPIKY[0], HEADS_SPIKY_BLINK[0]]
-EARS_SIDE = [HEAD_SIDE, HEAD_SIDE_BLINK,
-             HEADS_SHORT[1], HEADS_SHORT_BLINK[1],
-             HEADS_SPIKY[1], HEADS_SPIKY_BLINK[1]]
+for _hs in (HAIR_SHORT, HAIR_SPIKY, HAIR_LONG):
+    for _d, (_dy, _art) in _hs.items():
+        assert all(len(r) == HEAD_W for r in _art), \
+            (_d, [(i, len(r)) for i, r in enumerate(_art) if len(r) != HEAD_W])
 
 
 # ------------------------------------------------------------------- 몸통
@@ -443,9 +511,8 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     """앞모습 몸통+팔. swing: 화면 왼쪽 팔이 앞으로 나간 양 -3..+3
     dx: 휘두르기용 좌우 쏠림. skip: 'left'/'right' 팔을 안 그린다 (휘두르는 팔)"""
     y = SHIRT_Y + bob
-    # 목 — 4칸 폭에 NECK_H줄. 턱(8칸)보다 확실히 가늘어야 턱선이 산다.
-    # 턱 바로 밑은 그늘(S)이 짙게 앉고, 아래로 갈수록 살결(s)이 나온다 —
-    # 원통이 빛을 받는 모양이라, 이 두 단이 있어야 목이 기둥으로 보인다.
+    # 목 — 4칸 폭에 NECK_H줄. 턱 바로 밑은 그늘(S)이 짙게 앉고, 아래로
+    # 갈수록 살결(s)이 나온다 — 이 두 단이 있어야 목이 기둥으로 보인다.
     g.rect(14 + dx, y - NECK_H, 17 + dx, y - 1, 's')
     g.hline(14 + dx, 17 + dx, y - NECK_H, 'S')   # 턱 밑 그림자
     g.vline(17 + dx, y - NECK_H, y - 1, 'S')     # 오른쪽(빛 반대편) 그늘
@@ -456,24 +523,23 @@ def torso_down(g, bob, swing, dx=0, skip=None):
     g.vline(ARM_L + 2 + dx, y + ARMPIT, y + 10, 'B')   # 팔과 몸 사이 솔기 —
     g.vline(ARM_R + dx, y + ARMPIT, y + 10, 'B')       # 겨드랑이부터만
     g.hline(13 + dx, 18 + dx, y, 'B')            # 옷깃 (목 아래 그늘)
+    g.px(13 + dx, y + 1, 'B')                    # 둥근 깃 양 끝
+    g.px(18 + dx, y + 1, 'B')
     g.hline(ARM_L + 1 + dx, ARM_L + 2 + dx, y, 'L')   # 어깨 캡 — 몸통 윗줄이 팔
     g.hline(ARM_R + dx, ARM_R + 1 + dx, y, 'b')       # 위로 흘러 승모근 경사를 만든다
     for cx in (10 + dx, 21 + dx):                # 밑단 모서리를 깎는다
         g.px(cx, y + 11, '.')                    # (깎인 자리는 윤곽선이 채운다)
-    g.hline(15 + dx, 16 + dx, y + 2, 'B')        # 앞섶 단추 세 개
-    g.hline(15 + dx, 16 + dx, y + 4, 'B')
-    g.hline(15 + dx, 16 + dx, y + 6, 'B')
+    g.px(16 + dx, y + 3, 'B')                    # 앞섶 단추 세 개
+    g.px(16 + dx, y + 6, 'B')
+    g.px(16 + dx, y + 9, 'B')
     g.vline(20 + dx, y + 6, y + 10, 'B')         # 오른쪽 아래 그늘 (입체)
-    # 팔: 소매 3픽셀 폭 + 세 칸 손. 손끝이 엉덩이 띠 바로 위(아랫단)까지
-    # 온다. 앞으로 흔들면 소매가 늘어나며 내려가고 뒤로 가면 접히며
-    # 올라간다 — 어깨는 늘 몸통에 붙어 있다.
+    # 팔: 소매 3픽셀 폭 + 세 칸 손. 앞으로 흔들면 소매가 늘어나며 내려가고
+    # 뒤로 가면 접히며 올라간다 — 어깨는 늘 몸통에 붙어 있다.
     # 위상은 같은 쪽 다리와 **반대** — 왼팔은 오른다리와 함께 나간다.
-    # (4칸으로 키워 봤더니 정면 어깨가 벌어져 어색했다 — 옆모습만 4칸.)
     for sx, sw, side in ((ARM_L, -swing, 'left'), (ARM_R, swing, 'right')):
         if side == skip:
             # 휘두르는 팔 쪽: 어깨 캡 밑을 두 줄 이어 둔다 — 안 이으면
-            # 몸판(10~21)에서 캡(8~9)만 혹처럼 튀어나오고, 그 밑이 파였다가
-            # 휘두르는 팔에서 다시 불거져 실루엣이 층진다.
+            # 몸판에서 캡만 혹처럼 튀어나오고 실루엣이 층진다.
             if side == 'left':
                 g.rect(ARM_L + dx, y + 1, ARM_L + 1 + dx, y + ARMPIT - 1, 'b')
                 g.px(ARM_L + dx, y + 1, 'L')
@@ -483,8 +549,6 @@ def torso_down(g, bob, swing, dx=0, skip=None):
         sx += dx
         dy = (1 if sw >= 2 else 0) + (1 if sw >= 3 else 0) \
             - (1 if sw <= -2 else 0) - (1 if sw <= -3 else 0)
-        # 팔 길이: 소매 5칸 + 단 + 손 3칸 (예전에는 소매가 6칸이었다).
-        # 손끝이 엉덩이 띠께에 오도록 한 칸 줄였다 — 팔이 길면 원숭이처럼 보인다.
         g.rect(sx, y + 1, sx + 2, y + 5 + dy, 'b')
         g.vline(sx if side == 'left' else sx + 2, y + 1, y + 5 + dy,
                 'L' if side == 'left' else 'B')
@@ -501,16 +565,13 @@ def legs_down(g, stride, dx=0, sq=0, pass_leg=0):
     dx/sq: 휘두르기 때 몸이 쏠리고 주저앉는 양 — 엉덩이는 몸통을 따라가고
     발은 디딘 자리에 남아, 다리가 엉덩이에서 발로 기울어진다.
     pass_leg: +1 왼쪽 다리가, -1 오른쪽 다리가 허공을 지나가는 중."""
-    # 바지는 셔츠보다 한 칸씩 안으로 들어간다 (11~20, 셔츠는 10~21) —
-    # 셔츠 밑단이 바지를 살짝 덮은 실루엣이라, 폭이 아래로 갈수록
-    # 좁아지기만 하고 옆으로 되튀어나오는 데가 없다.
+    # 바지는 셔츠보다 한 칸씩 안으로 들어간다 (11~20, 셔츠는 10~21).
     g.rect(11 + dx, HIP_Y + sq, 20 + dx, HIP_Y + 2 + sq, 'p')   # 엉덩이 띠
     g.hline(11 + dx, 20 + dx, HIP_Y + sq, 'P')  # 셔츠 아랫단 그늘
     g.rect(15 + dx, HIP_Y + 2 + sq, 16 + dx, HIP_Y + 2 + sq, 'P')
     for x0, s in ((11, stride), (17, -stride)):
-        # 통과 칸에 허공을 지나가는 다리 — 앞모습에서도 한 다리를 들어야
-        # 「모으고 서 있는 그림」이 안 된다 (정면은 보폭이 안 보이니
-        #  들어 올린 발이 걸음을 말해 주는 유일한 단서다).
+        # 통과 칸에 허공을 지나가는 다리 — 정면은 보폭이 안 보이니
+        # 들어 올린 발이 걸음을 말해 주는 유일한 단서다.
         swinging = (pass_leg > 0 and x0 == 11) or (pass_leg < 0 and x0 == 17)
         lift = 3 if swinging else (min(3, -s) if s < 0 else 0)
         pc = 'P' if lift else 'p'              # 들린 다리는 그늘에 잠긴다
@@ -519,8 +580,7 @@ def legs_down(g, stride, dx=0, sq=0, pass_leg=0):
         # 들린 다리는 무릎 아래가 안쪽으로 접힌다 (정면에서 본 무릎 굽힘)
         bend = (1 if x0 == 11 else -1) if lift >= 2 else 0
         knee_row = (top + GROUND - lift) // 2
-        # 쪼그릴 때(휘두르기 내리침)는 디딘 무릎이 바깥으로 불거진다 —
-        # 무릎 언저리만 한 칸 밀고 발은 디딘 자리에 남아 다리가 굽어 보인다
+        # 쪼그릴 때(휘두르기 내리침)는 디딘 무릎이 바깥으로 불거진다
         flare = (-1 if x0 == 11 else 1) if (sq >= 2 and not lift) else 0
         outer = x0 if x0 == 11 else x0 + 3     # 빛 받는 바깥 열 (왼쪽 다리만)
         for yy in range(top, GROUND - 3 - lift):
@@ -552,7 +612,7 @@ def _side_arm(g, c, y, sw, near):
     깔려 몸 가장자리 밖으로 나온 부분만 보인다.
     손 올림은 진자 원호(√(L²-s²))로 계산해 팔 길이가 어느 위상에서든
     같다 — 안 그러면 저을 때마다 팔이 늘었다 줄었다 한다."""
-    hy = y + 7 - round(10 - (100 - sw * sw) ** 0.5)   # 팔 한 칸 줄임
+    hy = y + 7 - round(10 - (100 - sw * sw) ** 0.5)
     cells = {}
     sleeve = ('B', 'b', 'b', 'b', 'b') if near else ('B',) * 5
     for yy in range(y + 1, hy):
@@ -561,8 +621,7 @@ def _side_arm(g, c, y, sw, near):
         for j, cc in enumerate(sleeve):
             col = cc
             if near:
-                # 소매단도 손목 각도를 따라 기운다 — 크게 저으면 단이
-                # 두 줄에 걸쳐 비스듬히 잘린다.
+                # 소매단도 손목 각도를 따라 기운다
                 if yy == hy - 1:
                     if abs(sw) < 3 or (sw > 0 and j <= 2) or (sw < 0 and j >= 2):
                         col = 'B'
@@ -571,7 +630,7 @@ def _side_arm(g, c, y, sw, near):
                     col = 'B'
             cells[(x + j, yy)] = col
     # 손: 팔 기울기를 따라 줄마다 어긋나게(전단) 그린다 — 손목이 팔
-    # 방향으로 꺾여 보인다. 좌우 평행이동만 하면 손만 둥둥 떠다닌다.
+    # 방향으로 꺾여 보인다.
     hx = c - 1 + sw
     hand = 's' if near else 'S'
     for k in range(3):
@@ -586,10 +645,8 @@ def _side_arm(g, c, y, sw, near):
         for nx, ny in ((x - 1, yy), (x + 1, yy), (x, yy - 1), (x, yy + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
                 continue
-            # 겨드랑이 위로는 윤곽선을 **아예 긋지 않는다**. 옆으로만 열어
-            # 두면 팔 양옆의 검은 세로줄이 어깨 꼭대기까지 올라와, 어깨가
-            # 세 갈래로 갈린 것처럼 보인다 (팔을 목에 붙여 놓은 꼴이다).
-            # 여기가 트여 있어야 어깨-윗팔이 한 덩어리로 읽힌다.
+            # 겨드랑이 위로는 윤곽선을 긋지 않는다 — 어깨-윗팔이 한 덩어리로
+            # 읽혀야 한다.
             if yy < y + ARMPIT:
                 continue
             if g.d[ny][nx] != '.':             # (팔이 몸에 이어 붙는다)
@@ -598,17 +655,19 @@ def _side_arm(g, c, y, sw, near):
         g.px(x, yy, cc)
 
 
-def torso_side(g, bob, swing, lean=0, draw_arm=True, arm=None):
+def torso_side(g, bob, swing, lean=0, draw_arm=True, arm=None, far_arm=None):
     """옆모습 몸통+팔(오른쪽 보기). swing: 다리 보폭 -3..+3
-    arm: 팔이 앞으로 나간 양을 직접 지정 (걷기는 ARM 표를 넘긴다)."""
+    arm: 팔이 앞으로 나간 양을 직접 지정 (걷기는 ARM 표를 넘긴다).
+    far_arm: draw_arm 이 꺼져 있을 때(휘두르기) 몸 뒤의 반대팔만 이만큼
+    앞으로 내민다 — 도구 든 팔은 따로 긋지만 반대팔은 여기서."""
     y = SHIRT_Y + bob
     c = 15 + lean                              # 몸 중심 (반 칸 왼쪽)
-    # 팔은 같은 쪽 다리와 반대로(교차 보행), 다리 보폭보다 한 칸만 크게 —
-    # 손이 몸통 가장자리를 살짝 벗어나는 정도가 자연스럽다.
     sw = arm if arm is not None else \
         -(swing + (1 if swing > 0 else -1 if swing < 0 else 0))
     if draw_arm:
         _side_arm(g, c, y, -sw, False)         # 저편 팔 — 반대 위상, 몸 뒤에
+    elif far_arm is not None:
+        _side_arm(g, c, y, far_arm, False)
     g.rect(c - 1, y - NECK_H, c + 2, y - 1, 's')   # 목
     g.hline(c - 1, c + 2, y - NECK_H, 'S')         # 턱 밑 그림자
     g.vline(c - 1, y - NECK_H, y - 1, 'S')         # 뒷목은 그늘
@@ -618,6 +677,7 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True, arm=None):
     g.px(c + 4, y + 1, 'L')
     g.vline(c - 4, y, y + 10, 'B')             # 등쪽 그늘
     g.px(c - 3, y + 1, 'B')
+    g.hline(c - 1, c + 3, y, 'B')              # 옷깃
     for cx in (c - 4, c + 5):                  # 어깨·밑단 모서리 깎기
         g.px(cx, y, '.')
         g.px(cx, y + 11, '.')
@@ -627,21 +687,12 @@ def torso_side(g, bob, swing, lean=0, draw_arm=True, arm=None):
 
 def _bone(g, x0, y0, x1, y1, w0, w1, body, back=None, front=None, mark=None):
     """뼈 하나를 **축에 수직으로 두께를 재어** 긋는다.
-
-    가로줄을 폭 w로 채우면, 줄이 기울수록 실제 두께가 w·cos(기울기)로
-    얇아진다. 60도로 접힌 정강이는 4칸이 2칸이 된다 — 접을 때마다 다리가
-    가늘어지던 이유다. 축을 따라 도장을 찍으면 어느 각도에서도 같다.
-
-    back/front: 뒤·앞 모서리에 얹을 색 (그늘·하이라이트).
-    """
+    back/front: 뒤·앞 모서리에 얹을 색 (그늘·하이라이트)."""
     d = math.hypot(x1 - x0, y1 - y0)
     if d < 0.01:
         d, ux, uy = 0.01, 0.0, 1.0
     else:
         ux, uy = (x1 - x0) / d, (y1 - y0) / d
-    # 축에 수직인 방향. 아래로 향한 뼈(0,1)에서 +쪽이 **앞**(+x)이 되게
-    # 잡는다. (-uy, ux)로 잡으면 부호가 뒤집혀 그늘이 앞면에, 하이라이트가
-    # 등쪽에 얹힌다 — 다리가 안쪽에서 빛나 보였다.
     nx, ny = uy, -ux
     for i in range(int(d * 4) + 1):
         t = i / (d * 4)
@@ -682,34 +733,36 @@ def _boot(g, ax, ay, tilt, body, sole, lit, mark=None):
     return (hi, lo, y + 1, y + 2)
 
 
-def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
-    """옆모습 다리.
-
+def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0, poses=None):
+    """옆모습 다리. 돌려주는 값은 골반 줄(반올림) — 몸통이 그 위에 앉는다.
     phase 를 주면 걷기 — LEG 표(각도)의 그 칸을 가까운 다리에 쓰고, 먼
     다리에는 반 바퀴 뒤(phase + LEG_LAG)를 쓴다.
-    phase 가 없으면 stride 로 곧은 다리를 만든다 (정지·휘두르기용).
-    hip: 골반이 앞으로 밀린 칸 — 다리와 바지 띠가 함께 움직인다.
-    """
-    if phase is None:
+    poses 를 주면 (가까운 다리, 먼 다리) 자세 튜플을 그대로 쓴다 (휘두르기).
+    둘 다 없으면 stride 로 곧은 다리를 만든다 (정지).
+    hip: 골반이 앞으로 밀린 칸 — 다리와 바지 띠가 함께 움직인다."""
+    if poses is not None:
+        near_spec, far_spec = poses
+        hip_row = GROUND - 2 - max(_leg_depth(near_spec), _leg_depth(far_spec)) + sq
+    elif phase is None:
+        near_spec = far_spec = None
         hip_row = HIP_Y + 2 + sq
     else:
+        near_spec = LEG[phase % WALK]
+        far_spec = LEG[(phase + LEG_LAG) % WALK]
         hip_row = hip_row_at(phase, sq)
     c = 15 + lean + hip
     hr = round(hip_row)
-    # 바지 띠 — 몸통(10칸)보다 한 칸씩 안으로 들어간 8칸.
     g.rect(c - 3 + dx, hr - 2, c + 4 + dx, hr, 'p')
     g.hline(c - 3 + dx, c + 4 + dx, hr - 2, 'P')   # 셔츠 아랫단 그늘
     g.hline(c - 3 + dx, c + 4 + dx, hr, 'P')       # 가랑이 그늘 줄
-    # 가까운 다리가 앞인가 뒤인가 — 둘을 가르는 어두운 선을 어느 쪽 모서리에
-    # 그을지가 여기서 갈린다.
-    if phase is None:
+    if near_spec is None:
         near_front = None if not stride else stride > 0
     else:
-        _n = _joints(phase, 0)[3]
-        _f = _joints(phase + LEG_LAG, 0)[3]
+        _n = _joints(near_spec, 0)[3]
+        _f = _joints(far_spec, 0)[3]
         near_front = None if abs(_n - _f) < 0.5 else _n > _f
     for shade in (True, False):
-        if phase is None:
+        if near_spec is None:
             off = -stride if shade else stride
             hx = off * 0.35
             kx, ky = off * 0.85, hip_row + LEG_L
@@ -718,30 +771,22 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
             if shade and not stride:
                 hx -= 0.7; kx -= 0.7; ax -= 0.7
         else:
-            hx, kx, ky, ax, ay, tilt = _joints(
-                phase + (LEG_LAG if shade else 0), hip_row)
-        # 골반이 밀린 만큼은 위에서만 크고 발끝으로 갈수록 0이 된다.
+            hx, kx, ky, ax, ay, tilt = _joints(far_spec if shade else near_spec, hip_row)
         base = 16 + lean
         hx = base + hx + dx + hip
         kx = base + kx + (dx + hip) * 0.5
         ax = base + ax + (dx + hip) * 0.15
         pc, sc, hl = ('P', 'n', None) if shade else ('p', 'P', 'q')
         kc, kk = ('n', 'K') if shade else ('k', 'K')
-        # 굵기 — 골반에서 발목으로 완만히 좁아진다. 굽힘과는 무관하다.
         mark = None if shade else set()
         _bone(g, hx, hip_row - 1, kx, ky, 4.6, 3.8, pc, sc, hl, mark)
         _bone(g, kx, ky, ax, ay, 3.8, 3.1, pc, sc, hl, mark)
         if not shade:
             g.px(round(ax), round(ay), 'q')        # 발목 접단
         _boot(g, ax, ay, tilt, kc, kk, 'p' if not shade else None, mark)
-        # 가까운 다리에서 **먼 다리와 맞닿는 쪽** 모서리를 어둡게 눌러 뗀다.
-        # 그 바깥에 먼 다리가 더 남아 있을 때만 — 한 칸만 비죽 나온 자리에
-        # 그으면 그 한 칸이 지워져 다리에 구멍이 뚫린다.
         if shade or near_front is None:
             continue
-        # 색으로 찾으면 안 된다 — 가까운 다리의 뒤쪽 모서리도 먼 다리와
-        # 같은 그늘색이라, 선이 가까운 다리 **안쪽에** 그어진다.
-        # 실제로 찍은 칸을 기억해 두고 그 바로 바깥에 긋는다.
+        # 가까운 다리에서 먼 다리와 맞닿는 쪽 모서리를 어둡게 눌러 뗀다.
         LEGC = ('p', 'P', 'q', 'k', 'K', 'n')
         rows = {}
         for (mx, my) in mark:
@@ -749,11 +794,10 @@ def legs_side(g, stride=0, lean=0, dx=0, sq=0, phase=None, hip=0):
         for yy, xs in rows.items():
             bx = (min(xs) - 1) if near_front else (max(xs) + 1)
             ox = bx - 1 if near_front else bx + 1
-            # 그 바깥에 먼 다리가 더 남아 있을 때만 — 한 칸만 비죽 나온
-            # 자리에 그으면 그 한 칸이 지워져 다리에 구멍이 뚫린다.
             if 0 <= bx < GW and 0 <= ox < GW and 0 <= yy < GH \
                     and g.d[yy][bx] in LEGC and g.d[yy][ox] in LEGC:
                 g.px(bx, yy, 'O')
+    return hr
 
 
 def torso_up(g, bob, swing, dx=0, skip=None):
@@ -794,15 +838,8 @@ def legs_up(g, stride, dx=0, sq=0, pass_leg=0):
 
 # --------------------------------------------------------------- 휘두르기
 # 방향당 5장: 감기 시작 · 다 감음 · 휘두름 · 내리침 · 되돌아옴.
-# 「휘두름」은 다 감은 팔이 내리침으로 넘어가는 중간 칸 — 없으면 주먹이
-# 머리 옆에서 반대편 아래로 한 칸에 건너뛰어 호가 안 보인다.
 # 도구는 게임(player.gd)이 주먹 자리에 얹으므로 여기서는 몸+팔만 그린다.
 # 주먹 자리는 아래에서 SWING_HAND_DOT 값으로 계산해 찍어 준다.
-#
-# 팔 길이 조심: 걷기 팔이 예닐곱 칸이니 어깨-주먹 거리도 그 언저리로 묶는다
-# (늘려도 열다섯 칸 안). 「다 감음」의 주먹은 머리 옆면 높이까지만 올리고,
-# 그 위로는 주먹에 얹히는 도구가 뻗어 보인다. 뒷모습 내리침은 주먹까지
-# 머리 저편(=캐릭터의 앞)으로 넘어가 통째로 가려진다 — 안 보이는 쪽이 맞다.
 #
 # 칸마다 (fist, elbow, dx, sq, behind):
 #   fist    주먹 3x3 블록의 왼쪽 위 논리 칸
@@ -813,32 +850,41 @@ def legs_up(g, stride, dx=0, sq=0, pass_leg=0):
 SWING_N = 5                     # 방향당 칸 수 (player.gd SWING_FRAMES와 같아야 한다)
 SWING = {
     # 앞모습: **화면 쪽으로** 내리친다 (원근). 팔이 닿는 왼쪽 옆에서
-    # 위로 감았다가 그대로 내리 긋는다 — 주먹을 정수리나 몸통 가운데까지
-    # 억지로 끌고 가면 팔이 고무줄처럼 늘어난다. 내리친 주먹은 어깨 바로
-    # 앞이라 팔이 짧아 보이고(단축법), 도구가 화면 쪽으로 넘어온다.
-    # 몸은 옆으로 밀지 않고 정중앙에서 쪼그린다.
+    # 위로 감았다가 그대로 내리 긋는다.
     'down': {'skip': 'left', 'shoulder': (10, 24),
-             'poses': [((5, 19), (5, 22), -1, 0, False),
-                       ((3, 10), (2, 17), -2, 0, False),
-                       ((1, 19), (4, 22), -1, 0, False),
+             'poses': [((4, 19), (4, 22), -1, 0, False),
+                       ((2, 10), (1, 17), -2, 0, False),
+                       ((0, 19), (3, 22), -1, 0, False),
                        ((8, 31), (8, 28), 0, 2, False),
-                       ((5, 21), (5, 23), 0, 0, False)]},
-    # 뒷모습: 등을 보이는 캐릭터의 「앞」은 화면 위쪽 — 어깨 옆으로 감아올려
-    # 정수리 너머 저편으로 내리친다. 휘두름부터는 팔이 머리 저쪽(=캐릭터의
-    # 앞)이라 머리가 가리고, 주먹만 정수리 위로 잠깐 보인다.
+                       ((4, 21), (4, 23), 0, 0, False)]},
+    # 뒷모습: 어깨 옆으로 감아올려 정수리 너머 저편으로 내리친다. 휘두름부터는
+    # 팔이 머리 저쪽(=캐릭터의 앞)이라 머리가 가리고, 주먹만 정수리 위로
+    # 잠깐 보인다. (머리가 두 줄 커져서 주먹도 두 줄 올렸다.)
     'up':   {'skip': 'right', 'shoulder': (21, 24),
-             'poses': [((24, 17), (26, 20), 1, 0, False),
-                       ((24, 10), (27, 17), 2, 0, False),
-                       ((19, 4), (24, 11), 0, 0, True),
-                       ((16, 9), (20, 14), 0, 2, True),
-                       ((24, 14), (26, 18), 0, 0, False)]},
-    # 옆모습(오른쪽 보기): 뒤로 감았다가 앞으로 내리친다
+             'poses': [((25, 17), (27, 20), 1, 0, False),
+                       ((25, 9), (28, 16), 2, 0, False),
+                       ((19, 1), (25, 9), 0, 0, True),
+                       ((16, 7), (20, 13), 0, 2, True),
+                       ((25, 14), (27, 18), 0, 0, False)]},
+    # 옆모습(오른쪽 보기): 뒤로 감았다가 앞으로 내리친다. 머리가 커져 뒤통수가
+    # 7열까지 오므로, 감은 주먹은 그보다 더 뒤(4열)로 뺀다.
     'side': {'skip': None, 'shoulder': (15, 24),
-             'poses': [((6, 17), (8, 21), -2, 0, False),
-                       ((6, 11), (6, 17), -3, 0, False),
-                       ((25, 15), (19, 21), 2, 1, False),
-                       ((24, 33), (23, 29), 3, 2, False),
-                       ((23, 27), (18, 27), 2, 0, False)]},
+             'poses': [((5, 17), (7, 21), -2, 0, False),
+                       ((4, 10), (5, 17), -3, 0, False),
+                       ((26, 13), (20, 20), 2, 1, False),
+                       ((24, 33), (23, 29), 3, 1, False),
+                       ((23, 27), (18, 27), 2, 0, False)],
+             # 다리 (가까운 다리=앞, 먼 다리=뒤) — (골반 밀림, 허벅지°, 무릎 굽힘°, 발)
+             # 감을수록 뒷다리에 무게가 실려 앞발 끝이 들리고, 내리칠 때는
+             # 앞무릎이 깊게 굽어 골반이 내려앉는다 (몸통은 그 위에 앉는다).
+             'legs': [((0.3, 22, 6, 0), (-0.3, -20, 6, -1)),
+                      ((0.4, 26, 8, 1), (-0.4, -24, 14, -1)),
+                      ((0.2, 20, 24, 0), (-0.2, -22, 10, -1)),
+                      ((0.3, 34, 58, 0), (-0.5, -30, 16, -1)),
+                      ((0.2, 22, 18, 0), (-0.3, -20, 10, -1))],
+             # 반대팔 (몸 뒤) 이 앞으로 나간 양 — 감을 때 앞으로 뻗어 균형을 잡고,
+             # 내리칠 때 뒤로 젖혀진다
+             'far_arm': [3, 5, 1, -4, -2]},
 }
 
 
@@ -861,10 +907,8 @@ def arm_stroke(g, x0, y0, fx, fy, ex, ey):
         for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
             if (nx, ny) in cells or not (0 <= nx < GW and 0 <= ny < GH):
                 continue
-            # 셔츠에 닿는 자리는 두르지 않는다 — 어깨든 가슴이든, 두르면
-            # 팔이 몸통에서 잘려 붙인 막대처럼 뜨고 가슴에 금이 간 것처럼
-            # 보인다. 몸 앞을 지나는 팔은 셔츠와 한 덩어리다(원근 단축).
-            # 주먹 둘레만은 셔츠 위라도 둘러서 손이 또렷이 읽히게 한다.
+            # 셔츠에 닿는 자리는 두르지 않는다 — 몸 앞을 지나는 팔은 셔츠와
+            # 한 덩어리다(원근 단축). 주먹 둘레만은 둘러서 손이 또렷하게.
             if (x, y) not in hand and g.d[ny][nx] in SHIRT:
                 continue
             if g.d[ny][nx] != '.':
@@ -882,19 +926,17 @@ def arm_stroke(g, x0, y0, fx, fy, ex, ey):
     g.px(fx + 1, fy + 2, 'S')
 
 
-def swing_frame(direction, phase):
+def swing_frame(direction, phase, spec_head):
     spec = SWING[direction]
     (fx, fy), (ex, ey), dx, sq, behind = spec['poses'][phase]
     g = G()
     if direction == 'side':
-        # 발은 네 장 내내 같은 자리를 디디고(벌린 자세), 엉덩이·다리 윗동이
-        # 몸통을 따라 쏠린다 — 허리가 어긋나지 않고 다리도 같이 움직인다.
-        legs_side(g, 3, 0, dx, sq)
-        torso_side(g, sq, 0, dx, draw_arm=False)
+        # 발은 다섯 장 내내 같은 자리를 디디고, 무릎·골반이 칸마다 달라진다.
+        # 몸통은 다리가 정한 골반 줄에 앉으므로 내리칠 때 저절로 주저앉는다.
+        hr = legs_side(g, 0, 0, dx, sq, poses=spec['legs'][phase])
+        sq = hr - (HIP_Y + 2)
+        torso_side(g, sq, 0, dx, draw_arm=False, far_arm=spec['far_arm'][phase])
     elif direction == 'down':
-        # 반대팔·발도 조금씩 따라 움직인다 — 내려치면서 몸이 사는 정도만.
-        # 반대팔은 감을 때 살짝 접혔다가 내리칠 때 뒤로 흔들리고,
-        # 오른발은 감는 동안 뒤꿈치가 한 칸 들렸다가 내리칠 때 쾅 디딘다.
         counter = (-1, -2, 0, 2, 1)[phase]
         step = (0, 1, 1, 0, 0)[phase]
         legs_down(g, step, dx, sq)
@@ -902,16 +944,15 @@ def swing_frame(direction, phase):
     else:
         legs_up(g, 0, dx, sq)
         torso_up(g, sq, 0, dx, skip=spec['skip'])
-    art = PARTS[direction][0]
     sx, sy = spec['shoulder']
     # 내리치는 칸은 머리를 한 칸 더 움츠린다 — 어깨 사이로 목이 파묻히는
     # 크런치가 있어야 팔만 도는 게 아니라 온몸으로 찍는 느낌이 난다
-    hb = sq + (1 if (direction == 'down' and phase == 3) else 0)
+    hb = sq + (1 if phase == 3 else 0)
     if behind:
         arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
-        head(g, art, hb, dx)                   # 머리가 팔을 덮고 도구만 저편에
+        head(g, spec_head, hb, dx, direction == 'side')   # 머리가 팔을 덮는다
     else:
-        head(g, art, hb, dx)
+        head(g, spec_head, hb, dx, direction == 'side')
         arm_stroke(g, sx + dx, sy + sq, fx, fy, ex, ey)
     roughen(g)
     g.outline()
@@ -929,49 +970,28 @@ def hand_dot(direction, phase):
 
 # ------------------------------------------------------------------- 조립
 
-PARTS = {
-    'down': (HEAD_DOWN, torso_down, legs_down),
-    'side': (HEAD_SIDE, torso_side, legs_side),
-    'up':   (HEAD_UP, torso_up, legs_up),
-}
-
-for _art in (HEAD_DOWN, HEAD_SIDE, HEAD_UP):
-    assert len(_art) == 16 and all(len(r) == 16 for r in _art), \
-        [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
-
-
-def head(g, art, bob, lean=0):
-    # 두상을 한 줄 깎은 만큼 한 줄 내리고, 목을 낸 만큼 다시 올린다.
-    # 턱이 목 바로 위에 놓여야 머리와 몸이 안 벌어진다.
-    top = HEAD_Y + 2 - NECK_H + bob
-    g.blit(shrink_head(art), HEAD_X + lean, top)
-    # 귀 — 민머리 남자만. 여자는 머리카락이 귀를 덮는다.
-    if any(art is a for a in EARS_DOWN):             # 눈높이 양옆에 볼록 한 칸
-        for ex in (HEAD_X - 1, HEAD_X + 14):
-            g.px(ex + lean, top + 8, 's')
-            g.px(ex + lean, top + 9, 'S')
-    elif any(art is a for a in EARS_SIDE):           # 옆모습은 귓바퀴 모양
-        g.px(12 + lean, top + 8, 'S')
-        g.px(13 + lean, top + 8, 'S')
-        g.px(12 + lean, top + 9, 'S')
-        g.px(13 + lean, top + 9, 's')
-        g.px(12 + lean, top + 10, 'S')
-        g.px(13 + lean, top + 10, 'S')
+def head(g, spec, bob, lean=0, profile=False):
+    """머리 = 얼굴 그림 + (귀) + 머리 모양 덧그림.
+    spec = (얼굴, 머리덧그림 or None, 귀를 그릴까)
+    profile: 옆모습 — 귀는 얼굴 그림 안에 있으니 양옆 조각을 안 붙인다"""
+    art, hair, ears = spec
+    top = HEAD_TOP + bob
+    g.blit(art, HEAD_X + lean, top)
+    if ears and not profile:                   # 눈높이 양옆에 볼록 두 칸
+        for ex in (HEAD_X - 1, HEAD_X + HEAD_W):
+            g.px(ex + lean, top + 9, 's')
+            g.px(ex + lean, top + 10, 'S')
+    if hair is not None:
+        dy, hart = hair
+        g.blit(hart, HEAD_X + lean, top + dy)
 
 
 # ------------------------------------------------------------------- 결
-#
-# 한 색으로 넓게 채운 면은 도트가 아니라 비닐처럼 보인다. 옷·바지·신발에
-# 성근 얼룩을 흩어 **짜인 천의 결**을 낸다.
-#
-# 두 가지를 지킨다:
-#   ① 얼굴은 건드리지 않는다 (셔츠 윗줄 위) — 눈·입이 지저분해진다
-#   ② 얼룩 자리는 **칸 좌표로만** 정한다. 프레임마다 다시 뽑으면 걸을 때
-#      결이 지글지글 끓는다 (도트 게임에서 제일 눈에 띄는 실수다)
-# 신발(k/K)은 뺀다 — 칸이 몇 개 안 되는 데다 어두워서, 얼룩이 앉으면
-# 결이 아니라 흙이 묻은 것처럼 보인다.
-ROUGH_DARK = {'b': 'B', 'p': 'P', 's': 'S', 'L': 'b', 'q': 'p'}
-ROUGH_LITE = {'b': 'L', 'p': 'q', 'B': 'b', 'P': 'p', 'S': 's'}
+# 한 색으로 넓게 채운 면은 도트가 아니라 비닐처럼 보인다. 옷·바지에 성근
+# 얼룩을 흩어 **짜인 천의 결**을 낸다. 바둑판 위에만, 칸 좌표로만(프레임마다
+# 다시 뽑으면 걸을 때 지글거린다). 살결·신발은 건드리지 않는다.
+ROUGH_DARK = {'b': 'B', 'p': 'P', 'L': 'b', 'q': 'p'}
+ROUGH_LITE = {'b': 'L', 'p': 'q', 'B': 'b', 'P': 'p'}
 
 
 def _rough_hash(x, y):
@@ -986,194 +1006,97 @@ def roughen(g):
             c = g.d[y][x]
             if c in ('.', 'O'):
                 continue
-            # **바둑판 위에만 얼룩을 둔다.** 아무 데나 흩으면 잡음(노이즈)이
-            # 되어 옷이 더러워 보인다. 한 칸 건너 한 칸으로 두면 도트를
-            # 찍는 사람이 쓰는 디더링이 되어 「짜인 천」으로 읽힌다.
             if (x + y) % 2:
                 continue
-            # 아래로 갈수록 짙게 — 천은 접히는 쪽(아랫단·무릎)에 그늘이 앉는다
             depth = (y - SHIRT_Y) / max(1, GH - SHIRT_Y)
             r = _rough_hash(x, y)
-            if r < 0.16 + depth * 0.16 and c in ROUGH_DARK:
+            if r < 0.14 + depth * 0.14 and c in ROUGH_DARK:
                 g.d[y][x] = ROUGH_DARK[c]
-            elif r < 0.30 and c in ROUGH_LITE:
+            elif r < 0.26 and c in ROUGH_LITE:
                 g.d[y][x] = ROUGH_LITE[c]
 
 
-def frame(direction, phase=None, bob=0):
+BODY = {
+    'down': (torso_down, legs_down),
+    'side': (torso_side, legs_side),
+    'up':   (torso_up, legs_up),
+}
+
+
+def frame(direction, spec_head, phase=None, bob=0):
     """한 칸을 그린다. phase 를 주면 걷기(LEG 표의 그 칸), 없으면 정지."""
-    art, torso, legs = PARTS[direction]
+    torso, legs = BODY[direction]
     g = G()
-    # 엉덩이도 몸통 바운스를 따라간다 (sq=bob) — 안 그러면 몸·다리는
-    # 움직이는데 허리 띠만 공중에 고정돼 상하체가 따로 논다.
-    # 발은 땅에 붙어 있으니 그만큼 무릎이 눌린다.
     if direction == 'side':
         lean = 0 if phase is None else 1       # 걸을 때 몸이 살짝 앞으로 쏠린다
         hip = 0 if phase is None else HIP[phase % WALK]
-        # 몸통·머리도 골반이 놓인 높이를 따라간다 — 다리에서 나온 값이다.
         if phase is not None:
             bob = round(hip_row_at(phase) - (HIP_Y + 2))
         arm = None if phase is None else ARM[phase % WALK]
         legs(g, 0, lean, 0, bob, phase, hip)
-        # 몸통은 골반만큼 따라가지 **않는다**. 그 한 칸 차이가 허리다 —
-        # 골반이 다리를 따라 밀리는 동안 윗몸이 제자리에 남아 허리가 접힌다.
+        # 몸통은 골반만큼 따라가지 않는다. 그 한 칸 차이가 허리다.
         torso(g, bob, 0, lean, arm=arm)
-        head(g, art, bob, lean)
+        head(g, spec_head, bob, lean, True)
     else:
-        # 앞뒤 모습은 두 다리가 나란해 겹치지 않으니 관절을 따로 잡을 것도
-        # 없다. 보폭 하나로 충분하고, 자연스럽다고 한 걸 건드릴 이유도 없다.
         sf = 0 if phase is None else STRIDE_F[phase % WALK]
         pl = 0 if phase is None else PASS[phase % WALK]
         legs(g, sf, 0, bob, pl)
         torso(g, bob, sf)
-        head(g, art, bob)
+        head(g, spec_head, bob)
     roughen(g)
     g.outline()
     return g
 
 
-def save(name, g):
-    g.render().save(os.path.join(REF, name + '.png'))
-    return g
-
-
-# ------------------------------------------------------- 남/녀 두 벌 생성
-# 몸·모션은 같고 머리 그림과 셔츠 색만 다르다. 여자는 밤색 단발머리
-# (앞머리 + 옆 갈래)에 분홍 셔츠 — 이름은 player_f_* 로 설치한다.
-
-HEAD_DOWN_F = [
-    "....OOOOOOOO....",
-    "..OOhhhhhhhhOO..",
-    ".OhhjjjjjjjjhhO.",
-    ".OhjjjjjjjjjjhO.",
-    "OhhjjjjjjjjjjhhO",
-    "OhhjjhhhhhhjjhhO",
-    "Ohh" "ssssssssss" "hhO",
-    "Oh" "s" "eee" "ssss" "eee" "s" "h" "O",
-    "Oh" "ss" "ew" "ssss" "we" "ss" "h" "O",
-    "Oh" "ss" "ee" "ssss" "ee" "ss" "h" "O",
-    "Oh" "ss" "ei" "ssss" "ie" "ss" "h" "O",
-    "Oh" "r" "ssssssssss" "r" "h" "O",
-    ".hh" "ssss" "mm" "ssss" "hh.",
-    ".hh" "ssssssssss" "hh.",
-    # 턱이 좁아지는 만큼 머리채가 두꺼워지며 턱선을 감싼다
-    "." "hhh" "ssssssss" "hhh" ".",
-    "..." "hh" "ssssss" "hh" "...",
-    # ---- 턱 아래: 어깨까지 내려오는 머리채 ----
-    "..." "hh" "......" "hh" "...",
-    "." "hhhh" "......" "hhhh" ".",
-    "." "hhhh" "......" "hhhh" ".",
-    "." "ghh" "........" "hhg" ".",
-    "..." "g" "........" "g" "...",
-]
-
-HEAD_SIDE_F = [   # 오른쪽을 본다
-    "....OOOOOOOO....",
-    "..OOhhhhhhhhOO..",
-    ".OhhjjjjjjjjhhO.",
-    ".OhjjjjjjjjjjhO.",
-    "OhhjjjjjjjjjjhhO",
-    "OhhhjjhhhhhhhhhO",
-    "Ohhhhhhhh" "ssssss" "O",
-    "Ohhhh" "ssss" "eee" "sss" "O",
-    "OhjhssssssewsssO",
-    "OhjhsssssseesssO",
-    "Ohjhsssssseissss",
-    "Ohh" "sss" "rr" "sssssss" "S",
-    ".hhh" "ssssss" "mm" "ss" "O.",
-    ".hhh" "ssssssssss" "O.",
-    # 턱 끝으로 갈수록 얼굴은 뒤로 물러나고 뒷머리는 두꺼워진다
-    "." "hhh" "ssssssss" "O" "...",
-    "." "hhhh" "ssssss" "O" "....",
-    # ---- 턱 아래: 등까지 흘러내리는 뒷머리 ----
-    "." "hhhh" "...........",
-    "." "hhhh" "...........",
-    "." "hhhh" "...........",
-    "." "ghh" "............",
-    "..." "g" "............",
-]
-
-HEAD_UP_F = [
-    "....OOOOOOOO....",
-    "..OOhhhhhhhhOO..",
-    ".OhhjjjjjjjjhhO.",
-    ".OhjjjjjjjjjjhO.",
-    "OhhjjjjjjjjjjhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OhhhjhhhhhhjhhhO",
-    "OghhhhhhhhhhhhgO",
-    ".hhhjhhhhhhjhhh.",
-    ".hhhjhhhhhhjhhh.",
-    ".hghhhhhhhhhhgh.",
-    # ---- 목덜미 아래: 등을 덮는 머리채 ----
-    ".hhhhhhhhhhhhhh.",
-    ".hhhjhhhhhhjhhh.",
-    ".hhhjhhhhhhjhhh.",
-    "..." "ghhhhhhhhg" "...",
-    "...." "gggggggg" "....",
-]
-
-# 긴머리는 16행 얼굴 + 5행 머리채 = 21행. 머리를 몸 위에 겹쳐 그리므로
-# 늘어난 다섯 줄이 어깨와 가슴 위쪽을 덮어 「길게 늘어뜨린 머리」가 된다.
-# (예전에는 두 줄뿐이라 셔츠에 닿지도 못하고 귀밑에서 뚝 끊겼다.)
-for _art in (HEAD_DOWN_F, HEAD_SIDE_F, HEAD_UP_F):
-    assert len(_art) == 21 and all(len(r) == 16 for r in _art), \
-        [(i, len(r)) for i, r in enumerate(_art) if len(r) != 16]
-
+# ------------------------------------------------------- 네 벌 생성
+# 몸·모션은 같고 머리만 다르다. 네 벌 모두 **같은 표준 팔레트**로 뽑는다 —
+# 옷·살결·머리색은 게임이 외형 선택에 맞춰 실행 중에 갈아입힌다.
+#   new_boy_     민머리 (귀 보임)
+#   hair_short_  짧은 머리
+#   hair_spiky_  삐죽 머리
+#   player_f_    긴 머리 (여자 얼굴 — 눈꼬리 속눈썹, 귀는 머리카락에 가린다)
 OUT = os.path.normpath(os.path.join(REF, '..', '..', 'sprites'))
 
 
-def render_set(heads, blinks, ref_prefix, out_prefix):
-    """머리 그림만 갈아 끼워 전체 프레임(정지+걷기+휘두르기+깜빡임)을 뽑는다.
-    지금 PAL 값으로 즉시 그려 두므로, 부른 뒤 PAL을 바꿔도 안 변한다."""
-    for d in heads:
-        PARTS[d] = (heads[d], PARTS[d][1], PARTS[d][2])
+def head_set(face_d, face_s, hair, ears):
+    return {
+        'down': (face_d, hair['down'] if hair else None, ears),
+        'side': (face_s, hair['side'] if hair else None, ears),
+        'up': (HEAD_UP, hair['up'] if hair else None, ears),
+        'down_blink': (closed_eyes(face_d, EYES_DOWN, LIDS_DOWN),
+                       hair['down'] if hair else None, ears),
+        'side_blink': (closed_eyes(face_s, EYES_SIDE, LIDS_SIDE),
+                       hair['side'] if hair else None, ears),
+    }
+
+
+SETS = [
+    ('', 'new_boy_', head_set(HEAD_DOWN, HEAD_SIDE, None, True)),
+    ('short_', 'hair_short_', head_set(HEAD_DOWN, HEAD_SIDE, HAIR_SHORT, True)),
+    ('spiky_', 'hair_spiky_', head_set(HEAD_DOWN, HEAD_SIDE, HAIR_SPIKY, True)),
+    ('f_', 'player_f_', head_set(FACE_DOWN_F, FACE_SIDE_F, HAIR_LONG, False)),
+]
+
+
+def render_set(heads, ref_prefix, out_prefix):
     images = {}
     for d in ('down', 'side', 'up'):
-        images[f'{d}_idle'] = frame(d).render()
+        images[f'{d}_idle'] = frame(d, heads[d]).render()
         for i in range(WALK):
-            images[f'{d}_walk_{i}'] = frame(d, i, BOB[i]).render()
+            images[f'{d}_walk_{i}'] = frame(d, heads[d], i, BOB[i]).render()
         for i in range(SWING_N):
-            images[f'{d}_swing_{i}'] = swing_frame(d, i).render()
-    for d, art in blinks.items():              # 눈 감은 정지 한 장씩
-        keep = PARTS[d]
-        PARTS[d] = (art, keep[1], keep[2])
-        images[f'{d}_blink'] = frame(d).render()
-        PARTS[d] = keep
+            images[f'{d}_swing_{i}'] = swing_frame(d, i, heads[d]).render()
+    for d in ('down', 'side'):                 # 눈 감은 정지 한 장씩
+        images[f'{d}_blink'] = frame(d, heads[f'{d}_blink']).render()
     for k, im in images.items():
         im.save(os.path.join(REF, f'{ref_prefix}{k}.png'))
         im.save(os.path.join(OUT, f'{out_prefix}{k}.png'))
     return images
 
 
-# 네 세트(머리 스타일) 모두 **같은 표준 팔레트**(파란 셔츠·갈색 바지)로
-# 뽑는다 — 옷 색은 게임이 외형 선택에 맞춰 실행 중에 갈아입힌다
-# (game_data.gd recolor_player_image가 이 PAL 값을 그대로 찾아 바꾼다).
-FRAMES = render_set(
-    {'down': HEAD_DOWN, 'side': HEAD_SIDE, 'up': HEAD_UP},
-    {'down': HEAD_DOWN_BLINK, 'side': HEAD_SIDE_BLINK}, '', 'new_boy_')
+ALL = [(render_set(h, rp, op), rp) for rp, op, h in SETS]
 
-FRAMES_S = render_set(
-    {'down': HEADS_SHORT[0], 'side': HEADS_SHORT[1], 'up': HEADS_SHORT[2]},
-    {'down': HEADS_SHORT_BLINK[0], 'side': HEADS_SHORT_BLINK[1]},
-    'short_', 'hair_short_')
-
-FRAMES_K = render_set(
-    {'down': HEADS_SPIKY[0], 'side': HEADS_SPIKY[1], 'up': HEADS_SPIKY[2]},
-    {'down': HEADS_SPIKY_BLINK[0], 'side': HEADS_SPIKY_BLINK[1]},
-    'spiky_', 'hair_spiky_')
-
-FRAMES_F = render_set(
-    {'down': HEAD_DOWN_F, 'side': HEAD_SIDE_F, 'up': HEAD_UP_F},
-    {'down': closed_eyes(HEAD_DOWN_F), 'side': closed_eyes(HEAD_SIDE_F)},
-    'f_', 'player_f_')
-
-# player.gd SWING_HAND_DOT에 옮겨 적을 주먹 좌표 (남녀 같은 골격이라 공용)
+# player.gd SWING_HAND_DOT에 옮겨 적을 주먹 좌표 (네 벌이 같은 골격이라 공용)
 print('SWING_HAND_DOT (player.gd):')
 for d in ('side', 'down', 'up'):
     pts = ', '.join('Vector2(%g, %g)' % hand_dot(d, i) for i in range(SWING_N))
@@ -1211,8 +1134,7 @@ def gif(images, name, keys, ms=125):
                 duration=ms, loop=0)
 
 
-for images, tag in ((FRAMES, ''), (FRAMES_F, 'f_'),
-                    (FRAMES_S, 'short_'), (FRAMES_K, 'spiky_')):
+for images, tag in ALL:
     strip(images, f'preview_{tag}idle.png', ['down_idle', 'side_idle', 'up_idle'])
     for d in ('down', 'side', 'up'):
         keys = [f'{d}_walk_{i}' for i in range(WALK)]
@@ -1223,5 +1145,16 @@ for images, tag in ((FRAMES, ''), (FRAMES_F, 'f_'),
         gif(images, f'anim_{tag}{d}_swing.gif', sw, ms=170)
     gif(images, f'anim_{tag}idle.gif', ['down_idle', 'side_idle', 'up_idle'], ms=600)
 
-print('done: %d+%d frames + previews + gifs (sprites/에 설치됨)'
-      % (len(FRAMES), len(FRAMES_F)))
+# 네 벌의 서기·깜빡임을 한 장에 — 얼굴을 견줘 보는 용도
+_faces = []
+for images, tag in ALL:
+    _faces += [images['down_idle'], images['down_blink'], images['side_idle'], images['up_idle']]
+_sheet = Image.new('RGB', (FW * 2 * len(_faces), FH * 2))
+for i, fim in enumerate(_faces):
+    base = Image.new('RGBA', (FW, FH), SAND + (255,))
+    base.alpha_composite(fim)
+    _sheet.paste(base.convert('RGB').resize((FW * 2, FH * 2), Image.NEAREST), (i * FW * 2, 0))
+_sheet.save(os.path.join(REF, 'preview_faces.png'))
+
+print('done: %d frames x %d sets + previews + gifs (sprites/에 설치됨)'
+      % (len(ALL[0][0]), len(ALL)))
