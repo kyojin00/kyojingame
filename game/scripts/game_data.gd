@@ -36,6 +36,10 @@ const CROPS := {
 	"pumpkin": {"name": "호박", "seed_price": 80, "sell_price": 145, "grow_days": 7, "seasons": [FALL]},
 	"eggplant": {"name": "가지", "seed_price": 30, "sell_price": 55, "grow_days": 3, "seasons": [FALL]},
 	"cabbage": {"name": "배추", "seed_price": 50, "sell_price": 90, "grow_days": 5, "seasons": [FALL]},
+	# 사과나무(과수원, S6a) — 씨앗이 아니라 묘목이다. 열흘 자라면 열매를 맺고, 따도 나무는 남아 나흘마다
+	# 다시 맺는다. 물이 필요 없고 계절이 바뀌어도 시들지 않는다(겨울엔 그냥 서 있다). 묘목은 읍을 발견하면 온다
+	"apple": {"name": "사과", "seed_price": 150, "sell_price": 60, "grow_days": 10,
+		"seasons": [SPRING, SUMMER, FALL], "tree": true, "regrow_days": 4},
 	"winter_radish": {"name": "겨울무", "seed_price": 45, "sell_price": 80, "grow_days": 4, "seasons": [WINTER]},
 	# 봄
 	"spinach": {"name": "시금치", "seed_price": 25, "sell_price": 45, "grow_days": 2, "seasons": [SPRING]},
@@ -63,6 +67,7 @@ const CROP_IDS := [
 	"pumpkin", "eggplant", "cabbage", "sweet_potato", "bean", "rice",
 	"winter_radish", "leek", "beet", "snow_cabbage",
 	"herb_leaf",
+	"apple",
 ]
 
 const ENERGY_MAX := 100.0  # 체력 (동굴 전투용. 밖에서는 천천히 자연 회복)
@@ -8566,6 +8571,16 @@ const JOBS := {
 # 자유직 문턱 8 — stat 값(사전이면 합)이 need 를 넘으면 불린다. 여럿이면 value/need 비율 최대(D16).
 # "animals" 만 통계가 아니라 런타임 animals_now(가축 수)다.
 const FREE_TITLES := {
+	# 과수원지기(S6a) — 사과만 센다(ids)
+	"orchardist": {
+		"name": "과수원지기",
+		"stat": "crops_harvested",
+		"ids": ["apple"],
+		"need": 60,
+		"known_m": "과수원 총각",
+		"known_f": "과수원 처자",
+		"master": "우리 마을 과수원지기",
+	},
 	"farmer": {
 		"name": "농부",
 		"stat": "crops_harvested",
@@ -9986,14 +10001,15 @@ func honor() -> String:
 
 
 # 자유직 통계값 — "animals" 는 런타임 가축 수, 사전(도감)이면 값의 합, 수면 그 값.
-func free_stat_value(stat: String) -> int:
+func free_stat_value(stat: String, ids: Array = []) -> int:
 	if stat == "animals":
 		return animals_now
 	var v: Variant = get(stat)
 	if v is Dictionary:
 		var total := 0
 		for k in v.keys():
-			total += int(v[k])
+			if ids.is_empty() or str(k) in ids:   # ids 가 있으면 그 종류만(과수원지기의 사과)
+				total += int(v[k])
 		return total
 	if v is int or v is float:
 		return int(v)
@@ -10008,7 +10024,7 @@ func free_title_of() -> String:
 		var need := int(FREE_TITLES[id].need)
 		if need <= 0:
 			continue
-		var value := free_stat_value(str(FREE_TITLES[id].stat))
+		var value := free_stat_value(str(FREE_TITLES[id].stat), FREE_TITLES[id].get("ids", []))
 		if value < need:
 			continue
 		var ratio := float(value) / float(need)
@@ -12156,6 +12172,11 @@ func grandpa_line() -> String:
 
 func merchant_discount() -> bool:
 	return aff("merchant") >= 50
+
+
+# 나무 작물(S6a) — 물이 필요 없고, 따도 남고, 계절에 안 시든다
+func crop_is_tree(id: String) -> bool:
+	return bool(CROPS.get(id, {}).get("tree", false))
 
 
 func seed_price(id: String) -> int:

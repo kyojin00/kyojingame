@@ -136,8 +136,12 @@ func _try_harvest(t: Vector2i) -> bool:
 			m.hud.show_message("은빛 %s 수확! (판매가 %dG)" % [def.name, qprice])
 		_:
 			m.hud.show_message("%s 수확! (판매가 %dG)" % [def.name, qprice])
-	cell.crop_id = ""
-	cell.crop_day = 0.0
+	if GameData.crop_is_tree(cid):
+		# 나무는 남는다(S6a) — 다음 열매까지 regrow_days
+		cell.crop_day = m.farming._grow_total(def) - float(def.get("regrow_days", 4)) * 60.0
+	else:
+		cell.crop_id = ""
+		cell.crop_day = 0.0
 	cell.half_fed = false
 	Sound.play_sfx("sfx_harvest")
 	m.renderer.spawn_particles(t, "sparkle")

@@ -819,8 +819,13 @@ func _reveal_sea() -> void:
 
 # 바다를 연 직후/불러온 직후 해변에 조개를 몇 개 깔아 둔다
 func _seed_beach_forage(with_node := true) -> void:
-	for i in 4:
-		_try_spawn_shell(with_node)
+	# 네 번 던져서 모래에 안 떨어지면 빈 해변이 된다(하네스 SEA 가 그걸 잡았다) — 넷이 놓일 때까지 던진다
+	var placed := 0
+	var tries := 0
+	while placed < 4 and tries < 40:
+		tries += 1
+		if _try_spawn_shell(with_node):
+			placed += 1
 
 
 func _try_spawn_shell(with_node := true) -> bool:

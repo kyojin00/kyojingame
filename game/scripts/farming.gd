@@ -20,6 +20,8 @@ func _grow_total(def: Dictionary) -> float:
 func _crop_thirsty(cell: Dictionary) -> bool:
 	if cell.crop_id == "" or cell.dead or bool(cell.get("half_fed", false)):
 		return false
+	if GameData.crop_is_tree(cell.crop_id):
+		return false   # 나무는 물을 안 찾는다(S6a)
 	return float(cell.crop_day) >= _grow_total(GameData.CROPS[cell.crop_id]) * m.GROW_CHECKPOINT
 
 
@@ -257,6 +259,12 @@ func _growth_tick(game_minutes: float) -> void:
 	var changed := false
 	var keep: Array[Dictionary] = []
 	for cell in _ticking:
+		# 나무(S6a)는 물과 상관없이 자란다
+		if cell.crop_id != "" and not cell.dead and GameData.crop_is_tree(cell.crop_id):
+			var before_tree: Texture2D = m.renderer._crop_texture(cell)
+			cell.crop_day = float(cell.crop_day) + game_minutes * GameData.farm_growth_mult()
+			if m.renderer._crop_texture(cell) != before_tree:
+				changed = true
 		if float(cell.wet_min) > 0.0:
 			cell.wet_min = float(cell.wet_min) - game_minutes
 			if float(cell.wet_min) <= 0.0:

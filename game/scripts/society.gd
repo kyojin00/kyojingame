@@ -1368,8 +1368,9 @@ func _grudge_trample() -> void:
 	for cell: Dictionary in m.farming.farm_cells():
 		if pulled >= GameData.GRUDGE_CROPS:
 			break
-		if str(cell.get("crop_id", "")) == "" or bool(cell.get("dead", false)):
-			continue
+		if str(cell.get("crop_id", "")) == "" or bool(cell.get("dead", false)) \
+				or GameData.crop_is_tree(str(cell.crop_id)):
+			continue   # 나무는 못 뽑는다
 		cell.crop_id = ""
 		cell.crop_day = 0.0
 		cell.dead = false
@@ -2870,7 +2871,7 @@ func serve_sentence() -> void:
 		cell.watered = false
 		cell.wet_min = 0.0
 		var cid := str(cell.get("crop_id", ""))
-		if cid == "" or bool(cell.get("dead", false)) or not GameData.CROPS.has(cid):
+		if cid == "" or bool(cell.get("dead", false)) or not GameData.CROPS.has(cid) or GameData.crop_is_tree(cid):
 			continue
 		if m.village.in_greenhouse(Vector2i(int(cell.tx), int(cell.ty))):
 			continue

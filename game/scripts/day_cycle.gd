@@ -133,6 +133,7 @@ func _next_day(passed_out: bool) -> void:
 		for cell: Dictionary in m.farming.farm_cells():
 			if cell.crop_id != "" and not cell.dead \
 					and GameData.season() not in GameData.CROPS[cell.crop_id].seasons \
+					and not GameData.crop_is_tree(cell.crop_id) \
 					and not m.village.in_greenhouse(Vector2i(int(cell.tx), int(cell.ty))):
 				cell.dead = true
 				wilted += 1

@@ -563,6 +563,9 @@ func open_town_sign() -> void:
 	GameData.town_open = true
 	if first:
 		m.hud.event_toast("%s 발견!" % m.TOWN_NAME)
+		if not GameData.shop_seeds.has("apple"):
+			GameData.shop_seeds.append("apple")   # 읍 장터의 묘목이 잡화점에 들어온다(과수원, S6a)
+			m.hud.show_message("잡화점에 사과나무 묘목이 들어온다.", 4.0)
 		m.saveio.save_now()
 	m.dialog.open(m.TOWN_NAME, "『갈뫼읍 — 군청 · 경찰서 · 법원 · 검찰청』\n" \
 		+ "관청 거리 아래로 보건소·신협·여관·식당, 그 아래가 장터다.\n"
