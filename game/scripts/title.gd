@@ -433,13 +433,6 @@ func _appear_refresh() -> void:
 		for i in btns.size():
 			var sw: Button = btns[i]
 			_paint_swatch(sw, i == sel)
-	# 민머리에는 머리카락 픽셀이 아예 없다 — 머리색 줄을 흐리게 해서
-	# 「지금은 눌러도 안 바뀐다」를 색으로 알려 준다
-	if _swatch_btns.has("hair_col"):
-		var lit: bool = int(_appear.hair) != 0
-		var hair_sw: Array = _swatch_btns["hair_col"]
-		for b2: Button in hair_sw:
-			b2.modulate = Color(1, 1, 1, 1.0 if lit else 0.4)
 	# 액자: 고른 머리의 정면 도트를 그 자리에서 갈아입힌다 (평소 + 눈 감은 것)
 	_idle_tex = _dress("%s_down_idle" % GameData.HAIR_PREFIX[int(_appear.hair)])
 	_blink_tex = _dress("%s_down_blink" % GameData.HAIR_PREFIX[int(_appear.hair)])

@@ -113,12 +113,11 @@ const SWING_POSE := {
 # 안 맞으면 도구가 손에서 뜬다. 도트가 없는 방향은 SWING_POSE의 식을 쓴다.
 const SWING_HAND_DOT := {
 	# 감기 시작 · 다 감음(머리 옆) · 휘두름 · 내리침 · 되돌아옴
-	# 앞·뒷모습은 옆으로 쓸지 않고 **앞으로** 내리친다(원근). 앞모습은 팔이
-	# 닿는 왼쪽 옆에서 그대로 내리 긋고(가운데까지 억지로 안 끌고 간다),
-	# 뒷모습은 정수리 너머 저편으로 넘어가 주먹이 머리에 가려진다.
-	"side": [Vector2(-19, -57), Vector2(-22, -71), Vector2(23, -65), Vector2(19, -25), Vector2(17, -37)],
-	"down": [Vector2(-21, -53), Vector2(-25, -71), Vector2(-29, -53), Vector2(-13, -29), Vector2(-21, -49)],
-	"up": [Vector2(21, -57), Vector2(21, -73), Vector2(9, -90), Vector2(3, -77), Vector2(21, -63)],
+	# 4판(AI 시트 밑그림)은 휘두르기가 네 장이라 「다 감음」을 「휘두름」 위상에도
+	# 쓴다 — 주먹 자리도 둘이 같다. (3세대 시트에서 눈으로 읽은 값)
+	"side": [Vector2(-18, -57), Vector2(-9, -86), Vector2(-9, -86), Vector2(16, -16), Vector2(19, -37)],
+	"down": [Vector2(-18, -57), Vector2(-9, -86), Vector2(-9, -86), Vector2(16, -34), Vector2(16, -35)],
+	"up": [Vector2(19, -56), Vector2(10, -87), Vector2(10, -87), Vector2(-19, -17), Vector2(-16, -34)],
 }
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",

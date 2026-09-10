@@ -101,7 +101,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.hunger_open = bool(d.get("hunger_open", false))
 	GameData.gender = str(d.get("gender", "m"))
 	# 외형 — 외형 시스템 이전의 세이브는 성별에서 옛 기본 모습을 만든다
-	# (남자 = 민머리·파란 셔츠, 여자 = 긴 머리·분홍 셔츠)
+	# (남자 = 짧은 머리·파란 셔츠, 여자 = 긴 머리·분홍 셔츠)
 	var was_f := GameData.gender == "f"
 	var ap: Dictionary = d.get("appearance", {})
 	GameData.appearance = {

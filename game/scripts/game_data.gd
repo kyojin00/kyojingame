@@ -918,7 +918,7 @@ var gender := "m"  # 플레이어 성별 (m/f) — 옛 세이브 호환용 (외�
 var appearance := {"hair": 0, "shirt": 0, "pants": 0, "shoes": 0,
 	"skin": 0, "hair_col": 0}
 const HAIR_PREFIX := ["new_boy", "hair_short", "hair_spiky", "player_f"]
-const HAIR_NAMES := ["민머리", "짧은 머리", "삐죽 머리", "긴 머리"]
+const HAIR_NAMES := ["짧은 머리", "단발", "삐죽 머리", "긴 머리"]
 const SHIRT_NAMES := ["파랑", "분홍", "초록", "노랑"]
 const PANTS_NAMES := ["갈색", "남색", "잿빛", "카키"]
 const SHOES_NAMES := ["밤색", "검정", "빨강", "파랑"]
@@ -956,8 +956,8 @@ const APPEAR_SKIN := [
 	[[158, 102, 68], [182, 130, 94], [120, 72, 46], [150, 86, 58], [96, 54, 34]],
 	[[116, 74, 50], [142, 98, 68], [84, 50, 32], [110, 62, 42], [68, 38, 24]],
 ]
-# 머리카락 [기본, 밝은 면, 그늘] — 민머리(new_boy)에는 이 색이 아예 없어서
-# 아무리 바꿔도 그림이 그대로다 (그래서 생성창에서 머리색 줄이 흐려진다)
+# 머리카락 [기본, 밝은 면, 그늘] — 네 벌 모두 머리카락이 있어 다 바뀐다
+# (4판부터. 옛 민머리 벌은 짧은 머리가 됐다)
 const APPEAR_HAIR_COL := [
 	[[118, 72, 40], [152, 100, 56], [86, 52, 30]],
 	[[52, 46, 50], [78, 72, 78], [32, 28, 32]],
@@ -3679,8 +3679,10 @@ func swing_tex_base(key: String) -> String:
 # 초당 칸 수도 8에서 12로 올렸다. 8fps × 여섯 칸이면 한 바퀴가 0.75초,
 # 이동 속도 150px/s로는 한 발짝에 3.5칸(112px)을 간다 — 발이 미끄러진다.
 # 12fps면 한 발짝이 1.2칸쯤이라 다리 길이에 가깝다.
-const WALK_FRAMES := 6
-const WALK_FPS := 12.0
+# 4판(AI 시트 밑그림)은 걷기가 다섯 칸으로 그려져 있다. 한 바퀴가 같은
+# 0.5초가 되게 초당 10칸.
+const WALK_FRAMES := 5
+const WALK_FPS := 10.0
 
 
 func player_side_tex(is_moving: bool, _suffix: String, t: float) -> String:
