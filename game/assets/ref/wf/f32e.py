@@ -81,10 +81,13 @@ def band(g, rows, L, R, ch):
 
 
 def shell(g, table, fill_ch=None):
-    """row -> (L, R) 표를 받아 양끝을 윤곽으로, 안쪽을 fill_ch 로 채운다."""
+    """row -> (L, R) 표를 받아 안쪽을 fill_ch 로 채운다.
+
+    양끝에 윤곽을 직접 써 넣지 않는다 — 윤곽은 outline_pass 가 **재질 색으로**
+    두른다. 여기서 검정을 박아 두면 옆에 머리가 붙은 자리(여자 어깨)에만
+    검정이 남아 남녀 어깨선이 달라진다."""
     for y in sorted(table):
         L, R = table[y]
-        hfill(g, y, L, R, '#')
         if fill_ch is not None and R - L >= 2:
             hfill(g, y, L + 1, R - 1, fill_ch)
 
@@ -117,8 +120,27 @@ def rim_right(g, y0, y1, n, ch):
                 break
 
 
+# 재질 -> 그 재질의 가장 어두운 단. 실루엣을 **이 색으로** 두른다.
+# 참고 도트에는 검정이 한 칸도 없다 — 머리는 (75,57,57), 스웨터는 (36,70,88),
+# 바지는 (58,57,74) 로 재질마다 자기 가장 어두운 단이 테두리를 맡는다.
+# 검정 한 색으로 두르면 선이 딱딱하고, 옷을 갈아입혀도 테두리만 그대로라 겉돈다.
+EDGE = {}
+for _k in 'slScmkw':
+    EDGE[_k] = 'k'          # 살결 (184,99,83)
+for _k in 'hHdDG':
+    EDGE[_k] = 'D'          # 머리 (58,35,20)
+for _k in 'tTyYU':
+    EDGE[_k] = 'Y'          # 윗도리 (27,41,84)
+for _k in 'pPqQu':
+    EDGE[_k] = 'Q'          # 아랫도리 (69,43,22)
+for _k in 'oOx':
+    EDGE[_k] = 'x'          # 신발 (39,26,18)
+for _k in 'eiW':
+    EDGE[_k] = 'D'
+
+
 def outline_pass(g):
-    """바깥 공기와 맞닿은 칸을 전부 윤곽으로 — 위·아래 모서리까지 닫는다."""
+    """바깥 공기와 맞닿은 칸을 그 재질의 가장 어두운 단으로 바꾼다."""
     todo = []
     for y in range(GH):
         for x in range(GW):
@@ -132,7 +154,14 @@ def outline_pass(g):
                     todo.append((x, y))
                     break
     for x, y in todo:
-        g[y][x] = '#'
+        vote = {}
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < GW and 0 <= ny < GH:
+                e = EDGE.get(g[ny][nx])
+                if e:
+                    vote[e] = vote.get(e, 0) + 1
+        g[y][x] = max(vote, key=vote.get) if vote else '#'
 
 
 def soften(g):
@@ -144,7 +173,7 @@ def soften(g):
     cut = []
     for y in range(GH):
         for x in range(GW):
-            if g[y][x] != '#':
+            if g[y][x] not in ('#', 'k', 'D', 'Y', 'Q', 'x'):
                 continue
             hor = [dx for dx in (-1, 1)
                    if 0 <= x + dx < GW and g[y][x + dx] != '.']
@@ -253,7 +282,7 @@ def build_boy():
     # 수직으로 내려간다. 전에는 목 바로 밑이 곧장 최대 폭이라 어깨가 없었다
     # 목은 20줄 한 줄뿐. 21줄부터 바로 어깨가 벌어진다 (전에는 21줄이
     # 좁은 깃이라 목이 두 줄로 길어 보였다). 어깨 폭은 18 → 20 칸
-    BODY = {21: (10, 21), 22: (8, 23)}
+    BODY = {21: (9, 22), 22: (7, 24)}
     for y in range(23, 29):
         BODY[y] = (7, 24)
     for y in range(29, 32):
@@ -269,8 +298,8 @@ def build_boy():
     # 소매 — **가르는 선을 넣지 않는다.** 왼팔을 한 단 밝게, 오른팔을 한 단
     # 어둡게 칠하면 톤만으로 팔이 갈린다. 검은 줄로 자르면 어깨가 세 갈래
     # 세로 띠가 되어 「어깨가 없는」 몸이 된다 (참고 도트도 선이 없다)
-    hfill(g, 21, 11, 20, 'T')      # 어깨 뚜껑 — 빛을 정면으로 받는 면
-    hfill(g, 22, 9, 22, 'T')       # 두 줄을 깔고 그 아래에서 팔만 남긴다
+    hfill(g, 21, 10, 21, 'T')      # 어깨 뚜껑 — 빛을 정면으로 받는 면
+    hfill(g, 22, 8, 23, 'T')       # 두 줄을 깔고 그 아래에서 팔만 남긴다
     for y in range(23, 28):
         hfill(g, y, 8, 10, 'T')    # 왼팔
     for y in range(23, 32):        # 오른팔 이음선 한 줄 (오른팔 색은 몸통과 같다)
