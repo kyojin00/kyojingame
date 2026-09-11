@@ -254,8 +254,10 @@ def build_boy():
     # 목은 20줄 한 줄뿐. 21줄부터 바로 어깨가 벌어진다 (전에는 21줄이
     # 좁은 깃이라 목이 두 줄로 길어 보였다). 어깨 폭은 18 → 20 칸
     BODY = {21: (10, 21), 22: (8, 23)}
-    for y in range(23, 32):
-        BODY[y] = (6, 25)
+    for y in range(23, 29):
+        BODY[y] = (7, 24)
+    for y in range(29, 32):
+        BODY[y] = (6, 25)          # 손끝만 벙어리장갑처럼 불룩
     BODY[32] = (10, 21)
     for y in range(33, 46):
         BODY[y] = (10, 21)
@@ -270,7 +272,7 @@ def build_boy():
     hfill(g, 21, 11, 20, 'T')      # 어깨 뚜껑 — 빛을 정면으로 받는 면
     hfill(g, 22, 9, 22, 'T')       # 두 줄을 깔고 그 아래에서 팔만 남긴다
     for y in range(23, 28):
-        hfill(g, y, 7, 10, 'T')    # 왼팔 (네 칸으로 도톰하게)
+        hfill(g, y, 8, 10, 'T')    # 왼팔
     for y in range(23, 32):        # 오른팔 이음선 한 줄 (오른팔 색은 몸통과 같다)
         swap(g, 20, y, 't', 'y')
     for y in (23, 24):             # 왼쪽 겨드랑이 주름
@@ -279,13 +281,15 @@ def build_boy():
     hfill(g, 21, 13, 14, 'U')
     hfill(g, 21, 17, 18, 'U')
     hfill(g, 21, 15, 16, 'S')
-    hfill(g, 27, 7, 10, 'U')       # 걷어올린 소맷단
-    hfill(g, 27, 21, 24, 'U')
+    hfill(g, 27, 8, 10, 'U')       # 걷어올린 소맷단
+    hfill(g, 27, 21, 23, 'U')
     # 손
-    for y in range(28, 32):
+    hfill(g, 28, 8, 10, 's')
+    hfill(g, 28, 21, 23, 's')
+    for y in range(29, 32):
         hfill(g, y, 7, 10, 's')
         hfill(g, y, 21, 24, 's')
-    hfill(g, 28, 7, 8, 'l')
+    hfill(g, 28, 8, 9, 'l')
     hfill(g, 29, 7, 8, 'l')
     hfill(g, 31, 7, 10, 'S')
     hfill(g, 31, 21, 24, 'S')
