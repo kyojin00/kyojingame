@@ -306,10 +306,9 @@ def build_boy():
     hfill(g, 22, 8, 23, 'T')       # 두 줄을 깔고 그 아래에서 팔만 남긴다
     for y in range(23, 28):
         hfill(g, y, 8, 10, 'T')    # 왼팔
-    for y in range(23, 32):        # 오른팔 이음선 한 줄 (오른팔 색은 몸통과 같다)
+    for y in range(25, 32):        # 팔 이음선 — 어깨 뚜껑에서 두 줄 띄운다
+        swap(g, 11, y, 't', 'y')   # (붙여 놓으면 팔이 어깨에 매달린 꼴)
         swap(g, 20, y, 't', 'y')
-    for y in (23, 24):             # 왼쪽 겨드랑이 주름
-        swap(g, 11, y, 't', 'y')
     # 옷깃 — 어깨 뚜껑 위에 얹는다
     hfill(g, 21, 13, 14, 'U')
     hfill(g, 21, 17, 18, 'U')
@@ -421,10 +420,9 @@ def build_girl():
     hfill(g, 22, 9, 22, 'T')
     for y in range(23, 26):
         hfill(g, y, 8, 10, 'T')
-    for y in range(23, 32):        # 오른팔 이음선 한 줄
-        swap(g, 20, y, 't', 'y')
-    for y in (23, 24):
+    for y in range(25, 32):        # 팔 이음선 — 어깨 뚜껑에서 두 줄 띄운다
         swap(g, 11, y, 't', 'y')
+        swap(g, 20, y, 't', 'y')
     hfill(g, 21, 13, 14, 'U')      # 옷깃
     hfill(g, 21, 17, 18, 'U')
     hfill(g, 21, 15, 16, 'S')
@@ -556,7 +554,7 @@ def body_side(g, girl):
     shell(g, BODY, 't')
     hfill(g, 21, 11, 20, 'T')      # 어깨 뚜껑
     hfill(g, 22, 10, 21, 'T')
-    for y in range(23, 32):        # 등 쪽 한 단 어둡게 — 앞뒤가 갈린다
+    for y in range(25, 32):        # 등 쪽 한 단 어둡게 — 앞뒤가 갈린다
         swaprow(g, y, 10, 11, 't', 'y')
     for y in range(23, 27):        # 앞쪽 팔
         hfill(g, y, 17, 21, 'T')
