@@ -547,18 +547,18 @@ def draw_head_side(g, girl):
 def body_side(g, girl):
     """옆몸. 앞모습보다 두 칸만 얇다 (절반으로 줄이면 방향이 바뀔 때
     캐릭터가 홀쭉해졌다 부풀었다 한다). 팔 하나가 몸통 한가운데에 붙는다."""
-    BODY = {21: (10, 21), 22: (8, 23)}
+    BODY = {21: (11, 20), 22: (9, 22)}
     for y in range(23, 32):
-        BODY[y] = (8, 23)
-    for y in range(32, 46):
-        BODY[y] = (10, 21)
-    for y in range(46, 48):
         BODY[y] = (9, 22)
+    for y in range(32, 46):
+        BODY[y] = (11, 20)
+    for y in range(46, 48):
+        BODY[y] = (10, 21)
     shell(g, BODY, 't')
-    hfill(g, 21, 11, 20, 'T')      # 어깨 뚜껑
-    hfill(g, 22, 9, 22, 'T')
+    hfill(g, 21, 12, 19, 'T')      # 어깨 뚜껑
+    hfill(g, 22, 10, 21, 'T')
     for y in range(25, 32):        # 등 쪽 한 단 어둡게 — 앞뒤가 갈린다
-        swap(g, 9, y, 't', 'y')
+        swap(g, 10, y, 't', 'y')
     for y in range(23, 27):        # 팔 — 몸통 한가운데, 여섯 칸
         hfill(g, y, 13, 18, 'T')
     for y in range(23, 32):        # 뒤쪽 이음선 — 팔이 몸 앞에 있다는 표시
@@ -569,35 +569,35 @@ def body_side(g, girl):
     for y in (30, 31):             # 가로질러 허리띠처럼 보인다
         hfill(g, y, 14, 17, 's')
     hfill(g, 31, 14, 17, 'S')
-    hfill(g, 31, 9, 22, 'Y')       # 윗도리 밑단
+    hfill(g, 31, 10, 21, 'Y')      # 윗도리 밑단
     if girl:
-        hfill(g, 32, 10, 21, 'Q')
+        hfill(g, 32, 11, 20, 'Q')
         for y in range(33, 39):    # 치마
             w = (y - 33) // 2
-            hfill(g, y, 9 - w, 22 + w, 'p')
-            swaprow(g, y, 9 - w, 10 - w, 'p', 'q')
-            swaprow(g, y, 21 + w, 22 + w, 'p', 'P')
-        for y in range(39, 43):    # 맨다리
-            hfill(g, y, 12, 19, 's')
-            swaprow(g, y, 12, 13, 's', 'S')
+            hfill(g, y, 10 - w, 21 + w, 'p')
+            swaprow(g, y, 10 - w, 11 - w, 'p', 'q')
+            swaprow(g, y, 20 + w, 21 + w, 'p', 'P')
+        for y in range(39, 43):    # 맨다리 — 앞보다 얇다
+            hfill(g, y, 13, 18, 's')
+            swaprow(g, y, 13, 14, 's', 'S')
         for y in range(43, 48):
-            hfill(g, y, 12, 20, 'o')
-            swaprow(g, y, 12, 13, 'o', 'O')
-        hfill(g, 43, 12, 19, 'O')
-        hfill(g, 47, 11, 21, 'x')
+            hfill(g, y, 13, 19, 'o')
+            swaprow(g, y, 13, 14, 'o', 'O')
+        hfill(g, 43, 13, 18, 'O')
+        hfill(g, 47, 12, 20, 'x')
     else:
-        hfill(g, 32, 10, 21, 'Q')
+        hfill(g, 32, 11, 20, 'Q')
         hfill(g, 32, 15, 16, 'u')
-        for y in range(33, 42):    # 바지 — 앞모습과 같은 10칸
-            hfill(g, y, 11, 20, 'p')
-            swaprow(g, y, 11, 12, 'p', 'q')
-            swaprow(g, y, 19, 20, 'p', 'P')
-        hfill(g, 41, 11, 20, 'Q')
+        for y in range(33, 42):    # 바지 — 옆에서 본 다리는 얇다
+            hfill(g, y, 12, 19, 'p')
+            swaprow(g, y, 12, 13, 'p', 'q')
+            swaprow(g, y, 18, 19, 'p', 'P')
+        hfill(g, 41, 12, 19, 'Q')
         for y in range(42, 48):
-            hfill(g, y, 11, 21, 'o')
-            swaprow(g, y, 20, 21, 'o', 'O')
-        hfill(g, 42, 11, 20, 'O')
-        hfill(g, 47, 10, 22, 'x')
+            hfill(g, y, 12, 20, 'o')
+            swaprow(g, y, 19, 20, 'o', 'O')
+        hfill(g, 42, 12, 19, 'O')
+        hfill(g, 47, 11, 21, 'x')
 
 
 def build_side(girl):
@@ -620,16 +620,15 @@ def build_back(girl):
     """뒷모습 — 앞모습 몸을 그대로 쓰고 머리만 통째로 채운다.
     뒤통수에는 얼굴이 없으므로 앞머리·눈·입을 빼고 머릿결과 목만 남긴다."""
     g = (build_girl if girl else build_boy)()
-    for y in range(1, 20):         # 얼굴이 있던 자리를 머리로
+    for y in range(1, 20):         # 머리 자리를 통째로 밀어 흔적을 지운다
         for x in range(GW):
-            if g[y][x] in 'slScmkwebW':
+            if g[y][x] != '.':
                 g[y][x] = 'h'
     rim_top(g, 6, 25, 3, 'H')      # 명암은 앞모습과 같은 방식으로 다시
     rim_right(g, 3, 19, 2, 'd')
-    for x, y0, y1 in ((12, 8, 14), (20, 6, 12)):   # 머릿결 — 두 줄, 길이 다르게
+    for x, y0, y1 in ((12, 9, 15), (20, 7, 13)):   # 머릿결 — 두 줄, 길이 다르게
         for y in range(y0, y1 + 1):
             swap(g, x, y, 'hH', 'd')
-    hfill(g, 19, 13, 18, 'd')      # 머리 밑단
     hfill(g, 20, 13, 18, 'k')      # 목덜미
     hfill(g, 20, 14, 17, 'S')
     for y in range(21, 32):        # 깃·단추를 지운다 (뒤에는 없다)
