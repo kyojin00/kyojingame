@@ -119,8 +119,11 @@ def face64(g, cx, girl, q=False):
         # 3/4 — 가까운 눈은 다섯 칸, 먼 눈은 네 칸으로 눌린다
         eye64(g, cx - 9, ey, 5, lash=girl)
         eye64(g, cx + 3, ey, 4, mirror=True, lash=girl)
-        hfill(g, ey + 7, cx + 5, cx + 6, 'S')       # 콧대
-        put(g, cx + 5, ey + 8, 'S')
+        # 코는 두 눈 사이, 먼 눈 쪽에 붙는다. 먼 눈 바깥(뺨)에 두면
+        # 볼에 얼룩이 묻은 것처럼 보인다.
+        for y in (ey + 5, ey + 6, ey + 7):
+            put(g, cx + 1, y, 'S')
+        hfill(g, ey + 8, cx + 1, cx + 2, 'k')
         hfill(g, ey + 11, cx - 1, cx + 2, 'm')      # 입
         hfill(g, ey + 12, cx, cx + 1, 'c')
         hfill(g, ey + 5, cx - 11, cx - 8, 'c')      # 볼 — 가까운 쪽이 넓다
@@ -150,7 +153,53 @@ def build(kind, girl):
                 if g[y][x] in 'eWbm':
                     g[y][x] = 's'
         face64(g, cx, girl, q=(kind == 'side'))
+    hair64(g, girl)
+    detail64(g)
+    soften(g)
     return g
+
+
+def soften(g):
+    """볼록 모서리를 한 칸씩 깎는다. 64칸에서는 한 칸이 화면 한 픽셀이라
+    이 한 번으로 실루엣이 눈에 띄게 둥글어진다."""
+    cut = []
+    for y in range(GH):
+        for x in range(GW):
+            if g[y][x] == '.':
+                continue
+            hor = [dx for dx in (-1, 1) if 0 <= x + dx < GW and g[y][x + dx] != '.']
+            ver = [dy for dy in (-1, 1) if 0 <= y + dy < GH and g[y + dy][x] != '.']
+            if len(hor) == 1 and len(ver) == 1:
+                dx, dy = hor[0], ver[0]
+                if 0 <= x + dx < GW and 0 <= y + dy < GH and g[y + dy][x + dx] != '.':
+                    cut.append((x, y))
+    for x, y in cut:
+        g[y][x] = '.'
+
+
+def hair64(g, girl):
+    """머릿결 — 64칸에서는 한 칸 굵기 가닥을 여러 개 넣을 수 있다.
+    2배로만 키우면 결이 두 칸이라 얼굴만 정밀하고 머리는 뭉툭해 보인다."""
+    # 가닥은 적게, 짧게, 시작 높이를 다르게. 정수리부터 끝까지 곧게 그은
+    # 줄을 여러 개 넣으면 머리가 아니라 나뭇결이 된다.
+    dark = ((19, 11, 19), (27, 7, 13), (41, 9, 20), (47, 6, 11))
+    for x, y0, y1 in dark:
+        for y in range(y0, y1 + 1):
+            swap(g, x, y, 'hH', 'd')
+    if girl:                       # 긴 머리 — 아래쪽에 두 가닥만
+        for x, y0, y1 in ((15, 34, 45), (49, 37, 46)):
+            for y in range(y0, y1 + 1):
+                swap(g, x, y, 'hH', 'd')
+
+
+def detail64(g):
+    """손가락 · 옷 주름 — 한 칸 굵기라 32칸에서는 못 넣던 것들."""
+    for x, y0, y1 in ((19, 59, 62), (45, 59, 62)):      # 손가락 가름선
+        for y in range(y0, y1 + 1):
+            swap(g, x, y, 'sl', 'S')
+    for x, y0, y1 in ((27, 50, 54), (37, 46, 49), (29, 60, 62)):   # 옷 주름
+        for y in range(y0, y1 + 1):
+            swap(g, x, y, 't', 'y')
 
 
 def outline_pass(g):
