@@ -135,7 +135,7 @@ for _k in 'pPqQu':
     EDGE[_k] = 'Q'          # 아랫도리 (69,43,22)
 for _k in 'oOx':
     EDGE[_k] = 'x'          # 신발 (39,26,18)
-for _k in 'eiW':
+for _k in 'ebW':
     EDGE[_k] = 'D'
 
 
@@ -232,17 +232,21 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
     hfill(g, 19, 12, 19, 'S')
 
     # --- 눈 (3칸 폭 x 3줄). 바깥 아래 모서리를 깎아 둥글게, 흰자 한 칸을 넣는다
+    # 참고 도트 구조 — 속눈썹 한 줄 · 홍채 두 줄 · 아래 한 단 밝은 줄.
+    # 세 줄을 통째로 검정으로 칠하면 눈이 구멍 두 개가 된다.
     t = eye_top
-    for y in (t, t + 1):
-        hfill(g, y, EL, EL + 2, 'e')
-        hfill(g, y, ER, ER + 2, 'e')
-    hfill(g, t + 2, EL + 1, EL + 2, 'e')
-    hfill(g, t + 2, ER, ER + 1, 'e')
-    put(g, EL, t + 1, 'W')               # 반사점 — 원본 자리 (옮겨 봤더니
-    put(g, ER + 2, t + 1, 'W')           # 오히려 이상해서 되돌렸다)
+    hfill(g, t, EL, EL + 2, 'e')
+    hfill(g, t, ER, ER + 2, 'e')
+    for y in (t + 1, t + 2):
+        hfill(g, y, EL, EL + 2, 'b')
+        hfill(g, y, ER, ER + 2, 'b')
+    put(g, EL, t + 1, 'W')               # 반사점은 바깥쪽 (참고 도트도 대칭)
+    put(g, ER + 2, t + 1, 'W')
+    hfill(g, t + 3, EL + 1, EL + 2, 'c')  # 아래 홍채 — 한 단 밝게
+    hfill(g, t + 3, ER, ER + 1, 'c')
     if lash:
-        put(g, EL, t + 2, 'e')
-        put(g, ER + 2, t + 2, 'e')
+        put(g, EL, t, 'e')
+        put(g, ER + 2, t, 'e')
 
     # --- 볼 · 입
     cheek = t + 3                        # 참고 도트는 볼이 아래 홍채와 같은 줄
@@ -487,6 +491,146 @@ def build_girl():
 SOFT = True
 
 
+# ================================================================ 옆·뒤
+# 옆모습은 앞모습을 돌린 게 아니라 **따로 찍는다.** 32칸에서는 폭이 절반으로
+# 줄어 얼굴 부속이 들어갈 자리가 달라지기 때문이다. 오른쪽을 보고 서 있고,
+# 게임이 왼쪽을 볼 때는 통째로 뒤집어 쓴다.
+#
+# 뒷모습은 앞모습 몸을 그대로 쓰고 머리만 통째로 채운다 — 뒤통수에는 얼굴이
+# 없으므로 앞머리·눈·입을 빼고, 대신 목덜미 그늘과 머릿결만 넣는다.
+
+# 옆얼굴 — 앞모습과 **같은 머리 표**를 쓴다. 폭이 달라지면 걸을 때 방향이
+# 바뀔 때마다 머리 크기가 들쭉날쭉해 보인다. 대신 얼굴을 오른쪽으로 몰고
+# 왼쪽(뒤통수)을 통째로 머리로 덮는다.
+HEAD_SIDE = {
+    1: (13, 20), 2: (11, 21), 3: (10, 22), 4: (8, 23), 5: (7, 23),
+    6: (7, 23), 7: (6, 23), 8: (6, 23), 9: (6, 22), 10: (6, 22),
+    11: (6, 22), 12: (6, 22), 13: (7, 22), 14: (7, 22), 15: (8, 23),
+    16: (8, 22), 17: (9, 21), 18: (10, 20), 19: (11, 19), 20: (12, 18),
+}
+# 옆얼굴 살결 — 줄마다 (뒤쪽 끝, 앞쪽 끝). 14·15줄에서 한 칸 나오는 게 코다.
+FACE_SIDE = {
+    10: (15, 22), 11: (14, 22), 12: (14, 22), 13: (14, 22), 14: (14, 22),
+    15: (14, 23), 16: (14, 21), 17: (15, 21), 18: (16, 20), 19: (17, 19),
+}
+
+
+def draw_head_side(g, girl):
+    """옆얼굴. 눈 하나, 코 한 칸, 뒤통수는 통째로 머리."""
+    shell(g, HEAD_SIDE, 'h')
+    for y in sorted(FACE_SIDE):
+        L, R = FACE_SIDE[y]
+        hfill(g, y, L, R, 's')
+    # 앞머리가 이마를 덮고 관자놀이로 흘러내린다 (칸마다 끝 줄이 다르다)
+    for x, bot in ((14, 12), (15, 11), (16, 10), (17, 10), (18, 9), (19, 9)):
+        for y in range(6, bot + 1):
+            swap(g, x, y, 'sl', 'h')
+    rim_top(g, 7, 22, 3, 'H')
+    rim_right(g, 3, 19, 2, 'd')
+    # 눈 하나 — 앞모습과 같은 구조(속눈썹 한 줄 · 홍채 두 줄 · 아래 밝은 단)
+    hfill(g, 11, 18, 20, 'e')      # 속눈썹 한 줄
+    hfill(g, 12, 18, 20, 'b')      # 홍채 두 줄
+    hfill(g, 13, 18, 20, 'b')
+    put(g, 20, 12, 'W')            # 반사점
+    hfill(g, 14, 19, 20, 'c')      # 아래 홍채
+    if girl:
+        put(g, 18, 11, 'e')
+    hfill(g, 16, 15, 17, 'c')      # 볼
+    hfill(g, 17, 19, 21, 'm')      # 입 (코 아래)
+    put(g, 15, 13, 'S')            # 귀
+    put(g, 15, 14, 'S')
+    hfill(g, 19, 16, 19, 'S')      # 턱 그늘
+    hfill(g, 20, 14, 18, 'k')      # 목
+    hfill(g, 20, 15, 17, 'S')
+
+
+def body_side(g, girl):
+    """옆몸. 어깨는 정면보다 좁고(앞뒤로 얇으니까), 팔 하나가 앞쪽에 붙는다."""
+    BODY = {21: (10, 21), 22: (9, 22)}
+    for y in range(23, 32):
+        BODY[y] = (9, 22)
+    for y in range(32, 46):
+        BODY[y] = (11, 20)
+    for y in range(46, 48):
+        BODY[y] = (10, 21)
+    shell(g, BODY, 't')
+    hfill(g, 21, 11, 20, 'T')      # 어깨 뚜껑
+    hfill(g, 22, 10, 21, 'T')
+    for y in range(23, 32):        # 등 쪽 한 단 어둡게 — 앞뒤가 갈린다
+        swaprow(g, y, 10, 11, 't', 'y')
+    for y in range(23, 27):        # 앞쪽 팔
+        hfill(g, y, 17, 21, 'T')
+    hfill(g, 27, 17, 21, 'U')      # 소맷단
+    for y in range(28, 32):        # 손
+        hfill(g, y, 17, 21, 's')
+    hfill(g, 31, 17, 21, 'S')
+    hfill(g, 31, 10, 21, 'Y')      # 윗도리 밑단
+    if girl:
+        hfill(g, 32, 11, 20, 'Q')
+        for y in range(33, 39):
+            w = (y - 33) // 2
+            hfill(g, y, 10 - w, 21 + w, 'p')
+            swaprow(g, y, 10 - w, 11 - w, 'p', 'q')
+            swaprow(g, y, 20 + w, 21 + w, 'p', 'P')
+        for y in range(39, 43):    # 맨다리
+            hfill(g, y, 13, 18, 's')
+            swaprow(g, y, 13, 14, 's', 'S')
+        for y in range(43, 48):
+            hfill(g, y, 13, 19, 'o')
+            swaprow(g, y, 13, 14, 'o', 'O')
+        hfill(g, 43, 13, 18, 'O')
+        hfill(g, 47, 12, 20, 'x')
+    else:
+        hfill(g, 32, 11, 20, 'Q')
+        hfill(g, 32, 15, 16, 'u')
+        for y in range(33, 42):
+            hfill(g, y, 12, 19, 'p')
+            swaprow(g, y, 12, 13, 'p', 'q')
+            swaprow(g, y, 18, 19, 'p', 'P')
+        hfill(g, 41, 12, 19, 'Q')
+        for y in range(42, 48):
+            hfill(g, y, 12, 20, 'o')
+            swaprow(g, y, 19, 20, 'o', 'O')
+        hfill(g, 42, 12, 19, 'O')
+        hfill(g, 47, 11, 21, 'x')
+
+
+def build_side(girl):
+    g = blank()
+    draw_head_side(g, girl)
+    if girl:                       # 긴 머리가 등 뒤로 흘러내린다
+        BACK = {}
+        for y in range(9, 31):
+            BACK[y] = (4 + max(0, y - 26) // 2, 12)
+        shell(g, BACK, 'h')
+        rim_right(g, 9, 30, 1, 'd')
+    body_side(g, girl)
+    return g
+
+
+def build_back(girl):
+    """뒷모습 — 앞모습 몸을 그대로 쓰고 머리만 통째로 채운다.
+    뒤통수에는 얼굴이 없으므로 앞머리·눈·입을 빼고 머릿결과 목만 남긴다."""
+    g = (build_girl if girl else build_boy)()
+    for y in range(1, 20):         # 얼굴이 있던 자리를 머리로
+        for x in range(GW):
+            if g[y][x] in 'slScmkwebW':
+                g[y][x] = 'h'
+    rim_top(g, 6, 25, 3, 'H')      # 명암은 앞모습과 같은 방식으로 다시
+    rim_right(g, 3, 19, 2, 'd')
+    for x, y0, y1 in ((12, 8, 14), (20, 6, 12)):   # 머릿결 — 두 줄, 길이 다르게
+        for y in range(y0, y1 + 1):
+            swap(g, x, y, 'hH', 'd')
+    hfill(g, 19, 13, 18, 'd')      # 머리 밑단
+    hfill(g, 20, 13, 18, 'k')      # 목덜미
+    hfill(g, 20, 14, 17, 'S')
+    for y in range(21, 32):        # 깃·단추를 지운다 (뒤에는 없다)
+        for x in range(11, 21):
+            if g[y][x] == 'U':
+                g[y][x] = 't'
+    return g
+
+
 def render(g):
     outline_pass(g)
     if SOFT:
@@ -584,13 +728,19 @@ def check(name, img):
 
 
 def main():
-    boy = render(build_boy())
-    girl = render(build_girl())
+    out = {}
+    for sex, girl in (('boy', False), ('girl', True)):
+        out[sex + '_down'] = render((build_girl if girl else build_boy)())
+        out[sex + '_side'] = render(build_side(girl))
+        out[sex + '_up'] = render(build_back(girl))
+    for k, im in out.items():
+        im.save(os.path.join(HERE, 'f32e_%s.png' % k))
+    boy, girl = out['boy_down'], out['girl_down']
     boy.save(os.path.join(HERE, 'f32e_boy.png'))
     girl.save(os.path.join(HERE, 'f32e_girl.png'))
     make_view(boy, girl).save(os.path.join(HERE, 'f32e_view.png'))
     allok = True
-    for nm, im in (('boy ', boy), ('girl', girl)):
+    for nm, im in sorted(out.items()):
         ok, msgs = check(nm, im)
         allok = allok and ok
         for m in msgs:
