@@ -216,7 +216,7 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
         put(g, ER + 2, t + 2, 'e')
 
     # --- 볼 · 입
-    cheek = t + 4                        # 눈에서 한 줄 떼어야 볼로 읽힌다
+    cheek = t + 3                        # 참고 도트는 볼이 아래 홍채와 같은 줄
     for x in (10, 11):
         swap(g, x, cheek, 'sl', 'c')
     for x in (20, 21):
@@ -249,11 +249,11 @@ def build_boy():
 
 
     # ================================ 몸
-    BODY = {21: (10, 21), 22: (8, 23)}
-    for y in range(23, 28):
+    # 어깨 — 목에서 어깨끝까지 **네 줄**에 걸쳐 벌어지고, 그 아래로 팔이
+    # 수직으로 내려간다. 전에는 목 바로 밑이 곧장 최대 폭이라 어깨가 없었다
+    BODY = {21: (12, 19), 22: (10, 21), 23: (8, 23)}
+    for y in range(24, 32):
         BODY[y] = (7, 24)
-    for y in range(28, 32):
-        BODY[y] = (6, 25)          # 손이 벙어리장갑처럼 바깥으로 불룩
     BODY[32] = (10, 21)
     for y in range(33, 46):
         BODY[y] = (10, 21)
@@ -265,35 +265,25 @@ def build_boy():
     hfill(g, 21, 13, 14, 'U')
     hfill(g, 21, 17, 18, 'U')
     hfill(g, 21, 15, 16, 'S')
-    # 팔과 몸통 사이 검정 줄
-    for y in range(23, 32):
-        put(g, 10, y, '#')
-        put(g, 21, y, '#')
-    # 소매 (왼쪽이 빛, 오른쪽이 그늘)
+    # 소매 — **가르는 선을 넣지 않는다.** 왼팔을 한 단 밝게, 오른팔을 한 단
+    # 어둡게 칠하면 톤만으로 팔이 갈린다. 검은 줄로 자르면 어깨가 세 갈래
+    # 세로 띠가 되어 「어깨가 없는」 몸이 된다 (참고 도트도 선이 없다)
     for y in range(23, 28):
         L, R = BODY[y]
-        hfill(g, y, L + 1, 9, 't')
-        hfill(g, y, 22, R - 1, 't')
-        swap(g, R - 1, y, 't', 'y')
-    for y in (23, 24, 25):
-        put(g, 8, y, 'T')
-    hfill(g, 27, 8, 9, 'U')        # 걷어올린 소맷단 — 밝은 색이라야 보인다
-    hfill(g, 27, 22, 23, 'U')
-    # 손 (벙어리장갑처럼 도톰하게)
+        hfill(g, y, L + 1, 10, 'T')
+        hfill(g, y, 21, R - 1, 'y')
+    hfill(g, 27, 8, 10, 'U')       # 걷어올린 소맷단
+    hfill(g, 27, 21, 23, 'U')
+    # 손
     for y in range(28, 32):
-        hfill(g, y, 7, 9, 's')
-        hfill(g, y, 22, 24, 's')
-    hfill(g, 28, 7, 8, 'l')
-    hfill(g, 29, 7, 8, 'l')
-    hfill(g, 31, 7, 9, 'S')
-    hfill(g, 31, 22, 24, 'S')
-    swap(g, 24, 30, 's', 'S')
-    # 몸통: 밝은 면 / 기본 / 그늘 세 장
-    for y in range(22, 32):
-        swaprow(g, y, 11, 12, 't', 'T')
-        swap(g, 20, y, 't', 'y')
-    swaprow(g, 22, 10, 11, 't', 'T')
-    swap(g, 21, 22, 't', 'y')
+        hfill(g, y, 8, 10, 's')
+        hfill(g, y, 21, 23, 's')
+    hfill(g, 28, 8, 9, 'l')
+    hfill(g, 29, 8, 9, 'l')
+    hfill(g, 31, 8, 10, 'S')
+    hfill(g, 31, 21, 23, 'S')
+    # 몸통에는 그늘 줄을 넣지 않는다. 오른소매와 같은 색이라 붙여 놓으면
+    # 팔이 몸통에 녹아버린다 — 소매 두 단만으로 팔이 갈린다
     # 단추
     for y in (23, 26, 29):               # 단추 — 몸통 안쪽 12~19 의 축은 15.5
         hfill(g, y, 15, 16, 'U')         # 한 칸이면 반 칸 어긋난다
@@ -364,8 +354,8 @@ def build_girl():
     put(g, 23, 10, 'y')
 
     # ================================ 몸
-    BODY = {21: (10, 21), 22: (9, 22)}
-    for y in range(23, 29):
+    BODY = {21: (12, 19), 22: (10, 21), 23: (9, 22)}
+    for y in range(24, 29):
         BODY[y] = (8, 23)
     for y in range(29, 32):
         BODY[y] = (7, 24)          # 손
@@ -385,17 +375,11 @@ def build_girl():
     hfill(g, 21, 13, 14, 'U')
     hfill(g, 21, 17, 18, 'U')
     hfill(g, 21, 15, 16, 'S')
-    # 팔과 몸통 사이 검정 줄
-    for y in range(23, 32):
-        put(g, 11, y, '#')
-        put(g, 20, y, '#')
-    # 짧은 소매
+    # 짧은 소매 — 가르는 선 없이 톤으로만 (남자와 같은 이유)
     for y in range(23, 27):
         L, R = BODY[y]
-        hfill(g, y, L + 1, 10, 't')
+        hfill(g, y, L + 1, 10, 'T')
         hfill(g, y, 21, R - 1, 'y')
-    for y in (23, 24):
-        put(g, 9, y, 'T')
     hfill(g, 26, 9, 10, 'U')
     hfill(g, 26, 21, 22, 'U')
     # 맨팔 · 손
@@ -409,9 +393,7 @@ def build_girl():
     hfill(g, 30, 8, 9, 'l')
     hfill(g, 31, 21, 23, 'S')
     # 상의 명암
-    for y in range(22, 32):
-        swaprow(g, y, 12, 13, 't', 'T')
-        swap(g, 19, y, 't', 'y')
+
 
     # ---- 치마
     hfill(g, 31, 12, 19, 'Q')
