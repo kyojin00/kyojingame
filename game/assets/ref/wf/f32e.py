@@ -120,6 +120,41 @@ def rim_right(g, y0, y1, n, ch):
                 break
 
 
+def rim_prof(g, x0, prof, ch):
+    """칸마다 깊이를 따로 줘서 위에서부터 머리색을 ch 로 바꾼다.
+
+    깊이가 똑같은 띠는 실루엣을 자로 대고 따라 그은 자국이 된다 — 그게
+    「기계가 뽑은 것 같다」의 정체다. 빛을 받은 자리는 덩어리로 두껍고
+    그늘 쪽으로 갈수록 얇아져야 손으로 칠한 것처럼 보인다.
+    prof[i] 는 x0+i 칸의 깊이, 0 이면 그 칸은 건드리지 않는다."""
+    for i, n in enumerate(prof):
+        x = x0 + i
+        if not (0 <= x < GW) or n <= 0:
+            continue
+        cnt = 0
+        for y in range(GH):
+            if g[y][x] in HAIRCH:
+                g[y][x] = ch
+                cnt += 1
+                if cnt >= n:
+                    break
+            elif cnt:
+                break
+
+
+def strand(g, x, y0, y1, ch='d'):
+    """머리 가닥 한 줄. 길이를 제각각으로 둬야 결로 읽힌다."""
+    for y in range(y0, y1 + 1):
+        swap(g, x, y, 'hH', ch)
+
+
+# 빛은 왼쪽 위에서 온다. 정수리 왼쪽이 가장 두껍고 오른쪽으로 갈수록 얇다.
+PROF_BOY = (1, 3, 5, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1)      # x6..22
+PROF_GIRL = (1, 2, 4, 5, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 1)  # x4..22
+PROF_SIDE = (2, 4, 5, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1)     # x7..23
+PROF_BACK = (1, 3, 4, 5, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 2, 1, 1, 1, 1, 1)  # x6..25
+
+
 # 재질 -> 그 재질의 가장 어두운 단. 실루엣을 **이 색으로** 두른다.
 # 참고 도트에는 검정이 한 칸도 없다 — 머리는 (75,57,57), 스웨터는 (36,70,88),
 # 바지는 (58,57,74) 로 재질마다 자기 가장 어두운 단이 테두리를 맡는다.
@@ -197,7 +232,7 @@ EL, ER = 11, 18          # 왼눈·오른눈 왼쪽 칸 (각 3칸 = 얼굴 폭 1
 
 
 def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
-              lash=False, blush_wide=False):
+              lash=False, blush_wide=False, prof=None):
     """머리 덩어리 + 얼굴.
     명암은 실루엣을 따라가는 띠로 넣는다 — 자로 그은 사선도, 네모 딱지도 안 생긴다."""
     shell(g, HEAD, 'h')
@@ -217,7 +252,10 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
             put(g, c, y, 'h')
 
     # --- 위 테두리를 따라 밝은 띠 (빛은 왼쪽 위에서 온다)
-    rim_top(g, lit_cols[0], lit_cols[1], 3, 'H')
+    if prof:
+        rim_prof(g, lit_cols[0], prof, 'H')
+    else:
+        rim_top(g, lit_cols[0], lit_cols[1], 3, 'H')
     # --- 오른쪽 테두리를 따라 그늘 띠
     rim_right(g, dark_rows[0], dark_rows[1], 2, 'd')
 
@@ -278,7 +316,10 @@ def build_boy():
     # 넘으면 앞머리가 눈꺼풀을 덮어 한쪽 눈만 감은 것처럼 보인다
     BANG = {10: 12, 11: 11, 12: 11, 13: 10, 14: 10, 15: 10,
             16: 10, 17: 10, 18: 11, 19: 11, 20: 11, 21: 12}
-    draw_head(g, HEAD, BANG, lit_cols=(6, 22), dark_rows=(3, 17), eye_top=12)
+    draw_head(g, HEAD, BANG, lit_cols=(6, 22), dark_rows=(3, 17), eye_top=12,
+              prof=PROF_BOY)
+    strand(g, 11, 2, 5)            # 결 — 길이가 다른 두 가닥
+    strand(g, 18, 1, 3)
 
 
     # ================================ 몸
@@ -327,6 +368,13 @@ def build_boy():
     hfill(g, 31, 20, 23, 'S')
     # 몸통에는 그늘 줄을 넣지 않는다. 오른소매와 같은 색이라 붙여 놓으면
     # 팔이 몸통에 녹아버린다 — 소매 두 단만으로 팔이 갈린다
+    # 옷 주름 — 좌우 높이를 일부러 어긋나게 둔다. 같은 높이에 대칭으로
+    # 넣으면 주름이 아니라 무늬가 되고, 그게 「기계가 찍은 것 같다」가 된다
+    put(g, 13, 26, 'y')
+    put(g, 13, 27, 'y')
+    put(g, 18, 24, 'y')
+    put(g, 18, 25, 'y')
+    put(g, 14, 30, 'y')                  # 밑단 구김
     # 단추
     for y in (23, 26, 29):               # 단추 — 몸통 안쪽 12~19 의 축은 15.5
         hfill(g, y, 15, 16, 'U')         # 한 칸이면 반 칸 어긋난다
@@ -355,8 +403,10 @@ def build_boy():
         hfill(g, y, 15, 16, 'x')     # 장화 가장 어두운 단
     hfill(g, 42, 11, 14, 'O')          # 장화 목
     hfill(g, 42, 17, 20, 'O')
-    hfill(g, 37, 11, 14, 'q')          # 무릎 주름
-    hfill(g, 37, 17, 20, 'q')
+    hfill(g, 37, 11, 14, 'q')          # 무릎 주름 — 두 다리 높이를 어긋나게
+    hfill(g, 38, 17, 20, 'q')
+    hfill(g, 34, 12, 13, 'q')          # 허벅지 구김 (한쪽만)
+    hfill(g, 44, 17, 19, 'O')          # 장화 접힌 자국 (한쪽만)
     for y in range(43, 48):
         swap(g, 14, y, 'o', 'O')
         swap(g, 20, y, 'o', 'O')
@@ -381,7 +431,9 @@ def build_girl():
     BANG = {10: 12, 11: 10, 12: 10, 13: 10, 14: 10, 15: 10,
             16: 10, 17: 10, 18: 10, 19: 10, 20: 10, 21: 12}
     draw_head(g, HEAD, BANG, lit_cols=(4, 22), dark_rows=(4, 29),
-              eye_top=12, lash=True, blush_wide=True)
+              eye_top=12, lash=True, blush_wide=True, prof=PROF_GIRL)
+    strand(g, 10, 2, 6)                # 결 — 길이가 다른 두 가닥
+    strand(g, 17, 1, 4)
 
     # 긴 머리 안쪽에 결 한 줄씩 (판자로 안 보이게)
     for y in range(15, 27):
@@ -438,6 +490,11 @@ def build_girl():
     hfill(g, 29, 8, 9, 'l')
     hfill(g, 30, 8, 9, 'l')
     hfill(g, 31, 20, 23, 'S')
+    put(g, 13, 24, 'y')                # 옷 주름 — 좌우 높이를 어긋나게
+    put(g, 13, 25, 'y')
+    put(g, 18, 27, 'y')
+    put(g, 18, 28, 'y')
+    put(g, 14, 30, 'y')
     # 상의 명암
 
 
@@ -448,9 +505,11 @@ def build_girl():
         hfill(g, y, L + 1, R - 1, 'p')
         swaprow(g, y, L + 1, L + 2, 'p', 'P')
         swap(g, R - 1, y, 'p', 'q')
-    for y in range(33, 37):
-        swap(g, 11, y, 'p', 'q')    # 주름
+    for y in range(33, 37):         # 주름 — 길이를 제각각으로. 셋이 같은
+        swap(g, 11, y, 'p', 'q')    # 길이면 자로 그은 줄무늬가 된다
+    for y in range(34, 37):
         swap(g, 16, y, 'p', 'q')
+    for y in range(33, 36):
         swap(g, 21, y, 'p', 'q')
     hfill(g, 37, 7, 24, 'Q')
     hfill(g, 37, 11, 20, 'Q')
@@ -532,7 +591,9 @@ def draw_head_side(g, girl):
     for x, bot in ((14, 12), (15, 12), (16, 11), (17, 11), (18, 10), (19, 10)):
         for y in range(6, bot + 1):
             swap(g, x, y, 'sl', 'h')
-    rim_top(g, 7, 23, 3, 'H')
+    rim_prof(g, 7, PROF_SIDE, 'H')
+    strand(g, 12, 2, 6)
+    strand(g, 19, 1, 3)
     rim_right(g, 3, 19, 2, 'd')
     # 눈 하나 — 앞모습과 같은 구조(속눈썹 한 줄 · 홍채 두 줄 · 아래 밝은 단)
     hfill(g, 11, 19, 21, 'e')
@@ -669,7 +730,7 @@ def build_back(girl):
         for x in range(GW):
             if g[y][x] != '.':
                 g[y][x] = 'h'
-    rim_top(g, 6, 25, 3, 'H')      # 명암은 앞모습과 같은 방식으로 다시
+    rim_prof(g, 6, PROF_BACK, 'H')  # 명암은 앞모습과 같은 방식으로 다시
     rim_right(g, 3, 19, 2, 'd')
     for x, y0, y1 in ((12, 9, 15), (20, 7, 13)):   # 머릿결 — 두 줄, 길이 다르게
         for y in range(y0, y1 + 1):
