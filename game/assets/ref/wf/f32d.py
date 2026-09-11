@@ -176,8 +176,8 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
     # --- 얼굴을 도려낸다
     for y in sorted(FACE):
         L, R = FACE[y]
-        put(g, L, y, '#')
-        put(g, R, y, '#')
+        put(g, L, y, 'D' if g[y][L - 1] in HAIRCH else '#')
+        put(g, R, y, 'D' if g[y][R + 1] in HAIRCH else '#')
         hfill(g, y, L + 1, R - 1, 's')
     hfill(g, 20, 12, 19, '#')
     hfill(g, 20, 14, 17, 'S')            # 목 (턱 그늘)
@@ -191,7 +191,6 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
     rim_top(g, lit_cols[0], lit_cols[1], 3, 'H')
     # --- 오른쪽 테두리를 따라 그늘 띠
     rim_right(g, dark_rows[0], dark_rows[1], 2, 'd')
-    rim_right(g, dark_rows[0] + 3, dark_rows[1], 1, 'D')
 
     # --- 앞머리 끝은 가장 어두운 머리색 — 살결과 부딪혀 선처럼 읽힌다
     for c, bot in BANG.items():
@@ -247,14 +246,12 @@ def build_boy():
     BANG = {10: 12, 11: 11, 12: 10, 13: 10, 14: 10, 15: 10,
             16: 10, 17: 11, 18: 11, 19: 11, 20: 11, 21: 12}
     draw_head(g, HEAD, BANG, lit_cols=(6, 22), dark_rows=(3, 17), eye_top=12)
-    for y in range(4, 8):              # 머릿결 — 짧게 끊는다. 길게 그으면
-        swap(g, 9, y, 'hH', 'd')       # 갈라진 금으로 보인다
-    for y in range(6, 10):
-        swap(g, 18, y, 'hH', 'd')
+
 
     # ================================ 몸
     BODY = {21: (10, 21), 22: (9, 22)}
-    for y in range(23, 28):
+    BODY[23] = (8, 23)
+    for y in range(24, 28):
         BODY[y] = (7, 24)
     for y in range(28, 32):
         BODY[y] = (6, 25)          # 손이 벙어리장갑처럼 바깥으로 불룩
@@ -275,9 +272,10 @@ def build_boy():
         put(g, 21, y, '#')
     # 소매 (왼쪽이 빛, 오른쪽이 그늘)
     for y in range(23, 28):
-        hfill(g, y, 8, 9, 't')
-        hfill(g, y, 22, 23, 't')
-        swap(g, 23, y, 't', 'y')
+        L, R = BODY[y]
+        hfill(g, y, L + 1, 9, 't')
+        hfill(g, y, 22, R - 1, 't')
+        swap(g, R - 1, y, 't', 'y')
     for y in (23, 24, 25):
         put(g, 8, y, 'T')
     hfill(g, 27, 8, 9, 'U')        # 걷어올린 소맷단 — 밝은 색이라야 보인다
@@ -295,14 +293,11 @@ def build_boy():
     for y in range(22, 32):
         swaprow(g, y, 11, 12, 't', 'T')
         swap(g, 20, y, 't', 'y')
-    swaprow(g, 22, 9, 10, 't', 'T')
-    swap(g, 22, 22, 't', 'y')
+    swaprow(g, 22, 10, 11, 't', 'T')
+    swap(g, 21, 22, 't', 'y')
     # 단추
     for y in (23, 26, 29):               # 단추 — 몸통 안쪽 12~19 의 축은 15.5
         hfill(g, y, 15, 16, 'U')         # 한 칸이면 반 칸 어긋난다
-    # 가슴 주머니 — 어두운 선 두 줄이면 주머니로 읽힌다
-    hfill(g, 24, 18, 19, 'y')
-    hfill(g, 25, 18, 19, 'y')
     # 윗도리 밑단
     hfill(g, 31, 11, 20, 'Y')
 
@@ -372,7 +367,8 @@ def build_girl():
 
     # ================================ 몸
     BODY = {21: (10, 21), 22: (9, 22)}
-    for y in range(23, 29):
+    BODY[23] = (9, 22)
+    for y in range(24, 29):
         BODY[y] = (8, 23)
     for y in range(29, 32):
         BODY[y] = (7, 24)          # 손
@@ -398,8 +394,9 @@ def build_girl():
         put(g, 20, y, '#')
     # 짧은 소매
     for y in range(23, 27):
-        hfill(g, y, 9, 10, 't')
-        hfill(g, y, 21, 22, 'y')
+        L, R = BODY[y]
+        hfill(g, y, L + 1, 10, 't')
+        hfill(g, y, 21, R - 1, 'y')
     for y in (23, 24):
         put(g, 9, y, 'T')
     hfill(g, 26, 9, 10, 'U')
