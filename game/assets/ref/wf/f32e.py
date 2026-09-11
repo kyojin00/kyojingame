@@ -511,15 +511,22 @@ HEAD_SIDE = {
 # 옆얼굴 살결 — 줄마다 (뒤쪽 끝, 앞쪽 끝). 14줄에서 한 칸 나오는 게 코다.
 FACE_SIDE = {
     10: (15, 23), 11: (14, 23), 12: (14, 23), 13: (14, 23), 14: (14, 24),
-    15: (14, 23), 16: (14, 22), 17: (15, 21), 18: (16, 20), 19: (17, 19),
+    15: (14, 23), 16: (14, 22), 17: (15, 22), 18: (16, 21), 19: (17, 20),
 }
+# 남자는 짧은 머리다. 옆모습에서 턱 뒤까지 머리로 채우면 단발이 되어
+# 앞모습(구레나룻이 14줄에서 끝나는 짧은 머리)과 다른 사람이 된다.
+# 15줄부터 살결을 뒤로 넓혀 목덜미를 드러낸다 — 머리는 뒤통수만 덮는다.
+FACE_SIDE_BOY = dict(FACE_SIDE)
+FACE_SIDE_BOY.update({15: (12, 23), 16: (11, 22), 17: (11, 22),
+                      18: (12, 21), 19: (13, 20)})
 
 
 def draw_head_side(g, girl):
     """옆얼굴. 눈 하나, 코 한 칸, 귀 두 칸, 뒤통수는 통째로 머리."""
     shell(g, HEAD_SIDE, 'h')
-    for y in sorted(FACE_SIDE):
-        L, R = FACE_SIDE[y]
+    F = FACE_SIDE if girl else FACE_SIDE_BOY
+    for y in sorted(F):
+        L, R = F[y]
         hfill(g, y, L, R, 's')
     # 앞머리가 이마를 덮고 관자놀이로 흘러내린다 (칸마다 끝 줄이 다르다)
     for x, bot in ((14, 12), (15, 12), (16, 11), (17, 11), (18, 10), (19, 10)):
@@ -537,39 +544,52 @@ def draw_head_side(g, girl):
         put(g, 19, 11, 'e')
     hfill(g, 16, 15, 17, 'c')      # 볼
     hfill(g, 17, 19, 21, 'm')      # 입
-    put(g, 16, 14, 'S')            # 귀
-    put(g, 16, 15, 'S')
-    hfill(g, 19, 16, 19, 'S')      # 턱 그늘
+    ear = 14 if girl else 13       # 귀는 볼 뒤끝에 붙는다
+    put(g, ear, 16, 'S')
+    put(g, ear + 1, 16, 'S')
+    hfill(g, 19, 16 if girl else 14, 19, 'S')      # 턱 그늘
     hfill(g, 20, 13, 18, 'k')      # 목 — 앞모습과 같은 굵기
     hfill(g, 20, 14, 17, 'S')
 
 
 def body_side(g, girl):
-    """옆몸. 앞모습보다 두 칸만 얇다 (절반으로 줄이면 방향이 바뀔 때
-    캐릭터가 홀쭉해졌다 부풀었다 한다). 팔 하나가 몸통 한가운데에 붙는다."""
-    BODY = {21: (11, 20), 22: (9, 22)}
+    """옆몸. 몸통은 앞모습의 3분의 2 굵기, 허리 아래는 거기서 한 칸 더 좁다.
+    발은 옆에서 보면 길어서 앞으로 나온다 — 이 턱이 방향을 읽히게 한다.
+    실루엣 표와 칠하는 폭을 반드시 같게 둔다. 어긋나면 가장자리에
+    윗도리 색이 남아 다리에 남색 점이 박힌다."""
+    BODY = {21: (11, 20), 22: (10, 21)}
     for y in range(23, 32):
-        BODY[y] = (9, 22)
-    for y in range(32, 46):
-        BODY[y] = (11, 20)
-    for y in range(46, 48):
-        BODY[y] = (10, 21)
+        BODY[y] = (10, 21)          # 몸통 열 칸
+    for y in range(32, 42):
+        BODY[y] = (11, 20)          # 허리 아래 여덟 칸
+    if girl:
+        for y in range(39, 43):
+            BODY[y] = (12, 19)      # 맨다리 여섯 칸
+        for y in range(43, 46):
+            BODY[y] = (12, 20)      # 신발
+        for y in range(46, 48):
+            BODY[y] = (11, 21)      # 앞코
+    else:
+        for y in range(42, 45):
+            BODY[y] = (11, 21)      # 장화 목 아홉 칸
+        for y in range(45, 48):
+            BODY[y] = (10, 22)      # 발등이 앞으로 나온다
     shell(g, BODY, 't')
     hfill(g, 21, 12, 19, 'T')      # 어깨 뚜껑
-    hfill(g, 22, 10, 21, 'T')
+    hfill(g, 22, 11, 20, 'T')
     for y in range(25, 32):        # 등 쪽 한 단 어둡게 — 앞뒤가 갈린다
-        swap(g, 10, y, 't', 'y')
+        swap(g, 11, y, 't', 'y')
     for y in range(23, 27):        # 팔 — 몸통 한가운데, 여섯 칸
         hfill(g, y, 13, 18, 'T')
     for y in range(23, 32):        # 뒤쪽 이음선 — 팔이 몸 앞에 있다는 표시
         swap(g, 12, y, 't', 'y')
     hfill(g, 27, 13, 18, 'U')      # 소맷단
-    for y in (28, 29):             # 손 — 두 단에 걸쳐 오므린다.
-        hfill(g, y, 13, 18, 's')   # 여섯 칸 그대로 두면 살결 띠가 몸통을
-    for y in (30, 31):             # 가로질러 허리띠처럼 보인다
+    for y in (28, 29):             # 손 — 두 단에 걸쳐 오므린다
+        hfill(g, y, 13, 18, 's')
+    for y in (30, 31):
         hfill(g, y, 14, 17, 's')
     hfill(g, 31, 14, 17, 'S')
-    hfill(g, 31, 10, 21, 'Y')      # 윗도리 밑단
+    hfill(g, 31, 11, 20, 'Y')      # 윗도리 밑단
     if girl:
         hfill(g, 32, 11, 20, 'Q')
         for y in range(33, 39):    # 치마
@@ -580,9 +600,12 @@ def body_side(g, girl):
         for y in range(39, 43):    # 맨다리 — 앞보다 얇다
             hfill(g, y, 13, 18, 's')
             swaprow(g, y, 13, 14, 's', 'S')
-        for y in range(43, 48):
+        for y in range(43, 46):    # 신발 목
             hfill(g, y, 13, 19, 'o')
             swaprow(g, y, 13, 14, 'o', 'O')
+        for y in range(46, 48):    # 앞코
+            hfill(g, y, 12, 20, 'o')
+            swaprow(g, y, 12, 13, 'o', 'O')
         hfill(g, 43, 13, 18, 'O')
         hfill(g, 47, 12, 20, 'x')
     else:
@@ -593,26 +616,47 @@ def body_side(g, girl):
             swaprow(g, y, 12, 13, 'p', 'q')
             swaprow(g, y, 18, 19, 'p', 'P')
         hfill(g, 41, 12, 19, 'Q')
-        for y in range(42, 48):
+        for y in range(42, 45):    # 장화 목
             hfill(g, y, 12, 20, 'o')
             swaprow(g, y, 19, 20, 'o', 'O')
-        hfill(g, 42, 12, 19, 'O')
-        hfill(g, 47, 11, 21, 'x')
+        for y in range(45, 48):    # 발등 — 앞으로 한 칸 더
+            hfill(g, y, 11, 21, 'o')
+            swaprow(g, y, 20, 21, 'o', 'O')
+        hfill(g, 42, 12, 19, 'O')  # 장화 목 테두리
+        hfill(g, 47, 11, 21, 'x')  # 밑창
 
 
 def build_side(girl):
     g = blank()
     draw_head_side(g, girl)
-    if girl:                       # 긴 머리가 등 뒤로 흘러내린다
+    if girl:
+        # 긴 생머리가 등을 타고 곧게 흘러내린다. 전에는 아래로 갈수록
+        # 부풀었다 끝이 모이는 꽁지머리였는데, 앞·뒷모습은 어깨를 덮는
+        # 긴 생머리라 옆에서만 다른 사람이 됐다. 폭을 일정하게 두고
+        # 앞모습과 같은 29줄에서 끝낸다.
         BACK = {}
         for y in range(10, 31):
-            l = max(4, 12 - (y - 10))      # 위에서 한 칸씩 벌어진다
-            if y > 26:
-                l = 4 + (y - 26)           # 끝에서 다시 좁아진다
-            BACK[y] = (l, 12)
+            if y <= 11:
+                l = 6                      # 뒤통수에 딱 붙여 시작한다
+            elif y <= 14:
+                l = 5                      # 한 칸씩 퍼진다 (턱이 안 생기게)
+            elif y <= 27:
+                l = 4                      # 등을 타고 곧게 — 폭이 일정하다
+            else:
+                l = 4 + (y - 27) * 2       # 끝만 모은다
+            BACK[y] = (l, 11)   # 몸통(11~20) 뒤에서 멎는다
         shell(g, BACK, 'h')
         rim_right(g, 10, 30, 1, 'd')
+        for y in range(16, 28):            # 결 한 줄 — 판자로 안 보이게
+            swap(g, 7, y, 'hH', 'd')
     body_side(g, girl)
+    if girl:
+        # 목덜미 뒤 — 머리와 어깨 사이가 뚫려 배경이 비쳤다. 머리카락은
+        # 목 뒤를 지나 어깨로 이어져야 한다 (몸통이 x11 부터라 19~21줄만 빈다).
+        for y in range(19, 22):
+            for x in (11, 12):
+                if g[y][x] == '.':
+                    g[y][x] = 'h'
     return g
 
 
@@ -635,6 +679,16 @@ def build_back(girl):
         for x in range(11, 21):
             if g[y][x] == 'U':
                 g[y][x] = 't'
+    if girl:
+        # 긴 머리가 등을 덮는다. 몸을 나중에 그리는 바람에 머리가 통째로
+        # 가려져 있었다 — 몸 위에 다시 얹는다.
+        BACKHAIR = {20: (5, 26), 21: (5, 26), 22: (6, 25), 23: (7, 24),
+                    24: (8, 23), 25: (9, 22), 26: (10, 21)}
+        shell(g, BACKHAIR, 'h')
+        rim_right(g, 20, 26, 2, 'd')
+        for x, y0, y1 in ((10, 20, 23), (21, 20, 23)):   # 머릿결
+            for y in range(y0, y1 + 1):
+                swap(g, x, y, 'hH', 'd')
     return g
 
 
