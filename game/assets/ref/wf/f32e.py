@@ -270,8 +270,14 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
     for y in sorted(F):
         L, R = F[y]
         put(g, L, y, 'D' if g[y][L - 1] in HAIRCH else '#')
-        put(g, R, y, 'D' if g[y][R + 1] in HAIRCH else '#')
-        hfill(g, y, L + 1, R - 1, 's')
+        if q:
+            # 3/4 은 오른쪽 끝이 실루엣 밖으로 나가는 줄이 있다 (광대·코).
+            # 거기에 윤곽을 박으면 뺨에 까만 딱지가 붙는다 — 살결로 두고
+            # outline_pass 가 살결 어두운 단으로 둘러 주게 맡긴다.
+            hfill(g, y, L + 1, R, 's')
+        else:
+            put(g, R, y, 'D' if g[y][R + 1] in HAIRCH else '#')
+            hfill(g, y, L + 1, R - 1, 's')
     n = 1 if q else 0                    # 3/4 은 얼굴 부속이 통째로 한 칸 간다
     hfill(g, 20, 12 + n, 19 + n, 'k')
     hfill(g, 20, 14 + n, 17 + n, 'S')    # 목 (턱 그늘)
@@ -295,46 +301,49 @@ def draw_head(g, HEAD, BANG, lit_cols, dark_rows, eye_top,
 
     # --- 살결 명암 (세로 면 세 장. 그라데이션·디더 금지)
     for y in range(11, 18):
-        swap(g, 10 + n, y, 's', 'S' if q else 'l')   # 3/4 은 먼 쪽이 그늘
-        swap(g, 21 + n, y, 's', 'l' if q else 'S')   # 가까운 쪽이 빛을 받는다
+        swap(g, 10 + n, y, 's', 'l')
+        swap(g, 21 + n, y, 's', 'S')
     hfill(g, 19, 12 + n, 19 + n, 'S')
 
     # --- 눈 (3칸 폭 x 3줄). 바깥 아래 모서리를 깎아 둥글게, 흰자 한 칸을 넣는다
     # 참고 도트 구조 — 속눈썹 한 줄 · 홍채 두 줄 · 아래 한 단 밝은 줄.
     # 세 줄을 통째로 검정으로 칠하면 눈이 구멍 두 개가 된다.
     t = eye_top
-    # 3/4 은 먼 눈이 두 칸으로 눌린다 — 이 비대칭 하나가 「돌아섰다」의 8할이다
-    fl, fw = (EL + 2, 2) if q else (EL, 3)
-    nl = ER + n
-    hfill(g, t, fl, fl + fw - 1, 'e')
+    # 오른쪽을 보는 3/4 에서 **먼 눈은 오른쪽**이다 — 코 옆에서 눌려 두 칸이
+    # 되고, 그 바깥으로는 뺨이 한 칸밖에 안 남는다. 가까운 눈은 왼쪽에서
+    # 세 칸을 다 쓰고 바깥으로 뺨이 세 칸 남는다. 이 비대칭이 「돌아섰다」다.
+    nl = 13 if q else EL                 # 가까운 눈 (세 칸)
+    fl, fw = (20, 2) if q else (ER, 3)   # 먼 눈 (3/4 은 두 칸)
     hfill(g, t, nl, nl + 2, 'e')
+    hfill(g, t, fl, fl + fw - 1, 'e')
     for y in (t + 1, t + 2):
-        hfill(g, y, fl, fl + fw - 1, 'b')
         hfill(g, y, nl, nl + 2, 'b')
-    put(g, fl, t + 1, 'W')               # 반사점은 바깥쪽 (참고 도트도 대칭)
-    put(g, nl + 2, t + 1, 'W')
-    hfill(g, t + 3, fl + fw - 2, fl + fw - 1, 'c')   # 아래 홍채 — 한 단 밝게
-    hfill(g, t + 3, nl, nl + 1, 'c')
+        hfill(g, y, fl, fl + fw - 1, 'b')
+    put(g, nl, t + 1, 'W')               # 반사점은 바깥쪽 (참고 도트도 대칭)
+    put(g, fl + fw - 1, t + 1, 'W')
+    hfill(g, t + 3, nl + 1, nl + 2, 'c')  # 아래 홍채 — 한 단 밝게
+    hfill(g, t + 3, fl, fl + fw - 2, 'c')
     if lash:
-        put(g, fl, t, 'e')
-        put(g, nl + 2, t, 'e')
+        put(g, nl, t, 'e')
+        put(g, fl + fw - 1, t, 'e')
 
     # --- 볼 · 입
     cheek = t + 3                        # 참고 도트는 볼이 아래 홍채와 같은 줄
-    # 3/4 은 먼 쪽 볼이 한 칸, 가까운 쪽 볼이 세 칸 — 폭이 다른 게 핵심이다
-    for x in ((12,) if q else (10, 11)):
+    # 3/4 은 가까운(왼) 쪽 볼이 세 칸, 먼(오른) 쪽 볼이 한 칸
+    for x in ((11, 12) if q else (10, 11)):
         swap(g, x, cheek, 'sl', 'c')
-    for x in ((20, 21, 22) if q else (20, 21)):
+    for x in ((22,) if q else (20, 21)):
         swap(g, x, cheek, 'sSl', 'c')
     if blush_wide:
-        swap(g, 12 + n, cheek, 's', 'c')
+        swap(g, 13, cheek, 's', 'c') if q else swap(g, 12, cheek, 's', 'c')
         swap(g, 19 + n, cheek, 's', 'c')
     if q:
-        put(g, 21, cheek + 1, 'S')       # 코 — 광대 아래 그늘 한 칸
+        put(g, 22, cheek - 1, 'S')       # 콧대 그늘 — 먼 눈 바로 옆
+        put(g, 22, cheek, 'S')
     # 입 — 원본대로 두 칸. 네 칸으로 넓히면 벌린 입이 되고, 양끝을 한 줄
     # 올리면 32칸에서는 칸 사이가 벌어져 점 세 개로 읽힌다. 아랫입술에 빛을
     # 한 줄 둬 봤더니 턱 그늘 위에 얹혀 염소수염이 됐다 — 그것도 뺐다
-    hfill(g, cheek + 2, 15 + n, 16 + n, 'm')
+    hfill(g, cheek + 2, 16 if q else 15, 17 if q else 16, 'm')
 
 
 # ================================================================ 남자
