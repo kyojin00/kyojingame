@@ -112,69 +112,108 @@ def mass(g, rows, pal, strand=(), lit=()):
     return cells
 
 
-FACE = {                                     # 줄 -> (앞머리가 끝나는 칸, 얼굴 끝 칸)
-    'boy': {12: (20, 23), 13: (19, 23), 14: (19, 23), 15: (18, 23),
-            16: (18, 23), 17: (17, 22), 18: (17, 22), 19: (16, 21)},
-    'girl': {12: (20, 23), 13: (19, 23), 14: (19, 23), 15: (18, 23),
-             16: (18, 23), 17: (17, 22), 18: (17, 22), 19: (16, 21)},
-}
+# ---------------------------------------------------------------- 옆얼굴
+# 참고 그림을 뜯어보면 옆얼굴은 얼굴이 앞에 툭 나온 꼴이 아니다.
+# **뒤 덩어리와 앞 갈래 사이에 난 창**이다. 앞에도 머리가 내려오고,
+# 뒤통수는 뒤로 불룩하다. 얼굴을 앞끝에 붙이면 살점이 떨어져 나간
+# 것처럼 보인다 — 그게 여태 어색했던 까닭이다.
+
+GIRL_BACK = {4: (12, 20), 5: (10, 21), 6: (9, 22), 7: (8, 22), 8: (7, 22),
+             9: (7, 22), 10: (7, 22), 11: (7, 22),
+             12: (7, 14), 13: (6, 14), 14: (6, 14), 15: (6, 14), 16: (6, 14),
+             17: (6, 14), 18: (6, 14), 19: (6, 14), 20: (6, 14), 21: (6, 14),
+             22: (6, 14), 23: (6, 14), 24: (6, 14), 25: (6, 14), 26: (6, 14),
+             27: (6, 14), 28: (6, 14), 29: (6, 14), 30: (6, 14), 31: (7, 14),
+             32: (7, 14), 33: (7, 13), 34: (7, 13), 35: (8, 13), 36: (8, 13),
+             37: (9, 12), 38: (9, 12), 39: (10, 12)}
+GIRL_LOCK = {12: (21, 22), 13: (21, 22), 14: (21, 22), 15: (21, 22),
+             16: (21, 22), 17: (21, 22), 18: (21, 22), 19: (21, 22),
+             20: (21, 22), 21: (21, 22), 22: (21, 22), 23: (21, 22),
+             24: (21, 22), 25: (21, 22), 26: (21, 22)}
+GIRL_FACE = {12: (15, 20), 13: (15, 20), 14: (15, 20), 15: (15, 20),
+             16: (15, 20), 17: (15, 20), 18: (15, 20), 19: (15, 20)}
+GIRL_NECK = {20: (15, 19), 21: (15, 19)}
+
+BOY_BACK = {5: (12, 19), 6: (10, 20), 7: (9, 21), 8: (8, 21), 9: (8, 21),
+            10: (8, 21), 11: (8, 21),
+            12: (8, 14), 13: (8, 14), 14: (8, 14), 15: (8, 14), 16: (8, 14),
+            17: (8, 14), 18: (9, 14), 19: (10, 14)}
+BOY_LOCK = {12: (21, 22), 13: (21, 22), 14: (21, 22), 15: (21, 22),
+            16: (21, 22), 17: (21, 22)}
+BOY_FACE = {12: (15, 20), 13: (15, 20), 14: (15, 20), 15: (15, 20),
+            16: (15, 20), 17: (15, 20), 18: (15, 20), 19: (15, 20)}
+BOY_NECK = {20: (15, 19), 21: (15, 19)}
+
+SHAPE = {'boy': (BOY_BACK, BOY_LOCK, BOY_FACE, BOY_NECK),
+         'girl': (GIRL_BACK, GIRL_LOCK, GIRL_FACE, GIRL_NECK)}
 EYE_SRC = 18                                 # 앞모습 오른쪽 눈이 시작하는 칸
-EYE_DST = 19                                 # 옆얼굴에서 눈이 앉는 칸
+EYE_DST = {'boy': 17, 'girl': 17}
+
+
+def paint_hair(g, src, kind, rows, cells, side=None, from_y=99):
+    """머리는 새로 칠하지 않고 **앞모습 머리칸을 폭에 맞춰 늘여** 쓴다.
+    새로 칠하면 결도 음영도 달라져 화풍이 어긋난다."""
+    hairset = set(P[kind]['hair'])
+    HB = P[kind]['hair'][2]
+    top = min(rows)
+    src_rows = {}
+    for y in range(3, 22):
+        xs = [x for x in range(W) if src[y][x] in hairset]
+        if xs:
+            src_rows[y] = xs
+    if not src_rows:
+        return
+    keys = sorted(src_rows)
+    lo, hi = keys[0], keys[-1]
+    for y, (x0, x1) in rows.items():
+        # 머리통 밖(흘러내린 머리채)은 같은 줄이 없다. 한 줄만 되풀이하면
+        # 가로 줄무늬가 생기니 위쪽 줄을 돌려 쓴다.
+        bodyk = [k for k in keys if 8 <= k <= 20] or keys
+        sy = y if y in src_rows else bodyk[(y - lo) % len(bodyk)]
+        xs = src_rows[sy]
+        if side and y >= from_y:
+            # **한쪽 갈래만** 베낀다. 앞모습은 좌우 두 갈래가 다 잡혀 있어서
+            # 그대로 늘이면 두 갈래가 섞여 얼룩이 된다.
+            half = [x for x in xs if (x < 16 if side == 'left' else x >= 16)]
+            if len(half) >= 2:
+                xs = half
+        for x in range(x0, x1 + 1):
+            k = round((x - x0) * (len(xs) - 1) / max(1, x1 - x0))
+            g[y][x] = src[sy][xs[k]]
+            cells.append((x, y))
 
 
 def head(g, src, kind):
-    """옆얼굴은 **앞머리 픽셀을 옮겨** 만든다.
-
-    새로 칠하면 결도 음영도 선도 달라져 화풍이 어긋난다. 앞머리를 통째로
-    베끼고, 얼굴의 뒤쪽 절반만 머리카락으로 덮은 뒤, 남은 눈 하나를
-    앞으로 민다. 덮는 머리카락도 새로 칠하지 않고 여섯 줄 위의 결을
-    그대로 내려 붙인다 — 그래야 가닥이 이어진다."""
-    hairset = set(P[kind]['hair'])
-    HB = P[kind]['hair'][2]
+    back, lock, face, neck = SHAPE[kind]
+    pal = P[kind]['hair']
     for y in range(3, 22):
-        g[y] = list(src[y])
-
-    for y, (cut, fx1) in FACE[kind].items():
-        for x in range(W):                       # 뒤쪽은 위 결을 내려 붙인다
-            if g[y][x] is not None and x <= cut:
-                c = src[y - 6][x]
-                g[y][x] = c if c in hairset else HB
-        for x in range(cut + 1, fx1 + 1):
-            g[y][x] = SK
-        for x in range(fx1 + 1, W):
-            g[y][x] = None
-        g[y][fx1] = SKO if y >= 17 else SKD      # 이마는 부드럽게, 턱만 또렷이
-
-    for y in range(14, 18):                      # 남은 눈 하나를 앞으로
-        for k in range(3):
-            c = src[y][EYE_SRC + k]
-            if c is not None:
-                g[y][EYE_DST + k] = c
-    g[16][22] = SKM                              # 코 — 실루엣을 튀우면 부리가 된다
-
-    for y in (20, 21):                           # 목은 앞모습 그대로 두되 한 칸 뒤로
-        row = [None] * W
         for x in range(W):
-            if src[y][x] is not None and x < 22:
-                row[x - 1] = src[y][x]
-        g[y] = row
+            g[y][x] = None
+
+    cells = []
+    paint_hair(g, src, kind, back, cells, 'left', 12)
+    paint_hair(g, src, kind, lock, cells, 'right', 0)
+
+    for y, (x0, x1) in face.items():             # 두 머리 사이에 난 창.
+        for x in range(x0, x1 + 1):              # 앞모습 얼굴 오른쪽 절반을
+            c = src[y][EYE_SRC - 2 + (x - x0)]   # 그대로 옮긴다 — 눈·볼·턱선이
+            g[y][x] = c if c is not None else SK  # 한 번에 따라온다
+    for y, (x0, x1) in neck.items():
+        for x in range(x0, x1 + 1):
+            g[y][x] = SKO if y == 20 else SKM
+        g[21][x0] = g[21][x1] = SKD
+
+    edge(g, cells, pal[0])
 
 
-def fall(g, src):
-    """등 뒤로 흘러내린 머리채. 결은 앞모습 옆머리 칸을 돌려 쓴다."""
-    hairset = set(P['girl']['hair'])
-    cols = [x for x in range(16) if any(src[y][x] in hairset for y in range(24, 38))]
-    if not cols:
+def relock(g, src, kind):
+    """앞 갈래는 어깨보다 앞이다. 옷을 그린 뒤 다시 얹는다."""
+    lock = {y: v for y, v in SHAPE[kind][1].items() if y >= 22}
+    if not lock:
         return
     cells = []
-    for y, x0, x1 in GIRL_FALL:
-        for x in range(x0, x1 + 1):
-            k = round((x - x0) * (len(cols) - 1) / max(1, x1 - x0))
-            c = src[y][cols[k]]                  # 앞모습 옆머리를 폭에 맞춰 늘인다.
-                                                 # 돌려 쓰면 이음매가 줄무늬로 남는다
-            g[y][x] = c if c in hairset else P['girl']['hair'][2]
-            cells.append((x, y))
-    edge(g, cells, P['girl']['hair'][0])
+    paint_hair(g, src, kind, lock, cells, 'right', 0)
+    edge(g, cells, P[kind]['hair'][0])
 
 
 def darkest(kind, c):
@@ -258,9 +297,8 @@ def build(kind):
     src = [[px[x, y][:3] if px[x, y][3] else None for x in range(W)] for y in range(H)]
     g = [[None] * W for _ in range(H)]
     head(g, src, kind)
-    if kind == 'girl':
-        fall(g, src)
-    body(g, src, kind)                          # 옷은 머리채 위에 — 머리는 등 뒤다
+    body(g, src, kind)                          # 옷은 뒤 머리채 위에 — 머리는 등 뒤다
+    relock(g, src, kind)                        # 앞 갈래는 옷 앞에 — 어깨를 덮는다
     one_arm(g, kind)
     feet(g)
     return g
