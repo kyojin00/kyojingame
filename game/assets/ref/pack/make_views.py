@@ -57,38 +57,59 @@ def img(g):
 
 # ----------------------------------------------------------------- 뒷모습
 def build_back(g, kind):
+    """뒷모습. 뒤통수는 **통째로 다시 칠한다.**
+
+    앞모습에서 얼굴만 머리색으로 덮었더니 이마 위 머리선(가장 어두운 단)이
+    뒤통수 한가운데 가로 띠로 남았다 — 그게 눈에 띄던 「경계」다. 머리 영역을
+    밑색으로 싹 밀고 위 테두리 밝은 띠 · 오른쪽 그늘 띠 · 결 두 가닥만
+    다시 얹으면 이음매가 없다."""
     hair = P[kind]['hair']
     top = P[kind]['top']
+    HD, HS, HB = hair[0], hair[1], hair[2]          # 가장어두운 · 그늘 · 밑색
+    HL = hair[3] if len(hair) > 3 else hair[2]      # 밝은 단
     out = [row[:] for row in g]
-    # 얼굴·눈·머리핀을 머리색으로 덮는다 (머리 영역 안에서만)
-    for y in range(4, HEAD_BOT[kind]):
-        for x in range(W):
-            c = out[y][x]
-            if c and (c in FACE or c in ACC):
-                out[y][x] = hair[2] if kind == 'boy' else hair[2]
-    # 덮은 자리 가장자리를 머리 윤곽으로 정리
-    for y in range(4, HEAD_BOT[kind]):
-        for x in range(W):
-            if out[y][x] == hair[2]:
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = x + dx, y + dy
-                    if not (0 <= nx < W and 0 <= ny < H) or out[ny][nx] is None:
-                        out[y][x] = hair[0]
-                        break
-    # 뒷머리 결 — 길이가 다른 두 가닥
-    for x, y0, y1 in ((13, 8, 16), (19, 6, 12)):
+
+    head = [(x, y) for y in range(4, HEAD_BOT[kind] + 1) for x in range(W)
+            if out[y][x] is not None]
+    for x, y in head:                                # 밑색으로 싹 민다
+        out[y][x] = HB
+    for x, y in head:                                # 실루엣만 가장 어두운 단
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if not (0 <= nx < W and 0 <= ny < H) or out[ny][nx] is None:
+                out[y][x] = HD
+                break
+    # 위 테두리를 따라 밝은 띠 — 칸마다 깊이를 달리해 자로 그은 자국을 피한다
+    depth = (1, 2, 3, 3, 4, 4, 3, 3, 2, 3, 3, 2, 2, 1, 2, 1, 1)
+    for i, x in enumerate(sorted({x for x, _ in head})):
+        n = depth[i % len(depth)]
+        k = 0
+        for y in sorted(yy for xx, yy in head if xx == x):
+            if out[y][x] == HB:
+                out[y][x] = HL
+                k += 1
+                if k >= n:
+                    break
+    # 오른쪽 테두리를 따라 그늘 띠 두 칸
+    for y in range(4, HEAD_BOT[kind] + 1):
+        xs = sorted(xx for xx, yy in head if yy == y)
+        k = 0
+        for x in reversed(xs):
+            if out[y][x] in (HB, HL):
+                out[y][x] = HS
+                k += 1
+                if k >= 2:
+                    break
+    for x, y0, y1 in ((13, 7, 15), (19, 5, 11)):     # 결 두 가닥, 길이 다르게
         for y in range(y0, y1 + 1):
-            if out[y][x] in (hair[2], hair[3]):
-                out[y][x] = hair[1]
-    # 목덜미 — 가운데 몇 칸만 (가로로 다 칠하면 목도리가 된다)
-    ny = HEAD_BOT[kind]
+            if out[y][x] in (HB, HL):
+                out[y][x] = HS
+    ny = HEAD_BOT[kind]                              # 목덜미
     for x in range(W):
-        if out[ny][x] and g[ny][x] in SKIN:     # 앞모습에서 살결이던 칸만
+        if out[ny][x] and g[ny][x] in SKIN:
             out[ny][x] = NECK[kind]
     if kind == 'girl':
-        # 긴 머리가 등을 덮는다 — 앞모습에서 어깨 양옆에 있던 머리를
-        # 가운데까지 채운다. 안 그러면 뒤에서 블라우스가 다 보인다
-        for y in range(21, 37):
+        for y in range(21, 37):                      # 긴 머리가 등을 덮는다
             xs = [x for x in range(W) if out[y][x]]
             if not xs:
                 continue
@@ -97,14 +118,24 @@ def build_back(g, kind):
                 continue
             for x in range(l + 1, r):
                 if out[y][x] and out[y][x] not in hair:
-                    out[y][x] = hair[2]
-        for y in range(21, 37):                 # 덮은 자리에 결
+                    out[y][x] = HB
+        for y in range(21, 37):
             for x in (12, 20):
-                if out[y][x] == hair[2]:
-                    out[y][x] = hair[1]
-        for x in range(W):                      # 아랫단
-            if out[36][x] == hair[2]:
-                out[36][x] = hair[0]
+                if out[y][x] == HB:
+                    out[y][x] = HS
+        for x in range(W):
+            if out[36][x] == HB:
+                out[36][x] = HD
+    for y in range(22, 34):                          # 깃·단추를 지운다
+        for x in range(W):
+            c = out[y][x]
+            if c in ACC:
+                out[y][x] = top[0]
+            elif len(top) > 2 and c == top[2] and 12 <= x <= 19:
+                out[y][x] = top[0]
+    for y in range(24, 32):                          # 등솔기
+        if out[y][16] == top[0]:
+            out[y][16] = top[1]
     return out
 
 
@@ -181,26 +212,48 @@ def side_feet(out, kind):
         for x in range(W):
             out[y][x] = None
 
-    def shoe(x0, x1, ax0, ax1, base, lit, sole):
-        for y in (44, 45):                      # 발목
-            out[y][ax0] = V
-            out[y][ax1] = V
-            for x in range(ax0 + 1, ax1):
-                out[y][x] = base
-        out[46][x0] = V                          # 발등 — 앞코가 오른쪽으로
-        out[46][x1] = V
-        for x in range(x0 + 1, x1):
-            out[46][x] = lit if x0 + 1 < x < x1 - 1 else base
-        out[47][x0] = V                          # 밑창
-        out[47][x1] = V
-        for x in range(x0 + 1, x1):
+    def shoe(heel, toe, ax0, ax1, base, lit, sole):
+        """오른쪽을 보는 신발. **좌우 대칭이면 방향이 없다.**
+        뒤꿈치는 발목 바로 뒤에서 짧게 서고, 앞코는 발목보다 세 칸 더
+        앞으로 낮게 뻗는다."""
+        out[44][ax0] = V                         # 발목 — 뒤쪽에만
+        out[44][ax1] = V
+        for x in range(ax0 + 1, ax1):
+            out[44][x] = base
+        out[45][heel] = V                        # 뒤꿈치가 서는 줄
+        for x in range(heel + 1, ax1):
+            out[45][x] = base
+        out[45][ax1] = V
+        out[46][heel] = V                        # 발등 — 앞코까지 뻗는다
+        for x in range(heel + 1, toe):
+            out[46][x] = lit if x > heel + 1 else base
+        out[46][toe] = V
+        out[47][heel] = V                        # 밑창
+        for x in range(heel + 1, toe):
             out[47][x] = sole
+        out[47][toe] = V
 
-    # 발목은 다리 바로 밑에 (가까운 다리 x13~16, 먼 다리 x18~21)
-    shoe(16, 22, 18, 21, SOLE, BASE, SOLE)       # 먼 발 — 한 단 어둡게, 뒤에
-    shoe(10, 16, 12, 15, BASE, LIT, SOLE)        # 가까운 발 — 위에 덮는다
-    # 가까운 발을 한 칸 왼쪽에 둬 두 발 중심이 앞모습과 같은 16.0 이 된다.
-    # 안 맞으면 방향이 바뀔 때 캐릭터가 옆으로 튄다
+    # 먼 다리를 한 칸 당겨 먼 발목과 잇는다 (x18~21 -> x17~20)
+    for y in range(34, 44):
+        row = out[y]
+        xs = [x for x in range(W) if row[x]]
+        if not xs:
+            continue
+        gaps = [x for x in range(xs[0], xs[-1]) if row[x] is None]
+        if not gaps:
+            continue
+        far = [x for x in range(gaps[-1] + 1, xs[-1] + 1)]
+        sh = row[:]
+        for x in far:
+            sh[x] = None
+        for x in far:
+            sh[x - 1] = row[x]
+        out[y] = sh
+    # 뒤꿈치 · 앞코 · 발목. 두 발 합쳐 x11~21 이라 중심이 앞모습과 같은 16.0
+    # 가까운 발을 너무 길게 뽑으면 먼 발을 통째로 덮어 토막만 남는다.
+    # 겹치는 구간을 두 칸으로 줄여 먼 발의 앞코 네 칸이 보이게 한다
+    shoe(16, 21, 17, 20, SOLE, BASE, SOLE)       # 먼 발 — 한 단 어둡게, 뒤에
+    shoe(11, 17, 12, 15, BASE, LIT, SOLE)        # 가까운 발 — 위에 덮는다
 
 
 def build_side(g, kind):
