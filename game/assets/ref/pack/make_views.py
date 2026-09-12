@@ -167,6 +167,42 @@ LETTER = {
 }
 
 
+def side_feet(out, kind):
+    """옆에서 본 신발. 고개를 돌렸으면 발도 돌아야 한다.
+
+    앞모습 신발은 좌우 대칭 상자다 — 그걸 그대로 두면 몸만 돌고 발은 정면인
+    꼴이 된다. 옆신발은 뒤꿈치가 왼쪽, 앞코가 오른쪽으로 길다.
+    먼 발은 한 단 어둡게 깔고 뒤(오른쪽 위)에 둔다.
+    발 중심은 앞모습과 같은 16.0 으로 맞춘다 — 안 맞으면 방향이 바뀔 때
+    캐릭터가 한 칸 옆으로 튄다."""
+    V, BASE, LIT, SOLE = SHOE[3], SHOE[0], SHOE[2], SHOE[1]
+
+    for y in range(44, 48):
+        for x in range(W):
+            out[y][x] = None
+
+    def shoe(x0, x1, ax0, ax1, base, lit, sole):
+        for y in (44, 45):                      # 발목
+            out[y][ax0] = V
+            out[y][ax1] = V
+            for x in range(ax0 + 1, ax1):
+                out[y][x] = base
+        out[46][x0] = V                          # 발등 — 앞코가 오른쪽으로
+        out[46][x1] = V
+        for x in range(x0 + 1, x1):
+            out[46][x] = lit if x0 + 1 < x < x1 - 1 else base
+        out[47][x0] = V                          # 밑창
+        out[47][x1] = V
+        for x in range(x0 + 1, x1):
+            out[47][x] = sole
+
+    # 발목은 다리 바로 밑에 (가까운 다리 x13~16, 먼 다리 x18~21)
+    shoe(16, 22, 18, 21, SOLE, BASE, SOLE)       # 먼 발 — 한 단 어둡게, 뒤에
+    shoe(10, 16, 12, 15, BASE, LIT, SOLE)        # 가까운 발 — 위에 덮는다
+    # 가까운 발을 한 칸 왼쪽에 둬 두 발 중심이 앞모습과 같은 16.0 이 된다.
+    # 안 맞으면 방향이 바뀔 때 캐릭터가 옆으로 튄다
+
+
 def build_side(g, kind):
     """머리는 새로 찍고, 몸은 앞모습을 좁혀 쓴다."""
     hair = P[kind]['hair']
@@ -210,15 +246,9 @@ def build_side(g, kind):
         if not gaps:
             continue
         g0 = gaps[0]
-        near = [x for x in range(xs[0], g0)]
-        if near and len(gaps) >= 2 and y < 44:   # 신발은 밀지 않는다 —
-            sh = row[:]                          # 밀면 밑창이 어긋나 발이 부서진다
-            for x in near:
-                sh[x] = None
-            for x in near:
-                sh[x + 1] = row[x]
-            out[y] = sh
-            g0 += 1
+        # 다리는 밀지 않는다. 밀었더니 신발 자리와 겹쳐 두 다리가 하나로
+        # 붙어 무릎도 발목도 없는 기둥이 됐다. 먼 쪽을 한 단 어둡게 까는
+        # 것만으로 앞뒤가 갈린다
         for x in range(g0 + 1, xs[-1] + 1):
             c = out[y][x]
             if c == bot[0]:
@@ -229,6 +259,7 @@ def build_side(g, kind):
                 out[y][x] = SHOE[1]
             elif c == SHOE[2]:
                 out[y][x] = SHOE[0]
+    side_feet(out, kind)
     return out
 
 
