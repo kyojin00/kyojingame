@@ -62,8 +62,7 @@ LIFT_R = (0, 2, 1, 0, 0)
 HAND_L = (-1, -1, 1, 1, -1)     # 정면·후면 — 위아래로 한 칸
 HAND_R = (1, 1, -1, -1, 1)
 # 옆모습 — 옆에서는 팔이 앞뒤로 간다. 같은 쪽 다리와 반대 위상이다.
-ARM_N = (1, 1, -1, -1, 0)       # 가까운 팔 — 앞뒤로 한 칸 (+x 가 앞)
-ARM_F = (1, 1, -1, -1, 0)       # 먼 팔은 몸에 가려 앞뒤가 안 보인다. 위아래로만.
+ARM_N = (1, 1, -1, -1, 0)       # 옆면에 보이는 한쪽 팔 — 앞뒤로 한 칸 (+x 가 앞)
 
 # 두 다리가 실제로 갈라지는 줄. 그 위(바지통·치마)는 흔들리지 않는 몸통이다
 LEG_TOP = {'boy': 41, 'girl': 40}
@@ -72,11 +71,12 @@ HAND_ROW = range(28, 36)
 
 # 옆모습에서 두 다리가 차지하는 칸 — 앞뒤로 겹쳐 있어 자동으로 못 가른다
 SIDE_SRC = {
-    'boy': {41: ((13, 15), (17, 19)), 42: ((13, 15), (17, 19)), 43: ((12, 15), (17, 20))},
-    'girl': {40: ((12, 15), (18, 21)), 41: ((12, 15), (17, 20)),
-             42: ((12, 15), (17, 20)), 43: ((12, 15), (17, 20))},
+    'boy': {41: ((13, 15), (18, 20)), 42: ((13, 15), (18, 20)), 43: ((13, 15), (18, 20))},
+    'girl': {40: ((13, 15), (18, 20)), 41: ((13, 15), (18, 20)),
+             42: ((13, 15), (18, 20)), 43: ((13, 15), (18, 20))},
 }
-NEAR_ANCHOR, FAR_ANCHOR = 2, -2             # 두 발을 모았을 때의 자리로 옮기는 값
+SIDE_HAND = (range(18, 22),)                # 옆면은 팔이 하나다
+NEAR_ANCHOR, FAR_ANCHOR = 2, -3             # 두 발을 모았을 때의 자리로 옮기는 값
 SHOE_NEAR = dict(heel=13, toe=19, ax0=14, ax1=17, base=BASE, lit=LIT, sole=SOLE)
 SHOE_FAR = dict(heel=14, toe=19, ax0=15, ax1=18, base=SOLE, lit=BASE, sole=SOLE)
 
@@ -96,13 +96,13 @@ def img(g):
     return im
 
 
-def swing_hands(out, src, dxy, rows=HAND_ROW, fill=False):
+def swing_hands(out, src, dxy, rows=HAND_ROW, fill=False, cols_set=HAND_COL):
     """팔을 한 칸 흔든다. 손(살색)만 옮기고 소매로 길이를 맞춘다.
 
     옆에서는 앞뒤로 흔드는데, 이 그림은 손이 곧 몸통의 바깥선이라 손만
     옮기면 허리가 홀쭉해지거나 팔이 떨어져 나간다. 그래서 비운 자리를
     소매로 메운다 — 실루엣은 그대로 두고 살색만 앞뒤로 미끄러진다."""
-    for cols, (dx, dy) in zip(HAND_COL, dxy):
+    for cols, (dx, dy) in zip(cols_set, dxy):
         if not dx and not dy:
             continue
         hand = [(x, y) for y in rows for x in cols
@@ -260,7 +260,7 @@ def build_side(g, kind, f):
     src = SIDE_SRC[kind]
     top = min(src)
     out = [row[:] for row in g]
-    swing_hands(out, g, ((ARM_N[f], 0), (0, ARM_F[f])), range(30, 34), fill=True)
+    swing_hands(out, g, ((ARM_N[f], 0),), range(30, 34), fill=True, cols_set=SIDE_HAND)
 
     near, far = {}, {}
     for y, ((n0, n1), (f0, f1)) in src.items():
