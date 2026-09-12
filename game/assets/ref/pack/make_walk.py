@@ -59,8 +59,11 @@ POS_L = (2, 0, -2, -2, -2)
 POS_R = (-2, -2, 2, 2, 0)
 LIFT_L = (0, 0, 0, 1, 2)        # 드는 높이
 LIFT_R = (0, 2, 1, 0, 0)
-HAND_L = (-1, -1, 1, 1, -1)     # 팔은 반대쪽 다리를 따라간다
+HAND_L = (-1, -1, 1, 1, -1)     # 정면·후면 — 위아래로 한 칸
 HAND_R = (1, 1, -1, -1, 1)
+# 옆모습 — 옆에서는 팔이 앞뒤로 간다. 같은 쪽 다리와 반대 위상이다.
+ARM_N = (1, 1, -1, -1, 0)       # 가까운 팔 — 앞뒤로 한 칸 (+x 가 앞)
+ARM_F = (1, 1, -1, -1, 0)       # 먼 팔은 몸에 가려 앞뒤가 안 보인다. 위아래로만.
 
 # 두 다리가 실제로 갈라지는 줄. 그 위(바지통·치마)는 흔들리지 않는 몸통이다
 LEG_TOP = {'boy': 41, 'girl': 40}
@@ -93,12 +96,16 @@ def img(g):
     return im
 
 
-def swing_hands(out, src, f):
-    """팔을 한 칸 흔든다. 손(살색)만 옮기고 소매로 길이를 맞춘다."""
-    for cols, dy in zip(HAND_COL, (HAND_L[f], HAND_R[f])):
-        if not dy:
+def swing_hands(out, src, dxy, rows=HAND_ROW, fill=False):
+    """팔을 한 칸 흔든다. 손(살색)만 옮기고 소매로 길이를 맞춘다.
+
+    옆에서는 앞뒤로 흔드는데, 이 그림은 손이 곧 몸통의 바깥선이라 손만
+    옮기면 허리가 홀쭉해지거나 팔이 떨어져 나간다. 그래서 비운 자리를
+    소매로 메운다 — 실루엣은 그대로 두고 살색만 앞뒤로 미끄러진다."""
+    for cols, (dx, dy) in zip(HAND_COL, dxy):
+        if not dx and not dy:
             continue
-        hand = [(x, y) for y in HAND_ROW for x in cols
+        hand = [(x, y) for y in rows for x in cols
                 if 0 <= x < W and out[y][x] in SKINSET]
         if not hand:
             continue
@@ -106,9 +113,13 @@ def swing_hands(out, src, f):
         for x, y in hand:
             out[y][x] = None
         for (x, y), c in val.items():
-            if 0 <= y + dy < H:
-                out[y + dy][x] = c
-        for x in cols:
+            if 0 <= y + dy < H and 0 <= x + dx < W:
+                out[y + dy][x + dx] = c
+        if fill:                                     # 비운 자리를 소매로 메운다
+            for x, y in sorted(hand, key=lambda c: c[1]):
+                if out[y][x] is None and out[y - 1][x] is not None:
+                    out[y][x] = out[y - 1][x]
+        for x in cols if dy else ():
             ys = sorted(y for xx, y in hand if xx == x)
             if not ys:
                 continue
@@ -118,11 +129,54 @@ def swing_hands(out, src, f):
             else:                                        # 짧아졌다 — 아래를 지운다
                 for k in range(-dy):
                     out[ys[-1] - k][x] = None
-    for cols in HAND_COL:                                # 소매에 뚫린 한 칸을 메운다
-        for x in cols:
-            for y in range(min(HAND_ROW), max(HAND_ROW)):
-                if out[y][x] is None and out[y - 1][x] and out[y + 1][x]:
-                    out[y][x] = out[y - 1][x]
+
+
+def repair(out, ymax=40):
+    """팔을 옮기면 몸과 소매 사이에 틈이 생긴다. 갇힌 틈은 위 색으로 메우고
+    떨어져 나간 조각은 지운다. 발치(ymax 아래)는 손대지 않는다 — 두 다리
+    사이는 뚫려 있어야 맞다."""
+    seen = set()
+    for y0 in range(ymax):
+        for x0 in range(W):
+            if out[y0][x0] is not None or (x0, y0) in seen:
+                continue
+            blob, edge, stack = [], False, [(x0, y0)]
+            seen.add((x0, y0))
+            while stack:
+                x, y = stack.pop()
+                blob.append((x, y))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if not (0 <= nx < W and 0 <= ny < H):
+                        edge = True
+                    elif out[ny][nx] is None and (nx, ny) not in seen:
+                        if ny >= ymax:
+                            edge = True                  # 아래로 새면 바깥이다
+                        else:
+                            seen.add((nx, ny))
+                            stack.append((nx, ny))
+            if not edge:
+                for x, y in sorted(blob, key=lambda c: c[1]):
+                    out[y][x] = out[y - 1][x] or out[y][x - 1] or out[y][x + 1]
+
+    on = [(x, y) for y in range(H) for x in range(W) if out[y][x]]
+    big, left = set(), set(on)
+    while left:
+        st = [left.pop()]
+        comp = {st[0]}
+        while st:
+            x, y = st.pop()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (x + dx, y + dy)
+                if n in left:
+                    left.discard(n)
+                    comp.add(n)
+                    st.append(n)
+        if len(comp) > len(big):
+            big = comp
+    for x, y in on:
+        if (x, y) not in big:
+            out[y][x] = None
 
 
 def hoist(g, b, top):
@@ -183,7 +237,7 @@ def build_flat(g, kind, f):
     if kind == 'girl':
         legcol |= SKINSET                               # 맨다리
     out = [row[:] for row in g]
-    swing_hands(out, g, f)
+    swing_hands(out, g, ((0, HAND_L[f]), (0, HAND_R[f])))
 
     part = {}
     for y in range(top, H):
@@ -197,6 +251,7 @@ def build_flat(g, kind, f):
     zero = lambda y: 0
     place_leg(out, {k: v for k, v in part.items() if k[0] <= 16}, zero, LIFT_L[f], top)
     place_leg(out, {k: v for k, v in part.items() if k[0] > 16}, zero, LIFT_R[f], top)
+    repair(out)
     return out
 
 
@@ -205,7 +260,7 @@ def build_side(g, kind, f):
     src = SIDE_SRC[kind]
     top = min(src)
     out = [row[:] for row in g]
-    swing_hands(out, g, f)
+    swing_hands(out, g, ((ARM_N[f], 0), (0, ARM_F[f])), range(30, 34), fill=True)
 
     near, far = {}, {}
     for y, ((n0, n1), (f0, f1)) in src.items():
@@ -227,6 +282,7 @@ def build_side(g, kind, f):
             (near, NEAR_ANCHOR, POS_R[f], LIFT_R[f], SHOE_NEAR)):
         place_leg(out, part, lambda y, a=anchor, o=pos: a + o, lift, top)
         put_shoe(out, pos, lift, short=lift > 0, **sh)
+    repair(out)
     return out
 
 
