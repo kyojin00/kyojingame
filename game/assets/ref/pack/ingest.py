@@ -197,9 +197,12 @@ def ingest(path, kind, out=None, raw=False):
     bx0, bx1 = min(b[0] for b in box), max(b[0] for b in box)
     by0, by1 = min(b[1] for b in box), max(b[1] for b in box)
     cw, ch = bx1 - bx0 + 1, by1 - by0 + 1
-    fit = min(1.0, W / cw, (H - 1) / ch)
+    # **키로만** 줄인다. 폭 때문에 줄이면 안 된다 — 여자는 머리가 34칸으로
+    # 퍼져서 폭으로 맞추면 사람이 0.94 배가 되는데, 걷기 그림은 29칸이라
+    # 안 줄어든다. 그러면 서 있다가 걸을 때 몸이 커지며 툭 튄다.
+    # 머리끝 한 칸 잘리는 편이 낫다.
+    fit = min(1.0, (H - 1) / ch)
     if fit < 1.0:
-        # 사람이 32x48 보다 크면 줄인다. 잘라내면 발이나 머리가 날아간다
         im = im.crop((bx0, by0, bx1 + 1, by1 + 1)).resize(
             (max(1, int(cw * fit)), max(1, int(ch * fit))), Image.NEAREST)
         w, h = im.size
