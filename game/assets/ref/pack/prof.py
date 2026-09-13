@@ -372,6 +372,13 @@ def build(kind):
 
 
 if __name__ == '__main__':
+    # 옆·뒤는 이제 PixelLab 에서 받아 ingest.py 로 앉힌다. 이 손그림
+    # 생성기를 무심코 돌리면 그걸 덮어쓴다. 일부러 부를 때만 돌게 막는다.
+    import sys as _s
+    if '--force' not in _s.argv:
+        print('%s 는 이제 안 쓴다 (PixelLab + ingest.py 로 대체). '
+              '정말 돌리려면 --force' % __file__)
+        raise SystemExit(0)
     for k in ('boy', 'girl'):
         im = img(build(k))
         im.save(os.path.join(HERE, '%s_side.png' % k))
