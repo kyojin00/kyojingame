@@ -176,7 +176,7 @@ def check(g):
     return bad
 
 
-def ingest(path, kind, out=None):
+def ingest(path, kind, out=None, raw=False):
     im = Image.open(path).convert('RGBA')
     ow, oh = im.size
     w, h = im.size
@@ -216,7 +216,7 @@ def ingest(path, kind, out=None):
         a[0] += (y - ytop) / tall
         a[1] += 1
     lut, dark = {}, {}
-    for c, a in acc.items():
+    for c, a in ((), acc.items())[not raw]:
         if max(c) < 34:                          # 검정은 나중에 이웃을 보고 정한다
             lut[c] = None
             continue
@@ -231,7 +231,7 @@ def ingest(path, kind, out=None):
     # 검정이었다), 우리 팩은 검정을 한 칸도 안 쓴다 — 재료마다 제 색 중
     # 가장 어두운 단으로 두른다. 그래서 검은 칸마다 **둘레에 뭐가 있는지**
     # 보고 그 재료의 가장 어두운 단을 준다.
-    grid = {(x, y): lut[c] for x, y, c in on}
+    grid = {(x, y): (c if raw else lut[c]) for x, y, c in on}
     ymof = {(x, y): (y - ytop) / tall for x, y, c in on}
     for _ in range(12):
         todo = [p for p, v in grid.items() if v is None]
@@ -292,7 +292,7 @@ def ingest(path, kind, out=None):
     res.save(out)
 
     used = len({c[2] for c in cells})
-    print('%s' % os.path.basename(path))
+    print('%s%s' % (os.path.basename(path), ' [원본색]' if raw else ''))
     print('  들어옴 %dx%d · 배율 %d · 색 %d개%s'
           % (ow, oh, s, raw, '' if fit >= 1.0 else ' · %.2f 배로 줄임' % fit))
     print('  나감   32x48 · 팩 색 %d개' % used)
@@ -308,4 +308,5 @@ if __name__ == '__main__':
     if len(sys.argv) < 3:
         print(__doc__)
         sys.exit(1)
-    ingest(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+    outp = next((a for a in sys.argv[3:] if not a.startswith('--')), None)
+    ingest(sys.argv[1], sys.argv[2], outp, raw='--raw' in sys.argv)
