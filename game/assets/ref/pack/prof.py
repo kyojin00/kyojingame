@@ -118,13 +118,13 @@ def mass(g, rows, pal, strand=(), lit=()):
 # 뒤통수는 뒤로 불룩하다. 얼굴을 앞끝에 붙이면 살점이 떨어져 나간
 # 것처럼 보인다 — 그게 여태 어색했던 까닭이다.
 
-GIRL_BACK = {4: (12, 20), 5: (10, 21), 6: (9, 22), 7: (8, 22), 8: (7, 22),
-             9: (7, 22), 10: (7, 22), 11: (7, 22),
-             12: (7, 14), 13: (6, 14), 14: (6, 14), 15: (6, 14), 16: (6, 14),
-             17: (6, 14), 18: (6, 14), 19: (6, 14), 20: (6, 14), 21: (6, 14),
-             22: (6, 14), 23: (6, 14), 24: (6, 14), 25: (6, 14), 26: (6, 14),
-             27: (6, 14), 28: (6, 14), 29: (6, 14), 30: (6, 14), 31: (7, 14),
-             32: (7, 14), 33: (7, 13), 34: (7, 13), 35: (8, 13), 36: (8, 13),
+GIRL_BACK = {4: (12, 19), 5: (10, 21), 6: (9, 22), 7: (8, 22), 8: (7, 23),
+             9: (7, 23), 10: (6, 23), 11: (6, 23),
+             12: (6, 15), 13: (6, 15), 14: (6, 15), 15: (6, 15), 16: (6, 15),
+             17: (6, 15), 18: (6, 15), 19: (6, 15), 20: (6, 15), 21: (6, 15),
+             22: (6, 15), 23: (6, 15), 24: (6, 15), 25: (6, 15), 26: (6, 15),
+             27: (6, 15), 28: (6, 15), 29: (6, 15), 30: (6, 14), 31: (6, 14),
+             32: (7, 14), 33: (7, 14), 34: (7, 13), 35: (8, 13), 36: (8, 13),
              37: (9, 12), 38: (9, 12), 39: (10, 12)}
 GIRL_LOCK = {12: (21, 22), 13: (21, 22), 14: (21, 22), 15: (21, 22),
              16: (21, 22), 17: (21, 22), 18: (21, 22), 19: (21, 22),
@@ -132,18 +132,32 @@ GIRL_LOCK = {12: (21, 22), 13: (21, 22), 14: (21, 22), 15: (21, 22),
              24: (21, 22), 25: (21, 22), 26: (21, 22)}
 GIRL_FACE = {12: (15, 20), 13: (15, 20), 14: (15, 20), 15: (15, 20),
              16: (15, 20), 17: (15, 20), 18: (15, 20), 19: (15, 20)}
-GIRL_NECK = {20: (15, 19), 21: (15, 19)}
+GIRL_NECK = {20: (15, 20), 21: (15, 20)}
 
-BOY_BACK = {5: (12, 19), 6: (10, 20), 7: (9, 21), 8: (8, 21), 9: (8, 21),
-            10: (8, 21), 11: (8, 21),
-            12: (8, 14), 13: (8, 14), 14: (8, 14), 15: (8, 14), 16: (8, 14),
-            17: (8, 14), 18: (9, 14), 19: (10, 14)}
+BOY_BACK = {5: (12, 19), 6: (10, 20), 7: (9, 21), 8: (8, 22), 9: (8, 22),
+            10: (8, 22), 11: (8, 22),
+            12: (8, 15), 13: (8, 15), 14: (8, 15), 15: (8, 15), 16: (8, 15),
+            17: (8, 15), 18: (9, 15), 19: (9, 15)}
 BOY_LOCK = {12: (21, 22), 13: (21, 22), 14: (21, 22), 15: (21, 22),
             16: (21, 22), 17: (21, 22)}
 BOY_FACE = {12: (15, 20), 13: (15, 20), 14: (15, 20), 15: (15, 20),
             16: (15, 20), 17: (15, 20), 18: (15, 20), 19: (15, 20)}
 BOY_NECK = {20: (15, 19), 21: (15, 19)}
 
+TORSO = {
+    'boy': {22: (15, 20), 23: (14, 21), 24: (13, 21), 25: (13, 21), 26: (13, 21),
+            27: (13, 21), 28: (13, 21), 29: (13, 21), 30: (13, 21), 31: (13, 21),
+            32: (13, 21), 33: (13, 21)},
+    'girl': {22: (15, 20), 23: (14, 21), 24: (13, 21), 25: (13, 21), 26: (13, 21),
+             27: (13, 21), 28: (13, 21), 29: (13, 21), 30: (13, 21), 31: (13, 21),
+             32: (13, 21), 33: (13, 21)},
+}
+LOWER = {
+    'boy': {34: (14, 21), 35: (14, 21), 36: (14, 20), 37: (14, 20), 38: (14, 20),
+            39: (14, 20), 40: (14, 20), 41: (14, 20), 42: (14, 20), 43: (13, 20)},
+    'girl': {34: (13, 21), 35: (13, 22), 36: (13, 22), 37: (12, 22), 38: (12, 22),
+             39: (13, 21)},
+}
 SHAPE = {'boy': (BOY_BACK, BOY_LOCK, BOY_FACE, BOY_NECK),
          'girl': (GIRL_BACK, GIRL_LOCK, GIRL_FACE, GIRL_NECK)}
 EYE_SRC = 18                                 # 앞모습 오른쪽 눈이 시작하는 칸
@@ -177,9 +191,14 @@ def paint_hair(g, src, kind, rows, cells, side=None, from_y=99):
             half = [x for x in xs if (x < 16 if side == 'left' else x >= 16)]
             if len(half) >= 2:
                 xs = half
+        # 늘이지 않고 **한 칸씩 그대로** 옮긴다. 폭에 맞춰 늘이면 칸이
+        # 솎이면서 결이 삐죽삐죽한 술처럼 튄다.
+        sc = (xs[0] + xs[-1]) / 2.0
+        tc = (x0 + x1) / 2.0
         for x in range(x0, x1 + 1):
-            k = round((x - x0) * (len(xs) - 1) / max(1, x1 - x0))
-            g[y][x] = src[sy][xs[k]]
+            sx = min(xs[-1], max(xs[0], int(round(x - tc + sc))))
+            c = src[sy][sx]
+            g[y][x] = c if c in hairset else HB   # 볼·눈까지 딸려오면 안 된다
             cells.append((x, y))
 
 
@@ -206,6 +225,26 @@ def head(g, src, kind):
     edge(g, cells, pal[0])
 
 
+def backfall(g, src, kind):
+    """등 뒤로 흘러내린 머리채. 몸통을 세운 뒤에 얹는다 — 어깨 뒤를 덮는다.
+
+    여기는 앞모습 결을 베끼지 않는다. 넓고 판판한 면이라 가닥을 옮겨 놓으면
+    삐죽삐죽한 술처럼 보인다. 앞모습 긴머리도 밑색 한 장에 테두리뿐이다."""
+    rows = {y: v for y, v in SHAPE[kind][0].items() if y >= 22}
+    if not rows:
+        return
+    HD, HS, HB, HL = (P[kind]['hair'][i] for i in (0, 1, 2, -1))
+    cells = []
+    for y, (x0, x1) in rows.items():
+        for x in range(x0, x1 + 1):
+            g[y][x] = HB
+            cells.append((x, y))
+        g[y][x0] = HS
+        if x1 - x0 >= 3 and 24 <= y <= 33:
+            g[y][x0 + 2] = HL                    # 어깨에서 흘러내리는 윤 한 줄
+    edge(g, cells, HD)
+
+
 def relock(g, src, kind):
     """앞 갈래는 어깨보다 앞이다. 옷을 그린 뒤 다시 얹는다."""
     lock = {y: v for y, v in SHAPE[kind][1].items() if y >= 22}
@@ -229,39 +268,66 @@ def darkest(kind, c):
 
 
 def body(g, src, kind):
-    """몸통은 앞모습을 좌우로 깎는다. 옆에서는 어깨가 좁다.
-    깎아낸 자리의 새 바깥칸은 제 재료의 가장 어두운 단으로 다시 두른다."""
-    hairset = set(P[kind]['hair'])
+    """옆에서 본 몸은 **기둥 하나**다.
+
+    앞모습을 좌우로 깎아 썼더니 깃·단추·치마 주름·두 다리가 그대로 남아
+    얼굴만 옆을 보고 몸은 앞을 보는 꼴이 됐다. 앞면에만 있는 것들이라
+    옆에서는 한 칸으로 접히거나 아예 안 보여야 한다.
+
+    그래서 줄마다 통 하나를 세운다 — 뒤가 어둡고 앞이 밝다. 그게 원기둥을
+    옆에서 본 명암이고, 그것만으로 몸이 돌아간다."""
+    P_ = P[kind]
+    top, bot = P_['top'], P_['bot']
+
+    def pal(c):
+        return dict(dark=c[min(3, len(c) - 1)], shade=c[1], base=c[0],
+                    lit=c[min(2, len(c) - 1)])
+
+    def column(y, x0, x1, c):
+        p = pal(c)
+        for x in range(x0, x1 + 1):
+            g[y][x] = p['base']
+        g[y][x0] = p['dark']                     # 등 쪽
+        if x1 - x0 >= 3:
+            g[y][x0 + 1] = p['shade']
+            g[y][x1 - 1] = p['lit']              # 가슴 쪽이 밝다
+        g[y][x1] = p['dark']
+
     for y in range(22, 48):
-        xs = [x for x in range(W) if src[y][x] and src[y][x] not in hairset]
-        if not xs:
-            continue
-        t = 2 if len(xs) >= 12 else (1 if len(xs) >= 8 else 0)
-        keep = xs[t:len(xs) - t] if t else xs
-        for x in keep:
-            g[y][x] = src[y][x]
-        if t:
-            g[y][keep[0]] = darkest(kind, src[y][keep[0]])
-            g[y][keep[-1]] = darkest(kind, src[y][keep[-1]])
+        for x in range(W):
+            g[y][x] = None
+    for y, (x0, x1) in TORSO[kind].items():
+        column(y, x0, x1, top)
+    for y, (x0, x1) in LOWER[kind].items():
+        column(y, x0, x1, bot)
+    if kind == 'girl':                           # 무릎 아래 맨다리와 양말
+        for y in (40, 41):
+            for x in range(14, 20):
+                g[y][x] = SKM
+            g[y][14] = g[y][19] = SKD
+        for y in (42, 43):
+            for x in range(14, 20):
+                g[y][x] = SHOE[4]
+            g[y][14] = g[y][19] = SHOE[1]
 
 
 def one_arm(g, kind):
-    """옆에서는 팔이 하나다. 몸통 앞쪽에 소매를 세우고 손을 단다."""
+    """옆에서는 팔이 하나다. 몸통 앞쪽에 소매를 세우고 손을 단다.
+    팔은 몸보다 앞이라 제 테두리를 등 쪽에 하나 갖는다 — 없으면 옷주름으로
+    보이고 팔이 없는 사람이 된다."""
     top = P[kind]['top']
     sleeve, line = top[1], top[min(3, len(top) - 1)]
     wrist = 30 if kind == 'boy' else 29
+    x0, x1 = TORSO[kind][26]
     for y in range(24, wrist + 1):
-        xs = [x for x in range(W) if g[y][x]]
-        if len(xs) < 6:
-            continue
-        g[y][xs[-2]] = sleeve
-        g[y][xs[-3]] = line
+        g[y][x1 - 1] = sleeve
+        g[y][x1 - 2] = sleeve
+        g[y][x1 - 3] = line
     for y in range(wrist + 1, wrist + 4):
-        xs = [x for x in range(W) if g[y][x]]
-        if len(xs) < 6:
-            continue
-        g[y][xs[-2]] = SKM
-        g[y][xs[-3]] = SKD
+        g[y][x1 - 1] = SKM
+        g[y][x1 - 2] = SK
+        g[y][x1 - 3] = SKD
+    g[wrist + 4][x1 - 2] = SKD
 
 
 def feet(g):
@@ -297,8 +363,9 @@ def build(kind):
     src = [[px[x, y][:3] if px[x, y][3] else None for x in range(W)] for y in range(H)]
     g = [[None] * W for _ in range(H)]
     head(g, src, kind)
-    body(g, src, kind)                          # 옷은 뒤 머리채 위에 — 머리는 등 뒤다
-    relock(g, src, kind)                        # 앞 갈래는 옷 앞에 — 어깨를 덮는다
+    body(g, src, kind)                          # 몸은 기둥 하나
+    backfall(g, src, kind)                      # 등 뒤 머리채는 몸을 그린 뒤에
+    relock(g, src, kind)                        # 앞 갈래도 옷 앞 — 어깨를 덮는다
     one_arm(g, kind)
     feet(g)
     return g
