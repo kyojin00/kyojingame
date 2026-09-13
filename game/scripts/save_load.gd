@@ -104,8 +104,14 @@ func _apply_save(d: Dictionary) -> void:
 	# (남자 = 짧은 머리·파란 셔츠, 여자 = 긴 머리·분홍 셔츠)
 	var was_f := GameData.gender == "f"
 	var ap: Dictionary = d.get("appearance", {})
+	# 머리 스타일 넷이 사람 둘로 줄기 전(appear_v 없음)의 세이브는 번호를
+	# 옮겨 준다: 0·1·2 = 남자 세 머리 -> 0(남자아이), 3 = 긴 머리 -> 1(여자아이).
+	# 번호만 보고 옮기면 새 세이브의 1(여자)까지 0으로 되돌리므로 판을 본다.
+	var hair := int(ap.get("hair", 3 if was_f else 0))
+	if int(d.get("appear_v", 1)) < 2:
+		hair = 1 if hair >= 3 else 0
 	GameData.appearance = {
-		"hair": int(ap.get("hair", 3 if was_f else 0)),
+		"hair": hair,
 		"shirt": int(ap.get("shirt", 1 if was_f else 0)),
 		"pants": int(ap.get("pants", 0)),
 		"shoes": int(ap.get("shoes", 0)),

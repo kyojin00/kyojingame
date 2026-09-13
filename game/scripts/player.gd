@@ -530,7 +530,10 @@ func _update_sprite() -> void:
 	if not walking and not swinging and not riding and dir != "up":
 		if fmod(Time.get_ticks_msec() / 1000.0, 3.7) < 0.13:
 			var v := "side" if (dir == "left" or dir == "right") else "down"
-			tex_name = "pc_%s_blink" % v
+			# 눈 감은 장이 없는 벌도 있다. 없는 이름을 넘기면 그 0.13초
+			# 동안 주인공이 통째로 사라지므로, 있을 때만 갈아끼운다
+			if main.tex.has("pc_%s_blink" % v):
+				tex_name = "pc_%s_blink" % v
 	sprite.texture = main.tex[tex_name]
 	# 서 있을 때 숨쉬기: 프레임 대신 세로 스케일을 살짝 키웠다 줄인다
 	# (스프라이트 offset이 발 기준이라 발은 그대로, 머리만 오르내린다)

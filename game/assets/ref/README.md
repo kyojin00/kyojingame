@@ -10,7 +10,8 @@
 
 | 폴더 | 원본 | 만드는 것 |
 | --- | --- | --- |
-| `ai_boy/` | `src/` = 3세대 시트 결과물 30장 | **지금 쓰는 주인공** — 팔레트로 분류하고 머리 모양을 덧그려 네 벌(짧은·단발·삐죽·긴 머리) x 35장 |
+| `pack/` | PixelLab 로 뽑은 남자·여자 (서기 3 + 걷기 4x3) | **지금 쓰는 주인공** — 두 벌(남자아이·여자아이). `install_game.py`가 `sprites/`에 앉히고 눈 감은 장을 만들며, `make_mat.py`가 갈아입히기용 재질판을 굽는다 |
+| `ai_boy/` | `src/` = 3세대 시트 결과물 30장 | 4판 주인공 — 안 쓴다 (네 벌 x 35장) |
 | `dot_boy/` | 없음 — `make_sprites.py`가 코드로 그린다 | 2·3판 주인공 — 안 쓴다 (프롤로그 그림 `make_prologue.py`는 여기 그대로) |
 | `new_boy3/` | AI 시트 (걷기 5 + 휘두르기 5) x 3방향 | 3세대 남자 캐릭터 — 안 쓴다 |
 | `new_boy2/` | AI 시트 (걷기 5 + 서기) | 옛 걷기·서기 — 안 쓴다 |
@@ -18,9 +19,10 @@
 | `npc/` | NPC 원본 | 마을 사람 도트 |
 | `trees/` `mat/` `src/` | 지형·오브젝트 원본 | 타일·나무·바위·아이템 |
 
-**1·2·3세대 생성기와 `dot_boy/make_sprites.py`는 돌리지 말 것.** `new_boy_*`
-같은 이름으로 덮어써서 주인공이 옛 그림으로 바뀐다. 주인공을 다시 뽑을 때는
-`ai_boy/make_sprites.py`만 돌린다.
+**1·2·3·4세대 생성기와 `dot_boy/make_sprites.py`는 돌리지 말 것.** `new_boy_*`
+같은 이름으로 덮어써서 주인공이 옛 그림으로 바뀐다. 지금 주인공을 다시
+앉힐 때는 `pack/install_game.py --write` 다음 `pack/make_mat.py --write`,
+그리고 `godot --headless --path game --import` 순서다.
 
 ## 바닥 — `make_ground.js`
 

@@ -107,6 +107,9 @@ var objects: Dictionary = {}
 var obj_nodes: Dictionary = {}  # Vector2i -> Node2D (설치/제거 가능한 오브젝트만)
 
 var tex: Dictionary = {}
+# 플레이어 도트의 재질판 (이름 -> Image). 어느 칸이 머리·옷·살결인지 적혀
+# 있어서 옷 색을 갈아입힐 때만 읽는다 — 화면에는 안 그린다.
+var mat_img: Dictionary = {}
 var world: Node2D
 var overlay: Node2D  # 건물보다 앞에 그리는 안내 텍스트/화살표/날씨 레이어
 var player: Node2D
@@ -1449,6 +1452,11 @@ func _load_textures() -> void:
 			var sp := "res://assets/sprites/%s.png" % sn
 			if ResourceLoader.exists(sp):
 				tex[sn] = load(sp)
+			# 재질판 — 어느 칸이 머리고 옷인지 적어 둔 그림. 화면에는 안
+			# 그리고 갈아입힐 때만 읽으므로 Image 로 들고 있는다
+			var mp := "res://assets/sprites/mat/%s.png" % sn
+			if ResourceLoader.exists(mp):
+				mat_img[sn] = (load(mp) as Texture2D).get_image()
 
 
 # 플레이어 한 벌을 이루는 프레임 이름들 (idle 3 + walk 18 + blink 2 + swing 15)
@@ -1469,16 +1477,20 @@ func _player_suffixes() -> Array[String]:
 func apply_appearance() -> void:
 	var ap: Dictionary = GameData.appearance
 	var src: String = GameData.HAIR_PREFIX[clampi(int(ap.hair), 0, GameData.HAIR_PREFIX.size() - 1)]
-	var plain: bool = int(ap.shirt) == 0 and int(ap.pants) == 0 and int(ap.shoes) == 0
+	# 다섯 자리가 모두 「그린 그대로」면 손댈 것이 없다 (예전엔 살결·머리색을
+	# 빠뜨려서, 그 둘만 고르면 아무 일도 안 일어났다)
+	var plain: bool = int(ap.shirt) == 0 and int(ap.pants) == 0 and int(ap.shoes) == 0 \
+		and int(ap.get("skin", 0)) == 0 and int(ap.get("hair_col", 0)) == 0
 	for sfx: String in _player_suffixes():
 		var t: Texture2D = tex.get("%s_%s" % [src, sfx])
 		if t == null:
 			continue
-		if plain:
+		var mi: Image = mat_img.get("%s_%s" % [src, sfx])
+		if plain or mi == null:
 			tex["pc_" + sfx] = t
 		else:
 			var img: Image = t.get_image()
-			GameData.recolor_player_image(img, ap)
+			GameData.recolor_player_image(img, mi, src, ap)
 			tex["pc_" + sfx] = ImageTexture.create_from_image(img)
 
 

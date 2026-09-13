@@ -153,7 +153,7 @@ func _show_creator(on: bool) -> void:
 func _start_new(g: String) -> void:
 	# (개발 스크린샷 등 옛 경로) 성별만으로 옛 기본 외형을 만든다
 	GameData.gender = g
-	GameData.appearance = {"hair": 3 if g == "f" else 0,
+	GameData.appearance = {"hair": 1 if g == "f" else 0,
 		"shirt": 1 if g == "f" else 0, "pants": 0, "shoes": 0,
 		"skin": 0, "hair_col": 0}
 	if FileAccess.file_exists(GameData.SAVE_PATH):
@@ -194,6 +194,9 @@ const WOOD_MID := Color(0.55, 0.37, 0.20)
 const WOOD_LIGHT := Color(0.86, 0.70, 0.46)
 const INK := Color(0.24, 0.14, 0.06)
 # [부위, 팻말, 색표] — 색은 각 벌의 「기본」 색을 그대로 스와치에 쓴다
+# 고르는 자리 이름 -> PC_BASE 의 이름 (머리「색」은 머리 도트와 이름이 다르다)
+const BASE_KEY := {"hair_col": "hair", "skin": "skin", "shirt": "shirt",
+	"pants": "pants", "shoes": "shoes"}
 const SWATCH_ROWS := [
 	["hair_col", "머리색", "hair"],
 	["skin", "피부", "skin"],
@@ -342,8 +345,8 @@ func _build_gender_panel() -> void:
 		var g: String = pair[0]
 		var b := _wood_button(pair[1], func() -> void:
 			_appear_gender = g
-			# 성별을 바꾸면 어울리는 기본 머리로 한 번 맞춰 준다
-			_appear.hair = 3 if g == "f" else 1
+			# 도트 한 벌이 곧 한 사람이라 성별이 그대로 사람을 정한다
+			_appear.hair = 1 if g == "f" else 0
 			_appear_refresh(), 78)
 		b.add_theme_font_size_override("font_size", 26)
 		_gender_btns[g] = b
@@ -374,7 +377,7 @@ func _build_gender_panel() -> void:
 	# 머리 모양 — 이름이 있는 것이라 화살표로 넘긴다
 	_hair_row = HBoxContainer.new()
 	_hair_row.add_theme_constant_override("separation", 6)
-	_hair_row.add_child(_mk_tag("머리"))
+	_hair_row.add_child(_mk_tag("모습"))
 	_hair_row.add_child(_wood_button("◀", func() -> void: _hair_cycle(-1), 30))
 	_hair_label = Label.new()
 	_hair_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -394,7 +397,7 @@ func _build_gender_panel() -> void:
 		var tbl: Array = _swatch_colors(str(row_def[2]))
 		for i in tbl.size():
 			var idx := i
-			var rgb: Array = tbl[i][0]
+			var rgb: Array = tbl[i]
 			var b := _mk_swatch(Color8(rgb[0], rgb[1], rgb[2]), func() -> void:
 				_appear[part] = idx
 				_appear_refresh())
@@ -413,9 +416,12 @@ func _build_gender_panel() -> void:
 	_appear_refresh()
 
 
-# 머리 모양만 화살표로 넘긴다 (색과 달리 한눈에 늘어놓을 수 없어서)
+# 누구로 시작할지 화살표로 넘긴다 (색과 달리 한눈에 늘어놓을 수 없어서).
+# 도트 한 벌이 곧 한 사람이라 ♂♀ 단추와 같은 것을 가리킨다 — 한쪽만
+# 움직이면 표식과 액자가 어긋나 보이므로 여기서 성별도 같이 돌린다.
 func _hair_cycle(dir: int) -> void:
 	_appear.hair = wrapi(int(_appear.hair) + dir, 0, GameData.HAIR_NAMES.size())
+	_appear_gender = "f" if int(_appear.hair) == 1 else "m"
 	_appear_refresh()
 
 
@@ -427,9 +433,14 @@ func _appear_refresh() -> void:
 		b.add_theme_stylebox_override("normal",
 			_wood_style(WOOD_BG if on else WOOD_MID,
 				WOOD_LIGHT if on else WOOD_DARK, 3 if on else 2))
+	# 0번 「그린 그대로」 네모는 사람마다 색이 달라 표에 적어 둘 수가 없다 —
+	# 지금 고른 사람에게 실제로 그려진 색을 가져다 칠한다
+	var base: Dictionary = GameData.PC_BASE[GameData.HAIR_PREFIX[int(_appear.hair)]]
 	for part: String in _swatch_btns:
 		var sel: int = int(_appear[part])
 		var btns: Array = _swatch_btns[part]
+		var b0: Array = base[BASE_KEY[part]]
+		btns[0].set_meta("col", Color8(b0[0], b0[1], b0[2]))
 		for i in btns.size():
 			var sw: Button = btns[i]
 			_paint_swatch(sw, i == sel)
@@ -444,7 +455,11 @@ func _dress(sprite: String) -> Texture2D:
 	if not ResourceLoader.exists(path):
 		return null
 	var img: Image = (load(path) as Texture2D).get_image()
-	GameData.recolor_player_image(img, _appear)
+	var mp := "res://assets/sprites/mat/%s.png" % sprite
+	if ResourceLoader.exists(mp):
+		var pre: String = GameData.HAIR_PREFIX[int(_appear.hair)]
+		GameData.recolor_player_image(img, (load(mp) as Texture2D).get_image(),
+			pre, _appear)
 	return ImageTexture.create_from_image(img)
 
 
@@ -462,25 +477,24 @@ func _start_selected() -> void:
 
 # 검증용 — 고른 색이 정말 액자 속 도트에 칠해졌는지 픽셀로 센다.
 # (스와치만 눌리고 그림은 그대로면 아무 소용이 없다)
+func _rgb32(a: Array) -> int:
+	return Color8(int(a[0]), int(a[1]), int(a[2])).to_rgba32()
+
+
+# 「고른 색이 정말 도트에 들어갔는가」를 센다.
+#   머리색·피부  : 고른 색이 한 칸이라도 있어야 한다
+#   옛색남음     : 그 벌에 **그려져 있던** 기본색이 한 칸도 남으면 안 된다
+#                  (남으면 재질판이 그 칸을 놓쳤다는 뜻이다)
 func _creator_report() -> String:
 	if _idle_tex == null:
 		return "false 미리보기없음"
 	var img: Image = _idle_tex.get_image()
+	var base: Dictionary = GameData.PC_BASE[GameData.HAIR_PREFIX[int(_appear.hair)]]
 	var want := {
-		"hair": Color8(GameData.APPEAR_HAIR_COL[int(_appear.hair_col)][0][0],
-			GameData.APPEAR_HAIR_COL[int(_appear.hair_col)][0][1],
-			GameData.APPEAR_HAIR_COL[int(_appear.hair_col)][0][2]).to_rgba32(),
-		"skin": Color8(GameData.APPEAR_SKIN[int(_appear.skin)][0][0],
-			GameData.APPEAR_SKIN[int(_appear.skin)][0][1],
-			GameData.APPEAR_SKIN[int(_appear.skin)][0][2]).to_rgba32(),
+		"hair": _rgb32(GameData.APPEAR_HAIR_COL[int(_appear.hair_col)]),
+		"skin": _rgb32(GameData.APPEAR_SKIN[int(_appear.skin)]),
 	}
-	var src := {
-		"hair": Color8(GameData.APPEAR_HAIR_COL[0][0][0],
-			GameData.APPEAR_HAIR_COL[0][0][1],
-			GameData.APPEAR_HAIR_COL[0][0][2]).to_rgba32(),
-		"skin": Color8(GameData.APPEAR_SKIN[0][0][0], GameData.APPEAR_SKIN[0][0][1],
-			GameData.APPEAR_SKIN[0][0][2]).to_rgba32(),
-	}
+	var src := {"hair": _rgb32(base.hair), "skin": _rgb32(base.skin)}
 	var hair_n := 0
 	var skin_n := 0
 	var stale := 0
@@ -818,7 +832,7 @@ func _process(delta: float) -> void:
 		_name_edit.text = "교진"
 		_village_edit.text = "교진"
 		_appear_gender = "f"
-		_appear = {"hair": 3, "shirt": 1, "pants": 1, "shoes": 2,
+		_appear = {"hair": 1, "shirt": 1, "pants": 1, "shoes": 2,
 			"skin": 2, "hair_col": 3}
 		_appear_refresh()
 		print("CREATOR_OK=", _creator_report())
