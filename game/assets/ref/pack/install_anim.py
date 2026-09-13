@@ -68,6 +68,22 @@ def one(kind, dirname, sets, dy, label, write):
     jit = max(bodies) - min(bodies)
     print('  몸통 흔들림 %.1f칸 %s' % (jit, 'OK' if jit <= 1.0 else '** 몸이 떤다'))
 
+    # **방향이 뒤집혔는지** 본다. 생성기가 뒤통수 걷기에서 넉 장 중 셋을
+    # 앞모습으로 그려 보낸 적이 있다. 낱장 검사로는 안 잡힌다 — 알파도
+    # 발바닥도 멀쩡하니까. 머리통에 얼굴 살결이 얼마나 보이는지로 잡는다.
+    face = []
+    for s in sets:
+        ys = [c[1] for c in s]
+        t, tall = min(ys), max(ys) - min(ys) + 1
+        face.append(sum(1 for x, y, c in s
+                        if y <= t + tall * 0.42 and c[0] > 190 and c[0] - c[2] > 25))
+    print('  장별 얼굴살: %s' % ' '.join(str(f) for f in face))
+    lo, hi = min(face), max(face)
+    if hi - lo > 12:
+        print('  ** 장마다 얼굴이 다르게 보인다 — 방향이 뒤집힌 장이 섞였다')
+    elif dirname == 'up' and hi > 12:
+        print('  ** 뒤통수여야 하는데 얼굴이 보인다')
+
     for i, s in enumerate(sets):
         g = [[None] * W for _ in range(H)]
         lost = 0
