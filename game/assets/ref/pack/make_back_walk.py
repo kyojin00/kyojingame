@@ -40,10 +40,22 @@ def save(g, name):
     im.save(os.path.join(HERE, name))
 
 
+def span(g, y0, y1):
+    xs = [x for y in range(y0, y1) for x in range(W) if g[y][x]]
+    return (min(xs), max(xs)) if xs else None
+
+
 def main(kind, split, write=False):
     back = grid('%s_up.png' % kind)
+    # 뒤집은 다리를 뒷모습 다리 자리에 맞춘다. 그냥 x->32-x 로 뒤집으면
+    # 앞뒤 다리 중심이 다를 때 한두 칸 어긋나 다리가 몸에서 비켜난다.
+    bs = span(back, split, H)
     for i in range(4):
         legs = grid('%s_down_walk_%d.png' % (kind, i))
+        ls = span(legs, split, H)
+        shift = 0
+        if bs and ls:
+            shift = int(round((bs[0] + bs[1]) / 2.0 - (32 - (ls[0] + ls[1]) / 2.0)))
         out = [[back[y][x] for x in range(W)] for y in range(H)]
         for y in range(split, H):
             for x in range(W):
@@ -51,7 +63,7 @@ def main(kind, split, write=False):
             for x in range(W):
                 c = legs[y][x]
                 if c:
-                    nx = 32 - x                  # 뒤에서 보면 좌우가 바뀐다
+                    nx = 32 - x + shift          # 뒤에서 보면 좌우가 바뀐다
                     if 0 <= nx < W:
                         out[y][nx] = c
         on = [(x, y) for y in range(H) for x in range(W) if out[y][x]]

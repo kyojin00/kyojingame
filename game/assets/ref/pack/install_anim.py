@@ -14,7 +14,12 @@
 판 크기가 달라(앞은 68칸, 옆은 48칸) 옆모습이 장당 109칸씩 잘려 나갔다.
 다 땅을 딛고 있으니 방향마다 제 발바닥을 47 에 두면 그게 같은 지면이다.
 
-쓰기: python3 install_anim.py <boy|girl> down=앞.gif side=옆.gif up=뒤.gif [--write]
+장수가 다르게 올 때가 있다. 여자는 4프레임, 남자는 6프레임으로 왔다.
+게임은 한 값(WALK_FRAMES)을 쓰니 맞춰야 한다. --pick 으로 고른다.
+6프레임은 한 걸음 세 장씩 두 걸음이라 --pick 0,1,3,4 로 걸음마다 두 장씩
+뽑으면 번갈아 딛는 게 유지된다.
+
+쓰기: python3 install_anim.py <boy|girl> down=앞 side=옆 up=뒤 [--pick 0,1,3,4] [--write]
 """
 
 import os
@@ -50,9 +55,11 @@ def body_foot(s):
     return (min(bx) + max(bx)) / 2.0, (min(fx) + max(fx)) / 2.0
 
 
-def main(kind, jobs, write=False):
+def main(kind, jobs, write=False, pick=None):
     for d, t in jobs:
         sets = [cells_of(f) for f in frames_of(t)]
+        if pick:
+            sets = [sets[i] for i in pick if i < len(sets)]
         # 그 방향 안에서는 **모든 장을 묶어** 한 값. 장마다 맞추면 몸이 떤다
         dy = 47 - max(max(c[1] for c in s) for s in sets)
         one(kind, d, sets, dy, os.path.basename(t), write)
@@ -79,8 +86,11 @@ def one(kind, dirname, sets, dy, label, write):
                         if y <= t + tall * 0.42 and c[0] > 190 and c[0] - c[2] > 25))
     print('  장별 얼굴살: %s' % ' '.join(str(f) for f in face))
     lo, hi = min(face), max(face)
-    if hi - lo > 12:
-        print('  ** 장마다 얼굴이 다르게 보인다 — 방향이 뒤집힌 장이 섞였다')
+    # 차이가 아니라 **비율**로 본다. 남자 옆모습은 79~96 으로 다 높은데
+    # (머리가 얼굴을 안 가리니 당연) 차이만 보면 걸린다. 진짜 뒤집힌 세트는
+    # 여자 뒤통수처럼 6 대 62 로 자릿수가 다르다.
+    if hi and lo < hi * 0.35:
+        print('  ** 장마다 얼굴이 딴판이다 — 방향이 뒤집힌 장이 섞였다')
     elif dirname == 'up' and hi > 12:
         print('  ** 뒤통수여야 하는데 얼굴이 보인다')
 
@@ -117,6 +127,9 @@ if __name__ == '__main__':
     if not jobs:
         print(__doc__)
         sys.exit(1)
-    main(kind, jobs, '--write' in sys.argv)
+    pick = None
+    if '--pick' in sys.argv:
+        pick = [int(v) for v in sys.argv[sys.argv.index('--pick') + 1].split(',')]
+    main(kind, jobs, '--write' in sys.argv, pick)
     if '--write' not in sys.argv:
         print('\n재보기만 했다. 넣으려면 --write')
