@@ -18,6 +18,7 @@
 쓰기: python3 ingest.py <입력.png> <boy|girl> [<나갈이름.png>]
 """
 
+import math
 import os
 import sys
 from collections import deque
@@ -46,6 +47,37 @@ KIND = {
              (70, 139, 140), (40, 102, 108), (116, 170, 170),
              (168, 206, 212), (217, 183, 104)],
 }
+
+
+SKIN = [(255, 227, 201), (255, 244, 223), (245, 201, 177), (191, 141, 131), (104, 71, 73)]
+SHOE = [(217, 223, 212), (200, 199, 188), (244, 247, 240), (64, 62, 78), (236, 240, 230)]
+PARTS = {
+    'boy': dict(hair=[(75, 57, 57), (112, 81, 74), (146, 112, 98), (179, 141, 116)],
+                top=[(89, 133, 159), (54, 94, 122), (128, 167, 186), (36, 70, 88), (181, 205, 209)],
+                bot=[(58, 57, 74), (44, 43, 58), (83, 86, 103), (31, 30, 42), (115, 125, 139)]),
+    'girl': dict(hair=[(55, 49, 70), (80, 70, 98), (107, 96, 131), (128, 117, 150), (150, 139, 172)],
+                 top=[(243, 236, 215), (222, 222, 206), (254, 247, 228), (172, 166, 154)],
+                 bot=[(70, 139, 140), (40, 102, 108), (116, 170, 170)]),
+}
+
+
+def band_palette(kind, ym):
+    """그 칸이 몸의 어디쯤인지로 **어느 재료인지**를 먼저 정한다.
+
+    이게 없으면 색만 보고 고르다가 재료를 넘나든다. 생성기가 스웨터를
+    회색빛으로 그려 왔더니 가슴팍 158칸이 통째로 **바지색**에 앉았다.
+    그러면 게임에서 윗옷 색을 바꿔도 스웨터가 안 변하고, 바지색을 바꾸면
+    가슴이 물든다 — 색 바꾸기가 통째로 죽는다.
+
+    살결은 어느 높이에나 있다(얼굴·손·다리). 그래서 늘 후보에 넣는다."""
+    p = PARTS[kind]
+    if ym < 0.44:
+        return p['hair'] + SKIN                  # 머리통
+    if ym < 0.74:
+        return p['top'] + SKIN                   # 몸통과 팔
+    if ym < 0.92:
+        return p['bot'] + SKIN + SHOE            # 다리와 양말
+    return SHOE + p['bot'] + SKIN                # 발
 
 
 def palette(kind):
@@ -147,13 +179,18 @@ def ingest(path, kind, out=None):
         w, h = im.size
         px = im.load()
 
-    pal = palette(kind)
-    cells = []
-    for y in range(h):
-        for x in range(w):
-            r, gg, b, a = px[x, y]
-            if a > 128:
-                cells.append((x, y, near((r, gg, b), pal)))
+    # 원본 색마다 **주로 어느 높이에 나오는지**를 먼저 센다. 색 하나가
+    # 몸 전체에 흩어져 있으면 그 평균 높이로 재료를 정한다.
+    on = [(x, y, px[x, y][:3]) for y in range(h) for x in range(w) if px[x, y][3] > 128]
+    ys = [c[1] for c in on]
+    ytop, tall = min(ys), max(ys) - min(ys) + 1
+    acc = {}
+    for x, y, c in on:
+        a = acc.setdefault(c, [0, 0])
+        a[0] += (y - ytop) / tall
+        a[1] += 1
+    lut = {c: near(c, band_palette(kind, a[0] / a[1])) for c, a in acc.items()}
+    cells = [(x, y, lut[c]) for x, y, c in on]
     if not cells:
         print('%s: 불투명한 칸이 없다' % path)
         return
@@ -163,7 +200,9 @@ def ingest(path, kind, out=None):
     # 쏠린 방향에서 발이 옆으로 밀려, 방향이 바뀔 때 캐릭터가 튄다.
     foot = [c[0] for c in cells if c[1] >= max(ys) - 1]
     cx = (min(foot) + max(foot)) / 2.0
-    dx = int(round(16 - cx))
+    # 파이썬 round 는 0.5 를 짝수로 붙인다(round(-0.5)==0). 발이 반 칸
+    # 어긋난 채 굳어 버리므로 항상 0.5 를 더해 내림한다.
+    dx = math.floor(16 - cx + 0.5)
     dy = 47 - max(ys)                            # 발바닥을 맨 아래로
 
     g = [[None] * W for _ in range(H)]
