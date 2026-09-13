@@ -147,10 +147,12 @@ def ingest(path, kind, out=None):
         print('%s: 불투명한 칸이 없다' % path)
         return
 
-    xs = [c[0] for c in cells]
     ys = [c[1] for c in cells]
-    cx = (min(xs) + max(xs)) / 2.0
-    dx = int(round(16 - cx))                     # 가로는 가운데
+    # 가로는 **발**을 기준으로 맞춘다. 몸 전체로 맞추면 머리채가 한쪽으로
+    # 쏠린 방향에서 발이 옆으로 밀려, 방향이 바뀔 때 캐릭터가 튄다.
+    foot = [c[0] for c in cells if c[1] >= max(ys) - 1]
+    cx = (min(foot) + max(foot)) / 2.0
+    dx = int(round(16 - cx))
     dy = 47 - max(ys)                            # 발바닥을 맨 아래로
 
     g = [[None] * W for _ in range(H)]
