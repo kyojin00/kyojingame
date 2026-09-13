@@ -61,23 +61,49 @@ PARTS = {
 }
 
 
-def band_palette(kind, ym):
-    """그 칸이 몸의 어디쯤인지로 **어느 재료인지**를 먼저 정한다.
-
-    이게 없으면 색만 보고 고르다가 재료를 넘나든다. 생성기가 스웨터를
-    회색빛으로 그려 왔더니 가슴팍 158칸이 통째로 **바지색**에 앉았다.
-    그러면 게임에서 윗옷 색을 바꿔도 스웨터가 안 변하고, 바지색을 바꾸면
-    가슴이 물든다 — 색 바꾸기가 통째로 죽는다.
-
-    살결은 어느 높이에나 있다(얼굴·손·다리). 그래서 늘 후보에 넣는다."""
+def mats(kind):
     p = PARTS[kind]
+    return dict(hair=p['hair'], top=p['top'], bot=p['bot'], shoe=SHOE, skin=SKIN)
+
+
+PENALTY = 3.0                                    # 제자리가 아닌 재료에 매기는 벌점
+
+
+def expected(ym):
+    """그 높이에서 **주로** 나와야 할 재료."""
     if ym < 0.44:
-        return p['hair'] + SKIN                  # 머리통
+        return 'hair'
     if ym < 0.74:
-        return p['top'] + SKIN                   # 몸통과 팔
+        return 'top'
     if ym < 0.92:
-        return p['bot'] + SKIN + SHOE            # 다리와 양말
-    return SHOE + p['bot'] + SKIN                # 발
+        return 'bot'
+    return 'shoe'
+
+
+def band_near(c, kind, ym):
+    """높이로 기울이되 **못 박지는 않는다.**
+
+    처음엔 높이로 재료를 정해 버렸다. 그랬더니 생성기가 스웨터를 회색빛
+    (118,134,151) 으로 그려 온 걸 바로잡는 데는 성공했지만(가슴팍 158칸이
+    바지색에 앉던 것), 엉덩이까지 내려온 여자 머리카락이 "몸통 칸"에 걸려
+    **살색**이 됐다 — 471칸이 살결로 앉았다.
+
+    그래서 제자리 재료는 그대로, 아닌 재료는 거리에 벌점을 곱해서 고른다.
+    색이 확실히 가까우면(머리카락) 벌점을 물고도 이기고, 애매하면
+    (회색빛 스웨터 — 상의냐 바지냐) 높이가 결정한다.
+
+    살결은 얼굴·손·맨다리 어디에나 나오므로 벌점을 안 문다."""
+    p = PARTS[kind]
+    want = expected(ym)
+    best, bd = None, None
+    for mat, pal in (('hair', p['hair']), ('top', p['top']), ('bot', p['bot']),
+                     ('shoe', SHOE), ('skin', SKIN)):
+        k = 1.0 if (mat == want or mat == 'skin') else PENALTY
+        for col in pal:
+            d = dist(c, col) * k
+            if bd is None or d < bd:
+                best, bd = col, d
+    return best
 
 
 def palette(kind):
@@ -189,8 +215,49 @@ def ingest(path, kind, out=None):
         a = acc.setdefault(c, [0, 0])
         a[0] += (y - ytop) / tall
         a[1] += 1
-    lut = {c: near(c, band_palette(kind, a[0] / a[1])) for c, a in acc.items()}
-    cells = [(x, y, lut[c]) for x, y, c in on]
+    lut, dark = {}, {}
+    for c, a in acc.items():
+        if max(c) < 34:                          # 검정은 나중에 이웃을 보고 정한다
+            lut[c] = None
+            continue
+        ym = a[0] / a[1]
+        m = min(ACCENT, key=lambda q: dist(c, q))
+        lut[c] = m if dist(c, m) <= ACCENT_TOL else band_near(c, kind, ym)
+    for mat, pal in mats(kind).items():
+        for col in pal:
+            dark[col] = pal[0] if mat in ('hair',) else pal[min(3, len(pal) - 1)]
+    # **검정 외곽선을 재료별로 나눈다.**
+    # 생성기는 온 몸을 검정 한 색으로 두르는데(여자는 스물여덟 칸 중 하나가
+    # 검정이었다), 우리 팩은 검정을 한 칸도 안 쓴다 — 재료마다 제 색 중
+    # 가장 어두운 단으로 두른다. 그래서 검은 칸마다 **둘레에 뭐가 있는지**
+    # 보고 그 재료의 가장 어두운 단을 준다.
+    grid = {(x, y): lut[c] for x, y, c in on}
+    ymof = {(x, y): (y - ytop) / tall for x, y, c in on}
+    for _ in range(12):
+        todo = [p for p, v in grid.items() if v is None]
+        if not todo:
+            break
+        fixed = {}
+        for (x, y) in todo:
+            near_mat = {}
+            for dx in range(-2, 3):
+                for dy in range(-2, 3):
+                    v = grid.get((x + dx, y + dy))
+                    if v:
+                        wgt = 3 if abs(dx) + abs(dy) == 1 else 1
+                        near_mat[v] = near_mat.get(v, 0) + wgt
+            if near_mat:
+                fixed[(x, y)] = dark.get(max(near_mat, key=near_mat.get))
+        if not fixed:
+            break
+        grid.update(fixed)
+    # 둘레까지 전부 검정이라 끝내 못 정한 칸 — 버리면 구멍이 나고 조각이
+    # 떨어진다. 그 높이에 있어야 할 재료의 가장 어두운 단으로 메운다.
+    for p, v in list(grid.items()):
+        if v is None:
+            pal = mats(kind)[expected(ymof[p])]
+            grid[p] = pal[0] if len(pal) == 4 else pal[min(3, len(pal) - 1)]
+    cells = [(x, y, grid[(x, y)]) for x, y, c in on]
     if not cells:
         print('%s: 불투명한 칸이 없다' % path)
         return
