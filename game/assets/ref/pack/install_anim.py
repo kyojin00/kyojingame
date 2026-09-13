@@ -10,7 +10,11 @@
   세로 — 모든 장을 통틀어 제일 낮은 발이 y=47 에 오게
   가로 — 모든 장의 발 중심을 평균 내서 16 에 오게
 
-쓰기: python3 install_anim.py <gif 또는 폴더> <boy|girl> <down|side|up> [--write]
+세로는 **방향마다** 제 바닥을 47 에 맞춘다. 방향을 통틀어 한 값으로 묶었더니
+판 크기가 달라(앞은 68칸, 옆은 48칸) 옆모습이 장당 109칸씩 잘려 나갔다.
+다 땅을 딛고 있으니 방향마다 제 발바닥을 47 에 두면 그게 같은 지면이다.
+
+쓰기: python3 install_anim.py <boy|girl> down=앞.gif side=옆.gif up=뒤.gif [--write]
 """
 
 import os
@@ -37,29 +41,28 @@ def cells_of(im):
     return [(x, y, px[x, y][:3]) for y in range(h) for x in range(w) if px[x, y][3] > 128]
 
 
-def main(target, kind, dirname, write=False):
-    fr = frames_of(target)
-    if not fr:
-        print('그림이 없다')
-        return
-    sets = [cells_of(f) for f in fr]
+def body_foot(s):
+    ys = [c[1] for c in s]
+    t, b = min(ys), max(ys)
+    tall = b - t + 1
+    bx = [c[0] for c in s if t + tall * 0.15 <= c[1] <= t + tall * 0.7]
+    fx = [c[0] for c in s if c[1] >= b - 1]
+    return (min(bx) + max(bx)) / 2.0, (min(fx) + max(fx)) / 2.0
 
-    # 한 번에 정할 값 두 개
-    bottom = max(max(c[1] for c in s) for s in sets)          # 제일 낮은 발
-    dy = 47 - bottom
-    bodies, foots = [], []
-    for s in sets:
-        ys = [c[1] for c in s]
-        t, b = min(ys), max(ys)
-        tall = b - t + 1
-        bx = [c[0] for c in s if t + tall * 0.15 <= c[1] <= t + tall * 0.7]
-        bodies.append((min(bx) + max(bx)) / 2.0)
-        fx = [c[0] for c in s if c[1] >= b - 1]
-        foots.append((min(fx) + max(fx)) / 2.0)
+
+def main(kind, jobs, write=False):
+    for d, t in jobs:
+        sets = [cells_of(f) for f in frames_of(t)]
+        # 그 방향 안에서는 **모든 장을 묶어** 한 값. 장마다 맞추면 몸이 떤다
+        dy = 47 - max(max(c[1] for c in s) for s in sets)
+        one(kind, d, sets, dy, os.path.basename(t), write)
+
+
+def one(kind, dirname, sets, dy, label, write):
+    bodies, foots = zip(*[body_foot(s) for s in sets])
     dx = math.floor(16 - sum(bodies) / len(bodies) + 0.5)
 
-    print('%s — %d장' % (os.path.basename(target), len(fr)))
-    print('  묶어서 옮김  가로 %+d  세로 %+d' % (dx, dy))
+    print('\n%s → %s  (%d장)  가로 %+d  세로 %+d' % (label, dirname, len(sets), dx, dy))
     print('  몸통 중심(옮긴 뒤): %s' % ' '.join('%.1f' % (b + dx) for b in bodies))
     print('  발  중심(옮긴 뒤): %s' % ' '.join('%.1f' % (f + dx) for f in foots))
     jit = max(bodies) - min(bodies)
@@ -86,12 +89,18 @@ def main(target, kind, dirname, write=False):
             for x, y in on:
                 px[x, y] = g[y][x] + (255,)
             im.save(os.path.join(HERE, '%s_%s_walk_%d.png' % (kind, dirname, i)))
-    if not write:
-        print('\n재보기만 했다. 넣으려면 --write')
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    if len(args) < 2:
         print(__doc__)
         sys.exit(1)
-    main(sys.argv[1], sys.argv[2], sys.argv[3], '--write' in sys.argv)
+    kind = args[0]
+    jobs = [tuple(a.split('=', 1)) for a in args[1:] if '=' in a]
+    if not jobs:
+        print(__doc__)
+        sys.exit(1)
+    main(kind, jobs, '--write' in sys.argv)
+    if '--write' not in sys.argv:
+        print('\n재보기만 했다. 넣으려면 --write')
