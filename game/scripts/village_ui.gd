@@ -12,18 +12,23 @@ var m: KyojinMain    # main.gd
 var _gift_layer: CanvasLayer = null
 
 
+# ---- 할아버지의 낡은 집 (보수) ----
+#
+# 빈 터에 새로 짓는 이야기가 아니다. 집은 처음부터 서 있고, 오래 비워 둬서
+# 서까래가 내려앉고 문이 뒤틀렸다. 목재를 모아 **손을 봐야** 들어가 산다.
 func _open_build_dialog() -> void:
-	m.dialog.open("집터",
-		"할아버지가 남긴 집터다.\n재료를 모아 직접 집을 지어야 한다.\n\n필요 재료: 목재 %d (보유 %d)" %
+	m.dialog.open("할아버지의 낡은 집",
+		"할아버지가 지내던 집이다. 오래 비워 둬서\n문이 뒤틀리고 서까래가 내려앉았다.\n"
+		+ "목재를 모아 손을 보면 들어가 살 수 있다.\n\n필요 재료: 목재 %d (보유 %d)" %
 			[GameData.HOUSE_BUILD_WOOD, GameData.wood], [
-		["집 짓기", _build_house],
+		["집 보수하기", _build_house],
 		["닫기", null],
 	])
 
 
 func _build_house() -> void:
 	if GameData.house_lv > 0:
-		return  # 이미 지은 집 — 두 번 지어지지 않는다
+		return  # 이미 손본 집 — 두 번 보수되지 않는다
 	if GameData.wood < GameData.HOUSE_BUILD_WOOD:
 		m.dialog.set_body("목재가 부족하다... (%d/%d)\n도끼로 나무를 베어 목재를 모으자." %
 			[GameData.wood, GameData.HOUSE_BUILD_WOOD])
@@ -31,13 +36,13 @@ func _build_house() -> void:
 	GameData.wood -= GameData.HOUSE_BUILD_WOOD
 	GameData.house_lv = 1
 	m.tutorial_notify("home")
-	m.objnode._remove_object(m.HOME_SITE)
+	# 그림을 다시 세운다 — 낡아 보이게 죽여 둔 빛깔을 벗는다
 	m.worldgen._fill_building(m.HOME_ANCHOR)
 	Sound.play_sfx("sfx_place")
-	m.dialog.set_body("우리집 완성!\n아직 안은 텅 비어 있다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
+	m.dialog.set_body("집을 손봤다!\n아직 안은 휑하다.\n침대(목재 %d)를 만들어야 잠을 잘 수 있다." %
 		GameData.BED_WOOD)
 	m.dialog.set_buttons([["좋아!", null]])
-	m.hud.event_toast("집 짓기")
+	m.hud.event_toast("집 보수")
 	m.saveio.save_now()
 
 
@@ -143,6 +148,20 @@ func _talk_to(npc: Node2D) -> void:
 		return
 	if npc.id == "fisher" and GameData.fisher_quest == "meet":
 		m.story._start_fisher_dialog()
+		return
+	if npc.id == "fisher" and GameData.fisher_quest == "cast":
+		# 부두 수업 중 — 다시 물으면 던지는 법을 한 번 더 일러 준다
+		m.dialog.open("낚시꾼 용식",
+			"「낚싯대를 빠른 슬롯에 넣고, 물을 보고 서서 던지게.」\n"
+			+ "「찌가 흔들리고 (!) 가 뜨면 그때 한 번 더 — 그게 채는 걸세.」\n"
+			+ "「여기 부두 끝이 제일 잘 물리는 자리야.」",
+			[["해 보겠습니다", null]])
+		return
+	if npc.id == "fisher" and GameData.fisher_quest == "open":
+		m.dialog.open("낚시꾼 용식",
+			"「남쪽 능선 길목의 큰 바위 둘 말일세.\n곡괭이로 캐 주면 바닷길이 열리네.」\n"
+			+ "「나는 여기서 찌나 보고 있겠네.」",
+			[["다녀오겠습니다", null]])
 		return
 	if npc.id == "chief" and GameData.move_quest == "show":
 		m.story._start_move_chief_dialog()

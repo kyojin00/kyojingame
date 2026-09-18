@@ -1106,6 +1106,24 @@ var shop_seeds: Array = ["wheat", "corn"]
 const SHOP_BUILD_WOOD := 30
 const SHOP_BUILD_STONE := 20
 
+# ---- 튜토리얼은 **낚시꾼과 한 마리를 낚는 데서** 끝난다 ----
+#
+# 예전에는 상점·바닷길·첫 밭·첫 끼까지를 한 줄로 이끌고서야 「이제부터는
+# 마을 사람들의 이야기」라고 말했다. 그 줄이 너무 길었다 — 배우는 대목이
+# 한 시간을 넘어가면 그건 배우는 게 아니라 시키는 대로 하는 것이다.
+#
+# 이제 이끄는 줄기는 **도구를 한 번씩 써 보는 데까지**다. 호미로 갈고,
+# 도끼로 베고, 곡괭이로 캐고, 마지막으로 부두에서 낚싯대를 던져 한 마리.
+# 그 뒤로는 이끌지 않는다 — 호미 밭이든 만수의 첫 끼든 이주 편지든,
+# 전부 **만나는 사람이 저마다 들고 있는 부탁**(서브 퀘스트)이 된다.
+#
+# 이 값이 켜지는 순간이 그 경계다. 단계값(story2_phase 따위)은 그대로
+# 돌아간다 — 바뀌는 것은 「메인 이야기인가 곁이야기인가」뿐이다.
+var tutorial_closed := false
+
+# 튜토리얼이 닫히기 전까지 메인으로 남는 퀘스트
+const TUTORIAL_QUEST_IDS := ["story1", "story2", "fisher", "tutorial"]
+
 # 메인 스토리 2 진행 — 집 인사 후 이 순서로 이어진다:
 #   shop: 재료를 모아 상점 짓기 / fisher: 낚시꾼 퀘스트(fisher_quest가 세부) /
 #   farm_talk: 이장에게 가 호미 받기 / farm: 밭 갈기(STORY2_FLAGS) / done: 완료
@@ -1140,10 +1158,15 @@ func story2_objective_short() -> String:
 			return step if step != "" else "만수에게 말을 걸자."
 	return ""
 
-# 낚시꾼 퀘스트 (메인 스토리 3): 전설의 황금잉어를 쫓는 낚시꾼과 함께
-# 남쪽 바위 능선을 뚫어 바다·해변을 열고, 간이낚싯대(낚시)를 얻는다.
-#   "": 아직 (첫 수확 뒤 시작) / meet: 광장의 낚시꾼에게 말 걸기 /
-#   follow: 함께 능선으로 / open: 길목 바위 캐기 / done: 완료
+# 낚시꾼 퀘스트 — **낚싯대를 배우는 대목이다.**
+#
+# 전설의 황금잉어를 쫓는 낚시꾼이 서쪽 호수 부두에 와 있다. 말을 걸면
+# 낚싯대를 건네 주고, 그 자리에서 한 마리를 낚아 보인다. 그다음에야
+# 「바다도 보고 싶은데 능선이 막혔다」는 부탁이 온다.
+# (예전에는 만나자마자 남쪽 능선까지 데리고 내려가 바위를 캤다 —
+#  낚시꾼을 만나 놓고 낚시는 안 배우고 곡괭이를 들었다)
+#   "": 아직 (첫 수확 뒤 시작) / meet: 부두의 낚시꾼에게 말 걸기 /
+#   cast: 받은 낚싯대로 부두에서 한 마리 / open: 길목 바위 캐기 / done: 완료
 var fisher_quest := ""
 var fisher_choice := 0     # 황금잉어 선택지 (1: 꼭 잡겠다 / 2: 욕심 없다)
 var sea_open := false      # 남쪽 바다·해변 개방 (능선 길목이 뚫렸다)
@@ -1359,12 +1382,12 @@ const SPRINKLER_RECIPE_PRICE := 500
 # 미리 마련해 둔 빈 집터들 — [{x, y, used}]. **빈 집터가 있어야만**
 # 이주 희망 편지를 수락할 수 있다 (수락하면 첫 빈 집터에 집이 지어진다)
 var home_plots: Array = []
-# 새터말(S3b) — 너른 초원 서쪽에 처음부터 있는 빈 집터 여덟(짓기 없음). 집 5×4 에 둘레 한 칸을
+# 새터말(S3b) — 마을 격자 남쪽, 너른 초원에 처음부터 있는 빈 집터 여덟(짓기 없음). 집 5×4 에 둘레 한 칸을
 # 비운 7×6 격자. y 는 main.NORTH_PAD(12)를 더한 값이다(VILLAGE_ZONES 와 같은 이유). 장부에는
 # 집이 선 자리만 {fixed:true, used:true} 로 적힌다 — 옛 마을 너머(스토리 4)가 열려야 자리로 센다
 const MEADOW_PLOTS := [
-	Vector2i(106, 62), Vector2i(114, 62), Vector2i(122, 62), Vector2i(130, 62),
-	Vector2i(106, 70), Vector2i(114, 70), Vector2i(122, 70), Vector2i(130, 70),
+	Vector2i(106, 76), Vector2i(114, 76), Vector2i(122, 76), Vector2i(130, 76),
+	Vector2i(106, 84), Vector2i(114, 84), Vector2i(122, 84), Vector2i(130, 84),
 ]
 
 
@@ -1575,8 +1598,8 @@ var zones_open: Array = []         # 열린 구역 id 목록
 const VILLAGE_ZONES := {
 	# y 는 main.gd 의 NORTH_PAD(12) 를 이미 더한 값이다. 여기서 KyojinMain 을
 	# 참조하면 main -> GameData -> main 순환이 되어 파싱이 막힌다.
-	"east_north": {"rect": Rect2i(100, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
-	"east_south": {"rect": Rect2i(100, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
+	"east_north": {"rect": Rect2i(196, 13, 68, 20), "name": "옛 마을 북동쪽 터"},
+	"east_south": {"rect": Rect2i(196, 33, 68, 23), "name": "옛 마을 남동쪽 터"},
 }
 const ZONE_ORDER := ["east_north", "east_south"]
 const ZONE_COST := {"east_north": [0, 0], "east_south": [60, 30]}  # [목재, 석재]
@@ -2610,13 +2633,14 @@ func quest_catalog() -> Array:
 			"reward": "상점·바다·밭 — 마을의 기틀"})
 	o = fisher_objective_short()
 	if o != "":
-		out.append({"id": "fisher", "title": "낚시꾼과 바닷길", "obj": o,
+		out.append({"id": "fisher", "title": "낚시꾼과 첫 한 마리", "obj": o,
 			"desc": "어떤 사람은 평생 한 마리의 물고기를 쫓는다.\n\n"
 				+ "황금빛 비늘 이야기를 품고 온 낚시꾼이\n"
-				+ "남쪽 바위 능선 앞에 서서, 넘어가지 못한 바다를 본다.\n"
-				+ "능선 너머에는 아무도 오래 보지 못한 파도가 있다.\n\n"
-				+ "돌 하나를 걷어내는 일이지만, 그 하나로\n"
-				+ "이 마을은 잃어버렸던 바다를 되찾는다.",
+				+ "서쪽 호수의 부두 끝에 앉아 한나절째 찌를 본다.\n"
+				+ "낯선 사람에게 그가 먼저 건네는 것은 인사가 아니라\n"
+				+ "손수 깎은 낚싯대 한 자루다.\n\n"
+				+ "「던져 보게. 옆에서 봐 주지.」\n"
+				+ "배우는 일은 언제나 한 번 해 보는 것에서 시작한다.",
 			"cat": "main", "ep": "메인 스토리 2", "npc": "fisher",
 			"reward": "바다·해변 해금 + 간이낚싯대"})
 	o = move_objective_short()
@@ -2983,8 +3007,31 @@ var tracked_pick := ""
 # 보여 주고, 미니창은 걸러지지 않은 목록의 맨 앞을 집었다. 그래서 둘이
 # 서로 다른 퀘스트를 가리키는 일이 생겼다. 이제 거르는 자리는 여기
 # 한 곳뿐이고, 두 창이 같은 목록을 읽는다.
+# 튜토리얼이 닫힌 뒤에는 **메인 이야기가 없다.**
+#
+# 장(章)은 그대로 스무 개가 이어지지만, 그것을 「지금 따라가야 하는 줄기」로
+# 보여 주면 마을은 끝까지 시키는 대로 하는 곳이 된다. 낚시까지 배우고 나면
+# 남는 것은 사람들이다 — 이장의 밭, 만수의 첫 끼, 재민의 편지, 다 저마다의
+# 부탁이지 이어 달리는 한 줄이 아니다.
+#
+# 단계값은 하나도 안 건드린다. 표에 붙은 이름표만 바꾼다 — 그래야 이야기의
+# 앞뒤(장 번호)는 살아 있으면서 이끌지는 않는다.
+func _resort_quests(cat: Array) -> Array:
+	if not tutorial_closed:
+		return cat
+	for q: Dictionary in cat:
+		if str(q.get("cat", "sub")) != "main":
+			continue
+		q["cat"] = "sub"
+		# 장 번호는 남긴다 — 「이야기 7」처럼. 앞뒤 순서를 아는 것과
+		# 「지금 이걸 따라가라」는 전혀 다른 말이다
+		if q.has("ep"):
+			q["ep"] = str(q["ep"]).replace("메인 스토리", "이야기")
+	return cat
+
+
 func quest_list() -> Array:
-	var cat := quest_catalog()
+	var cat := _resort_quests(quest_catalog())
 	# 목록에 남길 메인 이야기 하나를 먼저 정한다 — 보통은 맨 앞이지만,
 	# 고정한 퀘스트가 메인이면 **그쪽이 언제나 이긴다.**
 	var keep_main := ""
@@ -3309,11 +3356,11 @@ func beach_rare_chance() -> float:
 func fisher_objective_short() -> String:
 	match fisher_quest:
 		"meet":
-			return "낚시꾼과 대화하자."
-		"follow":
-			return "함께 바위 능선으로 가자."
+			return "서쪽 호수 부두의 낚시꾼과 대화하자."
+		"cast":
+			return "부두에서 낚싯대를 던져 한 마리 낚아 보자."
 		"open":
-			return "길목의 큰 바위를 캐자."
+			return "남쪽 능선 길목의 큰 바위를 캐자."
 	return ""
 
 
@@ -3714,7 +3761,12 @@ func story_objective_short() -> String:
 		"deliver":
 			return "이장에게 가 보자."
 		"home_open":
-			return "집에 들어가 보자."
+			# 집은 서 있지만 낡았다 — 손을 봐야 들어가 산다
+			if house_lv >= 1:
+				return "집에 들어가 보자."
+			# 「— 」 뒤는 트래커가 세는 자리다 (괄호도 조작키도 쓰지 않는다)
+			return "할아버지의 낡은 집을 손보자 — 목재 %d/%d" % [
+				mini(wood, HOUSE_BUILD_WOOD), HOUSE_BUILD_WOOD]
 		"greet":
 			return "집을 둘러보고 나가 보자."
 	return ""
@@ -6182,8 +6234,8 @@ const TUTORIAL_ORDER := [
 	["chop", "도끼로 나무를 베어 목재를 모으자"],
 	["slept", "침대에서 자고 다음 날을 맞자"],
 	["mine", "곡괭이로 돌을 캐서 석재를 모으자"],
-	["fish", "낚시터에서 물고기를 낚자"],
-	["shop", "마을 잡화점에 들어가 씨앗을 사 보자"],
+	["fish", "호수 부두에서 낚싯대를 던져 물고기를 낚자"],
+	["shop", "문을 연 잡화점에 들어가 씨앗을 사 보자"],
 ]
 # 목표 달성 시 해금되는 도구 — 메인 줄기(밭 갈기)에만 묶는다.
 # 도끼·곡괭이는 스토리 1에서 이미 받았고, 나머지는 첫 수확에 열린다.
@@ -6192,7 +6244,7 @@ const TUTORIAL_ORDER := [
 const TUTORIAL_UNLOCKS := {
 	"till": ["seed"],
 	"plant": ["water"],
-	# 낚싯대는 여기서 주지 않는다 — 용식과 바닷길을 연 뒤에야 손에 들어온다
+	# 낚싯대는 여기서 주지 않는다 — 부두에서 용식에게 직접 배우며 받는다
 	# 울타리는 여기서 빠졌다 — **목재를 손에 넣으면** 잡화점이 레시피를 들여놓는다
 	# (나무 한 그루 베어 본 적 없는 사람에게 울타리부터 쥐여 줄 이유가 없다)
 	"harvest": ["axe", "pickaxe"],
@@ -12655,6 +12707,7 @@ func reset_all() -> void:
 	shop_seeds = ["wheat", "corn"]
 	recipe_pending = []
 	story2_phase = ""
+	tutorial_closed = false
 	village_built = ALL_VILLAGE_PLOTS.duplicate()
 	if DEV_MODE and OS.get_environment("KYOJIN_SHOT") != "":
 		# 검증 하네스 전용: 기본 아이템을 잔뜩 들고 시작한다.
@@ -13021,6 +13074,7 @@ func build_save(grid_data: Array, player_pos: Vector2, objects_data: Array = [],
 		"home_signs": home_signs,
 		"storage_stock": storage_stock,
 		"sea_open": sea_open, "story2_phase": story2_phase,
+		"tutorial_closed": tutorial_closed,
 		"merchant_errand": merchant_errand, "merchant_day": merchant_day,
 		"stall_hours": stall_hours,
 		"forest_quest": forest_quest, "forest_day": forest_day,

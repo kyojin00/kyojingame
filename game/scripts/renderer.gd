@@ -13,6 +13,371 @@ extends Node
 
 var m: KyojinMain    # main.gd
 
+# ---- 살아 있는 마을 (앰비언트) ----
+#
+# 정적인 화면과 살아 있는 화면의 차이는 **아무도 시키지 않은 움직임**이다:
+# 구름 그림자가 땅 위를 지나가고, 나무에서 잎이 한두 장 떨어지고,
+# 걸음마다 발밑에서 잔것이 인다. 셋 다 게임 규칙에는 손대지 않는다.
+#
+# 검증(KYOJIN_SHOT)에서는 끈다 — 무작위 픽셀이 어서션을 흔들면 안 된다.
+# 앨범(KYOJIN_ALBUM)은 사람 눈으로 보는 사진이니 켠 채로 찍는다.
+var _ambient_on := true
+var _cloud_tex: Texture2D = null
+var _amb_leaf_cd := 0.0
+var _step_accum := 0.0
+var _last_player_pos := Vector2.ZERO
+const CLOUD_CELL := Vector2(560.0, 430.0)   # 구름 하나가 사는 칸
+const CLOUD_WIND := Vector2(8.0, 3.2)       # 초당 흐르는 속도 (세계 px)
+
+
+func _ready() -> void:
+	_ambient_on = OS.get_environment("KYOJIN_SHOT") == "" \
+		or OS.get_environment("KYOJIN_ALBUM") != ""
+	# 구름 그림자 원판 — 가장자리로 갈수록 옅어지는 둥근 얼룩 한 장
+	var img := Image.create(96, 96, false, Image.FORMAT_RGBA8)
+	for y in 96:
+		for x in 96:
+			var d := Vector2(x - 48, y - 48).length() / 46.0
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			a = a * a * (3.0 - 2.0 * a)
+			img.set_pixel(x, y, Color(1, 1, 1, a * a))
+	_cloud_tex = ImageTexture.create_from_image(img)
+	# ---- 자연물 접지 그림자 원판 ----
+	#
+	# 예전에는 가장자리로 갈수록 매끈하게 옅어지는 **에어브러시 얼룩**이었다.
+	# 도트로 그린 세계 한복판에 부드러운 그러데이션 하나만 있어도 그것만
+	# 딴 그림이 된다 — 나무는 도트인데 그림자는 3D 게임의 것이었다.
+	#
+	# 살림·나무에 구워 넣은 그림자와 **같은 규칙**으로 다시 만든다.
+	#   ① 세 단   안(짙다) · 중간 · 가장자리(옅다). 단이 있어야 도트다
+	#   ② 기울기  해가 왼쪽 위에 있으니 오른쪽으로 밀어 눕힌다
+	#   ③ 허문 테 제일 바깥 단은 절반만 찍는다 — 매끈한 타원 테두리가
+	#             보이면 그 순간 「깔아 둔 판」이 된다
+	var sim := Image.create(64, 24, false, Image.FORMAT_RGBA8)
+	sim.fill(Color(0, 0, 0, 0))
+	for y in 24:
+		for x in 64:
+			var d := Vector2((x - 32 - 3.0) / 29.0, (y - 12) / 11.0).length()
+			if d > 1.0:
+				continue
+			var a := 0.16
+			if d <= 0.44:
+				a = 0.42
+			elif d <= 0.76:
+				a = 0.29
+			# 테를 허문다 — 자리로 굳힌 난수라 매번 같은 꼴이 나온다
+			if d > 0.82 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.45:
+				continue
+			sim.set_pixel(x, y, Color(0.10, 0.08, 0.18, a))
+	_obj_shadow_tex = ImageTexture.create_from_image(sim)
+
+
+# ---- 자연물의 접지 그림자 ----
+#
+# 나무·바위는 여태 그림자 없이 떠 있었다 — 밑동의 풀숲 몇 포기로는 땅을
+# 못 딛는다. 세계보다 밑에 깔린 레이어(main.shadows)에 부드러운 타원을
+# 한 장씩 그리면 화면의 모든 나무가 단번에 땅으로 내려앉는다.
+# 노드에 자식을 끼우지 않는 이유: 온 코드가 「자식 0번 = 스프라이트」로
+# 잡고 있어서, 그 사이에 그림자를 끼우면 전부 흔들린다.
+var _obj_shadow_tex: Texture2D = null
+const OBJ_SHADOW_KINDS := ["tree", "rock", "bigrock", "searock", "bent_tree",
+	"cave", "stall", "old_lookout",
+	# 게시판·표지판·팻말 — 다리가 가늘어 그림자가 없으면 어느 바닥에서든
+	# 떠 보인다. 부드러운 타원 하나가 이들을 그 바닥 위에 세운다
+	"board", "auction", "sign", "housesite", "plotsite", "home_sign", "homeplot"]
+
+func _draw_object_shadows() -> void:
+	if _obj_shadow_tex == null or m.player == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	var view := _view_rect().grow(96.0)
+	for pos: Vector2i in m.obj_nodes:
+		var od: Dictionary = m.objects.get(pos, {})
+		var kind: String = str(od.get("kind", ""))
+		if not kind in OBJ_SHADOW_KINDS:
+			continue
+		var node: Node2D = m.obj_nodes[pos]
+		if not is_instance_valid(node) or not view.has_point(node.position):
+			continue
+		if node.get_child_count() == 0:
+			continue
+		var spr: Sprite2D = node.get_child(0)
+		if spr.texture == null:
+			continue
+		# 폭은 그 그루의 화면 폭을 따른다 — 캐노피와 거의 같게, 바위는 조금 넓게
+		# (바위는 밑동의 흙무더기가 그림자 안쪽을 가리므로 밖으로 비어져 나와야 보인다),
+		# 구조물(동굴·노점·전망대)은 밑변 폭보다 조금 안쪽으로
+		var wk := 0.95 if kind == "tree" or kind == "bent_tree" \
+			else (1.25 if kind == "rock" or kind == "bigrock" or kind == "searock" \
+			else 0.85)
+		var w: float = spr.texture.get_width() * spr.scale.x * wk
+		if kind == "tree" and int(od.get("hp", m.TREE_HP)) < m.TREE_HP:
+			w *= 0.4                       # 잎을 잃은 나무는 그림자도 준다
+		var sz := Vector2(w, w * 0.36)
+		# 그림자는 **그림의 실제 자리**를 따른다 — 나무는 격자를 깨려고
+		# 그루마다 몇 픽셀씩 어긋나 있으므로, 칸이 아니라 스프라이트의
+		# 한가운데·밑변에서 잰다.
+		var cx: float = node.position.x \
+			+ (spr.offset.x + spr.texture.get_width() / 2.0) * spr.scale.x
+		var by: float = node.position.y \
+			+ (spr.offset.y + spr.texture.get_height()) * spr.scale.y
+		# 바위 그림은 밑 여섯 도트가 **흙자리**다 (make_rocks.js). 그림의
+		# 밑변에서 재면 그늘이 돌보다 한참 아래로 내려간다 — 돌이 닿는 줄에서 잰다
+		if kind == "rock" or kind == "bigrock" or kind == "searock":
+			by -= 24.0 * spr.scale.y
+		# 중심을 밑변보다 **아래로** — 위에서 내려다보는 화면에서는 캐노피가
+		# 제 그림자의 위쪽을 다 가린다. 아래로 고여야 눈에 보인다.
+		# 그리고 **오른쪽으로 조금** — 빛은 왼쪽 위에서 온다 (집·살림과 같은
+		# 해). 그림자가 한 방향으로 눕지 않으면 저마다 딴 해를 쬔 것이 된다
+		m.shadows.draw_texture_rect(_obj_shadow_tex,
+			Rect2(Vector2(cx - sz.x / 2.0 + sz.x * 0.06, by - sz.y * 0.28), sz), false)
+
+
+# 화면이 보고 있는 세계 사각형
+func _view_rect() -> Rect2:
+	var inv: Transform2D = m.overlay.get_canvas_transform().affine_inverse()
+	var vp: Vector2 = m.get_viewport().get_visible_rect().size
+	var o: Vector2 = inv * Vector2.ZERO
+	return Rect2(o, (inv * vp) - o)
+
+
+# 구름 그림자 — 칸마다 구름이 하나 살거나 안 살고, 바람에 실려 흐른다.
+# 자리는 해시로 굳혀 두므로 같은 구름이 늘 같은 꼴로 온다
+func _draw_clouds() -> void:
+	if not _ambient_on or _cloud_tex == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	var view := _view_rect().grow(340.0)
+	var off: Vector2 = CLOUD_WIND * m.weather_time
+	var c0x := floori((view.position.x + off.x) / CLOUD_CELL.x) - 1
+	var c1x := floori((view.end.x + off.x) / CLOUD_CELL.x) + 1
+	var c0y := floori((view.position.y + off.y) / CLOUD_CELL.y) - 1
+	var c1y := floori((view.end.y + off.y) / CLOUD_CELL.y) + 1
+	for cy in range(c0y, c1y + 1):
+		for cx in range(c0x, c1x + 1):
+			var r0 := m._hash01(cx * 7 + 3, cy * 11 + 5)
+			if r0 < 0.42:
+				continue                       # 빈 하늘도 많다
+			var pos := Vector2(
+				(cx + m._hash01(cx, cy)) * CLOUD_CELL.x,
+				(cy + m._hash01(cy * 3 + 1, cx * 5 + 2)) * CLOUD_CELL.y) - off
+			var sc := 2.0 + m._hash01(cx * 13 + 1, cy * 17 + 4) * 1.6
+			var size := Vector2(96.0 * sc * 1.7, 96.0 * sc)
+			var a := 0.065 + 0.05 * m._hash01(cx * 5 + 2, cy * 3 + 7)
+			# 그늘은 남보라로 기운다 — 회색 그늘은 때가 된다
+			m.overlay.draw_texture_rect(_cloud_tex,
+				Rect2(pos - size * 0.5, size), false,
+				Color(0.10, 0.10, 0.22, a))
+			# 같은 구름의 작은 짝 — 덩어리가 둘이어야 구름 꼴이 난다
+			var pos2 := pos + Vector2(size.x * 0.34, size.y * 0.18)
+			m.overlay.draw_texture_rect(_cloud_tex,
+				Rect2(pos2 - size * 0.30, size * 0.6), false,
+				Color(0.10, 0.10, 0.22, a * 0.8))
+
+
+# ---- 밤 등불 빛무리 ----
+#
+# 밤(CanvasModulate)이 짙어질수록 가로등·창가에 따뜻한 빛무리가 살아난다.
+# 등불 자리는 프레임마다 온 objects를 뒤지면 비싸니 몇 초에 한 번 모은다
+var _lamp_cache: Array = []
+var _anvil_cache: Array = []
+var _lamp_cache_cd := 0.0
+var _glint_cd := 0.0
+var _spark_cd := 0.0
+# 새 — 풀밭에 앉아 모이를 쪼다가, 다가가면 날아오른다
+var _birds: Array = []
+var _bird_cd := 4.0
+
+func _draw_glows() -> void:
+	if m.night == null or m.player == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	# 어둠의 깊이 — 밤 색이 어두울수록 빛무리가 짙어진다
+	var dark := 1.0 - m.night.color.v
+	if dark < 0.18 or _cloud_tex == null:
+		return
+	var a := clampf((dark - 0.18) / 0.5, 0.0, 1.0)
+	var view := _view_rect().grow(160.0)
+	for lp: Vector2 in _lamp_cache:
+		if not view.has_point(lp):
+			continue
+		var size := Vector2(210, 210)
+		m.glow.draw_texture_rect(_cloud_tex, Rect2(lp - size * 0.5, size), false,
+			Color(1.0, 0.72, 0.32, 0.22 * a))
+		m.glow.draw_texture_rect(_cloud_tex, Rect2(lp - size * 0.25, size * 0.5), false,
+			Color(1.0, 0.85, 0.5, 0.18 * a))
+
+
+func _refresh_lamp_cache() -> void:
+	_lamp_cache.clear()
+	_anvil_cache.clear()
+	for pos: Vector2i in m.objects:
+		var k := String(m.objects[pos].kind)
+		if k == "deco_lamp":
+			# 불알은 기둥 위에 있다 — 칸 가운데보다 위
+			_lamp_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE - 14))
+		elif k == "deco_forge":
+			_lamp_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE + 20))
+		elif k == "deco_anvil":
+			_anvil_cache.append(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE + 2))
+
+
+# 앰비언트 한 틱 — main._process가 매 프레임 부른다
+func _update_ambient(delta: float) -> void:
+	_lamp_cache_cd -= delta
+	if _lamp_cache_cd <= 0.0:
+		_lamp_cache_cd = 4.0
+		_refresh_lamp_cache()
+	if not _ambient_on or m.player == null:
+		return
+	if m.interior.visible or m.cave.visible \
+			or (m.shop_room != null and m.shop_room.visible):
+		return
+	# ① 나무에서 잎이 진다 — 화면 안 무작위 칸을 찔러 나무를 찾는다
+	_amb_leaf_cd -= delta
+	if _amb_leaf_cd <= 0.0:
+		_amb_leaf_cd = randf_range(0.55, 1.2)
+		if GameData.season_key() != "winter":
+			var view := _view_rect()
+			var tx0 := maxi(0, int(view.position.x / m.TILE))
+			var ty0 := maxi(0, int(view.position.y / m.TILE))
+			var tx1 := mini(m.MAP_W - 1, int(view.end.x / m.TILE))
+			var ty1 := mini(m.WORLD_H - 1, int(view.end.y / m.TILE))
+			for attempt in 14:
+				var pos := Vector2i(randi_range(tx0, tx1), randi_range(ty0, ty1))
+				var obj: Variant = m.objects.get(pos)
+				if obj == null or String(obj.kind) != "tree":
+					continue
+				var leaf := "leaf_fall" if GameData.season_key() == "fall" else "leaf"
+				spawn_burst(Vector2(pos.x * m.TILE + 16, pos.y * m.TILE - 30),
+					leaf, 0.25, 16.0)
+				break
+	# ② 발걸음 — 일정 거리마다 바닥에 맞는 잔것이 인다
+	var dmove := m.player.position.distance_to(_last_player_pos)
+	_last_player_pos = m.player.position
+	if dmove > 0.05 and dmove < 60.0:
+		_step_accum += dmove
+	if _step_accum >= 30.0:
+		_step_accum = 0.0
+		var t := m.player_tile()
+		if t.y >= 0 and t.y < m.WORLD_H and t.x >= 0 and t.x < m.MAP_W:
+			var gk: String = m.grid[t.y][t.x].ground
+			var pk := ""
+			if gk == "grass" or gk == "":
+				pk = "step_grass"
+			elif gk in ["yard", "soil", "path", "sand"]:
+				pk = "step_dust"
+			if pk != "":
+				spawn_burst(m.player.position + Vector2(0, 4), pk, 1.0, 4.0)
+	# ③ 물가 반짝임 — 화면 안 물 칸에서 해가 부서진다
+	_glint_cd -= delta
+	if _glint_cd <= 0.0:
+		_glint_cd = randf_range(0.25, 0.6)
+		var view := _view_rect()
+		var tx0 := maxi(0, int(view.position.x / m.TILE))
+		var ty0 := maxi(0, int(view.position.y / m.TILE))
+		var tx1 := mini(m.MAP_W - 1, int(view.end.x / m.TILE))
+		var ty1 := mini(m.WORLD_H - 1, int(view.end.y / m.TILE))
+		for attempt in 10:
+			var wx := randi_range(tx0, tx1)
+			var wy := randi_range(ty0, ty1)
+			if m.grid[wy][wx].ground != "water":
+				continue
+			spawn_burst(Vector2(wx * m.TILE + randf_range(4, 28),
+				wy * m.TILE + randf_range(4, 28)), "glint", 1.0, 2.0)
+			break
+	# ④ 망치질 불티 — 모루 곁에 사람이 있으면 이따금 튄다
+	_spark_cd -= delta
+	if _spark_cd <= 0.0:
+		_spark_cd = randf_range(1.6, 3.2)
+		for ap: Vector2 in _anvil_cache:
+			if not _view_rect().grow(60.0).has_point(ap):
+				continue
+			var someone := m.player.position.distance_to(ap) < 110.0
+			if not someone:
+				for mn in m.npcs:
+					if mn.visible and mn.position.distance_to(ap) < 110.0:
+						someone = true
+						break
+			if someone:
+				spawn_burst(ap + Vector2(0, -14), "spark", 1.0, 3.0)
+			break
+	# ⑤ 새 — 풀밭에 두어 마리 내려앉고, 다가가면 날아오른다
+	_update_birds(delta)
+
+
+# ---- 새 ----
+#
+# 파티클로는 안 된다 — 새는 **반응**해야 산다. 앉아서 콕콕 쪼다가
+# 사람이 다가오면 푸드덕 날아오르는 것, 그 한 박자가 생동감의 전부다.
+func _update_birds(delta: float) -> void:
+	_bird_cd -= delta
+	var view := _view_rect()
+	if _bird_cd <= 0.0 and _birds.size() < 3:
+		_bird_cd = randf_range(5.0, 9.0)
+		# 화면 가장자리 쪽 풀밭에 내려앉는다 (한복판이면 바로 쫓겨난다)
+		var tx0 := maxi(0, int(view.position.x / m.TILE))
+		var ty0 := maxi(0, int(view.position.y / m.TILE))
+		var tx1 := mini(m.MAP_W - 1, int(view.end.x / m.TILE))
+		var ty1 := mini(m.WORLD_H - 1, int(view.end.y / m.TILE))
+		for attempt in 12:
+			var bx := randi_range(tx0, tx1)
+			var by := randi_range(ty0, ty1)
+			var g0: String = m.grid[by][bx].ground
+			if (g0 != "grass" and g0 != "") or m.objects.has(Vector2i(bx, by)):
+				continue
+			var bp := Vector2(bx * m.TILE + 16, by * m.TILE + 16)
+			if m.player.position.distance_to(bp) < 140.0:
+				continue
+			_birds.append({"p": bp, "v": Vector2.ZERO, "state": "ground",
+				"t": randf_range(4.0, 9.0), "phase": randf() * TAU,
+				"tint": randf() < 0.5})
+			break
+	var alive: Array = []
+	for b in _birds:
+		b.t -= delta
+		b.phase += delta * (14.0 if b.state == "fly" else 3.0)
+		if b.state == "ground":
+			# 가끔 한 발짝 총총
+			if randf() < delta * 0.8:
+				b.p += Vector2(randf_range(-6, 6), randf_range(-3, 3))
+			# 사람이 다가오면 날아오른다
+			if m.player.position.distance_to(b.p) < 74.0 or b.t <= 0.0:
+				b.state = "fly"
+				b.t = 2.6
+				b.v = Vector2(randf_range(-40, 40), -randf_range(90, 130))
+		else:
+			b.p += b.v * delta
+			b.v.x *= 1.0 + delta * 0.4
+		if b.state == "fly" and b.t <= 0.0:
+			continue
+		alive.append(b)
+	_birds = alive
+
+
+# 새 그리기 — 몸통 한 점, 날개 두 점. 날 때는 날개가 퍼덕인다
+func _draw_birds() -> void:
+	for b in _birds:
+		var body := Color(0.32, 0.3, 0.38) if b.tint else Color(0.55, 0.42, 0.3)
+		var wing := Color(0.2, 0.19, 0.26) if b.tint else Color(0.4, 0.3, 0.2)
+		var p: Vector2 = b.p
+		if b.state == "ground":
+			var peck := 1.0 if fmod(b.phase, 2.4) < 0.4 else 0.0
+			m.overlay.draw_rect(Rect2(p + Vector2(-2, -3), Vector2(5, 3)), body)
+			m.overlay.draw_rect(Rect2(p + Vector2(2, -4 + peck * 2.0), Vector2(2, 2)), body)
+			m.overlay.draw_rect(Rect2(p + Vector2(-1, -4), Vector2(3, 2)), wing)
+		else:
+			var flap := sin(b.phase) * 3.0
+			m.overlay.draw_rect(Rect2(p + Vector2(-1, -2), Vector2(4, 2)), body)
+			m.overlay.draw_rect(Rect2(p + Vector2(-4, -2 - flap), Vector2(3, 2)), wing)
+			m.overlay.draw_rect(Rect2(p + Vector2(3, -2 - flap), Vector2(3, 2)), wing)
+
 
 func _draw_building_signs() -> void:
 	var f: Font = m.UI_FONT_SMALL
@@ -22,9 +387,9 @@ func _draw_building_signs() -> void:
 		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
 		_draw_name_plate(f, str(m.VILLAGE_PLOTS[pid].name),
 			Vector2((a.x + 2) * m.TILE + 16, a.y * m.TILE - 6))
-	if GameData.house_lv >= 1:
-		_draw_name_plate(f, "우리집",
-			Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16, m.HOME_ANCHOR.y * m.TILE - 6))
+	# 손보기 전에도 집은 서 있다 — 다만 아직 「우리집」이라 부르기엔 이르다
+	_draw_name_plate(f, "우리집" if GameData.house_lv >= 1 else "할아버지의 낡은 집",
+		Vector2((m.HOME_ANCHOR.x + 2) * m.TILE + 16, m.HOME_ANCHOR.y * m.TILE - 6))
 	# 갈뫼읍(S4b) — 관청 여덟의 이름표
 	for tid: String in m.TOWN_PLOTS:
 		var ta: Vector2i = m.TOWN_PLOTS[tid].anchor
@@ -152,6 +517,7 @@ func _crop_texture(cell: Dictionary) -> Texture2D:
 
 
 func _draw_overlay() -> void:
+	_draw_clouds()   # 구름 그림자가 제일 밑 — 안내 표시를 어둡게 하면 안 된다
 	# 길라잡이 화살표는 없앴다 — 퀘스트 목표 문구와 길 자체로 안내한다
 	_draw_festival()
 	_draw_greenhouse()
@@ -185,6 +551,7 @@ func _draw_overlay() -> void:
 				else:
 					_draw_question(mn.position + Vector2(0, -124))
 
+	_draw_birds()
 	for pt in m.particles:
 		var s: float = float(pt.size)
 		m.overlay.draw_rect(Rect2(pt.p, Vector2(s, s)), pt.c)
@@ -230,11 +597,21 @@ func _draw_question(pos: Vector2) -> void:
 		m.overlay.draw_rect(r, Color(0.55, 0.95, 0.45))
 
 
+# 머리 위 안내가 뜨는 높이 (월드 픽셀). 예전 값(100)은 주인공 정수리에
+# 딱 붙어 있어서 도트 그림과 글자가 서로 먹었다 — 한 뼘 띄운다.
+const HINT_LIFT := 124.0
+
+
 func _context_hint() -> Array:
 	# 반환: [문구, 기준 위치(월드)] 또는 []
 	if m.player == null or m.ui_open():
 		return []
-	var above_player := m.player.position + Vector2(0, -100)
+	# 머리 위 안내는 **말풍선 위로** 비켜선다.
+	#
+	# 둘 다 「주인공 머리 위」에 붙어 있어서 말을 하는 순간 글자가 겹쳐
+	# 둘 다 못 읽었다. 말풍선이 떠 있으면 그 키만큼 더 올라간다.
+	var lift: float = HINT_LIFT + (m.hud.bubble_lift() if m.hud != null else 0.0)
+	var above_player := m.player.position + Vector2(0, -lift)
 	if m.fishing_state == "bite":
 		return ["지금이다!", above_player]
 	if m.fishing_state == "waiting":
@@ -243,7 +620,7 @@ func _context_hint() -> Array:
 	if m.story._postman != null and m.story._postman_state == "wait" \
 			and (m.player.position - m.story._postman.position).length() < m.POSTMAN_TALK_DIST:
 		return ["%s: 말 걸기" % GameData.key_label("talk"),
-			m.story._postman.position + Vector2(0, -112)]
+			m.story._postman.position + Vector2(0, -(HINT_LIFT + 12.0))]
 	# 대화는 대화키(F) 하나로 통일 — 어떤 키인지 머리 위에 같이 적어 준다
 	if m.actions.nearby_npc() != null:
 		return ["%s: 대화" % GameData.key_label("talk"), above_player]
@@ -257,7 +634,7 @@ func _context_hint() -> Array:
 			t = bt
 	if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
 		return []
-	var above_tile := Vector2(t.x * m.TILE + 16, t.y * m.TILE - 12)
+	var above_tile := Vector2(t.x * m.TILE + 16, t.y * m.TILE - 24)
 	var obj: Variant = m.objects.get(t)
 	if obj != null:
 		match obj.kind:
@@ -266,6 +643,8 @@ func _context_hint() -> Array:
 			"horse":
 				return ["%s: 말 타기" % GameData.key_label("mount"), above_tile]
 			"sign":
+				if t == m.STORY_TRAIL_SIGN:
+					return ["낡은 표지판", above_tile]
 				if t == m.FISH_SIGN:
 					return ["낚시터 안내", above_tile]
 				if t == m.GREENHOUSE_SIGN:
@@ -296,8 +675,14 @@ func _context_hint() -> Array:
 				var bk: String = m.actions._building_kind_at(t)
 				if bk == "home":
 					return ["집에 들어가기", above_tile]
+				if bk == "home_ruin":
+					return ["집 보수 — 목재 %d" % GameData.HOUSE_BUILD_WOOD, above_tile]
 				if bk in ["general", "ranch", "smith", "fish"]:
 					return [m.BUILDING_NAMES[bk], above_tile]
+				# 서 있기는 하되 아직 사람이 들지 않은 가게
+				var ep: String = m.plot_body_at(t)
+				if ep != "":
+					return ["빈 %s" % str(m.VILLAGE_PLOTS[ep].name), above_tile]
 		return []
 	var cell: Dictionary = m.grid[t.y][t.x]
 	if cell.crop_id != "":
@@ -386,6 +771,7 @@ func _draw_weather() -> void:
 			var sy := fposmod(m._hash01(i, 2) * full_h + m.weather_time * 280.0, full_h) - 5.0
 			m.overlay.draw_line(Vector2(sx - 2, sy - 7), Vector2(sx, sy),
 				Color(0.72, 0.82, 1.0, 0.5), 1.0)
+		_draw_rain_splashes(34)
 	elif w == GameData.WEATHER_SNOW:
 		for i in 240:
 			var sx := fposmod(m._hash01(i, 1) * full_w + sin(m.weather_time * 1.5 + i) * 12.0, full_w)
@@ -401,6 +787,7 @@ func _draw_weather() -> void:
 		var flash := fposmod(m.weather_time, 5.2)
 		if flash < 0.18:
 			m.overlay.draw_rect(_camera_rect(), Color(1, 1, 1, 0.45 * (1.0 - flash / 0.18)))
+		_draw_rain_splashes(58)
 	elif w == GameData.WEATHER_FOG:
 		# 가장자리로 갈수록 짙어지는 안개 (가까운 곳만 또렷하다)
 		var view2 := _camera_rect()
@@ -436,3 +823,24 @@ func _draw_weather() -> void:
 func _camera_rect() -> Rect2:
 	var half := Vector2(960.0, 540.0) / (2.0 * m.CAMERA_ZOOM)
 	return Rect2(m.player.position - half, half * 2.0)
+
+
+# 빗방울이 닿는 자리 — 바닥에 잠깐 퍼지는 잔물결 고리.
+# 하늘에서 내리는 줄만 있고 바닥이 조용하면 비가 「화면 앞 유리」에
+# 내리는 것처럼 보인다. 닿는 자리가 있어야 비가 세계 안에 내린다.
+# 상태 없이 시간·해시로만 계산한다 — 고리마다 제 주기를 돌고 끝나면
+# 다른 자리에서 다시 시작한다
+func _draw_rain_splashes(count: int) -> void:
+	var view := _camera_rect()
+	for i in count:
+		var ph: float = m.weather_time * 2.4 + m._hash01(i, 8) * 7.0
+		var cyc := int(ph)
+		var t := ph - float(cyc)
+		var px: float = view.position.x + m._hash01(i * 3 + cyc, 9) * view.size.x
+		var py: float = view.position.y + m._hash01(cyc * 7 + i, 10) * view.size.y
+		var r: float = 1.5 + t * 4.5
+		var a: float = (1.0 - t) * 0.38
+		m.overlay.draw_set_transform(Vector2(px, py), 0.0, Vector2(1.0, 0.45))
+		m.overlay.draw_arc(Vector2.ZERO, r, 0.0, TAU, 10,
+			Color(0.85, 0.92, 1.0, a), 1.0)
+	m.overlay.draw_set_transform(Vector2.ZERO)

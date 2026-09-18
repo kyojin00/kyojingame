@@ -14,6 +14,11 @@ func _ready() -> void:
 	add_child(sprite)
 
 
+func _draw() -> void:
+	# 발밑 그림자 — 펫도 땅을 딛는다 (여태 없어서 붕 떠 보였다)
+	KyojinMain.draw_ground_shadow(self, 5.0, 1.7)
+
+
 func _process(delta: float) -> void:
 	if GameData.active_pet == "" or main.player == null:
 		visible = false

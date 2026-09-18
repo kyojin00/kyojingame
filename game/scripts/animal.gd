@@ -24,7 +24,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	# 발밑 그림자 (쓰다듬어준 날은 하트 표시)
-	draw_rect(Rect2(-5, -2, 10, 3), Color(0, 0, 0, 0.22))
+	KyojinMain.draw_ground_shadow(self, 6.0, 2.0)
 	if fed:
 		draw_rect(Rect2(-2, -18, 2, 2), Color(0.95, 0.35, 0.45))
 		draw_rect(Rect2(1, -18, 2, 2), Color(0.95, 0.35, 0.45))

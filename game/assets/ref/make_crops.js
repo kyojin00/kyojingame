@@ -21,7 +21,20 @@ const C = {
   brown: [150, 100, 58],
 };
 
+const LINE = [44, 34, 28];
 const blank = () => Array.from({ length: S }, () => new Array(S).fill(null));
+// 윤곽선 — 마을의 모든 것이 어두운 따뜻한 선으로 둘려 있다. 작물만
+// 맨살이면 밭에서 스티커가 된다 (밀·옥수수 원화와 같은 문법)
+function outline(c) {
+  const add = [];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    if (c[y][x]) continue;
+    for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+      if (inb(x + ax, y + ay) && c[y + ay][x + ax] && c[y + ay][x + ax] !== LINE
+          && c[y + ay][x + ax] !== C.soil) { add.push([x, y]); break; }
+  }
+  for (const [x, y] of add) c[y][x] = LINE;
+}
 const inb = (x, y) => x >= 0 && y >= 0 && x < S && y < S;
 function px(c, x, y, col) { if (inb(x, y) && col) c[y][x] = col; }
 function rect(c, x, y, w, h, col) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(c, x + i, y + j, col); }
@@ -34,9 +47,12 @@ function ellipse(c, cx, cy, rx, ry, col) {
 
 // 잎 두 장이 V자로 뻗은 윗동 (뿌리채소·열매채소가 공유한다)
 function tops(c, col, y0) {
-  for (let i = 0; i < 4; i++) { px(c, 6 - i, y0 - i, col); px(c, 9 + i, y0 - i, col); }
-  rect(c, 7, y0 - 1, 2, 2, col);
-  px(c, 3, y0 - 3, col); px(c, 12, y0 - 3, col);
+  // 잎은 덩이로 — 가는 획에 윤곽선을 두르면 검은 벌레가 된다
+  ellipse(c, 5, y0 - 2, 2, 2, col); ellipse(c, 10, y0 - 2, 2, 2, col);
+  ellipse(c, 8, y0 - 3, 2, 2, col);
+  rect(c, 7, y0 - 1, 2, 2, C.leaf2);
+  px(c, 4, y0 - 3, C.leaf3); px(c, 9, y0 - 4, C.leaf3);   // 윗빛
+  px(c, 6, y0 - 1, C.leaf2); px(c, 11, y0 - 1, C.leaf2);  // 밑그늘
 }
 
 // 뿌리채소 — 잎 밑에 아래로 뾰족해지는 덩이 (당근·무 계열)
@@ -158,11 +174,54 @@ const CROPS = {
   rice: () => grain(C.gold),
   wheat: () => grain(C.cream),   // 밀 — 벼보다 옅은 밀짚색 이삭
   snow_cabbage: () => head(C.ice, C.pale),
+  potato: () => root(C.brown, [110, 72, 40]),
 };
 
+// ---- 성장 단계 — 새싹·잎 몇 장·수북한 포기 ----
+//
+// 모든 작물이 공유한다. 밭에서 제일 오래 보이는 그림인데 민무늬
+// 초록 덩이였다 — 잎 한 장을 윗변·속·그늘로 그린다
+function stageSprout() {
+  const c = blank();
+  rect(c, 7, 10, 2, 4, C.leaf2);                     // 줄기
+  rect(c, 5, 8, 2, 2, C.leaf); px(c, 5, 7, C.leaf3); px(c, 6, 9, C.leaf2);   // 왼잎
+  rect(c, 9, 8, 2, 2, C.leaf); px(c, 10, 7, C.leaf3); px(c, 9, 9, C.leaf2);  // 오른잎
+  px(c, 7, 9, C.leaf); px(c, 8, 9, C.leaf);          // 잎이 줄기에 붙는다
+  for (const [x, y] of [[5, 14], [10, 14], [7, 15]]) px(c, x, y, C.soil);  // 흙 알
+  return c;
+}
+function stageSmall() {
+  const c = blank();
+  rect(c, 7, 8, 2, 6, C.leaf2);                      // 줄기
+  ellipse(c, 5, 9, 2, 2, C.leaf); ellipse(c, 11, 9, 2, 2, C.leaf);   // 옆잎 두 덩이
+  ellipse(c, 8, 6, 2, 2, C.leaf);                    // 윗잎
+  px(c, 4, 8, C.leaf3); px(c, 10, 8, C.leaf3); px(c, 8, 4, C.leaf3); // 윗빛
+  px(c, 6, 10, C.leaf2); px(c, 10, 10, C.leaf2);     // 밑그늘
+  for (const [x, y] of [[5, 14], [11, 14]]) px(c, x, y, C.soil);
+  return c;
+}
+function stageMedium() {
+  const c = blank();
+  for (const [x, y, r] of [[5, 10, 3], [11, 10, 3], [8, 8, 4]])
+    ellipse(c, x, y, r, r - 1, C.leaf);
+  for (const [x, y] of [[4, 11], [12, 11], [7, 12], [10, 12]]) px(c, x, y, C.leaf2);  // 밑그늘
+  for (const [x, y] of [[5, 8], [11, 8], [8, 5], [7, 6]]) px(c, x, y, C.leaf3);       // 윗빛
+  rect(c, 7, 12, 2, 3, C.leaf2);
+  px(c, 8, 4, C.leaf3);                              // 꽃눈
+  return c;
+}
+const STAGES = { crop_sprout: stageSprout, crop_small: stageSmall, crop_medium: stageMedium };
+
 let n = 0;
+const JOBS = [];
 for (const [id, make] of Object.entries(CROPS)) {
+  if (id === 'wheat') continue;   // 밀은 유저 원화(cut_wheat)가 이미 자리에 있다 — 덮지 않는다
+  JOBS.push(['mature_' + id, make]);
+}
+for (const [name, make] of Object.entries(STAGES)) JOBS.push([name, make]);
+for (const [outName, make] of JOBS) {
   const c = make();
+  outline(c);
   const p = new PNG({ width: S * Z, height: S * Z });
   p.data.fill(0);
   for (let y = 0; y < S * Z; y++) for (let x = 0; x < S * Z; x++) {
@@ -171,7 +230,7 @@ for (const [id, make] of Object.entries(CROPS)) {
     const i = (y * S * Z + x) * 4;
     p.data[i] = col[0]; p.data[i + 1] = col[1]; p.data[i + 2] = col[2]; p.data[i + 3] = 255;
   }
-  fs.writeFileSync(OUT + 'mature_' + id + '.png', PNG.sync.write(p));
+  fs.writeFileSync(OUT + outName + '.png', PNG.sync.write(p));
   n++;
 }
 console.log('작물 %d 장 생성', n);

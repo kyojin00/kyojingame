@@ -84,6 +84,7 @@ func _on_fishing_finished(success: bool) -> void:
 		# (예전에는 판매가를 괄호로 같이 띄워 「돈이 들어왔다」로 읽혔다)
 		m.hud.show_message("%s를 낚았다!" % def.name)
 		m.tutorial_notify("fish")
+		m.story.fisher_lesson_caught()   # 부두에서 배우는 첫 한 마리 (스토리 2)
 		# 여름 낚시대회: 대회 시간 안에 낚시터에서 낚은 것만 센다
 		if GameData.festival_open() and str(GameData.festival_today().id) == "fishing" \
 				and at_fishing_spot():

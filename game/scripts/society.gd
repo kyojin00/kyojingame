@@ -1210,7 +1210,7 @@ func after_new_day() -> void:
 # 벌금(물건값 ×3, 하한 200)이거나 사흘 봉사. 자수하면 절반. 벌금은 마을 예산으로 간다.
 
 # 광장 남쪽 · 게시판 앞 · 서쪽 어귀 (NORTH_PAD 를 더한 실제 칸). 막힌 칸이면 가장 가까운 빈 칸
-const PATROL_SPOTS := [Vector2i(78, 37), Vector2i(82, 27), Vector2i(62, 33)]
+const PATROL_SPOTS := [Vector2i(146, 47), Vector2i(141, 34), Vector2i(82, 26)]
 const PATROL_NAMES := ["광장 남쪽", "게시판 앞", "서쪽 어귀"]
 # 청년회장의 야경(S3c) — 광장 분수 · 잡화점 앞 · 우체국 앞. 21시부터, 등불 없이
 const WATCH_NAMES := ["광장 분수", "잡화점 앞", "우체국 앞"]

@@ -70,6 +70,10 @@ func _debug_tick() -> void:
 		_shot_frames += 1
 		_reel_tick()
 		return
+	if OS.get_environment("KYOJIN_ALBUM") != "":
+		_shot_frames += 1
+		_album_tick()
+		return
 	if Net.is_guest() and not m._net_ready:
 		return  # 접속 완료 후부터 시퀀스 시작
 	_shot_frames += 1
@@ -102,7 +106,13 @@ func _debug_tick() -> void:
 			for hp in m.objects:
 				if String(m.objects[hp].kind) == "house":
 					houses += 1
+			# 마을에는 이장뿐이다. **고장 사람은 제 고장에 있어야 한다** —
+			# 여기 섞여 있으면 그건 「아직 안 만난 사람」이 아니라 「끌려온
+			# 사람」이다. 예전에는 튜토리얼 동안 rescue_trapped 가 세계를
+			# 통째로 못 가는 땅으로 읽고 여섯을 농장 한복판으로 데려왔고,
+			# 마을에 도착하면 거기서 제 고장까지 맵을 가로질러 걸어갔다.
 			var nids: Array = []
+			var home_ok := true
 			for n2 in m.npcs:
 				nids.append(n2.id)
 			nids.sort()
@@ -111,10 +121,14 @@ func _debug_tick() -> void:
 			# 새 게임에는 낡은 표지판이 서 있고, 동쪽 확장 구역은 잠겨 있다
 			var zone0: bool = str(m.objects.get(m.OLD_SIGN, {}).get("kind", "")) == "sign" \
 				and GameData.story4_phase == "" \
-				and not GameData.is_tile_owned(105, 10 + m.NORTH_PAD) \
-				and not m.is_passable(Vector2i(105, 10 + m.NORTH_PAD))   # 동쪽 확장 구역 안의 칸(NORTH_PAD 포함)
+				and not GameData.is_tile_owned(201, 10 + m.NORTH_PAD) \
+				and not m.is_passable(Vector2i(201, 10 + m.NORTH_PAD))   # 동쪽 확장 구역 안의 칸(NORTH_PAD 포함)
+			# 낚시꾼과 우체부만은 마을 밖에서 오는 사람이다 — 낚시꾼은 황금잉어 소문을 듣고
+			# 부두에 서고(fisher_quest), 우체부는 3장 끝에 돌아온다(move_quest). 첫날엔 없어야 맞다
 			var owners_here := true
 			for own9: String in GameData.START_GREETED:
+				if own9 in ["fisher", "postman"]:
+					continue
 				if own9 not in nids:
 					owners_here = false
 			# 새터말(S3b) — 초원에 빈 집터 여덟이 처음부터 있다: 장부·팻말·둘레 7×6 이 맨 풀밭.
@@ -150,10 +164,11 @@ func _debug_tick() -> void:
 			# 서 있는 칸이 지도에 드러나 있어야 한다 (마커만 검은 벌판에 뜨면 안 된다)
 			var pt9: Vector2i = m.player_tile()
 			var here_lit: bool = m.map_ui._visible_tile(pt9.x, pt9.y)
-			# 지나온 길도 드러나 있다
+			# 지나온 길도 드러나 있다 (첫 마디 — 서쪽에서 걸어온 그 줄)
 			var road_lit := 0
-			for rx9 in range(m.STORY_ROAD_X0, pt9.x + 1):
-				if m.map_ui._visible_tile(rx9, m.STORY_LANE_Y):
+			var lane0: Vector2i = m.STORY_LANE[0]
+			for rx9 in range(lane0.x, pt9.x + 1):
+				if m.map_ui._visible_tile(rx9, lane0.y):
 					road_lit += 1
 			# 이름패에 아직 마을 이름은 없다 (본 적도 들은 적도 없는 곳이다)
 			var plate9: String = m.map_ui.map_plate()
@@ -190,17 +205,27 @@ func _debug_tick() -> void:
 		73: _save_shot("_map.png")
 		74:
 			m.map_ui.close()
-			m.player.position = Vector2(76 * m.TILE + 16, 12 * m.TILE + 16)
-			m.player.dir = "right"                       # 마을 광장 게시판 앞으로
-			for n in m.npcs:                             # 게시판 캡처를 위해 NPC를 비켜둔다
-				n.position = Vector2(62 * m.TILE + 16, 25 * m.TILE + 16)
+			# 게시판 **바로 앞**에 선다. 좌표를 손으로 박아 두었더니 광장과
+			# 게시판이 옮겨 간 뒤로 엉뚱한 풀밭을 보고 E를 누르고 있었다
+			m.player.position = Vector2(m.BOARD_POS.x * m.TILE + 16,
+				(m.BOARD_POS.y + 1) * m.TILE + 16)
+			m.player.dir = "up"
+			# 게시판 캡처를 위해 NPC를 비켜둔다. **빈 땅으로 비켜야 한다** —
+			# 예전에 쓰던 (62,25)는 이제 대장간 안이다 (마을 건물이 처음부터
+			# 다 선다). 사람이 지붕 밑에 박힌 채로 찍혔다
+			var park74: Vector2i = m.nearest_open_tile(Vector2i(62, 46))
+			for n in m.npcs:
+				n.position = Vector2(park74.x * m.TILE + 16, park74.y * m.TILE + 16)
 				n.target = n.position
 		78: _send_key(KEY_E)
 		84: _save_shot("_quest.png")
 		86: m.dialog.close()
 		87:
-			m.player.position = Vector2(74 * m.TILE + 16, 20 * m.TILE + 16)
-			m.player.dir = "up"                          # 중앙 광장(건물 없는 초기 마을)
+			# 광장 남쪽에서 북쪽을 본다 — 분수 너머로 마을회관이 들어온다
+			m.player.position = Vector2(
+				(m.PLAZA.get_center().x - 2) * m.TILE + 16,
+				(m.PLAZA.end.y - 1) * m.TILE + 16)
+			m.player.dir = "up"
 		89: _save_shot("_village.png")
 		90:
 			m.player.position = m.npcs[0].position + Vector2(12, 0)
@@ -272,12 +297,19 @@ func _debug_tick() -> void:
 			m.player.position = Vector2(74 * m.TILE + 16, 11 * m.TILE + 16)
 			m.player.dir = "up"
 		186: _save_shot("_village2.png")
-		187: m.shop_room.open("general")                 # 가게 방 (잡화점)
-		190: _save_shot("_shoproom.png")
-		191: m.shop.open("buy", ["buy", "sell"], "잡화점")
-		193: _save_shot("_shop.png")
-		194: m.shop.close()
-		195:
+		187:
+			# 대장간 마당 한 채만 따로 — 부지 꾸밈을 눈으로 보는 자리
+			var sa87: Vector2i = m.VILLAGE_PLOTS["smith"].anchor
+			m.player.position = Vector2((sa87.x + 2) * m.TILE + 16,
+				(sa87.y + 7) * m.TILE + 16)
+			m.player.dir = "up"
+		189: _save_shot("_plot_smith.png")
+		190: m.shop_room.open("general")                 # 가게 방 (잡화점)
+		192: _save_shot("_shoproom.png")
+		193: m.shop.open("buy", ["buy", "sell"], "잡화점")
+		194: _save_shot("_shop.png")
+		195: m.shop.close()
+		196:
 			m.shop_room.close()
 			m.shop_room.open("smith")                    # 가게 방 (대장간)
 		197: _save_shot("_shoproom2.png")
@@ -400,9 +432,12 @@ func _debug_tick() -> void:
 			# 회귀 검사: 커다란 바위 사이의 한 칸 틈은 계속 지나갈 수 있어야 한다
 			# (퀘스트 5에서 바위 하나를 캐면 그 자리로 빠져나간다)
 			var gap := Vector2i(20, 40)
-			# 잡초·나물은 날마다 아무 풀밭에나 다시 돋는다 — 그날 마침 틈 칸에 돋으면
-			# 바위 틈과 상관없이 막히므로, 틈 칸 자체는 비우고 잰다
-			m.objects.erase(gap)
+			# 재는 것은 **큰 바위 둘 사이의 틈**이다. 그 자리에 어쩌다 돋아난
+			# 풀 한 포기(채집물은 randf 로 흩어진다)가 제 그림 여백으로 틈을
+			# 막으면 이 검사가 들쭉날쭉해진다 — 둘레를 먼저 비우고 잰다
+			for gdy in range(-1, 2):
+				for gdx in range(-1, 2):
+					m.objects.erase(gap + Vector2i(gdx, gdy))
 			m.objects[gap + Vector2i(0, -1)] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			m.objects[gap + Vector2i(0, 1)] = {"kind": "bigrock", "hp": m.BIGROCK_HP}
 			print("BIGROCK_GAP_OK=", m.is_passable_px(
@@ -747,7 +782,7 @@ func _debug_tick() -> void:
 			m.dialog.close()
 			GameData.story4_phase = ""
 			GameData.zones_open = []
-			var zin := Vector2i(105, 20)          # east_north 안쪽 칸 — 구역 rect 는 NORTH_PAD 를 더한 y 다
+			var zin := Vector2i(201, 20)          # east_north 안쪽 칸 — 구역 rect 는 NORTH_PAD 를 더한 y 다
 			m.objects.erase(zin)
 			m.grid[zin.y][zin.x].ground = "grass"
 			var sign_ok: bool = str(m.objects.get(m.OLD_SIGN, {}).get("kind", "")) == "sign"
@@ -755,7 +790,7 @@ func _debug_tick() -> void:
 				and not m.is_passable(zin)
 			# 잠긴 구역에는 집터를 못 놓는다
 			GameData.items["housing_kit"] = int(GameData.items.get("housing_kit", 0)) + 1
-			var plot_deny: bool = not m.story.try_place_home_plot(Vector2i(107, 20))
+			var plot_deny: bool = not m.story.try_place_home_plot(Vector2i(203, 20))
 			# 표지판 확인 -> 이장에게 묻는 목표
 			m.story.examine_old_sign()
 			var sign_seq: bool = m.dialog.visible
@@ -772,7 +807,7 @@ func _debug_tick() -> void:
 				and GameData.zones_open.has("east_north") \
 				and GameData.is_tile_owned(zin.x, zin.y) and m.is_passable(zin)
 			# 둘째 구역은 아직 잠김 -> 「마을 확장 이야기」에서 재료로 해금
-			var lock2: bool = not GameData.is_tile_owned(105, 40)   # east_south(y 33~)
+			var lock2: bool = not GameData.is_tile_owned(201, 40)   # east_south(x 196~, y 33~)
 			var wood0: int = GameData.wood
 			GameData.wood = maxi(GameData.wood, 200)
 			GameData.stone = maxi(GameData.stone, 200)
@@ -825,7 +860,7 @@ func _debug_tick() -> void:
 				and GameData.story9_objective_short() == ""
 			var dummies: Array = []                 # 임시 주민을 10명 초과까지 채운다
 			while m.village_residents() <= GameData.HALL_RESIDENTS:
-				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				m.npcmgr._spawn_npc("forest_girl", m.PLAZA.position + Vector2i(2, 2))
 				dummies.append(m.npcs[m.npcs.size() - 1])
 			GameData.story9_phase = "build"         # 스토리 9의 개관식 단계
 			var gate_after: bool = m.village_residents() > GameData.HALL_RESIDENTS \
@@ -847,13 +882,15 @@ func _debug_tick() -> void:
 			print("CHIEFGROW_OK=", hut_ok and res_ok and up_ok and gate_before
 				and gate_after and hall_ok and work and off_work,
 				" 오두막=", hut_ok, " 주민수=", res_ok, "(", res0, "명)",
-				" 새집=", up_ok, " 회관잠금=", gate_before, " 회관해금=", gate_after,
+				" 새집=", up_ok, " 회관섬=", gate_before, " 주민열명=", gate_after,
 				" 회관건설=", hall_ok, " 낮근무=", work, " 아침집=", off_work)
 		265:
 			# 이주 NPC 공통 「완공 다음 날, 직접 찾아와 첫 인사」 +
 			# 집터 자리 고르기 프리뷰 (동물의 숲식 범위 표시)
 			m.dialog.close()
 			# ① 첫 인사 전에는 잡화점 문이 닫혀 있고 주인도 없다
+			#    (새 게임에서는 건물 주인이 첫날부터 인사한 셈이라(START_GREETED) 다 있다 —
+			#     여기서는 인사를 지워 「찾아와 인사하는」 대목만 잰다)
 			GameData.npc_greeted.erase("merchant")
 			for nm in m.npcs.duplicate():
 				if nm.id == "merchant":
@@ -1174,7 +1211,7 @@ func _debug_tick() -> void:
 				" 빈집터=", plot_ok, " 수락후집완공=", house2_ok, " 이사=", greet_q,
 				" 첫인사=", greet_talk and seed_q, " 씨앗·배고픔=", hunger_on,
 				" 씨앗심기=", seed_done, " 이장호출=", post_q,
-				" 우체국잠김=", post_gated, " 우체국해금=", post_open,
+				" 이장호출단계=", post_gated, " 우체부부름=", post_open,
 				" 우체국완공=", built_post, " 우체부방문=", post_arrival,
 				" 우체부정착=", post_talk and move_done)
 			GameData.village_built = k_built3
@@ -2146,14 +2183,181 @@ func _debug_tick() -> void:
 				" 걸어갈 수 있는 칸=", seen_w.size())
 			# 나무·돌 여백을 넓혀도 한 칸 통로는 살아 있어야 한다
 			print("PAD_INFO=", m.OBJECT_PAD["tree"], m.OBJECT_PAD["rock"])
-			# 스토리 길목: 두 곳 · 각 두 그루(개), 막는 줄은 길 안에서 이어져 있어야
-			# 한다 (떨어져 있으면 사이로 그냥 지나가 버린다)
-			print("STORY_GATE_OK=", m.STORY_GATE_XS.size() == 2
-					and m.STORY_GATE_ROWS.size() == 2
-					and int(m.STORY_GATE_ROWS[1]) == int(m.STORY_GATE_ROWS[0]) + 1
-					and int(m.STORY_GATE_ROWS[0]) >= m.STORY_ROAD_Y0
-					and int(m.STORY_GATE_ROWS[1]) <= m.STORY_ROAD_Y1,
-				" 길목=", m.STORY_GATE_XS.size(), "곳 · 막는 줄=", m.STORY_GATE_ROWS)
+			# ---- 튜토리얼 숲길의 모양 ----
+			#
+			# 길이 고정된 가로 띠에서 **꺾은선 배열**이 됐다. 좌표를 손으로
+			# 옮기는 일이라, 여기서 지키는 것은 셋이다:
+			#   ① 이름난 자리(시작·갈림길·합류·어귀)가 정말 꺾은선 위에 있는가
+			#   ② 마디가 전부 축에 나란한가 · 길이 숲 한 장 안에 들어오는가
+			#   ③ **길목이 실제로 막고, 두 갈래가 실제로 통하는가**
+			#      — 이게 갈림길이 「고를 수 있는 길」인지 「막다른 길 두 개」인지
+			#        가르는 유일한 검사다
+			var lane_pts: Array = m.STORY_LANE
+			var det_pts: Array = m.STORY_DETOUR
+			var named_ok: bool = m.STORY_CLEARING.has_point(m.STORY_SPAWN) \
+				and lane_pts[lane_pts.size() - 1] == m.STORY_EXIT \
+				and lane_pts.has(m.STORY_FORK) and det_pts[0] == m.STORY_FORK \
+				and det_pts[det_pts.size() - 1] == m.STORY_MERGE \
+				and m.tutorial_walkable(m.STORY_MERGE) \
+				and m.tutorial_walkable(m.STORY_ROCK)
+			# 숲 어귀: 시작 자리는 빈터 안이고, 지나온 길은 **화면 밖으로 나간다**.
+			# 빈터 서쪽 끝에 서면 그 너머로 한 칸도 못 가야 정상이지만(맵 끝),
+			# 거기까지 가는 동안 등 뒤에 나무 벽이 서 있으면 안 된다 —
+			# 어귀가 아니라 또 하나의 막다른 길이 된다.
+			var head_ok: bool = m.STORY_CLEARING.position.x <= 1 \
+				and m.tutorial_walkable(Vector2i(m.STORY_CLEARING.position.x,
+					m.STORY_SPAWN.y)) \
+				and m.STORY_CLEARING.has_point(m.STORY_TRAIL_SIGN) \
+				and not m.story_dirt_rect(lane_pts[0], lane_pts[1]).has_point(
+					m.STORY_TRAIL_SIGN)   # 표지판이 길 한복판을 막으면 안 된다
+			# 마디는 가로 아니면 세로 (비스듬한 마디는 사각형으로 못 편다)
+			var axis_ok := true
+			var lane_box := m.story_lane_bounds()
+			for lane_arr: Array in [lane_pts, det_pts]:
+				for li in range(lane_arr.size() - 1):
+					var pa: Vector2i = lane_arr[li]
+					var pb: Vector2i = lane_arr[li + 1]
+					if pa.x != pb.x and pa.y != pb.y:
+						axis_ok = false
+			# 길과 그 둘레의 숲이 튜토리얼 한 장 · 카메라 폭 안에 들어온다
+			var fit_ok: bool = m.TUTORIAL_REGION.encloses(lane_box.grow(1)) \
+				and lane_box.end.x + 1 <= m.STORY_FOREST_W
+			# 길목은 길 위에 있고, 좁히는 갓길도 길 위에 있다.
+			# 눈앞에서 쓰러지는 나무는 **길 밖**에 서 있어야 한다 — 길 위였다면
+			# 넘어지며 비운 그 칸이 길목 옆의 샛길이 된다
+			var gate_ok: bool = m.STORY_GATES.size() == 4 \
+				and m.STORY_FALL_TREES.size() == 2
+			for ft5: Dictionary in m.STORY_FALL_TREES:
+				if m.tutorial_walkable(ft5.at):
+					gate_ok = false   # 쓰러지며 비운 칸이 샛길이 된다
+			for g5: Dictionary in m.STORY_GATES:
+				for p5: Vector2i in m.story._gate_tiles(g5) + m.story._gate_shoulders(g5):
+					if not m.tutorial_walkable(p5):
+						gate_ok = false
+			# 막힌 길목을 넣고 서쪽 끝에서 마을 어귀까지 걸어 본다.
+			# (갓길은 늘 막혀 있다 — 길목이 길을 두 줄로 좁히는 자리다)
+			var lane_reach := func(shut: Array) -> bool:
+				var block := {}
+				for g6: Dictionary in m.STORY_GATES:
+					for s6: Vector2i in m.story._gate_shoulders(g6):
+						block[s6] = true
+					if not shut.has(str(g6.role)):
+						continue
+					for t6: Vector2i in m.story._gate_tiles(g6):
+						block[t6] = true
+				var seen6 := {m.STORY_SPAWN: true}
+				var q6: Array[Vector2i] = [m.STORY_SPAWN]
+				var h6 := 0
+				while h6 < q6.size():
+					var c6: Vector2i = q6[h6]
+					h6 += 1
+					for d6: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
+							Vector2i(0, 1), Vector2i(0, -1)]:
+						var n6: Vector2i = c6 + d6
+						if seen6.has(n6) or block.has(n6) or not m.tutorial_walkable(n6):
+							continue
+						seen6[n6] = true
+						q6.append(n6)
+				return seen6.has(m.STORY_EXIT)
+			var open_ok: bool = lane_reach.call([])                    # 다 뚫리면 통한다
+			var first_ok: bool = not lane_reach.call(["first"])        # 첫 나무는 길을 통째로 막는다
+			var short_ok: bool = lane_reach.call(["short"])            # 지름길이 막혀도 우회로로 간다
+			var det_ok: bool = lane_reach.call(["detour"])             # 우회로가 막혀도 지름길로 간다
+			var both_ok: bool = not lane_reach.call(["short", "detour"])
+			var rock_ok: bool = not lane_reach.call(["rock"])          # 바위는 합류 뒤 — 못 피한다
+			print("STORY_LANE_OK=", named_ok and head_ok and axis_ok and fit_ok
+					and gate_ok and open_ok and first_ok and short_ok and det_ok
+					and both_ok and rock_ok,
+				" 이름난자리=", named_ok, " 숲어귀=", head_ok,
+				" 축나란함=", axis_ok, " 숲안에=", fit_ok,
+				" 길목자리=", gate_ok, " 다뚫림=", open_ok, " 첫나무막힘=", first_ok,
+				" 지름길막혀도=", short_ok, " 우회로막혀도=", det_ok,
+				" 둘다막히면=", both_ok, " 바위못피함=", rock_ok,
+				" 길범위=", lane_box)
+
+			# ---- 숲길을 실제로 심어 놓고 걸어 본다 ----
+			#
+			# 위가 좌표의 이야기라면 여기는 **놓인 것들**의 이야기다.
+			# 첫 나무는 눈앞에서 쓰러져 길을 막고, 그 뒤로는 도끼로 뚫은
+			# 만큼만 앞으로 갈 수 있어야 한다.
+			var k_tut8: bool = GameData.tutorial_space
+			var k_ph8: String = GameData.story_phase
+			var k_gate8: int = GameData.story_gates_left
+			var k_expl8: Dictionary = GameData.explored.duplicate()
+			GameData.tutorial_space = true
+			GameData.story_phase = "enter"
+			m.story._plant_story_forest()
+			# 서쪽 끝에서 그 칸까지 실제로 걸어갈 수 있는가 (놓인 것까지 본다)
+			var walk8 := func(goal: Vector2i) -> bool:
+				var seen8 := {m.STORY_SPAWN: true}
+				var q8: Array[Vector2i] = [m.STORY_SPAWN]
+				var h8 := 0
+				while h8 < q8.size():
+					var c8: Vector2i = q8[h8]
+					h8 += 1
+					for d8: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
+							Vector2i(0, 1), Vector2i(0, -1)]:
+						var n8: Vector2i = c8 + d8
+						if seen8.has(n8) or not m.is_passable(n8):
+							continue
+						seen8[n8] = true
+						q8.append(n8)
+				return seen8.has(goal)
+			var clear8 := func(role: String) -> void:
+				for g8: Dictionary in m.STORY_GATES:
+					if str(g8.role) == role:
+						for p8: Vector2i in m.story._gate_tiles(g8):
+							m.objects.erase(p8)
+				m.story._refresh_story_gates()
+			# ① 심은 직후: 길은 갈림길까지 열려 있고, 쓰러질 나무는 **양쪽**
+			#    길가에 서 있다
+			var plant8: bool = not m.objects.has(m.STORY_GATES[0].at) \
+				and walk8.call(m.STORY_FORK) and not walk8.call(m.STORY_EXIT) \
+				and GameData.story_gates_left == 1
+			for ft8: Dictionary in m.STORY_FALL_TREES:
+				if str(m.objects.get(ft8.at, {}).get("kind", "")) != "tree":
+					plant8 = false
+			# ② 양쪽에서 한 그루씩 넘어온다 — 길가에서 사라지고 길 위에 눕는다.
+			#    누운 쪽이 서로 반대여야 「양쪽에서 넘어왔다」로 읽힌다
+			m.story._topple_first_tree()
+			var rest8: Array = m.story._gate_tiles(m.STORY_GATES[0])
+			var fell8: bool = not walk8.call(m.STORY_FORK) \
+				and GameData.story_gates_left == 2 \
+				and float(m.objects.get(rest8[0], {}).get("fallen", 0.0)) > 0.0 \
+				and float(m.objects.get(rest8[rest8.size() - 1], {})
+					.get("fallen", 0.0)) < 0.0
+			for ft9: Dictionary in m.STORY_FALL_TREES:
+				if m.objects.has(ft9.at):
+					fell8 = false
+			# ③ 그 나무를 치우면 갈림길까지, 지름길을 뚫으면 바위까지 간다
+			clear8.call("first")
+			var chop8: bool = walk8.call(m.STORY_FORK) \
+				and not walk8.call(m.STORY_EXIT) and GameData.story_gates_left == 1
+			clear8.call("short")
+			var short8: bool = walk8.call(m.STORY_ROCK + Vector2i(-1, 0)) \
+				and not walk8.call(m.STORY_EXIT) and GameData.story_gates_left == 0
+			# ④ 바위에는 광석이 박혀 있고, 캐야만 마을 어귀에 닿는다
+			var ore8: bool = bool(m.objects.get(m.STORY_ROCK, {}).get("ore", false))
+			clear8.call("rock")
+			var exit8: bool = walk8.call(m.STORY_EXIT)
+			# ⑤ 우회로만으로도 똑같이 닿는다 (지름길을 도로 막고 우회로를 뚫는다)
+			m.story._plant_story_forest()
+			m.story._topple_first_tree()
+			clear8.call("first")
+			clear8.call("detour")
+			clear8.call("rock")
+			var detour8: bool = walk8.call(m.STORY_EXIT) \
+				and GameData.story_gates_left == 0
+			m.story._close_tutorial_space()
+			GameData.explored = k_expl8
+			GameData.tutorial_space = k_tut8
+			GameData.story_phase = k_ph8
+			GameData.story_gates_left = k_gate8
+			print("STORY_WALK_OK=", plant8 and fell8 and chop8 and short8
+					and ore8 and exit8 and detour8,
+				" 심은직후=", plant8, " 눈앞에서쓰러짐=", fell8, " 치우면열림=", chop8,
+				" 지름길=", short8, " 바위에광석=", ore8, " 어귀도착=", exit8,
+				" 우회로로도=", detour8)
 		384:
 			# 나무 뒤에 서면 나무가 비쳐 보여야 한다 (플레이어가 안 가려지게)
 			var ft := Vector2i(24, 22)
@@ -2512,13 +2716,14 @@ func _debug_tick() -> void:
 				and GameData.quest_npc_marks().get("chief", "") == "!"
 			m.story._start_hall_ask_dialog()
 			m.dialog.skip_seq()
+			# 회관은 처음부터 서 있다 — 남은 것은 주민을 모으는 일이다
 			var s9_invite: bool = GameData.story9_phase == "invite" \
 				and GameData.story9_objective_short() != "" \
 				and not GameData.hall_feature_open("office")
 			# 주민이 10명(플레이어 제외)을 넘어가면 건설 단계가 절로 열린다
 			var s9_dummies: Array = []
 			while m.village_residents() <= GameData.HALL_RESIDENTS:
-				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				m.npcmgr._spawn_npc("forest_girl", m.PLAZA.position + Vector2i(2, 2))
 				s9_dummies.append(m.npcs[m.npcs.size() - 1])
 			m.story._story9_update(0.016)
 			var s9_build: bool = GameData.story9_phase == "build" \
@@ -2539,13 +2744,13 @@ func _debug_tick() -> void:
 				and not GameData.hall_feature_open("meet") \
 				and GameData.hall_next_feature_text() != ""
 			while m.village_residents() < GameData.HALL_STORE_RES:
-				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				m.npcmgr._spawn_npc("forest_girl", m.PLAZA.position + Vector2i(2, 2))
 				s9_dummies.append(m.npcs[m.npcs.size() - 1])
 			m.story._story9_update(0.016)
 			var s9_store_open: bool = GameData.hall_feature_open("store") \
 				and not GameData.hall_feature_open("project")
 			while m.village_residents() < GameData.HALL_MEET_RES:
-				m.npcmgr._spawn_npc("forest_girl", Vector2i(74, 22))
+				m.npcmgr._spawn_npc("forest_girl", m.PLAZA.position + Vector2i(2, 2))
 				s9_dummies.append(m.npcs[m.npcs.size() - 1])
 			m.story._story9_update(0.016)
 			var s9_meet_open: bool = GameData.hall_feature_open("project") \
@@ -3826,19 +4031,22 @@ func _debug_tick() -> void:
 				if free_spot:
 					break
 			var desk_block: bool = desk_hit and kit_hit and free_spot
-			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라) — 사방이 트인 자리에서
-			var keep_pos_sf: Vector2 = m.player.position
-			for cand_sf: Vector2i in [Vector2i(74, 11), Vector2i(74, 24), Vector2i(30, 40), Vector2i(20, 40)]:
-				if m.is_passable(cand_sf + Vector2i(0, -3)) and m.is_passable(cand_sf + Vector2i(-3, 0)):
-					m.player.position = Vector2(cand_sf.x * m.TILE + 16, cand_sf.y * m.TILE + 16)
-					break
+			# ④ 찾아오는 사람은 자기가 서 있던 쪽에서 다가온다 (늘 남쪽이 아니라)
+			#
+			# **사방이 트인 자리에서 잰다.** 앞 걸음이 남겨 둔 자리가 어쩌다
+			# 집 문 앞이면 북쪽 세 칸이 통째로 지붕이라, 「북쪽에서 오면
+			# 북쪽 칸」이 성립할 수 없다 — 그건 이 함수의 잘못이 아니다
+			var k_ppos: Vector2 = m.player.position
+			var open0: Vector2i = m.nearest_open_tile(
+				m.PLAZA.position + Vector2i(2, 2))
+			m.player.position = Vector2(open0.x * m.TILE + 16, open0.y * m.TILE + 16)
 			var pt0 := m.player_tile()
 			var from_north := Vector2((pt0.x) * m.TILE + 16.0, (pt0.y - 8) * m.TILE + 16.0)
 			var spot_n := m.story._walk_tile_near_player(3, from_north)
 			var from_west := Vector2((pt0.x - 8) * m.TILE + 16.0, (pt0.y) * m.TILE + 16.0)
 			var spot_w := m.story._walk_tile_near_player(3, from_west)
 			var side_ok: bool = spot_n.y < pt0.y and spot_w.x < pt0.x
-			m.player.position = keep_pos_sf
+			m.player.position = k_ppos
 			m.hud._toast_queue.clear()
 			print("SUBFIX_OK=", chain_ok and bubble_ok and no_black_bar
 				and desk_block and side_ok,
@@ -4010,8 +4218,6 @@ func _debug_tick() -> void:
 			m.dialog.close()
 
 			# 뒷정리
-			if not had_general:
-				GameData.village_built.erase("general")
 			GameData.kitchen_found = k_kf
 			GameData.kitchen_quest = k_kq
 			GameData.kitchen_branch = ""
@@ -4339,8 +4545,7 @@ func _debug_tick() -> void:
 			var k_built4: Array = GameData.village_built.duplicate()
 			var k_story := GameData.story_phase
 			GameData.story_phase = "done"
-			GameData.village_built.erase("general")
-			GameData.story2_phase = "shop"
+			GameData.story2_phase = "farm"
 			var shop_entry: Dictionary = {}
 			for q: Dictionary in GameData.quest_catalog():
 				if str(q.id) == "story2":
@@ -4367,13 +4572,17 @@ func _debug_tick() -> void:
 			# ── ② 지도 마커: **하나뿐**이고, 고정한 퀘스트의 목적지를 짚는다
 			var k_pick2 := GameData.tracked_pick
 			GameData.tracked_pick = "story2"
+			GameData.story2_phase = "farm"
+			if not GameData.tool_slots.has("hoe"):
+				GameData.tool_slots.append("hoe")
 			var guides2: Array = m.map_ui._quest_guides()
 			var spot_ok: bool = guides2.size() == 1
 			if spot_ok:
 				var g0: Dictionary = guides2[0]
 				var gt: Vector2i = g0.tile
-				# 상점을 세울 자리를 가리키고, 라벨은 퀘스트 이름 하나뿐이다
-				spot_ok = gt == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2) \
+				# 밭을 만들 자리를 가리키고, 라벨은 퀘스트 이름 하나뿐이다
+				# (「상점을 세울 자리」는 없앴다 — 가게는 처음부터 다 열려 있다)
+				spot_ok = gt == m.HOME_ANCHOR + Vector2i(2, 5) \
 					and str(g0.text) == "마을을 깨우다" \
 					and not str(g0.text).contains("(")
 			# 다 지으면 그 자리는 더 이상 가리키지 않는다
@@ -4545,31 +4754,34 @@ func _debug_tick() -> void:
 				var t1: Vector2i = g1.tile
 				one_ok = t1 == m.HILL_POS and str(g1.text) == "할머니의 시계"
 			# 다른 퀘스트를 고정하면 그쪽 하나만 뜬다
+			# (「잡화점을 열자」는 없앴으므로 밭 갈기로 잰다)
 			var k_s2c := GameData.story2_phase
-			var k_builtc: Array = GameData.village_built.duplicate()
-			GameData.story2_phase = "shop"
-			GameData.village_built.erase("general")
+			var k_slots: Array = GameData.tool_slots.duplicate()
+			GameData.story2_phase = "farm"
+			if not GameData.tool_slots.has("hoe"):
+				GameData.tool_slots.append("hoe")
 			GameData.tracked_pick = "story2"
 			var gs2: Array = m.map_ui._quest_guides()
 			var swap_ok: bool = gs2.size() == 1
 			if swap_ok:
 				var g2: Dictionary = gs2[0]
 				var t2: Vector2i = g2.tile
-				swap_ok = t2 == m.VILLAGE_PLOTS["general"].anchor + Vector2i(2, 2)
-			GameData.village_built = k_builtc
+				swap_ok = t2 == m.HOME_ANCHOR + Vector2i(2, 5)
+			GameData.tool_slots = k_slots
 			GameData.story2_phase = k_s2c
 			GameData.story18_phase = k_s18c
 			GameData.tracked_pick = k_pick3
 
 			# ── ② 목표는 짧고, 괄호도 조작키 안내도 없다
 			var checks: Array = [
-				["story2_phase", ["shop", "farm_talk"], "story2_objective_short"],
+				["story2_phase", ["farm_talk", "cook"], "story2_objective_short"],
 				["fisher_home", ["wait", "build", "built"], "fisher_home_objective_short"],
 				["move_quest", ["show", "wait", "greet", "seed", "seedrep",
 					"post", "postbuild", "postgreet"], "move_objective_short"],
 				["kitchen_quest", ["broom", "make", "sweep", "found", "jam"],
 					"kitchen_quest_objective_short"],
-				["fisher_quest", ["meet", "follow", "open"], "fisher_objective_short"],
+				["fisher_quest", ["meet", "cast", "open"], "fisher_objective_short"],
+				["story_phase", ["home_open"], "story_objective_short"],
 				["forest_quest", ["arrive", "found", "ask", "go", "back"],
 					"forest_objective_short"],
 				["story6_phase", ["show_chief", "ask_post", "wait", "visit", "told",
@@ -4645,8 +4857,10 @@ func _debug_tick() -> void:
 			GameData.story20_phase = "gate"
 			GameData.tracked_pick = "story20"
 			var gs20: Array = m.map_ui._quest_guides()
-			var gate_hid: bool = gs20.size() == 1
-			if gate_hid:
+			# 동굴을 아직 세상에 놓지 않았다면 그리로 가리키는 마커도 없어야
+			# 한다 (없는 곳을 짚는 핀이 지도에 뜨면 그게 더 나쁘다)
+			var gate_hid: bool = gs20.size() == (1 if m.CAVE_PLACED else 0)
+			if gate_hid and m.CAVE_PLACED:
 				var g20: Dictionary = gs20[0]
 				var t20: Vector2i = g20.tile
 				gate_hid = t20 == m.CAVE_POS
@@ -5351,7 +5565,7 @@ func _debug_tick() -> void:
 				and m.region_open_at(Vector2i(gate3.x, 100))   # 벼랑길이 열려 있다
 			# 마을에서 그 자리까지 실제로 길이 이어져 있는가
 			var seen3 := {}
-			var q3: Array[Vector2i] = [m.nearest_open_tile(Vector2i(74, 20 + m.NORTH_PAD))]   # 마을 광장 근처 빈 칸
+			var q3: Array[Vector2i] = [m.nearest_open_tile(m.PLAZA.position + Vector2i(2, 2))]   # 마을 광장 근처 빈 칸
 			var head3 := 0
 			seen3[q3[0]] = true
 			while head3 < q3.size():
@@ -5423,7 +5637,15 @@ func _debug_tick() -> void:
 			var e_silent := false
 			var t_pos: Vector2 = m.player.position
 			var t_tool: String = GameData.tool
+			var t_npos: Vector2 = talk_npc.position if talk_npc != null else Vector2.ZERO
 			if talk_npc != null:
+				# **빈 땅에 세워 놓고 잰다.** 이 사람이 어쩌다 가게나 우리집
+				# 앞에 서 있으면, E를 눌렀을 때 열리는 것은 「말 걸기」가 아니라
+				# 그 건물의 창이다 — 그건 E가 사람에게 말을 건 것이 아니다
+				var open_t: Vector2i = m.nearest_open_tile(
+					m.PLAZA.position + Vector2i(3, 3))
+				talk_npc.position = Vector2(open_t.x * m.TILE + 16,
+					open_t.y * m.TILE + 16)
 				m.player.position = talk_npc.position + Vector2(0, 20)
 				m.player.dir = "up"
 				m._sel_target = Vector2i(-999, -999)
@@ -8780,8 +9002,8 @@ func _debug_tick() -> void:
 					thin = true
 			print("SEASON_CONTENT_OK=", not thin, " ", per_season)
 		376:
-			# 낚시꾼 퀘스트(메인 스토리 3): 등장 -> 황금잉어 선택지 ->
-			# 길목 바위 -> 바다/해변 해금 + 간이낚싯대(낚시 해금) + 조개
+			# 낚시꾼 퀘스트: 부두 등장 -> 황금잉어 선택지 -> **낚싯대를 받고
+			# 그 자리에서 한 마리** -> 그다음에야 길목 바위 -> 바다/해변 해금
 			GameData.fisher_quest = ""
 			GameData.sea_open = false
 			GameData.unlocked_tools.erase("rod")
@@ -8800,9 +9022,21 @@ func _debug_tick() -> void:
 			var picked: bool = GameData.fisher_choice == 2 and m.dialog.visible
 			m.dialog.close()
 			m.story._end_fisher_meet()
-			var follow: bool = GameData.fisher_quest == "follow" \
+			# **낚싯대는 만나는 자리에서 받는다** (배울 것은 곡괭이가 아니라 낚싯대다)
+			var lesson: bool = GameData.fisher_quest == "cast" \
+				and GameData.is_tool_unlocked("rod") \
 				and GameData.fisher_objective_short() != ""
-			GameData.fisher_quest = "open"         # 게이트 앞 대화가 끝난 상태
+			# 부두에서 한 마리 — 그러면 바다 이야기로 넘어간다
+			var k_pos76: Vector2 = m.player.position
+			m.player.position = Vector2(m.DOCK_STAND.x * m.TILE + 16,
+				m.DOCK_STAND.y * m.TILE + 16)
+			m.story.fisher_lesson_caught()
+			var caught: bool = GameData.fisher_quest == "open" and m.dialog.visible
+			m.dialog.skip_seq()
+			m.dialog.close()
+			m.player.position = k_pos76
+			# 부두를 벗어나 낚은 것은 이 수업으로 치지 않는다
+			GameData.fisher_quest = "open"         # 길목 바위를 캘 차례
 			for p: Vector2i in m.SEA_GATE:         # 길목 바위 둘을 캐낸 셈 친다
 				m.objnode._remove_object(p)
 			m.story._sea_gate_mined()              # -> 보상(간이낚싯대) 대화
@@ -8827,10 +9061,11 @@ func _debug_tick() -> void:
 					shells += 1
 			var shell_ok: bool = GameData.ITEMS.has("forage_shell") \
 				and m.tex.has("forage_shell") and m.tex.has("forage_coral") and shells > 0
-			print("SEA_OK=", met and choice_shown and picked and follow and reward
+			print("SEA_OK=", met and choice_shown and picked and lesson and caught and reward
 				and sea and ridge and sand and water and shell_ok and hidden,
 				" 등장=", met, " 선택지=", choice_shown, " 선택반영=", picked,
-				" 동행=", follow, " 보상대화=", reward, " 바다해금=", sea,
+				" 낚싯대받음=", lesson, " 부두에서한마리=", caught,
+				" 보상대화=", reward, " 바다해금=", sea,
 				" 열기전길막힘=", hidden, " 능선=", ridge, " 모래=", sand,
 				" 바닷물=", water, " 조개=", shells)
 			GameData.story2_phase = "done"
@@ -8875,8 +9110,15 @@ func _debug_tick() -> void:
 			var deliver_talk := m.dialog.visible
 			m.dialog.close()
 			m.story._end_delivery()
-			var opened := GameData.house_lv == 1 and GameData.has_bed \
+			# 편지를 전하면 **집을 물려받는다.** 다만 낡아서 손을 봐야
+			# 들어가 산다 — 집이 그 자리에서 열리지는 않는다
+			var inherit: bool = GameData.house_lv == 0 and GameData.has_bed \
 				and GameData.story_phase == "home_open"
+			GameData.wood += GameData.HOUSE_BUILD_WOOD
+			m.village._build_house()
+			m.dialog.close()
+			var opened: bool = inherit and GameData.house_lv == 1 \
+				and str(m.objects.get(m.HOME_SITE, {}).get("kind", "")) == "house"
 			m.interior.open()
 			var s1_done := GameData.story_phase == "greet"
 			var small: bool = m.interior.ROOM.size.x < 500.0   # 처음 집은 좁은 오두막
@@ -8923,7 +9165,7 @@ func _debug_tick() -> void:
 				and order_ok,
 				" 작별=", farewell, " 편지=", deliver_talk, " 집해금=", opened,
 				" 입장으로1막끝=", s1_done, " 오두막=", small, " 이장대화=", talk,
-				" 상점퀘=", shop_q, " 상점완성=", shop_built, " 호미대화=", farm_talk,
+				" 첫인사→낚시꾼=", shop_q, " 상점완성=", shop_built, " 호미대화=", farm_talk,
 				" 밭시작=", farm, " 수확→만수=", s2_done, " 안내분리=", order_ok)
 			GameData.house_lv = keep_house
 			GameData.has_bed = keep_bed
@@ -9440,6 +9682,248 @@ func _debug_tick() -> void:
 				" 한 장=", per_draw, "us (", _bench_n, "장 평균 · 배율 1)",
 				" 굽기=", bake, "us 격자읽기=", floor_us, "us(물 ", n_cal, ") ", m.map_ui.prof)
 		406:
+			# 부지마다 「여기는 뭐 하는 곳」 — 내놓은 소품과 울타리 경계.
+			#
+			# 지키는 것은 셋이다:
+			#   ① 소품이 **보이는가.** object_nodes 의 match 에 없는 종류를
+			#      적으면 texture 가 null 인 채 노드만 서서 투명하게 놓인다 —
+			#      눈으로 보기 전에는 절대 모른다
+			#   ② 문과 문 앞이 열려 있는가 (내놓은 물건이 가게를 닫아걸면 안 된다)
+			#   ③ 광장에서 **걸어서 문까지 닿는가** (경계 울타리가 목을 잠그면 안 된다)
+			#   ④ **문을 열기 전에도 건물이 서 있는가.** village_built 는
+			#      「문을 연 가게」라는 뜻만 남았다 — 한 곳도 열지 않은 채로
+			#      세계를 지어도 아홉 채가 다 서 있어야 한다
+			#      (낚시터를 비우는 네모가 여관 왼쪽 한 줄을 갉아먹고 있었다)
+			var k_built94: Array = GameData.village_built.duplicate()
+			GameData.village_built = []
+			m.worldgen._build_map()
+			var stand94 := true
+			var gone94 := ""
+			for pid93: String in m.VILLAGE_PLOTS:
+				var a93: Vector2i = m.VILLAGE_PLOTS[pid93].anchor
+				var body93 := 0
+				for y93 in range(a93.y, a93.y + 4):
+					for x93 in range(a93.x, a93.x + 5):
+						if Vector2i(x93, y93) == m.door_tile(a93):
+							continue
+						if not m.is_passable(Vector2i(x93, y93)):
+							body93 += 1
+				if body93 < 19:
+					stand94 = false
+					gone94 += "%s(%d/19) " % [pid93, body93]
+			# 할아버지의 낡은 집도 처음부터 서 있다 (빈 터 표지판이 아니다)
+			var k_hl94: int = GameData.house_lv
+			GameData.house_lv = 0
+			m.worldgen._build_map()
+			var home94: bool = not m.is_passable(m.HOME_ANCHOR) \
+				and str(m.objects.get(m.HOME_SITE, {}).get("kind", "")) == "house"
+			GameData.house_lv = k_hl94
+			m.worldgen._build_map()
+			# ① 그림이 붙는 종류인가 — 빈 칸에 한 번 세워 보고 지운다
+			var art_ok94 := true
+			var blind94 := ""
+			var scratch94 := Vector2i(2, m.WORLD_H - 3)
+			for pid94: String in m.VILLAGE_PLOTS:
+				for e94: Array in (m.PLOT_DECOR.get(pid94, {}) as Dictionary).get("props", []):
+					var kind94 := str(e94[1])
+					m.objnode._spawn_object_node(scratch94, kind94)
+					var nd94: Variant = m.obj_nodes.get(scratch94)
+					var spr94: Variant = nd94.get_child(0) if nd94 != null else null
+					if spr94 == null or (spr94 as Sprite2D).texture == null:
+						art_ok94 = false
+						blind94 += kind94 + " "
+					if nd94 != null:
+						(nd94 as Node2D).queue_free()
+						m.obj_nodes.erase(scratch94)
+			# ②③ 문이 열려 있고 광장에서 걸어 닿는가
+			var seen94 := {}
+			# 광장 **한가운데는 분수다** — 거기서 출발하면 물에 갇혀 한 칸도
+			# 못 나간다 (이 검사가 처음에 아홉 곳 다 「길없음」을 뱉은 이유)
+			var plaza94: Vector2i = m.nearest_open_tile(
+				m.PLAZA.position + Vector2i(1, 1))
+			var q94: Array[Vector2i] = [plaza94]
+			seen94[plaza94] = true
+			var h94 := 0
+			while h94 < q94.size():
+				var c94: Vector2i = q94[h94]
+				h94 += 1
+				for d94: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0),
+						Vector2i(0, 1), Vector2i(0, -1)]:
+					var n94: Vector2i = c94 + d94
+					if seen94.has(n94) or not m.is_passable(n94):
+						continue
+					seen94[n94] = true
+					q94.append(n94)
+			var door_ok94 := true
+			var reach94 := true
+			var shut94 := ""
+			for pid95: String in m.VILLAGE_PLOTS:
+				var a95: Vector2i = m.VILLAGE_PLOTS[pid95].anchor
+				var front95: Vector2i = a95 + Vector2i(2, 4)
+				if m.objects.has(m.door_tile(a95)) or not m.is_passable(front95):
+					door_ok94 = false
+					shut94 += pid95 + " "
+				if not seen94.has(front95):
+					reach94 = false
+					shut94 += pid95 + "(길없음) "
+			# 경계가 **실제로 서 있는가.** 예전에 이 검사가 「길을 안 막았나」만
+			# 보다가, 말뚝이 한 개도 안 선 것을 통과시켰다 (땅이 잔디가 아니라
+			# 마당 흙이라 전부 건너뛰고 있었다)
+			var ring_ok94 := true
+			var bare94 := ""
+			for pid96: String in m.VILLAGE_PLOTS:
+				var a96: Vector2i = m.VILLAGE_PLOTS[pid96].anchor
+				var ring96 := Rect2i(a96.x - m.YARD_PAD - 1, a96.y - m.YARD_PAD - 1,
+					5 + m.YARD_PAD * 2 + 2, 4 + m.YARD_PAD * 2 + 2)
+				var posts96 := 0
+				for yy96 in range(ring96.position.y, ring96.end.y):
+					for xx96 in range(ring96.position.x, ring96.end.x):
+						if str(m.objects.get(Vector2i(xx96, yy96), {})
+								.get("kind", "")) == "fence":
+							posts96 += 1
+				if posts96 < 8:
+					ring_ok94 = false
+					bare94 += "%s(%d) " % [pid96, posts96]
+			# **그림 노드까지 실제로 서는가.** objects 에 넣는 것과 화면에
+			# 서는 것은 다른 일이다 — 세계를 다시 지은 뒤 노드를 다시 세우고
+			# (스트리밍 창 안으로) 세어 본다
+			#
+			# **부지마다 그 앞에 서서** 본다. 노드는 주인공 둘레 34x26 칸만
+			# 세워지므로(_stream_nodes), 부지들을 넓게 벌려 놓은 지금은 한자리에
+			# 서서 아홉 곳을 다 볼 수 없다 — 멀리 있는 부지의 소품이 「안 섰다」로
+			# 잡히는데 그건 스트리밍이 제 할 일을 한 것이다
+			var node_ok94 := true
+			var miss94 := ""
+			for pid97: String in m.VILLAGE_PLOTS:
+				var a97: Vector2i = m.VILLAGE_PLOTS[pid97].anchor
+				m.player.position = Vector2((a97.x + 2) * m.TILE + 16,
+					(a97.y + 6) * m.TILE + 16)
+				m.objnode._spawn_objects()
+				for e97: Array in (m.PLOT_DECOR.get(pid97, {}) as Dictionary).get("props", []):
+					var t97: Vector2i = a97 + (e97[0] as Vector2i)
+					if m.objects.has(t97) and not m.obj_nodes.has(t97):
+						node_ok94 = false
+						miss94 += "%s:%s " % [pid97, str(e97[1])]
+			# **마을 생활 공간 안에는 나무가 없다.**
+			#
+			# 마을 어귀의 목(x53~63)이 도착 자리를 옮긴 뒤로 감쌀 것도 없이
+			# 마을 서쪽 한복판에 나무 덩어리로 남아 있었다. 바깥 테두리
+			# 두 줄은 원래 나무를 두르는 자리라 빼고 본다.
+			# **마을에도 숲은 있다 — 다만 길·광장·마당 위에는 없다.**
+			#
+			# 예전에는 「마을 구역 안에 나무 0그루」였다. 부지가 다닥다닥
+			# 붙어 있던 시절의 규칙인데, 한 부지를 한 구역으로 벌려 놓고
+			# 그대로 두었더니 사이가 통째로 맨 잔디밭이 됐다. 이제 사이는
+			# 숲이고, 검사는 **자연물이 길·광장·부지 안을 침범했는가**로 바뀐다.
+			var wild94 := 0
+			var green94 := 0
+			var bad94 := ""
+			# 부지가 **일부러 내놓은** 소품은 자연물이 아니다 — 수산시장 앞의
+			# 조개와 목장 마당의 여물은 종류만 forage_/weed 일 뿐 마당 살림이다
+			var decor94 := {}
+			for pid99: String in m.VILLAGE_PLOTS:
+				var a99: Vector2i = m.VILLAGE_PLOTS[pid99].anchor
+				for e99: Array in (m.PLOT_DECOR.get(pid99, {}) as Dictionary).get("props", []):
+					decor94[a99 + (e99[0] as Vector2i)] = true
+			for wt94: Vector2i in m.objects:
+				var wk94 := str(m.objects[wt94].kind)
+				if wk94 not in ["tree", "rock", "weed"] \
+						and not wk94.begins_with("forage_"):
+					continue
+				if not m.VILLAGE_REGION.has_point(wt94) or decor94.has(wt94):
+					continue
+				var onroad94 := m.PLAZA.has_point(wt94) or m.ROAD.has_point(wt94)
+				for lane96: Rect2i in m.VILLAGE_ROADS:
+					if lane96.has_point(wt94):
+						onroad94 = true
+				if onroad94 or m.worldgen._in_any_plot_ring(wt94):
+					wild94 += 1          # 있으면 안 되는 자리
+					if bad94.length() < 90:
+						bad94 += "%s%s " % [wk94, wt94]
+				else:
+					green94 += 1          # 부지 사이의 숲 — 있어야 하는 것
+			# **집 칸 위에 끼이면 구조된다.** 통행을 막는 것은 지형만이
+			# 아니라 그 칸에 놓인 것이기도 한데, rescue_trapped 가 지형만
+			# 보고 있어서 지붕 위에 올라선 채로 갇혔다
+			var k_pos94: Vector2 = m.player.position
+			var roof94: Vector2i = m.VILLAGE_PLOTS["general"].anchor + Vector2i(1, 1)
+			m.player.position = Vector2(roof94.x * m.TILE + 16, roof94.y * m.TILE + 16)
+			m.rescue_trapped()
+			var freed94: bool = m.is_passable(m.player_tile())
+			m.player.position = k_pos94
+			m.hud.hide_bubble()
+			# 큰길·광장 위에는 말뚝 하나 박지 않는다
+			var road_ok94 := true
+			for rt94: Vector2i in m.objects:
+				if str(m.objects[rt94].kind) != "fence":
+					continue
+				if m.ROAD.has_point(rt94) or m.PLAZA.has_point(rt94):
+					road_ok94 = false
+				for lane94: Rect2i in m.VILLAGE_ROADS:
+					if lane94.has_point(rt94):
+						road_ok94 = false
+			# **사람은 건물 안에 서지 않는다.** 건물이 처음부터 다 서면서,
+			# 「문 앞」으로 적어 둔 자리 몇이 건물 안이 됐다 — 거기 세우면
+			# 길찾기가 막힌 칸에서 시작해 한 발도 못 떼고 굳어 선다
+			var npc_ok94 := true
+			var inside94 := ""
+			for pid98: String in m.VILLAGE_NPC:
+				var nid98: String = m.VILLAGE_NPC[pid98]
+				for pl98: String in ["home", "work", "plaza", "board"]:
+					var t98: Vector2i = m.npcmgr.npc_place_tile(nid98, pl98)
+					if not m.is_passable(t98):
+						npc_ok94 = false
+						inside94 += "%s/%s " % [nid98, pl98]
+			# **길이 실제로 깔렸는가.** 3줄짜리 흙길이 부지 사이를 지나야 한다
+			var lane_ok94 := true
+			var thin94 := ""
+			# **네모가 다 덮였는가**가 아니라 **한 줄기로 이어졌는가**를 잰다.
+			#
+			# 길은 굽이친다. 줄기 네모(lane) 안이 몇 할이나 자갈이냐로 재면,
+			# 잘 굽은 길일수록 점수가 낮다 — 실제로 곧은 길은 100%, 굽은
+			# 길은 64%가 나왔다. 그건 길이 안 깔린 게 아니라 옆으로 비킨 것이다.
+			#
+			# 그래서 줄기를 따라 한 칸씩 걸어가며, **그 자리에서 좌우 세 칸
+			# 안에 자갈이 있는가**를 본다. 있으면 거기 길이 지나간 것이다.
+			for lane95: Rect2i in m.VILLAGE_ROADS:
+				var vert95: bool = lane95.size.y > lane95.size.x
+				var paved95 := 0
+				var cells95 := 0
+				var a0_95: int = lane95.position.y if vert95 else lane95.position.x
+				var a1_95: int = lane95.end.y if vert95 else lane95.end.x
+				var mid95: int = int((lane95.position.x + lane95.end.x) / 2) if vert95 \
+					else int((lane95.position.y + lane95.end.y) / 2)
+				for a95 in range(a0_95, a1_95):
+					var hit95 := false
+					for off95 in range(-3, 4):
+						var lx95: int = mid95 + off95 if vert95 else a95
+						var ly95: int = a95 if vert95 else mid95 + off95
+						if lx95 < 0 or ly95 < 0 or lx95 >= m.MAP_W or ly95 >= m.MAP_H:
+							continue
+						if m.grid[ly95][lx95].ground == "path":
+							hit95 = true
+							break
+					cells95 += 1
+					if hit95:
+						paved95 += 1
+				if cells95 == 0 or float(paved95) / float(cells95) < 0.9:
+					lane_ok94 = false
+					thin94 += "%s(%d/%d) " % [lane95, paved95, cells95]
+			GameData.village_built = k_built94
+			m.worldgen._build_map()
+			print("PLOT_DECOR_OK=", art_ok94 and door_ok94 and reach94
+					and road_ok94 and ring_ok94 and node_ok94 and wild94 == 0
+					and freed94 and stand94 and home94 and npc_ok94 and lane_ok94
+					and green94 >= 60,
+				" 건물다섬=", stand94, "(", gone94, ")", " 낡은집섬=", home94,
+				" 사람선자리=", npc_ok94, "(", inside94, ")",
+				" 길깔림=", lane_ok94, "(", thin94, ")",
+				" 그림있음=", art_ok94, "(", blind94, ")", " 문열림=", door_ok94,
+				" 광장에서닿음=", reach94, "(", shut94, ")", " 길안막음=", road_ok94,
+				" 경계있음=", ring_ok94, "(", bare94, ")",
+				" 그림섬=", node_ok94, "(", miss94, ")",
+				" 길·마당침범=", wild94, "그루(", bad94, ")", " 부지사이숲=", green94, "그루",
+				" 집위구조=", freed94)
 			# 개발용 「메인 스토리 건너뛰기」 — 오프닝 도중에 눌러도 샌드박스로 선다.
 			# 앞 이야기를 다시 볼 수 없으니 만드는 동안 제일 자주 쓰는 길이다.
 			var k_all := {
@@ -9938,3 +10422,71 @@ func _mp_tick() -> void:
 func _me_int_h(key: String) -> int:
 	return int(GameData.me.get(key, 0))
 
+# ---- 부지 사진첩 ----
+#
+# 「누가 봐도 대장간」인지는 **눈으로** 확인할 수밖에 없다. 그런데 본
+# 시퀀스에 사진 찍는 자리를 끼워 넣으면 걸음 수(_shot_frames)가 밀려서
+# 뒤의 검증이 통째로 어긋난다 — 한 번 그렇게 해 보고 겨울 튜토리얼 벌판에
+# 선 대장간 사진을 얻었다.
+#
+# 그래서 아예 딴 모드로 뺀다. KYOJIN_ALBUM=1 로 켜면 검증은 한 줄도 돌지
+# 않고, 부지를 한 곳씩 돌며 사진만 찍고 끝난다 (십수 초).
+#
+#   KYOJIN_ALBUM=1 KYOJIN_SHOT=<dir>/ godot --rendering-driver opengl3
+const ALBUM_HOLD := 26        # 자리를 잡고 카메라가 따라붙을 때까지
+
+
+func _album_tick() -> void:
+	var ids: Array = m.VILLAGE_PLOTS.keys()
+	var slot := int(_shot_frames / ALBUM_HOLD)
+	var beat := _shot_frames % ALBUM_HOLD
+	if slot > ids.size() + 2:
+		get_tree().quit()
+		return
+	# 마지막 석 장은 **광장**이다 — 낮 · 골든아워 · 밤.
+	# 하루의 색 온도와 등불 빛무리가 어떻게 앉는지 한 벌로 본다
+	var plaza := slot >= ids.size()
+	var dusk := slot == ids.size() + 1
+	var night := slot == ids.size() + 2
+	var pid := "plaza" if plaza else str(ids[slot])
+	if dusk:
+		pid = "plaza_dusk"
+	elif night:
+		pid = "plaza_night"
+	var a: Vector2i = m.PLAZA.get_center() - Vector2i(2, 2) if plaza \
+		else (m.VILLAGE_PLOTS[pid].anchor as Vector2i)
+	if (dusk or night) and beat == 2:
+		GameData.minutes = int((17.6 if dusk else 21.5) * 60.0)
+		m.daycycle._update_night()
+	if beat == 1:
+		m.dialog.close()
+		# 문 칸 위에 세우면 가게 문이 열려 대화창이 사진을 덮는다 — 마당 아래로
+		m.player.position = Vector2((a.x + 2) * m.TILE + 16, (a.y + 7) * m.TILE + 16)
+		m.player.dir = "up"
+	elif beat == 3:
+		# **순간이동한 자리에서는 소품이 한 박자 늦게 선다.**
+		# 노드는 걸어 들어오는 속도에 맞춰 한 줄씩 세워진다(_stream_nodes).
+		# 사진기는 걸어오지 않으니 큐를 한 번에 비워야 마당이 다 찬다 —
+		# 이걸 안 해서 「소품이 안 보인다」고 한나절을 헤맸다
+		m.objnode._stream_nodes()
+		m.objnode._drain_spawn_queue(true)
+	elif beat == ALBUM_HOLD - 1:
+		_save_shot("_zplot_%s.png" % pid)
+		# 놓으라고 적어 둔 살림이 **정말 다 섰는지** 한 줄로 센다.
+		# 자리를 옮길 때마다 몇 개씩 조용히 사라졌다 — 밭흙 위라서, 옆문
+		# 자리라서. 사진만 봐서는 무엇이 빠졌는지 알 수가 없다
+		var miss := []
+		if night:
+			return
+		for entry: Array in (m.PLOT_DECOR.get(pid, {}) as Dictionary).get("props", []):
+			var t: Vector2i = a + (entry[0] as Vector2i)
+			var have := m.objects.has(t)
+			var node := m.obj_nodes.has(t)
+			var texok := false
+			if node:
+				var nd: Node2D = m.obj_nodes[t]
+				texok = is_instance_valid(nd) and nd.get_child_count() > 0 \
+					and (nd.get_child(0) as Sprite2D).texture != null
+			if not (have and node and texok):
+				miss.append("%s@%s obj=%s node=%s tex=%s" % [entry[1], entry[0], have, node, texok])
+		print("ALBUM_", pid, "_MISS=", miss.size(), " ", miss)

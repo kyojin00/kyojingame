@@ -88,7 +88,13 @@ func object_rows() -> Array:
 			1 if m.objects[pos].get("apple", false) else 0,
 			1 if m.objects[pos].get("young", false) else 0,
 			int(m.objects[pos].get("grow", 0)),
-			1 if m.objects[pos].get("fixed", false) else 0])
+			1 if m.objects[pos].get("fixed", false) else 0,
+			# 8: 누워 있는 나무 — **누운 쪽**까지 담는다 (0 안 누움 / 1 서쪽 /
+			#    2 동쪽) · 9: 광석이 박힌 바위.
+			# 옛 세이브에는 이 자리가 없다 — 읽는 쪽이 길이를 본다
+			(2 if float(m.objects[pos].get("fallen", 0.0)) > 0.0
+				else (1 if m.objects[pos].get("fallen", false) else 0)),
+			1 if m.objects[pos].get("ore", false) else 0])
 	return objs
 
 
@@ -123,7 +129,7 @@ func _apply_save(d: Dictionary) -> void:
 	GameData.player_name = str(d.get("player_name", ""))
 	GameData.farm_name = str(d.get("farm_name", ""))
 	GameData.village_name = str(d.get("village_name", ""))
-	GameData.village_built = d.get("village_built", [])
+	GameData.village_built = d.get("village_built", GameData.ALL_VILLAGE_PLOTS.duplicate())
 	GameData.house_lv = int(d.get("house_lv", 0))
 	GameData.has_bed = bool(d.get("has_bed", false))
 	GameData.desk_lv = int(d.get("desk_lv", 0))
@@ -400,12 +406,18 @@ func _apply_save(d: Dictionary) -> void:
 	# 대기로 이어 준다 (옛 세이브는 마을이 이미 다 서 있다)
 	GameData.story2_phase = str(d.get("story2_phase",
 		"done" if str(d.get("fisher_quest", "")) == "done" else "fisher"))
-	# 무건물 시작 버그(reset_all 잔재가 ALL을 다시 채우던 시절) 세이브 교정:
-	# 스토리가 거기까지 안 갔으면 건물이 서 있을 수 없다
-	if GameData.story_phase != "done" or GameData.story2_phase == "":
-		GameData.village_built = []
-	elif GameData.story2_phase == "shop":
-		GameData.village_built.erase("general")   # 상점은 퀘스트로 지어야 한다
+	# 튜토리얼이 닫혔는가 — 이 값이 없는 옛 세이브는 **낚시를 배웠는가**로
+	# 잰다. 튜토리얼이 부두의 첫 한 마리에서 끝나게 바뀌기 전 세이브라,
+	# 낚싯대를 이미 받았다면 그 대목은 지나온 것이다
+	GameData.tutorial_closed = bool(d.get("tutorial_closed",
+		str(d.get("fisher_quest", "")) in ["open", "done"]))
+	# 가게는 이제 **처음부터 아홉 채가 다 열려 있다.** 하나씩 여는 이야기를
+	# 없앴으므로, 옛 세이브도 열려 있는 쪽으로 맞춰 준다 — 안 그러면 예전에
+	# 저장한 사람은 열 수 없는 가게 앞에서 영영 문이 잠긴다
+	GameData.village_built = GameData.ALL_VILLAGE_PLOTS.duplicate()
+	for own_id: String in ["merchant", "blacksmith", "rancher", "librarian"]:
+		if own_id not in GameData.npc_greeted:
+			GameData.npc_greeted.append(own_id)
 	# 조리대 발견이 생기기 전 세이브: 이미 요리하던 집(확장됨/요리 기록)은
 	# 발견한 것으로 친다 — 쓰던 조리대가 갑자기 먼지에 묻히면 안 된다
 	GameData.kitchen_found = bool(d.get("kitchen_found",
@@ -674,6 +686,11 @@ func _apply_save(d: Dictionary) -> void:
 				od["grow"] = int(o[6])
 			if o.size() > 7 and int(o[7]) == 1:
 				od["fixed"] = true  # 스토리 울타리 (걷어낼 수 없다)
+			if o.size() > 8 and int(o[8]) != 0:
+				# 길 위에 누운 나무 (그림만 누워 있다). 1 서쪽 · 2 동쪽
+				od["fallen"] = 1.0 if int(o[8]) == 2 else -1.0
+			if o.size() > 9 and int(o[9]) == 1:
+				od["ore"] = true     # 광석이 박힌 바위
 			m.objects[Vector2i(int(o[0]), int(o[1]))] = od
 		# 경매 게시판이 생기기 전 세이브 — 광장에 세워 준다
 		if not m.objects.has(m.AUCTION_POS):

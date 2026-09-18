@@ -122,14 +122,24 @@ const ROOF_PAL = {
   clay:   [[255,152,62],[244,116,40],[226,88,28],[198,68,24],[168,52,20],[140,40,17],[112,32,14],[84,24,11]],
   soot:   [[164,148,140],[138,122,116],[114,100,96],[92,80,78],[72,62,62],[56,48,48],[40,34,34],[26,22,22]],
   slate:  [[152,178,192],[126,154,170],[104,132,150],[84,110,130],[66,90,110],[52,72,90],[38,54,70],[26,38,52]],
+  // 대장간의 함석 지붕 — **그늘이 남보라로 기운다.** 순회색(soot)으로
+  // 두었더니 지붕이 큰 잿빛 판이라 그림 전체가 우중충했다. 손으로 찍은
+  // 그림의 회색은 회색이 아니다 — 빛은 하늘색, 그늘은 남보라다
+  ironblue: [[212,226,236],[178,196,214],[144,166,192],[114,136,168],[90,108,146],[70,84,124],[54,64,102],[42,48,80]],
   moss:   [[156,172,112],[130,148,92],[106,124,76],[86,104,62],[68,84,48],[52,66,38],[40,50,30],[28,36,22]],
   copper: [[144,208,194],[116,184,172],[94,160,150],[76,136,128],[60,112,106],[46,90,86],[34,68,66],[24,50,48]],
 };
 const WALL_PAL = {
   brick: { k: [176,110,70], K: [116,68,44], i: [210,148,100] },
   stone: { k: [154,150,144], K: [98,94,90], i: [192,188,180] },
+  // 따뜻한 돌 — 순회색 돌은 흙 마당 위에서 잿더미처럼 보였다. 모래빛으로
+  // 아주 조금 데우면 같은 돌인데 볕을 받은 돌이 된다
+  stonewarm: { k: [178, 168, 148], K: [120, 110, 96], i: [216, 206, 186] },
   pale:  { k: [198,192,174], K: [134,128,114], i: [230,226,210] },
   warm:  { k: [190,136,90], K: [128,86,58], i: [222,170,122] },
+  // 헛간의 빨강 — 페인트를 칠한 널이라 채도가 높다. 크림색 테두리와
+  // 짝을 이루는 고전적인 붉은 헛간의 색
+  barnred: { k: [178, 64, 50], K: [118, 40, 32], i: [210, 94, 72] },
 };
 
 class G {
@@ -241,12 +251,39 @@ const ROUGH = parseFloat((process.argv.find(a => a.startsWith('--rough=')) || ''
 // 그걸 톤 사다리 q0..q7 에 얹으면 앞 지붕과 뒤로 누운 면이 한 줄기로 이어진다.
 const ROOF_GLYPH = new Set(['r', 'R', 'l', 'Mn', 'M', 'M2', 'M3']);
 const ROOF_Q = new Set(['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']);
-const TH = 3;                    // 한 켜의 높이 (앞 지붕)
-const FRONT_SHARE = 0.52;        // 앞 지붕이 톤 사다리에서 차지하는 몫
+// **손으로 찍은 느낌은 「큰 조각 + 조용한 면」이다.**
+//
+// 지금 그림이 인위적으로 보이는 이유를 참고 그림(스타듀) 옆에 놓고 재 보니
+// 색이 아니라 **잡음의 크기**였다. 우리는 기와 한 장·돌 한 장마다 톤을
+// 흔들어 온 면이 고르게 자글거리고, 참고 그림은 조각이 크고 면이 조용한
+// 대신 얼룩이 서너 장씩 뭉쳐 다닌다 — 사람 손은 균일한 난수를 못 찍는다.
+// chunky 모드: 조각을 키우고(기와 8x4 · 돌 8~10x5), 톤은 **뭉치 단위**로만
+// 흔들고, 기와 밑변 귀퉁이를 둥글려 비늘처럼 얹는다. 일단 대장간만 쓴다.
+let CHUNKY = false;
+let TH = 3;                      // 한 켜의 높이 (앞 지붕)
+// **윗면이 제일 밝다.** 오래 「멀수록 어둡다」로 두었더니 뒤로 누운 면이
+// 지붕 위에 드리운 커다란 그늘로 보여서, 그림이 위에서 본 게 아니라
+// 정면 입면도에 어두운 배경을 깐 꼴이었다. 하늘을 가장 넓게 받는 면은
+// 눕는 면이다 — 마당 살림(topFace)에 세운 규칙과 같은 규칙이다.
+//
+//   용마루 뒤 윗면   BACK_LO..BACK_HI   밝다 (멀수록 아주 조금만 어둡게)
+//   앞으로 선 빗면   FRONT_LO..FRONT_HI 어둡다 (처마 쪽이 제일 어둡다)
+//
+// 두 구간이 겹치지 않게 벌려 두는 게 핵심이다. 붙여 두면 용마루에서
+// 톤이 이어져 버려서 접힌 자리가 사라진다.
+const BACK_LO = 0.04, BACK_HI = 0.30;
+const FRONT_LO = 0.46, FRONT_HI = 0.74;
 let FRONT_ROWS = 0;              // 앞 지붕의 켜 수 (뒤 켜 번호가 여기서 이어진다)
 let roofT = null;                // 셀마다 0~1 (처마 -> 용마루), -1 이면 지붕 아님
 let roofRow = null;              // 셀마다 기와 켜 번호
-const TW = 5;                    // 한 장의 폭
+let TW = 5;                      // 한 장의 폭
+
+// 켜의 경계는 **자로 그은 듯 곧으면 안 된다.**
+//
+// 기와는 서까래에 한 장씩 얹는 것이라, 백 년 된 지붕의 켜는 한 칸씩
+// 처지고 들린다. 켜 선이 지붕을 가로질러 한 픽셀도 안 어긋나면 그건
+// 얹은 기와가 아니라 **찍어 낸 골함석**이다. 두 칸마다 한 줄씩 흔든다.
+function tileWob(x) { return hash(x >> 1, 77) < 0.28 ? 1 : 0; }
 
 function resetRoof() {
   roofT = Array.from({ length: GH }, () => new Float32Array(GW).fill(-1));
@@ -266,13 +303,54 @@ function shingles(g) {
     // 한 단만 흔들었더니 지붕이 너무 성해 보였다. 오래 쓴 지붕은 장마다
     // 색이 제법 다르고, 드문드문 이가 빠져 있다.
     const r = hash(col, row), r2 = hash(row * 3 + 1, col * 5 + 2);
-    let i = Math.round(t * 5.4)
-      + (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
-    // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
-    if (r2 < 0.055 && at(x, y + 1) !== row) i += 3;
-    if (at(x, y - 1) !== row) i -= 1;                    // 윗변 (빛)
-    if (at(x, y + 1) !== row) i += 2;                    // 아랫변 (겹침 턱)
-    if (u % TW === 0) i += 2;                            // 세로 이음매
+    let i = Math.round(t * 5.4);
+    if (CHUNKY) {
+      // ---- 기와는 **켜로 읽힌다** ----
+      //
+      // 「다 그리지 않는다」를 지붕에까지 밀어붙였더니(서너 장에 한 획),
+      // 지붕이 주황색 벌판에 녹슨 얼룩이 앉은 꼴이 됐다. 그 규칙은 **수백
+      // 번 반복되는 바닥 타일**의 것이다 — 한 장뿐인 큰 면에서는 반대다.
+      // 지붕을 지붕으로 만드는 건 **가로로 줄줄이 겹친 켜**고, 그 켜가
+      // 안 보이면 어떤 색을 입혀도 천막이다.
+      //
+      // 한 켜는 세 부분이다 (기와 한 장의 단면이 그렇다):
+      //   윗변  윗장 밑으로 들어가는 자리 — 한 단 밝다 (빛을 받는 능선)
+      //   몸    장마다 조금씩 다른 톤
+      //   밑변  아랫장 위에 얹히는 턱 — 두 단 어둡다 (겹침 그늘)
+      // 세로 이음매는 **켜의 아래 절반에만** 긋는다. 위아래로 통으로 그으면
+      // 격자가 되어 그물을 씌운 꼴이 된다.
+      const ru = ((u % TW) + TW) % TW;
+      const isBottom = at(x, y + 1) !== row;
+      const isTop = at(x, y - 1) !== row;
+      if (isBottom) i += 2;                         // 겹침 턱
+      else if (isTop) i -= 1;                       // 빛 받는 윗변
+      if (ru === 0 && !isTop) i += 1;               // 세로 이음매 (아래 절반)
+      if (ru === 1 && isBottom) i += 1;             // 이음매 옆의 그늘
+      // **지붕에도 옆에서 빛이 든다.** 켜만 그으면 지붕이 평평한 판이다 —
+      // 해가 왼쪽 위에 있으니 왼쪽 비탈이 한 단 밝고 오른쪽이 한 단 어둡다.
+      // 이 한 단이 지붕에 부피를 준다 (사람·살림·나무와 같은 해다)
+      const lat = (x - CX) / Math.max(1, GW * 0.42);
+      if (lat < -0.55) i -= 1;
+      else if (lat > 0.55) i += 1;
+      // 장마다 낯빛이 조금 다르다. 오래 쓴 지붕은 한 장 한 장 색이 다르다
+      if (r < 0.18) i += 1;
+      else if (r > 0.86) i -= 1;
+      // 갈아 끼운 기와 — 아주 드문 장은 **통째로** 톤이 다르다. 지붕을
+      // 오래 쓰면 깨진 자리에 새 기와를 끼우고, 그 한 장이 도드라진다
+      const r3 = hash(col * 11 + 5, row * 3 + 8);
+      if (r3 < 0.028) i += 2;
+      else if (r3 < 0.060) i += 1;
+      else if (r3 > 0.986) i -= 2;
+      // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다. 아주 드물게
+      if (r2 < 0.020 && isBottom && ru >= 1 && ru <= 2) i += 3;
+    } else {
+      i += (r < 0.10 ? 2 : (r < 0.28 ? 1 : (r > 0.92 ? -2 : (r > 0.74 ? -1 : 0))));
+      // 이 빠진 장 — 아랫귀퉁이가 깨져 나가 밑장이 비친다
+      if (r2 < 0.055 && at(x, y + 1) !== row) i += 3;
+      if (at(x, y - 1) !== row) i -= 1;                  // 윗변 (빛)
+      if (at(x, y + 1) !== row) i += 2;                  // 아랫변 (겹침 턱)
+      if (u % TW === 0) i += 2;                          // 세로 이음매
+    }
     g.px(x, y, 'q' + Math.max(0, Math.min(7, i)));
   }
 }
@@ -318,7 +396,55 @@ function brickCourse(g) {
   }
 }
 
-// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
+// 큰 돌 쌓기 — chunky 모드의 벽. 참고 그림의 돌탑은 여섯 칸짜리 벽돌이
+// 아니라 **주먹만 한 돌**이 한 층에 서너 개다. 켜 높이 5, 폭 8~10으로
+// 잡고, 이음매 자리를 켜마다 흔들어 크기가 들쭉날쭉하게 한다.
+// 귀퉁이 네 점을 줄눈색으로 깎으면 돌이 둥글어진다 — 이 둥긂이 손맛이다.
+// 톤은 뭉치 단위: 대부분 기본색으로 조용히 두고 드문드문 밝은/어두운 돌
+// 막돌 벽 — chunky. **화로(make_props.rubble)와 같은 보로노이.**
+//
+// 벽만 회벽에 드문 돌로 두었더니, 곁의 막돌 화로와 딴 재료가 됐다.
+// 같은 마당의 돌은 같은 채석장에서 나온다 — 씨앗점을 흩뿌리고 픽셀마다
+// 가장 가까운 씨앗을 찾아, 돌 하나하나가 다각형 덩이가 되게 쌓는다.
+//   줄눈  첫째·둘째 씨앗까지의 거리가 비슷한 골 (v5)
+//   낯빛  돌마다 한 색 (v1~v4), 윗변 한 줄이 밝다
+//   크기  RC2=7 — 창·문 사이 벽 폭이 돌 두어 개는 되는 크기
+const RC2 = 7;
+function wallSeed(ci, cj) {
+  return [ci * RC2 + 1 + hash(ci * 7 + 1, cj * 3 + 5) * (RC2 - 2),
+          cj * RC2 + 1 + hash(ci * 3 + 4, cj * 7 + 2) * (RC2 - 2)];
+}
+function rubbleWall(g) {
+  const stone = new Set(['k', 'K', 'i']);
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
+    if (!stone.has(g.d[y][x])) continue;
+    const ci0 = Math.floor(x / RC2), cj0 = Math.floor(y / RC2);
+    let d1 = 1e9, d2 = 1e9, id = 0;
+    for (let cj = cj0 - 1; cj <= cj0 + 1; cj++) for (let ci = ci0 - 1; ci <= ci0 + 1; ci++) {
+      const sp = wallSeed(ci, cj);
+      const dx = x - sp[0], dy = (y - sp[1]) * 1.4;
+      const d = dx * dx + dy * dy;
+      if (d < d1) { d2 = d1; d1 = d; id = ci * 131 + cj * 61; }
+      else if (d < d2) d2 = d;
+    }
+    const gap = Math.sqrt(d2) - Math.sqrt(d1);
+    if (gap < 1.15) { g.px(x, y, 'v5'); continue; }
+    const rc = hash(id, 17);
+    let t = 2;
+    if (rc < 0.24) t -= 1; else if (rc > 0.78) t += 1;
+    g.px(x, y, 'v' + Math.max(0, Math.min(4, t)));
+  }
+  // 윗변 빛 — 줄눈 바로 아래 한 줄
+  for (let y = 1; y < GH; y++) for (let x = 0; x < GW; x++) {
+    const c = g.d[y][x];
+    if (typeof c !== 'string' || c[0] !== 'v' || c === 'v5') continue;
+    if (g.d[y - 1][x] !== 'v5') continue;
+    const t = parseInt(c[1]);
+    if (t > 0) g.px(x, y, 'v' + (t - 1));
+  }
+}
+
+// 목재 — 세로로 긴 결// 목재 — 세로로 긴 결// 목재 — 세로로 긴 결 (한 열이 위아래로 쭉 이어진다)
 function woodGrain(g) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
     const c = g.d[y][x];
@@ -358,7 +484,7 @@ function weather(g) {
 // 이끼 — 처마 가까운 기와에만. 지붕 전체에 뿌리면 초원이 된다
 function moss(g) {
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
-    if (roofT[y][x] < 0 || roofT[y][x] > 0.13) continue;
+    if (roofT[y][x] < 0.62) continue;                      // 처마 쪽 = 톤이 제일 어두운 구간
     if (!ROOF_Q.has(g.d[y][x])) continue;
     // **덩어리로** 낀다. 잔 확률로 뿌렸더니 처마를 따라 초록 띠가 생겨서
     // 이끼가 아니라 페인트 줄로 보였다 — 큰 칸(4x3)으로 자리를 먼저 정하고
@@ -376,7 +502,10 @@ function roughen(g) {
   ditherFace(g, ['i', 'k', 'K'], 0, GROUND);            // 벽돌
   ditherFace(g, ['x', 'w', 'W'], 0, GROUND);            // 석재 테두리
   shingles(g);          // 기와는 사다리 톤으로 한 장씩
-  brickCourse(g);
+  // 칠한 널(plankk)은 k/K/i 를 널 무늬로 쓰므로 막돌 패스를 건너뛴다 —
+  // 안 그러면 붉은 페인트가 붉은 막돌이 된다
+  if (CHUNKY && WALL !== 'plankk') rubbleWall(g);
+  else if (!CHUNKY) brickCourse(g);
   wallPatches(g, 0, GROUND);
   woodGrain(g);
   weather(g);           // 흘러내린 줄 · 밑동 흙탕물
@@ -454,7 +583,9 @@ function soften(g) {
 // 정면 벽(37칸)의 절반쯤 — 이제 눈이 이걸 「지붕」으로 읽는다.
 // 열세 칸은 「두껍다」, 스물네 칸은 「길다」, 서른여섯 칸은 **「뻗어 있다」**이다.
 // 앞 지붕(마흔 칸)과 거의 맞먹는 길이라, 지붕이 몸통 뒤로 한참 이어진다.
-const DEPTH = 36;
+// 몸이 낮아진 만큼 뒤로 눕는 깊이도 서른으로 — 36이면 지붕 윗면이
+// 몸통의 두 배라 다시 「지붕만 있는 집」이 된다
+const DEPTH = 30;
 
 // 그리고 **멀어질수록 좁아진다.**
 //
@@ -523,8 +654,12 @@ function extrude(g) {
         // 앞 지붕의 켜 정보가 전부 뒷면 값으로 덮여 사라졌다
         if (!isRoof || g.d[ny][nx] !== '.') continue;
         // 뒤로 누운 면도 **같은 기와**다. 켜 번호를 앞 지붕에서 이어 받고,
-        // 톤 사다리의 남은 몫(FRONT_SHARE~1)을 깊이에 따라 나눠 쓴다
-        roofT[ny][nx] = FRONT_SHARE + (1 - FRONT_SHARE) * (i / DEPTH);
+        // 톤 사다리의 밝은 몫(BACK_LO~BACK_HI)을 깊이에 따라 나눠 쓴다
+        // chunky 는 윗면을 한 단 누른다 — 맨 밝은 단을 평평하게 비우니
+        // 지붕이 아니라 쌓인 눈이었다. 밝되 색이 있는 단에서 시작한다
+        const bl = CHUNKY ? BACK_LO + 0.12 : BACK_LO;
+        const bh = CHUNKY ? BACK_HI + 0.10 : BACK_HI;
+        roofT[ny][nx] = bl + (bh - bl) * (i / DEPTH);
         roofRow[ny][nx] = FRONT_ROWS + [...COURSE].filter(v => v <= i).length;
       }
     }
@@ -579,8 +714,30 @@ function setWall(kind) {
   WD = kind === 'stucco' ? 'W' : (kind === 'plank' ? 'T' : 'K');
   // 회벽·널판에 크림색 테두리를 두르면 벽에 묻힌다. 그럴 땐 진한 목재로
   FRAME = kind === 'brick' ? 'w' : 'T';
+  // 칠한 널(plankk) — 널판인데 색은 벽 팔레트에서 받는다 (붉은 헛간).
+  // 빨강 위의 테두리는 크림색이라야 「페인트와 트림」으로 읽힌다
+  if (kind === 'plankk') { WB = 'k'; WD = 'K'; FRAME = 'w'; }
 }
 
+
+// 용마루 반폭 — **「위에서 본 지붕」은 뾰족한 고깔이 아니라 넓은 사다리꼴이다.**
+//
+// 오래 RH=4 로 두었더니 지붕이 한 점으로 모여서, 아무리 뒤로 밀어도
+// 정면 입면도(전개도)로 보였다. 용마루가 **길게 누워** 있어야 그 띠가
+// 그대로 뒤로 뻗어 지붕 윗면이 되고, 그제서야 「내려다본」 그림이 된다.
+//
+// 폭은 처마 반폭에서 지붕 높이의 절반쯤을 깎아 잡는다 — 모임지붕(우진각)의
+// 귀마루가 45도보다 조금 눕는 각이다. 처마 72칸 / 용마루 38칸쯤 된다.
+function ridgeHalf(half, h) { return Math.max(10, Math.round(half - h * 0.45)); }
+
+function roofHalfW(i, h, half) {
+  const RH = ridgeHalf(half, h);
+  // 지수 0.94면 거의 곧은 빗변이다. 「너무 각져」서 부풀렸던 건데, 각을
+  // 없애는 건 지붕이 아니라 **몸통 귀퉁이**의 일이었다 (soften이 한다).
+  let w = RH + (half - RH) * Math.pow(i / h, 0.94);
+  if (i > h - 4) w += (i - (h - 4)) * 1.5;               // 처마 들림
+  return Math.round(w);
+}
 
 // 지붕 — **곧은 빗변은 상자로 보인다.** 위에서 빨리 벌어지고 아래로 갈수록
 // 완만해지게 부풀리면 종 모양이 되어 초가·동화집 느낌이 난다.
@@ -595,47 +752,60 @@ function roof(g, x0, x1, top, base) {
   // 점이 스물네 칸 올라간 선이 되고, 그건 지붕이 아니라 굴뚝처럼 보인다.
   // 꼭대기에 폭 RH의 **용마루**를 두면, 그 띠가 그대로 뒤로 뻗으면서
   // 양옆으로 지붕면이 흘러내린다 — 이게 「길이감」이다.
-  const RH = 4;
   for (let i = 0; i <= h; i++) {
-    let w = RH + (half - RH) * Math.pow(i / h, 0.94);
-    if (i > h - 4) w += (i - (h - 4)) * 1.5;               // 처마 들림
-    w = Math.round(w);
+    const w = roofHalfW(i, h, half);
     const a = Math.round(cx - w), b = Math.round(cx + w);
     g.rect(a, top + i, b, top + i, 'r');
     // 기와 한 장의 자리 정보. 켜는 **처마에서부터** 센다 — 뒤로 누운 면의
     // 켜와 번호가 이어져야 지붕이 한 면으로 읽힌다
     for (let x = a; x <= b; x++) {
       if (x < 0 || x >= GW) continue;
-      roofT[top + i][x] = FRONT_SHARE * (1 - i / h);
-      roofRow[top + i][x] = Math.floor((base - (top + i)) / TH);
+      roofT[top + i][x] = FRONT_LO + (FRONT_HI - FRONT_LO) * (i / h);
+      roofRow[top + i][x] = Math.floor((base - (top + i) + tileWob(x)) / TH);
     }
   }
   FRONT_ROWS = Math.floor((base - top) / TH) + 1;
-  // 처마 끝 서까래 — 기와보다 한 칸 튀어나온 널이라 기와를 얹지 않는다
-  g.hline(x0 - 2, x1 + 2, base - 1, 'r');
-  g.hline(x0 - 2, x1 + 2, base, 'R');
-  g.hline(x0 - 1, x1 + 1, base + 1, SHADE);                // 처마 밑 그늘
-  for (let x = x0 - 2; x <= x1 + 2; x++) {                 // 서까래엔 기와 안 얹음
+  // 처마 끝 서까래 — 기와보다 한 칸 튀어나온 널이라 기와를 얹지 않는다.
+  // chunky 면 **비늘단**이다: 기와 한 장마다 가운데가 한 칸 처지는 물결.
+  // 곧은 자로 끊긴 처마는 판금이고, 물결치는 처마가 손으로 얹은 기와다
+  for (let x = x0 - 2; x <= x1 + 2; x++) {
     if (x < 0 || x >= GW) continue;
+    const ph = ((x % TW) + TW) % TW;
+    const drop = CHUNKY && ph >= 2 && ph <= TW - 3 ? 1 : 0;
+    g.px(x, base - 1, 'r');
+    g.px(x, base + drop, 'R');
+    if (drop) g.px(x, base, 'r');
+    g.px(x, base + drop + 1, SHADE);                       // 처마 밑 그늘
     roofT[base - 1][x] = -1; roofT[base][x] = -1;
+    if (drop && base + 1 < GH) roofT[base + 1][x] = -1;
   }
 }
 
 
-// 박공널 — 빗변 바깥 두 칸. **기와를 얹은 뒤에** 긋는다. 먼저 그으면
-// 기와 패스가 덧칠해서 지붕에 모서리가 없어진다.
+// 귀마루 — 모임지붕의 **모서리 기와**. 빗변을 따라 얹히는 갓기와라서
+// 박공널처럼 어둡게 두면 안 된다. 하늘을 바로 받는 모서리는 지붕면보다
+// **밝고**, 그 안쪽 한 칸이 그늘이다 — 이 밝음/그늘 한 쌍이 두 면(앞면과
+// 옆면)을 갈라 준다. 어둡게만 그었더니 사다리꼴에 검은 테를 두른 꼴이었다.
+// **기와를 얹은 뒤에** 긋는다. 먼저 그으면 기와 패스가 덧칠해서 지붕에
+// 모서리가 없어진다.
 function bargeBoard(g, x0, x1, top, base) {
-  const h = base - top, half = (x1 - x0) / 2, cx = (x0 + x1) / 2, RH = 4;
+  const h = base - top, half = (x1 - x0) / 2, cx = (x0 + x1) / 2;
   for (let i = 0; i <= h - 2; i++) {
-    let w = RH + (half - RH) * Math.pow(i / h, 0.94);
-    if (i > h - 4) w += (i - (h - 4)) * 1.5;
-    w = Math.round(w);
-    for (let t = 0; t < 2; t++) {
-      if (ROOF_Q.has(g.get(Math.round(cx) - w + t, top + i)))
-        g.px(Math.round(cx) - w + t, top + i, t ? 'q5' : 'q7');
-      if (ROOF_Q.has(g.get(Math.round(cx) + w - t, top + i)))
-        g.px(Math.round(cx) + w - t, top + i, t ? 'q5' : 'q7');
+    const w = roofHalfW(i, h, half);
+    for (const s of [-1, 1]) {
+      const e = Math.round(cx) + s * w;
+      if (ROOF_Q.has(g.get(e, top + i))) g.px(e, top + i, 'q1');
+      if (ROOF_Q.has(g.get(e - s, top + i))) g.px(e - s, top + i, 'q2');
+      if (ROOF_Q.has(g.get(e - s * 2, top + i))) g.px(e - s * 2, top + i, 'q6');
     }
+  }
+  // 용마루 갓기와 — 위에서 본 지붕은 **가로로 길게 누운 마루**가 제일 먼저
+  // 보인다. 앞면과 뒤로 누운 면이 만나는 자리라 여기에 한 줄이 필요하다
+  const rw = roofHalfW(0, h, half);
+  for (let x = Math.round(cx) - rw; x <= Math.round(cx) + rw; x++) {
+    if (ROOF_Q.has(g.get(x, top))) g.px(x, top, 'q1');
+    if (ROOF_Q.has(g.get(x, top + 1))) g.px(x, top + 1, 'q2');
+    if (ROOF_Q.has(g.get(x, top + 2))) g.px(x, top + 2, 'q5');
   }
 }
 
@@ -646,8 +816,10 @@ function bargeBoard(g, x0, x1, top, base) {
 // 두 채가 맞닿은 것으로 보인다.
 function wall(g, x0, x1, y0, y1, plinth, skip) {
   g.rect(x0, y0, x1, y1, WB);
-  if (WALL === 'brick') {
-    for (let y = y0 + 1; y < y1 - 3; y += 6) {             // 귀돌
+  if (WALL === 'brick' && !CHUNKY) {
+    // 귀돌 — 막돌 벽(chunky)에는 안 넣는다. 크림색 블록이 막돌 위에 떠서
+    // 「벽에 붙인 스티커」가 됐다
+    for (let y = y0 + 1; y < y1 - 3; y += 6) {
       if (skip !== 'left') g.rect(x0, y, x0 + 2, y + 2, 'w');
       if (skip !== 'right') g.rect(x1 - 2, y, x1, y + 2, 'w');
     }
@@ -655,6 +827,10 @@ function wall(g, x0, x1, y0, y1, plinth, skip) {
     // 널판 — 세로로 널을 대고 이음매마다 어두운 줄. 헛간의 벽이다
     for (let x = x0; x <= x1; x += 5) g.vline(x, y0, y1, 'T');
     for (let x = x0 + 1; x <= x1; x += 5) g.vline(x, y0, y1, 'u');
+  } else if (WALL === 'plankk') {
+    // 칠한 널 — 이음매는 어둡게, 그 옆은 빛을. 색은 벽 팔레트(k/K/i)
+    for (let x = x0; x <= x1; x += 5) g.vline(x, y0, y1, 'K');
+    for (let x = x0 + 1; x <= x1; x += 5) g.vline(x, y0, y1, 'i');
   } else {
     g.vline(x0 + 1, y0 + 1, y1 - 1, 't');                  // 기둥
     g.vline(x1 - 1, y0 + 1, y1 - 1, 't');
@@ -840,6 +1016,36 @@ function archDoor(g, cx, w, h, GROUND) {
   // 문지방 돌
   g.rect(x0 - 2, GROUND - 1, x0 + w + 1, GROUND, 'S');
   g.hline(x0 - 2, x0 + w + 1, GROUND - 1, 's');
+}
+
+
+// 헛간의 두짝문 — 수레가 드나드는 폭에, 문짝마다 크림색 X 버팀대.
+// 이 X 하나가 건물을 「헛간」으로 만든다 (윤곽만으로 이름이 나와야 한다)
+function barnDoors(g, cx, w, h, GROUND) {
+  const x0 = cx - Math.floor(w / 2), y0 = GROUND - h, x1 = x0 + w - 1;
+  g.rect(x0 - 1, y0 - 1, x1 + 1, GROUND, 'w');             // 크림색 문틀
+  g.rect(x0 + 1, y0 + 1, x1 - 1, GROUND, 't');
+  plankFace(g, x0 + 1, x1 - 1, y0 + 1, GROUND - 1);
+  // 문짝마다 X — 대각선은 두 칸 두께라야 빨강 위에서 읽힌다
+  for (const side of [0, 1]) {
+    const a = x0 + 1 + side * ((w - 2) >> 1);
+    const b = side ? x1 - 1 : x0 + ((w - 2) >> 1);
+    const dw = b - a, dh = GROUND - 1 - (y0 + 1);
+    for (let i = 0; i <= dh; i++) {
+      const t = i / dh;
+      const xa = Math.round(a + t * (dw - 1)), xb = Math.round(b - 1 - t * (dw - 1));
+      g.px(xa, y0 + 1 + i, 'w'); g.px(xa + 1, y0 + 1 + i, 'W');
+      g.px(xb, y0 + 1 + i, 'w'); g.px(xb + 1, y0 + 1 + i, 'W');
+    }
+    g.hline(a, b, y0 + 1, 'w');                            // 위아래 가로대
+    g.hline(a, b, GROUND - 1, 'w');
+  }
+  g.vline(cx, y0 + 1, GROUND, 'T');                        // 가운데 틈
+  g.rect(cx - 4, y0 + (h >> 1), cx - 3, y0 + (h >> 1) + 1, 'y');   // 손잡이
+  g.rect(cx + 3, y0 + (h >> 1), cx + 4, y0 + (h >> 1) + 1, 'y');
+  // 문지방 돌
+  g.rect(x0 - 2, GROUND - 1, x1 + 2, GROUND, 'S');
+  g.hline(x0 - 2, x1 + 2, GROUND - 1, 's');
 }
 
 
@@ -1045,9 +1251,19 @@ function baskets(g, x0, x1, y) {
 // 크기와 대비가 곧 거리다. 같은 크기·같은 밝기로 두면 아무리 위에 올려도
 // 그냥 「지붕 위쪽에 있는 굴뚝」이지 「뒤에 있는 굴뚝」이 아니다.
 function chimney(g, x, top, base, far, w) {
-  const W = w || (far ? 5 : 7), x1 = x + W - 1, bodyY = top + 4;
-  const LIT = far ? 'p1' : 'p0', MID = far ? 'p2' : 'p1', DIM = far ? 'p6' : 'p2';
-  const CAP = far ? 'p4' : 'p3', CAPM = far ? 'p5' : 'p4';
+  const W = w || (far ? 5 : 7), x1 = x + W - 1;
+  const TD = far ? 5 : 7;                                  // 윗면(아가리) 깊이
+  const bodyY = top + 4;
+  // 색은 **지붕 사다리에서** 뽑는다 (build 에서 p0..p6 을 채워 둔다).
+  const LIT = 'p0', MID = 'p1', DIM = 'p2';
+  // 갓은 **먼 굴뚝이라고 어둡게 두면 안 된다.** 몸통만 거리에 따라 눅이고
+  // 갓 윗면은 늘 사다리 맨 위를 쓴다 — 하늘을 정면으로 받는 유일한 면이라
+  // 여기가 어두우면 굴뚝이 지붕에 뚫린 구멍으로 보인다 (실제로 그랬다).
+  const CAP = 'p3', CAPM = 'p4';
+  // 지붕과 **같은 색줄기**를 쓰기로 한 대가로, 굴뚝이 지붕에 묻힐 수 있다.
+  // 그래서 몸통 둘레에 윤곽선을 두른다 — 색이 아니라 선이 물건을 세운다.
+  const mine = new Set();
+  const P = (xx, yy, c) => { g.px(xx, yy, c); if (yy >= 0 && yy < GH && xx >= 0 && xx < GW) mine.add(yy * GW + xx); };
   // 밑동은 **지붕 빗변과 같은 기울기로 잘린다.**
   //
   // 수평으로 자르면 굴뚝만 딴 평면에 서 있는 것처럼 보인다. 굴뚝은
@@ -1065,31 +1281,77 @@ function chimney(g, x, top, base, far, w) {
     return base + Math.round((down > 0 ? c - x : x1 - c) * SLOPE);
   };
 
-  // 몸통 — 세로 세 톤. 폭이 일곱 칸(화면 14px)뿐이라 벽돌 한 장은 안 읽힌다.
-  // 격자로 쪼갰더니 굴뚝이 아니라 사다리가 됐다. 왼쪽 한 줄 빛 /
-  // 가운데 / 오른쪽 두 줄 그늘이면 각진 기둥으로 선다
-  for (let xx = x; xx <= x1; xx++) {
-    const tone = xx === x ? LIT : (xx >= x1 - 1 ? DIM : MID);
-    for (let y = bodyY; y <= foot(xx); y++) g.px(xx, y, tone);
-  }
-  // 켜 — 여섯 줄마다 한 줄, 빛은 왼쪽 끝에만. 굴뚝은 서 있는 물건이라
-  // 켜는 **수평**이다 (비스듬한 건 지붕에 잘린 발뿐이다)
-  for (let y = bodyY + 5; y <= foot(x1) - 1; y += 6)
-    for (let xx = x; xx <= x1; xx++) {
-      if (y > foot(xx)) continue;
-      g.px(xx, y, DIM);
-      if (xx <= x + 1 && y + 1 <= foot(xx)) g.px(xx, y + 1, LIT);
+  // 벽돌 켜 — **기와와 같은 자로 잰다.** 한 장이 TW x TH 이고 켜마다 반
+  // 장씩 어긋난다. 굴뚝만 다른 무늬로 쌓았더니 지붕에서 뚫고 나온 게 아니라
+  // 지붕 앞에 세워 둔 딴 물건으로 보였다 — 재료가 같으면 손도 같아야 한다.
+  // **먼 굴뚝이라고 톤까지 뭉개면 안 된다.** 어둡게 눌렀더니 벽돌 켜가
+  // 전부 한 색으로 붙어서 굴뚝이 지붕에 뚫린 검은 홈이 됐다. 거리는
+  // 크기(폭 7 vs 11)가 말한다 — 색은 두 굴뚝 다 같은 네 단을 쓴다.
+  const LAD = [LIT, MID, DIM, 'p6'];
+  for (let xx = x; xx <= x1; xx++) for (let y = bodyY; y <= foot(xx); y++) {
+    const row = Math.floor((base - y) / TH);
+    const u = xx + ((row % 2) ? (TW >> 1) : 0);
+    const col = Math.floor(u / TW);
+    const r = hash(col * 3 + 7, row * 5 + 1);
+    // 왼쪽이 빛, 오른쪽 두 줄이 그늘 — 각진 기둥의 기본
+    let i = xx === x ? 0 : (xx >= x1 - 1 ? 3 : 1);
+    if (CHUNKY) {
+      // 평평한 기둥에 **드문 획**만 — 지붕·벽과 같은 그림체
+      const isBottom = Math.floor((base - (y + 1)) / TH) !== row;
+      const ru = ((u % TW) + TW) % TW;
+      if (r < 0.30 && isBottom && ru >= 1 && ru <= 4) i += 1;
+    } else {
+      if (r < 0.22) i += 1; else if (r > 0.80) i -= 1;
+      if (Math.floor((base - (y - 1)) / TH) !== row) i -= 1;   // 윗변 (빛)
+      if (Math.floor((base - (y + 1)) / TH) !== row) i += 1;   // 아랫변 (겹침 턱)
+      if (u % TW === 0) i += 1;                                // 세로 이음매
     }
+    P(xx, y, LAD[Math.max(0, Math.min(3, i))]);
+  }
+
   // 갓돌 — 양옆으로 두 칸씩 나온다. 이 턱과 밑그늘이 「얹혀 있다」를 만든다
   const CO = far ? 1 : 2;                                   // 갓 내밀기
-  g.rect(x - CO, top + 1, x1 + CO, top + 3, CAPM);
-  g.hline(x - CO, x1 + CO, top + 1, CAP);
-  g.hline(x - CO, x1 + CO, top + 3, 'p5');
-  g.px(x1 + CO, top + 2, 'p5');
-  // 연도 — 갓 위로 솟은 관. 구멍이 있어야 연기가 나올 데가 생긴다
-  g.rect(x + 1, top - 1, x1 - 1, top + 1, CAPM);
-  g.px(x + 1, top - 1, CAP); g.px(x + 1, top, CAP);
-  g.rect(x + 2, top - 1, x1 - 2, top, 'O');
+  for (let yy = top + 1; yy <= top + 3; yy++)
+    for (let xx = x - CO; xx <= x1 + CO; xx++) P(xx, yy, yy === top + 3 ? 'p5' : CAPM);
+  P(x1 + CO, top + 2, 'p5');
+
+  // ---- 윗면과 아가리 ----
+  //
+  // 위에서 내려다본 그림이니 굴뚝은 **아가리가 보여야 한다.** 갓돌 위로
+  // 윗면이 뒤로 물러나고 그 한가운데가 뚫려 안쪽 벽이 보인다 — 이 구멍
+  // 하나가 굴뚝을 「기둥」에서 「통」으로 바꾼다. 넓적한 갓만 얹었을 땐
+  // 아무리 색을 갈아도 회색 막대에 뚜껑을 덮은 것으로 보였다.
+  //
+  //   윗면    갓돌 앞모서리 위로 TD 줄. 멀어질수록 **좁아지고 조금 어둡다**
+  //   앞모서리 한 줄 어둡게 — 윗면과 정면을 가르는 접힘선
+  //   아가리   윗면 한가운데. 안쪽 먼 벽이 한 단 밝아야 「깊이」가 생긴다
+  for (let k = 1; k <= TD; k++) {
+    const inset = Math.round((k - 1) * 0.4);
+    const a = x - CO + inset, b = x1 + CO - inset;
+    if (a > b) break;
+    for (let xx = a; xx <= b; xx++) P(xx, top - k, k >= TD - 1 ? CAPM : CAP);
+  }
+  for (let xx = x - CO; xx <= x1 + CO; xx++) P(xx, top, 'p5');   // **앞 모서리**
+  const hx0 = x + 1, hx1 = x1 - 1, hy1 = top - 2, hy0 = top - TD + 1;
+  if (hx1 > hx0 && hy1 > hy0) {
+    for (let yy = hy0; yy <= hy1; yy++)
+      for (let xx = hx0; xx <= hx1; xx++) P(xx, yy, 'O');
+    for (let xx = hx0; xx <= hx1; xx++) {
+      P(xx, hy0, CAPM);                                     // 안쪽 먼 벽
+      P(xx, hy0 + 1, 'p5');
+    }
+    P(hx0, hy1, 'p5'); P(hx1, hy1, 'p5');                   // 아가리 앞턱
+  }
+  // 윤곽 — 굴뚝에 **닿은 바깥 칸**만 먹색으로. 하늘 쪽은 g.outline() 이 한다
+  for (const key of [...mine]) {
+    const cy = Math.floor(key / GW), cx = key % GW;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+      if (mine.has(ny * GW + nx) || g.d[ny][nx] === '.') continue;
+      g.px(nx, ny, 'O');
+    }
+  }
 
   // 밑동 — **물받이(납판).** 굴뚝이 지붕을 뚫고 나온 자리에는 빗물이 새지
   // 않게 납판을 둘러 댄다. 이 치마가 굴뚝을 지붕에 앉힌다.
@@ -1319,14 +1581,14 @@ function noticeboard(g, x, y) {
 // 본채 지붕이 쓰는 자 — 높이만 넣으면 그 자리의 톤이 나온다.
 // 덧붙인 지붕은 전부 이걸 써야 이어지는 자리에서 색이 안 끊긴다.
 function roofToneAt(y) {
-  const t = FRONT_SHARE * (EAVE - y) / Math.max(1, EAVE - RIDGE);
+  const t = FRONT_HI - (FRONT_HI - FRONT_LO) * (EAVE - y) / Math.max(1, EAVE - RIDGE);
   return Math.max(0, Math.min(1, t));
 }
 
 function markRoof(x, y, t, base) {
   if (y < 0 || y >= GH || x < 0 || x >= GW) return;
   roofT[y][x] = t;
-  roofRow[y][x] = Math.floor((base - y) / TH);
+  roofRow[y][x] = Math.floor((base - y + tileWob(x)) / TH);
 }
 
 // 지붕창 — 지붕에서 튀어나온 작은 박공. 실루엣에 혹이 하나 생겨서
@@ -1562,6 +1824,11 @@ function build(spec) {
   resetRoof();
 
   // ---- 재료와 비례를 spec 에서 갈아 끼운다 ----
+  // 대장간에서 실험한 chunky 가 **기본**이 됐다 — 큰 기와, 막돌 벽,
+  // 비늘단 처마, 조용한 면. 한 채만 새 그림체면 그 한 채가 떠 보인다
+  CHUNKY = spec.chunky !== false;
+  TW = CHUNKY ? 8 : 5;
+  TH = CHUNKY ? 4 : 3;
   const rp = ROOF_PAL[spec.roofPal || 'clay'];
   for (let i = 0; i < 8; i++) PAL['q' + i] = rp[i];
   // 기와를 얹기 **전** 색(r/R/l)과 뒤 지붕색도 같은 사다리에서 뽑는다.
@@ -1574,8 +1841,24 @@ function build(spec) {
   else { PAL.g = [72, 148, 200]; PAL.G = [36, 84, 140]; PAL.e = [168, 216, 248]; }
   const wp = WALL_PAL[spec.wallPal || 'brick'];
   PAL.k = wp.k; PAL.K = wp.K; PAL.i = wp.i;
-  PAL.p0 = wp.i; PAL.p1 = wp.k; PAL.p2 = wp.K;
-  PAL.p6 = wp.K.map(v => Math.round(v * 0.7));
+  // 막돌 사다리 (v0 밝음 ~ v4 어두움, v5 줄눈) — 벽 색 세 칸을 축으로
+  // 사이를 메운다. 화로(rubble)와 같은 손이 되려면 단 수가 같아야 한다
+  const mixv = (a2, b2, t2) => a2.map((v, i2) => Math.round(v * (1 - t2) + b2[i2] * t2));
+  PAL.v0 = mixv(wp.i, [255, 255, 255], 0.25);
+  PAL.v1 = wp.i; PAL.v2 = mixv(wp.i, wp.k, 0.5); PAL.v3 = wp.k;
+  PAL.v4 = mixv(wp.k, wp.K, 0.55); PAL.v5 = wp.K;
+  // 굴뚝은 **지붕에서 색을 받는다.**
+  //
+  // 벽 색에서 뽑았더니, 지붕이 집마다 갈리는데 굴뚝만 늘 벽 색이라
+  // 「지붕 앞에 세워 둔 딴 물건」으로 보였다. 굴뚝은 지붕을 뚫고 나온
+  // 것이니 같은 사다리에서 뽑아야 한 채로 읽힌다. 켜 무늬도 기와와
+  // 같은 자(TW x TH)로 재니, 이제 재료와 손이 둘 다 같다.
+  //   p0..p2  몸통 (빛 / 정면 / 그늘)   — 사다리 가운데
+  //   p3..p5  갓돌과 윗면              — 사다리 위쪽 (하늘을 받는 면)
+  //   p6      멀리 있는 굴뚝의 그늘
+  PAL.p0 = rp[2]; PAL.p1 = rp[4]; PAL.p2 = rp[6];
+  PAL.p3 = rp[0]; PAL.p4 = rp[2]; PAL.p5 = rp[7];
+  PAL.p6 = rp[7];
   setWall(WALL_CLI || spec.wall || 'brick');
   // 그을린 지붕(대장간)과 청동 지붕(연구소)에는 이끼가 안 낀다 —
   // 하나는 늘 뜨겁고 하나는 늘 닦는 집이다
@@ -1583,9 +1866,17 @@ function build(spec) {
 
   const wide = spec.w || 0, st = spec.storey || 0;         // 폭 가감 / 층높이 가감
   X0 = CX - 30 - wide; X1 = CX + 30 + wide;
-  MID = GROUND - 22 - st;                                  // 1층 천장
-  EAVE = MID - 22 - st + (spec.eave || 0);                 // 2층 천장 = 처마
-  RIDGE = EAVE - 40 - (spec.pitch || 0);                   // +면 더 뾰족
+  // **낮고 넓적하게.** 층고 22+22, 지붕 40으로 지은 집은 폭 90에 키
+  // 120이 넘는 탑이었다 — 참고 맵(스타듀)의 집은 키가 폭과 엇비슷하다.
+  // 1층 20, 2층은 다락으로 14, 지붕 34: 같은 집인데 앉은 자세가 낮아진다
+  // **벽에 숨 쉴 자리를 준다.** 1층 20 · 다락 14로 지었더니 벽이 서른넉
+  // 줄인데 그 안에 차양 · 진열창 · 매단 바구니 · 간판 · 창턱 물건이 다
+  // 들어가서, 한 덩어리로 뭉개져 무엇 하나 안 읽혔다. 지붕이 크다는 건
+  // 좋은데 벽이 **띠**가 되면 그건 지붕에 굽도리를 댄 것이지 집이 아니다.
+  // 여섯 줄을 벽에 돌려준다 (집이 화면에서 열두 픽셀 높아진다).
+  MID = GROUND - 24 - st;                                  // 1층 천장
+  EAVE = MID - 18 - st + (spec.eave || 0);                 // 다락 천장 = 처마
+  RIDGE = EAVE - 34 - (spec.pitch || 0);                   // +면 더 뾰족
 
   // ---- 몸통 ----
   wall(g, X0, X1, MID, GROUND);                            // 1층
@@ -1610,19 +1901,20 @@ function build(spec) {
   const wh = (spec.awning ? 10 : 12) + Math.round(st * 0.7);   // 층이 높으면 창도 크다
   archWin(g, CX - 13 - bw, wy, bw, wh, !spec.bigWin && !spec.awning);
   archWin(g, CX + 14, wy, bw, wh, !spec.bigWin && !spec.awning);
-  if (spec.win3) {                                          // 여관 — 2층 창이 셋
-    const h2 = 13 + Math.round(st * 0.7);
-    archWin(g, CX - 31, EAVE + 6, 11, h2, false);
-    archWin(g, CX - 5, EAVE + 6, 11, h2, false);
-    archWin(g, CX + 21, EAVE + 6, 11, h2, false);
+  if (spec.win3) {                                          // 여관 — 다락 창이 셋
+    const h2 = 9 + Math.round(st * 0.5);
+    archWin(g, CX - 31, EAVE + 3, 11, h2, false);
+    archWin(g, CX - 5, EAVE + 3, 11, h2, false);
+    archWin(g, CX + 21, EAVE + 3, 11, h2, false);
   } else {
-    archWin(g, CX - 24, EAVE + 6, 12, 13 + Math.round(st * 0.7), false);
-    archWin(g, CX + 13, EAVE + 6, 12, 13 + Math.round(st * 0.7), false);
+    archWin(g, CX - 24, EAVE + 3, 12, 9 + Math.round(st * 0.5), false);
+    archWin(g, CX + 13, EAVE + 3, 12, 9 + Math.round(st * 0.5), false);
   }
 
   // ---- 문 ----
-  if (spec.forge) forge(g, CX, 19, 27, GROUND);
-  else archDoor(g, CX, 15, 25, GROUND);
+  if (spec.forge) forge(g, CX, 19, 24, GROUND);
+  else if (spec.barnDoor) barnDoors(g, CX, 34, 26, GROUND);
+  else archDoor(g, CX, 15, 22, GROUND);
   if (spec.awning) awning(g, X0 + 2, X1 - 2, MID + 2);
 
   // ---- 지붕 ----
@@ -1672,15 +1964,24 @@ function build(spec) {
   if (spec.cupola) cupola(g, CX, RIDGE + 2);
   if (spec.vane) vane(g, CX, RIDGE - DEPTH + 2);
   // 굴뚝 — 뒤로 누운 지붕면 위. 발만 지붕에 붙어 있으면 윗동은 하늘로 나가도 된다
-  if (spec.chim !== 'none') {
+  // 굴뚝은 **불을 쓰는 집에만.**
+  //
+  // 아홉 채 전부에 꽂아 두었더니 굴뚝이 지붕의 기본 장식이 되어 버려서,
+  // 정작 대장간·여관처럼 하루 종일 불을 때는 집이 눈에 안 띄었다.
+  // 기본값을 「없음」으로 두고 필요한 집만 chim 을 적는다.
+  if (spec.chim) {
     const big = spec.chim === 'big';
-    chimney(g, spec.chimneyX !== undefined ? spec.chimneyX : CX + 14,
-      RIDGE - (big ? 33 : 30), RIDGE - (big ? 2 : 11), !big, big ? 11 : 5);
+    // 지붕이 사다리꼴이 되면서 **용마루 뒤 윗면이 좁아졌다.** 예전 자리
+    // (CX+14)에 그대로 두면 굴뚝 오른쪽 절반이 지붕 밖 허공에 뜬다.
+    chimney(g, spec.chimneyX !== undefined ? spec.chimneyX : CX + 7,
+      RIDGE - (big ? 33 : 30), RIDGE - (big ? 2 : 11), !big, big ? 11 : 7);
   }
 
   // ---- 살림 ----
-  lantern(g, CX - 13, MID + 8);
-  lantern(g, CX + 9, MID + 8);
+  if (!spec.barnDoor) {                                    // 헛간 문에는 등이 없다
+    lantern(g, CX - 13, MID + 8);
+    lantern(g, CX + 9, MID + 8);
+  }
   for (const [kind, at] of (spec.props || [])) {
     const px = at < 0 ? X0 - JUT + at : X1 + JUT + at;     // 음수=왼쪽 밖, 양수=오른쪽 밖
     if (kind === 'planter') planter(g, px, GROUND - 1);
@@ -1701,7 +2002,7 @@ function build(spec) {
   }
   if (spec.flag) flag(g, X1 + JUT + 5, GROUND);
   if (spec.sign) sign(g, CX, spec.icon);
-  if (spec.hang) hangSign(g, X1 + JUT - 14, MID - 22, spec.icon);
+  if (spec.hang) hangSign(g, X1 + JUT - 14, MID - 10, spec.icon);   // 다락 벽 가운데
   if (spec.baskets) baskets(g, CX - 22, CX + 22, MID + 11);
   // 연장·약초는 **처마 밑에** 건다. 벽은 창과 문으로 이미 꽉 차서 걸 데가
   // 없었다 — 실제로도 이런 건 처마 밑에 매단다
@@ -1717,7 +2018,7 @@ function build(spec) {
   if (spec.pipes) { pipes(g, X0 + 3, EAVE + 4, GROUND - 4); pipes(g, X1 - 4, EAVE + 4, GROUND - 4); }
   if (spec.gull) gull(g, CX + 26, EAVE - 4);
   if (spec.fishLine) fishLine(g, X0 + 4, X1 - 4, MID - 26);
-  if (spec.smoke) smoke(g, (spec.chimneyX || CX) + 5, RIDGE - 39);
+  if (spec.smoke) smoke(g, (spec.chimneyX !== undefined ? spec.chimneyX : CX + 7) + 3, RIDGE - 39);
   // 담쟁이는 **맨 마지막**에. 창틀·간판 위로 조금 넘어가야 자란 것처럼 보인다
   const iv = spec.ivy === undefined ? 2 : spec.ivy;
   // 덩어리가 붙은 쪽은 담쟁이를 **안으로 들인다.** 이음매 위에 얹으면
@@ -1765,8 +2066,9 @@ const KINDS = {
 
   // 대장간 — 망치 간판. 화구 위 벽이 그을리고 불똥이 튄다. 벽에는
   // 망치·집게·편자, 앞에는 모루·담금질통·석탄더미. 옆에 작업 곁채
-  house_smith: { sign: true, icon: 'hammer', hang: true, roofPal: 'soot',
-    wallPal: 'stone', chim: 'big', chimneyX: 38, smoke: true, forge: true,
+  house_smith: {
+    sign: true, icon: 'hammer', hang: true, roofPal: 'ironblue',
+    wallPal: 'stonewarm', chim: 'big', chimneyX: 38, smoke: true, forge: true,
     lean: 'right', ivy: 0, soot: true, hang2: 'smith',
     props: [['anvil', 26], ['trough', -16], ['coal', 40]] },
 
@@ -1777,9 +2079,10 @@ const KINDS = {
     ivy: 0, hang2: 'fish', sill: 'fish', gull: true,
     props: [['crate', -14], ['crate2', -14], ['crate', 3]] },
 
-  // 여관 — 맥주잔 간판. **창에 불이 켜져 있다.** 창턱에 술병, 문 앞 긴 의자
+  // 여관 — 맥주잔 간판. **창에 불이 켜져 있다.** 창턱에 술병, 문 앞 긴 의자.
+  // 부엌 아궁이가 하루 종일 도는 집이라 굴뚝을 둔 세 채 중 하나다
   house_inn: { sign: true, icon: 'mug', hang: true, w: 6, pitch: 5, win3: true,
-    dormer: true, lit: true, sill: 'bottle',
+    dormer: true, lit: true, sill: 'bottle', chim: 'far', smoke: true,
     props: [['bench', -20], ['barrel', 3]] },
 
   // 도서관 — 책 간판. 창에 불이 켜져 있고 앞에 가로등과 책더미.
@@ -1791,7 +2094,7 @@ const KINDS = {
   // 연금 연구소 — 플라스크 간판. 벽을 타고 오르는 배관, 창턱에 약병.
   // 청동 지붕에 옥탑 채광창. 담쟁이는 없다(깔끔해야 한다)
   house_lab: { sign: true, icon: 'flask', roofPal: 'copper', wallPal: 'pale',
-    gable: 'vent', cupola: true, chim: 'none', vane: true, ivy: 0,
+    gable: 'vent', cupola: true, vane: true, ivy: 0,
     pipes: true, sill: 'flask', props: [['barrel', 3]] },
 
   // 우체국 — 편지 간판에 박공 시계, 깃발, 우체통, 쌓아 둔 소포
@@ -1874,12 +2177,66 @@ const KINDS = {
     gable: 'loft', vane: true, dormer: true, lit: true, ivy: 2, steps: true,
     flag: true, sign: true, icon: 'sprout',
     props: [['notice', -12], ['bench', -26], ['planter', 14]] },
+
+  // 농장의 축사 — 마을에서 홀로 옛 그림체(뿌연 잡음 널판)로 남아 있던
+  // 마지막 건물. 붉게 칠한 널벽에 크림색 트림, 수레가 드나드는 X자
+  // 두짝문, 지붕엔 다락문 — 실루엣과 색만으로 「헛간」이 나와야 한다.
+  // 지붕은 잿빛(slate) — 빨강 벽이 주인공이다. 판은 다른 집과 같은
+  // 기본 판 — 납작했던 몸집 자체가 이질감의 절반이었다.
+  // (make_barn.js 는 이 항목으로 대체됐다)
+  barn: { w: 10, pitch: -8, storey: 2,
+    wall: 'plankk', wallPal: 'barnred', roofPal: 'slate',
+    gable: 'loft', barnDoor: true, vane: true, ivy: 1,
+    props: [['hay', -14], ['barrel', 3]] },
 };
+
+// 접지 그림자 — **집이 땅을 누르는 자국.**
+//
+// 참고 맵의 물건들이 땅에 「서 있는」 건 그림자 덕이다. 밑변 바로 아래로
+// 반투명한 어둠이 서너 줄 깔리고 좌우로 조금 번진다 — 이게 없으면
+// 어떤 집이든 종이 인형처럼 뜬다. 마당 살림(P.ground)과 같은 규칙을
+// 건물에도 편다. 밑변에서 멀수록 옅어진다.
+function groundShadow(im) {
+  const W2 = im.width, H2 = im.height;
+  const opaque = (x, y) => x >= 0 && x < W2 && y >= 0 && y < H2
+    && im.data[(y * W2 + x) * 4 + 3] > 128;
+  // 빛은 **왼쪽 위**에서 온다 (사람·살림과 같은 해). 그러니 집의 그림자는
+  // 밑변 아래로 곧게 깔리는 게 아니라 **오른쪽 아래로 드리운다.**
+  // 곧은 그림자는 「밑에 깔아 둔 회색 띠」로 보이고, 기운 그림자라야
+  // 집이 땅을 누르는 무게가 생긴다.
+  const DEEP = 11;                        // 드리우는 길이 (px)
+  const SKEW = 0.55;                      // 한 줄 내려갈 때 오른쪽으로 미는 정도
+  const base = new Int32Array(W2).fill(-1);
+  for (let x = 0; x < W2; x++) {
+    for (let y = H2 - 1; y >= 0; y--) if (opaque(x, y)) { base[x] = y; break; }
+    if (base[x] < H2 * 0.7) base[x] = -1;                  // 허공 장식은 건너뛴다
+  }
+  for (let x = 0; x < W2; x++) {
+    if (base[x] < 0) continue;
+    for (let k = 1; k <= DEEP; k++) {
+      const y = base[x] + k;
+      const sx = x + Math.round(k * SKEW);                 // 기울어 눕는다
+      if (y >= H2 || sx >= W2 || opaque(sx, y)) continue;
+      // 끝으로 갈수록 옅다. 다만 **매끈하게** 잦아들면 에어브러시 얼룩이라,
+      // 도트로 그린 집 밑에 그것만 딴 그림이 된다 — 살림·나무·사람에 쓰는
+      // 것과 같이 **세 단**으로 끊고, 제일 바깥 단은 절반만 찍어 테를 허문다
+      const f = 1 - k / (DEEP + 1);
+      const a = f > 0.66 ? 104 : (f > 0.36 ? 72 : 40);
+      if (f <= 0.36 && hash(x * 7 + 3, y * 11 + 5) < 0.45) continue;
+      const i = (y * W2 + sx) * 4;
+      if (im.data[i + 3] >= a) continue;                   // 이미 짙으면 둔다
+      im.data[i] = 30; im.data[i + 1] = 26; im.data[i + 2] = 34;
+      im.data[i + 3] = a;
+    }
+  }
+  return im;
+}
 
 let n = 0;
 for (const [name, spec] of Object.entries(KINDS)) {
   const tag = STYLE === 'soft' ? '' : STYLE + '_';
-  fs.writeFileSync(OUT + PRE + tag + name + '.png', PNG.sync.write(build(spec).render()));
+  fs.writeFileSync(OUT + PRE + tag + name + '.png',
+    PNG.sync.write(groundShadow(build(spec).render())));
   n++;
 }
 console.log(`건물 ${n}채 — ${FW}x${FH} (논리 ${GW}x${GH} · 화면에서 도트 2px)`);

@@ -334,6 +334,7 @@ const GUIDE_GOLD := Color(0.98, 0.80, 0.28)
 const GUIDE_GOLD_DK := Color(0.80, 0.55, 0.13)
 const GUIDE_INK := Color(0.24, 0.15, 0.06)
 const GUIDE_CREAM := Color(0.97, 0.93, 0.83)
+const GUIDE_PIN_UP := 84.0        # 핀이 뜨는 높이 — 주민 그림(약 59px)보다 위
 const GUIDE_MARGIN := 54.0        # 가장자리에서 이만큼 안쪽에 화살표를 둔다
 const GUIDE_TOP := 96.0           # 위쪽은 HUD 패널이 있어 더 내려 잡는다
 
@@ -384,8 +385,13 @@ func _draw_guide() -> void:
 		vp.x - GUIDE_MARGIN * 2.0, vp.y - GUIDE_TOP - GUIDE_MARGIN * 1.6)
 	if inner.has_point(sp):
 		# ---- 화면 안 — 목표 바로 위에 핀이 뜬다 ----
+		# 핀은 **사람 키 위로** 뜬다.
+		#
+		# 46픽셀은 주민 그림의 절반쯤이라, 사람을 가리키는 핀이 그 사람의
+		# 얼굴을 덮고 명패가 몸통을 가렸다 — 누구를 가리키는지 알려 주려고
+		# 세운 것이 정작 그 사람을 안 보이게 했다.
 		var bob := sin(_guide_t * 3.2) * 4.0
-		var top := sp + Vector2(0, -46.0 + bob)
+		var top := sp + Vector2(0, -GUIDE_PIN_UP + bob)
 		# 발밑 그림자 (핀이 떠 있는 것으로 읽히게)
 		_guide.draw_rect(Rect2(sp.x - 7, sp.y - 3, 14, 4),
 			Color(0, 0, 0, 0.22 * a))
@@ -849,6 +855,11 @@ func refresh(force := false) -> void:
 # 화면 아래 검은 띠 대신, **주인공 머리 위에 뜨는 작은 말풍선**이다.
 # 글자는 미리 폭에 맞춰 잘라 두고, 풍선을 그 크기에 맞춰 키운다 —
 # 그래서 어떤 문장이 와도 풍선 밖으로 삐져나오지 않는다.
+#
+# **여기 담는 말은 전부 주인공의 목소리다.** 꼬리가 주인공을 가리키고
+# 있으므로, 「새 퀘스트:」 같은 창 문구를 넣으면 주인공이 그걸 소리 내어
+# 읽는 꼴이 된다. 퀘스트 이름은 오른쪽 두루마리와 토스트가 맡는다 —
+# 여기에는 주인공이 속으로 할 법한 말만 적는다.
 const BUB_FONT := 11
 const BUB_W := 250.0        # 말풍선 안쪽 글 폭 (넘으면 줄바꿈)
 const BUB_LINE := 15.0
@@ -933,6 +944,18 @@ func _place_bubble() -> void:
 	# 화면 밖으로 밀렸으면 꼬리도 주인공 쪽을 가리키게 옮긴다
 	_bub_tail.position = Vector2(
 		clampf(anchor.x - p.x, 12.0, _bub.size.x - 12.0), _bub.size.y - 1.0)
+
+
+# 말풍선이 **주인공 머리 위에서 차지하는 높이**(월드 픽셀). 안 뜨면 0.
+#
+# 머리 위에 뜨는 것이 둘이다 — 이 말풍선과, 「F: 대화」 같은 안내 문구
+# (renderer._draw_context_hint). 둘 다 같은 높이에 붙어 있어서 말을 하는
+# 순간 글자가 겹쳐 둘 다 못 읽는 일이 생겼다. 안내 문구가 이만큼 비켜선다.
+func bubble_lift() -> float:
+	if _bub == null or not _bub.visible or main == null:
+		return 0.0
+	var zoom: float = maxf(main.CAMERA_ZOOM, 0.01)
+	return (_bub.size.y + 24.0) / zoom
 
 
 # 말풍선을 즉시 걷는다 (창이 열리거나 장면이 바뀔 때)

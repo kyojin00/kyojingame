@@ -43,12 +43,20 @@ func _spawn_objects() -> void:
 	m.obj_nodes.clear()
 	m.tree_sprites.clear()
 	m.landmark_sprites.clear()
-	# 지은 뒤에만 존재한다. 문 칸은 비워 둔다 (구버전 저장도 여기서 열린다)
-	for pid: String in GameData.village_built:
-		if m.VILLAGE_PLOTS.has(pid):
-			m.objects.erase(m.door_tile(m.VILLAGE_PLOTS[pid].anchor))
-			m.worldgen._spawn_house_node(m.VILLAGE_PLOTS[pid].anchor, pid)
-			m.worldgen._trim_paths_under_building(m.VILLAGE_PLOTS[pid].anchor)
+	# 마을 건물은 처음부터 다 서 있다 (village_built 는 「문을 연 가게」).
+	# 문 칸은 비워 둔다 — 거기서 안으로 들어간다.
+	for pid: String in m.VILLAGE_PLOTS:
+		m.objects.erase(m.door_tile(m.VILLAGE_PLOTS[pid].anchor))
+		m.worldgen._spawn_house_node(m.VILLAGE_PLOTS[pid].anchor, pid)
+		m.worldgen._trim_paths_under_building(m.VILLAGE_PLOTS[pid].anchor)
+		# 마당의 소품과 경계도 여기서 챙긴다.
+		#
+		# 이 둘은 `_build_yard` 안에 있었는데 그건 **건물이 놓이는
+		# 순간에만** 돈다 — 이미 지어 놓은 세이브를 불러오면 마당이
+		# 텅 빈 채로 있다가, 자고 일어나 세계를 다시 지을 때에야
+		# 붙었다 (「자고 일어나야 울타리가 생긴다」가 이것이다).
+		# 이미 놓인 칸은 건너뛰므로 몇 번을 불러도 같은 모습이다.
+		m.worldgen.decorate_plot(m.VILLAGE_PLOTS[pid].anchor, pid)
 	# 고장 마을의 집 — 세계를 지을 때는 칸만 놓였다 (그때는 m.world 가
 	# 없다). 그림은 여기서 세운다. 짓는 게 아니라 처음부터 있는 집이라
 	# 조건 없이 전부 세운다
@@ -65,10 +73,19 @@ func _spawn_objects() -> void:
 	for th: Vector2i in m.TOWN_HOMES:
 		m.objects.erase(m.door_tile(th))
 		m.worldgen._spawn_house_node(th)
-	if GameData.house_lv >= 1:
-		m.objects.erase(m.door_tile(m.HOME_ANCHOR))
-		m.worldgen._spawn_house_node(m.HOME_ANCHOR)
-		m.worldgen._trim_paths_under_building(m.HOME_ANCHOR)
+	# 우리집 — **보수하기 전에도 서 있다** (할아버지가 남긴 낡은 집).
+	# 아직 손을 안 봤으면 빛을 죽여서 「오래 비워 둔 집」으로 보이게 한다.
+	# 옛 세이브에는 집 한가운데에 「집터」 표지판이 저장돼 있다 — 이제 그
+	# 자리는 집 안이라 치운다
+	if str(m.objects.get(m.HOME_SITE, {}).get("kind", "")) == "housesite":
+		m.objects[m.HOME_SITE] = {"kind": "house", "hp": 0}
+	m.objects.erase(m.door_tile(m.HOME_ANCHOR))
+	m.worldgen._spawn_house_node(m.HOME_ANCHOR)
+	m.worldgen._trim_paths_under_building(m.HOME_ANCHOR)
+	if GameData.house_lv < 1:
+		var hn: Variant = m.obj_nodes.get(m.HOME_ANCHOR)
+		if hn != null:
+			(hn as Node2D).modulate = OLD_HOUSE
 	if GameData.forest_quest in ["visit", "done"]:
 		# 숲속의 집 (스토리 5) — 저장된 발자취 그대로 그림만 다시 세운다
 		m.objects.erase(m.door_tile(m.FOREST_HOUSE_ANCHOR))
@@ -91,19 +108,60 @@ func _spawn_objects() -> void:
 	m.story._apply_story_visibility()
 
 
+# ---- 나무 흔들림 ----
+#
+# 바람은 GDScript가 아니라 **셰이더**가 분다. 나무가 수백 그루라
+# 프레임마다 스크립트로 흔들면 그 값이 다 CPU 비용인데, 정점 셰이더는
+# 공짜다. 우듬지(UV.y 위쪽)만 사인파로 밀고 밑동은 못 박는다.
+# 위상은 나무의 세계 좌표에서 뽑아 그루마다 어긋난다.
+#
+# **아주 약하게.** 숲에서는 화면 대부분이 우듬지라, 진폭을 크게 주면
+# 걸을 때 화면 전체가 울렁여 멀미가 난다. 눈 둘 곳(주인공)은 곧게
+# 가는데 배경 전부가 물결치면 뇌가 「내가 흔들린다」로 읽는 탓이다.
+# 꼭대기 한 뼘만, 천천히, 한 파장으로만 민다 — 멈춰 서서 보면 살아
+# 있고, 걸을 때는 눈에 걸리지 않는 정도.
+var _sway_mat: ShaderMaterial = null
+
+func _sway_material() -> ShaderMaterial:
+	if _sway_mat != null:
+		return _sway_mat
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+void vertex() {
+	float ph = MODEL_MATRIX[3].x * 0.043 + MODEL_MATRIX[3].y * 0.029;
+	float k = clamp(1.0 - UV.y * 1.8, 0.0, 1.0);   // 꼭대기 한 뼘만
+	VERTEX.x += sin(TIME * 0.55 + ph) * 0.55 * k * k;
+}
+"""
+	_sway_mat = ShaderMaterial.new()
+	_sway_mat.shader = sh
+	return _sway_mat
+
+
 func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	var offset := Vector2(0, -64)
 	var texture: Texture2D
 	match kind:
 		"tree":
 			texture = m.tex["tree_01"]  # 실제 상태별 텍스처는 _refresh_tree_sprite가 결정
-			offset = Vector2(0, -100)
-		"rock":
-			texture = m.tex["rock"]
+			# 밑동을 칸 밑변보다 **일곱 화면px 위**에 둔다. 예전에는 -100 을
+			# 그대로 박아 뒀는데, 그림 크기가 바뀌면 나무가 땅에 파묻힌다 —
+			# 그림에서 재야 어떤 판을 써도 발이 같은 자리에 놓인다
+			offset = Vector2(0, -texture.get_height() - 14.0)
+		"rock", "searock":
+			# 바위 셋 중 하나를 자리 해시로 고른다. 예전에는 **한 그림을
+			# 배율만 흔들어** 썼는데, 그러면 같은 돌이 자리마다 다른 도트
+			# 크기로 서고 (나무에서 이미 겪은 함정) 크게 뜬 돌은 흐려진다.
+			# 크기가 아니라 **다른 돌**로 변화를 준다.
+			texture = m.tex[["rock", "rock_02", "rock_03"][
+				int(m._hash01(pos.x * 13 + 2, pos.y * 7 + 5) * 3.0) % 3]]
+			# 그림 밑 여섯 도트는 흙자리다 — 돌이 땅에 닿는 줄은 그보다 위다
+			offset = Vector2(0, 24.0 - texture.get_height())
 		"bigrock":
-			texture = m.tex["rock"]  # 같은 바위 그림을 크게 그린다 (퀘스트 5)
-		"searock":
-			texture = m.tex["rock"]  # 남쪽 바위 능선 — 캘 수 없는 바위 벽
+			# 큰 바위는 작은 바위를 늘인 것이 아니라 **다른 돌**이다 (퀘스트 5)
+			texture = m.tex["rock_big"]
+			offset = Vector2(0, 24.0 - texture.get_height())
 		"housesite":
 			# 집터·구역 해금 게시판 — 지붕 얹은 파란 현판 (의뢰 게시판과 다르다)
 			texture = m.tex["board_unlock"]
@@ -148,7 +206,9 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			offset = Vector2(0, -100)
 		"old_barn":
 			texture = m.tex["barn"]    # 방치된 옛 헛간 (메인 스토리 17)
-			offset = Vector2(0, -160)
+			# 헛간 그림이 마을 판형(552줄)으로 커졌다 — 밑변이 옛 그림
+			# (352줄, 오프셋 -160)과 같은 자리에 오도록 높이에서 잰다
+			offset = Vector2(0, 192 - texture.get_height())
 		"old_lookout":
 			texture = m.tex["old_lookout"]   # 옛 전망대 (메인 스토리 18)
 			offset = Vector2(0, -100)
@@ -162,9 +222,11 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			texture = m.tex["tree_bare"]     # 마을 쪽으로 굽은 나무
 			offset = Vector2(0, -100)
 		"fence":
-			texture = m.tex["fence"]
+			texture = m.tex["fence_%d" % fence_mask(pos)]
 		"sprinkler":
 			texture = m.tex["sprinkler"]
+		"forage_branch":
+			texture = m.tex["forage_branch"]
 		"forage_berry":
 			texture = m.tex["forage_berry"]
 		"forage_herb":
@@ -236,6 +298,18 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 			# 물방앗간 곁의 물레방아 — 돈다 (_tick_landmarks)
 			texture = m.tex["deco_wheel_0"]
 			offset = Vector2(0, -texture.get_height())
+		"deco_forge":
+			# 대장간의 화로 — 불이 흔들린다 (_tick_landmarks 가 장을 갈아 낀다)
+			texture = m.tex["deco_forge_0"]
+			offset = Vector2(0, -texture.get_height())
+		"deco_anvil", "deco_logpile", "deco_trough", \
+		"deco_feedbox", "deco_hay", "deco_netrack", \
+		"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen", \
+		"deco_crate", "deco_sack", "deco_toolrack", \
+		"deco_weaponrack":
+			# 마당에 세워 두는 살림 (ref/make_props.js). 밑변을 칸에 맞춘다
+			texture = m.tex[kind]
+			offset = Vector2(0, -texture.get_height())
 		"deco_stonelamp":
 			# 돌계단을 따라 늘어선 석등 — 하나로 볼 것이 아니라 **줄지어**
 			# 섰을 때 길의 방향과 길이를 말한다
@@ -244,19 +318,21 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		"horse":
 			texture = m.tex["horse_side_0"]   # 세워 둔 말
 			offset = Vector2(0, -80)
+		# ---- 가게 마당에 내놓는 것들 ----
+		#
+		# 그림은 진작에 있었는데 이 match 에 없어서 **투명하게** 놓였다
+		# (texture 가 null 인 채로 노드만 선다). 전부 32x32 한 칸짜리라
+		# 밑변을 칸에 맞추고(-height), 배율은 OBJECT_SCALES 가 잡는다.
+		"flower_pot", "chest", "storage_box", "ore_node", "rock_wedge", \
+		"bait", "crystal", "rope", "broom", \
+		"old_box", "ore", "star_ore", "nail", "cloth", "gem", \
+		"recipe", "glow_shroom", "spring_water", "sludge":
+			texture = m.tex[kind]
+			offset = Vector2(0, -texture.get_height())
 	var node := _make_object(texture, Vector2(pos.x * m.TILE, (pos.y + 1) * m.TILE), offset)
 	# 큰 캐릭터에 맞춰 자연물은 타일보다 크게 그린다 (충돌 칸은 1칸 유지)
 	var sc: float = m.OBJECT_SCALES.get(kind, 1.0) / m.OBJECT_TEX_DENSITY
-	if kind == "tree":
-		# 크기 편차는 5칸 간격 안에서 겹치지 않는 범위까지만 (숲에서는 덩어리감을 준다)
-		sc *= 0.82 + m._hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 0.26
-	elif kind == "rock":
-		# 큰 돌과 작은 돌이 섞이도록
-		sc *= 0.65 + m._hash01(pos.x * 5 + 1, pos.y * 9 + 4) * 0.6
-	elif kind == "searock":
-		# 능선 바위도 크기를 조금씩 다르게 — 벽이 자로 잰 듯 보이지 않게
-		sc *= 0.85 + m._hash01(pos.x * 7 + 2, pos.y * 3 + 8) * 0.3
-	elif kind == "chief_hut":
+	if kind == "chief_hut":
 		# 이장의 거처는 낡은 오두막·새 집 둘 다 **우리 도트 밀도**로 그렸다.
 		# 그림 한 도트가 4px이라 0.5배로 얹어야 화면에서 2px이 되고, 그래야
 		# 사람·다른 집과 도트 크기가 맞는다.
@@ -264,14 +340,57 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 		#  화면 72x62px — 주인공 64x96px보다 낮아, 이장이 제 집보다 컸다.)
 		sc = 0.5
 	elif kind.begins_with("landmark_") or kind == "deco_wheel" \
-			or kind == "deco_stonelamp" or kind == "deco_cairn":
-		sc = 0.5   # 원본 4px = 도트 한 칸 (make_landmarks.js)
+			or kind == "deco_stonelamp" or kind == "deco_cairn" \
+			or kind in m.DOT_PROPS:
+		sc = 0.5   # 원본 4px = 도트 한 칸 (make_landmarks.js · make_props.js)
 	if texture != null:
 		var spr: Sprite2D = node.get_child(0)
 		if kind == "tree":
 			spr.flip_h = m._hash01(pos.x * 3 + 5, pos.y * 11 + 7) > 0.5  # 좌우 변형
+			# 그루마다 낯빛이 조금 다르다 — 같은 그림을 좌우로 뒤집는 것만으로는
+			# 숲이 「한 나무의 복사」로 읽힌다. 참고 그림(스타듀)의 숲이 우거져
+			# 보이는 건 그루마다 볕을 받은 정도가 달라서다. 셋 중 하나를
+			# 아주 옅게 그늘지게, 하나를 아주 옅게 볕바래게 물들인다.
+			# (modulate 는 통째로 곱해지므로 폭을 크게 주면 병든 나무가 된다)
+			var tint := int(m._hash01(pos.x * 7 + 1, pos.y * 13 + 3) * 3.0) % 3
+			if tint == 1:
+				spr.self_modulate = Color(0.93, 0.96, 0.90)
+			elif tint == 2:
+				spr.self_modulate = Color(1.05, 1.03, 0.94)
+		elif kind == "rock" or kind == "searock":
+			# 셋을 좌우로도 뒤집어 여섯 꼴로 쓴다. 돌은 나무보다 자주 붙어
+			# 서므로(능선·광맥) 세 꼴만으로는 금세 되풀이가 보인다
+			spr.flip_h = m._hash01(pos.x * 17 + 4, pos.y * 5 + 9) > 0.5
+			var rt := int(m._hash01(pos.x * 23 + 6, pos.y * 29 + 2) * 3.0) % 3
+			if rt == 1:
+				spr.self_modulate = Color(0.94, 0.95, 0.96)
+			elif rt == 2:
+				spr.self_modulate = Color(1.04, 1.02, 0.98)
 		spr.scale = Vector2(sc, sc)
 		spr.offset.x = 16.0 / sc - texture.get_width() / 2.0
+		if kind == "tree":
+			# 격자 깨기 — 숲의 나무가 행렬로 서면 벽지가 된다. 그루마다
+			# 몇 픽셀씩 어긋나야 숲이다. 판정 칸은 그대로 — 그림만 옮긴다
+			spr.offset.x += (m._hash01(pos.x * 11 + 2, pos.y * 17 + 5) - 0.5) * 8.0
+			spr.offset.y += (m._hash01(pos.x * 13 + 4, pos.y * 19 + 7) - 0.5) * 4.0
+		elif kind in m.DOT_PROPS or kind == "deco_bench":
+			# ---- 마당 살림도 자로 잰 듯 서면 안 된다 ----
+			#
+			# 살림을 칸 한복판에 정확히 세웠더니 마당이 **바둑판**이 됐다 —
+			# 「그냥 위에 얹어 놓은 것 같다」가 이것이다. 사람이 내려놓은
+			# 물건은 칸에 맞춰 놓이지 않는다. 몇 픽셀씩 어긋나야 놓인 것이다.
+			#
+			# 세로는 가로의 절반만 흔든다. 세로로 크게 흔들면 앞뒤 순서(y정렬)와
+			# 어긋나서, 뒤에 있는 물건이 앞으로 튀어나온 것처럼 보인다.
+			# 문 앞 등불은 뺀다 — 그건 살림이 아니라 문의 일부라, 한 쌍이
+			# 나란해야 문이 된다. 어긋나면 한쪽이 삐뚤어진 집으로 보인다.
+			spr.offset.x += (m._hash01(pos.x * 23 + 7, pos.y * 29 + 3) - 0.5) * 22.0
+			spr.offset.y += (m._hash01(pos.x * 31 + 5, pos.y * 37 + 9) - 0.5) * 9.0
+			# 좌우 뒤집기 — 같은 그림이 마당마다 서면 복사한 티가 난다.
+			# 글씨도 얼굴도 없는 살림이라 뒤집어도 어색하지 않다
+			if kind in ["deco_crate", "deco_sack", "deco_logpile", "deco_hay",
+					"deco_trough", "deco_feedbox", "deco_bookstack"]:
+				spr.flip_h = m._hash01(pos.x * 41 + 1, pos.y * 43 + 6) > 0.5
 		if kind == "deco_fountain":
 			spr.offset.x += 16.0 / sc  # 4칸짜리 분수의 정중앙에 세운다
 		elif kind == "auction":
@@ -285,9 +404,41 @@ func _spawn_object_node(pos: Vector2i, kind: String) -> void:
 	m.obj_nodes[pos] = node
 	if kind == "tree":
 		m.tree_sprites.append(node.get_child(0))
+		var od: Dictionary = m.objects.get(pos, {})
+		var lie: float = float(od.get("fallen", 0.0))
+		if lie != 0.0:
+			_lay_tree_down(node.get_child(0), lie)   # 누운 채로 길을 막은 나무
+		# ---- 벨 수 있는 나무와 못 베는 나무 ----
+		#
+		# 둘이 똑같이 생겨서, 빽빽한 숲에서는 어느 것이 벽이고 어느 것이
+		# 목재인지 도끼를 대 봐야 알 수 있었다 (「나무가 너무 우거져
+		# 벨 엄두가 나지 않는다」). **못 베는 것은 한 톤 어둡게** 깐다 —
+		# 깊은 숲은 뒤로 물러나고 벨 수 있는 나무만 앞으로 나온다.
+		if bool(od.get("fixed", false)):
+			(node.get_child(0) as Sprite2D).modulate = DEEP_WOOD
+		_refresh_tree_sprite(pos)   # 그루마다 다른 나무를 고른다 (tree_01/02/03)
 	elif m.LANDMARK_FRAMES.has(kind):
 		m.landmark_sprites.append([node.get_child(0), kind])
 	m.world.add_child(node)
+
+
+# ---- 누워 있는 나무 ----
+#
+# 길 위로 넘어온 나무는 **그림만** 누워 있다. 판정은 선 나무와 똑같다 —
+# 도끼로 베고, 목재가 나오고, 길이 열린다. 새 그림을 그리지 않고 서 있는
+# 나무를 밑동째 눕혀 쓴다 (`_fell_tree`가 쓰러뜨리는 각과 같은 각이다).
+#
+# 누운 쪽은 **넘어온 쪽**을 따른다 (dir: -1 서쪽 / +1 동쪽). 길 양옆에서
+# 한 그루씩 넘어오는데 남은 몸통이 둘 다 같은 쪽으로 누워 있으면 방금 본
+# 것과 어긋난다.
+func _lay_tree_down(spr: Sprite2D, dir: float) -> void:
+	if spr.texture == null:
+		return
+	var pivot := Vector2(m.TILE / 2.0,
+		(spr.offset.y + spr.texture.get_height()) * spr.scale.y)
+	var a := FALL_ANGLE * (1.0 if dir > 0.0 else -1.0)
+	spr.rotation = a
+	spr.position = pivot - pivot.rotated(a)
 
 
 func _refresh_tree_sprite(pos: Vector2i) -> void:
@@ -296,6 +447,9 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 	if m.objects[pos].kind != "tree":
 		return
 	var spr: Sprite2D = m.obj_nodes[pos].get_child(0)
+	var lie: float = float(m.objects[pos].get("fallen", 0.0))
+	if lie != 0.0:
+		_lay_tree_down(spr, lie)   # 도끼질로 그림이 바뀌어도 계속 누워 있다
 	var hp := int(m.objects[pos].hp)
 	if hp >= m.TREE_HP:
 		if bool(m.objects[pos].get("young", false)):
@@ -303,11 +457,18 @@ func _refresh_tree_sprite(pos: Vector2i) -> void:
 		elif m.objects[pos].get("apple", false):
 			spr.texture = m.tex["tree_13"]  # 일부 나무에만 사과 3개
 		else:
-			spr.texture = m.tex["tree_01"]  # 완전히 자란 기본 나무
+			# 다 자란 나무 **세 그루** 중 하나. 크기를 흔들어 변화를 주던
+			# 방식은 도트 크기를 망가뜨렸다 — 이제 그림 자체를 달리한다
+			spr.texture = m.tex[["tree_01", "tree_02", "tree_03"][
+				int(m._hash01(pos.x * 7 + 3, pos.y * 13 + 1) * 3.0) % 3]]
+		# 온전한 나무만 바람에 흔들린다 — 그루터기가 흔들리면 무섭다
+		spr.material = _sway_material() if lie == 0.0 else null
 	elif hp == 2:
 		spr.texture = m.tex["tree_06"]
+		spr.material = null
 	else:
 		spr.texture = m.tex["tree_09"]
+		spr.material = null
 
 
 func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> void:
@@ -317,6 +478,8 @@ func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> voi
 		m.story.story16_field_work("clear", pos)
 		m.story.story17_barn_work("clear", pos)
 	m.objects.erase(pos)
+	if gone == "fence":
+		restyle_fences_around(pos)   # 남은 말뚝은 여기가 끝인 줄 알아야 한다
 	if m.obj_nodes.has(pos):
 		var node: Node2D = m.obj_nodes[pos]
 		var sprite := node.get_child(0)
@@ -351,6 +514,13 @@ func _remove_object(pos: Vector2i, pop: bool = false, delay: float = 0.0) -> voi
 # 판정은 `_fell_tree`를 부르는 그 자리에서 이미 끝나 있다 (objects에서 지운다).
 # 여기 있는 것은 전부 그림뿐이라, 도중에 날이 바뀌거나 세이브를 불러와도
 # 노드만 치우면 그만이다 (`_clear_tree_falls`).
+# 벨 수 없는 나무(fixed)에 입히는 빛깔 — 그늘진 깊은 숲.
+# 채도를 조금 죽이고 어둡게만 한다. 색을 바꾸면 다른 종류의 나무로 보인다.
+const DEEP_WOOD := Color(0.66, 0.74, 0.68)
+# 아직 보수하지 않은 할아버지의 집 — 빛이 바래고 이끼가 앉은 낡은 집.
+# 형체는 그대로 두고 밝기와 채도만 죽인다 (다른 집으로 보이면 안 된다).
+const OLD_HOUSE := Color(0.62, 0.64, 0.58)
+
 const FALL_WIND := 0.12         # 반동 시간
 const FALL_WIND_ANGLE := 0.11   # 되젖히는 각(라디안)
 const FALL_DOWN := 0.46         # 넘어가는 시간
@@ -398,6 +568,36 @@ func _fell_tree(pos: Vector2i, dir: float) -> void:
 	})
 
 
+# ---- 쓰러진 채로 **남는** 나무 ----
+#
+# `_fell_tree`는 벤 나무다 — 넘어가고, 잠깐 누웠다가, 스르르 사라진다.
+# 이쪽은 길가에 서 있던 나무가 **길 위로 넘어와 그대로 눕는** 것이다
+# (메인 스토리 1의 첫 나무). 넘어가는 그림은 같고, 착지한 자리에 누운
+# 몸통이 남는다.
+#
+# 통행은 **부르는 즉시** 막힌다 (objects에 이미 놓고 부른다). 그림만
+# 늦게 온다 — 넘어가는 동안은 쓰러지는 나무가 그 자리를 덮고 있다.
+func _topple_onto(pos: Vector2i, dir: float, rest: Array) -> void:
+	if not m.obj_nodes.has(pos):
+		for p: Vector2i in rest:
+			_spawn_object_node(p, "tree")
+		m.objects.erase(pos)
+		return
+	_fell_tree(pos, dir)
+	if m._tree_falls.is_empty():
+		for p: Vector2i in rest:
+			_spawn_object_node(p, "tree")
+		return
+	var f: Dictionary = m._tree_falls[-1]
+	f["rest"] = rest
+	f["wait"] = 0.0        # 도끼질이 아니다 — 그 자리에서 바로 기운다
+	var stv: Variant = f.stump
+	if is_instance_valid(stv):
+		# 밑동만 남기는 건 「벤 나무」의 그림이다. 이건 뿌리째 넘어간 것이다
+		(stv as Sprite2D).queue_free()
+		f["stump"] = null
+
+
 # 0(서 있음) ~ FALL_ANGLE(다 누움). 부호는 부르는 쪽에서 곱한다.
 func _fall_angle(t: float) -> float:
 	if t < FALL_WIND:
@@ -431,6 +631,15 @@ func _update_tree_fall(delta: float) -> void:
 		if not f.landed and f.t >= FALL_WIND + FALL_DOWN:
 			f.landed = true
 			_tree_landed(node, spr, f)
+			if f.has("rest"):
+				# 길 위로 넘어와 **그대로 눕는다** — 누운 몸통을 그 자리에
+				# 세우고 쓰러지던 그림은 물린다 (둘 다 누운 나무라 이어져 보인다)
+				for p: Vector2i in f.rest:
+					if m.objects.has(p) and not m.obj_nodes.has(p):
+						_spawn_object_node(p, str(m.objects[p].kind))
+				m._tree_falls.erase(f)
+				node.queue_free()
+				continue
 		if not f.landed:
 			continue
 		var lie: float = f.t - FALL_WIND - FALL_DOWN
@@ -487,6 +696,42 @@ func _place_object(pos: Vector2i, kind: String, hp: int) -> void:
 	_spawn_object_node(pos, kind)
 	if kind == "sprinkler":
 		m.farming.add_sprinkler(pos)   # 물 주는 목록에 넣는다 (매번 다 뒤지지 않게)
+	elif kind == "fence":
+		restyle_fences_around(pos)     # 옆 말뚝에도 장이 뻗어 나가야 한다
+
+
+# ---- 울타리는 **이웃을 보고** 제 모습을 정한다 ----
+#
+# 북1 · 동2 · 남4 · 서8. 이어진 쪽으로만 가로장을 뻗는 그림을 고른다
+# (ref/make_fence.js 가 열여섯 벌을 찍어 둔다).
+const FENCE_DIRS: Array[Vector2i] = [
+	Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0),
+]
+
+
+func fence_mask(pos: Vector2i) -> int:
+	var mk := 0
+	for i in 4:
+		if str(m.objects.get(pos + FENCE_DIRS[i], {}).get("kind", "")) == "fence":
+			mk |= 1 << i
+	return mk
+
+
+# 한 칸이 바뀌면 **이웃 넷의 그림도 바뀐다.** 말뚝 하나를 새로 박았는데
+# 옆 말뚝이 여태 「끝」인 채로 서 있으면 장이 허공에서 끊긴다.
+# 그림만 갈아 끼운다 — 노드를 다시 세우면 나무 페이드 목록 같은 것이 꼬인다.
+func restyle_fences_around(pos: Vector2i) -> void:
+	for d: Vector2i in FENCE_DIRS:
+		var t: Vector2i = pos + d
+		if str(m.objects.get(t, {}).get("kind", "")) != "fence":
+			continue
+		if not m.obj_nodes.has(t):
+			continue
+		var node: Node2D = m.obj_nodes[t]
+		if not is_instance_valid(node) or node.get_child_count() == 0:
+			continue
+		var spr: Sprite2D = node.get_child(0)
+		spr.texture = m.tex["fence_%d" % fence_mask(t)]
 
 
 func _make_object(texture: Texture2D, base_pos: Vector2, offset: Vector2) -> Node2D:
@@ -556,13 +801,27 @@ func _update_object_fade(delta: float) -> void:
 # 폭포가 안 흐르면 그건 폭포 그림이지 폭포가 아니다. 세계에 넷뿐이라
 # 매 프레임 도는 것보다 훨씬 싸다 — 초당 일곱 번, 그림 넷만 갈아 끼운다.
 func _tick_landmarks() -> void:
+	# **치운 노드는 목록에서도 뺀다.**
+	#
+	# 랜드마크는 KEEP_ALWAYS 라 한 번 서면 안 치워졌다 — 그래서 목록에
+	# 죽은 것이 쌓일 일이 없었다. 그런데 대장간의 화로(deco_forge)는
+	# 마당의 살림이라 화면을 벗어나면 치워진다. 치운 스프라이트가 목록에
+	# 그대로 남아, 다음 박자에 그 자리를 갈아 끼우려다 매번 터졌다.
+	#
+	# `var spr: Sprite2D = e[0]` 은 **살았는지 묻기 전에** 이미 터진다 —
+	# 형을 박아 받는 대입이 곧 접근이다. 먼저 Variant 로 받아 물어본다.
+	var live: Array = []
 	for e: Array in m.landmark_sprites:
-		var spr: Sprite2D = e[0]
-		if not is_instance_valid(spr):
+		var sv: Variant = e[0]
+		if not is_instance_valid(sv):
 			continue
+		var spr: Sprite2D = sv
 		var kind: String = e[1]
 		var n: int = int(m.LANDMARK_FRAMES[kind])
 		spr.texture = m.tex["%s_%d" % [kind, m.lm_frame % n]]
+		live.append(e)
+	if live.size() != m.landmark_sprites.size():
+		m.landmark_sprites = live
 
 
 # ---- 가까운 것만 세운다 ----
@@ -629,6 +888,16 @@ func _stream_nodes() -> void:
 	_stream_center = pt
 	var keep := Rect2i(pt.x - STREAM_W, pt.y - STREAM_H,
 		STREAM_W * 2 + 1, STREAM_H * 2 + 1)
+	# **튜토리얼 숲은 통째로 세운다.**
+	#
+	# 이 창은 「카메라는 늘 주인공을 한가운데 둔다」를 전제로 잡혀 있다.
+	# 세계에서는 맞는 말이지만, 튜토리얼 숲은 화면 하나만 한 공간이라
+	# 카메라 제한에 걸려 붙박여 있다 — 주인공이 서쪽 어귀에 서 있어도
+	# 화면에는 동쪽 끝까지 다 보인다. 주인공 둘레(좌우 34칸)만 세우면
+	# 화면 오른쪽 숲이 통째로 안 그려지고 흙길만 뜬 맨땅이 남는다.
+	# 한 장뿐인 공간이니 그 한 장을 다 세운다.
+	if GameData.tutorial_space:
+		keep = m.TUTORIAL_REGION
 	_stream_prev = keep
 	# 한 칸도 안 겹치게 멀리 뛰었으면(순간이동·불러오기) 통째로 다시 센다
 	if not prev.intersects(keep):

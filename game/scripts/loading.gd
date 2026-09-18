@@ -7,9 +7,9 @@
 # 두 가지를 한다.
 #   ① 장면을 바꾸기 **전에** 이 화면을 띄우고 한 프레임 그리게 한다.
 #      그래야 멈춰 있는 동안 보이는 그림이 「짓는 중」이다
-#   ② 짓는 도중 단계마다 step() 을 부르면 RenderingServer.force_draw() 로
-#      그 자리에서 다시 그린다. 장면 트리를 재우지 않으므로(await 가 아니다)
-#      절반만 지어진 세계에 다른 노드가 끼어들 일이 없다
+#   ② 짓는 도중 단계마다 breathe() 를 await 하면 **진짜 프레임이 한동안 돈다.**
+#      그동안 트리는 멈춰 있고(paused) 세계는 감춰져 있어(main.visible=false),
+#      절반만 지어진 세계가 보이거나 남의 _process 가 끼어들 일이 없다
 #
 # 이 노드는 **장면 밖(root)** 에 붙는다. 장면이 통째로 갈릴 때 같이 지워지면
 # 정작 필요한 순간에 사라지기 때문이다.
@@ -43,7 +43,19 @@ const BOX_H := 150.0
 # 꽉 차 있으면 그때부터는 멈춘 것으로 보인다.
 const CLIMB := 0.62               # 초당 차오르는 양
 const BUILD_CAP := 0.75           # 짓는 동안 보여 줄 수 있는 최대치
-const WARMUP := 0.40              # 장면을 바꾸기 전에 미리 채워 두는 몫
+# 장면을 바꾸기 전에 미리 채워 두는 몫.
+#
+# **작아야 한다.** 예전에는 0.40이었는데, 세계를 짓는 첫 세 단계의 목표가
+# 0.10·0.34·0.40 이라 전부 이 값보다 낮았다 — 이미 지나온 자리라 막대가
+# 움직일 것이 없고, 그래서 **프레임을 한 장도 못 벌었다.** 하필 그 구간이
+# 로딩에서 가장 긴 대목(그림 굽기·땅 고르기)이라, 화면은 마지막에 그린
+# 39%에 그대로 굳어 있었다.
+const WARMUP := 0.08
+const MIN_HOLD := 4               # 단계마다 적어도 이만큼은 프레임을 흘려 보낸다
+# 한 프레임에 이만큼 넘게는 안 채운다. 짓는 동안에는 프레임 간격이 0.5초를
+# 넘기도 해서, 그대로 두면 move_toward 가 두 프레임 만에 껑충 뛴다 —
+# 「차오른다」가 아니라 「띄엄띄엄 갈아 끼운다」로 보인다.
+const STEP_MAX := 0.05
 
 var _c: Control
 var _msg := "마을을 짓는 중…"
@@ -77,11 +89,22 @@ static func close(tree: SceneTree) -> void:
 		n.queue_free()
 
 
-# 어디서든 한 줄로: KyojinLoadingHelper 없이 쓰라고 static 으로 둔다
+# 어디서든 한 줄로: KyojinLoadingHelper 없이 쓰라고 static 으로 둔다.
+# 값만 바꾼다 (그림은 다음 프레임에 따라온다)
 static func mark(tree: SceneTree, text: String, ratio: float) -> void:
 	var n: Node = tree.root.get_node_or_null(NODE_NAME)
 	if n != null:
 		n.step(text, ratio)
+
+
+# 값을 바꾸고 **막대가 거기까지 차오를 때까지 프레임을 흘려 보낸다.**
+# 세계를 짓는 도중에 부르는 것은 이쪽이다 (await 로 부를 것).
+# 로딩판이 이미 걷혔으면 아무 일도 없이 그 자리에서 돌아온다.
+static func breathe(tree: SceneTree, text: String, ratio: float) -> void:
+	var n: Node = tree.root.get_node_or_null(NODE_NAME)
+	if n == null:
+		return
+	await n.hold(text, ratio)
 
 
 # 목표만 정한다 — 채우는 건 _process 가 **실제 프레임에서** 한다.
@@ -129,22 +152,36 @@ func is_at_target() -> bool:
 	return _silent or _ratio >= _target - 0.005
 
 
-# 세계를 짓는 **도중**에 부른다. 여기서는 프레임이 안 돌기 때문에
-# force_draw() 로 직접 그려 보는데, 그게 먹지 않는 환경도 있다 —
-# 그래서 이 구간에 막대를 기대지 않는다. 눈에 보이는 채움은 앞뒤
-# (프레임이 도는 구간)에서 다 하고, 여기서는 되면 좋고 아니면 마는 덤이다
+# 값만 바꾸고 그림은 다음 프레임에 맡긴다 (breathe 가 그 프레임을 벌어 준다)
 func step(text: String, ratio: float) -> void:
 	_msg = text if text != "" else _msg
 	_target = clampf(ratio, 0.0, BUILD_CAP)
-	# **보이는 값은 건드리지 않는다.** 여기서 값을 밀어 놓으면, force_draw
-	# 가 안 먹는 환경에서는 그 사이가 통째로 안 보이다가 다 지은 뒤에
-	# 한 번에 뛴다 (3%에 멈췄다가 100%가 되던 것이 이것이다).
-	# 채우는 일은 프레임이 도는 앞뒤 구간에 맡기고, 여기서는 글만 바꿔
-	# 본다 — 다시 그려지면 좋고, 아니면 마는 덤이다
 	if _c != null:
 		_c.queue_redraw()
-	if DisplayServer.get_name() != "headless":
-		RenderingServer.force_draw()
+
+
+# ---- 막대가 **천천히 차오르는** 자리 ----
+#
+# 세계를 짓는 동안에는 프레임이 안 돈다. 오래도록 `RenderingServer.force_draw()`
+# 로 그 자리에서 그려 보려 했는데, **그게 화면에 올라오지 않는 환경이 있다** —
+# 값은 0.40 -> 0.75 로 멀쩡히 오르는데 사람 눈에는 39%에 굳어 있다가 다 지은
+# 뒤에 튀는 것으로 보였다 (창이 「응답 없음」으로 굳어 마지막 화면만 남는다).
+#
+# 그래서 **진짜 프레임을 기다린다.** 목표에 다다를 때까지 process_frame 을
+# 흘려 보내면, 막대는 _process 가 늘 하던 대로 CLIMB 속도로 차오른다.
+# 그동안 트리는 멈춰 있고(main 이 paused 를 걸어 둔다) 세계는 감춰져 있어,
+# 절반만 지어진 세계가 보이거나 남의 _process 가 끼어들 일은 없다.
+#
+# guard 는 만일의 무한 대기를 막는 빗장이다 — 프레임이 안 돌면 그냥 나간다.
+func hold(text: String, ratio: float) -> void:
+	step(text, ratio)
+	if DisplayServer.get_name() == "headless":
+		_ratio = maxf(_ratio, _target)
+		return
+	var guard := 0
+	while (guard < MIN_HOLD or _ratio < _target - 0.005) and guard < 180:
+		guard += 1
+		await get_tree().process_frame
 
 
 # 세계를 다 지었다. 남은 만큼을 _process 가 채운다
@@ -170,7 +207,7 @@ func _process(delta: float) -> void:
 				queue_free()
 				return
 	else:
-		_ratio = move_toward(_ratio, _target, CLIMB * delta)
+		_ratio = move_toward(_ratio, _target, minf(CLIMB * delta, STEP_MAX))
 	if _c != null:
 		_c.queue_redraw()
 

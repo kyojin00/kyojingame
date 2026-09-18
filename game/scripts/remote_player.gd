@@ -22,7 +22,7 @@ func _ready() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(-4, -2, 8, 3), Color(0, 0, 0, 0.22))
+	KyojinMain.draw_ground_shadow(self, 5.0, 1.8)
 
 
 func set_state(pos: Vector2, new_dir: String, new_moving: bool) -> void:

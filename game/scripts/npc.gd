@@ -43,7 +43,7 @@ func _ready() -> void:
 
 func _draw() -> void:
 	# 발밑 그림자
-	draw_rect(Rect2(-4, -2, 8, 3), Color(0, 0, 0, 0.22))
+	KyojinMain.draw_ground_shadow(self, 5.0, 1.8)
 
 
 func _process(delta: float) -> void:
@@ -54,7 +54,7 @@ func _process(delta: float) -> void:
 			or GameData.story2_phase == "farm_talk"
 			or GameData.story_phase in ["travel", "deliver", "home_open", "greet"])) \
 		and not (id == "fisher"
-			and GameData.fisher_quest in ["meet", "follow", "open"]) \
+			and GameData.fisher_quest in ["meet", "cast", "open"]) \
 		and not GameData.night_owl(id) \
 		and not GameData.constable_on_duty(id)   # 밤 사람은 22시까지, 밤 교대 순경은 24시까지 밖에 남는다
 	if GameData.constable_off_duty(id) or GameData.npc_is_down(id):

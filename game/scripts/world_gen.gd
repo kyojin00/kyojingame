@@ -44,17 +44,22 @@ func _build_map() -> void:
 	# 흐르는 물이 하나는 있어야 지형에 방향이 생긴다
 	_carve_river(30, 24, 44, 46, 2.2)
 
+	await m.mark_build("높낮이를 잡는 중…", 0.48)
 	_build_levels()
+	await m.mark_build("마을 터를 놓는 중…", 0.56)
 	_build_village()
 
 	# 농장 -> 마을 이음새는 잔디 그대로 둔다 (흙길은 깔지 않는다 —
 	# 바닥 타일은 앞으로 플레이어가 직접 깐다. m.ROAD 직사각형은
 	# 자연물이 스폰되지 않는 통행로로 계속 쓰인다)
 
-	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다)
-	m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
+	# 동굴 (출하 상자는 없앴다 — 판매는 마을 잡화점에서 한다).
+	# 자리를 정할 때까지는 놓지 않는다 (main.CAVE_PLACED 참고)
+	if m.CAVE_PLACED:
+		m.objects[m.CAVE_POS] = {"kind": "cave", "hp": 0}
 	m.objects[m.WORLDTREE_POS] = {"kind": "worldtree", "hp": 0}
 
+	await m.mark_build("숲을 심는 중…", 0.64)
 	# 세계의 끝을 두르는 나무 (그림 폭에 맞춰 4칸 간격 — 서로 겹치지 않는다)
 	for x in m.MAP_W:
 		if x % 4 == 0 and not m.objects.has(Vector2i(x, 0)):
@@ -127,8 +132,11 @@ func _build_map() -> void:
 
 	# 낚시터 둘레는 마지막에 비운다 — 나무/돌 그림이 부두와 강을 덮으면 안 된다.
 	# (자연물 배치가 모두 끝난 뒤라야 확실히 비워진다)
+	# **저절로 난 것만** 걷는다. 여기서 통째로 지웠더니 낚시터 네모의 동쪽
+	# 끝(x=60)에 걸친 **여관 건물의 왼쪽 한 줄**까지 같이 날아갔다 —
+	# 부지 아홉 곳 중 여관 한 곳만 건물이 안 서던 것이 이것이었다.
 	for p: Vector2i in m.objects.keys():
-		if m.FISH_CLEAR.has_point(p):
+		if m.FISH_CLEAR.has_point(p) and _is_wild(str(m.objects[p].kind)):
 			m.objects.erase(p)
 	m.objects[m.FISH_SIGN] = {"kind": "sign", "hp": 0}
 	# 고장의 랜드마크 — 나무·돌을 다 흩고 **난 뒤에** 세운다. 먼저 세우면
@@ -479,6 +487,9 @@ func _build_levels() -> void:
 	_raise_blob(56, 58 + m.NORTH_PAD, 9.0, 5.0, 2, 41)
 	# 동쪽 채석장의 단구 — 돌을 캐 낸 자리라 층이 진다
 	_raise_blob(196, 46 + m.NORTH_PAD, 13.0, 6.0, 2, 57)
+	# 언덕 위에 얹히는 부지 몇 곳 (main.HILL_PLOTS)
+	for hid: String in m.HILL_PLOTS:
+		_raise_plot_hill(m.VILLAGE_PLOTS[hid].anchor)
 	# 오르막 — 벼랑을 끊고 내려오는 자리. 없으면 올라갈 수가 없다.
 	# **남쪽 자락**에 낸다 — 바위면이 보이는 쪽이라야 길로 읽힌다
 	# 폭은 **네 칸**. 두 칸이면, 벼랑면이 두 칸 높이가 된 지금은 계단이
@@ -487,6 +498,10 @@ func _build_levels() -> void:
 	_cut_ramp(51, 63 + m.NORTH_PAD, 4)
 	_cut_ramp(60, 63 + m.NORTH_PAD, 4)
 	_cut_ramp(190, 52 + m.NORTH_PAD, 4)
+	# 언덕 위 부지의 문 앞에서 큰길로 내려오는 돌계단 (문 앞 세 칸 그대로)
+	for hid2: String in m.HILL_PLOTS:
+		var ha: Vector2i = m.VILLAGE_PLOTS[hid2].anchor
+		_cut_ramp(ha.x + 1, ha.y + 4 + m.YARD_PAD + 1, 3)
 	# ---- 고장 랜드마크의 단차 ----
 	#
 	# 그림만 세우면 아무리 잘 그려도 평지에 붙인 판때기다. 폭포는
@@ -577,7 +592,9 @@ func _build_levels() -> void:
 					continue
 				if m.grid[sy][lx].ground == "water" or _lamp_hides_stairs(lx, sy):
 					continue
-				m.objects[Vector2i(lx, sy)] = {"kind": "deco_stonelamp", "hp": 0}
+				# 석등은 뺐다 — 잿빛 돌기둥이 마을 그림체와 따로 놀았다.
+				# 계단 곁은 나무 등불이 지킨다
+				m.objects[Vector2i(lx, sy)] = {"kind": "deco_lamp", "hp": 0}
 				_no_spawn_rect(lx, sy, lx, sy, 1)
 				break
 	# 바다로 내려가는 길목 — 큰 바위를 캐면 이 오르막으로 내려간다
@@ -689,6 +706,38 @@ func _raise_blob(cx: int, cy: int, rx: float, ry: float, to: int, seed: int) -> 
 #
 # 가로/세로로만 꺾는다. 비스듬한 길은 칸 단위 세계에서 톱니로 나오고,
 # 무엇보다 **오르막이 세로로만 나므로** 길도 같은 결이라야 이어 붙는다.
+# ---- 언덕 하나 ----
+#
+# 부지의 울타리 테두리(17x16)를 **한 칸 여유로 감싸는 네모**를 한 켜 올린다.
+# `_raise_blob` 은 타원이라 여기 못 쓴다 — 테두리가 네모라서, 타원 가장자리가
+# 부지를 비스듬히 잘라 마당 한쪽이 벼랑 아래로 떨어진다.
+#
+# **남쪽 변만은 자로 잰 듯 곧다.** 거기가 계단이 걸리는 축대이고, 한 줄만
+# 남쪽으로 밀려도 바위벽 두 줄이 큰길 첫 줄을 먹어 마을이 두 쪽 난다.
+# 나머지 세 변은 들쭉날쭉하게 부풀린다 — 부지 사이 숲으로 파고드는 자락이라
+# 흔들어도 아무것도 안 막는다. 다만 동서로는 **한 칸까지만** — 두 칸이면
+# 옆으로 지나는 세로 줄기 길에 닿는다.
+func _raise_plot_hill(anchor: Vector2i) -> void:
+	var x0: int = anchor.x - m.YARD_PAD - 2
+	var x1: int = anchor.x + 4 + m.YARD_PAD + 2
+	var y0: int = anchor.y - m.YARD_PAD - 2
+	var y1: int = anchor.y + 4 + m.YARD_PAD + 1        # 축대 — 곧게
+	for y in range(maxi(0, y0 - 2), mini(m.MAP_H, y1 + 1)):
+		# 북쪽 자락 — 두 칸까지 위로 부푼다
+		if y < y0 - int(round(m._hash01(y * 3 + 5, 19) * 2.0)):
+			continue
+		# 동서 변은 **자로 잰 듯 곧게** 둔다.
+		#
+		# 줄마다 한 칸씩 흔들어 봤더니 옆구리 벼랑이 톱니가 됐다. 옆을 보는
+		# 벼랑면은 그리기가 반 칸 폭 띠로만 그린다(make_ground.cliffPx) —
+		# 그 좁은 띠가 한 칸씩 좌우로 튀니 벽이 아니라 **땅에 간 금**으로
+		# 보였고, 톱니가 꺾이는 자리마다 띠가 끊겨 「뚫린」 것처럼 보였다.
+		# 남쪽 축대만 정면이라 제대로 서고, 옆은 곧아야 옆으로 읽힌다.
+		for x in range(maxi(0, x0), mini(m.MAP_W, x1 + 1)):
+			if _lv(x, y) > 0:
+				_set_lv(x, y, 2)
+
+
 func _lay_path(chain: Array, w := 2) -> void:
 	for i in range(chain.size() - 1):
 		var a: Array = chain[i]
@@ -1017,6 +1066,7 @@ func _build_hamlets() -> void:
 		# 같은 이유다 — 그림은 뒤이어 _spawn_objects 가 세운다.
 		for entry2: Array in h.houses:
 			_place_building_tiles(entry2[0])
+			_house_yard(entry2[0], String(entry2[1]))
 
 		# 마을 한복판 — 다져진 흙 마당. 여기서 사람들이 만난다
 		for y2 in range(h.square.y - 2, h.square.y + 3):
@@ -1098,8 +1148,23 @@ func _carve_river(x0: int, y0: int, x1: int, y1: int, w: float) -> void:
 
 
 func _build_village() -> void:
-	# 흙길은 더 이상 깔지 않는다 — 마을 바닥은 잔디이고, 길·광장 바닥은
-	# 앞으로 플레이어가 직접 타일을 깔아 꾸미는 구조로 간다.
+	# ---- 길부터 깐다 ----
+	#
+	# 부지와 부지 사이로 3줄짜리 흙길이 지난다 (main.VILLAGE_ROADS).
+	# **부지보다 먼저** 깔아야 한다: `_lay_yard` 는 잔디만 마당 흙으로 바꾸므로,
+	# 길이 먼저 깔려 있으면 마당이 길을 덮지 않는다.
+	#
+	# 「마을 바닥은 잔디」라는 약속은 **부지 안**의 이야기다. 부지 사이까지
+	# 잔디로 두면 집들이 잔디밭에 그냥 얹혀 있는 모형 줄로 보인다 —
+	# 사람이 다녀 풀이 죽은 길이 있어야 마을이 된다.
+	# 바닥은 **자갈**("path")이다. 마당 흙과 같은 흙으로 깔아 봤더니 마당과
+	# 길이 한 덩어리로 뭉개져 어디까지가 남의 마당인지 안 보였다.
+	# 대신 길은 자로 그은 네모가 아니라 **굽이친다**(_paint_village_lane) —
+	# 곧게 그은 자갈 격자는 시골 마을이 아니라 도시였다.
+	var lanes: Array = m.VILLAGE_ROADS.duplicate()
+	lanes.append(m.ROAD)          # 농장에서 드는 큰길도 같은 길이다
+	for lane: Rect2i in lanes:
+		_paint_village_lane(lane)
 	# 광장 한가운데 분수
 	# 분수만은 네모로 둔다 — 사람이 만든 것이라 자로 잰 게 맞다
 	for y in range(m.FOUNTAIN.position.y, m.FOUNTAIN.end.y):
@@ -1109,59 +1174,468 @@ func _build_village() -> void:
 	# (마을을 가르던 강과 다리는 전부 없앴다 — 물을 걷어낸 자리는
 	#  잔디로 이어지고, 낚시터는 서쪽 호수로 옮겼다)
 
-	# 마을 건물은 처음부터 다 서 있다 — 칸과 마당을 여기서 만든다
-	for pid: String in GameData.village_built:
-		if m.VILLAGE_PLOTS.has(pid):
-			_place_building_tiles(m.VILLAGE_PLOTS[pid].anchor)
+	# 마을 건물은 **처음부터 다 서 있다.** `village_built` 은 「문을 연 가게」
+	# 라는 뜻만 남는다 — 건물은 있고 안이 비어 있다가, 이장이 사람을 들이면
+	# 그때 장사가 시작된다.
+	for pid: String in m.VILLAGE_PLOTS:
+		_place_building_tiles(m.VILLAGE_PLOTS[pid].anchor)
 
-	_make_village_gate()
 
-	# 할아버지의 집 — 처음부터 서 있다(짓기 없음). 옛 세이브(house_lv 0)에만 집터 표지판
-	if GameData.house_lv >= 1:
-		_place_building_tiles(m.HOME_ANCHOR)
-	else:
-		m.objects[m.HOME_SITE] = {"kind": "housesite", "hp": 0}
+	# **할아버지의 낡은 집** — 빈 터가 아니라 집이 서 있다.
+	#
+	# 예전에는 여기에 「집터」 표지판 하나를 꽂아 두고 목재를 모아 새로
+	# 지었다. 그런데 이야기는 처음부터 「자네 할아버지가 지내던 집이 마을
+	# 서쪽에 그대로 있네」라고 말한다 — 빈 터를 보여 주면 그 말이 거짓이 된다.
+	# 집은 처음부터 서 있고, 오래 비워 둬서 낡았을 뿐이다. 플레이어가 할 일은
+	# 짓는 것이 아니라 **보수**다 (village_ui._open_build_dialog).
+	_place_building_tiles(m.HOME_ANCHOR)
+	_house_yard(m.HOME_ANCHOR, "home")
 	# 이장의 거처 — 처음부터 있는 집 (마을의 유일한 지붕)
 	m.objects[m.CHIEF_HUT] = {"kind": "chief_hut", "hp": 0}
 	# 그림이 덮는 칸을 막는다. 안 막으면 512x552 짜리 집 안으로 걸어
 	# 들어가진다 (예전 오두막은 한 칸짜리라 이럴 일이 없었다).
 	# 문 칸만 남겨 둔다 — 거기서 이장을 부른다.
 	_block_under_art(m.CHIEF_ART, Rect2i(m.CHIEF_HUT.x, m.CHIEF_HUT.y, 1, 1))
-	# 상점 터 게시판 — 메인 스토리 2의 첫 퀘스트 (재료를 모아 여기서 짓는다)
-	if not GameData.village_built.has("general"):
-		m.objects[m.door_tile(m.VILLAGE_PLOTS["general"].anchor)] = {"kind": "plotsite", "hp": 0}
+	# 이장 거처의 기준점은 문 칸에서 되짚는다 (CHIEF_HUT = door_tile(anchor))
+	_house_yard(m.CHIEF_HUT - Vector2i(2, 3), "chief")
 	m.objects[m.BOARD_POS] = {"kind": "board", "hp": 0}
 	# 경매 게시판 — 다른 농장 사람들과 사고파는 장터로 이어진다
 	m.objects[m.AUCTION_POS] = {"kind": "auction", "hp": 0}
 	m.objects[m.FOUNTAIN_DECO] = {"kind": "deco_fountain", "hp": 0}
+	_decorate_plaza()
+	# 언덕으로 오르는 돌계단 양옆에 석등 한 쌍. 계단이 어디로 나 있는지는
+	# 멀리서 보이지 않는다 — 등 두 개가 「여기로 오른다」를 대신 말한다
+	for hid: String in m.HILL_PLOTS:
+		var ha: Vector2i = m.VILLAGE_PLOTS[hid].anchor
+		var sy: int = ha.y + 4 + m.YARD_PAD + 1        # 축대 줄
+		for sx: int in [ha.x, ha.x + 4]:
+			var st := Vector2i(sx, sy)
+			if not m.objects.has(st):
+				m.objects[st] = {"kind": "deco_lamp", "hp": 0}
 	# 동쪽 다리 건너 — 옛 마을의 경계를 알리는 낡은 표지판 (메인 스토리 4)
 	m.objects[m.OLD_SIGN] = {"kind": "sign", "hp": 0}
-	# (광장의 가로등·벤치는 없앴다 — 밤이 되면 마을도 캄캄하다)
 	# 마을 외곽에만 나무를 둔다 (생활 공간 안에는 나무/돌을 두지 않는다).
 	# 줄 번호는 **마을 구역에서 잰다** — 예전에는 1과 43을 그대로 적어
 	# 두었는데, 세계를 북쪽으로 열두 줄 내리면서 이 두 줄만 제자리에
 	# 남아 지도 맨 위에 뜬금없는 나무 띠가 생겼다
-	for x in range(m.VILLAGE_REGION.position.x + 4, m.VILLAGE_REGION.end.x - 1):
-		for y in [m.VILLAGE_REGION.position.y + 1, m.VILLAGE_REGION.end.y - 1]:
-			var rim := Vector2i(x, y)
-			if m.grid[y][x].ground == "grass" and not m.objects.has(rim) \
-					and m._hash01(x * 5 + 3, y * 7 + 2) < 0.9 and _nature_clear(rim, "tree"):
-				m.objects[rim] = {"kind": "tree", "hp": m.TREE_HP}
+	_plant_village_greenery()
+
+
+# ---- 광장 ----
+#
+# 마을 한복판이 **맨 잔디밭**이었다. 열일곱 칸 × 열여섯 칸 초록 네모 안에
+# 네모난 물웅덩이 하나 — 광장이 아니라 아직 손대지 않은 공터로 보였다.
+# 사방에서 자갈길이 들어오는데 정작 그 길이 닿는 자리에는 아무것도 없다.
+#
+# 세 가지로 광장을 만든다.
+#   ① 바닥   자갈을 깐다. 다만 **가장자리는 들쭉날쭉하게** — 네모로 딱
+#            떨어지게 깔면 잔디밭에 회색 카펫을 오려 붙인 꼴이 된다
+#   ② 둘레   가로등 네 귀퉁이, 평상 네 변. 앉을 자리가 있어야 광장이다
+#   ③ 화분   분수 둘레에 놓아 물가를 두른다
+#
+# 게시판·경매판·분수는 이미 서 있다 — 여기서는 그 사이를 채운다.
+func _decorate_plaza() -> void:
+	var p: Rect2i = m.PLAZA
+	# ⓪ 광장 안의 나무·돌·풀숲을 먼저 걷고, **다시 나지 않게 막는다.**
+	#
+	# 세계를 흩뿌릴 때 심긴 것들이 그대로 남아 있었다. 광장이 맨 잔디밭일
+	# 때는 그럭저럭 넘어갔는데, 자갈을 깔고 나니 **포장 한복판에 전나무가
+	# 다섯 그루** 서 있는 꼴이 됐다. 사람이 닦아 놓은 자리다.
+	#
+	# 걷어 내기만 해서는 안 된다 — 숲을 심는 일(_build_map)은 마을을
+	# 놓은 **뒤에** 돈다. 실제로 지웠는데 그대로 다시 자라 있었다.
+	_no_spawn_rect(p.position.x, p.position.y, p.end.x - 1, p.end.y - 1)
+	for pid: String in m.VILLAGE_PLOTS:
+		var pa: Vector2i = m.VILLAGE_PLOTS[pid].anchor
+		_no_spawn_rect(pa.x - m.YARD_PAD - 1, pa.y - m.YARD_PAD - 1,
+			pa.x + 4 + m.YARD_PAD + 1, pa.y + 3 + m.YARD_PAD + 1)
+	for y in range(p.position.y, p.end.y):
+		for x in range(p.position.x, p.end.x):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			var t := Vector2i(x, y)
+			if _is_wild(str(m.objects.get(t, {}).get("kind", ""))):
+				m.objects.erase(t)
+	for y in range(p.position.y, p.end.y):
+		for x in range(p.position.x, p.end.x):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue      # 물(분수)과 이미 깔린 길은 그대로
+			# 바깥 두 겹은 확률로 남긴다 — 잔디가 자갈 사이로 파고들게
+			var edge: int = mini(mini(x - p.position.x, p.end.x - 1 - x),
+				mini(y - p.position.y, p.end.y - 1 - y))
+			if edge < 2 and m._hash01(x * 5 + 3, y * 7 + 1) < 0.55 - edge * 0.30:
+				continue
+			m.grid[y][x].ground = "path"
+	# 둘레의 살림. 광장 왼쪽 위 모서리에서 잰다
+	var deco := [
+		[Vector2i(1, 1), "deco_lamp"], [Vector2i(15, 1), "deco_lamp"],
+		[Vector2i(1, 14), "deco_lamp"], [Vector2i(15, 14), "deco_lamp"],
+		[Vector2i(1, 7), "deco_lamp"], [Vector2i(15, 7), "deco_lamp"],
+		[Vector2i(4, 4), "deco_bench"], [Vector2i(12, 4), "deco_bench"],
+		[Vector2i(4, 11), "deco_bench"], [Vector2i(12, 11), "deco_bench"],
+		[Vector2i(8, 3), "deco_bench"], [Vector2i(8, 12), "deco_bench"],
+		[Vector2i(5, 6), "flower_pot"], [Vector2i(11, 6), "flower_pot"],
+		[Vector2i(5, 9), "flower_pot"], [Vector2i(11, 9), "flower_pot"],
+		[Vector2i(3, 13), "flower_pot"], [Vector2i(13, 13), "flower_pot"],
+	]
+	for entry: Array in deco:
+		var t: Vector2i = p.position + (entry[0] as Vector2i)
+		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+			continue
+		if m.objects.has(t) or m.grid[t.y][t.x].ground == "water":
+			continue
+		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
+
+
+# 부지와 부지 **사이**를 숲으로 채운다.
+#
+# 마을 구역 안에는 자연물을 한 포기도 두지 않았다. 부지가 다닥다닥 붙어
+# 있던 시절에는 그게 맞았는데, 한 부지를 한 구역으로 벌려 놓고 나니
+# 사이가 통째로 맨 잔디밭이 됐다 — 「이 집 다음 이 집」, 주택 단지다.
+#
+# 사진 속 마을은 집이 **제 환경을 두르고** 있다. 나무와 덤불 사이에 한 채가
+# 서 있고, 다음 집까지는 숲 사이를 걸어간다. 그 사이를 여기서 심는다.
+#
+# 건드리지 않는 것: 길·광장·부지 울타리 안·문 앞 통로·잔디가 아닌 바닥.
+# 길이 사방으로 뚫려 있으므로 나무가 부지를 가둘 일은 없다.
+func _plant_village_greenery() -> void:
+	var r: Rect2i = m.VILLAGE_REGION
+	for y in range(maxi(1, r.position.y), mini(m.WORLD_H - 1, r.end.y)):
+		for x in range(maxi(1, r.position.x), mini(m.MAP_W - 1, r.end.x)):
+			var pos := Vector2i(x, y)
+			if m.grid[y][x].ground != "grass":
+				continue          # 흙길·자갈 마당·물은 그대로
+			if m.objects.has(pos) or m.spawn_blocked(x, y):
+				continue
+			if m.PLAZA.has_point(pos) or m.ROAD.has_point(pos) or _on_village_road(pos):
+				continue
+			if _in_any_plot_ring(pos) or _is_plot_gateway(pos):
+				continue
+			# 길가 한 줄은 비워 둔다 — 나무 그림이 길을 덮으면 답답하다
+			if _next_to_village_road(pos):
+				continue
+			var h := m._hash01(x * 3 + 11, y * 5 + 7)
+			# 덩어리로 난다 (world_gen 의 흩뿌리기와 같은 결)
+			var clump: float = clampf(_vnoise(x, y, 14, 23) * 2.2, 0.0, 2.2)
+			# 나무는 조금 성기게 — 0.26이면 마을이 숲에 잠겼다
+			if h < 0.12 * clump:
+				if _nature_clear(pos, "tree"):
+					m.objects[pos] = {"kind": "tree", "hp": m.TREE_HP}
+			elif h < 0.12 * clump + 0.03:
+				if _nature_clear(pos, "rock"):
+					m.objects[pos] = {"kind": "rock", "hp": m.ROCK_HP}
+			elif h < 0.40 and h >= 0.37:
+				# 떨어진 가지 — 주우면 목재. 나무 사이에 드문드문
+				m.objects[pos] = {"kind": "forage_branch", "hp": 0}
+			elif h < 0.42:
+				# 풀숲 — 걸어 다니는 데 걸리지 않는 잔것.
+				# **채집물(forage_*)은 심지 않는다.** 그건 하루 상한이 있는
+				# 물건이라, 마을을 채운 만큼 들판이 텅 빈다 (LIVELY_OK 채집)
+				m.objects[pos] = {"kind": "weed", "hp": 0}
+
+
+# 마을 길에 붙은 칸인가 (길 양옆 한 줄은 비워 둔다)
+func _next_to_village_road(t: Vector2i) -> bool:
+	for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if _on_village_road(t + d) or m.ROAD.has_point(t + d):
+			return true
+	return false
+
+
+# 이 칸이 어느 부지의 울타리 테두리 안(문턱 한 줄 포함)인가
+func _in_any_plot_ring(t: Vector2i) -> bool:
+	for pid: String in m.VILLAGE_PLOTS:
+		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
+		if Rect2i(a.x - m.YARD_PAD - 1, a.y - m.YARD_PAD - 1,
+				5 + m.YARD_PAD * 2 + 2, 4 + m.YARD_PAD * 2 + 2).has_point(t):
+			return true
+	return false
 
 
 # 건물 한 채의 마당: 그림 둘레 한 칸을 잔디로 고르고 울타리를 두른다.
 # 문 앞 한 줄만 터 두고, 거기서 가장 가까운 길까지 흙길을 잇는다.
 func _build_yard(anchor: Vector2i) -> void:
+	# 마당 바닥을 잔디로 **되돌리지 않는다.** 예전에는 여기서 마당 네모를
+	# 통째로 잔디로 칠해, `_lay_yard` 가 깔아 놓은 흙마당이 바깥 한 겹만
+	# 남았다 — 집이 잔디밭에 얹힌 모형처럼 보이던 것이 이것이다.
+	# 사람이 사는 집 둘레에는 풀이 못 자란 땅이 생긴다.
+	#
+	# **물만은 메운다.** 잔디로 칠하던 그 고리가 겸사겸사 하던 일이 있었다 —
+	# 개울이 지나는 자리에 집을 앉히면 물을 땅으로 바꿔 주었다. 그 한 줄을
+	# 빼자 숲속의 집 문 앞이 개울이 되어 문이 잠겼다.
 	var yard := Rect2i(anchor.x - m.YARD_PAD, anchor.y - m.YARD_PAD,
 		5 + m.YARD_PAD * 2, 4 + m.YARD_PAD * 2)
-	# 마당 안은 잔디 (길이 건물 밑으로 지나가지 않게)
 	for y in range(yard.position.y, yard.end.y):
 		for x in range(yard.position.x, yard.end.x):
 			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
 				continue
-			m.grid[y][x].ground = "grass"
-	# (건물을 감싸던 마당 울타리는 없앴다 — 마당은 잔디로 트여 있다.
-	#  문 앞 흙길도 더 이상 내지 않는다 — 바닥 타일은 플레이어 몫이다)
+			if m.grid[y][x].ground == "water":
+				m.grid[y][x].ground = "yard"
+	# 문 앞 흙길은 내지 않는다 — **마을 바닥은 잔디**이고 포장은 플레이어
+	# 몫이라는 약속이 있다 (마을 어귀도 그래서 흙길 대신 나무로 목을 만들었다).
+	# 「여기는 뭐 하는 곳」은 바닥이 아니라 **내놓은 물건과 경계**로 말한다.
+	var pid: String = m.plot_at_anchor(anchor)
+	if pid == "":
+		return          # 농장 집 · 고장 집 · 숲속 집은 꾸미지 않는다
+	decorate_plot(anchor, pid)
+
+
+# 마당의 소품과 경계 — **여러 번 불러도 같은 모습**이다 (이미 놓인 칸은
+# 건너뛴다). 건물을 놓을 때와 세계를 펼 때 양쪽에서 부른다:
+# 짓는 순간에만 두었더니, 이미 지어 놓은 세이브는 자고 일어나 세계를
+# 다시 지을 때까지 마당이 텅 비어 있었다.
+func decorate_plot(anchor: Vector2i, pid: String) -> void:
+	_plot_bounds(anchor)
+	_plot_props(anchor, pid)
+
+
+# 부지의 경계 — 마당 한 칸 바깥을 울타리로 두르고 **문 앞만 터 둔다.**
+#
+# 가게들이 잔디 위에 나란히 놓여 있으면 어디까지가 그 가게의 자리인지
+# 알 수가 없다. 낮은 울타리 한 겹이면 「여기부터 저기까지가 대장간」이 된다.
+#
+# 이미 무언가 서 있는 칸, 잔디가 아닌 칸, 큰길과 광장은 건드리지 않는다 —
+# 부지들이 서로 가깝고 이장 집 그림과도 닿아 있어서, 그냥 두르면 남의
+# 자리에 말뚝을 박는다.
+func _plot_bounds(anchor: Vector2i) -> void:
+	var ring := Rect2i(anchor.x - m.YARD_PAD - 1, anchor.y - m.YARD_PAD - 1,
+		5 + m.YARD_PAD * 2 + 2, 4 + m.YARD_PAD * 2 + 2)
+	var gate_y: int = ring.end.y - 1              # 아래 변 = 문이 난 쪽
+	var side_x: int = _plot_side_gate_x(anchor)   # 옆문 = 마을 한복판 쪽
+	for y in range(ring.position.y, ring.end.y):
+		for x in range(ring.position.x, ring.end.x):
+			var edge: bool = x == ring.position.x or x == ring.end.x - 1 \
+				or y == ring.position.y or y == gate_y
+			if not edge:
+				continue
+			# 드나드는 목 — 문 앞 세 칸은 비운다
+			if y == gate_y and absi(x - (anchor.x + 2)) <= 1:
+				continue
+			# 옆문 세 칸
+			if x == side_x and y >= anchor.y + 1 and y <= anchor.y + 3:
+				continue
+			var t := Vector2i(x, y)
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.objects.has(t):
+				continue
+			# 잔디와 **마당 흙**에만 박는다. `_lay_yard` 가 부지 둘레를 이미
+			# 흙마당으로 깔아 두므로 잔디만 보면 말뚝이 한 개도 안 선다.
+			# 문 앞에서 큰길로 난 길("path")은 건드리지 않는다 — 드나드는 길이다
+			if m.grid[y][x].ground not in ["grass", "yard"]:
+				continue
+			if m.ROAD.has_point(t) or m.PLAZA.has_point(t) or _on_village_road(t):
+				continue
+			if _is_plot_gateway(t):
+				continue
+			m.objects[t] = {"kind": "fence", "hp": 0}
+
+
+# **어느 부지든** 문 앞 목에 걸리는 칸인가.
+#
+# 부지는 한 곳씩 지어지는데 서로 가깝다. 제 울타리만 보고 두르면, 나중에
+# 지은 집의 경계가 **앞서 지은 집의 출입구를 덮는다** — 대장간 문 앞을
+# 목장 상회의 울타리가 막아 광장에서 대장간까지 길이 끊겼다.
+# 어느 부지의 목이든 세 칸 폭 · 두 줄 깊이로 비워 둔다.
+func _is_plot_gateway(t: Vector2i) -> bool:
+	for pid: String in m.VILLAGE_PLOTS:
+		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
+		var gate_y: int = a.y + 4 + m.YARD_PAD          # 울타리 아래 변
+		if absi(t.x - (a.x + 2)) <= 1 and (t.y >= a.y + 4 and t.y <= gate_y + 1):
+			return true
+		var sx: int = _plot_side_gate_x(a)
+		if absi(t.x - sx) <= 1 and t.y >= a.y + 1 and t.y <= a.y + 3:
+			return true
+	return false
+
+
+# 길 한 줄을 **굽이치게** 깐다.
+#
+# 자로 그은 네모로 깔면 마을이 격자 도시가 된다 — 시골길은 지형을 피해
+# 휘고, 밟히는 폭도 들쭉날쭉하다. 줄기(lane)는 그대로 두고 칸마다 두어 칸씩
+# 좌우로 흔들면서, 가장자리 한 겹은 확률로 빼서 톱니를 남긴다.
+#
+# 바닥은 자갈("path")이다. 흙마당과 같은 흙으로 깔았더니 마당과 길이
+# 한 덩어리로 뭉개져 어디까지가 마당인지 안 보였다.
+func _paint_village_lane(lane: Rect2i) -> void:
+	var vertical: bool = lane.size.y > lane.size.x
+	var along0: int = lane.position.y if vertical else lane.position.x
+	var along1: int = lane.end.y if vertical else lane.end.x
+	var across0: int = lane.position.x if vertical else lane.position.y
+	var width: int = lane.size.x if vertical else lane.size.y
+	for a in range(along0, along1):
+		# 굽이는 **한 칸 남짓**이면 된다. 두세 칸씩 흔들었더니 3줄짜리 길이
+		# 화면에서 열 칸 폭의 자갈 얼룩이 됐다 — 길이 아니라 자갈밭이었다.
+		# 서른 칸 주기 하나로 완만하게 휜다.
+		var wob := int(round(sin(float(a) * 0.19) * 1.4))
+		# 줄기 폭 **그대로** 깐다. 예전에는 한 겹을 덤으로 얹고(width+1) 거기에
+		# 굽이 한 칸이 더해져, 세 줄짜리 시골길이 화면에서 대여섯 칸 폭의
+		# 자갈 대로가 됐다 — 마을이 아니라 광장 사이를 잇는 활주로였다.
+		for k in range(0, width):
+			var c: int = across0 + wob + k
+			var x: int = c if vertical else a
+			var y: int = a if vertical else c
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue
+			# **부지 안은 건드리지 않는다.** 길이 울타리 자리를 자갈로 덮으면
+			# 말뚝이 한 개도 안 선다 (_plot_bounds 는 잔디·마당에만 박는다)
+			if _in_any_plot_ring(Vector2i(x, y)):
+				continue
+			# 양 가장자리는 확률로 뺀다 (가장자리가 자로 잰 듯하지 않게).
+			# 길은 가운데 한 줄만 늘 밟히고, 양옆은 밟혔다 말았다 한다
+			if (k == 0 or k == width - 1) and m._hash01(x * 7 + 1, y * 5 + 3) < 0.25:
+				continue
+			m.grid[y][x].ground = "path"
+
+
+# 이 칸이 마을 길 위인가.
+#
+# 길이 굽이치므로 네모 안에 드는지로는 못 잰다 — 줄기 네모를 두 칸 부풀린
+# 것을 「길목」으로 보고, 울타리·소품·나무를 그 안에 두지 않는다.
+func _on_village_road(t: Vector2i) -> bool:
+	for lane: Rect2i in m.VILLAGE_ROADS:
+		# 두 칸씩 부풀렸더니 길 양옆으로 **네 칸짜리 민둥 띠**가 생겼다.
+		# 나무가 그 밖에서 멈추니 세 줄짜리 길이 일곱 줄로 보였다 —
+		# 시골길은 풀과 나무가 바짝 붙어 있어야 시골길이다.
+		if lane.grow(1).has_point(t):
+			return true
+	return false
+
+
+# 부지의 **옆문**이 난 줄 — 마을 한복판을 바라보는 쪽이다.
+#
+# 앞문(남쪽) 하나로는 모자란다. 서쪽 줄의 세 부지(대장간·목장 상회·여관)는
+# 여덟 칸 간격으로 놓여 있고 울타리 테두리가 여덟 줄이라, 테두리끼리 **틈
+# 없이 맞닿는다** — 세 마당이 남쪽으로만 뚫린 하나의 관이 되고, 그 관은
+# 가운데 선 건물이 스스로 막는다. 광장에서 대장간까지 걸어갈 길이 없었다.
+# (여태 이게 안 드러난 것은 낚시터를 비우는 네모가 여관의 서쪽 울타리를
+#  통째로 지워 우연히 구멍을 내 주고 있었기 때문이다)
+func _plot_side_gate_x(anchor: Vector2i) -> int:
+	var ring_l: int = anchor.x - m.YARD_PAD - 1
+	var ring_r: int = anchor.x + 4 + m.YARD_PAD + 1
+	return ring_r if anchor.x + 2 < m.PLAZA.get_center().x else ring_l
+
+
+# 그 가게다운 마당을 편다 (main.PLOT_DECOR) — 바닥을 먼저 깔고 살림을 놓는다.
+# 자리가 이미 차 있으면 그 하나만 건너뛴다 — 나머지는 그대로 놓는다.
+func _plot_props(anchor: Vector2i, pid: String) -> void:
+	var spec: Dictionary = m.PLOT_DECOR.get(pid, {})
+	# ① 바닥 — 자갈 마당이든 다진 흙이든, 소품보다 먼저 깐다
+	for f: Array in spec.get("floor", []):
+		var r: Rect2i = f[0] as Rect2i
+		for y in range(anchor.y + r.position.y, anchor.y + r.end.y):
+			for x in range(anchor.x + r.position.x, anchor.x + r.end.x):
+				if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+					continue
+				var t0 := Vector2i(x, y)
+				if m.ROAD.has_point(t0) or m.PLAZA.has_point(t0) or _on_village_road(t0):
+					continue
+				if m.grid[y][x].ground not in ["grass", "yard"]:
+					continue      # 물·모래·이미 깐 바닥은 건드리지 않는다
+				m.grid[y][x].ground = str(f[1])
+	# ①-b **닳은 자리** — 자로 잰 네모가 아니라 둥근 얼룩이다.
+	#
+	# 대장간 앞은 사람이 하루 종일 오가며 밟아 다진 자리다. 그런데 바닥을
+	# 네모로 깔았더니 마당에 회색 카펫을 오려 붙인 꼴이었다 — 「배치가
+	# 안 어울린다」가 이것이다. 불 앞과 문 앞을 감싸는 **한 덩어리**로 깔고,
+	# 가장자리는 들쭉날쭉하게 흩어 놓는다.
+	for ap: Array in spec.get("apron", []):
+		var c: Vector2i = anchor + (ap[0] as Vector2i)
+		var rx: float = float(ap[1])
+		var ry: float = float(ap[2])
+		for y in range(c.y - int(ry) - 1, c.y + int(ry) + 2):
+			for x in range(c.x - int(rx) - 1, c.x + int(rx) + 2):
+				if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+					continue
+				var t1 := Vector2i(x, y)
+				if m.ROAD.has_point(t1) or m.PLAZA.has_point(t1) or _on_village_road(t1):
+					continue
+				if m.grid[y][x].ground not in ["grass", "yard"]:
+					continue
+				var d: float = pow((x - c.x) / rx, 2.0) + pow((y - c.y) / ry, 2.0)
+				if d > 1.0:
+					continue
+				# 가장자리는 확률로 뺀다 — 둥근 자국도 자로 그으면 접시가 된다
+				if d > 0.62 and m._hash01(x * 7 + 5, y * 11 + 3) < (d - 0.62) * 2.2:
+					continue
+				m.grid[y][x].ground = str(ap[3])
+	# ② 살림
+	for entry: Array in spec.get("props", []):
+		var t: Vector2i = anchor + (entry[0] as Vector2i)
+		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+			continue
+		# 깔아 둔 바닥이면 무엇이든 그 위에 놓는다. 예전에는 잔디·마당·자갈·
+		# 모래만 꼽아 뒀는데, 연구소 앞에 밭흙("soil")을 깔고 수산시장 앞에
+		# 널("dock")을 깔자 **제가 깐 바닥 위에 제 살림을 못 놓는** 꼴이 됐다
+		if m.objects.has(t) or m.grid[t.y][t.x].ground \
+				not in ["grass", "yard", "path", "sand", "soil", "dock"]:
+			continue
+		if m.ROAD.has_point(t) or m.PLAZA.has_point(t) or _on_village_road(t):
+			continue
+		if _is_plot_gateway(t):
+			continue      # 드나드는 목은 무엇으로도 막지 않는다
+		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
+		_scuff(t, str(entry[1]))
+
+
+# ---- 가게가 아닌 집에도 마당을 편다 ----
+#
+# main.HOUSE_DECOR 를 보고 집 둘레에 살림 두어 가지를 내놓는다.
+# 자리가 이미 차 있거나 물·바위 위면 그 하나만 건너뛴다.
+func _house_yard(anchor: Vector2i, key: String) -> void:
+	for entry: Array in m.HOUSE_DECOR.get(key, []):
+		var t: Vector2i = anchor + (entry[0] as Vector2i)
+		if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+			continue
+		if m.objects.has(t):
+			continue
+		if m.grid[t.y][t.x].ground not in ["grass", "yard", "path", "sand", "soil"]:
+			continue
+		if m.ROAD.has_point(t) or m.PLAZA.has_point(t) or _on_village_road(t):
+			continue
+		if t == m.door_tile(anchor) or t == m.door_tile(anchor) + Vector2i(0, 1):
+			continue      # 문 앞은 비워 둔다
+		m.objects[t] = {"kind": str(entry[1]), "hp": 0}
+		_scuff(t, str(entry[1]))
+
+
+# ---- 물건이 놓인 자리는 풀이 죽는다 ----
+#
+# 살림을 잔디 위에 그냥 세웠더니 「그냥 위에 얹어 놓은 것 같다」는 말을
+# 들었다. 그림자를 아무리 곱게 깔아도 그렇다 — 그림자는 **빛**의 일이고,
+# 물건이 거기 **오래 있었다**는 것은 **땅**이 말한다.
+#
+# 궤짝 하나가 한 계절만 놓여 있어도 그 밑의 풀은 죽고, 둘레는 드나들며
+# 밟혀 흙이 드러난다. 그 한 뼘의 다진 흙(yard)이 물건을 땅에 앉힌다.
+# 자로 잰 네모가 아니라 둥근 얼룩이고, 가장자리는 들쭉날쭉해야 한다.
+func _scuff(t: Vector2i, kind: String) -> void:
+	if not kind.begins_with("deco_"):
+		return                              # 울타리·풀 따위는 땅을 다지지 않는다
+	# 큰 물건일수록 넓게 밟힌다
+	var big := kind in ["deco_forge", "deco_weaponrack", "deco_cart",
+		"deco_netrack", "deco_specimen", "deco_toolrack"]
+	var rx: float = 2.1 if big else 1.5
+	var ry: float = 1.5 if big else 1.1
+	for y in range(t.y - 2, t.y + 3):
+		for x in range(t.x - 3, t.x + 4):
+			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
+				continue
+			if m.grid[y][x].ground != "grass":
+				continue                    # 이미 깐 바닥은 건드리지 않는다
+			var p := Vector2i(x, y)
+			if m.ROAD.has_point(p) or m.PLAZA.has_point(p) or _on_village_road(p):
+				continue
+			var d: float = pow((x - t.x) / rx, 2.0) + pow((y - t.y + 0.25) / ry, 2.0)
+			if d > 1.0:
+				continue
+			# 가장자리는 확률로 뺀다 — 둥근 자국도 자로 그으면 접시가 된다
+			if d > 0.34 and m._hash01(x * 13 + 7, y * 17 + 11) < (d - 0.34) * 1.45:
+				continue
+			m.grid[y][x].ground = "yard"
 
 
 # 자연물은 타일보다 훨씬 크게 그려진다. 그림이 서로 겹치지 않도록,
@@ -1198,21 +1672,45 @@ func _nature_clear(pos: Vector2i, kind: String, override_dist := -1) -> bool:
 # 집 둘레에는 풀이 못 자란 자리가 생기고, 문 앞에서 큰길까지 길이 난다.
 # 이 둘이 집을 땅에 앉힌다.
 func _lay_yard(anchor: Vector2i) -> void:
-	for y in range(anchor.y - 1, anchor.y + 6):
-		for x in range(anchor.x - 2, anchor.x + 7):
+	# 울타리 테두리 **안쪽을 다 채운다.** 자리를 넓히면(YARD_PAD) 마당도
+	# 같이 넓어져야 한다 — 예전에는 아홉 칸으로 박아 두어서, 부지를 키우면
+	# 넓어진 자리만 잔디로 남아 울타리 안에 풀밭이 생겼다
+	# ---- 마당은 **울타리에서 뚝 끊기지 않는다** ----
+	#
+	# 예전에는 테두리 안쪽까지만 흙을 깔았다. 그러면 바깥에서 볼 때
+	# 잔디 → 말뚝 → 흙이 한 줄에 딱 붙어, 마당이 잔디밭에 오려 붙인
+	# 갈색 네모가 됐다. 경계 그림(trod)이 번져 주기는 하는데 그게 하필
+	# **말뚝이 선 줄**이라 울타리 그림에 가려 아무도 못 봤다.
+	#
+	# 사람이 드나드는 자리의 흙은 울타리 **밖으로도 새어 나간다.** 안쪽은
+	# 다 채우고, 테두리부터는 멀어질수록 성기게 — 두 칸 밖이면 몇 점만
+	# 남는다. 그 성긴 자락이 잔디와 흙을 이어 준다.
+	var SPILL := [0.0, 0.30, 0.62, 0.86]      # 테두리에서 0·1·2·3칸 나갈 확률
+	for y in range(anchor.y - m.YARD_PAD - 3, anchor.y + 7 + m.YARD_PAD):
+		for x in range(anchor.x - m.YARD_PAD - 3, anchor.x + 8 + m.YARD_PAD):
 			if x < 0 or y < 0 or x >= m.MAP_W or y >= m.MAP_H:
 				continue
 			var cell: Dictionary = m.grid[y][x]
 			if cell.ground != "grass":
 				continue                      # 길·물·밭·모래는 건드리지 않는다
-			# 가장자리는 **자로 잰 듯하면 안 된다.** 바깥 한 겹을 확률로 빼서
-			# 들쭉날쭉하게 만든다 (모서리일수록 많이 빠진다)
-			var edge := 0
-			if x == anchor.x - 2 or x == anchor.x + 6:
-				edge += 1
-			if y == anchor.y - 1 or y == anchor.y + 5:
-				edge += 1
-			if edge > 0 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.4 * float(edge):
+			# 마당 네모에서 얼마나 벗어났는가 (안쪽이면 0)
+			var out_x: int = maxi(anchor.x - m.YARD_PAD - x,
+				x - (anchor.x + 4 + m.YARD_PAD))
+			var out_y: int = maxi(anchor.y - m.YARD_PAD - y,
+				y - (anchor.y + 3 + m.YARD_PAD))
+			var out: int = maxi(maxi(out_x, out_y), 0)
+			if out > 3:
+				continue
+			# 안쪽 가장자리 한 겹도 자로 잰 듯하면 안 된다 (모서리일수록 많이)
+			if out == 0:
+				var edge := 0
+				if x == anchor.x - m.YARD_PAD or x == anchor.x + 4 + m.YARD_PAD:
+					edge += 1
+				if y == anchor.y - m.YARD_PAD or y == anchor.y + 3 + m.YARD_PAD:
+					edge += 1
+				if edge > 0 and m._hash01(x * 7 + 3, y * 11 + 5) < 0.28 * float(edge):
+					continue
+			elif m._hash01(x * 5 + 9, y * 13 + 7) < SPILL[out]:
 				continue
 			cell.ground = "yard"
 	# 문 앞에서 큰길까지 — 마당만 있고 길이 없으면 부지가 섬처럼 뜬다.
@@ -1234,8 +1732,26 @@ func _lay_yard(anchor: Vector2i) -> void:
 			run.append(t)
 
 
+# 집 앞 **나무 데크**. 건물이 바닥에 그냥 붙어 있으면 종이를 오려 붙인
+# 것처럼 납작하다 — 문 앞에 널을 한 겹 깔면 집이 한 단 올라선다.
+#
+# 널은 건물 폭만큼(문 앞 다섯 칸) 두 줄. 드나드는 통로 위이므로 지나갈 수
+# 있어야 하고(바닥일 뿐 오브젝트가 아니다), 길·광장은 건드리지 않는다.
+func _lay_porch(anchor: Vector2i) -> void:
+	for dy in range(4, 6):
+		for dx in range(0, 5):
+			var t := anchor + Vector2i(dx, dy)
+			if t.x < 0 or t.y < 0 or t.x >= m.MAP_W or t.y >= m.MAP_H:
+				continue
+			if m.PLAZA.has_point(t) or m.ROAD.has_point(t) or _on_village_road(t):
+				continue
+			if m.grid[t.y][t.x].ground in ["grass", "yard", "path"]:
+				m.grid[t.y][t.x].ground = "dock"
+
+
 func _place_building_tiles(anchor: Vector2i) -> void:
 	_lay_yard(anchor)
+	_lay_porch(anchor)
 	for y in range(anchor.y, anchor.y + 4):
 		for x in range(anchor.x, anchor.x + 5):
 			m.objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
@@ -1267,14 +1783,13 @@ func _spawn_forest_house() -> void:
 	for y in range(a.y - 2, a.y + 6):
 		for x in range(a.x - 3, a.x + 9):
 			m.objnode._remove_object(Vector2i(x, y))
-	# 숲길(y18) 남쪽에서 문 앞까지 내려오는 좁은 오솔길
-	for y in range(m.STORY_ROAD_Y1 + 1, a.y + 5):
-		for x in [m.FOREST_TRAIL_X, m.FOREST_TRAIL_X + 1]:
-			m.objnode._remove_object(Vector2i(x, y))
-			if m.grid[y][x].ground == "grass":
-				m.grid[y][x].ground = "path"
+	# 여기에 「숲길 남쪽에서 문 앞까지 내려오는 오솔길」을 내는 줄이 있었다.
+	# 그 숲길은 **세계 안(y15~18)에 있던 시절**의 튜토리얼 길이다 —
+	# 세계 밖으로 옮겨 간 뒤로는 시작 줄이 끝 줄보다 커서, 이 반복문은
+	# 한 번도 돌지 않았다 (길은 오래전부터 없었다). 죽은 줄을 걷어낸다.
 	_fill_building(a)
 	m.objects.erase(m.door_tile(a))
+	_house_yard(a, "forest")
 	m.queue_redraw()
 
 
@@ -1301,6 +1816,7 @@ func _spawn_alch_house() -> void:
 				m.grid[y2][x2].ground = "path"
 	_fill_building(a)
 	m.objects.erase(m.door_tile(a))
+	_house_yard(a, "alch")
 	m.queue_redraw()
 
 
@@ -1647,6 +2163,14 @@ func _forage_ok(pos: Vector2i) -> bool:
 	# 길을 막지 않는다 — 나무 간격(네 칸)을 그대로 쓰면 온 들판이 「자리 없음」이 된다.
 	if not _respawn_ok(pos, "weed", 1):
 		return false
+	# 마을 안에서는 **길·광장·부지 마당**을 피한다. 마을 사이가 숲이 되면서
+	# 채집물도 마을에 돋게 됐는데, 아침마다 흙길 한복판과 대장간 자갈 마당에
+	# 산딸기가 돋았다 — 사람이 쓸고 다니는 자리다
+	if m.VILLAGE_REGION.has_point(pos):
+		if m.PLAZA.has_point(pos) or m.ROAD.has_point(pos) or _on_village_road(pos):
+			return false
+		if _in_any_plot_ring(pos) or _is_plot_gateway(pos):
+			return false
 	# 아직 이야기가 닿지 않은 땅에는 돋지 않는다 — 가지도 못하는 곳에
 	# 상한을 채워 버리면 정작 다닐 수 있는 들판이 텅 빈다
 	return m.region_open_at(pos) and GameData.is_tile_owned(pos.x, pos.y)
@@ -1658,11 +2182,13 @@ func _place_forage(pos: Vector2i, with_node := true) -> void:
 	# 다만 **북쪽 산자락**(MOUNTAIN_Y 위)에서는 민들레가 절반쯤 돋는다 —
 	# 산에서만 볼 수 있는 노란 꽃이다.
 	var roll := randf()
-	var kind := "forage_berry" if roll < 0.5 \
-		else ("forage_herb" if roll < 0.8 else "weed")
+	var kind := "forage_berry" if roll < 0.45 \
+		else ("forage_herb" if roll < 0.72 \
+		else ("forage_branch" if roll < 0.85 else "weed"))
 	if pos.y <= m.MOUNTAIN_Y:
 		kind = "forage_dandelion" if roll < 0.5 \
-			else ("forage_herb" if roll < 0.7 else "weed")
+			else ("forage_herb" if roll < 0.65 \
+			else ("forage_branch" if roll < 0.8 else "weed"))
 	if with_node:
 		m.objnode._place_object(pos, kind, 0)
 	else:
@@ -1755,6 +2281,7 @@ func _migrate_farm_layout() -> void:
 			m.objects.erase(p)
 	if GameData.barn_built:
 		m.objects[m.BARN_POS] = {"kind": "barn", "hp": 0}
+		_house_yard(m.BARN_POS, "barn")
 		_block_barn_art()
 		# 새 축사 그림 자리에 서 있던 세이브라면 밖으로 꺼내 준다 (갇히지 않게)
 		if not m.is_passable(m.player_tile()):
@@ -1762,39 +2289,14 @@ func _migrate_farm_layout() -> void:
 			m.player.position = Vector2(out.x * m.TILE + 16, out.y * m.TILE + 16)
 
 
-# ---- 마을 어귀 ----
+# ---- 마을 어귀의 목은 걷어냈다 ----
 #
-# 숲길을 한참 걸어와서 닿는 자리인데, 여기는 좌표 한 점(WORLD_ENTRY)일 뿐
-# 사방이 트인 벌판이었다. 마을에 **들어서는** 게 아니라 그냥 나타난다.
+# 여기에 x53~63 을 나무로 두껍게 채워 **목**을 만드는 함수가 있었다.
+# 도착 자리(story.WORLD_ENTRY)가 마을 문턱(58, 21)이던 시절, 숲길을 걸어
+# 나와 그 자리에서 눈을 뜨면 사방이 트인 벌판이라 「마을에 들어선다」가
+# 아니라 그냥 나타나는 것이었다 — 양옆을 숲으로 막은 이유가 그것이다.
 #
-# 바닥에 길을 까는 것으로는 못 고친다 — 마을 바닥은 잔디로 두는 것이
-# 이 게임의 약속이고(포장은 플레이어가 직접 한다), 어귀만 흙길이면
-# 그 약속이 거기서만 깨진다. 대신 **나무로 목을 만든다**: 양옆을 숲으로
-# 막고 가운데 세 칸을 비우면, 도착한 자리가 「길목」이 되고 동쪽으로
-# 걸어 나가야 마을이 열린다.
-const GATE_X0 := 53
-const GATE_X1 := 63
-const GATE_LANE := 3          # 가운데로 비워 두는 폭 (사람 셋이 지난다)
-
-
-func _make_village_gate() -> void:
-	var cy: int = m.story.WORLD_ENTRY.y
-	var y0: int = cy - GATE_LANE / 2
-	var y1: int = y0 + GATE_LANE - 1
-	for x in range(GATE_X0, GATE_X1 + 1):
-		# 가장자리로 갈수록 숲이 두껍다 — 목이 좁아지며 마을이 열린다
-		var depth := 3 if x < GATE_X0 + 4 else 2
-		# (동쪽 끝은 한 겹만 — 마을 쪽은 트여 있어야 한다)
-		if x >= GATE_X1 - 1:
-			depth = 1
-		for d in range(1, depth + 1):
-			for ty in [y0 - d, y1 + d]:
-				if ty < 1 or ty >= m.WORLD_H - 1:
-					continue
-				if m.objects.has(Vector2i(x, ty)):
-					continue
-				if m.grid[ty][x].ground != "grass":
-					continue
-				m.objects[Vector2i(x, ty)] = {"kind": "tree", "hp": m.TREE_HP}
-	# 걷는 자리에는 아무것도 나지 않게
-	_no_spawn_rect(GATE_X0, y0, GATE_X1, y1, 0)
+# 도착 자리가 **세계 서쪽 끝**으로 옮겨 가면서 그 이유가 통째로 사라졌다.
+# 이제는 거기서 눈을 뜨지 않고 농장을 지나 걸어서 마을에 든다. 감쌀 것이
+# 없어진 나무 벽만 마을 서쪽 한복판에 덩어리로 남아, 지나갈 때마다
+# 「여기 왜 숲이 있지」가 됐다.

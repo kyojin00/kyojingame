@@ -19,8 +19,9 @@ var m: KyojinMain    # main.gd
 
 
 func _door_kind_at(t: Vector2i) -> String:
-	if GameData.house_lv >= 1 and t == m.door_tile(m.HOME_ANCHOR):
-		return "home"
+	if t == m.door_tile(m.HOME_ANCHOR):
+		# 보수하기 전에도 집은 서 있다 — 문 앞에서 손볼 이야기를 꺼낸다
+		return "home" if GameData.house_lv >= 1 else "home_ruin"
 	if GameData.forest_quest in ["visit", "done"] \
 			and t == m.door_tile(m.FOREST_HOUSE_ANCHOR):
 		return "forest_house"
@@ -43,6 +44,10 @@ func _enter_building(kind: String) -> void:
 	m.riding.dismount_horse()   # 말을 타고 실내로 들어갈 수는 없다
 	if kind == "home":
 		m.interior.open()
+		return
+	if kind == "home_ruin":
+		# 할아버지의 낡은 집 — 손을 봐야 들어가 살 수 있다
+		m.village._open_build_dialog()
 		return
 	if kind == "move_house":
 		m.dialog.open("재민의 집",
@@ -73,7 +78,7 @@ func _enter_building(kind: String) -> void:
 		# 주인이 아직 첫 인사를 안 했으면 이사 준비 중 — 문이 닫혀 있다
 		var owner := str(m.VILLAGE_NPC.get(kind, ""))
 		if owner != "" and owner != "fisher" and not GameData.npc_greeted.has(owner):
-			m.hud.show_message("이사 준비로 분주한 모양이다.\n내일 주인이 직접 인사하러 온다고 했다.", 4.0)
+			m.hud.show_message("아직 문을 열 채비가 안 된 모양이다.", 4.0)
 			return
 		# 공공 건물은 영업시간에만 문을 연다 (개인 주거지는 해당 없음)
 		var why := GameData.shop_closed_why()
@@ -302,6 +307,20 @@ func interact() -> void:
 		if String(obj.kind).begins_with("forage_") or String(obj.kind) == "weed":
 			var fid: String = obj.kind
 			m.objnode._remove_object(t)
+			if fid == "forage_branch":
+				# 떨어진 가지 — 주우면 **목재**다. 목재는 가방(items)이 아니라
+				# 자원 주머니(GameData.wood)로 들어가므로 여기서 따로 처리한다.
+				# 도감에도 안 오른다 — 재료지 채집물이 아니다
+				var got_w := GameData.beach_pick_count()
+				m.toolwork.gain_skill("beach", 3.0)
+				GameData.wood += got_w
+				Sound.play_sfx("sfx_harvest")
+				m.renderer.spawn_particles(t, "sparkle")
+				m.hud.show_message("떨어진 가지를 주웠다. 목재 x%d" % got_w)
+				if Net.is_host():
+					m.netsync._broadcast_area(t)
+					m.netsync._broadcast_stats()
+				return
 			if fid == "weed":
 				GameData.queue_respawn("weed")   # 3~5일 뒤 다른 빈자리에서
 			if fid in ["weed", "forage_herb"]:
@@ -396,6 +415,14 @@ func interact() -> void:
 		if obj.kind == "auction":
 			m.auction_ui.open()
 			return
+		if obj.kind == "sign" and t == m.STORY_TRAIL_SIGN:
+			# 숲 어귀의 낡은 표지판 — 「내가 왜 여기 서 있는가」에 대한 답이다
+			m.dialog.open("낡은 표지판",
+				"      교진 마을  →\n\n글씨는 비바람에 반쯤 지워져 있다.\n"
+				+ "화살표만 저 숲 쪽을 가리키고 있다.\n\n"
+				+ "(사람이 안 다닌 지 오래된 길인 모양이다.)",
+				[["숲으로 들어간다", null]])
+			return
 		if obj.kind == "sign" and t == m.OLD_SIGN:
 			m.story.examine_old_sign()
 			return
@@ -454,12 +481,21 @@ func interact() -> void:
 					break
 			return
 		if obj.kind == "house":
-			var bk := _building_kind_at(t)
+			var bk: String = _building_kind_at(t)
 			if bk == "":
 				# 정착민의 집(S2c) — 마을 부지가 아닌 집은 문 앞 대화다: 두드리거나, 몰래 들어가거나
 				var owner := _settler_house_at(t)
 				if owner != "":
 					m.society.house_door(owner)
+					return
+				# 서 있기는 하되 아직 사람이 들지 않은 가게 — 문이 잠겨 있다.
+				# (아무 말도 없이 조용하면 「E가 안 먹는다」로 읽힌다)
+				# 창을 띄우지는 않는다 — 옆에 선 사람에게 말을 걸려다 E를
+				# 눌렀을 뿐일 수도 있다. 말풍선 한 줄이면 족하다
+				var empty: String = m.plot_body_at(t)
+				if empty != "":
+					m.hud.show_message("오래 비어 있는 %s다. 문이 잠겨 있다.\n이장에게 이야기하면 사람을 들일 수 있을 것 같다."
+						% str(m.VILLAGE_PLOTS[empty].name), 4.0)
 					return
 			_enter_building(bk)
 			return
@@ -557,9 +593,9 @@ func _settler_house_at(t: Vector2i) -> String:
 
 
 func _building_kind_at(t: Vector2i) -> String:
-	if GameData.house_lv >= 1 and t.x >= m.HOME_ANCHOR.x and t.x < m.HOME_ANCHOR.x + 5 \
+	if t.x >= m.HOME_ANCHOR.x and t.x < m.HOME_ANCHOR.x + 5 \
 			and t.y >= m.HOME_ANCHOR.y and t.y < m.HOME_ANCHOR.y + 4:
-		return "home"
+		return "home" if GameData.house_lv >= 1 else "home_ruin"
 	# 마을 건물은 실제로 지어진 것만 존재한다
 	for pid: String in GameData.village_built:
 		if not m.VILLAGE_PLOTS.has(pid):

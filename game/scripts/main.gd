@@ -111,7 +111,9 @@ var tex: Dictionary = {}
 # 있어서 옷 색을 갈아입힐 때만 읽는다 — 화면에는 안 그린다.
 var mat_img: Dictionary = {}
 var world: Node2D
+var shadows: Node2D  # 자연물 접지 그림자 — 세계보다 밑에 깔리는 레이어
 var overlay: Node2D  # 건물보다 앞에 그리는 안내 텍스트/화살표/날씨 레이어
+var glow: Node2D     # 밤 어둠(CanvasModulate) **밖**에서 그리는 등불 빛무리
 var player: Node2D
 var hud: CanvasLayer
 var shop: CanvasLayer
@@ -129,6 +131,11 @@ const LANDMARK_FRAMES := {
 	"landmark_greattree": 3, "landmark_falls": 4,
 	# 물방앗간 곁의 물레방아 — 랜드마크는 아니지만 같은 규칙으로 돈다
 	"deco_wheel": 4,
+	# 돌무지 — 한 장뿐이다 (대장간 곁의 화덕으로도 쓴다). 표에 없으면
+	# _tick_landmarks 가 없는 열쇠를 물어 터진다
+	"deco_cairn": 1,
+	# 대장간 곁의 화로 — **불이 흔들린다.** 네 장을 돌린다 (ref/make_props.js)
+	"deco_forge": 4,
 }
 var water_timer := 0.0
 # 물의 깊이 — 뭍에서 몇 걸음인지 미리 재 둔다 (0 = 뭍, 1 = 물가...).
@@ -283,6 +290,9 @@ const TEXTURE_NAMES := [
 	"crop_sprout", "crop_small", "crop_medium", "withered",
 	"tree_spring", "tree_summer", "tree_fall", "tree_winter",
 	"tree_bare", "tree_half", "tree_apple",
+	# 다 자란 나무는 **세 그루**다 (make_trees.js). 한 그루를 좌우로 뒤집고
+	# 낯빛만 바꾸는 것으로는 스무 그루가 서면 복사한 티가 난다
+	"tree_02", "tree_03",
 	"tree_01", "tree_06", "tree_09", "tree_13", "tree_15",
 	# 고장마다 하나씩 선 「엄청 큰 것」 (ref/make_landmarks.js).
 	# 여러 장씩이다 — 물이 흐르고 잎이 흔들린다 (LANDMARK_FRAMES)
@@ -294,13 +304,38 @@ const TEXTURE_NAMES := [
 	# 돌계단을 따라 늘어선 석등 (ref/make_landmarks.js).
 	# 마을 광장의 가로등(deco_lamp)과 이름이 겹치지 않게 한다
 	"deco_stonelamp_0",
+	"forage_branch",
+	# 마당에 **세워 두는 살림** (ref/make_props.js).
+	#
+	# 예전에는 여기에 광석·못·천 같은 **가방 아이콘**을 놓았다. 그건 32px
+	# 네모 안에 물건이 딱 들어차게 그린 그림이라, 땅에 놓으면 「서 있는
+	# 물건」이 아니라 「누가 떨어뜨리고 간 물건」으로 보인다.
+	# 화로는 여러 장이라 아래 for 문이 따로 불러온다 (불이 흔들린다).
+	# (숫돌·통은 뺐다 — 화면에서 열여섯 도트로 줄어들면 숫돌은 벽시계가,
+	#  통은 쓰레기통이 된다. 무엇인지 모를 물건은 마당을 어지럽힐 뿐이다)
+	"deco_anvil", "deco_logpile", "deco_trough",
+	"deco_feedbox", "deco_hay", "deco_netrack",
+	"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen",
+	# 궤짝·자루·광석 더미·연장 걸이 — 마당에서 제일 자주 놓이는 넷.
+	# 예전에는 이 자리에 가방 아이콘(old_box·chest·storage_box)과 채집물
+	# 그림(ore_node·rock_wedge)을 그대로 갖다 놨다. 뚜껑 열린 보물상자가
+	# 아홉 마당에 스물몇 개씩 놓여 있었고, 회색 돌붙이는 자갈 바닥에
+	# 묻혀 보이지도 않았다
+	"deco_crate", "deco_sack", "deco_toolrack",
+	# 무기 거치대 — 대장간이 무엇을 만드는 집인지 말하는 물건
+	"deco_weaponrack",
 	# 고장의 작은 마을 집 (ref/make_buildings.js)
 	"house_mill", "house_creek", "house_cabin", "house_shade",
-	"rock", "house", "fence", "sprinkler", "board", "sign",
+	"rock", "rock_02", "rock_03", "rock_big",
+	"house", "fence", "sprinkler", "board", "sign",
 	"board_quest", "board_unlock", "bed_old", "bed_wood", "kitchen_counter",
 	"icon_letter", "old_book",
 	# 제작 재료·결과물 그림 — 제작대(책상) 창이 글자 대신 이 그림으로 말한다
 	"nail", "cloth", "broom",
+	# 밧줄 — 가게 마당에 내놓는 살림(PLOT_DECOR)에만 쓴다. 그림 파일은
+	# 진작 있었는데 여기 이름이 빠져 있어서, 마당에 놓는 순간 tex["rope"]가
+	# 사전에 없다며 매 프레임 오류가 났다
+	"rope",
 	# 민들레는 필드 그림(forage_dandelion, FORAGE_IDS로 자동 로드)과
 	# 가방 아이콘 그림이 서로 다르다
 	"icon_forage_dandelion",
@@ -397,6 +432,8 @@ const TEXTURE_NAMES := [
 	"bug_butterfly_0", "bug_butterfly_1",
 	"bug_dragonfly_0", "bug_dragonfly_1", "bug_firefly_0", "bug_firefly_1",
 	"treant_0", "treant_1", "barn", "icon_coin", "icon_heart",
+	"cave_floor_0", "cave_floor_1", "cave_floor_2",
+	"cave_wall_0", "cave_wall_1", "cave_wall_2",
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"icon_spear", "icon_sword", "arrow", "desk", "recipe",
@@ -415,11 +452,21 @@ const TEXTURE_NAMES := [
 	# 물(water_<깊이>_<판>_<장>)과 경계 아틀라스(edge_*)는 이름이
 	# 규칙적이라 _load_textures가 훑는다
 	"path_edge_n", "path_edge_s", "path_edge_w", "path_edge_e",
+	"path_curb_n", "path_curb_s", "path_curb_w", "path_curb_e",
 	"dock_edge_n", "dock_edge_s", "dock_edge_w", "dock_edge_e",
 ]
 
 const START_TILE := Vector2i(14, 10 + NORTH_PAD)
 const CAVE_POS := Vector2i(50, 1 + NORTH_PAD)
+# ---- 동굴은 아직 세상에 놓지 않는다 ----
+#
+# 들판 한가운데에 입구만 덩그러니 서 있었다 — 산도 벼랑도 없는 자리라
+# 「동굴」이 아니라 「놓아 둔 문」으로 보인다. 자리를 정할 때까지 걷어 둔다.
+#
+# **다시 놓을 때는 두 줄이면 된다.** CAVE_POS 를 그 칸으로 바꾸고 이 값을
+# true 로 되돌리면, 입구도 지도 이름표도 길잡이도 함께 돌아온다.
+# 동굴 **안**(채광·층·광석)과 그걸 쓰는 이야기는 손대지 않았다.
+const CAVE_PLACED := false
 const WORLDTREE_POS := Vector2i(68, 50 + NORTH_PAD)  # 세계수 동굴 (깊은 숲)
 # 축사(구입 시 농장에 건설). 이 칸이 축사 **문 칸**이고, 그림은 여기서
 # 위로 5칸 반 · 좌우로 3칸씩 뻗는다 (7 x 5.5칸). BARN_ART 참고.
@@ -456,17 +503,32 @@ const GREENHOUSE_COST_MONEY := 5000
 # 부지를 오므리면서 구역도 같이 줄였다 (46x44 -> 40x38). 이 사각형 안에는
 # 나무·돌이 나지 않으므로, 줄인 만큼 **숲이 마을 코앞까지 다가온다** —
 # 넓은 세계에 파묻힌 작은 마을이라는 그림이 여기서 나온다
-const VILLAGE_REGION := Rect2i(57, 0 + NORTH_PAD, 40, 38)
+const VILLAGE_REGION := Rect2i(78, -10 + NORTH_PAD, 109, 72)
 # 인도는 모두 3줄. 길 폭을 한 곳에서 정하고 건물은 이 선에 맞춰 놓는다.
 const ROAD_W := 3
 const WEST_LANE_X := 67                    # 서쪽 세로 인도 (x 67~69)
 const EAST_LANE_X := 86                    # 동쪽 세로 인도 (x 86~88)
 const NS_LANE_X := 77                      # 광장을 지나는 남북 인도 (x 77~79)
-const ROAD := Rect2i(30, 8 + NORTH_PAD, 30, 3)         # 농장/숲 -> 마을 공용 길 (3줄)
-const MAIN_STREET_Y := 8 + NORTH_PAD                   # 마을 입구를 가로지르는 큰길 (y 8~10)
-const PLAZA := Rect2i(70, 14 + NORTH_PAD, 16, 12)      # 중앙 광장 (아주 넓은 평지)
-const FOUNTAIN := Rect2i(76, 18 + NORTH_PAD, 4, 4)     # 광장 중앙 분수
-const FOUNTAIN_DECO := Vector2i(77, 20 + NORTH_PAD)    # 분수 조형물 (분수 한가운데)
+const ROAD := Rect2i(30, 11 + NORTH_PAD, 52, 3)        # 농장/숲 -> 마을 공용 길 (3줄)
+const MAIN_STREET_Y := 11 + NORTH_PAD                   # 마을 첫째 가로길과 이어진다
+# ---- 마을 길 (모두 3줄) ----
+#
+# 「마을 바닥은 잔디」라는 약속은 **부지 안**의 이야기다. 부지와 부지 사이는
+# 사람이 다니면서 풀이 죽은 길이 나 있어야 마을로 읽힌다 — 집들이 잔디밭에
+# 그냥 얹혀 있으면 아직 모형이다.
+#
+# 세로 두 줄이 부지 세 칸 사이를, 가로 세 줄이 네 줄 사이를 지난다.
+# 결과로 광장은 사방이 길로 둘러싸인다.
+const VILLAGE_ROADS := [
+	Rect2i(102, -10 + NORTH_PAD, 3, 72),     # 세로 — 첫째 칸과 둘째 칸 사이
+	Rect2i(130, -10 + NORTH_PAD, 3, 72),     # 세로 — 둘째 칸과 셋째 칸 사이
+	Rect2i(158, -10 + NORTH_PAD, 3, 72),     # 세로 — 셋째 칸과 넷째 칸 사이
+	Rect2i(78, 11 + NORTH_PAD, 109, 3),      # 가로 — 첫째 줄 아래 (농장 큰길과 이어진다)
+	Rect2i(78, 37 + NORTH_PAD, 109, 3),      # 가로 — 둘째 줄 아래
+]
+const PLAZA := Rect2i(138, 18 + NORTH_PAD, 17, 16)     # 중앙 광장 (격자의 한 칸을 통째로)
+const FOUNTAIN := Rect2i(144, 24 + NORTH_PAD, 4, 4)    # 광장 중앙 분수
+const FOUNTAIN_DECO := Vector2i(145, 26 + NORTH_PAD)   # 분수 조형물 (분수 한가운데)
 # (마을을 가르던 남쪽 강과 동쪽 세로 강은 없앴다 — 맵은 하나로 이어진
 #  큰 육지다. 물은 서쪽 호수·깊은 숲 연못·남쪽 바다만 남는다)
 # ---- 낚시터 (마을 서쪽 호수, 맵에 하나뿐) ----
@@ -496,7 +558,13 @@ const SEA_RIDGE_Y := WORLD_H - 13          # 바위 능선 줄 — 바다로 가
 const BEACH_Y0 := WORLD_H - 12             # 모래사장 (능선 아래 ~ 바다 위)
 const SEA_Y0 := WORLD_H - 7                # 여기부터 남쪽 끝까지 바다
 const SEA_GATE := [Vector2i(63, WORLD_H - 13), Vector2i(64, WORLD_H - 13)]  # 곡괭이로 캐서 여는 길목
-const FISHER_ARRIVE := Vector2i(78, 23 + NORTH_PAD)  # 낚시꾼이 처음 서 있는 곳 (광장 분수 남쪽)
+# 낚시꾼이 처음 서 있는 곳 — **호수 부두 끝.**
+#
+# 예전에는 광장 분수 앞이었다. 낚시꾼이 마을 한복판에 서 있는 것은
+# 「낚싯대를 멘 낯선 사람」이라는 첫인상과 어긋난다 — 낚시꾼은 물가에 있다.
+# 부두는 이 맵에 하나뿐인 낚시터이고, 그가 이 마을에 온 이유이기도 하다.
+# 부두까지 걸어가는 그 길이 곧 「낚시터를 처음 보는 대목」이 된다.
+const FISHER_ARRIVE := DOCK_STAND
 const SHELL_CAP := 8               # 해변 채집물(조개/산호/쓰레기...) 최대 수
 # 해변 모래밭에만 밀려오는 것들 — 조개·비닐봉지·유리 조각·금속 고리(기본),
 # 산호 조각·고대 조각(매우 희귀 — 숨겨진 이야기·레시피와 이어진다)
@@ -504,7 +572,7 @@ const BEACH_FORAGE := ["forage_shell", "forage_coral", "forage_trash", "forage_g
 	"forage_ring", "forage_relic"]
 const STALL_TILE := Vector2i(72, BEACH_Y0 + 1)  # 만수의 해변 노점 (게이트 서남쪽 모래밭)
 # 마을 온천 (메인 스토리 15) — 마을 북쪽 바위 밑. 수맥을 되살리면 물이 찬다
-const ONSEN_POS := Vector2i(66, 6 + NORTH_PAD)
+const ONSEN_POS := Vector2i(52, -7 + NORTH_PAD)
 # 옛 농지 (메인 스토리 16) — 마을 서쪽, 오래 묵어 수풀이 우거진 밭.
 # 단서를 다 모으면 잡초·돌·나무가 우거진 채로 드러난다
 const OLD_FARM := Rect2i(20, 44 + NORTH_PAD, 10, 7)
@@ -526,12 +594,12 @@ const BRACELET_ROCK := Vector2i(8, SEA_Y0 - 1)
 const FISH_SPOT := Rect2i(42, 26 + NORTH_PAD, 14, 12)   # 이 안이면 「낚시터에 있다」
 # 호수 둘레 + 마을에서 호수로 드는 어귀(x 53~60)는 나무/돌을 두지 않는다
 const FISH_CLEAR := Rect2i(41, 24 + NORTH_PAD, 20, 14)
-const BOARD_POS := Vector2i(82, 14 + NORTH_PAD)        # 광장 게시판 (오늘의 의뢰)
-const AUCTION_POS := Vector2i(85, 14 + NORTH_PAD)      # 경매 게시판 (온 세상 농부들의 장터)
+const BOARD_POS := Vector2i(140, 20 + NORTH_PAD)        # 광장 게시판 (오늘의 의뢰)
+const AUCTION_POS := Vector2i(142, 20 + NORTH_PAD)      # 경매 게시판 (온 세상 농부들의 장터)
 # (광장·낚시터의 가로등과 벤치는 없앴다 — 밤에는 마을도 캄캄하다)
 # 메인 스토리 4 — 동쪽 다리 건너, 옛 마을의 경계를 알리는 낡은 표지판.
 # 너머(GameData.VILLAGE_ZONES)는 구역을 해금해야 들어갈 수 있다.
-const OLD_SIGN := Vector2i(99, 9 + NORTH_PAD)
+const OLD_SIGN := Vector2i(190, 9 + NORTH_PAD)
 
 # ---- 야생 지역 ----
 #
@@ -552,7 +620,7 @@ const REGIONS := [
 	# ---- 원래 있던 땅 (마을 · 농장 둘레) ----
 	# 예전부터 있던 남동쪽 깊은 숲 — 넓어진 만큼 남쪽으로 늘렸다
 	{"id": "deep", "name": "깊은 숲", "rect": Rect2i(44, 40 + NORTH_PAD, 52, 24),
-		"tree": 0.30, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.20, "rock": 0.10, "ground": "", "grid": 0, "pond": 0.0},
 	# 옛 표지판 너머 첫 땅. 줄 맞춰 심긴 사과나무 — 사람 손이 닿았던 자리다
 	{"id": "orchard", "name": "동쪽 과수원", "rect": Rect2i(172, 8 + NORTH_PAD, 48, 26),
 		"tree": 0.9, "rock": 0.0, "ground": "", "grid": 4, "pond": 0.0},
@@ -569,7 +637,7 @@ const REGIONS := [
 	# 나무는 NATURE_CLEAR(가로 4칸)에 걸려 아무리 올려도 6%쯤에서 포화된다 —
 	# 그래서 「더 깊다」는 바위로 낸다 (바위는 두 칸 간격이라 훨씬 촘촘하다)
 	{"id": "pinewood", "name": "솔숲 골짜기", "rect": Rect2i(160, 70 + NORTH_PAD, 62, 24),
-		"tree": 0.34, "rock": 0.26, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.24, "rock": 0.22, "ground": "", "grid": 0, "pond": 0.0},
 
 	# ---- 네 배로 넓히며 붙인 땅 ----
 	#
@@ -580,10 +648,10 @@ const REGIONS := [
 
 	# 폭포골 — 물소리가 나는 골짜기. 젖은 땅이라 웅덩이가 흩어져 있다
 	{"id": "falls", "name": "폭포골", "rect": Rect2i(238, 6 + NORTH_PAD, 66, 52),
-		"tree": 0.24, "rock": 0.14, "ground": "", "grid": 0, "pond": 0.05},
+		"tree": 0.17, "rock": 0.12, "ground": "", "grid": 0, "pond": 0.05},
 	# 자작나무 언덕 — 훤한 숲. 나무는 많은데 바닥이 밝아 어둡지 않다
 	{"id": "birch", "name": "자작나무 언덕", "rect": Rect2i(316, 4 + NORTH_PAD, 60, 46),
-		"tree": 0.52, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
+		"tree": 0.38, "rock": 0.01, "ground": "", "grid": 0, "pond": 0.0},
 	# 붉은바위 벌판 — 마른 흙땅. 돌무지 언덕이 여기 있다.
 	#
 	# 바닥이 **자갈(path)** 이었다. 그런데 자갈 타일도 벼랑면도 같은 돌
@@ -838,8 +906,8 @@ const TOWN_HOMES := [Vector2i(246, 118), Vector2i(253, 118), Vector2i(260, 118),
 const TOWN_LAMPS := [Vector2i(248, 98), Vector2i(270, 98), Vector2i(292, 98), Vector2i(248, 108),
 	Vector2i(270, 108), Vector2i(292, 108), Vector2i(250, 115), Vector2i(272, 115), Vector2i(294, 115),
 	Vector2i(256, 123), Vector2i(276, 123), Vector2i(296, 123)]
-# 정류장 — 교진 북쪽 어귀와 읍 서쪽 입구. 실제 칸은 세계를 지을 때 가장 가까운 빈 칸으로 잡는다(bus_tiles)
-const BUS_STOPS := {"kyojin": Vector2i(76, 4 + NORTH_PAD), "town": Vector2i(245, 100)}
+# 정류장 — 교진 서쪽 어귀(큰길이 마을로 드는 자리)와 읍 서쪽 입구. 실제 칸은 세계를 지을 때 가장 가까운 빈 칸으로 잡는다(bus_tiles)
+const BUS_STOPS := {"kyojin": Vector2i(80, 9 + NORTH_PAD), "town": Vector2i(245, 100)}
 var bus_tiles := {}
 # 읍 손글 아홉(S4c) — 관청마다 우두머리 하나, 여관 뒷방의 장물아비 하나. 고장 사람처럼 m.npcs 에 살되
 # 주민 수에는 안 든다(TOWN_NPC_IDS). 그림은 고장 사람과 같은 도트 판에서 색만 갈아 낀다
@@ -864,8 +932,8 @@ const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
-const HOME_ANCHOR := Vector2i(71, 30 + NORTH_PAD)   # 광장에서 두 칸 떨어뜨렸다
-const HOME_SITE := Vector2i(73, 30 + NORTH_PAD)  # 집터 표지판 (건물 그림 한가운데)
+const HOME_ANCHOR := Vector2i(88, 50 + NORTH_PAD)   # 마을 남서쪽 — 격자의 한 자리
+const HOME_SITE := Vector2i(90, 50 + NORTH_PAD)  # 건물 그림 한가운데 (지도 라벨 기준점)
 # 새터말(사회 S3b)의 빈 집터 여덟은 GameData.MEADOW_PLOTS 다 — 장부(home_plots)에 적지 않는
 # 「암묵의 집터」라 새 게임 초기화(reset_all)에도 사라지지 않는다
 
@@ -885,22 +953,241 @@ const HOME_SITE := Vector2i(73, 30 + NORTH_PAD)  # 집터 표지판 (건물 그�
 # 북쪽 줄은 18칸 -> **12칸** 간격(그림 7칸 + 사이 풀 5칸), 서쪽 줄은
 # 10칸 -> **8칸**(마당 6칸 + 사이 2칸). 이보다 더 좁히면 마당이 붙어
 # 벽처럼 보인다 — 여기가 끝이다.
+# 마을은 **세 줄 × 네 칸의 격자**다. 한 부지가 울타리까지 11x10칸을 쓰고,
+# 부지 사이는 3줄짜리 흙길(VILLAGE_ROADS)이 지나간다. 가운데 한 자리는
+# 건물 대신 광장이다.
+#
+#        x60          x75          x90
+#   y6   우체국       연구소       도서관
+#   y21  대장간       마을회관     목장 상회
+#   y36  수산시장     (광장)       잡화점
+#   y51  우리집       이장 집      여관
+#
+# 자리를 옮길 때는 **울타리 테두리(11x10)가 서로도, 길과도 닿지 않게** 둔다.
+# 마을은 네 칸 × 세 줄이되, **자로 잰 격자가 아니다.**
+#
+# 한 부지가 울타리까지 17x16칸을 쓰고(YARD_PAD 5), 부지 사이는 28칸 · 26칸씩
+# 벌어져 있다. 화면이 담는 것이 53x30칸이니 **한 화면에 한 부지**다 —
+# 「여기는 대장간」이고, 길을 따라 걸어가면 「여기는 잡화점」이다.
+#
+# 부지 사이는 숲이고(world_gen._plant_village_greenery), 길은 자로 그은
+# 네모가 아니라 굽이친다(_paint_village_lane).
+#
+#          x88          x116         x144         x172
+#   y10    우체국       연구소       마을회관     도서관
+#   y36    수산시장     대장간       (광장)       잡화점
+#   y62    우리집       이장 집      여관         목장 상회
 const VILLAGE_PLOTS := {
-	# 북쪽 줄 (큰길 위쪽)
-	"post":    {"anchor": Vector2i(62, 2 + NORTH_PAD),  "name": "우체국"},
-	"general": {"anchor": Vector2i(74, 2 + NORTH_PAD),  "name": "잡화점"},
-	"lab":     {"anchor": Vector2i(86, 2 + NORTH_PAD),  "name": "연구소"},
-	# 서쪽 줄 (서쪽 세로 길가)
-	"smith":   {"anchor": Vector2i(60, 12 + NORTH_PAD), "name": "대장간"},
-	"ranch":   {"anchor": Vector2i(60, 20 + NORTH_PAD), "name": "목장 상회"},
+	"post":    {"anchor": Vector2i(88, -2 + NORTH_PAD),  "name": "우체국"},
+	"lab":     {"anchor": Vector2i(116, -2 + NORTH_PAD), "name": "연구소"},
+	"hall":    {"anchor": Vector2i(144, -2 + NORTH_PAD), "name": "마을회관"},
+	"library": {"anchor": Vector2i(172, -2 + NORTH_PAD), "name": "도서관"},
+	"fish":    {"anchor": Vector2i(88, 24 + NORTH_PAD),  "name": "수산시장"},
+	"smith":   {"anchor": Vector2i(116, 24 + NORTH_PAD), "name": "대장간"},
+	"general": {"anchor": Vector2i(172, 24 + NORTH_PAD), "name": "잡화점"},
 	# 여관 부지는 파출소가 됐다(사회 S2b) — 여관·연구소는 읍(S4)으로 간다. 그림은 house_inn 그대로
-	"inn":     {"anchor": Vector2i(60, 28 + NORTH_PAD), "name": "파출소"},
-	# 동쪽 줄 (동쪽 세로 길가)
-	"library": {"anchor": Vector2i(89, 12 + NORTH_PAD), "name": "도서관"},
-	"fish":    {"anchor": Vector2i(89, 22 + NORTH_PAD), "name": "수산시장"},
-	# 광장 남쪽 — 주민 10명(플레이어 포함)부터 지을 수 있다 (마을 성장의 정점)
-	"hall":    {"anchor": Vector2i(80, 28 + NORTH_PAD), "name": "마을회관"},
+	"inn":     {"anchor": Vector2i(144, 50 + NORTH_PAD), "name": "파출소"},
+	"ranch":   {"anchor": Vector2i(172, 50 + NORTH_PAD), "name": "목장 상회"},
 }
+# ---- 부지마다 「여기는 뭐 하는 곳」 ----
+#
+# 가게가 다 같은 집 그림에 이름표만 다르면, 마을은 지어 놓은 모형 줄이다.
+# 마당에 그 가게다운 살림이 벌어져 있으면 이름표를 안 읽어도 읽힌다 —
+# 대장간 마당에는 자갈이 깔리고 광석 더미가 쌓여 있는 식이다.
+#
+# 두 가지를 적는다.
+#   "floor": [[Rect2i(오프셋x, 오프셋y, 폭, 높이), 바닥], ...]
+#            바닥은 "path"(자갈)·"yard"(다진 흙)·"soil"(갈아 둔 흙)·"sand".
+#            **소품보다 먼저** 깔린다.
+#   "props": [[Vector2i(오프셋), 종류], ...]
+#
+# 자리는 **건물 왼쪽 위 모서리에서 잰다.** 본체는 5x4, 문은 (2,3), 마당은
+# YARD_PAD 만큼 사방으로 (지금은 x -5..+9 · y -5..+8), 울타리는 그 한 칸
+# 바깥이다. 문 앞 통로(x +1~+3, y +4 아래)는 무엇도 놓지 않는다 — 드나드는 길이다.
+#
+# 그리고 **집 그림 뒤에는 아무것도 두지 않는다.** 집 한 채가 512px 판이라
+# 화면에서 여덟 칸 폭이다 — x -1~+5 · y +3 위에 놓은 것은 죄다 지붕에
+# 먹힌다. 소품은 x -5~-2 와 x +6~+9 두 줄, 그리고 앞마당(y +6~+8)에 둔다.
+# 앞마당 널마루(y +4~+5, x 0~4)도 비워 둔다 — 거기는 나무 널이 깔린다.
+# ---- **언덕 위의 집** ----
+#
+# 마을이 온통 평지였다. 집도 마당도 길도 한 장의 판에 놓여 있어서, 아무리
+# 마당을 채워도 「위에서 내려다본 배치도」였다 — 높이가 없으니 깊이도 없다.
+#
+# 그렇다고 북쪽 줄을 통째로 올리면 마을 뒤에 백 칸짜리 성벽이 선다.
+# 단차는 **몇 곳만** 준다. 부지 하나가 통째로 제 언덕에 얹히고, 문 앞에서
+# 큰길로 돌계단이 내려온다 — 걸어가다 보면 「저 집은 언덕 위에 있네」가
+# 되는 쪽이 마을 전체가 계단식인 것보다 특색이 있다.
+#
+# 어느 부지를 올릴 수 있는가는 **남쪽에 큰길이 있는가**로 정해진다.
+# 언덕 남쪽 두 줄은 바위벽이라 걸어 들어갈 수 없고, 계단을 내려서면
+# 그 아래 첫 줄부터 다시 걷는다. 그 첫 줄이 가로 큰길이라야 마을과 이어진다.
+#   북쪽 줄(y10)  언덕 3~20 · 벽 21~22 · 큰길 23  ✔
+#   가운데 줄(y36) 언덕 29~46 · 벽 47~48 · 큰길 49 ✔
+#   남쪽 줄(y62)  아래가 숲이라 계단이 숲으로 떨어진다  ✘
+#
+# 그래서 도서관(북쪽)과 대장간(가운데)을 고른다 — 마을을 가로질러 대각선으로
+# 멀리 떨어져 있어서 언덕이 줄지어 선 것처럼 보이지 않는다.
+const HILL_PLOTS := ["library", "smith"]
+
+
+const PLOT_DECOR := {
+	# ── 마당에는 **한 가지를 하나씩** ──
+	#
+	# 한때 궤짝과 자루를 스물몇 개씩 흩어 놓았다. 그러면 아홉 마당이 다
+	# 「짐 쌓아 둔 곳」으로 똑같아진다. 그래서 서너 개로 줄였는데, 살림을
+	# 제 격자에 크게 다시 그리고 나니 이번에는 **같은 그림이 마당마다 둘씩
+	# 셋씩** 서서 복사해 붙인 티가 났다 — 물건이 클수록 반복이 눈에 띈다.
+	#
+	# 이제 종류마다 **딱 하나씩**만 둔다. 문 앞 등불 한 쌍만 예외다:
+	# 그건 살림이 아니라 문의 일부고, 한쪽만 있으면 부서진 집으로 보인다.
+	#
+	# 마당은 그 가게가 **무엇을 하는 집인지**만 말하면 된다.
+
+	# ── 대장간 ── 불 붙은 화로 · 모루 · 무기 거치대 · 작업대
+	"smith": {
+		# 자로 잰 네모가 아니라 **닳은 자리 한 덩어리**다 (world_gen 의 apron).
+		# 불 앞과 문 앞을 함께 감싼다 — 사람이 오가는 자리는 이어져 있다
+		"apron": [[Vector2i(5, 3), 7.5, 6.0, "path"]],
+		"props": [
+			# 집 그림 뒤(x -1~+5, y +3 위)에는 아무것도 두지 않는다 —
+			# 집 한 채가 여덟 칸 폭이라 그 안에 놓은 것은 지붕에 먹힌다.
+			#
+			# **쇠 부리는 것끼리 한자리에 모은다.** 화로 · 그 앞의 모루 ·
+			# 곁의 작업대 · 담금질통. 마당에 고르게 흩어 놓으면 물건은
+			# 있는데 「일하는 자리」가 없다
+			[Vector2i(7, 1), "deco_forge"],
+			[Vector2i(5, 6), "deco_anvil"], [Vector2i(9, 5), "deco_toolrack"],
+			[Vector2i(8, 8), "deco_trough"],
+			[Vector2i(-4, 4), "deco_weaponrack"],
+			[Vector2i(-5, -4), "deco_logpile"], [Vector2i(-4, 8), "deco_crate"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(9, 8), "weed"],
+		],
+	},
+	# ── 우체국 ── 짐수레와 마대 자루
+	"post": {
+		"floor": [[Rect2i(-5, 6, 5, 3), "path"], [Rect2i(5, 6, 5, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "deco_cart"], [Vector2i(8, 4), "deco_sack"],
+			[Vector2i(-4, 7), "deco_crate"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+		],
+	},
+	# ── 연구소 ── 표본 선반과 약초 화단
+	"lab": {
+		"floor": [[Rect2i(-5, 6, 5, 3), "soil"], [Rect2i(5, 6, 5, 3), "soil"]],
+		"props": [
+			[Vector2i(-5, -4), "deco_specimen"], [Vector2i(7, 7), "deco_planter"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+		],
+	},
+	# ── 마을회관 ── 평상과 등불, 새겨 놓은 돌
+	"hall": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "carved_stone"],
+			[Vector2i(-4, 7), "deco_bench"], [Vector2i(8, 7), "deco_planter"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+		],
+	},
+	# ── 도서관 ── 내놓은 책 무더기와 앉아 읽는 평상
+	"library": {
+		"floor": [[Rect2i(-5, 6, 5, 3), "path"], [Rect2i(5, 6, 5, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -2), "deco_bookstack"], [Vector2i(8, 4), "deco_bench"],
+			[Vector2i(-4, 7), "deco_planter"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+		],
+	},
+	# ── 수산시장 ── 널판 마당과 모래 · 그물 말리는 틀 · 물통
+	"fish": {
+		"floor": [
+			[Rect2i(-5, 6, 15, 3), "dock"],    # 앞마당은 물가처럼 널을 깐다
+			[Rect2i(-5, -4, 4, 9), "sand"], [Rect2i(6, -4, 4, 9), "sand"],
+		],
+		"props": [
+			[Vector2i(-5, -4), "deco_netrack"], [Vector2i(8, 1), "deco_trough"],
+			[Vector2i(8, 7), "deco_crate"],
+			[Vector2i(0, 8), "deco_lamp"], [Vector2i(4, 8), "deco_lamp"],
+		],
+	},
+	# ── 잡화점 ── 자갈 장터 앞마당 · 내놓은 궤짝과 자루 · 손수레
+	"general": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "deco_crate"], [Vector2i(8, 4), "deco_sack"],
+			[Vector2i(-4, 7), "deco_cart"], [Vector2i(8, 8), "deco_planter"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+		],
+	},
+	# ── 여관 ── 등불 늘어선 앞뜰 · 평상과 화단 · 뒤뜰의 장작더미
+	"inn": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			[Vector2i(-5, -4), "deco_logpile"], [Vector2i(8, 4), "deco_bench"],
+			[Vector2i(-4, 7), "deco_planter"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+		],
+	},
+	# ── 목장 상회 ── **울타리 우리** · 볏단과 여물통
+	#
+	# 이 부지만은 살림이 아니라 **우리 한 칸**으로 말한다. 서쪽에 네 칸 ×
+	# 다섯 칸 울타리를 두르고 남쪽 한 칸을 문으로 터 둔다.
+	"ranch": {
+		"floor": [[Rect2i(-5, 6, 15, 3), "path"]],
+		"props": [
+			# 우리 — 윗변
+			[Vector2i(-5, -4), "fence"], [Vector2i(-4, -4), "fence"],
+			[Vector2i(-3, -4), "fence"], [Vector2i(-2, -4), "fence"],
+			# 우리 — 좌우 기둥. **y +1~+3 로는 내려가지 않는다** — 그 줄에는
+			# 부지의 옆문이 나 있어서, 말뚝을 박으면 광장 쪽 길이 막힌다
+			[Vector2i(-5, -3), "fence"], [Vector2i(-5, -2), "fence"],
+			[Vector2i(-5, -1), "fence"],
+			[Vector2i(-2, -3), "fence"], [Vector2i(-2, -2), "fence"],
+			[Vector2i(-2, -1), "fence"],
+			# 우리 — 아랫변 (가운데 한 칸이 문이다)
+			[Vector2i(-5, 0), "fence"], [Vector2i(-4, 0), "fence"],
+			[Vector2i(-2, 0), "fence"],
+			# 우리 안 — 여물통과 풀
+			[Vector2i(-4, -2), "deco_feedbox"], [Vector2i(-3, -1), "weed"],
+			# 동쪽 — 볏단
+			[Vector2i(8, 4), "deco_hay"], [Vector2i(-4, 7), "deco_trough"],
+			[Vector2i(-1, 4), "deco_lamp"], [Vector2i(5, 4), "deco_lamp"],
+			[Vector2i(7, 7), "weed"],
+		],
+	},
+}
+
+
+# 이 모서리가 마을 부지인가 (아니면 빈 문자열). 마당을 꾸밀 때만 쓴다 —
+# 농장 집·고장 집·숲속 집은 같은 _build_yard 를 지나가지만 꾸미지 않는다.
+func plot_at_anchor(anchor: Vector2i) -> String:
+	for pid: String in VILLAGE_PLOTS:
+		if VILLAGE_PLOTS[pid].anchor == anchor:
+			return pid
+	return ""
+
+
+# 이 칸을 몸통으로 삼는 마을 부지 (아니면 빈 문자열).
+# 건물이 처음부터 다 서 있게 되면서, 「이 집은 어느 가게인가」를 물을 일이
+# `village_built` 바깥에서도 생겼다 — 아직 사람이 들지 않은 가게가 그렇다.
+func plot_body_at(t: Vector2i) -> String:
+	for pid: String in VILLAGE_PLOTS:
+		var a: Vector2i = VILLAGE_PLOTS[pid].anchor
+		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
+			return pid
+	return ""
+
+
+# 부지 앞 게시판이 서는 칸 — **문 옆**이다.
+#
+# 예전에는 문 칸(anchor+(2,3))에 세웠다. 그때는 빈 터였으니 문이랄 것도
+# 없었지만, 건물이 처음부터 서 있는 지금 그 자리는 드나드는 문이다.
+func plot_board_tile(anchor: Vector2i) -> Vector2i:
+	return anchor + Vector2i(-1, 4)
+
+
 # 이장의 거처 — 처음부터 마을에 있는 집 (광장 북쪽). 주민이 늘면 회관 급
 # 새 집으로 다시 지어진다 (GameData.chief_house_lv).
 #
@@ -909,11 +1196,11 @@ const VILLAGE_PLOTS := {
 # 물건 배치의 기본 규칙(밑변을 한 칸 아래, 가로는 칸 한가운데)이 그대로
 # 5x4 본체에 맞아떨어진다. 그림이 다른 집들과 같은 512x552 판이 되면서
 # 한 칸짜리 물건처럼 세우면 집이 문 앞으로 반쯤 튀어나왔다.
-const CHIEF_ANCHOR := Vector2i(70, 9 + NORTH_PAD)          # 본체 5x4 의 왼쪽 위
-const CHIEF_HUT := Vector2i(72, 12 + NORTH_PAD)            # = door_tile(CHIEF_ANCHOR)
-const CHIEF_ART := Rect2i(69, 7 + NORTH_PAD, 7, 6)         # 그림이 덮는 칸
+const CHIEF_ANCHOR := Vector2i(116, 50 + NORTH_PAD)        # 본체 5x4 의 왼쪽 위
+const CHIEF_HUT := Vector2i(118, 53 + NORTH_PAD)           # = door_tile(CHIEF_ANCHOR)
+const CHIEF_ART := Rect2i(115, 48 + NORTH_PAD, 7, 6)       # 그림이 덮는 칸
 # 마당: 건물 그림(5x4) 둘레로 한 칸씩 더. 울타리를 두르고 문 앞만 터 둔다.
-const YARD_PAD := 1
+const YARD_PAD := 5
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "library", "ranch",
@@ -1000,23 +1287,30 @@ const NPC_SCHEDULE := {
 	"teller":     [[9, "square"], [12, "tree"], [17, "square"], [19, "home"]],
 }
 # 광장에서 각자 서는 자리 (한 곳에 몰리지 않게 흩어 둔다)
+# 광장(x71~82 · y32~43) 안에서 분수(x75~78 · y36~39)를 비켜 선다.
+# 분수 북쪽 한 줄, 남쪽 한 줄, 양옆 기둥 — 그러면 열여섯이 겹치지 않는다
+# 광장(x105~119 · y25~38) 안에서 분수(x110~113 · y29~32)를 비켜 선다.
+# 분수 북쪽 한 줄, 남쪽 한 줄, 양옆 기둥 — 그러면 열여섯이 겹치지 않는다
+# 광장(x114~126 · y26~37) 안에서 분수(x119~122 · y30~33)를 비켜 선다
+# 광장(x138~154 · y30~45) 안에서 분수(x144~147 · y36~39)를 비켜 선다
 const NPC_PLAZA := {
-	"chief": Vector2i(74, 13 + NORTH_PAD), "merchant": Vector2i(70, 15 + NORTH_PAD),
-	"blacksmith": Vector2i(80, 15 + NORTH_PAD), "rancher": Vector2i(70, 19 + NORTH_PAD),
-	"fisher": Vector2i(80, 19 + NORTH_PAD),
-	# 이사 온 주민들 — 광장 남쪽에 삼삼오오 모여 수다를 떤다
-	"farmer": Vector2i(72, 17 + NORTH_PAD), "foodie": Vector2i(74, 17 + NORTH_PAD),
-	"angler": Vector2i(78, 17 + NORTH_PAD), "alchemist": Vector2i(76, 15 + NORTH_PAD),
-	"miner": Vector2i(76, 19 + NORTH_PAD), "florist": Vector2i(72, 15 + NORTH_PAD),
-	"carpenter": Vector2i(78, 15 + NORTH_PAD), "herbalist": Vector2i(74, 19 + NORTH_PAD),
-	"painter": Vector2i(82, 17 + NORTH_PAD), "musician": Vector2i(76, 17 + NORTH_PAD),
-	"weaver": Vector2i(82, 15 + NORTH_PAD),
+	"chief": Vector2i(144, 20 + NORTH_PAD), "merchant": Vector2i(146, 20 + NORTH_PAD),
+	"blacksmith": Vector2i(142, 20 + NORTH_PAD), "alchemist": Vector2i(148, 20 + NORTH_PAD),
+	"miner": Vector2i(150, 20 + NORTH_PAD),
+	# 이사 온 주민들 — 분수 남쪽에 삼삼오오 모여 수다를 떤다
+	"rancher": Vector2i(140, 29 + NORTH_PAD), "fisher": Vector2i(142, 29 + NORTH_PAD),
+	"farmer": Vector2i(144, 29 + NORTH_PAD), "foodie": Vector2i(146, 29 + NORTH_PAD),
+	"angler": Vector2i(148, 29 + NORTH_PAD), "musician": Vector2i(150, 29 + NORTH_PAD),
+	"weaver": Vector2i(152, 29 + NORTH_PAD),
+	# 양옆 기둥
+	"florist": Vector2i(139, 23 + NORTH_PAD), "herbalist": Vector2i(139, 26 + NORTH_PAD),
+	"carpenter": Vector2i(153, 23 + NORTH_PAD), "painter": Vector2i(153, 26 + NORTH_PAD),
 }
 # 건물이 없는 NPC(이장)의 집 자리
-const NPC_HOME := {"chief": Vector2i(72, 20 + NORTH_PAD), "explorer": Vector2i(78, 16 + NORTH_PAD),
+const NPC_HOME := {"chief": Vector2i(118, 54 + NORTH_PAD), "explorer": Vector2i(146, 26 + NORTH_PAD),
 	"forest_mom": Vector2i(31, 28 + NORTH_PAD), "forest_girl": Vector2i(34, 28 + NORTH_PAD),
-	"librarian": Vector2i(76, 14 + NORTH_PAD),   # 방문객 시절 — 광장 분수 곁
-	"rancher": Vector2i(70, 20 + NORTH_PAD),     # 방문객 시절 — 광장 남서쪽 풀밭
+	"librarian": Vector2i(144, 31 + NORTH_PAD),  # 방문객 시절 — 광장 분수 곁
+	"rancher": Vector2i(142, 31 + NORTH_PAD),    # 방문객 시절 — 광장 분수 남쪽
 	"alchemist": Vector2i(58, 50 + NORTH_PAD)}   # 깊은 숲 오두막 문 앞 (ALCH_HOUSE_ANCHOR 문+1)
 # 낚시터에 나란히 설 순서 (겹치지 않게 한 칸씩 띄운다)
 const NPC_PIER_ORDER := ["chief", "merchant", "blacksmith", "rancher", "fisher"]
@@ -1043,6 +1337,15 @@ var npcs: Array = []
 const KyojinLoading := preload("res://scripts/loading.gd")
 
 
+# 세계를 짓는 도중에 로딩판의 막대를 민다.
+#
+# 가장 긴 대목이 `_build_map()` 하나다. 그 앞뒤에서만 값을 바꾸면 짓는 내내
+# 막대가 한 자리에 붙박여 「멈췄다」로 보이므로, 안에서도 몇 번 부른다.
+# **await 로 부른다** — 막대가 거기까지 차오르는 동안 진짜 프레임이 돈다.
+func mark_build(text: String, ratio: float) -> void:
+	await KyojinLoading.breathe(get_tree(), text, ratio)
+
+
 func _ready() -> void:
 	# 갈라낸 모듈부터 붙인다 — 바로 아래 _build_map()이 worldgen을 쓴다.
 	# @rpc는 노드 경로로 상대를 찾으므로 **NetSync는 이름을 바꾸면 통신이 죽는다.**
@@ -1066,19 +1369,41 @@ func _ready() -> void:
 	# 여기부터 몇 초쯤 화면이 굳는다 — 그동안 무엇을 하고 있는지 말해 준다.
 	# await 가 아니라 그 자리에서 다시 그리는 방식이라(loading.gd 참고),
 	# 절반만 지어진 세계에 남의 _process 가 끼어들 일이 없다
-	KyojinLoading.mark(get_tree(), "그림을 굽는 중…", 0.10)
+	# **짓는 동안 트리는 멈추고 세계는 감춘다.**
+	#
+	# 아래 breathe() 들이 진짜 프레임을 흘려 보내므로(막대가 차오르는 자리다),
+	# 그대로 두면 절반만 지어진 세계가 그려지고 남의 _process 도 끼어든다.
+	# 로딩판은 PROCESS_MODE_ALWAYS 라 멈춘 트리에서도 혼자 움직인다.
+	visible = false
+	get_tree().paused = true
+	await KyojinLoading.breathe(get_tree(), "그림을 굽는 중…", 0.14)
 	_load_textures()
-	KyojinLoading.mark(get_tree(), "옷을 입히는 중…", 0.34)
+	await KyojinLoading.breathe(get_tree(), "옷을 입히는 중…", 0.26)
 	apply_appearance()   # 새 게임: 타이틀에서 고른 외형 / 게스트: 기본 외형
-	KyojinLoading.mark(get_tree(), "땅을 고르고 숲을 심는 중…", 0.40)
-	worldgen._build_map()
-	KyojinLoading.mark(get_tree(), "물길을 내는 중…", 0.80)
+	await KyojinLoading.breathe(get_tree(), "땅을 고르고 숲을 심는 중…", 0.34)
+	await worldgen._build_map()
+	await KyojinLoading.breathe(get_tree(), "물길을 내는 중…", 0.72)
 	rebuild_water_levels()
-	KyojinLoading.mark(get_tree(), "밭을 일구는 중…", 0.88)
+	await KyojinLoading.breathe(get_tree(), "밭을 일구는 중…", 0.75)
 	farming.rebuild()
+	get_tree().paused = false
+	visible = true
 
 	night = CanvasModulate.new()
 	add_child(night)
+
+	# 자연물의 접지 그림자 — 나무·바위는 여태 그림자 없이 떠 있었다.
+	# 세계(world)보다 **먼저** 붙는 형제라 언제나 모든 것의 밑에 깔린다.
+	# 무엇을 어디에 그릴지는 renderer._draw_object_shadows 가 정한다
+	shadows = Node2D.new()
+	shadows.name = "Shadows"
+	# **가까운 픽셀로 늘린다.** 그늘 원판은 64x24짜리인데 나무 밑에서는
+	# 156x56로 늘어난다 — 기본 필터(선형)로 늘리면 세 단으로 끊어 놓은
+	# 농도가 도로 뭉개져 매끈한 에어브러시 얼룩이 된다. 세계의 모든 그림이
+	# nearest 인데 그늘 한 겹만 부드러우면, 그 한 겹이 딴 게임의 것이다
+	shadows.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	shadows.draw.connect(renderer._draw_object_shadows)
+	add_child(shadows)
 
 	world = Node2D.new()
 	world.name = "World"
@@ -1090,6 +1415,39 @@ func _ready() -> void:
 	overlay.z_index = 100
 	overlay.draw.connect(renderer._draw_overlay)
 	add_child(overlay)
+
+	# 등불 빛무리 — CanvasModulate(밤)는 같은 캔버스의 그림을 전부
+	# 어둡게 눌러서, overlay에 아무리 밝게 그려도 같이 꺼진다.
+	# **딴 CanvasLayer**에 얹으면 어둠이 못 미친다. follow_viewport로
+	# 세계 좌표를 그대로 쓴다 (HUD보다 밑, 세계보다 위)
+	var glow_layer := CanvasLayer.new()
+	glow_layer.name = "GlowLayer"
+	glow_layer.layer = 1
+	glow_layer.follow_viewport_enabled = true
+	add_child(glow_layer)
+	glow = Node2D.new()
+	glow.name = "Glow"
+	glow.draw.connect(renderer._draw_glows)
+	glow_layer.add_child(glow)
+
+	# 비네트 — 화면 귀퉁이가 아주 살짝 어둡다. 시선이 한복판으로 모이고
+	# 화면에 「렌즈」가 생긴다. 정적인 그림 한 장이라 비용이 없다
+	var vin_img := Image.create(192, 108, false, Image.FORMAT_RGBA8)
+	for vy in 108:
+		for vx in 192:
+			var d := Vector2((vx - 96) / 96.0, (vy - 54) / 54.0).length()
+			var va := clampf(d - 0.62, 0.0, 1.0)
+			vin_img.set_pixel(vx, vy, Color(0.03, 0.03, 0.07, va * va * 0.34))
+	var vin_layer := CanvasLayer.new()
+	vin_layer.name = "VignetteLayer"
+	vin_layer.layer = 2
+	add_child(vin_layer)
+	var vin := TextureRect.new()
+	vin.texture = ImageTexture.create_from_image(vin_img)
+	vin.stretch_mode = TextureRect.STRETCH_SCALE
+	vin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vin_layer.add_child(vin)
 
 	player = preload("res://scenes/player.tscn").instantiate()
 	player.main = self
@@ -1175,7 +1533,7 @@ func _ready() -> void:
 
 	# 마을 사람들: 이장만 처음부터 광장에 있고,
 	# 나머지는 자기 건물이 지어진 뒤에 마을에 자리를 잡는다
-	npcmgr._spawn_npc("chief", Vector2i(71, 20 + NORTH_PAD))
+	npcmgr._spawn_npc("chief", Vector2i(144, 20 + NORTH_PAD))
 
 	sleep_dialog = ConfirmationDialog.new()
 	sleep_dialog.dialog_text = "잠자리에 들까요?\n다음 날 아침이 됩니다."
@@ -1260,7 +1618,7 @@ func _ready() -> void:
 		elif GameData.story_phase == "greet":
 			# 집에 들어간 직후 저장했다면, 나온 셈 치고 이장이 다가온다
 			story.start_home_greet.call_deferred()
-		if GameData.fisher_quest in ["meet", "follow", "open"]:
+		if GameData.fisher_quest in ["meet", "cast", "open"]:
 			story._restore_fisher.call_deferred()   # 낚시꾼 연출 자리 복구
 		hud.show_message("저장된 농장을 불러왔다!")
 	else:
@@ -1276,9 +1634,10 @@ func _ready() -> void:
 				GameData.tool_slots.append("")
 			GameData.tool = "hoe"
 			player.position = Vector2(STORY_SPAWN.x * TILE + 16, STORY_SPAWN.y * TILE + 16)
+			player.dir = "right"   # 등 뒤는 지나온 들판, 눈앞이 숲이다
 			story._plant_story_forest()
 			story._apply_story_camera.call_deferred()
-			hud.show_message("우거진 숲... 이 숲을 지나야 마을이 나온다.", 5.0)
+			hud.show_message("숲 어귀에 닿았다. 이 숲을 지나야 마을이 나온다.", 5.0)
 			if not story_shot:
 				story._show_intro.call_deferred()
 		else:
@@ -1308,10 +1667,9 @@ func _ready() -> void:
 			for cy in range(0, WORLD_H / GameData.EXPLORE_CHUNK + 1):
 				for cx in range(0, MAP_W / GameData.EXPLORE_CHUNK + 1):
 					GameData.explored[Vector2i(cx, cy)] = true  # 지도 캡처용 전체 탐사
-			for y in range(HOME_ANCHOR.y, HOME_ANCHOR.y + 4):
-				for x in range(HOME_ANCHOR.x, HOME_ANCHOR.x + 5):
-					objects[Vector2i(x, y)] = {"kind": "house", "hp": 0}
-			objects.erase(HOME_SITE)
+			# (집 칸을 손으로 채우고 「집터」 표지판을 지우던 네 줄은 없앴다 —
+			#  이제 우리집도 세계를 지을 때 다른 건물과 같이 선다. 표지판을
+			#  지우던 그 한 줄이 이제는 **집 한복판에 구멍을 뚫는다**)
 	npcmgr._sync_village_npcs()
 	objnode._spawn_objects()
 	objnode._apply_season_visuals()
@@ -1353,6 +1711,17 @@ func _setup_fade(animate_in: bool) -> void:
 func _load_textures() -> void:
 	for n in TEXTURE_NAMES:
 		tex[n] = load("res://assets/sprites/%s.png" % n)
+	# 울타리 — **이웃 넷의 꼴마다 한 장**(북1 · 동2 · 남4 · 서8).
+	#
+	# 예전에는 한 장을 열 칸에 그대로 찍었다. 조각 하나에 말뚝이 둘,
+	# 그 사이에 가로장 — 그것을 나란히 놓으면 말뚝이 두 개씩 붙어 서고
+	# 모퉁이에서는 장이 허공으로 뻗었다. 울타리가 아니라 도장이었다.
+	# 이제는 이어진 쪽으로만 장을 뻗는다 (ref/make_fence.js).
+	for fm in 16:
+		tex["fence_%d" % fm] = load("res://assets/sprites/fence_%d.png" % fm)
+	# 화로 — 불이 흔들리도록 네 장 (LANDMARK_FRAMES 가 돌린다)
+	for ff in int(LANDMARK_FRAMES["deco_forge"]):
+		tex["deco_forge_%d" % ff] = load("res://assets/sprites/deco_forge_%d.png" % ff)
 	# 물 — 깊이 다섯 단 × 판 셋 × 장 둘.
 	#   깊이  물가에서 멀수록 짙다. 한 단이 반 톤이라 경계가 안 보인다
 	#   판    한 장을 호수에 반복해 깔면 잔물결이 같은 자리마다 찍혀
@@ -1494,9 +1863,33 @@ func apply_appearance() -> void:
 			tex["pc_" + sfx] = ImageTexture.create_from_image(img)
 
 
-# 맵 밖 배경 색조 (어두운 숲처럼 보이게)
-const OUT_TINT := Color(0.42, 0.47, 0.42)
-const OUT_TREE_TINT := Color(0.34, 0.4, 0.35)
+# ---- 맵 밖 ----
+#
+# 세계의 끝을 **벽**으로 막으면 「여기가 렌더러의 끝」이라고 말하는 꼴이다.
+# 어두운 숲 한 겹으로 채워 두었더니 화면 위쪽이 통째로 검은 띠였다.
+#
+# 세계는 벽이 아니라 **거리**로 끝나야 한다. 멀어질수록 대기가 끼어들어
+# 색이 옅어지고 푸르러지는 것 — 대기 원근이다. 맵 변에서 멀어질수록
+# 숲을 이 흐림빛(HAZE)으로 녹인다. 그러면 끝이 「막힌 데」가 아니라
+# 「더 가 볼 수 없을 만큼 먼 데」가 된다.
+# 맵 변 **바로 밖**은 안쪽과 거의 같아야 한다. 0.46으로 눌러 두었더니 변에서
+# 밝기가 뚝 떨어져, 안개를 아무리 곱게 깔아도 그 한 줄이 「여기가 끝」이라고
+# 말했다. 경계는 밝기로 긋는 게 아니라 **거리로** 그어야 한다
+const OUT_TINT := Color(0.88, 0.92, 0.88)
+const OUT_TREE_TINT := Color(0.80, 0.86, 0.82)
+const HAZE := Color(0.72, 0.80, 0.86)      # 먼 하늘빛 — 푸르고 옅다
+const HAZE_FULL := 26.0                    # 몇 칸 밖에서 흐림이 다 차는가
+
+
+# 맵 변에서 얼마나 멀리 나갔는지로 흐림을 섞는다
+func _out_tint(at: Vector2, base: Color) -> Color:
+	var tx: float = at.x / float(TILE)
+	var ty: float = at.y / float(TILE)
+	var d: float = maxf(maxf(-tx, tx - float(MAP_W - 1)),
+		maxf(-ty, ty - float(MAP_H - 1)))
+	var f: float = clampf(d / HAZE_FULL, 0.0, 1.0)
+	# 가까이는 그대로, 멀리 갈수록 빠르게 흐려진다 (제곱근으로 당긴다)
+	return base.lerp(HAZE, sqrt(f) * 0.86)
 
 
 # 맵 끝에서도 주인공이 화면 가운데 오도록 카메라 제한을 맵 밖까지 넉넉히 둔다
@@ -1545,14 +1938,64 @@ const BUILDING_KINDS := ["house", "art_block", "barn", "barn_block"]
 # 종류별 시각 배율. 텍스처가 2배 해상도(EPX)라서 실제 곱은 여기의 절반이 적용된다.
 const OBJECT_SCALES := {
 	# 주인공(약 3타일 키)에 맞춘 크기. 그림이 타일보다 크므로 배치 간격도 띄운다.
-	"tree": 3.0, "rock": 1.9, "bigrock": 4.0, "cave": 2.2, "worldtree": 2.6,
-	"barn": 1.0, "forage_berry": 1.5, "forage_herb": 1.5, "searock": 2.3,
+	# 크게, 대신 드물게 — 잔 나무가 우글거리면 배경이 되고, 큰 나무가
+	# 드문드문 서야 한 그루 한 그루가 물건이 된다
+	# 나무는 **도트 밀도로 못 박는다** (1.0 / 2.0 = 0.5배).
+	#
+	# 예전에는 96px 그림을 1.7배로 늘여 썼다. 그 바람에 픽셀 하나가 화면에서
+	# 1.7px — 집도 사람도 살림도 다 2px 인데 나무만 어긋났고, 그루마다 배율을
+	# 흔들기까지 해서 같은 나무가 3.4px 도 되고 1.7px 도 됐다. 화면에서 제일
+	# 큰 물건이 제일 흐린 물건이었다. 이제 82x82칸(화면 164px)에 제 밀도로
+	# 그리고 배율은 건드리지 않는다 (make_trees.js).
+	# 바위도 나무와 같이 **도트 밀도로 못 박는다** (1.0 / 2.0 = 0.5배).
+	# 예전에는 64x64 그림 하나를 0.72~1.38배로 흔들어 썼다. 그 바람에 바위만
+	# 한 픽셀이 화면에서 0.72px 도 되고 1.38px 도 됐고, 같은 돌이 자리마다
+	# 다른 해상도로 섰다. 이제 크기를 흔드는 대신 **다른 돌 셋**을 그려 두고
+	# 자리 해시로 골라 쓴다 (make_rocks.js · object_nodes.gd).
+	"tree": 1.0, "rock": 1.0, "bigrock": 1.0, "cave": 2.2, "worldtree": 2.6,
+	# 온천·전망대 — 배율이 없어서 0.5배(한 칸짜리)로 그려졌다. 새 그림은
+	# 도트 한 칸 = 화면 2px 로 그렸으므로 2.0이라야 자가 맞는다
+	"onsen": 2.0, "old_lookout": 2.0,
+	"barn": 1.0, "forage_berry": 1.7, "forage_herb": 1.7, "searock": 1.0,
 	"forage_shell": 1.2, "forage_coral": 1.3,
 	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6, "shop_stand": 2.6, "market_stall": 2.6,
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)
 	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,
+	# 가게 마당의 소품 — 32x32 한 칸짜리라 2.0이면 화면에서 딱 한 칸이다.
+	# 조금씩 다르게 두어 늘어놓았을 때 자로 잰 듯 보이지 않게 한다
+	"flower_pot": 2.0, "chest": 2.1, "storage_box": 2.2, "ore_node": 2.2,
+	"rock_wedge": 2.0, "bait": 2.0, "crystal": 1.9, "rope": 1.9, "broom": 2.0,
+	"old_box": 2.1, "ore": 2.1, "star_ore": 2.1, "nail": 1.9, "cloth": 1.9,
+	"gem": 1.8, "recipe": 1.8, "glow_shroom": 1.9, "spring_water": 1.9,
+	"sludge": 1.9,
 }
+# ---- 가게가 아닌 집의 마당 ----
+#
+# 아홉 가게에는 마당(PLOT_DECOR)이 있는데 나머지 집들은 잔디 위에 그냥
+# 얹혀 있었다 — 우리집도, 이장의 거처도, 폭포골·큰나무숲의 집들도, 축사도.
+# 그 집들이 「모형」으로 보인 까닭이 이것이다: **사람이 사는 집 둘레에는
+# 살림이 나와 있다.**
+#
+# 가게 마당과 다른 점이 둘 있다.
+#   ① 장사 물건이 아니라 **살림**이다 — 장작, 물통, 화분, 궤짝
+#   ② 종류마다 하나씩, 그것도 두세 가지면 족하다. 가게가 아니니까
+#
+# 좌표는 집 기준점(anchor)에서 잰다. 집 그림이 x -1~+5 · y -2~+3 을 덮으므로
+# 그 밖에만 놓는다 — 안에 두면 지붕에 먹힌다.
+const HOUSE_DECOR := {
+	"home":   [[Vector2i(-3, 4), "deco_logpile"], [Vector2i(6, 4), "deco_planter"]],
+	"chief":  [[Vector2i(-3, 5), "deco_logpile"], [Vector2i(7, 4), "deco_planter"]],
+	"mill":   [[Vector2i(-3, 4), "deco_sack"], [Vector2i(6, 4), "deco_crate"]],
+	"creek":  [[Vector2i(-3, 4), "deco_trough"], [Vector2i(6, 4), "deco_logpile"]],
+	"cabin":  [[Vector2i(-3, 4), "deco_logpile"], [Vector2i(6, 4), "deco_crate"]],
+	"shade":  [[Vector2i(-3, 4), "deco_bench"], [Vector2i(6, 4), "deco_planter"]],
+	"barn":   [[Vector2i(-4, 2), "deco_hay"], [Vector2i(4, 2), "deco_feedbox"]],
+	"forest": [[Vector2i(-3, 4), "deco_logpile"]],
+	"alch":   [[Vector2i(-3, 4), "deco_specimen"], [Vector2i(6, 4), "deco_planter"]],
+}
+
+
 # 자연물 배치 간격(타일). 실제 그려지는 폭에서 뽑았다.
 #
 # 나무는 "옆으로 나란히" 있을 때만 그림이 지저분하게 겹친다.
@@ -1577,13 +2020,22 @@ func spawn_blocked(x: int, y: int) -> bool:
 	return no_spawn[y * MAP_W + x] != 0
 
 
-const TREE_DX := 4   # 가로로 4칸 이내이면서
+const TREE_DX := 5   # 가로로 5칸 이내이면서 (나무가 커진 만큼 간격도)
 const TREE_DY := 2   # 세로로 2칸 이내면 겹쳐 보인다 -> 금지
 const NATURE_CLEAR := {
 	"tree": 4, "bigrock": 3, "rock": 2, "forage_berry": 2, "forage_herb": 2,
 }
 const NATURE_CLEAR_MAX := 4
 const OBJECT_TEX_DENSITY := 2.0  # 농장 오브젝트 텍스처 밀도 (월드 크기 유지용)
+
+# 마당에 세워 두는 살림 (ref/make_props.js). 원본 4px이 도트 한 칸이라
+# **0.5배**로 얹어야 사람·집·바닥과 도트 크기가 맞는다 — 랜드마크·석등과
+# 같은 규칙이다 (object_nodes 가 이 목록을 보고 배율을 못박는다)
+const DOT_PROPS := ["deco_forge", "deco_anvil",
+	"deco_logpile", "deco_trough", "deco_feedbox", "deco_hay", "deco_netrack",
+	"deco_planter", "deco_cart", "deco_bookstack", "deco_specimen",
+	"deco_crate", "deco_sack", "deco_toolrack",
+	"deco_weaponrack", "forage_branch"]
 
 # 오브젝트가 실제로 막는 크기(픽셀). 기준 칸(32px) 밖으로 얼마나 더 넓히는지다.
 # 그림이 타일보다 훨씬 크기 때문에, 칸 하나만 막으면 캐릭터가 나무 밑동/바위 속으로
@@ -1604,12 +2056,17 @@ const OBJECT_PAD := {
 	"searock": Vector2(10, 8),
 	"cave": Vector2(16, 8), "worldtree": Vector2(16, 8), "barn": Vector2(4, 3),
 	"forage_berry": Vector2(3, 2), "forage_herb": Vector2(3, 2),
+	"forage_branch": Vector2(3, 2),
 	"deco_fountain": Vector2(5, 4), "deco_lamp": Vector2(3, 3), "deco_bench": Vector2(4, 3),
 	"board": Vector2(3, 2), "sign": Vector2(3, 2),
 	# 석등(계단 옆)은 마을 광장의 가로등(deco_lamp)과 **다른 물건**이다.
 	# 계단 바로 옆에 서므로 여백이 넓으면 두 칸짜리 계단을 양쪽에서
 	# 좁혀 지나갈 수가 없어진다
 	"deco_stonelamp": Vector2(2, 2),
+	# 마당 소품은 여백을 거의 안 준다 — 가게 앞 한 칸 틈으로도 지나갈 수 있어야 한다
+	"flower_pot": Vector2(2, 2), "chest": Vector2(2, 2), "storage_box": Vector2(2, 2),
+	"ore_node": Vector2(2, 2), "rock_wedge": Vector2(2, 2), "bait": Vector2(2, 2),
+	"crystal": Vector2(2, 2), "rope": Vector2(2, 2), "broom": Vector2(2, 2),
 }
 
 
@@ -1628,6 +2085,104 @@ func _hash01(x: int, y: int) -> float:
 	h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
 	h = h ^ (h >> 16)
 	return float(h) / 4294967295.0
+
+
+# ---- 발밑 그림자 ----
+#
+# 사람·짐승의 접지 그림자. 딱딱한 검정 네모는 「붙인 스티커」로 보인다 —
+# 가장자리가 옅은 타원 두 겹이라야 발이 땅을 딛는다. 빛깔은 검정이 아니라
+# 남보라다 (회색은 회색이 아니다 — 그늘은 하늘빛을 받는다).
+# 매끈한 원 두 겹으로는 **에어브러시 얼룩**이다 — 도트로 그린 세계에서
+# 그것만 딴 그림이 된다. 살림·나무·자연물에 쓰는 것과 같은 규칙으로 짠다:
+#   ① 세 단   안(짙다) · 중간 · 가장자리(옅다)
+#   ② 기울기  해가 왼쪽 위에 있으니 오른쪽으로 밀어 눕힌다
+#   ③ 허문 테 제일 바깥 단은 자리에 따라 절반만 찍는다
+# 그리는 것은 **도트 한 칸(화면 2px)짜리 네모**다. 원을 그리면 가장자리가
+# 세계의 격자와 어긋나 그 한 겹만 매끄러워진다.
+static func draw_ground_shadow(ci: CanvasItem, half_w: float, half_h: float) -> void:
+	var col := Color(0.10, 0.08, 0.18)
+	var skew: float = half_w * 0.18
+	var y0: int = int(floor(-half_h / DOT)) - 1
+	var y1: int = int(ceil(half_h / DOT)) + 1
+	var x0: int = int(floor((-half_w - skew) / DOT)) - 1
+	var x1: int = int(ceil((half_w + skew) / DOT)) + 1
+	for gy in range(y0, y1 + 1):
+		for gx in range(x0, x1 + 1):
+			var px: float = gx * DOT
+			var py: float = gy * DOT
+			var d := Vector2((px - skew) / half_w, py / half_h).length()
+			if d > 1.0:
+				continue
+			var a := 0.10
+			if d <= 0.44:
+				a = 0.26
+			elif d <= 0.76:
+				a = 0.18
+			if d > 0.82 and _shadow_jitter(gx, gy) < 0.45:
+				continue
+			ci.draw_rect(Rect2(px, py, DOT, DOT), Color(col.r, col.g, col.b, a))
+
+
+# 그림자 테를 허무는 난수. 자리로 굳혀 두므로 걸어도 테가 자글거리지 않는다
+static func _shadow_jitter(x: int, y: int) -> float:
+	var n: int = (x * 73856093) ^ (y * 19349663) ^ 0x9E3779B9
+	n = (n ^ (n >> 13)) & 0x7FFFFFFF
+	return float((n * 1274126177) & 0x7FFFFFFF) / 2147483647.0
+
+
+# ---- 도트 자 ----
+#
+# 실내의 가구·진열 상품도 **세계와 같은 격자**를 탄다. 화면 2px = 도트
+# 한 칸. 세계는 도트인데 실내 살림만 매끈한 벡터 사각형이면, 색을 아무리
+# 맞춰도 다른 게임의 그림이다 — 어색함의 뿌리가 이것이었다.
+const DOT := 2.0
+const DOT_LINE := Color(0.17, 0.13, 0.11)   # 세계의 윤곽선과 같은 어두운 따뜻한 선
+
+static func dot_rect(ci: CanvasItem, o: Vector2, x: float, y: float,
+		w: float, h: float, c: Color) -> void:
+	ci.draw_rect(Rect2(o.x + x * DOT, o.y + y * DOT, w * DOT, h * DOT), c)
+
+
+# 윤곽선 두른 판 — 몸통을 한 번에. 속은 fill, 테는 LINE
+static func dot_panel(ci: CanvasItem, o: Vector2, x: float, y: float,
+		w: float, h: float, fill: Color) -> void:
+	dot_rect(ci, o, x - 1, y - 1, w + 2, h + 2, DOT_LINE)
+	dot_rect(ci, o, x, y, w, h, fill)
+
+
+# 큰 얼룩 — **여러 칸에 걸친 낮은 주파수 잡음.**
+#
+# 바닥 장(variant)을 칸마다 백색 잡음으로 골라 왔다. 세 장이 잘게 섞이니
+# 넓은 들판은 결국 세 장의 평균, 곧 통짜 한 색이었다 — 가까이서 보면
+# 어지럽고 멀리서 보면 밋밋한, 제일 나쁜 조합이다.
+#
+# 참고 그림(스타듀)의 땅이 살아 보이는 건 장이 예뻐서가 아니라 **얼룩의
+# 크기** 때문이다. 밝은 자리와 그늘진 자리가 대여섯 칸에 걸쳐 번갈아 난다.
+# 격자점에서만 잡음을 뽑고 사이를 부드럽게 이으면(smoothstep) 그 크기가
+# 나온다. 장 자체의 톤은 make_ground.js 에서 갈라 두었다.
+func _patch01(x: int, y: int, seed: int, cell: int) -> float:
+	var fx := float(x) / float(cell)
+	var fy := float(y) / float(cell)
+	var x0 := int(floor(fx))
+	var y0 := int(floor(fy))
+	var tx := fx - float(x0)
+	var ty := fy - float(y0)
+	tx = tx * tx * (3.0 - 2.0 * tx)
+	ty = ty * ty * (3.0 - 2.0 * ty)
+	var a := _hash01(x0 * 31 + seed, y0 * 17 + seed)
+	var b := _hash01((x0 + 1) * 31 + seed, y0 * 17 + seed)
+	var c := _hash01(x0 * 31 + seed, (y0 + 1) * 17 + seed)
+	var d := _hash01((x0 + 1) * 31 + seed, (y0 + 1) * 17 + seed)
+	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), ty)
+
+
+# 얼룩에서 장 번호를 뽑는다. 얼룩만 쓰면 경계가 매끈한 등고선으로 드러나
+# 「지도의 색칠」처럼 보이므로, 칸마다 잔 잡음을 조금 섞어 가장자리를 허문다.
+func _patch_variant(x: int, y: int, seed: int, cell: int) -> int:
+	var v: float = _patch01(x, y, seed, cell) * 0.80 + _hash01(x * 7 + seed, y * 3) * 0.20
+	if v < 0.37:
+		return 0
+	return 1 if v < 0.68 else 2
 
 
 # ---- 통행/타겟 ----
@@ -1692,22 +2247,82 @@ func _tile_accessible(t: Vector2i) -> bool:
 		or GameData.is_tile_owned(t.x, t.y)
 
 
-# 튜토리얼 숲길 — **울타리 안**만 걸을 수 있다.
+# 튜토리얼 숲길 — **길 위**만 걸을 수 있다.
 #
 # 예전에는 튜토리얼 공간(TUTORIAL_REGION) 전체를 열어 두었다. 울타리는
 # 세워 두었지만 그 너머도 통행 가능한 땅이라, 나무 사이 틈으로 빠져나가면
 # 숲 바깥 풀밭을 마음대로 걸어 다닐 수 있었다 — 우체부와 말도 섞기 전에
-# 길 밖으로 나가 버리는 일이 그래서 생겼다. 길과 두 갈래만 남긴다.
+# 길 밖으로 나가 버리는 일이 그래서 생겼다.
+#
+# 지금은 꺾은선 두 개(본길 · 우회로)가 덮는 칸이 곧 걸을 수 있는 땅이다.
+# 상태를 들고 있지 않는다 — 숲을 아직 심지 않았어도, 두 번 심어도 같은 답이
+# 나온다 (하네스가 심기 전후로 이걸 묻는다).
 func tutorial_walkable(t: Vector2i) -> bool:
-	# 본길 (동쪽 끝 X1에 닿으면 마을로 넘어가는 연출이 시작된다)
-	if t.x >= STORY_ROAD_X0 and t.x <= STORY_ROAD_X1 \
-			and t.y >= STORY_ROAD_Y0 and t.y <= STORY_ROAD_Y1:
-		return true
-	# 갈림길의 북·남 갈래 (둘 다 막다른 길 — 지도 퀘스트가 여기서 헤맨다)
-	if t.x >= STORY_FORK.x - 1 and t.x <= STORY_FORK.x + 2 \
-			and t.y >= 10 + TUT_DY and t.y <= 21 + TUT_DY:
-		return true
+	if STORY_CLEARING.has_point(t):
+		return true          # 숲 어귀의 빈터 (길이 여기서 넓어진다)
+	return on_story_lane(t, STORY_LANE) or on_story_lane(t, STORY_DETOUR)
+
+
+func on_story_lane(t: Vector2i, lane: Array) -> bool:
+	for i in range(lane.size() - 1):
+		if story_lane_rect(lane[i], lane[i + 1]).has_point(t):
+			return true
+	for i in range(1, lane.size() - 1):
+		if story_corner_rect(lane[i]).has_point(t):
+			return true
 	return false
+
+
+# 마디 하나가 덮는 칸 — 한복판의 -STORY_LANE_BACK ~ +STORY_LANE_FWD.
+func story_lane_rect(a: Vector2i, b: Vector2i) -> Rect2i:
+	var w: int = STORY_LANE_BACK + STORY_LANE_FWD + 1
+	if a.y == b.y:
+		return Rect2i(mini(a.x, b.x), a.y - STORY_LANE_BACK,
+			absi(b.x - a.x) + 1, w)
+	return Rect2i(a.x - STORY_LANE_BACK, mini(a.y, b.y),
+		w, absi(b.y - a.y) + 1)
+
+
+# 꺾이는 자리마다 놓는 **정사각형 한 칸**.
+#
+# 마디 둘만 겹쳐 두면 안쪽 모서리는 이어지지만 **바깥쪽 모서리가 옴폭 팬다.**
+# 그 옴폭한 자리에 선 나무는 제 칸에서 위로 세 칸을 덮어 그리므로, 꺾어져
+# 올라가는 길을 통째로 가려 버린다 — 길이 꺾이는 바로 그 순간에 길이
+# 안 보인다. 모서리를 길 폭만큼 네모나게 터 준다.
+func story_corner_rect(v: Vector2i) -> Rect2i:
+	var w: int = STORY_LANE_BACK + STORY_LANE_FWD + 1
+	return Rect2i(v.x - STORY_LANE_BACK, v.y - STORY_LANE_BACK, w, w)
+
+
+# 길이 덮는 사각형 전부 (마디 + 꺾이는 자리). 한 번 받아 두고 훑는 쪽에서 쓴다.
+func story_road_rects() -> Array:
+	var out: Array = [STORY_CLEARING]
+	for lane: Array in [STORY_LANE, STORY_DETOUR]:
+		for i in range(lane.size() - 1):
+			out.append(story_lane_rect(lane[i], lane[i + 1]))
+		for i in range(1, lane.size() - 1):
+			out.append(story_corner_rect(lane[i]))
+	return out
+
+
+# 밟혀 다져진 흙이 깔리는 가운데 세 줄 (양옆은 풀 갓길로 남는다)
+func story_dirt_rect(a: Vector2i, b: Vector2i) -> Rect2i:
+	var w: int = STORY_DIRT_BACK + STORY_DIRT_FWD + 1
+	if a.y == b.y:
+		return Rect2i(mini(a.x, b.x), a.y - STORY_DIRT_BACK,
+			absi(b.x - a.x) + 1, w)
+	return Rect2i(a.x - STORY_DIRT_BACK, mini(a.y, b.y),
+		w, absi(b.y - a.y) + 1)
+
+
+# 길 전체를 감싸는 칸 범위 — 카메라가 숲을 어디까지 비출지 여기서 잰다
+func story_lane_bounds() -> Rect2i:
+	var out := Rect2i()
+	var first := true
+	for r: Rect2i in story_road_rects():
+		out = r if first else out.merge(r)
+		first = false
+	return out
 
 
 # 이 칸이 속한 지역이 이미 열렸는가 (지금은 언제나 열려 있다 — 아래 주석 참고)
@@ -1925,6 +2540,7 @@ var float_texts: Array = []  # 경험치 획득 플로팅 텍스트 [{text, pos,
 
 # 채집·벌목·채광 대상이 되는 것들
 const AIM_KINDS := ["tree", "rock", "bigrock", "forage_berry", "forage_herb", "weed",
+	"forage_branch",
 	"forage_shell", "forage_coral", "forage_trash", "forage_glass",
 	"forage_ring", "forage_relic", "old_book"]
 
@@ -1971,33 +2587,141 @@ const FEST_COLORS := {
 # ---- 오프닝 스토리 / 튜토리얼 ----
 
 # ---- 메인 스토리 1 「우체부 아저씨와의 첫 만남」 ----
-const STORY_SPAWN := Vector2i(18, 16 + TUT_DY)   # 화면 왼쪽에서 시작
-const STORY_LANE_Y := 16 + TUT_DY          # 우체부가 왼쪽에서 걸어오는 길
-const STORY_FORK := Vector2i(34, 16 + TUT_DY)    # 숲길이 갈라지는 갈림길 (지도 퀘스트)
-const STORY_ROCK := Vector2i(40, 16 + TUT_DY)    # 길을 막는 커다란 바위 (퀘스트 5)
-# 스토리 숲의 가로 폭. 화면(37.5칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
-# 옆으로 움직인다. 숲길(x 4~33) 동쪽은 들어갈 수 없는 배경 숲이다.
+#
+# **숲길의 모양은 아래 꺾은선 두 개가 전부다.**
+#
+# 예전에는 고정된 가로 띠 하나였다 — 한복판이 STORY_LANE_Y 한 줄, 그
+# 위아래로 네 줄. 길이 자로 잰 듯 곧아서 「숲을 걸어간다」가 아니라
+# 「복도를 지난다」에 가까웠고, 갈림길의 두 갈래는 **둘 다 막다른 길**이라
+# 고를 것이 없었다. 지도를 펴 볼 구실로만 서 있던 갈림길이다.
+#
+# 지금은 점을 차례로 이은 꺾은선이 길의 한복판이다. 우체부의 걸음도,
+# 카메라도, 길목 판정도 전부 이 배열만 읽는다 — 길 모양을 바꾸고 싶으면
+# 여기 점만 옮기면 되고, 고정 y를 아는 코드는 어디에도 없다.
+#
+#   STORY_LANE    서쪽 시작 -> 갈림길 -> **지름길** -> 합류 -> 마을 어귀
+#   STORY_DETOUR  갈림길 -> 남쪽 골짜기로 크게 돌아 -> 같은 자리에서 합류
+#
+# 길의 폭은 **여섯 칸**(한복판의 -2 ~ +3), 그중 가운데 **세 줄**이 밟혀
+# 다져진 흙이고 위아래 한 줄씩은 풀 갓길이다.
+#
+# 네 칸·다섯 칸으로도 가 봤는데 둘 다 좁았다. 나무가 제 칸에서 위로 세 칸을
+# 덮어 그리는 통에, 걸을 수 있는 폭은 넉넉해도 **눈에 보이는 길**은 두 줄이
+# 전부였다 — 나뭇잎 사이로 난 틈처럼 보이지 길로 보이지 않는다.
+#
+# **남쪽이 한 칸 더 넓은 것도 그 그림 때문이다.** 길 남쪽 가장자리에 선
+# 나무는 그 위 두 줄을 가린다. 남쪽 여유가 딱 맞으면 가려지는 줄 하나가
+# 다져진 흙길이 되지만, 한 칸을 더 두면 가려지는 것은 풀 갓길뿐이다.
+const STORY_LANE_BACK := 2                 # 한복판에서 이만큼 뒤(북)까지가 길
+const STORY_LANE_FWD := 3                  # 한복판에서 이만큼 앞(남)까지가 길
+const STORY_DIRT_BACK := 1                 # 그중 흙이 깔리는 몫 (한복판의 -1 ~ +1)
+const STORY_DIRT_FWD := 1
+const STORY_LANE := [
+	Vector2i(1, 13 + TUT_DY),    # ① 숲 어귀의 빈터 — 여기서 이야기가 시작한다
+	Vector2i(25, 13 + TUT_DY),   # ② 길이 북으로 꺾이는 자리
+	Vector2i(25, 6 + TUT_DY),    # ③ 오르막 — 여기서 첫 나무가 쓰러진다
+	Vector2i(33, 6 + TUT_DY),    # ④ 갈림길
+	Vector2i(41, 6 + TUT_DY),    # ⑤ 지름길: 쓰러진 나무를 넘어 곧장 동쪽으로
+	Vector2i(41, 13 + TUT_DY),   # ⑥ 다시 남으로 내려와
+	Vector2i(55, 13 + TUT_DY),   # ⑦ 마을 어귀
+]
+# 우회로는 **지름길의 두 배쯤** 된다. 조금 돌아가는 정도로는 「골랐다」는
+# 느낌이 안 난다 — 남쪽 골짜기까지 한참 내려갔다 올라와야 돌아온 보람이 있다.
+const STORY_DETOUR := [
+	Vector2i(33, 6 + TUT_DY),    # 갈림길에서 갈라져
+	Vector2i(33, 24 + TUT_DY),   # 남쪽 골짜기로 깊이 내려가
+	Vector2i(45, 24 + TUT_DY),   # 동쪽으로 길게 돌고
+	Vector2i(45, 13 + TUT_DY),   # 다시 올라와 본길에 합류한다
+]
+# ---- 이야기가 시작하는 자리는 숲 **한복판**이 아니라 **어귀**다 ----
+#
+# 예전에는 길 한가운데에 툭 놓였다. 앞도 뒤도 빽빽한 숲이라, 밝아지자마자
+# 나오는 독백 「눈앞에 우거진 숲이 펼쳐져 있다」가 화면과 맞지 않았고 —
+# 숲은 눈앞이 아니라 사방에 있었다 — 무엇보다 **여기까지 어떻게 왔는지**에
+# 대한 답이 화면 어디에도 없었다. 세계가 만들어지고 사람이 그 안에 얹힌
+# 것처럼 보였다.
+#
+# 이 빈터가 그 답이다. 성긴 나무가 선 들판이 화면 **서쪽 끝까지** 이어져
+# 지나온 길이 화면 밖으로 나가고(그래서 등 뒤에 벽이 없다), 흙길은 그
+# 들판을 가로질러 동쪽의 빽빽한 숲으로 빨려 들어간다. 그 입구에 표지판이
+# 서 있다 — 이 길이 어디로 가는 길인지 화면이 먼저 말해 준다.
+const STORY_CLEARING := Rect2i(1, 9 + TUT_DY, 14, 9)
+const STORY_TRAIL_SIGN := Vector2i(13, 10 + TUT_DY)   # 숲으로 드는 입구의 낡은 표지판
+# 꺾은선 위의 이름난 자리들 (위 배열의 ①·④·⑦ 과 같은 점이어야 한다 —
+# 어긋나면 하네스의 STORY_LANE_OK 가 잡아낸다)
+const STORY_SPAWN := Vector2i(5, 13 + TUT_DY)    # 빈터 한복판 — 숲을 마주 보고 선다
+const STORY_FORK := Vector2i(33, 6 + TUT_DY)     # 숲길이 갈라지는 갈림길 (지도 퀘스트)
+const STORY_MERGE := Vector2i(45, 13 + TUT_DY)   # 두 길이 다시 만나는 자리
+const STORY_EXIT := Vector2i(55, 13 + TUT_DY)    # 여기 서면 마을로 넘어간다
+const STORY_ROCK := Vector2i(51, 13 + TUT_DY)    # 길을 막는 커다란 바위 (퀘스트 5)
+# ---- 눈앞에서 쓰러지는 첫 나무가 **서 있는** 자리 ----
+#
+# **양쪽에서 한 그루씩** 넘어온다. 길이 여섯 칸이라 한 그루로는 길을 다
+# 못 덮고, 한쪽에서만 넘어오면 반대쪽에 훤히 트인 틈이 남아 「막혔다」로
+# 안 읽힌다. 좌우에서 동시에 넘어와 길 위에서 겹치는 것이 훨씬 세다.
+#
+# **반드시 길 밖이어야 한다.** 쓰러진 자리는 빈 칸이 되는데, 그 칸이 길
+# 위였다면 나무가 넘어지는 순간 길목 옆으로 빠져나갈 틈이 생긴다 —
+# 막으려고 쓰러뜨린 나무가 길을 여는 셈이다. (STORY_LANE_OK가 지킨다)
+#
+# dir: +1 이면 오른쪽으로, -1 이면 왼쪽으로 넘어간다 (길 쪽으로).
+const STORY_FALL_TREES := [
+	{"at": Vector2i(22, 10 + TUT_DY), "dir": 1, "take": 2},   # 서쪽 그루 — 앞 두 칸을 덮는다
+	{"at": Vector2i(29, 10 + TUT_DY), "dir": -1, "take": 1},  # 동쪽 그루 — 남은 칸을 덮는다
+]
+# 스토리 숲의 가로 폭. 화면(53.6칸)보다 넉넉히 넓어야 카메라가 주인공을 따라
+# 옆으로 움직인다. 길(x 18~54)의 동쪽은 들어갈 수 없는 배경 숲이다.
 const STORY_FOREST_W := 58
-# 숲길은 4줄 폭의 흙길. 양옆은 울타리로 막혀 있어 길을 벗어날 수 없다.
-const STORY_ROAD_Y0 := 15 + TUT_DY
-const STORY_ROAD_Y1 := 18 + TUT_DY         # 네 줄 폭의 숲길
-const STORY_ROAD_X0 := 18
-const STORY_ROAD_X1 := 47
 # 메인 스토리 5: 숲 깊은 곳의 수상한 집 (이장에게 물어본 뒤 세상에 드러난다)
 const FOREST_HOUSE_ANCHOR := Vector2i(30, 24 + NORTH_PAD)
 # 연금술사의 오두막 (메인 스토리 12) — 깊은 숲(deep_rect) 연못 서쪽.
 # 소문을 다 모으면 숨은 길과 함께 세상에 놓인다 (worldgen._spawn_alch_house)
 const ALCH_HOUSE_ANCHOR := Vector2i(56, 46 + NORTH_PAD)
-const FOREST_TRAIL_X := 32                 # 숲길(y18)에서 집 문 앞으로 내려가는 오솔길
-const EXPLORER_ARRIVE := Vector2i(78, 16 + NORTH_PAD)  # 모험가 재민이 처음 서성이는 광장 언저리
-# 길을 가로막고 선 나무 줄 (4줄 전체를 막는다) — 베어야만 지나갈 수 있다.
-# 첫 번째는 퀘스트 1의 「더 이상 갈 수 없는 길」이자 퀘스트 3의 벌목 대상.
-# 길을 막은 길목. 예전에는 네 곳 x 네 줄 = 나무 16그루라 초반이 지루했다.
-# 지금은 두 곳이고, 길목마다 길이 두 줄로 좁아진다 → 나무 4그루.
-const STORY_GATE_XS := [27, 38]
-const STORY_GATE_ROWS := [16 + TUT_DY, 17 + TUT_DY]   # 막히는 줄
+# 모험가 재민이 처음 서성이는 자리 — **분수 남쪽**이다.
+# 예전 값(146, 26+PAD)은 분수 네모(144~147 · 24~27+PAD) **한복판**이라,
+# 재민이 물 위에 서 있었다. 광장이 맨 잔디밭이던 시절에는 분수가 눈에
+# 안 띄어서 아무도 몰랐다.
+const EXPLORER_ARRIVE := Vector2i(146, 29 + NORTH_PAD)
+# ---- 길을 막고 선 것들 ----
+#
+# 자리와 성격을 **여기 한 곳에** 적는다. 예전에는 「가로막는 x 두 개
+# (STORY_GATE_XS) × 막히는 y 두 줄 (STORY_GATE_ROWS)」이라, 길이 세로로
+# 꺾이는 순간 뜻을 잃는 표였다.
+#
+#   at    **한복판 칸.** 여기를 가운데로 span 칸이 막히고, 길의 나머지 폭은
+#         숲으로 채워 좁힌다 (여섯 줄을 다 뚫게 하면 초반부터 지루하다)
+#   axis  "h" 가로 구간 (위아래가 좁아진다) · "v" 세로 구간 (좌우가 좁아진다)
+#   span  막는 칸 수. 나무 길목은 다져진 흙 세 줄을 그대로 막고, 바위는
+#         두 칸이다 (커다란 바위는 한 덩이에 곡괭이 네 번이라 셋이면 길다)
+#   kind  tree 선 나무 / log 쓰러진 나무 (도끼는 같다) / bigrock 커다란 바위
+#   role  이야기에서 맡은 몫
+const STORY_GATES := [
+	# ③ 눈앞에서 쓰러지는 첫 나무 — 처음에는 비어 있다가, 다가서면 **양쪽**
+	#    길가의 나무(STORY_FALL_TREES)가 이 자리로 넘어와 겹쳐 눕는다
+	{"at": Vector2i(25, 10 + TUT_DY), "axis": "v", "span": 3,
+		"kind": "log", "role": "first"},
+	# ② 지름길을 가로막은 오래된 등걸 — 넘어가려면 도끼가 필요하다.
+	#    누운 나무는 **세로 구간**에만 놓는다 — 가로 구간에 놓으면 몸통이
+	#    길과 나란히 누워, 막고 선 것이 아니라 길가에 치워 둔 것으로 보인다
+	{"at": Vector2i(41, 9 + TUT_DY), "axis": "v", "span": 3,
+		"kind": "log", "role": "short"},
+	# ② 우회로 끝, 마을 어귀 직전의 한 그루 — 돌아와도 도끼는 배우게 된다
+	{"at": Vector2i(45, 17 + TUT_DY), "axis": "v", "span": 3,
+		"kind": "tree", "role": "detour"},
+	# ④ 광석이 박힌 커다란 바위 (곡괭이 대목) — 두 길이 합친 뒤라 어느 쪽으로
+	#    와도 반드시 만난다
+	{"at": Vector2i(51, 13 + TUT_DY), "axis": "h", "span": 2,
+		"kind": "bigrock", "role": "rock"},
+]
 const BIGROCK_HP := 4                      # 커다란 바위는 여러 번 캐야 부서진다
 const BIGROCK_STONE := 4                   # 커다란 바위에서 나오는 돌
+# 숲길을 막은 그 바위에는 **광석이 박혀 있다.**
+#
+# 예전에는 돌 넉 장만 떨어졌다. 곡괭이를 처음 쥐는 대목인데 나오는 것이
+# 나무를 벨 때와 다를 바 없어서, 「새 도구를 얻었다」가 아니라 「또 치웠다」가
+# 됐다. 반짝이는 것이 하나 나오면 곡괭이가 무엇을 하는 도구인지 손이 먼저
+# 안다 — 동굴에 들어갈 이유도 여기서 생긴다.
+const STORY_ROCK_ORE := 2                  # 그 바위에만 박혀 있는 광석
 var story_cutscene := false                # 컷신 중 조작 잠금
 var house_preview := false                 # 집터 자리 고르기 (동물의 숲식 범위 표시)
 const POSTMAN_STOP_DIST := 168.0           # 걸어와서 멈춰 서는 거리 (5칸쯤 앞)
@@ -2145,6 +2869,17 @@ func rescue_trapped() -> void:
 	var pt := player_tile()
 	var stuck: bool = pt.x < 0 or pt.y < 0 or pt.x >= MAP_W or pt.y >= MAP_H \
 		or not _tile_accessible(pt) or grid[clampi(pt.y, 0, MAP_H - 1)][clampi(pt.x, 0, MAP_W - 1)].ground == "water"
+	# **깔고 앉은 것도 갇힌 것이다.**
+	#
+	# 여기는 「못 가는 지역인가 · 물인가」만 봤다. 그런데 통행을 막는 것은
+	# 지형만이 아니라 **그 칸에 놓인 것**이기도 하다(is_passable 이 제일 먼저
+	# objects 를 본다) — 집 칸 위에 서면 사방이 다 제 몸이라 한 칸도 못
+	# 움직이는데, 이 검사는 멀쩡한 것으로 봤다. 집을 드나드는 대목에서
+	# 지붕 위에 끼이던 것이 이것이다.
+	#
+	# 말을 타고 있을 때는 뺀다 — 그때는 말 칸 위에 서 있는 것이 정상이다.
+	if not stuck and not GameData.riding and objects.has(pt):
+		stuck = true
 	if stuck:
 		var to := nearest_open_tile(Vector2i(clampi(pt.x, 1, MAP_W - 2),
 			clampi(pt.y, 1, MAP_H - 2)))
@@ -2152,17 +2887,44 @@ func rescue_trapped() -> void:
 			to = START_TILE
 		player.position = Vector2(to.x * TILE + 16, to.y * TILE + 16)
 		hud.show_message("길이 없는 곳에 갇혀 있었다 — 가까운 땅으로 나왔다.", 4.0)
-	# 마을 사람 — 잠긴 구역이나 맵 밖으로 밀려났으면 제 자리로 돌려보낸다
+	# 마을 사람 — 잠긴 구역이나 맵 밖으로 밀려났으면 제 자리로 돌려보낸다.
+	#
+	# **튜토리얼 동안에는 한 사람도 건드리지 않는다.**
+	#
+	# 그때는 세계가 통째로 「닿을 수 없는 땅」이다 — `_tile_accessible` 이
+	# 숲길만 참으로 보기 때문이다. 그래서 이 고리가 **마을 사람 전부를
+	# 갇힌 것으로 읽고** 제 자리로 돌려보냈는데, NPC_HOME 에 없는 사람은
+	# 갈 곳이 START_TILE 이었다. 숲길을 걷는 동안 시골 마을 여섯이 농장
+	# 한복판(14, 22)에 모여 있다가, 마을에 도착하는 순간 거기서 제 고장까지
+	# **맵을 가로질러 걸어가던 것**이 이것이다. 길이 안 나오는 사람은
+	# 15초씩 서 있었고(npc._route_cd), 그게 「가만히 있는 NPC」다.
+	if GameData.tutorial_space:
+		return
 	for n in npcs:
 		var nt := Vector2i(int(n.position.x / TILE), int(n.position.y / TILE))
 		if nt.x >= 0 and nt.y >= 0 and nt.x < MAP_W and nt.y < MAP_H \
 				and _tile_accessible(nt):
 			continue
-		var home: Vector2i = NPC_HOME.get(n.id, START_TILE)
+		var home: Vector2i = npc_home_tile(n.id)
 		var ht := nearest_open_tile(home)
 		if ht.x < 0:
 			ht = home
 		n.position = Vector2(ht.x * TILE + 16, ht.y * TILE + 16)
+
+
+# 이 사람을 돌려보낼 자리.
+#
+# NPC_HOME 은 교진 마을 사람들의 표다 — 고장 사람은 거기 없어서 START_TILE
+# (농장 한복판)로 떨어졌다. 제 고장이 있는 사람은 제 고장으로 보낸다.
+func npc_home_tile(nid: String) -> Vector2i:
+	if NPC_HOME.has(nid):
+		return NPC_HOME[nid]
+	if HAMLET_OF.has(nid):
+		for entry: Array in HAMLETS[HAMLET_OF[nid]].houses:
+			if str(entry[2]) == nid:
+				return door_tile(entry[0]) + Vector2i(0, 1)
+		return HAMLETS[HAMLET_OF[nid]].square
+	return START_TILE
 
 
 func _process(delta: float) -> void:
@@ -2291,6 +3053,7 @@ func _process(delta: float) -> void:
 		GameData.energy = minf(GameData.ENERGY_MAX, GameData.energy + delta * 2.0)
 	_starve_process(delta)
 	renderer._update_particles(delta)
+	renderer._update_ambient(delta)
 	daycycle._update_night_mobs(delta)
 	objnode._update_tree_fade()
 	story._update_u_intro()
@@ -2305,7 +3068,9 @@ func _process(delta: float) -> void:
 		_p = _pm("HUD", _p)
 		_perf_tick(delta)
 	queue_redraw()
+	shadows.queue_redraw()
 	overlay.queue_redraw()
+	glow.queue_redraw()
 	if _shot_path != "":
 		harness._debug_tick()
 
@@ -2584,6 +3349,20 @@ const PARTICLE_DEFS := {
 	# 쓰러진 나무가 땅에 닿을 때 이는 흙먼지 (옆으로 낮게 퍼진다)
 	"dust": {"c": Color(0.74, 0.68, 0.54), "n": 14, "up": -12.0, "g": 18.0,
 		"drift": 34.0, "size": 2.0, "life": 1.6},
+	# 가을 잎 — 앰비언트 낙엽의 가을 옷
+	"leaf_fall": {"c": Color(0.85, 0.52, 0.2), "n": 9, "up": -10.0, "g": 14.0,
+		"drift": 22.0, "size": 2.0, "life": 2.6, "sway": 26.0},
+	# 발걸음 — 잔디에선 풀잎, 흙·자갈·모래에선 먼지가 인다
+	"step_grass": {"c": Color(0.44, 0.7, 0.3), "n": 3, "up": -20.0, "g": 85.0,
+		"drift": 12.0, "life": 0.8},
+	"step_dust": {"c": Color(0.72, 0.64, 0.5), "n": 3, "up": -12.0, "g": 26.0,
+		"drift": 10.0, "size": 1.6, "life": 0.9},
+	# 물가 반짝임 — 해가 물결에 부서지는 흰 점
+	"glint": {"c": Color(0.95, 0.99, 1.0), "n": 2, "up": -6.0, "g": 0.0,
+		"drift": 4.0, "life": 1.1},
+	# 망치질 불티 — 모루에서 튄다. 빠르고 무겁게 떨어진다
+	"spark": {"c": Color(1.0, 0.72, 0.25), "n": 7, "up": -55.0, "g": 210.0,
+		"drift": 40.0, "life": 0.8},
 }
 
 
@@ -2623,6 +3402,7 @@ var _cam_shake_amp := 0.0
 # 지나갈 수 없게 된다 (한 칸짜리 통로가 다 막힌다). 그래서 범위는 그대로 두고,
 # **가리는 동안만 반투명**하게 해서 플레이어가 언제나 보이게 한다.
 const FADE_KINDS := ["tree", "bigrock", "cave", "worldtree", "barn",
+	"onsen", "old_lookout", "stall",
 	"deco_fountain", "deco_lamp", "house", "art_block",
 	# 랜드마크는 화면 열두 칸이 넘는다 — 뒤로 걸어 들어가면 주인공이
 	# 통째로 사라지므로 반드시 비쳐야 한다
@@ -2915,12 +3695,25 @@ func _dc_fill(x: int, y: int, ci: int, i: int, above: PackedByteArray,
 	elif ground == "soil":
 		kind = DC_SOIL
 	elif ground == "path":
-		_dc_base[ci] = tex["path_%d" % (int(_hash01(x * 7, y * 3) * 3.0) % 3)]
+		# 길은 얼룩을 **크게** 잡는다. 여섯 칸으로 잡았더니 길 한 토막이
+		# 통째로 밝고 다음 토막이 통째로 어두워, 포장을 이어 붙인 꼴이었다
+		_dc_base[ci] = tex["path_%d" % _patch_variant(x, y, 5, 9)]
+		# **연석** — 길이 끝나는 자리에 어두운 가장자리 한 단. 이게 없으면
+		# 길이 「깔린 것」이 아니라 흙에 번진 얼룩이다. 참고 맵의 길이
+		# 입체적으로 읽히는 건 무늬가 아니라 이 경계 단 덕이다
+		if gn != K_PATH:
+			el.append(tex["path_curb_n"])
+		if gs != K_PATH:
+			el.append(tex["path_curb_s"])
+		if gw != K_PATH:
+			el.append(tex["path_curb_w"])
+		if gek != K_PATH:
+			el.append(tex["path_curb_e"])
 	elif ground == "yard":
 		# 집 둘레의 다져진 흙 — 길처럼 깐 게 아니라 밟혀서 풀이 죽은 자리
-		_dc_base[ci] = tex["yard_%d" % (int(_hash01(x * 9, y * 5) * 3.0) % 3)]
+		_dc_base[ci] = tex["yard_%d" % _patch_variant(x, y, 11, 5)]
 	else:
-		_dc_base[ci] = tex[grass_prefix + str(int(_hash01(x, y) * 3.0) % 3)]
+		_dc_base[ci] = tex[grass_prefix + str(_patch_variant(x, y, 3, 7))]
 		# 흙길과 풀이 만나는 자리는 직선으로 끊기면 종이처럼 보인다.
 		# 길 쪽에서 자갈이 조금 흘러나온 것처럼 톱니 가장자리를 덧그린다
 		if gn == K_PATH:
@@ -3081,7 +3874,12 @@ func _draw() -> void:
 	var x0 := maxi(0, vx0)
 	var y0 := maxi(0, vy0)
 	var x1 := mini(MAP_W, vx1)
-	var y1 := mini(MAP_H, vy1)
+	# **세계는 WORLD_H 에서 끝난다.** 격자는 MAP_H 까지 있지만 그 아래는
+	# 세계 밖에 따로 붙여 둔 튜토리얼 공간이라, 바닷가에 서서 남쪽을 보면
+	# 바다 일곱 줄 너머로 **잔디밭**이 펼쳐졌다 — 바다 건너 들판인 셈이다.
+	# 그 아래는 그리지 않고 바깥(바다)에 맡긴다
+	var south: int = MAP_H if GameData.tutorial_space else WORLD_H
+	var y1 := mini(south, vy1)
 
 	var grass_prefix := "grass_" + GameData.season_key() + "_"
 	var tile_size := Vector2(TILE, TILE)
@@ -3123,17 +3921,36 @@ func _draw() -> void:
 	# 맵 바깥: 화면 가장자리가 비지 않도록 어두운 숲을 깔아 둔다.
 	# (카메라 제한을 풀어 주인공을 항상 화면 가운데 두기 위한 배경)
 	var out_grass := {}
+	var out_sea := {}
 	var out_trees: Array[Vector2] = []
 	# 잔디 판 셋은 미리 꺼내 둔다 — 칸마다 글자를 붙여 사전을 뒤질 일이 아니다
 	var g3: Array[Texture2D] = [tex[grass_prefix + "0"], tex[grass_prefix + "1"],
 		tex[grass_prefix + "2"]]
+	# 먼바다 판 — 제일 깊은 단(WATER_LV - 1) 셋. 물결 판을 나눠 써야
+	# 넓은 바다에 같은 잔물결이 바둑판으로 찍히지 않는다
+	var deep: Array[Texture2D] = []
+	for vr in 3:
+		deep.append(_water_tex[((WATER_LV - 1) * 3 + vr) * 2 + water_frame])
 	for y in range(vy0, vy1):
 		for x in range(vx0, vx1):
-			if x >= 0 and y >= 0 and x < MAP_W and y < MAP_H:
+			if x >= 0 and y >= 0 and x < MAP_W and y < south:
+				continue
+			# **남쪽 밖은 바다다.** 세계의 남쪽 끝이 바다인데 그 너머를
+			# 잔디로 깔면 「바다 건너 들판」이 된다
+			if y >= SEA_Y0 and not GameData.tutorial_space:
+				put.call(out_sea, deep[int(_hash01(x * 3 + 1, y * 5 + 2) * 3.0) % 3],
+					Vector2(x * TILE, y * TILE))
 				continue
 			put.call(out_grass, g3[int(_hash01(x, y) * 3.0) % 3],
 				Vector2(x * TILE, y * TILE))
-			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다
+			# 드문드문 나무 실루엣을 세워 숲이 이어지는 것처럼 보이게 한다.
+			# 다만 **맵 변에서 열 칸까지만.** 사십 칸 밖까지 나무를 세우면
+			# 그건 「끝없는 숲」이 아니라 「끝없는 벽지」다. 가까운 숲 한 뼘
+			# 너머로는 능선과 안개가 맡는다 (_draw_far_ridges)
+			var od: float = maxf(maxf(-float(x), float(x - (MAP_W - 1))),
+				maxf(-float(y), float(y - (MAP_H - 1))))
+			if od > 8.0:
+				continue
 			if x % 3 == 0 and y % 2 == 0 and _hash01(x * 5 + 1, y * 7 + 3) < 0.55:
 				out_trees.append(Vector2(x * TILE, y * TILE))
 
@@ -3215,15 +4032,24 @@ func _draw() -> void:
 	# 맵 바깥 (어둡게)
 	for t: Texture2D in out_grass:
 		for at: Vector2 in out_grass[t]:
-			draw_texture_rect(t, Rect2(at, tile_size), false, OUT_TINT)
+			draw_texture_rect(t, Rect2(at, tile_size), false, _out_tint(at, OUT_TINT))
+	for t: Texture2D in out_sea:
+		for at: Vector2 in out_sea[t]:
+			draw_texture_rect(t, Rect2(at, tile_size), false, _sea_tint(at))
+	# 먼 능선 — 바깥 잔디 **뒤**, 바깥 나무 **앞**에 얹는다
+	_draw_far_ridges(vx0, vx1, vy0)
 	if not out_trees.is_empty():
 		var ot: Texture2D = tex["tree_01"]
-		var osc := 1.5
+		# 배율은 **그림 크기에서 되짚는다.** 1.5로 박아 두었더니, 나무 판을
+		# 96px에서 328px로 다시 그린 순간 맵 밖 나무가 492px짜리 거인이 됐다
+		# — 화면 위쪽이 통째로 나무 밑동 벽이었다. 맵 안 나무가 0.5배이므로
+		# 바깥은 그보다 조금 작게(0.44) 두어 「멀리 있는 숲」으로 물러난다
+		var osc := 0.44
 		var osize: Vector2 = ot.get_size() * osc
 		for at: Vector2 in out_trees:
 			draw_texture_rect(ot, Rect2(
 				Vector2(at.x + 16 - osize.x / 2.0, at.y + TILE - osize.y), osize),
-				false, OUT_TREE_TINT)
+				false, _out_tint(at, OUT_TREE_TINT))
 	# 바탕 -> 길 가장자리 -> 작물
 	for t: Texture2D in base:
 		for at: Vector2 in base[t]:
@@ -3291,9 +4117,350 @@ func _draw() -> void:
 			else:
 				draw_rect(Rect2(Vector2(tt.x * TILE, tt.y * TILE), Vector2(TILE, TILE)),
 					Color(1, 1, 1, 0.6), false, 1.0)
+	# 먼바다 — **세계 안 타일을 다 그린 뒤에** 덧칠한다. 바깥 칸에만 얹었더니
+	# 세계의 남쪽 변에서 물빛이 뚝 갈려 「여기가 끝」이라고 말했다
+	if not out_sea.is_empty() or vy1 > SEA_Y0 + 2:
+		_draw_open_sea(vx0, vx1, vy1)
+	_draw_map_rim(x0, y0, x1, y1)
 	if perf_show:
 		_perf["draw"] = Time.get_ticks_usec() - _t0
 		_pm("그리기", _t0)
+
+
+# ---- 먼바다 ----
+#
+# 세계의 남쪽 끝은 바다다. 그런데 그 바다가 맵 변에서 뚝 끊기고 그 아래로
+# **잔디밭**이 펼쳐져 있었다 — 바닷가에 서서 남쪽을 보면 「바다 건너 들판」
+# 이었다. 격자는 MAP_H 까지 있지만 WORLD_H 아래는 세계 밖에 따로 붙여 둔
+# 튜토리얼 공간이라, 그 자리를 잔디로 채우고 있었던 것이다.
+#
+# 바다는 벽으로 끝나지 않는다. 북쪽 숲이 능선과 안개로 물러나듯,
+# 바다는 **깊어지다가 안개에 잠긴다.**
+#   가까운 바다  물빛 그대로
+#   중간         한 단 짙게 (깊어진다)
+#   먼 바다      하늘빛에 녹는다 (수평선 대신 안개)
+const SEA_DEEP := Color(0.62, 0.74, 0.90)   # 깊은 물 — 조금 어둡고 푸르다
+# 안개는 **세계 안에서부터** 시작한다. 남쪽 변에서 시작하면 그 한 줄이
+# 그대로 경계선이 된다 — 경계를 지우려고 까는 안개가 경계를 긋는 꼴이다
+const SEA_HAZE_FROM := 2.0
+const SEA_HAZE_FULL := 30.0                 # 몇 칸 밖에서 안개가 다 차는가
+# 바다 위의 안개는 하늘의 것보다 **푸르고 밝다** — 잿빛으로 깔면 물이
+# 뿌예지는 게 아니라 물 위에 회색 판을 덮은 꼴이 된다
+const SEA_AIR := Color(0.74, 0.84, 0.92)
+
+# **바다에는 색조(modulate)로 안개를 못 끼운다.** 색조는 곱셈이라,
+# 밝은 잔디에 하늘빛을 곱하면 뿌예지지만 검푸른 물에 곱하면 그냥 **검어진다**.
+# 실제로 그렇게 됐다 — 세계 남쪽 밖이 통째로 먹빛 구덩이였다.
+# 물빛은 그대로 두고, 안개는 **위에 덧칠**한다 (_draw_open_sea 가 한다).
+func _sea_tint(at: Vector2) -> Color:
+	var d: float = at.y / float(TILE) - float(SEA_Y0)
+	var deep: float = clampf((d - SEA_HAZE_FROM) / 10.0, 0.0, 1.0)
+	return Color(1, 1, 1).lerp(SEA_DEEP, deep * 0.5)
+
+
+# 먼바다에 얹는 것 — 흰 물결과 섬 하나.
+#
+# 안개만 깔면 그건 「비어 있는 먼 데」다. 북쪽 능선에서 배운 것과 같다:
+# **거리에 무언가가 있어야 거리가 된다.** 다만 바다에 있는 것은 능선이
+# 아니라 물결과 섬이다.
+func _draw_open_sea(vx0: int, vx1: int, vy1: int) -> void:
+	var ts := float(TILE)
+	var x0 := float(vx0) * ts
+	var ww := float(vx1 - vx0) * ts
+	# ① 안개 — **줄마다 한 겹씩 덧칠한다.** 멀수록 짙어져 물빛을 지운다.
+	#    색조로 곱하면 검어지지만 위에 덧칠하면 진짜로 뿌예진다
+	for ty in range(maxi(SEA_Y0, 0), vy1):
+		var d0: float = float(ty - SEA_Y0)
+		if d0 < SEA_HAZE_FROM:
+			continue
+		var f0: float = clampf((d0 - SEA_HAZE_FROM) / SEA_HAZE_FULL, 0.0, 1.0)
+		draw_rect(Rect2(x0, float(ty) * ts, ww, ts),
+			Color(SEA_AIR.r, SEA_AIR.g, SEA_AIR.b, sqrt(f0) * 0.66))
+	# ② **너울** — 바다가 잔물결뿐이면 그건 물웅덩이지 바다가 아니다.
+	#    바다에는 크게 굽이치는 이랑이 있고, 그 이랑이 멀어질수록 촘촘해진다
+	#    (그 간격이 곧 거리다 — 기와 켜와 같은 규칙).
+	#    이랑 하나는 두 줄이다: 마루의 밝은 등과 골의 그늘.
+	# (GDScript 에는 맨 중괄호 블록이 없다 — 그건 사전 리터럴로 읽힌다)
+	var sw_y: float = float(SEA_Y0) * ts + ts * 1.2
+	var sw_gap: float = ts * 1.35
+	var sw_k := 0
+	while sw_y < float(vy1) * ts:
+		var dd: float = sw_y / ts - float(SEA_Y0)
+		var fa: float = clampf(1.0 - dd / 30.0, 0.12, 1.0)
+		var seg := 12.0
+		var sx: float = floor(x0 / seg) * seg
+		while sx < x0 + ww:
+			# 이랑은 곧지 않다 — 길게 굽이친다 (사인 둘을 겹쳐 되풀이를 감춘다)
+			var wob: float = sin(sx / (ts * 7.0) + float(sw_k) * 1.7) * 3.2 \
+				+ sin(sx / (ts * 2.3) + float(sw_k) * 0.6) * 1.6
+			draw_rect(Rect2(sx, sw_y + wob, seg, 2.0),
+				Color(1, 1, 1, 0.10 * fa))
+			draw_rect(Rect2(sx, sw_y + wob + 2.0, seg, 3.0),
+				Color(0.06, 0.12, 0.22, 0.16 * fa))
+			sx += seg
+		sw_gap *= 0.93                      # 멀수록 촘촘해진다
+		sw_y += maxf(sw_gap, 7.0)
+		sw_k += 1
+	# ③ 흰 물결 — 멀수록 잘고 성기다. 가로로 눕는 짧은 획이라야 물결이고
+	#    점으로 뿌리면 그건 비 오는 화면이다. 한 획은 **두 줄**이다 —
+	#    부서지는 흰 마루와 그 밑의 그늘. 흰 줄만 그으면 종잇조각이 뜬다
+	for ty in range(maxi(SEA_Y0, 0), vy1):
+		var d: float = float(ty - SEA_Y0)
+		if d < 1.0:
+			continue
+		var dens: float = clampf(0.34 - d * 0.010, 0.05, 0.34)
+		var a: float = clampf(0.62 - d * 0.016, 0.10, 0.62)
+		for tx in range(vx0, vx1):
+			if _hash01(tx * 13 + 5, ty * 17 + 9) > dens:
+				continue
+			var w: float = (6.0 - minf(d * 0.12, 3.5)) * 2.0
+			var ox: float = _hash01(tx * 7 + 1, ty * 3 + 6) * (ts - w)
+			var oy: float = _hash01(tx * 5 + 4, ty * 11 + 2) * (ts - 6.0)
+			draw_rect(Rect2(tx * ts + ox, ty * ts + oy, w, 2.0),
+				Color(1, 1, 1, a * 0.62))
+			draw_rect(Rect2(tx * ts + ox + 2.0, ty * ts + oy + 2.0, w - 2.0, 2.0),
+				Color(0.06, 0.12, 0.22, a * 0.24))
+			# 부서진 자락 — 마루 앞으로 흩어지는 거품 두어 점
+			if _hash01(tx * 3 + 8, ty * 7 + 1) < 0.45:
+				draw_rect(Rect2(tx * ts + ox + w * 0.5, ty * ts + oy - 2.0,
+					w * 0.4, 2.0), Color(1, 1, 1, a * 0.34))
+	# ④ **윤슬** — 해가 물에 부서지는 길. 바다를 바다로 만드는 마지막 한 겹이다.
+	#    낮에만, 그것도 한 줄기만 — 온 바다가 반짝이면 그건 유리다
+	var hr: float = GameData.hour_now()
+	if hr > 7.0 and hr < 18.0:
+		var gx: float = float(MAP_W) * 0.5 * ts        # 해는 남중한다 (세계 한가운데)
+		for ty2 in range(maxi(SEA_Y0, 0), vy1):
+			var d2: float = float(ty2 - SEA_Y0)
+			if d2 < 1.0:
+				continue
+			var spread: float = ts * (1.6 + d2 * 0.42)  # 멀수록 넓게 퍼진다
+			var ga: float = clampf(0.34 - d2 * 0.009, 0.05, 0.34)
+			for i in 4:
+				var jx: float = (_hash01(ty2 * 5 + i, 77) - 0.5) * spread * 2.0
+				if absf(jx) > spread:
+					continue
+				var gw: float = 4.0 + _hash01(i, ty2 * 3 + 2) * 8.0
+				draw_rect(Rect2(gx + jx, float(ty2) * ts
+					+ _hash01(i * 7, ty2) * (ts - 3.0), gw, 2.0),
+					Color(1.0, 0.98, 0.88,
+						ga * (1.0 - absf(jx) / spread) * 0.9))
+	# ⑤ 먼 섬 셋 — 안개에 반쯤 잠긴 실루엣. 바다가 어딘가로 이어진다는 표시.
+	#    **회색으로 흐리면 섬이 아니라 콘크리트 둔덕이다** (능선에서 배운 것과
+	#    같다). 섬은 숲이다 — 초록을 지키고, 물가에 모래 한 줄을 두르고,
+	#    등성이에 나무 혹을 얹는다
+	for isl in ISLANDS:
+		var cx: float = float(isl[0]) * ts
+		var cy: float = float(SEA_Y0 + int(isl[1])) * ts
+		if cy > float(vy1) * ts + ts * 2.0:
+			continue
+		var w2: float = float(isl[2]) * ts
+		var hh: float = float(isl[3]) * ts
+		var f: float = clampf(float(isl[1]) / SEA_HAZE_FULL, 0.0, 1.0)
+		# 바다 위의 안개는 하늘빛보다 조금 푸르다
+		var air := SEA_AIR
+		var col: Color = Color(0.21, 0.35, 0.26).lerp(air, 0.22 + sqrt(f) * 0.42)
+		var sand: Color = Color(0.80, 0.74, 0.58).lerp(air, 0.30 + sqrt(f) * 0.40)
+		var step := 8.0
+		var x: float = cx - w2 * 0.5
+		while x < cx + w2 * 0.5:
+			var u: float = (x - cx) / (w2 * 0.5)          # -1 .. 1
+			var top: float = cy - hh * sqrt(maxf(0.0, 1.0 - u * u))
+			# 섬의 등성이도 매끈하면 접시다 — 나무 한 그루만 한 혹을 얹는다
+			top += (_hash01(int(x / step), 91 + int(isl[0])) - 0.5) * 7.0
+			draw_rect(Rect2(x, top, step, cy - top), col)
+			draw_rect(Rect2(x, top, step, 3.0), col.lightened(0.16))
+			# 물가 — 섬이 물에 닿는 자리는 모래다. 이 한 줄이 「섬」을 만든다.
+			# 다만 곧은 막대로 그으면 **배**가 된다 — 굽이치게, 그리고
+			# 양 끝은 물에 잠겨 가늘어지게
+			var sw: float = ts * 0.34 * sqrt(maxf(0.0, 1.0 - u * u * 0.82))
+			sw += (_hash01(int(x / step), 55 + int(isl[0])) - 0.5) * 4.0
+			if sw > 1.0:
+				draw_rect(Rect2(x, cy, step, sw), sand)
+				draw_rect(Rect2(x, cy + sw, step, ts * 0.16), sand.darkened(0.16))
+			x += step
+		# 등성이의 나무 — 섬을 **숲 덮인 섬**으로 만드는 것. 매끈한 초록
+		# 돔은 언덕 도안이지 섬이 아니다. 다만 멀리 있으니 한 그루씩이
+		# 아니라 **덩어리 몇 개**로만
+		var nt: int = 3 + int(_hash01(int(isl[0]), 7) * 3.0)
+		for ti in nt:
+			var tu: float = (_hash01(int(isl[0]) + ti, 23) - 0.5) * 1.5
+			var tx2: float = cx + tu * w2 * 0.5
+			var tyy: float = cy - hh * sqrt(maxf(0.0, 1.0 - tu * tu))
+			var tr: float = ts * (0.22 + _hash01(ti, int(isl[0])) * 0.16)
+			draw_rect(Rect2(tx2 - tr, tyy - tr * 1.5, tr * 2.0, tr * 1.6),
+				col.darkened(0.16))
+			draw_rect(Rect2(tx2 - tr * 0.7, tyy - tr * 1.7, tr * 1.2, tr * 0.7),
+				col.lightened(0.10))
+		# 섬 그림자가 물에 비친다 — 밑변 바로 아래 한 줄
+		draw_rect(Rect2(cx - w2 * 0.5, cy + ts * 0.54, w2, ts * 0.5),
+			Color(0.10, 0.16, 0.26, 0.20 * (1.0 - f)))
+		# 곁의 바위섬 — 큰 섬 하나만 있으면 그건 「놓아 둔 모형」이다.
+		# 곁에 작은 것이 하나 있어야 바다에 흩어진 땅으로 읽힌다
+		var rx2: float = cx + w2 * (0.72 if int(isl[0]) % 2 == 0 else -0.72)
+		var ry2: float = cy + ts * (0.6 + _hash01(int(isl[0]), 31) * 1.2)
+		var rr: float = ts * 0.5
+		draw_rect(Rect2(rx2 - rr, ry2 - rr * 0.9, rr * 2.0, rr * 0.9),
+			col.darkened(0.10))
+		draw_rect(Rect2(rx2 - rr * 0.6, ry2 - rr * 1.1, rr * 1.2, rr * 0.4),
+			col.lightened(0.14))
+		draw_rect(Rect2(rx2 - rr, ry2, rr * 2.0, rr * 0.3), sand)
+
+# 먼 섬 — [x칸, 바다 시작에서 몇 칸 남쪽, 폭칸, 높이칸].
+# 셋뿐이다: 바다를 섬으로 채우면 그건 바다가 아니라 군도다
+const ISLANDS := [[74, 11, 13, 2.2], [212, 15, 18, 2.6], [352, 9, 10, 1.8]]
+
+
+# ---- 세계 너머의 능선 ----
+#
+# 안개로 숲을 녹여 「끝이 멀다」까지는 왔는데, 그 너머가 여전히 **아무것도
+# 없는 옅은 초록**이었다. 거리를 말하려면 **거리에 무언가가 있어야** 한다 —
+# 멀어서 흐릿할 뿐이지 텅 빈 것이 아니다.
+#
+# 그래서 세계의 북쪽 위로 능선 두 겹을 눕힌다. 위에서 내려다보는 화면에서
+# **화면 위쪽이 곧 먼 곳**이라, 지평선은 북쪽에만 선다 (좌우·남쪽에 세우면
+# 산이 옆으로 누운 꼴이 된다).
+#
+#   가까운 능선  숲빛이 남아 있고 마루가 굵게 굽이친다
+#   먼 능선      거의 하늘빛. 마루가 잘고 길게 눕는다
+#
+# 두 겹인 것이 핵심이다. 한 겹이면 그건 「하늘을 가린 벽」이고,
+# 겹이 둘이면 그 사이의 공기가 곧 **깊이**가 된다.
+# 마루의 평균 높이 (칸, 맵 위쪽이 음수).
+#
+# 능선을 맵 변 코앞까지 끌어내렸더니, 변 바로 밖이 통째로 회록색 슬래브가
+# 되어 「안쪽은 잔디, 바깥은 포장」으로 갈렸다. 변 바로 밖 서너 칸은
+# **안쪽과 이어지는 숲 바닥**으로 두고, 능선은 그 너머에서 시작한다.
+const RIDGE_NEAR_Y := -6.5
+const RIDGE_FAR_Y := -10.5
+const RIDGE_SKY_Y := -14.5     # 제일 먼 마루 — 거의 하늘이다
+# **회색으로 흐리면 능선이 아니라 콘크리트 바닥이다.** 하늘빛(HAZE)이
+# 워낙 탁해서 거기에 섞을수록 초록이 죽는다 — 처음에 두 겹을 다 그렇게
+# 섞었더니 마을 북쪽이 통째로 「포장한 광장」이 됐다. 능선은 **숲**이다:
+# 가까운 마루는 초록을 지키고, 먼 마루만 하늘빛으로 물러난다.
+const RIDGE_NEAR := Color(0.35, 0.49, 0.36)
+const RIDGE_FAR := Color(0.57, 0.67, 0.65)
+# 세 번째 겹 — 하늘빛에 거의 다 녹았다. 두 겹은 「앞과 뒤」지만
+# 세 겹이라야 「점점 멀어진다」가 된다
+const RIDGE_SKY := Color(0.70, 0.78, 0.82)
+const SKY_FAR := Color(0.80, 0.86, 0.88)
+
+# 굽이치는 마루선 — 성긴 격자의 난수를 부드럽게 이어 뽑는다.
+# 사인 곡선을 쓰면 산이 아니라 물결이 되고, 칸마다 난수를 쓰면 톱니가 된다
+func _ridge_line(tx: float, span: float, amp: float, seed: int) -> float:
+	var u: float = tx / span
+	var i: int = int(floor(u))
+	var f: float = u - float(i)
+	f = f * f * (3.0 - 2.0 * f)
+	var a: float = _hash01(i, seed)
+	var b: float = _hash01(i + 1, seed)
+	return (a + (b - a) * f - 0.5) * amp
+
+
+func _draw_far_ridges(vx0: int, vx1: int, vy0: int) -> void:
+	if vy0 >= -1:
+		return                              # 북쪽 하늘이 화면에 없다
+	var ts := float(TILE)
+	var x0 := float(vx0) * ts
+	var x1 := float(vx1) * ts
+	var top_y := float(vy0) * ts
+	# ① 제일 먼 곳은 하늘이다. 잔디 무늬가 지평선까지 이어지면 그건
+	#    「끝없는 벽지」지 먼 데가 아니다
+	draw_rect(Rect2(x0, top_y, x1 - x0, (RIDGE_SKY_Y + 2.0) * ts - top_y), SKY_FAR)
+	var step := 8.0                         # 마루를 8px 기둥으로 세운다 (도트 4칸)
+	# ② 능선 **세 겹** — 먼 것부터. **띠로 눕히고 바닥은 다음 겹이 받는다.**
+	#    마루에서 맵 변까지 통으로 채웠더니 슬래브 한 장이 됐다.
+	#    두 겹은 「앞과 뒤」지만 세 겹이라야 「점점 멀어진다」가 된다
+	for k in 3:
+		var by: float = [RIDGE_SKY_Y, RIDGE_FAR_Y, RIDGE_NEAR_Y][k] * ts
+		var amp: float = [1.4, 1.8, 2.4][k] * ts
+		var span: float = [25.0, 19.0, 12.0][k] * ts
+		var col: Color = [RIDGE_SKY, RIDGE_FAR, RIDGE_NEAR][k]
+		var seed: int = [23, 41, 77][k]
+		var bump: float = [3.0, 4.0, 7.0][k]
+		# 바닥 — 다음 겹의 마루께까지. 겹끼리 맞물려 두께가 생긴다
+		var foot: float = [-9.5, -6.0, -3.0][k] * ts
+		var x: float = floor(x0 / step) * step
+		var kk := 0
+		while x < x1:
+			var top: float = by + _ridge_line(x, span, amp, seed)
+			# 숲으로 덮인 마루라 능선이 **잘게 울퉁불퉁하다.** 매끈한 곡선은
+			# 산이 아니라 언덕 도안이다 — 나무 한 그루만 한 요철을 얹는다
+			top += (_hash01(kk, seed + 5) - 0.5) * bump
+			draw_rect(Rect2(x, top, step, foot - top), col)
+			draw_rect(Rect2(x, top, step, 4.0), col.lightened(0.14))
+			# **산비탈에도 골이 있다.** 통짜로 칠하면 색종이를 오려 붙인
+			# 꼴이다. 다만 기둥마다 난수로 밝기를 흔들었더니 이번에는
+			# **바코드**가 됐다 — 골짜기는 한 기둥 폭이 아니라 대여섯 기둥
+			# 폭이다. 마루선과 같은 부드러운 잡음으로 넓게 흘려야 산이 된다
+			var vv: float = _ridge_line(x, span * 0.42, 1.0, seed + 31)
+			if vv < -0.16:
+				draw_rect(Rect2(x, top + 4.0, step, (foot - top) * 0.75),
+					col.darkened(0.10))
+			elif vv > 0.18:
+				draw_rect(Rect2(x, top + 4.0, step, (foot - top) * 0.55),
+					col.lightened(0.06))
+			x += step
+			kk += 1
+		# 마루 밑에 고인 안개 — 두 겹 사이를 갈라 주는 것이 이 한 줄이다.
+		# 없으면 능선들이 한 덩어리로 붙어 깊이가 사라진다
+		var mist: float = [0.30, 0.24, 0.13][k]
+		for b2 in 3:
+			var bh: float = 1.1 * ts
+			draw_rect(Rect2(x0, foot - bh * float(b2 + 1), x1 - x0, bh),
+				Color(SKY_FAR.r, SKY_FAR.g, SKY_FAR.b, mist * (1.0 - float(b2) * 0.32)))
+	# ③ 하늘에 뜬 구름 — 지평선 위가 통짜 하늘색이면 그건 색종이다.
+	#    길게 눕는 띠 몇 장. 흘러가지 않는다 (배경은 조용해야 한다)
+	for ci in 5:
+		var cwx: float = (float(ci) * 137.0 + 40.0) * ts
+		# 화면을 따라 되풀이한다 — 세계 밖이라 자리를 굳혀 둘 데가 없다
+		var period: float = 137.0 * 5.0 * ts
+		cwx = fmod(cwx - x0, period)
+		if cwx < 0.0:
+			cwx += period
+		cwx += x0
+		if cwx > x1 + ts * 20.0:
+			continue
+		var cwy: float = (RIDGE_SKY_Y - 2.0 - float(ci % 3) * 2.2) * ts
+		if cwy < top_y:
+			continue
+		var cww: float = ts * (9.0 + float(ci % 4) * 5.0)
+		var cha: float = 0.34 - float(ci % 3) * 0.07
+		draw_rect(Rect2(cwx, cwy, cww, ts * 0.5), Color(1, 1, 1, cha))
+		draw_rect(Rect2(cwx + cww * 0.18, cwy - ts * 0.34, cww * 0.6, ts * 0.4),
+			Color(1, 1, 1, cha * 0.8))
+		draw_rect(Rect2(cwx - ts * 0.6, cwy + ts * 0.34, cww * 0.8, ts * 0.3),
+			Color(1, 1, 1, cha * 0.5))
+
+
+# ---- 맵의 가장자리 ----
+#
+# 맵 밖은 어두운 숲으로 채운다 (OUT_TINT). 그런데 그 어둠이 맵 변에서
+# **면도날처럼 끊겼다** — 화면을 가로지르는 곧은 선 하나가 「여기가
+# 렌더러의 끝」이라고 말한다. 숲은 그렇게 끝나지 않는다.
+#
+# 안쪽으로 서너 칸에 걸쳐 어둠을 흘려 넣는다. 나무 그늘이 들판으로
+# 번지는 것이고, 화면의 네 변은 그저 「더 깊은 숲」이 된다.
+const RIM_DEPTH := 4          # 어둠이 스며드는 깊이 (칸)
+const RIM_DARK := Color(0.05, 0.09, 0.06)
+
+func _draw_map_rim(x0: int, y0: int, x1: int, y1: int) -> void:
+	var ts := float(TILE)
+	for d in RIM_DEPTH:
+		# 바깥일수록 짙다. 한 겹이 옅어야 계단이 아니라 번짐으로 보인다
+		# **0.30은 액자였다.** 바깥의 어두운 숲과 이 어둠이 겹쳐, 화면 네 변에
+		# 검은 테를 두른 꼴이 됐다. 나무 그늘이 들판으로 번지는 정도면 족하다
+		var a: float = 0.15 * pow(1.0 - float(d) / float(RIM_DEPTH), 1.7)
+		var c := Color(RIM_DARK.r, RIM_DARK.g, RIM_DARK.b, a)
+		if x0 <= d and d < x1:                       # 서쪽
+			draw_rect(Rect2(d * ts, y0 * ts, ts, (y1 - y0) * ts), c)
+		var rx := MAP_W - 1 - d
+		if x0 <= rx and rx < x1:                     # 동쪽
+			draw_rect(Rect2(rx * ts, y0 * ts, ts, (y1 - y0) * ts), c)
+		if y0 <= d and d < y1:                       # 북쪽
+			draw_rect(Rect2(x0 * ts, d * ts, (x1 - x0) * ts, ts), c)
+		var by := MAP_H - 1 - d
+		if y0 <= by and by < y1:                     # 남쪽
+			draw_rect(Rect2(x0 * ts, by * ts, (x1 - x0) * ts, ts), c)
 
 
 # ---- F3: 한 프레임이 어디서 몇 밀리초를 쓰는가 ----
