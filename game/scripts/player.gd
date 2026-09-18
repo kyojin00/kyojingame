@@ -66,10 +66,12 @@ var horse_sprite: Sprite2D
 #
 # ---- 휘두르기 도트 ----
 #
-# 남녀 모두 `assets/ref/dot_boy/make_sprites.py`가 방향당 다섯 장을 그린다
-# (`new_boy_/player_f_<방향>_swing_0..4` = 감기 시작·다 감음·휘두름·내리침·되돌아옴).
-# 골격이 같아 SWING_HAND_DOT도 공용이다. 도트가 없으면 `_swing_frame`이
-# ""를 돌려주고, 그때는 아래 몸통 회전으로 대신한다.
+# 남녀 각각 PixelLab 에서 뽑아 `assets/ref/pack/install_swing.py`가 방향당 다섯 장을
+# 앉힌다 (`new_boy_/player_f_<방향>_swing_0..4` = 감기 시작·다 감음·휘두름·내리침·되돌아옴).
+# 두 벌은 골격이 달라 주먹 자리(SWING_HAND_DOT)도 벌마다 따로 적는다. 휘두르기 판은
+# 서기·걷기(128x192)보다 넓은 192x192 다 — 팔을 벌리면 128 에 안 들어간다. 그래서
+# 그림을 갈아 끼울 때마다 그림 폭의 한가운데를 원점에 맞춘다(_fit_offset).
+# 도트가 없으면 `_swing_frame`이 ""를 돌려주고, 그때는 아래 몸통 회전으로 대신한다.
 #
 # 도트가 있으면 **몸을 가르지 않는다**. 그림이 이미 굽힌 자세라 거기에
 # 상체 회전을 또 얹으면 두 번 굽는다.
@@ -108,17 +110,33 @@ const SWING_POSE := {
 #   도트에서 읽은 값 (발밑 가운데가 원점) -> 여기 적는 값
 #   node.x = 도트.x / 2 ,  node.y = (도트.y + 2) / 2      (offset -64,-188 · 0.5배)
 #
-# 값은 `assets/ref/dot_boy/make_sprites.py`가 주먹을 그린 자리에서 계산해
-# 실행 끝에 찍어 준다 — **그림을 다시 뽑으면 찍힌 값을 여기 그대로 옮긴다.**
+# 값은 `assets/ref/pack/preview_swing_<boy|girl>.png`(4배 미리보기)에서 **눈으로 읽는다** —
+# 판 칸 (x, y) 를 읽으면 node = (2x + 1 - 48, 2y - 93) 이다 (48x48 을 네 배로 키워
+# 0.5 배로 그리니 한 칸이 2px). 살결 색으로 자동으로 잡으려 했지만 얼굴·양말·블라우스가
+# 다 살결로 잡혀 못 믿는다. **그림을 다시 뽑으면 여기도 다시 읽는다.**
 # 안 맞으면 도구가 손에서 뜬다. 도트가 없는 방향은 SWING_POSE의 식을 쓴다.
+# 벌(HAIR_PREFIX)마다 한 표씩 — 두 벌은 키도 팔 길이도 다르다. 옆모습은 오른쪽을
+# 볼 때의 값이고 x 는 sign_x 로 뒤집힌다. 도구를 쥐는 쪽(오른손)만 적는다.
 const SWING_HAND_DOT := {
-	# 감기 시작 · 다 감음(머리 옆) · 휘두름 · 내리침 · 되돌아옴
-	# 4판(AI 시트 밑그림)은 휘두르기가 네 장이라 「다 감음」을 「휘두름」 위상에도
-	# 쓴다 — 주먹 자리도 둘이 같다. (3세대 시트에서 눈으로 읽은 값)
-	"side": [Vector2(-18, -57), Vector2(-9, -86), Vector2(-9, -86), Vector2(16, -16), Vector2(19, -37)],
-	"down": [Vector2(-18, -57), Vector2(-9, -86), Vector2(-9, -86), Vector2(16, -34), Vector2(16, -35)],
-	"up": [Vector2(19, -56), Vector2(10, -87), Vector2(10, -87), Vector2(-19, -17), Vector2(-16, -34)],
+	# 감기 시작 · 다 감음(머리 위) · 휘두름 · 내리침 · 되돌아옴
+	"new_boy": {
+		"down": [Vector2(29, -43), Vector2(27, -63), Vector2(15, -55), Vector2(7, -11), Vector2(13, -13)],
+		"side": [Vector2(-15, -31), Vector2(-17, -61), Vector2(37, -31), Vector2(33, -13), Vector2(19, -17)],
+		"up": [Vector2(13, -33), Vector2(19, -43), Vector2(19, -41), Vector2(13, -13), Vector2(19, -21)],
+	},
+	"player_f": {
+		"down": [Vector2(31, -41), Vector2(29, -49), Vector2(1, -17), Vector2(5, -13), Vector2(19, -23)],
+		"side": [Vector2(-17, -63), Vector2(-17, -71), Vector2(35, -39), Vector2(31, -19), Vector2(15, -27)],
+		"up": [Vector2(15, -29), Vector2(27, -73), Vector2(37, -17), Vector2(25, -13), Vector2(19, -21)],
+	},
 }
+
+
+# 지금 고른 벌의 주먹 자리 표 (없는 벌이면 첫 벌의 것)
+static func hand_dots() -> Dictionary:
+	var pre: String = GameData.HAIR_PREFIX[clampi(int(GameData.appearance.get("hair", 0)), 0,
+		GameData.HAIR_PREFIX.size() - 1)]
+	return SWING_HAND_DOT.get(pre, SWING_HAND_DOT[GameData.HAIR_PREFIX[0]])
 const TOOL_ICONS := {
 	"axe": "icon_axe", "pickaxe": "icon_pickaxe",
 	"hoe": "icon_hoe", "water": "icon_water",
@@ -290,6 +308,20 @@ func _swing_key() -> String:
 	return "up" if swing_face.y < 0.0 else "down"
 
 
+# 그림 폭의 한가운데를 발밑 원점에 맞춘다. 서기·걷기는 128 이고 휘두르기는 192 라
+# (팔을 벌리면 128 에 안 든다) 폭이 장마다 다르다 — offset.x 를 고정해 두면 넓은
+# 장에서 몸이 32px 오른쪽으로 튄다. 세로는 늘 발이 188 행이라 그대로다.
+func _fit_offset() -> void:
+	if sprite.texture == null:
+		return
+	var ox: float = -sprite.texture.get_width() * 0.5
+	if ox == _base_offset.x:
+		return
+	_base_offset.x = ox
+	if not _split:
+		sprite.offset.x = ox
+
+
 # 휘두르기가 끝났다 — 갈라 놓은 몸을 도로 붙인다
 func _swing_off() -> void:
 	tool_sprite.visible = false
@@ -390,9 +422,9 @@ func _swing_visual() -> void:
 			-_tool_grip.y)
 	# 감을 때는 어깨 뒤로 세우고(c=-1), 내리칠 때는 발치까지 넘긴다(c=+1)
 	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * spin
-	if dot != "" and SWING_HAND_DOT.has(key):
+	if dot != "" and hand_dots().has(key):
 		# 도트가 자세를 쥐고 있다 — 도구는 그 프레임의 주먹 자리에 얹는다
-		hand = SWING_HAND_DOT[key][swing_phase()]
+		hand = hand_dots()[key][swing_phase()]
 		tool_sprite.position = Vector2(hand.x * sign_x, hand.y) + shift
 	else:
 		tool_sprite.position = Vector2(hand.x * sign_x + c * 7.0 * sign_x,
@@ -535,6 +567,7 @@ func _update_sprite() -> void:
 			if main.tex.has("pc_%s_blink" % v):
 				tex_name = "pc_%s_blink" % v
 	sprite.texture = main.tex[tex_name]
+	_fit_offset()
 	# 서 있을 때 숨쉬기: 프레임 대신 세로 스케일을 살짝 키웠다 줄인다
 	# (스프라이트 offset이 발 기준이라 발은 그대로, 머리만 오르내린다)
 	if not moving and not riding:

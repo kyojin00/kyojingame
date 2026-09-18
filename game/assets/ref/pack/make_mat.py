@@ -52,7 +52,11 @@ CFG = {
 }
 SFX = (['%s_idle' % d for d in ('down', 'side', 'up')]
        + ['%s_walk_%d' % (d, i) for d in ('down', 'side', 'up') for i in range(4)]
+       + ['%s_swing_%d' % (d, i) for d in ('down', 'side', 'up') for i in range(5)]
        + ['down_blink', 'side_blink'])
+# 게임 판은 팩의 네 배다 (install_game.py). 가르기는 팩 칸(32x48·48x48)에서 하고
+# 결과를 도로 네 배로 키운다 — split 행 번호 같은 상수가 전부 팩 칸 기준이다
+UP = 4
 
 
 def hsv(c):
@@ -108,6 +112,8 @@ def groups8(cells):
 def stage1(path, pre, cfg):
     """검정과 몸통을 뺀 나머지를 가른다."""
     im = Image.open(path).convert('RGBA')
+    if im.size[1] % (48 * UP) == 0:            # 네 배로 키워 넣은 게임 판 -> 팩 칸으로
+        im = im.resize((im.size[0] // UP, im.size[1] // UP), Image.NEAREST)
     px, (W, H) = im.load(), im.size
     op = [(x, y) for y in range(H) for x in range(W) if px[x, y][3]]
     mat = {}
@@ -183,6 +189,8 @@ def run(write):
         vote = {}                  # 색 -> 높이 표결 (한 색이 두 군데로 안 갈라지게)
         for sfx in SFX:
             path = os.path.join(SPR, '%s_%s.png' % (pre, sfx))
+            if not os.path.exists(path):
+                continue                       # 휘두르기가 아직 없는 방향
             im, px, W, H, mat, body = stage1(path, pre, cfg)
             for p in body:
                 vote.setdefault(px[p][:3], Counter())[band(p[1], cfg['split'])] += 1
@@ -199,7 +207,8 @@ def run(write):
                 ip[x, y] = m * STEP
                 tally[m] += 1
             if write:
-                img.save(os.path.join(OUT, '%s_%s.png' % (pre, sfx)))
+                img.resize((W * UP, H * UP), Image.NEAREST).save(
+                    os.path.join(OUT, '%s_%s.png' % (pre, sfx)))
         print('  %-9s %s' % (pre, ' '.join(
             '%s=%d' % (n, tally[i]) for i, n in enumerate(
                 ['안바꿈', '살결', '머리', '윗도리', '아랫도리', '신발']))))

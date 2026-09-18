@@ -64,3 +64,4 @@ func _update_sprite() -> void:
 			tex_name = GameData.player_side_tex(moving, suffix, anim_time)
 			sprite.flip_h = dir == "left"
 	sprite.texture = main.tex[tex_name]
+	sprite.offset.x = -sprite.texture.get_width() * 0.5   # 휘두르기 장은 192 폭 (player.gd _fit_offset)

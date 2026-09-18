@@ -1,13 +1,28 @@
 # 휘두르는 도트
 
-> **5판(지금)에는 휘두르기 도트가 없다.** 주인공 두 벌(`new_boy_*` 남자아이 ·
-> `player_f_*` 여자아이)은 PixelLab 로 뽑은 것이라 서기·걷기만 있다. 옛
-> 휘두르기 도트는 그림체가 아예 달라, 남겨 두면 **휘두를 때만 옛 얼굴로
-> 바뀌므로** 걷어냈다. 지금은 `player.gd`가 몸통을 굽혀 대신한다
-> (`_swing_frame`이 ""를 돌려주면 그 길로 간다).
+> **5판(지금)의 휘두르기는 PixelLab 에서 뽑는다.** 주인공 두 벌(`new_boy_*`
+> 남자아이 · `player_f_*` 여자아이)은 PixelLab 계정에 캐릭터로 남아 있고,
+> 휘두르기는 골격 템플릿에 도끼질이 없어 **글로 동작을 적는 v3 방식**으로
+> 방향마다 열 장을 받아 다섯 장을 고른다.
 >
-> 아래는 **4판까지의 기록**이다. 도트를 다시 넣게 되면 규격과 위상은
-> 그대로 쓰면 된다 — 방향마다 다섯 장, 다 있어야 켜진다.
+> ```
+> cd game/assets/ref/pack
+> PIXELLAB_API_KEY=… python3 fetch_swing.py --submit   # 여섯 벌 요청 (생성 6회)
+> python3 fetch_swing.py --fetch                       # swing_src/ 에 받는다 + 시트
+> python3 install_swing.py boy  down=2,3,5,7,9 side=1,3,4,6,9 up=1,3,4,6,8 --write
+> python3 install_swing.py girl down=1,3,5,7,9 side=2,3,4,6,9 up=1,2,4,6,8 --write
+> python3 install_game.py --write && python3 make_mat.py --write
+> godot --headless --path game --import
+> ```
+>
+> 고를 장 번호는 `swing_src/sheet_*.png` 를 보고 정한다 (위 번호가 지금 들어간
+> 것). 휘두르기 판은 **48x48** 이라(팔을 벌리면 32 에 안 든다) 게임에는 192x192
+> 로 들어가고, `player.gd _fit_offset` 이 그림 폭의 한가운데를 원점에 맞춘다.
+> 주먹 자리(`SWING_HAND_DOT`)는 `preview_swing_<boy|girl>.png` 에서 눈으로 읽어
+> 벌마다 따로 적는다 — 두 벌은 골격이 다르다.
+>
+> 아래는 **4판까지의 기록**이다. 위상 규약(방향마다 다섯 장, 다 있어야 켜진다)은
+> 그대로다.
 
 ---
 

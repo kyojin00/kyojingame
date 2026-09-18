@@ -733,9 +733,11 @@ func _update_sprite() -> void:
 			player_sprite.flip_h = swing_dir == "left"
 	_place_tool(sw_key, sw_phase)
 	player_sprite.texture = main.tex[tex_name]
-	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다
+	# 원본 128x192에 발바닥이 y=190. 0.5배로 그리니 발이 ppos에 오도록 맞춘다.
+	# 휘두르기 장은 192 폭이라(player.gd _fit_offset) 그림 폭의 반을 뺀다
 	player_sprite.scale = Vector2(0.5, 0.5) * ZOOM
-	player_sprite.position = _to_screen(ppos) + Vector2(-32, -95) * ZOOM
+	player_sprite.position = _to_screen(ppos) \
+		+ Vector2(-player_sprite.texture.get_width() * 0.25, -95) * ZOOM
 	if hurt_flash > 0.0:
 		player_sprite.modulate = Color(2.6, 2.6, 2.6)   # 맞는 순간 하얀 번쩍
 	elif hurt_cd > 0.55:
@@ -789,7 +791,7 @@ func _swing_c() -> float:
 # 여기서는 ZOOM만 더 곱하면 바깥 세상과 같은 자리에 온다.
 func _place_tool(key: String, phase: int) -> void:
 	var icon := ""
-	if key != "" and PlayerArt.SWING_HAND_DOT.has(key):
+	if key != "" and PlayerArt.hand_dots().has(key):
 		icon = str(PlayerArt.TOOL_ICONS.get(GameData.tool, ""))
 		if GameData.tool == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
 			icon = "icon_axe_stone"
@@ -810,7 +812,7 @@ func _place_tool(key: String, phase: int) -> void:
 	tool_sprite.offset = Vector2(
 		-(tw - 1.0 - grip.x) if tool_sprite.flip_h else -grip.x, -grip.y)
 	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * spin
-	var hand: Vector2 = PlayerArt.SWING_HAND_DOT[key][clampi(phase, 0, 4)]
+	var hand: Vector2 = PlayerArt.hand_dots()[key][clampi(phase, 0, 4)]
 	tool_sprite.position = _to_screen(ppos) + Vector2(hand.x * sign_x, hand.y) * ZOOM
 	# 감아올릴 때는 몸 뒤, 내리치기 시작하면 앞. 뒤를 보고 칠 때는 내내 뒤다.
 	if key == "up" or c < 0.0:
