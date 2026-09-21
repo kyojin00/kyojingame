@@ -798,20 +798,24 @@ func _place_tool(key: String, phase: int) -> void:
 	if icon == "" or not main.tex.has(icon):
 		tool_sprite.visible = false
 		return
-	var tex: Texture2D = main.tex[icon]
-	var grip: Vector2 = PlayerArt.TOOL_GRIP.get(icon, Vector2(16, 30))
+	# 앞·뒤는 앞에서 본 그림 (player.gd tool_tex_name 과 같은 규칙)
+	var tname: String = PlayerArt.tool_tex_name(icon, key, main.tex)
+	var front_art: bool = tname != icon
+	var tex: Texture2D = main.tex[tname]
+	var grip: Vector2 = PlayerArt.TOOL_GRIP.get(tname, Vector2(16, 30))
 	var pose: Dictionary = PlayerArt.SWING_POSE[key]
 	var sign_x := -1.0 if swing_dir == "left" else 1.0
 	var spin: float = sign_x * float(pose.spin)
 	var c := _swing_c()
 	tool_sprite.texture = tex
 	tool_sprite.visible = true
-	tool_sprite.scale = Vector2(1.15, 1.15) * ZOOM
-	tool_sprite.flip_h = (spin < 0.0) != PlayerArt.TOOL_MIRROR.has(GameData.tool)
+	tool_sprite.flip_h = ((spin < 0.0) != PlayerArt.TOOL_MIRROR.has(GameData.tool)) if not front_art else false
 	var tw := float(tex.get_width())
 	tool_sprite.offset = Vector2(
 		-(tw - 1.0 - grip.x) if tool_sprite.flip_h else -grip.x, -grip.y)
 	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * spin
+	var squash: float = 1.0 - 0.45 * absf(sin(tool_sprite.rotation)) if front_art else 1.0
+	tool_sprite.scale = Vector2(1.15, 1.15 * squash) * ZOOM
 	var hand: Vector2 = PlayerArt.hand_dots()[key][clampi(phase, 0, 4)]
 	tool_sprite.position = _to_screen(ppos) + Vector2(hand.x * sign_x, hand.y) * ZOOM
 	# 감아올릴 때는 몸 뒤, 내리치기 시작하면 앞. 뒤를 보고 칠 때는 내내 뒤다.

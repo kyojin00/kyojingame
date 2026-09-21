@@ -175,6 +175,16 @@ var _split := false             # 지금 상·하체를 갈라 그리는 중인�
 var _trail: Array = []          # 도구 끝이 지나간 자취 (node 좌표)
 var _tool_mirror := false       # 지금 든 도구 그림을 좌우로 뒤집어야 하는가
 var _tool_grip := Vector2(16, 30)  # 지금 든 도구를 쥐는 자리 (아이콘 안 픽셀)
+var _tool_icon := ""            # 지금 든 도구의 옆모습 그림 이름 (앞·뒤에서는 _front 를 찾는다)
+
+
+# 방향에 맞는 도구 그림. 앞·뒤를 볼 때는 **앞에서 본 그림**(icon_*_front — 자루가 세로,
+# 날이 위)이 있으면 그것을 쓴다. 옆에서 본 그림 한 장으로 앞을 향해 휘두르면 도구가
+# 옆으로 넘어가 보였다 — 스타듀처럼 방향마다 다른 그림을 쥔다.
+static func tool_tex_name(icon: String, key: String, tex: Dictionary) -> String:
+	if key != "side" and tex.has(icon + "_front"):
+		return icon + "_front"
+	return icon
 
 
 func _ready() -> void:
@@ -214,11 +224,13 @@ func start_swing(tool_id: String, face: Vector2, length: float) -> void:
 	if tool_id == "axe" and int(GameData.tool_level.get("axe", 1)) >= 2:
 		icon = "icon_axe_stone"
 	if icon != "" and main != null and main.tex.has(icon):
+		_tool_icon = icon
 		tool_sprite.texture = main.tex[icon]
 		_tool_grip = TOOL_GRIP.get(icon, Vector2(16, 30))
 		_tool_mirror = TOOL_MIRROR.has(tool_id)
 	else:
 		# 그림 없는 도구 — 맨손으로 휘두른다 (도구만 안 보인다)
+		_tool_icon = ""
 		tool_sprite.texture = null
 		tool_sprite.visible = false
 		_tool_grip = Vector2(16, 30)
@@ -417,16 +429,24 @@ func _swing_visual() -> void:
 			queue_redraw()
 		return
 	tool_sprite.visible = true
-	tool_sprite.flip_h = (spin < 0.0) != _tool_mirror
+	# 방향에 맞는 그림 — 앞·뒤는 앞에서 본 그림(대칭이라 뒤집지 않는다)
+	var tname := tool_tex_name(_tool_icon, key, main.tex)
+	var front_art: bool = tname != _tool_icon
+	if tool_sprite.texture != main.tex[tname]:
+		tool_sprite.texture = main.tex[tname]
+	var grip: Vector2 = TOOL_GRIP.get(tname, Vector2(16, 30)) if front_art else _tool_grip
+	tool_sprite.flip_h = false if front_art else ((spin < 0.0) != _tool_mirror)
 	# 쥐는 자리를 node 원점(=주먹)에 맞춘다. 좌우로 뒤집으면 그림 안의 x도
 	# 뒤집히므로 offset을 그만큼 반대로 잡아야 축이 자루 끝에 그대로 있는다.
-	if tool_sprite.texture != null:
-		var tw := float(tool_sprite.texture.get_width())
-		tool_sprite.offset = Vector2(
-			-(tw - 1.0 - _tool_grip.x) if tool_sprite.flip_h else -_tool_grip.x,
-			-_tool_grip.y)
+	var tw := float(tool_sprite.texture.get_width())
+	tool_sprite.offset = Vector2(
+		-(tw - 1.0 - grip.x) if tool_sprite.flip_h else -grip.x, -grip.y)
 	# 감을 때는 어깨 뒤로 세우고(c=-1), 내리칠 때는 발치까지 넘긴다(c=+1)
 	tool_sprite.rotation = (float(pose.mid) + c * float(pose.arc) * 0.5) * spin
+	# 앞·뒤에서는 도구가 카메라 쪽으로 넘어온다 — 옆으로 누운 순간(회전 90도)에
+	# 세로로 눌러서 깊이 방향으로 지나가는 것처럼 보이게 한다
+	var squash: float = 1.0 - 0.45 * absf(sin(tool_sprite.rotation)) if front_art else 1.0
+	tool_sprite.scale = Vector2(1.15, 1.15 * squash)
 	if dot != "" and hand_dots().has(key):
 		# 도트가 자세를 쥐고 있다 — 도구는 그 프레임의 주먹 자리에 얹는다
 		hand = hand_dots()[key][swing_phase()]

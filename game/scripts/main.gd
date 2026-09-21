@@ -437,6 +437,9 @@ const TEXTURE_NAMES := [
 	"icon_hoe", "icon_water", "icon_seed", "icon_axe", "icon_axe_stone",
 	"icon_pickaxe", "icon_rod", "icon_wood", "icon_stone",
 	"icon_spear", "icon_sword", "arrow", "desk", "recipe",
+	# 앞에서 본 도구 — 앞·뒤를 보고 휘두를 때 쥔다 (player.gd tool_tex_name)
+	"icon_axe_front", "icon_axe_stone_front", "icon_pickaxe_front", "icon_hoe_front",
+	"icon_water_front", "icon_sword_front", "icon_spear_front",
 	# 대장간 장비 (무기·방어구·장신구)
 	"gear_sword_wood", "gear_sword_iron", "gear_sword_star",
 	"gear_vest_leather", "gear_vest_iron", "gear_vest_star",
