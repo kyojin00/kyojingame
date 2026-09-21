@@ -7,8 +7,8 @@
 
 생성기(PixelLab)로도 뽑아 봤지만 32칸에서는 자루가 기울고 머리가 뭉개져서 축이 안 맞았다.
 앞모습은 모양이 단순하다(세로 자루 + 위에 머리) — 코드로 찍는 편이 곧고 한결같다.
-색은 지금 옆모습 아이콘에서 뽑는다(나무는 icon_axe 의 자루, 쇠는 icon_sword 의 날,
-돌은 icon_axe_stone 의 머리) — 그래야 옆·앞이 같은 도구로 보인다.
+색은 옆모습 아이콘의 톤에 맞춘 다섯 단 팔레트(나무·쇠·돌·양철·끈)다 — 옆·앞이 같은 도구로
+보이게. 빛은 왼쪽 위에서 온다: 왼쪽 면이 밝고 오른쪽 면이 어둡다.
 
 규약: 자루는 x 14~17 세로, 자루 끝이 y 30 (쥐는 자리 (16, 30) = TOOL_GRIP 기본값),
 머리는 위. 윤곽은 한 칸 검정.
@@ -65,11 +65,12 @@ def is_stone(c):
 
 
 # 아이콘에서 뽑으려 했더니(palette) 색이 한두 개로 몰려 단이 안 나뉜다 — 옆모습 아이콘의
-# 톤에 맞춰 세 단을 손으로 적는다 (어두움 · 중간 · 밝음)
-WOOD = [(96, 62, 36), (150, 102, 58), (196, 146, 92)]
-IRON = [(118, 120, 130), (170, 172, 182), (222, 224, 232)]
-STONE = [(96, 90, 88), (138, 130, 126), (186, 176, 165)]
-TIN = WOOD                                    # 물뿌리개는 옆모습이 나무통이다 — 같은 색
+# 톤에 맞춰 다섯 단을 손으로 적는다 (가장 어두움 → 가장 밝음)
+WOOD = [(74, 46, 26), (110, 70, 40), (150, 102, 58), (184, 136, 84), (214, 176, 122)]
+IRON = [(84, 86, 98), (122, 124, 136), (168, 170, 182), (206, 208, 218), (238, 240, 246)]
+STONE = [(70, 64, 62), (104, 96, 94), (140, 132, 128), (176, 168, 162), (206, 198, 190)]
+CORD = [(120, 84, 40), (168, 124, 62)]                 # 끈 (어두움 · 밝음)
+TIN = [(96, 92, 88), (138, 134, 128), (176, 172, 166), (208, 204, 198), (236, 232, 226)]  # 양철
 
 
 class Canvas:
@@ -101,8 +102,15 @@ class Canvas:
             b = int(round(top_x1 + (bot_x1 - top_x1) * t))
             self.hline(a, b, y, c)
 
+    def shade_lr(self, x0, x1, y0, y1, pal, steps=(4, 3, 2, 1)):
+        """가로로 왼쪽 밝고 오른쪽 어둡게 — 세로 물건(자루·날) 입체감."""
+        w = x1 - x0 + 1
+        for i, x in enumerate(range(x0, x1 + 1)):
+            k = steps[min(len(steps) - 1, int(i * len(steps) / float(w)))]
+            self.vline(x, y0, y1, pal[k])
+
     def outline(self):
-        """불투명 칸에 닿은 투명 칸을 검정으로 — 한 칸 윤곽."""
+        """불투명 칸에 닿은 투명 칸을 검정으로 — 한 칸 윤곽 (대각선은 안 두른다: 둥글게)."""
         on = {(x, y) for y in range(H) for x in range(W) if self.px[x, y][3]}
         for x, y in list(on):
             for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
@@ -111,123 +119,178 @@ class Canvas:
                     self.put(q[0], q[1], OUTLINE)
 
 
-def handle(c, y0, y1=30, pal=None):
-    """세로 자루 x 14~17: 왼쪽 밝고 오른쪽 어둡다 (빛은 왼쪽 위에서)."""
-    pal = pal or WOOD
-    c.vline(14, y0, y1, pal[2])
-    c.vline(15, y0, y1, pal[1])
-    c.vline(16, y0, y1, pal[1])
-    c.vline(17, y0, y1, pal[0])
-    # 나뭇결 — 몇 칸 어둡게
-    for y in range(y0 + 3, y1, 5):
-        c.put(15, y, pal[0])
+def handle(c, y0, y1=30, x0=14, x1=17):
+    """세로 자루: 왼쪽 밝고 오른쪽 어둡다 (빛은 왼쪽 위). 나뭇결·끝동을 넣는다."""
+    c.shade_lr(x0, x1, y0, y1, WOOD, (4, 3, 2, 1))
+    for y in range(y0 + 4, y1 - 1, 6):                 # 나뭇결
+        c.put(x0 + 1, y, WOOD[1])
+        c.put(x0 + 2, y + 1, WOOD[1])
+    c.hline(x0, x1, y1, WOOD[0])                        # 자루 끝동 (쥐는 자리)
+    c.hline(x0, x1, y1 - 1, WOOD[1])
 
 
-def head_axe(c, pal):
-    # 앞에서 본 도끼 머리: 위가 넓은 사다리꼴 날 + 자루를 감싼 눈(socket)
-    c.trapezoid(8, 23, 11, 20, 4, 10, pal[1])
-    c.hline(8, 23, 4, pal[2])                    # 위 날 — 빛 받는 면
-    c.hline(9, 22, 5, pal[2])
-    c.trapezoid(19, 23, 18, 20, 5, 10, pal[0])   # 오른쪽 그늘
-    c.rect(13, 9, 18, 12, pal[0])                # 눈 — 자루가 박히는 자리
-    c.rect(14, 10, 17, 11, pal[1])
+def wrap(c, x0, x1, y, rows=2):
+    """자루를 감은 끈 — 줄무늬로."""
+    for i in range(rows):
+        c.hline(x0, x1, y + i, CORD[0] if i % 2 == 0 else CORD[1])
+        c.put(x0, y + i, CORD[0])
+
+
+def head_axe(c, pal, chipped=False):
+    """앞에서 본 도끼 머리 — 위가 넓은 사다리꼴, 위 모서리는 둥글고, 자루를 감싼 눈이 있다."""
+    c.trapezoid(8, 23, 12, 19, 3, 11, pal[2])
+    c.hline(9, 22, 3, pal[3])                           # 위 모서리 밝게
+    c.hline(10, 21, 2, pal[3])                          # 둥근 윗선
+    c.hline(11, 20, 4, pal[4])                          # 빛줄
+    c.trapezoid(20, 23, 18, 19, 3, 11, pal[1])          # 오른쪽 그늘
+    c.trapezoid(8, 9, 12, 12, 4, 11, pal[3])            # 왼쪽 빛
+    for y in range(6, 11):                              # 아래로 갈수록 어둡다
+        c.put(15 + (y % 2), y, pal[1])
+    if chipped:                                         # 돌 — 깨진 면
+        for x, y in ((10, 5), (13, 7), (18, 5), (20, 8), (12, 9)):
+            c.put(x, y, pal[0])
+            c.put(x + 1, y, pal[4])
+    c.rect(13, 10, 18, 12, pal[1])                      # 눈(socket) — 자루가 박히는 자리
+    c.hline(13, 18, 10, pal[0])
+    c.rect(14, 11, 17, 12, WOOD[2])                     # 눈 사이로 보이는 자루 끝
+    c.hline(14, 17, 11, WOOD[3])
 
 
 def draw_axe():
     c = Canvas()
-    handle(c, 11)
+    handle(c, 12)
     head_axe(c, IRON)
+    wrap(c, 14, 17, 14, 2)                              # 머리 아래 끈
     c.outline()
     return c.im
 
 
 def draw_axe_stone():
     c = Canvas()
-    handle(c, 11)
-    head_axe(c, STONE)
-    # 돌을 묶은 끈 두 줄
-    c.hline(12, 19, 12, WOOD[0])
-    c.hline(12, 19, 14, WOOD[0])
+    handle(c, 12)
+    head_axe(c, STONE, chipped=True)
+    wrap(c, 13, 18, 13, 3)                              # 돌을 묶은 끈은 굵다
     c.outline()
     return c.im
 
 
 def draw_pickaxe():
     c = Canvas()
-    handle(c, 9)
-    # T자 머리 — 가로 막대, 양끝은 가늘어진다
-    c.hline(6, 25, 5, IRON[1])
-    c.hline(5, 26, 6, IRON[1])
-    c.hline(5, 26, 7, IRON[0])
-    c.hline(7, 24, 4, IRON[2])
-    c.put(4, 6, IRON[1]); c.put(27, 6, IRON[1])
-    c.rect(13, 3, 18, 9, IRON[1])                 # 가운데 머리통
-    c.hline(13, 18, 3, IRON[2])
-    c.rect(17, 4, 18, 9, IRON[0])
+    handle(c, 10)
+    # T자 머리 — 가운데 두껍고 양끝으로 가늘어져 뾰족하다
+    c.hline(7, 24, 6, IRON[2])
+    c.hline(5, 26, 7, IRON[2])
+    c.hline(4, 27, 8, IRON[1])
+    c.hline(6, 25, 9, IRON[1])
+    c.hline(8, 23, 5, IRON[3])                          # 윗면 빛
+    c.hline(10, 21, 4, IRON[3])
+    c.put(3, 8, IRON[2]); c.put(28, 8, IRON[1])         # 끝점
+    c.put(4, 9, IRON[0]); c.put(27, 9, IRON[0])
+    c.rect(12, 3, 19, 11, IRON[2])                      # 가운데 머리통
+    c.hline(12, 19, 3, IRON[3])
+    c.hline(13, 18, 2, IRON[3])
+    c.vline(12, 4, 11, IRON[3])                         # 왼쪽 빛
+    c.rect(18, 4, 19, 11, IRON[1])                      # 오른쪽 그늘
+    c.hline(12, 19, 11, IRON[0])                        # 아래 그늘
+    c.put(14, 5, IRON[4]); c.put(15, 5, IRON[4])        # 반짝
+    wrap(c, 14, 17, 12, 2)
     c.outline()
     return c.im
 
 
 def draw_hoe():
     c = Canvas()
-    handle(c, 9)
-    c.rect(9, 3, 22, 7, IRON[1])                   # 넓적한 날
-    c.hline(9, 22, 3, IRON[2])
-    c.vline(21, 4, 7, IRON[0]); c.vline(22, 4, 7, IRON[0])
-    c.rect(14, 8, 17, 9, IRON[0])                  # 목
+    handle(c, 10)
+    # 넓적한 날 — 아래로 살짝 오므라들고, 아랫날이 밝다(갈아 둔 쇠)
+    c.trapezoid(8, 23, 9, 22, 3, 8, IRON[2])
+    c.hline(8, 23, 3, IRON[1])                          # 위 모서리 그늘 (뒤로 꺾인 면)
+    c.hline(9, 22, 8, IRON[4])                          # 아랫날
+    c.hline(9, 22, 7, IRON[3])
+    c.vline(21, 4, 7, IRON[1]); c.vline(22, 4, 7, IRON[1])
+    c.vline(8, 4, 7, IRON[3])
+    c.rect(13, 3, 18, 5, IRON[1])                       # 목 — 자루가 들어가는 통
+    c.hline(13, 18, 3, IRON[0])
+    c.rect(14, 6, 17, 9, IRON[1])
+    c.vline(14, 6, 9, IRON[2])
+    wrap(c, 14, 17, 10, 2)
     c.outline()
     return c.im
 
 
 def draw_water():
+    """물뿌리개 — 옆모습 아이콘이 나무통이라 앞도 나무판을 세로로 잇고 쇠테를 두른다."""
     c = Canvas()
-    # 몸통 — 나무통(옆모습과 같은 재질)
-    c.rect(10, 11, 22, 28, TIN[1])
-    c.vline(10, 11, 28, TIN[2]); c.vline(11, 11, 28, TIN[2])
-    c.vline(21, 11, 28, TIN[0]); c.vline(22, 11, 28, TIN[0])
-    for y in (15, 20, 25):                         # 테
-        c.hline(10, 22, y, TIN[0])
-    c.hline(10, 22, 10, TIN[0])                    # 윗테
-    # 위 손잡이 — 아치
-    c.hline(13, 19, 5, TIN[1])
-    c.vline(12, 6, 9, TIN[1]); c.vline(20, 6, 9, TIN[0])
-    c.put(13, 6, TIN[2])
-    # 주둥이 — 보는 쪽으로 튀어나온 원 (앞에서 보면 구멍만 보인다)
-    c.rect(14, 19, 18, 23, TIN[2])
-    c.rect(15, 20, 17, 22, OUTLINE)
-    c.put(16, 21, TIN[0])
+    # 나무판 여섯 장 — 왼쪽이 밝고 오른쪽이 어둡다, 판 사이는 어두운 줄
+    staves = [(10, 11, 4), (12, 13, 3), (14, 15, 3), (16, 17, 2), (18, 19, 2), (20, 22, 1)]
+    for x0, x1, k in staves:
+        c.rect(x0, 11, x1, 28, WOOD[k])
+        c.vline(x1, 11, 28, WOOD[max(0, k - 1)])
+    c.hline(10, 22, 11, WOOD[4])                        # 윗테두리 빛
+    c.hline(10, 22, 28, WOOD[0])                        # 바닥
+    for y in (13, 26):                                  # 쇠테 두 줄
+        c.hline(10, 22, y, IRON[1])
+        c.hline(10, 22, y + 1, IRON[2])
+        c.put(10, y + 1, IRON[3]); c.put(22, y + 1, IRON[0])
+    # 위 손잡이 — 나무 아치
+    c.hline(13, 19, 4, WOOD[3])
+    c.hline(12, 20, 5, WOOD[2])
+    c.vline(12, 6, 10, WOOD[3]); c.vline(20, 6, 10, WOOD[1])
+    c.hline(13, 19, 4, WOOD[4])
+    # 주둥이 — 이쪽으로 튀어나온 쇠 물뿌리개 머리(rose): 둥근 판에 구멍이 촘촘
+    c.rect(13, 17, 19, 23, IRON[2])
+    c.hline(14, 18, 16, IRON[3]); c.hline(14, 18, 24, IRON[1])
+    c.vline(12, 18, 22, IRON[3]); c.vline(20, 18, 22, IRON[1])
+    c.hline(14, 18, 17, IRON[4])
+    for y in (19, 21):
+        for x in (14, 16, 18):
+            c.put(x, y, IRON[0])
+    c.put(15, 20, IRON[0]); c.put(17, 20, IRON[0])
     c.outline()
     return c.im
 
 
 def draw_sword():
     c = Canvas()
-    # 손잡이(나무) 아래, 날 위
-    handle(c, 23, 29)
-    c.rect(14, 30, 17, 30, IRON[0])                # 칼자루 끝
-    c.rect(10, 21, 21, 22, IRON[0])                # 날밑
-    c.hline(10, 21, 21, IRON[1])
-    c.rect(14, 4, 17, 20, IRON[1])                 # 날
-    c.vline(14, 4, 20, IRON[2])
-    c.vline(17, 4, 20, IRON[0])
-    c.vline(15, 5, 19, IRON[2])                    # 가운데 빛줄
-    c.rect(15, 2, 16, 3, IRON[1])                  # 끝
-    c.put(15, 1, IRON[2])
+    # 손잡이 — 가죽 감은 자루, 아래 둥근 칼자루머리
+    c.shade_lr(14, 17, 23, 28, WOOD, (3, 2, 2, 1))
+    for y in (24, 26, 28):
+        c.hline(14, 17, y, CORD[0])
+    c.rect(13, 29, 18, 30, IRON[1])                     # 칼자루머리
+    c.hline(14, 17, 30, IRON[0])
+    c.put(14, 29, IRON[3])
+    # 날밑 — 살짝 위로 휜 쇠막대
+    c.rect(9, 21, 22, 22, IRON[1])
+    c.hline(10, 21, 21, IRON[2])
+    c.put(9, 20, IRON[2]); c.put(22, 20, IRON[2])
+    c.hline(11, 20, 20, IRON[3])
+    # 날 — 가운데 홈(fuller)이 어둡고 양날이 밝다
+    c.rect(14, 3, 17, 19, IRON[2])
+    c.vline(14, 3, 19, IRON[4])
+    c.vline(17, 3, 19, IRON[1])
+    c.vline(15, 6, 18, IRON[1])                         # 홈
+    c.vline(16, 6, 18, IRON[3])
+    c.rect(15, 1, 16, 2, IRON[3])                       # 끝
+    c.put(15, 0, IRON[4])
+    c.put(14, 2, IRON[4]); c.put(17, 2, IRON[2])
     c.outline()
     return c.im
 
 
 def draw_spear():
     c = Canvas()
-    c.vline(15, 9, 30, WOOD[1]); c.vline(16, 9, 30, WOOD[0])
-    for y in range(12, 30, 5):
-        c.put(15, y, WOOD[0])
-    # 부싯돌 촉 — 위로 좁아지는 삼각
-    c.trapezoid(15, 16, 13, 18, 2, 8, STONE[1])
-    c.vline(15, 2, 8, STONE[2])
-    c.put(18, 8, STONE[0]); c.put(17, 7, STONE[0])
-    c.hline(14, 17, 9, WOOD[0])                    # 묶은 끈
-    c.hline(14, 17, 10, WOOD[0])
+    c.shade_lr(15, 16, 10, 30, WOOD, (3, 1))
+    for y in range(14, 30, 6):
+        c.put(15, y, WOOD[1])
+    c.hline(15, 16, 30, WOOD[0])
+    # 부싯돌 촉 — 위로 좁아지는 삼각, 깨진 면이 보인다
+    c.trapezoid(15, 16, 12, 19, 1, 8, STONE[2])
+    c.trapezoid(15, 15, 12, 13, 2, 8, STONE[3])         # 왼쪽 빛
+    c.trapezoid(16, 16, 18, 19, 2, 8, STONE[1])         # 오른쪽 그늘
+    c.put(15, 1, STONE[4])
+    for x, y in ((14, 5), (17, 6), (13, 7)):            # 깨진 면
+        c.put(x, y, STONE[0])
+    c.hline(13, 18, 8, STONE[1])
+    wrap(c, 14, 17, 9, 3)                               # 촉을 묶은 끈
     c.outline()
     return c.im
 
