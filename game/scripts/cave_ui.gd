@@ -580,8 +580,7 @@ func _attack_hit(wpn: String, first: bool) -> void:
 		# 컬렉션 「동굴의 광물」 완성 — 광석이 늘 하나 더 나온다
 		var n := (2 if randf() < GameData.bonus_drop_chance("mine") else 1) \
 			+ GameData.perk_cave_ore_bonus()
-		main.doing.gain_item("ore", n)
-		main.hud.show_message("광석 %d개 획득!" % n if n > 1 else "광석 획득!")
+		main.doing.gain_item("ore", n)   # 획득 줄은 gain_item 이 올린다
 		main.toolwork.gain_skill("mine", 8.0)
 		# 수맥을 막고 무너져 쌓인 바위 (메인 스토리 15)
 		main.story.story15_dig_progress("ore", floor_num)
@@ -658,7 +657,8 @@ func _interact() -> void:
 			elif randf() < 0.2:
 				main.doing.gain_item("cave_moss", 1)
 				msg += ", 동굴 이끼 1개"
-		main.hud.show_message(msg + "를 얻었다!")
+		# 무엇을 얻었는지는 gain_item 이 오른쪽 아래에 한 줄씩 올린다 — msg 는 이제 기록용
+		print_verbose(msg)
 		# 깊은 층(5층+)의 상자: 전설 「별빛 광석」은 한 번만,
 		# 대장간 재료인 「별빛 조각」은 층이 깊을수록 여러 개 나온다
 		if floor_num >= 5:

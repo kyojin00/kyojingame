@@ -677,6 +677,117 @@ func _update_toast(delta: float) -> void:
 		_toast = null
 
 
+# ---- 획득 알림 (오른쪽 아래) ----
+#
+# 주운 것·캔 것·낚은 것·수확한 것은 말풍선으로 말하지 않는다. 화면 오른쪽
+# 아래에 「아이콘 이름 ×n」 한 줄이 쌓이고 몇 초 뒤 사라진다. 같은 것을
+# 연달아 얻으면 줄이 늘지 않고 숫자만 오른다 — 나무 세 그루를 베면 목재 ×9
+# 한 줄이다. 말풍선은 사람이 말하는 자리로 남긴다 (처음 발견 안내 같은 것).
+const PICK_TIME := 2.8
+const PICK_W := 176
+const PICK_H := 24
+const PICK_GAP := 3
+const PICK_MAX := 5
+const PICK_X := 960 - 6 - PICK_W
+const PICK_Y := 540 - 6 - PICK_H          # 맨 아래 줄 (최신)
+var _picks: Array = []                     # [{id, count, t, panel, label, pop}] 뒤가 최신
+
+
+func _pick_icon(id: String) -> Texture2D:
+	if main == null:
+		return null
+	for cand in ["icon_" + id, id, "mature_" + id, id + "_0", "forage_" + id]:
+		if main.tex.has(cand):
+			return main.tex[cand]
+	return null
+
+
+func _pick_name(id: String) -> String:
+	if GameData.ITEMS.has(id):
+		return str(GameData.ITEMS[id].name)
+	if GameData.CROPS.has(id):
+		return str(GameData.CROPS[id].name)
+	return {"wood": "목재", "stone": "석재", "money": "G"}.get(id, id)
+
+
+# 얻은 것을 한 줄 올린다. name 을 주면 그 이름으로 (「금빛 감자」처럼 꾸밀 때)
+func pickup_toast(id: String, count: int, name := "") -> void:
+	if count <= 0 or (main != null and main.remote_acting):
+		return
+	var label_name := name if name != "" else _pick_name(id)
+	for p in _picks:
+		if str(p.id) == id and str(p.name) == label_name and float(p.t) < PICK_TIME - 0.45:
+			p.count = int(p.count) + count
+			p.t = 0.0
+			p.pop = 1.0
+			p.label.text = "%s ×%d" % [label_name, int(p.count)]
+			return
+	var panel := Panel.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.99, 0.95, 0.83, 0.96)
+	st.border_color = Color(0.62, 0.4, 0.18)
+	st.set_border_width_all(2)
+	st.set_corner_radius_all(8)
+	st.shadow_color = Color(0.15, 0.09, 0.03, 0.22)
+	st.shadow_size = 3
+	st.shadow_offset = Vector2(0, 2)
+	panel.add_theme_stylebox_override("panel", st)
+	panel.size = Vector2(PICK_W, PICK_H)
+	panel.position = Vector2(PICK_X + 40, PICK_Y)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon := _pick_icon(id)
+	var tx := 8
+	if icon != null:
+		var ic := TextureRect.new()
+		ic.texture = icon
+		ic.position = Vector2(4, 3)
+		ic.size = Vector2(18, 18)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		panel.add_child(ic)
+		tx = 27
+	var lab := Label.new()
+	lab.text = "%s ×%d" % [label_name, count]
+	lab.position = Vector2(tx, 4)
+	lab.size = Vector2(PICK_W - tx - 6, 16)
+	lab.add_theme_font_override("font", FONT_SMALL)
+	lab.add_theme_font_size_override("font_size", 12)
+	lab.add_theme_color_override("font_color", WOOD_TEXT)
+	panel.add_child(lab)
+	add_child(panel)
+	_picks.append({"id": id, "name": label_name, "count": count, "t": 0.0,
+		"panel": panel, "label": lab, "pop": 0.0})
+	while _picks.size() > PICK_MAX:
+		var old: Dictionary = _picks.pop_front()
+		old.panel.queue_free()
+
+
+func _update_picks(delta: float) -> void:
+	if _picks.is_empty():
+		return
+	var n := _picks.size()
+	for i in n:
+		var p: Dictionary = _picks[i]
+		p.t = float(p.t) + delta
+		var panel: Panel = p.panel
+		# 최신이 맨 아래. 오른쪽에서 미끄러져 들어와 자리 잡고, 끝에 흐려진다
+		var slide: float = clampf(float(p.t) / 0.16, 0.0, 1.0)
+		var want := Vector2(PICK_X + 40.0 * (1.0 - slide) * (1.0 - slide),
+			PICK_Y - float(n - 1 - i) * (PICK_H + PICK_GAP))
+		panel.position = panel.position.lerp(want, minf(1.0, delta * 14.0))
+		# 숫자가 오를 때 톡 커졌다 앉는다
+		p.pop = maxf(0.0, float(p.pop) - delta * 5.0)
+		var sc := 1.0 + 0.08 * float(p.pop)
+		panel.pivot_offset = Vector2(PICK_W, PICK_H * 0.5)
+		panel.scale = Vector2(sc, sc)
+		panel.modulate.a = clampf((PICK_TIME - float(p.t)) / 0.35, 0.0, 1.0)
+	for i in range(n - 1, -1, -1):
+		if float(_picks[i].t) >= PICK_TIME:
+			_picks[i].panel.queue_free()
+			_picks.remove_at(i)
+
+
 # ---- 하단 핫바 ----
 
 func _build_hotbar() -> void:
@@ -1015,6 +1126,7 @@ func _watch_goal(goal: String) -> void:
 
 func _process(delta: float) -> void:
 	_update_toast(delta)
+	_update_picks(delta)
 	# 길잡이 핀 — 켜지고 꺼질 때 톡 끊기지 않게 부드럽게 여닫는다
 	if _guide != null:
 		_guide_t += delta

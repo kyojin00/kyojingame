@@ -49,9 +49,11 @@ func gain_item(id: String, count: int) -> void:
 		m.hud.show_message("★ %s — 도감에 기록했다! (N)" % GameData.ITEMS[id].name, 2.6)
 	if Net.is_guest():
 		GameData.items[id] += count  # 낙관적 반영, 통계 브로드캐스트로 수렴
+		m.hud.pickup_toast(id, count)
 		m.netsync._req_gain.rpc_id(1, id, count)
 		return
 	GameData.items[id] += count
+	m.hud.pickup_toast(id, count)
 	if Net.is_host():
 		m.netsync._broadcast_stats()
 

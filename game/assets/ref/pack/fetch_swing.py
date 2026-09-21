@@ -34,17 +34,25 @@ DIRS = {'down': 'south', 'side': 'east', 'up': 'north'}
 JOBS = os.path.join(HERE, 'swing_jobs.txt')
 OUT = os.path.join(HERE, 'swing_src')
 
-# 시험 세 벌 중 이 문구(enhance 로 늘린 것)가 「머리 위로 감았다가 허리를 굽혀
-# 내리치고 되돌아오는」 다섯 위상을 다 냈다. 짧은 문구는 만세하고 절하는 데서 끝났다
-PROMPT = ("The character begins by rapidly raising both arms high above their head, "
-          "then forcefully swings them down in a wide arc toward the ground. As the arms "
-          "descend, the character's torso bends forward at the waist until their arms are "
-          "extended straight down toward their feet. After a brief moment of impact, the "
-          "character fluidly straightens their torso and lowers their arms back to their "
-          "sides, returning to their original standing posture. Hands are empty, no tool. "
-          "Feet stay planted.")
+# 문구는 방향마다 다르다. 옆은 「팔을 머리 위로 감았다 허리를 굽혀 내리치는」 문구가
+# 제일 자연스러웠는데, 같은 문구를 앞·뒤에 쓰면 절하는 것처럼 보였다(얼굴이 사라진다).
+# 앞·뒤는 **고개를 든 채 허리 높이로 내리치는** 문구로 바꾸니 자연스럽다.
+# 「도끼를 든다」고 적으면 도끼를 그려 넣는다 — 도구는 게임이 따로 얹으니 빈손이라 못 박는다
+PROMPT_SIDE = ("The character begins by rapidly raising both arms high above their head, "
+               "then forcefully swings them down in a wide arc toward the ground. As the arms "
+               "descend, the character's torso bends forward at the waist until their arms are "
+               "extended straight down toward their feet. After a brief moment of impact, the "
+               "character fluidly straightens their torso and lowers their arms back to their "
+               "sides, returning to their original standing posture. Hands are empty, no tool. "
+               "Feet stay planted.")
+PROMPT_FRONT = ("Overhead strike with empty hands: the character lifts both arms straight up "
+                "over the head with fists together, then brings both arms down fast in front of "
+                "the body to waist height, bending the knees a little on impact. The upper body "
+                "stays upright, the head stays up facing the camera, no bowing. Then the arms "
+                "return to the sides. Feet stay planted.")
+PROMPT = {'down': PROMPT_FRONT, 'side': PROMPT_SIDE, 'up': PROMPT_FRONT}
+SEED = {'down': 9001, 'side': 4242, 'up': 9001}
 FRAMES = 10
-SEED = 4242
 
 
 def call(path, body=None):
@@ -64,8 +72,8 @@ def submit():
         for d, face in DIRS.items():
             r = call('/characters/animations', {
                 'character_id': cid, 'mode': 'v3', 'animation_name': 'swing_' + face,
-                'action_description': PROMPT, 'frame_count': FRAMES,
-                'keep_first_frame': False, 'directions': [face], 'seed': SEED})
+                'action_description': PROMPT[d], 'frame_count': FRAMES,
+                'keep_first_frame': False, 'directions': [face], 'seed': SEED[d]})
             jid = r['background_job_ids'][0]
             print('%s %s -> %s' % (kind, d, jid))
             lines.append('%s %s %s' % (kind, d, jid))

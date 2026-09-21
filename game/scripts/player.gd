@@ -120,14 +120,14 @@ const SWING_POSE := {
 const SWING_HAND_DOT := {
 	# 감기 시작 · 다 감음(머리 위) · 휘두름 · 내리침 · 되돌아옴
 	"new_boy": {
-		"down": [Vector2(29, -43), Vector2(27, -63), Vector2(15, -55), Vector2(7, -11), Vector2(13, -13)],
+		"down": [Vector2(31, -43), Vector2(19, -67), Vector2(27, -59), Vector2(5, -23), Vector2(7, -21)],
 		"side": [Vector2(-15, -31), Vector2(-17, -61), Vector2(37, -31), Vector2(33, -13), Vector2(19, -17)],
-		"up": [Vector2(13, -33), Vector2(19, -43), Vector2(19, -41), Vector2(13, -13), Vector2(19, -21)],
+		"up": [Vector2(31, -41), Vector2(25, -53), Vector2(21, -29), Vector2(21, -21), Vector2(25, -27)],
 	},
 	"player_f": {
-		"down": [Vector2(31, -41), Vector2(29, -49), Vector2(1, -17), Vector2(5, -13), Vector2(19, -23)],
+		"down": [Vector2(33, -41), Vector2(27, -57), Vector2(3, -31), Vector2(3, -19), Vector2(5, -21)],
 		"side": [Vector2(-17, -63), Vector2(-17, -71), Vector2(35, -39), Vector2(31, -19), Vector2(15, -27)],
-		"up": [Vector2(15, -29), Vector2(27, -73), Vector2(37, -17), Vector2(25, -13), Vector2(19, -21)],
+		"up": [Vector2(25, -29), Vector2(31, -63), Vector2(35, -27), Vector2(19, -19), Vector2(23, -21)],
 	},
 }
 

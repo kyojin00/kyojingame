@@ -5268,11 +5268,13 @@ func _debug_tick() -> void:
 			m.toolwork.use_tool()
 			GameData.alchemy_known = k_form
 			m._target_override = Vector2i(-999, -999)
+			# 얻은 것은 말풍선이 아니라 오른쪽 아래 획득 줄(pickup_toast)에 「목재 ×n」으로
+			# 오른다 — 말풍선에는 아무 말도 없어야 하고, 획득 줄 맨 아래가 목재여야 한다
 			var chop_msg: String = m.hud._bub_label.text if m.hud._bub_label != null else ""
-			var no_count: bool = chop_msg.contains("얻었다")
-			for dch in "0123456789":
-				if chop_msg.contains(dch):
-					no_count = false
+			var last_pick: Dictionary = m.hud._picks[-1] if not m.hud._picks.is_empty() else {}
+			var no_count: bool = not chop_msg.contains("얻었다") \
+				and str(last_pick.get("id", "")) == "wood" and int(last_pick.get("count", 0)) >= m.WOOD_PER_TREE
+			chop_msg = "획득줄=%s ×%d" % [str(last_pick.get("name", "")), int(last_pick.get("count", 0))]
 			m.objnode._remove_object(wt)
 			m.player.position = k_pos0
 			m.hud.hide_bubble()

@@ -127,15 +127,9 @@ func _try_harvest(t: Vector2i) -> bool:
 	var quality := GameData.roll_quality(GameData.total_luck())
 	GameData.add_produce(cid, quality)
 	GameData.today_harvest += 1
-	# 여기 적히는 값도 잡화점이 실제로 세는 값이어야 한다 (개량 단계 포함)
-	var qprice: int = GameData.crop_unit_price(cid, quality)
-	match quality:
-		2:
-			m.hud.show_message("금빛 %s 수확! (판매가 %dG)" % [def.name, qprice])
-		1:
-			m.hud.show_message("은빛 %s 수확! (판매가 %dG)" % [def.name, qprice])
-		_:
-			m.hud.show_message("%s 수확! (판매가 %dG)" % [def.name, qprice])
+	# 수확은 오른쪽 아래 획득 줄로 — 품질은 이름 앞에 붙인다 (값은 가방 도움말이 안다)
+	var qname: String = ["", "은빛 ", "금빛 "][clampi(quality, 0, 2)] + str(def.name)
+	m.hud.pickup_toast(cid, 1, qname)
 	if GameData.crop_is_tree(cid):
 		# 나무는 남는다(S6a) — 다음 열매까지 regrow_days
 		cell.crop_day = m.farming._grow_total(def) - float(def.get("regrow_days", 4)) * 60.0
@@ -344,7 +338,7 @@ func use_tool() -> void:
 					GameData.wood += wood_got
 					GameData.discover("wood")   # 도감 「기본 재료」 등록
 					GameData.trees_chopped += 1
-					m.hud.show_message("목재를 얻었다!")
+					m.hud.pickup_toast("wood", wood_got)
 					m.doing._maybe_drop_recipe("tree")
 					# 길목을 뚫었다면 진행도를 갱신한다
 					if story_gate:
@@ -401,7 +395,7 @@ func use_tool() -> void:
 					GameData.stone += stone_got
 					GameData.discover("stone")   # 도감 「기본 재료」 등록
 					GameData.rocks_mined += 1
-					m.hud.show_message("석재를 얻었다!")
+					m.hud.pickup_toast("stone", stone_got)
 					m.doing._maybe_drop_recipe("rock")
 					m.tutorial_notify("mine")
 					gain_skill("mine", 6.0)
@@ -426,14 +420,13 @@ func use_tool() -> void:
 					# 돌도 곡괭이 날이 닿는 순간에 맞춰 튄다 (main.HIT_AT)
 					m.objnode._remove_object(t, true, m.HIT_AT)
 					GameData.stone += m.BIGROCK_STONE
+					m.hud.pickup_toast("stone", m.BIGROCK_STONE)
 					if has_ore:
 						# 곡괭이를 처음 쥐는 대목이다. 돌만 나오면 「또 치웠다」로
 						# 끝나지만, 반짝이는 것이 하나 섞이면 이 도구가 무엇을
 						# 하는 물건인지 손이 먼저 안다
 						m.doing.gain_item("ore", m.STORY_ROCK_ORE)
 						m.hud.show_message("석재와 함께 — 갈라진 틈에서 광석이 나왔다!")
-					else:
-						m.hud.show_message("석재를 얻었다!")
 					m.doing._maybe_drop_recipe("bigrock")
 					gain_skill("mine", 4.0)
 					m.story._story_rock_mined()

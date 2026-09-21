@@ -294,8 +294,9 @@ func interact() -> void:
 		Sound.play_sfx("sfx_catch")
 		m.renderer.spawn_particles(m.player_tile(), "sparkle")
 		# 「연구 노트에 기록」 안내는 처음 잡았을 때 한 번만
-		m.hud.show_message("%s를 잡았다!%s" % [GameData.ITEMS[bid].name,
-			" 연구 노트에 기록됐다." if bug_first else ""])
+		m.hud.pickup_toast(bid, 1)
+		if bug_first:
+			m.hud.show_message("%s — 연구 노트에 기록됐다." % GameData.ITEMS[bid].name)
 		bug.respawn()
 		if Net.is_host():
 			m.netsync._broadcast_stats()
@@ -316,7 +317,7 @@ func interact() -> void:
 				GameData.wood += got_w
 				Sound.play_sfx("sfx_harvest")
 				m.renderer.spawn_particles(t, "sparkle")
-				m.hud.show_message("떨어진 가지를 주웠다. 목재 x%d" % got_w)
+				m.hud.pickup_toast("wood", got_w)
 				if Net.is_host():
 					m.netsync._broadcast_area(t)
 					m.netsync._broadcast_stats()
@@ -343,9 +344,9 @@ func interact() -> void:
 			Sound.play_sfx("sfx_harvest")
 			m.renderer.spawn_particles(t, "sparkle")
 			# 「연구 노트에 기록」 안내는 처음 얻었을 때 한 번만
-			m.hud.show_message("%s%s 채집!%s"
-				% [GameData.ITEMS[fid].name, " x%d" % got if got > 1 else "",
-				" 연구 노트에 기록됐다." if first_find else ""])
+			m.hud.pickup_toast(fid, got)
+			if first_find:
+				m.hud.show_message("%s — 연구 노트에 기록됐다." % GameData.ITEMS[fid].name)
 			if Net.is_host():
 				m.netsync._broadcast_area(t)
 				m.netsync._broadcast_stats()
