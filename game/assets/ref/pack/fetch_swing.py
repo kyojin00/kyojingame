@@ -36,7 +36,8 @@ OUT = os.path.join(HERE, 'swing_src')
 
 # 문구는 방향마다 다르다. 옆은 「팔을 머리 위로 감았다 허리를 굽혀 내리치는」 문구가
 # 제일 자연스러웠는데, 같은 문구를 앞·뒤에 쓰면 절하는 것처럼 보였다(얼굴이 사라진다).
-# 앞·뒤는 **고개를 든 채 허리 높이로 내리치는** 문구로 바꾸니 자연스럽다.
+# 앞·뒤는 **고개를 든 채, 팔은 몸 앞에서만 오르내리며** 허리 높이로 내리치는 문구로 바꾸니
+# 자연스럽다 (팔을 옆으로 벌리는 T자 장이 나오지 않게 못 박는다).
 # 「도끼를 든다」고 적으면 도끼를 그려 넣는다 — 도구는 게임이 따로 얹으니 빈손이라 못 박는다
 PROMPT_SIDE = ("The character begins by rapidly raising both arms high above their head, "
                "then forcefully swings them down in a wide arc toward the ground. As the arms "
@@ -45,13 +46,14 @@ PROMPT_SIDE = ("The character begins by rapidly raising both arms high above the
                "character fluidly straightens their torso and lowers their arms back to their "
                "sides, returning to their original standing posture. Hands are empty, no tool. "
                "Feet stay planted.")
-PROMPT_FRONT = ("Overhead strike with empty hands: the character lifts both arms straight up "
-                "over the head with fists together, then brings both arms down fast in front of "
-                "the body to waist height, bending the knees a little on impact. The upper body "
-                "stays upright, the head stays up facing the camera, no bowing. Then the arms "
-                "return to the sides. Feet stay planted.")
+PROMPT_FRONT = ("Chopping straight down in front with empty hands: both fists held together in "
+                "front of the chest, elbows pointing forward. The fists rise straight up past the "
+                "face to above the head, then drive straight down in front of the body to belt "
+                "height. The arms move only forward and up-down, in the plane in front of the body "
+                "— never out to the sides, no T-pose, elbows stay in front of the torso. Head up, "
+                "facing the camera, no bowing. Small knee bend on impact. Feet planted.")
 PROMPT = {'down': PROMPT_FRONT, 'side': PROMPT_SIDE, 'up': PROMPT_FRONT}
-SEED = {'down': 9001, 'side': 4242, 'up': 9001}
+SEED = {'down': 31337, 'side': 4242, 'up': 31337}   # 여자 앞·뒤는 씨앗 22 로 뽑은 것(팔을 덜 벌린다)
 FRAMES = 10
 
 
