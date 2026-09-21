@@ -397,8 +397,7 @@ func use_tool() -> void:
 					m.doing._maybe_drop_recipe("rock")
 					m.tutorial_notify("mine")
 					gain_skill("mine", 6.0)
-				else:
-					m.hud.show_message("돌을 내리쳤다.")
+				# 아직 안 부서졌으면 아무 말도 없다 — 바위가 흔들리는 것으로 족하다
 			elif obj.kind == "bigrock":
 				# 길목의 바위 (스토리 1 바위 / 바닷길 바위 — 여러 번 캐야 부서진다)
 				# 붙박이 바위는 이야기가 그 자리에 오기 전까지만 단단하다.
@@ -429,8 +428,7 @@ func use_tool() -> void:
 					gain_skill("mine", 4.0)
 					m.story._story_rock_mined()
 					m.story._sea_gate_mined()
-				else:
-					m.hud.show_message("커다란 바위를 내리쳤다.")
+				# 아직 안 부서졌으면 아무 말도 없다 (도끼질과 같은 규칙)
 			elif obj.kind == "sprinkler":
 				m.objnode._remove_object(t)
 				GameData.wood += GameData.SPRINKLER_COST_WOOD
