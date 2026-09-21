@@ -53,6 +53,9 @@ PROMPT_FRONT = ("Chopping straight down in front with empty hands: both fists he
                 "— never out to the sides, no T-pose, elbows stay in front of the torso. Head up, "
                 "facing the camera, no bowing. Small knee bend on impact. Feet planted.")
 PROMPT = {'down': PROMPT_FRONT, 'side': PROMPT_SIDE, 'up': PROMPT_FRONT}
+# ※ 앞·뒤는 결국 글이 아니라 **골격 인페인팅**(pack/skel_inpaint.py -> swing_src)으로 뽑았다.
+#   글로 시키면 팔을 옆으로 벌린 장이 꼭 끼었다. 몸·머리는 서기 그림 그대로 두고 팔 자리만
+#   골격 좌표대로 다시 그리게 하면 팔이 몸 앞 좁은 폭에서만 오르내린다.
 SEED = {'down': 31337, 'side': 4242, 'up': 31337}   # 여자 앞·뒤는 씨앗 22 로 뽑은 것(팔을 덜 벌린다)
 FRAMES = 10
 
