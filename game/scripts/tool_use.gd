@@ -360,10 +360,8 @@ func use_tool() -> void:
 						get_tree().create_timer(1.0).timeout.connect(m.story._start_u_intro_dialog)
 					if randf() < 0.02:
 						gain_legend("world_branch")
-				elif obj.hp == 2:
-					m.hud.show_message("나무를 베었다! (1/%d)" % m.TREE_HP)
-				else:
-					m.hud.show_message("나무가 쓰러지기 직전이다! (2/%d)" % m.TREE_HP)
+				# 도끼질 중간에는 아무 말도 하지 않는다 — 나무가 흔들리는 것으로 족하다
+				# (「1/3」「쓰러지기 직전」 말풍선이 도끼질마다 머리 위를 가렸다)
 			elif obj.kind == "fence":
 				if bool(obj.get("fixed", false)):
 					m.hud.show_message("단단히 박힌 울타리다. 길을 따라 가야 한다.")
