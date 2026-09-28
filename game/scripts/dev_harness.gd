@@ -6866,13 +6866,19 @@ func _debug_tick() -> void:
 				_bench_n += 1
 		405:
 			var per_draw: int = _bench_us / maxi(1, _bench_n)
+			# 굽기도 상자의 순간 속도에 흔들린다 — 격자 읽기처럼 세 번 구워 가운데 값으로 잰다
+			var bakes: Array = [m.map_ui.bake_us]
+			for rep_bk in 2:
+				m.map_ui._bake()
+				bakes.append(m.map_ui.bake_us)
+			bakes.sort()
 			m.map_ui.close()
 			# 소프트웨어 렌더러(CI)에서도 8ms를 넘으면 안 된다 —
 			# 넘으면 그리는 것만으로 120fps가 무너진다는 뜻이다
 			# 굽기는 **여는 순간 한 번**이라 예산이 다르다. 소프트웨어 렌더러의
 			# 느린 CI 상자에서 2만 7천 칸에 65ms쯤 — 여유를 두고 90ms로 잡는다.
 			# (칸마다 구역을 훑던 시절에는 160ms였다. 이 선이 그때로 돌아가는 것을 막는다)
-			var bake: int = m.map_ui.bake_us
+			var bake: int = int(bakes[1])
 			# 상자마다 속도가 다르다(개발기 66ms · 헤드리스 컨테이너 150ms+). 절대 90ms 아니면
 			# 같은 상자에서 잰 「격자 읽기」(칸마다 grid 의 사전에서 ground 를 읽는 것 — 굽기가
 			# 피할 수 없는 일)의 2.5배 안이면 된다. 굽기가 그보다 무거워지면 칸마다 딴 일을 하는 것이다
