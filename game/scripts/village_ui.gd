@@ -407,8 +407,6 @@ func _talk_to(npc: Node2D) -> void:
 			{"text": GameData.npc_line(npc.id), "choices": plain_choices},
 		])
 		return
-	# 하루 첫 대화인가 — 호칭 첫마디(society.talk_opener)는 그날 첫 만남에만 나온다 (D1)
-	var first_today: bool = not npc.talked_today
 	if not npc.talked_today:
 		npc.talked_today = true
 		GameData.aff_add(npc.id, 2)
@@ -451,29 +449,17 @@ func _talk_to(npc: Node2D) -> void:
 	# 축제날에는 이장이 진행을 맡는다
 	if npc.id == "chief" and GameData.festival_open():
 		choices.insert(0, ["축제 이야기", _open_festival_dialog])
-	# 사회(S1) — 일자리 이야기·이장의 질문·마을 회의·봉사·소매치기는 society 가 끼운다.
-	# 게스트에게는 회색(gray) 으로만 보이고, 호감도 콘텐츠가 열리기 전에는 아무것도 안 낀다
-	m.society.add_talk_choices(npc.id, choices)
 	# 연화의 서브 퀘스트 — 「대화 끝」 바로 위에 실제 퀘스트 이름으로 뜬다
 	var mom_q: Dictionary = {}
 	if npc.id == "forest_mom":
 		mom_q = _mom_quest_option()
 		if not mom_q.is_empty():
 			choices.insert(choices.size() - 1, [str(mom_q.label), mom_q.cb])
-	# 호칭은 NPC 의 입으로 나온다(헌법 §0.4) — 하루 첫 대화면 첫마디를 **별도 페이지**로
-	# line 앞에 둔다. line 에 접두로 붙이지 않는 이유: 위의 secret50/100·memory_given 이
-	# line 을 통째로 덮어 호칭이 사라지고, 길어진 line 이 PAGE_LINES 로 갈라지면 선택지가
-	# 뒷장으로 밀린다. 별도 페이지는 line 의 페이지 수를 오늘과 똑같이 둔다 (D1).
-	# 빈 문자열이면(둘째 대화·호감도 잠김·게스트) 페이지를 만들지 않는다
-	var opener: String = m.society.talk_opener(npc.id, first_today)
-	var seq: Array = []
-	if opener != "":
-		seq.append({"text": opener})
-	# 연화의 「!」는 선택지 페이지의 버튼이 지어진 뒤에야 붙일 수 있다 — 첫 페이지가
-	# 호칭이면 즉시 부착이 빗나가므로, line 엔트리의 event 로 넘겨 society 가 한 프레임 미룬다
-	seq.append({"text": line, "choices": choices,
-		"event": m.society.on_choices_page.bind(str(mom_q.get("label", "")))})
-	m.dialog.open_seq(title, _npc_portrait(npc.id), seq)
+	m.dialog.open_seq(title, _npc_portrait(npc.id), [
+		{"text": line, "choices": choices},
+	])
+	if not mom_q.is_empty():
+		_attach_quest_bang(str(mom_q.label))
 
 
 func in_greenhouse(t: Vector2i) -> bool:
@@ -549,8 +535,6 @@ func _enter_mine(f: int) -> void:
 
 func room_action(kind: String) -> void:
 	match kind:
-		"town":
-			_open_town_room_dialog()   # 갈뫼읍(S4b) — 사람은 S4c 에 온다
 		"rest":
 			_open_inn_dialog()
 		"breed":
@@ -565,130 +549,6 @@ func room_action(kind: String) -> void:
 				_open_hall_dialog()
 		"mail":
 			_open_post_dialog()
-		"police":
-			m.society.open_police()   # 파출소 창구(사회 S2b) — 자수·출동·순찰·봉급
-		"prison":
-			m.society.open_prison()   # 교도소(S4g) — 형이 있으면 복역, 없으면 닫힌 문
-
-
-# ---- 갈뫼읍 (S4b) — 발견·정류장·장터·빈 창구 ----
-#
-# 읍은 짓지 않는다. 억새 벌판에 처음부터 서 있고, 걸어가서 팻말을 읽으면 발견이다. 버스는
-# 면사무소 사업 「버스 개통」 뒤에 정류장 E 로 탄다(50G, 반 시간, 19시 뒤엔 없다 — 밤길은 걸어야
-# 하고 그건 대범함이다). 창구의 사람과 일은 S4c 가 채운다.
-
-func open_town_sign() -> void:
-	var first: bool = not GameData.town_open
-	GameData.town_open = true
-	if first:
-		m.hud.event_toast("%s 발견!" % m.TOWN_NAME)
-		if not GameData.shop_seeds.has("apple"):
-			GameData.shop_seeds.append("apple")   # 읍 장터의 묘목이 잡화점에 들어온다(과수원, S6a)
-			m.hud.show_message("잡화점에 사과나무 묘목이 들어온다.", 4.0)
-		m.saveio.save_now()
-	m.dialog.open(m.TOWN_NAME, "『갈뫼읍 — 군청 · 경찰서 · 법원 · 검찰청』\n" \
-		+ "관청 거리 아래로 보건소·신협·여관·식당, 그 아래가 장터다.\n"
-		+ ("교진 북쪽 어귀에서 버스가 온다." if GameData.bus_open() else "버스는 아직 없다. 교진까지 걸어야 한다."),
-		[["닫기", null]])
-
-
-# 장터 점포(S4d) — 상인이 점포 앞에 서 있는 시간엔 내 물건을 도심 값(×1.1)에 판다
-func open_market_stall(t: Vector2i) -> void:
-	var owner := ""
-	for id in GameData.gen_npcs:
-		var g: Dictionary = GameData.gen_npcs[id]
-		if bool(g.get("here", false)) and int(g.get("stall", -1)) >= 0 \
-				and m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] == t:
-			owner = str(id)
-	if owner != "" and m.npcmgr.npc_place_now(owner) == "stall":
-		m.shop.open("sell", ["sell"], "%s의 점포" % GameData.npc_name(owner), "", GameData.town_sell_mult())
-		return
-	if owner != "":
-		m.dialog.open("장터 점포", "%s의 점포다. 지금은 자리에 없다." % GameData.npc_name(owner), [["닫기", null]])
-		return
-	m.dialog.open("장터 점포", "빈 점포다. 차양만 걸려 있다.", [["닫기", null]])
-
-
-func _open_town_room_dialog() -> void:
-	var d: Dictionary = m.shop_room.ROOMS.get(m.shop_room.room_id, {})
-	var keeper := str(d.get("keeper", ""))
-	# 읍 살림(S4e) — 군청 창구엔 읍 장부가, 신협 창구엔 기채·상환이 있다
-	if m.shop_room.room_id == "county":
-		m.society.open_town_ledger()
-		return
-	if m.shop_room.room_id == "bank":
-		m.society.town_bank_menu()
-		return
-	# 읍 순경(S4f) — 경찰서 창구는 자수·내 서류, 법원 창구는 기소된 나의 피고석
-	if m.shop_room.room_id == "police" and m.society.police_town_counter():
-		return
-	if m.shop_room.room_id == "court" and m.society.court_town_counter():
-		return
-	if keeper != "" and GameData.NPCS.has(keeper):
-		# 우두머리의 한마디 — 채용·근무는 society.counter_menu 가 먼저 가로챈다(자격이 있을 때)
-		m.dialog.open(GameData.npc_name(keeper), GameData.npc_line(keeper), [["대화 끝", null]],
-			m.tex.get("npc_%s_portrait_normal" % keeper))
-		return
-	m.dialog.open(str(d.get("name", "창구")), "창구는 열려 있는데 앉은 사람이 없다.", [["나간다", null]])
-
-
-func open_bus_stop(t: Vector2i) -> void:
-	var here := ""
-	for key in m.bus_tiles:
-		if m.bus_tiles[key] == t:
-			here = str(key)
-	var dest_key := "town" if here != "town" else "kyojin"
-	var dest_name: String = m.TOWN_NAME if dest_key == "town" else "교진"
-	if not GameData.bus_open():
-		m.dialog.open("정류장", "정류장 팻말만 서 있다. 버스는 아직이다.\n면사무소 사업 「버스 개통」 뒤에 선다.", [["닫기", null]])
-		return
-	if GameData.hour_now() >= 19.0:
-		m.dialog.open("정류장", "밤엔 버스가 없다. 걸어야 한다.", [["닫기", null]])
-		return
-	if int(GameData.me.get("reputation", {}).get("kyojin", 0)) < -40:
-		m.dialog.open("정류장", "기사가 문을 열어 주지 않는다. 마을에 도는 내 얘기 때문이다.", [["닫기", null]])
-		return
-	var btns: Array = []
-	var lbl := "%s행 — %dG" % [dest_name, GameData.BUS_FARE]
-	if here == "town" and GameData.town_wanted_active() \
-			and GameData.boldness() < int(GameData.GATE.get("flee", 30)):
-		# 도망(S5c, 헌법 §6.3) — 수배 중 버스는 대범함 30 부터. 그 아래는 정류장의 순경 앞에서 발이 안 떨어진다
-		btns.append(m.society.gray(lbl, str(GameData.SOCIETY_LINES.police_town.bus_cop)))
-	elif GameData.money >= GameData.BUS_FARE:
-		btns.append([lbl, _bus_ride.bind(dest_key)])
-	else:
-		btns.append(m.society.gray(lbl, "차비가 없다."))
-	btns.append(["닫기", null])
-	m.dialog.open("정류장", "%s행 버스가 선다. 반 시간이면 닿는다." % dest_name, btns)
-
-
-func _bus_ride(dest_key: String) -> void:
-	m.dialog.close()
-	if GameData.money < GameData.BUS_FARE or not m.bus_tiles.has(dest_key):
-		return
-	GameData.money -= GameData.BUS_FARE
-	GameData.today_spent += GameData.BUS_FARE
-	GameData.gov_budget["kyojin"] = int(GameData.gov_budget.get("kyojin", 0)) + GameData.BUS_FARE
-	var tw := create_tween()
-	tw.tween_property(m.fade_rect, "color:a", 1.0, 0.35)
-	tw.tween_callback(_bus_arrive.bind(dest_key))
-	tw.tween_property(m.fade_rect, "color:a", 0.0, 0.35)
-
-
-# 내린다 — 정류장 앞 빈 칸, 시계는 반 시간 뒤. 하네스는 이 함수를 바로 부른다(페이드 없이)
-func _bus_arrive(dest_key: String) -> void:
-	var t: Vector2i = m.bus_tiles.get(dest_key, Vector2i(-1, -1))
-	if t.x < 0:
-		return
-	m.riding.dismount_horse()
-	var land: Vector2i = m.nearest_open_tile(t + Vector2i(0, 1))
-	if land.x < 0:
-		land = t
-	m.player.position = Vector2(land.x * m.TILE + 16, land.y * m.TILE + 16)
-	GameData.minutes += GameData.BUS_MINUTES
-	m.hud.show_message("버스가 %s에 닿았다." % (m.TOWN_NAME if dest_key == "town" else "교진"), 3.0)
-	m.queue_redraw()
-	m.saveio.save_now()
 
 
 # ---- 우체국 (메인 스토리 3에서 세운다) ----
@@ -835,21 +695,6 @@ func _open_hall_dialog() -> void:
 		btns.append(["공동 프로젝트", _open_hall_project_dialog])
 	if GameData.hall_feature_open("meet"):
 		btns.append(["마을 회의", _open_hall_meeting_dialog])
-	# 면사무소 창구(S2a) — 세금·예산·기관직. 회관이 열린 날부터 정부가 있다(헌법 §2.2).
-	# 게스트는 조용히 죽는 단추가 아니라 회색 안내가 뜬다(D19 규약)
-	if GameData.hall_feature_open("office"):
-		btns.append(m.society.gray("면사무소 창구", "손님은 이 마을 일에 끼지 않는다.")
-			if Net.is_guest() else ["면사무소 창구", m.society.open_township])
-	# 순회 재판(S2c) — 계절 7·21일, 윤 판사·한 검사가 회관에 온다. 기소된 나는 피고석,
-	# 아니면 방청. 게스트는 방청도 회색(사회가 없다)
-	if GameData.is_court_day():
-		body += "\n오늘은 순회 재판일 — 윤 판사와 한 검사가 와 있다."
-		if Net.is_guest():
-			btns.append(m.society.gray("순회 재판 방청", "손님은 이 마을 일에 끼지 않는다."))
-		elif GameData.charged_active():
-			btns.insert(0, ["★ 순회 재판 — 피고석에 선다", m.society.open_trial])
-		else:
-			btns.append(["순회 재판 방청", m.society.open_docket])
 	btns.append(["나가기", null])
 	m.dialog.open("마을회관", body, btns)
 
@@ -1258,10 +1103,6 @@ func _open_library_dialog() -> void:
 	btns.append(["할아버지의 메모 찾기", _open_grandpa_memo_dialog])
 	if GameData.relics_owned() > 0:
 		btns.append(["할머니의 기록 읽기", m.story.open_grandma_records])
-	# 「책 읽기 — 하루 한 권」(S1, 헌법 §7.1 books_read 가 사서보 채용의 열쇠) —
-	# 게스트는 조용히 죽는 버튼이 아니라 회색 안내가 뜬다 (D19)
-	btns.append(m.society.gray("책 읽기 — 하루 한 권", "손님은 이 마을 일에 끼지 않는다.")
-		if Net.is_guest() else ["책 읽기 — 하루 한 권", m.society.read_book])
 	btns.append(["나가기", null])
 	m.dialog.open("도서관",
 		"나무 냄새가 나는 아담한 서가.\n서하가 책과 마을의 기록을 정리해 두었다.", btns)

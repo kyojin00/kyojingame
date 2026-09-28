@@ -54,11 +54,7 @@ func _process(delta: float) -> void:
 			or GameData.story2_phase == "farm_talk"
 			or GameData.story_phase in ["travel", "deliver", "home_open", "greet"])) \
 		and not (id == "fisher"
-			and GameData.fisher_quest in ["meet", "cast", "open"]) \
-		and not GameData.night_owl(id) \
-		and not GameData.constable_on_duty(id)   # 밤 사람은 22시까지, 밤 교대 순경은 24시까지 밖에 남는다
-	if GameData.constable_off_duty(id) or GameData.npc_is_down(id):
-		home_time = true   # 비번 순경은 경찰서 안, 맞아 누운 사람은 집 안 — 보이지도, 보지도 않는다
+			and GameData.fisher_quest in ["meet", "cast", "open"])
 	if visible == home_time:
 		visible = not home_time
 	if home_time:
@@ -136,9 +132,6 @@ func _update_schedule() -> void:
 		place = want
 		dest = main.npcmgr.npc_place_tile(id, place)
 		_route_cd = 0.0
-	# 쫓는 중이면 목적지가 움직인다 — 길이 끝날 때마다 다시 잡는다(사회 S2b, 박 순경)
-	if place == "chase" and route.is_empty():
-		dest = main.npcmgr.npc_place_tile(id, place)
 	if dest.x == -999 or not route.is_empty():
 		return
 	var ts: int = main.TILE

@@ -111,13 +111,9 @@ func _next_day(passed_out: bool) -> void:
 	var stats := [GameData.today_harvest, GameData.today_earned, GameData.today_spent]
 	var prev_season := GameData.season()
 	GameData.day += 1
-	# 기력 소진 기절인가 — 26시 강제 취침도 passed_out 으로 들어오지만 그건
-	# 기절이 아니다(D15). 시계를 06:00 으로 되돌리기 전에 갈라 둔다
-	var ko: bool = passed_out and GameData.minutes < GameData.DAY_END
 	GameData.minutes = GameData.DAY_START
 	# 침대가 좋을수록 잘 잔다 — 낡은 침대 70% · 나무 100% · 푹신 100%(+쓰러짐 완화)
-	# 어젯밤 밖에서 오래 걸었거나 일터에 나갔으면 그만큼 덜 쉰다 (rest_mult)
-	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out) * GameData.rest_mult()
+	GameData.energy = GameData.ENERGY_MAX * GameData.bed_wake_mult(passed_out)
 	# 한숨 자고 나면 속이 조금은 든든하다 (완전히 차지는 않는다)
 	GameData.hunger = maxf(GameData.hunger, GameData.HUNGER_WAKE_MIN)
 	GameData.reset_daily()
@@ -240,11 +236,6 @@ func _next_day(passed_out: bool) -> void:
 				m.hud.show_message("주민이 %d명이 됐다! 마을회관에서\n「%s」이(가) 열렸다." % [int(feat[1]), str(feat[2])], 6.0)
 		GameData.hall_donate_morning(m.npcs.size())
 
-	# 사회의 아침 — 결근·봉급·대범함·회의·호칭. 회관(스토리 9) if 블록 **밖**이라
-	# 스토리 9 전에도 매일 돈다. 저장 앞에 두어 오늘 아침의 상태가 세이브에 담긴다
-	GameData.society_new_day(stats, ko)
-	m.society.after_new_day()   # 압류(여덟 주 밀린 세금) — 가축은 세계를 든 쪽이 걷는다
-
 	_t = Time.get_ticks_usec()
 	m.saveio.save_now()
 	m._perf_day["save"] = Time.get_ticks_usec() - _t
@@ -282,14 +273,11 @@ func _next_day(passed_out: bool) -> void:
 		note += "\n쓰러져서 기력이 절반만 회복됐다..."
 	if spouse_note != "":
 		note += "\n\n" + spouse_note
-	# 사회 줄(봉급날·결근·호칭…)은 호스트의 결산에만 — 게스트는 사회가 없으니
-	# send_new_day 의 s_body 에는 싣지 않는다 (헌법 §0: 알림은 아침 결산 한 줄)
-	var soc_tail := GameData.society_note()
 
 	var s_title := "- %s %d일 아침 -" % [GameData.season_name(), GameData.day_in_season()]
 	var s_body := "어제 수확: %d개\n판매 수입: +%dG\n지출: -%dG\n소지금: %dG\n%s" \
 		% [stats[0], stats[1], stats[2], GameData.money, note]
-	m.summary.open(s_title, s_body if soc_tail == "" else s_body + "\n\n" + soc_tail)
+	m.summary.open(s_title, s_body)
 	if Net.is_host():
 		m.netsync.send_new_day(m.netsync._make_snapshot_json(), s_title, s_body)
 	m.queue_redraw()
@@ -305,9 +293,8 @@ func _update_night() -> void:
 	# 낮이 순백이고 밤만 파란 세계는 형광등 방이다. 해가 뜨고 질 때
 	# 화면이 금빛으로 물들어야 같은 마을이 하루에 몇 번씩 딴 얼굴이 된다.
 	var hr := GameData.minutes / 60.0
-	# 깊은 밤(남보라). 밤길 등불(마을 예산 사업)이 걸리면 조금 덜 어둡다 —
-	# 내가 낸 세금이 눈에 보이는 자리
-	var night: Color = GameData.night_dark_color()
+	# 깊은 밤(남보라)
+	var night := Color(0.16, 0.15, 0.26)
 	const DAWN := Color(1.0, 0.87, 0.76)       # 동틀 녘 (연한 금빛)
 	const DAY := Color(1, 1, 1)
 	const GOLD := Color(1.0, 0.88, 0.68)       # 골든아워 (해질 녘 주황)

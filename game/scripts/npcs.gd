@@ -59,12 +59,6 @@ func _tile_has_npc(t: Vector2i) -> bool:
 
 
 func npc_place_now(npc_id: String) -> String:
-	# 사회가 자리를 정한 사람이 먼저다 — 이장의 마을 회의(meeting)와 밤 사람(plaza·pier).
-	# 축제 블록보다 위에 있지만 「축제 > 사회」는 society_place 안의 시간 조건이 지킨다:
-	# 회의는 축제 없는 날 9~17시만, 밤 사람은 축제가 끝난 저녁(is_evening) 이후만
-	var soc := GameData.society_place(npc_id)
-	if soc != "":
-		return soc
 	# 축제날에는 일과를 접고 다 같이 축제 자리로 모인다
 	var fest: Dictionary = GameData.festival_today()
 	if not fest.is_empty() and GameData.minutes >= GameData.FEST_START \
@@ -87,8 +81,6 @@ func npc_place_now(npc_id: String) -> String:
 		if hh >= 9.0 and hh < 17.0:
 			return "hallwork"
 	var plan: Array = m.NPC_SCHEDULE.get(npc_id, [])
-	if plan.is_empty() and GameData.gen_npcs.has(npc_id):
-		plan = GameData.GEN_SCHEDULE.get(str(GameData.gen_npcs[npc_id].get("role", "")), [])   # 생성 NPC(S4d)
 	if plan.is_empty():
 		return ""
 	var hour := GameData.minutes / 60.0
@@ -122,50 +114,8 @@ func _hamlet_tile(npc_id: String, place: String) -> Vector2i:
 	return h.square
 
 
-# 읍 사람(S4c)이 갈 자리 — 집도 일터도 제 관청이고, 낮엔 장터 앞이다.
-# 생성 NPC(S4d): 상인은 제 점포 앞·여관, 주택가 주민은 제 집
-func _town_tile(npc_id: String, place: String) -> Vector2i:
-	if place == "square":
-		return m.TOWN_SQUARE
-	if GameData.gen_npcs.has(npc_id):
-		var g: Dictionary = GameData.gen_npcs[npc_id]
-		if str(g.get("role", "")) == "constable":
-			# 읍 순경(S4f) — 쫓을 땐 내 발밑(읍 안에 있을 때만), 교대면 시각+교대의 구역, 아니면 서 문 앞
-			if place == "chase" and m.TOWN_RECT.grow(4).has_point(m.player_tile()):
-				return m.player_tile()
-			if place == "chase" or place == "beat":
-				return m.TOWN_BEATS[(int(GameData.hour_now()) + int(g.get("shift", 0))) % m.TOWN_BEATS.size()]
-			return m.door_tile(m.TOWN_PLOTS["police"].anchor) + Vector2i(0, 1)
-		var st: Dictionary = GameData.staff_of(npc_id)
-		if not st.is_empty() and place == "work":
-			# 기관 직원(S4h) — 제 관청 문 옆(우두머리는 문 앞 한가운데에 선다)
-			var room := str(GameData.INSTITUTIONS[str(st.inst)].room)
-			return m.door_tile(m.TOWN_PLOTS[room].anchor) + Vector2i(-1 - int(st.slot), 1)
-		if place == "stall" and int(g.get("stall", -1)) >= 0:
-			return m.TOWN_STALLS[int(g.stall) % m.TOWN_STALLS.size()] + Vector2i(0, 1)
-		if int(g.get("home", -1)) >= 0:
-			return m.door_tile(m.TOWN_HOMES[int(g.home) % m.TOWN_HOMES.size()]) + Vector2i(0, 1)
-		return m.door_tile(m.TOWN_PLOTS["town_inn"].anchor) + Vector2i(-1 - int(g.get("idx", 0)) % 3, 1)
-	var plot := str(m.TOWN_OF.get(npc_id, ""))
-	if m.TOWN_PLOTS.has(plot):
-		var d: Vector2i = m.door_tile(m.TOWN_PLOTS[plot].anchor) + Vector2i(0, 1)
-		if npc_id == "fence_gu":
-			d += Vector2i(2, 0)   # 장물아비는 여관 문 옆 그늘에 선다
-		return d
-	return m.TOWN_SQUARE
-
-
 func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 	var t := Vector2i(-999, -999)
-	if m.TOWN_OF.has(npc_id) or GameData.gen_npcs.has(npc_id):
-		t = _town_tile(npc_id, place)
-		if m.is_passable(t):
-			return t
-		for d0: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0),
-				Vector2i(-1, 0), Vector2i(0, 2), Vector2i(2, 0), Vector2i(-2, 0)]:
-			if m.is_passable(t + d0):
-				return t + d0
-		return t
 	if m.HAMLET_OF.has(npc_id):
 		t = _hamlet_tile(npc_id, place)
 		if m.is_passable(t):
@@ -180,19 +130,6 @@ func npc_place_tile(npc_id: String, place: String) -> Vector2i:
 			t = m.STALL_TILE + Vector2i(0, 1)   # 노점 앞 모래밭
 		"hallwork":
 			t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
-		"patrol":
-			# 박 순경의 순찰 — 시각마다 세 지점(광장 남쪽·게시판 앞·서쪽 어귀)을 돈다
-			var pts: Array = m.society.patrol_points()
-			t = pts[int(GameData.hour_now()) % pts.size()]
-		"chase":
-			# 수배 중인 나를 쫓는다 — 목적지가 곧 내 발밑이다(npc.gd 가 route 마다 다시 잡는다)
-			t = m.player_tile()
-		"meeting":
-			# 이장의 마을 회의 — 회관이 있으면 회관 문 앞, 없으면 이장 집 문 앞 (D14)
-			if GameData.village_built.has("hall"):
-				t = m.door_tile(m.VILLAGE_PLOTS["hall"].anchor) + Vector2i(0, 1)
-			else:
-				t = m.CHIEF_HUT + Vector2i(0, 1)
 		"onsen":
 			# 온천 앞 — 셋이 겹치지 않게 한 칸씩 벌려 선다
 			var oi: int = maxi(0, ONSEN_GOERS.find(npc_id))
@@ -271,66 +208,8 @@ func _sync_hamlet_npcs() -> void:
 			_spawn_npc(nid, m.door_tile(entry2[0]) + Vector2i(0, 1), box)
 
 
-# 생성 NPC 의 도트(S4d) — 목장주 판 위에 팔레트를 건다(make_settlers.js 와 같은 규칙, 실행 중에).
-# 세이브의 씨앗을 안 뒤에 굽는다 — 그래서 _load_textures 가 아니라 여기다
-const GEN_FRAMES := ["down_0", "down_1", "up_0", "up_1", "side_0", "side_1", "portrait_normal", "portrait_happy"]
-
-
-func bake_gen_sprites() -> void:
-	for id in GameData.gen_npcs:
-		if m.tex.has("npc_%s_down_0" % id):
-			continue
-		var pal: Array = GameData.GEN_PALETTES[int(GameData.gen_npcs[id].get("palette", 0)) % GameData.GEN_PALETTES.size()]
-		if str(GameData.gen_npcs[id].get("role", "")) == "constable":
-			pal = GameData.GEN_UNIFORM   # 제복은 하나다 — 얼굴이 아니라 옷으로 알아본다
-		for sfx: String in GEN_FRAMES:
-			var base: Texture2D = m.tex.get("npc_rancher_" + sfx)
-			if base == null:
-				continue
-			var img: Image = base.get_image().duplicate()
-			GameData.gen_recolor(img, pal[0], pal[1])
-			m.tex["npc_%s_%s" % [id, sfx]] = ImageTexture.create_from_image(img)
-
-
-# 생성 NPC 의 오고 감(계절 이주·전근·죽음)을 노드에 맞춘다 — 하루가 넘어간 아침에 society.after_new_day 가 부른다
-func sync_gen_nodes() -> void:
-	for n in m.npcs.duplicate():
-		var nid := str(n.id)
-		if GameData.gen_npcs.has(nid) and not bool(GameData.gen_npcs[nid].get("here", false)):
-			remove_npc(nid)
-	_sync_town_npcs()
-
-
-# 그 사람의 노드를 세계에서 치운다 — 떠남(story)·죽음(society)·전근(sync_gen_nodes)이 같이 쓴다
-func remove_npc(nid: String) -> void:
-	for n in m.npcs.duplicate():
-		if str(n.id) == nid:
-			m.npcs.erase(n)
-			n.queue_free()
-
-
-# 읍 손글 아홉(S4c)과 읍에 와 있는 생성 NPC(S4d) — 조건 없이 제자리에 있다. 어슬렁 범위는 읍 안
-func _sync_town_npcs() -> void:
-	var box: Rect2i = m.TOWN_RECT.grow(3)
-	GameData.ensure_gen_npcs()
-	bake_gen_sprites()
-	var want: Array = m.TOWN_NPC_IDS + GameData.gen_here()
-	for nid: String in want:
-		var found := false
-		for n in m.npcs:
-			if n.id == nid:
-				found = true
-				break
-		if found:
-			continue
-		var spot: Vector2i = _town_tile(nid, "beat" if GameData.constable_shift(nid) >= 0
-			else ("stall" if GameData.gen_npcs.has(nid) and GameData.staff_of(nid).is_empty() else "work"))
-		_spawn_npc(nid, spot, box)
-
-
 func _sync_village_npcs() -> void:
 	_sync_hamlet_npcs()
-	_sync_town_npcs()
 	# **마을 사람은 처음부터 다 여기 산다.**
 	#
 	# 예전에는 건물이 서고(village_built) 인사까지 나눠야(npc_greeted) 사람이

@@ -33,10 +33,6 @@ func _door_kind_at(t: Vector2i) -> String:
 	for pid: String in GameData.village_built:
 		if m.VILLAGE_PLOTS.has(pid) and t == m.door_tile(m.VILLAGE_PLOTS[pid].anchor):
 			return pid
-	# 갈뫼읍(S4b) — 처음부터 서 있는 읍 건물의 문
-	for tid: String in m.TOWN_PLOTS:
-		if t == m.door_tile(m.TOWN_PLOTS[tid].anchor):
-			return tid
 	return ""
 
 
@@ -369,9 +365,6 @@ func interact() -> void:
 		if obj.kind == "stall":
 			m.village.open_stall()
 			return
-		if obj.kind == "shop_stand":
-			m.society.open_stand()   # 내 좌판(사회 S3a) — 올리고, 내리고, 돈을 받는다
-			return
 		if obj.kind == "trash_bin":
 			m.village.open_trash_bin(t)
 			return
@@ -427,15 +420,6 @@ func interact() -> void:
 		if obj.kind == "sign" and t == m.OLD_SIGN:
 			m.story.examine_old_sign()
 			return
-		if obj.kind == "sign" and t == m.TOWN_SIGN:
-			m.village.open_town_sign()   # 갈뫼읍(S4b) — 읍을 「발견」한다
-			return
-		if obj.kind == "bus_stop":
-			m.village.open_bus_stop(t)   # 버스(S4b) — 개통 뒤 50G, 밤엔 없다
-			return
-		if obj.kind == "market_stall":
-			m.village.open_market_stall(t)
-			return
 		if obj.kind == "old_book":
 			m.story.examine_old_book(t)   # 메인 스토리 6 — 오래된 책 발견
 			return
@@ -484,11 +468,6 @@ func interact() -> void:
 		if obj.kind == "house":
 			var bk: String = _building_kind_at(t)
 			if bk == "":
-				# 정착민의 집(S2c) — 마을 부지가 아닌 집은 문 앞 대화다: 두드리거나, 몰래 들어가거나
-				var owner := _settler_house_at(t)
-				if owner != "":
-					m.society.house_door(owner)
-					return
 				# 서 있기는 하되 아직 사람이 들지 않은 가게 — 문이 잠겨 있다.
 				# (아무 말도 없이 조용하면 「E가 안 먹는다」로 읽힌다)
 				# 창을 띄우지는 않는다 — 옆에 선 사람에게 말을 걸려다 E를
@@ -581,18 +560,6 @@ func nearby_animal() -> Node2D:
 	return null
 
 
-# 이 칸을 덮은 정착민의 집 주인 — 없으면 "". 집은 앵커에서 5×4 다(마을 부지와 같은 틀)
-func _settler_house_at(t: Vector2i) -> String:
-	for nid in GameData.settler_homes:
-		var h: Array = GameData.settler_homes[nid]
-		if h.size() < 2:
-			continue
-		var a := Vector2i(int(h[0]), int(h[1]))
-		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
-			return str(nid)
-	return ""
-
-
 func _building_kind_at(t: Vector2i) -> String:
 	if t.x >= m.HOME_ANCHOR.x and t.x < m.HOME_ANCHOR.x + 5 \
 			and t.y >= m.HOME_ANCHOR.y and t.y < m.HOME_ANCHOR.y + 4:
@@ -604,10 +571,6 @@ func _building_kind_at(t: Vector2i) -> String:
 		var a: Vector2i = m.VILLAGE_PLOTS[pid].anchor
 		if t.x >= a.x and t.x < a.x + 5 and t.y >= a.y and t.y < a.y + 4:
 			return pid
-	for tid: String in m.TOWN_PLOTS:
-		var ta: Vector2i = m.TOWN_PLOTS[tid].anchor
-		if t.x >= ta.x and t.x < ta.x + 5 and t.y >= ta.y and t.y < ta.y + 4:
-			return tid
 	return ""
 
 

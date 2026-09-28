@@ -276,8 +276,6 @@ var daycycle: KyojinDayCycle = null
 var npcmgr: KyojinNpcs = null
 # 세이브 담기/펴기 (scripts/save_load.gd)
 var saveio: KyojinSaveIO = null
-# 사회 — 채용·근무·봉급·소매치기·이장의 회의 (scripts/society.gd)
-var society: KyojinSociety = null
 # 먹기·요리·조합·아이템 얻기 (scripts/player_actions.gd)
 var doing: KyojinDoing = null
 var _weather_override := -1
@@ -885,59 +883,13 @@ const HAMLET_OF := {
 	"sawyer": "treeshade", "teller": "treeshade", "beekeep": "treeshade",
 }
 const HAMLET_NPC_IDS := ["miller", "dyer", "brook", "sawyer", "beekeep", "teller"]
-# ---- 갈뫼읍(S4b) — 억새 벌판 한복판의 읍. 짓는 게 아니라 발견한다(HAMLETS 패턴). y 는 NORTH_PAD 포함.
-# 관청 거리 y 92 · 남쪽 줄 y 102 · 장터 y 110 · 주택 여덟 y 118. 그림은 마을·고장 집을 빌려 색만 물들인다
-const TOWN_NAME := "갈뫼읍"
-const TOWN_RECT := Rect2i(244, 90, 58, 32)      # 읍 안쪽 — 바닥은 자갈, 자연물은 나지 않는다
-const TOWN_SIGN := Vector2i(247, 100)           # 서쪽 입구 팻말 — 읽으면 「발견」(town_open)
-const TOWN_PLOTS := {
-	"county":      {"anchor": Vector2i(250, 92),  "name": "군청",   "tex": "library", "tint": Color(0.84, 0.9, 1.0)},
-	"police":      {"anchor": Vector2i(262, 92),  "name": "경찰서", "tex": "inn",     "tint": Color(0.78, 0.84, 1.0)},
-	"court":       {"anchor": Vector2i(274, 92),  "name": "법원",   "tex": "post",    "tint": Color(1.0, 0.84, 0.84)},
-	"prosecution": {"anchor": Vector2i(286, 92),  "name": "검찰청", "tex": "smith",   "tint": Color(0.92, 0.92, 0.92)},
-	"clinic":      {"anchor": Vector2i(250, 102), "name": "보건소", "tex": "lab",     "tint": Color(1.0, 1.0, 1.0)},
-	"bank":        {"anchor": Vector2i(262, 102), "name": "신협",   "tex": "general", "tint": Color(1.0, 0.94, 0.68)},
-	"town_inn":    {"anchor": Vector2i(274, 102), "name": "여관",   "tex": "cabin",   "tint": Color(1.0, 0.9, 0.78)},
-	"diner":       {"anchor": Vector2i(286, 102), "name": "식당",   "tex": "ranch",   "tint": Color(1.0, 0.86, 0.72)},
-	# 교도소(S4g) — 읍이 아니라 잿빛 벌판 한가운데. 징역은 여기 실내에서 84일을 건너뛴다
-	"prison":      {"anchor": Vector2i(194, 158), "name": "교도소", "tex": "inn",     "tint": Color(0.6, 0.6, 0.64)},
-}
-const TOWN_STALLS := [Vector2i(252, 110), Vector2i(258, 110), Vector2i(264, 110), Vector2i(270, 110),
-	Vector2i(276, 110), Vector2i(282, 110), Vector2i(288, 110), Vector2i(294, 110)]
-const TOWN_HOMES := [Vector2i(246, 118), Vector2i(253, 118), Vector2i(260, 118), Vector2i(267, 118),
-	Vector2i(274, 118), Vector2i(281, 118), Vector2i(288, 118), Vector2i(295, 118)]
-const TOWN_LAMPS := [Vector2i(248, 98), Vector2i(270, 98), Vector2i(292, 98), Vector2i(248, 108),
-	Vector2i(270, 108), Vector2i(292, 108), Vector2i(250, 115), Vector2i(272, 115), Vector2i(294, 115),
-	Vector2i(256, 123), Vector2i(276, 123), Vector2i(296, 123)]
-# 정류장 — 교진 서쪽 어귀(큰길이 마을로 드는 자리)와 읍 서쪽 입구. 실제 칸은 세계를 지을 때 가장 가까운 빈 칸으로 잡는다(bus_tiles)
-const BUS_STOPS := {"kyojin": Vector2i(80, 9 + NORTH_PAD), "town": Vector2i(245, 100)}
-var bus_tiles := {}
-# 읍 손글 아홉(S4c) — 관청마다 우두머리 하나, 여관 뒷방의 장물아비 하나. 고장 사람처럼 m.npcs 에 살되
-# 주민 수에는 안 든다(TOWN_NPC_IDS). 그림은 고장 사람과 같은 도트 판에서 색만 갈아 낀다
-const TOWN_NPC := {
-	"county": "mayor_kang", "police": "chief_ha", "court": "judge_suh", "prosecution": "pros_min",
-	"clinic": "doctor_oh", "bank": "manager_baek", "town_inn": "innkeeper_ok", "diner": "cook_jang",
-}
-const TOWN_OF := {
-	"mayor_kang": "county", "chief_ha": "police", "judge_suh": "court", "pros_min": "prosecution",
-	"doctor_oh": "clinic", "manager_baek": "bank", "innkeeper_ok": "town_inn", "cook_jang": "diner",
-	"fence_gu": "town_inn",
-}
-const TOWN_NPC_IDS := ["mayor_kang", "chief_ha", "judge_suh", "pros_min", "doctor_oh", "manager_baek",
-	"innkeeper_ok", "cook_jang", "fence_gu"]
-const TOWN_SQUARE := Vector2i(272, 113)          # 장터 앞 — 읍 사람들이 낮에 모이는 자리
-# 읍 순경의 세 구역(S4f) — 정류장(bus_tiles.town 옆) · 관청 거리(경찰서 앞길) · 장터. 시각+교대로 돈다
-const TOWN_BEATS := [Vector2i(246, 100), Vector2i(264, 97), Vector2i(272, 113)]
-# 사회(S2b~)가 데려오는 사람들 — 고장 사람과 같은 도트 판(make_settlers.js)에서 색만 갈아 낀다
-# 순회 판사·검사(S2c)는 NPC 노드 없이 초상·도트만 싣는다 — 주민 수에 들지 않는다
-const SOCIETY_NPC_IDS := ["officer_park", "judge_yoon", "prosecutor_han"]
 
 
 # 우리집: 스토리 1 완료 후 집터(E)에서 목재로 직접 짓는다.
 # 자리는 광장 남쪽 빈터 — 북쪽 줄(우체국) 마당과 겹치지 않는 곳으로 옮겼다.
 const HOME_ANCHOR := Vector2i(88, 50 + NORTH_PAD)   # 마을 남서쪽 — 격자의 한 자리
 const HOME_SITE := Vector2i(90, 50 + NORTH_PAD)  # 건물 그림 한가운데 (지도 라벨 기준점)
-# 새터말(사회 S3b)의 빈 집터 여덟은 GameData.MEADOW_PLOTS 다 — 장부(home_plots)에 적지 않는
+# 새터말(S3b)의 빈 집터 여덟은 GameData.MEADOW_PLOTS 다 — 장부(home_plots)에 적지 않는
 # 「암묵의 집터」라 새 게임 초기화(reset_all)에도 사라지지 않는다
 
 # 건물 부지(좌상단 앵커, 5x4). 처음에는 아무것도 없는 빈 공간이며
@@ -988,8 +940,7 @@ const VILLAGE_PLOTS := {
 	"fish":    {"anchor": Vector2i(88, 24 + NORTH_PAD),  "name": "수산시장"},
 	"smith":   {"anchor": Vector2i(116, 24 + NORTH_PAD), "name": "대장간"},
 	"general": {"anchor": Vector2i(172, 24 + NORTH_PAD), "name": "잡화점"},
-	# 여관 부지는 파출소가 됐다(사회 S2b) — 여관·연구소는 읍(S4)으로 간다. 그림은 house_inn 그대로
-	"inn":     {"anchor": Vector2i(144, 50 + NORTH_PAD), "name": "파출소"},
+	"inn":     {"anchor": Vector2i(144, 50 + NORTH_PAD), "name": "여관"},
 	"ranch":   {"anchor": Vector2i(172, 50 + NORTH_PAD), "name": "목장 상회"},
 }
 # ---- 부지마다 「여기는 뭐 하는 곳」 ----
@@ -1207,15 +1158,13 @@ const YARD_PAD := 5
 # 마을 발전 순서: 이장에게 이야기하면 이 순서대로 하나씩 지을 수 있다.
 # (여관·연구소·도서관 부지는 자리만 잡아두고 이후 이야기에서 열린다)
 const VILLAGE_BUILD_ORDER := ["post", "general", "smith", "library", "ranch",
-	"fish", "hall", "inn"]   # inn = 파출소(회관 뒤, 사회 S2b)
+	"fish", "hall"]
 const VILLAGE_BUILD_COST := {   # [목재, 석재]
 	# general은 메인 스토리 2의 첫 퀘스트 — GameData.SHOP_BUILD_*와 같게 둔다
 	"post": [30, 10], "general": [30, 20], "smith": [60, 50],
 	"ranch": [80, 40], "fish": [100, 60], "hall": [120, 80],
 	# 도서관은 메인 스토리 6(오래된 책과 사서)에서만 열리는 건설이다
 	"library": [90, 50],
-	# 파출소(inn 부지) — 회관이 열린 뒤 이장의 「마을 발전 이야기」에서 (사회 S2b)
-	"inn": [50, 50],
 }
 
 
@@ -1226,15 +1175,13 @@ const VILLAGE_BUILD_COST := {   # [목재, 석재]
 func village_residents() -> int:
 	var n := 1
 	for npc in npcs:
-		# 고장 사람·읍 손글·읍 생성 NPC(S4d)는 교진 주민이 아니다
-		if str(npc.id) in HAMLET_NPC_IDS or str(npc.id) in TOWN_NPC_IDS or GameData.gen_npcs.has(str(npc.id)):
+		if str(npc.id) in HAMLET_NPC_IDS:
 			continue
 		n += 1
 	return n
 # 건물이 생기면 그 건물의 주인이 마을에 자리를 잡는다 (이장은 처음부터 있다)
 const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 	"ranch": "rancher", "fish": "fisher", "library": "librarian",
-	"inn": "officer_park",   # 파출소의 선임 순경(사회 S2b)
 	"post": "postman"}
 # ---- NPC 하루 일과 ----
 #
@@ -1244,9 +1191,6 @@ const VILLAGE_NPC := {"general": "merchant", "smith": "blacksmith",
 #   [시작 시각, 장소] — 시각 순서대로 적는다
 const NPC_SCHEDULE := {
 	"chief":      [[6, "home"], [9, "board"], [12, "plaza"], [16, "board"]],
-	# 박 순경 — 파출소와 순찰 세 지점(광장 남쪽·게시판 앞·서쪽 어귀)을 오간다. 저녁 뒤는
-	# society_place 가 야간 순찰(patrol)로 잡는다 — 자정까지 밖에 있는 유일한 사람
-	"officer_park": [[6, "home"], [9, "work"], [11, "patrol"], [13, "work"], [15, "patrol"], [17, "work"]],
 	"merchant":   [[6, "home"], [9, "work"], [13, "plaza"], [15, "work"]],
 	# 우체부 — 아침 첫 배달을 돌고(광장) 낮부터 우체국을 지킨다
 	"postman":    [[6, "work"], [8, "plaza"], [10, "work"], [16, "plaza"]],
@@ -1272,16 +1216,6 @@ const NPC_SCHEDULE := {
 	# ---- 고장 사람들 ----
 	# plaza 는 교진 마을 광장이라 여기 사람들은 안 간다. 대신 제 마을
 	# 한복판(square)에 모인다 — 하루가 제 고장 안에서 돈다
-	# 읍 사람들(S4c) — 관청에서 일하고 점심엔 장터 앞에 모인다. 장물아비는 낮에만 장터를 어슬렁댄다
-	"mayor_kang":   [[6, "home"], [9, "work"], [13, "square"], [14, "work"], [19, "home"]],
-	"chief_ha":     [[6, "home"], [8, "work"], [12, "square"], [13, "work"], [19, "home"]],
-	"judge_suh":    [[6, "home"], [9, "work"], [13, "square"], [15, "work"], [19, "home"]],
-	"pros_min":     [[6, "home"], [9, "work"], [12, "square"], [13, "work"], [19, "home"]],
-	"doctor_oh":    [[6, "home"], [9, "work"], [14, "square"], [15, "work"], [19, "home"]],
-	"manager_baek": [[6, "home"], [9, "work"], [13, "square"], [14, "work"], [19, "home"]],
-	"innkeeper_ok": [[6, "work"], [11, "square"], [12, "work"], [19, "home"]],
-	"cook_jang":    [[6, "work"], [10, "square"], [11, "work"], [19, "home"]],
-	"fence_gu":     [[6, "home"], [10, "square"], [17, "home"]],
 	"miller":     [[6, "work"], [12, "square"], [14, "work"], [19, "home"]],
 	"dyer":       [[7, "work"], [11, "square"], [13, "work"], [19, "home"]],
 	"brook":      [[8, "square"], [10, "falls"], [15, "square"], [18, "home"]],
@@ -1321,11 +1255,8 @@ const NPC_WANDER := 2   # 목적지에 닿은 뒤 어슬렁거리는 반경(타�
 
 const BUILDING_NAMES := {
 	"home": "집", "post": "우체국", "general": "잡화점", "smith": "대장간",
-	"lab": "연구소", "inn": "파출소", "library": "도서관",
+	"lab": "연구소", "inn": "여관", "library": "도서관",
 	"ranch": "목장 상회", "fish": "수산시장", "hall": "마을회관",
-	# 갈뫼읍(S4b)
-	"county": "군청", "police": "경찰서", "court": "법원", "prosecution": "검찰청",
-	"clinic": "보건소", "bank": "신협", "town_inn": "여관", "diner": "식당", "prison": "교도소",
 }
 # 폰트 규칙: 큰 글씨(14px+)=갈무리11, 작은 글씨(13px 이하·소형 오버레이)=갈무리9
 # 카메라 줌: 1보다 작을수록 더 넓게(작게) 보인다. 화면에 보이는 범위 = 960/줌 x 540/줌
@@ -1367,7 +1298,6 @@ func _ready() -> void:
 	npcmgr = _mount("npcs", "Npcs")
 	saveio = _mount("save_load", "SaveIO")
 	doing = _mount("player_actions", "PlayerActions")
-	society = _mount("society", "Society")
 
 	# 여기부터 몇 초쯤 화면이 굳는다 — 그동안 무엇을 하고 있는지 말해 준다.
 	# await 가 아니라 그 자리에서 다시 그리는 방식이라(loading.gd 참고),
@@ -1803,7 +1733,7 @@ func _load_textures() -> void:
 		tex[id] = load("res://assets/sprites/%s.png" % id)
 	# 고장 마을 사람들 — 여덟 장씩(걷기 6 + 초상 2)이라 이름을 하나씩
 	# 적으면 표만 마흔여덟 줄이 된다. 표에서 따라간다
-	for nid: String in HAMLET_NPC_IDS + SOCIETY_NPC_IDS + TOWN_NPC_IDS:
+	for nid: String in HAMLET_NPC_IDS:
 		for sfx: String in ["down_0", "down_1", "up_0", "up_1", "side_0", "side_1",
 				"portrait_normal", "portrait_happy"]:
 			var nn := "npc_%s_%s" % [nid, sfx]
@@ -1961,7 +1891,7 @@ const OBJECT_SCALES := {
 	"onsen": 2.0, "old_lookout": 2.0,
 	"barn": 1.0, "forage_berry": 1.7, "forage_herb": 1.7, "searock": 1.0,
 	"forage_shell": 1.2, "forage_coral": 1.3,
-	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6, "shop_stand": 2.6, "market_stall": 2.6,
+	"forage_trash": 1.25, "forage_glass": 1.1, "stall": 2.6,
 	# chief_hut은 여기 없다 — object_nodes.gd 가 sc=0.5로 못 박는다 (도트 밀도)
 	"forage_ring": 1.1, "forage_relic": 1.2, "trash_bin": 2.4,
 	"deco_fountain": 1.4, "deco_lamp": 1.15, "deco_bench": 1.15,

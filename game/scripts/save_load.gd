@@ -229,99 +229,6 @@ func _apply_save(d: Dictionary) -> void:
 		GameData.story8_phase = "done"
 	GameData.arrivals = d.get("arrivals", [])
 	GameData.npc_greeted = d.get("npc_greeted", [])
-	# 사회(직업·자리·대범함…) — _apply_me 가 빈 그릇 위에 저장된 값만 덮는다.
-	# 열쇠가 늘어도 옛 세이브가 깨지지 않고, 모르는 열쇠는 그냥 지나가며,
-	# JSON 이 float 로 돌려준 수는 int 로 되돌린다(D21). 게스트는 남의 me 를
-	# 읽지 않는다 — fresh_me 그대로라 사회 진입점이 전부 첫 줄에서 돌아간다(D18)
-	if not Net.is_guest():
-		GameData.me = GameData._apply_me(d.get("me", {}))
-	# 세계 키 — 옛 세이브엔 없어 society_v 0 · 자리와 지갑은 빈 채(전부 기본값).
-	# 손댄 세이브의 이상한 모양은 여기서 걸러 매일 아침 하루 넘김이 죽지 않게 한다.
-	# 세이브의 판(d.society_v, 옛 세이브는 0)은 여기서 읽고 버린다 — 적용이 끝난 메모리의
-	# 상태는 이제 현재 판이다(아래). 옛 판을 그대로 들고 있으면 이 세션의 채용·지갑이
-	# 판 0 으로 다시 저장돼, 판으로 마이그레이션을 가르는 날 S1 세이브를 S0 로 오판한다
-	var seats_in: Variant = d.get("seats", {})
-	GameData.seats = seats_in if typeof(seats_in) == TYPE_DICTIONARY else {}
-	GameData.npc_wallet = {}
-	var wallet_in: Variant = d.get("npc_wallet", {})
-	if typeof(wallet_in) == TYPE_DICTIONARY:
-		for wk in wallet_in:
-			GameData.npc_wallet[str(wk)] = int(wallet_in[wk])
-	# 정부(S2a) — 옛 세이브엔 없어 예산 2,000 · 사업 없음으로 시작한다
-	var gb: Variant = d.get("gov_budget", {})
-	GameData.gov_budget = {"kyojin": int(gb.get("kyojin", 2000)) if gb is Dictionary else 2000,
-		"town": int(gb.get("town", 20000)) if gb is Dictionary else 20000}
-	var gd: Variant = d.get("gov_done", [])
-	GameData.gov_done = []
-	if gd is Array:
-		for pid in gd:
-			GameData.gov_done.append(str(pid))
-	GameData.gov_building = str(d.get("gov_building", ""))
-	GameData.gov_tax_season = int(d.get("gov_tax_season", 0))
-	var gl: Variant = d.get("gov_log", [])
-	GameData.gov_log = gl if gl is Array else []
-	# 읍 살림(S4e)
-	var gdt: Variant = d.get("gov_debt", {})
-	GameData.gov_debt = {"town": int(gdt.get("town", 0)) if gdt is Dictionary else 0}
-	var tl: Variant = d.get("town_log", [])
-	GameData.town_log = tl if tl is Array else []
-	GameData.town_building = str(d.get("town_building", ""))
-	GameData.town_done = []
-	var tdn: Variant = d.get("town_done", [])
-	if tdn is Array:
-		for pid_t in tdn:
-			GameData.town_done.append(str(pid_t))
-	GameData.town_austerity_lv = int(d.get("town_austerity_lv", 0))
-	# 생성 NPC(S4d) — 씨앗으로 다시 짓고 here·since 만 세이브에서
-	GameData.gen_seed = int(d.get("gen_seed", 0))
-	GameData.gen_npcs = {}
-	GameData.ensure_gen_npcs(d.get("gen_npcs", {}))
-	# 갈뫼읍(S4b) — 발견 여부와 주택 예약
-	GameData.town_open = bool(d.get("town_open", false))
-
-	GameData.tax_seize_due = 0
-	# 파출소(S2b) — 사건은 stage 문자열만 믿고 수는 int 로 되돌린다
-	var cs: Variant = d.get("cases", [])
-	GameData.cases = []
-	if cs is Array:
-		for c in cs:
-			if c is Dictionary:
-				# 읍 사건(S4d)의 region·heat·charged_day·indicted_day 까지 — 수는 int 로
-				GameData.cases.append({"id": int(c.get("id", 0)), "crime": str(c.get("crime", "")),
-					"day": int(c.get("day", 0)), "suspect": str(c.get("suspect", "")),
-					"victim": str(c.get("victim", "")), "witness": str(c.get("witness", "")),
-					"evidence": int(c.get("evidence", 0)), "stage": str(c.get("stage", "closed")),
-					"closed_by": str(c.get("closed_by", "")), "deadline": int(c.get("deadline", 0)),
-					"region": str(c.get("region", "kyojin")), "heat": int(c.get("heat", 1)),
-					"charged_day": int(c.get("charged_day", 0)), "indicted_day": int(c.get("indicted_day", 0)),
-					# 내가 피고인 읍 사건(S4f) — 자수·뇌물·거른 재판·본 사람·물건값
-					"surrender": bool(c.get("surrender", false)), "bribe": bool(c.get("bribe", false)),
-					"skips": int(c.get("skips", 0)), "seen": int(c.get("seen", 0)),
-					"others": int(c.get("others", 0)), "value": int(c.get("value", 0))})
-	GameData.case_seq = int(d.get("case_seq", 0))
-	# 대면 범죄(S5a) — 죽은 이와 누운 이
-	GameData.dead = []
-	var dead_in: Variant = d.get("dead", [])
-	if dead_in is Array:
-		for dk in dead_in:
-			GameData.dead.append(str(dk))
-	GameData.grudges = []
-	var gr_in: Variant = d.get("grudges", [])
-	if gr_in is Array:
-		for gr in gr_in:
-			if gr is Dictionary:
-				GameData.grudges.append({"id": str(gr.get("id", "")), "day": int(gr.get("day", 0))})
-	GameData.npc_down = {}
-	var down_in: Variant = d.get("npc_down", {})
-	if down_in is Dictionary:
-		for nk in down_in:
-			GameData.npc_down[str(nk)] = int(down_in[nk])
-	GameData.npc_greed_adj = {}
-	var ga: Variant = d.get("npc_greed_adj", {})
-	if ga is Dictionary:
-		for gk in ga:
-			GameData.npc_greed_adj[str(gk)] = float(ga[gk])
-	GameData.society_v = 1   # 메모리의 상태는 이제 현재 판이다
 	# ---- 저장은 하는데 **읽지 않던** 여덟 개 ----
 	#
 	# build_save 는 이것들을 꼬박꼬박 적어 왔고 멀티 동기화(apply_stats)도
@@ -440,7 +347,6 @@ func _apply_save(d: Dictionary) -> void:
 	for c in d.get("explored", []):
 		GameData.explored[Vector2i(int(c[0]), int(c[1]))] = true
 	GameData.trees_chopped = int(d.get("trees_chopped", 0))
-	GameData.things_built = int(d.get("things_built", 0))
 	GameData.u_intro_state = int(d.get("u_intro", 0))
 	GameData.story_rock_state = int(d.get("rock_state", 0))
 	GameData.story_gates_left = int(d.get("gates_left", 0))
@@ -588,15 +494,6 @@ func _apply_save(d: Dictionary) -> void:
 	var pos_scale := float(m.TILE) / float(d.get("tile", 16))
 	m.player.position = Vector2(float(d.player[0]), float(d.player[1])) * pos_scale
 
-	# 호칭 기준선은 호감도까지 다 읽은 뒤에 잡는다 — 그 전에 잡으면 첫 아침마다 거짓 알림(D9).
-	# 자유직 통계(mob_kills·recipes_cooked·forage_caught)도 affinity 뒤에 읽히므로
-	# 그것까지 다 지난 여기, grid_cells 분기 앞이 가장 이른 안전한 자리다.
-	# 목장주 호칭 재료(animals_now)는 폴링이 아니라 여기서 먼저 채운다 — society._process 는
-	# 반 초 뒤에야 도는데 _ready 안의 로드는 그 전이라, 가축이 여섯인 세이브가 부팅마다
-	# 「새로 온 사람」으로 기준선이 박혀 첫 아침 결산에 거짓 「목장주」 줄이 떴다
-	GameData.animals_now = m.animals.size()
-	GameData.society_loaded()
-
 	# ---- 밭 상태 ----
 	#
 	# 새 형식은 **사람이 바꾼 칸만** 담는다. 세계가 448x264 로 넓어지면서
@@ -698,10 +595,11 @@ func _apply_save(d: Dictionary) -> void:
 		m.worldgen._migrate_farm_layout()
 		# 새터말(S3b)이 생기기 전 세이브 — 초원의 빈 집터 여덟을 깔아 준다(팻말 노드는 _spawn_objects 가)
 		m.worldgen.ensure_meadow_plots(false)
-		# 갈뫼읍(S4b)이 생기기 전 세이브 — 읍을 세워 준다(위에서 걷힌 가로등도 여기서 되살아난다)
-		m.worldgen.ensure_town(false)
 	# 회관 공동 프로젝트의 가로등·벤치는 위에서 걷혔다 — 완성 기록대로 되살린다
 	m.village.restore_hall_project_deco()
+	# 과수원(S6a) — 옛 마을 너머가 열린 세이브면 사과나무 묘목이 잡화점에 있어야 한다
+	if GameData.story4_phase == "done":
+		m.story.unlock_orchard()
 	# ---- 메인 스토리 12 (숲의 연금술사) ----
 	GameData.story12_phase = str(d.get("story12_phase", ""))
 	GameData.story12_heard = Array(d.get("story12_heard", []))

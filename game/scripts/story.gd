@@ -2768,8 +2768,19 @@ func _end_story4() -> void:
 		GameData.plot3_quest = "make"
 		GameData.plot3_made = 0
 		m.hud.quest_start_toast("이장의 부탁 — 새 이웃의 자리")
+	unlock_orchard(true)
 	m.queue_redraw()
 	m.saveio.save_now()
+
+
+# 과수원(S6a) — 마을이 옛 경계 너머로 넓어지면 잡화점에 사과나무 묘목이 들어온다.
+# 옛 세이브를 열 때도 부른다(말 없이). 이미 있으면 아무것도 안 한다
+func unlock_orchard(tell := false) -> void:
+	if GameData.shop_seeds.has("apple"):
+		return
+	GameData.shop_seeds.append("apple")
+	if tell:
+		m.hud.show_message("잡화점에 사과나무 묘목이 들어온다.", 4.0)
 
 
 # ---- 제4장 서브 퀘스트: 새 이웃을 위한 빈 집터 셋 ----
@@ -3105,13 +3116,6 @@ func _start_movein_dialog(nid: String) -> void:
 				"portrait": m.tex["npc_merchant_portrait_happy"]},
 			{"text": "「씨앗이든 뭐든 필요하면 들러!\n좋은 물건 잔뜩 갖다 놨으니까. 잘 부탁해~」",
 				"portrait": m.tex["npc_merchant_portrait_happy"]},
-		]
-	elif nid == "officer_park":
-		# 읍에서 내려온 선임 순경 — 해요체 인사말은 이 사람 입이 아니다
-		entries = [
-			{"text": "「교진 파출소에 부임한 박 순경일세.\n읍에서 내려왔네.」"},
-			{"text": "「문을 안 잠그는 마을이라 들었네.\n그래도 밤길은 내가 돌지.」"},
-			{"text": "「일 있으면 파출소로 오게.\n없는 게 제일 좋고.」"},
 		]
 	else:
 		entries = [
@@ -5854,7 +5858,10 @@ func _settler_depart(nid: String, silent: bool) -> void:
 	if GameData.settler_homes.has(nid):
 		GameData.empty_houses.append(GameData.settler_homes[nid])
 		GameData.settler_homes.erase(nid)
-	m.npcmgr.remove_npc(nid)
+	for n in m.npcs.duplicate():
+		if n.id == nid:
+			m.npcs.erase(n)
+			n.queue_free()
 	var nm := GameData.npc_name(nid)
 	if silent:
 		GameData.items["farewell_letter"] = \

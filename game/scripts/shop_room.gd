@@ -64,13 +64,12 @@ const ROOMS := {
 		"hint": "우체부 아저씨가 편지를 정리하고 있다.",
 	},
 	# ---- 거래 창 대신 제 나름의 기능을 가진 방들 ----
-	# 파출소(사회 S2b) — 여관 부지를 물려받았다. 뒤쪽 간이침대(beds)는 그대로 — 파출소에도 침상은 있다
 	"inn": {
-		"name": "파출소", "keeper": "officer_park",
-		"wall": Color(0.3, 0.33, 0.42), "floor": Color(0.5, 0.52, 0.58),
-		"counter": Color(0.32, 0.34, 0.44), "deco": "beds",
-		"tab": "", "tabs": [], "action": "police",
-		"hint": "박 순경이 순찰 일지를 적고 있다.",
+		"name": "여관", "keeper": "chief",
+		"wall": Color(0.44, 0.3, 0.3), "floor": Color(0.6, 0.44, 0.38),
+		"counter": Color(0.48, 0.32, 0.28), "deco": "beds",
+		"tab": "", "tabs": [], "action": "rest",
+		"hint": "한숨 돌리고 간다 (100G, 체력 회복)",
 	},
 	"lab": {
 		"name": "연구소", "keeper": "merchant",
@@ -85,71 +84,6 @@ const ROOMS := {
 		"counter": Color(0.44, 0.34, 0.22), "deco": "books",
 		"tab": "", "tabs": [], "action": "read",
 		"hint": "할아버지의 연구를 뒤쫓는다 (다음 전설 재료 힌트)",
-	},
-	# ---- 갈뫼읍(S4b·S4c) — 관청마다 우두머리가 앉아 있다. 창구 E 는 기관직 채용·근무(counter_menu), 아니면 한마디 ----
-	"county": {
-		"name": "군청", "keeper": "mayor_kang",
-		"wall": Color(0.36, 0.38, 0.46), "floor": Color(0.62, 0.62, 0.66),
-		"counter": Color(0.4, 0.4, 0.48), "deco": "town",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "긴 복도에 창구가 늘어서 있다.",
-	},
-	# 교도소(S4g) — 사람 없는 방. 창구 E 가 곧 복역이다
-	"prison": {
-		"name": "교도소", "keeper": "",
-		"wall": Color(0.3, 0.3, 0.33), "floor": Color(0.42, 0.42, 0.45),
-		"counter": Color(0.27, 0.27, 0.3), "deco": "beds",
-		"tab": "", "tabs": [], "action": "prison",
-		"hint": "쇠창살 너머로 잿빛 벌판이 보인다.",
-	},
-	"police": {
-		"name": "경찰서", "keeper": "chief_ha",
-		"wall": Color(0.28, 0.31, 0.42), "floor": Color(0.5, 0.52, 0.58),
-		"counter": Color(0.3, 0.32, 0.44), "deco": "beds",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "당직 책상 위에 일지가 펼쳐져 있다.",
-	},
-	"court": {
-		"name": "법원", "keeper": "judge_suh",
-		"wall": Color(0.42, 0.3, 0.28), "floor": Color(0.6, 0.5, 0.42),
-		"counter": Color(0.46, 0.32, 0.28), "deco": "town",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "법정 문이 닫혀 있다. 순회 재판일엔 판사가 교진에 가 있다.",
-	},
-	"prosecution": {
-		"name": "검찰청", "keeper": "pros_min",
-		"wall": Color(0.34, 0.34, 0.36), "floor": Color(0.56, 0.56, 0.58),
-		"counter": Color(0.38, 0.38, 0.4), "deco": "town",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "서류 냄새가 난다.",
-	},
-	"clinic": {
-		"name": "보건소", "keeper": "doctor_oh",
-		"wall": Color(0.7, 0.74, 0.76), "floor": Color(0.82, 0.84, 0.86),
-		"counter": Color(0.62, 0.66, 0.7), "deco": "beds",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "약 냄새와 흰 커튼.",
-	},
-	"bank": {
-		"name": "신협", "keeper": "manager_baek",
-		"wall": Color(0.46, 0.42, 0.26), "floor": Color(0.68, 0.62, 0.42),
-		"counter": Color(0.52, 0.44, 0.26), "deco": "shelf",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "쇠창살 너머에 장부가 쌓여 있다.",
-	},
-	"town_inn": {
-		"name": "여관", "keeper": "innkeeper_ok",
-		"wall": Color(0.44, 0.34, 0.26), "floor": Color(0.64, 0.52, 0.4),
-		"counter": Color(0.48, 0.36, 0.26), "deco": "beds",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "이층으로 오르는 계단이 삐걱거린다.",
-	},
-	"diner": {
-		"name": "식당", "keeper": "cook_jang",
-		"wall": Color(0.5, 0.36, 0.24), "floor": Color(0.7, 0.56, 0.4),
-		"counter": Color(0.54, 0.38, 0.24), "deco": "crate",
-		"tab": "", "tabs": [], "action": "town",
-		"hint": "국솥에서 김이 오른다.",
 	},
 	"hall": {
 		"name": "마을회관", "keeper": "chief",
@@ -291,7 +225,6 @@ func close() -> void:
 	visible = false
 	room_id = ""
 	Sound.play_sfx("sfx_place")
-	main.society.on_room_closed()   # 수배 중이면 문 앞에 순경(S5h)
 
 
 func _def() -> Dictionary:
@@ -370,38 +303,23 @@ func _at_counter() -> bool:
 func _try_interact() -> bool:
 	var si := _shelf_near()
 	if si >= 0:
-		# 대범해진 사람에게는 선반 앞에 「슬쩍한다」가 먼저 뜬다 — 그 아래에서는 false 를
-		# 돌려 사려는 사람에게 클릭 하나를 더 시키지 않는다 (S1 · D13)
-		if main.society.shelf_menu(si):
-			return true
 		# 선반에서 산다 — 그 카테고리의 물건만 진열된다
 		main.shop.open("buy", ["buy"],
 			"잡화점 — %s" % str(SHELVES[si][1]), str(SHELVES[si][0]))
 		return true
 	if _at_counter():
-		# 이 방에 고용됐거나 채용될 수 있으면 계산대 E 는 일자리 메뉴가 먼저다 —
-		# 그 첫 버튼 「가게 일」이 counter_default 로 돌아온다. 그 밖(샌드박스 포함)에는
-		# false 라 계산대 흐름이 한 줄도 안 바뀐다 (S1 · D2)
-		if main.society.counter_menu(room_id):
-			return true
-		counter_default()
+		var d := _def()
+		if str(d.get("action", "")) != "":
+			main.room_action(str(d.action))   # 여관·연구소·도서관
+		elif room_id == "general":
+			# 만수에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
+			main.village.open_merchant_counter()
+		elif str(d.tab) == "":
+			main.hud.show_message(str(d.hint), 4.0)
+		else:
+			main.shop.open(str(d.tab), d.tabs, str(d.name))
 		return true
 	return false
-
-
-# 계산대의 본래 흐름 — 여관·연구소·도서관 행동 / 만수의 인사 메뉴 / 거래창.
-# society.counter_menu 의 「가게 일」이 여기로 돌아오므로 따로 떼어 두었다 (동작 무변)
-func counter_default() -> void:
-	var d := _def()
-	if str(d.get("action", "")) != "":
-		main.room_action(str(d.action))   # 여관·연구소·도서관
-	elif room_id == "general":
-		# 만수에게 말을 걸면 인사말 + 선택지 메뉴 (판매/대화/퀘스트)
-		main.village.open_merchant_counter()
-	elif str(d.tab) == "":
-		main.hud.show_message(str(d.hint), 4.0)
-	else:
-		main.shop.open(str(d.tab), d.tabs, str(d.name))
 
 
 # 가게 안 안내 — 물건은 상호작용키(E), 사람은 대화키(F)
